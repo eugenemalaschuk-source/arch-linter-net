@@ -31,10 +31,17 @@ public sealed partial class ExplainCommandHandlerTests
         {
             Assert.That(expansion.GetProperty("sets")[0].GetProperty("name").GetString(), Is.EqualTo("modules"));
             Assert.That(contract.GetProperty("authoredContractId").GetString(), Is.EqualTo("modules-no-infrastructure"));
+            Assert.That(contract.GetProperty("exclusions")[0].GetProperty("matched").GetBoolean(), Is.False);
+            Assert.That(contract.GetProperty("inclusions")[0].GetProperty("source").GetString(),
+                Is.EqualTo("Acme.Modules.Orders"));
             Assert.That(instance.GetProperty("source").GetString(), Is.EqualTo("Acme.Modules.Orders"));
             Assert.That(instance.GetProperty("sourceSet").GetString(), Is.EqualTo("modules"));
             Assert.That(instance.GetProperty("selector").GetString(), Is.EqualTo("Acme.Modules.*"));
             Assert.That(contract.GetProperty("policyLocation").GetProperty("sourcePath").GetString(),
+                Is.EqualTo("architecture/parts/modules.yml"));
+            Assert.That(instance.GetProperty("authoredContractPolicyLocation").GetProperty("sourcePath").GetString(),
+                Is.EqualTo("architecture/parts/modules.yml"));
+            Assert.That(instance.GetProperty("sourceSetReferencePolicyLocation").GetProperty("sourcePath").GetString(),
                 Is.EqualTo("architecture/parts/modules.yml"));
         });
     }
@@ -56,8 +63,57 @@ public sealed partial class ExplainCommandHandlerTests
         Assert.Multiple(() =>
         {
             Assert.That(console.OutputText, Does.Contain("[modules-no-infrastructure] set 'modules' -> Acme.Modules.Orders"));
+            Assert.That(console.OutputText,
+                Does.Contain("Source expansion exclusion: [modules-no-infrastructure] stale sources -> Acme.Modules.Legacy"));
             Assert.That(console.OutputText, Does.Contain("architecture/parts/modules.yml"));
         });
+    }
+
+    [Test]
+    public void Explain_SelectorParticipation_ReportsEffectiveInclusionAndStaleExclusion()
+    {
+        var runtime = new ExplainStubRuntime
+        {
+            Outcome = new ArchitectureExplainOutcome("A", "B", ["A", "B"], ["rule"])
+            {
+                SelectorParticipation =
+                [
+                    new ArchitectureSubtractiveMatcherParticipation(
+                        "controllers", "controllers", "types_matching", null, true)
+                    {
+                        Kind = ArchitectureSelectorParticipationKind.Inclusion,
+                        Mode = ArchitectureSelectorParticipationMode.Strict
+                    },
+                    new ArchitectureSubtractiveMatcherParticipation(
+                        "controllers", "controllers", "exclude_types_matching", 0, true)
+                    {
+                        Mode = ArchitectureSelectorParticipationMode.Audit,
+                        EvaluationFailed = true
+                    }
+                ]
+            }
+        };
+        var console = new RecordingCliConsole();
+
+        Handler(runtime, console).Execute(Options(format: "json"));
+
+        using JsonDocument document = JsonDocument.Parse(console.OutputText);
+        JsonElement participation = document.RootElement.GetProperty("selectorParticipation");
+        Assert.Multiple(() =>
+        {
+            Assert.That(participation[0].GetProperty("kind").GetString(), Is.EqualTo("inclusion"));
+            Assert.That(participation[0].GetProperty("index").ValueKind, Is.EqualTo(JsonValueKind.Null));
+            Assert.That(participation[0].GetProperty("mode").GetString(), Is.EqualTo("strict"));
+            Assert.That(participation[0].GetProperty("matched").GetBoolean(), Is.True);
+            Assert.That(participation[1].GetProperty("kind").GetString(), Is.EqualTo("exclusion"));
+            Assert.That(participation[1].GetProperty("mode").GetString(), Is.EqualTo("audit"));
+            Assert.That(participation[1].GetProperty("matched").GetBoolean(), Is.True);
+            Assert.That(participation[1].GetProperty("evaluationFailed").GetBoolean(), Is.True);
+        });
+
+        Handler(runtime, console).Execute(Options(format: "human"));
+        Assert.That(console.OutputText,
+            Does.Contain("Selector participation: [controllers] audit exclusion exclude_types_matching[0] matched; evaluation failed"));
     }
 
     [Test]
@@ -218,9 +274,38 @@ public sealed partial class ExplainCommandHandlerTests
                             "Acme.Modules.Orders",
                             "modules",
                             "Acme.Modules.*")
+                        {
+                            PolicyLocation = location,
+                            AuthoredContractPolicyLocation = location,
+                            SourceSetReferencePolicyLocation = location
+                        }
                     ])
                 {
-                    PolicyLocation = location
+                    PolicyLocation = location,
+                    Inclusions =
+                    [
+                        new ArchitectureExpandedContractInstance(
+                            "modules-no-infrastructure/acme-modules-orders",
+                            "Acme.Modules.Orders",
+                            "modules",
+                            "Acme.Modules.*")
+                        {
+                            PolicyLocation = location,
+                            AuthoredContractPolicyLocation = location,
+                            SourceSetReferencePolicyLocation = location
+                        }
+                    ],
+                    Exclusions =
+                    [
+                        new ArchitectureExpandedContractExclusion(
+                            "Acme.Modules.Legacy",
+                            null,
+                            "Acme.Modules.Legacy",
+                            false)
+                        {
+                            PolicyLocation = location
+                        }
+                    ]
                 }
             ]);
     }

@@ -5,20 +5,23 @@ namespace ArchLinterNet.Core.Reporting;
 
 public sealed partial class ArchitectureSarifFormatter
 {
+    private const string PolicyLocationKey = "policy_location";
+
     /// <summary>
     /// Additive overload carrying the resolved source-set expansion, so a SARIF consumer can prove
     /// which sources an authored contract expanded to without parsing display text. Exists
     /// alongside the prior overloads rather than extending them, matching the pattern used for
     /// build-state preflight and coverage summaries.
     /// </summary>
-    public string FormatResultAsSarif(
+    public string FormatResultAsSarif( // NOSONAR: each parameter represents a semantically distinct section of the SARIF payload; grouping would obscure the data contract
         string mode,
         IReadOnlyCollection<ArchitectureViolation> violations,
         IReadOnlyCollection<string> cycles,
         IReadOnlyCollection<BuildStatePreflightDiagnostic> preflightDiagnostics,
         IReadOnlyCollection<ArchitectureCoverageSummary> coverageSummaries,
         ArchitectureSourceExpansionInventory sourceExpansion,
-        string toolVersion)
+        string toolVersion,
+        IReadOnlyCollection<ArchitectureSubtractiveMatcherParticipation>? subtractiveMatcherParticipation = null)
     {
         return FormatResultAsSarifCore(
             mode,
@@ -27,17 +30,19 @@ public sealed partial class ArchitectureSarifFormatter
             toolVersion,
             preflightDiagnostics,
             coverageSummaries,
-            sourceExpansion);
+            sourceExpansion,
+            subtractiveMatcherParticipation);
     }
 
-    public static string FormatResultAsSarif(
+    public static string FormatResultAsSarif( // NOSONAR: each parameter represents a semantically distinct section of the SARIF payload; grouping would obscure the data contract
         string mode,
         IReadOnlyCollection<ArchitectureViolation> violations,
         IReadOnlyCollection<ArchitectureCycleFinding> cycles,
         IReadOnlyCollection<BuildStatePreflightDiagnostic> preflightDiagnostics,
         IReadOnlyCollection<ArchitectureCoverageSummary> coverageSummaries,
         ArchitectureSourceExpansionInventory sourceExpansion,
-        string toolVersion)
+        string toolVersion,
+        IReadOnlyCollection<ArchitectureSubtractiveMatcherParticipation>? subtractiveMatcherParticipation = null)
     {
         return FormatResultAsSarifCore(
             mode,
@@ -47,7 +52,8 @@ public sealed partial class ArchitectureSarifFormatter
             toolVersion,
             preflightDiagnostics,
             coverageSummaries,
-            sourceExpansion);
+            sourceExpansion,
+            subtractiveMatcherParticipation);
     }
 
     internal static Dictionary<string, object?> FormatSourceExpansion(ArchitectureSourceExpansionInventory inventory)
@@ -61,7 +67,7 @@ public sealed partial class ArchitectureSarifFormatter
                 ["resolved_sources"] = set.ResolvedSources,
                 ["optional"] = set.Optional,
                 ["reason"] = set.Reason,
-                ["policy_location"] = FormatSourceExpansionLocation(set.PolicyLocation)
+                [PolicyLocationKey] = FormatSourceExpansionLocation(set.PolicyLocation)
             }).ToArray(),
             ["contracts"] = inventory.Contracts.Select(expansion => (object)new Dictionary<string, object?>
             {
@@ -73,16 +79,59 @@ public sealed partial class ArchitectureSarifFormatter
                 ["source_sets"] = expansion.SetNames,
                 ["optional_empty"] = expansion.OptionalEmpty,
                 ["optional_reason"] = expansion.OptionalReason,
-                ["policy_location"] = FormatSourceExpansionLocation(expansion.PolicyLocation),
+                [PolicyLocationKey] = FormatSourceExpansionLocation(expansion.PolicyLocation),
+                ["exclusions"] = expansion.Exclusions.Select(exclusion => (object)new Dictionary<string, object?>
+                {
+                    ["source"] = exclusion.Source,
+                    ["source_set"] = exclusion.SetName,
+                    ["selector"] = exclusion.Selector,
+                    ["matched"] = exclusion.Matched,
+                    ["optional_empty"] = exclusion.OptionalEmpty,
+                    ["optional_reason"] = exclusion.OptionalReason,
+                    [PolicyLocationKey] = FormatSourceExpansionLocation(exclusion.PolicyLocation)
+                }).ToArray(),
+                ["inclusions"] = expansion.Inclusions.Select(instance => (object)new Dictionary<string, object?>
+                {
+                    ["contract_id"] = instance.ContractId,
+                    ["source"] = instance.Source,
+                    ["source_set"] = instance.SetName,
+                    ["selector"] = instance.Selector,
+                    ["optional_empty"] = instance.OptionalEmpty,
+                    ["optional_reason"] = instance.OptionalReason,
+                    [PolicyLocationKey] = FormatSourceExpansionLocation(instance.PolicyLocation),
+                    ["authored_contract_policy_location"] = FormatSourceExpansionLocation(instance.AuthoredContractPolicyLocation),
+                    ["source_set_reference_policy_location"] = FormatSourceExpansionLocation(instance.SourceSetReferencePolicyLocation)
+                }).ToArray(),
                 ["instances"] = expansion.Instances.Select(instance => (object)new Dictionary<string, object?>
                 {
                     ["contract_id"] = instance.ContractId,
                     ["source"] = instance.Source,
                     ["source_set"] = instance.SetName,
-                    ["selector"] = instance.Selector
+                    ["selector"] = instance.Selector,
+                    [PolicyLocationKey] = FormatSourceExpansionLocation(instance.PolicyLocation),
+                    ["authored_contract_policy_location"] = FormatSourceExpansionLocation(instance.AuthoredContractPolicyLocation),
+                    ["source_set_reference_policy_location"] = FormatSourceExpansionLocation(instance.SourceSetReferencePolicyLocation)
                 }).ToArray()
             }).ToArray()
         };
+    }
+
+    internal static object[] FormatSubtractiveMatcherParticipation(
+        IReadOnlyCollection<ArchitectureSubtractiveMatcherParticipation> participation)
+    {
+        return participation.Select(p => (object)new Dictionary<string, object?>
+        {
+            ["contract_id"] = p.ContractId,
+            ["contract_name"] = p.ContractName,
+            ["mode"] = p.Mode.ToString().ToLowerInvariant(),
+            ["field"] = p.Field,
+            ["index"] = p.Index,
+            ["matched"] = p.Matched,
+            ["evaluation_failed"] = p.EvaluationFailed,
+            ["kind"] = p.Kind == ArchitectureSelectorParticipationKind.Inclusion ? "inclusion" : "exclusion",
+            ["stale_exclusion"] = p.IsStaleExclusion,
+            [PolicyLocationKey] = FormatSourceExpansionLocation(p.PolicyLocation)
+        }).ToArray();
     }
 
     private static Dictionary<string, object?>? FormatSourceExpansionLocation(ArchitecturePolicySourceLocation? location)
@@ -100,6 +149,7 @@ public sealed partial class ArchitectureSarifFormatter
     {
         ArchitectureContractExpansionKind.FanOut => "fan_out",
         ArchitectureContractExpansionKind.InlineUnion => "inline_union",
+        ArchitectureContractExpansionKind.ContainerSet => "container_set",
         _ => throw new ArgumentOutOfRangeException(nameof(kind), kind, null)
     };
 }

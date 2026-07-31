@@ -37,9 +37,46 @@ public sealed record ArchitectureSourceSetResolution(
 
 public sealed record ArchitectureExpandedContractInstance(
     string ContractId,
-    string Source,
+    string? Source,
     string? SetName,
-    string Selector);
+    string? Selector)
+{
+    // The authored location this instance's source came from: the matching `sources[i]` entry for
+    // an explicit source, or the referenced source set's own declaration for a resolved member/glob.
+    public ArchitecturePolicySourceLocation? PolicyLocation { get; init; }
+
+    // The root of the authored contract. This remains distinct from PolicyLocation when a source
+    // comes from an imported set, so consumers can show both the rule that consumes the source and
+    // the concrete set selector that produced it.
+    public ArchitecturePolicySourceLocation? AuthoredContractPolicyLocation { get; init; }
+
+    // The precise `source_sets[i]` reference on the authored contract. Null for explicit sources
+    // and container-template expansion, whose source has no named-set reference.
+    public ArchitecturePolicySourceLocation? SourceSetReferencePolicyLocation { get; init; }
+
+    // An optional source-set reference is a positive authored selector even when it resolves no
+    // concrete source. It therefore belongs in Inclusions, with its own source_sets[i] provenance,
+    // rather than being collapsed into the expansion-level optional-empty summary.
+    public bool OptionalEmpty { get; init; }
+
+    public string OptionalReason { get; init; } = string.Empty;
+}
+
+public sealed record ArchitectureExpandedContractExclusion(
+    string? Source,
+    string? SetName,
+    string? Selector,
+    bool Matched)
+{
+    public ArchitecturePolicySourceLocation? PolicyLocation { get; init; }
+
+    // True when this record represents a whole `exclude_source_sets` reference that resolved to no
+    // source (an `optional: true` set), so it carries no concrete Source/Selector of its own but
+    // must still be observable evidence rather than silently vanishing from the exclusion list.
+    public bool OptionalEmpty { get; init; }
+
+    public string OptionalReason { get; init; } = string.Empty;
+}
 
 // Fan-out contracts become one executable contract per resolved source. List-shaped consumers
 // keep one executable contract and union set values into one of its selectors; recording that as
@@ -47,7 +84,12 @@ public sealed record ArchitectureExpandedContractInstance(
 public enum ArchitectureContractExpansionKind
 {
     FanOut,
-    InlineUnion
+    InlineUnion,
+
+    // A layer_template contract's `containers` minus `exclude_containers`, computed once at load
+    // time exactly like source-set expansion, so exclude_containers gets the same typed
+    // matched/stale participation evidence and reuses the same coverage/explain/JSON/SARIF wiring.
+    ContainerSet
 }
 
 public sealed record ArchitectureContractExpansion(
@@ -70,6 +112,15 @@ public sealed record ArchitectureContractExpansion(
     public string OptionalReason { get; init; } = string.Empty;
 
     public ArchitecturePolicySourceLocation? PolicyLocation { get; init; }
+
+    public IReadOnlyList<ArchitectureExpandedContractExclusion> Exclusions { get; init; } =
+        Array.Empty<ArchitectureExpandedContractExclusion>();
+
+    // Authored positive selector evidence before exclusions are applied.  `Instances` deliberately
+    // remains the executable, effective scope; keeping this separate preserves proof that a fully
+    // subtracted source/container was admitted by the positive selector in the first place.
+    public IReadOnlyList<ArchitectureExpandedContractInstance> Inclusions { get; init; } =
+        Array.Empty<ArchitectureExpandedContractInstance>();
 }
 
 public sealed class ArchitectureSourceExpansionInventory

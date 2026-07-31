@@ -26,14 +26,16 @@ public sealed partial class ArchitectureDiagnosticFormatter
         IReadOnlyCollection<PolicyConsistencyDiagnostic>? policyConsistencyFindings = null,
         IReadOnlyCollection<ArchitectureCoverageSummary>? coverageSummaries = null,
         IReadOnlyCollection<ArchitectureClassificationConflict>? classificationConflicts = null,
-        IReadOnlyCollection<ArchitectureClassificationMetadataFailure>? classificationMetadataFailures = null)
+        IReadOnlyCollection<ArchitectureClassificationMetadataFailure>? classificationMetadataFailures = null,
+        IReadOnlyCollection<ArchitectureSubtractiveMatcherParticipation>? subtractiveMatcherParticipation = null)
     {
         return BuildCiArtifactsJson(new CiArtifactsRequest(
             mode, passed, violations, cycles, classificationRoles, coverageFindings, unmatched,
             policyConsistencyFindings, coverageSummaries, cycleFindings, classificationConflicts,
             classificationMetadataFailures, classificationPathDeferred, preflightDiagnostics)
         {
-            SourceExpansion = sourceExpansion
+            SourceExpansion = sourceExpansion,
+            SubtractiveMatcherParticipation = subtractiveMatcherParticipation
         });
     }
 }

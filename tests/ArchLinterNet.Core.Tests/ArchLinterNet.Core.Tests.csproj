@@ -19,6 +19,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\ArchLinterNet.CEL\ArchLinterNet.CEL.csproj" />
+    <ProjectReference Include="..\..\src\ArchLinterNet.Cli\ArchLinterNet.Cli.csproj" ReferenceOutputAssembly="false" />
     <ProjectReference Include="..\..\src\ArchLinterNet.Core\ArchLinterNet.Core.csproj" />
     <ProjectReference Include="..\..\src\ArchLinterNet.Testing\ArchLinterNet.Testing.csproj" />
   </ItemGroup>

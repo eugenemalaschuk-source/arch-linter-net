@@ -46,7 +46,7 @@
       "layer": "declared layers keys",
       "project": "not supported — project sets accept explicit members only"
     },
-    "expansion": "Contracts referencing sets through sources/source_sets expand into one instance per resolved source, deduplicated and ordinally ordered, with instance id '<authored-id>/<normalized-source>' and a retained expansion origin (authored contract id, set name, exact selector). List-shaped fields use project_sets and allowed_only_in_assembly_sets, which union resolved members into the existing list instead of fanning out.",
+    "expansion": "Contracts referencing sets through sources/source_sets expand into one instance per resolved source, deduplicated and ordinally ordered, with instance id '<authored-id>/<normalized-source>' and a retained expansion origin (authored contract id, set name, exact selector). Compatible source-scoped families may additionally subtract exclude_sources/exclude_source_sets from that already-resolved universe, preserving matched/stale exclusion evidence in explain/JSON/SARIF. List-shaped fields use project_sets and allowed_only_in_assembly_sets, which union resolved members into the existing list instead of fanning out.",
     "failClosed": [
       "unknown set reference",
       "set kind that does not match the referencing field",
@@ -119,29 +119,29 @@
       "kind": "external-dependency",
       "strictGroup": "strict_external",
       "auditGroup": "audit_external",
-      "fields": ["name", "source", "sources", "source_sets", "forbidden", "ignored_violations", "reason"],
-      "validates": "A source layer does not reference forbidden vendor/framework dependency groups declared in external_dependencies. sources/source_sets (layer-kind sets) expand one authored contract into one instance per resolved source layer instead of declaring an exact source."
+      "fields": ["name", "source", "sources", "source_sets", "exclude_sources", "exclude_source_sets", "forbidden", "ignored_violations", "reason"],
+      "validates": "A source layer does not reference forbidden vendor/framework dependency groups declared in external_dependencies. sources/source_sets (layer-kind sets) expand one authored contract into one instance per resolved source layer instead of declaring an exact source; exclude_sources/exclude_source_sets subtract from that bounded resolved universe."
     },
     {
       "kind": "layer-template",
       "strictGroup": "strict_layer_templates",
       "auditGroup": "audit_layer_templates",
-      "fields": ["name", "id", "containers", "layers[].name", "layers[].optional", "exhaustive", "reason"],
-      "validates": "Reusable layer order contract applied to multiple namespace containers. Each container produces one concrete ordered-layer contract. Relative layer names are resolved by prepending the container namespace. Optional layers (layers[].optional: true) silently skip empty namespaces. When exhaustive is true, every immediate child namespace under the container that contains types must be mapped to a declared layer; unmapped sibling namespaces produce a violation."
+      "fields": ["name", "id", "containers", "exclude_containers", "layers[].name", "layers[].optional", "exhaustive", "reason"],
+      "validates": "Reusable layer order contract applied to multiple namespace containers. Each container produces one concrete ordered-layer contract unless exclude_containers subtracts it first. Relative layer names are resolved by prepending the container namespace. Optional layers (layers[].optional: true) silently skip empty namespaces. When exhaustive is true, every immediate child namespace under the container that contains types must be mapped to a declared layer; unmapped sibling namespaces produce a violation."
     },
     {
       "kind": "type-placement",
       "strictGroup": "strict_type_placement",
       "auditGroup": "audit_type_placement",
-      "fields": ["name", "id", "types_matching.name_suffix", "types_matching.name_prefix", "types_matching.namespace", "types_matching.layer", "types_matching.base_type", "types_matching.implements_interface", "types_matching.has_attribute", "must_reside_in_layers", "must_reside_in_namespaces", "must_reside_in_projects", "must_reside_in_assemblies", "required_name_suffix", "required_name_prefix", "forbidden_name_suffix", "forbidden_name_prefix", "ignored_violations", "reason"],
-      "validates": "A type selected by constrained matchers (name suffix/prefix, namespace, layer, base type, implemented interface, attribute) resides in a declared layer/namespace/project/assembly and/or carries a declared naming suffix/prefix. must_reside_in_projects resolves to assembly-name matching via project discovery, not physical .csproj-membership tracking. Requires at least one placement or naming expectation."
+      "fields": ["name", "id", "types_matching.name_suffix", "types_matching.name_prefix", "types_matching.namespace", "types_matching.layer", "types_matching.base_type", "types_matching.implements_interface", "types_matching.has_attribute", "exclude_types_matching", "must_reside_in_layers", "must_reside_in_namespaces", "must_reside_in_projects", "must_reside_in_assemblies", "required_name_suffix", "required_name_prefix", "forbidden_name_suffix", "forbidden_name_prefix", "ignored_violations", "reason"],
+      "validates": "A type selected by constrained matchers (name suffix/prefix, namespace, layer, base type, implemented interface, attribute) resides in a declared layer/namespace/project/assembly and/or carries a declared naming suffix/prefix. exclude_types_matching reuses the same matcher shape and subtracts matched types after inclusion. must_reside_in_projects resolves to assembly-name matching via project discovery, not physical .csproj-membership tracking. Requires at least one placement or naming expectation."
     },
     {
       "kind": "layout-conventions",
       "strictGroup": "strict_layout_conventions",
       "auditGroup": "audit_layout_conventions",
-      "fields": ["name", "id", "files_matching.folder_segment", "files_matching.namespace_segment", "files_matching.file_name_suffix", "files_matching.file_name_prefix", "files_matching.when", "require_type_kind", "forbid_type_kind", "required_name_suffix", "required_name_prefix", "forbidden_name_suffix", "forbidden_name_prefix", "require_type_name_matches_file_name", "require_matching_interface.name_prefix", "ignored_violations", "reason"],
-      "validates": "Source files selected by folder segment, namespace segment, and/or file-name prefix/suffix (files_matching, AND-combined, no regex) have their declared types checked against a required/forbidden type kind, required/forbidden naming suffix/prefix, file-name-matches-primary-type-name, and/or a matching-interface counterpart for every concrete (non-abstract) class. files_matching.when is an optional ArchLinter CEL Profile v1 predicate compiled against the same closed subject context shape as layers.<name>.selector.when, narrowing which declared types in an already-selected file are evaluated. Requires at least one files_matching selector field and at least one expectation. Record vs. class/struct classification and file/folder facts require analysis.source_roots to be configured; a contract needing that data reports a deterministic 'unavailable' diagnostic instead of silently passing when it is missing for the whole run or for an individual declared type."
+      "fields": ["name", "id", "files_matching.folder_segment", "files_matching.namespace_segment", "files_matching.file_name_suffix", "files_matching.file_name_prefix", "files_matching.when", "exclude_files_matching", "require_type_kind", "forbid_type_kind", "required_name_suffix", "required_name_prefix", "forbidden_name_suffix", "forbidden_name_prefix", "require_type_name_matches_file_name", "require_matching_interface.name_prefix", "ignored_violations", "reason"],
+      "validates": "Source files selected by folder segment, namespace segment, and/or file-name prefix/suffix (files_matching, AND-combined, no regex) have their declared types checked against a required/forbidden type kind, required/forbidden naming suffix/prefix, file-name-matches-primary-type-name, and/or a matching-interface counterpart for every concrete (non-abstract) class. exclude_files_matching reuses the same matcher shape and subtracts matched candidates before expectations, including its own when predicates. files_matching.when is an optional ArchLinter CEL Profile v1 predicate compiled against the same closed subject context shape as layers.<name>.selector.when, narrowing which declared types in an already-selected file are evaluated. Requires at least one files_matching selector field and at least one expectation. Record vs. class/struct classification and file/folder facts require analysis.source_roots to be configured; a contract needing that data reports a deterministic 'unavailable' diagnostic instead of silently passing when it is missing for the whole run or for an individual declared type."
     },
     {
       "kind": "public-api-surface",
@@ -177,6 +177,41 @@
       "auditGroup": "audit_composition",
       "fields": ["name", "id", "forbidden_apis", "allowed_only_in_layers", "allowed_only_in_namespaces", "allowed_only_in_projects", "allowed_only_in_assemblies", "allowed_only_in_assembly_sets", "ignored_violations", "reason"],
       "validates": "A type residing outside a declared composition boundary (allowed_only_in_layers/namespaces/projects/assemblies) does not call a forbidden composition-root/service-locator API (matched with the same call-pattern vocabulary as method-body contracts: exact member names, Type.Member names, fully qualified members, and namespace/type prefixes via forbidden_apis). Requires at least one forbidden_apis selector and at least one allowed_only_in_* composition boundary selector. Reflection/IL-based static detection of call sites only: does NOT validate runtime dependency-injection resolution and does not prove every service is registered correctly."
+    },
+    {
+      "kind": "package-dependency",
+      "strictGroup": "strict_package_dependency",
+      "auditGroup": "audit_package_dependency",
+      "fields": ["name", "id", "source", "sources", "source_sets", "exclude_sources", "exclude_source_sets", "forbidden", "dependency_depth", "ignored_violations", "reason"],
+      "validates": "A source project/assembly does not declare a PackageReference matching a forbidden packages group. sources/source_sets expand one authored contract into one instance per resolved source; exclude_sources/exclude_source_sets subtract from that bounded resolved universe before package evaluation."
+    },
+    {
+      "kind": "package-allow-only",
+      "strictGroup": "strict_package_allow_only",
+      "auditGroup": "audit_package_allow_only",
+      "fields": ["name", "id", "source", "sources", "source_sets", "exclude_sources", "exclude_source_sets", "allowed", "dependency_depth", "ignored_violations", "reason"],
+      "validates": "A source project/assembly declares only PackageReferences matching allowed packages groups. sources/source_sets expand one authored contract into one instance per resolved source; exclude_sources/exclude_source_sets subtract from that bounded resolved universe before allow-only evaluation."
+    },
+    {
+      "kind": "framework-dependency",
+      "strictGroup": "strict_framework_dependency",
+      "auditGroup": "audit_framework_dependency",
+      "fields": ["name", "id", "source", "sources", "source_sets", "exclude_sources", "exclude_source_sets", "forbidden", "ignored_violations", "reason"],
+      "validates": "A source project/assembly does not declare a FrameworkReference matching a forbidden framework_references group. sources/source_sets expand one authored contract into one instance per resolved source; exclude_sources/exclude_source_sets subtract from that bounded resolved universe before framework evaluation."
+    },
+    {
+      "kind": "framework-allow-only",
+      "strictGroup": "strict_framework_allow_only",
+      "auditGroup": "audit_framework_allow_only",
+      "fields": ["name", "id", "source", "sources", "source_sets", "exclude_sources", "exclude_source_sets", "allowed", "ignored_violations", "reason"],
+      "validates": "A source project/assembly declares only FrameworkReferences matching allowed framework_references groups. sources/source_sets expand one authored contract into one instance per resolved source; exclude_sources/exclude_source_sets subtract from that bounded resolved universe before allow-only evaluation."
+    },
+    {
+      "kind": "external-allow-only",
+      "strictGroup": "strict_external_allow_only",
+      "auditGroup": "audit_external_allow_only",
+      "fields": ["name", "id", "source", "sources", "source_sets", "exclude_sources", "exclude_source_sets", "allowed", "allowed_types", "ignored_violations", "reason"],
+      "validates": "A source layer references only explicitly allowed external dependency groups. sources/source_sets expand one authored contract into one instance per resolved source layer; exclude_sources/exclude_source_sets subtract from that bounded resolved universe before allow-only evaluation."
     },
     {
       "kind": "coverage",

@@ -25,6 +25,7 @@ public sealed class ArchitectureValidationResult
     public bool PreflightBlocked { get; }
     public string? Mode { get; }
     public IReadOnlyCollection<BaselineLifecycleEntry> BaselineLifecycleEntries { get; }
+    public IReadOnlyCollection<ArchitectureSubtractiveMatcherParticipation> SubtractiveMatcherParticipation { get; }
 
     public ArchitectureValidationResult(ArchitectureValidationResultParams @params)
     {
@@ -44,6 +45,8 @@ public sealed class ArchitectureValidationResult
         PreflightBlocked = @params.PreflightBlocked;
         Mode = @params.Mode;
         BaselineLifecycleEntries = @params.BaselineLifecycleEntries ?? Array.Empty<BaselineLifecycleEntry>();
+        SubtractiveMatcherParticipation = @params.SubtractiveMatcherParticipation
+            ?? Array.Empty<ArchitectureSubtractiveMatcherParticipation>();
         Findings = ArchitectureFindingMapper.Order(AllDiagnostics());
     }
 
@@ -180,4 +183,5 @@ public sealed record ArchitectureValidationResultParams(
     public bool PreflightBlocked { get; init; }
     public string? Mode { get; init; }
     public IReadOnlyCollection<BaselineLifecycleEntry>? BaselineLifecycleEntries { get; init; }
+    public IReadOnlyCollection<ArchitectureSubtractiveMatcherParticipation>? SubtractiveMatcherParticipation { get; init; }
 }

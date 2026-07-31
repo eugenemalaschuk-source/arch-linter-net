@@ -589,14 +589,14 @@ internal sealed class ReportCoordinator
             outcome.PolicyConsistencyConfig == "off" ? Array.Empty<PolicyConsistencyDiagnostic>() : outcome.PolicyConsistencyFindings,
             outcome.CoverageSummaries, outcome.ClassificationConflicts, outcome.ClassificationMetadataFailures,
             outcome.ClassificationRoles, outcome.ClassificationPathDeferred, outcome.PreflightDiagnostics,
-            outcome.SourceExpansion);
+            outcome.SourceExpansion, outcome.SubtractiveMatcherParticipation);
     }
 
     private string FormatSarifContent(string mode, ValidationOutcome outcome)
     {
         return _runtime.FormatResultAsSarif(
             mode, outcome.Violations, outcome.Cycles, outcome.CycleFindings, outcome.PreflightDiagnostics,
-            outcome.CoverageSummaries, outcome.SourceExpansion);
+            outcome.CoverageSummaries, outcome.SourceExpansion, outcome.SubtractiveMatcherParticipation);
     }
 
     private static string DispatchFormat(

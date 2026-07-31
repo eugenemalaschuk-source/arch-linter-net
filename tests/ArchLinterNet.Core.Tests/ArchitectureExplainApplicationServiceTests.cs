@@ -325,4 +325,50 @@ public sealed class ArchitectureExplainApplicationServiceTests
             Directory.Delete(Path.GetDirectoryName(policyPath)!, true);
         }
     }
+
+    [Test]
+    public void Explain_TypePlacementSelectors_ExposeEffectiveRuntimeScope()
+    {
+        string policyPath = WritePolicy("""
+            version: 1
+            name: Test
+
+            analysis:
+              target_assemblies: [ArchLinterNet.Core]
+
+            contracts:
+              strict_type_placement:
+                - id: execution-types
+                  name: execution-types
+                  types_matching:
+                    namespace: ArchLinterNet.Core.Execution
+                  exclude_types_matching:
+                    - namespace: Does.Not.Exist
+                  required_name_suffix: NeverMatches
+            """);
+
+        try
+        {
+            using ArchitectureEngine engine = CreateEngine();
+
+            ArchitectureExplainOutcome outcome = engine.Explain(new ArchitectureExplainRequest
+            {
+                PolicyPath = policyPath,
+                Source = ExecutionNamespace,
+                Target = ContractsNamespace,
+            });
+
+            Assert.That(
+                outcome.SelectorParticipation.Select(item => (item.Kind, item.Field, item.Matched, item.IsStaleExclusion)),
+                Is.EqualTo(new[]
+                {
+                    (ArchitectureSelectorParticipationKind.Inclusion, "types_matching", true, false),
+                    (ArchitectureSelectorParticipationKind.Exclusion, "exclude_types_matching", false, true)
+                }));
+        }
+        finally
+        {
+            Directory.Delete(Path.GetDirectoryName(policyPath)!, true);
+        }
+    }
 }

@@ -21,4 +21,7 @@ public sealed record ArchitectureExplainOutcome(
     // set that produced each instance, the concrete source, and the authored fragment location.
     public Model.ArchitectureSourceExpansionInventory SourceExpansion { get; init; } =
         Model.ArchitectureSourceExpansionInventory.Empty;
+
+    public IReadOnlyList<Model.ArchitectureSubtractiveMatcherParticipation> SelectorParticipation { get; init; } =
+        Array.Empty<Model.ArchitectureSubtractiveMatcherParticipation>();
 }

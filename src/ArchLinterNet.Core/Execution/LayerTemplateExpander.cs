@@ -17,7 +17,8 @@ public static class LayerTemplateExpander
             string templateIdBase = ArchitecturePolicyDocumentLoader.NormalizeToContractId(
                 template.Id ?? template.Name);
 
-            foreach (string container in template.Containers)
+            foreach (string container in template.Containers
+                         .Where(container => !template.ExcludeContainers.Contains(container, StringComparer.Ordinal)))
             {
                 List<string> layers = new();
                 HashSet<string> optionalLayers = new(StringComparer.Ordinal);

@@ -26,6 +26,8 @@ public sealed class ArchitectureLayerTemplateContract : IArchitectureContract
 
     [YamlMember(Alias = "containers")] public List<string> Containers { get; set; } = new();
 
+    [YamlMember(Alias = "exclude_containers")] public List<string> ExcludeContainers { get; set; } = new();
+
     [YamlMember(Alias = "layers")] public List<ArchitectureTemplateLayer> Layers { get; set; } = new();
 
     [YamlMember(Alias = "exhaustive")] public bool Exhaustive { get; set; }

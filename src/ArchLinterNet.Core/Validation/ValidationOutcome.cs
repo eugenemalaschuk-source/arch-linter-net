@@ -65,4 +65,10 @@ public sealed record ValidationOutcome(
     // which sources each authored contract expanded to. Empty for policies that declare no set.
     public Model.ArchitectureSourceExpansionInventory SourceExpansion { get; init; } =
         Model.ArchitectureSourceExpansionInventory.Empty;
+
+    // Matched/stale evidence for exclude_types_matching/exclude_files_matching items, recorded as
+    // this mode's type-placement/layout-convention contracts executed. Empty when the preflight
+    // blocked execution (BuildBlockedOutcome) or no contract declared these matchers.
+    public IReadOnlyList<ArchitectureSubtractiveMatcherParticipation> SubtractiveMatcherParticipation { get; init; } =
+        Array.Empty<ArchitectureSubtractiveMatcherParticipation>();
 }

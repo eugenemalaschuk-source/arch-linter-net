@@ -38,7 +38,9 @@ public sealed class ArchitectureExplainApplicationService(IArchitectureGraphAppl
         {
             ExpressionParticipation = CollectExpressionParticipation(outcome.Path, edgeViolations),
             CoverageSummaries = graphOutcome.CoverageSummaries ?? Array.Empty<Reporting.ArchitectureCoverageSummary>(),
-            SourceExpansion = graphOutcome.SourceExpansion ?? Model.ArchitectureSourceExpansionInventory.Empty
+            SourceExpansion = graphOutcome.SourceExpansion ?? Model.ArchitectureSourceExpansionInventory.Empty,
+            SelectorParticipation = graphOutcome.SelectorParticipation
+                ?? Array.Empty<Model.ArchitectureSubtractiveMatcherParticipation>()
         };
     }
 

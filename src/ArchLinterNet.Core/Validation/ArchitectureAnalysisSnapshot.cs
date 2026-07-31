@@ -210,6 +210,10 @@ public sealed class ArchitectureAnalysisSnapshot : IDisposable
         // before or after.
         int unmatchedStartIndex = runner.UnmatchedIgnoredViolations.Count;
 
+        // Same rationale as unmatchedStartIndex above: SubtractiveMatcherParticipation is one
+        // mutable list shared across every mode evaluated on this snapshot's session.
+        int subtractiveMatcherStartIndex = runner.Session.SubtractiveMatcherParticipation.Count;
+
         using (timing?.Measure("configuration_check"))
             allViolations.AddRange(runner.CheckConfiguration(strict: mode == "strict"));
 
@@ -272,7 +276,10 @@ public sealed class ArchitectureAnalysisSnapshot : IDisposable
             PolicyImportPaths = GetPolicyImportPaths(),
             ResolvedAssemblyPaths = GetResolvedAssemblyPaths(),
             DiscoveredProjectPaths = GetDiscoveredProjectPaths(),
-            SourceExpansion = _document.SourceExpansion
+            SourceExpansion = _document.SourceExpansion,
+            SubtractiveMatcherParticipation = runner.Session.SubtractiveMatcherParticipation
+                .Skip(subtractiveMatcherStartIndex)
+                .ToList()
         };
     }
 

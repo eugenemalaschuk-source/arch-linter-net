@@ -164,3 +164,10 @@ The system SHALL, when a `layout_conventions` contract is declared for a run who
 - **WHEN** a `layout_conventions` contract is declared and the run's source fact index has at least one fact with a non-null `SourceFilePath`
 - **THEN** validation SHALL evaluate the contract normally against the available source-enriched facts, without emitting the unavailable-data diagnostic
 
+### Requirement: Layout conventions support subtractive file matching
+The system SHALL allow a layout convention to subtract compatible file matchers from its included candidate files before evaluating CEL and layout expectations.
+
+#### Scenario: Excluded file does not produce a layout finding
+- **WHEN** a file matches both the configured include and exclude matchers
+- **THEN** no layout convention finding SHALL be produced for that file
+

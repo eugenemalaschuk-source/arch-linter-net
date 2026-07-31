@@ -97,3 +97,9 @@ field the underlying violation carries.
 - **THEN** the JSON object includes an `allowed_package_groups` field listing the contract's configured
   `allowed` package group names, alongside non-empty `source` and `forbidden_references` fields
 
+### Requirement: Package allow-only contracts support bounded source subtraction
+The system SHALL allow package allow-only sources resolved by the configured source model to be subtracted before package evaluation.
+
+#### Scenario: Excluded source is not checked
+- **WHEN** a package allow-only contract excludes a resolved source
+- **THEN** the system SHALL not produce a package allow-only finding for it

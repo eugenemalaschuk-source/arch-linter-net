@@ -184,3 +184,10 @@ Every `strict_framework_dependency`/`audit_framework_dependency` violation SHALL
 - **WHEN** the same violation is rendered as human text, unified JSON, SARIF, and through the Testing API's validation result
 - **THEN** all four identify the same source project, the same matched framework reference, and the same target framework
 
+### Requirement: Framework contracts support bounded source subtraction
+The system SHALL allow framework-reference sources resolved by the configured source model to be subtracted before framework evaluation.
+
+#### Scenario: Excluded source is not checked
+- **WHEN** a framework contract excludes a resolved source
+- **THEN** the system SHALL not produce a framework finding for it
+

@@ -48,14 +48,15 @@ internal interface ICliRuntime
         IReadOnlyCollection<ArchitectureCoverageSummary> coverageSummaries) =>
         FormatResultAsSarif(mode, violations, cycles, cycleFindings, preflightDiagnostics);
 
-    string FormatResultAsSarif(
+    string FormatResultAsSarif( // NOSONAR: each parameter represents a semantically distinct section of the SARIF payload; grouping would obscure the data contract
         string mode,
         IReadOnlyCollection<ArchitectureViolation> violations,
         IReadOnlyCollection<string> cycles,
         IReadOnlyCollection<ArchitectureCycleFinding> cycleFindings,
         IReadOnlyCollection<BuildStatePreflightDiagnostic> preflightDiagnostics,
         IReadOnlyCollection<ArchitectureCoverageSummary> coverageSummaries,
-        ArchitectureSourceExpansionInventory sourceExpansion) =>
+        ArchitectureSourceExpansionInventory sourceExpansion,
+        IReadOnlyCollection<ArchitectureSubtractiveMatcherParticipation>? subtractiveMatcherParticipation = null) =>
         FormatResultAsSarif(mode, violations, cycles, cycleFindings, preflightDiagnostics, coverageSummaries);
 
     string FormatResultForCiArtifacts( // NOSONAR: each parameter represents a semantically distinct section of the CI artifact payload; grouping would obscure the data contract
@@ -73,7 +74,8 @@ internal interface ICliRuntime
         IReadOnlyCollection<ArchitectureClassificationRoleFact> classificationRoles,
         ArchitectureClassificationPathDeferredNotice? classificationPathDeferred,
         IReadOnlyCollection<BuildStatePreflightDiagnostic> preflightDiagnostics,
-        ArchitectureSourceExpansionInventory sourceExpansion) =>
+        ArchitectureSourceExpansionInventory sourceExpansion,
+        IReadOnlyCollection<ArchitectureSubtractiveMatcherParticipation>? subtractiveMatcherParticipation = null) =>
         FormatResultForCiArtifacts(
             mode, passed, violations, cycles, cycleFindings, coverageFindings, unmatchedIgnoredViolations,
             policyConsistencyFindings, coverageSummaries, classificationConflicts, classificationMetadataFailures,

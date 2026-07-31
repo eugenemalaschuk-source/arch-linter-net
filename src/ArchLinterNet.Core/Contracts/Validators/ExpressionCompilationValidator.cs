@@ -90,29 +90,54 @@ internal sealed partial class ExpressionCompilationValidator : IArchitecturePoli
         for (int index = 0; index < contracts.Count; index++)
         {
             ArchitectureLayoutConventionContract contract = contracts[index];
-            ArchitectureLayoutFileMatcher matcher = contract.FilesMatching;
-            if (matcher is null || string.IsNullOrEmpty(matcher.When))
+            string contractPath = ContractPath(groupKey, index);
+            CompileLayoutMatcher(
+                document,
+                contract.FilesMatching,
+                contract.Name,
+                ArchitecturePolicyProvenancePath.AppendProperty(contractPath, "files_matching"),
+                "files_matching");
+
+            for (int exclusionIndex = 0; exclusionIndex < contract.ExcludeFilesMatching.Count; exclusionIndex++)
             {
-                continue;
+                CompileLayoutMatcher(
+                    document,
+                    contract.ExcludeFilesMatching[exclusionIndex],
+                    contract.Name,
+                    ArchitecturePolicyProvenancePath.AppendIndex(
+                        ArchitecturePolicyProvenancePath.AppendProperty(contractPath, "exclude_files_matching"),
+                        exclusionIndex),
+                    $"exclude_files_matching[{exclusionIndex}]");
             }
-
-            string path = ArchitecturePolicyProvenancePath.AppendProperty(ContractPath(groupKey, index), "files_matching");
-            document.Provenance.SetValidationSubject(path);
-
-            CelCompilationResult<CelCompiledPredicate> result =
-                ArchitectureExpressionSchemas.SelectorEnvironment.CompilePredicate(matcher.When);
-            if (!result.IsSuccess)
-            {
-                throw new InvalidOperationException(
-                    $"Layout convention contract '{contract.Name}' declares a 'files_matching.when' expression " +
-                    $"that failed to compile: {Describe(result.Diagnostics)}");
-            }
-
-            matcher.CompiledWhen = result.Program;
-            document.Provenance.TryGetLocation(path, out ArchitecturePolicySourceLocation? location);
-            matcher.WhenLocation = location;
-            matcher.WhenContractName = contract.Name;
         }
+    }
+
+    private static void CompileLayoutMatcher(
+        ArchitectureContractDocument document,
+        ArchitectureLayoutFileMatcher matcher,
+        string contractName,
+        string path,
+        string fieldName)
+    {
+        if (string.IsNullOrEmpty(matcher.When))
+        {
+            return;
+        }
+
+        document.Provenance.SetValidationSubject(path);
+        CelCompilationResult<CelCompiledPredicate> result =
+            ArchitectureExpressionSchemas.SelectorEnvironment.CompilePredicate(matcher.When);
+        if (!result.IsSuccess)
+        {
+            throw new InvalidOperationException(
+                $"Layout convention contract '{contractName}' declares a '{fieldName}.when' expression " +
+                $"that failed to compile: {Describe(result.Diagnostics)}");
+        }
+
+        matcher.CompiledWhen = result.Program;
+        document.Provenance.TryGetLocation(path, out ArchitecturePolicySourceLocation? location);
+        matcher.WhenLocation = location;
+        matcher.WhenContractName = contractName;
     }
 
     private static void CompileContextDependencyGroup(

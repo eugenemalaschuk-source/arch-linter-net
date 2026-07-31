@@ -251,4 +251,347 @@ public sealed class SourceExpansionIdentityTests
             Directory.Delete(directory, recursive: true);
         }
     }
+
+    [Test]
+    public void SourceExpansion_ExcludesExplicitAndSetResolvedSourcesWithoutExpandingTheUniverse()
+    {
+        string directory = Path.Combine(Path.GetTempPath(), $"arch-linter-expansion-exclusion-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(directory);
+
+        try
+        {
+            string path = Path.Combine(directory, "dependencies.arch.yml");
+            File.WriteAllText(path, """
+                version: 1
+                name: Test
+                layers:
+                  application:
+                    namespace: Acme.Application
+                  domain:
+                    namespace: Acme.Domain
+                  infrastructure:
+                    namespace: Acme.Infrastructure
+                source_sets:
+                  inner_layers:
+                    kind: layer
+                    members: [application, domain]
+                  omitted_layers:
+                    kind: layer
+                    members: [domain]
+                external_dependencies:
+                  vendor:
+                    namespace_prefixes: [Vendor]
+                contracts:
+                  strict_external:
+                    - name: inner layers avoid vendor
+                      id: inner-no-vendor
+                      source_sets: [inner_layers]
+                      exclude_sources: [infrastructure]
+                      exclude_source_sets: [omitted_layers]
+                      forbidden: [vendor]
+                """);
+
+            ArchitectureContractDocument document = new ArchitecturePolicyDocumentLoader().Load(path);
+
+            Assert.That(document.Contracts.StrictExternal.Select(contract => contract.Source),
+                Is.EqualTo(new[] { "application" }));
+            Assert.That(document.SourceExpansion.Contracts.Single().Exclusions.Select(exclusion => (exclusion.Source, exclusion.Matched)),
+                Is.EqualTo(new[] { ("infrastructure", false), ("domain", true) }));
+        }
+        finally
+        {
+            Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    [Test]
+    public void SourceExpansion_AllResolvedSourcesExcluded_ProducesEmptyExpansionWithoutLoadError()
+    {
+        string directory = Path.Combine(Path.GetTempPath(), $"arch-linter-expansion-empty-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(directory);
+
+        try
+        {
+            string path = Path.Combine(directory, "dependencies.arch.yml");
+            File.WriteAllText(path, """
+                version: 1
+                name: Test
+                layers:
+                  application:
+                    namespace: Acme.Application
+                  domain:
+                    namespace: Acme.Domain
+                source_sets:
+                  inner_layers:
+                    kind: layer
+                    members: [application, domain]
+                external_dependencies:
+                  vendor:
+                    namespace_prefixes: [Vendor]
+                contracts:
+                  strict_external:
+                    - name: inner layers avoid vendor
+                      id: inner-no-vendor
+                      source_sets: [inner_layers]
+                      exclude_source_sets: [inner_layers]
+                      forbidden: [vendor]
+                """);
+
+            ArchitectureContractDocument document = new ArchitecturePolicyDocumentLoader().Load(path);
+            ArchitectureContractExpansion expansion = document.SourceExpansion.Contracts.Single();
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(document.Contracts.StrictExternal, Is.Empty);
+                Assert.That(expansion.Instances, Is.Empty);
+                Assert.That(expansion.Inclusions.Select(instance => instance.Source),
+                    Is.EqualTo(new[] { "application", "domain" }));
+                Assert.That(expansion.OptionalEmpty, Is.False);
+                Assert.That(expansion.Exclusions.All(exclusion => exclusion.Matched), Is.True);
+            });
+        }
+        finally
+        {
+            Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    [Test]
+    public void SourceExpansion_OverlappingExclusions_BothReportMatched()
+    {
+        string directory = Path.Combine(Path.GetTempPath(), $"arch-linter-expansion-overlap-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(directory);
+
+        try
+        {
+            string path = Path.Combine(directory, "dependencies.arch.yml");
+            File.WriteAllText(path, """
+                version: 1
+                name: Test
+                layers:
+                  application:
+                    namespace: Acme.Application
+                  domain:
+                    namespace: Acme.Domain
+                  infrastructure:
+                    namespace: Acme.Infrastructure
+                source_sets:
+                  inner_layers:
+                    kind: layer
+                    members: [application, domain, infrastructure]
+                  legacy_layers:
+                    kind: layer
+                    members: [infrastructure]
+                external_dependencies:
+                  vendor:
+                    namespace_prefixes: [Vendor]
+                contracts:
+                  strict_external:
+                    - name: inner layers avoid vendor
+                      id: inner-no-vendor
+                      source_sets: [inner_layers]
+                      exclude_sources: [infrastructure]
+                      exclude_source_sets: [legacy_layers]
+                      forbidden: [vendor]
+                """);
+
+            ArchitectureContractDocument document = new ArchitecturePolicyDocumentLoader().Load(path);
+            ArchitectureContractExpansion expansion = document.SourceExpansion.Contracts.Single();
+
+            // Both exclusions target 'infrastructure'; the first (exclude_sources) removes it from
+            // the live selector set, but the second (exclude_source_sets, resolving to the same
+            // source) must still be reported as matched rather than stale, since it too excludes a
+            // source that was genuinely part of the included scope.
+            Assert.That(expansion.Exclusions.Select(exclusion => (exclusion.Source, exclusion.Matched)),
+                Is.EqualTo(new[] { ("infrastructure", true), ("infrastructure", true) }));
+        }
+        finally
+        {
+            Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    [Test]
+    public void SourceExpansion_OptionalEmptyExcludedSet_RecordsExclusionEvidence()
+    {
+        string directory = Path.Combine(Path.GetTempPath(), $"arch-linter-expansion-optional-exclude-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(directory);
+
+        try
+        {
+            string path = Path.Combine(directory, "dependencies.arch.yml");
+            File.WriteAllText(path, """
+                version: 1
+                name: Test
+                layers:
+                  application:
+                    namespace: Acme.Application
+                  domain:
+                    namespace: Acme.Domain
+                source_sets:
+                  inner_layers:
+                    kind: layer
+                    members: [application, domain]
+                  not_yet_extracted:
+                    kind: layer
+                    globs: [messaging.*]
+                    optional: true
+                    reason: Reserved for a module not extracted yet.
+                external_dependencies:
+                  vendor:
+                    namespace_prefixes: [Vendor]
+                contracts:
+                  strict_external:
+                    - name: inner layers avoid vendor
+                      id: inner-no-vendor
+                      source_sets: [inner_layers]
+                      exclude_source_sets: [not_yet_extracted]
+                      forbidden: [vendor]
+                """);
+
+            ArchitectureContractDocument document = new ArchitecturePolicyDocumentLoader().Load(path);
+            ArchitectureContractExpansion expansion = document.SourceExpansion.Contracts.Single();
+            ArchitectureExpandedContractExclusion exclusion = expansion.Exclusions.Single();
+
+            // An excluded set that resolves to nothing must still surface as evidence - not vanish
+            // from the exclusion list the way it silently did before.
+            Assert.Multiple(() =>
+            {
+                Assert.That(exclusion.SetName, Is.EqualTo("not_yet_extracted"));
+                Assert.That(exclusion.Source, Is.Null);
+                Assert.That(exclusion.Matched, Is.False);
+                Assert.That(exclusion.OptionalEmpty, Is.True);
+                Assert.That(exclusion.OptionalReason, Does.Contain("not extracted yet"));
+                Assert.That(document.Contracts.StrictExternal.Select(contract => contract.Source),
+                    Is.EqualTo(new[] { "application", "domain" }));
+            });
+        }
+        finally
+        {
+            Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    [Test]
+    public void SourceExpansion_InstancesCarryItemLevelPolicyLocation()
+    {
+        string directory = Path.Combine(Path.GetTempPath(), $"arch-linter-expansion-location-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(directory);
+
+        try
+        {
+            string path = Path.Combine(directory, "dependencies.arch.yml");
+            File.WriteAllText(path, """
+                version: 1
+                name: Test
+                layers:
+                  application:
+                    namespace: Acme.Application
+                  domain:
+                    namespace: Acme.Domain
+                source_sets:
+                  inner_layers:
+                    kind: layer
+                    members: [domain]
+                external_dependencies:
+                  vendor:
+                    namespace_prefixes: [Vendor]
+                contracts:
+                  strict_external:
+                    - name: inner layers avoid vendor
+                      id: inner-no-vendor
+                      sources: [application]
+                      source_sets: [inner_layers]
+                      forbidden: [vendor]
+                """);
+
+            ArchitectureContractDocument document = new ArchitecturePolicyDocumentLoader().Load(path);
+            ArchitectureContractExpansion expansion = document.SourceExpansion.Contracts.Single();
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(expansion.Instances.Select(instance => instance.Source),
+                    Is.EqualTo(new[] { "application", "domain" }));
+                Assert.That(expansion.Instances.All(instance => instance.PolicyLocation != null), Is.True,
+                    "Every included instance must carry the authored location it came from: the " +
+                    "matching 'sources[i]' entry for an explicit source, or the referenced source " +
+                    "set's own declaration for a resolved member.");
+            });
+        }
+        finally
+        {
+            Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    [Test]
+    public void SourceExpansion_InstanceLocation_PointsAtTheSpecificMemberOrGlobEntry()
+    {
+        string directory = Path.Combine(Path.GetTempPath(), $"arch-linter-expansion-item-location-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(directory);
+
+        try
+        {
+            string path = Path.Combine(directory, "dependencies.arch.yml");
+            File.WriteAllText(path, """
+                version: 1
+                name: Test
+                layers:
+                  application:
+                    namespace: Acme.Application
+                  domain:
+                    namespace: Acme.Domain
+                  infra.gateway:
+                    namespace: Acme.Infrastructure
+                source_sets:
+                  inner_layers:
+                    kind: layer
+                    members: [application, domain]
+                    globs: ["infra.*"]
+                external_dependencies:
+                  vendor:
+                    namespace_prefixes: [Vendor]
+                contracts:
+                  strict_external:
+                    - name: inner layers avoid vendor
+                      id: inner-no-vendor
+                      source_sets: [inner_layers]
+                      forbidden: [vendor]
+                """);
+
+            ArchitectureContractDocument document = new ArchitecturePolicyDocumentLoader().Load(path);
+            ArchitectureContractExpansion expansion = document.SourceExpansion.Contracts.Single();
+
+            ArchitectureExpandedContractInstance applicationInstance =
+                expansion.Instances.Single(i => i.Source == "application");
+            ArchitectureExpandedContractInstance domainInstance =
+                expansion.Instances.Single(i => i.Source == "domain");
+            ArchitectureExpandedContractInstance infrastructureInstance =
+                expansion.Instances.Single(i => i.Source == "infra.gateway");
+
+            // Each instance's location must point at the specific authored member/glob entry that
+            // produced it - not merely the shared 'source_sets.inner_layers' root every one of these
+            // three otherwise-identical-looking sources came from.
+            Assert.Multiple(() =>
+            {
+                Assert.That(applicationInstance.PolicyLocation!.YamlPath, Does.Contain("members/0"));
+                Assert.That(domainInstance.PolicyLocation!.YamlPath, Does.Contain("members/1"));
+                Assert.That(infrastructureInstance.PolicyLocation!.YamlPath, Does.Contain("globs/0"));
+                Assert.That(applicationInstance.AuthoredContractPolicyLocation!.YamlPath,
+                    Does.Contain("contracts.strict_external[0]"));
+                Assert.That(applicationInstance.SourceSetReferencePolicyLocation!.YamlPath,
+                    Does.Contain("source_sets/0"));
+                Assert.That(new[]
+                {
+                    applicationInstance.PolicyLocation!.YamlPath,
+                    domainInstance.PolicyLocation!.YamlPath,
+                    infrastructureInstance.PolicyLocation!.YamlPath
+                }, Is.Unique);
+            });
+        }
+        finally
+        {
+            Directory.Delete(directory, recursive: true);
+        }
+    }
 }

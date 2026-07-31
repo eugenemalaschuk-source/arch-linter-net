@@ -350,6 +350,31 @@ public sealed class SourceSetExpansionTests
     }
 
     [Test]
+    public void DeclaringSourceWithExcludeSources_IsRejectedWithAnAccurateMessage()
+    {
+        InvalidOperationException exception = Assert.Throws<InvalidOperationException>(() => Load($"""
+            version: 1
+            name: Test
+            analysis:
+              target_assemblies: [Acme.Host, Acme.Modules.Orders]
+            packages:
+              infrastructure:
+                package_ids: [Acme.Infrastructure]
+            contracts:
+              strict_package_dependency:
+                - name: modules avoid infrastructure
+                  source: Acme.Host
+                  exclude_sources: [Acme.Modules.Orders]
+                  forbidden: [infrastructure]
+            """))!;
+
+        Assert.That(exception.Message, Does.Contain("declares an exact 'source' together with"));
+        Assert.That(exception.Message, Does.Not.Contain("'sources'/'source_sets'. Declare exactly one"),
+            "An exact-source-plus-exclusion contract never declared 'sources'/'source_sets'; the " +
+            "error must not blame fields that were never authored.");
+    }
+
+    [Test]
     public void SetMemberOutsideDeclaredTargets_IsRejected()
     {
         InvalidOperationException exception = Assert.Throws<InvalidOperationException>(() => Load($"""

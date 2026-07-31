@@ -331,6 +331,139 @@ contracts:
     }
 
     [Test]
+    public void Load_LayerTemplateContract_TypoExcludeContainersField_Throws()
+    {
+        string dir = Path.Combine(Path.GetTempPath(), $"arch-linter-test-{Guid.NewGuid():N}");
+        try
+        {
+            Directory.CreateDirectory(dir);
+            string policyPath = Path.Combine(dir, "dependencies.arch.yml");
+
+            string yaml = $"""
+                version: 1
+                name: Test
+                analysis:
+                  target_assemblies: [{CoreAssemblyName}]
+                contracts:
+                  strict_layer_templates:
+                    - name: test-template
+                      containers: [Does.Not.Exist]
+                      exclude_container: [Also.Not.Exist]
+                      layers:
+                        - name: LayerA
+                          optional: true
+                """;
+            File.WriteAllText(policyPath, yaml);
+
+            InvalidOperationException? ex = Assert.Throws<InvalidOperationException>(() =>
+                new ArchitecturePolicyDocumentLoader().Load(policyPath));
+
+            Assert.That(ex!.Message, Does.Contain("exclude_container"));
+        }
+        finally
+        {
+            if (Directory.Exists(dir))
+                Directory.Delete(dir, true);
+        }
+    }
+
+    [Test]
+    public void Load_LayerTemplateContract_ExcludeContainers_RecordsMatchedAndStaleParticipation()
+    {
+        string dir = Path.Combine(Path.GetTempPath(), $"arch-linter-test-{Guid.NewGuid():N}");
+        try
+        {
+            Directory.CreateDirectory(dir);
+            string policyPath = Path.Combine(dir, "dependencies.arch.yml");
+
+            string yaml = $"""
+                version: 1
+                name: Test
+                analysis:
+                  target_assemblies: [{CoreAssemblyName}]
+                contracts:
+                  strict_layer_templates:
+                    - name: test-template
+                      id: test-template
+                      containers: [Feature.Billing, Feature.Orders]
+                      exclude_containers: [Feature.Billing, Feature.NoSuchFeature]
+                      layers:
+                        - name: LayerA
+                          optional: true
+                """;
+            File.WriteAllText(policyPath, yaml);
+
+            ArchitectureContractDocument document = new ArchitecturePolicyDocumentLoader().Load(policyPath);
+            ArchitectureContractExpansion expansion = document.SourceExpansion.Contracts.Single();
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(expansion.Kind, Is.EqualTo(ArchitectureContractExpansionKind.ContainerSet));
+                Assert.That(expansion.Instances.Select(i => i.Source), Is.EqualTo(new[] { "Feature.Orders" }));
+                Assert.That(expansion.Inclusions.Select(i => i.Source), Is.EqualTo(new[] { "Feature.Billing", "Feature.Orders" }));
+                Assert.That(expansion.Inclusions.First(i => i.Source == "Feature.Billing").PolicyLocation?.YamlPath,
+                    Does.EndWith("/containers/0"));
+                Assert.That(
+                    expansion.Exclusions.Select(e => (e.Source, e.Matched)),
+                    Is.EqualTo(new[] { ("Feature.Billing", true), ("Feature.NoSuchFeature", false) }));
+            });
+        }
+        finally
+        {
+            if (Directory.Exists(dir))
+                Directory.Delete(dir, true);
+        }
+    }
+
+    [Test]
+    public void Load_LayerTemplateContract_OverlappingExcludeContainers_BothReportMatchedWithInclusionLocation()
+    {
+        string dir = Path.Combine(Path.GetTempPath(), $"arch-linter-test-{Guid.NewGuid():N}");
+        try
+        {
+            Directory.CreateDirectory(dir);
+            string policyPath = Path.Combine(dir, "dependencies.arch.yml");
+
+            string yaml = $"""
+                version: 1
+                name: Test
+                analysis:
+                  target_assemblies: [{CoreAssemblyName}]
+                contracts:
+                  strict_layer_templates:
+                    - name: test-template
+                      id: test-template
+                      containers: [Feature.Billing, Feature.Orders]
+                      exclude_containers: [Feature.Billing, Feature.Billing]
+                      layers:
+                        - name: LayerA
+                          optional: true
+                """;
+            File.WriteAllText(policyPath, yaml);
+
+            ArchitectureContractDocument document = new ArchitecturePolicyDocumentLoader().Load(policyPath);
+            ArchitectureContractExpansion expansion = document.SourceExpansion.Contracts.Single();
+
+            Assert.Multiple(() =>
+            {
+                // Both exclude_containers entries target the same container; both must report
+                // matched, since removing it via the first entry must not starve the second of a
+                // stable snapshot to judge itself against.
+                Assert.That(expansion.Exclusions.Select(e => e.Matched), Is.EqualTo(new[] { true, true }));
+                Assert.That(expansion.Instances.Single().Source, Is.EqualTo("Feature.Orders"));
+                Assert.That(expansion.Instances.Single().PolicyLocation, Is.Not.Null,
+                    "The surviving included instance must carry the authored 'containers[i]' location " +
+                    "it came from, not a null location.");
+            });
+        }
+        finally
+        {
+            if (Directory.Exists(dir))
+                Directory.Delete(dir, true);
+        }
+    }
+
+    [Test]
     public void Validator_TemplateContractDirectionViolation_Fails()
     {
         string dir = Path.Combine(Path.GetTempPath(), $"arch-linter-test-{Guid.NewGuid():N}");

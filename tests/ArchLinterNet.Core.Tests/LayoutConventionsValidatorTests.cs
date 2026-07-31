@@ -161,6 +161,52 @@ public sealed class LayoutConventionsValidatorTests
     }
 
     [Test]
+    public void Load_LayoutConventionContract_ExcludeWhenExpression_CompilesIndependentlyFromIncludeWhen()
+    {
+        string path = WritePolicy($"""
+            version: 1
+            name: Test
+            analysis:
+              target_assemblies: [{AssemblyName}]
+            contracts:
+              strict_layout_conventions:
+                - name: exclusion-when
+                  files_matching:
+                    folder_segment: Services
+                  exclude_files_matching:
+                    - folder_segment: Services
+                      when: "subject.notARealMember"
+                  require_type_kind: class
+            """);
+
+        var exception = Assert.Throws<InvalidOperationException>(() => new ArchitecturePolicyDocumentLoader().Load(path));
+        Assert.That(exception!.Message, Does.Contain("exclude_files_matching[0].when"));
+        Assert.That(exception.Message, Does.Contain("failed to compile"));
+    }
+
+    [Test]
+    public void Load_LayoutConventionContract_EmptyExcludeMatcher_Throws()
+    {
+        string path = WritePolicy($"""
+            version: 1
+            name: Test
+            analysis:
+              target_assemblies: [{AssemblyName}]
+            contracts:
+              strict_layout_conventions:
+                - name: empty-exclusion
+                  files_matching:
+                    folder_segment: Services
+                  exclude_files_matching:
+                    - when: "true"
+                  require_type_kind: class
+            """);
+
+        var exception = Assert.Throws<InvalidOperationException>(() => new ArchitecturePolicyDocumentLoader().Load(path));
+        Assert.That(exception!.Message, Does.Contain("no usable exclude_files_matching selector field"));
+    }
+
+    [Test]
     public void Load_LayoutConventionContract_WhenOnNonFilesMatchingLocation_Throws()
     {
         string path = WritePolicy($"""

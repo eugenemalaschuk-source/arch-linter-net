@@ -57,6 +57,9 @@ public sealed class ArchitectureLayoutConventionContract : IArchitectureContract
     [YamlMember(Alias = "files_matching")]
     public ArchitectureLayoutFileMatcher FilesMatching { get; set; } = new();
 
+    [YamlMember(Alias = "exclude_files_matching")]
+    public List<ArchitectureLayoutFileMatcher> ExcludeFilesMatching { get; set; } = new();
+
     [YamlMember(Alias = "require_type_kind")] public string RequireTypeKind { get; set; } = string.Empty;
 
     [YamlMember(Alias = "forbid_type_kind")] public string ForbidTypeKind { get; set; } = string.Empty;

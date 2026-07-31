@@ -34,7 +34,8 @@ public sealed class ArchitectureGraphApplicationService(
         {
             EdgeViolations = edgeViolations,
             CoverageSummaries = coverageSummaries,
-            SourceExpansion = session.Document.SourceExpansion
+            SourceExpansion = session.Document.SourceExpansion,
+            SelectorParticipation = session.SubtractiveMatcherParticipation
         };
     }
 
