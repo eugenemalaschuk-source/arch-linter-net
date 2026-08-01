@@ -36,6 +36,13 @@ public sealed class PerTestDurationGuardAttributeTests
     }
 
     [Test]
+    public void CheckDuration_OverLimitWithoutExemptionAndNotEnforced_DoesNotThrow()
+    {
+        Assert.DoesNotThrow(() => PerTestDurationGuardAttribute.CheckDuration(
+            "slow-parallel", PerTestDurationGuardAttribute.DefaultLimitMs * 8, hasExplicitExemption: false, enforce: false));
+    }
+
+    [Test]
     [CancelAfter(120_000)]
     public void EndToEnd_ExemptedLongTest_RunsThroughGuardWithoutFailing()
     {

@@ -1,15 +1,25 @@
 .PHONY: test clean-results test-coverage test-coverage-main-ci test-coverage-badge _acceptance-test benchmark-cel
 
 # Unit tests and E2E tests run in two parallel `dotnet test` processes: the heavy E2E tests
-# ([Category("E2E")] — real CLI subprocess builds and full-assembly analyses) no longer extend the
-# critical path of the unit suite. The solution is built once up front; both processes run with
-# --no-build so they never race on shared obj/bin output.
+# (real CLI subprocess builds and full-assembly analyses) no longer extend the critical path of
+# the unit suite. The solution is built once up front; both processes run with --no-build so they
+# never race on shared obj/bin output.
+#
+# The E2E split uses FullyQualifiedName filters, NOT [Category("E2E")]: the NUnit3TestAdapter does
+# not surface fixture-level categories as VSTest traits, so `Category=E2E`/`Category!=E2E` match
+# nothing. The fixtures' [Category("E2E")] attributes stay as human-readable documentation.
+# `!~` negation is supported by the VSTest filter syntax.
+TEST_E2E_FILTER := FullyQualifiedName~ExternalDependencyContractAuditE2eTests|FullyQualifiedName~BuildStatePreflightTests|FullyQualifiedName~BuildStatePreflightAssemblyReloadTests|FullyQualifiedName~CheckpointAAdoptionAcceptanceTests|FullyQualifiedName~ArchitectureBaselineIntegrationTests
+TEST_UNIT_FILTER := FullyQualifiedName!~ExternalDependencyContractAuditE2eTests&FullyQualifiedName!~BuildStatePreflightTests&FullyQualifiedName!~BuildStatePreflightAssemblyReloadTests&FullyQualifiedName!~CheckpointAAdoptionAcceptanceTests&FullyQualifiedName!~ArchitectureBaselineIntegrationTests
+
+# Both background processes are waited on regardless of the first one's exit status, then the
+# combined result is checked explicitly — no `set -e`, which would abort the shell at the first
+# failed `wait`, orphaning the second process and losing its result.
 test:  ## Run all tests (unit tests and E2E tests in parallel)
 	@dotnet build "$(SLNX)" --no-restore --nologo
-	@set -e; \
-	dotnet test "$(SLNX)" --no-restore --no-build --filter "Category!=E2E" & \
+	@dotnet test "$(SLNX)" --no-restore --no-build --filter "$(TEST_UNIT_FILTER)" & \
 	p1=$$!; \
-	dotnet test "$(SLNX)" --no-restore --no-build --filter "Category=E2E" & \
+	dotnet test "$(SLNX)" --no-restore --no-build --filter "$(TEST_E2E_FILTER)" & \
 	p2=$$!; \
 	wait $$p1; s1=$$?; \
 	wait $$p2; s2=$$?; \
@@ -29,12 +39,11 @@ clean-results:  ## Remove test-results folder
 test-coverage:  ## Run all tests with coverage collection (Cobertura + OpenCover XML under test-results/)
 	@rm -rf "$(RESULTS_DIR)"
 	@dotnet build "$(SLNX)" --no-restore --nologo
-	@set -e; \
-	dotnet test "$(SLNX)" --no-restore --no-build --logger trx --collect:"XPlat Code Coverage" \
+	@dotnet test "$(SLNX)" --no-restore --no-build --filter "$(TEST_UNIT_FILTER)" --logger trx --collect:"XPlat Code Coverage" \
 		--results-directory "$(RESULTS_DIR)/units" \
 		-- DataCollectionRunSettings.DataCollectors.DataCollector.Configuration.Format=cobertura,opencover & \
 	p1=$$!; \
-	dotnet test "$(SLNX)" --no-restore --no-build --filter "Category=E2E" --logger trx --collect:"XPlat Code Coverage" \
+	dotnet test "$(SLNX)" --no-restore --no-build --filter "$(TEST_E2E_FILTER)" --logger trx --collect:"XPlat Code Coverage" \
 		--results-directory "$(RESULTS_DIR)/e2e" \
 		-- DataCollectionRunSettings.DataCollectors.DataCollector.Configuration.Format=cobertura,opencover & \
 	p2=$$!; \
@@ -45,12 +54,11 @@ test-coverage:  ## Run all tests with coverage collection (Cobertura + OpenCover
 test-coverage-main-ci:  ## Run coverage for main-branch badge refresh with hang diagnostics enabled
 	@rm -rf "$(RESULTS_DIR)"
 	@dotnet build "$(SLNX)" --no-restore --nologo
-	@set -e; \
-	dotnet test "$(SLNX)" --no-restore --no-build --logger trx --blame-hang --blame-hang-timeout 5m \
+	@dotnet test "$(SLNX)" --no-restore --no-build --filter "$(TEST_UNIT_FILTER)" --logger trx --blame-hang --blame-hang-timeout 5m \
 		--collect:"XPlat Code Coverage" --results-directory "$(RESULTS_DIR)/units" \
 		-- DataCollectionRunSettings.DataCollectors.DataCollector.Configuration.Format=cobertura,opencover & \
 	p1=$$!; \
-	dotnet test "$(SLNX)" --no-restore --no-build --filter "Category=E2E" --logger trx --blame-hang --blame-hang-timeout 5m \
+	dotnet test "$(SLNX)" --no-restore --no-build --filter "$(TEST_E2E_FILTER)" --logger trx --blame-hang --blame-hang-timeout 5m \
 		--collect:"XPlat Code Coverage" --results-directory "$(RESULTS_DIR)/e2e" \
 		-- DataCollectionRunSettings.DataCollectors.DataCollector.Configuration.Format=cobertura,opencover & \
 	p2=$$!; \

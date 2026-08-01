@@ -7,6 +7,7 @@ using NUnit.Framework;
 namespace ArchLinterNet.Core.Tests;
 
 [TestFixture]
+[Category("E2E")]
 public sealed class BuildStatePreflightTests
 {
     private string _repoRoot = null!;
