@@ -469,19 +469,7 @@ public sealed class BuildStatePreparationService : IBuildStatePreparationService
 
     private static void WaitForExitOrCancellation(Process process, CancellationToken cancellationToken)
     {
-        while (!process.WaitForExit(ProcessPollIntervalMs))
-        {
-            if (cancellationToken.IsCancellationRequested)
-            {
-                TryKillProcessTree(process);
-
-                // Process.Kill is asynchronous. Keep cancellation bounded even if a hostile or
-                // kernel-stuck child ignores termination; the Process handle is disposed by the
-                // caller after this method returns.
-                process.WaitForExit(ProcessExitAfterKillTimeoutMs);
-                cancellationToken.ThrowIfCancellationRequested();
-            }
-        }
+        WaitForExitOrCancellationCore(process.WaitForExit, () => TryKillProcessTree(process), cancellationToken, process.Id);
 
         // The timed overload only observes process termination. Complete the parameterless
         // wait before consuming the asynchronously populated StringBuilders so the final
@@ -493,6 +481,33 @@ public sealed class BuildStatePreparationService : IBuildStatePreparationService
         // loop. Re-check here so a cancelled session can never treat a just-finished exit-0 build
         // as success or go on to publish build receipts for it.
         cancellationToken.ThrowIfCancellationRequested();
+    }
+
+    // Extracted from WaitForExitOrCancellation so the kill-then-bounded-wait timeout branch can
+    // be exercised deterministically with fake delegates — a real dotnet process that survives
+    // Process.Kill(entireProcessTree: true) for a full ProcessExitAfterKillTimeoutMs is not
+    // something a test can reliably provoke without flaking.
+    internal static void WaitForExitOrCancellationCore(
+        Func<int, bool> waitForExit, Action killProcessTree, CancellationToken cancellationToken, int processId)
+    {
+        while (!waitForExit(ProcessPollIntervalMs))
+        {
+            if (cancellationToken.IsCancellationRequested)
+            {
+                killProcessTree();
+
+                // Process.Kill is asynchronous. Bound the wait so a hostile or kernel-stuck
+                // child cannot hang cancellation forever. A child still not reporting exit after
+                // this deadline is a genuine cleanup failure, not a benign race — report it as
+                // such instead of silently proceeding as if the kill had been confirmed.
+                if (!waitForExit(ProcessExitAfterKillTimeoutMs))
+                {
+                    throw new BuildStateProcessCleanupTimedOutException(processId, ProcessExitAfterKillTimeoutMs, cancellationToken);
+                }
+
+                cancellationToken.ThrowIfCancellationRequested();
+            }
+        }
     }
 
     private static void TryKillProcessTree(Process process)
@@ -541,9 +556,14 @@ public sealed class BuildStatePreparationService : IBuildStatePreparationService
             }
 
             string assemblyPath = diagnostic.Evidence.ExpectedOutputPath;
-            string fingerprint = BuildStateCanonicalHasher.ComputeBuildInputFingerprint(project.Path, request.RepositoryRoot);
-            request.CancellationToken.ThrowIfCancellationRequested();
-            string assemblyDigest = BuildStateCanonicalHasher.ComputeContentDigest(assemblyPath);
+            string fingerprint = BuildStateCanonicalHasher.ComputeBuildInputFingerprint(
+                project.Path, request.RepositoryRoot, request.CancellationToken);
+            string assemblyDigest = BuildStateCanonicalHasher.ComputeContentDigest(assemblyPath, request.CancellationToken);
+
+            // Re-checked immediately before the write that actually publishes trusted receipt
+            // evidence — hashing above already observes the token per file/project, but this is
+            // the last gate before BuildReceiptStore.Write, so a cancellation racing the very end
+            // of hashing still cannot slip a new trusted receipt out.
             request.CancellationToken.ThrowIfCancellationRequested();
 
             // The receipt's configuration/TFM record what was actually resolved for this build —

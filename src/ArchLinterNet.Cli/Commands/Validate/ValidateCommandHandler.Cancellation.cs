@@ -62,7 +62,18 @@ internal sealed partial class ValidateCommandHandler
         // A cancelled run never reaches a legitimate report for this invocation (see
         // WriteExecutionError's own rationale for the analogous "before any report exists" case),
         // so routing the cancellation notice to every configured sink, including files, is safe.
-        WriteErrorContent(options, format, contentByFormat, allowFileSinks: true);
+        //
+        // Routed with a fresh token, not _cancellationToken: this method only runs once
+        // _cancellationToken is already cancelled (that cancellation is why Execute is in this
+        // catch block at all). Passing the already-cancelled token to RouteErrorToAllSinks would
+        // make its very first staging check see IsCancellationRequested == true and return
+        // Cancelled immediately, without attempting delivery to a single configured sink — the
+        // typed "cancelled" content built above would then never reach any destination, and the
+        // WriteErrorRoutingFailureFallback path below would report a misleading "output-failed"
+        // status instead. This is the one document whose whole purpose is to report cancellation,
+        // so it must be allowed to actually publish.
+        WriteErrorContent(
+            options, format, contentByFormat, allowFileSinks: true, routingCancellationToken: CancellationToken.None);
     }
 
     private static string BuildCancellationJsonText(string message)

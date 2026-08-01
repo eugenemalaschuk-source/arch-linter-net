@@ -643,6 +643,13 @@ public sealed partial class BaselineCommandHandlerTests
 
         public Exception? UpdateException { get; set; }
 
+        /// <summary>Invoked once UpdateBaseline is about to return its outcome — lets a test
+        /// simulate cancellation observed between Core returning and the handler's own
+        /// subsequent write/publish step.</summary>
+        public Action? OnUpdateBaseline { get; set; }
+
+        public Action? OnGenerateBaseline { get; set; }
+
         public Exception? PruneException { get; set; }
 
         public Exception? DiffException { get; set; }
@@ -690,12 +697,14 @@ public sealed partial class BaselineCommandHandlerTests
         public BaselineGenerationOutcome GenerateBaseline(BaselineGenerationRequest request)
         {
             GenerateRequest = request;
+            OnGenerateBaseline?.Invoke();
             return GenerateException == null ? GenerateOutcome : throw GenerateException;
         }
 
         public BaselineUpdateOutcome UpdateBaseline(BaselineUpdateRequest request)
         {
             UpdateRequest = request;
+            OnUpdateBaseline?.Invoke();
             return UpdateException == null ? UpdateOutcome : throw UpdateException;
         }
 

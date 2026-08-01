@@ -224,7 +224,8 @@ internal sealed partial class ValidateCommandHandler
         string errorFormat,
         IReadOnlyDictionary<string, string> contentByFormat,
         bool allowFileSinks,
-        RouteResult? priorOutputResult = null)
+        RouteResult? priorOutputResult = null,
+        CancellationToken? routingCancellationToken = null)
     {
         if (options.AdditionalSinks.Count == 0)
         {
@@ -244,7 +245,7 @@ internal sealed partial class ValidateCommandHandler
         if (allowFileSinks)
         {
             RouteResult errorRouteResult = _coordinator.RouteErrorToAllSinks(
-                options.AdditionalSinks, contentByFormat, _cancellationToken);
+                options.AdditionalSinks, contentByFormat, routingCancellationToken ?? _cancellationToken);
             if (errorRouteResult.Status != ReportRouteStatus.AllSucceeded
                 && CanUseStderrFallback(errorRouteResult))
             {

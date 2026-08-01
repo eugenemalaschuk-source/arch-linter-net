@@ -69,6 +69,10 @@ internal sealed class PublicApiCaptureCommandHandler(ICliRuntime runtime, ICliCo
                 return CliExitCodes.InvalidArgumentsOrRuntimeError;
             }
 
+            // Re-checked immediately before publication, whether that means writing a new
+            // snapshot or just reporting the existing one as already current.
+            cancellationToken.ThrowIfCancellationRequested();
+
             if (!identical)
             {
                 string tempPath = fileSystem.WriteAllTextToTemp(destination, outcome.Snapshot!);
@@ -87,6 +91,10 @@ internal sealed class PublicApiCaptureCommandHandler(ICliRuntime runtime, ICliCo
                 : FormatForHumans(outcome.EntryCount, destination, identical));
 
             return CliExitCodes.Success;
+        }
+        catch (OperationCanceledException)
+        {
+            return PublicApiCancellationOutput.Write(console, "capture", options.Format == PublicApiOptionsFactory.JsonFormat);
         }
         catch (Exception ex)
         {

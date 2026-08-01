@@ -623,6 +623,14 @@ public sealed partial class ReportCoordinatorTests
         public int JsonCallCount { get; private set; }
         public int SarifCallCount { get; private set; }
 
+        /// <summary>Invoked from FormatViolationsForHumans/FormatResultForCiArtifacts — lets a
+        /// test simulate cancellation observed mid-render, between rendering boundaries
+        /// ReportCoordinator itself controls (sections within one mode, or modes within a
+        /// combined strict+audit report).</summary>
+        public Action? OnFormatViolationsForHumans { get; set; }
+
+        public Action? OnFormatResultForCiArtifacts { get; set; }
+
         public string Version => "1.2.3";
 
         public ValidationOutcome Validate(ValidationRequest request, ValidationTiming? timing) =>
@@ -647,6 +655,7 @@ public sealed partial class ReportCoordinatorTests
             IReadOnlyCollection<BuildStatePreflightDiagnostic> preflightDiagnostics)
         {
             JsonCallCount++;
+            OnFormatResultForCiArtifacts?.Invoke();
             return "{\"kind\":\"validation\",\"passed\":true}";
         }
 
@@ -664,7 +673,12 @@ public sealed partial class ReportCoordinatorTests
         public string FormatBuildStatePreflightForHumans(IReadOnlyCollection<BuildStatePreflightDiagnostic> diagnostics) =>
             string.Empty;
 
-        public string FormatViolationsForHumans(IReadOnlyCollection<ArchitectureViolation> violations) { HumanCallCount++; return "violations"; }
+        public string FormatViolationsForHumans(IReadOnlyCollection<ArchitectureViolation> violations)
+        {
+            HumanCallCount++;
+            OnFormatViolationsForHumans?.Invoke();
+            return "violations";
+        }
         public string FormatCyclesForHumans(IReadOnlyCollection<string> cycles, IReadOnlyCollection<ArchitectureCycleFinding> cycleFindings) { HumanCallCount++; return "cycles"; }
         public string FormatPolicyConsistencyForHumans(IReadOnlyCollection<PolicyConsistencyDiagnostic> diagnostics) => "pc";
         public string FormatUnmatchedForHumans(IReadOnlyList<ArchitectureUnmatchedIgnoredViolation> unmatchedViolations) => "unmatched";

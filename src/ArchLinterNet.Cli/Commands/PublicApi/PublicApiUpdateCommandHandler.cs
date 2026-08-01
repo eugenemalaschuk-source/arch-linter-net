@@ -55,6 +55,16 @@ internal sealed class PublicApiUpdateCommandHandler(ICliRuntime runtime, ICliCon
             // cwd-relative string here would update a different file and still report success.
             string destination = outcome.ResolvedSnapshotPath!;
 
+            // Re-checked immediately before publication: outcome above may have taken long
+            // enough that cancellation arrived after Core's own last check but before this
+            // handler commits anything or prints a completion document — including a dry-run
+            // preview, which reports a proposed-content document as if the operation had
+            // completed normally. WriteAllTextToTemp/RenameTempToTarget are not re-checked
+            // between themselves — the temp file is staged content only, invisible at the
+            // destination path until the rename commits it, so no partial/visible write is
+            // possible in that narrow window.
+            cancellationToken.ThrowIfCancellationRequested();
+
             if (!options.DryRun)
             {
                 string tempPath = fileSystem.WriteAllTextToTemp(destination, outcome.Snapshot!);
@@ -68,6 +78,10 @@ internal sealed class PublicApiUpdateCommandHandler(ICliRuntime runtime, ICliCon
                 : FormatForHumans(outcome, destination, options.DryRun));
 
             return CliExitCodes.Success;
+        }
+        catch (OperationCanceledException)
+        {
+            return PublicApiCancellationOutput.Write(console, "update", options.Format == PublicApiOptionsFactory.JsonFormat);
         }
         catch (Exception ex)
         {

@@ -9,11 +9,13 @@ namespace ArchLinterNet.Core.Execution;
 public sealed class ArchitectureTypeIndex
 {
     private readonly IReadOnlyCollection<Assembly> _targetAssemblies;
+    private readonly CancellationToken _cancellationToken;
     private readonly Lazy<Type[]> _allTypes;
 
-    public ArchitectureTypeIndex(IReadOnlyCollection<Assembly> targetAssemblies)
+    public ArchitectureTypeIndex(IReadOnlyCollection<Assembly> targetAssemblies, CancellationToken cancellationToken = default)
     {
         _targetAssemblies = targetAssemblies ?? throw new ArgumentNullException(nameof(targetAssemblies));
+        _cancellationToken = cancellationToken;
         _allTypes = new Lazy<Type[]>(LoadAllTypes);
     }
 
@@ -69,9 +71,17 @@ public sealed class ArchitectureTypeIndex
 
     private Type[] LoadAllTypes()
     {
-        return _targetAssemblies
-            .Distinct()
-            .SelectMany(ArchitectureTypeScanner.GetLoadableTypes)
-            .ToArray();
+        // Checked per assembly (not once up front) — this is the same reflection-pass boundary
+        // ArchitectureSourceFileFactIndex.RunReflectionPass already checks at, so a large
+        // multi-assembly target set can be interrupted between assemblies instead of running the
+        // whole SelectMany to completion first.
+        List<Type> types = new();
+        foreach (Assembly assembly in _targetAssemblies.Distinct())
+        {
+            _cancellationToken.ThrowIfCancellationRequested();
+            types.AddRange(ArchitectureTypeScanner.GetLoadableTypes(assembly));
+        }
+
+        return types.ToArray();
     }
 }

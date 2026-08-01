@@ -78,19 +78,48 @@ public sealed partial class PublicApiCommandHandlerTests
 
         public PublicApiMigrateOutcome? MigrateOutcome { get; init; }
 
+        /// <summary>Thrown from the matching Public-API entrypoint instead of returning its
+        /// outcome — used to simulate Core observing a cancelled token and raising
+        /// OperationCanceledException.</summary>
+        public Exception? CaptureException { get; init; }
+
+        public Exception? DiffException { get; init; }
+
+        public Exception? UpdateException { get; init; }
+
+        public Exception? MigrateException { get; init; }
+
+        /// <summary>Invoked once the matching entrypoint is about to return its outcome — lets a
+        /// test simulate cancellation observed between Core returning and the handler's own
+        /// subsequent two-phase publish step.</summary>
+        public Action? OnCapturePublicApi { get; init; }
+
+        public Action? OnUpdatePublicApi { get; init; }
+
+        public Action? OnMigratePublicApi { get; init; }
+
         public string Version => "1.0.0";
 
-        public PublicApiCaptureOutcome CapturePublicApi(PublicApiCaptureRequest request) =>
-            CaptureOutcome ?? throw new NotSupportedException();
+        public PublicApiCaptureOutcome CapturePublicApi(PublicApiCaptureRequest request)
+        {
+            OnCapturePublicApi?.Invoke();
+            return CaptureException != null ? throw CaptureException : CaptureOutcome ?? throw new NotSupportedException();
+        }
 
         public PublicApiDiffOutcome DiffPublicApi(PublicApiDiffRequest request) =>
-            DiffOutcome ?? throw new NotSupportedException();
+            DiffException != null ? throw DiffException : DiffOutcome ?? throw new NotSupportedException();
 
-        public PublicApiUpdateOutcome UpdatePublicApi(PublicApiUpdateRequest request) =>
-            UpdateOutcome ?? throw new NotSupportedException();
+        public PublicApiUpdateOutcome UpdatePublicApi(PublicApiUpdateRequest request)
+        {
+            OnUpdatePublicApi?.Invoke();
+            return UpdateException != null ? throw UpdateException : UpdateOutcome ?? throw new NotSupportedException();
+        }
 
-        public PublicApiMigrateOutcome MigratePublicApi(PublicApiMigrateRequest request) =>
-            MigrateOutcome ?? throw new NotSupportedException();
+        public PublicApiMigrateOutcome MigratePublicApi(PublicApiMigrateRequest request)
+        {
+            OnMigratePublicApi?.Invoke();
+            return MigrateException != null ? throw MigrateException : MigrateOutcome ?? throw new NotSupportedException();
+        }
 
         // The delta formatter routes human output through the real Core formatter, so this stub
         // uses it too: the assertions above then exercise the same rendering the CLI ships.

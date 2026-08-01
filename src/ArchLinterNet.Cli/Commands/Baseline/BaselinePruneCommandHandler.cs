@@ -67,6 +67,9 @@ internal sealed class BaselinePruneCommandHandler(ICliRuntime runtime, ICliConso
             }
             else if (outcome.IsNoOp && !options.Write.DryRun && options.OutputPath != null)
             {
+                // Re-checked immediately before the write that actually publishes the baseline.
+                cancellationToken.ThrowIfCancellationRequested();
+
                 BaselineWriteGate gate = new(console, fileSystem);
                 if (!gate.TryCopySource(
                         new BaselineWriteGate.Request(
@@ -80,6 +83,9 @@ internal sealed class BaselinePruneCommandHandler(ICliRuntime runtime, ICliConso
             }
             else
             {
+                // Re-checked immediately before the write that actually publishes the baseline.
+                cancellationToken.ThrowIfCancellationRequested();
+
                 BaselineWriteGate gate = new(console, fileSystem);
                 if (!gate.TryApply(
                         new BaselineWriteGate.Request(
@@ -93,6 +99,10 @@ internal sealed class BaselinePruneCommandHandler(ICliRuntime runtime, ICliConso
 
             Report(options, outcome, disposition);
             return CliExitCodes.Success;
+        }
+        catch (OperationCanceledException)
+        {
+            return BaselineCancellationOutput.Write(console, "prune", options.Format == "json");
         }
         catch (Exception ex)
         {

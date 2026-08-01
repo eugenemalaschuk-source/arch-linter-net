@@ -8,7 +8,11 @@
 
 - [x] 2.1 Thread cancellation through policy import/composition and all scanning outer loops.
 - [x] 2.2 Add cancellation boundaries to hashing and receipt publication.
-- [x] 2.3 Extend baseline, public-API, and profile shared-pipeline requests and CLI callers.
+- [x] 2.3 Extend baseline and public-API shared-pipeline requests and CLI callers with a
+      `CancellationToken` and pre-publication checks (see the follow-up review-fix pass below for the
+      publication-safety/typed-completion gaps found after this task was first marked done). Profile
+      generation/artifact cleanup was NOT extended — that capability does not exist yet (depends on
+      issue #374); see issue #418.
 
 ## 3. Validation
 

@@ -74,6 +74,8 @@ internal sealed class BaselineVerifyCommandHandler(ICliRuntime runtime, ICliCons
                 outcome.New, outcome.Frozen, outcome.Resolved, outcome.Ambiguous, outcome.ConfigurationErrors,
                 outcome.Entries);
 
+            cancellationToken.ThrowIfCancellationRequested();
+
             if (options.Format == "json")
             {
                 console.Out.WriteLine(JsonSerializer.Serialize(
@@ -90,6 +92,10 @@ internal sealed class BaselineVerifyCommandHandler(ICliRuntime runtime, ICliCons
             }
 
             return outcome.InSync ? CliExitCodes.Success : CliExitCodes.ValidationFailure;
+        }
+        catch (OperationCanceledException)
+        {
+            return BaselineCancellationOutput.Write(console, "verify", options.Format == "json");
         }
         catch (Exception ex)
         {

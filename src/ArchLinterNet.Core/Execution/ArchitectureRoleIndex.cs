@@ -15,12 +15,17 @@ public sealed class ArchitectureRoleIndex
 {
     private readonly ArchitectureClassificationConfiguration _configuration;
     private readonly ArchitectureTypeIndex _typeIndex;
+    private readonly CancellationToken _cancellationToken;
     private readonly Lazy<RoleIndexData> _data;
 
-    public ArchitectureRoleIndex(ArchitectureClassificationConfiguration configuration, ArchitectureTypeIndex typeIndex)
+    public ArchitectureRoleIndex(
+        ArchitectureClassificationConfiguration configuration,
+        ArchitectureTypeIndex typeIndex,
+        CancellationToken cancellationToken = default)
     {
         _configuration = configuration ?? throw new ArgumentNullException(nameof(configuration));
         _typeIndex = typeIndex ?? throw new ArgumentNullException(nameof(typeIndex));
+        _cancellationToken = cancellationToken;
         _data = new Lazy<RoleIndexData>(BuildData);
     }
 
@@ -69,8 +74,12 @@ public sealed class ArchitectureRoleIndex
         HashSet<ArchitectureClassificationConflict> conflicts = new();
         HashSet<ArchitectureClassificationMetadataFailure> metadataFailures = new();
 
+        // Checked per type — mirrors ArchitectureSourceFileFactIndex.RunReflectionPass's
+        // per-type check, the same granularity a full-codebase extractor pass over every type
+        // needs to be interruptible.
         foreach (Type type in types)
         {
+            _cancellationToken.ThrowIfCancellationRequested();
             ArchitectureTypeClassificationResult result = extractor.Extract(type);
             conflicts.UnionWith(result.Conflicts);
             metadataFailures.UnionWith(result.MetadataFailures);

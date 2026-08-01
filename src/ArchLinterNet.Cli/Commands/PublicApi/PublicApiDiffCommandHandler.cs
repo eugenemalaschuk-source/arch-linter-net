@@ -48,12 +48,18 @@ internal sealed class PublicApiDiffCommandHandler(ICliRuntime runtime, ICliConso
                 return PublicApiCommandGuards.ExitCodeFor(outcome.FailureKind);
             }
 
+            cancellationToken.ThrowIfCancellationRequested();
+
             console.Out.WriteLine(PublicApiDeltaFormatter.Format(
                 runtime, options.Format, options.ContractId!, outcome.Delta));
 
             // Drift is a validation failure, not a runtime error: CI can gate on exit code 1 the
             // same way it gates on a failing strict run.
             return outcome.InSync ? CliExitCodes.Success : CliExitCodes.ValidationFailure;
+        }
+        catch (OperationCanceledException)
+        {
+            return PublicApiCancellationOutput.Write(console, "diff", options.Format == PublicApiOptionsFactory.JsonFormat);
         }
         catch (Exception ex)
         {

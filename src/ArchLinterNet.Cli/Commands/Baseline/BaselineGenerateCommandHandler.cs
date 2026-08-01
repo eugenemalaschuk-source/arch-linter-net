@@ -56,6 +56,10 @@ internal sealed class BaselineGenerateCommandHandler(ICliRuntime runtime, ICliCo
             }
 
             bool json = options.Format == "json";
+
+            // Re-checked immediately before the write that actually publishes the baseline.
+            cancellationToken.ThrowIfCancellationRequested();
+
             BaselineWriteGate gate = new(console, fileSystem);
             if (!gate.TryApply(
                     new BaselineWriteGate.Request(
@@ -68,6 +72,10 @@ internal sealed class BaselineGenerateCommandHandler(ICliRuntime runtime, ICliCo
 
             Report(options, outcome, disposition);
             return CliExitCodes.Success;
+        }
+        catch (OperationCanceledException)
+        {
+            return BaselineCancellationOutput.Write(console, "generation", options.Format == "json");
         }
         catch (Exception ex)
         {

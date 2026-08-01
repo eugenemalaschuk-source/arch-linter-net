@@ -454,6 +454,44 @@ public sealed class BuildStatePreflightTests
         Assert.That(tempSolutionCountAfter, Is.EqualTo(tempSolutionCountBefore));
     }
 
+    // A child that survives Process.Kill(entireProcessTree: true) for the full post-kill
+    // deadline (a hostile or kernel-stuck process) is not something a real dotnet build can be
+    // made to reproduce deterministically. WaitForExitOrCancellationCore is fake-delegate
+    // testable specifically so this timeout branch can be proven without flaking.
+    [Test]
+    public void WaitForExitOrCancellationCore_ProcessSurvivesKillPastDeadline_ThrowsCleanupTimeoutException()
+    {
+        using CancellationTokenSource cts = new();
+        cts.Cancel();
+        bool killed = false;
+
+        BuildStateProcessCleanupTimedOutException? thrown = Assert.Throws<BuildStateProcessCleanupTimedOutException>(() =>
+            BuildStatePreparationService.WaitForExitOrCancellationCore(
+                waitForExit: _ => false,
+                killProcessTree: () => killed = true,
+                cancellationToken: cts.Token,
+                processId: 4242));
+
+        Assert.That(killed, Is.True);
+        Assert.That(thrown!.ProcessId, Is.EqualTo(4242));
+        Assert.That(thrown.TimeoutMs, Is.GreaterThan(0));
+    }
+
+    [Test]
+    public void WaitForExitOrCancellationCore_ProcessExitsWithinKillDeadline_ThrowsPlainOperationCanceledException()
+    {
+        using CancellationTokenSource cts = new();
+        cts.Cancel();
+        bool killed = false;
+
+        Assert.Throws<OperationCanceledException>(() =>
+            BuildStatePreparationService.WaitForExitOrCancellationCore(
+                waitForExit: _ => killed, // exits only after the kill has been requested
+                killProcessTree: () => killed = true,
+                cancellationToken: cts.Token,
+                processId: 4242));
+    }
+
     private string CreateRealBuildableProjectFixture(string assemblyName)
     {
         string projectDirectory = Path.Combine(_repoRoot, "src", assemblyName);

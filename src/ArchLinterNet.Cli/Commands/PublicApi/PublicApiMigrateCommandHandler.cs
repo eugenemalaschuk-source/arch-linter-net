@@ -71,6 +71,10 @@ internal sealed class PublicApiMigrateCommandHandler(ICliRuntime runtime, ICliCo
                 return CliExitCodes.InvalidArgumentsOrRuntimeError;
             }
 
+            // Re-checked immediately before publication, whether that means writing the
+            // migrated snapshot or just reporting a dry-run preview.
+            cancellationToken.ThrowIfCancellationRequested();
+
             if (!options.DryRun && !identical)
             {
                 string tempPath = fileSystem.WriteAllTextToTemp(destination, outcome.Snapshot!);
@@ -82,6 +86,10 @@ internal sealed class PublicApiMigrateCommandHandler(ICliRuntime runtime, ICliCo
                 : FormatForHumans(outcome, options, destination));
 
             return CliExitCodes.Success;
+        }
+        catch (OperationCanceledException)
+        {
+            return PublicApiCancellationOutput.Write(console, "migrate", options.Format == PublicApiOptionsFactory.JsonFormat);
         }
         catch (Exception ex)
         {

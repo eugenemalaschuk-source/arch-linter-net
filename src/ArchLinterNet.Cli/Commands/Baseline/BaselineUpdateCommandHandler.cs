@@ -69,6 +69,12 @@ internal sealed class BaselineUpdateCommandHandler(ICliRuntime runtime, ICliCons
             }
 
             bool json = options.Format == "json";
+
+            // Re-checked immediately before the write that actually publishes the baseline —
+            // outcome above may have taken long enough that a Ctrl+C/SIGTERM arrived after Core's
+            // own last check but before this handler commits anything.
+            cancellationToken.ThrowIfCancellationRequested();
+
             BaselineWriteGate gate = new(console, fileSystem);
             if (!gate.TryApply(
                     new BaselineWriteGate.Request(
@@ -81,6 +87,10 @@ internal sealed class BaselineUpdateCommandHandler(ICliRuntime runtime, ICliCons
 
             Report(options, outcome, disposition);
             return CliExitCodes.Success;
+        }
+        catch (OperationCanceledException)
+        {
+            return BaselineCancellationOutput.Write(console, "update", options.Format == "json");
         }
         catch (Exception ex)
         {

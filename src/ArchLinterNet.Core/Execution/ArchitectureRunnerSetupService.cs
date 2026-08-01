@@ -35,7 +35,7 @@ public sealed class ArchitectureRunnerSetupService(
         cancellationToken.ThrowIfCancellationRequested();
         ArchitectureContractDocument document;
         using (timing?.Measure("yaml_loading", indent: 1))
-            document = policyDocumentLoader.Load(policyPath);
+            document = policyDocumentLoader.Load(policyPath, cancellationToken);
 
         cancellationToken.ThrowIfCancellationRequested();
 

@@ -1,4 +1,7 @@
 using ArchLinterNet.Cli.Commands.Validate;
+using ArchLinterNet.Core.Model;
+using ArchLinterNet.Core.Reporting;
+using ArchLinterNet.Core.Validation;
 using NUnit.Framework;
 
 namespace ArchLinterNet.Cli.Tests;
@@ -151,5 +154,52 @@ public sealed partial class ReportCoordinatorTests
             Assert.That(result.Cancelled, Is.False);
             Assert.That(result.Status, Is.EqualTo(ReportRouteStatus.AllSucceeded));
         });
+    }
+
+    // PR #416 review: FormatSingle/CombinedHuman/Json/Sarif previously accepted no token at all,
+    // so a large findings set could fully serialize after Ctrl+C before the next check. These
+    // prove cancellation observed mid-render — at the boundary between two of a human report's
+    // sections, or between two modes of a combined json/sarif document — stops before the
+    // remaining section/mode renders, instead of only being checked before the whole render started.
+    private static ValidationOutcome ViolationsAndCyclesOutcome => new(
+        false,
+        new[] { new ArchitectureViolation("rule-a", null, "pkg-a", "pkg-b", Array.Empty<string>()) },
+        new[] { "pkg-a -> pkg-b -> pkg-a" }, Array.Empty<ArchitectureViolation>(), "off",
+        Array.Empty<ArchitectureUnmatchedIgnoredViolation>(), "off",
+        Array.Empty<PolicyConsistencyDiagnostic>(), "off",
+        Array.Empty<ArchitectureCoverageSummary>(),
+        Array.Empty<ArchitectureClassificationConflict>(),
+        Array.Empty<ArchitectureClassificationMetadataFailure>());
+
+    [Test]
+    public void RouteSingleOutcome_CancelledDuringHumanRendering_StopsBeforeLaterSectionRenders()
+    {
+        using CancellationTokenSource cts = new();
+        var runtime = new CountingRuntime { OnFormatViolationsForHumans = cts.Cancel };
+        var console = new CapturingConsole();
+        var coordinator = new ReportCoordinator(runtime, console, new StubFileSystem());
+
+        Assert.Throws<OperationCanceledException>(() =>
+            coordinator.RouteSingleOutcome("human", "strict", ViolationsAndCyclesOutcome, Array.Empty<ReportSink>(), cts.Token));
+
+        Assert.That(runtime.HumanCallCount, Is.EqualTo(1), "FormatCyclesForHumans must not run once cancellation was observed after violations rendered");
+        Assert.That(console.OutputText, Is.Empty, "no partial document may reach stdout");
+    }
+
+    [Test]
+    public void RouteCombinedOutcomes_CancelledDuringJsonRendering_StopsBeforeSecondModeRenders()
+    {
+        using CancellationTokenSource cts = new();
+        var runtime = new CountingRuntime { OnFormatResultForCiArtifacts = cts.Cancel };
+        var console = new CapturingConsole();
+        var coordinator = new ReportCoordinator(runtime, console, new StubFileSystem());
+
+        var outcomesByMode = new[] { ("strict", PassedOutcome), ("audit", FailedOutcome) };
+        var sinks = new[] { new ReportSink("json", ReportDestinationType.File, "results.json") };
+
+        Assert.Throws<OperationCanceledException>(() =>
+            coordinator.RouteCombinedOutcomes("human", outcomesByMode, sinks, cts.Token));
+
+        Assert.That(runtime.JsonCallCount, Is.EqualTo(1), "the audit mode's JSON must not be rendered once cancellation was observed after strict rendered");
     }
 }

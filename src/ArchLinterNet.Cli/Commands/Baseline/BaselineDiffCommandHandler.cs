@@ -74,6 +74,8 @@ internal sealed class BaselineDiffCommandHandler(ICliRuntime runtime, ICliConsol
                 outcome.New, outcome.Frozen, outcome.Resolved, outcome.Ambiguous, outcome.ConfigurationErrors,
                 outcome.Entries);
 
+            cancellationToken.ThrowIfCancellationRequested();
+
             console.Out.WriteLine(options.Format switch
             {
                 "json" => FormatBaselineComparisonAsJson(report),
@@ -82,6 +84,10 @@ internal sealed class BaselineDiffCommandHandler(ICliRuntime runtime, ICliConsol
             });
 
             return CliExitCodes.Success;
+        }
+        catch (OperationCanceledException)
+        {
+            return BaselineCancellationOutput.Write(console, "diff", options.Format == "json");
         }
         catch (Exception ex)
         {

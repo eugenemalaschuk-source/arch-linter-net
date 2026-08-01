@@ -44,6 +44,77 @@ public sealed partial class ValidateCommandHandlerReportModeTests
         });
     }
 
+    // PR #416 review: the test above passes the handler CancellationToken.None (the default) and
+    // throws the OperationCanceledException artificially — it never exercises the actual
+    // production path, where _cancellationToken is the SAME token that was cancelled and caused
+    // Core to throw. Passing that already-cancelled token into RouteErrorToAllSinks made its
+    // first staging check see IsCancellationRequested == true and return Cancelled immediately,
+    // without delivering to any sink — WriteErrorContent's fallback then reported
+    // "output-failed" instead of the typed "cancelled" content built for this exact case. This
+    // reproduces the real path: the handler's own token is cancelled, runtime throws OCE from
+    // it, and the cancellation notice must still reach the configured file sink undistorted.
+    [Test]
+    public void ValidateHandler_HandlerTokenCancelled_RealProductionPath_StillPublishesTypedCancelledStatus()
+    {
+        using CancellationTokenSource cts = new();
+        cts.Cancel();
+        FakeCliRuntime runtime = new()
+        {
+            ExceptionToThrow = new OperationCanceledException("cancelled during validation", cts.Token)
+        };
+        FakeCliConsole console = new();
+        FakeFileSystem fileSystem = new(exists: true);
+        ValidateCommandHandler handler = new(runtime, console, fileSystem, cts.Token);
+
+        ValidateCommandOptions options = new(
+            "policy.yml", "strict", "human", [], null, false, null, false, false)
+        {
+            AdditionalSinks = [new ReportSink("json", ReportDestinationType.File, "cancelled.json")],
+        };
+
+        int exitCode = handler.Execute(options);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(exitCode, Is.EqualTo(CliExitCodes.InvalidArgumentsOrRuntimeError));
+            Assert.That(fileSystem.CommittedPaths, Does.Contain("cancelled.json"));
+            string committedContent = fileSystem.ReadAllText("cancelled.json.tmp");
+            Assert.That(committedContent, Does.Contain("\"status\":\"cancelled\""));
+            Assert.That(committedContent, Does.Not.Contain("output-failed"));
+            Assert.That(committedContent, Does.Not.Contain("partial-output"));
+            Assert.That(console.StdErr, Does.Not.Contain("output-failed"));
+        });
+    }
+
+    // Same production-path reproduction as above, for the legacy (no --report sinks) shape:
+    // proves the stream fallback in WriteErrorContent also still delivers the typed cancelled
+    // content — not a routing-failure document — when the handler's own token is cancelled.
+    [Test]
+    public void ValidateHandler_HandlerTokenCancelled_NoAdditionalSinks_WritesCancelledMessageToStderr()
+    {
+        using CancellationTokenSource cts = new();
+        cts.Cancel();
+        FakeCliRuntime runtime = new()
+        {
+            ExceptionToThrow = new OperationCanceledException("cancelled during validation", cts.Token)
+        };
+        FakeCliConsole console = new();
+        FakeFileSystem fileSystem = new(exists: true);
+        ValidateCommandHandler handler = new(runtime, console, fileSystem, cts.Token);
+
+        ValidateCommandOptions options = new(
+            "policy.yml", "strict", "human", [], null, false, null, false, false);
+
+        int exitCode = handler.Execute(options);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(exitCode, Is.EqualTo(CliExitCodes.InvalidArgumentsOrRuntimeError));
+            Assert.That(console.StdErr, Does.Contain("Architecture validation was cancelled."));
+            Assert.That(console.StdOut, Is.Empty);
+        });
+    }
+
     [Test]
     public void ValidateHandler_Cancelled_NoAdditionalSinks_WritesCancelledMessageToStderr()
     {
