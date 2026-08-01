@@ -1,5 +1,7 @@
 using ArchLinterNet.Cli.Abstractions;
 using ArchLinterNet.Cli.Commands.Validate;
+using ArchLinterNet.Core.Contracts;
+using ArchLinterNet.Core.Model;
 using NUnit.Framework;
 
 namespace ArchLinterNet.Cli.Tests;
@@ -125,4 +127,95 @@ public sealed partial class ValidateCommandHandlerReportModeTests
             Assert.That(fileSystem.CommittedPaths, Is.Empty);
         });
     }
+
+    // SonarCloud S8949 (RELIABILITY, MAJOR): WriteErrorContent's call to
+    // _coordinator.RouteErrorToAllSinks previously never forwarded _cancellationToken, so a
+    // pre-outcome policy-load failure with --report file sinks configured would stage/commit
+    // those sinks even when the handler's own token was already cancelled. Proves the token now
+    // reaches RouteErrorToAllSinks: with it pre-cancelled, the file sink must never commit.
+    [Test]
+    public void ValidateHandler_PolicyErrorWithCancelledToken_RouteErrorToAllSinksHonorsToken()
+    {
+        ArchitecturePolicySourceDescriptor source = new(
+            "architecture/root.yml", "architecture/root.yml", ArchitecturePolicyDocumentRole.Root,
+            0, null, null, ["architecture/root.yml"]);
+        ArchitecturePolicySourceLocation location = new(source, "$", 1, 1, null, null);
+        FakeCliRuntime runtime = new()
+        {
+            ExceptionToThrow = new ArchitecturePolicyLoadException(
+                "Invalid namespace.",
+                new ArchitecturePolicyDiagnostic(ArchitecturePolicyDiagnosticKind.SourceShape, location, [], source.ImportChain),
+                ArchitecturePolicyImportErrorCategory.SourceShape.ToString())
+        };
+        FakeCliConsole console = new();
+        FakeFileSystem fileSystem = new(exists: true);
+        using CancellationTokenSource cts = new();
+        cts.Cancel();
+        ValidateCommandHandler handler = new(runtime, console, fileSystem, cts.Token);
+
+        ValidateCommandOptions options = new(
+            "policy.yml", "strict", "human", [], null, false, null, false, false)
+        {
+            AdditionalSinks = [new ReportSink("json", ReportDestinationType.File, "out.json")],
+        };
+
+        int exitCode = handler.Execute(options);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(exitCode, Is.EqualTo(CliExitCodes.InvalidArgumentsOrRuntimeError));
+            Assert.That(fileSystem.CommittedPaths, Does.Not.Contain("out.json"));
+        });
+    }
+
+    // Coverage: WriteCancelledRouting's JSON branch is already exercised by
+    // ValidateHandler_CoordinatorReportsCancelled_WritesDistinctCancelledStatusNotOutputFailure
+    // (a --report json=... sink). These two cover the SARIF and human branches of the same
+    // switch — ReportErrorContentFormatter.BuildCancelledOutputSarifText/HumanText — via the
+    // legacy no-sinks path, which still goes through RouteResult.Cancelled (not an
+    // OperationCanceledException) because RouteOutcomes' pre-render check fires before any
+    // rendering happens for a token already cancelled at Execute() time.
+    [Test]
+    public void ValidateHandler_CoordinatorReportsCancelled_SarifFormat_UsesDistinctCancelledRuleId()
+    {
+        FakeCliRuntime runtime = new();
+        FakeCliConsole console = new();
+        using CancellationTokenSource cts = new();
+        cts.Cancel();
+        ValidateCommandHandler handler = new(runtime, console, new FakeFileSystem(exists: true), cts.Token);
+
+        ValidateCommandOptions options = new(
+            "policy.yml", "strict", "sarif", [], null, false, null, false, false);
+
+        int exitCode = handler.Execute(options);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(exitCode, Is.EqualTo(CliExitCodes.InvalidArgumentsOrRuntimeError));
+            Assert.That(console.StdOut, Does.Contain("\"ruleId\":\"architecture-cancelled\""));
+            Assert.That(console.StdOut, Does.Contain("\"status\":\"cancelled\""));
+        });
+    }
+
+    [Test]
+    public void ValidateHandler_CoordinatorReportsCancelled_HumanFormat_WritesCancelledMessageToStderr()
+    {
+        FakeCliRuntime runtime = new();
+        FakeCliConsole console = new();
+        using CancellationTokenSource cts = new();
+        cts.Cancel();
+        ValidateCommandHandler handler = new(runtime, console, new FakeFileSystem(exists: true), cts.Token);
+
+        ValidateCommandOptions options = new(
+            "policy.yml", "strict", "human", [], null, false, null, false, false);
+
+        int exitCode = handler.Execute(options);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(exitCode, Is.EqualTo(CliExitCodes.InvalidArgumentsOrRuntimeError));
+            Assert.That(console.StdErr, Does.Contain("Architecture validation was cancelled during report output."));
+        });
+    }
+
 }

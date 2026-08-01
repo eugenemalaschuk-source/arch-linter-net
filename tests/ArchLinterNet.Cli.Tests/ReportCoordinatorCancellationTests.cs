@@ -81,6 +81,34 @@ public sealed partial class ReportCoordinatorTests
     // cancellation already observed at RouteOutcomes entry must stop that write, not just prevent
     // a file sink from being staged. Uses --format json (not human) so a single WriteLine call, not
     // the legacy-combined-human per-mode loop, is what's being guarded here.
+    // Issue #375 PR #416 review: proves the coordinator's own error-routing entrypoint
+    // (RouteErrorToAllSinks — used by ValidateCommandHandler.WriteErrorContent for pre-outcome
+    // policy/execution errors) honors a cancelled token on its own DistributeToSinks early-return,
+    // independent of RouteOutcomes' pre-render guard (RouteErrorToAllSinks never goes through
+    // RouteOutcomes at all).
+    [Test]
+    public void RouteErrorToAllSinks_CancelledToken_ReportsCancelledWithoutStaging()
+    {
+        var runtime = new CountingRuntime();
+        var console = new CapturingConsole();
+        var fileSystem = new StubFileSystem();
+        var coordinator = new ReportCoordinator(runtime, console, fileSystem);
+        using CancellationTokenSource cts = new();
+        cts.Cancel();
+
+        RouteResult result = coordinator.RouteErrorToAllSinks(
+            new[] { new ReportSink("json", ReportDestinationType.File, "error.json") },
+            new Dictionary<string, string> { ["json"] = "{}" },
+            cts.Token);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(result.Cancelled, Is.True);
+            Assert.That(result.CommittedPaths, Is.Empty);
+            Assert.That(fileSystem.TempPaths, Is.Empty);
+        });
+    }
+
     [Test]
     public void RouteSingleOutcome_CancelledBeforeRendering_NoAdditionalSinks_NeverWritesToStdout()
     {

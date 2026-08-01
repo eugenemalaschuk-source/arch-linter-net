@@ -243,7 +243,8 @@ internal sealed partial class ValidateCommandHandler
 
         if (allowFileSinks)
         {
-            RouteResult errorRouteResult = _coordinator.RouteErrorToAllSinks(options.AdditionalSinks, contentByFormat);
+            RouteResult errorRouteResult = _coordinator.RouteErrorToAllSinks(
+                options.AdditionalSinks, contentByFormat, _cancellationToken);
             if (errorRouteResult.Status != ReportRouteStatus.AllSucceeded
                 && CanUseStderrFallback(errorRouteResult))
             {
