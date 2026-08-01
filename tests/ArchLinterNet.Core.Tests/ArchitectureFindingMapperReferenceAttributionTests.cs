@@ -125,6 +125,87 @@ public sealed class ArchitectureFindingMapperReferenceAttributionTests
         Assert.That(ReferencesOf(findings[0]), Is.EqualTo(references));
     }
 
+    // PR #420 review, P1: two calls to the same forbidden API from the same method produce displays
+    // that differ only by IL offset and identities that differ only by Occurrence. No amount of
+    // parsing the display can tell them apart, so the pairing recorded during identity attachment
+    // is what attributes them — without it both findings would carry both references and N repeated
+    // calls would square the report again.
+    [Test]
+    public void FromViolations_RepeatedCallsToSameApi_AttributeOneReferencePerOccurrence()
+    {
+        string[] references =
+        {
+            "il 0001 (Ns.Type.Run): pattern -> Vendor.Api.Call",
+            "il 000A (Ns.Type.Run): pattern -> Vendor.Api.Call",
+        };
+
+        ArchitectureViolation violation = ExternalViolation(
+            references,
+            new[]
+            {
+                Identity("Ns.Type.Run", "Vendor.Api.Call", occurrence: 0),
+                Identity("Ns.Type.Run", "Vendor.Api.Call", occurrence: 1),
+            },
+            identityReferences: references);
+
+        IReadOnlyList<ArchitectureFinding> findings = ArchitectureFindingMapper.FromViolations(new[] { violation });
+
+        Assert.That(findings.Select(ReferencesOf), Is.EqualTo(new[]
+        {
+            new[] { references[0] },
+            new[] { references[1] },
+        }));
+    }
+
+    // The recorded pairing wins over display-text matching even when the two disagree, because it
+    // is the pairing identity attachment actually made.
+    [Test]
+    public void FromViolations_RecordedPairing_TakesPrecedenceOverDisplayMatching()
+    {
+        string[] references = { "Ns.Type.Alpha: System.String", "Ns.Type.Beta: System.Int32" };
+
+        ArchitectureViolation violation = ExternalViolation(
+            references,
+            new[]
+            {
+                Identity("Ns.Type.Alpha", "System.String", occurrence: 0),
+                Identity("Ns.Type.Beta", "System.Int32", occurrence: 0),
+            },
+            identityReferences: new[] { references[1], references[0] });
+
+        IReadOnlyList<ArchitectureFinding> findings = ArchitectureFindingMapper.FromViolations(new[] { violation });
+
+        Assert.That(findings.Select(ReferencesOf), Is.EqualTo(new[]
+        {
+            new[] { references[1] },
+            new[] { references[0] },
+        }));
+    }
+
+    // A pairing that does not line up with the identities is ignored rather than mis-applied.
+    [Test]
+    public void FromViolations_PairingLengthMismatch_FallsBackToDisplayMatching()
+    {
+        string[] references = { "Ns.Type.Alpha: System.String", "Ns.Type.Beta: System.Int32" };
+
+        ArchitectureViolation violation = ExternalViolation(
+            references,
+            new[]
+            {
+                Identity("Ns.Type.Alpha", "System.String", occurrence: 0),
+                Identity("Ns.Type.Beta", "System.Int32", occurrence: 0),
+            },
+            identityReferences: new[] { references[0] });
+
+        IReadOnlyList<ArchitectureFinding> findings = ArchitectureFindingMapper.FromViolations(new[] { violation });
+
+        Assert.That(findings.Select(ReferencesOf), Is.EqualTo(new[]
+        {
+            new[] { references[0] },
+            new[] { references[1] },
+        }));
+    }
+
     private static string[] ReferencesOf(ArchitectureFinding finding)
     {
         return ((ExternalDependencyDiagnostic)finding.Details).ForbiddenReferences.ToArray();
@@ -132,7 +213,8 @@ public sealed class ArchitectureFindingMapperReferenceAttributionTests
 
     private static ArchitectureViolation ExternalViolation(
         string[] references,
-        ArchitectureViolationIdentity[] identities)
+        ArchitectureViolationIdentity[] identities,
+        string[]? identityReferences = null)
     {
         return new ArchitectureViolation(
             "core-audit-system",
@@ -144,6 +226,7 @@ public sealed class ArchitectureFindingMapperReferenceAttributionTests
             Payload = new ExternalDependencyPayload("system"),
             Identity = identities[0],
             Identities = identities,
+            IdentityReferences = identityReferences ?? Array.Empty<string>(),
         };
     }
 

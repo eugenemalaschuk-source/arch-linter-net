@@ -55,6 +55,31 @@ public sealed class ArchitectureAnalysisSessionFindingIdentityTests
         Assert.That(allIdentities.Distinct().Count(), Is.EqualTo(allIdentities.Length));
     }
 
+    // PR #420 review, P1: normalization must not have to re-derive which reference an identity came
+    // from. Identity attachment is the only step that knows it, so it records the pairing here.
+    [Test]
+    public void AttachFindingIdentities_RecordsTheReferenceEachIdentityWasSelectedFor()
+    {
+        ArchitectureAnalysisSession session = CreateSession(out ArchitectureExternalDependencyContract contract);
+
+        int cursor = session.FindingIdentityCursor;
+        IReadOnlyList<ArchitectureViolation> attached =
+            session.AttachFindingIdentities(session.CheckExternalContract(contract), cursor);
+
+        Assert.That(attached, Is.Not.Empty);
+
+        foreach (ArchitectureViolation violation in attached)
+        {
+            Assert.That(violation.IdentityReferences.Count, Is.EqualTo(violation.Identities.Count),
+                $"pairing not aligned with identities for {violation.SourceType}");
+            Assert.That(violation.IdentityReferences.All(violation.ForbiddenReferences.Contains), Is.True,
+                $"paired a reference the violation never reported for {violation.SourceType}");
+            Assert.That(violation.IdentityReferences.Distinct(StringComparer.Ordinal).Count(),
+                Is.EqualTo(violation.IdentityReferences.Count),
+                $"two identities paired to the same reference for {violation.SourceType}");
+        }
+    }
+
     [Test]
     public void AttachFindingIdentities_NoCandidatesAfterCursor_LeavesViolationsUnchanged()
     {

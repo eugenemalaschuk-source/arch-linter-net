@@ -29,6 +29,24 @@ internal sealed class ArchitectureExternalDependencyIlScanner : IArchitectureExt
     // deterministic and per-run.
     private readonly Dictionary<IlTokenKey, MemberInfo?> _resolvedMembers = new();
 
+    // Seam over Module.ResolveMember. The cache is invisible in the scanner's results — an uncached
+    // implementation reports exactly the same findings — so a test can only prove the cache exists
+    // by observing how often resolution is actually requested. This is that observation point;
+    // production always goes through the parameterless constructor below.
+    private readonly Func<Module, int, Type[], Type[], MemberInfo?> _resolveMember;
+
+    public ArchitectureExternalDependencyIlScanner()
+        : this(static (module, token, typeArguments, methodArguments) =>
+            module.ResolveMember(token, typeArguments, methodArguments))
+    {
+    }
+
+    internal ArchitectureExternalDependencyIlScanner(
+        Func<Module, int, Type[], Type[], MemberInfo?> resolveMember)
+    {
+        _resolveMember = resolveMember;
+    }
+
     public IEnumerable<ArchitectureViolation> FindMethodBodyViolations(
         Type[] sourceTypes,
         string externalGroupName,
@@ -370,7 +388,7 @@ internal sealed class ArchitectureExternalDependencyIlScanner : IArchitectureExt
         MemberInfo? resolved;
         try
         {
-            resolved = module.ResolveMember(token, genericContext.TypeArguments, genericContext.MethodArguments);
+            resolved = _resolveMember(module, token, genericContext.TypeArguments, genericContext.MethodArguments);
         }
         catch
         {

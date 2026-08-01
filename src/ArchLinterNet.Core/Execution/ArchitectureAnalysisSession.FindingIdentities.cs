@@ -31,9 +31,24 @@ public sealed partial class ArchitectureAnalysisSession
             ArchitectureBaselineCandidate[] matches = bucket == null
                 ? Array.Empty<ArchitectureBaselineCandidate>()
                 : bucket.Where(candidate => CandidateReferencesMatchViolation(candidate, violation)).ToArray();
-            ArchitectureBaselineCandidate[] selected = violation.Payload is CompositionPayload
-                ? matches
-                : SelectOneCandidatePerReportedReference(violation, matches);
+
+            // The composition family takes every match without walking the reported references, so
+            // it establishes no reference-to-identity pairing; every other family selects one
+            // candidate per reported reference and therefore knows the pairing exactly.
+            ArchitectureBaselineCandidate[] selected;
+            string[] attributedReferences;
+            if (violation.Payload is CompositionPayload)
+            {
+                selected = matches;
+                attributedReferences = Array.Empty<string>();
+            }
+            else
+            {
+                SelectedCandidate[] pairs = SelectOneCandidatePerReportedReference(violation, matches);
+                selected = Array.ConvertAll(pairs, pair => pair.Candidate);
+                attributedReferences = Array.ConvertAll(pairs, pair => pair.Reference);
+            }
+
             foreach (ArchitectureBaselineCandidate candidate in selected)
             {
                 bucket!.Remove(candidate);
@@ -44,7 +59,12 @@ public sealed partial class ArchitectureAnalysisSession
                 .ToArray();
             attached.Add(identities.Length == 0
                 ? violation
-                : violation with { Identity = identities[0], Identities = identities });
+                : violation with
+                {
+                    Identity = identities[0],
+                    Identities = identities,
+                    IdentityReferences = attributedReferences,
+                });
         }
 
         return attached;
@@ -87,11 +107,11 @@ public sealed partial class ArchitectureAnalysisSession
             || ReferenceMatches(reference, candidate.ForbiddenReference));
     }
 
-    private static ArchitectureBaselineCandidate[] SelectOneCandidatePerReportedReference(
+    private static SelectedCandidate[] SelectOneCandidatePerReportedReference(
         ArchitectureViolation violation,
         IReadOnlyCollection<ArchitectureBaselineCandidate> candidates)
     {
-        var selected = new List<ArchitectureBaselineCandidate>();
+        var selected = new List<SelectedCandidate>();
         // Value-equality set mirroring `selected`: the linear Contains it replaces turned a
         // reference-rich violation into quadratic work (issue #419).
         var selectedSet = new HashSet<ArchitectureBaselineCandidate>();
@@ -103,13 +123,17 @@ public sealed partial class ArchitectureAnalysisSession
                     || ReferenceMatches(reference, candidate.ForbiddenReference)));
             if (candidate is not null)
             {
-                selected.Add(candidate);
+                selected.Add(new SelectedCandidate(candidate, reference));
                 selectedSet.Add(candidate);
             }
         }
 
         return selected.ToArray();
     }
+
+    // The candidate chosen for one reported reference, carrying that reference so the pairing
+    // survives into the violation instead of being re-derived downstream.
+    private readonly record struct SelectedCandidate(ArchitectureBaselineCandidate Candidate, string Reference);
 
     // Matches `reportedReference` against `identityReference` either exactly or as an
     // '<identity>@...'/'<identity> ...' prefix. Written without the two string concatenations the

@@ -1,3 +1,4 @@
+using System.Reflection;
 using ArchLinterNet.Core.Contracts;
 using ArchLinterNet.Core.Model;
 using ArchLinterNet.Core.Resolution;
@@ -107,6 +108,93 @@ public sealed class ExternalDependencyIlScannerCacheTests
 
         Assert.Throws<OperationCanceledException>(() => enumerator.MoveNext());
     }
+
+    // The tests above compare results, which an uncached implementation would also pass. These three
+    // observe the resolver itself, so deleting the token cache — or losing its reuse across groups,
+    // or dropping the generic context from its key — fails them. (PR #420 review, P2.)
+    [Test]
+    public void FindMethodBodyViolations_TokenRequestedAgain_IsResolvedOnce()
+    {
+        var single = new ResolveRecorder();
+        new ArchitectureExternalDependencyIlScanner(single.Resolve).FindMethodBodyViolations(
+            _mixedSourceTypes, "vendor_sdk", VendorSdkGroup(), NewExecutionContext()).ToList();
+
+        // Scanning the same types twice in one call re-requests every token the first copy walked.
+        var doubled = new ResolveRecorder();
+        new ArchitectureExternalDependencyIlScanner(doubled.Resolve).FindMethodBodyViolations(
+            _mixedSourceTypes.Concat(_mixedSourceTypes).ToArray(),
+            "vendor_sdk", VendorSdkGroup(), NewExecutionContext()).ToList();
+
+        Assert.That(single.Calls, Is.Not.Empty);
+        Assert.That(doubled.Calls.Count, Is.EqualTo(single.Calls.Count),
+            "scanning the same types twice resolved tokens again instead of reusing the cache");
+        Assert.That(doubled.Calls.Distinct().Count(), Is.EqualTo(doubled.Calls.Count),
+            "the same (module, token, generic context) reached the resolver more than once");
+    }
+
+    [Test]
+    public void FindMethodBodyViolations_ScannerReusedAcrossGroups_ReusesTokenResolutions()
+    {
+        var recorder = new ResolveRecorder();
+        var scanner = new ArchitectureExternalDependencyIlScanner(recorder.Resolve);
+
+        scanner.FindMethodBodyViolations(
+            _mixedSourceTypes, "vendor_sdk", VendorSdkGroup(), NewExecutionContext()).ToList();
+        int afterFirstGroup = recorder.Calls.Count;
+
+        scanner.FindMethodBodyViolations(
+            _mixedSourceTypes, "unity_runtime", UnityGroup(), NewExecutionContext()).ToList();
+
+        Assert.That(afterFirstGroup, Is.GreaterThan(0));
+        Assert.That(recorder.Calls.Count, Is.EqualTo(afterFirstGroup),
+            "the second group re-resolved tokens the first group had already resolved");
+    }
+
+    // A token inside a generic type or generic method resolves against that generic context, so the
+    // same token under two contexts must reach the resolver twice rather than be served one cached
+    // answer. The mixed corpus contains such tokens; this asserts they were not collapsed.
+    [Test]
+    public void FindMethodBodyViolations_SameTokenInDifferentGenericContexts_IsResolvedPerContext()
+    {
+        var recorder = new ResolveRecorder();
+        new ArchitectureExternalDependencyIlScanner(recorder.Resolve).FindMethodBodyViolations(
+            _mixedSourceTypes, "vendor_sdk", VendorSdkGroup(), NewExecutionContext()).ToList();
+
+        int tokensSeenUnderSeveralContexts = recorder.Calls
+            .GroupBy(call => (call.Module, call.Token))
+            .Count(group => group.Select(call => call.GenericContext).Distinct().Count() > 1);
+
+        Assert.That(recorder.Calls.Any(call => call.GenericContext.Length > 0), Is.True,
+            "corpus no longer exercises a non-empty generic context");
+        Assert.That(tokensSeenUnderSeveralContexts, Is.GreaterThan(0),
+            "no token was resolved under more than one generic context — the key may have dropped it");
+    }
+
+    private sealed class ResolveRecorder
+    {
+        public List<ResolveCall> Calls { get; } = new();
+
+        public MemberInfo? Resolve(Module module, int token, Type[] typeArguments, Type[] methodArguments)
+        {
+            Calls.Add(new ResolveCall(
+                module,
+                token,
+                string.Join(
+                    "|",
+                    typeArguments.Select(a => a.ToString()).Concat(methodArguments.Select(a => $"m:{a}")))));
+
+            try
+            {
+                return module.ResolveMember(token, typeArguments, methodArguments);
+            }
+            catch
+            {
+                return null;
+            }
+        }
+    }
+
+    private readonly record struct ResolveCall(Module Module, int Token, string GenericContext);
 
     private static ArchitectureExternalDependencyGroup VendorSdkGroup()
     {
