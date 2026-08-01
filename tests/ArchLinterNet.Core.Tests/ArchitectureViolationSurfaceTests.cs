@@ -22,30 +22,11 @@ public sealed class ArchitectureViolationSurfaceTests
             "IdentityReferences is pipeline state, not part of the diagnostics model callers consume");
     }
 
-    [Test]
-    public void PublicSurface_IsTheDiagnosticsModelOnly()
-    {
-        string[] publicProperties = typeof(ArchitectureViolation)
-            .GetProperties(BindingFlags.Instance | BindingFlags.Public)
-            .Select(property => property.Name)
-            .OrderBy(name => name, StringComparer.Ordinal)
-            .ToArray();
-
-        Assert.That(publicProperties, Is.EqualTo(new[]
-        {
-            "ContractId",
-            "ContractName",
-            "ForbiddenNamespace",
-            "ForbiddenReferences",
-            "Identities",
-            "Identity",
-            "MatchedNamespacePrefixes",
-            "Payload",
-            "PolicyLocation",
-            "RelatedPolicyLocations",
-            "SourceType",
-        }));
-    }
+    // The whole public property set is pinned by CorePublicApiSurfaceApprovalTests, so it is not
+    // repeated here — a second copy would have to be updated in step with the baseline. What stays
+    // is the named guard above, which reports this specific regression far more usefully than a
+    // diff against a 3 800-line surface, plus the two checks below that the approval test does not
+    // cover at all.
 
     // A caller serializing a raw violation must see exactly what it saw before.
     [Test]
