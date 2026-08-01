@@ -15,6 +15,9 @@ namespace ArchLinterNet.Core.Tests;
 [TestFixture]
 public sealed class ArchitectureAssemblyResolutionServiceCancellationTests
 {
+    private static readonly string[] _assemblyNames = { "AssemblyA", "AssemblyB" };
+    private static readonly string[] _net10 = { "net10.0" };
+
     private sealed class FakeIsolatedLoadScope : IArchitectureAssemblyLoadScope
     {
         public bool Disposed { get; private set; }
@@ -71,13 +74,13 @@ public sealed class ArchitectureAssemblyResolutionServiceCancellationTests
             ["AssemblyB"] = "/fake/repo/AssemblyB.dll",
         };
         ProjectDiscoveryResult discovery = new(
-            new[] { "AssemblyA", "AssemblyB" }, Array.Empty<string>(), Array.Empty<string>(),
+            _assemblyNames, Array.Empty<string>(), Array.Empty<string>(),
             Array.Empty<ArchitectureProjectDiscoveryDiagnostic>())
         {
             DiscoveredProjects = new[]
             {
-                new ArchitectureDiscoveredProject("A.csproj", "AssemblyA", new[] { "net10.0" }),
-                new ArchitectureDiscoveredProject("B.csproj", "AssemblyB", new[] { "net10.0" }),
+                new ArchitectureDiscoveredProject("A.csproj", "AssemblyA", _net10),
+                new ArchitectureDiscoveredProject("B.csproj", "AssemblyB", _net10),
             },
             ResolvedAssemblyPaths = resolvedPaths,
         };

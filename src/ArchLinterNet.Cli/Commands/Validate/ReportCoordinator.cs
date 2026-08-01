@@ -90,9 +90,10 @@ internal sealed class ReportCoordinator
         if (cancellationToken.IsCancellationRequested)
         {
             return BuildRouteResult(
-                additionalSinks, contentByFormat: new Dictionary<string, string>(), failedPaths: new List<string>(),
-                committedPaths: new List<string>(), stagedPaths: new List<string>(), errorDetails: new List<string>(),
-                deliveredStreamPaths: new List<string>(), cancelled: true);
+                additionalSinks, contentByFormat: new Dictionary<string, string>(),
+                new SinkDistributionEvidence(
+                    new List<string>(), new List<string>(), new List<string>(), new List<string>(), new List<string>()),
+                cancelled: true);
         }
 
         // Legacy combined human: write each mode sequentially (pre-#364 behavior)
@@ -225,8 +226,9 @@ internal sealed class ReportCoordinator
         if (cancellationToken.IsCancellationRequested)
         {
             return BuildRouteResult(
-                additionalSinks, contentByFormat, failedPaths, new List<string>(), stagedPaths, errorDetails,
-                deliveredStreamPaths, cancelled: true);
+                additionalSinks, contentByFormat,
+                new SinkDistributionEvidence(failedPaths, new List<string>(), stagedPaths, errorDetails, deliveredStreamPaths),
+                cancelled: true);
         }
 
         // Do not emit a normal stream document until every file artifact passed staging. Otherwise
@@ -240,18 +242,7 @@ internal sealed class ReportCoordinator
         List<string> committedPaths = new();
         if (failedPaths.Count == 0 && !cancellationToken.IsCancellationRequested)
         {
-            // Stderr is last so a failed stdout never leaves a successful stderr report that
-            // hides the same invocation's output failure. A failed stderr is retried by the
-            // handler with the enriched fallback document.
-            foreach (ReportSink sink in additionalSinks
-                .Where(sink => sink.DestinationType != ReportDestinationType.File)
-                .OrderBy(sink => sink.DestinationType == ReportDestinationType.Stdout ? 0 : 1))
-            {
-                if (!WriteStreamSink(sink, contentByFormat, failedPaths, errorDetails, deliveredStreamPaths))
-                {
-                    break;
-                }
-            }
+            WriteStreamSinksInOrder(additionalSinks, contentByFormat, failedPaths, errorDetails, deliveredStreamPaths);
         }
 
         bool cancelledBeforeCommit = cancellationToken.IsCancellationRequested;
@@ -267,8 +258,30 @@ internal sealed class ReportCoordinator
         }
 
         return BuildRouteResult(
-            additionalSinks, contentByFormat, failedPaths, committedPaths, stagedPaths, errorDetails,
-            deliveredStreamPaths, cancelled: cancelledBeforeCommit || cancelledMidCommit);
+            additionalSinks, contentByFormat,
+            new SinkDistributionEvidence(failedPaths, committedPaths, stagedPaths, errorDetails, deliveredStreamPaths),
+            cancelled: cancelledBeforeCommit || cancelledMidCommit);
+    }
+
+    // Stderr is last so a failed stdout never leaves a successful stderr report that hides the
+    // same invocation's output failure. A failed stderr is retried by the handler with the
+    // enriched fallback document.
+    private void WriteStreamSinksInOrder(
+        IReadOnlyList<ReportSink> additionalSinks,
+        IReadOnlyDictionary<string, string> contentByFormat,
+        List<string> failedPaths,
+        List<string> errorDetails,
+        List<string> deliveredStreamPaths)
+    {
+        foreach (ReportSink sink in additionalSinks
+            .Where(sink => sink.DestinationType != ReportDestinationType.File)
+            .OrderBy(sink => sink.DestinationType == ReportDestinationType.Stdout ? 0 : 1))
+        {
+            if (!WriteStreamSink(sink, contentByFormat, failedPaths, errorDetails, deliveredStreamPaths))
+            {
+                break;
+            }
+        }
     }
 
     private void StageFileSink(
@@ -408,35 +421,42 @@ internal sealed class ReportCoordinator
         }
     }
 
+    // Bundles the five accumulator lists DistributeToSinks builds up together (they are always
+    // passed as one group to BuildRouteResult) so that method stays under the parameter-count
+    // limit rather than taking each list as its own parameter.
+    private readonly record struct SinkDistributionEvidence(
+        List<string> FailedPaths,
+        List<string> CommittedPaths,
+        List<string> StagedPaths,
+        List<string> ErrorDetails,
+        List<string> DeliveredStreamPaths);
+
     private static RouteResult BuildRouteResult(
         IReadOnlyList<ReportSink> additionalSinks,
         IReadOnlyDictionary<string, string> contentByFormat,
-        List<string> failedPaths,
-        List<string> committedPaths,
-        List<string> stagedPaths,
-        List<string> errorDetails,
-        List<string> deliveredStreamPaths,
+        SinkDistributionEvidence evidence,
         bool cancelled = false)
     {
-        if (failedPaths.Count == 0 && !cancelled)
+        if (evidence.FailedPaths.Count == 0 && !cancelled)
         {
             return new RouteResult(
-                ReportRouteStatus.AllSucceeded, Array.Empty<string>(), committedPaths, stagedPaths,
-                Array.Empty<string>(), Array.Empty<string>(), deliveredStreamPaths);
+                ReportRouteStatus.AllSucceeded, Array.Empty<string>(), evidence.CommittedPaths, evidence.StagedPaths,
+                Array.Empty<string>(), Array.Empty<string>(), evidence.DeliveredStreamPaths);
         }
 
         var allFileSinks = additionalSinks
             .Where(s => s.DestinationType == ReportDestinationType.File && contentByFormat.ContainsKey(s.Format))
             .Select(s => s.FilePath!)
             .ToArray();
-        var uncommittedPaths = allFileSinks.Except(committedPaths).ToArray();
+        var uncommittedPaths = allFileSinks.Except(evidence.CommittedPaths).ToArray();
 
-        ReportRouteStatus status = committedPaths.Count > 0
+        ReportRouteStatus status = evidence.CommittedPaths.Count > 0
             ? ReportRouteStatus.PartialOutput
             : ReportRouteStatus.OutputFailed;
 
         return new RouteResult(
-            status, failedPaths, committedPaths, stagedPaths, uncommittedPaths, errorDetails, deliveredStreamPaths)
+            status, evidence.FailedPaths, evidence.CommittedPaths, evidence.StagedPaths, uncommittedPaths,
+            evidence.ErrorDetails, evidence.DeliveredStreamPaths)
         {
             Cancelled = cancelled
         };

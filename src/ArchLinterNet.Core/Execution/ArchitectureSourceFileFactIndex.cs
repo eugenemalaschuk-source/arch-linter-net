@@ -55,11 +55,17 @@ public sealed class ArchitectureSourceFileFactIndex
             sourceRoots,
             preprocessorSymbols,
             fileSystem,
-            projectDiscovery: null,
-            sourceRootAssemblyOwnership: null,
+            default,
             cancellationToken)
     {
     }
+
+    // Bundles the two "how source roots map to project-owning assemblies" inputs — always
+    // supplied (or omitted) together — so the internal constructor below stays under the
+    // parameter-count limit rather than taking each as its own parameter.
+    internal readonly record struct ProjectOwnership(
+        ProjectDiscoveryResult? ProjectDiscovery,
+        IReadOnlyDictionary<string, string>? SourceRootAssemblyOwnership);
 
     internal ArchitectureSourceFileFactIndex(
         IReadOnlyCollection<Assembly> targetAssemblies,
@@ -67,8 +73,7 @@ public sealed class ArchitectureSourceFileFactIndex
         IReadOnlyList<string> sourceRoots,
         IReadOnlyList<string>? preprocessorSymbols,
         IArchitectureFileSystem? fileSystem,
-        ProjectDiscoveryResult? projectDiscovery,
-        IReadOnlyDictionary<string, string>? sourceRootAssemblyOwnership,
+        ProjectOwnership projectOwnership,
         CancellationToken cancellationToken = default)
     {
         _targetAssemblies = targetAssemblies ?? throw new ArgumentNullException(nameof(targetAssemblies));
@@ -79,8 +84,8 @@ public sealed class ArchitectureSourceFileFactIndex
         _sourcePathAssemblyOwnership = BuildSourcePathAssemblyOwnership(
             _targetAssemblies,
             _sourceRoots,
-            projectDiscovery,
-            sourceRootAssemblyOwnership);
+            projectOwnership.ProjectDiscovery,
+            projectOwnership.SourceRootAssemblyOwnership);
         _cancellationToken = cancellationToken;
         _data = new Lazy<FactIndexData>(BuildData);
     }

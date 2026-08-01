@@ -8,6 +8,8 @@ namespace ArchLinterNet.Cli.Tests;
 // CountingRuntime/CapturingConsole/PassedOutcome fixtures via the partial class.
 public sealed partial class ReportCoordinatorTests
 {
+    private static readonly string[] _oneJsonPath = { "one.json" };
+
     // Issue #375: cancellation observed before staging even begins must report zero committed
     // files, Cancelled=true, and never call WriteAllTextToTemp for any sink.
     [Test]
@@ -70,8 +72,8 @@ public sealed partial class ReportCoordinatorTests
         {
             Assert.That(result.Cancelled, Is.True);
             Assert.That(result.Status, Is.EqualTo(ReportRouteStatus.PartialOutput));
-            Assert.That(result.CommittedPaths, Is.EquivalentTo(new[] { "one.json" }));
-            Assert.That(fileSystem.TargetPaths, Is.EquivalentTo(new[] { "one.json" }));
+            Assert.That(result.CommittedPaths, Is.EquivalentTo(_oneJsonPath));
+            Assert.That(fileSystem.TargetPaths, Is.EquivalentTo(_oneJsonPath));
             Assert.That(fileSystem.FileExists("two.sarif.tmp"), Is.False);
         });
     }
