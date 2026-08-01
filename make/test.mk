@@ -36,35 +36,31 @@ _acceptance-test: | lint-architecture
 clean-results:  ## Remove test-results folder
 	rm -rf "$(RESULTS_DIR)"
 
+# Coverage targets run the two suites SEQUENTIALLY, not in parallel. Microsoft.CodeCoverage
+# instruments assemblies in-place in the shared bin/ output: while the units process rewrites
+# (instrument at start, restore at end) those files, a concurrently running E2E process loads the
+# same files — the torn reads crash its test host or surface as random BadImageFormatException
+# ("Index not found") in IL-scanning tests. With one process at a time there is no rewrite/load
+# overlap, so coverage is collected by the units process and the E2E process (which runs CLI
+# subprocesses that never contribute to the collector anyway) runs after it without --collect.
+# `make test` itself stays parallel — without coverage collection nothing rewrites bin files.
 test-coverage:  ## Run all tests with coverage collection (Cobertura + OpenCover XML under test-results/)
 	@rm -rf "$(RESULTS_DIR)"
 	@dotnet build "$(SLNX)" --no-restore --nologo
 	@dotnet test "$(SLNX)" --no-restore --no-build --filter "$(TEST_UNIT_FILTER)" --logger trx --collect:"XPlat Code Coverage" \
 		--results-directory "$(RESULTS_DIR)/units" \
-		-- DataCollectionRunSettings.DataCollectors.DataCollector.Configuration.Format=cobertura,opencover & \
-	p1=$$!; \
-	dotnet test "$(SLNX)" --no-restore --no-build --filter "$(TEST_E2E_FILTER)" --logger trx --collect:"XPlat Code Coverage" \
-		--results-directory "$(RESULTS_DIR)/e2e" \
-		-- DataCollectionRunSettings.DataCollectors.DataCollector.Configuration.Format=cobertura,opencover & \
-	p2=$$!; \
-	wait $$p1; s1=$$?; \
-	wait $$p2; s2=$$?; \
-	if [ $$s1 -ne 0 ] || [ $$s2 -ne 0 ]; then exit 1; fi
+		-- DataCollectionRunSettings.DataCollectors.DataCollector.Configuration.Format=cobertura,opencover
+	@dotnet test "$(SLNX)" --no-restore --no-build --filter "$(TEST_E2E_FILTER)" --logger trx \
+		--results-directory "$(RESULTS_DIR)/e2e"
 
 test-coverage-main-ci:  ## Run coverage for main-branch badge refresh with hang diagnostics enabled
 	@rm -rf "$(RESULTS_DIR)"
 	@dotnet build "$(SLNX)" --no-restore --nologo
 	@dotnet test "$(SLNX)" --no-restore --no-build --filter "$(TEST_UNIT_FILTER)" --logger trx --blame-hang --blame-hang-timeout 5m \
 		--collect:"XPlat Code Coverage" --results-directory "$(RESULTS_DIR)/units" \
-		-- DataCollectionRunSettings.DataCollectors.DataCollector.Configuration.Format=cobertura,opencover & \
-	p1=$$!; \
-	dotnet test "$(SLNX)" --no-restore --no-build --filter "$(TEST_E2E_FILTER)" --logger trx --blame-hang --blame-hang-timeout 5m \
-		--collect:"XPlat Code Coverage" --results-directory "$(RESULTS_DIR)/e2e" \
-		-- DataCollectionRunSettings.DataCollectors.DataCollector.Configuration.Format=cobertura,opencover & \
-	p2=$$!; \
-	wait $$p1; s1=$$?; \
-	wait $$p2; s2=$$?; \
-	if [ $$s1 -ne 0 ] || [ $$s2 -ne 0 ]; then exit 1; fi
+		-- DataCollectionRunSettings.DataCollectors.DataCollector.Configuration.Format=cobertura,opencover
+	@dotnet test "$(SLNX)" --no-restore --no-build --filter "$(TEST_E2E_FILTER)" --logger trx --blame-hang --blame-hang-timeout 5m \
+		--results-directory "$(RESULTS_DIR)/e2e"
 
 test-coverage-badge: test-coverage  ## Run tests with coverage and print a test-coverage badge Markdown line
 	@cd "$(PROJECT_ROOT)" && UV_PROJECT_ENVIRONMENT="$(PROJECT_ROOT)/.venv" "$(UV)" run --project tools/pyproject.toml \
