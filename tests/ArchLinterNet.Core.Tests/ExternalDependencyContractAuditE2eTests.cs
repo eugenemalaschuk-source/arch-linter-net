@@ -4,10 +4,11 @@ using NUnit.Framework;
 
 namespace ArchLinterNet.Core.Tests;
 
-// E2E: runs the real audit pipeline (full IL-token resolution and reference scanning) against
-// the actual ArchLinterNet.Core assembly — tens of seconds on CI runners. Kept out of the unit
-// path via Category E2E and capped with [CancelAfter]; the perf follow-up is tracked in
-// https://github.com/eugenemalaschuk-source/arch-linter-net/issues/419.
+// E2E: runs the real audit pipeline (full IL-token resolution and reference scanning) against the
+// actual ArchLinterNet.Core assembly. Issue #419 removed the quadratic finding-identity attachment
+// and added IL-token caching, so this no longer needs a [CancelAfter] exemption from the default
+// per-test duration limit — it now runs well inside PerTestDurationGuardAttribute.DefaultLimitMs,
+// and that guard is what keeps the audit path from regressing back into minutes.
 [TestFixture]
 [Category("E2E")]
 public sealed class ExternalDependencyContractAuditE2eTests
@@ -31,7 +32,6 @@ public sealed class ExternalDependencyContractAuditE2eTests
     }
 
     [Test]
-    [CancelAfter(180_000)]
     public void ValidateAudit_AuditExternalViolation_IsReported()
     {
         string contractDir = Path.Combine(_tempDir, "architecture");
