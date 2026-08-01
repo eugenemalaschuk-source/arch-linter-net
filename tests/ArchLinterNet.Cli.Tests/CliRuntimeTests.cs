@@ -135,6 +135,86 @@ public sealed class CliRuntimeTests
         Assert.That(sarif, Does.Contain("\"layer\":\"future\""));
     }
 
+    // PR #416 review round 2: FormatViolationsForHumans/FormatResultForCiArtifacts/
+    // FormatResultAsSarif previously accepted no CancellationToken at all, so a single call
+    // rendering a large findings set could not be interrupted mid-render — only checked
+    // before/after the whole call. These prove the new cancellation-aware overloads reach the
+    // real formatter's per-finding loop, through the full ICliRuntime -> CliRuntime ->
+    // ArchitectureDiagnosticFormatter/ArchitectureSarifFormatter chain ReportCoordinator uses.
+    private static readonly ArchitectureViolation[] _twoViolations =
+    {
+        new("rule-a", null, "pkg-a", "pkg-b", Array.Empty<string>()),
+        new("rule-b", null, "pkg-c", "pkg-d", Array.Empty<string>()),
+    };
+
+    [Test]
+    public void FormatViolationsForHumans_PreCancelledToken_ThrowsOperationCanceledException()
+    {
+        var runtime = new CliRuntime();
+        using CancellationTokenSource cts = new();
+        cts.Cancel();
+
+        Assert.Throws<OperationCanceledException>(() =>
+            runtime.FormatViolationsForHumans(_twoViolations, cts.Token));
+    }
+
+    [Test]
+    public void FormatResultForCiArtifacts_PreCancelledToken_ThrowsOperationCanceledException()
+    {
+        var runtime = new CliRuntime();
+        using CancellationTokenSource cts = new();
+        cts.Cancel();
+
+        Assert.Throws<OperationCanceledException>(() => runtime.FormatResultForCiArtifacts(
+            "strict",
+            false,
+            _twoViolations,
+            Array.Empty<string>(),
+            Array.Empty<ArchitectureCycleFinding>(),
+            Array.Empty<ArchitectureViolation>(),
+            Array.Empty<ArchitectureUnmatchedIgnoredViolation>(),
+            Array.Empty<PolicyConsistencyDiagnostic>(),
+            Array.Empty<ArchitectureCoverageSummary>(),
+            Array.Empty<ArchitectureClassificationConflict>(),
+            Array.Empty<ArchitectureClassificationMetadataFailure>(),
+            Array.Empty<ArchitectureClassificationRoleFact>(),
+            classificationPathDeferred: null,
+            Array.Empty<BuildStatePreflightDiagnostic>(),
+            ArchitectureSourceExpansionInventory.Empty,
+            subtractiveMatcherParticipation: null,
+            cts.Token));
+    }
+
+    [Test]
+    public void FormatResultAsSarif_PreCancelledToken_ThrowsOperationCanceledException()
+    {
+        var runtime = new CliRuntime();
+        using CancellationTokenSource cts = new();
+        cts.Cancel();
+
+        Assert.Throws<OperationCanceledException>(() => runtime.FormatResultAsSarif(
+            "strict",
+            _twoViolations,
+            Array.Empty<string>(),
+            Array.Empty<ArchitectureCycleFinding>(),
+            Array.Empty<BuildStatePreflightDiagnostic>(),
+            Array.Empty<ArchitectureCoverageSummary>(),
+            ArchitectureSourceExpansionInventory.Empty,
+            subtractiveMatcherParticipation: null,
+            cts.Token));
+    }
+
+    [Test]
+    public void FormatViolationsForHumans_TokenNotCancelled_MatchesNonCancellationAwareOverload()
+    {
+        var runtime = new CliRuntime();
+
+        string withToken = runtime.FormatViolationsForHumans(_twoViolations, CancellationToken.None);
+        string withoutToken = runtime.FormatViolationsForHumans(_twoViolations);
+
+        Assert.That(withToken, Is.EqualTo(withoutToken));
+    }
+
     [Test]
     public void MigrateBaseline_MissingBaselineFile_ForwardsToEngineAndThrows()
     {

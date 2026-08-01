@@ -73,6 +73,12 @@ internal sealed class ArchitecturePolicyImportGraphResolver
 
         for (int importIndex = 0; importIndex < source.Imports.Count; importIndex++)
         {
+            // Checked before each sibling import, not only inside Visit() once its own document is
+            // entered — VisitImport already resolves, reads, and parses the import file before
+            // Visit() is ever called for it, so a check only at the top of Visit() lets that
+            // resolve/read/parse work for the next sibling run to completion even after
+            // cancellation was observed while a prior sibling's subtree was being visited.
+            state.CancellationToken.ThrowIfCancellationRequested();
             VisitImport(source, importIndex, depth, state);
         }
 

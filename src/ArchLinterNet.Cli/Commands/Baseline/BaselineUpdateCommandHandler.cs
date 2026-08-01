@@ -80,7 +80,7 @@ internal sealed class BaselineUpdateCommandHandler(ICliRuntime runtime, ICliCons
                     new BaselineWriteGate.Request(
                         "baseline update", options.OutputPath, options.Write.DryRun, options.Write.Force,
                         outcome.Yaml!, outcome.CommentDiagnostic, options.BaselinePath, !json),
-                    out BaselineWriteGate.Disposition disposition))
+                    out BaselineWriteGate.Disposition disposition, cancellationToken))
             {
                 return CliExitCodes.InvalidArgumentsOrRuntimeError;
             }

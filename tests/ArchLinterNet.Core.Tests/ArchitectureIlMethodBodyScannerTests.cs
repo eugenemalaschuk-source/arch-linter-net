@@ -28,6 +28,27 @@ public sealed class ArchitectureIlMethodBodyScannerTests
             context).ToList(), Is.Empty);
     }
 
+    // PR #416 review round 2: this scanner previously accepted no CancellationToken at all, so a
+    // large source-type set could be walked (types, methods, IL instructions) to completion with
+    // no way to interrupt it — only the surrounding per-contract-family boundary could stop it,
+    // which is too coarse for a single expensive contract.
+    [Test]
+    public void FindMethodBodyViolations_PreCancelledToken_ThrowsOperationCanceledException()
+    {
+        var scanner = new ArchitectureIlMethodBodyScanner();
+        var context = new ArchitectureContractExecutionContext(
+            "method-body", "method-body-id", Array.Empty<ArchitectureIgnoredViolation>(), false, null, null);
+        using CancellationTokenSource cts = new();
+        cts.Cancel();
+
+        Assert.Throws<OperationCanceledException>(() => scanner.FindMethodBodyViolations(
+            _fixtureAssembly,
+            typeof(MethodBodyFixture).Namespace!,
+            _consoleWriteLinePattern,
+            context,
+            cancellationToken: cts.Token).ToList());
+    }
+
     [Test]
     public void FindMatchesForType_ReturnsMemberAndMethodDetails()
     {

@@ -43,6 +43,14 @@ internal sealed partial class ValidateCommandHandler
         {
             return ExecuteValidation(options, errorFormat);
         }
+        // Must precede the general OperationCanceledException catch below (it is a subtype) — a
+        // killed build/restore process that never confirmed exit carries evidence (which process,
+        // what deadline) that a generic "cancelled" message would silently discard.
+        catch (BuildStateProcessCleanupTimedOutException ex)
+        {
+            WriteCancellation(options, errorFormat, ex);
+            return CliExitCodes.InvalidArgumentsOrRuntimeError;
+        }
         catch (OperationCanceledException)
         {
             WriteCancellation(options, errorFormat);
@@ -224,8 +232,7 @@ internal sealed partial class ValidateCommandHandler
         string errorFormat,
         IReadOnlyDictionary<string, string> contentByFormat,
         bool allowFileSinks,
-        RouteResult? priorOutputResult = null,
-        CancellationToken? routingCancellationToken = null)
+        RouteResult? priorOutputResult = null)
     {
         if (options.AdditionalSinks.Count == 0)
         {
@@ -245,7 +252,7 @@ internal sealed partial class ValidateCommandHandler
         if (allowFileSinks)
         {
             RouteResult errorRouteResult = _coordinator.RouteErrorToAllSinks(
-                options.AdditionalSinks, contentByFormat, routingCancellationToken ?? _cancellationToken);
+                options.AdditionalSinks, contentByFormat, _cancellationToken);
             if (errorRouteResult.Status != ReportRouteStatus.AllSucceeded
                 && CanUseStderrFallback(errorRouteResult))
             {

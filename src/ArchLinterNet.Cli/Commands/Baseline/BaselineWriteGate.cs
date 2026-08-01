@@ -45,7 +45,7 @@ internal sealed class BaselineWriteGate(ICliConsole console, IFileSystem fileSys
     /// Applies the gate. Returns false when the command must fail; on success reports how the proposal
     /// was disposed of, so the caller can word its own summary.
     /// </summary>
-    public bool TryApply(Request request, out Disposition disposition)
+    public bool TryApply(Request request, out Disposition disposition, CancellationToken cancellationToken = default)
     {
         disposition = Disposition.Preview;
 
@@ -87,7 +87,7 @@ internal sealed class BaselineWriteGate(ICliConsole console, IFileSystem fileSys
         // Temp-then-rename: if producing or writing the content fails, the destination still holds
         // its original bytes because nothing has been renamed over it.
         string tempPath = fileSystem.WriteAllTextToTemp(request.OutputPath, request.Yaml);
-        fileSystem.RenameTempToTarget(tempPath, request.OutputPath);
+        RenameOrCleanUpOnCancellation(tempPath, request.OutputPath, cancellationToken);
         disposition = Disposition.Written;
         return true;
     }
@@ -96,13 +96,14 @@ internal sealed class BaselineWriteGate(ICliConsole console, IFileSystem fileSys
     /// Copies an already-reviewed source document through the same overwrite and atomic-rename gate.
     /// Used for a no-op prune so a separate destination preserves the source's exact bytes.
     /// </summary>
-    public bool TryCopySource(Request request, string sourcePath, out Disposition disposition)
+    public bool TryCopySource(
+        Request request, string sourcePath, out Disposition disposition, CancellationToken cancellationToken = default)
     {
         disposition = Disposition.Preview;
 
         if (request.OutputPath == null || request.DryRun)
         {
-            return TryApply(request, out disposition);
+            return TryApply(request, out disposition, cancellationToken);
         }
 
         if (request.CommentDiagnostic != null)
@@ -117,9 +118,38 @@ internal sealed class BaselineWriteGate(ICliConsole console, IFileSystem fileSys
         }
 
         string tempPath = fileSystem.CopyFileToTemp(sourcePath, request.OutputPath);
-        fileSystem.RenameTempToTarget(tempPath, request.OutputPath);
+        RenameOrCleanUpOnCancellation(tempPath, request.OutputPath, cancellationToken);
         disposition = Disposition.Written;
         return true;
+    }
+
+    // The staged temp file is invisible at OutputPath until this rename commits it, so a token
+    // cancelled any time up to and including this check is still cancellation-safe — nothing has
+    // been published yet. Re-checking only before WriteAllTextToTemp/CopyFileToTemp (the caller's
+    // previous behavior) left this exact window uncovered: a signal arriving after staging but
+    // before this call would still have gone on to rename and report success.
+    private void RenameOrCleanUpOnCancellation(string tempPath, string outputPath, CancellationToken cancellationToken)
+    {
+        if (cancellationToken.IsCancellationRequested)
+        {
+            DeleteTempFileBestEffort(tempPath);
+            cancellationToken.ThrowIfCancellationRequested();
+        }
+
+        fileSystem.RenameTempToTarget(tempPath, outputPath);
+    }
+
+    private void DeleteTempFileBestEffort(string tempPath)
+    {
+        try
+        {
+            fileSystem.DeleteFile(tempPath);
+        }
+        catch
+        {
+            // Cleanup only — a failure here just leaves a stray .tmp file behind, which doesn't
+            // change the cancellation this call is already about to report.
+        }
     }
 
     private bool TryConfirmOverwriteIntent(Request request)

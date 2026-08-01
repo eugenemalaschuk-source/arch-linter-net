@@ -70,12 +70,15 @@ public sealed partial class ArchitectureSarifFormatter : IArchitectureSarifForma
         IReadOnlyCollection<BuildStatePreflightDiagnostic> preflightDiagnostics,
         IReadOnlyCollection<ArchitectureCoverageSummary>? coverageSummaries = null,
         Model.ArchitectureSourceExpansionInventory? sourceExpansion = null,
-        IReadOnlyCollection<Model.ArchitectureSubtractiveMatcherParticipation>? subtractiveMatcherParticipation = null)
+        IReadOnlyCollection<Model.ArchitectureSubtractiveMatcherParticipation>? subtractiveMatcherParticipation = null,
+        CancellationToken cancellationToken = default)
     {
         string level = mode == "strict" ? "error" : "warning";
 
-        List<ResultEntry> entries = ArchitectureFindingMapper.FromViolations(violations, mode)
-            .Select(finding => BuildViolationEntry(finding, level))
+        // Violations are the dominant contributor to a large report's size, so this is checked
+        // per finding — not just before/after the whole SARIF document is built.
+        List<ResultEntry> entries = BuildViolationEntriesCancellationAware(
+                ArchitectureFindingMapper.FromViolations(violations, mode), level, cancellationToken)
             .Concat(cycleEntryFactories.Select(factory => factory(level)))
             .Concat(preflightDiagnostics.Where(d => d.IsBlocking).Select(diagnostic => BuildPreflightEntry(diagnostic, mode)))
             .OrderBy(e => e.RuleId, StringComparer.Ordinal)
@@ -126,6 +129,19 @@ public sealed partial class ArchitectureSarifFormatter : IArchitectureSarifForma
         };
 
         return JsonSerializer.Serialize(payload);
+    }
+
+    private static List<ResultEntry> BuildViolationEntriesCancellationAware(
+        IEnumerable<ArchitectureFinding> findings, string level, CancellationToken cancellationToken)
+    {
+        List<ResultEntry> entries = new();
+        foreach (ArchitectureFinding finding in findings)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            entries.Add(BuildViolationEntry(finding, level));
+        }
+
+        return entries;
     }
 
     private static object[] FormatCoverageSummaries(IReadOnlyCollection<ArchitectureCoverageSummary> summaries)

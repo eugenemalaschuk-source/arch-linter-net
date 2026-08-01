@@ -59,16 +59,12 @@ internal sealed class PublicApiUpdateCommandHandler(ICliRuntime runtime, ICliCon
             // enough that cancellation arrived after Core's own last check but before this
             // handler commits anything or prints a completion document — including a dry-run
             // preview, which reports a proposed-content document as if the operation had
-            // completed normally. WriteAllTextToTemp/RenameTempToTarget are not re-checked
-            // between themselves — the temp file is staged content only, invisible at the
-            // destination path until the rename commits it, so no partial/visible write is
-            // possible in that narrow window.
+            // completed normally.
             cancellationToken.ThrowIfCancellationRequested();
 
             if (!options.DryRun)
             {
-                string tempPath = fileSystem.WriteAllTextToTemp(destination, outcome.Snapshot!);
-                fileSystem.RenameTempToTarget(tempPath, destination);
+                PublicApiTwoPhaseWriter.WriteAndCommit(fileSystem, destination, outcome.Snapshot!, cancellationToken);
             }
 
             // One document per invocation: for `json` the delta, status, destination, and proposed

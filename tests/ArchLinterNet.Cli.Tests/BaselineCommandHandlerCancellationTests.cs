@@ -81,6 +81,36 @@ public sealed partial class BaselineCommandHandlerTests
         });
     }
 
+    // PR #416 review round 2: the handler-level pre-check above only closes the window before
+    // BaselineWriteGate.TryApply is called at all — it does not cover cancellation observed
+    // *inside* the gate's own staging, between WriteAllTextToTemp and RenameTempToTarget.
+    // BaselineWriteGate now re-checks immediately before the rename and cleans up the staged temp;
+    // this reproduces cancellation as a side effect of the temp write itself.
+    [Test]
+    public void BaselineUpdate_TokenCancelledDuringTempWrite_DoesNotRenameAndCleansUpStagedTemp()
+    {
+        using CancellationTokenSource cts = new();
+        var runtime = new StubRuntime
+        {
+            UpdateOutcome = new BaselineUpdateOutcome(true, "updated: yaml", 3, 1, Array.Empty<ArchitectureViolation>()),
+        };
+        var console = new RecordingConsole();
+        var fileSystem = new StubFileSystem("policy.yml", "baseline.yml") { OnWriteAllTextToTemp = cts.Cancel };
+
+        int result = new BaselineUpdateCommandHandler(runtime, console, fileSystem, cts.Token).Execute(
+            new BaselineUpdateCommandOptions(
+                "policy.yml", "baseline.yml", "updated.yml", _reasons, "strict", null, "human", _write,
+                Array.Empty<string>(), false));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(result, Is.EqualTo(CliExitCodes.InvalidArgumentsOrRuntimeError));
+            Assert.That(console.ErrorText, Does.Contain("Baseline update was cancelled."));
+            Assert.That(fileSystem.RenameCount, Is.EqualTo(0), "cancellation observed after staging must prevent the rename from committing the baseline");
+            Assert.That(fileSystem.DeletedPaths, Does.Contain("updated.yml.tmp"), "the staged temp file must be cleaned up, not left orphaned");
+        });
+    }
+
     [Test]
     public void BaselineGenerate_TokenCancelledAfterOutcomeReturned_DoesNotWriteAndReportsCancelled()
     {

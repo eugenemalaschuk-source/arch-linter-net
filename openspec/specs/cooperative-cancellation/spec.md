@@ -54,12 +54,14 @@ issue #418, not something this requirement claims is already true.
 
 #### Scenario: Cancellation during a deep policy import graph
 - **WHEN** the token is cancelled while `ArchitecturePolicyImportGraphResolver` is traversing a multi-file
-  import chain
-- **THEN** the current document's own import list stops being visited and no further import file is read
+  import chain, whether while a document's own subtree is being visited or between two sibling imports of
+  the same parent document
+- **THEN** the next import — nested or sibling — is not resolved, read, or parsed
 
-#### Scenario: Cancellation during deep type/role scanning
-- **WHEN** the token is cancelled while `ArchitectureTypeIndex.LoadAllTypes()` or `ArchitectureRoleIndex.BuildData()`
-  is scanning a large target-assembly set
+#### Scenario: Cancellation during deep type/role/IL scanning
+- **WHEN** the token is cancelled while `ArchitectureTypeIndex.LoadAllTypes()`, `ArchitectureRoleIndex.BuildData()`,
+  `ArchitectureIlMethodBodyScanner.FindMethodBodyViolations`, or `ArchitectureExternalDependencyIlScanner.FindMethodBodyViolations`
+  is scanning a large target-assembly or source-type set
 - **THEN** scanning stops at the next assembly/type boundary and raises `OperationCanceledException`
 
 #### Scenario: Cancellation during contract-family execution
@@ -212,17 +214,28 @@ The system SHALL retain every configured file sink in cancellation evidence, SHA
 - **WHEN** a child process exits while async stdout or stderr callbacks remain pending
 - **THEN** diagnostic output is read only after parameterless `WaitForExit()` completes
 
-#### Scenario: Cancellation mid-render stops before the next section or mode
+#### Scenario: Cancellation mid-render stops before the next section, mode, or finding
 - **WHEN** cancellation is observed while `ReportCoordinator` is rendering one human report section (e.g.
-  between violations and cycles) or one mode of a combined strict+audit JSON/SARIF document
-- **THEN** rendering stops before the next section or mode, and `OperationCanceledException` propagates
+  between violations and cycles), one mode of a combined strict+audit JSON/SARIF document, or one finding
+  within a single large violations/coverage-findings list inside one section's own render call
+- **THEN** rendering stops at that boundary — including mid-list, inside `FormatViolationsForHumans`,
+  `FormatResultForCiArtifacts`, or `FormatResultAsSarif` — and `OperationCanceledException` propagates
   instead of a partial document reaching any sink
+
+#### Scenario: A cancellation notice never overwrites an existing configured report file
+- **WHEN** the CLI's own `CancellationToken` is cancelled (e.g. a real Ctrl+C) and a `--report <format>=<file>`
+  file sink is configured
+- **THEN** the typed cancelled completion is written to a safe stream fallback (stderr, or a configured
+  stream sink) and the configured file sink is left untouched — it may hold a legitimate report from an
+  earlier run of the same command
 
 #### Scenario: A killed build/restore process that will not confirm exit is reported, not silently leaked
 - **WHEN** `BuildStatePreparationService` kills a cancelled child `dotnet build`/`dotnet restore` process and
   it does not report exit within the bounded post-kill deadline
 - **THEN** the operation raises a typed cleanup-timeout exception (a subtype of `OperationCanceledException`)
-  identifying the process instead of silently treating the kill as confirmed
+  identifying the process, and the CLI's cancelled completion output surfaces that process ID and deadline —
+  it is not caught by the generic `OperationCanceledException` handling and reported as a bare "cancelled"
+  message that discards the evidence
 
 ### Requirement: Shared application seams observe cancellation
 Baseline, public-API, policy composition, hashing, receipt publication, and final outcome construction SHALL observe the caller token before publishing a completed result.
@@ -238,8 +251,9 @@ Baseline, public-API, policy composition, hashing, receipt publication, and fina
   distinct human message) rather than folding it into that command's generic `<command> error` message
 
 #### Scenario: Baseline/public-API cancellation racing publication does not write
-- **WHEN** a baseline or public-API command handler's `CancellationToken` is cancelled after Core returns a
-  successful outcome but before the handler's own write/rename step
-- **THEN** the handler re-checks the token immediately before that write/rename and does not write, leaving
-  any existing baseline/snapshot file at the destination unchanged
+- **WHEN** a baseline or public-API command handler's `CancellationToken` is cancelled at any point up to and
+  including the moment the temp file has been staged (`WriteAllTextToTemp`/`BaselineWriteGate.TryApply` or
+  `TryCopySource`) but before the rename that commits it (`RenameTempToTarget`)
+- **THEN** the rename does not happen, the staged temp file is deleted, and any existing baseline/snapshot
+  file at the destination is left unchanged
 

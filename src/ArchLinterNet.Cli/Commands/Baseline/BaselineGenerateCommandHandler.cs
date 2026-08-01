@@ -65,7 +65,7 @@ internal sealed class BaselineGenerateCommandHandler(ICliRuntime runtime, ICliCo
                     new BaselineWriteGate.Request(
                         "baseline generate", options.OutputPath, options.Write.DryRun, options.Write.Force,
                         outcome.Yaml!, CommentDiagnostic: null, InPlacePath: null, EmitProposalToStdout: !json),
-                    out BaselineWriteGate.Disposition disposition))
+                    out BaselineWriteGate.Disposition disposition, cancellationToken))
             {
                 return CliExitCodes.InvalidArgumentsOrRuntimeError;
             }

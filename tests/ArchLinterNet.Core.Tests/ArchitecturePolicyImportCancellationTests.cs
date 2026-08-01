@@ -48,6 +48,47 @@ public sealed class ArchitecturePolicyImportCancellationTests
         }
     }
 
+    // PR #416 review round 2: the per-document check at the top of Visit() only covers a nested
+    // import's own subtree — it does not stop a SIBLING import from being resolved, read, and
+    // parsed. a.yml here has no imports of its own, so Visit(a) returns normally without ever
+    // observing the mid-read cancellation; the loop back in the parent must catch it before
+    // moving on to b.yml.
+    [Test]
+    public void Load_CancelledWhileReadingASiblingImport_StopsBeforeTheNextSiblingIsRead()
+    {
+        string directory = Path.Combine(Path.GetTempPath(), $"arch-linter-import-cancel-{Guid.NewGuid():N}", "architecture");
+        Directory.CreateDirectory(directory);
+        string rootPath = Path.Combine(directory, "root.yml");
+        string aPath = Path.Combine(directory, "a.yml");
+        string bPath = Path.Combine(directory, "b.yml");
+
+        File.WriteAllText(
+            rootPath,
+            "version: 1\nname: Root\nimports: [a.yml, b.yml]\nanalysis:\n  target_assemblies: [App]\ncontracts:\n  strict: []\n");
+        // a.yml has no nested imports, so Visit(a) completes and returns to the parent's loop
+        // without ever re-observing a cancellation signal raised while a.yml was being read.
+        File.WriteAllText(aPath, "layers:\n  domain:\n    namespace: App.Domain\n");
+        File.WriteAllText(bPath, "layers:\n  infra:\n    namespace: App.Infra\n");
+
+        try
+        {
+            using CancellationTokenSource cts = new();
+            var fileSystem = new CancelOnReadFileSystem(aPath, cts);
+
+            Assert.Throws<OperationCanceledException>(() =>
+                new ArchitecturePolicyDocumentLoader(fileSystem).Load(rootPath, cts.Token));
+
+            Assert.That(
+                fileSystem.ReadPaths.Any(path => string.Equals(path, Path.GetFullPath(bPath), StringComparison.OrdinalIgnoreCase)),
+                Is.False,
+                "cancellation observed while reading sibling a.yml must stop before sibling b.yml is resolved/read/parsed");
+        }
+        finally
+        {
+            Directory.Delete(Path.GetDirectoryName(directory)!, recursive: true);
+        }
+    }
+
     [Test]
     public void Load_TokenNotCancelled_ReadsEveryImportAsBefore()
     {

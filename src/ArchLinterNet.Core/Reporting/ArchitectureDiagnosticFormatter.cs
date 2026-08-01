@@ -7,6 +7,17 @@ public partial interface IArchitectureDiagnosticFormatter
 {
     string FormatViolationsForHumans(IReadOnlyCollection<ArchitectureViolation> violations);
 
+    /// <summary>
+    /// Additive overload, not a modification of the member above: any caller already compiled
+    /// against the original one-parameter overload keeps resolving to it, unaffected. Declared
+    /// with a default interface implementation that ignores the token and delegates to the
+    /// original overload, so a third-party implementer that predates this member is not forced to
+    /// add it just to keep compiling — only <see cref="ArchitectureDiagnosticFormatter"/> itself
+    /// overrides it with a genuinely per-finding cancellation-aware implementation.
+    /// </summary>
+    string FormatViolationsForHumans(IReadOnlyCollection<ArchitectureViolation> violations, CancellationToken cancellationToken) =>
+        FormatViolationsForHumans(violations);
+
     string FormatCyclesForHumans(IReadOnlyCollection<string> cycles);
 
     string FormatUnmatchedForHumans(IReadOnlyCollection<ArchitectureUnmatchedIgnoredViolation> unmatched);
@@ -111,11 +122,25 @@ public sealed partial class ArchitectureDiagnosticFormatter : IArchitectureDiagn
 {
     public string FormatViolationsForHumans(IReadOnlyCollection<ArchitectureViolation> violations)
     {
+        return FormatViolationsForHumans(violations, CancellationToken.None);
+    }
+
+    // Checked per finding — a large findings set is the dominant contributor to a large human
+    // report, so this is the actual iteration boundary that needs to be interruptible, not just a
+    // check before/after the whole call.
+    public string FormatViolationsForHumans(
+        IReadOnlyCollection<ArchitectureViolation> violations, CancellationToken cancellationToken)
+    {
         IReadOnlyList<ArchitectureFinding> findings = ArchitectureFindingMapper.Order(
             ArchitectureFindingMapper.FromViolations(violations));
-        return string.Join(
-            Environment.NewLine,
-            findings.Select(FormatFindingForHumans));
+        var lines = new string[findings.Count];
+        for (int i = 0; i < findings.Count; i++)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            lines[i] = FormatFindingForHumans(findings[i]);
+        }
+
+        return string.Join(Environment.NewLine, lines);
     }
 
     public string FormatUnmatchedForHumans(IReadOnlyCollection<ArchitectureUnmatchedIgnoredViolation> unmatched)

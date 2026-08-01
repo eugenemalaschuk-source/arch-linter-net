@@ -76,7 +76,7 @@ internal sealed class BaselinePruneCommandHandler(ICliRuntime runtime, ICliConso
                             "baseline prune", options.OutputPath, options.Write.DryRun, options.Write.Force,
                             outcome.Yaml!, outcome.CommentDiagnostic, options.BaselinePath, !json),
                         options.BaselinePath,
-                        out disposition))
+                        out disposition, cancellationToken))
                 {
                     return CliExitCodes.InvalidArgumentsOrRuntimeError;
                 }
@@ -91,7 +91,7 @@ internal sealed class BaselinePruneCommandHandler(ICliRuntime runtime, ICliConso
                         new BaselineWriteGate.Request(
                             "baseline prune", options.OutputPath, options.Write.DryRun, options.Write.Force,
                             outcome.Yaml!, outcome.CommentDiagnostic, options.BaselinePath, !json),
-                        out disposition))
+                        out disposition, cancellationToken))
                 {
                     return CliExitCodes.InvalidArgumentsOrRuntimeError;
                 }

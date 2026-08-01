@@ -486,7 +486,8 @@ public sealed partial class ArchitectureAnalysisSession
             sourceLayer.Namespace,
             contract.ForbiddenCalls,
             executionContext,
-            sourceLayer: sourceLayer)
+            sourceLayer: sourceLayer,
+            cancellationToken: Context.CancellationToken)
             .ToList();
 
         List<ArchitectureViolation> violations = ArchitectureNamespaceViolationFinder.MergeMethodBodyViolations(contract.Name, contract.Id, roslynViolations, ilViolations);
@@ -683,7 +684,8 @@ public sealed partial class ArchitectureAnalysisSession
                 sourceTypes,
                 externalGroupName,
                 externalGroup,
-                executionContext));
+                executionContext,
+                Context.CancellationToken));
         }
 
         executionContext.CollectUnmatchedIgnores(_unmatchedIgnoredViolations);

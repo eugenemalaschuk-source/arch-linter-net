@@ -75,8 +75,7 @@ internal sealed class PublicApiCaptureCommandHandler(ICliRuntime runtime, ICliCo
 
             if (!identical)
             {
-                string tempPath = fileSystem.WriteAllTextToTemp(destination, outcome.Snapshot!);
-                fileSystem.RenameTempToTarget(tempPath, destination);
+                PublicApiTwoPhaseWriter.WriteAndCommit(fileSystem, destination, outcome.Snapshot!, cancellationToken);
             }
 
             console.Out.WriteLine(options.Format == PublicApiOptionsFactory.JsonFormat

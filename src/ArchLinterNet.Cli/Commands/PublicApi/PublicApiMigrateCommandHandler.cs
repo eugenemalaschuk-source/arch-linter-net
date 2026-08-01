@@ -77,8 +77,7 @@ internal sealed class PublicApiMigrateCommandHandler(ICliRuntime runtime, ICliCo
 
             if (!options.DryRun && !identical)
             {
-                string tempPath = fileSystem.WriteAllTextToTemp(destination, outcome.Snapshot!);
-                fileSystem.RenameTempToTarget(tempPath, destination);
+                PublicApiTwoPhaseWriter.WriteAndCommit(fileSystem, destination, outcome.Snapshot!, cancellationToken);
             }
 
             console.Out.WriteLine(options.Format == PublicApiOptionsFactory.JsonFormat

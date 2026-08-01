@@ -1,5 +1,6 @@
 using ArchLinterNet.Cli.Abstractions;
 using ArchLinterNet.Cli.Commands.Validate;
+using ArchLinterNet.Core.BuildState;
 using ArchLinterNet.Core.Contracts;
 using ArchLinterNet.Core.Model;
 using NUnit.Framework;
@@ -13,10 +14,15 @@ public sealed partial class ValidateCommandHandlerReportModeTests
 {
     // Issue #375: cancellation exits via the same numeric category as any other execution error
     // (CliExitCodes.InvalidArgumentsOrRuntimeError) but must carry a distinct "cancelled"
-    // status/kind — never the generic architecture_execution_error shape — in every configured
-    // format, and route through file sinks the same way a pre-outcome execution error does.
+    // status/kind — never the generic architecture_execution_error shape.
+    //
+    // PR #416 review round 2: WriteCancellation must NOT route through file sinks the way a
+    // post-outcome execution error does — a --report file sink may already hold a legitimate
+    // report from an earlier run, and #375 requires preserving pre-existing report destinations.
+    // The typed cancelled notice goes to the safe stream fallback (stderr) instead, never
+    // touching the configured file.
     [Test]
-    public void ValidateHandler_Cancelled_RoutesDistinctCancelledStatusToFileSink()
+    public void ValidateHandler_Cancelled_NeverOverwritesConfiguredFileSink_UsesStderrFallback()
     {
         FakeCliRuntime runtime = new()
         {
@@ -37,24 +43,21 @@ public sealed partial class ValidateCommandHandlerReportModeTests
         Assert.Multiple(() =>
         {
             Assert.That(exitCode, Is.EqualTo(CliExitCodes.InvalidArgumentsOrRuntimeError));
-            Assert.That(fileSystem.CommittedPaths, Does.Contain("cancelled.json"));
-            string committedContent = fileSystem.ReadAllText("cancelled.json.tmp");
-            Assert.That(committedContent, Does.Contain("\"status\":\"cancelled\""));
-            Assert.That(committedContent, Does.Not.Contain("architecture_execution_error"));
+            Assert.That(fileSystem.CommittedPaths, Does.Not.Contain("cancelled.json"),
+                "a --report file sink must never be overwritten by a cancellation notice — it may hold a legitimate report from an earlier run");
+            Assert.That(console.StdErr, Does.Contain("\"status\":\"cancelled\""));
+            Assert.That(console.StdErr, Does.Not.Contain("architecture_execution_error"));
         });
     }
 
     // PR #416 review: the test above passes the handler CancellationToken.None (the default) and
     // throws the OperationCanceledException artificially — it never exercises the actual
     // production path, where _cancellationToken is the SAME token that was cancelled and caused
-    // Core to throw. Passing that already-cancelled token into RouteErrorToAllSinks made its
-    // first staging check see IsCancellationRequested == true and return Cancelled immediately,
-    // without delivering to any sink — WriteErrorContent's fallback then reported
-    // "output-failed" instead of the typed "cancelled" content built for this exact case. This
-    // reproduces the real path: the handler's own token is cancelled, runtime throws OCE from
-    // it, and the cancellation notice must still reach the configured file sink undistorted.
+    // Core to throw. This reproduces the real path: the handler's own token is cancelled, runtime
+    // throws OCE from it, and the cancellation notice must still reach a safe fallback — and, per
+    // round 2, must still never touch the configured file sink.
     [Test]
-    public void ValidateHandler_HandlerTokenCancelled_RealProductionPath_StillPublishesTypedCancelledStatus()
+    public void ValidateHandler_HandlerTokenCancelled_RealProductionPath_NeverOverwritesFileSink()
     {
         using CancellationTokenSource cts = new();
         cts.Cancel();
@@ -77,12 +80,41 @@ public sealed partial class ValidateCommandHandlerReportModeTests
         Assert.Multiple(() =>
         {
             Assert.That(exitCode, Is.EqualTo(CliExitCodes.InvalidArgumentsOrRuntimeError));
-            Assert.That(fileSystem.CommittedPaths, Does.Contain("cancelled.json"));
-            string committedContent = fileSystem.ReadAllText("cancelled.json.tmp");
-            Assert.That(committedContent, Does.Contain("\"status\":\"cancelled\""));
-            Assert.That(committedContent, Does.Not.Contain("output-failed"));
-            Assert.That(committedContent, Does.Not.Contain("partial-output"));
+            Assert.That(fileSystem.CommittedPaths, Does.Not.Contain("cancelled.json"));
+            Assert.That(console.StdErr, Does.Contain("\"status\":\"cancelled\""));
             Assert.That(console.StdErr, Does.Not.Contain("output-failed"));
+            Assert.That(console.StdErr, Does.Not.Contain("partial-output"));
+        });
+    }
+
+    // PR #416 review round 2: BuildStateProcessCleanupTimedOutException carries ProcessId/TimeoutMs
+    // evidence that a killed build/restore process never confirmed exit — the handler's generic
+    // catch (OperationCanceledException) previously matched this subtype too and discarded that
+    // evidence behind a bare "cancelled" message. A dedicated catch branch must surface it.
+    [Test]
+    public void ValidateHandler_ProcessCleanupTimedOut_SurfacesProcessIdAndTimeoutEvidence()
+    {
+        using CancellationTokenSource cts = new();
+        FakeCliRuntime runtime = new()
+        {
+            ExceptionToThrow = new BuildStateProcessCleanupTimedOutException(4242, 5000, cts.Token)
+        };
+        FakeCliConsole console = new();
+        FakeFileSystem fileSystem = new(exists: true);
+        ValidateCommandHandler handler = new(runtime, console, fileSystem);
+
+        ValidateCommandOptions options = new(
+            "policy.yml", "strict", "json", [], null, false, null, false, false);
+
+        int exitCode = handler.Execute(options);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(exitCode, Is.EqualTo(CliExitCodes.InvalidArgumentsOrRuntimeError));
+            Assert.That(console.StdOut, Does.Contain("\"status\":\"cancelled\""));
+            Assert.That(console.StdOut, Does.Contain("\"processId\":4242"));
+            Assert.That(console.StdOut, Does.Contain("\"processCleanupTimeoutMs\":5000"));
+            Assert.That(console.StdOut, Does.Contain("\"processCleanupTimedOut\":true"));
         });
     }
 

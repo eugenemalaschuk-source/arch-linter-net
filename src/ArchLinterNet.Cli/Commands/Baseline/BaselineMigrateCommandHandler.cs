@@ -91,7 +91,7 @@ internal sealed class BaselineMigrateCommandHandler(ICliRuntime runtime, ICliCon
                             "baseline migrate", options.OutputPath, options.DryRun, options.Force,
                             outcome.Yaml, CommentDiagnostic: null, InPlacePath: null,
                             EmitProposalToStdout: options.Format == "human"),
-                        out BaselineWriteGate.Disposition disposition))
+                        out BaselineWriteGate.Disposition disposition, cancellationToken))
                 {
                     return CliExitCodes.InvalidArgumentsOrRuntimeError;
                 }

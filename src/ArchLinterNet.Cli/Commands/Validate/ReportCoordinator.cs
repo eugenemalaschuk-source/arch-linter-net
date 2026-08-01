@@ -635,7 +635,7 @@ internal sealed class ReportCoordinator
         {
             if (outcome.Violations.Count > 0)
             {
-                sb.AppendLine(_runtime.FormatViolationsForHumans(outcome.Violations));
+                sb.AppendLine(_runtime.FormatViolationsForHumans(outcome.Violations, cancellationToken));
             }
 
             cancellationToken.ThrowIfCancellationRequested();
@@ -695,8 +695,7 @@ internal sealed class ReportCoordinator
 
     private string FormatSingleJson(string mode, ValidationOutcome outcome, CancellationToken cancellationToken = default)
     {
-        cancellationToken.ThrowIfCancellationRequested();
-        return FormatJsonContent(mode, outcome);
+        return FormatJsonContent(mode, outcome, cancellationToken);
     }
 
     private string FormatCombinedJson(
@@ -707,9 +706,10 @@ internal sealed class ReportCoordinator
         {
             // Checked per mode — a combined strict+audit document stops adding further modes'
             // results once cancellation is observed, instead of only checking before the whole
-            // multi-mode document starts.
+            // multi-mode document starts. FormatJsonContent below additionally checks per finding
+            // within a single mode's own violations list.
             cancellationToken.ThrowIfCancellationRequested();
-            results.Add(JsonNode.Parse(FormatJsonContent(mode, outcome)));
+            results.Add(JsonNode.Parse(FormatJsonContent(mode, outcome, cancellationToken)));
         }
 
         return new JsonObject { ["results"] = results }.ToJsonString();
@@ -717,8 +717,7 @@ internal sealed class ReportCoordinator
 
     private string FormatSingleSarif(string mode, ValidationOutcome outcome, CancellationToken cancellationToken = default)
     {
-        cancellationToken.ThrowIfCancellationRequested();
-        return FormatSarifContent(mode, outcome);
+        return FormatSarifContent(mode, outcome, cancellationToken);
     }
 
     private string FormatCombinedSarif(
@@ -728,7 +727,7 @@ internal sealed class ReportCoordinator
         foreach ((string mode, ValidationOutcome outcome) in outcomesByMode)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            JsonNode? document = JsonNode.Parse(FormatSarifContent(mode, outcome));
+            JsonNode? document = JsonNode.Parse(FormatSarifContent(mode, outcome, cancellationToken));
             foreach (JsonNode? run in document?["runs"]?.AsArray() ?? new JsonArray())
             {
                 runs.Add(run?.DeepClone());
@@ -738,7 +737,12 @@ internal sealed class ReportCoordinator
         return new JsonObject { ["version"] = "2.1.0", ["runs"] = runs }.ToJsonString();
     }
 
-    private string FormatJsonContent(string mode, ValidationOutcome outcome)
+    // cancellationToken defaults to None so RenderReportContent (which must always complete a
+    // render regardless of the real cancellation state — see its own comment) keeps working
+    // unchanged; every other caller passes the live token through, checked per violation inside
+    // the widest FormatResultForCiArtifacts overload — the dominant contributor to a large
+    // report's size, not just before/after this call.
+    private string FormatJsonContent(string mode, ValidationOutcome outcome, CancellationToken cancellationToken = default)
     {
         return _runtime.FormatResultForCiArtifacts(
             mode, outcome.Passed, outcome.Violations, outcome.Cycles, outcome.CycleFindings, outcome.CoverageFindings,
@@ -746,14 +750,14 @@ internal sealed class ReportCoordinator
             outcome.PolicyConsistencyConfig == "off" ? Array.Empty<PolicyConsistencyDiagnostic>() : outcome.PolicyConsistencyFindings,
             outcome.CoverageSummaries, outcome.ClassificationConflicts, outcome.ClassificationMetadataFailures,
             outcome.ClassificationRoles, outcome.ClassificationPathDeferred, outcome.PreflightDiagnostics,
-            outcome.SourceExpansion, outcome.SubtractiveMatcherParticipation);
+            outcome.SourceExpansion, outcome.SubtractiveMatcherParticipation, cancellationToken);
     }
 
-    private string FormatSarifContent(string mode, ValidationOutcome outcome)
+    private string FormatSarifContent(string mode, ValidationOutcome outcome, CancellationToken cancellationToken = default)
     {
         return _runtime.FormatResultAsSarif(
             mode, outcome.Violations, outcome.Cycles, outcome.CycleFindings, outcome.PreflightDiagnostics,
-            outcome.CoverageSummaries, outcome.SourceExpansion, outcome.SubtractiveMatcherParticipation);
+            outcome.CoverageSummaries, outcome.SourceExpansion, outcome.SubtractiveMatcherParticipation, cancellationToken);
     }
 
     private static string DispatchFormat(

@@ -79,6 +79,35 @@ public sealed partial class PublicApiCommandHandlerTests
         });
     }
 
+    // PR #416 review round 2: the handler-level pre-check above only closes the window before
+    // WriteAllTextToTemp is called at all — it does not cover cancellation observed *between*
+    // WriteAllTextToTemp and RenameTempToTarget. PublicApiTwoPhaseWriter now re-checks immediately
+    // before the rename and cleans up the staged temp; this reproduces cancellation as a side
+    // effect of the temp write itself.
+    [Test]
+    public void Update_TokenCancelledDuringTempWrite_DoesNotRenameAndCleansUpStagedTemp()
+    {
+        using CancellationTokenSource cts = new();
+        StubFileSystem fileSystem = new(PolicyPath, SnapshotPath) { OnWriteAllTextToTemp = cts.Cancel };
+        RecordingConsole console = new();
+        StubRuntime runtime = new()
+        {
+            UpdateOutcome = new PublicApiUpdateOutcome(
+                true, CapturedSnapshot, DriftDelta(), false, SnapshotPath, Array.Empty<BuildStatePreflightDiagnostic>()),
+        };
+
+        int exitCode = new PublicApiUpdateCommandHandler(runtime, console, fileSystem, cts.Token).Execute(
+            new PublicApiUpdateCommandOptions(PolicyPath, ContractId, SnapshotPath, null, "human", false, false));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(exitCode, Is.EqualTo(CliExitCodes.InvalidArgumentsOrRuntimeError));
+            Assert.That(console.ErrorText, Does.Contain("public-api update was cancelled."));
+            Assert.That(fileSystem.RenameCount, Is.EqualTo(0), "cancellation observed after staging must prevent the rename from committing the snapshot");
+            Assert.That(fileSystem.DeletedPaths, Does.Contain($"{SnapshotPath}.tmp"), "the staged temp file must be cleaned up, not left orphaned");
+        });
+    }
+
     // A dry run never reaches the publish step at all — cancellation observed after Core returns
     // must still be reported distinctly rather than falling through to a normal dry-run preview.
     [Test]

@@ -568,6 +568,12 @@ public sealed partial class BaselineCommandHandlerTests
 
         public int RenameCount { get; private set; }
 
+        /// <summary>Invoked once WriteAllTextToTemp is about to return its temp path — lets a test
+        /// simulate cancellation observed between staging and the subsequent rename.</summary>
+        public Action? OnWriteAllTextToTemp { get; set; }
+
+        public List<string> DeletedPaths { get; } = new();
+
         public string WriteAllTextToTemp(string targetPath, string contents)
         {
             if (TempWriteException != null)
@@ -577,6 +583,7 @@ public sealed partial class BaselineCommandHandlerTests
 
             LastWritePath = targetPath;
             LastWriteContents = contents;
+            OnWriteAllTextToTemp?.Invoke();
             return targetPath + ".tmp";
         }
 
@@ -587,6 +594,7 @@ public sealed partial class BaselineCommandHandlerTests
 
         public void DeleteFile(string path)
         {
+            DeletedPaths.Add(path);
         }
 
         public bool CanWriteToDirectory(string path) => true;

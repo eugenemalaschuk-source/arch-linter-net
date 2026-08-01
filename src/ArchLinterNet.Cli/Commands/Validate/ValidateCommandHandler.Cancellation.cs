@@ -1,4 +1,5 @@
 using System.Text.Json;
+using ArchLinterNet.Core.BuildState;
 using ArchLinterNet.Core.Validation;
 
 namespace ArchLinterNet.Cli.Commands.Validate;
@@ -44,45 +45,52 @@ internal sealed partial class ValidateCommandHandler
     // (CliExitCodes.InvalidArgumentsOrRuntimeError) — see design.md Decision 5 — but carries a
     // distinct "cancelled" status/kind literal in every format, so a caller telling completion
     // statuses apart never confuses cancellation with a generic execution error.
-    private void WriteCancellation(ValidateCommandOptions options, string format)
+    //
+    // cleanupTimeout is non-null only when the cancellation was actually a
+    // BuildStateProcessCleanupTimedOutException — a killed child build/restore process that never
+    // confirmed exit within its deadline. That evidence (which process, what deadline) must reach
+    // the operator; a bare "cancelled" message would silently discard it and look identical to an
+    // ordinary, cleanly-terminated cancellation.
+    private void WriteCancellation(
+        ValidateCommandOptions options, string format, BuildStateProcessCleanupTimedOutException? cleanupTimeout = null)
     {
-        const string Message = "Architecture validation was cancelled.";
+        string message = cleanupTimeout is null
+            ? "Architecture validation was cancelled."
+            : "Architecture validation was cancelled. Child build/restore process " +
+                $"{cleanupTimeout.ProcessId} did not exit within {cleanupTimeout.TimeoutMs}ms after being killed " +
+                "and may still be running.";
 
         Dictionary<string, string> contentByFormat = new();
         foreach (string neededFormat in NeededErrorFormats(options, format))
         {
             contentByFormat[neededFormat] = neededFormat switch
             {
-                FormatJson => BuildCancellationJsonText(Message),
-                FormatSarif => BuildCancellationSarifText(Message),
-                _ => Message,
+                FormatJson => BuildCancellationJsonText(message, cleanupTimeout),
+                FormatSarif => BuildCancellationSarifText(message),
+                _ => message,
             };
         }
 
-        // A cancelled run never reaches a legitimate report for this invocation (see
-        // WriteExecutionError's own rationale for the analogous "before any report exists" case),
-        // so routing the cancellation notice to every configured sink, including files, is safe.
-        //
-        // Routed with a fresh token, not _cancellationToken: this method only runs once
-        // _cancellationToken is already cancelled (that cancellation is why Execute is in this
-        // catch block at all). Passing the already-cancelled token to RouteErrorToAllSinks would
-        // make its very first staging check see IsCancellationRequested == true and return
-        // Cancelled immediately, without attempting delivery to a single configured sink — the
-        // typed "cancelled" content built above would then never reach any destination, and the
-        // WriteErrorRoutingFailureFallback path below would report a misleading "output-failed"
-        // status instead. This is the one document whose whole purpose is to report cancellation,
-        // so it must be allowed to actually publish.
-        WriteErrorContent(
-            options, format, contentByFormat, allowFileSinks: true, routingCancellationToken: CancellationToken.None);
+        // allowFileSinks: false, unlike WriteExecutionError's analogous "before any report exists
+        // this invocation" case: a --report file sink may already hold a legitimate report from an
+        // earlier run of this same command, and #375 requires preserving pre-existing report
+        // destinations. Writing the cancellation notice there would silently overwrite it. Routing
+        // through the safe stream fallback (stderr, or a configured stream sink) instead — the same
+        // path WriteOutputError/WriteCancelledRouting already use for a post-outcome failure — never
+        // touches a file, so it needs no dependency on the (already-cancelled) handler token either.
+        WriteErrorContent(options, format, contentByFormat, allowFileSinks: false);
     }
 
-    private static string BuildCancellationJsonText(string message)
+    private static string BuildCancellationJsonText(string message, BuildStateProcessCleanupTimedOutException? cleanupTimeout)
     {
         return JsonSerializer.Serialize(new
         {
             kind = "architecture_cancelled",
             status = "cancelled",
             message,
+            processCleanupTimedOut = cleanupTimeout is not null,
+            processId = cleanupTimeout?.ProcessId,
+            processCleanupTimeoutMs = cleanupTimeout?.TimeoutMs,
         });
     }
 

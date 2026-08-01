@@ -20,6 +20,14 @@ public sealed partial class PublicApiCommandHandlerTests
 
         public string ReadContents { get; init; } = string.Empty;
 
+        public int RenameCount { get; private set; }
+
+        /// <summary>Invoked once WriteAllTextToTemp is about to return its temp path — lets a test
+        /// simulate cancellation observed between staging and the subsequent rename.</summary>
+        public Action? OnWriteAllTextToTemp { get; set; }
+
+        public List<string> DeletedPaths { get; } = new();
+
         public bool FileExists(string path) => _existingPaths.Contains(path);
 
         public string ReadAllText(string path) => ReadContents;
@@ -34,15 +42,18 @@ public sealed partial class PublicApiCommandHandlerTests
         {
             LastWritePath = targetPath;
             LastWriteContents = contents;
+            OnWriteAllTextToTemp?.Invoke();
             return targetPath + ".tmp";
         }
 
         public void RenameTempToTarget(string tempPath, string targetPath)
         {
+            RenameCount++;
         }
 
         public void DeleteFile(string path)
         {
+            DeletedPaths.Add(path);
         }
 
         public bool CanWriteToDirectory(string path) => true;
