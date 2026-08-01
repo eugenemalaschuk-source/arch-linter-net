@@ -19,4 +19,6 @@ public sealed record BaselineUpdateRequest
     public IReadOnlyCollection<string>? ReasonForFamily { get; init; }
 
     public IReadOnlyCollection<string>? ContractIds { get; init; }
+
+    public CancellationToken CancellationToken { get; init; } = default;
 }

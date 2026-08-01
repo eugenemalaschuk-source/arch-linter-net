@@ -5,7 +5,7 @@ using ArchLinterNet.Core.Validation;
 
 namespace ArchLinterNet.Cli.Commands.PublicApi;
 
-internal sealed class PublicApiUpdateCommandHandler(ICliRuntime runtime, ICliConsole console, IFileSystem fileSystem)
+internal sealed class PublicApiUpdateCommandHandler(ICliRuntime runtime, ICliConsole console, IFileSystem fileSystem, CancellationToken cancellationToken = default)
 {
     private const string CommandName = "update";
 
@@ -42,6 +42,7 @@ internal sealed class PublicApiUpdateCommandHandler(ICliRuntime runtime, ICliCon
                 SnapshotPath = options.SnapshotPath,
                 DryRun = options.DryRun,
                 ConditionSetName = options.ConditionSetName,
+                CancellationToken = cancellationToken,
             });
 
             if (!outcome.Succeeded)
@@ -54,10 +55,16 @@ internal sealed class PublicApiUpdateCommandHandler(ICliRuntime runtime, ICliCon
             // cwd-relative string here would update a different file and still report success.
             string destination = outcome.ResolvedSnapshotPath!;
 
+            // Re-checked immediately before publication: outcome above may have taken long
+            // enough that cancellation arrived after Core's own last check but before this
+            // handler commits anything or prints a completion document — including a dry-run
+            // preview, which reports a proposed-content document as if the operation had
+            // completed normally.
+            cancellationToken.ThrowIfCancellationRequested();
+
             if (!options.DryRun)
             {
-                string tempPath = fileSystem.WriteAllTextToTemp(destination, outcome.Snapshot!);
-                fileSystem.RenameTempToTarget(tempPath, destination);
+                PublicApiTwoPhaseWriter.WriteAndCommit(fileSystem, destination, outcome.Snapshot!, cancellationToken);
             }
 
             // One document per invocation: for `json` the delta, status, destination, and proposed
@@ -67,6 +74,10 @@ internal sealed class PublicApiUpdateCommandHandler(ICliRuntime runtime, ICliCon
                 : FormatForHumans(outcome, destination, options.DryRun));
 
             return CliExitCodes.Success;
+        }
+        catch (OperationCanceledException)
+        {
+            return PublicApiCancellationOutput.Write(console, "update", options.Format == PublicApiOptionsFactory.JsonFormat);
         }
         catch (Exception ex)
         {

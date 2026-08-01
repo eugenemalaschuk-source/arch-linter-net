@@ -8,9 +8,9 @@ internal sealed class DiffBaselineSubcommandModule : IBaselineSubcommandModule
 {
     public string CommandName => "diff";
 
-    public Command CreateCommand(ICliRuntime runtime, ICliConsole console, IFileSystem fileSystem)
+    public Command CreateCommand(ICliRuntime runtime, ICliConsole console, IFileSystem fileSystem, CancellationToken cancellationToken = default)
     {
-        BaselineDiffCommandHandler handler = new(runtime, console, fileSystem);
+        BaselineDiffCommandHandler handler = new(runtime, console, fileSystem, cancellationToken);
         Command command = new(CommandName);
         Option<string> policyOption = BaselineOptionsFactory.CreatePolicyOption();
         Option<string> baselineOption = new("--baseline");

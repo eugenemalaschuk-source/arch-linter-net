@@ -6,7 +6,7 @@ using ArchLinterNet.Core.Validation;
 
 namespace ArchLinterNet.Cli.Commands.Baseline;
 
-internal sealed class BaselineVerifyCommandHandler(ICliRuntime runtime, ICliConsole console, IFileSystem fileSystem)
+internal sealed class BaselineVerifyCommandHandler(ICliRuntime runtime, ICliConsole console, IFileSystem fileSystem, CancellationToken cancellationToken = default)
 {
     public int Execute(BaselineVerifyCommandOptions options)
     {
@@ -60,6 +60,7 @@ internal sealed class BaselineVerifyCommandHandler(ICliRuntime runtime, ICliCons
                 BaselinePath = options.BaselinePath,
                 Mode = options.Mode,
                 ConditionSetName = options.ConditionSetName,
+                CancellationToken = cancellationToken,
                 ContractIds = options.ContractIds.ToList(),
             });
 
@@ -72,6 +73,8 @@ internal sealed class BaselineVerifyCommandHandler(ICliRuntime runtime, ICliCons
             BaselineDiffCommandHandler.BaselineComparisonReport report = new(
                 outcome.New, outcome.Frozen, outcome.Resolved, outcome.Ambiguous, outcome.ConfigurationErrors,
                 outcome.Entries);
+
+            cancellationToken.ThrowIfCancellationRequested();
 
             if (options.Format == "json")
             {
@@ -89,6 +92,10 @@ internal sealed class BaselineVerifyCommandHandler(ICliRuntime runtime, ICliCons
             }
 
             return outcome.InSync ? CliExitCodes.Success : CliExitCodes.ValidationFailure;
+        }
+        catch (OperationCanceledException)
+        {
+            return BaselineCancellationOutput.Write(console, "verify", options.Format == "json");
         }
         catch (Exception ex)
         {

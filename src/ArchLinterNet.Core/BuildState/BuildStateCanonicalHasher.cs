@@ -22,7 +22,8 @@ public static class BuildStateCanonicalHasher
     private static readonly string[] _ancestorImportFileNames =
         { "Directory.Build.props", "Directory.Build.targets", "Directory.Build.rsp", "Directory.Packages.props" };
 
-    public static string ComputeBuildInputFingerprint(string projectPath, string repositoryRoot)
+    public static string ComputeBuildInputFingerprint(
+        string projectPath, string repositoryRoot, CancellationToken cancellationToken = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(projectPath);
         ArgumentException.ThrowIfNullOrWhiteSpace(repositoryRoot);
@@ -37,8 +38,11 @@ public static class BuildStateCanonicalHasher
 
         List<(string RepoRelativePath, byte[] Digest)> entries = new();
 
+        // Checked before each file is hashed (not once up front) — a project directory can carry
+        // many source files, and this is the fingerprint's actual expensive-work boundary.
         foreach (string file in EnumerateRelevantFiles(projectDirectory))
         {
+            cancellationToken.ThrowIfCancellationRequested();
             string repoRelative = ToRepositoryRelativePath(file, repositoryRoot);
             byte[] digest = SHA256.HashData(File.ReadAllBytes(file));
             entries.Add((repoRelative, digest));
@@ -46,10 +50,13 @@ public static class BuildStateCanonicalHasher
 
         foreach (string file in EnumerateAncestorImportFiles(projectDirectory, repositoryRoot))
         {
+            cancellationToken.ThrowIfCancellationRequested();
             string repoRelative = ToRepositoryRelativePath(file, repositoryRoot);
             byte[] digest = SHA256.HashData(File.ReadAllBytes(file));
             entries.Add((repoRelative, digest));
         }
+
+        cancellationToken.ThrowIfCancellationRequested();
 
         // Canonical envelope rule: set-like arrays are sorted by a declared canonical key —
         // here, ordinal repository-relative path.
@@ -72,9 +79,10 @@ public static class BuildStateCanonicalHasher
         return Convert.ToHexStringLower(SHA256.HashData(buffer.ToArray()));
     }
 
-    public static string ComputeContentDigest(string filePath)
+    public static string ComputeContentDigest(string filePath, CancellationToken cancellationToken = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(filePath);
+        cancellationToken.ThrowIfCancellationRequested();
         return Convert.ToHexStringLower(SHA256.HashData(File.ReadAllBytes(filePath)));
     }
 

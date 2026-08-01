@@ -7,6 +7,6 @@ public sealed partial class ArchitecturePolicyDocumentLoader : IArchitecturePoli
 {
     ArchitectureContractDocument IArchitecturePolicyCheckDocumentLoader.LoadForPolicyCheck(string policyPath)
     {
-        return LoadCore(policyPath, validateEffectiveSchema: true);
+        return LoadCore(policyPath, validateEffectiveSchema: true, CancellationToken.None);
     }
 }

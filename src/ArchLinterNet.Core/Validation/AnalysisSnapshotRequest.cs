@@ -30,6 +30,8 @@ public sealed record AnalysisSnapshotRequest
 
     public string? RequestedTargetFramework { get; init; }
 
+    public CancellationToken CancellationToken { get; init; } = default;
+
     public ValidationRequest ForMode(string mode)
     {
         return new ValidationRequest
@@ -45,7 +47,8 @@ public sealed record AnalysisSnapshotRequest
             PreparationMode = PreparationMode,
             NoRestore = NoRestore,
             RequestedConfiguration = RequestedConfiguration,
-            RequestedTargetFramework = RequestedTargetFramework
+            RequestedTargetFramework = RequestedTargetFramework,
+            CancellationToken = CancellationToken
         };
     }
 
@@ -63,7 +66,8 @@ public sealed record AnalysisSnapshotRequest
             PreparationMode = request.PreparationMode,
             NoRestore = request.NoRestore,
             RequestedConfiguration = request.RequestedConfiguration,
-            RequestedTargetFramework = request.RequestedTargetFramework
+            RequestedTargetFramework = request.RequestedTargetFramework,
+            CancellationToken = request.CancellationToken
         };
     }
 }

@@ -60,6 +60,18 @@ public sealed class ArchitectureTypeIndexTests
         Assert.That(countingAssemblies.EnumerationCount, Is.EqualTo(1));
     }
 
+    // Issue #375 follow-up: LoadAllTypes() previously ran the full SelectMany(GetLoadableTypes)
+    // pass over every target assembly with no cancellation check at all.
+    [Test]
+    public void AllTypes_PreCancelledToken_ThrowsOperationCanceledException()
+    {
+        using CancellationTokenSource cts = new();
+        cts.Cancel();
+        var index = new ArchitectureTypeIndex(_targetAssemblies, cts.Token);
+
+        Assert.Throws<OperationCanceledException>(() => index.AllTypes());
+    }
+
     private sealed class EnumerationCountingCollection : IReadOnlyCollection<System.Reflection.Assembly>
     {
         private readonly System.Reflection.Assembly[] _items;

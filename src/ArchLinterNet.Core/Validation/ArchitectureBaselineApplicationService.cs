@@ -32,7 +32,7 @@ public sealed class ArchitectureBaselineApplicationService(
         }
 
         (_, IReadOnlyList<ArchitectureBaselineCandidate>? candidates, List<ArchitectureViolation> configViolations) =
-            CollectCandidates(request.PolicyPath, request.Mode, request.ConditionSetName, request.ContractIds);
+            CollectCandidates(request.PolicyPath, request.Mode, request.ConditionSetName, request.ContractIds, request.CancellationToken);
 
         if (candidates == null)
         {
@@ -69,7 +69,7 @@ public sealed class ArchitectureBaselineApplicationService(
         }
 
         (ArchitectureContractDocument document, IReadOnlyList<ArchitectureBaselineCandidate>? candidates, List<ArchitectureViolation> configViolations) =
-            CollectCandidates(request.PolicyPath, request.Mode, request.ConditionSetName, request.ContractIds);
+            CollectCandidates(request.PolicyPath, request.Mode, request.ConditionSetName, request.ContractIds, request.CancellationToken);
 
         if (candidates == null)
         {
@@ -101,7 +101,7 @@ public sealed class ArchitectureBaselineApplicationService(
     public BaselinePruneOutcome Prune(BaselinePruneRequest request)
     {
         (ArchitectureContractDocument document, IReadOnlyList<ArchitectureBaselineCandidate>? candidates, List<ArchitectureViolation> configViolations) =
-            CollectCandidates(request.PolicyPath, request.Mode, request.ConditionSetName, request.ContractIds);
+            CollectCandidates(request.PolicyPath, request.Mode, request.ConditionSetName, request.ContractIds, request.CancellationToken);
 
         if (candidates == null)
         {
@@ -150,7 +150,7 @@ public sealed class ArchitectureBaselineApplicationService(
     public BaselineDiffOutcome Diff(BaselineDiffRequest request)
     {
         (ArchitectureContractDocument document, IReadOnlyList<ArchitectureBaselineCandidate>? candidates, List<ArchitectureViolation> configViolations) =
-            CollectCandidates(request.PolicyPath, request.Mode, request.ConditionSetName, request.ContractIds);
+            CollectCandidates(request.PolicyPath, request.Mode, request.ConditionSetName, request.ContractIds, request.CancellationToken);
 
         if (candidates == null)
         {
@@ -183,7 +183,7 @@ public sealed class ArchitectureBaselineApplicationService(
     public BaselineVerifyOutcome Verify(BaselineVerifyRequest request)
     {
         (ArchitectureContractDocument document, IReadOnlyList<ArchitectureBaselineCandidate>? candidates, List<ArchitectureViolation> configViolations) =
-            CollectCandidates(request.PolicyPath, request.Mode, request.ConditionSetName, request.ContractIds);
+            CollectCandidates(request.PolicyPath, request.Mode, request.ConditionSetName, request.ContractIds, request.CancellationToken);
 
         if (candidates == null)
         {
@@ -250,7 +250,7 @@ public sealed class ArchitectureBaselineApplicationService(
         // candidate set (which is why candidates are always collected with mode "all" and no
         // --contract restriction) before anything is written.
         (_, IReadOnlyList<ArchitectureBaselineCandidate>? candidates, List<ArchitectureViolation> configViolations) =
-            CollectCandidates(request.PolicyPath, "all", request.ConditionSetName, contractIds: null);
+            CollectCandidates(request.PolicyPath, "all", request.ConditionSetName, contractIds: null, cancellationToken: request.CancellationToken);
 
         if (candidates == null)
         {
@@ -344,14 +344,21 @@ public sealed class ArchitectureBaselineApplicationService(
     }
 
     private (ArchitectureContractDocument Document, IReadOnlyList<ArchitectureBaselineCandidate>? Candidates, List<ArchitectureViolation> ConfigurationViolations)
-        CollectCandidates(string policyPath, string mode, string? conditionSetName, IReadOnlyCollection<string>? contractIds)
+        CollectCandidates(
+            string policyPath,
+            string mode,
+            string? conditionSetName,
+            IReadOnlyCollection<string>? contractIds,
+            CancellationToken cancellationToken = default)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         if (mode is not (ModeStrict or ModeAudit or "all"))
         {
             throw new ArgumentException($"Invalid mode: {mode}. Use 'strict', 'audit', or 'all'.", nameof(mode));
         }
 
-        ArchitectureContractDocument document = runnerSetupService.LoadDocument(policyPath);
+        ArchitectureContractDocument document = runnerSetupService.LoadDocument(policyPath, null, null, cancellationToken);
+        cancellationToken.ThrowIfCancellationRequested();
 
         HashSet<string>? selectedContractIds = contractIds is { Count: > 0 }
             ? new HashSet<string>(contractIds, StringComparer.OrdinalIgnoreCase)
@@ -376,7 +383,8 @@ public sealed class ArchitectureBaselineApplicationService(
             conditionSetName,
             selectedContractIds: selectedContractIds,
             enableUnmatchedIgnoreTracking: true,
-            mode: mode == "all" ? null : mode);
+            mode: mode == "all" ? null : mode,
+            cancellationToken: cancellationToken);
 
         IArchitectureContractRunner runner = setup.Runner;
 
@@ -398,13 +406,17 @@ public sealed class ArchitectureBaselineApplicationService(
 
         if (includeStrict)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             contractExecutor.Execute(runner.Session, ModeStrict, handlerRegistry, includeAsmdefContracts: false);
         }
 
         if (includeAudit)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             contractExecutor.Execute(runner.Session, ModeAudit, handlerRegistry, includeAsmdefContracts: false);
         }
+
+        cancellationToken.ThrowIfCancellationRequested();
 
         return (document, runner.BaselineCandidates, new List<ArchitectureViolation>());
     }

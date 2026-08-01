@@ -8,9 +8,9 @@ internal sealed class DiffPublicApiSubcommandModule : IPublicApiSubcommandModule
 {
     public string CommandName => "diff";
 
-    public Command CreateCommand(ICliRuntime runtime, ICliConsole console, IFileSystem fileSystem)
+    public Command CreateCommand(ICliRuntime runtime, ICliConsole console, IFileSystem fileSystem, CancellationToken cancellationToken = default)
     {
-        PublicApiDiffCommandHandler handler = new(runtime, console, fileSystem);
+        PublicApiDiffCommandHandler handler = new(runtime, console, fileSystem, cancellationToken);
         Command command = new(CommandName);
         Option<string> policyOption = PublicApiOptionsFactory.CreatePolicyOption();
         Option<string> contractOption = PublicApiOptionsFactory.CreateContractOption();

@@ -11,7 +11,7 @@ using NUnit.Framework;
 namespace ArchLinterNet.Cli.Tests;
 
 [TestFixture]
-public sealed class ReportCoordinatorTests
+public sealed partial class ReportCoordinatorTests
 {
     [Test]
     public void StripAnsi_RemovesCsiAndOscSequencesFromHumanReports()
@@ -288,6 +288,7 @@ public sealed class ReportCoordinatorTests
         Assert.That(result.FailedPaths, Is.EquivalentTo(new[] { "bad.json" }));
     }
 
+
     [Test]
     public void ReportMode_StdoutSink_WritesFormatToStdout()
     {
@@ -519,10 +520,20 @@ public sealed class ReportCoordinatorTests
     {
         private readonly StringBuilder _output = new();
         private readonly StringBuilder _error = new();
-        public TextWriter Out => new StringWriter(_output);
+        public Action? OnOutputWriteLine { get; init; }
+        public TextWriter Out => new CallbackStringWriter(_output, OnOutputWriteLine);
         public TextWriter Error => new StringWriter(_error);
         public string OutputText => _output.ToString();
         public string ErrorText => _error.ToString();
+
+        private sealed class CallbackStringWriter(StringBuilder builder, Action? onWriteLine) : StringWriter(builder)
+        {
+            public override void WriteLine(string? value)
+            {
+                base.WriteLine(value);
+                onWriteLine?.Invoke();
+            }
+        }
     }
 
     private sealed class StubFileSystem : IFileSystem
@@ -535,6 +546,11 @@ public sealed class ReportCoordinatorTests
 
         public List<string> TempPaths { get; } = new();
         public List<string> TargetPaths { get; } = new();
+
+        // Issue #375: lets a test observe mid-commit cancellation by cancelling the token right
+        // after a specific target has been renamed, so the next pending rename in the loop sees
+        // IsCancellationRequested at its own top-of-loop check.
+        public Action<string>? OnRenamed { get; set; }
 
         public void MakeUnwritable(string path, FailPhase phase = FailPhase.Write) =>
             _failOn.Add(new FailEntry(path, phase));
@@ -579,6 +595,7 @@ public sealed class ReportCoordinatorTests
             }
 
             TargetPaths.Add(targetPath);
+            OnRenamed?.Invoke(targetPath);
         }
 
         public void DeleteFile(string path)
@@ -606,6 +623,14 @@ public sealed class ReportCoordinatorTests
         public int JsonCallCount { get; private set; }
         public int SarifCallCount { get; private set; }
 
+        /// <summary>Invoked from FormatViolationsForHumans/FormatResultForCiArtifacts — lets a
+        /// test simulate cancellation observed mid-render, between rendering boundaries
+        /// ReportCoordinator itself controls (sections within one mode, or modes within a
+        /// combined strict+audit report).</summary>
+        public Action? OnFormatViolationsForHumans { get; set; }
+
+        public Action? OnFormatResultForCiArtifacts { get; set; }
+
         public string Version => "1.2.3";
 
         public ValidationOutcome Validate(ValidationRequest request, ValidationTiming? timing) =>
@@ -630,6 +655,7 @@ public sealed class ReportCoordinatorTests
             IReadOnlyCollection<BuildStatePreflightDiagnostic> preflightDiagnostics)
         {
             JsonCallCount++;
+            OnFormatResultForCiArtifacts?.Invoke();
             return "{\"kind\":\"validation\",\"passed\":true}";
         }
 
@@ -647,7 +673,12 @@ public sealed class ReportCoordinatorTests
         public string FormatBuildStatePreflightForHumans(IReadOnlyCollection<BuildStatePreflightDiagnostic> diagnostics) =>
             string.Empty;
 
-        public string FormatViolationsForHumans(IReadOnlyCollection<ArchitectureViolation> violations) { HumanCallCount++; return "violations"; }
+        public string FormatViolationsForHumans(IReadOnlyCollection<ArchitectureViolation> violations)
+        {
+            HumanCallCount++;
+            OnFormatViolationsForHumans?.Invoke();
+            return "violations";
+        }
         public string FormatCyclesForHumans(IReadOnlyCollection<string> cycles, IReadOnlyCollection<ArchitectureCycleFinding> cycleFindings) { HumanCallCount++; return "cycles"; }
         public string FormatPolicyConsistencyForHumans(IReadOnlyCollection<PolicyConsistencyDiagnostic> diagnostics) => "pc";
         public string FormatUnmatchedForHumans(IReadOnlyList<ArchitectureUnmatchedIgnoredViolation> unmatchedViolations) => "unmatched";

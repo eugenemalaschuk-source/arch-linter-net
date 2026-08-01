@@ -4,7 +4,7 @@ using ArchLinterNet.Core.Validation;
 
 namespace ArchLinterNet.Cli.Commands.PublicApi;
 
-internal sealed class PublicApiCaptureCommandHandler(ICliRuntime runtime, ICliConsole console, IFileSystem fileSystem)
+internal sealed class PublicApiCaptureCommandHandler(ICliRuntime runtime, ICliConsole console, IFileSystem fileSystem, CancellationToken cancellationToken = default)
 {
     private const string CommandName = "capture";
 
@@ -40,6 +40,7 @@ internal sealed class PublicApiCaptureCommandHandler(ICliRuntime runtime, ICliCo
                 ContractId = options.ContractId!,
                 OutputPath = options.OutputPath,
                 ConditionSetName = options.ConditionSetName,
+                CancellationToken = cancellationToken,
             });
 
             if (!outcome.Succeeded)
@@ -68,10 +69,13 @@ internal sealed class PublicApiCaptureCommandHandler(ICliRuntime runtime, ICliCo
                 return CliExitCodes.InvalidArgumentsOrRuntimeError;
             }
 
+            // Re-checked immediately before publication, whether that means writing a new
+            // snapshot or just reporting the existing one as already current.
+            cancellationToken.ThrowIfCancellationRequested();
+
             if (!identical)
             {
-                string tempPath = fileSystem.WriteAllTextToTemp(destination, outcome.Snapshot!);
-                fileSystem.RenameTempToTarget(tempPath, destination);
+                PublicApiTwoPhaseWriter.WriteAndCommit(fileSystem, destination, outcome.Snapshot!, cancellationToken);
             }
 
             console.Out.WriteLine(options.Format == PublicApiOptionsFactory.JsonFormat
@@ -86,6 +90,10 @@ internal sealed class PublicApiCaptureCommandHandler(ICliRuntime runtime, ICliCo
                 : FormatForHumans(outcome.EntryCount, destination, identical));
 
             return CliExitCodes.Success;
+        }
+        catch (OperationCanceledException)
+        {
+            return PublicApiCancellationOutput.Write(console, "capture", options.Format == PublicApiOptionsFactory.JsonFormat);
         }
         catch (Exception ex)
         {

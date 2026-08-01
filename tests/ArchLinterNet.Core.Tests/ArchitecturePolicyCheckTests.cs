@@ -21,7 +21,8 @@ public sealed class ArchitecturePolicyCheckTests
         public ProjectDiscoveryResult ResolveAndApply(
             ArchitectureContractDocument document,
             string repositoryRoot,
-            bool resolveAssemblyOutputs)
+            bool resolveAssemblyOutputs,
+            CancellationToken cancellationToken = default)
         {
             WasCalled = true;
             throw new InvalidOperationException("Policy check must not evaluate projects.");

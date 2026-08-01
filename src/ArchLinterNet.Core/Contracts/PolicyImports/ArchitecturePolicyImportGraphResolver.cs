@@ -22,7 +22,8 @@ internal sealed class ArchitecturePolicyImportGraphResolver
         _parser = parser;
     }
 
-    public IReadOnlyList<ArchitecturePolicySource> Resolve(string rootPath, string rootYaml)
+    public IReadOnlyList<ArchitecturePolicySource> Resolve(
+        string rootPath, string rootYaml, CancellationToken cancellationToken = default)
     {
         ArchitecturePolicyRootPath root;
         try
@@ -38,13 +39,14 @@ internal sealed class ArchitecturePolicyImportGraphResolver
 
         ArchitecturePolicySourceDescriptor rootDescriptor =
             ArchitecturePolicyProvenanceFactory.CreateRootDescriptor(root);
-        return Resolve(root, rootDescriptor, rootYaml);
+        return Resolve(root, rootDescriptor, rootYaml, cancellationToken);
     }
 
     public IReadOnlyList<ArchitecturePolicySource> Resolve(
         ArchitecturePolicyRootPath root,
         ArchitecturePolicySourceDescriptor rootDescriptor,
-        string rootYaml)
+        string rootYaml,
+        CancellationToken cancellationToken = default)
     {
         ArchitecturePolicySource rootSource = _parser.Parse(
             rootDescriptor,
@@ -52,20 +54,31 @@ internal sealed class ArchitecturePolicyImportGraphResolver
             root.PhysicalPath,
             root.FileIdentity,
             rootYaml);
-        var state = new ResolutionState(root, rootSource);
+        var state = new ResolutionState(root, rootSource, cancellationToken);
 
         Visit(rootSource, depth: 0, state);
         return state.Sources;
     }
 
+    // Checked once per document entered (root plus every import target reached) — the natural
+    // per-document boundary a large, deep import graph offers; the graph itself is bounded
+    // (MaximumDepth/MaximumFileCount above), so this is the granularity that matters here.
     private void Visit(ArchitecturePolicySource source, int depth, ResolutionState state)
     {
+        state.CancellationToken.ThrowIfCancellationRequested();
+
         state.Active.Add(source.FileIdentity);
         state.Stack.Add(source.PortableIdentity);
         state.Sources.Add(source);
 
         for (int importIndex = 0; importIndex < source.Imports.Count; importIndex++)
         {
+            // Checked before each sibling import, not only inside Visit() once its own document is
+            // entered — VisitImport already resolves, reads, and parses the import file before
+            // Visit() is ever called for it, so a check only at the top of Visit() lets that
+            // resolve/read/parse work for the next sibling run to completion even after
+            // cancellation was observed while a prior sibling's subtree was being visited.
+            state.CancellationToken.ThrowIfCancellationRequested();
             VisitImport(source, importIndex, depth, state);
         }
 
@@ -239,14 +252,16 @@ internal sealed class ArchitecturePolicyImportGraphResolver
 
     private sealed class ResolutionState
     {
-        public ResolutionState(ArchitecturePolicyRootPath root, ArchitecturePolicySource rootSource)
+        public ResolutionState(ArchitecturePolicyRootPath root, ArchitecturePolicySource rootSource, CancellationToken cancellationToken)
         {
             Root = root;
             RootSource = rootSource;
+            CancellationToken = cancellationToken;
             PortableIdentities.Add(rootSource.PortableIdentity);
             FirstImports[rootSource.FileIdentity] = rootSource.PortableIdentity;
         }
 
+        public CancellationToken CancellationToken { get; }
         public ArchitecturePolicyRootPath Root { get; }
         public ArchitecturePolicySource RootSource { get; }
         public List<ArchitecturePolicySource> Sources { get; } = new();

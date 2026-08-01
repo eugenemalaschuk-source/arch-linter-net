@@ -11,9 +11,11 @@ namespace ArchLinterNet.Core.Validation;
 // shares. Split from the operation bodies so neither file grows past the repository's file-size gate.
 public sealed partial class ArchitecturePublicApiApplicationService
 {
-    private SurfaceResolution ResolveSurface(string policyPath, string contractId, string? conditionSetName)
+    private SurfaceResolution ResolveSurface(string policyPath, string contractId, string? conditionSetName, CancellationToken cancellationToken)
     {
-        ArchitectureContractDocument document = runnerSetupService.LoadDocument(policyPath);
+        cancellationToken.ThrowIfCancellationRequested();
+        ArchitectureContractDocument document = runnerSetupService.LoadDocument(policyPath, null, null, cancellationToken);
+        cancellationToken.ThrowIfCancellationRequested();
 
         ArchitecturePublicApiSurfaceContract? contract = document.Contracts.StrictPublicApiSurface
             .Concat(document.Contracts.AuditPublicApiSurface)
@@ -32,10 +34,10 @@ public sealed partial class ArchitecturePublicApiApplicationService
                 $"Unknown public API surface contract '{contractId}'. Available contract ids: {availableText}.");
         }
 
-        ArchitectureRunnerSetup setup = runnerSetupService.BuildRunner(document, policyPath, conditionSetName);
+        ArchitectureRunnerSetup setup = runnerSetupService.BuildRunner(document, policyPath, conditionSetName, cancellationToken: cancellationToken);
         try
         {
-            BuildStatePreflightResult preflight = RunBuildStatePreflight(setup.Runner);
+            BuildStatePreflightResult preflight = RunBuildStatePreflight(setup.Runner, cancellationToken);
             if (preflight.Blocked)
             {
                 return SurfaceResolution.Failed(
@@ -46,6 +48,7 @@ public sealed partial class ArchitecturePublicApiApplicationService
 
             IReadOnlyList<PublicApiSnapshotEntry> entries = setup.Runner.Session.CapturePublicApiSurface(
                 contract, out IReadOnlyList<string> missingAssemblies);
+            cancellationToken.ThrowIfCancellationRequested();
 
             if (missingAssemblies.Count > 0)
             {
@@ -70,7 +73,7 @@ public sealed partial class ArchitecturePublicApiApplicationService
     // the fingerprint/receipt inputs it needs when project discovery produced a project graph, and
     // "resolution never ran" (neither resolved nor missing names) must not be read as "artifact
     // missing".
-    private BuildStatePreflightResult RunBuildStatePreflight(IArchitectureContractRunner runner)
+    private BuildStatePreflightResult RunBuildStatePreflight(IArchitectureContractRunner runner, CancellationToken cancellationToken)
     {
         Discovery.ProjectDiscoveryResult? discovery = runner.Session.Context.ProjectDiscovery;
         if (discovery == null || discovery.DiscoveredProjects.Count == 0)
@@ -91,7 +94,8 @@ public sealed partial class ArchitecturePublicApiApplicationService
             runner.Session.Context.RepositoryRoot,
             discovery,
             resolution,
-            BuildPreparationMode.Ordinary));
+            BuildPreparationMode.Ordinary,
+            CancellationToken: cancellationToken));
     }
 
     private sealed record SurfaceResolution(

@@ -6,7 +6,7 @@ using ArchLinterNet.Core.Validation;
 
 namespace ArchLinterNet.Cli.Commands.Baseline;
 
-internal sealed class BaselineDiffCommandHandler(ICliRuntime runtime, ICliConsole console, IFileSystem fileSystem)
+internal sealed class BaselineDiffCommandHandler(ICliRuntime runtime, ICliConsole console, IFileSystem fileSystem, CancellationToken cancellationToken = default)
 {
     public int Execute(BaselineDiffCommandOptions options)
     {
@@ -60,6 +60,7 @@ internal sealed class BaselineDiffCommandHandler(ICliRuntime runtime, ICliConsol
                 BaselinePath = options.BaselinePath,
                 Mode = options.Mode,
                 ConditionSetName = options.ConditionSetName,
+                CancellationToken = cancellationToken,
                 ContractIds = options.ContractIds.ToList(),
             });
 
@@ -73,6 +74,8 @@ internal sealed class BaselineDiffCommandHandler(ICliRuntime runtime, ICliConsol
                 outcome.New, outcome.Frozen, outcome.Resolved, outcome.Ambiguous, outcome.ConfigurationErrors,
                 outcome.Entries);
 
+            cancellationToken.ThrowIfCancellationRequested();
+
             console.Out.WriteLine(options.Format switch
             {
                 "json" => FormatBaselineComparisonAsJson(report),
@@ -81,6 +84,10 @@ internal sealed class BaselineDiffCommandHandler(ICliRuntime runtime, ICliConsol
             });
 
             return CliExitCodes.Success;
+        }
+        catch (OperationCanceledException)
+        {
+            return BaselineCancellationOutput.Write(console, "diff", options.Format == "json");
         }
         catch (Exception ex)
         {

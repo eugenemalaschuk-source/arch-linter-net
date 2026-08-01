@@ -16,6 +16,8 @@ public sealed record PublicApiCaptureRequest
     public required string OutputPath { get; init; }
 
     public string? ConditionSetName { get; init; }
+
+    public CancellationToken CancellationToken { get; init; } = default;
 }
 
 public sealed record PublicApiDiffRequest
@@ -27,6 +29,8 @@ public sealed record PublicApiDiffRequest
     public required string SnapshotPath { get; init; }
 
     public string? ConditionSetName { get; init; }
+
+    public CancellationToken CancellationToken { get; init; } = default;
 }
 
 public sealed record PublicApiUpdateRequest
@@ -40,6 +44,8 @@ public sealed record PublicApiUpdateRequest
     public bool DryRun { get; init; }
 
     public string? ConditionSetName { get; init; }
+
+    public CancellationToken CancellationToken { get; init; } = default;
 }
 
 public sealed record PublicApiMigrateRequest
@@ -53,4 +59,6 @@ public sealed record PublicApiMigrateRequest
     public bool AcceptDrift { get; init; }
 
     public string? ConditionSetName { get; init; }
+
+    public CancellationToken CancellationToken { get; init; } = default;
 }

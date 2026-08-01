@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using ArchLinterNet.Core.Contracts;
 using ArchLinterNet.Core.Model;
 
@@ -54,6 +55,65 @@ public sealed partial class ArchitectureSarifFormatter
             coverageSummaries,
             sourceExpansion,
             subtractiveMatcherParticipation);
+    }
+
+    /// <summary>
+    /// Cancellation-aware widest instance overload: identical to the one above, but checks
+    /// <paramref name="cancellationToken"/> per finding while serializing violation entries — the
+    /// dominant contributor to a large report's size — instead of only before/after the whole
+    /// document is built. <paramref name="subtractiveMatcherParticipation"/> has no default here
+    /// (unlike the overload above) purely so this overload stays unambiguous by arity against it.
+    /// </summary>
+    [SuppressMessage("Performance", "CA1822:Mark members as static", Justification = "Kept as an instance member so CliRuntime can call it through the same _sarifFormatter instance reference as its cycles-based sibling overload, without a CS0176 static-via-instance call error.")]
+    public string FormatResultAsSarif( // NOSONAR: each parameter represents a semantically distinct section of the SARIF payload; grouping would obscure the data contract
+        string mode,
+        IReadOnlyCollection<ArchitectureViolation> violations,
+        IReadOnlyCollection<string> cycles,
+        IReadOnlyCollection<BuildStatePreflightDiagnostic> preflightDiagnostics,
+        IReadOnlyCollection<ArchitectureCoverageSummary> coverageSummaries,
+        ArchitectureSourceExpansionInventory sourceExpansion,
+        string toolVersion,
+        IReadOnlyCollection<ArchitectureSubtractiveMatcherParticipation>? subtractiveMatcherParticipation,
+        CancellationToken cancellationToken)
+    {
+        return FormatResultAsSarifCore(
+            mode,
+            violations,
+            cycles.Select(cycle => (Func<string, ResultEntry>)(level => BuildCycleEntry(cycle, level))),
+            toolVersion,
+            preflightDiagnostics,
+            coverageSummaries,
+            sourceExpansion,
+            subtractiveMatcherParticipation,
+            cancellationToken);
+    }
+
+    /// <summary>
+    /// Cancellation-aware widest static overload, mirroring the instance overload above for the
+    /// <see cref="ArchitectureCycleFinding"/>-typed cycles path.
+    /// </summary>
+    public static string FormatResultAsSarif( // NOSONAR: each parameter represents a semantically distinct section of the SARIF payload; grouping would obscure the data contract
+        string mode,
+        IReadOnlyCollection<ArchitectureViolation> violations,
+        IReadOnlyCollection<ArchitectureCycleFinding> cycles,
+        IReadOnlyCollection<BuildStatePreflightDiagnostic> preflightDiagnostics,
+        IReadOnlyCollection<ArchitectureCoverageSummary> coverageSummaries,
+        ArchitectureSourceExpansionInventory sourceExpansion,
+        string toolVersion,
+        IReadOnlyCollection<ArchitectureSubtractiveMatcherParticipation>? subtractiveMatcherParticipation,
+        CancellationToken cancellationToken)
+    {
+        return FormatResultAsSarifCore(
+            mode,
+            violations,
+            cycles.Select(cycle => (Func<string, ResultEntry>)(level =>
+                BuildCycleEntry(ArchitectureDiagnosticMapper.FromCycle(cycle), level))),
+            toolVersion,
+            preflightDiagnostics,
+            coverageSummaries,
+            sourceExpansion,
+            subtractiveMatcherParticipation,
+            cancellationToken);
     }
 
     internal static Dictionary<string, object?> FormatSourceExpansion(ArchitectureSourceExpansionInventory inventory)

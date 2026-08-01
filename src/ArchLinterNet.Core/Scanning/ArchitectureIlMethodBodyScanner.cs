@@ -13,7 +13,8 @@ internal interface IArchitectureIlMethodBodyScanner
         string sourceNamespacePrefix,
         IReadOnlyList<string> forbiddenCallPatterns,
         ArchitectureContractExecutionContext executionContext,
-        ArchitectureLayer? sourceLayer = null);
+        ArchitectureLayer? sourceLayer = null,
+        CancellationToken cancellationToken = default);
 }
 
 internal readonly record struct ArchitectureIlForbiddenCallMatch(
@@ -33,11 +34,12 @@ internal sealed class ArchitectureIlMethodBodyScanner : IArchitectureIlMethodBod
         string sourceNamespacePrefix,
         IReadOnlyList<string> forbiddenCallPatterns,
         ArchitectureContractExecutionContext executionContext,
-        ArchitectureLayer? sourceLayer = null)
+        ArchitectureLayer? sourceLayer = null,
+        CancellationToken cancellationToken = default)
     {
         Type[] sourceTypes = sourceLayer != null
-            ? ArchitectureTypeScanner.FindTypesInLayer(targetAssemblies, sourceLayer)
-            : ArchitectureTypeScanner.FindTypesInNamespace(targetAssemblies, sourceNamespacePrefix);
+            ? ArchitectureTypeScanner.FindTypesInLayer(targetAssemblies, sourceLayer, cancellationToken)
+            : ArchitectureTypeScanner.FindTypesInNamespace(targetAssemblies, sourceNamespacePrefix, cancellationToken);
         if (sourceTypes.Length == 0)
         {
             return Array.Empty<ArchitectureViolation>();
@@ -48,8 +50,11 @@ internal sealed class ArchitectureIlMethodBodyScanner : IArchitectureIlMethodBod
         Dictionary<string, bool> matchCache = new(StringComparer.Ordinal);
         List<ArchitectureViolation> violations = new();
 
+        // Checked per type — the same IL-scanning-per-type boundary the rest of the codebase
+        // already uses (ArchitectureSourceFileFactIndex.RunReflectionPass, ArchitectureTypeIndex).
         foreach (Type sourceType in sourceTypes)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             string sourceTypeName = ArchitectureTypeNames.SafeFullName(sourceType);
             string sourceAssembly = sourceType.Assembly.GetName().Name ?? string.Empty;
             var matches = FindMatchDetailsForType(sourceType, patterns, matchCache)

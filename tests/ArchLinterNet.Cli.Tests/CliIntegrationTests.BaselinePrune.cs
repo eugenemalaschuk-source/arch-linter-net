@@ -84,6 +84,7 @@ baseline:
     }
 
     [Test]
+    [CancelAfter(120_000)]
     public void BaselinePrune_JsonShortFlag_IsAccepted()
     {
         string baselinePath = Path.Combine(Path.GetTempPath(), $"baseline-{Guid.NewGuid():N}.yml");

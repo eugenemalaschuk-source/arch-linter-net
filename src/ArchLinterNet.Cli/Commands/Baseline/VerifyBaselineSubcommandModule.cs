@@ -8,9 +8,9 @@ internal sealed class VerifyBaselineSubcommandModule : IBaselineSubcommandModule
 {
     public string CommandName => "verify";
 
-    public Command CreateCommand(ICliRuntime runtime, ICliConsole console, IFileSystem fileSystem)
+    public Command CreateCommand(ICliRuntime runtime, ICliConsole console, IFileSystem fileSystem, CancellationToken cancellationToken = default)
     {
-        BaselineVerifyCommandHandler handler = new(runtime, console, fileSystem);
+        BaselineVerifyCommandHandler handler = new(runtime, console, fileSystem, cancellationToken);
         Command command = new(CommandName);
         Option<string> policyOption = BaselineOptionsFactory.CreatePolicyOption();
         Option<string> baselineOption = new("--baseline");

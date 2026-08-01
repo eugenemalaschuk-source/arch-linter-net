@@ -20,6 +20,7 @@ public sealed class ArchitectureValidationBuilder
     private bool _noRestore;
     private string? _requestedConfiguration;
     private string? _requestedTargetFramework;
+    private CancellationToken _cancellationToken;
 
     public ArchitectureValidationBuilder(string policyPath)
     {
@@ -72,6 +73,13 @@ public sealed class ArchitectureValidationBuilder
     public ArchitectureValidationBuilder WithNoRestore()
     {
         _noRestore = true;
+        return this;
+    }
+
+    /// <summary>Bounds this builder's validation/snapshot calls with a caller-supplied cancellation token.</summary>
+    public ArchitectureValidationBuilder WithCancellation(CancellationToken cancellationToken)
+    {
+        _cancellationToken = cancellationToken;
         return this;
     }
 
@@ -141,6 +149,7 @@ public sealed class ArchitectureValidationBuilder
             NoRestore = _noRestore,
             RequestedConfiguration = _requestedConfiguration,
             RequestedTargetFramework = _requestedTargetFramework,
+            CancellationToken = _cancellationToken,
         };
 
         ValidationTiming? timing = _collectTimings ? new ValidationTiming() : null;
@@ -162,6 +171,7 @@ public sealed class ArchitectureValidationBuilder
             NoRestore = _noRestore,
             RequestedConfiguration = _requestedConfiguration,
             RequestedTargetFramework = _requestedTargetFramework,
+            CancellationToken = _cancellationToken,
         };
 
         ValidationTiming? timing = _collectTimings ? new ValidationTiming() : null;

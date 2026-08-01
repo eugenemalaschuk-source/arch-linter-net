@@ -2,5 +2,5 @@ namespace ArchLinterNet.Core.Discovery.Abstractions;
 
 internal interface IArchitectureProjectRoslynContextResolver
 {
-    ArchitectureProjectRoslynResolution Resolve(string projectAbsolutePath);
+    ArchitectureProjectRoslynResolution Resolve(string projectAbsolutePath, CancellationToken cancellationToken = default);
 }

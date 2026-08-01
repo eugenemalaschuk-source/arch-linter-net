@@ -39,6 +39,7 @@ public sealed class ArchitectureSourceFileFactIndex
     private readonly IReadOnlyList<string>? _preprocessorSymbols;
     private readonly IArchitectureFileSystem _fileSystem;
     private readonly IReadOnlyList<(string SourcePath, string AssemblyName)> _sourcePathAssemblyOwnership;
+    private readonly CancellationToken _cancellationToken;
     private readonly Lazy<FactIndexData> _data;
 
     public ArchitectureSourceFileFactIndex(
@@ -46,17 +47,25 @@ public sealed class ArchitectureSourceFileFactIndex
         string repositoryRoot,
         IReadOnlyList<string> sourceRoots,
         IReadOnlyList<string>? preprocessorSymbols = null,
-        IArchitectureFileSystem? fileSystem = null)
+        IArchitectureFileSystem? fileSystem = null,
+        CancellationToken cancellationToken = default)
         : this(
             targetAssemblies,
             repositoryRoot,
             sourceRoots,
             preprocessorSymbols,
             fileSystem,
-            projectDiscovery: null,
-            sourceRootAssemblyOwnership: null)
+            default,
+            cancellationToken)
     {
     }
+
+    // Bundles the two "how source roots map to project-owning assemblies" inputs — always
+    // supplied (or omitted) together — so the internal constructor below stays under the
+    // parameter-count limit rather than taking each as its own parameter.
+    internal readonly record struct ProjectOwnership(
+        ProjectDiscoveryResult? ProjectDiscovery,
+        IReadOnlyDictionary<string, string>? SourceRootAssemblyOwnership);
 
     internal ArchitectureSourceFileFactIndex(
         IReadOnlyCollection<Assembly> targetAssemblies,
@@ -64,8 +73,8 @@ public sealed class ArchitectureSourceFileFactIndex
         IReadOnlyList<string> sourceRoots,
         IReadOnlyList<string>? preprocessorSymbols,
         IArchitectureFileSystem? fileSystem,
-        ProjectDiscoveryResult? projectDiscovery,
-        IReadOnlyDictionary<string, string>? sourceRootAssemblyOwnership)
+        ProjectOwnership projectOwnership,
+        CancellationToken cancellationToken = default)
     {
         _targetAssemblies = targetAssemblies ?? throw new ArgumentNullException(nameof(targetAssemblies));
         _repositoryRoot = repositoryRoot ?? throw new ArgumentNullException(nameof(repositoryRoot));
@@ -75,8 +84,9 @@ public sealed class ArchitectureSourceFileFactIndex
         _sourcePathAssemblyOwnership = BuildSourcePathAssemblyOwnership(
             _targetAssemblies,
             _sourceRoots,
-            projectDiscovery,
-            sourceRootAssemblyOwnership);
+            projectOwnership.ProjectDiscovery,
+            projectOwnership.SourceRootAssemblyOwnership);
+        _cancellationToken = cancellationToken;
         _data = new Lazy<FactIndexData>(BuildData);
     }
 
@@ -122,12 +132,16 @@ public sealed class ArchitectureSourceFileFactIndex
 
     private FactIndexData BuildData()
     {
+        _cancellationToken.ThrowIfCancellationRequested();
+
         List<Assembly> sortedAssemblies = _targetAssemblies
             .Distinct()
             .OrderBy(a => a.GetName().Name ?? string.Empty, _ordinal)
             .ToList();
 
         Dictionary<string, List<BaseFact>> reflectionFacts = RunReflectionPass(sortedAssemblies);
+
+        _cancellationToken.ThrowIfCancellationRequested();
 
         Dictionary<SourceFactKey, List<(string FilePath, ArchitectureTypeKind Kind)>> sourceMap =
             _sourceRoots.Count > 0 ? RunSourceScan() : [];
@@ -236,14 +250,16 @@ public sealed class ArchitectureSourceFileFactIndex
 
     // Step 1: walk every loadable type in each assembly and collect one BaseFact per
     // (assemblyName, fullTypeName). Assemblies are already sorted alphabetically before this call.
-    private static Dictionary<string, List<BaseFact>> RunReflectionPass(List<Assembly> sortedAssemblies)
+    private Dictionary<string, List<BaseFact>> RunReflectionPass(List<Assembly> sortedAssemblies)
     {
         Dictionary<string, List<BaseFact>> factsByName = new(_ordinal);
         foreach (Assembly assembly in sortedAssemblies)
         {
+            _cancellationToken.ThrowIfCancellationRequested();
             string assemblyName = assembly.GetName().Name ?? string.Empty;
-            foreach (Type type in ArchitectureTypeScanner.GetLoadableTypes(assembly))
+            foreach (Type type in ArchitectureTypeScanner.GetLoadableTypes(assembly, _cancellationToken))
             {
+                _cancellationToken.ThrowIfCancellationRequested();
                 string? fullName = SafeFullName(type);
                 if (string.IsNullOrEmpty(fullName)) continue;
 
@@ -279,6 +295,7 @@ public sealed class ArchitectureSourceFileFactIndex
 
         foreach (string sourceRoot in _sourceRoots)
         {
+            _cancellationToken.ThrowIfCancellationRequested();
             string normalizedSourceRoot = NormalizeRelativePath(sourceRoot);
             string absoluteRoot = Path.Combine(_repositoryRoot, normalizedSourceRoot);
             if (!_fileSystem.DirectoryExists(absoluteRoot)) continue;
@@ -288,6 +305,7 @@ public sealed class ArchitectureSourceFileFactIndex
                 "*.cs",
                 SearchOption.AllDirectories))
             {
+                _cancellationToken.ThrowIfCancellationRequested();
                 string normalizedFilePath = NormalizePath(_repositoryRoot, absoluteFile);
                 string? assemblyName = ResolveOwnedAssemblyName(normalizedFilePath, ownershipEntries);
                 if (assemblyName == null)

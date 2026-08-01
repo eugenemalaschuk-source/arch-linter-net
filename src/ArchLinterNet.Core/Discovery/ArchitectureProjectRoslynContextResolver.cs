@@ -7,8 +7,9 @@ namespace ArchLinterNet.Core.Discovery;
 
 internal sealed class ArchitectureProjectRoslynContextResolver : IArchitectureProjectRoslynContextResolver
 {
-    public ArchitectureProjectRoslynResolution Resolve(string projectAbsolutePath)
+    public ArchitectureProjectRoslynResolution Resolve(string projectAbsolutePath, CancellationToken cancellationToken = default)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         if (!File.Exists(projectAbsolutePath))
         {
             return ArchitectureProjectRoslynResolution.Failure(
@@ -27,6 +28,7 @@ internal sealed class ArchitectureProjectRoslynContextResolver : IArchitecturePr
             }
 
             IAnalyzerResults results = analyzer.Build(new EnvironmentOptions { DesignTime = true, Restore = false });
+            cancellationToken.ThrowIfCancellationRequested();
 
             IAnalyzerResult? result = results.FirstOrDefault(candidate => candidate.Succeeded);
 
@@ -37,10 +39,26 @@ internal sealed class ArchitectureProjectRoslynContextResolver : IArchitecturePr
                     "The project may not have been restored, or its target framework may not be installed.");
             }
 
+            List<string> sourceFiles = new();
+            foreach (string sourceFile in result.SourceFiles)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                sourceFiles.Add(sourceFile);
+            }
+
+            List<string> references = new();
+            foreach (string reference in result.References)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                references.Add(reference);
+            }
+
             return ArchitectureProjectRoslynResolution.Success(new ArchitectureProjectRoslynContext(
-                projectAbsolutePath,
-                result.SourceFiles.ToArray(),
-                result.References.ToArray()));
+                projectAbsolutePath, sourceFiles, references));
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
         }
         catch (Exception ex)
         {

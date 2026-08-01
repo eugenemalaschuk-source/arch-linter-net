@@ -6,12 +6,14 @@ namespace ArchLinterNet.Core.Scanning;
 
 internal static class ArchitectureTypeScanner
 {
-    public static Type[] FindTypesInNamespace(IEnumerable<Assembly> targetAssemblies, string namespacePrefix)
+    public static Type[] FindTypesInNamespace(
+        IEnumerable<Assembly> targetAssemblies, string namespacePrefix, CancellationToken cancellationToken = default)
     {
         return FindTypes(
             targetAssemblies,
             type => ArchitectureLayerResolver.MatchesPrefix(
-                ArchitectureTypeNames.SafeNamespace(type), namespacePrefix));
+                ArchitectureTypeNames.SafeNamespace(type), namespacePrefix),
+            cancellationToken);
     }
 
     public static Type[] FindTypesInNamespaceWithSuffix(
@@ -23,31 +25,62 @@ internal static class ArchitectureTypeScanner
         return FindTypesInLayer(targetAssemblies, layer);
     }
 
-    public static Type[] FindTypesInLayer(IEnumerable<Assembly> targetAssemblies, ArchitectureLayer layer)
+    public static Type[] FindTypesInLayer(
+        IEnumerable<Assembly> targetAssemblies, ArchitectureLayer layer, CancellationToken cancellationToken = default)
     {
         return FindTypes(
             targetAssemblies,
-            type => ArchitectureLayerResolver.MatchesNamespace(layer, ArchitectureTypeNames.SafeNamespace(type)));
+            type => ArchitectureLayerResolver.MatchesNamespace(layer, ArchitectureTypeNames.SafeNamespace(type)),
+            cancellationToken);
     }
 
-    private static Type[] FindTypes(IEnumerable<Assembly> targetAssemblies, Func<Type, bool> predicate)
+    // Checked per assembly AND per type — the same reflection-pass boundary
+    // ArchitectureSourceFileFactIndex.RunReflectionPass/ArchitectureTypeIndex already check at.
+    // GetLoadableTypes itself is one eager reflection call per assembly (not individually
+    // interruptible), but a single large target assembly can still contain thousands of types, so
+    // the predicate loop below is checked per type too — not only at the assembly boundary — so
+    // discovering the candidate type set is interruptible at the same granularity a caller (e.g.
+    // ArchitectureIlMethodBodyScanner) would otherwise expect from the per-type loop it runs over
+    // the result afterward.
+    private static Type[] FindTypes(
+        IEnumerable<Assembly> targetAssemblies, Func<Type, bool> predicate, CancellationToken cancellationToken = default)
     {
-        return targetAssemblies
-            .Distinct()
-            .SelectMany(GetLoadableTypes)
-            .Where(predicate)
-            .ToArray();
+        List<Type> matches = new();
+        foreach (Assembly assembly in targetAssemblies.Distinct())
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            foreach (Type type in GetLoadableTypes(assembly, cancellationToken))
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                if (predicate(type))
+                {
+                    matches.Add(type);
+                }
+            }
+        }
+
+        return matches.ToArray();
     }
 
-    internal static IEnumerable<Type> GetLoadableTypes(Assembly assembly)
+    internal static IEnumerable<Type> GetLoadableTypes(Assembly assembly) =>
+        GetLoadableTypes(assembly, CancellationToken.None);
+
+    internal static IEnumerable<Type> GetLoadableTypes(Assembly assembly, CancellationToken cancellationToken)
     {
+        Type[] types;
         try
         {
-            return assembly.GetTypes();
+            types = assembly.GetTypes();
         }
         catch (ReflectionTypeLoadException exception)
         {
-            return exception.Types.Where(type => type != null)!;
+            types = exception.Types.Where(type => type != null).Cast<Type>().ToArray();
+        }
+
+        foreach (Type type in types)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            yield return type;
         }
     }
 }

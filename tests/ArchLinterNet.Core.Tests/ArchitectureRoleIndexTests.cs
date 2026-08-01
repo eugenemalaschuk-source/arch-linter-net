@@ -740,6 +740,20 @@ public sealed class ArchitectureRoleIndexTests
             Is.False);
     }
 
+    // Issue #375 follow-up: BuildData() previously ran its full per-type extractor pass with no
+    // cancellation check at all. Uses a non-empty classification config so BuildData reaches the
+    // scanning loop instead of taking its empty-config early return.
+    [Test]
+    public void Conflicts_PreCancelledToken_ThrowsOperationCanceledException()
+    {
+        using CancellationTokenSource cts = new();
+        cts.Cancel();
+        var index = new ArchitectureRoleIndex(
+            DomainAttributeConfiguration(), new ArchitectureTypeIndex(_targetAssemblies), cts.Token);
+
+        Assert.Throws<OperationCanceledException>(() => _ = index.Conflicts);
+    }
+
     private sealed class EnumerationCountingCollection : IReadOnlyCollection<System.Reflection.Assembly>
     {
         private readonly System.Reflection.Assembly[] _items;

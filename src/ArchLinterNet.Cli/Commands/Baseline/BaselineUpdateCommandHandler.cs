@@ -5,7 +5,7 @@ using ArchLinterNet.Core.Validation;
 
 namespace ArchLinterNet.Cli.Commands.Baseline;
 
-internal sealed class BaselineUpdateCommandHandler(ICliRuntime runtime, ICliConsole console, IFileSystem fileSystem)
+internal sealed class BaselineUpdateCommandHandler(ICliRuntime runtime, ICliConsole console, IFileSystem fileSystem, CancellationToken cancellationToken = default)
 {
     public int Execute(BaselineUpdateCommandOptions options)
     {
@@ -47,6 +47,7 @@ internal sealed class BaselineUpdateCommandHandler(ICliRuntime runtime, ICliCons
                 BaselinePath = options.BaselinePath,
                 Mode = options.Mode,
                 ConditionSetName = options.ConditionSetName,
+                CancellationToken = cancellationToken,
                 Reason = options.Reasons.Reason,
                 ReasonForContract = options.Reasons.ReasonForContract,
                 ReasonForFamily = options.Reasons.ReasonForFamily,
@@ -68,18 +69,28 @@ internal sealed class BaselineUpdateCommandHandler(ICliRuntime runtime, ICliCons
             }
 
             bool json = options.Format == "json";
+
+            // Re-checked immediately before the write that actually publishes the baseline —
+            // outcome above may have taken long enough that a Ctrl+C/SIGTERM arrived after Core's
+            // own last check but before this handler commits anything.
+            cancellationToken.ThrowIfCancellationRequested();
+
             BaselineWriteGate gate = new(console, fileSystem);
             if (!gate.TryApply(
                     new BaselineWriteGate.Request(
                         "baseline update", options.OutputPath, options.Write.DryRun, options.Write.Force,
                         outcome.Yaml!, outcome.CommentDiagnostic, options.BaselinePath, !json),
-                    out BaselineWriteGate.Disposition disposition))
+                    out BaselineWriteGate.Disposition disposition, cancellationToken))
             {
                 return CliExitCodes.InvalidArgumentsOrRuntimeError;
             }
 
             Report(options, outcome, disposition);
             return CliExitCodes.Success;
+        }
+        catch (OperationCanceledException)
+        {
+            return BaselineCancellationOutput.Write(console, "update", options.Format == "json");
         }
         catch (Exception ex)
         {

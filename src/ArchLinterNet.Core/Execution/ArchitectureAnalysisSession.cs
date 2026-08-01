@@ -45,16 +45,16 @@ public sealed partial class ArchitectureAnalysisSession
         EnableUnmatchedIgnoreTracking = enableUnmatchedIgnoreTracking;
         PreprocessorSymbols = preprocessorSymbols;
         Catalog = ArchitectureContractCatalog.Build(document);
-        TypeIndex = new ArchitectureTypeIndex(context.TargetAssemblies);
-        RoleIndex = new ArchitectureRoleIndex(document.Classification, TypeIndex);
+        TypeIndex = new ArchitectureTypeIndex(context.TargetAssemblies, context.CancellationToken);
+        RoleIndex = new ArchitectureRoleIndex(document.Classification, TypeIndex, context.CancellationToken);
         SourceFileFactIndex = new ArchitectureSourceFileFactIndex(
             context.TargetAssemblies,
             context.RepositoryRoot,
             document.Analysis.SourceRoots,
             preprocessorSymbols,
             fileSystem: null,
-            context.ProjectDiscovery,
-            sourceRootAssemblyOwnership: null);
+            new ArchitectureSourceFileFactIndex.ProjectOwnership(context.ProjectDiscovery, SourceRootAssemblyOwnership: null),
+            context.CancellationToken);
         ExpressionFacts = new ArchitectureExpressionFactService(RoleIndex, SourceFileFactIndex, context.ProjectDiscovery);
         RegisterAllContextualConsumersFromDocument();
     }

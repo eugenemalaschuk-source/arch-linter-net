@@ -14,12 +14,15 @@ internal static class CliCompositionRoot
         IReadOnlyList<ITopLevelCliSubcommandModule> subcommandModules =
             CliCommandModuleCatalog.CreateSubcommandModules();
 
+        CliProcessInterruptionSource interruptionSource = new();
+
         ICliRootCommandFactory rootCommandFactory = new CliRootCommandFactory(
             rootCommandModule,
             subcommandModules,
             runtime,
             console,
-            fileSystem);
+            fileSystem,
+            interruptionSource.Token);
         CliHost host = new(rootCommandFactory, console, runtime);
 
         return new CliComposition(
@@ -27,18 +30,24 @@ internal static class CliCompositionRoot
             rootCommandFactory,
             runtime,
             rootCommandModule,
-            subcommandModules);
-    }
-
-    public static CliHost CreateHost()
-    {
-        return Compose().Host;
+            subcommandModules,
+            interruptionSource);
     }
 }
 
+// IDisposable so the one process-scoped CliProcessInterruptionSource this composition owns
+// (Console.CancelKeyPress subscription, PosixSignalRegistration, CancellationTokenSource) is
+// deterministically released instead of left to finalization — see Program.Main's `using`.
 internal sealed record CliComposition(
     CliHost Host,
     ICliRootCommandFactory RootCommandFactory,
     ICliRuntime Runtime,
     IRootCliCommandModule RootCommandModule,
-    IReadOnlyList<ITopLevelCliSubcommandModule> SubcommandModules);
+    IReadOnlyList<ITopLevelCliSubcommandModule> SubcommandModules,
+    CliProcessInterruptionSource InterruptionSource) : IDisposable
+{
+    public void Dispose()
+    {
+        InterruptionSource.Dispose();
+    }
+}

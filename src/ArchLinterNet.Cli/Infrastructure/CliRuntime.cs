@@ -105,6 +105,45 @@ internal sealed class CliRuntime : ICliRuntime
             subtractiveMatcherParticipation);
     }
 
+    public string FormatResultForCiArtifacts( // NOSONAR: each parameter represents a semantically distinct section of the CI artifact payload; grouping would obscure the data contract
+        string mode,
+        bool passed,
+        IReadOnlyCollection<ArchitectureViolation> violations,
+        IReadOnlyCollection<string> cycles,
+        IReadOnlyCollection<ArchitectureCycleFinding> cycleFindings,
+        IReadOnlyCollection<ArchitectureViolation> coverageFindings,
+        IReadOnlyList<ArchitectureUnmatchedIgnoredViolation> unmatchedIgnoredViolations,
+        IReadOnlyCollection<PolicyConsistencyDiagnostic> policyConsistencyFindings,
+        IReadOnlyCollection<ArchitectureCoverageSummary> coverageSummaries,
+        IReadOnlyCollection<ArchitectureClassificationConflict> classificationConflicts,
+        IReadOnlyCollection<ArchitectureClassificationMetadataFailure> classificationMetadataFailures,
+        IReadOnlyCollection<ArchitectureClassificationRoleFact> classificationRoles,
+        ArchitectureClassificationPathDeferredNotice? classificationPathDeferred,
+        IReadOnlyCollection<BuildStatePreflightDiagnostic> preflightDiagnostics,
+        ArchitectureSourceExpansionInventory sourceExpansion,
+        IReadOnlyCollection<ArchitectureSubtractiveMatcherParticipation>? subtractiveMatcherParticipation,
+        CancellationToken cancellationToken)
+    {
+        return ArchitectureDiagnosticFormatter.FormatResultForCiArtifacts(
+            mode,
+            passed,
+            violations,
+            cycles,
+            cycleFindings,
+            classificationRoles,
+            classificationPathDeferred,
+            preflightDiagnostics,
+            sourceExpansion,
+            coverageFindings,
+            unmatchedIgnoredViolations,
+            policyConsistencyFindings,
+            coverageSummaries,
+            classificationConflicts,
+            classificationMetadataFailures,
+            subtractiveMatcherParticipation,
+            cancellationToken);
+    }
+
     public string FormatBuildStatePreflightForHumans(IReadOnlyCollection<BuildStatePreflightDiagnostic> diagnostics)
     {
         return _formatter.FormatBuildStatePreflightForHumans(diagnostics);
@@ -163,9 +202,34 @@ internal sealed class CliRuntime : ICliRuntime
                 subtractiveMatcherParticipation);
     }
 
+    public string FormatResultAsSarif(
+        string mode,
+        IReadOnlyCollection<ArchitectureViolation> violations,
+        IReadOnlyCollection<string> cycles,
+        IReadOnlyCollection<ArchitectureCycleFinding> cycleFindings,
+        IReadOnlyCollection<BuildStatePreflightDiagnostic> preflightDiagnostics,
+        IReadOnlyCollection<ArchitectureCoverageSummary> coverageSummaries,
+        ArchitectureSourceExpansionInventory sourceExpansion,
+        IReadOnlyCollection<ArchitectureSubtractiveMatcherParticipation>? subtractiveMatcherParticipation,
+        CancellationToken cancellationToken)
+    {
+        return cycleFindings.Count > 0
+            ? ArchitectureSarifFormatter.FormatResultAsSarif(
+                mode, violations, cycleFindings, preflightDiagnostics, coverageSummaries, sourceExpansion, Version,
+                subtractiveMatcherParticipation, cancellationToken)
+            : _sarifFormatter.FormatResultAsSarif(
+                mode, violations, cycles, preflightDiagnostics, coverageSummaries, sourceExpansion, Version,
+                subtractiveMatcherParticipation, cancellationToken);
+    }
+
     public string FormatViolationsForHumans(IReadOnlyCollection<ArchitectureViolation> violations)
     {
         return _formatter.FormatViolationsForHumans(violations);
+    }
+
+    public string FormatViolationsForHumans(IReadOnlyCollection<ArchitectureViolation> violations, CancellationToken cancellationToken)
+    {
+        return _formatter.FormatViolationsForHumans(violations, cancellationToken);
     }
 
     public string FormatCyclesForHumans(
@@ -190,6 +254,11 @@ internal sealed class CliRuntime : ICliRuntime
     public string FormatCoverageForHumans(IReadOnlyCollection<ArchitectureViolation> coverageFindings)
     {
         return _formatter.FormatCoverageForHumans(coverageFindings);
+    }
+
+    public string FormatCoverageForHumans(IReadOnlyCollection<ArchitectureViolation> coverageFindings, CancellationToken cancellationToken)
+    {
+        return _formatter.FormatCoverageForHumans(coverageFindings, cancellationToken);
     }
 
     public string FormatCoverageSummaryForHumans(IReadOnlyCollection<ArchitectureCoverageSummary> coverageSummaries)

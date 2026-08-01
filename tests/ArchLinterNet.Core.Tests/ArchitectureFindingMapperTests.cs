@@ -25,6 +25,137 @@ public sealed class ArchitectureFindingMapperTests
         });
     }
 
+    // PR #416 review round 3: FromViolations previously accepted no CancellationToken at all, so
+    // mapping (diagnostic/identity construction) for a large violations set ran to completion
+    // before any caller-side per-finding check ever got a chance to run. This proves the token is
+    // now checked mid-enumeration — not just before/after the whole call — using a collection
+    // whose enumerator cancels as a side effect of being asked for its second item, and asserting
+    // the third item was never even fetched from the source collection.
+    [Test]
+    public void FromViolations_CancelledMidEnumeration_StopsBeforeMappingRemainingViolations()
+    {
+        var violations = new[]
+        {
+            new ArchitectureViolation("rule-a", null, "pkg-a", "pkg-b", Array.Empty<string>()),
+            new ArchitectureViolation("rule-a", null, "pkg-c", "pkg-d", Array.Empty<string>()),
+            new ArchitectureViolation("rule-a", null, "pkg-e", "pkg-f", Array.Empty<string>()),
+        };
+        using CancellationTokenSource cts = new();
+        var collection = new CancelOnItemCollection<ArchitectureViolation>(violations, cts, cancelBeforeIndex: 1);
+
+        Assert.Throws<OperationCanceledException>(() =>
+            ArchitectureFindingMapper.FromViolations(collection, mode: null, cts.Token));
+
+        Assert.That(collection.FetchedCount, Is.EqualTo(2),
+            "the loop must stop as soon as cancellation is observed for the second item — the third must never be fetched from the source collection");
+    }
+
+    [Test]
+    public void FromViolations_CancelledDuringIdentityExpansion_StopsBeforeMappingRemainingIdentities()
+    {
+        using CancellationTokenSource cts = new();
+        var identities = new CancelOnItemCollection<ArchitectureViolationIdentity>(
+            [Identity("first"), Identity("second"), Identity("third")], cts, cancelBeforeIndex: 1);
+        var violation = new ArchitectureViolation("rule-a", null, "pkg-a", "pkg-b", Array.Empty<string>())
+        {
+            Identities = identities,
+        };
+
+        Assert.Throws<OperationCanceledException>(() =>
+            ArchitectureFindingMapper.FromViolations([violation], mode: null, cts.Token));
+
+        Assert.That(identities.FetchedCount, Is.EqualTo(2),
+            "the mapper must observe cancellation while expanding an aggregated violation, before fetching another identity");
+    }
+
+    private sealed class CancelOnItemCollection<T> : IReadOnlyCollection<T>
+    {
+        private readonly IReadOnlyList<T> _items;
+        private readonly CancellationTokenSource _cts;
+        private readonly int _cancelBeforeIndex;
+
+        public CancelOnItemCollection(IReadOnlyList<T> items, CancellationTokenSource cts, int cancelBeforeIndex)
+        {
+            _items = items;
+            _cts = cts;
+            _cancelBeforeIndex = cancelBeforeIndex;
+        }
+
+        public int FetchedCount { get; private set; }
+
+        public int Count => _items.Count;
+
+        public IEnumerator<T> GetEnumerator()
+        {
+            for (int i = 0; i < _items.Count; i++)
+            {
+                if (i == _cancelBeforeIndex)
+                {
+                    _cts.Cancel();
+                }
+
+                FetchedCount++;
+                yield return _items[i];
+            }
+        }
+
+        System.Collections.IEnumerator System.Collections.IEnumerable.GetEnumerator() => GetEnumerator();
+    }
+
+    // PR #375 review: Order's per-comparison cancellation check used to surface as
+    // InvalidOperationException — LINQ's sort machinery wraps comparer exceptions — so a
+    // mid-sort cancellation would have been reported by the CLI as a generic error instead of
+    // the typed cancelled completion. This proves the comparer's OperationCanceledException is
+    // unwrapped and rethrown as-is: the findings enumerable cancels the token only after it has
+    // been fully enumerated, i.e. once the sort's buffering pass has already completed, so the
+    // exception can only come from the sort's per-comparison check — and it must propagate as
+    // OperationCanceledException, not InvalidOperationException.
+    [Test]
+    public void Order_CancelledMidSort_PropagatesOperationCanceledException()
+    {
+        ArchitectureFinding[] findings = Enumerable.Range(0, 16)
+            .Select(i => ArchitectureFindingMapper.FromDiagnostic(new DependencyDiagnostic(
+                "contract", null, $"Source.{i}", "Forbidden", Array.Empty<string>())))
+            .ToArray();
+        var collection = new CancelOnTerminationEnumerable<ArchitectureFinding>(findings);
+        using CancellationTokenSource cts = new();
+        collection.CancellationTokenSource = cts;
+
+        Assert.Throws<OperationCanceledException>(() => ArchitectureFindingMapper.Order(collection, cts.Token));
+
+        Assert.That(collection.FetchedCount, Is.EqualTo(findings.Length),
+            "the findings set was fully buffered before cancellation — the exception must come from the sort's per-comparison check");
+    }
+
+    private sealed class CancelOnTerminationEnumerable<T> : IEnumerable<T>
+    {
+        private readonly IReadOnlyList<T> _items;
+
+        public CancelOnTerminationEnumerable(IReadOnlyList<T> items)
+        {
+            _items = items;
+        }
+
+        public CancellationTokenSource? CancellationTokenSource { get; set; }
+
+        public int FetchedCount { get; private set; }
+
+        public IEnumerator<T> GetEnumerator()
+        {
+            foreach (T item in _items)
+            {
+                FetchedCount++;
+                yield return item;
+            }
+
+            // Fires on the MoveNext() that terminates the enumeration, i.e. only after every
+            // phase that consumes this enumerable has already run to completion.
+            CancellationTokenSource?.Cancel();
+        }
+
+        System.Collections.IEnumerator System.Collections.IEnumerable.GetEnumerator() => GetEnumerator();
+    }
+
     [Test]
     public void Order_KeepsSameNamedGlobalProgramsDistinctByAssemblyAndMemberIdentity()
     {

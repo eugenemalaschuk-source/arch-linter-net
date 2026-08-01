@@ -7,6 +7,7 @@ using NUnit.Framework;
 namespace ArchLinterNet.Core.Tests;
 
 [TestFixture]
+[Category("E2E")]
 public sealed class BuildStatePreflightTests
 {
     private string _repoRoot = null!;
@@ -418,6 +419,78 @@ public sealed class BuildStatePreflightTests
             Path.GetDirectoryName(projectPath)!, "bin", "Debug", "net10.0", "EnsureBuiltFixture.dll");
         Assert.That(File.Exists(assemblyPath), Is.True);
         Assert.That(File.Exists(BuildReceiptStore.ReceiptPathFor(assemblyPath)), Is.True);
+    }
+
+    // Issue #375: cancellation during EnsureBuilt must terminate the in-flight child
+    // dotnet restore/build process (without a shell — see BuildStatePreparationService's
+    // ProcessStartInfo, which never sets UseShellExecute=true) and still remove the temporary
+    // .slnx solution the existing `finally` block in InvokeGraphBuild already cleans up.
+    [Test]
+    [Category("Integration")]
+    [CancelAfter(120_000)]
+    public async Task Prepare_EnsureBuilt_CancelledMidBuild_TerminatesProcessAndCleansUpTempSolution()
+    {
+        string projectPath = CreateRealBuildableProjectFixture("CancelledBuildFixture");
+        ProjectDiscoveryResult discovery = SingleProjectDiscovery(projectPath, "CancelledBuildFixture");
+        var service = new BuildStatePreparationService();
+
+        const string TempSolutionPattern = "archlinternet-ensure-built-*.slnx";
+        int tempSolutionCountBefore = Directory.GetFiles(Path.GetTempPath(), TempSolutionPattern).Length;
+
+        using CancellationTokenSource cts = new();
+        Task prepareTask = Task.Run(() => service.Prepare(new BuildStatePreflightRequest(
+            _repoRoot, discovery, new BuildStateResolvedAssemblies(Array.Empty<Assembly>(), Array.Empty<string>()),
+            BuildPreparationMode.EnsureBuilt, RequestedConfiguration: "Debug", CancellationToken: cts.Token)));
+
+        // Give the child dotnet restore/build process a moment to actually start before
+        // cancelling — cancelling instantly risks interrupting before Process.Start even runs,
+        // which would still throw OperationCanceledException but wouldn't exercise the
+        // process-kill path this test is for.
+        await Task.Delay(300);
+        cts.Cancel();
+
+        Assert.ThrowsAsync<OperationCanceledException>(async () => await prepareTask);
+
+        int tempSolutionCountAfter = Directory.GetFiles(Path.GetTempPath(), TempSolutionPattern).Length;
+        Assert.That(tempSolutionCountAfter, Is.EqualTo(tempSolutionCountBefore));
+    }
+
+    // A child that survives Process.Kill(entireProcessTree: true) for the full post-kill
+    // deadline (a hostile or kernel-stuck process) is not something a real dotnet build can be
+    // made to reproduce deterministically. WaitForExitOrCancellationCore is fake-delegate
+    // testable specifically so this timeout branch can be proven without flaking.
+    [Test]
+    public void WaitForExitOrCancellationCore_ProcessSurvivesKillPastDeadline_ThrowsCleanupTimeoutException()
+    {
+        using CancellationTokenSource cts = new();
+        cts.Cancel();
+        bool killed = false;
+
+        BuildStateProcessCleanupTimedOutException? thrown = Assert.Throws<BuildStateProcessCleanupTimedOutException>(() =>
+            BuildStatePreparationService.WaitForExitOrCancellationCore(
+                waitForExit: _ => false,
+                killProcessTree: () => killed = true,
+                cancellationToken: cts.Token,
+                processId: 4242));
+
+        Assert.That(killed, Is.True);
+        Assert.That(thrown!.ProcessId, Is.EqualTo(4242));
+        Assert.That(thrown.TimeoutMs, Is.GreaterThan(0));
+    }
+
+    [Test]
+    public void WaitForExitOrCancellationCore_ProcessExitsWithinKillDeadline_ThrowsPlainOperationCanceledException()
+    {
+        using CancellationTokenSource cts = new();
+        cts.Cancel();
+        bool killed = false;
+
+        Assert.Throws<OperationCanceledException>(() =>
+            BuildStatePreparationService.WaitForExitOrCancellationCore(
+                waitForExit: _ => killed, // exits only after the kill has been requested
+                killProcessTree: () => killed = true,
+                cancellationToken: cts.Token,
+                processId: 4242));
     }
 
     private string CreateRealBuildableProjectFixture(string assemblyName)

@@ -8,9 +8,9 @@ internal sealed class MigrateBaselineSubcommandModule : IBaselineSubcommandModul
 {
     public string CommandName => "migrate";
 
-    public Command CreateCommand(ICliRuntime runtime, ICliConsole console, IFileSystem fileSystem)
+    public Command CreateCommand(ICliRuntime runtime, ICliConsole console, IFileSystem fileSystem, CancellationToken cancellationToken = default)
     {
-        BaselineMigrateCommandHandler handler = new(runtime, console, fileSystem);
+        BaselineMigrateCommandHandler handler = new(runtime, console, fileSystem, cancellationToken);
         Command command = new(CommandName);
         Option<string> policyOption = BaselineOptionsFactory.CreatePolicyOption();
         Option<string> baselineOption = new("--baseline");
