@@ -33,7 +33,15 @@ public sealed record ArchitectureViolation(
     /// established (violations built outside identity attachment, or the composition family, which
     /// selects candidates without a per-reference walk).
     /// </summary>
-    public IReadOnlyList<string> IdentityReferences { get; init; } = Array.Empty<string>();
+    /// <remarks>
+    /// Deliberately internal. This is pipeline plumbing between identity attachment and finding
+    /// normalization, not part of the diagnostics model callers consume: this record reaches users
+    /// through ArchitectureValidationResult.Violations, so a public member here would widen the
+    /// package's API surface and appear in any caller's own JSON projection of a raw violation.
+    /// Every consumer-facing view of this pairing is the per-finding <c>forbidden_references</c>
+    /// that normalization already emits.
+    /// </remarks>
+    internal IReadOnlyList<string> IdentityReferences { get; init; } = Array.Empty<string>();
 
     public IReadOnlyCollection<ArchitecturePolicySourceLocation> RelatedPolicyLocations { get; init; } =
         Array.Empty<ArchitecturePolicySourceLocation>();
