@@ -15,8 +15,13 @@ public partial interface IArchitectureDiagnosticFormatter
     /// add it just to keep compiling — only <see cref="ArchitectureDiagnosticFormatter"/> itself
     /// overrides it with a genuinely per-finding cancellation-aware implementation.
     /// </summary>
-    string FormatViolationsForHumans(IReadOnlyCollection<ArchitectureViolation> violations, CancellationToken cancellationToken) =>
-        FormatViolationsForHumans(violations);
+    string FormatViolationsForHumans(IReadOnlyCollection<ArchitectureViolation> violations, CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        // This method IS the cancellation-aware overload; the token is already observed via
+        // ThrowIfCancellationRequested, not by forwarding it further.
+        return FormatViolationsForHumans(violations); // NOSONAR: see comment above
+    }
 
     string FormatCyclesForHumans(IReadOnlyCollection<string> cycles);
 

@@ -14,7 +14,9 @@ public interface IArchitecturePolicyDocumentLoader
     ArchitectureContractDocument Load(string policyPath, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        ArchitectureContractDocument document = Load(policyPath);
+        // This method IS the cancellation-aware overload; the token is already observed via the
+        // ThrowIfCancellationRequested calls bracketing this call, not by forwarding it further.
+        ArchitectureContractDocument document = Load(policyPath); // NOSONAR: see comment above
         cancellationToken.ThrowIfCancellationRequested();
         return document;
     }

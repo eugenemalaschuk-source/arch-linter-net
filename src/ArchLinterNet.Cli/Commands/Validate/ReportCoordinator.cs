@@ -145,7 +145,7 @@ internal sealed class ReportCoordinator
                 return BuildRouteResult(Array.Empty<ReportSink>(), SinkDistributionEvidence.Empty(), cancelled: true);
             }
 
-            _console.Out.WriteLine(FormatSingleHuman(outcome));
+            _console.Out.WriteLine(FormatSingleHuman(outcome, cancellationToken));
         }
 
         return BuildRouteResult(Array.Empty<ReportSink>(), SinkDistributionEvidence.Empty(), cancelled: false);

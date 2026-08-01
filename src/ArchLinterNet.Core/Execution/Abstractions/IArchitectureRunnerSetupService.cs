@@ -22,7 +22,9 @@ public interface IArchitectureRunnerSetupService
         CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        ArchitectureContractDocument document = LoadDocument(policyPath, baselinePath, timing);
+        // This method IS the cancellation-aware overload; the token is already observed via the
+        // ThrowIfCancellationRequested calls bracketing this call, not by forwarding it further.
+        ArchitectureContractDocument document = LoadDocument(policyPath, baselinePath, timing); // NOSONAR: see comment above
         cancellationToken.ThrowIfCancellationRequested();
         return document;
     }

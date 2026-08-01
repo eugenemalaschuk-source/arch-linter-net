@@ -76,10 +76,15 @@ internal interface ICliRuntime
         IReadOnlyCollection<ArchitectureCoverageSummary> coverageSummaries,
         ArchitectureSourceExpansionInventory sourceExpansion,
         IReadOnlyCollection<ArchitectureSubtractiveMatcherParticipation>? subtractiveMatcherParticipation,
-        CancellationToken cancellationToken) =>
-        FormatResultAsSarif(
+        CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        // This method IS the cancellation-aware overload; the token is already observed via
+        // ThrowIfCancellationRequested, not by forwarding it further.
+        return FormatResultAsSarif( // NOSONAR: see comment above
             mode, violations, cycles, cycleFindings, preflightDiagnostics, coverageSummaries, sourceExpansion,
             subtractiveMatcherParticipation);
+    }
 
     string FormatResultForCiArtifacts( // NOSONAR: each parameter represents a semantically distinct section of the CI artifact payload; grouping would obscure the data contract
         string mode,
@@ -128,12 +133,17 @@ internal interface ICliRuntime
         IReadOnlyCollection<BuildStatePreflightDiagnostic> preflightDiagnostics,
         ArchitectureSourceExpansionInventory sourceExpansion,
         IReadOnlyCollection<ArchitectureSubtractiveMatcherParticipation>? subtractiveMatcherParticipation,
-        CancellationToken cancellationToken) =>
-        FormatResultForCiArtifacts(
+        CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        // This method IS the cancellation-aware overload; the token is already observed via
+        // ThrowIfCancellationRequested, not by forwarding it further.
+        return FormatResultForCiArtifacts( // NOSONAR: see comment above
             mode, passed, violations, cycles, cycleFindings, coverageFindings, unmatchedIgnoredViolations,
             policyConsistencyFindings, coverageSummaries, classificationConflicts, classificationMetadataFailures,
             classificationRoles, classificationPathDeferred, preflightDiagnostics, sourceExpansion,
             subtractiveMatcherParticipation);
+    }
 
     string FormatViolationsForHumans(IReadOnlyCollection<ArchitectureViolation> violations);
 
@@ -143,8 +153,13 @@ internal interface ICliRuntime
     /// only <see cref="ArchLinterNet.Cli.Infrastructure.CliRuntime"/> overrides it with a
     /// genuinely per-finding cancellation-aware implementation.
     /// </summary>
-    string FormatViolationsForHumans(IReadOnlyCollection<ArchitectureViolation> violations, CancellationToken cancellationToken) =>
-        FormatViolationsForHumans(violations);
+    string FormatViolationsForHumans(IReadOnlyCollection<ArchitectureViolation> violations, CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        // This method IS the cancellation-aware overload; the token is already observed via
+        // ThrowIfCancellationRequested, not by forwarding it further.
+        return FormatViolationsForHumans(violations); // NOSONAR: see comment above
+    }
 
     string FormatCyclesForHumans(
         IReadOnlyCollection<string> cycles,
