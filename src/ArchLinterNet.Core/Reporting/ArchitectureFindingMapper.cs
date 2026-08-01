@@ -339,7 +339,8 @@ public static class ArchitectureFindingMapper
         }
 
         string[] selected = references
-            .Where(reference => ReferenceMatchesIdentity(reference, targetMember))
+            .Where(reference => ReferenceMatchesIdentity(reference, targetMember)
+                || ReferenceMatchesSourceQualifiedIdentity(reference, identity.SourceMember, targetMember))
             .ToArray();
         return selected.Length == 0 ? references : selected;
     }
@@ -371,6 +372,56 @@ public static class ArchitectureFindingMapper
         reference.Equals(targetMember, StringComparison.Ordinal)
         || reference.StartsWith(targetMember + "@", StringComparison.Ordinal)
         || reference.StartsWith(targetMember + " ", StringComparison.Ordinal);
+
+    // The method-body families report one reference per (source member, target member) occurrence
+    // and build its display from exactly those two parts, with the target member at the *end*:
+    //
+    //   "<source member>: <target member>"                       — external dependency IL scan
+    //   "il <offset> (<source member>): <pattern> -> <target>"    — forbidden-call IL scan
+    //
+    // ReferenceMatchesIdentity above only anchors on the start of the reference, so it never
+    // attributed those, and every identity of such a violation fell back to the violation's whole
+    // reference list. A violation with N occurrences then serialized N x N references — on a broad
+    // `audit_external` group that turned 17k real references into 2.4M and exhausted memory before
+    // the report could be written (issue #419). Attributing them also fixes the content itself: a
+    // finding no longer claims the references that belong to its siblings.
+    private static bool ReferenceMatchesSourceQualifiedIdentity(
+        string reference,
+        string? sourceMember,
+        string targetMember)
+    {
+        if (sourceMember is not { Length: > 0 })
+        {
+            return false;
+        }
+
+        // The target member terminates the display and is always preceded by a space (": " or "-> ").
+        if (reference.Length <= targetMember.Length
+            || reference[reference.Length - targetMember.Length - 1] != ' '
+            || !reference.EndsWith(targetMember, StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        // The source member is named verbatim, closed by ':' or wrapped in parentheses. Anchoring on
+        // that delimiter stops a member whose name is a prefix of another's (Convert vs ConvertNode)
+        // from claiming the other's reference.
+        int index = reference.IndexOf(sourceMember, StringComparison.Ordinal);
+        while (index >= 0)
+        {
+            int after = index + sourceMember.Length;
+            if (after < reference.Length
+                && (reference[after] == ':'
+                    || (reference[after] == ')' && index > 0 && reference[index - 1] == '(')))
+            {
+                return true;
+            }
+
+            index = reference.IndexOf(sourceMember, index + 1, StringComparison.Ordinal);
+        }
+
+        return false;
+    }
 
     private static string? PolicyErrorImportPosition(ArchitecturePolicyErrorDiagnostic policyError) =>
         policyError.ImportChain.Count == 0

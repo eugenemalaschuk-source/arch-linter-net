@@ -106,32 +106,55 @@ internal static class AnsiEscapeSequenceStripper
     }
 }
 
-internal sealed class AnsiStrippingTextWriter(TextWriter inner) : TextWriter
+// The parser reports visible characters one at a time. Forwarding each of them straight to the
+// inner writer costs one virtual write per character, which is invisible on a few console lines and
+// crippling on a real report: a 45 MB `--format json` document took ~43 s to reach a redirected
+// stdout, far longer than producing it (issue #419). Visible characters are therefore batched here
+// and handed to the inner writer in blocks. The buffer is drained at the end of every public write,
+// so each call still publishes everything it was given before returning — ordering against a
+// separately written stderr is unchanged — and the parser's own state machine is untouched, so the
+// characters and their order are exactly what they were.
+internal sealed class AnsiStrippingTextWriter : TextWriter
 {
-    private readonly AnsiEscapeSequenceStripper.Parser _parser = new(inner.Write);
+    private const int BlockSize = 8192;
 
-    public override Encoding Encoding => inner.Encoding;
+    private readonly TextWriter _inner;
+    private readonly AnsiEscapeSequenceStripper.Parser _parser;
+    private readonly char[] _block = new char[BlockSize];
+    private int _blockLength;
 
-    public override IFormatProvider FormatProvider => inner.FormatProvider;
+    public AnsiStrippingTextWriter(TextWriter inner)
+    {
+        _inner = inner;
+        _parser = new AnsiEscapeSequenceStripper.Parser(AppendVisibleCharacter);
+    }
+
+    public override Encoding Encoding => _inner.Encoding;
+
+    public override IFormatProvider FormatProvider => _inner.FormatProvider;
 
     public override void Flush()
     {
-        inner.Flush();
+        DrainBlock();
+        _inner.Flush();
     }
 
     public override void Write(char value)
     {
         _parser.Write(value);
+        DrainBlock();
     }
 
     public override void Write(char[] buffer, int index, int count)
     {
         _parser.Write(buffer.AsSpan(index, count));
+        DrainBlock();
     }
 
     public override void Write(ReadOnlySpan<char> buffer)
     {
         _parser.Write(buffer);
+        DrainBlock();
     }
 
     public override void Write(string? value)
@@ -139,6 +162,37 @@ internal sealed class AnsiStrippingTextWriter(TextWriter inner) : TextWriter
         if (value is not null)
         {
             _parser.Write(value);
+            DrainBlock();
         }
+    }
+
+    protected override void Dispose(bool disposing)
+    {
+        if (disposing)
+        {
+            DrainBlock();
+        }
+
+        base.Dispose(disposing);
+    }
+
+    private void AppendVisibleCharacter(char value)
+    {
+        _block[_blockLength++] = value;
+        if (_blockLength == _block.Length)
+        {
+            DrainBlock();
+        }
+    }
+
+    private void DrainBlock()
+    {
+        if (_blockLength == 0)
+        {
+            return;
+        }
+
+        _inner.Write(_block.AsSpan(0, _blockLength));
+        _blockLength = 0;
     }
 }
