@@ -520,10 +520,20 @@ public sealed partial class ReportCoordinatorTests
     {
         private readonly StringBuilder _output = new();
         private readonly StringBuilder _error = new();
-        public TextWriter Out => new StringWriter(_output);
+        public Action? OnOutputWriteLine { get; init; }
+        public TextWriter Out => new CallbackStringWriter(_output, OnOutputWriteLine);
         public TextWriter Error => new StringWriter(_error);
         public string OutputText => _output.ToString();
         public string ErrorText => _error.ToString();
+
+        private sealed class CallbackStringWriter(StringBuilder builder, Action? onWriteLine) : StringWriter(builder)
+        {
+            public override void WriteLine(string? value)
+            {
+                base.WriteLine(value);
+                onWriteLine?.Invoke();
+            }
+        }
     }
 
     private sealed class StubFileSystem : IFileSystem

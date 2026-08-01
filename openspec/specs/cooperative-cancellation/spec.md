@@ -8,7 +8,6 @@ how cancellation takes precedence over an in-flight but unpublished success, how
 Testing API callers see equivalent completion semantics. This capability builds on — and does not
 redefine — the build-state-phase cancellation and snapshot-reuse-rejection rules already owned by
 `analysis-build-state-fingerprints`.
-
 ## Requirements
 ### Requirement: One cancellation token enters Core through the validation seam
 The system SHALL expose cooperative cancellation to CLI and `ArchLinterNet.Testing` callers exclusively
@@ -180,4 +179,22 @@ failure, a build failure, and an unexpected tool failure, while still exiting th
 - **WHEN** `--format sarif` is used and the invocation is cancelled
 - **THEN** the emitted SARIF document's result carries a rule identifier distinct from the existing
   `architecture-execution`/`architecture-policy` identifiers
+
+### Requirement: Cancellation completion is complete and non-retroactive
+The system SHALL retain every configured file sink in cancellation evidence, SHALL not reclassify fully delivered streams after publication, and SHALL drain asynchronous child output before reading diagnostics.
+
+#### Scenario: Cancellation before rendering
+- **WHEN** cancellation is observed before report rendering with file sinks configured
+- **THEN** every configured file destination is reported as uncommitted
+
+#### Scenario: Child process exits during polling
+- **WHEN** a child process exits while async stdout or stderr callbacks remain pending
+- **THEN** diagnostic output is read only after parameterless `WaitForExit()` completes
+
+### Requirement: Shared application seams observe cancellation
+Baseline, public-API, policy composition, hashing, receipt publication, and final outcome construction SHALL observe the caller token before publishing a completed result.
+
+#### Scenario: Cancellation during shared pipeline work
+- **WHEN** the caller cancels during one of the shared pipeline phases
+- **THEN** the operation raises cancellation and publishes no completed result or receipt
 

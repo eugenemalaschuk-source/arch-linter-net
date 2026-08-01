@@ -132,4 +132,24 @@ public sealed partial class ReportCoordinatorTests
             Assert.That(console.ErrorText, Is.Empty);
         });
     }
+
+    [Test]
+    public void RouteSingleOutcome_StreamOnlyCancellationAfterFinalWrite_RemainsSuccessful()
+    {
+        var runtime = new CountingRuntime();
+        using CancellationTokenSource cts = new();
+        var console = new CapturingConsole { OnOutputWriteLine = cts.Cancel };
+        var coordinator = new ReportCoordinator(runtime, console, new StubFileSystem());
+
+        RouteResult result = coordinator.RouteSingleOutcome(
+            "human", "strict", PassedOutcome,
+            [new ReportSink("json", ReportDestinationType.Stdout)], cts.Token);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(console.OutputText, Does.Contain("kind"));
+            Assert.That(result.Cancelled, Is.False);
+            Assert.That(result.Status, Is.EqualTo(ReportRouteStatus.AllSucceeded));
+        });
+    }
 }
