@@ -47,20 +47,23 @@ internal sealed class ArchitecturePolicyCheckApplicationService(
 
     private static PolicyCheckFailure? FindSnapshotFailure(ArchitectureContractDocument document)
     {
-        foreach (ArchitecturePublicApiSurfaceContract contract in document.Contracts.StrictPublicApiSurface
-                     .Concat(document.Contracts.AuditPublicApiSurface)
-                     .Where(contract => contract.ApiSnapshotErrorKind is PublicApiSnapshotErrorKind.ParseError or PublicApiSnapshotErrorKind.OwnershipError))
+        ArchitecturePublicApiSurfaceContract? contract = document.Contracts.StrictPublicApiSurface
+            .Concat(document.Contracts.AuditPublicApiSurface)
+            .FirstOrDefault(contract => contract.ApiSnapshotErrorKind
+                is PublicApiSnapshotErrorKind.ParseError or PublicApiSnapshotErrorKind.OwnershipError);
+
+        if (contract is null)
         {
-            ArchitecturePolicySourceLocation? location = document.Provenance.LocationFor(contract);
-            ArchitecturePolicyDiagnostic? diagnostic = location is null ? null : new ArchitecturePolicyDiagnostic(
-                ArchitecturePolicyDiagnosticKind.SemanticValidation,
-                location,
-                Array.Empty<ArchitecturePolicySourceLocation>(),
-                location.Source.ImportChain);
-            return new PolicyCheckFailure(contract.ApiSnapshotError!, contract.ApiSnapshotErrorKind.ToString(), diagnostic);
+            return null;
         }
 
-        return null;
+        ArchitecturePolicySourceLocation? location = document.Provenance.LocationFor(contract);
+        ArchitecturePolicyDiagnostic? diagnostic = location is null ? null : new ArchitecturePolicyDiagnostic(
+            ArchitecturePolicyDiagnosticKind.SemanticValidation,
+            location,
+            Array.Empty<ArchitecturePolicySourceLocation>(),
+            location.Source.ImportChain);
+        return new PolicyCheckFailure(contract.ApiSnapshotError!, contract.ApiSnapshotErrorKind.ToString(), diagnostic);
     }
 
     private static IReadOnlyCollection<PolicyCheckDeferredCheck> BuildDeferredChecks(
