@@ -3,9 +3,9 @@ using ArchLinterNet.Cli.Abstractions;
 
 namespace ArchLinterNet.Cli.Commands.PublicApi;
 
-// Issue #375 follow-up: every public-api subcommand handler previously caught
-// OperationCanceledException with its own generic catch (Exception), reporting real Ctrl+C/SIGTERM
-// (or a caller-supplied cancelled token) as an unexpected "public-api <command> error" —
+// Issue #375 follow-up: every public-api subcommand handler previously let OperationCanceledException
+// fall into its own generic catch-all exception handler, reporting real Ctrl+C/SIGTERM (or a
+// caller-supplied cancelled token) as an unexpected "public-api <command> error" —
 // indistinguishable from a genuine failure. Shared here so every handler's dedicated
 // OperationCanceledException branch reports the same shape, mirroring BaselineCancellationOutput.
 internal static class PublicApiCancellationOutput

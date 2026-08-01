@@ -13,6 +13,8 @@ namespace ArchLinterNet.Core.Tests;
 [TestFixture]
 public sealed class ArchitecturePolicyImportCancellationTests
 {
+    private static readonly string[] _domainAndInfraLayers = { "domain", "infra" };
+
     [Test]
     public void Load_CancelledWhileReadingAnImport_StopsBeforeItsOwnNestedImportIsRead()
     {
@@ -109,7 +111,7 @@ public sealed class ArchitecturePolicyImportCancellationTests
             var document = new ArchitecturePolicyDocumentLoader(ArchitectureFileSystem.Real)
                 .Load(rootPath, CancellationToken.None);
 
-            Assert.That(document.Layers.Keys, Is.EquivalentTo(new[] { "domain", "infra" }));
+            Assert.That(document.Layers.Keys, Is.EquivalentTo(_domainAndInfraLayers));
         }
         finally
         {

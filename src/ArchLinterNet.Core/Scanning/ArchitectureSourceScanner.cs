@@ -82,7 +82,7 @@ internal sealed class ArchitectureSourceScanner : IArchitectureSourceScanner
         {
             cancellationToken.ThrowIfCancellationRequested();
             SemanticModel semanticModel = compilation.GetSemanticModel(syntaxTree, true);
-            CompilationUnitSyntax root = syntaxTree.GetCompilationUnitRoot();
+            CompilationUnitSyntax root = syntaxTree.GetCompilationUnitRoot(cancellationToken);
 
             if (!ContainsNamespace(root, effectiveLayer))
             {

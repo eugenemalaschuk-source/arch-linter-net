@@ -3,10 +3,10 @@ using ArchLinterNet.Cli.Abstractions;
 
 namespace ArchLinterNet.Cli.Commands.Baseline;
 
-// Issue #375 follow-up: every baseline subcommand handler previously caught
-// OperationCanceledException with its own generic catch (Exception), reporting real Ctrl+C/SIGTERM
-// (or a caller-supplied cancelled token) as an unexpected "<command> error" — indistinguishable from
-// a genuine failure, and giving a machine caller (--format json) no typed way to tell the two apart.
+// Issue #375 follow-up: every baseline subcommand handler previously let OperationCanceledException
+// fall into its own generic catch-all exception handler, reporting real Ctrl+C/SIGTERM (or a
+// caller-supplied cancelled token) as an unexpected "<command> error" — indistinguishable from a
+// genuine failure, and giving a machine caller (--format json) no typed way to tell the two apart.
 // Shared here so every handler's dedicated OperationCanceledException branch reports the same shape.
 internal static class BaselineCancellationOutput
 {

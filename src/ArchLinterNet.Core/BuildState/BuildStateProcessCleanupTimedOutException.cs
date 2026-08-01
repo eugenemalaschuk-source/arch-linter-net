@@ -4,7 +4,7 @@ namespace ArchLinterNet.Core.BuildState;
 // process does not report exit within the bounded post-kill wait — Process.Kill is asynchronous
 // and, on a hostile or kernel-stuck child, the wait can time out without the process actually
 // having terminated. Deriving from OperationCanceledException keeps every existing
-// catch (OperationCanceledException) handler (ValidateCommandHandler, ArchitectureValidationApplicationService,
+// OperationCanceledException catch branch (ValidateCommandHandler, ArchitectureValidationApplicationService,
 // the Testing API) working unchanged; the extra fields let cancellation evidence honestly report
 // that cleanup could not be confirmed within the deadline instead of implying a clean kill.
 public sealed class BuildStateProcessCleanupTimedOutException : OperationCanceledException

@@ -28,9 +28,9 @@ public sealed class ArchitectureRunnerSetupService(
 
     public ArchitectureContractDocument LoadDocument(
         string policyPath,
-        string? baselinePath = null,
-        ValidationTiming? timing = null,
-        CancellationToken cancellationToken = default)
+        string? baselinePath,
+        ValidationTiming? timing,
+        CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
         ArchitectureContractDocument document;

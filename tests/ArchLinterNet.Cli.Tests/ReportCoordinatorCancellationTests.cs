@@ -12,6 +12,8 @@ namespace ArchLinterNet.Cli.Tests;
 public sealed partial class ReportCoordinatorTests
 {
     private static readonly string[] _oneJsonPath = { "one.json" };
+    private static readonly string[] _oneJsonAndTwoSarifPaths = { "one.json", "two.sarif" };
+    private static readonly string[] _pkgACycle = { "pkg-a -> pkg-b -> pkg-a" };
 
     // Issue #375: cancellation observed before staging even begins must report zero committed
     // files, Cancelled=true, and never call WriteAllTextToTemp for any sink.
@@ -38,7 +40,7 @@ public sealed partial class ReportCoordinatorTests
         {
             Assert.That(result.Cancelled, Is.True);
             Assert.That(result.CommittedPaths, Is.Empty);
-            Assert.That(result.UncommittedPaths, Is.EquivalentTo(new[] { "one.json", "two.sarif" }));
+            Assert.That(result.UncommittedPaths, Is.EquivalentTo(_oneJsonAndTwoSarifPaths));
             Assert.That(fileSystem.TempPaths, Is.Empty);
         });
     }
@@ -164,7 +166,7 @@ public sealed partial class ReportCoordinatorTests
     private static ValidationOutcome ViolationsAndCyclesOutcome => new(
         false,
         new[] { new ArchitectureViolation("rule-a", null, "pkg-a", "pkg-b", Array.Empty<string>()) },
-        new[] { "pkg-a -> pkg-b -> pkg-a" }, Array.Empty<ArchitectureViolation>(), "off",
+        _pkgACycle, Array.Empty<ArchitectureViolation>(), "off",
         Array.Empty<ArchitectureUnmatchedIgnoredViolation>(), "off",
         Array.Empty<PolicyConsistencyDiagnostic>(), "off",
         Array.Empty<ArchitectureCoverageSummary>(),

@@ -469,7 +469,7 @@ public sealed class BuildStatePreparationService : IBuildStatePreparationService
 
     private static void WaitForExitOrCancellation(Process process, CancellationToken cancellationToken)
     {
-        WaitForExitOrCancellationCore(process.WaitForExit, () => TryKillProcessTree(process), cancellationToken, process.Id);
+        WaitForExitOrCancellationCore(process.WaitForExit, () => TryKillProcessTree(process), process.Id, cancellationToken);
 
         // The timed overload only observes process termination. Complete the parameterless
         // wait before consuming the asynchronously populated StringBuilders so the final
@@ -488,7 +488,7 @@ public sealed class BuildStatePreparationService : IBuildStatePreparationService
     // Process.Kill(entireProcessTree: true) for a full ProcessExitAfterKillTimeoutMs is not
     // something a test can reliably provoke without flaking.
     internal static void WaitForExitOrCancellationCore(
-        Func<int, bool> waitForExit, Action killProcessTree, CancellationToken cancellationToken, int processId)
+        Func<int, bool> waitForExit, Action killProcessTree, int processId, CancellationToken cancellationToken)
     {
         while (!waitForExit(ProcessPollIntervalMs))
         {

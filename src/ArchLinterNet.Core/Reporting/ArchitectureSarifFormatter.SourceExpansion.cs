@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using ArchLinterNet.Core.Contracts;
 using ArchLinterNet.Core.Model;
 
@@ -63,6 +64,7 @@ public sealed partial class ArchitectureSarifFormatter
     /// document is built. <paramref name="subtractiveMatcherParticipation"/> has no default here
     /// (unlike the overload above) purely so this overload stays unambiguous by arity against it.
     /// </summary>
+    [SuppressMessage("Performance", "CA1822:Mark members as static", Justification = "Kept as an instance member so CliRuntime can call it through the same _sarifFormatter instance reference as its cycles-based sibling overload, without a CS0176 static-via-instance call error.")]
     public string FormatResultAsSarif( // NOSONAR: each parameter represents a semantically distinct section of the SARIF payload; grouping would obscure the data contract
         string mode,
         IReadOnlyCollection<ArchitectureViolation> violations,
