@@ -171,6 +171,21 @@ internal interface ICliRuntime
 
     string FormatCoverageForHumans(IReadOnlyCollection<ArchitectureViolation> coverageFindings);
 
+    /// <summary>
+    /// Cancellation-aware overload — coverage findings share the same shape (and can be equally
+    /// large) as violations. Default interface implementation ignores the token and delegates to
+    /// the overload above, so every existing test fake keeps compiling unaffected — only
+    /// <see cref="ArchLinterNet.Cli.Infrastructure.CliRuntime"/> overrides it with a genuinely
+    /// per-finding cancellation-aware implementation.
+    /// </summary>
+    string FormatCoverageForHumans(IReadOnlyCollection<ArchitectureViolation> coverageFindings, CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        // This method IS the cancellation-aware overload; the token is already observed via
+        // ThrowIfCancellationRequested, not by forwarding it further.
+        return FormatCoverageForHumans(coverageFindings); // NOSONAR: see comment above
+    }
+
     string FormatCoverageSummaryForHumans(IReadOnlyCollection<ArchitectureCoverageSummary> coverageSummaries);
 
     string FormatClassificationFactsForHumans(

@@ -31,6 +31,21 @@ public partial interface IArchitectureDiagnosticFormatter
 
     string FormatCoverageForHumans(IReadOnlyCollection<ArchitectureViolation> findings);
 
+    /// <summary>
+    /// Cancellation-aware overload — coverage findings share the same shape (and can be equally
+    /// large) as violations. Default interface implementation ignores the token and delegates to
+    /// the overload above, so every existing test fake keeps compiling unaffected — only
+    /// <see cref="ArchitectureDiagnosticFormatter"/> overrides it with a genuinely per-finding
+    /// cancellation-aware implementation.
+    /// </summary>
+    string FormatCoverageForHumans(IReadOnlyCollection<ArchitectureViolation> findings, CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        // This method IS the cancellation-aware overload; the token is already observed via
+        // ThrowIfCancellationRequested, not by forwarding it further.
+        return FormatCoverageForHumans(findings); // NOSONAR: see comment above
+    }
+
     string FormatCoverageSummaryForHumans(IReadOnlyCollection<ArchitectureCoverageSummary> summaries);
 
     string FormatClassificationFactsForHumans(
@@ -137,7 +152,7 @@ public sealed partial class ArchitectureDiagnosticFormatter : IArchitectureDiagn
         IReadOnlyCollection<ArchitectureViolation> violations, CancellationToken cancellationToken)
     {
         IReadOnlyList<ArchitectureFinding> findings = ArchitectureFindingMapper.Order(
-            ArchitectureFindingMapper.FromViolations(violations));
+            ArchitectureFindingMapper.FromViolations(violations, mode: null, cancellationToken));
         var lines = new string[findings.Count];
         for (int i = 0; i < findings.Count; i++)
         {
@@ -207,13 +222,18 @@ public sealed partial class ArchitectureDiagnosticFormatter : IArchitectureDiagn
 
     public string FormatCoverageForHumans(IReadOnlyCollection<ArchitectureViolation> findings)
     {
+        return FormatCoverageForHumans(findings, CancellationToken.None);
+    }
+
+    public string FormatCoverageForHumans(IReadOnlyCollection<ArchitectureViolation> findings, CancellationToken cancellationToken)
+    {
         if (findings.Count == 0)
         {
             return string.Empty;
         }
 
         return "Coverage findings:" + Environment.NewLine
-            + FormatViolationsForHumans(findings);
+            + FormatViolationsForHumans(findings, cancellationToken);
     }
 
     public string FormatCoverageSummaryForHumans(IReadOnlyCollection<ArchitectureCoverageSummary> summaries)

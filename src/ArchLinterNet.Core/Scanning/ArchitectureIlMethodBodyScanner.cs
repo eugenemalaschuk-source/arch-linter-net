@@ -38,8 +38,8 @@ internal sealed class ArchitectureIlMethodBodyScanner : IArchitectureIlMethodBod
         CancellationToken cancellationToken = default)
     {
         Type[] sourceTypes = sourceLayer != null
-            ? ArchitectureTypeScanner.FindTypesInLayer(targetAssemblies, sourceLayer)
-            : ArchitectureTypeScanner.FindTypesInNamespace(targetAssemblies, sourceNamespacePrefix);
+            ? ArchitectureTypeScanner.FindTypesInLayer(targetAssemblies, sourceLayer, cancellationToken)
+            : ArchitectureTypeScanner.FindTypesInNamespace(targetAssemblies, sourceNamespacePrefix, cancellationToken);
         if (sourceTypes.Length == 0)
         {
             return Array.Empty<ArchitectureViolation>();

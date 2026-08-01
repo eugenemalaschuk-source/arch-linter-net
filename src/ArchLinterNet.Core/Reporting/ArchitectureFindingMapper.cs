@@ -67,11 +67,15 @@ public static class ArchitectureFindingMapper
     /// </summary>
     public static IReadOnlyList<ArchitectureFinding> FromViolations(
         IEnumerable<ArchitectureViolation> violations,
-        string? mode = null)
+        string? mode = null,
+        CancellationToken cancellationToken = default)
     {
         var findings = new List<ArchitectureFinding>();
+        // Checked per violation — mapping (diagnostic/identity construction) is real work per
+        // item, not just the final serialization step callers loop over afterward.
         foreach (ArchitectureViolation violation in violations)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             ArchitectureDiagnostic diagnostic = ArchitectureDiagnosticMapper.FromViolation(violation);
             IReadOnlyCollection<ArchitectureViolationIdentity> identities = violation.Identities.Count > 0
                 ? violation.Identities

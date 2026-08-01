@@ -58,11 +58,15 @@ issue #418, not something this requirement claims is already true.
   the same parent document
 - **THEN** the next import — nested or sibling — is not resolved, read, or parsed
 
-#### Scenario: Cancellation during deep type/role/IL scanning
+#### Scenario: Cancellation during deep type/role/IL/source scanning
 - **WHEN** the token is cancelled while `ArchitectureTypeIndex.LoadAllTypes()`, `ArchitectureRoleIndex.BuildData()`,
-  `ArchitectureIlMethodBodyScanner.FindMethodBodyViolations`, or `ArchitectureExternalDependencyIlScanner.FindMethodBodyViolations`
-  is scanning a large target-assembly or source-type set
-- **THEN** scanning stops at the next assembly/type boundary and raises `OperationCanceledException`
+  `ArchitectureTypeScanner` type discovery, `ArchitectureIlMethodBodyScanner.FindMethodBodyViolations`,
+  `ArchitectureExternalDependencyIlScanner.FindMethodBodyViolations`, or `ArchitectureSourceScanner.FindMethodBodyViolations`
+  is scanning a large target-assembly, source-type, or source-file set
+- **THEN** scanning stops at the next assembly/type/file boundary and raises `OperationCanceledException` — for
+  `ArchitectureSourceScanner` specifically, before the next source file is read during discovery, before the
+  next syntax tree is analyzed after the Roslyn compilation is built, and before that compilation is built at
+  all if cancellation was already observed
 
 #### Scenario: Cancellation during contract-family execution
 - **WHEN** the token is cancelled between two contract-family iterations inside
@@ -219,8 +223,11 @@ The system SHALL retain every configured file sink in cancellation evidence, SHA
   between violations and cycles), one mode of a combined strict+audit JSON/SARIF document, or one finding
   within a single large violations/coverage-findings list inside one section's own render call
 - **THEN** rendering stops at that boundary — including mid-list, inside `FormatViolationsForHumans`,
-  `FormatResultForCiArtifacts`, or `FormatResultAsSarif` — and `OperationCanceledException` propagates
-  instead of a partial document reaching any sink
+  `FormatCoverageForHumans`, `FormatResultForCiArtifacts`, or `FormatResultAsSarif` — and
+  `OperationCanceledException` propagates instead of a partial document reaching any sink; this covers
+  both the per-item serialization step and the underlying `ArchitectureFindingMapper.FromViolations`
+  mapping pass itself, which is checked per violation as diagnostics and finding identities are built,
+  not only when the mapped result is later iterated for output
 
 #### Scenario: A cancellation notice never overwrites an existing configured report file
 - **WHEN** the CLI's own `CancellationToken` is cancelled (e.g. a real Ctrl+C) and a `--report <format>=<file>`

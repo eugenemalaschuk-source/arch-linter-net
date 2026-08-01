@@ -78,7 +78,7 @@ public sealed partial class ArchitectureSarifFormatter : IArchitectureSarifForma
         // Violations are the dominant contributor to a large report's size, so this is checked
         // per finding — not just before/after the whole SARIF document is built.
         List<ResultEntry> entries = BuildViolationEntriesCancellationAware(
-                ArchitectureFindingMapper.FromViolations(violations, mode), level, cancellationToken)
+                ArchitectureFindingMapper.FromViolations(violations, mode, cancellationToken), level, cancellationToken)
             .Concat(cycleEntryFactories.Select(factory => factory(level)))
             .Concat(preflightDiagnostics.Where(d => d.IsBlocking).Select(diagnostic => BuildPreflightEntry(diagnostic, mode)))
             .OrderBy(e => e.RuleId, StringComparer.Ordinal)

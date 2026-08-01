@@ -237,12 +237,13 @@ public sealed partial class ArchitectureDiagnosticFormatter
         // The dominant contributor to report size for a large run, so this is where cancellation
         // is actually checked per item — not just before/after the whole JSON document is built.
         var violationsSerialized = ToCiJsonObjectsCancellationAware(
-            ArchitectureFindingMapper.Order(ArchitectureFindingMapper.FromViolations(request.Violations, request.Mode)),
+            ArchitectureFindingMapper.Order(
+                ArchitectureFindingMapper.FromViolations(request.Violations, request.Mode, request.CancellationToken)),
             request.CancellationToken);
         var coverageFindingsSerialized = ToCiJsonObjectsCancellationAware(
             ArchitectureFindingMapper.Order(
                 ArchitectureFindingMapper.FromViolations(
-                    request.CoverageFindings ?? Array.Empty<ArchitectureViolation>(), request.Mode)),
+                    request.CoverageFindings ?? Array.Empty<ArchitectureViolation>(), request.Mode, request.CancellationToken)),
             request.CancellationToken);
 
         var payload = new

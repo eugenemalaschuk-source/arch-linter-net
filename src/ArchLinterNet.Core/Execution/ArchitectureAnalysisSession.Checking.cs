@@ -478,7 +478,7 @@ public sealed partial class ArchitectureAnalysisSession
                 contract.ForbiddenCalls, executionContext, sourceRoots: sourceRoots,
                 sourceLayer: sourceLayer, preprocessorSymbols: PreprocessorSymbols,
                 explicitReferenceAssemblyPaths: explicitReferenceAssemblyPaths,
-                sourceAssemblyHint: sourceAssemblyHint)
+                sourceAssemblyHint: sourceAssemblyHint, cancellationToken: Context.CancellationToken)
             .ToList();
 
         IReadOnlyList<ArchitectureViolation> ilViolations = new ArchitectureIlMethodBodyScanner().FindMethodBodyViolations(

@@ -654,7 +654,7 @@ internal sealed class ReportCoordinator
             () => _runtime.FormatUnmatchedForHumans(outcome.UnmatchedIgnoredViolations));
         cancellationToken.ThrowIfCancellationRequested();
         AppendSection(sb, outcome.CoverageConfig != "off" && outcome.CoverageFindings.Count > 0,
-            () => _runtime.FormatCoverageForHumans(outcome.CoverageFindings));
+            () => _runtime.FormatCoverageForHumans(outcome.CoverageFindings, cancellationToken));
         cancellationToken.ThrowIfCancellationRequested();
         AppendSection(sb, outcome.CoverageSummaries.Count > 0,
             () => _runtime.FormatCoverageSummaryForHumans(outcome.CoverageSummaries));

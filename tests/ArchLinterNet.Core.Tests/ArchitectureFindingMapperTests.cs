@@ -25,6 +25,65 @@ public sealed class ArchitectureFindingMapperTests
         });
     }
 
+    // PR #416 review round 3: FromViolations previously accepted no CancellationToken at all, so
+    // mapping (diagnostic/identity construction) for a large violations set ran to completion
+    // before any caller-side per-finding check ever got a chance to run. This proves the token is
+    // now checked mid-enumeration — not just before/after the whole call — using a collection
+    // whose enumerator cancels as a side effect of being asked for its second item, and asserting
+    // the third item was never even fetched from the source collection.
+    [Test]
+    public void FromViolations_CancelledMidEnumeration_StopsBeforeMappingRemainingViolations()
+    {
+        var violations = new[]
+        {
+            new ArchitectureViolation("rule-a", null, "pkg-a", "pkg-b", Array.Empty<string>()),
+            new ArchitectureViolation("rule-a", null, "pkg-c", "pkg-d", Array.Empty<string>()),
+            new ArchitectureViolation("rule-a", null, "pkg-e", "pkg-f", Array.Empty<string>()),
+        };
+        using CancellationTokenSource cts = new();
+        var collection = new CancelOnItemCollection(violations, cts, cancelBeforeIndex: 1);
+
+        Assert.Throws<OperationCanceledException>(() =>
+            ArchitectureFindingMapper.FromViolations(collection, mode: null, cts.Token));
+
+        Assert.That(collection.FetchedCount, Is.EqualTo(2),
+            "the loop must stop as soon as cancellation is observed for the second item — the third must never be fetched from the source collection");
+    }
+
+    private sealed class CancelOnItemCollection : IReadOnlyCollection<ArchitectureViolation>
+    {
+        private readonly IReadOnlyList<ArchitectureViolation> _items;
+        private readonly CancellationTokenSource _cts;
+        private readonly int _cancelBeforeIndex;
+
+        public CancelOnItemCollection(IReadOnlyList<ArchitectureViolation> items, CancellationTokenSource cts, int cancelBeforeIndex)
+        {
+            _items = items;
+            _cts = cts;
+            _cancelBeforeIndex = cancelBeforeIndex;
+        }
+
+        public int FetchedCount { get; private set; }
+
+        public int Count => _items.Count;
+
+        public IEnumerator<ArchitectureViolation> GetEnumerator()
+        {
+            for (int i = 0; i < _items.Count; i++)
+            {
+                if (i == _cancelBeforeIndex)
+                {
+                    _cts.Cancel();
+                }
+
+                FetchedCount++;
+                yield return _items[i];
+            }
+        }
+
+        System.Collections.IEnumerator System.Collections.IEnumerable.GetEnumerator() => GetEnumerator();
+    }
+
     [Test]
     public void Order_KeepsSameNamedGlobalProgramsDistinctByAssemblyAndMemberIdentity()
     {

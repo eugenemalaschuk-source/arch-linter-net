@@ -23,7 +23,8 @@ internal interface IArchitectureSourceScanner
         IRoslynCompilationFactory? compilationFactory = null,
         IArchitectureAssemblyLoader? assemblyLoader = null,
         IReadOnlyList<string>? explicitReferenceAssemblyPaths = null,
-        string? sourceAssemblyHint = null);
+        string? sourceAssemblyHint = null,
+        CancellationToken cancellationToken = default);
 
     IReadOnlyList<string> FindMatchingSourceFiles(
         string repositoryRoot,
@@ -48,7 +49,8 @@ internal sealed class ArchitectureSourceScanner : IArchitectureSourceScanner
         IRoslynCompilationFactory? compilationFactory = null,
         IArchitectureAssemblyLoader? assemblyLoader = null,
         IReadOnlyList<string>? explicitReferenceAssemblyPaths = null,
-        string? sourceAssemblyHint = null)
+        string? sourceAssemblyHint = null,
+        CancellationToken cancellationToken = default)
     {
         fileSystem ??= ArchitectureFileSystem.Real;
         compilationFactory ??= RoslynCompilationFactory.Real;
@@ -56,15 +58,21 @@ internal sealed class ArchitectureSourceScanner : IArchitectureSourceScanner
 
         ArchitectureLayer effectiveLayer = sourceLayer
                                           ?? new ArchitectureLayer { Namespace = sourceNamespacePrefix };
-        List<string> sourceFiles = FindMatchingSourceFiles(repositoryRoot, effectiveLayer, sourceRoots, fileSystem).ToList();
+        List<string> sourceFiles = FindMatchingSourceFiles(repositoryRoot, effectiveLayer, sourceRoots, fileSystem, cancellationToken).ToList();
         if (sourceFiles.Count == 0)
         {
             return Array.Empty<ArchitectureViolation>();
         }
 
+        // The compilation build itself (parsing every source file, resolving references) is not
+        // individually interruptible — it is one call into the Roslyn API — but is checked
+        // immediately before and after so it does not run unconditionally on an already-cancelled
+        // token, and per-file semantic analysis below is checked at each syntax tree boundary.
+        cancellationToken.ThrowIfCancellationRequested();
         CSharpCompilation compilation = compilationFactory.Create(
             "ArchitectureSourceScanner", sourceFiles, preprocessorSymbols, fileSystem, assemblyLoader,
             explicitReferenceAssemblyPaths);
+        cancellationToken.ThrowIfCancellationRequested();
         IReadOnlyList<ForbiddenCallPattern> patterns =
             ArchitectureForbiddenCallMatcher.NormalizePatterns(forbiddenCallPatterns);
         Dictionary<string, bool> matchCache = new(StringComparer.Ordinal);
@@ -72,6 +80,7 @@ internal sealed class ArchitectureSourceScanner : IArchitectureSourceScanner
 
         foreach (SyntaxTree syntaxTree in compilation.SyntaxTrees)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             SemanticModel semanticModel = compilation.GetSemanticModel(syntaxTree, true);
             CompilationUnitSyntax root = syntaxTree.GetCompilationUnitRoot();
 
@@ -123,9 +132,19 @@ internal sealed class ArchitectureSourceScanner : IArchitectureSourceScanner
         string[]? sourceRoots = null,
         IArchitectureFileSystem? fileSystem = null)
     {
+        return FindMatchingSourceFiles(repositoryRoot, layer, sourceRoots, fileSystem, CancellationToken.None);
+    }
+
+    private static IReadOnlyList<string> FindMatchingSourceFiles(
+        string repositoryRoot,
+        ArchitectureLayer layer,
+        string[]? sourceRoots,
+        IArchitectureFileSystem? fileSystem,
+        CancellationToken cancellationToken)
+    {
         fileSystem ??= ArchitectureFileSystem.Real;
         string[] roots = sourceRoots ?? _defaultSourceRoots;
-        return FindSourceFilesForNamespace(repositoryRoot, layer, roots, fileSystem);
+        return FindSourceFilesForNamespace(repositoryRoot, layer, roots, fileSystem, cancellationToken);
     }
 
     /// <summary>
@@ -272,7 +291,8 @@ internal sealed class ArchitectureSourceScanner : IArchitectureSourceScanner
     }
 
     private static List<string> FindSourceFilesForNamespace(
-        string repositoryRoot, ArchitectureLayer layer, string[] sourceRoots, IArchitectureFileSystem fileSystem)
+        string repositoryRoot, ArchitectureLayer layer, string[] sourceRoots, IArchitectureFileSystem fileSystem,
+        CancellationToken cancellationToken = default)
     {
         List<string> result = new();
 
@@ -285,8 +305,12 @@ internal sealed class ArchitectureSourceScanner : IArchitectureSourceScanner
                 continue;
             }
 
+            // Checked per file — a large source tree's file enumeration/read-per-line namespace
+            // check is real work, not just the compilation/semantic-analysis pass afterward.
             foreach (string filePath in fileSystem.EnumerateFiles(fullRoot, "*.cs", SearchOption.AllDirectories))
             {
+                cancellationToken.ThrowIfCancellationRequested();
+
                 // Checked relative to the scanned root (not the absolute path) so an ancestor
                 // directory name outside the repository — e.g. the OS temp directory a test
                 // fixture or CI checkout happens to live under — can never be mistaken for a

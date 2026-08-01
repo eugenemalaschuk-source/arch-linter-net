@@ -256,6 +256,11 @@ internal sealed class CliRuntime : ICliRuntime
         return _formatter.FormatCoverageForHumans(coverageFindings);
     }
 
+    public string FormatCoverageForHumans(IReadOnlyCollection<ArchitectureViolation> coverageFindings, CancellationToken cancellationToken)
+    {
+        return _formatter.FormatCoverageForHumans(coverageFindings, cancellationToken);
+    }
+
     public string FormatCoverageSummaryForHumans(IReadOnlyCollection<ArchitectureCoverageSummary> coverageSummaries)
     {
         return _formatter.FormatCoverageSummaryForHumans(coverageSummaries);
