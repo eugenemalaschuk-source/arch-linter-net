@@ -67,7 +67,10 @@ issue #418, not something this requirement claims is already true.
   `ArchitectureSourceScanner` specifically, before the next source file is read during discovery, before the
   next syntax tree is analyzed after the Roslyn compilation is built, and before that compilation is built at
   all if cancellation was already observed; project-aware reference resolution observes cancellation before
-  and after its opaque design-time build and while materializing each source-file/reference result
+  and after its opaque design-time build, while materializing each source-file/reference result, and while
+  resolving the owning project for a contract's matched source files — per discovered project while
+  materializing project directories, per matched file, and per candidate project directory while scanning the
+  matchedFiles × discoveredProjects product
 
 #### Scenario: Cancellation during contract-family execution
 - **WHEN** the token is cancelled between two contract-family iterations inside
@@ -228,7 +231,9 @@ The system SHALL retain every configured file sink in cancellation evidence, SHA
   `OperationCanceledException` propagates instead of a partial document reaching any sink; this covers
   both the per-item serialization step and the underlying `ArchitectureFindingMapper.FromViolations`
   mapping and ordering pass itself, which is checked per violation, per expanded identity, and per
-  finding comparison while sorting — not only when the mapped result is later iterated for output
+  finding comparison while sorting — and the final `ResultEntry` sort inside `FormatResultAsSarif`,
+  which is likewise checked per comparison — not only when the mapped result is later iterated for
+  output
 
 #### Scenario: A cancellation notice never overwrites an existing configured report file
 - **WHEN** the CLI's own `CancellationToken` is cancelled (e.g. a real Ctrl+C) and a `--report <format>=<file>`

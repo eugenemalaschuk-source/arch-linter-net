@@ -106,10 +106,22 @@ public static class ArchitectureFindingMapper
     // order, so sequential/non-cancelled output is byte-for-byte unchanged) while making the whole
     // sort interruptible: the token is observed on every comparison, not just before/after the
     // call, so cancellation mid-sort of a large findings set stops before the remaining
-    // comparisons instead of only being noticed once ToArray() has already finished.
+    // comparisons instead of only being noticed once ToArray() has already finished. LINQ's sort
+    // machinery wraps comparer exceptions in InvalidOperationException, so the comparer's
+    // OperationCanceledException is unwrapped and rethrown as-is to preserve the cancellation
+    // completion semantics the CLI and Testing API depend on.
     public static IReadOnlyList<ArchitectureFinding> Order(
-        IEnumerable<ArchitectureFinding> findings, CancellationToken cancellationToken) =>
-        findings.OrderBy(finding => finding, new FindingOrderComparer(cancellationToken)).ToArray();
+        IEnumerable<ArchitectureFinding> findings, CancellationToken cancellationToken)
+    {
+        try
+        {
+            return findings.OrderBy(finding => finding, new FindingOrderComparer(cancellationToken)).ToArray();
+        }
+        catch (InvalidOperationException ex) when (ex.InnerException is OperationCanceledException)
+        {
+            throw ex.InnerException;
+        }
+    }
 
     private sealed class FindingOrderComparer : IComparer<ArchitectureFinding>
     {

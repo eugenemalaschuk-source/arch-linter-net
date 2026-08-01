@@ -574,16 +574,25 @@ public sealed partial class ArchitectureAnalysisSession
     private ArchitectureDiscoveredProject? ResolveOwningProject(
         IReadOnlyCollection<ArchitectureDiscoveredProject> discoveredProjects, IReadOnlyList<string> matchedFiles)
     {
-        List<(ArchitectureDiscoveredProject Project, string Directory)> projectDirectories = discoveredProjects
-            .Select(project => (project, NormalizeDirectory(Path.GetFullPath(Path.Combine(
-                Context.RepositoryRoot, Path.GetDirectoryName(project.Path) ?? string.Empty)))))
-            .ToList();
+        // Materializing project directories is real per-project work (full-path resolution and
+        // directory normalization), so cancellation is checked per project here — not only at the
+        // prepass's surrounding boundaries.
+        List<(ArchitectureDiscoveredProject Project, string Directory)> projectDirectories = new(discoveredProjects.Count);
+        foreach (ArchitectureDiscoveredProject project in discoveredProjects)
+        {
+            Context.CancellationToken.ThrowIfCancellationRequested();
+            projectDirectories.Add((project, NormalizeDirectory(Path.GetFullPath(Path.Combine(
+                Context.RepositoryRoot, Path.GetDirectoryName(project.Path) ?? string.Empty)))));
+        }
 
         HashSet<string> owningProjectPaths = new(StringComparer.OrdinalIgnoreCase);
         ArchitectureDiscoveredProject? owner = null;
 
         foreach (string filePath in matchedFiles)
         {
+            // Per-file check: cancellation stops project-aware scanning at the nearest file
+            // boundary instead of only after every file has been matched against every project.
+            Context.CancellationToken.ThrowIfCancellationRequested();
             string fileDirectory = NormalizeDirectory(Path.GetDirectoryName(Path.GetFullPath(filePath)) ?? string.Empty);
 
             ArchitectureDiscoveredProject? bestMatch = null;
@@ -591,6 +600,10 @@ public sealed partial class ArchitectureAnalysisSession
 
             foreach ((ArchitectureDiscoveredProject candidate, string candidateDirectory) in projectDirectories)
             {
+                // Per-candidate-project check: the longest-prefix scan is a matchedFiles ×
+                // discoveredProjects product, so a large graph must stop at the next candidate
+                // boundary too, not only between files.
+                Context.CancellationToken.ThrowIfCancellationRequested();
                 if (fileDirectory.StartsWith(candidateDirectory, StringComparison.OrdinalIgnoreCase)
                     && candidateDirectory.Length > bestLength)
                 {

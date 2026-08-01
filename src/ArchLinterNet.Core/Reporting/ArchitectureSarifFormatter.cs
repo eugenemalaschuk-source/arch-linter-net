@@ -76,15 +76,29 @@ public sealed partial class ArchitectureSarifFormatter : IArchitectureSarifForma
         string level = mode == "strict" ? "error" : "warning";
 
         // Violations are the dominant contributor to a large report's size, so this is checked
-        // per finding — not just before/after the whole SARIF document is built.
-        List<ResultEntry> entries = BuildViolationEntriesCancellationAware(
-                ArchitectureFindingMapper.FromViolations(violations, mode, cancellationToken), level, cancellationToken)
-            .Concat(cycleEntryFactories.Select(factory => factory(level)))
-            .Concat(preflightDiagnostics.Where(d => d.IsBlocking).Select(diagnostic => BuildPreflightEntry(diagnostic, mode)))
-            .OrderBy(e => e.RuleId, StringComparer.Ordinal)
-            .ThenBy(e => e.SourceIdentifier, StringComparer.Ordinal)
-            .ThenBy(e => e.Category, StringComparer.Ordinal)
-            .ToList();
+        // per finding — not just before/after the whole SARIF document is built. The final
+        // OrderBy over every ResultEntry is interruptible too: a single comparer that replicates
+        // the RuleId/SourceIdentifier/Category tiebreakers observes the token on every
+        // comparison, so cancellation mid-sort of a large report stops at the next comparison
+        // instead of after the whole sort has finished (LINQ's stable OrderBy keeps ties in
+        // source order, so non-cancelled output is byte-for-byte unchanged). LINQ's sort
+        // machinery wraps comparer exceptions in InvalidOperationException, so the comparer's
+        // OperationCanceledException is unwrapped and rethrown as-is below to preserve the
+        // cancellation completion semantics the CLI and Testing API depend on.
+        List<ResultEntry> entries;
+        try
+        {
+            entries = BuildViolationEntriesCancellationAware(
+                    ArchitectureFindingMapper.FromViolations(violations, mode, cancellationToken), level, cancellationToken)
+                .Concat(cycleEntryFactories.Select(factory => factory(level)))
+                .Concat(preflightDiagnostics.Where(d => d.IsBlocking).Select(diagnostic => BuildPreflightEntry(diagnostic, mode)))
+                .OrderBy(e => e, new ResultEntryOrderComparer(cancellationToken))
+                .ToList();
+        }
+        catch (InvalidOperationException ex) when (ex.InnerException is OperationCanceledException)
+        {
+            throw ex.InnerException;
+        }
 
         object[] rules = entries
             .GroupBy(e => e.RuleId, StringComparer.Ordinal)
@@ -584,4 +598,37 @@ public sealed partial class ArchitectureSarifFormatter : IArchitectureSarifForma
         string SourceIdentifier,
         string Category,
         Dictionary<string, object?> Json);
+
+    // A single OrderBy(keySelector: identity, comparer) call with one comparer replicating the
+    // former OrderBy(RuleId).ThenBy(SourceIdentifier).ThenBy(Category) chain keeps LINQ's
+    // stable-sort guarantee (ties preserve source order, so sequential/non-cancelled output is
+    // byte-for-byte unchanged) while making the whole sort interruptible: the token is observed
+    // on every comparison, not just before/after the call.
+    private sealed class ResultEntryOrderComparer : IComparer<ResultEntry>
+    {
+        private readonly CancellationToken _cancellationToken;
+
+        internal ResultEntryOrderComparer(CancellationToken cancellationToken)
+        {
+            _cancellationToken = cancellationToken;
+        }
+
+        public int Compare(ResultEntry? x, ResultEntry? y)
+        {
+            _cancellationToken.ThrowIfCancellationRequested();
+            int result = StringComparer.Ordinal.Compare(x!.RuleId, y!.RuleId);
+            if (result != 0)
+            {
+                return result;
+            }
+
+            result = StringComparer.Ordinal.Compare(x.SourceIdentifier, y.SourceIdentifier);
+            if (result != 0)
+            {
+                return result;
+            }
+
+            return StringComparer.Ordinal.Compare(x.Category, y.Category);
+        }
+    }
 }

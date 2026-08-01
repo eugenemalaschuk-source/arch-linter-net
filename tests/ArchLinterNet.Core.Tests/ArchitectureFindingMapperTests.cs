@@ -102,6 +102,60 @@ public sealed class ArchitectureFindingMapperTests
         System.Collections.IEnumerator System.Collections.IEnumerable.GetEnumerator() => GetEnumerator();
     }
 
+    // PR #375 review: Order's per-comparison cancellation check used to surface as
+    // InvalidOperationException — LINQ's sort machinery wraps comparer exceptions — so a
+    // mid-sort cancellation would have been reported by the CLI as a generic error instead of
+    // the typed cancelled completion. This proves the comparer's OperationCanceledException is
+    // unwrapped and rethrown as-is: the findings enumerable cancels the token only after it has
+    // been fully enumerated, i.e. once the sort's buffering pass has already completed, so the
+    // exception can only come from the sort's per-comparison check — and it must propagate as
+    // OperationCanceledException, not InvalidOperationException.
+    [Test]
+    public void Order_CancelledMidSort_PropagatesOperationCanceledException()
+    {
+        ArchitectureFinding[] findings = Enumerable.Range(0, 16)
+            .Select(i => ArchitectureFindingMapper.FromDiagnostic(new DependencyDiagnostic(
+                "contract", null, $"Source.{i}", "Forbidden", Array.Empty<string>())))
+            .ToArray();
+        var collection = new CancelOnTerminationEnumerable<ArchitectureFinding>(findings);
+        using CancellationTokenSource cts = new();
+        collection.CancellationTokenSource = cts;
+
+        Assert.Throws<OperationCanceledException>(() => ArchitectureFindingMapper.Order(collection, cts.Token));
+
+        Assert.That(collection.FetchedCount, Is.EqualTo(findings.Length),
+            "the findings set was fully buffered before cancellation — the exception must come from the sort's per-comparison check");
+    }
+
+    private sealed class CancelOnTerminationEnumerable<T> : IEnumerable<T>
+    {
+        private readonly IReadOnlyList<T> _items;
+
+        public CancelOnTerminationEnumerable(IReadOnlyList<T> items)
+        {
+            _items = items;
+        }
+
+        public CancellationTokenSource? CancellationTokenSource { get; set; }
+
+        public int FetchedCount { get; private set; }
+
+        public IEnumerator<T> GetEnumerator()
+        {
+            foreach (T item in _items)
+            {
+                FetchedCount++;
+                yield return item;
+            }
+
+            // Fires on the MoveNext() that terminates the enumeration, i.e. only after every
+            // phase that consumes this enumerable has already run to completion.
+            CancellationTokenSource?.Cancel();
+        }
+
+        System.Collections.IEnumerator System.Collections.IEnumerable.GetEnumerator() => GetEnumerator();
+    }
+
     [Test]
     public void Order_KeepsSameNamedGlobalProgramsDistinctByAssemblyAndMemberIdentity()
     {
