@@ -109,6 +109,7 @@ public sealed class BuildStatePreparationService : IBuildStatePreparationService
         request.CancellationToken.ThrowIfCancellationRequested();
 
         BuildStatePreflightDiagnostic? failure = InvokeGraphBuild(request);
+        request.CancellationToken.ThrowIfCancellationRequested();
         if (failure != null)
         {
             return new BuildStatePreflightResult(new[] { failure });
@@ -120,7 +121,10 @@ public sealed class BuildStatePreparationService : IBuildStatePreparationService
         BuildStatePreflightRequest postBuildRequest = request with { Resolution = ResolveBuiltAssemblies(request) };
 
         BuildStatePreflightResult postBuildEvaluation = BuildStatePreflightEvaluator.Evaluate(postBuildRequest);
+        request.CancellationToken.ThrowIfCancellationRequested();
         WriteReceiptsForCurrentArtifacts(postBuildRequest, postBuildEvaluation);
+
+        request.CancellationToken.ThrowIfCancellationRequested();
 
         // Verified artifacts are re-checked once more from the freshly written receipts so the
         // TOCTOU window between build completion and receipt materialization cannot admit a
@@ -427,7 +431,7 @@ public sealed class BuildStatePreparationService : IBuildStatePreparationService
         process.Start();
         process.BeginOutputReadLine();
         process.BeginErrorReadLine();
-        process.WaitForExit();
+        WaitForExitOrCancellation(process, request.CancellationToken);
 
         if (process.ExitCode == 0)
         {
@@ -456,6 +460,69 @@ public sealed class BuildStatePreparationService : IBuildStatePreparationService
     private static string QuoteIfNeeded(string argument) =>
         argument.Contains(' ', StringComparison.Ordinal) ? $"\"{argument}\"" : argument;
 
+    // Polls instead of a blocking WaitForExit() so cancellation can interrupt an in-flight
+    // dotnet restore/build. No shell is ever involved (UseShellExecute=false above) — killing the
+    // tracked Process handle's own tree is sufficient. The 100ms interval is not observable at the
+    // scale of a dotnet build/restore invocation (seconds at minimum).
+    private const int ProcessPollIntervalMs = 100;
+    private const int ProcessExitAfterKillTimeoutMs = 5_000;
+
+    private static void WaitForExitOrCancellation(Process process, CancellationToken cancellationToken)
+    {
+        WaitForExitOrCancellationCore(process.WaitForExit, () => TryKillProcessTree(process), process.Id, cancellationToken);
+
+        // The timed overload only observes process termination. Complete the parameterless
+        // wait before consuming the asynchronously populated StringBuilders so the final
+        // OutputDataReceived/ErrorDataReceived callbacks have drained as documented by Process.
+        process.WaitForExit();
+
+        // The loop above can also exit normally (WaitForExit(ProcessPollIntervalMs) returned true)
+        // in the same interval the token was cancelled, without ever reaching the check inside the
+        // loop. Re-check here so a cancelled session can never treat a just-finished exit-0 build
+        // as success or go on to publish build receipts for it.
+        cancellationToken.ThrowIfCancellationRequested();
+    }
+
+    // Extracted from WaitForExitOrCancellation so the kill-then-bounded-wait timeout branch can
+    // be exercised deterministically with fake delegates — a real dotnet process that survives
+    // Process.Kill(entireProcessTree: true) for a full ProcessExitAfterKillTimeoutMs is not
+    // something a test can reliably provoke without flaking.
+    internal static void WaitForExitOrCancellationCore(
+        Func<int, bool> waitForExit, Action killProcessTree, int processId, CancellationToken cancellationToken)
+    {
+        while (!waitForExit(ProcessPollIntervalMs))
+        {
+            if (cancellationToken.IsCancellationRequested)
+            {
+                killProcessTree();
+
+                // Process.Kill is asynchronous. Bound the wait so a hostile or kernel-stuck
+                // child cannot hang cancellation forever. A child still not reporting exit after
+                // this deadline is a genuine cleanup failure, not a benign race — report it as
+                // such instead of silently proceeding as if the kill had been confirmed.
+                if (!waitForExit(ProcessExitAfterKillTimeoutMs))
+                {
+                    throw new BuildStateProcessCleanupTimedOutException(processId, ProcessExitAfterKillTimeoutMs, cancellationToken);
+                }
+
+                cancellationToken.ThrowIfCancellationRequested();
+            }
+        }
+    }
+
+    private static void TryKillProcessTree(Process process)
+    {
+        try
+        {
+            process.Kill(entireProcessTree: true);
+        }
+        catch (InvalidOperationException)
+        {
+            // The process already exited between the poll check and this call — benign race, not
+            // an error worth surfacing.
+        }
+    }
+
     private static void WriteReceiptsForCurrentArtifacts(
         BuildStatePreflightRequest request, BuildStatePreflightResult evaluation)
     {
@@ -464,6 +531,7 @@ public sealed class BuildStatePreparationService : IBuildStatePreparationService
 
         foreach (BuildStatePreflightDiagnostic diagnostic in evaluation.Diagnostics)
         {
+            request.CancellationToken.ThrowIfCancellationRequested();
             // Write (or overwrite) a fresh receipt for every state where ExpectedOutputPath is
             // confidently *this* project's own artifact — UnverifiableArtifact (freshly built, no
             // receipt yet), StaleArtifact (a receipt already existed but had a stale fingerprint —
@@ -488,8 +556,15 @@ public sealed class BuildStatePreparationService : IBuildStatePreparationService
             }
 
             string assemblyPath = diagnostic.Evidence.ExpectedOutputPath;
-            string fingerprint = BuildStateCanonicalHasher.ComputeBuildInputFingerprint(project.Path, request.RepositoryRoot);
-            string assemblyDigest = BuildStateCanonicalHasher.ComputeContentDigest(assemblyPath);
+            string fingerprint = BuildStateCanonicalHasher.ComputeBuildInputFingerprint(
+                project.Path, request.RepositoryRoot, request.CancellationToken);
+            string assemblyDigest = BuildStateCanonicalHasher.ComputeContentDigest(assemblyPath, request.CancellationToken);
+
+            // Re-checked immediately before the write that actually publishes trusted receipt
+            // evidence — hashing above already observes the token per file/project, but this is
+            // the last gate before BuildReceiptStore.Write, so a cancellation racing the very end
+            // of hashing still cannot slip a new trusted receipt out.
+            request.CancellationToken.ThrowIfCancellationRequested();
 
             // The receipt's configuration/TFM record what was actually resolved for this build —
             // ResolveBuiltAssemblies only accepted a candidate whose own output path matched a

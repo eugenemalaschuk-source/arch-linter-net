@@ -8,6 +8,7 @@ namespace ArchLinterNet.Core.Tests;
 // Regression coverage for post-ensure-built loading: a rebuilt target must be read from an
 // isolated snapshot scope, never reused from a same-simple-name assembly already in the process.
 [TestFixture]
+[Category("E2E")]
 public sealed class BuildStatePreflightAssemblyReloadTests
 {
     private string _tempDir = null!;

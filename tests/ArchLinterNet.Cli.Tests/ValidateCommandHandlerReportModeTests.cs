@@ -744,6 +744,11 @@ public sealed partial class ValidateCommandHandlerReportModeTests
 
         public List<string> CommittedPaths { get; } = new();
 
+        // Issue #375 PR #416 review: lets a test simulate cancellation racing with (rather than
+        // preceding) a real file-system operation — e.g. cancelling right as a temp file write
+        // succeeds — without the write itself failing.
+        public Action? OnWriteAllTextToTemp { get; set; }
+
         public bool FileExists(string path)
         {
             return _tempContents.ContainsKey(path) || exists;
@@ -767,6 +772,7 @@ public sealed partial class ValidateCommandHandlerReportModeTests
 
             string tempPath = targetPath + ".tmp";
             _tempContents[tempPath] = contents;
+            OnWriteAllTextToTemp?.Invoke();
             return tempPath;
         }
 

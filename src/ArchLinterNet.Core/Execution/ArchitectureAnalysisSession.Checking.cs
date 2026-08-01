@@ -478,7 +478,7 @@ public sealed partial class ArchitectureAnalysisSession
                 contract.ForbiddenCalls, executionContext, sourceRoots: sourceRoots,
                 sourceLayer: sourceLayer, preprocessorSymbols: PreprocessorSymbols,
                 explicitReferenceAssemblyPaths: explicitReferenceAssemblyPaths,
-                sourceAssemblyHint: sourceAssemblyHint)
+                sourceAssemblyHint: sourceAssemblyHint, cancellationToken: Context.CancellationToken)
             .ToList();
 
         IReadOnlyList<ArchitectureViolation> ilViolations = new ArchitectureIlMethodBodyScanner().FindMethodBodyViolations(
@@ -486,7 +486,8 @@ public sealed partial class ArchitectureAnalysisSession
             sourceLayer.Namespace,
             contract.ForbiddenCalls,
             executionContext,
-            sourceLayer: sourceLayer)
+            sourceLayer: sourceLayer,
+            cancellationToken: Context.CancellationToken)
             .ToList();
 
         List<ArchitectureViolation> violations = ArchitectureNamespaceViolationFinder.MergeMethodBodyViolations(contract.Name, contract.Id, roslynViolations, ilViolations);
@@ -516,8 +517,9 @@ public sealed partial class ArchitectureAnalysisSession
             return (null, null, null);
         }
 
-        IReadOnlyList<string> matchedFiles = new ArchitectureSourceScanner()
-            .FindMatchingSourceFiles(Context.RepositoryRoot, sourceLayer, sourceRoots);
+        Context.CancellationToken.ThrowIfCancellationRequested();
+        IReadOnlyList<string> matchedFiles = ArchitectureSourceScanner.FindMatchingSourceFiles(
+            Context.RepositoryRoot, sourceLayer, sourceRoots, fileSystem: null, Context.CancellationToken);
 
         if (matchedFiles.Count == 0)
         {
@@ -533,8 +535,14 @@ public sealed partial class ArchitectureAnalysisSession
         }
 
         string projectAbsolutePath = Path.GetFullPath(Path.Combine(Context.RepositoryRoot, owningProject.Path));
+
+        // The MSBuild design-time build inside Resolve is one opaque Buildalyzer call — like the
+        // Roslyn compilation build in ArchitectureSourceScanner, not individually interruptible —
+        // so it is checked immediately before and after instead of not at all.
+        Context.CancellationToken.ThrowIfCancellationRequested();
         ArchitectureProjectRoslynResolution resolution =
-            new ArchitectureProjectRoslynContextResolver().Resolve(projectAbsolutePath);
+            new ArchitectureProjectRoslynContextResolver().Resolve(projectAbsolutePath, Context.CancellationToken);
+        Context.CancellationToken.ThrowIfCancellationRequested();
 
         if (!resolution.Succeeded)
         {
@@ -566,16 +574,25 @@ public sealed partial class ArchitectureAnalysisSession
     private ArchitectureDiscoveredProject? ResolveOwningProject(
         IReadOnlyCollection<ArchitectureDiscoveredProject> discoveredProjects, IReadOnlyList<string> matchedFiles)
     {
-        List<(ArchitectureDiscoveredProject Project, string Directory)> projectDirectories = discoveredProjects
-            .Select(project => (project, NormalizeDirectory(Path.GetFullPath(Path.Combine(
-                Context.RepositoryRoot, Path.GetDirectoryName(project.Path) ?? string.Empty)))))
-            .ToList();
+        // Materializing project directories is real per-project work (full-path resolution and
+        // directory normalization), so cancellation is checked per project here — not only at the
+        // prepass's surrounding boundaries.
+        List<(ArchitectureDiscoveredProject Project, string Directory)> projectDirectories = new(discoveredProjects.Count);
+        foreach (ArchitectureDiscoveredProject project in discoveredProjects)
+        {
+            Context.CancellationToken.ThrowIfCancellationRequested();
+            projectDirectories.Add((project, NormalizeDirectory(Path.GetFullPath(Path.Combine(
+                Context.RepositoryRoot, Path.GetDirectoryName(project.Path) ?? string.Empty)))));
+        }
 
         HashSet<string> owningProjectPaths = new(StringComparer.OrdinalIgnoreCase);
         ArchitectureDiscoveredProject? owner = null;
 
         foreach (string filePath in matchedFiles)
         {
+            // Per-file check: cancellation stops project-aware scanning at the nearest file
+            // boundary instead of only after every file has been matched against every project.
+            Context.CancellationToken.ThrowIfCancellationRequested();
             string fileDirectory = NormalizeDirectory(Path.GetDirectoryName(Path.GetFullPath(filePath)) ?? string.Empty);
 
             ArchitectureDiscoveredProject? bestMatch = null;
@@ -583,6 +600,10 @@ public sealed partial class ArchitectureAnalysisSession
 
             foreach ((ArchitectureDiscoveredProject candidate, string candidateDirectory) in projectDirectories)
             {
+                // Per-candidate-project check: the longest-prefix scan is a matchedFiles ×
+                // discoveredProjects product, so a large graph must stop at the next candidate
+                // boundary too, not only between files.
+                Context.CancellationToken.ThrowIfCancellationRequested();
                 if (fileDirectory.StartsWith(candidateDirectory, StringComparison.OrdinalIgnoreCase)
                     && candidateDirectory.Length > bestLength)
                 {
@@ -683,7 +704,8 @@ public sealed partial class ArchitectureAnalysisSession
                 sourceTypes,
                 externalGroupName,
                 externalGroup,
-                executionContext));
+                executionContext,
+                Context.CancellationToken));
         }
 
         executionContext.CollectUnmatchedIgnores(_unmatchedIgnoredViolations);

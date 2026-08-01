@@ -175,8 +175,7 @@ public sealed partial class ArchitectureSourceFileFactIndexTests
             _foreignSourceRoot,
             null,
             fs,
-            projectDiscovery: null,
-            sourceRootAssemblyOwnership: null);
+            default(ArchitectureSourceFileFactIndex.ProjectOwnership));
 
         bool found = index.TryGetFact(
             "ArchLinterNet.Core.Tests.SourceFactFixtures.SingleTypeFixture",
@@ -426,8 +425,7 @@ public sealed partial class ArchitectureSourceFileFactIndexTests
             _singleSourceRoot,
             null,
             fs,
-            discovery,
-            sourceRootAssemblyOwnership: null);
+            new ArchitectureSourceFileFactIndex.ProjectOwnership(discovery, SourceRootAssemblyOwnership: null));
 
         bool foundTest = index.TryGetFact(
             "ArchLinterNet.Core.Tests",
@@ -477,8 +475,7 @@ public sealed partial class ArchitectureSourceFileFactIndexTests
             _singleSourceRoot,
             null,
             fs,
-            discovery,
-            sourceRootAssemblyOwnership: null);
+            new ArchitectureSourceFileFactIndex.ProjectOwnership(discovery, SourceRootAssemblyOwnership: null));
 
         bool found = index.TryGetFact(
             TestAssemblyName,
@@ -524,8 +521,7 @@ public sealed partial class ArchitectureSourceFileFactIndexTests
             _srcDomainRoot,
             null,
             fs,
-            discovery,
-            sourceRootAssemblyOwnership: null);
+            new ArchitectureSourceFileFactIndex.ProjectOwnership(discovery, SourceRootAssemblyOwnership: null));
 
         bool found = index.TryGetFact(
             TestAssemblyName,
@@ -570,8 +566,7 @@ public sealed partial class ArchitectureSourceFileFactIndexTests
             _singleSourceRoot,
             null,
             fs,
-            discovery,
-            sourceRootAssemblyOwnership: null);
+            new ArchitectureSourceFileFactIndex.ProjectOwnership(discovery, SourceRootAssemblyOwnership: null));
 
         bool foundTest = index.TryGetFact(
             "ArchLinterNet.Core.Tests",
@@ -623,11 +618,12 @@ public sealed partial class ArchitectureSourceFileFactIndexTests
             new[] { sourceRoot },
             preprocessorSymbols,
             fs,
-            projectDiscovery: null,
-            sourceRootAssemblyOwnership: new Dictionary<string, string>(StringComparer.Ordinal)
-            {
-                [sourceRoot] = TestAssemblyName
-            });
+            new ArchitectureSourceFileFactIndex.ProjectOwnership(
+                ProjectDiscovery: null,
+                SourceRootAssemblyOwnership: new Dictionary<string, string>(StringComparer.Ordinal)
+                {
+                    [sourceRoot] = TestAssemblyName
+                }));
     }
 
     private static ArchitectureSourceFileFactIndex BuildIndexWithTwoRoots(
@@ -668,12 +664,13 @@ public sealed partial class ArchitectureSourceFileFactIndexTests
             new[] { sourceRoot1, sourceRoot2 },
             null,
             fs,
-            projectDiscovery: null,
-            sourceRootAssemblyOwnership: new Dictionary<string, string>(StringComparer.Ordinal)
-            {
-                [sourceRoot1] = TestAssemblyName,
-                [sourceRoot2] = TestAssemblyName
-            });
+            new ArchitectureSourceFileFactIndex.ProjectOwnership(
+                ProjectDiscovery: null,
+                SourceRootAssemblyOwnership: new Dictionary<string, string>(StringComparer.Ordinal)
+                {
+                    [sourceRoot1] = TestAssemblyName,
+                    [sourceRoot2] = TestAssemblyName
+                }));
     }
 
     private static (Assembly Assembly, string AssemblyName) CreateDynamicAssemblyWithType(

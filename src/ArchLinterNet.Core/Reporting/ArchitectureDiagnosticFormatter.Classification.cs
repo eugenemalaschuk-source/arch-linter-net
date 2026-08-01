@@ -209,6 +209,11 @@ public sealed partial class ArchitectureDiagnosticFormatter
             get;
             init;
         }
+
+        // Init-only, defaulting to CancellationToken.None: every existing call site (all but the
+        // one cancellation-aware overload in ArchitectureDiagnosticFormatter.SourceExpansion.cs)
+        // leaves this unset and renders unconditionally to completion, unchanged.
+        public CancellationToken CancellationToken { get; init; }
     }
 
     private static string BuildCiArtifactsJson(CiArtifactsRequest request)
@@ -229,24 +234,31 @@ public sealed partial class ArchitectureDiagnosticFormatter
             .Select(cycle => ToCycleJsonObject(cycle, request.Mode))
             .ToArray();
 
+        // The dominant contributor to report size for a large run, so this is where cancellation
+        // is actually checked per item — not just before/after the whole JSON document is built.
+        var violationsSerialized = ToCiJsonObjectsCancellationAware(
+            ArchitectureFindingMapper.Order(
+                ArchitectureFindingMapper.FromViolations(request.Violations, request.Mode, request.CancellationToken),
+                request.CancellationToken),
+            request.CancellationToken);
+        var coverageFindingsSerialized = ToCiJsonObjectsCancellationAware(
+            ArchitectureFindingMapper.Order(
+                ArchitectureFindingMapper.FromViolations(
+                    request.CoverageFindings ?? Array.Empty<ArchitectureViolation>(), request.Mode, request.CancellationToken),
+                request.CancellationToken),
+            request.CancellationToken);
+
         var payload = new
         {
             passed = request.Passed,
             mode = request.Mode,
-            violations = ArchitectureFindingMapper.Order(ArchitectureFindingMapper.FromViolations(request.Violations, request.Mode))
-                .Select(finding => ToCiJsonObject(finding, includeContract: true))
-                .ToArray(),
+            violations = violationsSerialized,
             cycles = request.Cycles
                 .Select(cycle => ArchitectureDiagnosticMapper.FromCycle(cycle, contractName: string.Empty, contractId: null))
                 .Select(d => d.Path)
                 .ToArray(),
             cycle_diagnostics = cycleDiagnosticsSerialized,
-            coverage_findings = ArchitectureFindingMapper.Order(
-                    ArchitectureFindingMapper.FromViolations(
-                        request.CoverageFindings ?? Array.Empty<ArchitectureViolation>(),
-                        request.Mode))
-                .Select(finding => ToCiJsonObject(finding, includeContract: true))
-                .ToArray(),
+            coverage_findings = coverageFindingsSerialized,
             unmatched_ignored_violations = unmatchedSerialized,
             policy_consistency_findings = policyConsistencySerialized,
             coverage_summary = (request.CoverageSummaries ?? Array.Empty<ArchitectureCoverageSummary>())
@@ -287,6 +299,22 @@ public sealed partial class ArchitectureDiagnosticFormatter
         };
 
         return JsonSerializer.Serialize(payload);
+    }
+
+    // Checked per finding — violations (and, identically shaped, coverage findings) are the
+    // dominant contributor to a large report's size, so this is the actual iteration boundary
+    // that needs to be interruptible, not just a check before/after the whole document.
+    private static Dictionary<string, object?>[] ToCiJsonObjectsCancellationAware(
+        IReadOnlyList<ArchitectureFinding> findings, CancellationToken cancellationToken)
+    {
+        var results = new Dictionary<string, object?>[findings.Count];
+        for (int i = 0; i < findings.Count; i++)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            results[i] = ToCiJsonObject(findings[i], includeContract: true);
+        }
+
+        return results;
     }
 
     public string FormatClassificationFactsForHumans(

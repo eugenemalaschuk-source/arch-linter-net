@@ -15,4 +15,6 @@ public sealed record BaselineMigrateRequest
     public string? ConditionSetName { get; init; }
 
     public bool DryRun { get; init; }
+
+    public CancellationToken CancellationToken { get; init; } = default;
 }

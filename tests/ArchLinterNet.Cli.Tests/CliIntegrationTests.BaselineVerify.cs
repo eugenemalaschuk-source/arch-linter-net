@@ -100,6 +100,7 @@ baseline:
     }
 
     [Test]
+    [CancelAfter(120_000)]
     public void BaselineVerify_Json_ProducesValidJsonWithInSyncField()
     {
         string baselinePath = Path.Combine(Path.GetTempPath(), $"baseline-{Guid.NewGuid():N}.yml");

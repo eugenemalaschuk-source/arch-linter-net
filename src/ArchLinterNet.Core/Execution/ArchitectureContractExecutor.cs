@@ -36,6 +36,8 @@ internal sealed class ArchitectureContractExecutor : IArchitectureContractExecut
         // runtime decisions, not god-executor ceremony, so they stay as small special cases.
         foreach (string family in session.Catalog.FamiliesInOrder)
         {
+            session.Context.CancellationToken.ThrowIfCancellationRequested();
+
             if (family == CoverageFamily)
             {
                 ExecuteCoverageFamily(session, mode, handlerRegistry, timing, coverageViolations, coverageSummaries);
@@ -73,6 +75,7 @@ internal sealed class ArchitectureContractExecutor : IArchitectureContractExecut
         {
             foreach (IArchitectureContract contract in session.Catalog.ContractsFor(mode, CoverageFamily))
             {
+                session.Context.CancellationToken.ThrowIfCancellationRequested();
                 coverageCount++;
                 int identityCursor = session.FindingIdentityCursor;
                 coverageViolations.AddRange(session.AttachFindingIdentities(
@@ -103,6 +106,7 @@ internal sealed class ArchitectureContractExecutor : IArchitectureContractExecut
         {
             foreach (IArchitectureContract contract in session.Catalog.ContractsFor(mode, family))
             {
+                session.Context.CancellationToken.ThrowIfCancellationRequested();
                 count++;
                 int identityCursor = session.FindingIdentityCursor;
                 ArchitectureHandlerResult result = handlerRegistry.Execute(family, session, contract);

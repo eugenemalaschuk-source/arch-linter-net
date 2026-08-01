@@ -330,4 +330,103 @@ public sealed class ArchitectureAnalysisSessionMethodBodyProjectAwareTests
         Assert.That(violations.Any(v => v.ForbiddenReferences.Any(r => r.Contains("Console.WriteLine"))), Is.True,
             "The lightweight fallback compilation should still detect the violation.");
     }
+
+    // PR #375 review: ResolveOwningProject materialized discovered-project directories (and ran
+    // the matchedFiles × discoveredProjects scan) with no cancellation checks, so cancellation
+    // during the prepass was only observed at the next surrounding boundary, after the whole
+    // prepass had run. This proves the materialization loop's per-project check is live: the
+    // collection cancels on its 6th cumulative item fetch, which is the second project's fetch
+    // inside ResolveOwningProject — the first two enumerations (2 fetches each) belong to
+    // ArchitectureAnalysisContext's construction-time project-path inventory and
+    // ArchitectureSourceFileFactIndex's construction-time source-path ownership pass, both of
+    // which ran with an uncancelled token — so the OperationCanceledException comes from the
+    // materialization loop's check, and the loop stopped at the nearest project boundary.
+    [Test]
+    public void CheckMethodBodyContract_CancelledWhileResolvingOwningProject_StopsAtProjectBoundary()
+    {
+        var contract = new ArchitectureMethodBodyContract
+        {
+            Name = "no-referenced-widgets",
+            Id = "no-referenced-widgets",
+            Source = "consumer",
+            ForbiddenCalls = new List<string> { "Widgets.Build" },
+        };
+
+        using CancellationTokenSource cts = new();
+        var projects = new CancelOnFetchCountCollection<ArchitectureDiscoveredProject>(
+        [
+            new ArchitectureDiscoveredProject(
+                _consumerRelativePath.Replace('\\', '/'), "Fixture.Consumer", new[] { "net10.0" }),
+            new ArchitectureDiscoveredProject(
+                "Fixture.Referenced/Fixture.Referenced.csproj", "Fixture.Referenced", new[] { "net10.0" }),
+        ], cts, cancelBeforeTotalFetch: 6);
+
+        var document = new ArchitectureContractDocument
+        {
+            Layers = new Dictionary<string, ArchitectureLayer>
+            {
+                ["consumer"] = new ArchitectureLayer { Namespace = "Fixture.Consumer" },
+            },
+            Analysis = new ArchitectureAnalysisConfiguration
+            {
+                SourceRoots = new List<string> { "Fixture.Consumer" },
+            },
+        };
+
+        var context = new ArchitectureAnalysisContext(
+            _fixtureRoot,
+            Array.Empty<Assembly>(),
+            Array.Empty<string>(),
+            Array.Empty<string>(),
+            projectDiscovery: new ProjectDiscoveryResult(
+                Array.Empty<string>(), Array.Empty<string>(), Array.Empty<string>(),
+                Array.Empty<ArchitectureProjectDiscoveryDiagnostic>())
+            {
+                DiscoveredProjects = projects,
+            })
+        {
+            CancellationToken = cts.Token,
+        };
+
+        var session = new ArchitectureAnalysisSession(context, document, null, false, null);
+
+        Assert.Throws<OperationCanceledException>(() => session.CheckMethodBodyContract(contract));
+
+        Assert.That(projects.FetchedCount, Is.EqualTo(6),
+            "2 fetches (context construction) + 2 fetches (fact-index construction) + the materialization loop's own first project = 5, so the 6th fetch is the second project inside ResolveOwningProject — the loop must stop there and never fetch it again");
+    }
+
+    private sealed class CancelOnFetchCountCollection<T> : IReadOnlyCollection<T>
+    {
+        private readonly IReadOnlyList<T> _items;
+        private readonly CancellationTokenSource _cts;
+        private readonly int _cancelBeforeTotalFetch;
+
+        public CancelOnFetchCountCollection(IReadOnlyList<T> items, CancellationTokenSource cts, int cancelBeforeTotalFetch)
+        {
+            _items = items;
+            _cts = cts;
+            _cancelBeforeTotalFetch = cancelBeforeTotalFetch;
+        }
+
+        public int FetchedCount { get; private set; }
+
+        public int Count => _items.Count;
+
+        public IEnumerator<T> GetEnumerator()
+        {
+            foreach (T item in _items)
+            {
+                FetchedCount++;
+                if (FetchedCount == _cancelBeforeTotalFetch)
+                {
+                    _cts.Cancel();
+                }
+
+                yield return item;
+            }
+        }
+
+        System.Collections.IEnumerator System.Collections.IEnumerable.GetEnumerator() => GetEnumerator();
+    }
 }

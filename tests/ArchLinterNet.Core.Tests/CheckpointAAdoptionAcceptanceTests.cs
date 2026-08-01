@@ -10,6 +10,8 @@ using NUnit.Framework;
 namespace ArchLinterNet.Core.Tests;
 
 [TestFixture]
+[Category("E2E")]
+[CancelAfter(120_000)]
 public sealed class CheckpointAAdoptionAcceptanceTests
 {
     [Test]

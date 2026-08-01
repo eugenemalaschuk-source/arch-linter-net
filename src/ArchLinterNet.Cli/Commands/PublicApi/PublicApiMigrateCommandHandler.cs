@@ -4,7 +4,7 @@ using ArchLinterNet.Core.Validation;
 
 namespace ArchLinterNet.Cli.Commands.PublicApi;
 
-internal sealed class PublicApiMigrateCommandHandler(ICliRuntime runtime, ICliConsole console, IFileSystem fileSystem)
+internal sealed class PublicApiMigrateCommandHandler(ICliRuntime runtime, ICliConsole console, IFileSystem fileSystem, CancellationToken cancellationToken = default)
 {
     private const string CommandName = "migrate";
 
@@ -41,6 +41,7 @@ internal sealed class PublicApiMigrateCommandHandler(ICliRuntime runtime, ICliCo
                 OutputPath = options.OutputPath,
                 AcceptDrift = options.AcceptDrift,
                 ConditionSetName = options.ConditionSetName,
+                CancellationToken = cancellationToken,
             });
 
             if (!outcome.Succeeded)
@@ -70,10 +71,13 @@ internal sealed class PublicApiMigrateCommandHandler(ICliRuntime runtime, ICliCo
                 return CliExitCodes.InvalidArgumentsOrRuntimeError;
             }
 
+            // Re-checked immediately before publication, whether that means writing the
+            // migrated snapshot or just reporting a dry-run preview.
+            cancellationToken.ThrowIfCancellationRequested();
+
             if (!options.DryRun && !identical)
             {
-                string tempPath = fileSystem.WriteAllTextToTemp(destination, outcome.Snapshot!);
-                fileSystem.RenameTempToTarget(tempPath, destination);
+                PublicApiTwoPhaseWriter.WriteAndCommit(fileSystem, destination, outcome.Snapshot!, cancellationToken);
             }
 
             console.Out.WriteLine(options.Format == PublicApiOptionsFactory.JsonFormat
@@ -81,6 +85,10 @@ internal sealed class PublicApiMigrateCommandHandler(ICliRuntime runtime, ICliCo
                 : FormatForHumans(outcome, options, destination));
 
             return CliExitCodes.Success;
+        }
+        catch (OperationCanceledException)
+        {
+            return PublicApiCancellationOutput.Write(console, "migrate", options.Format == PublicApiOptionsFactory.JsonFormat);
         }
         catch (Exception ex)
         {

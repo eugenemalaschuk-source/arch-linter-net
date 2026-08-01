@@ -8,6 +8,7 @@ using ArchitectureContractGroups = ArchLinterNet.Core.Contracts.Families.Archite
 namespace ArchLinterNet.Core.Tests;
 
 [TestFixture]
+[Category("E2E")]
 public sealed class ArchitectureBaselineIntegrationTests
 {
     private static readonly ArchitectureBaselineGenerator _generator = new();

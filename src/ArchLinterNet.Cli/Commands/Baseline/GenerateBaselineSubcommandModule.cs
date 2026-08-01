@@ -8,19 +8,19 @@ internal sealed class GenerateBaselineSubcommandModule : IDefaultBaselineSubcomm
 {
     public string CommandName => "generate";
 
-    public Command CreateCommand(ICliRuntime runtime, ICliConsole console, IFileSystem fileSystem)
+    public Command CreateCommand(ICliRuntime runtime, ICliConsole console, IFileSystem fileSystem, CancellationToken cancellationToken = default)
     {
-        return CreateCommand("generate", runtime, console, fileSystem);
+        return CreateCommand("generate", runtime, console, fileSystem, cancellationToken);
     }
 
-    public Command CreateDefaultCommand(string commandName, ICliRuntime runtime, ICliConsole console, IFileSystem fileSystem)
+    public Command CreateDefaultCommand(string commandName, ICliRuntime runtime, ICliConsole console, IFileSystem fileSystem, CancellationToken cancellationToken = default)
     {
-        return CreateCommand(commandName, runtime, console, fileSystem);
+        return CreateCommand(commandName, runtime, console, fileSystem, cancellationToken);
     }
 
-    private static Command CreateCommand(string commandName, ICliRuntime runtime, ICliConsole console, IFileSystem fileSystem)
+    private static Command CreateCommand(string commandName, ICliRuntime runtime, ICliConsole console, IFileSystem fileSystem, CancellationToken cancellationToken)
     {
-        BaselineGenerateCommandHandler handler = new(runtime, console, fileSystem);
+        BaselineGenerateCommandHandler handler = new(runtime, console, fileSystem, cancellationToken);
         Command command = new(commandName);
         Option<string> policyOption = BaselineOptionsFactory.CreatePolicyOption();
         Option<string> outputOption = new("--output");

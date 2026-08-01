@@ -34,9 +34,13 @@ public sealed class ArchitectureProjectDiscoveryService : IArchitectureProjectDi
     }
 
     public ProjectDiscoveryResult ResolveAndApply(
-        ArchitectureContractDocument document, string repositoryRoot, bool resolveAssemblyOutputs)
+        ArchitectureContractDocument document,
+        string repositoryRoot,
+        bool resolveAssemblyOutputs,
+        CancellationToken cancellationToken = default)
     {
-        ProjectDiscoveryResult discovery = ResolveFromDocument(document, repositoryRoot, resolveAssemblyOutputs);
+        ProjectDiscoveryResult discovery = ResolveFromDocument(
+            document, repositoryRoot, resolveAssemblyOutputs, cancellationToken);
         ApplyDiscoveryResult(document.Analysis, discovery);
         return discovery;
     }
@@ -44,7 +48,8 @@ public sealed class ArchitectureProjectDiscoveryService : IArchitectureProjectDi
     public ProjectDiscoveryResult ResolveFromDocument(
         ArchitectureContractDocument document,
         string repositoryRoot,
-        bool resolveAssemblyOutputs = true)
+        bool resolveAssemblyOutputs = true,
+        CancellationToken cancellationToken = default)
     {
         ArchitectureAnalysisConfiguration analysis = document.Analysis;
         bool hasSolution = !string.IsNullOrWhiteSpace(analysis.Solution);
@@ -68,7 +73,8 @@ public sealed class ArchitectureProjectDiscoveryService : IArchitectureProjectDi
             projectPaths.Add(ResolvePath(explicitProject, repositoryRoot));
         }
 
-        return BuildDiscoveryResult(projectPaths, analysis, repositoryRoot, resolveAssemblyOutputs, diagnostics);
+        return BuildDiscoveryResult(
+            projectPaths, analysis, repositoryRoot, resolveAssemblyOutputs, diagnostics, cancellationToken);
     }
 
     private List<string> ResolveSolutionProjectPaths(
@@ -114,7 +120,8 @@ public sealed class ArchitectureProjectDiscoveryService : IArchitectureProjectDi
         ArchitectureAnalysisConfiguration analysis,
         string repositoryRoot,
         bool resolveAssemblyOutputs,
-        List<ArchitectureProjectDiscoveryDiagnostic> diagnostics)
+        List<ArchitectureProjectDiscoveryDiagnostic> diagnostics,
+        CancellationToken cancellationToken)
     {
         List<string> targetAssemblyNames = new();
         List<string> assemblySearchPaths = new();
@@ -124,6 +131,7 @@ public sealed class ArchitectureProjectDiscoveryService : IArchitectureProjectDi
 
         foreach (string projectPath in projectPaths.Distinct(StringComparer.OrdinalIgnoreCase))
         {
+            cancellationToken.ThrowIfCancellationRequested();
             ProcessProjectPath(
                 projectPath, analysis, repositoryRoot, resolveAssemblyOutputs,
                 diagnostics, targetAssemblyNames, assemblySearchPaths, sourceRoots, discoveredProjects,

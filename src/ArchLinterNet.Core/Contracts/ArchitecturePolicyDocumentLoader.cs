@@ -53,16 +53,26 @@ public sealed partial class ArchitecturePolicyDocumentLoader : IArchitecturePoli
 
     public ArchitectureContractDocument Load(string policyPath)
     {
-        return LoadCore(policyPath, validateEffectiveSchema: false);
+        return LoadCore(policyPath, validateEffectiveSchema: false, CancellationToken.None);
     }
 
-    private ArchitectureContractDocument LoadCore(string policyPath, bool validateEffectiveSchema)
+    public ArchitectureContractDocument Load(string policyPath, CancellationToken cancellationToken)
     {
+        return LoadCore(policyPath, validateEffectiveSchema: false, cancellationToken);
+    }
+
+    private ArchitectureContractDocument LoadCore(
+        string policyPath, bool validateEffectiveSchema, CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+
         ArchitecturePolicyRootPath? resolvedRoot = EnsureSelectedRootIsRegularFile(policyPath);
         ArchitecturePolicySourceDescriptor rootDescriptor = ResolveRootDescriptor(policyPath, resolvedRoot);
 
         (string yaml, ArchitecturePolicyProvenanceIndex provenance) =
-            LoadYamlAndProvenance(policyPath, resolvedRoot, rootDescriptor, validateEffectiveSchema);
+            LoadYamlAndProvenance(policyPath, resolvedRoot, rootDescriptor, validateEffectiveSchema, cancellationToken);
+
+        cancellationToken.ThrowIfCancellationRequested();
 
         try
         {
@@ -131,7 +141,8 @@ public sealed partial class ArchitecturePolicyDocumentLoader : IArchitecturePoli
         string policyPath,
         ArchitecturePolicyRootPath? resolvedRoot,
         ArchitecturePolicySourceDescriptor rootDescriptor,
-        bool validateEffectiveSchema)
+        bool validateEffectiveSchema,
+        CancellationToken cancellationToken)
     {
         string yaml = ArchitecturePolicySourceReader.ReadAllText(
             _fileSystem,
@@ -154,8 +165,8 @@ public sealed partial class ArchitecturePolicyDocumentLoader : IArchitecturePoli
         }
 
         IReadOnlyList<ArchitecturePolicySource> sources = resolvedRoot is null
-            ? _importResolver.Resolve(policyPath, yaml)
-            : _importResolver.Resolve(resolvedRoot, rootDescriptor, yaml);
+            ? _importResolver.Resolve(policyPath, yaml, cancellationToken)
+            : _importResolver.Resolve(resolvedRoot, rootDescriptor, yaml, cancellationToken);
         ArchitecturePolicyCompositionResult composition = new ArchitecturePolicyDocumentComposer().Compose(sources);
         ArchitecturePolicyEffectiveSchemaValidator.Validate(composition.Yaml, composition.Provenance);
         return (composition.Yaml, composition.Provenance);

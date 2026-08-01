@@ -15,6 +15,20 @@ public interface IArchitectureRunnerSetupService
         string? baselinePath = null,
         ValidationTiming? timing = null);
 
+    ArchitectureContractDocument LoadDocument(
+        string policyPath,
+        string? baselinePath,
+        ValidationTiming? timing,
+        CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        // This method IS the cancellation-aware overload; the token is already observed via the
+        // ThrowIfCancellationRequested calls bracketing this call, not by forwarding it further.
+        ArchitectureContractDocument document = LoadDocument(policyPath, baselinePath, timing); // NOSONAR: see comment above
+        cancellationToken.ThrowIfCancellationRequested();
+        return document;
+    }
+
     ArchitectureRunnerSetup BuildRunner( // NOSONAR: each parameter maps to a distinct configuration concern; a parameter object would wrap disparate optional axes without reducing call-site cognitive load
         ArchitectureContractDocument document,
         string policyPath,
@@ -23,7 +37,8 @@ public interface IArchitectureRunnerSetupService
         HashSet<string>? selectedContractIds = null,
         bool enableUnmatchedIgnoreTracking = true,
         ValidationTiming? timing = null,
-        string? mode = null);
+        string? mode = null,
+        CancellationToken cancellationToken = default);
 
     // The post-ensure-built pass must build a runner from fresh artifacts, not by delegating to
     // ordinary same-simple-name assembly resolution.
@@ -35,5 +50,6 @@ public interface IArchitectureRunnerSetupService
         HashSet<string>? selectedContractIds = null,
         bool enableUnmatchedIgnoreTracking = true,
         ValidationTiming? timing = null,
-        string? mode = null);
+        string? mode = null,
+        CancellationToken cancellationToken = default);
 }

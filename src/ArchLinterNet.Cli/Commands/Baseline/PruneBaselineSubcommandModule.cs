@@ -8,9 +8,9 @@ internal sealed class PruneBaselineSubcommandModule : IBaselineSubcommandModule
 {
     public string CommandName => "prune";
 
-    public Command CreateCommand(ICliRuntime runtime, ICliConsole console, IFileSystem fileSystem)
+    public Command CreateCommand(ICliRuntime runtime, ICliConsole console, IFileSystem fileSystem, CancellationToken cancellationToken = default)
     {
-        BaselinePruneCommandHandler handler = new(runtime, console, fileSystem);
+        BaselinePruneCommandHandler handler = new(runtime, console, fileSystem, cancellationToken);
         Command command = new(CommandName);
         Option<string> policyOption = BaselineOptionsFactory.CreatePolicyOption();
         Option<string> baselineOption = new("--baseline");

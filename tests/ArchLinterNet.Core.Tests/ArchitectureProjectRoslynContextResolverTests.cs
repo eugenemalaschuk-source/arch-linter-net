@@ -146,4 +146,14 @@ public sealed class ArchitectureProjectRoslynContextResolverTests
         Assert.That(resolution.Succeeded, Is.False);
         Assert.That(resolution.FailureReason, Does.Contain("does not exist"));
     }
+
+    [Test]
+    public void Resolve_PreCancelledToken_PropagatesCancellationInsteadOfReturningEvaluationFailure()
+    {
+        using CancellationTokenSource cts = new();
+        cts.Cancel();
+
+        Assert.Throws<OperationCanceledException>(() => new ArchitectureProjectRoslynContextResolver()
+            .Resolve(_consumerProjectPath, cts.Token));
+    }
 }

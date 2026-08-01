@@ -220,7 +220,8 @@ public static class BuildStatePreflightEvaluator
     private static BuildStatePreflightDiagnostic? CheckReceiptFreshness(
         ArchitectureDiscoveredProject project, BuildStatePreflightRequest request, string assemblyPath, BuildReceiptV1 receipt)
     {
-        string currentFingerprint = BuildStateCanonicalHasher.ComputeBuildInputFingerprint(project.Path, request.RepositoryRoot);
+        string currentFingerprint = BuildStateCanonicalHasher.ComputeBuildInputFingerprint(
+            project.Path, request.RepositoryRoot, request.CancellationToken);
         if (!string.Equals(receipt.BuildInputFingerprint, currentFingerprint, StringComparison.Ordinal))
         {
             return Diagnostic(project, BuildStatePreflightState.StaleArtifact,
@@ -232,7 +233,7 @@ public static class BuildStatePreflightEvaluator
                 });
         }
 
-        string currentAssemblyDigest = BuildStateCanonicalHasher.ComputeContentDigest(assemblyPath);
+        string currentAssemblyDigest = BuildStateCanonicalHasher.ComputeContentDigest(assemblyPath, request.CancellationToken);
         if (!string.Equals(receipt.AssemblyContentDigest, currentAssemblyDigest, StringComparison.Ordinal))
         {
             return Diagnostic(project, BuildStatePreflightState.StaleArtifact,

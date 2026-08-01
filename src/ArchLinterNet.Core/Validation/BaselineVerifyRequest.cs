@@ -11,4 +11,6 @@ public sealed record BaselineVerifyRequest
     public string? ConditionSetName { get; init; }
 
     public IReadOnlyCollection<string>? ContractIds { get; init; }
+
+    public CancellationToken CancellationToken { get; init; } = default;
 }

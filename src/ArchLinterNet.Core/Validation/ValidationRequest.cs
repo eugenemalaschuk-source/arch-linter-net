@@ -32,4 +32,6 @@ public sealed record ValidationRequest
     public string? RequestedConfiguration { get; init; }
 
     public string? RequestedTargetFramework { get; init; }
+
+    public CancellationToken CancellationToken { get; init; } = default;
 }

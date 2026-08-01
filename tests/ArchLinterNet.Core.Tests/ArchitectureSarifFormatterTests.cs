@@ -7,7 +7,7 @@ using NUnit.Framework;
 namespace ArchLinterNet.Core.Tests;
 
 [TestFixture]
-public sealed class ArchitectureSarifFormatterTests
+public sealed partial class ArchitectureSarifFormatterTests
 {
     private static readonly ArchitectureSarifFormatter _formatter = new();
     private static readonly string[] _ref1 = { "ref1" };

@@ -30,6 +30,11 @@ public sealed class ArchitectureAnalysisSnapshotTests
 
         public Exception? ExceptionToThrowFromBuildRunner { get; set; }
 
+        // Issue #375 PR #416 review: captures what BuildRunner actually received, so a test can
+        // prove ArchitectureValidationApplicationService.BuildRunnerFor forwards the request's
+        // token instead of silently defaulting it.
+        public CancellationToken LastCancellationTokenReceived { get; private set; }
+
         public ArchitectureContractDocument LoadDocument(
             string policyPath, string? baselinePath = null, ValidationTiming? timing = null)
         {
@@ -45,9 +50,11 @@ public sealed class ArchitectureAnalysisSnapshotTests
             HashSet<string>? selectedContractIds = null,
             bool enableUnmatchedIgnoreTracking = true,
             ValidationTiming? timing = null,
-            string? mode = null)
+            string? mode = null,
+            CancellationToken cancellationToken = default)
         {
             BuildRunnerCallCount++;
+            LastCancellationTokenReceived = cancellationToken;
             if (ExceptionToThrowFromBuildRunner is not null)
             {
                 throw ExceptionToThrowFromBuildRunner;
@@ -59,10 +66,11 @@ public sealed class ArchitectureAnalysisSnapshotTests
         public ArchitectureRunnerSetup BuildRunnerForPostBuild(
             ArchitectureContractDocument document, string policyPath, string? conditionSetName = null,
             IReadOnlyList<string>? preprocessorSymbols = null, HashSet<string>? selectedContractIds = null,
-            bool enableUnmatchedIgnoreTracking = true, ValidationTiming? timing = null, string? mode = null)
+            bool enableUnmatchedIgnoreTracking = true, ValidationTiming? timing = null, string? mode = null,
+            CancellationToken cancellationToken = default)
         {
             return BuildRunner(document, policyPath, conditionSetName, preprocessorSymbols, selectedContractIds,
-                enableUnmatchedIgnoreTracking, timing, mode);
+                enableUnmatchedIgnoreTracking, timing, mode, cancellationToken);
         }
     }
 
@@ -318,6 +326,89 @@ public sealed class ArchitectureAnalysisSnapshotTests
         snapshot.Dispose();
 
         Assert.Throws<ObjectDisposedException>(() => snapshot.Evaluate("strict"));
+    }
+
+    // Issue #375: cancellation observed during Evaluate() must not be wrapped by the
+    // ArchitectureAnalysisEvaluationException translation (mirrors the existing
+    // ArchitecturePolicyValidationException exclusion) and must mark the snapshot Cancelled so a
+    // later Evaluate() call for a different mode is rejected instead of silently reusing a
+    // session that already stopped mid-evaluation.
+    [Test]
+    public void Evaluate_CancellationRequested_ThrowsRawAndMarksSnapshotCancelled()
+    {
+        Fixture fixture = CreateFixture();
+        using CancellationTokenSource cts = new();
+        cts.Cancel();
+        ArchitectureContractDocument document = fixture.RunnerSetupService.DocumentToReturn;
+        var cancelledContext = new ArchitectureAnalysisContext(
+            "/fake/repository/root", Array.Empty<Assembly>(), Array.Empty<string>(), Array.Empty<string>())
+        {
+            CancellationToken = cts.Token
+        };
+        fixture.RunnerSetupService.RunnerToReturn = new FakeContractRunner(new ArchitectureAnalysisSession(
+            cancelledContext, document, selectedContractIds: null, enableUnmatchedIgnoreTracking: true,
+            preprocessorSymbols: null));
+
+        using ArchitectureAnalysisSnapshot snapshot = fixture.ApplicationService.CreateSnapshot(CreateSnapshotRequest());
+
+        Assert.Throws<OperationCanceledException>(() => snapshot.Evaluate("strict"));
+        Assert.That(snapshot.Cancelled, Is.True);
+    }
+
+    [Test]
+    public void Evaluate_AfterPriorModeObservedCancellation_RejectsFurtherModesWithoutExecutingThem()
+    {
+        Fixture fixture = CreateFixture();
+        using CancellationTokenSource cts = new();
+        cts.Cancel();
+        ArchitectureContractDocument document = fixture.RunnerSetupService.DocumentToReturn;
+        var cancelledContext = new ArchitectureAnalysisContext(
+            "/fake/repository/root", Array.Empty<Assembly>(), Array.Empty<string>(), Array.Empty<string>())
+        {
+            CancellationToken = cts.Token
+        };
+        fixture.RunnerSetupService.RunnerToReturn = new FakeContractRunner(new ArchitectureAnalysisSession(
+            cancelledContext, document, selectedContractIds: null, enableUnmatchedIgnoreTracking: true,
+            preprocessorSymbols: null));
+
+        using ArchitectureAnalysisSnapshot snapshot = fixture.ApplicationService.CreateSnapshot(CreateSnapshotRequest());
+        Assert.Throws<OperationCanceledException>(() => snapshot.Evaluate("strict"));
+
+        Assert.Throws<OperationCanceledException>(() => snapshot.Evaluate("audit"));
+        Assert.That(fixture.ContractExecutor.CallCountByMode, Does.Not.ContainKey("audit"));
+    }
+
+    // A snapshot cancelled during construction (before RunBuildStatePreflight even starts here)
+    // must never be returned to the caller at all — "never exposed as usable" is satisfied by not
+    // constructing it, not by constructing-then-marking-cancelled.
+    [Test]
+    public void CreateSnapshot_CancellationRequestedBeforeRunnerSetup_ThrowsAndNeverBuildsRunner()
+    {
+        Fixture fixture = CreateFixture();
+        using CancellationTokenSource cts = new();
+        cts.Cancel();
+
+        Assert.Throws<OperationCanceledException>(() => fixture.ApplicationService.CreateSnapshot(
+            CreateSnapshotRequest() with { CancellationToken = cts.Token }));
+
+        Assert.That(fixture.RunnerSetupService.BuildRunnerCallCount, Is.EqualTo(0));
+    }
+
+    // Issue #375 PR #416 review: BuildRunnerFor previously never forwarded request.CancellationToken
+    // to IArchitectureRunnerSetupService.BuildRunner, so BuildRunner always received `default` —
+    // meaning a cancellation observed during project discovery or assembly resolution (inside
+    // BuildRunner, which this fake stands in for) was never even checkable there. This asserts the
+    // exact token identity reaches BuildRunner, not merely that CreateSnapshot eventually throws.
+    [Test]
+    public void CreateSnapshot_TokenFromRequest_ReachesBuildRunnerUnchanged()
+    {
+        Fixture fixture = CreateFixture();
+        using CancellationTokenSource cts = new();
+
+        using ArchitectureAnalysisSnapshot snapshot = fixture.ApplicationService.CreateSnapshot(
+            CreateSnapshotRequest() with { CancellationToken = cts.Token });
+
+        Assert.That(fixture.RunnerSetupService.LastCancellationTokenReceived, Is.EqualTo(cts.Token));
     }
 
     [Test]

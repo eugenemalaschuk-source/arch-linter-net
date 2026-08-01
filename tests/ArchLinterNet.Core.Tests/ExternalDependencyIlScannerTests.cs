@@ -42,6 +42,36 @@ public sealed class ExternalDependencyIlScannerTests
             Is.True);
     }
 
+    // PR #416 review round 2: this scanner previously accepted no CancellationToken at all, so a
+    // large source-type set could be walked (types, methods, IL instructions) to completion with
+    // no way to interrupt it — only the surrounding per-contract-family boundary could stop it,
+    // which is too coarse for a single expensive contract.
+    [Test]
+    public void FindMethodBodyViolations_PreCancelledToken_ThrowsOperationCanceledException()
+    {
+        var group = new ArchitectureExternalDependencyGroup
+        {
+            NamespacePrefixes = new List<string> { "ExternalDependencyContractTestsFixtures.VendorSdk" }
+        };
+
+        Type[] sourceTypes = new[]
+        {
+            typeof(ExternalDependencyContractTestsFixtures.Core.CoreTypeWithMethodCall)
+        };
+
+        var executionContext = new ArchitectureContractExecutionContext(
+            "test-contract", "test-id", Array.Empty<ArchitectureIgnoredViolation>(), false, null, null);
+        using CancellationTokenSource cts = new();
+        cts.Cancel();
+
+        Assert.Throws<OperationCanceledException>(() => new ArchitectureExternalDependencyIlScanner().FindMethodBodyViolations(
+            sourceTypes,
+            "vendor_sdk",
+            group,
+            executionContext,
+            cts.Token).ToList());
+    }
+
     [Test]
     public void FindMethodBodyViolations_ConstructorCallToForbiddenGroup_DetectsViolation()
     {

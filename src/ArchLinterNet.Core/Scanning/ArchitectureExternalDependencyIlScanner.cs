@@ -12,7 +12,8 @@ internal interface IArchitectureExternalDependencyIlScanner
         Type[] sourceTypes,
         string externalGroupName,
         ArchitectureExternalDependencyGroup externalGroup,
-        ArchitectureContractExecutionContext executionContext);
+        ArchitectureContractExecutionContext executionContext,
+        CancellationToken cancellationToken = default);
 }
 
 internal sealed class ArchitectureExternalDependencyIlScanner : IArchitectureExternalDependencyIlScanner
@@ -23,10 +24,14 @@ internal sealed class ArchitectureExternalDependencyIlScanner : IArchitectureExt
         Type[] sourceTypes,
         string externalGroupName,
         ArchitectureExternalDependencyGroup externalGroup,
-        ArchitectureContractExecutionContext executionContext)
+        ArchitectureContractExecutionContext executionContext,
+        CancellationToken cancellationToken = default)
     {
+        // Checked per type — the same IL-scanning-per-type boundary
+        // ArchitectureIlMethodBodyScanner/ArchitectureTypeIndex already use.
         foreach (Type sourceType in sourceTypes)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             string sourceTypeName = ArchitectureTypeNames.SafeFullName(sourceType);
             string sourceAssembly = sourceType.Assembly.GetName().Name ?? string.Empty;
             string[] forbiddenReferences = FindTypeMatches(sourceType, externalGroup)

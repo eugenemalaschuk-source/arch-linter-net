@@ -6,7 +6,7 @@ using ArchLinterNet.Core.Validation;
 
 namespace ArchLinterNet.Cli.Commands.Baseline;
 
-internal sealed class BaselineMigrateCommandHandler(ICliRuntime runtime, ICliConsole console, IFileSystem fileSystem)
+internal sealed class BaselineMigrateCommandHandler(ICliRuntime runtime, ICliConsole console, IFileSystem fileSystem, CancellationToken cancellationToken = default)
 {
     public int Execute(BaselineMigrateCommandOptions options)
     {
@@ -60,6 +60,7 @@ internal sealed class BaselineMigrateCommandHandler(ICliRuntime runtime, ICliCon
                 BaselinePath = options.BaselinePath,
                 OutputPath = options.OutputPath,
                 ConditionSetName = options.ConditionSetName,
+                CancellationToken = cancellationToken,
                 DryRun = options.DryRun,
             });
 
@@ -81,13 +82,16 @@ internal sealed class BaselineMigrateCommandHandler(ICliRuntime runtime, ICliCon
             bool wrote = false;
             if (outcome.Yaml != null && outcome.AmbiguousCount == 0)
             {
+                // Re-checked immediately before the write that actually publishes the baseline.
+                cancellationToken.ThrowIfCancellationRequested();
+
                 BaselineWriteGate gate = new(console, fileSystem);
                 if (!gate.TryApply(
                         new BaselineWriteGate.Request(
                             "baseline migrate", options.OutputPath, options.DryRun, options.Force,
                             outcome.Yaml, CommentDiagnostic: null, InPlacePath: null,
                             EmitProposalToStdout: options.Format == "human"),
-                        out BaselineWriteGate.Disposition disposition))
+                        out BaselineWriteGate.Disposition disposition, cancellationToken))
                 {
                     return CliExitCodes.InvalidArgumentsOrRuntimeError;
                 }
@@ -113,6 +117,10 @@ internal sealed class BaselineMigrateCommandHandler(ICliRuntime runtime, ICliCon
             }
 
             return CliExitCodes.Success;
+        }
+        catch (OperationCanceledException)
+        {
+            return BaselineCancellationOutput.Write(console, "migrate", options.Format == "json");
         }
         catch (Exception ex)
         {

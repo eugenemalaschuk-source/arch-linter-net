@@ -55,6 +55,12 @@ public sealed class ArchitectureAnalysisContext : IDisposable
 
     public IReadOnlyList<string> DiscoveredProjectPaths { get; }
 
+    // Set once by ArchitectureRunnerSetupService at construction time. Deep type/IL/source scanning
+    // and fact-index materialization code (spread across many ArchitectureAnalysisSession partial-
+    // class files) reads this to check cancellation at its own natural per-file/per-type loop
+    // boundaries, instead of every one of those methods taking a CancellationToken parameter.
+    public CancellationToken CancellationToken { get; init; }
+
     public void Dispose()
     {
         if (_disposed)

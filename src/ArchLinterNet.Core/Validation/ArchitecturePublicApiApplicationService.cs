@@ -25,7 +25,7 @@ public sealed partial class ArchitecturePublicApiApplicationService(
 {
     public PublicApiCaptureOutcome Capture(PublicApiCaptureRequest request)
     {
-        SurfaceResolution resolution = ResolveSurface(request.PolicyPath, request.ContractId, request.ConditionSetName);
+        SurfaceResolution resolution = ResolveSurface(request.PolicyPath, request.ContractId, request.ConditionSetName, request.CancellationToken);
         if (resolution.Error != null)
         {
             return new PublicApiCaptureOutcome(
@@ -45,7 +45,7 @@ public sealed partial class ArchitecturePublicApiApplicationService(
 
     public PublicApiDiffOutcome Diff(PublicApiDiffRequest request)
     {
-        SurfaceResolution resolution = ResolveSurface(request.PolicyPath, request.ContractId, request.ConditionSetName);
+        SurfaceResolution resolution = ResolveSurface(request.PolicyPath, request.ContractId, request.ConditionSetName, request.CancellationToken);
         if (resolution.Error != null)
         {
             return new PublicApiDiffOutcome(
@@ -68,7 +68,7 @@ public sealed partial class ArchitecturePublicApiApplicationService(
 
     public PublicApiUpdateOutcome Update(PublicApiUpdateRequest request)
     {
-        SurfaceResolution resolution = ResolveSurface(request.PolicyPath, request.ContractId, request.ConditionSetName);
+        SurfaceResolution resolution = ResolveSurface(request.PolicyPath, request.ContractId, request.ConditionSetName, request.CancellationToken);
         if (resolution.Error != null)
         {
             return new PublicApiUpdateOutcome(
@@ -129,7 +129,7 @@ public sealed partial class ArchitecturePublicApiApplicationService(
 
     public PublicApiMigrateOutcome Migrate(PublicApiMigrateRequest request)
     {
-        SurfaceResolution resolution = ResolveSurface(request.PolicyPath, request.ContractId, request.ConditionSetName);
+        SurfaceResolution resolution = ResolveSurface(request.PolicyPath, request.ContractId, request.ConditionSetName, request.CancellationToken);
         if (resolution.Error != null)
         {
             return new PublicApiMigrateOutcome(

@@ -8,9 +8,9 @@ internal sealed class CapturePublicApiSubcommandModule : IPublicApiSubcommandMod
 {
     public string CommandName => "capture";
 
-    public Command CreateCommand(ICliRuntime runtime, ICliConsole console, IFileSystem fileSystem)
+    public Command CreateCommand(ICliRuntime runtime, ICliConsole console, IFileSystem fileSystem, CancellationToken cancellationToken = default)
     {
-        PublicApiCaptureCommandHandler handler = new(runtime, console, fileSystem);
+        PublicApiCaptureCommandHandler handler = new(runtime, console, fileSystem, cancellationToken);
         Command command = new(CommandName);
         Option<string> policyOption = PublicApiOptionsFactory.CreatePolicyOption();
         Option<string> contractOption = PublicApiOptionsFactory.CreateContractOption();

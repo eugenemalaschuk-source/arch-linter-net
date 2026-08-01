@@ -8,15 +8,15 @@ internal sealed class BaselineCommandModule : ITopLevelCliSubcommandModule
 {
     public string CommandName => "baseline";
 
-    public Command CreateCommand(ICliRuntime runtime, ICliConsole console, IFileSystem fileSystem)
+    public Command CreateCommand(ICliRuntime runtime, ICliConsole console, IFileSystem fileSystem, CancellationToken cancellationToken = default)
     {
         IReadOnlyList<IBaselineSubcommandModule> subcommandModules = BaselineSubcommandCatalog.CreateModules();
         IDefaultBaselineSubcommandModule defaultModule = subcommandModules.OfType<IDefaultBaselineSubcommandModule>().Single();
-        Command baselineCommand = defaultModule.CreateDefaultCommand("baseline", runtime, console, fileSystem);
+        Command baselineCommand = defaultModule.CreateDefaultCommand("baseline", runtime, console, fileSystem, cancellationToken);
 
         foreach (IBaselineSubcommandModule module in subcommandModules.OrderBy(static module => module.CommandName, StringComparer.Ordinal))
         {
-            baselineCommand.Subcommands.Add(module.CreateCommand(runtime, console, fileSystem));
+            baselineCommand.Subcommands.Add(module.CreateCommand(runtime, console, fileSystem, cancellationToken));
         }
 
         return baselineCommand;

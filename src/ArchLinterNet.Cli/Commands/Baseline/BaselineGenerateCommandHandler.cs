@@ -5,7 +5,7 @@ using ArchLinterNet.Core.Validation;
 
 namespace ArchLinterNet.Cli.Commands.Baseline;
 
-internal sealed class BaselineGenerateCommandHandler(ICliRuntime runtime, ICliConsole console, IFileSystem fileSystem)
+internal sealed class BaselineGenerateCommandHandler(ICliRuntime runtime, ICliConsole console, IFileSystem fileSystem, CancellationToken cancellationToken = default)
 {
     public int Execute(BaselineGenerateCommandOptions options)
     {
@@ -38,6 +38,7 @@ internal sealed class BaselineGenerateCommandHandler(ICliRuntime runtime, ICliCo
                 ReasonForContract = options.Reasons.ReasonForContract,
                 ReasonForFamily = options.Reasons.ReasonForFamily,
                 ContractIds = options.ContractIds.ToList(),
+                CancellationToken = cancellationToken,
             });
 
             if (!outcome.Succeeded)
@@ -55,18 +56,26 @@ internal sealed class BaselineGenerateCommandHandler(ICliRuntime runtime, ICliCo
             }
 
             bool json = options.Format == "json";
+
+            // Re-checked immediately before the write that actually publishes the baseline.
+            cancellationToken.ThrowIfCancellationRequested();
+
             BaselineWriteGate gate = new(console, fileSystem);
             if (!gate.TryApply(
                     new BaselineWriteGate.Request(
                         "baseline generate", options.OutputPath, options.Write.DryRun, options.Write.Force,
                         outcome.Yaml!, CommentDiagnostic: null, InPlacePath: null, EmitProposalToStdout: !json),
-                    out BaselineWriteGate.Disposition disposition))
+                    out BaselineWriteGate.Disposition disposition, cancellationToken))
             {
                 return CliExitCodes.InvalidArgumentsOrRuntimeError;
             }
 
             Report(options, outcome, disposition);
             return CliExitCodes.Success;
+        }
+        catch (OperationCanceledException)
+        {
+            return BaselineCancellationOutput.Write(console, "generation", options.Format == "json");
         }
         catch (Exception ex)
         {

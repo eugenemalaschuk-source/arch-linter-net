@@ -67,11 +67,17 @@ public static class ArchitectureFindingMapper
     /// </summary>
     public static IReadOnlyList<ArchitectureFinding> FromViolations(
         IEnumerable<ArchitectureViolation> violations,
-        string? mode = null)
+        string? mode = null,
+        CancellationToken cancellationToken = default)
     {
         var findings = new List<ArchitectureFinding>();
+        // Checked per violation AND per expanded identity — an aggregated legacy violation can
+        // carry many Identities behind one ArchitectureViolation, and building each one's
+        // ArchitectureFinding (ProjectDiagnosticForIdentity, Create) is real per-identity work, not
+        // just the final serialization step callers loop over afterward.
         foreach (ArchitectureViolation violation in violations)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             ArchitectureDiagnostic diagnostic = ArchitectureDiagnosticMapper.FromViolation(violation);
             IReadOnlyCollection<ArchitectureViolationIdentity> identities = violation.Identities.Count > 0
                 ? violation.Identities
@@ -79,23 +85,84 @@ public static class ArchitectureFindingMapper
                     ? new[] { identity }
                     : new[] { BuildIdentity(diagnostic) };
             bool isAggregated = identities.Count > 1;
-            findings.AddRange(identities.Select(identity => Create(
-                isAggregated ? ProjectDiagnosticForIdentity(diagnostic, identity) : diagnostic,
-                identity,
-                mode)));
+            foreach (ArchitectureViolationIdentity expandedIdentity in identities)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                findings.Add(Create(
+                    isAggregated ? ProjectDiagnosticForIdentity(diagnostic, expandedIdentity) : diagnostic,
+                    expandedIdentity,
+                    mode));
+            }
         }
 
         return findings;
     }
 
     public static IReadOnlyList<ArchitectureFinding> Order(IEnumerable<ArchitectureFinding> findings) =>
-        findings.OrderBy(finding => finding.ContractId ?? finding.ContractName, StringComparer.Ordinal)
-            .ThenBy(finding => finding.CanonicalIdentity, StringComparer.Ordinal)
-            .ThenBy(finding => finding.Kind, StringComparer.Ordinal)
-            .ThenBy(finding => finding.SourceLocation?.Path, StringComparer.Ordinal)
-            .ThenBy(finding => finding.SourceLocation?.Line)
-            .ThenBy(finding => finding.SourceLocation?.Column)
-            .ToArray();
+        Order(findings, CancellationToken.None);
+
+    // A single OrderBy(keySelector: identity, comparer) call with one comparer that replicates
+    // every original ThenBy tiebreaker keeps LINQ's stable-sort guarantee (ties preserve source
+    // order, so sequential/non-cancelled output is byte-for-byte unchanged) while making the whole
+    // sort interruptible: the token is observed on every comparison, not just before/after the
+    // call, so cancellation mid-sort of a large findings set stops before the remaining
+    // comparisons instead of only being noticed once ToArray() has already finished. LINQ's sort
+    // machinery wraps comparer exceptions in InvalidOperationException, so the comparer's
+    // OperationCanceledException is unwrapped and rethrown as-is to preserve the cancellation
+    // completion semantics the CLI and Testing API depend on.
+    public static IReadOnlyList<ArchitectureFinding> Order(
+        IEnumerable<ArchitectureFinding> findings, CancellationToken cancellationToken)
+    {
+        try
+        {
+            return findings.OrderBy(finding => finding, new FindingOrderComparer(cancellationToken)).ToArray();
+        }
+        catch (InvalidOperationException ex) when (ex.InnerException is OperationCanceledException)
+        {
+            throw ex.InnerException;
+        }
+    }
+
+    private sealed class FindingOrderComparer : IComparer<ArchitectureFinding>
+    {
+        private readonly CancellationToken _cancellationToken;
+
+        internal FindingOrderComparer(CancellationToken cancellationToken)
+        {
+            _cancellationToken = cancellationToken;
+        }
+
+        public int Compare(ArchitectureFinding? x, ArchitectureFinding? y)
+        {
+            _cancellationToken.ThrowIfCancellationRequested();
+            int result = StringComparer.Ordinal.Compare(x!.ContractId ?? x.ContractName, y!.ContractId ?? y.ContractName);
+            if (result != 0)
+            {
+                return result;
+            }
+
+            result = StringComparer.Ordinal.Compare(x.CanonicalIdentity, y.CanonicalIdentity);
+            if (result != 0)
+            {
+                return result;
+            }
+
+            result = StringComparer.Ordinal.Compare(x.Kind, y.Kind);
+            if (result != 0)
+            {
+                return result;
+            }
+
+            result = StringComparer.Ordinal.Compare(x.SourceLocation?.Path, y.SourceLocation?.Path);
+            if (result != 0)
+            {
+                return result;
+            }
+
+            result = Comparer<int?>.Default.Compare(x.SourceLocation?.Line, y.SourceLocation?.Line);
+            return result != 0 ? result : Comparer<int?>.Default.Compare(x.SourceLocation?.Column, y.SourceLocation?.Column);
+        }
+    }
 
     public static string KindToken(ArchitectureDiagnosticKind kind) => kind switch
     {

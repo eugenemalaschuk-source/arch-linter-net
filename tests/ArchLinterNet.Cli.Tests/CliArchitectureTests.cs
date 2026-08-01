@@ -26,7 +26,7 @@ public sealed class CliArchitectureTests
     [Test]
     public void Composition_ResolvesCliHostAndHandlersWithoutStaticGlobals()
     {
-        CliComposition composition = CliCompositionRoot.Compose();
+        using CliComposition composition = CliCompositionRoot.Compose();
 
         Assert.Multiple(() =>
         {
@@ -46,6 +46,45 @@ public sealed class CliArchitectureTests
             Assert.That(
                 composition.RootCommandFactory.Create().Subcommands.Select(static command => command.Name),
                 Is.EquivalentTo(new[] { "baseline", "graph", "explain", "policy", "public-api", "schema" }));
+        });
+    }
+
+    // Issue #375 PR #416 review: CliComposition owns the one CliProcessInterruptionSource behind
+    // its CancellationToken (Console.CancelKeyPress subscription, PosixSignalRegistration,
+    // CancellationTokenSource) and must release it deterministically, not accumulate handlers
+    // across repeated compositions — the shape NUnit produces by running many [Test] methods that
+    // each call Compose() once in the same process.
+    [Test]
+    public void Composition_IsDisposable_AndOwnsTheInterruptionSource()
+    {
+        CliComposition composition = CliCompositionRoot.Compose();
+
+        Assert.That(composition.InterruptionSource, Is.Not.Null);
+        Assert.DoesNotThrow(() => composition.Dispose());
+    }
+
+    [Test]
+    public void Composition_RepeatedComposeAndDispose_DoesNotThrowOrAccumulate()
+    {
+        Assert.DoesNotThrow(() =>
+        {
+            for (int i = 0; i < 25; i++)
+            {
+                using CliComposition composition = CliCompositionRoot.Compose();
+                _ = composition.RootCommandFactory.Create();
+            }
+        });
+    }
+
+    [Test]
+    public void CliProcessInterruptionSource_Dispose_IsIdempotent()
+    {
+        var source = new CliProcessInterruptionSource();
+
+        Assert.DoesNotThrow(() =>
+        {
+            source.Dispose();
+            source.Dispose();
         });
     }
 

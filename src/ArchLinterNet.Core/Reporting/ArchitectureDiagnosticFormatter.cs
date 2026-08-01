@@ -7,6 +7,22 @@ public partial interface IArchitectureDiagnosticFormatter
 {
     string FormatViolationsForHumans(IReadOnlyCollection<ArchitectureViolation> violations);
 
+    /// <summary>
+    /// Additive overload, not a modification of the member above: any caller already compiled
+    /// against the original one-parameter overload keeps resolving to it, unaffected. Declared
+    /// with a default interface implementation that ignores the token and delegates to the
+    /// original overload, so a third-party implementer that predates this member is not forced to
+    /// add it just to keep compiling — only <see cref="ArchitectureDiagnosticFormatter"/> itself
+    /// overrides it with a genuinely per-finding cancellation-aware implementation.
+    /// </summary>
+    string FormatViolationsForHumans(IReadOnlyCollection<ArchitectureViolation> violations, CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        // This method IS the cancellation-aware overload; the token is already observed via
+        // ThrowIfCancellationRequested, not by forwarding it further.
+        return FormatViolationsForHumans(violations); // NOSONAR: see comment above
+    }
+
     string FormatCyclesForHumans(IReadOnlyCollection<string> cycles);
 
     string FormatUnmatchedForHumans(IReadOnlyCollection<ArchitectureUnmatchedIgnoredViolation> unmatched);
@@ -14,6 +30,21 @@ public partial interface IArchitectureDiagnosticFormatter
     string FormatPolicyConsistencyForHumans(IReadOnlyCollection<PolicyConsistencyDiagnostic> findings);
 
     string FormatCoverageForHumans(IReadOnlyCollection<ArchitectureViolation> findings);
+
+    /// <summary>
+    /// Cancellation-aware overload — coverage findings share the same shape (and can be equally
+    /// large) as violations. Default interface implementation ignores the token and delegates to
+    /// the overload above, so every existing test fake keeps compiling unaffected — only
+    /// <see cref="ArchitectureDiagnosticFormatter"/> overrides it with a genuinely per-finding
+    /// cancellation-aware implementation.
+    /// </summary>
+    string FormatCoverageForHumans(IReadOnlyCollection<ArchitectureViolation> findings, CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        // This method IS the cancellation-aware overload; the token is already observed via
+        // ThrowIfCancellationRequested, not by forwarding it further.
+        return FormatCoverageForHumans(findings); // NOSONAR: see comment above
+    }
 
     string FormatCoverageSummaryForHumans(IReadOnlyCollection<ArchitectureCoverageSummary> summaries);
 
@@ -104,6 +135,20 @@ public partial interface IArchitectureDiagnosticFormatter
     string FormatViolationsForCiArtifacts(string contractName, string? contractId,
         IReadOnlyCollection<ArchitectureViolation> violations);
 
+    string FormatViolationsForCiArtifacts(
+        string contractName,
+        string? contractId,
+        IReadOnlyCollection<ArchitectureViolation> violations,
+        CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        // Existing external implementations can only provide the legacy member, which has no
+        // cancellation parameter. The guard above still prevents entering that compatibility
+        // path after cancellation; the concrete formatter overrides this overload and observes
+        // the token throughout mapping, sorting, and serialization.
+        return FormatViolationsForCiArtifacts(contractName, contractId, violations); // NOSONAR: preserve source compatibility for pre-cancellation interface implementers
+    }
+
     string FormatCyclesForCiArtifacts(string contractName, string? contractId, IReadOnlyCollection<string> cycles);
 }
 
@@ -111,11 +156,25 @@ public sealed partial class ArchitectureDiagnosticFormatter : IArchitectureDiagn
 {
     public string FormatViolationsForHumans(IReadOnlyCollection<ArchitectureViolation> violations)
     {
+        return FormatViolationsForHumans(violations, CancellationToken.None);
+    }
+
+    // Checked per finding — a large findings set is the dominant contributor to a large human
+    // report, so this is the actual iteration boundary that needs to be interruptible, not just a
+    // check before/after the whole call.
+    public string FormatViolationsForHumans(
+        IReadOnlyCollection<ArchitectureViolation> violations, CancellationToken cancellationToken)
+    {
         IReadOnlyList<ArchitectureFinding> findings = ArchitectureFindingMapper.Order(
-            ArchitectureFindingMapper.FromViolations(violations));
-        return string.Join(
-            Environment.NewLine,
-            findings.Select(FormatFindingForHumans));
+            ArchitectureFindingMapper.FromViolations(violations, mode: null, cancellationToken), cancellationToken);
+        var lines = new string[findings.Count];
+        for (int i = 0; i < findings.Count; i++)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            lines[i] = FormatFindingForHumans(findings[i]);
+        }
+
+        return string.Join(Environment.NewLine, lines);
     }
 
     public string FormatUnmatchedForHumans(IReadOnlyCollection<ArchitectureUnmatchedIgnoredViolation> unmatched)
@@ -177,13 +236,18 @@ public sealed partial class ArchitectureDiagnosticFormatter : IArchitectureDiagn
 
     public string FormatCoverageForHumans(IReadOnlyCollection<ArchitectureViolation> findings)
     {
+        return FormatCoverageForHumans(findings, CancellationToken.None);
+    }
+
+    public string FormatCoverageForHumans(IReadOnlyCollection<ArchitectureViolation> findings, CancellationToken cancellationToken)
+    {
         if (findings.Count == 0)
         {
             return string.Empty;
         }
 
         return "Coverage findings:" + Environment.NewLine
-            + FormatViolationsForHumans(findings);
+            + FormatViolationsForHumans(findings, cancellationToken);
     }
 
     public string FormatCoverageSummaryForHumans(IReadOnlyCollection<ArchitectureCoverageSummary> summaries)
@@ -238,21 +302,6 @@ public sealed partial class ArchitectureDiagnosticFormatter : IArchitectureDiagn
         return string.Join(
             Environment.NewLine,
             new[] { header }.Concat(excludedLines).Concat(uncoveredLines).Concat(staleLines).Concat(unknownLines).Concat(optionalEmptyLines));
-    }
-
-    public string FormatViolationsForCiArtifacts(string contractName, string? contractId,
-        IReadOnlyCollection<ArchitectureViolation> violations)
-    {
-        var payload = new
-        {
-            kind = "architecture_violations",
-            contract = contractName,
-            contract_id = contractId,
-            violations = ArchitectureFindingMapper.Order(ArchitectureFindingMapper.FromViolations(violations))
-                .Select(finding => ToCiJsonObject(finding, includeContract: false))
-        };
-
-        return JsonSerializer.Serialize(payload);
     }
 
     private static string SourceTypeOf(ArchitectureDiagnostic diagnostic) => diagnostic switch

@@ -8,9 +8,9 @@ internal sealed class UpdateBaselineSubcommandModule : IBaselineSubcommandModule
 {
     public string CommandName => "update";
 
-    public Command CreateCommand(ICliRuntime runtime, ICliConsole console, IFileSystem fileSystem)
+    public Command CreateCommand(ICliRuntime runtime, ICliConsole console, IFileSystem fileSystem, CancellationToken cancellationToken = default)
     {
-        BaselineUpdateCommandHandler handler = new(runtime, console, fileSystem);
+        BaselineUpdateCommandHandler handler = new(runtime, console, fileSystem, cancellationToken);
         Command command = new(CommandName);
         Option<string> policyOption = BaselineOptionsFactory.CreatePolicyOption();
         Option<string> baselineOption = new("--baseline");

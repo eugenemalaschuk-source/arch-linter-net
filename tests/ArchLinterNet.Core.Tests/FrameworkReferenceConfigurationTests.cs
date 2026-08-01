@@ -274,6 +274,7 @@ public sealed class FrameworkReferenceConfigurationTests
     }
 
     [Test]
+    [CancelAfter(120_000)]
     public void CheckConfiguration_ProjectTargetsUninstalledFramework_ReturnsEvaluationFailedViolation()
     {
         // Fail-closed regression: an MSBuild-evaluation-impossible project (bogus/uninstalled TFM)

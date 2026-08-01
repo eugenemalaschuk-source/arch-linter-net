@@ -69,6 +69,73 @@ internal static class ReportErrorContentFormatter
         return sb.ToString();
     }
 
+    // Issue #375: cancellation observed during multi-sink staging/commit (RouteResult.Cancelled)
+    // gets its own "cancelled" shape rather than reusing the output_status "partial-output"/
+    // "output-failed" literals — a caller distinguishing completion statuses must never see
+    // cancellation reported as a generic output failure. Mirrors BuildOutputError*'s structure
+    // (same committed/uncommitted/failed evidence, same embedded already-rendered report) exactly.
+    public static string BuildCancelledOutputJsonText(string message, RouteResult result, string reportJson)
+    {
+        return JsonSerializer.Serialize(new
+        {
+            kind = "architecture_cancelled",
+            status = "cancelled",
+            message,
+            failed_paths = result.FailedPaths,
+            committed_paths = result.CommittedPaths,
+            uncommitted_paths = result.UncommittedPaths,
+            errors = result.ErrorDetails,
+            report = JsonNode.Parse(reportJson),
+        });
+    }
+
+    public static string BuildCancelledOutputSarifText(string message, RouteResult result, string reportSarif)
+    {
+        JsonArray runs = JsonNode.Parse(reportSarif)?["runs"]?.AsArray() is JsonArray reportRuns
+            ? new JsonArray(reportRuns.Select(run => run?.DeepClone()).ToArray())
+            : new JsonArray();
+
+        runs.Add(new JsonObject
+        {
+            ["tool"] = new JsonObject { ["driver"] = new JsonObject { ["name"] = "arch-linter-net" } },
+            ["results"] = new JsonArray(new JsonObject
+            {
+                ["ruleId"] = "architecture-cancelled",
+                ["message"] = new JsonObject { ["text"] = message },
+                ["properties"] = new JsonObject
+                {
+                    ["status"] = "cancelled",
+                    ["failed_paths"] = ToJsonArray(result.FailedPaths),
+                    ["committed_paths"] = ToJsonArray(result.CommittedPaths),
+                    ["uncommitted_paths"] = ToJsonArray(result.UncommittedPaths),
+                    ["errors"] = ToJsonArray(result.ErrorDetails),
+                },
+                ["locations"] = new JsonArray(),
+            }),
+        });
+
+        return new JsonObject { ["version"] = "2.1.0", ["runs"] = runs }.ToJsonString();
+    }
+
+    public static string BuildCancelledOutputHumanText(string message, RouteResult result, string reportHuman)
+    {
+        var sb = new System.Text.StringBuilder(message);
+        sb.Append('\n').Append(reportHuman);
+        if (result.CommittedPaths.Count > 0)
+        {
+            sb.Append($"\n  committed: {string.Join(", ", result.CommittedPaths)}");
+        }
+        if (result.UncommittedPaths.Count > 0)
+        {
+            sb.Append($"\n  uncommitted: {string.Join(", ", result.UncommittedPaths)}");
+        }
+        foreach (string detail in result.ErrorDetails)
+        {
+            sb.Append($"\n  {detail}");
+        }
+        return sb.ToString();
+    }
+
     public static string BuildErrorRoutingFailureJsonText(
         string status, string originalJson, RouteResult routeResult)
     {

@@ -59,6 +59,33 @@ internal interface ICliRuntime
         IReadOnlyCollection<ArchitectureSubtractiveMatcherParticipation>? subtractiveMatcherParticipation = null) =>
         FormatResultAsSarif(mode, violations, cycles, cycleFindings, preflightDiagnostics, coverageSummaries);
 
+    /// <summary>
+    /// Cancellation-aware widest overload. Default interface implementation ignores the token and
+    /// delegates to the overload above, so every existing test fake keeps compiling unaffected —
+    /// only <see cref="ArchLinterNet.Cli.Infrastructure.CliRuntime"/> overrides it with a
+    /// genuinely per-finding cancellation-aware implementation.
+    /// <paramref name="subtractiveMatcherParticipation"/> has no default here (unlike the overload
+    /// above) purely so this overload stays unambiguous by arity against it.
+    /// </summary>
+    string FormatResultAsSarif( // NOSONAR: each parameter represents a semantically distinct section of the SARIF payload; grouping would obscure the data contract
+        string mode,
+        IReadOnlyCollection<ArchitectureViolation> violations,
+        IReadOnlyCollection<string> cycles,
+        IReadOnlyCollection<ArchitectureCycleFinding> cycleFindings,
+        IReadOnlyCollection<BuildStatePreflightDiagnostic> preflightDiagnostics,
+        IReadOnlyCollection<ArchitectureCoverageSummary> coverageSummaries,
+        ArchitectureSourceExpansionInventory sourceExpansion,
+        IReadOnlyCollection<ArchitectureSubtractiveMatcherParticipation>? subtractiveMatcherParticipation,
+        CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        // This method IS the cancellation-aware overload; the token is already observed via
+        // ThrowIfCancellationRequested, not by forwarding it further.
+        return FormatResultAsSarif( // NOSONAR: see comment above
+            mode, violations, cycles, cycleFindings, preflightDiagnostics, coverageSummaries, sourceExpansion,
+            subtractiveMatcherParticipation);
+    }
+
     string FormatResultForCiArtifacts( // NOSONAR: each parameter represents a semantically distinct section of the CI artifact payload; grouping would obscure the data contract
         string mode,
         bool passed,
@@ -81,7 +108,58 @@ internal interface ICliRuntime
             policyConsistencyFindings, coverageSummaries, classificationConflicts, classificationMetadataFailures,
             classificationRoles, classificationPathDeferred, preflightDiagnostics);
 
+    /// <summary>
+    /// Cancellation-aware widest overload. Declared with a default interface implementation that
+    /// ignores the token and delegates to the overload above, so every existing test fake
+    /// implementing this interface keeps compiling unaffected — only <see cref="ArchLinterNet.Cli.Infrastructure.CliRuntime"/>
+    /// overrides it with a genuinely per-finding cancellation-aware implementation.
+    /// <paramref name="subtractiveMatcherParticipation"/> has no default here (unlike the overload
+    /// above) purely so this overload stays unambiguous by arity against it.
+    /// </summary>
+    string FormatResultForCiArtifacts( // NOSONAR: each parameter represents a semantically distinct section of the CI artifact payload; grouping would obscure the data contract
+        string mode,
+        bool passed,
+        IReadOnlyCollection<ArchitectureViolation> violations,
+        IReadOnlyCollection<string> cycles,
+        IReadOnlyCollection<ArchitectureCycleFinding> cycleFindings,
+        IReadOnlyCollection<ArchitectureViolation> coverageFindings,
+        IReadOnlyList<ArchitectureUnmatchedIgnoredViolation> unmatchedIgnoredViolations,
+        IReadOnlyCollection<PolicyConsistencyDiagnostic> policyConsistencyFindings,
+        IReadOnlyCollection<ArchitectureCoverageSummary> coverageSummaries,
+        IReadOnlyCollection<ArchitectureClassificationConflict> classificationConflicts,
+        IReadOnlyCollection<ArchitectureClassificationMetadataFailure> classificationMetadataFailures,
+        IReadOnlyCollection<ArchitectureClassificationRoleFact> classificationRoles,
+        ArchitectureClassificationPathDeferredNotice? classificationPathDeferred,
+        IReadOnlyCollection<BuildStatePreflightDiagnostic> preflightDiagnostics,
+        ArchitectureSourceExpansionInventory sourceExpansion,
+        IReadOnlyCollection<ArchitectureSubtractiveMatcherParticipation>? subtractiveMatcherParticipation,
+        CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        // This method IS the cancellation-aware overload; the token is already observed via
+        // ThrowIfCancellationRequested, not by forwarding it further.
+        return FormatResultForCiArtifacts( // NOSONAR: see comment above
+            mode, passed, violations, cycles, cycleFindings, coverageFindings, unmatchedIgnoredViolations,
+            policyConsistencyFindings, coverageSummaries, classificationConflicts, classificationMetadataFailures,
+            classificationRoles, classificationPathDeferred, preflightDiagnostics, sourceExpansion,
+            subtractiveMatcherParticipation);
+    }
+
     string FormatViolationsForHumans(IReadOnlyCollection<ArchitectureViolation> violations);
+
+    /// <summary>
+    /// Cancellation-aware overload. Default interface implementation ignores the token and
+    /// delegates to the overload above, so every existing test fake keeps compiling unaffected —
+    /// only <see cref="ArchLinterNet.Cli.Infrastructure.CliRuntime"/> overrides it with a
+    /// genuinely per-finding cancellation-aware implementation.
+    /// </summary>
+    string FormatViolationsForHumans(IReadOnlyCollection<ArchitectureViolation> violations, CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        // This method IS the cancellation-aware overload; the token is already observed via
+        // ThrowIfCancellationRequested, not by forwarding it further.
+        return FormatViolationsForHumans(violations); // NOSONAR: see comment above
+    }
 
     string FormatCyclesForHumans(
         IReadOnlyCollection<string> cycles,
@@ -92,6 +170,21 @@ internal interface ICliRuntime
     string FormatUnmatchedForHumans(IReadOnlyList<ArchitectureUnmatchedIgnoredViolation> unmatchedViolations);
 
     string FormatCoverageForHumans(IReadOnlyCollection<ArchitectureViolation> coverageFindings);
+
+    /// <summary>
+    /// Cancellation-aware overload — coverage findings share the same shape (and can be equally
+    /// large) as violations. Default interface implementation ignores the token and delegates to
+    /// the overload above, so every existing test fake keeps compiling unaffected — only
+    /// <see cref="ArchLinterNet.Cli.Infrastructure.CliRuntime"/> overrides it with a genuinely
+    /// per-finding cancellation-aware implementation.
+    /// </summary>
+    string FormatCoverageForHumans(IReadOnlyCollection<ArchitectureViolation> coverageFindings, CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        // This method IS the cancellation-aware overload; the token is already observed via
+        // ThrowIfCancellationRequested, not by forwarding it further.
+        return FormatCoverageForHumans(coverageFindings); // NOSONAR: see comment above
+    }
 
     string FormatCoverageSummaryForHumans(IReadOnlyCollection<ArchitectureCoverageSummary> coverageSummaries);
 

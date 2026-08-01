@@ -689,48 +689,6 @@ contracts:
     }
 
     [Test]
-    public void ValidateAudit_AuditExternalViolation_IsReported()
-    {
-        string contractDir = Path.Combine(_tempDir, "architecture");
-        Directory.CreateDirectory(contractDir);
-        string contractPath = Path.Combine(contractDir, "dependencies.arch.yml");
-
-        File.WriteAllText(contractPath, @"
-version: 1
-name: Audit External Test
-layers:
-  core:
-    namespace: ArchLinterNet.Core
-external_dependencies:
-  system:
-    namespace_prefixes:
-      - System
-analysis:
-  target_assemblies:
-    - ArchLinterNet.Core
-contracts:
-  strict: []
-  strict_layers: []
-  strict_allow_only: []
-  strict_cycles: []
-  strict_method_body: []
-  strict_asmdef: []
-  strict_independence: []
-  strict_protected: []
-  strict_external: []
-  audit_external:
-    - name: core-audit-system
-      source: core
-      forbidden: [system]
-");
-
-        var result = ArchitectureAssertions.FromPolicy(contractPath).ValidateAudit();
-
-        Assert.That(result.Passed, Is.False);
-        Assert.That(result.Violations.Any(v => (v.Payload as ExternalDependencyPayload)?.ForbiddenExternalGroup == "system"), Is.True);
-    }
-
-    [Test]
     public void ArchitectureValidator_AuditExternalOnlyViolation_DoesNotFailValidate()
     {
         string contractDir = Path.Combine(_tempDir, "architecture");

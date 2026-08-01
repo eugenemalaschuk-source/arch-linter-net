@@ -8,9 +8,9 @@ internal sealed class UpdatePublicApiSubcommandModule : IPublicApiSubcommandModu
 {
     public string CommandName => "update";
 
-    public Command CreateCommand(ICliRuntime runtime, ICliConsole console, IFileSystem fileSystem)
+    public Command CreateCommand(ICliRuntime runtime, ICliConsole console, IFileSystem fileSystem, CancellationToken cancellationToken = default)
     {
-        PublicApiUpdateCommandHandler handler = new(runtime, console, fileSystem);
+        PublicApiUpdateCommandHandler handler = new(runtime, console, fileSystem, cancellationToken);
         Command command = new(CommandName);
         Option<string> policyOption = PublicApiOptionsFactory.CreatePolicyOption();
         Option<string> contractOption = PublicApiOptionsFactory.CreateContractOption();

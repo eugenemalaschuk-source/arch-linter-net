@@ -5,7 +5,7 @@ using ArchLinterNet.Core.Validation;
 
 namespace ArchLinterNet.Cli.Commands.Baseline;
 
-internal sealed class BaselinePruneCommandHandler(ICliRuntime runtime, ICliConsole console, IFileSystem fileSystem)
+internal sealed class BaselinePruneCommandHandler(ICliRuntime runtime, ICliConsole console, IFileSystem fileSystem, CancellationToken cancellationToken = default)
 {
     public int Execute(BaselinePruneCommandOptions options)
     {
@@ -47,6 +47,7 @@ internal sealed class BaselinePruneCommandHandler(ICliRuntime runtime, ICliConso
                 BaselinePath = options.BaselinePath,
                 Mode = options.Mode,
                 ConditionSetName = options.ConditionSetName,
+                CancellationToken = cancellationToken,
                 ContractIds = options.ContractIds.ToList(),
             });
 
@@ -66,25 +67,31 @@ internal sealed class BaselinePruneCommandHandler(ICliRuntime runtime, ICliConso
             }
             else if (outcome.IsNoOp && !options.Write.DryRun && options.OutputPath != null)
             {
+                // Re-checked immediately before the write that actually publishes the baseline.
+                cancellationToken.ThrowIfCancellationRequested();
+
                 BaselineWriteGate gate = new(console, fileSystem);
                 if (!gate.TryCopySource(
                         new BaselineWriteGate.Request(
                             "baseline prune", options.OutputPath, options.Write.DryRun, options.Write.Force,
                             outcome.Yaml!, outcome.CommentDiagnostic, options.BaselinePath, !json),
                         options.BaselinePath,
-                        out disposition))
+                        out disposition, cancellationToken))
                 {
                     return CliExitCodes.InvalidArgumentsOrRuntimeError;
                 }
             }
             else
             {
+                // Re-checked immediately before the write that actually publishes the baseline.
+                cancellationToken.ThrowIfCancellationRequested();
+
                 BaselineWriteGate gate = new(console, fileSystem);
                 if (!gate.TryApply(
                         new BaselineWriteGate.Request(
                             "baseline prune", options.OutputPath, options.Write.DryRun, options.Write.Force,
                             outcome.Yaml!, outcome.CommentDiagnostic, options.BaselinePath, !json),
-                        out disposition))
+                        out disposition, cancellationToken))
                 {
                     return CliExitCodes.InvalidArgumentsOrRuntimeError;
                 }
@@ -92,6 +99,10 @@ internal sealed class BaselinePruneCommandHandler(ICliRuntime runtime, ICliConso
 
             Report(options, outcome, disposition);
             return CliExitCodes.Success;
+        }
+        catch (OperationCanceledException)
+        {
+            return BaselineCancellationOutput.Write(console, "prune", options.Format == "json");
         }
         catch (Exception ex)
         {

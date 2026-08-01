@@ -8,9 +8,9 @@ internal sealed class MigratePublicApiSubcommandModule : IPublicApiSubcommandMod
 {
     public string CommandName => "migrate";
 
-    public Command CreateCommand(ICliRuntime runtime, ICliConsole console, IFileSystem fileSystem)
+    public Command CreateCommand(ICliRuntime runtime, ICliConsole console, IFileSystem fileSystem, CancellationToken cancellationToken = default)
     {
-        PublicApiMigrateCommandHandler handler = new(runtime, console, fileSystem);
+        PublicApiMigrateCommandHandler handler = new(runtime, console, fileSystem, cancellationToken);
         Command command = new(CommandName);
         Option<string> policyOption = PublicApiOptionsFactory.CreatePolicyOption();
         Option<string> contractOption = PublicApiOptionsFactory.CreateContractOption();

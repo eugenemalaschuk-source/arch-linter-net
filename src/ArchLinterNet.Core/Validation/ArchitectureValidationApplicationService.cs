@@ -67,18 +67,22 @@ public sealed class ArchitectureValidationApplicationService(
             {
                 try
                 {
-                    document = runnerSetupService.LoadDocument(request.PolicyPath, request.BaselinePath, timing);
+                    document = runnerSetupService.LoadDocument(request.PolicyPath, request.BaselinePath, timing, request.CancellationToken);
                 }
                 catch (ArchitecturePolicyImportException ex)
                 {
                     throw new ArchitecturePolicyLoadException(ex.Message, ex.Diagnostic, ex.Category.ToString(), ex);
                 }
 
+                request.CancellationToken.ThrowIfCancellationRequested();
+
                 // This can reject an invalid severity or contract ID after the policy/imports
                 // (and optional baseline) were loaded. Keep it inside the provenance-aware try
                 // so an error report cannot overwrite one of those already-consumed inputs.
                 policy = ComposeDocument(document, request, modeHint);
             }
+
+            request.CancellationToken.ThrowIfCancellationRequested();
 
             using (timing?.Measure("load_and_setup"))
                 setup = BuildRunnerFor(policy, request, modeHint, timing);
@@ -87,9 +91,13 @@ public sealed class ArchitectureValidationApplicationService(
             int assemblyLoads = setup.AssemblyLoads;
             IArchitectureContractRunner runner = setup.Runner;
 
+            request.CancellationToken.ThrowIfCancellationRequested();
+
             BuildStatePreflightResult preflight;
             using (timing?.Measure("build_state_preflight"))
                 preflight = RunBuildStatePreflight(request, runner);
+
+            request.CancellationToken.ThrowIfCancellationRequested();
 
             // --ensure-built may have just written new build output that the runner/session above —
             // built from assembly resolution that ran before this build — cannot see: its
@@ -115,6 +123,8 @@ public sealed class ArchitectureValidationApplicationService(
                 runner = setup.Runner;
             }
 
+            request.CancellationToken.ThrowIfCancellationRequested();
+
             return new ArchitectureAnalysisSnapshot(
                 policy.Document,
                 setup,
@@ -133,6 +143,14 @@ public sealed class ArchitectureValidationApplicationService(
                 // per-mode re-check in Evaluate — a single-mode snapshot (modeHint set) already
                 // validated its one mode's contract IDs exactly as before this change, above.
                 requestedContractIds: modeHint == null ? request.ContractIds : null);
+        }
+        catch (OperationCanceledException)
+        {
+            // A snapshot cancelled during construction is never exposed as usable: nothing is
+            // returned on this path, so release whatever this attempt already acquired (the
+            // assembly load scope owned by `setup`) instead of leaving it to finalization.
+            setup?.Runner.Session.Context.Dispose();
+            throw;
         }
         catch (Exception ex) when (document is not null
             && ex is not ArchitecturePolicyLoadException and not ArchitecturePolicyValidationException)
@@ -202,7 +220,8 @@ public sealed class ArchitectureValidationApplicationService(
             request.PreparationMode,
             request.NoRestore,
             request.RequestedConfiguration,
-            request.RequestedTargetFramework));
+            request.RequestedTargetFramework,
+            request.CancellationToken));
     }
 
     private readonly record struct ComposedPolicy(
@@ -261,10 +280,12 @@ public sealed class ArchitectureValidationApplicationService(
         return loadPostBuildArtifacts
             ? runnerSetupService.BuildRunnerForPostBuild(
                 policy.Document, request.PolicyPath, request.ConditionSetName, request.PreprocessorSymbols,
-                policy.SelectedContractIds, policy.EnableUnmatchedIgnoreTracking, timing, modeHint)
+                policy.SelectedContractIds, policy.EnableUnmatchedIgnoreTracking, timing, modeHint,
+                request.CancellationToken)
             : runnerSetupService.BuildRunner(
                 policy.Document, request.PolicyPath, request.ConditionSetName, request.PreprocessorSymbols,
-                policy.SelectedContractIds, policy.EnableUnmatchedIgnoreTracking, timing, modeHint);
+                policy.SelectedContractIds, policy.EnableUnmatchedIgnoreTracking, timing, modeHint,
+                request.CancellationToken);
     }
 
     private static void EnsureValidSeverityConfig(string value, string settingName)

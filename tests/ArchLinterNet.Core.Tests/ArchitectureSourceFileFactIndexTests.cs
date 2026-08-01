@@ -58,11 +58,12 @@ public sealed partial class ArchitectureSourceFileFactIndexTests
             new[] { sourceRoot },
             preprocessorSymbols: null,
             fs,
-            projectDiscovery: null,
-            sourceRootAssemblyOwnership: new Dictionary<string, string>(StringComparer.Ordinal)
-            {
-                [sourceRoot] = TestAssemblyName
-            });
+            new ArchitectureSourceFileFactIndex.ProjectOwnership(
+                ProjectDiscovery: null,
+                SourceRootAssemblyOwnership: new Dictionary<string, string>(StringComparer.Ordinal)
+                {
+                    [sourceRoot] = TestAssemblyName
+                }));
     }
 
     // ── Single type per file ──────────────────────────────────────────────────────────
