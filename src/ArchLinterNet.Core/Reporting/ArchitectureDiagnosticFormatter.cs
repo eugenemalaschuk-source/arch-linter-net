@@ -142,7 +142,11 @@ public partial interface IArchitectureDiagnosticFormatter
         CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        return FormatViolationsForCiArtifacts(contractName, contractId, violations);
+        // Existing external implementations can only provide the legacy member, which has no
+        // cancellation parameter. The guard above still prevents entering that compatibility
+        // path after cancellation; the concrete formatter overrides this overload and observes
+        // the token throughout mapping, sorting, and serialization.
+        return FormatViolationsForCiArtifacts(contractName, contractId, violations); // NOSONAR: preserve source compatibility for pre-cancellation interface implementers
     }
 
     string FormatCyclesForCiArtifacts(string contractName, string? contractId, IReadOnlyCollection<string> cycles);

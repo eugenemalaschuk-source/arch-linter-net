@@ -257,7 +257,7 @@ public sealed class ArchitectureSourceFileFactIndex
         {
             _cancellationToken.ThrowIfCancellationRequested();
             string assemblyName = assembly.GetName().Name ?? string.Empty;
-            foreach (Type type in ArchitectureTypeScanner.GetLoadableTypes(assembly))
+            foreach (Type type in ArchitectureTypeScanner.GetLoadableTypes(assembly, _cancellationToken))
             {
                 _cancellationToken.ThrowIfCancellationRequested();
                 string? fullName = SafeFullName(type);

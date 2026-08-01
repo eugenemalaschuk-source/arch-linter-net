@@ -79,7 +79,7 @@ public sealed class ArchitectureTypeIndex
         foreach (Assembly assembly in _targetAssemblies.Distinct())
         {
             _cancellationToken.ThrowIfCancellationRequested();
-            types.AddRange(ArchitectureTypeScanner.GetLoadableTypes(assembly));
+            types.AddRange(ArchitectureTypeScanner.GetLoadableTypes(assembly, _cancellationToken));
         }
 
         return types.ToArray();
