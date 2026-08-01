@@ -498,8 +498,12 @@ internal static class CelEvaluator
             return CompareMaps(left.Members, right.Members, span);
         }
 
+        // Implements CEL's `==` operator for the Float kind (see CompareValues above, alongside the
+        // Bool/Int/String branches' own exact equality) — CEL defines double equality as exact
+        // IEEE754 comparison, not approximate/range comparison. A tolerance here would be a
+        // spec-compliance regression, not a bug fix.
         private static bool AreFloatsEqual(double left, double right) =>
-            !double.IsNaN(left) && !double.IsNaN(right) && left.Equals(right);
+            !double.IsNaN(left) && !double.IsNaN(right) && left.Equals(right); // NOSONAR: exact equality is the correct CEL `==` semantics for doubles, not a bug
 
         private static long MapLookupCost(string key, int entryCount) =>
             1 + SaturatingMultiply(key.Length, entryCount + 1L);
