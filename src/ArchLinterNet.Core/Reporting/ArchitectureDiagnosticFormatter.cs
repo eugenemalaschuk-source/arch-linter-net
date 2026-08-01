@@ -135,6 +135,16 @@ public partial interface IArchitectureDiagnosticFormatter
     string FormatViolationsForCiArtifacts(string contractName, string? contractId,
         IReadOnlyCollection<ArchitectureViolation> violations);
 
+    string FormatViolationsForCiArtifacts(
+        string contractName,
+        string? contractId,
+        IReadOnlyCollection<ArchitectureViolation> violations,
+        CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        return FormatViolationsForCiArtifacts(contractName, contractId, violations);
+    }
+
     string FormatCyclesForCiArtifacts(string contractName, string? contractId, IReadOnlyCollection<string> cycles);
 }
 
@@ -152,7 +162,7 @@ public sealed partial class ArchitectureDiagnosticFormatter : IArchitectureDiagn
         IReadOnlyCollection<ArchitectureViolation> violations, CancellationToken cancellationToken)
     {
         IReadOnlyList<ArchitectureFinding> findings = ArchitectureFindingMapper.Order(
-            ArchitectureFindingMapper.FromViolations(violations, mode: null, cancellationToken));
+            ArchitectureFindingMapper.FromViolations(violations, mode: null, cancellationToken), cancellationToken);
         var lines = new string[findings.Count];
         for (int i = 0; i < findings.Count; i++)
         {
@@ -288,21 +298,6 @@ public sealed partial class ArchitectureDiagnosticFormatter : IArchitectureDiagn
         return string.Join(
             Environment.NewLine,
             new[] { header }.Concat(excludedLines).Concat(uncoveredLines).Concat(staleLines).Concat(unknownLines).Concat(optionalEmptyLines));
-    }
-
-    public string FormatViolationsForCiArtifacts(string contractName, string? contractId,
-        IReadOnlyCollection<ArchitectureViolation> violations)
-    {
-        var payload = new
-        {
-            kind = "architecture_violations",
-            contract = contractName,
-            contract_id = contractId,
-            violations = ArchitectureFindingMapper.Order(ArchitectureFindingMapper.FromViolations(violations))
-                .Select(finding => ToCiJsonObject(finding, includeContract: false))
-        };
-
-        return JsonSerializer.Serialize(payload);
     }
 
     private static string SourceTypeOf(ArchitectureDiagnostic diagnostic) => diagnostic switch

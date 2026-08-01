@@ -34,10 +34,14 @@ internal static class ArchitectureTypeScanner
             cancellationToken);
     }
 
-    // Checked per assembly — the same reflection-pass boundary
-    // ArchitectureSourceFileFactIndex.RunReflectionPass/ArchitectureTypeIndex already check at, so
-    // discovering the candidate type set itself is interruptible, not just the per-type loop a
-    // caller (e.g. ArchitectureIlMethodBodyScanner) runs over the result afterward.
+    // Checked per assembly AND per type — the same reflection-pass boundary
+    // ArchitectureSourceFileFactIndex.RunReflectionPass/ArchitectureTypeIndex already check at.
+    // GetLoadableTypes itself is one eager reflection call per assembly (not individually
+    // interruptible), but a single large target assembly can still contain thousands of types, so
+    // the predicate loop below is checked per type too — not only at the assembly boundary — so
+    // discovering the candidate type set is interruptible at the same granularity a caller (e.g.
+    // ArchitectureIlMethodBodyScanner) would otherwise expect from the per-type loop it runs over
+    // the result afterward.
     private static Type[] FindTypes(
         IEnumerable<Assembly> targetAssemblies, Func<Type, bool> predicate, CancellationToken cancellationToken = default)
     {
@@ -45,8 +49,9 @@ internal static class ArchitectureTypeScanner
         foreach (Assembly assembly in targetAssemblies.Distinct())
         {
             cancellationToken.ThrowIfCancellationRequested();
-            foreach (Type type in GetLoadableTypes(assembly))
+            foreach (Type type in GetLoadableTypes(assembly, cancellationToken))
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 if (predicate(type))
                 {
                     matches.Add(type);
@@ -57,15 +62,25 @@ internal static class ArchitectureTypeScanner
         return matches.ToArray();
     }
 
-    internal static IEnumerable<Type> GetLoadableTypes(Assembly assembly)
+    internal static IEnumerable<Type> GetLoadableTypes(Assembly assembly) =>
+        GetLoadableTypes(assembly, CancellationToken.None);
+
+    internal static IEnumerable<Type> GetLoadableTypes(Assembly assembly, CancellationToken cancellationToken)
     {
+        Type[] types;
         try
         {
-            return assembly.GetTypes();
+            types = assembly.GetTypes();
         }
         catch (ReflectionTypeLoadException exception)
         {
-            return exception.Types.Where(type => type != null)!;
+            types = exception.Types.Where(type => type != null).Cast<Type>().ToArray();
+        }
+
+        foreach (Type type in types)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            yield return type;
         }
     }
 }

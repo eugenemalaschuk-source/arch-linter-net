@@ -238,12 +238,14 @@ public sealed partial class ArchitectureDiagnosticFormatter
         // is actually checked per item — not just before/after the whole JSON document is built.
         var violationsSerialized = ToCiJsonObjectsCancellationAware(
             ArchitectureFindingMapper.Order(
-                ArchitectureFindingMapper.FromViolations(request.Violations, request.Mode, request.CancellationToken)),
+                ArchitectureFindingMapper.FromViolations(request.Violations, request.Mode, request.CancellationToken),
+                request.CancellationToken),
             request.CancellationToken);
         var coverageFindingsSerialized = ToCiJsonObjectsCancellationAware(
             ArchitectureFindingMapper.Order(
                 ArchitectureFindingMapper.FromViolations(
-                    request.CoverageFindings ?? Array.Empty<ArchitectureViolation>(), request.Mode, request.CancellationToken)),
+                    request.CoverageFindings ?? Array.Empty<ArchitectureViolation>(), request.Mode, request.CancellationToken),
+                request.CancellationToken),
             request.CancellationToken);
 
         var payload = new

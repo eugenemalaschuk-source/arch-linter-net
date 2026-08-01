@@ -66,7 +66,8 @@ issue #418, not something this requirement claims is already true.
 - **THEN** scanning stops at the next assembly/type/file boundary and raises `OperationCanceledException` — for
   `ArchitectureSourceScanner` specifically, before the next source file is read during discovery, before the
   next syntax tree is analyzed after the Roslyn compilation is built, and before that compilation is built at
-  all if cancellation was already observed
+  all if cancellation was already observed; project-aware reference resolution observes cancellation before
+  and after its opaque design-time build and while materializing each source-file/reference result
 
 #### Scenario: Cancellation during contract-family execution
 - **WHEN** the token is cancelled between two contract-family iterations inside
@@ -226,8 +227,8 @@ The system SHALL retain every configured file sink in cancellation evidence, SHA
   `FormatCoverageForHumans`, `FormatResultForCiArtifacts`, or `FormatResultAsSarif` — and
   `OperationCanceledException` propagates instead of a partial document reaching any sink; this covers
   both the per-item serialization step and the underlying `ArchitectureFindingMapper.FromViolations`
-  mapping pass itself, which is checked per violation as diagnostics and finding identities are built,
-  not only when the mapped result is later iterated for output
+  mapping and ordering pass itself, which is checked per violation, per expanded identity, and per
+  finding comparison while sorting — not only when the mapped result is later iterated for output
 
 #### Scenario: A cancellation notice never overwrites an existing configured report file
 - **WHEN** the CLI's own `CancellationToken` is cancelled (e.g. a real Ctrl+C) and a `--report <format>=<file>`
@@ -263,4 +264,3 @@ Baseline, public-API, policy composition, hashing, receipt publication, and fina
   `TryCopySource`) but before the rename that commits it (`RenameTempToTarget`)
 - **THEN** the rename does not happen, the staged temp file is deleted, and any existing baseline/snapshot
   file at the destination is left unchanged
-

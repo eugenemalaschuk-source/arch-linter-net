@@ -41,7 +41,7 @@ public sealed class ArchitectureFindingMapperTests
             new ArchitectureViolation("rule-a", null, "pkg-e", "pkg-f", Array.Empty<string>()),
         };
         using CancellationTokenSource cts = new();
-        var collection = new CancelOnItemCollection(violations, cts, cancelBeforeIndex: 1);
+        var collection = new CancelOnItemCollection<ArchitectureViolation>(violations, cts, cancelBeforeIndex: 1);
 
         Assert.Throws<OperationCanceledException>(() =>
             ArchitectureFindingMapper.FromViolations(collection, mode: null, cts.Token));
@@ -50,13 +50,31 @@ public sealed class ArchitectureFindingMapperTests
             "the loop must stop as soon as cancellation is observed for the second item — the third must never be fetched from the source collection");
     }
 
-    private sealed class CancelOnItemCollection : IReadOnlyCollection<ArchitectureViolation>
+    [Test]
+    public void FromViolations_CancelledDuringIdentityExpansion_StopsBeforeMappingRemainingIdentities()
     {
-        private readonly IReadOnlyList<ArchitectureViolation> _items;
+        using CancellationTokenSource cts = new();
+        var identities = new CancelOnItemCollection<ArchitectureViolationIdentity>(
+            [Identity("first"), Identity("second"), Identity("third")], cts, cancelBeforeIndex: 1);
+        var violation = new ArchitectureViolation("rule-a", null, "pkg-a", "pkg-b", Array.Empty<string>())
+        {
+            Identities = identities,
+        };
+
+        Assert.Throws<OperationCanceledException>(() =>
+            ArchitectureFindingMapper.FromViolations([violation], mode: null, cts.Token));
+
+        Assert.That(identities.FetchedCount, Is.EqualTo(2),
+            "the mapper must observe cancellation while expanding an aggregated violation, before fetching another identity");
+    }
+
+    private sealed class CancelOnItemCollection<T> : IReadOnlyCollection<T>
+    {
+        private readonly IReadOnlyList<T> _items;
         private readonly CancellationTokenSource _cts;
         private readonly int _cancelBeforeIndex;
 
-        public CancelOnItemCollection(IReadOnlyList<ArchitectureViolation> items, CancellationTokenSource cts, int cancelBeforeIndex)
+        public CancelOnItemCollection(IReadOnlyList<T> items, CancellationTokenSource cts, int cancelBeforeIndex)
         {
             _items = items;
             _cts = cts;
@@ -67,7 +85,7 @@ public sealed class ArchitectureFindingMapperTests
 
         public int Count => _items.Count;
 
-        public IEnumerator<ArchitectureViolation> GetEnumerator()
+        public IEnumerator<T> GetEnumerator()
         {
             for (int i = 0; i < _items.Count; i++)
             {

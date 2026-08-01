@@ -517,8 +517,9 @@ public sealed partial class ArchitectureAnalysisSession
             return (null, null, null);
         }
 
-        IReadOnlyList<string> matchedFiles = new ArchitectureSourceScanner()
-            .FindMatchingSourceFiles(Context.RepositoryRoot, sourceLayer, sourceRoots);
+        Context.CancellationToken.ThrowIfCancellationRequested();
+        IReadOnlyList<string> matchedFiles = ArchitectureSourceScanner.FindMatchingSourceFiles(
+            Context.RepositoryRoot, sourceLayer, sourceRoots, fileSystem: null, Context.CancellationToken);
 
         if (matchedFiles.Count == 0)
         {
@@ -534,8 +535,14 @@ public sealed partial class ArchitectureAnalysisSession
         }
 
         string projectAbsolutePath = Path.GetFullPath(Path.Combine(Context.RepositoryRoot, owningProject.Path));
+
+        // The MSBuild design-time build inside Resolve is one opaque Buildalyzer call — like the
+        // Roslyn compilation build in ArchitectureSourceScanner, not individually interruptible —
+        // so it is checked immediately before and after instead of not at all.
+        Context.CancellationToken.ThrowIfCancellationRequested();
         ArchitectureProjectRoslynResolution resolution =
-            new ArchitectureProjectRoslynContextResolver().Resolve(projectAbsolutePath);
+            new ArchitectureProjectRoslynContextResolver().Resolve(projectAbsolutePath, Context.CancellationToken);
+        Context.CancellationToken.ThrowIfCancellationRequested();
 
         if (!resolution.Succeeded)
         {

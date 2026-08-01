@@ -135,7 +135,12 @@ internal sealed class ArchitectureSourceScanner : IArchitectureSourceScanner
         return FindMatchingSourceFiles(repositoryRoot, layer, sourceRoots, fileSystem, CancellationToken.None);
     }
 
-    private static IReadOnlyList<string> FindMatchingSourceFiles(
+    // internal, not private: lets other Core call sites that already hold a live cancellation
+    // token (e.g. ArchitectureAnalysisSession.Checking's project-aware reference resolution
+    // prepass) reuse the same per-file-checked discovery path as FindMethodBodyViolations itself,
+    // instead of going through the public 4-arg overload above and silently getting
+    // CancellationToken.None.
+    internal static IReadOnlyList<string> FindMatchingSourceFiles(
         string repositoryRoot,
         ArchitectureLayer layer,
         string[]? sourceRoots,
