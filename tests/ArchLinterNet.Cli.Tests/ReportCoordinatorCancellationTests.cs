@@ -35,6 +35,7 @@ public sealed partial class ReportCoordinatorTests
         {
             Assert.That(result.Cancelled, Is.True);
             Assert.That(result.CommittedPaths, Is.Empty);
+            Assert.That(result.UncommittedPaths, Is.EquivalentTo(new[] { "one.json", "two.sarif" }));
             Assert.That(fileSystem.TempPaths, Is.Empty);
         });
     }

@@ -5,7 +5,7 @@ using ArchLinterNet.Core.Validation;
 
 namespace ArchLinterNet.Cli.Commands.Baseline;
 
-internal sealed class BaselineUpdateCommandHandler(ICliRuntime runtime, ICliConsole console, IFileSystem fileSystem)
+internal sealed class BaselineUpdateCommandHandler(ICliRuntime runtime, ICliConsole console, IFileSystem fileSystem, CancellationToken cancellationToken = default)
 {
     public int Execute(BaselineUpdateCommandOptions options)
     {
@@ -47,6 +47,7 @@ internal sealed class BaselineUpdateCommandHandler(ICliRuntime runtime, ICliCons
                 BaselinePath = options.BaselinePath,
                 Mode = options.Mode,
                 ConditionSetName = options.ConditionSetName,
+                CancellationToken = cancellationToken,
                 Reason = options.Reasons.Reason,
                 ReasonForContract = options.Reasons.ReasonForContract,
                 ReasonForFamily = options.Reasons.ReasonForFamily,

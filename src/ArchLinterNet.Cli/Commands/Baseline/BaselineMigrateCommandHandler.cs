@@ -6,7 +6,7 @@ using ArchLinterNet.Core.Validation;
 
 namespace ArchLinterNet.Cli.Commands.Baseline;
 
-internal sealed class BaselineMigrateCommandHandler(ICliRuntime runtime, ICliConsole console, IFileSystem fileSystem)
+internal sealed class BaselineMigrateCommandHandler(ICliRuntime runtime, ICliConsole console, IFileSystem fileSystem, CancellationToken cancellationToken = default)
 {
     public int Execute(BaselineMigrateCommandOptions options)
     {
@@ -60,6 +60,7 @@ internal sealed class BaselineMigrateCommandHandler(ICliRuntime runtime, ICliCon
                 BaselinePath = options.BaselinePath,
                 OutputPath = options.OutputPath,
                 ConditionSetName = options.ConditionSetName,
+                CancellationToken = cancellationToken,
                 DryRun = options.DryRun,
             });
 

@@ -5,7 +5,7 @@ using ArchLinterNet.Core.Validation;
 
 namespace ArchLinterNet.Cli.Commands.PublicApi;
 
-internal sealed class PublicApiUpdateCommandHandler(ICliRuntime runtime, ICliConsole console, IFileSystem fileSystem)
+internal sealed class PublicApiUpdateCommandHandler(ICliRuntime runtime, ICliConsole console, IFileSystem fileSystem, CancellationToken cancellationToken = default)
 {
     private const string CommandName = "update";
 
@@ -42,6 +42,7 @@ internal sealed class PublicApiUpdateCommandHandler(ICliRuntime runtime, ICliCon
                 SnapshotPath = options.SnapshotPath,
                 DryRun = options.DryRun,
                 ConditionSetName = options.ConditionSetName,
+                CancellationToken = cancellationToken,
             });
 
             if (!outcome.Succeeded)

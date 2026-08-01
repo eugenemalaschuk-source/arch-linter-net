@@ -8,7 +8,7 @@ internal sealed class PublicApiCommandModule : ITopLevelCliSubcommandModule
 {
     public string CommandName => "public-api";
 
-    public Command CreateCommand(ICliRuntime runtime, ICliConsole console, IFileSystem fileSystem)
+    public Command CreateCommand(ICliRuntime runtime, ICliConsole console, IFileSystem fileSystem, CancellationToken cancellationToken = default)
     {
         Command publicApiCommand = new(CommandName);
         Option<bool> helpOption = new("--help");
@@ -23,7 +23,7 @@ internal sealed class PublicApiCommandModule : ITopLevelCliSubcommandModule
         foreach (IPublicApiSubcommandModule module in PublicApiSubcommandCatalog.CreateModules()
                      .OrderBy(static module => module.CommandName, StringComparer.Ordinal))
         {
-            publicApiCommand.Subcommands.Add(module.CreateCommand(runtime, console, fileSystem));
+            publicApiCommand.Subcommands.Add(module.CreateCommand(runtime, console, fileSystem, cancellationToken));
         }
 
         return publicApiCommand;

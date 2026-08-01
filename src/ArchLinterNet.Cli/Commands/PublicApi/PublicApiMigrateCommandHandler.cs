@@ -4,7 +4,7 @@ using ArchLinterNet.Core.Validation;
 
 namespace ArchLinterNet.Cli.Commands.PublicApi;
 
-internal sealed class PublicApiMigrateCommandHandler(ICliRuntime runtime, ICliConsole console, IFileSystem fileSystem)
+internal sealed class PublicApiMigrateCommandHandler(ICliRuntime runtime, ICliConsole console, IFileSystem fileSystem, CancellationToken cancellationToken = default)
 {
     private const string CommandName = "migrate";
 
@@ -41,6 +41,7 @@ internal sealed class PublicApiMigrateCommandHandler(ICliRuntime runtime, ICliCo
                 OutputPath = options.OutputPath,
                 AcceptDrift = options.AcceptDrift,
                 ConditionSetName = options.ConditionSetName,
+                CancellationToken = cancellationToken,
             });
 
             if (!outcome.Succeeded)

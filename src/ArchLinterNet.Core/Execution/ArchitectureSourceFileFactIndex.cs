@@ -250,14 +250,16 @@ public sealed class ArchitectureSourceFileFactIndex
 
     // Step 1: walk every loadable type in each assembly and collect one BaseFact per
     // (assemblyName, fullTypeName). Assemblies are already sorted alphabetically before this call.
-    private static Dictionary<string, List<BaseFact>> RunReflectionPass(List<Assembly> sortedAssemblies)
+    private Dictionary<string, List<BaseFact>> RunReflectionPass(List<Assembly> sortedAssemblies)
     {
         Dictionary<string, List<BaseFact>> factsByName = new(_ordinal);
         foreach (Assembly assembly in sortedAssemblies)
         {
+            _cancellationToken.ThrowIfCancellationRequested();
             string assemblyName = assembly.GetName().Name ?? string.Empty;
             foreach (Type type in ArchitectureTypeScanner.GetLoadableTypes(assembly))
             {
+                _cancellationToken.ThrowIfCancellationRequested();
                 string? fullName = SafeFullName(type);
                 if (string.IsNullOrEmpty(fullName)) continue;
 
@@ -293,6 +295,7 @@ public sealed class ArchitectureSourceFileFactIndex
 
         foreach (string sourceRoot in _sourceRoots)
         {
+            _cancellationToken.ThrowIfCancellationRequested();
             string normalizedSourceRoot = NormalizeRelativePath(sourceRoot);
             string absoluteRoot = Path.Combine(_repositoryRoot, normalizedSourceRoot);
             if (!_fileSystem.DirectoryExists(absoluteRoot)) continue;
@@ -302,6 +305,7 @@ public sealed class ArchitectureSourceFileFactIndex
                 "*.cs",
                 SearchOption.AllDirectories))
             {
+                _cancellationToken.ThrowIfCancellationRequested();
                 string normalizedFilePath = NormalizePath(_repositoryRoot, absoluteFile);
                 string? assemblyName = ResolveOwnedAssemblyName(normalizedFilePath, ownershipEntries);
                 if (assemblyName == null)

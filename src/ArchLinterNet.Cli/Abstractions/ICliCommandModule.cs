@@ -12,7 +12,11 @@ internal interface ICliSubcommandModule
 {
     string CommandName { get; }
 
-    Command CreateCommand(ICliRuntime runtime, ICliConsole console, IFileSystem fileSystem);
+    Command CreateCommand(
+        ICliRuntime runtime,
+        ICliConsole console,
+        IFileSystem fileSystem,
+        CancellationToken cancellationToken = default);
 }
 
 internal interface ITopLevelCliSubcommandModule : ICliSubcommandModule

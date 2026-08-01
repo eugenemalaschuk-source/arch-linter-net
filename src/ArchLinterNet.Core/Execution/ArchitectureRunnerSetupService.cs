@@ -23,14 +23,28 @@ public sealed class ArchitectureRunnerSetupService(
         string? baselinePath = null,
         ValidationTiming? timing = null)
     {
+        return LoadDocument(policyPath, baselinePath, timing, default);
+    }
+
+    public ArchitectureContractDocument LoadDocument(
+        string policyPath,
+        string? baselinePath = null,
+        ValidationTiming? timing = null,
+        CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
         ArchitectureContractDocument document;
         using (timing?.Measure("yaml_loading", indent: 1))
             document = policyDocumentLoader.Load(policyPath);
+
+        cancellationToken.ThrowIfCancellationRequested();
 
         if (baselinePath != null)
         {
             using (timing?.Measure("baseline_loading", indent: 1))
                 baselineLoadingService.LoadAndMerge(document, baselinePath);
+
+            cancellationToken.ThrowIfCancellationRequested();
         }
 
         return document;

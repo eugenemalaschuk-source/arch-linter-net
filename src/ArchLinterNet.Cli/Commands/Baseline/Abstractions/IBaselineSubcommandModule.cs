@@ -9,5 +9,10 @@ internal interface IBaselineSubcommandModule : ICliSubcommandModule
 
 internal interface IDefaultBaselineSubcommandModule : IBaselineSubcommandModule
 {
-    Command CreateDefaultCommand(string commandName, ICliRuntime runtime, ICliConsole console, IFileSystem fileSystem);
+    Command CreateDefaultCommand(
+        string commandName,
+        ICliRuntime runtime,
+        ICliConsole console,
+        IFileSystem fileSystem,
+        CancellationToken cancellationToken = default);
 }

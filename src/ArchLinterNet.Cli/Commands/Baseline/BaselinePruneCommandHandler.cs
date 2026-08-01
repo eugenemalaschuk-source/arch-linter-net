@@ -5,7 +5,7 @@ using ArchLinterNet.Core.Validation;
 
 namespace ArchLinterNet.Cli.Commands.Baseline;
 
-internal sealed class BaselinePruneCommandHandler(ICliRuntime runtime, ICliConsole console, IFileSystem fileSystem)
+internal sealed class BaselinePruneCommandHandler(ICliRuntime runtime, ICliConsole console, IFileSystem fileSystem, CancellationToken cancellationToken = default)
 {
     public int Execute(BaselinePruneCommandOptions options)
     {
@@ -47,6 +47,7 @@ internal sealed class BaselinePruneCommandHandler(ICliRuntime runtime, ICliConso
                 BaselinePath = options.BaselinePath,
                 Mode = options.Mode,
                 ConditionSetName = options.ConditionSetName,
+                CancellationToken = cancellationToken,
                 ContractIds = options.ContractIds.ToList(),
             });
 

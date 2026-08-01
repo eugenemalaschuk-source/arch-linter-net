@@ -6,7 +6,7 @@ using ArchLinterNet.Core.Validation;
 
 namespace ArchLinterNet.Cli.Commands.Baseline;
 
-internal sealed class BaselineDiffCommandHandler(ICliRuntime runtime, ICliConsole console, IFileSystem fileSystem)
+internal sealed class BaselineDiffCommandHandler(ICliRuntime runtime, ICliConsole console, IFileSystem fileSystem, CancellationToken cancellationToken = default)
 {
     public int Execute(BaselineDiffCommandOptions options)
     {
@@ -60,6 +60,7 @@ internal sealed class BaselineDiffCommandHandler(ICliRuntime runtime, ICliConsol
                 BaselinePath = options.BaselinePath,
                 Mode = options.Mode,
                 ConditionSetName = options.ConditionSetName,
+                CancellationToken = cancellationToken,
                 ContractIds = options.ContractIds.ToList(),
             });
 

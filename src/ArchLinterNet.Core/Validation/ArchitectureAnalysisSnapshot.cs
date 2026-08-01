@@ -302,6 +302,10 @@ public sealed class ArchitectureAnalysisSnapshot : IDisposable
         IReadOnlyList<ArchitectureClassificationRoleFact> classificationRoles = runner.Session.CheckClassificationRoles();
         ArchitectureClassificationPathDeferredNotice? classificationPathDeferred = runner.Session.CheckClassificationPathDeferred();
 
+        // Classification post-processing can materialize additional facts. A signal observed
+        // there must win over constructing and returning an apparently complete outcome.
+        cancellationToken.ThrowIfCancellationRequested();
+
         return new ValidationOutcome(
             passed, allViolations, execution.Cycles, coverageFindings, _coverageConfig, unmatched, _unmatchedConfig,
             policyConsistencyFindings, _policyConsistencyConfig, execution.CoverageSummaries,

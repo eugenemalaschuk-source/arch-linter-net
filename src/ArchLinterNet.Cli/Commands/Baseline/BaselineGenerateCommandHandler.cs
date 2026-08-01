@@ -5,7 +5,7 @@ using ArchLinterNet.Core.Validation;
 
 namespace ArchLinterNet.Cli.Commands.Baseline;
 
-internal sealed class BaselineGenerateCommandHandler(ICliRuntime runtime, ICliConsole console, IFileSystem fileSystem)
+internal sealed class BaselineGenerateCommandHandler(ICliRuntime runtime, ICliConsole console, IFileSystem fileSystem, CancellationToken cancellationToken = default)
 {
     public int Execute(BaselineGenerateCommandOptions options)
     {
@@ -38,6 +38,7 @@ internal sealed class BaselineGenerateCommandHandler(ICliRuntime runtime, ICliCo
                 ReasonForContract = options.Reasons.ReasonForContract,
                 ReasonForFamily = options.Reasons.ReasonForFamily,
                 ContractIds = options.ContractIds.ToList(),
+                CancellationToken = cancellationToken,
             });
 
             if (!outcome.Succeeded)

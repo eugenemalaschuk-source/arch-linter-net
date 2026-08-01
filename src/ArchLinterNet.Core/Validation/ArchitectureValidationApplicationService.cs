@@ -67,7 +67,7 @@ public sealed class ArchitectureValidationApplicationService(
             {
                 try
                 {
-                    document = runnerSetupService.LoadDocument(request.PolicyPath, request.BaselinePath, timing);
+                    document = runnerSetupService.LoadDocument(request.PolicyPath, request.BaselinePath, timing, request.CancellationToken);
                 }
                 catch (ArchitecturePolicyImportException ex)
                 {

@@ -16,7 +16,7 @@ internal sealed class CliRootCommandFactory(
         RootCommand rootCommand = rootCommandModule.CreateRootCommand(runtime, console, fileSystem, cancellationToken);
         foreach (ITopLevelCliSubcommandModule module in subcommandModules.OrderBy(static module => module.CommandName, StringComparer.Ordinal))
         {
-            rootCommand.Subcommands.Add(module.CreateCommand(runtime, console, fileSystem));
+            rootCommand.Subcommands.Add(module.CreateCommand(runtime, console, fileSystem, cancellationToken));
         }
 
         return rootCommand;

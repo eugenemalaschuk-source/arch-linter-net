@@ -3,7 +3,7 @@ using ArchLinterNet.Core.Validation;
 
 namespace ArchLinterNet.Cli.Commands.PublicApi;
 
-internal sealed class PublicApiDiffCommandHandler(ICliRuntime runtime, ICliConsole console, IFileSystem fileSystem)
+internal sealed class PublicApiDiffCommandHandler(ICliRuntime runtime, ICliConsole console, IFileSystem fileSystem, CancellationToken cancellationToken = default)
 {
     private const string CommandName = "diff";
 
@@ -39,6 +39,7 @@ internal sealed class PublicApiDiffCommandHandler(ICliRuntime runtime, ICliConso
                 ContractId = options.ContractId!,
                 SnapshotPath = options.SnapshotPath,
                 ConditionSetName = options.ConditionSetName,
+                CancellationToken = cancellationToken,
             });
 
             if (!outcome.Succeeded)

@@ -15,6 +15,18 @@ public interface IArchitectureRunnerSetupService
         string? baselinePath = null,
         ValidationTiming? timing = null);
 
+    ArchitectureContractDocument LoadDocument(
+        string policyPath,
+        string? baselinePath,
+        ValidationTiming? timing,
+        CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        ArchitectureContractDocument document = LoadDocument(policyPath, baselinePath, timing);
+        cancellationToken.ThrowIfCancellationRequested();
+        return document;
+    }
+
     ArchitectureRunnerSetup BuildRunner( // NOSONAR: each parameter maps to a distinct configuration concern; a parameter object would wrap disparate optional axes without reducing call-site cognitive load
         ArchitectureContractDocument document,
         string policyPath,

@@ -4,7 +4,7 @@ using ArchLinterNet.Core.Validation;
 
 namespace ArchLinterNet.Cli.Commands.PublicApi;
 
-internal sealed class PublicApiCaptureCommandHandler(ICliRuntime runtime, ICliConsole console, IFileSystem fileSystem)
+internal sealed class PublicApiCaptureCommandHandler(ICliRuntime runtime, ICliConsole console, IFileSystem fileSystem, CancellationToken cancellationToken = default)
 {
     private const string CommandName = "capture";
 
@@ -40,6 +40,7 @@ internal sealed class PublicApiCaptureCommandHandler(ICliRuntime runtime, ICliCo
                 ContractId = options.ContractId!,
                 OutputPath = options.OutputPath,
                 ConditionSetName = options.ConditionSetName,
+                CancellationToken = cancellationToken,
             });
 
             if (!outcome.Succeeded)
