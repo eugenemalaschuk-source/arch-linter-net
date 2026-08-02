@@ -50,7 +50,10 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<IArchitectureAssemblyResolutionService, ArchitectureAssemblyResolutionService>();
         services.AddSingleton<IArchitectureAsmdefScanner, ArchitectureAsmdefScanner>();
         services.AddSingleton<IArchitectureSourceScanner, ArchitectureSourceScanner>();
-        services.AddSingleton<IArchitectureExternalDependencyIlScanner, ArchitectureExternalDependencyIlScanner>();
+        // Transient, unlike its neighbours: this scanner caches resolved IL tokens for the run it is
+        // scanning (issue #419), so a singleton would keep every module's metadata alive for the
+        // lifetime of the container.
+        services.AddTransient<IArchitectureExternalDependencyIlScanner, ArchitectureExternalDependencyIlScanner>();
         services.AddSingleton<IArchitectureIlMethodBodyScanner, ArchitectureIlMethodBodyScanner>();
         services.AddSingleton<IArchitectureRunnerSetupService, ArchitectureRunnerSetupService>();
         services.AddSingleton<ArchitectureContractHandlerRegistry>();

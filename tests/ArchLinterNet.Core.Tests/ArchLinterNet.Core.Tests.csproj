@@ -29,4 +29,8 @@
     <None Include="AdoptionAcceptance\Fixtures\**\*" />
   </ItemGroup>
 
+  <ItemGroup>
+    <None Include="ApprovedApi\**" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
 </Project>
