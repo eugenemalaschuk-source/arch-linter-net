@@ -158,6 +158,26 @@ public sealed partial class ReportCoordinatorTests
         });
     }
 
+    [Test]
+    public void RouteCombinedOutcomes_LegacyHumanCancellationAfterFirstWrite_ReportsDeliveredStdout()
+    {
+        var runtime = new CountingRuntime();
+        using CancellationTokenSource cts = new();
+        var console = new CapturingConsole { OnOutputWriteLine = cts.Cancel };
+        var coordinator = new ReportCoordinator(runtime, console, new StubFileSystem());
+
+        RouteResult result = coordinator.RouteCombinedOutcomes(
+            "human", [("strict", PassedOutcome), ("audit", PassedOutcome)], Array.Empty<ReportSink>(), cts.Token);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(result.Cancelled, Is.True);
+            Assert.That(result.Status, Is.EqualTo(ReportRouteStatus.PartialOutput));
+            Assert.That(result.DeliveredStreamPaths, Is.EquivalentTo(new[] { "<stdout>" }));
+            Assert.That(result.UncommittedPaths, Is.Empty);
+        });
+    }
+
     // PR #416 review: FormatSingle/CombinedHuman/Json/Sarif previously accepted no token at all,
     // so a large findings set could fully serialize after Ctrl+C before the next check. These
     // prove cancellation observed mid-render — at the boundary between two of a human report's

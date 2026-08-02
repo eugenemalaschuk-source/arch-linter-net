@@ -74,8 +74,11 @@ internal sealed partial class ValidateCommandHandler
             ResolveOutputSinkCount(options),
             completionStatus,
             cancellationObserved,
-            measurements,
-            output);
+            new AnalysisProfileBuildOptions
+            {
+                Measurements = measurements,
+                Output = output,
+            });
 
         WriteProfileToDestination(options.ProfileDestination, AnalysisProfileJsonWriter.Write(profile));
     }
@@ -99,10 +102,9 @@ internal sealed partial class ValidateCommandHandler
         return true;
     }
 
-    private static IReadOnlyList<string> CreateProfileInputPaths(IEnumerable<string> inputPaths)
+    private static string[] CreateProfileInputPaths(IEnumerable<string> inputPaths)
     {
         return inputPaths
-            .SelectMany(path => new[] { path, BuildReceiptStore.ReceiptPathFor(path) })
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToArray();
     }
@@ -119,7 +121,7 @@ internal sealed partial class ValidateCommandHandler
             FailedSinkCount = result.FailedPaths.Distinct(StringComparer.OrdinalIgnoreCase).Count(),
             StagedSinkCount = result.StagedPaths.Distinct(StringComparer.OrdinalIgnoreCase).Count(),
             UncommittedSinkCount = result.UncommittedPaths.Distinct(StringComparer.OrdinalIgnoreCase).Count(),
-            OutputFailed = result.Status != ReportRouteStatus.AllSucceeded,
+            OutputFailed = result.FailedPaths.Count > 0,
         };
     }
 
@@ -165,16 +167,26 @@ internal sealed partial class ValidateCommandHandler
         return options.AdditionalSinks.Count > 0 ? options.AdditionalSinks.Count : 1;
     }
 
-    private static AnalysisProfileCompletionStatus ResolveCompletionStatus(ValidationOutcome outcome, bool cancelled)
+    private static AnalysisProfileCompletionStatus ResolveCompletionStatus(
+        ValidationOutcome outcome, bool cancelled, bool outputFailed)
     {
-        return ResolveCompletionStatus(outcome.PreflightBlocked, outcome.Passed, cancelled);
+        return ResolveCompletionStatus(outcome.PreflightBlocked, outcome.Passed, cancelled, outputFailed);
     }
 
-    private static AnalysisProfileCompletionStatus ResolveCompletionStatus(bool preflightBlocked, bool passed, bool cancelled)
+    private static AnalysisProfileCompletionStatus ResolveCompletionStatus(
+        bool preflightBlocked, bool passed, bool cancelled, bool outputFailed)
     {
         if (cancelled)
         {
             return AnalysisProfileCompletionStatus.Cancelled;
+        }
+
+        // The profile contract has no separate runtime-publication status; a failed sink means
+        // this command did not complete successfully, so keep Success reserved for fully
+        // published validation results.
+        if (outputFailed)
+        {
+            return AnalysisProfileCompletionStatus.PreparationFailure;
         }
 
         if (preflightBlocked)

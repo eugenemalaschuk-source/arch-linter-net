@@ -28,7 +28,11 @@ internal sealed partial class ValidateCommandHandler
     private int ExecuteValidation(
         ValidateCommandOptions options, string errorFormat, ValidationProfileExecutionState profileState)
     {
-        TryParseModes(options.Mode, out IReadOnlyList<string> modes, out _);
+        if (!TryParseModes(options.Mode, out IReadOnlyList<string> modes, out string? modeError))
+        {
+            _console.Error.WriteLine(modeError);
+            return CliExitCodes.InvalidArgumentsOrRuntimeError;
+        }
 
         return modes.Count == 1
             ? ExecuteSingleMode(options, modes[0], errorFormat, profileState)
@@ -52,7 +56,8 @@ internal sealed partial class ValidateCommandHandler
             _runtime.ValidateWithCounters(request, timing);
         profileState.Counters = counters;
         profileState.InputPaths = CreateProfileInputPaths(outcome.PolicyImportPaths
-            .Concat(outcome.ResolvedAssemblyPaths)
+            .Concat(outcome.ResolvedAssemblyPaths
+                .SelectMany(path => new[] { path, BuildReceiptStore.ReceiptPathFor(path) }))
             .Concat(outcome.DiscoveredProjectPaths));
 
         string? importCollision = FindImportFileCollision(options, outcome.PolicyImportPaths);
@@ -109,7 +114,8 @@ internal sealed partial class ValidateCommandHandler
             timing?.WriteReport(_console.Error);
         }
 
-        WriteProfile(options, counters, timing, ResolveCompletionStatus(outcome, result.Cancelled), result.Cancelled,
+        WriteProfile(options, counters, timing,
+            ResolveCompletionStatus(outcome, result.Cancelled, outputFailed: result.FailedPaths.Count > 0), result.Cancelled,
             profileState.Output, profileState.InputPaths);
 
         if (result.Cancelled)
@@ -159,7 +165,7 @@ internal sealed partial class ValidateCommandHandler
 
         using ArchitectureAnalysisSnapshot snapshot = _runtime.CreateSnapshot(snapshotRequest, timing);
         profileState.Counters = snapshot.Counters;
-        profileState.InputPaths = CreateProfileInputPaths(snapshot.ProfileInputPaths);
+        profileState.InputPaths = CreateProfileInputPaths(snapshot.GetProfileInputPaths());
 
         bool allPassed = true;
         List<(string Mode, ValidationOutcome Outcome)> outcomesByMode = new();
@@ -243,7 +249,9 @@ internal sealed partial class ValidateCommandHandler
         // reflects every mode's Passed, unlike the single-mode overload's one outcome.
         WriteProfile(
             options, snapshot.Counters, timing,
-            ResolveCompletionStatus(outcomesByMode[0].Outcome.PreflightBlocked, allPassed, result.Cancelled),
+            ResolveCompletionStatus(
+                outcomesByMode[0].Outcome.PreflightBlocked, allPassed, result.Cancelled,
+                outputFailed: result.FailedPaths.Count > 0),
             result.Cancelled, profileState.Output, profileState.InputPaths);
 
         if (result.Cancelled)

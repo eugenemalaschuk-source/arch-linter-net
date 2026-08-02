@@ -261,6 +261,7 @@ public sealed class ValidateCommandHandlerProfileTests
             using JsonDocument document = JsonDocument.Parse(fileSystem.DirectWrites["cancelled-profile.json"]);
             Assert.That(document.RootElement.GetProperty("CompletionStatus").GetString(), Is.EqualTo("Cancelled"));
             Assert.That(document.RootElement.GetProperty("CancellationObserved").GetBoolean(), Is.True);
+            Assert.That(document.RootElement.GetProperty("Output").GetProperty("OutputFailed").GetBoolean(), Is.False);
         });
     }
 
@@ -304,6 +305,8 @@ public sealed class ValidateCommandHandlerProfileTests
         JsonElement output = document.RootElement.GetProperty("Output");
         Assert.Multiple(() =>
         {
+            Assert.That(document.RootElement.GetProperty("CompletionStatus").GetString(),
+                Is.EqualTo("PreparationFailure"));
             Assert.That(output.GetProperty("OutputFailed").GetBoolean(), Is.True);
             Assert.That(output.GetProperty("FailedSinkCount").GetInt32(), Is.EqualTo(1));
             Assert.That(output.GetProperty("CommittedSinkCount").GetInt32(), Is.EqualTo(0));

@@ -15,8 +15,7 @@ public static class AnalysisProfileBuilder
         int outputSinkCount,
         AnalysisProfileCompletionStatus completionStatus,
         bool cancellationObserved,
-        AnalysisProfileMeasurements? measurements = null,
-        AnalysisProfileOutput? output = null)
+        AnalysisProfileBuildOptions? options = null)
     {
         IReadOnlyList<AnalysisProfilePhaseMeasurement> phases = timing is null
             ? Array.Empty<AnalysisProfilePhaseMeasurement>()
@@ -25,9 +24,7 @@ public static class AnalysisProfileBuilder
                     entry.Name, entry.Indent, entry.Ordinal, entry.Count, entry.ElapsedMs, entry.ProcessorTimeMs))
                 .ToList();
 
-        // Only MeasureContractFamily entries carry a Count (see ArchitectureContractExecutor);
-        // plain Measure phases (policy_composition, load_and_setup, ...) never set it, so this
-        // filter naturally selects exactly the per-family execution counts.
+        // Contract-family entries carry execution counts; ordinary timing entries do not.
         Dictionary<string, int> contractFamilyCounts = new(StringComparer.Ordinal);
         if (timing is not null)
         {
@@ -50,7 +47,7 @@ public static class AnalysisProfileBuilder
             CancellationObserved = cancellationObserved,
             Counters = counters,
             Phases = phases,
-            Output = output ?? new AnalysisProfileOutput
+            Output = options?.Output ?? new AnalysisProfileOutput
             {
                 CommittedSinkCount = 0,
                 FailedSinkCount = 0,
@@ -58,7 +55,7 @@ public static class AnalysisProfileBuilder
                 UncommittedSinkCount = 0,
                 OutputFailed = false,
             },
-            Measurements = measurements,
+            Measurements = options?.Measurements,
         };
     }
 }

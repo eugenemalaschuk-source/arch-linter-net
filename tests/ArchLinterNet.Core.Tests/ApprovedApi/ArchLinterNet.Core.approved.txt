@@ -3012,8 +3012,19 @@ sealed class ArchLinterNet.Core.Profiling.AnalysisProfile : System.IEquatable<Ar
   property System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Profiling.AnalysisProfilePhaseMeasurement> Phases {get;init;}
   property bool CancellationObserved {get;init;}
   property string SchemaId {get;init;}
+sealed class ArchLinterNet.Core.Profiling.AnalysisProfileBuildOptions : System.IEquatable<ArchLinterNet.Core.Profiling.AnalysisProfileBuildOptions>
+  ctor()
+  method ArchLinterNet.Core.Profiling.AnalysisProfileBuildOptions <Clone>$()
+  method bool Equals(ArchLinterNet.Core.Profiling.AnalysisProfileBuildOptions? other)
+  method bool Equals(object? obj)
+  method int GetHashCode()
+  method string ToString()
+  operator !=(ArchLinterNet.Core.Profiling.AnalysisProfileBuildOptions? left, ArchLinterNet.Core.Profiling.AnalysisProfileBuildOptions? right)
+  operator ==(ArchLinterNet.Core.Profiling.AnalysisProfileBuildOptions? left, ArchLinterNet.Core.Profiling.AnalysisProfileBuildOptions? right)
+  property ArchLinterNet.Core.Profiling.AnalysisProfileMeasurements? Measurements {get;init;}
+  property ArchLinterNet.Core.Profiling.AnalysisProfileOutput? Output {get;init;}
 static class ArchLinterNet.Core.Profiling.AnalysisProfileBuilder
-  method static ArchLinterNet.Core.Profiling.AnalysisProfile Build(ArchLinterNet.Core.Validation.ArchitectureAnalysisSnapshotCounters snapshotCounters, ArchLinterNet.Core.Reporting.ValidationTiming? timing, int renderedSinkCount, int outputSinkCount, ArchLinterNet.Core.Profiling.AnalysisProfileCompletionStatus completionStatus, bool cancellationObserved, ArchLinterNet.Core.Profiling.AnalysisProfileMeasurements? measurements = null, ArchLinterNet.Core.Profiling.AnalysisProfileOutput? output = null)
+  method static ArchLinterNet.Core.Profiling.AnalysisProfile Build(ArchLinterNet.Core.Validation.ArchitectureAnalysisSnapshotCounters snapshotCounters, ArchLinterNet.Core.Reporting.ValidationTiming? timing, int renderedSinkCount, int outputSinkCount, ArchLinterNet.Core.Profiling.AnalysisProfileCompletionStatus completionStatus, bool cancellationObserved, ArchLinterNet.Core.Profiling.AnalysisProfileBuildOptions? options = null)
 sealed class ArchLinterNet.Core.Profiling.AnalysisProfileCacheCounters : System.IEquatable<ArchLinterNet.Core.Profiling.AnalysisProfileCacheCounters>
   ctor()
   method ArchLinterNet.Core.Profiling.AnalysisProfileCacheCounters <Clone>$()
@@ -3398,10 +3409,10 @@ sealed class ArchLinterNet.Core.Validation.AnalysisSnapshotRequest : System.IEqu
   property string? RequestedTargetFramework {get;init;}
 sealed class ArchLinterNet.Core.Validation.ArchitectureAnalysisSnapshot : System.IDisposable
   method ArchLinterNet.Core.Validation.ValidationOutcome Evaluate(string mode, ArchLinterNet.Core.Reporting.ValidationTiming? timing = null)
+  method System.Collections.Generic.IReadOnlyList<string> GetProfileInputPaths()
   method void Dispose()
   property ArchLinterNet.Core.BuildState.BuildStatePreflightResult Preflight {get;}
   property ArchLinterNet.Core.Validation.ArchitectureAnalysisSnapshotCounters Counters {get;}
-  property System.Collections.Generic.IReadOnlyList<string> ProfileInputPaths {get;}
   property bool Cancelled {get;}
   property bool Failed {get;}
   property bool IsDisposed {get;}

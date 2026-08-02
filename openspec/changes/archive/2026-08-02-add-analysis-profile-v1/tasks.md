@@ -5,7 +5,7 @@
 - [x] 1.3 Add `AnalysisProfileReservedFieldStatus` enum (`NotApplicable`) and `AnalysisProfileCacheCounters`/`AnalysisProfileConcurrencyCounters` reserved sub-records.
 - [x] 1.4 Add `AnalysisProfilePhaseMeasurement` record (`Name`, `Indent`, `Ordinal`, `Count`, nullable `ElapsedMs`).
 - [x] 1.5 Add `AnalysisProfileMeasurements` record (nullable `PeakWorkingSetBytes`, `AllocatedBytesTotal`).
-- [x] 1.6 Add `AnalysisProfileCounters` record extending `ArchitectureAnalysisSnapshotCounters` fields plus contract-family counts, `RenderedSinkCount`, `OutputSinkCount`, `Cache`, `Concurrency` (fact-index materialization counting dropped — no cheap existing hook; not required by the acceptance criteria).
+- [x] 1.6 Add `AnalysisProfileCounters` record extending `ArchitectureAnalysisSnapshotCounters` fields plus actual project/assembly/source inventories, contract-family execution/result counts, `RenderedSinkCount`, `OutputSinkCount`, `Cache`, and `Concurrency`.
 - [x] 1.7 Add `AnalysisProfile` top-level record (`SchemaId`, `CompletionStatus`, `CancellationObserved`, `Counters`, `Phases`, `Measurements`).
 - [x] 1.8 Add `AnalysisProfileBuilder` that assembles an `AnalysisProfile` from `ValidationTiming?`, `ArchitectureAnalysisSnapshotCounters`, sink counts, and completion status.
 - [x] 1.9 Add deterministic JSON serialization for `AnalysisProfile` (stable property order, camelCase or matching existing JSON conventions).

@@ -199,7 +199,10 @@ public sealed class ArchitectureValidationBuilder
             ? AnalysisProfileBuilder.Build(
                 counters, timing, renderedSinkCount: 0, outputSinkCount: 0,
                 ResolveCompletionStatus(outcome), cancellationObserved: false,
-                CaptureMeasurements(allocatedBytesAtStart))
+                new ArchLinterNet.Core.Profiling.AnalysisProfileBuildOptions
+                {
+                    Measurements = CaptureMeasurements(allocatedBytesAtStart),
+                })
             : null;
 
         return ArchitectureValidationResultMapper.ToResult(outcome, timing, mode, profile);

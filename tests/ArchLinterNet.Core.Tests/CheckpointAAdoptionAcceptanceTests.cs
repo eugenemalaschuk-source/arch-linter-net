@@ -14,6 +14,9 @@ namespace ArchLinterNet.Core.Tests;
 [CancelAfter(120_000)]
 public sealed class CheckpointAAdoptionAcceptanceTests
 {
+    private static readonly string[] _fixtureShapes =
+        { "clean-checkout", "large-multi-host", "migration", "multi-host", "multi-project", "small" };
+
     [Test]
     public void ScenarioManifest_ContainsRequiredSyntheticShapesAndNonReleaseBoundary()
     {
@@ -33,8 +36,7 @@ public sealed class CheckpointAAdoptionAcceptanceTests
             Assert.That(root.GetProperty("checkpoint").GetString(), Is.EqualTo("A"));
             Assert.That(root.GetProperty("release_gate").GetBoolean(), Is.False);
             Assert.That(root.GetProperty("synthetic_identities_only").GetBoolean(), Is.True);
-            Assert.That(shapes, Is.EqualTo(new[]
-                { "clean-checkout", "large-multi-host", "migration", "multi-host", "multi-project", "small" }));
+            Assert.That(shapes, Is.EqualTo(_fixtureShapes));
             Assert.That(reusers, Is.EqualTo(new[] { "#374", "#411", "#366" }));
             Assert.That(root.GetProperty("scenarios").EnumerateArray()
                 .Select(scenario => scenario.GetProperty("owner").GetString()),
@@ -45,9 +47,7 @@ public sealed class CheckpointAAdoptionAcceptanceTests
                 .Single(scenario => scenario.GetProperty("owner").GetString() == "#364")
                 .GetProperty("entrypoint").GetString(),
                 Is.EqualTo("ValidateCommandHandlerReportModeTests.CheckpointA_HumanJsonAndSarifSinks_ExecuteOneAnalysis"));
-            Assert.That(DeclaredFixtureRoots(root),
-                Is.EqualTo(new[]
-                    { "clean-checkout", "large-multi-host", "migration", "multi-host", "multi-project", "small" }));
+            Assert.That(DeclaredFixtureRoots(root), Is.EqualTo(_fixtureShapes));
         });
     }
 

@@ -1,9 +1,7 @@
 namespace ArchLinterNet.Core.Profiling;
 
-// Name/Indent/Ordinal/Count are deterministic (identical every run for the same request);
-// ElapsedMs is the environment-dependent measurement and is null unless a real ValidationTiming
-// instance measured it. See openspec/specs/analysis-profile/spec.md, "Deterministic counters are
-// separated from environment-dependent measurements".
+// Structural fields are deterministic for a request; elapsed and processor measurements depend on
+// the environment and are null when no timing instance backed the run.
 public sealed record AnalysisProfilePhaseMeasurement(
     string Name,
     int Indent,

@@ -348,8 +348,9 @@ public sealed class ArchitectureAnalysisSnapshot : IDisposable
 
     // This is deliberately a snapshot copy, not the internal mutable counter record. Hosts use
     // it when cancellation interrupts evaluation before a ValidationOutcome can expose inputs.
-    public IReadOnlyList<string> ProfileInputPaths => GetPolicyImportPaths()
-        .Concat(GetResolvedAssemblyPaths())
+    public IReadOnlyList<string> GetProfileInputPaths() => GetPolicyImportPaths()
+        .Concat(GetResolvedAssemblyPaths()
+            .SelectMany(path => new[] { path, BuildReceiptStore.ReceiptPathFor(path) }))
         .Concat(GetDiscoveredProjectPaths())
         .Distinct(StringComparer.OrdinalIgnoreCase)
         .ToArray();

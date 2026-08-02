@@ -57,8 +57,7 @@ public sealed class ArchitectureSourceFileFactIndex
             preprocessorSymbols,
             fileSystem,
             default,
-            cancellationToken,
-            profilingCounters: null)
+            new ConstructionOptions(cancellationToken, ProfilingCounters: null))
     {
     }
 
@@ -69,6 +68,10 @@ public sealed class ArchitectureSourceFileFactIndex
         ProjectDiscoveryResult? ProjectDiscovery,
         IReadOnlyDictionary<string, string>? SourceRootAssemblyOwnership);
 
+    internal readonly record struct ConstructionOptions(
+        CancellationToken CancellationToken,
+        AnalysisSessionProfilingCounters? ProfilingCounters);
+
     internal ArchitectureSourceFileFactIndex(
         IReadOnlyCollection<Assembly> targetAssemblies,
         string repositoryRoot,
@@ -76,8 +79,7 @@ public sealed class ArchitectureSourceFileFactIndex
         IReadOnlyList<string>? preprocessorSymbols,
         IArchitectureFileSystem? fileSystem,
         ProjectOwnership projectOwnership,
-        CancellationToken cancellationToken = default,
-        AnalysisSessionProfilingCounters? profilingCounters = null)
+        ConstructionOptions options = default)
     {
         _targetAssemblies = targetAssemblies ?? throw new ArgumentNullException(nameof(targetAssemblies));
         _repositoryRoot = repositoryRoot ?? throw new ArgumentNullException(nameof(repositoryRoot));
@@ -89,8 +91,8 @@ public sealed class ArchitectureSourceFileFactIndex
             _sourceRoots,
             projectOwnership.ProjectDiscovery,
             projectOwnership.SourceRootAssemblyOwnership);
-        _cancellationToken = cancellationToken;
-        _profilingCounters = profilingCounters;
+        _cancellationToken = options.CancellationToken;
+        _profilingCounters = options.ProfilingCounters;
         _data = new Lazy<FactIndexData>(BuildData);
     }
 

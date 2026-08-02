@@ -217,7 +217,8 @@ public sealed class AnalysisProfileBuilderTests
 
         AnalysisProfile profile = AnalysisProfileBuilder.Build(
             Counters(), TimingWithContractFamilies(), renderedSinkCount: 2, outputSinkCount: 2,
-            AnalysisProfileCompletionStatus.ValidationFailure, cancellationObserved: false, output: output);
+            AnalysisProfileCompletionStatus.ValidationFailure, cancellationObserved: false,
+            options: new AnalysisProfileBuildOptions { Output = output });
 
         Assert.Multiple(() =>
         {

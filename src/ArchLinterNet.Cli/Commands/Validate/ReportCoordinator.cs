@@ -81,6 +81,10 @@ internal sealed class ReportCoordinator
         bool isReportMode,
         CancellationToken cancellationToken)
     {
+        IReadOnlyList<ReportSink> requiredSinks = isReportMode
+            ? additionalSinks
+            : new[] { new ReportSink(stdoutFormat, ReportDestinationType.Stdout) };
+
         // Legacy combined human: write each mode sequentially (pre-#364 behavior). isReportMode is
         // false here by construction (legacyCombinedHuman requires !isReportMode, and isReportMode
         // is additionalSinks.Count > 0), so there are no file/stream sinks to stage or commit —
@@ -88,7 +92,7 @@ internal sealed class ReportCoordinator
         bool legacyCombinedHuman = !isReportMode && !isSingleMode && stdoutFormat == FormatHuman;
         if (legacyCombinedHuman)
         {
-            return WriteLegacyCombinedHuman(outcomesByMode, cancellationToken);
+            return WriteLegacyCombinedHuman(outcomesByMode, requiredSinks, cancellationToken);
         }
 
         // Checked before any rendering or stream write. DistributeToSinks below only guards
@@ -98,7 +102,7 @@ internal sealed class ReportCoordinator
         // reach stdout before any cancellation evidence is reported.
         if (cancellationToken.IsCancellationRequested)
         {
-            return BuildRouteResult(additionalSinks, SinkDistributionEvidence.Empty(), cancelled: true);
+            return BuildRouteResult(requiredSinks, SinkDistributionEvidence.Empty(), cancelled: true);
         }
 
         string? humanContent = ResolveHumanContent(
@@ -119,13 +123,13 @@ internal sealed class ReportCoordinator
             // so once this single write succeeds, publication for this call is complete.
             if (cancellationToken.IsCancellationRequested)
             {
-                return BuildRouteResult(additionalSinks, SinkDistributionEvidence.Empty(), cancelled: true);
+                return BuildRouteResult(requiredSinks, SinkDistributionEvidence.Empty(), cancelled: true);
             }
 
             _console.Out.WriteLine(DispatchFormat(stdoutFormat, humanContent, jsonContent, sarifContent));
             SinkDistributionEvidence evidence = SinkDistributionEvidence.Empty();
             evidence.DeliveredStreamPaths.Add(StreamFailureMarker(ReportDestinationType.Stdout));
-            return BuildRouteResult(additionalSinks, evidence, cancelled: false);
+            return BuildRouteResult(requiredSinks, evidence, cancelled: false);
         }
 
         return DistributeToSinks(
@@ -138,6 +142,7 @@ internal sealed class ReportCoordinator
     // AllSucceeded regardless of a cancellation signal observed only after this method returns.
     private RouteResult WriteLegacyCombinedHuman(
         IReadOnlyList<(string Mode, ValidationOutcome Outcome)> outcomesByMode,
+        IReadOnlyList<ReportSink> requiredSinks,
         CancellationToken cancellationToken)
     {
         SinkDistributionEvidence evidence = SinkDistributionEvidence.Empty();
@@ -145,13 +150,16 @@ internal sealed class ReportCoordinator
         {
             if (cancellationToken.IsCancellationRequested)
             {
-                return BuildRouteResult(Array.Empty<ReportSink>(), SinkDistributionEvidence.Empty(), cancelled: true);
+                return BuildRouteResult(requiredSinks, evidence, cancelled: true);
             }
 
             _console.Out.WriteLine(FormatSingleHuman(outcome, cancellationToken));
+            if (!evidence.DeliveredStreamPaths.Contains(StreamFailureMarker(ReportDestinationType.Stdout)))
+            {
+                evidence.DeliveredStreamPaths.Add(StreamFailureMarker(ReportDestinationType.Stdout));
+            }
         }
 
-        evidence.DeliveredStreamPaths.Add(StreamFailureMarker(ReportDestinationType.Stdout));
         return BuildRouteResult(Array.Empty<ReportSink>(), evidence, cancelled: false);
     }
 
@@ -495,13 +503,15 @@ internal sealed class ReportCoordinator
         // rendered for it yet — in particular, a cancellation observed before rendering starts
         // (see RouteOutcomes/StageAllFileSinks) must still list every configured file destination
         // as uncommitted, not silently drop it because contentByFormat was empty at that point.
-        var allFileSinks = additionalSinks
-            .Where(s => s.DestinationType == ReportDestinationType.File)
-            .Select(s => s.FilePath!)
+        HashSet<string> completedPaths = evidence.CommittedPaths
+            .Concat(evidence.DeliveredStreamPaths)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var uncommittedPaths = additionalSinks
+            .Select(SinkPath)
+            .Where(path => !completedPaths.Contains(path))
             .ToArray();
-        var uncommittedPaths = allFileSinks.Except(evidence.CommittedPaths).ToArray();
 
-        ReportRouteStatus status = evidence.CommittedPaths.Count > 0
+        ReportRouteStatus status = evidence.CommittedPaths.Count > 0 || evidence.DeliveredStreamPaths.Count > 0
             ? ReportRouteStatus.PartialOutput
             : ReportRouteStatus.OutputFailed;
 
@@ -511,6 +521,13 @@ internal sealed class ReportCoordinator
         {
             Cancelled = cancelled
         };
+    }
+
+    private static string SinkPath(ReportSink sink)
+    {
+        return sink.DestinationType == ReportDestinationType.File
+            ? sink.FilePath!
+            : StreamFailureMarker(sink.DestinationType);
     }
 
     // Re-validates the bytes actually landed on disk rather than trusting the in-memory string that

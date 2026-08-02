@@ -25,6 +25,7 @@ namespace ArchLinterNet.Core.Tests;
 public sealed class AnalysisProfileBenchmarkHarness
 {
     private const int RunsPerScenario = 10;
+    private static readonly JsonSerializerOptions _jsonOptions = new() { WriteIndented = true };
 
     private static string CliDllPath()
     {
@@ -46,7 +47,7 @@ public sealed class AnalysisProfileBenchmarkHarness
         List<RunSample> coldSeries = RunColdSeries(RunsPerScenario);
         summaries.Add(Summarize(
             "1-cold-process-warm-filesystem-strict", "First --ensure-built run on a never-built fixture copy",
-            coldSeries));
+            coldSeries, expectedStatus: "Success"));
 
         using AdoptionAcceptanceFixture warmFixture = AdoptionAcceptanceFixture.Create("large-multi-host");
         List<RunSample> warmSeries = RunSeries(
@@ -54,7 +55,7 @@ public sealed class AnalysisProfileBenchmarkHarness
             extraArgs: null, count: RunsPerScenario, prime: true);
         summaries.Add(Summarize(
             "2-immediate-warm-strict-repeat", "Same fixture, repeat --ensure-built runs (no persistent cache exists yet — #365)",
-            warmSeries));
+            warmSeries, expectedStatus: "Success"));
 
         // Scenario 3: strict and audit as two separate legacy-style processes.
         using AdoptionAcceptanceFixture legacyFixture = AdoptionAcceptanceFixture.Create("large-multi-host");
@@ -64,6 +65,8 @@ public sealed class AnalysisProfileBenchmarkHarness
         List<RunSample> legacyAudit = RunSeries(
             legacyFixture.Root, legacyFixture.PolicyPath, mode: "audit", ensureBuilt: true,
             extraArgs: null, count: RunsPerScenario, prime: false);
+        Assert.That(legacyStrict.Concat(legacyAudit).All(sample => sample.CompletionStatus == "Success"), Is.True,
+            "Unexpected failed/cancelled sample in the strict/audit comparison");
         List<double> legacyPairedTotals = legacyStrict.Zip(legacyAudit, (s, a) => s.AnalysisMs + a.AnalysisMs).ToList();
         summaries.Add(new ScenarioSummary(
             "3-strict-and-audit-separate-processes",
@@ -77,7 +80,8 @@ public sealed class AnalysisProfileBenchmarkHarness
             combinedFixture.Root, combinedFixture.PolicyPath, mode: "strict,audit", ensureBuilt: true,
             extraArgs: null, count: RunsPerScenario, prime: true);
         summaries.Add(Summarize(
-            "4-combined-strict-audit-one-snapshot", "One process, --mode strict,audit (one #363 snapshot)", combinedSeries));
+            "4-combined-strict-audit-one-snapshot", "One process, --mode strict,audit (one #363 snapshot)", combinedSeries,
+            expectedStatus: "Success"));
 
         // Scenario 5: one report sink versus human+JSON+SARIF through #364.
         using AdoptionAcceptanceFixture sinkFixture = AdoptionAcceptanceFixture.Create("large-multi-host");
@@ -92,9 +96,10 @@ public sealed class AnalysisProfileBenchmarkHarness
             sinkFixture.Root, sinkFixture.PolicyPath, mode: "strict", ensureBuilt: true,
             extraArgs: ["--report", "human=stdout", "--report", "json=result.json", "--report", "sarif=result.sarif"],
             count: RunsPerScenario, prime: false);
-        summaries.Add(Summarize("5a-one-report-sink", "--report json=stdout", oneSink));
+        summaries.Add(Summarize("5a-one-report-sink", "--report json=stdout", oneSink, expectedStatus: "Success"));
         summaries.Add(Summarize(
-            "5b-three-report-sinks", "--report human=stdout json=result.json sarif=result.sarif (one analysis, three renders)", threeSinks));
+            "5b-three-report-sinks", "--report human=stdout json=result.json sarif=result.sarif (one analysis, three renders)", threeSinks,
+            expectedStatus: "Success"));
 
         // Scenario 6: sequential execution before #408 — this whole matrix already runs
         // sequentially (no parallelism exists yet); no separate timed variant is meaningful.
@@ -107,17 +112,19 @@ public sealed class AnalysisProfileBenchmarkHarness
             successFixture.Root, failingPolicyPath, mode: "strict", ensureBuilt: true,
             extraArgs: null, count: RunsPerScenario, prime: true);
         summaries.Add(Summarize(
-            "7b-validation-failure-completion-path", "Intentionally-failing policy variant", validationFailureSeries));
+            "7b-validation-failure-completion-path", "Intentionally-failing policy variant", validationFailureSeries,
+            expectedStatus: "ValidationFailure"));
 
         using AdoptionAcceptanceFixture unbuiltFixture = AdoptionAcceptanceFixture.Create("large-multi-host");
         List<RunSample> preparationFailureSeries = RunSeries(
             unbuiltFixture.Root, unbuiltFixture.PolicyPath, mode: "strict", ensureBuilt: false,
             extraArgs: ["--no-restore"], count: RunsPerScenario, prime: false);
         summaries.Add(Summarize(
-            "7c-preparation-failure-completion-path", "Never-built fixture, --no-restore, no receipts", preparationFailureSeries));
+            "7c-preparation-failure-completion-path", "Never-built fixture, --no-restore, no receipts", preparationFailureSeries,
+            expectedStatus: "PreparationFailure"));
 
         string resultsPath = Path.Combine(Path.GetTempPath(), "analysis-profile-benchmark-results.json");
-        File.WriteAllText(resultsPath, JsonSerializer.Serialize(summaries, new JsonSerializerOptions { WriteIndented = true }));
+        File.WriteAllText(resultsPath, JsonSerializer.Serialize(summaries, _jsonOptions));
         TestContext.Out.WriteLine($"Benchmark results written to {resultsPath}");
         foreach (ScenarioSummary summary in summaries)
         {
@@ -128,13 +135,19 @@ public sealed class AnalysisProfileBenchmarkHarness
         }
     }
 
-    private static ScenarioSummary Summarize(string id, string description, List<RunSample> samples)
+    private static ScenarioSummary Summarize(
+        string id, string description, List<RunSample> samples, string expectedStatus)
     {
-        List<double> analysisMs = samples.Select(s => s.AnalysisMs).ToList();
+        List<RunSample> includedSamples = samples
+            .Where(sample => sample.CompletionStatus == expectedStatus)
+            .ToList();
+        Assert.That(includedSamples, Has.Count.EqualTo(samples.Count),
+            $"Unexpected failed/cancelled sample in {id}; expected {expectedStatus}");
+
+        List<double> analysisMs = includedSamples.Select(s => s.AnalysisMs).ToList();
         return new ScenarioSummary(
-            id, description, samples.Count, Median(analysisMs), Percentile95(analysisMs),
-            Median(samples.Select(s => s.PreflightMs).ToList()),
-            samples.Select(s => s.CompletionStatus).Distinct().Count() == 1 ? samples[0].CompletionStatus : "mixed");
+            id, description, includedSamples.Count, Median(analysisMs), Percentile95(analysisMs),
+            Median(includedSamples.Select(s => s.PreflightMs).ToList()), expectedStatus);
     }
 
     private static List<RunSample> RunSeries(
@@ -197,9 +210,15 @@ public sealed class AnalysisProfileBenchmarkHarness
 
         Stopwatch wallClock = Stopwatch.StartNew();
         using Process process = Process.Start(startInfo)!;
-        string stdout = process.StandardOutput.ReadToEnd();
-        string stderr = process.StandardError.ReadToEnd();
+        // Drain both redirected pipes concurrently. Reading stdout to completion before stderr
+        // can deadlock a child that fills the stderr pipe while ensure-built is reporting its
+        // build/restore diagnostics; a stuck sample would make the entire matrix hang before it
+        // can write the checked-in baseline evidence.
+        Task<string> stdoutTask = process.StandardOutput.ReadToEndAsync();
+        Task<string> stderrTask = process.StandardError.ReadToEndAsync();
         process.WaitForExit();
+        string stdout = stdoutTask.GetAwaiter().GetResult();
+        string stderr = stderrTask.GetAwaiter().GetResult();
         wallClock.Stop();
 
         Assert.That(File.Exists(profilePath), Is.True,

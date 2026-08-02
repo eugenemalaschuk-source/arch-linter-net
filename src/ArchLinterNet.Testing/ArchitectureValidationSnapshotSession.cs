@@ -36,7 +36,10 @@ public sealed class ArchitectureValidationSnapshotSession(
             ? AnalysisProfileBuilder.Build(
                 snapshot.Counters, timing, renderedSinkCount: 0, outputSinkCount: 0,
                 ArchitectureValidationBuilder.ResolveCompletionStatus(outcome), cancellationObserved: false,
-                ArchitectureValidationBuilder.CaptureMeasurements(allocatedBytesAtStart))
+                new ArchLinterNet.Core.Profiling.AnalysisProfileBuildOptions
+                {
+                    Measurements = ArchitectureValidationBuilder.CaptureMeasurements(allocatedBytesAtStart),
+                })
             : null;
 
         return ArchitectureValidationResultMapper.ToResult(outcome, timing, mode, profile);

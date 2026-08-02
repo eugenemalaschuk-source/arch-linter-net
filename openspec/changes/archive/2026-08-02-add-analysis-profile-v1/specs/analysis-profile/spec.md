@@ -1,4 +1,10 @@
-## ADDED Requirements
+# analysis-profile Specification
+
+## Purpose
+
+Give #365 (persistent cache), #408 (bounded parallel scanning), and #409 (post-optimization comparison) a stable, versioned, machine-readable `analysis-profile/v1` contract to measure against — built on top of the existing `analysis-snapshot` counters and `cli-timing` phase measurements, never affecting finding identity, session identity, ordering, or exit status.
+
+## Requirements
 
 ### Requirement: A versioned, machine-readable analysis profile is available
 The system SHALL provide an `AnalysisProfile` model identified by the constant schema id `analysis-profile/v1` (`AnalysisProfileId.V1`), buildable from an existing `ValidationTiming?`, `ArchitectureAnalysisSnapshotCounters`, sink render/output counts, and a completion status, without modifying `ValidationTiming`'s existing human-readable report shape or `ArchitectureAnalysisSnapshotCounters`'s existing fields.
@@ -8,7 +14,7 @@ The system SHALL provide an `AnalysisProfile` model identified by the constant s
 - **THEN** the human-readable timing report's phase names, order, and values are identical to what they would be without building a profile
 
 ### Requirement: Deterministic counters are separated from environment-dependent measurements
-The system SHALL group `AnalysisProfile` fields into a `Counters` section (policy compositions, project-graph evaluations, assembly loads, modes evaluated, contract-family execution counts, rendered-sink count, output-sink count) and a nullable `Measurements` section (peak working set bytes, allocated bytes) plus nullable per-phase `ElapsedMs`. `Counters.PolicyCompositions`, `ProjectGraphEvaluations`, `AssemblyLoads`, `ModesEvaluated`, `RenderedSinkCount`, and `OutputSinkCount` SHALL be populated identically regardless of whether a `ValidationTiming` instance backed the run. `Counters.ContractFamilyCounts` is sourced from that `ValidationTiming` instance's own per-family counts and SHALL be empty when none was supplied — the CLI's `--profile` option and the Testing API's `WithProfile()` always supply one internally when profiling is requested (independent of whether `--timings`' human report was also requested), so this is only reachable through a direct `AnalysisProfileBuilder.Build` call with `timing: null`. `Measurements` and each phase's `ElapsedMs` SHALL be `null` when no `ValidationTiming` instance backed the run, and populated when one did.
+The system SHALL group `AnalysisProfile` fields into a `Counters` section (policy compositions, project-graph evaluations, assembly loads, actual discovered-project/retained-assembly/selected-assembly inventories, modes evaluated, snapshot materializations, fact-index materializations, source-scan passes, source files scanned, contract-family execution/result counts, rendered-sink count, output-sink count), an `Output` section (actual committed/failed/staged/uncommitted sink counts and output-failure state), and a nullable `Measurements` section (peak working set bytes, allocated bytes) plus nullable per-phase `ElapsedMs` and `ProcessorTimeMs`. `Counters.PolicyCompositions`, `ProjectGraphEvaluations`, `AssemblyLoads`, inventory counts, `ModesEvaluated`, `SnapshotMaterializations`, `FactIndexMaterializations`, `SourceScanPasses`, `SourceFilesScanned`, `RenderedSinkCount`, and `OutputSinkCount` SHALL be populated identically regardless of whether a `ValidationTiming` instance backed the run. `Counters.ContractFamilyCounts` is sourced from that `ValidationTiming` instance's own per-family counts and SHALL be empty when none was supplied — the CLI's `--profile` option and the Testing API's `WithProfile()` always supply one internally when profiling is requested (independent of whether `--timings`' human report was also requested), so this is only reachable through a direct `AnalysisProfileBuilder.Build` call with `timing: null`. `Measurements` and each phase's elapsed/processor-time fields SHALL be `null` when no `ValidationTiming` instance backed the run, and populated when one did.
 
 #### Scenario: Counters are identical whether or not timing is enabled
 - **WHEN** the same validation request is profiled once with timing collection enabled and once without it
@@ -19,7 +25,7 @@ The system SHALL group `AnalysisProfile` fields into a `Counters` section (polic
 - **THEN** the produced findings, finding identity, ordering, and exit status are identical between the two runs
 
 ### Requirement: Counters prove the one-snapshot and sink-count-only invariants
-The system SHALL populate `AnalysisProfile.Counters` from the same `ArchitectureAnalysisSnapshotCounters` instance the snapshot itself exposes (not a re-derived count), and SHALL record the number of report sinks rendered and written for the run. Requesting additional output sinks for the same analysis SHALL change only the render/output counters, not `PolicyCompositions`, `ProjectGraphEvaluations`, `AssemblyLoads`, or contract-family execution counts.
+The system SHALL populate `AnalysisProfile.Counters` from the same `ArchitectureAnalysisSnapshotCounters` instance the snapshot itself exposes (not a re-derived count), and SHALL record both the requested report sinks and their actual publication result. `FactIndexMaterializations` SHALL count lazy fact-index data builds for the retained snapshot and therefore never exceed one; `SourceScanPasses` and `SourceFilesScanned` SHALL describe files that passed generated-file exclusion and were successfully read for parsing. Requesting additional output sinks for the same analysis SHALL change only the render/output counters, not `PolicyCompositions`, `ProjectGraphEvaluations`, `AssemblyLoads`, snapshot/fact-index/source counters, or contract-family execution/result counts.
 
 #### Scenario: An additional sink changes only render/output counters
 - **WHEN** the same validation request is profiled once with one output sink and once with three output sinks

@@ -73,22 +73,22 @@ internal sealed class ArchitectureContractExecutor : IArchitectureContractExecut
         List<ArchitectureCoverageSummary> coverageSummaries,
         IDictionary<string, int> resultCounts)
     {
-        int coverageCount = 0;
-        using (timing?.MeasureContractFamily(CoverageFamily, () => coverageCount))
+        int[] coverageCount = [0];
+        using (timing?.MeasureContractFamily(CoverageFamily, () => coverageCount[0]))
         {
             foreach (IArchitectureContract contract in session.Catalog.ContractsFor(mode, CoverageFamily))
             {
                 session.Context.CancellationToken.ThrowIfCancellationRequested();
-                coverageCount++;
+                coverageCount[0]++;
                 int identityCursor = session.FindingIdentityCursor;
                 int resultCount = 0;
-                IReadOnlyCollection<ArchitectureViolation> violations = session.AttachFindingIdentities(
+                ArchitectureViolation[] violations = session.AttachFindingIdentities(
                         handlerRegistry.Execute(CoverageFamily, session, contract).Violations,
                         identityCursor)
                     .Select(violation => session.Document.Provenance.Enrich(violation, contract))
                     .ToArray();
                 coverageViolations.AddRange(violations);
-                resultCount += violations.Count;
+                resultCount += violations.Length;
 
                 ArchitectureCoverageSummary? summary =
                     session.BuildCoverageSummary((ArchitectureCoverageContract)contract);
@@ -112,16 +112,16 @@ internal sealed class ArchitectureContractExecutor : IArchitectureContractExecut
         StandardFamilyFindings findings,
         IDictionary<string, int> resultCounts)
     {
-        int count = 0;
-        using (timing?.MeasureContractFamily(family, () => count))
+        int[] count = [0];
+        using (timing?.MeasureContractFamily(family, () => count[0]))
         {
             foreach (IArchitectureContract contract in session.Catalog.ContractsFor(mode, family))
             {
                 session.Context.CancellationToken.ThrowIfCancellationRequested();
-                count++;
+                count[0]++;
                 int identityCursor = session.FindingIdentityCursor;
                 ArchitectureHandlerResult result = handlerRegistry.Execute(family, session, contract);
-                IReadOnlyCollection<ArchitectureViolation> violations = session.AttachFindingIdentities(result.Violations, identityCursor)
+                ArchitectureViolation[] violations = session.AttachFindingIdentities(result.Violations, identityCursor)
                     .Select(violation => session.Document.Provenance.Enrich(violation, contract))
                     .ToArray();
                 findings.Violations.AddRange(violations);
@@ -139,7 +139,7 @@ internal sealed class ArchitectureContractExecutor : IArchitectureContractExecut
                         contract));
                 }
 
-                AddResultCount(resultCounts, family, violations.Count + cycleCount);
+                AddResultCount(resultCounts, family, violations.Length + cycleCount);
             }
         }
     }

@@ -65,7 +65,8 @@ public sealed partial class ArchitectureSourceFileFactIndexTests
                 {
                     [sourceRoot] = TestAssemblyName
                 }),
-            profilingCounters: profilingCounters);
+            new ArchitectureSourceFileFactIndex.ConstructionOptions(
+                CancellationToken: default, ProfilingCounters: profilingCounters));
     }
 
     [Test]
