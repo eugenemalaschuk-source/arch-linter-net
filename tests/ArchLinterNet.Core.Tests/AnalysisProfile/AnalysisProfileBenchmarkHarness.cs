@@ -12,12 +12,10 @@ namespace ArchLinterNet.Core.Tests;
 //
 //   rtk dotnet test tests/ArchLinterNet.Core.Tests --filter FullyQualifiedName~AnalysisProfileBenchmarkHarness
 //
-// Results are written to a JSON file under the OS temp directory (path printed to the NUnit
-// output). Each sample retains its complete raw analysis profile so processor time, allocations,
-// memory, publication evidence, and deterministic counters remain available for #409. Copy that
-// file into docs/internal/analysis-profile-pre-optimization-baseline-results.json, then update
-// docs/internal/analysis-profile-pre-optimization-baseline.md from the same run; never fabricate
-// the numbers there.
+// Results are written directly to docs/internal/analysis-profile-pre-optimization-baseline-results.json
+// so the complete raw profile from every sample is committed alongside the human-readable baseline.
+// This preserves processor time, allocations, memory, publication evidence, and deterministic
+// counters for #409; update the Markdown document from the same run and never fabricate its numbers.
 [TestFixture]
 [Explicit("Hardware-sensitive benchmark harness — run manually to refresh pre-optimization evidence, never in CI.")]
 [Category("Benchmark")]
@@ -29,11 +27,30 @@ public sealed class AnalysisProfileBenchmarkHarness
 {
     private const int RunsPerScenario = 10;
     private static readonly JsonSerializerOptions _jsonOptions = new() { WriteIndented = true };
+    private static readonly HashSet<string> _outputPhaseNames = new(StringComparer.Ordinal)
+    {
+        "render_human",
+        "render_json",
+        "render_sarif",
+        "output_staging",
+        "output_stream_write",
+        "output_commit",
+    };
+
+    private static readonly ExpectedSampleOutcome _successfulOutcome = new("Success", 0, OutputFailed: false);
+    private static readonly ExpectedSampleOutcome _validationFailureOutcome = new("ValidationFailure", 1, OutputFailed: false);
+    private static readonly ExpectedSampleOutcome _preparationFailureOutcome = new("PreparationFailure", 1, OutputFailed: false);
 
     private static string CliDllPath()
     {
         string repositoryRoot = new ArchitectureRepositoryRootResolver().Resolve();
         return Path.Combine(repositoryRoot, "src", "ArchLinterNet.Cli", "bin", "Debug", "net10.0", "ArchLinterNet.Cli.dll");
+    }
+
+    private static string ResultsPath()
+    {
+        string repositoryRoot = new ArchitectureRepositoryRootResolver().Resolve();
+        return Path.Combine(repositoryRoot, "docs", "internal", "analysis-profile-pre-optimization-baseline-results.json");
     }
 
     [Test]
@@ -47,64 +64,75 @@ public sealed class AnalysisProfileBenchmarkHarness
         // Every cold sample gets a fresh, never-built fixture. A single first run cannot provide
         // a meaningful p95, and splitting one shared series into 1 cold + 9 warm samples violates
         // the required ten-run-per-scenario evidence contract.
-        List<RunSample> coldSeries = RunColdSeries(RunsPerScenario);
+        SampleSeries coldSeries = RunColdSeries(RunsPerScenario);
         summaries.Add(Summarize(
             "1-cold-process-warm-filesystem-strict", "First --ensure-built run on a never-built fixture copy",
-            coldSeries, expectedStatus: "Success"));
+            coldSeries, _successfulOutcome));
 
         using AdoptionAcceptanceFixture warmFixture = AdoptionAcceptanceFixture.Create("large-multi-host");
-        List<RunSample> warmSeries = RunSeries(
+        SampleSeries warmSeries = RunSeries(
             warmFixture.Root, warmFixture.PolicyPath, mode: "strict", ensureBuilt: true,
-            extraArgs: null, count: RunsPerScenario, prime: true, expectedPrimeStatus: "Success");
+            extraArgs: null, count: RunsPerScenario, prime: true, expectedPrimeOutcome: _successfulOutcome);
         summaries.Add(Summarize(
             "2-immediate-warm-strict-repeat", "Same fixture, repeat --ensure-built runs (no persistent cache exists yet — #365)",
-            warmSeries, expectedStatus: "Success"));
+            warmSeries, _successfulOutcome));
 
         // Scenario 3: strict and audit as two separate legacy-style processes.
         using AdoptionAcceptanceFixture legacyFixture = AdoptionAcceptanceFixture.Create("large-multi-host");
-        List<RunSample> legacyStrict = RunSeries(
+        SampleSeries legacyStrict = RunSeries(
             legacyFixture.Root, legacyFixture.PolicyPath, mode: "strict", ensureBuilt: true,
-            extraArgs: null, count: RunsPerScenario, prime: true, expectedPrimeStatus: "Success");
-        List<RunSample> legacyAudit = RunSeries(
+            extraArgs: null, count: RunsPerScenario, prime: true, expectedPrimeOutcome: _successfulOutcome);
+        SampleSeries legacyAudit = RunSeries(
             legacyFixture.Root, legacyFixture.PolicyPath, mode: "audit", ensureBuilt: true,
             extraArgs: null, count: RunsPerScenario, prime: false);
-        Assert.That(legacyStrict.Concat(legacyAudit).All(sample => sample.CompletionStatus == "Success"), Is.True,
-            "Unexpected failed/cancelled sample in the strict/audit comparison");
-        List<double> legacyPairedTotals = legacyStrict.Zip(legacyAudit, (s, a) => s.AnalysisMs + a.AnalysisMs).ToList();
+        ValidateSamples(legacyStrict.MeasuredSamples, _successfulOutcome, "3-strict-and-audit-separate-processes strict");
+        ValidateSamples(legacyAudit.MeasuredSamples, _successfulOutcome, "3-strict-and-audit-separate-processes audit");
+        List<double> legacyPairedAnalysisOnly = legacyStrict.MeasuredSamples
+            .Zip(legacyAudit.MeasuredSamples, (s, a) => s.AnalysisOnlyMs + a.AnalysisOnlyMs).ToList();
+        List<double> legacyPairedOutput = legacyStrict.MeasuredSamples
+            .Zip(legacyAudit.MeasuredSamples, (s, a) => s.OutputMs + a.OutputMs).ToList();
+        List<double> legacyPairedCommandTotal = legacyStrict.MeasuredSamples
+            .Zip(legacyAudit.MeasuredSamples, (s, a) => s.CommandTotalMs + a.CommandTotalMs).ToList();
+        List<double> legacyPairedPreflight = legacyStrict.MeasuredSamples
+            .Zip(legacyAudit.MeasuredSamples, (s, a) => s.PreflightMs + a.PreflightMs).ToList();
         summaries.Add(new ScenarioSummary(
             "3-strict-and-audit-separate-processes",
             "Sum of one strict process + one audit process (10 paired runs)",
-            legacyPairedTotals.Count, Median(legacyPairedTotals), Percentile95(legacyPairedTotals),
-            Median(legacyStrict.Select(r => r.PreflightMs).ToList()), "Success/Success",
-            legacyStrict.Concat(legacyAudit).ToList()));
+            legacyPairedAnalysisOnly.Count,
+            Median(legacyPairedAnalysisOnly), Percentile95(legacyPairedAnalysisOnly),
+            Median(legacyPairedOutput), Percentile95(legacyPairedOutput),
+            Median(legacyPairedCommandTotal), Percentile95(legacyPairedCommandTotal),
+            Median(legacyPairedPreflight), "Success/Success",
+            legacyStrict.MeasuredSamples.Concat(legacyAudit.MeasuredSamples).ToList(),
+            legacyStrict.PrimingSamples.Concat(legacyAudit.PrimingSamples).ToList()));
 
         // Scenario 4: combined strict+audit from one #363 snapshot.
         using AdoptionAcceptanceFixture combinedFixture = AdoptionAcceptanceFixture.Create("large-multi-host");
-        List<RunSample> combinedSeries = RunSeries(
+        SampleSeries combinedSeries = RunSeries(
             combinedFixture.Root, combinedFixture.PolicyPath, mode: "strict,audit", ensureBuilt: true,
-            extraArgs: null, count: RunsPerScenario, prime: true, expectedPrimeStatus: "Success");
+            extraArgs: null, count: RunsPerScenario, prime: true, expectedPrimeOutcome: _successfulOutcome);
         summaries.Add(Summarize(
             "4-combined-strict-audit-one-snapshot", "One process, --mode strict,audit (one #363 snapshot)", combinedSeries,
-            expectedStatus: "Success"));
+            _successfulOutcome));
 
         // Scenario 5: one report sink versus human+JSON+SARIF through #364.
         using AdoptionAcceptanceFixture sinkFixture = AdoptionAcceptanceFixture.Create("large-multi-host");
-        List<RunSample> oneSink = RunSeries(
+        SampleSeries oneSink = RunSeries(
             sinkFixture.Root, sinkFixture.PolicyPath, mode: "strict", ensureBuilt: true,
             extraArgs: ["--report", "json=stdout"], count: RunsPerScenario, prime: true,
-            expectedPrimeStatus: "Success");
+            expectedPrimeOutcome: _successfulOutcome);
         // --report only allows one sink per destination (stdout can carry one format at a time —
         // see ValidateCommandDefinition.ParseReportSinks), so the three-sink comparison spreads
         // across stdout + two files, matching the existing Checkpoint A three-sink scenario
         // (ValidateCommandHandlerCheckpointATests.CheckpointA_HumanJsonAndSarifSinks_ExecuteOneAnalysis).
-        List<RunSample> threeSinks = RunSeries(
+        SampleSeries threeSinks = RunSeries(
             sinkFixture.Root, sinkFixture.PolicyPath, mode: "strict", ensureBuilt: true,
             extraArgs: ["--report", "human=stdout", "--report", "json=result.json", "--report", "sarif=result.sarif"],
             count: RunsPerScenario, prime: false);
-        summaries.Add(Summarize("5a-one-report-sink", "--report json=stdout", oneSink, expectedStatus: "Success"));
+        summaries.Add(Summarize("5a-one-report-sink", "--report json=stdout", oneSink, _successfulOutcome));
         summaries.Add(Summarize(
             "5b-three-report-sinks", "--report human=stdout json=result.json sarif=result.sarif (one analysis, three renders)", threeSinks,
-            expectedStatus: "Success"));
+            _successfulOutcome));
 
         // Scenario 6: sequential execution before #408 — this whole matrix already runs
         // sequentially (no parallelism exists yet); no separate timed variant is meaningful.
@@ -113,59 +141,82 @@ public sealed class AnalysisProfileBenchmarkHarness
         // Success is already demonstrated by scenarios 1/2/3/4/5 above.
         using AdoptionAcceptanceFixture successFixture = AdoptionAcceptanceFixture.Create("large-multi-host");
         string failingPolicyPath = Path.Combine(successFixture.Root, "dependencies.failing.arch.yml");
-        List<RunSample> validationFailureSeries = RunSeries(
+        SampleSeries validationFailureSeries = RunSeries(
             successFixture.Root, failingPolicyPath, mode: "strict", ensureBuilt: true,
-            extraArgs: null, count: RunsPerScenario, prime: true, expectedPrimeStatus: "ValidationFailure");
+            extraArgs: null, count: RunsPerScenario, prime: true, expectedPrimeOutcome: _validationFailureOutcome);
         summaries.Add(Summarize(
             "7b-validation-failure-completion-path", "Intentionally-failing policy variant", validationFailureSeries,
-            expectedStatus: "ValidationFailure"));
+            _validationFailureOutcome));
 
         using AdoptionAcceptanceFixture unbuiltFixture = AdoptionAcceptanceFixture.Create("large-multi-host");
-        List<RunSample> preparationFailureSeries = RunSeries(
+        SampleSeries preparationFailureSeries = RunSeries(
             unbuiltFixture.Root, unbuiltFixture.PolicyPath, mode: "strict", ensureBuilt: false,
             extraArgs: ["--no-restore"], count: RunsPerScenario, prime: false);
         summaries.Add(Summarize(
             "7c-preparation-failure-completion-path", "Never-built fixture, --no-restore, no receipts", preparationFailureSeries,
-            expectedStatus: "PreparationFailure"));
+            _preparationFailureOutcome));
 
-        string resultsPath = Path.Combine(Path.GetTempPath(), "analysis-profile-benchmark-results.json");
+        string resultsPath = ResultsPath();
         File.WriteAllText(resultsPath, JsonSerializer.Serialize(summaries, _jsonOptions));
         TestContext.Out.WriteLine($"Benchmark results written to {resultsPath}");
         foreach (ScenarioSummary summary in summaries)
         {
             TestContext.Out.WriteLine(
-                $"{summary.ScenarioId} (n={summary.SampleCount}): median={summary.MedianAnalysisMs:F1}ms " +
-                $"p95={summary.P95AnalysisMs:F1}ms preflight_median={summary.MedianPreflightMs:F1}ms " +
+                $"{summary.ScenarioId} (n={summary.SampleCount}): analysis_median={summary.MedianAnalysisOnlyMs:F1}ms " +
+                $"output_median={summary.MedianOutputMs:F1}ms command_median={summary.MedianCommandTotalMs:F1}ms " +
+                $"preflight_median={summary.MedianPreflightMs:F1}ms " +
                 $"status={summary.CompletionStatus} — {summary.Description}");
         }
     }
 
     private static ScenarioSummary Summarize(
-        string id, string description, List<RunSample> samples, string expectedStatus)
+        string id, string description, SampleSeries series, ExpectedSampleOutcome expectedOutcome)
     {
-        List<RunSample> includedSamples = samples
-            .Where(sample => sample.CompletionStatus == expectedStatus)
-            .ToList();
-        Assert.That(includedSamples, Has.Count.EqualTo(samples.Count),
-            $"Unexpected failed/cancelled sample in {id}; expected {expectedStatus}");
-
-        List<double> analysisMs = includedSamples.Select(s => s.AnalysisMs).ToList();
+        IReadOnlyList<RunSample> samples = series.MeasuredSamples;
+        ValidateSamples(samples, expectedOutcome, id);
         return new ScenarioSummary(
-            id, description, includedSamples.Count, Median(analysisMs), Percentile95(analysisMs),
-            Median(includedSamples.Select(s => s.PreflightMs).ToList()), expectedStatus, includedSamples);
+            id, description, samples.Count,
+            Median(samples.Select(s => s.AnalysisOnlyMs).ToList()), Percentile95(samples.Select(s => s.AnalysisOnlyMs).ToList()),
+            Median(samples.Select(s => s.OutputMs).ToList()), Percentile95(samples.Select(s => s.OutputMs).ToList()),
+            Median(samples.Select(s => s.CommandTotalMs).ToList()), Percentile95(samples.Select(s => s.CommandTotalMs).ToList()),
+            Median(samples.Select(s => s.PreflightMs).ToList()), expectedOutcome.CompletionStatus,
+            samples, series.PrimingSamples);
     }
 
-    private static List<RunSample> RunSeries(
-        string fixtureRoot, string policyPath, string mode, bool ensureBuilt, IReadOnlyList<string>? extraArgs,
-        int count, bool prime, string? expectedPrimeStatus = null)
+    private static void ValidateSamples(
+        IReadOnlyList<RunSample> samples, ExpectedSampleOutcome expectedOutcome, string scenario)
     {
+        for (int i = 0; i < samples.Count; i++)
+        {
+            ValidateSample(samples[i], expectedOutcome, $"{scenario} sample {i + 1}");
+        }
+    }
+
+    private static void ValidateSample(RunSample sample, ExpectedSampleOutcome expectedOutcome, string context)
+    {
+        string observed = $"completion={sample.CompletionStatus}, exit={sample.ExitCode}, output_failed={sample.OutputFailed}";
+        Assert.That(sample.CompletionStatus, Is.EqualTo(expectedOutcome.CompletionStatus),
+            $"Unexpected analysis completion for {context}: {observed}");
+        Assert.That(sample.ExitCode, Is.EqualTo(expectedOutcome.ExitCode),
+            $"Unexpected CLI exit category for {context}: {observed}");
+        Assert.That(sample.OutputFailed, Is.EqualTo(expectedOutcome.OutputFailed),
+            $"Unexpected report-publication outcome for {context}: {observed}");
+    }
+
+    private static SampleSeries RunSeries(
+        string fixtureRoot, string policyPath, string mode, bool ensureBuilt, IReadOnlyList<string>? extraArgs,
+        int count, bool prime, ExpectedSampleOutcome? expectedPrimeOutcome = null)
+    {
+        List<RunSample> primingSamples = new();
         if (prime)
         {
             RunSample primeSample = RunOnce(fixtureRoot, policyPath, mode, ensureBuilt, extraArgs);
-            Assert.That(expectedPrimeStatus, Is.Not.Null,
-                "Every requested priming run must declare the completion status it is expected to produce.");
-            Assert.That(primeSample.CompletionStatus, Is.EqualTo(expectedPrimeStatus),
-                $"Priming run failed for policy '{policyPath}' mode '{mode}'. The measured warm samples are invalid.");
+            Assert.That(expectedPrimeOutcome, Is.Not.Null,
+                "Every requested priming run must declare its expected completion, exit category, and output outcome.");
+            ValidateSample(
+                primeSample, expectedPrimeOutcome!,
+                $"priming run for policy '{policyPath}' mode '{mode}'; measured warm samples are invalid");
+            primingSamples.Add(primeSample);
         }
 
         List<RunSample> samples = new(count);
@@ -174,10 +225,10 @@ public sealed class AnalysisProfileBenchmarkHarness
             samples.Add(RunOnce(fixtureRoot, policyPath, mode, ensureBuilt, extraArgs));
         }
 
-        return samples;
+        return new SampleSeries(samples, primingSamples);
     }
 
-    private static List<RunSample> RunColdSeries(int count)
+    private static SampleSeries RunColdSeries(int count)
     {
         List<RunSample> samples = new(count);
         for (int i = 0; i < count; i++)
@@ -186,7 +237,7 @@ public sealed class AnalysisProfileBenchmarkHarness
             samples.Add(RunOnce(fixture.Root, fixture.PolicyPath, "strict", ensureBuilt: true, extraArgs: null));
         }
 
-        return samples;
+        return new SampleSeries(samples, Array.Empty<RunSample>());
     }
 
     private static RunSample RunOnce(
@@ -238,16 +289,18 @@ public sealed class AnalysisProfileBenchmarkHarness
         File.Delete(profilePath);
         JsonElement root = profile;
         string completionStatus = root.GetProperty("CompletionStatus").GetString()!;
+        bool outputFailed = root.GetProperty("Output").GetProperty("OutputFailed").GetBoolean();
 
         // Only the single-mode Validate() path wraps its work in a "total" Measure() call — the
         // combined --mode strict,audit path calls CreateSnapshot() directly, which has no such
-        // wrapper (see ArchitectureValidationApplicationService). When "total" is absent, sum the
-        // top-level (Indent 0) phases instead — safe because they never overlap each other, unlike
-        // "total" itself, which if present already encompasses every other Indent-0 phase and must
-        // not also be added to their sum.
+        // wrapper (see ArchitectureValidationApplicationService). `total` ends before normal
+        // report routing, whereas a combined top-level phase sum includes it. Keep the comparable
+        // boundaries explicit: AnalysisOnly excludes preflight and every rendering/publication
+        // phase; Output is the latter phase set; CommandTotal includes all three kinds of work.
         double? explicitTotalMs = null;
         double indentZeroSumMs = 0;
         double preflightMs = 0;
+        double outputMs = 0;
         foreach (JsonElement phase in root.GetProperty("Phases").EnumerateArray())
         {
             string name = phase.GetProperty("Name").GetString()!;
@@ -266,13 +319,21 @@ public sealed class AnalysisProfileBenchmarkHarness
             {
                 preflightMs += elapsed;
             }
+
+            if (_outputPhaseNames.Contains(name))
+            {
+                outputMs += elapsed;
+            }
         }
 
-        double totalMs = explicitTotalMs ?? indentZeroSumMs;
+        double commandTotalMs = explicitTotalMs is { } analysisAndPreflightMs
+            ? analysisAndPreflightMs + outputMs
+            : indentZeroSumMs;
+        double analysisOnlyMs = Math.Max(0, commandTotalMs - preflightMs - outputMs);
 
         return new RunSample(
-            totalMs, preflightMs, Math.Max(0, totalMs - preflightMs), completionStatus, wallClock.Elapsed.TotalMilliseconds,
-            profile);
+            commandTotalMs, preflightMs, analysisOnlyMs, outputMs, completionStatus, process.ExitCode, outputFailed,
+            wallClock.Elapsed.TotalMilliseconds, profile);
     }
 
     private static double Median(List<double> values)
@@ -293,14 +354,34 @@ public sealed class AnalysisProfileBenchmarkHarness
     // evidence for #409, including per-phase ProcessorTimeMs, Measurements, Output, and every
     // deterministic counter for each individual process.
     private sealed record RunSample(
-        double TotalMs,
+        double CommandTotalMs,
         double PreflightMs,
-        double AnalysisMs,
+        double AnalysisOnlyMs,
+        double OutputMs,
         string CompletionStatus,
+        int ExitCode,
+        bool OutputFailed,
         double WallClockMs,
         JsonElement Profile);
 
     private sealed record ScenarioSummary(
-        string ScenarioId, string Description, int SampleCount, double MedianAnalysisMs, double P95AnalysisMs,
-        double MedianPreflightMs, string CompletionStatus, IReadOnlyList<RunSample> Samples);
+        string ScenarioId,
+        string Description,
+        int SampleCount,
+        double MedianAnalysisOnlyMs,
+        double P95AnalysisOnlyMs,
+        double MedianOutputMs,
+        double P95OutputMs,
+        double MedianCommandTotalMs,
+        double P95CommandTotalMs,
+        double MedianPreflightMs,
+        string CompletionStatus,
+        IReadOnlyList<RunSample> Samples,
+        IReadOnlyList<RunSample> PrimingSamples);
+
+    private sealed record ExpectedSampleOutcome(string CompletionStatus, int ExitCode, bool OutputFailed);
+
+    private sealed record SampleSeries(
+        IReadOnlyList<RunSample> MeasuredSamples,
+        IReadOnlyList<RunSample> PrimingSamples);
 }

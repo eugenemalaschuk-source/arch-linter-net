@@ -45,7 +45,7 @@
 
 ## 7. Benchmark harness and evidence
 
-- [x] 7.1 Add `[Explicit]` NUnit harness under `tests/ArchLinterNet.Core.Tests/AnalysisProfile/` implementing the 7 declared scenarios against `large-multi-host`, 10 runs each, validating priming/measured statuses, separating restore/build from analysis time, computing median/p95, and retaining each raw profile in the generated evidence JSON.
+- [x] 7.1 Add `[Explicit]` NUnit harness under `tests/ArchLinterNet.Core.Tests/AnalysisProfile/` implementing the 7 declared scenarios against `large-multi-host`, 10 runs each, validating each priming/measured profile's completion status, CLI exit category, and output-failure state before statistics; separating preflight, analysis-only, output, and command-total timing; computing median/p95; and retaining each raw profile in the checked-in evidence JSON.
 - [x] 7.2 Confirm the harness is excluded from `rtk make test`/`rtk make acceptance`.
 - [x] 7.3 Run the harness for real on this development machine and record actual results.
 - [x] 7.4 Write `docs/internal/analysis-profile-pre-optimization-baseline.md` plus its raw-profile JSON evidence with the real results, environment metadata, and a non-universality disclaimer (mirroring `docs/internal/checkpoint-a-evidence.md`).

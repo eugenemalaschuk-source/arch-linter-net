@@ -13,36 +13,38 @@ This evidence records the pre-cache/pre-parallel baseline required by issue #374
 | Memory | 32 GB |
 | .NET SDK | 10.0.302 |
 | .NET runtime | 10.0.10 (host) |
-| Repository state | `e5acb96` on `feature/374-analysis-profile-v1`, `Debug` configuration, local development build (not CI) |
+| Repository state | Product instrumentation at `cf82e4e` on `feature/374-analysis-profile-v1`, `Debug` configuration, local development build (not CI); this evidence refresh adds only the benchmark/evidence changes recorded with it |
 | Harness | `AnalysisProfileBenchmarkHarness.RunBenchmarkMatrix` (`tests/ArchLinterNet.Core.Tests/AnalysisProfile/`) |
 | Fixture | `large-multi-host` (8 synthetic host projects + 2 shared library projects) |
 
 ## Method
 
-Every sample is one real `dotnet <ArchLinterNet.Cli.dll> --policy ... --profile <path>` process invocation against an isolated copy of the fixture. `AnalysisMs` is derived from the profile's own `Phases`: the single-mode path's explicit `total` phase, or — for the combined `--mode strict,audit` path, which has no `total` wrapper (`ArchitectureValidationApplicationService.CreateSnapshot` doesn't wrap in `Measure("total")` the way single-mode `Validate` does) — the sum of that profile's top-level (`Indent: 0`) phases. `PreflightMs` is the `build_state_preflight` phase alone, isolating MSBuild-driven `--ensure-built` verification from the rest of ArchLinterNet's own analysis work, per the issue's "separate restore/build/preparation time from ArchLinterNet analysis time" requirement. Every scenario has ten samples; every cold sample uses a separately created never-built fixture copy, so its median and p95 are statistically meaningful. The harness validates every measured and priming status before computing a statistic and emits each sample's full `Profile` (including phase `ProcessorTimeMs`, measurements, `Output`, and deterministic counters); this run's 1,216,467-byte raw artifact had SHA-256 `9c24d8fe2fb8e259740f20bf15058e2f74c11d4306a201f9b77d7d39015d6afa`.
+Every sample is one real `dotnet <ArchLinterNet.Cli.dll> --policy ... --profile <path>` process invocation against an isolated copy of the fixture. Before statistics, the harness checks each measured and priming profile's `CompletionStatus`, CLI exit category, and `Output.OutputFailed` value: the declared success paths require `Success`/`0`/`false`; validation and preparation failures require their matching status with exit `1` and `false`. A runtime/output failure (exit `2` or `OutputFailed: true`) is therefore rejected rather than counted as a successful sample.
+
+Timing boundaries are uniform across single and combined modes. `PreflightMs` is `build_state_preflight` alone. `Analysis-only` excludes preflight plus every rendering/publication phase: `render_human`, `render_json`, `render_sarif`, `output_staging`, `output_stream_write`, and `output_commit`. `Output` is the sum of those rendering/publication phases. `Command total` includes analysis-only, preflight, and output: for single mode it is the explicit `total` phase plus output, and for combined mode it is the top-level (`Indent: 0`) phase sum. This makes scenarios 3–5 directly comparable while preserving output work as its own measurement.
+
+Every scenario has ten measured samples; every cold sample uses a separately created never-built fixture copy, so its median and p95 are statistically meaningful. The checked-in [raw profile artifact](analysis-profile-pre-optimization-baseline-results.json) retains all 95 process profiles: 90 measured profiles used for statistics and 5 validated priming profiles, including phase `ProcessorTimeMs`, measurements, `Output`, deterministic counters, exit code, and derived timing boundaries. This run's artifact is 1,302,047 bytes with SHA-256 `bd2435fe6bc94fb9c717277c5d84228baa611b049b2c1b23d8eb12dd15610635`.
 
 ## Results
 
-| Scenario | n | Median analysis (ms) | p95 analysis (ms) | Median preflight (ms) | Completion status |
-|---|---|---|---|---|---|
-| 1 — cold process, warm filesystem, strict | 10 | 374 | 719 | 4273 | Success |
-| 2 — immediate warm strict repeat (no persistent cache — #365) | 10 | 360 | 396 | 3356 | Success |
-| 3 — strict + audit as separate legacy-style processes (paired sum) | 10 | 731.5 | 765 | 3533.5¹ | Success/Success |
-| 4 — combined strict+audit from one #363 snapshot | 10 | 369 | 425 | 3333 | Success |
-| 5a — one report sink (`--report json=stdout`) | 10 | 374 | 467 | 3401 | Success |
-| 5b — three report sinks (`--report human/json/sarif`, one analysis) | 10 | 355 | 397 | 3423 | Success |
-| 7b — validation-failure completion path | 10 | 385 | 451 | 3245.5 | ValidationFailure |
-| 7c — preparation-failure completion path (never built, `--no-restore`, no receipts) | 10 | 301.5 | 317 | 4 | PreparationFailure |
-
-¹ Preflight median for scenario 3's strict-process leg only; the audit-process leg pays its own separate preflight cost on top of this (not summed here — see "Observations").
+| Scenario | n | Analysis-only median / p95 (ms) | Output median / p95 (ms) | Command-total median / p95 (ms) | Preflight median (ms) | Completion status |
+|---|---:|---:|---:|---:|---:|---|
+| 1 — cold process, warm filesystem, strict | 10 | 356.5 / 551 | 20 / 47 | 4188 / 8783 | 3799 | Success |
+| 2 — immediate warm strict repeat (no persistent cache — #365) | 10 | 344 / 364 | 21 / 21 | 3587 / 3701 | 3219 | Success |
+| 3 — strict + audit as separate legacy-style processes (paired sum) | 10 | 687.5 / 708 | 41 / 43 | 7086.5 / 7200 | 6361.5 | Success/Success |
+| 4 — combined strict+audit from one #363 snapshot | 10 | 329.5 / 345 | 20 / 21 | 3535.5 / 3624 | 3190.5 | Success |
+| 5a — one report sink (`--report json=stdout`) | 10 | 343.5 / 367 | 45 / 51 | 3564 / 3664 | 3169.5 | Success |
+| 5b — three report sinks (`--report human/json/sarif`, one analysis) | 10 | 348 / 382 | 55 / 58 | 3554.5 / 3882 | 3159.5 | Success |
+| 7b — validation-failure completion path | 10 | 377.5 / 388 | 28 / 29 | 3599.5 / 3847 | 3196 | ValidationFailure |
+| 7c — preparation-failure completion path (never built, `--no-restore`, no receipts) | 10 | 288.5 / 298 | 39 / 42 | 331.5 / 341 | 4 | PreparationFailure |
 
 Scenario 6 ("sequential execution before #408") is not a separate timed row: every scenario above already runs sequentially, since no parallel-scanning capability exists yet. Scenario 7's "success" completion path is already demonstrated by scenarios 1–5.
 
 ## Observations
 
-- **The #363 one-snapshot benefit remains visible end to end**: scenario 3 (two separate processes, 731.5ms combined median analysis time) versus scenario 4 (one process, one snapshot, 369ms) is consistent with serving both modes from one composed snapshot. The deterministic snapshot counters, rather than this environment-sensitive delta, are the normative proof.
-- **`--ensure-built` preflight dominates wall-clock time on this fixture** (~3.2–4.3s median per run) regardless of cold/warm state, because `--ensure-built` shells out to `dotnet build` for verification on every invocation against ten projects. This is exactly the kind of cost #365's persistent cache is expected to address, and is why this evidence separates `PreflightMs` from `AnalysisMs` rather than reporting one blended number.
-- **Multi-sink output does not repeat analysis**: scenario 5b happens to have a lower machine-local median than 5a in this run, but this evidence does not claim a duration equivalence. Its one-snapshot / sink-count invariant is instead proved by the raw profile counters and correctness tests; report-rendering and process noise remain observable in this descriptive benchmark. The raw profiles include the new human/JSON/SARIF render and staging/stream/commit phases.
+- **The #363 one-snapshot benefit remains visible end to end**: scenario 3's paired separate processes have 687.5ms median analysis-only time and 7086.5ms median command total, versus scenario 4's 329.5ms and 3535.5ms. The deterministic snapshot counters, rather than these environment-sensitive deltas, are the normative proof.
+- **`--ensure-built` preflight dominates command-total time on this fixture** (~3.2–3.8s median per process) because it shells out to `dotnet build` for verification on every invocation against ten projects. This is exactly the kind of cost #365's persistent cache is expected to address, and why this evidence reports preflight separately rather than blending it into analysis-only time.
+- **Multi-sink output does not repeat analysis**: scenarios 5a/5b have similar analysis-only medians (343.5/348ms) but separately expose 45/55ms median rendering/publication work. Their one-snapshot / sink-count invariant is proved by the raw profile counters and correctness tests; these descriptive measurements make output work observable without treating local timing as a duration contract.
 - **`PeakWorkingSetBytes` is `null` in every sample on this platform** — `System.Diagnostics.Process.PeakWorkingSet64` is a documented no-op returning `0` on macOS rather than throwing; `ValidateCommandHandler.Profile.cs` treats that as "unavailable" and reports `null` explicitly rather than a misleading `0` (see the phase/counter dictionary).
 
 ## Non-release statement
