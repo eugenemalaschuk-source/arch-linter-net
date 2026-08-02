@@ -1,0 +1,40 @@
+version: 1
+name: Synthetic large multi-host adopter (failing variant)
+
+layers:
+  hostb:
+    namespace: Synthetic.HostB
+  sharedlib2:
+    namespace: Synthetic.SharedLib2
+
+analysis:
+  target_assemblies:
+    - Synthetic.HostA
+    - Synthetic.HostB
+    - Synthetic.HostC
+    - Synthetic.HostD
+    - Synthetic.HostE
+    - Synthetic.HostF
+    - Synthetic.HostG
+    - Synthetic.HostH
+    - Synthetic.SharedLib1
+    - Synthetic.SharedLib2
+  projects:
+    - src/Synthetic.HostA/Synthetic.HostA.csproj
+    - src/Synthetic.HostB/Synthetic.HostB.csproj
+    - src/Synthetic.HostC/Synthetic.HostC.csproj
+    - src/Synthetic.HostD/Synthetic.HostD.csproj
+    - src/Synthetic.HostE/Synthetic.HostE.csproj
+    - src/Synthetic.HostF/Synthetic.HostF.csproj
+    - src/Synthetic.HostG/Synthetic.HostG.csproj
+    - src/Synthetic.HostH/Synthetic.HostH.csproj
+    - src/Synthetic.SharedLib1/Synthetic.SharedLib1.csproj
+    - src/Synthetic.SharedLib2/Synthetic.SharedLib2.csproj
+
+contracts:
+  strict:
+    - name: hostb-must-not-depend-on-sharedlib2
+      id: hostb-must-not-depend-on-sharedlib2
+      source: hostb
+      forbidden: [sharedlib2]
+      reason: "Benchmark fixture (#374): intentionally violated by HostB to exercise the validation-failure completion path."

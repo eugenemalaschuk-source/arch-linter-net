@@ -15,6 +15,10 @@ public sealed class ArchitectureValidationApplicationService(
     IBuildStatePreparationService buildStatePreparationService)
     : IArchitectureValidationApplicationService
 {
+    // Exception.Data lets hosts recover completed profile evidence without changing the exact
+    // OperationCanceledException type that existing API consumers observe.
+    private const string CancellationCountersDataKey = "ArchLinterNet.AnalysisProfile.Counters";
+    private const string CancellationInputPathsDataKey = "ArchLinterNet.AnalysisProfile.InputPaths";
     private const string ErrorSeverity = "error";
     private const string ModeStrict = "strict";
     private const string ModeAudit = "audit";
@@ -24,6 +28,12 @@ public sealed class ArchitectureValidationApplicationService(
     // returning — so existing callers keep their exact current behavior, results, and performance
     // (see openspec/specs/analysis-snapshot/spec.md, "Single-mode validation remains simple").
     public ValidationOutcome Validate(ValidationRequest request, ValidationTiming? timing = null)
+    {
+        return ValidateWithCounters(request, timing).Outcome;
+    }
+
+    public (ValidationOutcome Outcome, ArchitectureAnalysisSnapshotCounters Counters) ValidateWithCounters(
+        ValidationRequest request, ValidationTiming? timing = null)
     {
         if (request.Mode is not (ModeStrict or ModeAudit))
         {
@@ -39,7 +49,16 @@ public sealed class ArchitectureValidationApplicationService(
             // CreateSnapshot uses when it doesn't know which modes will be evaluated.
             using ArchitectureAnalysisSnapshot snapshot = CreateSnapshotCore(
                 AnalysisSnapshotRequest.FromValidationRequest(request), request.Mode, timing);
-            return snapshot.Evaluate(request.Mode, timing);
+            try
+            {
+                ValidationOutcome outcome = snapshot.Evaluate(request.Mode, timing);
+                return (outcome, snapshot.Counters);
+            }
+            catch (OperationCanceledException ex)
+            {
+                AttachCancellationProfileState(ex, snapshot.Counters, snapshot.GetProfileInputPaths());
+                throw;
+            }
         }
     }
 
@@ -58,131 +77,162 @@ public sealed class ArchitectureValidationApplicationService(
     private ArchitectureAnalysisSnapshot CreateSnapshotCore(
         AnalysisSnapshotRequest request, string? modeHint, ValidationTiming? timing)
     {
-        ArchitectureContractDocument? document = null;
-        ArchitectureRunnerSetup? setup = null;
+        SnapshotConstructionState state = new();
         try
         {
-            ComposedPolicy policy;
-            using (timing?.Measure("policy_composition"))
-            {
-                try
-                {
-                    document = runnerSetupService.LoadDocument(request.PolicyPath, request.BaselinePath, timing, request.CancellationToken);
-                }
-                catch (ArchitecturePolicyImportException ex)
-                {
-                    throw new ArchitecturePolicyLoadException(ex.Message, ex.Diagnostic, ex.Category.ToString(), ex);
-                }
-
-                request.CancellationToken.ThrowIfCancellationRequested();
-
-                // This can reject an invalid severity or contract ID after the policy/imports
-                // (and optional baseline) were loaded. Keep it inside the provenance-aware try
-                // so an error report cannot overwrite one of those already-consumed inputs.
-                policy = ComposeDocument(document, request, modeHint);
-            }
-
-            request.CancellationToken.ThrowIfCancellationRequested();
-
-            using (timing?.Measure("load_and_setup"))
-                setup = BuildRunnerFor(policy, request, modeHint, timing);
-
-            int projectGraphEvaluations = 1;
-            int assemblyLoads = setup.AssemblyLoads;
-            IArchitectureContractRunner runner = setup.Runner;
-
-            request.CancellationToken.ThrowIfCancellationRequested();
-
-            BuildStatePreflightResult preflight;
-            using (timing?.Measure("build_state_preflight"))
-                preflight = RunBuildStatePreflight(request, runner);
-
-            request.CancellationToken.ThrowIfCancellationRequested();
-
-            // --ensure-built may have just written new build output that the runner/session above —
-            // built from assembly resolution that ran before this build — cannot see: its
-            // ArchitectureAnalysisContext captured whatever resolution found (or failed to find) at
-            // that earlier point in time. Rebuilding the runner/session after a successful build
-            // re-discovers and re-resolves from the now-current filesystem state, so every mode
-            // evaluated against this snapshot actually analyzes the artifacts preflight just verified.
-            // Only project discovery/assembly resolution/session construction are redone here — the
-            // policy document composed above (policy load, baseline merge, severity validation,
-            // contract-ID selection) does not depend on build output and is intentionally reused
-            // rather than recomposed, so policy composition still happens exactly once regardless of
-            // whether ensure-built triggers this rebuild. This rebuild is part of building the one
-            // snapshot, not per-mode work, so it runs at most once regardless of how many modes are
-            // later evaluated.
-            if (!preflight.Blocked
-                && request.PreparationMode == BuildPreparationMode.EnsureBuilt
-                && runner.Session.Context.ProjectDiscovery is { DiscoveredProjects.Count: > 0 })
-            {
-                using (timing?.Measure("post_ensure_built_reload"))
-                    setup = BuildRunnerFor(policy, request, modeHint, timing, loadPostBuildArtifacts: true);
-                projectGraphEvaluations = 2;
-                assemblyLoads += setup.AssemblyLoads;
-                runner = setup.Runner;
-            }
-
-            request.CancellationToken.ThrowIfCancellationRequested();
-
-            return new ArchitectureAnalysisSnapshot(
-                policy.Document,
-                setup,
-                preflight,
-                policy.UnmatchedConfig,
-                policy.PolicyConsistencyConfig,
-                policy.CoverageConfig,
-                request.EnforceUnmatchedIgnoredViolationsPolicy,
-                request.IncludeAsmdefContracts,
-                contractExecutor,
-                handlerRegistry,
-                policyCompositions: 1,
-                projectGraphEvaluations: projectGraphEvaluations,
-                assemblyLoads: assemblyLoads,
-                // Only a snapshot meant to serve any/all requested modes (modeHint null) needs the
-                // per-mode re-check in Evaluate — a single-mode snapshot (modeHint set) already
-                // validated its one mode's contract IDs exactly as before this change, above.
-                requestedContractIds: modeHint == null ? request.ContractIds : null);
+            return BuildSnapshot(state, request, modeHint, timing);
         }
-        catch (OperationCanceledException)
+        catch (OperationCanceledException ex)
         {
-            // A snapshot cancelled during construction is never exposed as usable: nothing is
-            // returned on this path, so release whatever this attempt already acquired (the
-            // assembly load scope owned by `setup`) instead of leaving it to finalization.
-            setup?.Runner.Session.Context.Dispose();
+            state.Setup?.Runner.Session.Context.Dispose();
+            AttachCancellationProfileState(ex, BuildCancellationCounters(state), BuildCancellationInputPaths(request, state));
             throw;
         }
-        catch (Exception ex) when (document is not null
+        catch (Exception ex) when (state.Document is not null
             && ex is not ArchitecturePolicyLoadException and not ArchitecturePolicyValidationException)
         {
-            string repositoryRoot = setup?.RepositoryRoot
-                ?? Path.GetDirectoryName(Path.GetFullPath(request.PolicyPath))
-                ?? Environment.CurrentDirectory;
-            HashSet<string> policyInputPaths = new(StringComparer.OrdinalIgnoreCase)
-            {
-                Path.GetFullPath(request.PolicyPath),
-            };
-            if (request.BaselinePath is not null)
-            {
-                policyInputPaths.Add(Path.GetFullPath(request.BaselinePath));
-            }
-            foreach (ArchitecturePolicySourceDescriptor source in document.Provenance.Sources)
-            {
-                policyInputPaths.Add(Path.GetFullPath(Path.Combine(repositoryRoot, source.SourcePath)));
-            }
-            IReadOnlyList<string> resolvedAssemblyPaths = setup?.Runner.Session.Context.TargetAssemblies
-                .Select(assembly => assembly.Location)
-                .Where(path => !string.IsNullOrEmpty(path))
-                .Select(Path.GetFullPath)
-                .Distinct(StringComparer.OrdinalIgnoreCase)
-                .ToArray()
-                ?? Array.Empty<string>();
-            IReadOnlyList<string> discoveredProjectPaths =
-                setup?.Runner.Session.Context.DiscoveredProjectPaths ?? Array.Empty<string>();
-
-            throw new ArchitectureAnalysisEvaluationException(
-                ex.Message, ex, policyInputPaths.ToArray(), resolvedAssemblyPaths, discoveredProjectPaths);
+            throw CreateEvaluationException(ex, request, state);
         }
+    }
+
+    private ArchitectureAnalysisSnapshot BuildSnapshot(
+        SnapshotConstructionState state,
+        AnalysisSnapshotRequest request,
+        string? modeHint,
+        ValidationTiming? timing)
+    {
+        using (timing?.Measure("policy_composition"))
+        {
+            try
+            {
+                state.Document = runnerSetupService.LoadDocument(
+                    request.PolicyPath, request.BaselinePath, timing, request.CancellationToken);
+            }
+            catch (ArchitecturePolicyImportException ex)
+            {
+                throw new ArchitecturePolicyLoadException(ex.Message, ex.Diagnostic, ex.Category.ToString(), ex);
+            }
+
+            request.CancellationToken.ThrowIfCancellationRequested();
+            state.Policy = ComposeDocument(state.Document, request, modeHint);
+            state.PolicyCompositions = 1;
+        }
+
+        request.CancellationToken.ThrowIfCancellationRequested();
+        using (timing?.Measure("load_and_setup"))
+            state.Setup = BuildRunnerFor(state.Policy, request, modeHint, timing);
+
+        state.ProjectGraphEvaluations = 1;
+        state.AssemblyLoads = state.Setup.AssemblyLoads;
+        IArchitectureContractRunner runner = state.Setup.Runner;
+
+        request.CancellationToken.ThrowIfCancellationRequested();
+        BuildStatePreflightResult preflight;
+        using (timing?.Measure("build_state_preflight"))
+            preflight = RunBuildStatePreflight(request, runner);
+
+        request.CancellationToken.ThrowIfCancellationRequested();
+        if (!preflight.Blocked
+            && request.PreparationMode == BuildPreparationMode.EnsureBuilt
+            && runner.Session.Context.ProjectDiscovery is { DiscoveredProjects.Count: > 0 })
+        {
+            ArchitectureRunnerSetup postBuildSetup;
+            using (timing?.Measure("post_ensure_built_reload"))
+                postBuildSetup = BuildRunnerFor(state.Policy, request, modeHint, timing, loadPostBuildArtifacts: true);
+            state.Setup = postBuildSetup;
+            state.ProjectGraphEvaluations++;
+            state.AssemblyLoads += postBuildSetup.AssemblyLoads;
+            runner = postBuildSetup.Runner;
+        }
+
+        request.CancellationToken.ThrowIfCancellationRequested();
+        return new ArchitectureAnalysisSnapshot(
+            state.Policy.Document,
+            state.Setup,
+            preflight,
+            state.Policy.UnmatchedConfig,
+            state.Policy.PolicyConsistencyConfig,
+            state.Policy.CoverageConfig,
+            request.EnforceUnmatchedIgnoredViolationsPolicy,
+            request.IncludeAsmdefContracts,
+            contractExecutor,
+            handlerRegistry,
+            policyCompositions: state.PolicyCompositions,
+            projectGraphEvaluations: state.ProjectGraphEvaluations,
+            assemblyLoads: state.AssemblyLoads,
+            requestedContractIds: modeHint == null ? request.ContractIds : null);
+    }
+
+    private ArchitectureAnalysisSnapshotCounters BuildCancellationCounters(SnapshotConstructionState state)
+    {
+        ArchitectureRunnerSetup? setup = state.Setup;
+        return new ArchitectureAnalysisSnapshotCounters
+        {
+            PolicyCompositions = state.PolicyCompositions,
+            ProjectGraphEvaluations = state.ProjectGraphEvaluations,
+            AssemblyLoads = state.AssemblyLoads,
+            DiscoveredProjectCount = setup?.Runner.Session.Context.ProjectDiscovery?.DiscoveredProjects.Count ?? 0,
+            RetainedAssemblyCount = setup?.Runner.Session.Context.TargetAssemblies.Count ?? 0,
+            SelectedAssemblyCount = (setup?.Runner.Session.Context.TargetAssemblies.Count ?? 0)
+                + (setup?.Runner.Session.Context.MissingAssemblyNames.Count ?? 0),
+        };
+    }
+
+    private static IReadOnlyList<string> BuildCancellationInputPaths(
+        AnalysisSnapshotRequest request, SnapshotConstructionState state)
+    {
+        string repositoryRoot = state.Setup?.RepositoryRoot
+            ?? Path.GetDirectoryName(Path.GetFullPath(request.PolicyPath))
+            ?? Environment.CurrentDirectory;
+        IEnumerable<string> policyInputPaths = state.Document?.Provenance.Sources
+            .Select(source => Path.GetFullPath(Path.Combine(repositoryRoot, source.SourcePath)))
+            ?? Array.Empty<string>();
+        IEnumerable<string> setupInputPaths = state.Setup is null
+            ? Array.Empty<string>()
+            : state.Setup.Runner.Session.Context.TargetAssemblies
+                .Select(SafeAssemblyLocation)
+                .Where(path => !string.IsNullOrEmpty(path))
+                .Select(path => Path.GetFullPath(path!))
+                .SelectMany(path => new[] { path, BuildReceiptStore.ReceiptPathFor(path) })
+                .Concat(state.Setup.Runner.Session.Context.DiscoveredProjectPaths);
+        return policyInputPaths
+            .Append(Path.GetFullPath(request.PolicyPath))
+            .Concat(request.BaselinePath is null ? Array.Empty<string>() : [Path.GetFullPath(request.BaselinePath)])
+            .Concat(setupInputPaths)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+    }
+
+    private static ArchitectureAnalysisEvaluationException CreateEvaluationException(
+        Exception exception, AnalysisSnapshotRequest request, SnapshotConstructionState state)
+    {
+        string repositoryRoot = state.Setup?.RepositoryRoot
+            ?? Path.GetDirectoryName(Path.GetFullPath(request.PolicyPath))
+            ?? Environment.CurrentDirectory;
+        HashSet<string> policyInputPaths = new(StringComparer.OrdinalIgnoreCase)
+        {
+            Path.GetFullPath(request.PolicyPath),
+        };
+        if (request.BaselinePath is not null)
+        {
+            policyInputPaths.Add(Path.GetFullPath(request.BaselinePath));
+        }
+        foreach (ArchitecturePolicySourceDescriptor source in state.Document!.Provenance.Sources)
+        {
+            policyInputPaths.Add(Path.GetFullPath(Path.Combine(repositoryRoot, source.SourcePath)));
+        }
+        IReadOnlyList<string> resolvedAssemblyPaths = state.Setup?.Runner.Session.Context.TargetAssemblies
+            .Select(assembly => assembly.Location)
+            .Where(path => !string.IsNullOrEmpty(path))
+            .Select(Path.GetFullPath)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray()
+            ?? Array.Empty<string>();
+        IReadOnlyList<string> discoveredProjectPaths =
+            state.Setup?.Runner.Session.Context.DiscoveredProjectPaths ?? Array.Empty<string>();
+
+        return new ArchitectureAnalysisEvaluationException(
+            exception.Message, exception, policyInputPaths.ToArray(), resolvedAssemblyPaths, discoveredProjectPaths);
     }
 
     // Preflight only runs when project discovery produced a project graph — the fingerprint/
@@ -231,6 +281,16 @@ public sealed class ArchitectureValidationApplicationService(
         string CoverageConfig,
         HashSet<string>? SelectedContractIds,
         bool EnableUnmatchedIgnoreTracking);
+
+    private sealed class SnapshotConstructionState
+    {
+        public ArchitectureContractDocument? Document { get; set; }
+        public ArchitectureRunnerSetup? Setup { get; set; }
+        public ComposedPolicy Policy { get; set; }
+        public int PolicyCompositions { get; set; }
+        public int ProjectGraphEvaluations { get; set; }
+        public int AssemblyLoads { get; set; }
+    }
 
     // Policy load, baseline merge, severity validation, and contract-ID selection depend only on
     // the policy document and the request — never on build output — so this runs exactly once per
@@ -336,5 +396,26 @@ public sealed class ArchitectureValidationApplicationService(
         HashSet<string> ids = new(catalog.AvailableContractIds(ModeStrict), StringComparer.OrdinalIgnoreCase);
         ids.UnionWith(catalog.AvailableContractIds(ModeAudit));
         return ids;
+    }
+
+    private static string? SafeAssemblyLocation(System.Reflection.Assembly assembly)
+    {
+        try
+        {
+            return assembly.Location;
+        }
+        catch (NotSupportedException)
+        {
+            return null;
+        }
+    }
+
+    private static void AttachCancellationProfileState(
+        OperationCanceledException exception,
+        ArchitectureAnalysisSnapshotCounters counters,
+        IReadOnlyList<string> inputPaths)
+    {
+        exception.Data[CancellationCountersDataKey] = counters;
+        exception.Data[CancellationInputPathsDataKey] = inputPaths;
     }
 }

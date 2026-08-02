@@ -16,7 +16,7 @@ namespace ArchLinterNet.Core.Tests;
 // fake-composition-seam pattern as ArchitectureValidationApplicationServiceFakeCompositionTests —
 // fake the application service's collaborators rather than touching real files/assemblies.
 [TestFixture]
-public sealed class ArchitectureAnalysisSnapshotTests
+public sealed partial class ArchitectureAnalysisSnapshotTests
 {
     private sealed class CountingRunnerSetupService : IArchitectureRunnerSetupService
     {
@@ -122,6 +122,8 @@ public sealed class ArchitectureAnalysisSnapshotTests
 
         public bool DelayExecution { get; set; }
 
+        public Action<ArchitectureAnalysisSession>? BeforeReturn { get; set; }
+
         // When set for a mode, Execute actually runs this real ArchitectureDependencyContract
         // against the session (via ArchitectureAnalysisSession.CheckContract) instead of
         // no-op'ing — needed so tests can observe the session's real mutable unmatched-ignore-list
@@ -150,6 +152,8 @@ public sealed class ArchitectureAnalysisSnapshotTests
                 List<ArchitectureViolation> violations = ContractByMode.TryGetValue(mode, out ArchitectureDependencyContract? contract)
                     ? session.CheckContract(contract)
                     : new List<ArchitectureViolation>();
+
+                BeforeReturn?.Invoke(session);
 
                 return new ArchitectureContractExecutionResult(
                     violations,

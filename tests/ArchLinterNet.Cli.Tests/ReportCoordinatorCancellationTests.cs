@@ -41,6 +41,7 @@ public sealed partial class ReportCoordinatorTests
             Assert.That(result.Cancelled, Is.True);
             Assert.That(result.CommittedPaths, Is.Empty);
             Assert.That(result.UncommittedPaths, Is.EquivalentTo(_oneJsonAndTwoSarifPaths));
+            Assert.That(result.RenderedFormats, Is.Empty);
             Assert.That(fileSystem.TempPaths, Is.Empty);
         });
     }
@@ -158,6 +159,26 @@ public sealed partial class ReportCoordinatorTests
         });
     }
 
+    [Test]
+    public void RouteCombinedOutcomes_LegacyHumanCancellationAfterFirstWrite_ReportsDeliveredStdout()
+    {
+        var runtime = new CountingRuntime();
+        using CancellationTokenSource cts = new();
+        var console = new CapturingConsole { OnOutputWriteLine = cts.Cancel };
+        var coordinator = new ReportCoordinator(runtime, console, new StubFileSystem());
+
+        RouteResult result = coordinator.RouteCombinedOutcomes(
+            "human", [("strict", PassedOutcome), ("audit", PassedOutcome)], Array.Empty<ReportSink>(), cts.Token);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(result.Cancelled, Is.True);
+            Assert.That(result.Status, Is.EqualTo(ReportRouteStatus.PartialOutput));
+            Assert.That(result.DeliveredStreamPaths, Is.EquivalentTo(new[] { "<stdout>" }));
+            Assert.That(result.UncommittedPaths, Is.Empty);
+        });
+    }
+
     // PR #416 review: FormatSingle/CombinedHuman/Json/Sarif previously accepted no token at all,
     // so a large findings set could fully serialize after Ctrl+C before the next check. These
     // prove cancellation observed mid-render — at the boundary between two of a human report's
@@ -181,11 +202,17 @@ public sealed partial class ReportCoordinatorTests
         var console = new CapturingConsole();
         var coordinator = new ReportCoordinator(runtime, console, new StubFileSystem());
 
-        Assert.Throws<OperationCanceledException>(() =>
-            coordinator.RouteSingleOutcome("human", "strict", ViolationsAndCyclesOutcome, Array.Empty<ReportSink>(), cts.Token));
+        RouteResult result = coordinator.RouteSingleOutcome(
+            "human", "strict", ViolationsAndCyclesOutcome, Array.Empty<ReportSink>(), cts.Token);
 
-        Assert.That(runtime.HumanCallCount, Is.EqualTo(1), "FormatCyclesForHumans must not run once cancellation was observed after violations rendered");
-        Assert.That(console.OutputText, Is.Empty, "no partial document may reach stdout");
+        Assert.Multiple(() =>
+        {
+            Assert.That(result.Cancelled, Is.True);
+            Assert.That(result.RenderedFormats, Is.Empty, "an interrupted render is not a completed render");
+            Assert.That(runtime.HumanCallCount, Is.EqualTo(1),
+                "FormatCyclesForHumans must not run once cancellation was observed after violations rendered");
+            Assert.That(console.OutputText, Is.Empty, "no partial document may reach stdout");
+        });
     }
 
     [Test]
@@ -199,9 +226,14 @@ public sealed partial class ReportCoordinatorTests
         var outcomesByMode = new[] { ("strict", PassedOutcome), ("audit", FailedOutcome) };
         var sinks = new[] { new ReportSink("json", ReportDestinationType.File, "results.json") };
 
-        Assert.Throws<OperationCanceledException>(() =>
-            coordinator.RouteCombinedOutcomes("human", outcomesByMode, sinks, cts.Token));
+        RouteResult result = coordinator.RouteCombinedOutcomes("human", outcomesByMode, sinks, cts.Token);
 
-        Assert.That(runtime.JsonCallCount, Is.EqualTo(1), "the audit mode's JSON must not be rendered once cancellation was observed after strict rendered");
+        Assert.Multiple(() =>
+        {
+            Assert.That(result.Cancelled, Is.True);
+            Assert.That(result.RenderedFormats, Is.Empty, "an interrupted combined render is not complete");
+            Assert.That(runtime.JsonCallCount, Is.EqualTo(1),
+                "the audit mode's JSON must not be rendered once cancellation was observed after strict rendered");
+        });
     }
 }

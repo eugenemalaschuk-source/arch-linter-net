@@ -1,5 +1,6 @@
 using ArchLinterNet.Core.BuildState;
 using ArchLinterNet.Core.Model;
+using ArchLinterNet.Core.Profiling;
 using ArchLinterNet.Core.Reporting;
 
 namespace ArchLinterNet.Testing;
@@ -27,6 +28,11 @@ public sealed class ArchitectureValidationResult
     public IReadOnlyCollection<BaselineLifecycleEntry> BaselineLifecycleEntries { get; }
     public IReadOnlyCollection<ArchitectureSubtractiveMatcherParticipation> SubtractiveMatcherParticipation { get; }
 
+    // Null unless the builder called WithProfile() — see
+    // openspec/specs/analysis-profile/spec.md, "Testing API exposes the same profile semantics as
+    // the CLI".
+    public AnalysisProfile? Profile { get; }
+
     public ArchitectureValidationResult(ArchitectureValidationResultParams @params)
     {
         Passed = @params.Passed;
@@ -47,6 +53,7 @@ public sealed class ArchitectureValidationResult
         BaselineLifecycleEntries = @params.BaselineLifecycleEntries ?? Array.Empty<BaselineLifecycleEntry>();
         SubtractiveMatcherParticipation = @params.SubtractiveMatcherParticipation
             ?? Array.Empty<ArchitectureSubtractiveMatcherParticipation>();
+        Profile = @params.Profile;
         Findings = ArchitectureFindingMapper.Order(AllDiagnostics());
     }
 
@@ -184,4 +191,5 @@ public sealed record ArchitectureValidationResultParams(
     public string? Mode { get; init; }
     public IReadOnlyCollection<BaselineLifecycleEntry>? BaselineLifecycleEntries { get; init; }
     public IReadOnlyCollection<ArchitectureSubtractiveMatcherParticipation>? SubtractiveMatcherParticipation { get; init; }
+    public AnalysisProfile? Profile { get; init; }
 }

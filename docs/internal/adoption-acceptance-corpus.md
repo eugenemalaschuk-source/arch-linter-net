@@ -11,6 +11,7 @@ This document owns the reusable, synthetic adopter-shaped fixture system introdu
 | `same-named-multi-host` | Multiple hosts with same-named roots | assembly-aware composition identity | #360 |
 | `legacy-import-migration` | Imported root policy with a 0.5.0 baseline | provenance and legacy-baseline compatibility | #361 |
 | `clean-checkout` | Project tree without `bin`/`obj` | deterministic build-state preflight | #362 |
+| `large-multi-host` | Eight hosts sharing two library projects | analysis-profile/v1 pre-optimization benchmark harness | #374 |
 
 All fixture names, source identities, report examples, and repository references are synthetic. Each manifest root contains a policy, compilable `.csproj`/`.slnx` project tree, and source code; the migration root also contains an imported fragment and legacy baseline. `AdoptionAcceptanceFixture` copies roots to isolated temporary directories, builds them without modifying checked-in fixtures, and is the shared execution helper for #374, #411, and #366.
 

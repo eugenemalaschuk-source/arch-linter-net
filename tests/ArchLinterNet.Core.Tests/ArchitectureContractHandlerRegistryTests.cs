@@ -487,7 +487,11 @@ public sealed class ArchitectureContractHandlerRegistryTests
         ArchitectureContractExecutionResult result =
             new ArchitectureContractExecutor().Execute(executorRunner.Session, "strict", CreateRegistry());
 
-        Assert.That(Project(result.Violations), Is.EqualTo(Project(expectedViolations)));
+        Assert.Multiple(() =>
+        {
+            Assert.That(Project(result.Violations), Is.EqualTo(Project(expectedViolations)));
+            Assert.That(result.ContractFamilyResultCounts.Values.Sum(), Is.EqualTo(result.Violations.Count + result.Cycles.Count));
+        });
     }
 
     [Test]

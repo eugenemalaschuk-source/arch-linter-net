@@ -1,0 +1,12 @@
+<Solution>
+  <Project Path="src/Synthetic.SharedLib1/Synthetic.SharedLib1.csproj" />
+  <Project Path="src/Synthetic.SharedLib2/Synthetic.SharedLib2.csproj" />
+  <Project Path="src/Synthetic.HostA/Synthetic.HostA.csproj" />
+  <Project Path="src/Synthetic.HostB/Synthetic.HostB.csproj" />
+  <Project Path="src/Synthetic.HostC/Synthetic.HostC.csproj" />
+  <Project Path="src/Synthetic.HostD/Synthetic.HostD.csproj" />
+  <Project Path="src/Synthetic.HostE/Synthetic.HostE.csproj" />
+  <Project Path="src/Synthetic.HostF/Synthetic.HostF.csproj" />
+  <Project Path="src/Synthetic.HostG/Synthetic.HostG.csproj" />
+  <Project Path="src/Synthetic.HostH/Synthetic.HostH.csproj" />
+</Solution>

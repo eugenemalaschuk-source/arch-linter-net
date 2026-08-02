@@ -540,20 +540,11 @@ contracts:
             Exhaustive = true,
             Layers = new List<string>
             {
-                "ArchLinterNet.Core.Asmdef",
-                "ArchLinterNet.Core.BuildState",
-                "ArchLinterNet.Core.Composition",
-                "ArchLinterNet.Core.Contracts",
-                "ArchLinterNet.Core.Discovery",
-                "ArchLinterNet.Core.Execution",
-                "ArchLinterNet.Core.Graph",
-                "ArchLinterNet.Core.IO",
-                "ArchLinterNet.Core.Model",
-                "ArchLinterNet.Core.Reporting",
-                "ArchLinterNet.Core.Resolution",
-                "ArchLinterNet.Core.Scanning",
-                "ArchLinterNet.Core.Schema",
-                "ArchLinterNet.Core.Validation"
+                "ArchLinterNet.Core.Asmdef", "ArchLinterNet.Core.BuildState", "ArchLinterNet.Core.Composition",
+                "ArchLinterNet.Core.Contracts", "ArchLinterNet.Core.Discovery", "ArchLinterNet.Core.Execution",
+                "ArchLinterNet.Core.Graph", "ArchLinterNet.Core.IO", "ArchLinterNet.Core.Model",
+                "ArchLinterNet.Core.Profiling", "ArchLinterNet.Core.Reporting", "ArchLinterNet.Core.Resolution",
+                "ArchLinterNet.Core.Scanning", "ArchLinterNet.Core.Schema", "ArchLinterNet.Core.Validation"
             },
             OptionalLayers = new HashSet<string>()
         };

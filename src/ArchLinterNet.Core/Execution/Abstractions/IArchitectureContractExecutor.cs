@@ -13,6 +13,9 @@ public sealed record ArchitectureContractExecutionResult(
 {
     public IReadOnlyCollection<ArchitectureCycleFinding> CycleFindings { get; init; } =
         Array.Empty<ArchitectureCycleFinding>();
+
+    public IReadOnlyDictionary<string, int> ContractFamilyResultCounts { get; init; } =
+        new Dictionary<string, int>(StringComparer.Ordinal);
 }
 
 public interface IArchitectureContractExecutor

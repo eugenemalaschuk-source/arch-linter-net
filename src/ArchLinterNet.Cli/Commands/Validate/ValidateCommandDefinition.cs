@@ -33,6 +33,9 @@ internal sealed class ValidateCommandDefinition(ValidateCommandHandler handler)
                                 otherwise empty symbol set)
               --baseline <path> Path to baseline file to merge with policy ignores
               --timings         Print phase-level timing report to stderr
+              --profile <dest>  Write a machine-readable analysis-profile/v1 JSON
+                                document to stdout, stderr, or a file path.
+                                Independent of --timings/--report.
               --ensure-built    Build the selected project graph once, verify it via an
                                 ArchLinterNet build receipt, then validate (never implicit;
                                 opt-in only)
@@ -86,6 +89,7 @@ internal sealed class ValidateCommandDefinition(ValidateCommandHandler handler)
         Option<bool> jsonOption = new("--json");
         Option<string[]> reportOption = new("--report") { AllowMultipleArgumentsPerToken = true };
         Option<bool> timingsOption = new("--timings");
+        Option<string> profileOption = new("--profile");
         Option<bool> ensureBuiltOption = new("--ensure-built");
         Option<bool> noRestoreOption = new("--no-restore");
         Option<string> configurationOption = new("--configuration");
@@ -106,6 +110,7 @@ internal sealed class ValidateCommandDefinition(ValidateCommandHandler handler)
         command.Options.Add(jsonOption);
         command.Options.Add(reportOption);
         command.Options.Add(timingsOption);
+        command.Options.Add(profileOption);
         command.Options.Add(ensureBuiltOption);
         command.Options.Add(noRestoreOption);
         command.Options.Add(configurationOption);
@@ -121,6 +126,7 @@ internal sealed class ValidateCommandDefinition(ValidateCommandHandler handler)
             baselineOption,
             reportOption,
             timingsOption,
+            profileOption,
             ensureBuiltOption,
             noRestoreOption,
             configurationOption,
@@ -154,6 +160,7 @@ internal sealed class ValidateCommandDefinition(ValidateCommandHandler handler)
         Option<string> baselineOption,
         Option<string[]> reportOption,
         Option<bool> timingsOption,
+        Option<string> profileOption,
         Option<bool> ensureBuiltOption,
         Option<bool> noRestoreOption,
         Option<string> configurationOption,
@@ -193,6 +200,7 @@ internal sealed class ValidateCommandDefinition(ValidateCommandHandler handler)
             IsFormatExplicit = isFormatExplicit,
             AdditionalSinks = additionalSinks,
             ReportParseError = reportParseError,
+            ProfileDestination = parseResult.GetValue(profileOption),
         };
     }
 

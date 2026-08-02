@@ -24,6 +24,13 @@ public sealed class ArchitectureEngine : IDisposable, IAsyncDisposable
             .Validate(request, timing);
     }
 
+    public (ValidationOutcome Outcome, ArchitectureAnalysisSnapshotCounters Counters) ValidateWithCounters(
+        ValidationRequest request, ValidationTiming? timing = null)
+    {
+        return _serviceProvider.GetRequiredService<IArchitectureValidationApplicationService>()
+            .ValidateWithCounters(request, timing);
+    }
+
     public PolicyCheckOutcome CheckPolicy(string policyPath)
     {
         return _serviceProvider.GetRequiredService<IArchitecturePolicyCheckApplicationService>()

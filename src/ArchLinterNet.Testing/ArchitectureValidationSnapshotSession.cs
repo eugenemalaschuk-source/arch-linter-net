@@ -1,3 +1,4 @@
+using ArchLinterNet.Core.Profiling;
 using ArchLinterNet.Core.Reporting;
 using ArchLinterNet.Core.Validation;
 
@@ -8,7 +9,11 @@ namespace ArchLinterNet.Testing;
 // and/or audit against the one shared snapshot, and disposes it deterministically (typically via
 // a `using` block) instead of paying for one independent policy/project/assembly setup per
 // assertion.
-public sealed class ArchitectureValidationSnapshotSession(ArchitectureAnalysisSnapshot snapshot, ValidationTiming? timing)
+public sealed class ArchitectureValidationSnapshotSession(
+    ArchitectureAnalysisSnapshot snapshot,
+    ValidationTiming? timing,
+    bool collectProfile = false,
+    long allocatedBytesAtStart = 0)
     : IDisposable
 {
     public ArchitectureValidationResult ValidateStrict()
@@ -26,7 +31,18 @@ public sealed class ArchitectureValidationSnapshotSession(ArchitectureAnalysisSn
     private ArchitectureValidationResult Evaluate(string mode)
     {
         ValidationOutcome outcome = snapshot.Evaluate(mode, timing);
-        return ArchitectureValidationResultMapper.ToResult(outcome, timing, mode);
+
+        AnalysisProfile? profile = collectProfile
+            ? AnalysisProfileBuilder.Build(
+                snapshot.Counters, timing, renderedSinkCount: 0, outputSinkCount: 0,
+                ArchitectureValidationBuilder.ResolveCompletionStatus(outcome), cancellationObserved: false,
+                new ArchLinterNet.Core.Profiling.AnalysisProfileBuildOptions
+                {
+                    Measurements = ArchitectureValidationBuilder.CaptureMeasurements(allocatedBytesAtStart),
+                })
+            : null;
+
+        return ArchitectureValidationResultMapper.ToResult(outcome, timing, mode, profile);
     }
 
     public void Dispose()
