@@ -38,21 +38,24 @@ internal sealed partial class ValidateCommandHandler
         }
 
         string errorFormat = ResolveEffectiveFormat(options);
+        ValidationProfileExecutionState profileState = new();
 
         try
         {
-            return ExecuteValidation(options, errorFormat);
+            return ExecuteValidation(options, errorFormat, profileState);
         }
         // Must precede the general OperationCanceledException catch below (it is a subtype) — a
         // killed build/restore process that never confirmed exit carries evidence (which process,
         // what deadline) that a generic "cancelled" message would silently discard.
         catch (BuildStateProcessCleanupTimedOutException ex)
         {
+            WriteCancelledProfile(options, profileState);
             WriteCancellation(options, errorFormat, ex);
             return CliExitCodes.InvalidArgumentsOrRuntimeError;
         }
         catch (OperationCanceledException)
         {
+            WriteCancelledProfile(options, profileState);
             WriteCancellation(options, errorFormat);
             return CliExitCodes.InvalidArgumentsOrRuntimeError;
         }
@@ -375,6 +378,13 @@ internal sealed partial class ValidateCommandHandler
             return CliExitCodes.InvalidArgumentsOrRuntimeError;
         }
 
+        string? profileCollision = FindProfileFileCollision(options);
+        if (profileCollision is not null)
+        {
+            _console.Error.WriteLine(profileCollision);
+            return CliExitCodes.InvalidArgumentsOrRuntimeError;
+        }
+
         if (!PreValidateReportDestinations(options))
         {
             return CliExitCodes.InvalidArgumentsOrRuntimeError;
@@ -412,6 +422,71 @@ internal sealed partial class ValidateCommandHandler
         }
 
         return null;
+    }
+
+    // --profile writes directly, so it needs the same input protection as --report plus an
+    // explicit cross-output collision check. Without this, a profile can overwrite the policy
+    // that was just read or replace a report that this invocation has already committed.
+    private static string? FindProfileFileCollision(ValidateCommandOptions options)
+    {
+        if (!TryGetProfileFilePath(options, out string? profilePath))
+        {
+            return null;
+        }
+
+        HashSet<string> inputFiles = new(StringComparer.OrdinalIgnoreCase)
+        {
+            Path.GetFullPath(options.PolicyPath),
+        };
+        if (options.BaselinePath is not null)
+        {
+            inputFiles.Add(Path.GetFullPath(options.BaselinePath));
+        }
+
+        if (inputFiles.Contains(profilePath!))
+        {
+            return $"--profile destination '{options.ProfileDestination}' matches an input file";
+        }
+
+        foreach (ReportSink sink in options.AdditionalSinks)
+        {
+            if (sink.DestinationType == ReportDestinationType.File
+                && sink.FilePath is not null
+                && string.Equals(profilePath, Path.GetFullPath(sink.FilePath), StringComparison.OrdinalIgnoreCase))
+            {
+                return $"--profile destination '{options.ProfileDestination}' matches --report destination '{sink.FilePath}'";
+            }
+        }
+
+        return null;
+    }
+
+    private static string? FindProfileFileCollision(
+        ValidateCommandOptions options, IEnumerable<string> inputPaths, string inputDescription)
+    {
+        if (!TryGetProfileFilePath(options, out string? profilePath))
+        {
+            return null;
+        }
+
+        string? matchedPath = inputPaths.FirstOrDefault(inputPath =>
+            string.Equals(profilePath, Path.GetFullPath(inputPath), StringComparison.OrdinalIgnoreCase));
+        return matchedPath is null
+            ? null
+            : $"--profile destination '{options.ProfileDestination}' matches {inputDescription} '{matchedPath}'";
+    }
+
+    private static bool TryGetProfileFilePath(ValidateCommandOptions options, out string? profilePath)
+    {
+        if (options.ProfileDestination is null
+            || options.ProfileDestination is ProfileDestinationStdout or ProfileDestinationStderr)
+        {
+            profilePath = null;
+            return false;
+        }
+
+        profilePath = Path.GetFullPath(options.ProfileDestination);
+        return true;
     }
 
     private static string? FindImportFileCollision(ValidateCommandOptions options, IReadOnlyList<string> policyImportPaths)

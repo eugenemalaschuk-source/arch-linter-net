@@ -40,6 +40,7 @@ public sealed class ArchitectureSourceFileFactIndex
     private readonly IArchitectureFileSystem _fileSystem;
     private readonly IReadOnlyList<(string SourcePath, string AssemblyName)> _sourcePathAssemblyOwnership;
     private readonly CancellationToken _cancellationToken;
+    private readonly AnalysisSessionProfilingCounters? _profilingCounters;
     private readonly Lazy<FactIndexData> _data;
 
     public ArchitectureSourceFileFactIndex(
@@ -56,7 +57,8 @@ public sealed class ArchitectureSourceFileFactIndex
             preprocessorSymbols,
             fileSystem,
             default,
-            cancellationToken)
+            cancellationToken,
+            profilingCounters: null)
     {
     }
 
@@ -74,7 +76,8 @@ public sealed class ArchitectureSourceFileFactIndex
         IReadOnlyList<string>? preprocessorSymbols,
         IArchitectureFileSystem? fileSystem,
         ProjectOwnership projectOwnership,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        AnalysisSessionProfilingCounters? profilingCounters = null)
     {
         _targetAssemblies = targetAssemblies ?? throw new ArgumentNullException(nameof(targetAssemblies));
         _repositoryRoot = repositoryRoot ?? throw new ArgumentNullException(nameof(repositoryRoot));
@@ -87,6 +90,7 @@ public sealed class ArchitectureSourceFileFactIndex
             projectOwnership.ProjectDiscovery,
             projectOwnership.SourceRootAssemblyOwnership);
         _cancellationToken = cancellationToken;
+        _profilingCounters = profilingCounters;
         _data = new Lazy<FactIndexData>(BuildData);
     }
 
@@ -132,6 +136,7 @@ public sealed class ArchitectureSourceFileFactIndex
 
     private FactIndexData BuildData()
     {
+        _profilingCounters?.RecordFactIndexMaterialization();
         _cancellationToken.ThrowIfCancellationRequested();
 
         List<Assembly> sortedAssemblies = _targetAssemblies
@@ -288,6 +293,7 @@ public sealed class ArchitectureSourceFileFactIndex
     // owning assembly can be determined from the most specific known project subtree.
     private Dictionary<SourceFactKey, List<(string FilePath, ArchitectureTypeKind Kind)>> RunSourceScan()
     {
+        _profilingCounters?.RecordSourceScanPass();
         Dictionary<SourceFactKey, List<(string FilePath, ArchitectureTypeKind Kind)>> sourceMap = [];
         IReadOnlyList<(string SourceRoot, string AssemblyName)> ownershipEntries = _sourcePathAssemblyOwnership
             .Select(static entry => (entry.SourcePath, entry.AssemblyName))
@@ -313,6 +319,7 @@ public sealed class ArchitectureSourceFileFactIndex
                     continue;
                 }
 
+                _profilingCounters?.RecordSourceFileScanned();
                 ProcessSourceFile(sourceMap, assemblyName, absoluteRoot, absoluteFile);
             }
         }

@@ -23,6 +23,8 @@ public sealed class ValidateCommandHandlerProfileTests
     {
         public string Version => "1.2.3";
 
+        public Exception? ExceptionToThrow { get; init; }
+
         public bool TryParseGraphLevel(string value, out ArchitectureGraphLevel level)
         {
             level = ArchitectureGraphLevel.Namespace;
@@ -31,6 +33,11 @@ public sealed class ValidateCommandHandlerProfileTests
 
         public ValidationOutcome Validate(ValidationRequest request, ValidationTiming? timing)
         {
+            if (ExceptionToThrow is not null)
+            {
+                throw ExceptionToThrow;
+            }
+
             return new ValidationOutcome(
                 Passed: true,
                 Violations: Array.Empty<ArchitectureViolation>(),
@@ -216,6 +223,66 @@ public sealed class ValidateCommandHandlerProfileTests
 
         Assert.That(exitCode, Is.EqualTo(CliExitCodes.Success));
         Assert.That(console.StdErr, Does.Not.Contain("Validation timings:"));
+    }
+
+    [Test]
+    public void Execute_CancelledDuringAnalysis_WritesCancelledProfile()
+    {
+        FakeCliConsole console = new();
+        FakeFileSystem fileSystem = new(exists: true);
+        ValidateCommandHandler handler = new(
+            new FakeCliRuntime { ExceptionToThrow = new OperationCanceledException("cancelled") },
+            console,
+            fileSystem);
+
+        int exitCode = handler.Execute(BaseOptions(profileDestination: "cancelled-profile.json"));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(exitCode, Is.EqualTo(CliExitCodes.InvalidArgumentsOrRuntimeError));
+            Assert.That(fileSystem.DirectWrites, Contains.Key("cancelled-profile.json"));
+            using JsonDocument document = JsonDocument.Parse(fileSystem.DirectWrites["cancelled-profile.json"]);
+            Assert.That(document.RootElement.GetProperty("CompletionStatus").GetString(), Is.EqualTo("Cancelled"));
+            Assert.That(document.RootElement.GetProperty("CancellationObserved").GetBoolean(), Is.True);
+        });
+    }
+
+    [Test]
+    public void Execute_ProfileDestinationMatchingPolicy_IsRejectedBeforeWriting()
+    {
+        FakeCliConsole console = new();
+        FakeFileSystem fileSystem = new(exists: true);
+        ValidateCommandHandler handler = new(new FakeCliRuntime(), console, fileSystem);
+
+        int exitCode = handler.Execute(BaseOptions(profileDestination: "policy.yml"));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(exitCode, Is.EqualTo(CliExitCodes.InvalidArgumentsOrRuntimeError));
+            Assert.That(console.StdErr, Does.Contain("--profile destination 'policy.yml' matches an input file"));
+            Assert.That(fileSystem.DirectWrites, Is.Empty);
+        });
+    }
+
+    [Test]
+    public void Execute_ProfileDestinationMatchingReport_IsRejectedBeforeWriting()
+    {
+        FakeCliConsole console = new();
+        FakeFileSystem fileSystem = new(exists: true);
+        ValidateCommandHandler handler = new(new FakeCliRuntime(), console, fileSystem);
+        ValidateCommandOptions options = BaseOptions(profileDestination: "result.json") with
+        {
+            AdditionalSinks = [new ReportSink("json", ReportDestinationType.File, "result.json")],
+        };
+
+        int exitCode = handler.Execute(options);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(exitCode, Is.EqualTo(CliExitCodes.InvalidArgumentsOrRuntimeError));
+            Assert.That(console.StdErr, Does.Contain("matches --report destination 'result.json'"));
+            Assert.That(fileSystem.DirectWrites, Is.Empty);
+        });
     }
 
     private sealed class FakeCliConsole : ICliConsole

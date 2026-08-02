@@ -38,24 +38,23 @@ public sealed class AnalysisProfileBenchmarkHarness
         Assert.That(File.Exists(CliDllPath()), Is.True,
             $"CLI not built at {CliDllPath()} — run `rtk dotnet build` first.");
 
-        using AdoptionAcceptanceFixture successFixture = AdoptionAcceptanceFixture.Create("large-multi-host");
-        string failingPolicyPath = Path.Combine(successFixture.Root, "dependencies.failing.arch.yml");
-
         List<ScenarioSummary> summaries = new();
 
-        // Scenarios 1 & 2 share one fixture instance so scenario 2 is genuinely "warm" after
-        // scenario 1's cold run — the first --ensure-built call pays the real `dotnet build` cost
-        // (reflected in that sample's PreflightMs), every later call on the same directory is a
-        // fast up-to-date check.
-        List<RunSample> strictSeries = RunSeries(
-            successFixture.Root, successFixture.PolicyPath, mode: "strict", ensureBuilt: true,
-            extraArgs: null, count: RunsPerScenario, prime: false);
+        // Every cold sample gets a fresh, never-built fixture. A single first run cannot provide
+        // a meaningful p95, and splitting one shared series into 1 cold + 9 warm samples violates
+        // the required ten-run-per-scenario evidence contract.
+        List<RunSample> coldSeries = RunColdSeries(RunsPerScenario);
         summaries.Add(Summarize(
             "1-cold-process-warm-filesystem-strict", "First --ensure-built run on a never-built fixture copy",
-            strictSeries.Take(1).ToList()));
+            coldSeries));
+
+        using AdoptionAcceptanceFixture warmFixture = AdoptionAcceptanceFixture.Create("large-multi-host");
+        List<RunSample> warmSeries = RunSeries(
+            warmFixture.Root, warmFixture.PolicyPath, mode: "strict", ensureBuilt: true,
+            extraArgs: null, count: RunsPerScenario, prime: true);
         summaries.Add(Summarize(
             "2-immediate-warm-strict-repeat", "Same fixture, repeat --ensure-built runs (no persistent cache exists yet — #365)",
-            strictSeries.Skip(1).ToList()));
+            warmSeries));
 
         // Scenario 3: strict and audit as two separate legacy-style processes.
         using AdoptionAcceptanceFixture legacyFixture = AdoptionAcceptanceFixture.Create("large-multi-host");
@@ -102,6 +101,8 @@ public sealed class AnalysisProfileBenchmarkHarness
 
         // Scenario 7: representative success/validation-failure/preparation-failure paths.
         // Success is already demonstrated by scenarios 1/2/3/4/5 above.
+        using AdoptionAcceptanceFixture successFixture = AdoptionAcceptanceFixture.Create("large-multi-host");
+        string failingPolicyPath = Path.Combine(successFixture.Root, "dependencies.failing.arch.yml");
         List<RunSample> validationFailureSeries = RunSeries(
             successFixture.Root, failingPolicyPath, mode: "strict", ensureBuilt: true,
             extraArgs: null, count: RunsPerScenario, prime: true);
@@ -149,6 +150,18 @@ public sealed class AnalysisProfileBenchmarkHarness
         for (int i = 0; i < count; i++)
         {
             samples.Add(RunOnce(fixtureRoot, policyPath, mode, ensureBuilt, extraArgs));
+        }
+
+        return samples;
+    }
+
+    private static List<RunSample> RunColdSeries(int count)
+    {
+        List<RunSample> samples = new(count);
+        for (int i = 0; i < count; i++)
+        {
+            using AdoptionAcceptanceFixture fixture = AdoptionAcceptanceFixture.Create("large-multi-host");
+            samples.Add(RunOnce(fixture.Root, fixture.PolicyPath, "strict", ensureBuilt: true, extraArgs: null));
         }
 
         return samples;

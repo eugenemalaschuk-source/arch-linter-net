@@ -33,7 +33,8 @@ public static class AnalysisProfileBuilder
             {
                 if (entry.Count.HasValue)
                 {
-                    contractFamilyCounts[entry.Name] = entry.Count.Value;
+                    contractFamilyCounts.TryGetValue(entry.Name, out int existingCount);
+                    contractFamilyCounts[entry.Name] = existingCount + entry.Count.Value;
                 }
             }
         }

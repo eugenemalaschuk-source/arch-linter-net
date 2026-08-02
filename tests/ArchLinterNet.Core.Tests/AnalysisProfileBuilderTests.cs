@@ -17,6 +17,10 @@ public sealed class AnalysisProfileBuilderTests
         ProjectGraphEvaluations = 1,
         AssemblyLoads = 1,
         ModesEvaluated = modes,
+        SnapshotMaterializations = 1,
+        FactIndexMaterializations = 1,
+        SourceScanPasses = 1,
+        SourceFilesScanned = 7,
     };
 
     private static ValidationTiming TimingWithContractFamilies()
@@ -68,6 +72,36 @@ public sealed class AnalysisProfileBuilderTests
         {
             Assert.That(profile.Counters.ContractFamilyCounts["dependency"], Is.EqualTo(5));
             Assert.That(profile.Counters.ContractFamilyCounts["coverage"], Is.EqualTo(2));
+        });
+    }
+
+    [Test]
+    public void Build_RepeatedContractFamilyMeasurements_AreSummedAcrossModes()
+    {
+        var timing = new ValidationTiming();
+        using (timing.MeasureContractFamily("dependency", () => 3)) { }
+        using (timing.MeasureContractFamily("dependency", () => 2)) { }
+
+        AnalysisProfile profile = AnalysisProfileBuilder.Build(
+            Counters(modes: 2), timing, renderedSinkCount: 1, outputSinkCount: 1,
+            AnalysisProfileCompletionStatus.Success, cancellationObserved: false);
+
+        Assert.That(profile.Counters.ContractFamilyCounts["dependency"], Is.EqualTo(5));
+    }
+
+    [Test]
+    public void Build_ExposesSnapshotFactIndexAndSourceCounters()
+    {
+        AnalysisProfile profile = AnalysisProfileBuilder.Build(
+            Counters(), timing: null, renderedSinkCount: 1, outputSinkCount: 1,
+            AnalysisProfileCompletionStatus.Success, cancellationObserved: false);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(profile.Counters.SnapshotMaterializations, Is.EqualTo(1));
+            Assert.That(profile.Counters.FactIndexMaterializations, Is.EqualTo(1));
+            Assert.That(profile.Counters.SourceScanPasses, Is.EqualTo(1));
+            Assert.That(profile.Counters.SourceFilesScanned, Is.EqualTo(7));
         });
     }
 

@@ -10,7 +10,10 @@ namespace ArchLinterNet.Testing;
 // a `using` block) instead of paying for one independent policy/project/assembly setup per
 // assertion.
 public sealed class ArchitectureValidationSnapshotSession(
-    ArchitectureAnalysisSnapshot snapshot, ValidationTiming? timing, bool collectProfile = false)
+    ArchitectureAnalysisSnapshot snapshot,
+    ValidationTiming? timing,
+    bool collectProfile = false,
+    long allocatedBytesAtStart = 0)
     : IDisposable
 {
     public ArchitectureValidationResult ValidateStrict()
@@ -32,7 +35,8 @@ public sealed class ArchitectureValidationSnapshotSession(
         AnalysisProfile? profile = collectProfile
             ? AnalysisProfileBuilder.Build(
                 snapshot.Counters, timing, renderedSinkCount: 0, outputSinkCount: 0,
-                ArchitectureValidationBuilder.ResolveCompletionStatus(outcome), cancellationObserved: false)
+                ArchitectureValidationBuilder.ResolveCompletionStatus(outcome), cancellationObserved: false,
+                AnalysisProfileMeasurements.Capture(allocatedBytesAtStart))
             : null;
 
         return ArchitectureValidationResultMapper.ToResult(outcome, timing, mode, profile);

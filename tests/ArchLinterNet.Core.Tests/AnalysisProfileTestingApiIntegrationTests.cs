@@ -51,9 +51,11 @@ public sealed class AnalysisProfileTestingApiIntegrationTests
         {
             Assert.That(result.Profile!.Counters.PolicyCompositions, Is.EqualTo(1));
             Assert.That(result.Profile.Counters.ProjectGraphEvaluations, Is.EqualTo(1));
+            Assert.That(result.Profile.Counters.SnapshotMaterializations, Is.EqualTo(1));
             Assert.That(result.Profile.CompletionStatus, Is.EqualTo(AnalysisProfileCompletionStatus.Success));
             Assert.That(result.Profile.CancellationObserved, Is.False);
             Assert.That(result.Profile.SchemaId, Is.EqualTo(AnalysisProfileId.V1));
+            Assert.That(result.Profile.Measurements, Is.Not.Null);
         });
     }
 
@@ -73,6 +75,39 @@ public sealed class AnalysisProfileTestingApiIntegrationTests
             Assert.That(strict.Profile!.Counters.PolicyCompositions, Is.EqualTo(1));
             Assert.That(audit.Profile!.Counters.PolicyCompositions, Is.EqualTo(1));
             Assert.That(audit.Profile.Counters.ModesEvaluated, Is.EqualTo(2));
+        });
+    }
+
+    [Test]
+    public void ValidateStrict_WithProfile_FactIndexMaterializesAtMostOncePerSnapshot()
+    {
+        string tempDir = Path.Combine(Path.GetTempPath(), $"arch-linter-analysis-profile-fact-index-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(tempDir);
+        string policyPath = Path.Combine(tempDir, "dependencies.arch.yml");
+        File.WriteAllText(policyPath, """
+            version: 1
+            name: Fact index test
+
+            analysis:
+              target_assemblies: [ArchLinterNet.Core]
+
+            contracts:
+              strict_layout_conventions:
+                - name: exercise the fact index
+                  files_matching:
+                    namespace_segment: Execution
+                  require_type_kind: class
+            """);
+
+        ArchitectureValidationResult result = new ArchitectureValidationBuilder(policyPath).WithProfile().ValidateStrict();
+
+        Assert.That(result.Profile, Is.Not.Null);
+        Assert.Multiple(() =>
+        {
+            Assert.That(result.Profile!.Counters.SnapshotMaterializations, Is.EqualTo(1));
+            Assert.That(result.Profile.Counters.FactIndexMaterializations, Is.EqualTo(1));
+            Assert.That(result.Profile.Counters.SourceScanPasses, Is.EqualTo(0));
+            Assert.That(result.Profile.Counters.SourceFilesScanned, Is.EqualTo(0));
         });
     }
 }

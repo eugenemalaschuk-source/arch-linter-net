@@ -30,6 +30,7 @@ public sealed class ArchitectureAnalysisSnapshot : IDisposable
     private readonly IArchitectureContractExecutor _contractExecutor;
     private readonly IArchitectureContractHandlerRegistry _handlerRegistry;
     private readonly IReadOnlyCollection<string>? _requestedContractIds;
+    private readonly AnalysisSessionProfilingCounters _profilingCounters;
     private readonly object _gate = new();
     private readonly Dictionary<string, ValidationOutcome> _evaluatedModes = new(StringComparer.Ordinal);
     private ArchitectureAnalysisSnapshotCounters _counters;
@@ -64,12 +65,14 @@ public sealed class ArchitectureAnalysisSnapshot : IDisposable
         _contractExecutor = contractExecutor;
         _handlerRegistry = handlerRegistry;
         _requestedContractIds = requestedContractIds;
+        _profilingCounters = setup.Runner.Session.Context.ProfilingCounters;
 
         _counters = new ArchitectureAnalysisSnapshotCounters
         {
             PolicyCompositions = policyCompositions,
             ProjectGraphEvaluations = projectGraphEvaluations,
-            AssemblyLoads = assemblyLoads
+            AssemblyLoads = assemblyLoads,
+            SnapshotMaterializations = 1,
         };
     }
 
@@ -86,7 +89,12 @@ public sealed class ArchitectureAnalysisSnapshot : IDisposable
         {
             lock (_gate)
             {
-                return _counters;
+                return _counters with
+                {
+                    FactIndexMaterializations = _profilingCounters.FactIndexMaterializations,
+                    SourceScanPasses = _profilingCounters.SourceScanPasses,
+                    SourceFilesScanned = _profilingCounters.SourceFilesScanned,
+                };
             }
         }
     }

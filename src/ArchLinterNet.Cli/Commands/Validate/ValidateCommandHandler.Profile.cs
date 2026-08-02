@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using ArchLinterNet.Core.Profiling;
 using ArchLinterNet.Core.Reporting;
 using ArchLinterNet.Core.Validation;
@@ -17,6 +16,23 @@ internal sealed partial class ValidateCommandHandler
     // validation work is not guaranteed to stay on one thread.
     private readonly long _allocatedBytesAtStart = GC.GetTotalAllocatedBytes(precise: false);
 
+    private sealed class ValidationProfileExecutionState
+    {
+        public ValidationTiming? Timing { get; set; }
+
+        public ArchitectureAnalysisSnapshotCounters? Counters { get; set; }
+    }
+
+    private void WriteCancelledProfile(ValidateCommandOptions options, ValidationProfileExecutionState state)
+    {
+        WriteProfile(
+            options,
+            state.Counters ?? new ArchitectureAnalysisSnapshotCounters(),
+            state.Timing,
+            AnalysisProfileCompletionStatus.Cancelled,
+            cancellationObserved: true);
+    }
+
     // No-op unless --profile was requested — omitting it leaves command output completely
     // unchanged, per openspec/specs/analysis-profile/spec.md, "CLI exposes the profile via a
     // dedicated opt-in option". Writes directly (open/write/close), not staged-then-renamed like
@@ -34,16 +50,7 @@ internal sealed partial class ValidateCommandHandler
             return;
         }
 
-        AnalysisProfileMeasurements measurements = new()
-        {
-            // .NET's Process.PeakWorkingSet64 is a documented no-op returning 0 on some platforms
-            // (observed on macOS) rather than throwing — a real process's peak working set is
-            // never actually 0, so treat that as "unavailable" and degrade to null explicitly
-            // instead of publishing a misleadingly precise zero (issue #374's "unavailable
-            // platform metrics must degrade explicitly, not disappear ambiguously").
-            PeakWorkingSetBytes = PositiveOrNull(Process.GetCurrentProcess().PeakWorkingSet64),
-            AllocatedBytesTotal = GC.GetTotalAllocatedBytes(precise: false) - _allocatedBytesAtStart,
-        };
+        AnalysisProfileMeasurements measurements = AnalysisProfileMeasurements.Capture(_allocatedBytesAtStart);
 
         AnalysisProfile profile = AnalysisProfileBuilder.Build(
             counters,
@@ -56,8 +63,6 @@ internal sealed partial class ValidateCommandHandler
 
         WriteProfileToDestination(options.ProfileDestination, AnalysisProfileJsonWriter.Write(profile));
     }
-
-    private static long? PositiveOrNull(long value) => value > 0 ? value : null;
 
     private void WriteProfileToDestination(string destination, string json)
     {

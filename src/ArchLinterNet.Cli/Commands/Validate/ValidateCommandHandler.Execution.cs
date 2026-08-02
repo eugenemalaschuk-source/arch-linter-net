@@ -25,16 +25,18 @@ internal sealed partial class ValidateCommandHandler
         return true;
     }
 
-    private int ExecuteValidation(ValidateCommandOptions options, string errorFormat)
+    private int ExecuteValidation(
+        ValidateCommandOptions options, string errorFormat, ValidationProfileExecutionState profileState)
     {
         TryParseModes(options.Mode, out IReadOnlyList<string> modes, out _);
 
         return modes.Count == 1
-            ? ExecuteSingleMode(options, modes[0], errorFormat)
-            : ExecuteCombinedModes(options, modes, errorFormat);
+            ? ExecuteSingleMode(options, modes[0], errorFormat, profileState)
+            : ExecuteCombinedModes(options, modes, errorFormat, profileState);
     }
 
-    private int ExecuteSingleMode(ValidateCommandOptions options, string mode, string errorFormat)
+    private int ExecuteSingleMode(
+        ValidateCommandOptions options, string mode, string errorFormat, ValidationProfileExecutionState profileState)
     {
         // A profile always needs a real ValidationTiming instance to derive contract-family
         // counts (see AnalysisProfileBuilder) even when --timings' human report was not
@@ -43,15 +45,25 @@ internal sealed partial class ValidateCommandHandler
         ValidationTiming? timing = options.TimingsEnabled || options.ProfileDestination is not null
             ? new ValidationTiming()
             : null;
+        profileState.Timing = timing;
         ValidationRequest request = BuildValidationRequest(options, mode);
 
         (ValidationOutcome outcome, ArchitectureAnalysisSnapshotCounters counters) =
             _runtime.ValidateWithCounters(request, timing);
+        profileState.Counters = counters;
 
         string? importCollision = FindImportFileCollision(options, outcome.PolicyImportPaths);
         if (importCollision is not null)
         {
             _console.Error.WriteLine(importCollision);
+            return CliExitCodes.InvalidArgumentsOrRuntimeError;
+        }
+
+        string? profileImportCollision = FindProfileFileCollision(
+            options, outcome.PolicyImportPaths, "imported policy file");
+        if (profileImportCollision is not null)
+        {
+            _console.Error.WriteLine(profileImportCollision);
             return CliExitCodes.InvalidArgumentsOrRuntimeError;
         }
 
@@ -62,10 +74,27 @@ internal sealed partial class ValidateCommandHandler
             return CliExitCodes.InvalidArgumentsOrRuntimeError;
         }
 
+        string? profileReceiptCollision = FindProfileFileCollision(
+            options, outcome.ResolvedAssemblyPaths.SelectMany(path => new[] { path, BuildReceiptStore.ReceiptPathFor(path) }),
+            "a build artifact or receipt loaded during this run");
+        if (profileReceiptCollision is not null)
+        {
+            _console.Error.WriteLine(profileReceiptCollision);
+            return CliExitCodes.InvalidArgumentsOrRuntimeError;
+        }
+
         string? projectCollision = FindDiscoveredProjectFileCollision(options, outcome.DiscoveredProjectPaths);
         if (projectCollision is not null)
         {
             _console.Error.WriteLine(projectCollision);
+            return CliExitCodes.InvalidArgumentsOrRuntimeError;
+        }
+
+        string? profileProjectCollision = FindProfileFileCollision(
+            options, outcome.DiscoveredProjectPaths, "a project file loaded during this run");
+        if (profileProjectCollision is not null)
+        {
+            _console.Error.WriteLine(profileProjectCollision);
             return CliExitCodes.InvalidArgumentsOrRuntimeError;
         }
 
@@ -97,13 +126,18 @@ internal sealed partial class ValidateCommandHandler
     // discovery, and assembly loading happen once (inside _runtime.CreateSnapshot), and each
     // requested mode is evaluated against that same snapshot — see issue #363 /
     // openspec/specs/analysis-snapshot/spec.md.
-    private int ExecuteCombinedModes(ValidateCommandOptions options, IReadOnlyList<string> modes, string errorFormat)
+    private int ExecuteCombinedModes(
+        ValidateCommandOptions options,
+        IReadOnlyList<string> modes,
+        string errorFormat,
+        ValidationProfileExecutionState profileState)
     {
         // See the identical comment in ExecuteSingleMode: a profile needs a real ValidationTiming
         // instance regardless of whether --timings' human report was also requested.
         ValidationTiming? timing = options.TimingsEnabled || options.ProfileDestination is not null
             ? new ValidationTiming()
             : null;
+        profileState.Timing = timing;
         AnalysisSnapshotRequest snapshotRequest = new()
         {
             PolicyPath = options.PolicyPath,
@@ -119,6 +153,7 @@ internal sealed partial class ValidateCommandHandler
         };
 
         using ArchitectureAnalysisSnapshot snapshot = _runtime.CreateSnapshot(snapshotRequest, timing);
+        profileState.Counters = snapshot.Counters;
 
         bool allPassed = true;
         List<(string Mode, ValidationOutcome Outcome)> outcomesByMode = new();
@@ -138,10 +173,27 @@ internal sealed partial class ValidateCommandHandler
             return CliExitCodes.InvalidArgumentsOrRuntimeError;
         }
 
+        string? profileImportCollision = FindProfileFileCollision(
+            options, outcomesByMode[0].Outcome.PolicyImportPaths, "imported policy file");
+        if (profileImportCollision is not null)
+        {
+            _console.Error.WriteLine(profileImportCollision);
+            return CliExitCodes.InvalidArgumentsOrRuntimeError;
+        }
+
         string? receiptCollision = FindReceiptFileCollision(options, outcomesByMode[0].Outcome.ResolvedAssemblyPaths);
         if (receiptCollision is not null)
         {
             _console.Error.WriteLine(receiptCollision);
+            return CliExitCodes.InvalidArgumentsOrRuntimeError;
+        }
+
+        string? profileReceiptCollision = FindProfileFileCollision(
+            options, outcomesByMode[0].Outcome.ResolvedAssemblyPaths.SelectMany(path => new[] { path, BuildReceiptStore.ReceiptPathFor(path) }),
+            "a build artifact or receipt loaded during this run");
+        if (profileReceiptCollision is not null)
+        {
+            _console.Error.WriteLine(profileReceiptCollision);
             return CliExitCodes.InvalidArgumentsOrRuntimeError;
         }
 
@@ -150,6 +202,14 @@ internal sealed partial class ValidateCommandHandler
         if (projectCollision is not null)
         {
             _console.Error.WriteLine(projectCollision);
+            return CliExitCodes.InvalidArgumentsOrRuntimeError;
+        }
+
+        string? profileProjectCollision = FindProfileFileCollision(
+            options, outcomesByMode[0].Outcome.DiscoveredProjectPaths, "a project file loaded during this run");
+        if (profileProjectCollision is not null)
+        {
+            _console.Error.WriteLine(profileProjectCollision);
             return CliExitCodes.InvalidArgumentsOrRuntimeError;
         }
 

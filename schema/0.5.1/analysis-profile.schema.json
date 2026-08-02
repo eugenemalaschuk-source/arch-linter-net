@@ -13,6 +13,7 @@
       "type": "object",
       "required": [
         "PolicyCompositions", "ProjectGraphEvaluations", "AssemblyLoads", "ModesEvaluated",
+        "SnapshotMaterializations", "FactIndexMaterializations", "SourceScanPasses", "SourceFilesScanned",
         "ContractFamilyCounts", "RenderedSinkCount", "OutputSinkCount", "Cache", "Concurrency"
       ],
       "properties": {
@@ -20,6 +21,10 @@
         "ProjectGraphEvaluations": { "type": "integer", "minimum": 0 },
         "AssemblyLoads": { "type": "integer", "minimum": 0 },
         "ModesEvaluated": { "type": "integer", "minimum": 0 },
+        "SnapshotMaterializations": { "type": "integer", "minimum": 0 },
+        "FactIndexMaterializations": { "type": "integer", "minimum": 0 },
+        "SourceScanPasses": { "type": "integer", "minimum": 0 },
+        "SourceFilesScanned": { "type": "integer", "minimum": 0 },
         "ContractFamilyCounts": {
           "type": "object",
           "additionalProperties": { "type": "integer", "minimum": 0 }

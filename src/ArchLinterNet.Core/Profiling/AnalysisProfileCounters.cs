@@ -16,6 +16,14 @@ public sealed record AnalysisProfileCounters
 
     public required int ModesEvaluated { get; init; }
 
+    public required int SnapshotMaterializations { get; init; }
+
+    public required int FactIndexMaterializations { get; init; }
+
+    public required int SourceScanPasses { get; init; }
+
+    public required int SourceFilesScanned { get; init; }
+
     // Contract-family name -> number of contracts executed for that family, for whichever mode(s)
     // were evaluated. Sourced from ValidationTiming's per-family Count (see
     // ArchitectureContractExecutor.ExecuteStandardFamily/ExecuteCoverageFamily), not re-derived
@@ -46,6 +54,10 @@ public sealed record AnalysisProfileCounters
             ProjectGraphEvaluations = snapshotCounters.ProjectGraphEvaluations,
             AssemblyLoads = snapshotCounters.AssemblyLoads,
             ModesEvaluated = snapshotCounters.ModesEvaluated,
+            SnapshotMaterializations = snapshotCounters.SnapshotMaterializations,
+            FactIndexMaterializations = snapshotCounters.FactIndexMaterializations,
+            SourceScanPasses = snapshotCounters.SourceScanPasses,
+            SourceFilesScanned = snapshotCounters.SourceFilesScanned,
             ContractFamilyCounts = contractFamilyCounts,
             RenderedSinkCount = renderedSinkCount,
             OutputSinkCount = outputSinkCount,

@@ -152,6 +152,7 @@ public sealed class ArchitectureValidationBuilder
     // above are unaffected and keep performing independent runs.
     public ArchitectureValidationSnapshotSession CreateSnapshot()
     {
+        long allocatedBytesAtStart = GC.GetTotalAllocatedBytes(precise: false);
         AnalysisSnapshotRequest request = new()
         {
             PolicyPath = _policyPath,
@@ -168,11 +169,12 @@ public sealed class ArchitectureValidationBuilder
 
         ValidationTiming? timing = _collectTimings || _collectProfile ? new ValidationTiming() : null;
         ArchitectureAnalysisSnapshot snapshot = _engine.Value.CreateSnapshot(request, timing);
-        return new ArchitectureValidationSnapshotSession(snapshot, timing, _collectProfile);
+        return new ArchitectureValidationSnapshotSession(snapshot, timing, _collectProfile, allocatedBytesAtStart);
     }
 
     private ArchitectureValidationResult Validate(string mode)
     {
+        long allocatedBytesAtStart = GC.GetTotalAllocatedBytes(precise: false);
         ValidationRequest request = new()
         {
             PolicyPath = _policyPath,
@@ -195,7 +197,8 @@ public sealed class ArchitectureValidationBuilder
         AnalysisProfile? profile = _collectProfile
             ? AnalysisProfileBuilder.Build(
                 counters, timing, renderedSinkCount: 0, outputSinkCount: 0,
-                ResolveCompletionStatus(outcome), cancellationObserved: false)
+                ResolveCompletionStatus(outcome), cancellationObserved: false,
+                AnalysisProfileMeasurements.Capture(allocatedBytesAtStart))
             : null;
 
         return ArchitectureValidationResultMapper.ToResult(outcome, timing, mode, profile);

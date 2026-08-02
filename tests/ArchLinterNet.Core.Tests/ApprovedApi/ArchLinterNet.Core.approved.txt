@@ -3054,17 +3054,22 @@ sealed class ArchLinterNet.Core.Profiling.AnalysisProfileCounters : System.IEqua
   property ArchLinterNet.Core.Profiling.AnalysisProfileConcurrencyCounters Concurrency {get;init;}
   property System.Collections.Generic.IReadOnlyDictionary<string,int> ContractFamilyCounts {get;init;}
   property int AssemblyLoads {get;init;}
+  property int FactIndexMaterializations {get;init;}
   property int ModesEvaluated {get;init;}
   property int OutputSinkCount {get;init;}
   property int PolicyCompositions {get;init;}
   property int ProjectGraphEvaluations {get;init;}
   property int RenderedSinkCount {get;init;}
+  property int SnapshotMaterializations {get;init;}
+  property int SourceFilesScanned {get;init;}
+  property int SourceScanPasses {get;init;}
 static class ArchLinterNet.Core.Profiling.AnalysisProfileId
   field const string V1 = "analysis-profile/v1"
 static class ArchLinterNet.Core.Profiling.AnalysisProfileJsonWriter
   method static string Write(ArchLinterNet.Core.Profiling.AnalysisProfile profile)
 sealed class ArchLinterNet.Core.Profiling.AnalysisProfileMeasurements : System.IEquatable<ArchLinterNet.Core.Profiling.AnalysisProfileMeasurements>
   ctor()
+  method static ArchLinterNet.Core.Profiling.AnalysisProfileMeasurements Capture(long allocatedBytesAtStart)
   method ArchLinterNet.Core.Profiling.AnalysisProfileMeasurements <Clone>$()
   method bool Equals(ArchLinterNet.Core.Profiling.AnalysisProfileMeasurements? other)
   method bool Equals(object? obj)
@@ -3390,9 +3395,13 @@ sealed class ArchLinterNet.Core.Validation.ArchitectureAnalysisSnapshotCounters 
   operator !=(ArchLinterNet.Core.Validation.ArchitectureAnalysisSnapshotCounters? left, ArchLinterNet.Core.Validation.ArchitectureAnalysisSnapshotCounters? right)
   operator ==(ArchLinterNet.Core.Validation.ArchitectureAnalysisSnapshotCounters? left, ArchLinterNet.Core.Validation.ArchitectureAnalysisSnapshotCounters? right)
   property int AssemblyLoads {get;init;}
+  property int FactIndexMaterializations {get;init;}
   property int ModesEvaluated {get;init;}
   property int PolicyCompositions {get;init;}
   property int ProjectGraphEvaluations {get;init;}
+  property int SnapshotMaterializations {get;init;}
+  property int SourceFilesScanned {get;init;}
+  property int SourceScanPasses {get;init;}
 sealed class ArchLinterNet.Core.Validation.ArchitectureBaselineApplicationService : ArchLinterNet.Core.Validation.Abstractions.IArchitectureBaselineApplicationService
   ctor(ArchLinterNet.Core.Execution.Abstractions.IArchitectureRunnerSetupService runnerSetupService, ArchLinterNet.Core.Execution.Abstractions.IArchitectureContractHandlerRegistry handlerRegistry, ArchLinterNet.Core.Execution.Abstractions.IArchitectureContractExecutor contractExecutor, ArchLinterNet.Core.Contracts.Abstractions.IArchitectureBaselineGenerator baselineGenerator, ArchLinterNet.Core.Contracts.Abstractions.IArchitectureBaselineLoadingService baselineLoadingService)
   method ArchLinterNet.Core.Validation.BaselineDiffOutcome Diff(ArchLinterNet.Core.Validation.BaselineDiffRequest request)
