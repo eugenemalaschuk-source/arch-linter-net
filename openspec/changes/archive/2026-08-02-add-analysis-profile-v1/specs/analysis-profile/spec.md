@@ -8,11 +8,11 @@ The system SHALL provide an `AnalysisProfile` model identified by the constant s
 - **THEN** the human-readable timing report's phase names, order, and values are identical to what they would be without building a profile
 
 ### Requirement: Deterministic counters are separated from environment-dependent measurements
-The system SHALL group `AnalysisProfile` fields into a deterministic `Counters` section (policy compositions, project-graph evaluations, assembly loads, modes evaluated, contract-family execution/result counts, render count, output-sink count, fact-index materializations) and a nullable `Measurements` section (peak working set bytes, allocated bytes) plus nullable per-phase `ElapsedMs`. Deterministic counters SHALL be populated identically regardless of whether timing collection is enabled; nullable measurement fields SHALL be `null` when the underlying `ValidationTiming` is not supplied, and non-null when it is.
+The system SHALL group `AnalysisProfile` fields into a `Counters` section (policy compositions, project-graph evaluations, assembly loads, modes evaluated, contract-family execution counts, rendered-sink count, output-sink count) and a nullable `Measurements` section (peak working set bytes, allocated bytes) plus nullable per-phase `ElapsedMs`. `Counters.PolicyCompositions`, `ProjectGraphEvaluations`, `AssemblyLoads`, `ModesEvaluated`, `RenderedSinkCount`, and `OutputSinkCount` SHALL be populated identically regardless of whether a `ValidationTiming` instance backed the run. `Counters.ContractFamilyCounts` is sourced from that `ValidationTiming` instance's own per-family counts and SHALL be empty when none was supplied — the CLI's `--profile` option and the Testing API's `WithProfile()` always supply one internally when profiling is requested (independent of whether `--timings`' human report was also requested), so this is only reachable through a direct `AnalysisProfileBuilder.Build` call with `timing: null`. `Measurements` and each phase's `ElapsedMs` SHALL be `null` when no `ValidationTiming` instance backed the run, and populated when one did.
 
 #### Scenario: Counters are identical whether or not timing is enabled
 - **WHEN** the same validation request is profiled once with timing collection enabled and once without it
-- **THEN** every field under `Counters` is identical between the two profiles, and only `Measurements` and per-phase `ElapsedMs` differ (present vs. `null`)
+- **THEN** `Counters.PolicyCompositions`, `ProjectGraphEvaluations`, `AssemblyLoads`, `ModesEvaluated`, `RenderedSinkCount`, and `OutputSinkCount` are identical between the two profiles, while `Counters.ContractFamilyCounts`, `Phases`, and `Measurements` are empty/`null` only in the profile built without timing
 
 #### Scenario: Timing/resource fields never affect validation outcome
 - **WHEN** a validation request is run once with `--profile` enabled and once without it
@@ -55,11 +55,11 @@ The system SHALL provide a `--profile <stdout|stderr|file-path>` option on the C
 - **THEN** the profile JSON is written to stdout in addition to the requested format/report output, and the existing `--format`/`--report` output is unchanged
 
 ### Requirement: Testing API exposes the same profile semantics as the CLI
-The system SHALL let `ArchLinterNet.Testing` consumers opt into profile collection via `ArchitectureValidationBuilder.WithProfile()` and read the resulting `AnalysisProfile` from `ArchitectureValidationResult.Profile`, built through the same `AnalysisProfileBuilder` the CLI uses, so a profile obtained through the Testing API and one obtained through the CLI for equivalent inputs contain identical `Counters`.
+The system SHALL let `ArchLinterNet.Testing` consumers opt into profile collection via `ArchitectureValidationBuilder.WithProfile()` (and the shared-snapshot `ArchitectureValidationSnapshotSession`) and read the resulting `AnalysisProfile` from `ArchitectureValidationResult.Profile`, built through the same `AnalysisProfileBuilder` and fed by the same `ArchitectureAnalysisSnapshotCounters` type the CLI's `--profile` option uses — one shared implementation in Core, not two independently maintained ones. `RenderedSinkCount`/`OutputSinkCount` are host-specific: the Testing API has no CLI-style output sinks, so it always reports `0` for both, distinct from the CLI's minimum of `1`.
 
-#### Scenario: Testing API profile matches CLI profile counters for equivalent input
-- **WHEN** the same policy and target assemblies are validated once via the CLI with `--profile` and once via `ArchitectureValidationBuilder.WithProfile()`
-- **THEN** both profiles' `Counters` sections are identical
+#### Scenario: Testing API reports real snapshot-derived counters
+- **WHEN** a policy is validated via `ArchitectureValidationBuilder.WithProfile()`
+- **THEN** `Counters.PolicyCompositions` and `Counters.ProjectGraphEvaluations` reflect the actual snapshot built for that run (e.g. both equal `1` for ordinary single-mode preparation), and `Counters.ModesEvaluated` reflects every mode evaluated against a shared `CreateSnapshot()` session
 
 #### Scenario: Profile is absent unless explicitly requested
 - **WHEN** an `ArchitectureValidationBuilder` run does not call `WithProfile()`
