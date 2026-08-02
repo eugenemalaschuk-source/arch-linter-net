@@ -36,7 +36,12 @@ internal sealed partial class ValidateCommandHandler
 
         AnalysisProfileMeasurements measurements = new()
         {
-            PeakWorkingSetBytes = Process.GetCurrentProcess().PeakWorkingSet64,
+            // .NET's Process.PeakWorkingSet64 is a documented no-op returning 0 on some platforms
+            // (observed on macOS) rather than throwing — a real process's peak working set is
+            // never actually 0, so treat that as "unavailable" and degrade to null explicitly
+            // instead of publishing a misleadingly precise zero (issue #374's "unavailable
+            // platform metrics must degrade explicitly, not disappear ambiguously").
+            PeakWorkingSetBytes = PositiveOrNull(Process.GetCurrentProcess().PeakWorkingSet64),
             AllocatedBytesTotal = GC.GetTotalAllocatedBytes(precise: false) - _allocatedBytesAtStart,
         };
 
@@ -51,6 +56,8 @@ internal sealed partial class ValidateCommandHandler
 
         WriteProfileToDestination(options.ProfileDestination, AnalysisProfileJsonWriter.Write(profile));
     }
+
+    private static long? PositiveOrNull(long value) => value > 0 ? value : null;
 
     private void WriteProfileToDestination(string destination, string json)
     {
