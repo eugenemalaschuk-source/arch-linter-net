@@ -45,6 +45,32 @@ namespace ExternalDependencyContractTestsFixtures.Core
             _ = clients.Count;
         }
     }
+
+    // Method-body tokens inside a generic declaring type resolve against the declaring type's
+    // generic arguments, so this fixture exercises a non-empty generic context in IL token
+    // resolution (and its cache key).
+    public sealed class CoreGenericTypeWithVendorCall<T>
+    {
+        public static void DoWork()
+        {
+            _ = new ExternalDependencyContractTestsFixtures.VendorSdk.Client();
+        }
+
+        public void UseValue(T value)
+        {
+            _ = value?.ToString();
+        }
+    }
+
+    // Same, for a generic method's own arguments.
+    public sealed class CoreTypeWithGenericMethodVendorCall
+    {
+        public static void DoWork<T>()
+        {
+            _ = new ExternalDependencyContractTestsFixtures.VendorSdk.Client();
+            _ = default(T);
+        }
+    }
 }
 
 namespace ExternalDependencyContractTestsFixtures.VendorSdk

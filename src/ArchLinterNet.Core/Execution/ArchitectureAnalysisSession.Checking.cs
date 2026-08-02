@@ -687,6 +687,12 @@ public sealed partial class ArchitectureAnalysisSession
 
         ArchitectureContractExecutionContext executionContext = CreateExecutionContext(contract, contract.IgnoredViolations);
 
+        // One scanner for every forbidden group of this contract: each group walks the same source
+        // types over the same IL, so sharing the instance shares its IL-token resolution cache
+        // instead of re-resolving every token once per group (issue #419). Group matching itself
+        // stays per call, so the shared instance cannot leak one group's verdicts into another.
+        ArchitectureExternalDependencyIlScanner ilScanner = new();
+
         foreach (string externalGroupName in contract.Forbidden)
         {
             if (!Document.ExternalDependencies.TryGetValue(externalGroupName, out ArchitectureExternalDependencyGroup? externalGroup))
@@ -700,7 +706,7 @@ public sealed partial class ArchitectureAnalysisSession
                 externalGroup,
                 executionContext));
 
-            violations.AddRange(new ArchitectureExternalDependencyIlScanner().FindMethodBodyViolations(
+            violations.AddRange(ilScanner.FindMethodBodyViolations(
                 sourceTypes,
                 externalGroupName,
                 externalGroup,

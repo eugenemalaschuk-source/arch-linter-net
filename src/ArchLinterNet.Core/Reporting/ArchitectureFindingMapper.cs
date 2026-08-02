@@ -13,7 +13,7 @@ public static class ArchitectureFindingMapper
         ArchitectureDiagnostic diagnostic = ArchitectureDiagnosticMapper.FromViolation(violation);
         ArchitectureViolationIdentity identity = violation.Identity ?? BuildIdentity(diagnostic);
         ArchitectureDiagnostic projected = violation.Identities.Count > 1
-            ? ProjectDiagnosticForIdentity(diagnostic, identity)
+            ? ProjectDiagnosticForIdentity(diagnostic, identity, AttributedReference(violation, 0))
             : diagnostic;
         return Create(projected, identity, mode);
     }
@@ -85,13 +85,18 @@ public static class ArchitectureFindingMapper
                     ? new[] { identity }
                     : new[] { BuildIdentity(diagnostic) };
             bool isAggregated = identities.Count > 1;
+            int identityIndex = 0;
             foreach (ArchitectureViolationIdentity expandedIdentity in identities)
             {
                 cancellationToken.ThrowIfCancellationRequested();
                 findings.Add(Create(
-                    isAggregated ? ProjectDiagnosticForIdentity(diagnostic, expandedIdentity) : diagnostic,
+                    isAggregated
+                        ? ProjectDiagnosticForIdentity(
+                            diagnostic, expandedIdentity, AttributedReference(violation, identityIndex))
+                        : diagnostic,
                     expandedIdentity,
                     mode));
+                identityIndex++;
             }
         }
 
@@ -293,23 +298,34 @@ public static class ArchitectureFindingMapper
         };
     }
 
+    // Returns the reference identity attachment paired with the identity at <paramref name="index"/>,
+    // or null when this violation carries no pairing.
+    private static string? AttributedReference(ArchitectureViolation violation, int index)
+    {
+        IReadOnlyList<string> attributed = violation.IdentityReferences;
+        return attributed.Count == violation.Identities.Count && index < attributed.Count
+            ? attributed[index]
+            : null;
+    }
+
     private static ArchitectureDiagnostic ProjectDiagnosticForIdentity(
         ArchitectureDiagnostic diagnostic,
-        ArchitectureViolationIdentity identity)
+        ArchitectureViolationIdentity identity,
+        string? attributedReference)
     {
         return diagnostic switch
         {
             DependencyDiagnostic dependency =>
-                dependency with { ForbiddenReferences = ReferencesForIdentity(dependency.ForbiddenReferences, identity) },
+                dependency with { ForbiddenReferences = ReferencesForIdentity(dependency.ForbiddenReferences, identity, attributedReference) },
             ExternalDependencyDiagnostic external =>
-                external with { ForbiddenReferences = ReferencesForIdentity(external.ForbiddenReferences, identity) },
+                external with { ForbiddenReferences = ReferencesForIdentity(external.ForbiddenReferences, identity, attributedReference) },
             PackageDependencyDiagnostic package =>
-                package with { ForbiddenReferences = ReferencesForIdentity(package.ForbiddenReferences, identity) },
+                package with { ForbiddenReferences = ReferencesForIdentity(package.ForbiddenReferences, identity, attributedReference) },
             PackageAllowOnlyDiagnostic package =>
-                package with { ForbiddenReferences = ReferencesForIdentity(package.ForbiddenReferences, identity) },
+                package with { ForbiddenReferences = ReferencesForIdentity(package.ForbiddenReferences, identity, attributedReference) },
             FrameworkReferenceDiagnostic framework => framework with
             {
-                ForbiddenReferences = ReferencesForIdentity(framework.ForbiddenReferences, identity),
+                ForbiddenReferences = ReferencesForIdentity(framework.ForbiddenReferences, identity, attributedReference),
                 Evidence = FrameworkEvidenceForIdentity(
                     framework.Evidence,
                     framework.ForbiddenReferences,
@@ -317,29 +333,42 @@ public static class ArchitectureFindingMapper
             },
             FrameworkReferenceAllowOnlyDiagnostic framework => framework with
             {
-                ForbiddenReferences = ReferencesForIdentity(framework.ForbiddenReferences, identity),
+                ForbiddenReferences = ReferencesForIdentity(framework.ForbiddenReferences, identity, attributedReference),
                 Evidence = FrameworkEvidenceForIdentity(
                     framework.Evidence,
                     framework.ForbiddenReferences,
                     identity),
             },
             CompositionDiagnostic composition =>
-                composition with { ForbiddenReferences = ReferencesForIdentity(composition.ForbiddenReferences, identity) },
+                composition with { ForbiddenReferences = ReferencesForIdentity(composition.ForbiddenReferences, identity, attributedReference) },
             _ => diagnostic,
         };
     }
 
     private static IReadOnlyCollection<string> ReferencesForIdentity(
         IReadOnlyCollection<string> references,
-        ArchitectureViolationIdentity identity)
+        ArchitectureViolationIdentity identity,
+        string? attributedReference)
     {
+        // Identity attachment already paired this identity with the reference it was selected for.
+        // That pairing is authoritative: it is the only thing that separates two occurrences whose
+        // identities differ solely by Occurrence and whose displays differ solely by IL offset.
+        if (attributedReference is not null)
+        {
+            return new[] { attributedReference };
+        }
+
         if (identity.TargetMember is not { Length: > 0 } targetMember)
         {
             return references;
         }
 
+        // No pairing (a violation built outside identity attachment): fall back to matching the
+        // display text. This still attributes the common shapes, but cannot split occurrences that
+        // share a (source member, target member) pair — they keep every reference of that pair.
         string[] selected = references
-            .Where(reference => ReferenceMatchesIdentity(reference, targetMember))
+            .Where(reference => ReferenceMatchesIdentity(reference, targetMember)
+                || ReferenceMatchesSourceQualifiedIdentity(reference, identity.SourceMember, targetMember))
             .ToArray();
         return selected.Length == 0 ? references : selected;
     }
@@ -371,6 +400,56 @@ public static class ArchitectureFindingMapper
         reference.Equals(targetMember, StringComparison.Ordinal)
         || reference.StartsWith(targetMember + "@", StringComparison.Ordinal)
         || reference.StartsWith(targetMember + " ", StringComparison.Ordinal);
+
+    // The method-body families report one reference per (source member, target member) occurrence
+    // and build its display from exactly those two parts, with the target member at the *end*:
+    //
+    //   "<source member>: <target member>"                       — external dependency IL scan
+    //   "il <offset> (<source member>): <pattern> -> <target>"    — forbidden-call IL scan
+    //
+    // ReferenceMatchesIdentity above only anchors on the start of the reference, so it never
+    // attributed those, and every identity of such a violation fell back to the violation's whole
+    // reference list. A violation with N occurrences then serialized N x N references — on a broad
+    // `audit_external` group that turned 17k real references into 2.4M and exhausted memory before
+    // the report could be written (issue #419). Attributing them also fixes the content itself: a
+    // finding no longer claims the references that belong to its siblings.
+    private static bool ReferenceMatchesSourceQualifiedIdentity(
+        string reference,
+        string? sourceMember,
+        string targetMember)
+    {
+        if (sourceMember is not { Length: > 0 })
+        {
+            return false;
+        }
+
+        // The target member terminates the display and is always preceded by a space (": " or "-> ").
+        if (reference.Length <= targetMember.Length
+            || reference[reference.Length - targetMember.Length - 1] != ' '
+            || !reference.EndsWith(targetMember, StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        // The source member is named verbatim, closed by ':' or wrapped in parentheses. Anchoring on
+        // that delimiter stops a member whose name is a prefix of another's (Convert vs ConvertNode)
+        // from claiming the other's reference.
+        int index = reference.IndexOf(sourceMember, StringComparison.Ordinal);
+        while (index >= 0)
+        {
+            int after = index + sourceMember.Length;
+            if (after < reference.Length
+                && (reference[after] == ':'
+                    || (reference[after] == ')' && index > 0 && reference[index - 1] == '(')))
+            {
+                return true;
+            }
+
+            index = reference.IndexOf(sourceMember, index + 1, StringComparison.Ordinal);
+        }
+
+        return false;
+    }
 
     private static string? PolicyErrorImportPosition(ArchitecturePolicyErrorDiagnostic policyError) =>
         policyError.ImportChain.Count == 0

@@ -20,6 +20,33 @@ internal sealed class ArchitectureExternalDependencyIlScanner : IArchitectureExt
 {
     private static readonly Dictionary<ushort, OpCode> _opCodes = BuildOpCodeMap();
 
+    // Module.ResolveMember is one of the most expensive reflection APIs, and a whole-assembly IL
+    // walk hits the same metadata token over and over (every call site of the same method, every
+    // access to the same field). Resolution depends only on the module, the token and the generic
+    // context the token is resolved in, so the result is cached across every method and every
+    // external group this scanner instance scans. The cache is bounded by the number of distinct
+    // tokens actually walked and is never shared between scanner instances, keeping it
+    // deterministic and per-run.
+    private readonly Dictionary<IlTokenKey, MemberInfo?> _resolvedMembers = new();
+
+    // Seam over Module.ResolveMember. The cache is invisible in the scanner's results — an uncached
+    // implementation reports exactly the same findings — so a test can only prove the cache exists
+    // by observing how often resolution is actually requested. This is that observation point;
+    // production always goes through the parameterless constructor below.
+    private readonly Func<Module, int, Type[], Type[], MemberInfo?> _resolveMember;
+
+    public ArchitectureExternalDependencyIlScanner()
+        : this(static (module, token, typeArguments, methodArguments) =>
+            module.ResolveMember(token, typeArguments, methodArguments))
+    {
+    }
+
+    internal ArchitectureExternalDependencyIlScanner(
+        Func<Module, int, Type[], Type[], MemberInfo?> resolveMember)
+    {
+        _resolveMember = resolveMember;
+    }
+
     public IEnumerable<ArchitectureViolation> FindMethodBodyViolations(
         Type[] sourceTypes,
         string externalGroupName,
@@ -27,6 +54,10 @@ internal sealed class ArchitectureExternalDependencyIlScanner : IArchitectureExt
         ArchitectureContractExecutionContext executionContext,
         CancellationToken cancellationToken = default)
     {
+        // Group matching is per external group, so its cache lives for one call while the token
+        // resolution cache above spans the whole scanner instance.
+        Dictionary<MemberInfo, ExternalMemberMatch?> matchedTypes = new();
+
         // Checked per type — the same IL-scanning-per-type boundary
         // ArchitectureIlMethodBodyScanner/ArchitectureTypeIndex already use.
         foreach (Type sourceType in sourceTypes)
@@ -34,7 +65,7 @@ internal sealed class ArchitectureExternalDependencyIlScanner : IArchitectureExt
             cancellationToken.ThrowIfCancellationRequested();
             string sourceTypeName = ArchitectureTypeNames.SafeFullName(sourceType);
             string sourceAssembly = sourceType.Assembly.GetName().Name ?? string.Empty;
-            string[] forbiddenReferences = FindTypeMatches(sourceType, externalGroup)
+            string[] forbiddenReferences = FindTypeMatches(sourceType, externalGroup, matchedTypes)
                 .Where(match => !executionContext.IsIgnored(
                     sourceTypeName,
                     match.Display,
@@ -65,13 +96,14 @@ internal sealed class ArchitectureExternalDependencyIlScanner : IArchitectureExt
         }
     }
 
-    private static IEnumerable<ExternalIlMatch> FindTypeMatches(
+    private IEnumerable<ExternalIlMatch> FindTypeMatches(
         Type sourceType,
-        ArchitectureExternalDependencyGroup externalGroup)
+        ArchitectureExternalDependencyGroup externalGroup,
+        Dictionary<MemberInfo, ExternalMemberMatch?> matchedTypes)
     {
         foreach (MethodBase method in EnumerateMethods(sourceType))
         {
-            foreach (ExternalIlMatch match in FindMethodMatches(method, externalGroup))
+            foreach (ExternalIlMatch match in FindMethodMatches(method, externalGroup, matchedTypes))
             {
                 yield return match;
             }
@@ -95,9 +127,10 @@ internal sealed class ArchitectureExternalDependencyIlScanner : IArchitectureExt
         }
     }
 
-    private static IEnumerable<ExternalIlMatch> FindMethodMatches(
+    private IEnumerable<ExternalIlMatch> FindMethodMatches(
         MethodBase method,
-        ArchitectureExternalDependencyGroup externalGroup)
+        ArchitectureExternalDependencyGroup externalGroup,
+        Dictionary<MemberInfo, ExternalMemberMatch?> matchedTypes)
     {
         MethodBody? body;
         try
@@ -121,6 +154,13 @@ internal sealed class ArchitectureExternalDependencyIlScanner : IArchitectureExt
         }
 
         string methodName = $"{method.DeclaringType?.FullName}.{method.Name}";
+        if (!IlGenericContext.TryCreate(method, out IlGenericContext genericContext))
+        {
+            // Reading the generic context used to happen inside the per-token resolve, where a
+            // failure made every token of this method unresolvable. Hoisting it out of the loop
+            // keeps that outcome: no token of this method can produce a match.
+            yield break;
+        }
 
         int position = 0;
         while (position < il.Length)
@@ -140,23 +180,31 @@ internal sealed class ArchitectureExternalDependencyIlScanner : IArchitectureExt
                 continue;
             }
 
-            MemberInfo? referencedMember = ResolveReferencedMember(method, token);
+            MemberInfo? referencedMember = ResolveReferencedMember(method.Module, token, genericContext);
             if (referencedMember == null)
             {
                 continue;
             }
 
-            string? matchedType = FindMatchedExternalType(referencedMember, externalGroup);
-            if (matchedType == null)
+            if (!matchedTypes.TryGetValue(referencedMember, out ExternalMemberMatch? memberMatch))
+            {
+                string? matched = FindMatchedExternalType(referencedMember, externalGroup);
+                memberMatch = matched == null
+                    ? null
+                    : new ExternalMemberMatch(matched, referencedMember.DeclaringType?.Assembly.GetName().Name);
+                matchedTypes[referencedMember] = memberMatch;
+            }
+
+            if (memberMatch == null)
             {
                 continue;
             }
 
             yield return new ExternalIlMatch(
-                $"{methodName}: {matchedType}",
+                $"{methodName}: {memberMatch.MatchedType}",
                 methodName,
-                matchedType,
-                referencedMember.DeclaringType?.Assembly.GetName().Name);
+                memberMatch.MatchedType,
+                memberMatch.TargetAssembly);
         }
     }
 
@@ -165,6 +213,87 @@ internal sealed class ArchitectureExternalDependencyIlScanner : IArchitectureExt
         string SourceMember,
         string TargetType,
         string? TargetAssembly);
+
+    // Per-member outcome of matching a resolved IL reference against one external group: the
+    // matched type name plus the assembly name reported alongside it.
+    private sealed record ExternalMemberMatch(string MatchedType, string? TargetAssembly);
+
+    // The generic arguments Module.ResolveMember needs to resolve a token that appears inside a
+    // generic type or generic method. Two methods on the same declaring type share the declaring
+    // type's arguments, so caching keyed on this collapses the whole type's tokens into one set.
+    private readonly record struct IlGenericContext(Type[] TypeArguments, Type[] MethodArguments)
+    {
+        public static bool TryCreate(MethodBase method, out IlGenericContext context)
+        {
+            try
+            {
+                Type[] typeArgs = method.DeclaringType?.IsGenericType == true
+                    ? method.DeclaringType.GetGenericArguments()
+                    : Type.EmptyTypes;
+
+                Type[] methodArgs = method.IsGenericMethod
+                    ? method.GetGenericArguments()
+                    : Type.EmptyTypes;
+
+                context = new IlGenericContext(typeArgs, methodArgs);
+                return true;
+            }
+            catch
+            {
+                context = new IlGenericContext(Type.EmptyTypes, Type.EmptyTypes);
+                return false;
+            }
+        }
+
+        public bool Equals(IlGenericContext other)
+        {
+            return SameArguments(TypeArguments, other.TypeArguments)
+                && SameArguments(MethodArguments, other.MethodArguments);
+        }
+
+        public override int GetHashCode()
+        {
+            HashCode hash = new();
+            hash.Add(TypeArguments.Length);
+            foreach (Type argument in TypeArguments)
+            {
+                hash.Add(argument);
+            }
+
+            hash.Add(MethodArguments.Length);
+            foreach (Type argument in MethodArguments)
+            {
+                hash.Add(argument);
+            }
+
+            return hash.ToHashCode();
+        }
+
+        private static bool SameArguments(Type[] left, Type[] right)
+        {
+            if (ReferenceEquals(left, right))
+            {
+                return true;
+            }
+
+            if (left.Length != right.Length)
+            {
+                return false;
+            }
+
+            for (int i = 0; i < left.Length; i++)
+            {
+                if (left[i] != right[i])
+                {
+                    return false;
+                }
+            }
+
+            return true;
+        }
+    }
+
+    private readonly record struct IlTokenKey(Module Module, int Token, IlGenericContext GenericContext);
 
     private static string? FindMatchedExternalType(
         MemberInfo member,
@@ -248,24 +377,28 @@ internal sealed class ArchitectureExternalDependencyIlScanner : IArchitectureExt
         }
     }
 
-    private static MemberInfo? ResolveReferencedMember(MethodBase method, int token)
+    private MemberInfo? ResolveReferencedMember(Module module, int token, IlGenericContext genericContext)
     {
+        IlTokenKey key = new(module, token, genericContext);
+        if (_resolvedMembers.TryGetValue(key, out MemberInfo? cached))
+        {
+            return cached;
+        }
+
+        MemberInfo? resolved;
         try
         {
-            Type[] typeArgs = method.DeclaringType?.IsGenericType == true
-                ? method.DeclaringType.GetGenericArguments()
-                : Type.EmptyTypes;
-
-            Type[] methodArgs = method.IsGenericMethod
-                ? method.GetGenericArguments()
-                : Type.EmptyTypes;
-
-            return method.Module.ResolveMember(token, typeArgs, methodArgs);
+            resolved = _resolveMember(module, token, genericContext.TypeArguments, genericContext.MethodArguments);
         }
         catch
         {
-            return null;
+            // Unresolvable tokens are cached too: a token that cannot be resolved once cannot be
+            // resolved later either, and re-throwing per call site is exactly the cost being removed.
+            resolved = null;
         }
+
+        _resolvedMembers[key] = resolved;
+        return resolved;
     }
 
     private static bool TryReadOpCode(byte[] il, ref int position, out OpCode opCode)
