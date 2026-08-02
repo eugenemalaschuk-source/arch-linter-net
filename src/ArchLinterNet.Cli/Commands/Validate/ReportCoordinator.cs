@@ -36,7 +36,7 @@ internal readonly record struct RouteResult(
     public IReadOnlyList<string> RenderedFormats { get; init; } = Array.Empty<string>();
 }
 
-internal sealed class ReportCoordinator
+internal sealed partial class ReportCoordinator
 {
     private const int MaxReportBytes = 100 * 1024 * 1024;
     private const string FormatHuman = "human";
@@ -187,86 +187,6 @@ internal sealed class ReportCoordinator
         }
 
         return BuildRouteResult(Array.Empty<ReportSink>(), evidence, cancelled: false);
-    }
-
-    private string FormatHumanContent(
-        bool isSingleMode,
-        IReadOnlyList<(string Mode, ValidationOutcome Outcome)> outcomesByMode,
-        CancellationToken cancellationToken)
-    {
-        return isSingleMode
-            ? FormatSingleHuman(outcomesByMode[0].Outcome, cancellationToken)
-            : FormatCombinedHuman(outcomesByMode, cancellationToken);
-    }
-
-    private static string? RenderContent(
-        string? needed,
-        string format,
-        Func<string> render,
-        SinkDistributionEvidence evidence,
-        ValidationTiming? timing)
-    {
-        if (needed is null)
-        {
-            return null;
-        }
-
-        string content;
-        using (timing?.Measure($"render_{format}"))
-            content = render();
-        evidence.RecordRenderedFormat(format);
-        return content;
-    }
-
-    private static string FormatStructuredContent(
-        bool isSingleMode,
-        IReadOnlyList<(string Mode, ValidationOutcome Outcome)> outcomesByMode,
-        Func<string, ValidationOutcome, CancellationToken, string> formatSingle,
-        Func<IReadOnlyList<(string Mode, ValidationOutcome Outcome)>, CancellationToken, string> formatCombined,
-        CancellationToken cancellationToken)
-    {
-        return isSingleMode
-            ? formatSingle(outcomesByMode[0].Mode, outcomesByMode[0].Outcome, cancellationToken)
-            : formatCombined(outcomesByMode, cancellationToken);
-    }
-
-    private static Dictionary<string, string> BuildContentByFormat(string? humanContent, string? jsonContent, string? sarifContent)
-    {
-        Dictionary<string, string> contentByFormat = new();
-        if (humanContent is not null)
-        {
-            contentByFormat[FormatHuman] = humanContent;
-        }
-        if (jsonContent is not null)
-        {
-            contentByFormat[FormatJson] = jsonContent;
-        }
-        if (sarifContent is not null)
-        {
-            contentByFormat[FormatSarif] = sarifContent;
-        }
-        return contentByFormat;
-    }
-
-    // Re-renders the full report for one format from an already-computed outcome — the contract
-    // execution and analysis this reads from already happened; this only re-serializes it. Used to
-    // embed the complete normalized findings into an output-routing-error document, so a sink
-    // failure never reduces what reaches the user to bare pass/fail counts.
-    public string RenderReportContent(
-        string format, bool isSingleMode, IReadOnlyList<(string Mode, ValidationOutcome Outcome)> outcomesByMode)
-    {
-        return format switch
-        {
-            FormatJson => isSingleMode
-                ? FormatSingleJson(outcomesByMode[0].Mode, outcomesByMode[0].Outcome)
-                : FormatCombinedJson(outcomesByMode),
-            FormatSarif => isSingleMode
-                ? FormatSingleSarif(outcomesByMode[0].Mode, outcomesByMode[0].Outcome)
-                : FormatCombinedSarif(outcomesByMode),
-            _ => isSingleMode
-                ? FormatSingleHuman(outcomesByMode[0].Outcome)
-                : FormatCombinedHuman(outcomesByMode),
-        };
     }
 
     // Routes error content (policy load failures, unexpected runtime errors) to every configured
