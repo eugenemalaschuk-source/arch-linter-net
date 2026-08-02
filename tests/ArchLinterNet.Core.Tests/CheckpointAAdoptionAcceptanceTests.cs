@@ -33,7 +33,8 @@ public sealed class CheckpointAAdoptionAcceptanceTests
             Assert.That(root.GetProperty("checkpoint").GetString(), Is.EqualTo("A"));
             Assert.That(root.GetProperty("release_gate").GetBoolean(), Is.False);
             Assert.That(root.GetProperty("synthetic_identities_only").GetBoolean(), Is.True);
-            Assert.That(shapes, Is.EqualTo(new[] { "clean-checkout", "migration", "multi-host", "multi-project", "small" }));
+            Assert.That(shapes, Is.EqualTo(new[]
+                { "clean-checkout", "large-multi-host", "migration", "multi-host", "multi-project", "small" }));
             Assert.That(reusers, Is.EqualTo(new[] { "#374", "#411", "#366" }));
             Assert.That(root.GetProperty("scenarios").EnumerateArray()
                 .Select(scenario => scenario.GetProperty("owner").GetString()),
@@ -45,7 +46,8 @@ public sealed class CheckpointAAdoptionAcceptanceTests
                 .GetProperty("entrypoint").GetString(),
                 Is.EqualTo("ValidateCommandHandlerReportModeTests.CheckpointA_HumanJsonAndSarifSinks_ExecuteOneAnalysis"));
             Assert.That(DeclaredFixtureRoots(root),
-                Is.EqualTo(new[] { "clean-checkout", "migration", "multi-host", "multi-project", "small" }));
+                Is.EqualTo(new[]
+                    { "clean-checkout", "large-multi-host", "migration", "multi-host", "multi-project", "small" }));
         });
     }
 

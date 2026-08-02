@@ -1,0 +1,25 @@
+version: 1
+name: Synthetic large multi-host adopter
+analysis:
+  target_assemblies:
+    - Synthetic.HostA
+    - Synthetic.HostB
+    - Synthetic.HostC
+    - Synthetic.HostD
+    - Synthetic.HostE
+    - Synthetic.HostF
+    - Synthetic.HostG
+    - Synthetic.HostH
+    - Synthetic.SharedLib1
+    - Synthetic.SharedLib2
+  projects:
+    - src/Synthetic.HostA/Synthetic.HostA.csproj
+    - src/Synthetic.HostB/Synthetic.HostB.csproj
+    - src/Synthetic.HostC/Synthetic.HostC.csproj
+    - src/Synthetic.HostD/Synthetic.HostD.csproj
+    - src/Synthetic.HostE/Synthetic.HostE.csproj
+    - src/Synthetic.HostF/Synthetic.HostF.csproj
+    - src/Synthetic.HostG/Synthetic.HostG.csproj
+    - src/Synthetic.HostH/Synthetic.HostH.csproj
+    - src/Synthetic.SharedLib1/Synthetic.SharedLib1.csproj
+    - src/Synthetic.SharedLib2/Synthetic.SharedLib2.csproj
