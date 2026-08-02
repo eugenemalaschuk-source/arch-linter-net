@@ -263,7 +263,13 @@ public sealed class ArchitectureAnalysisSessionMethodBodyProjectAwareTests
             "No fallback diagnostic should appear when project discovery was never configured.");
     }
 
+    // Writes a real project and drives MSBuild-backed project-aware analysis over it, so its wall
+    // time tracks the runner rather than this repository's code — the same reason every other
+    // build-bound test here carries an exemption. It was missing one and only tripped the 15 s
+    // default on the slowest CI runner (Intel macOS: ~17 s, against ~10 s elsewhere), which is why
+    // it stayed green until a slow runner exposed it.
     [Test]
+    [CancelAfter(120_000)]
     public void CheckMethodBodyContract_DiscoveryConfiguredButProjectNotRestored_EmitsFallbackDiagnosticAndStillDetectsViolations()
     {
         string notRestoredDir = Path.Combine(_fixtureRoot, "Fixture.NotRestored");
