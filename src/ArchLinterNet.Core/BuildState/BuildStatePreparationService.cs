@@ -419,26 +419,59 @@ public sealed class BuildStatePreparationService : IBuildStatePreparationService
         using Process process = new() { StartInfo = startInfo };
         StringBuilder stdOut = new();
         StringBuilder stdErr = new();
+        object outputGate = new();
+        TaskCompletionSource outputCompleted = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        TaskCompletionSource errorCompleted = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
         // Both streams must be drained concurrently with the process running, not sequentially
         // after Start() — `dotnet build`/`dotnet restore` can write enough to either pipe to fill
         // its OS buffer, and reading only one stream (or reading one fully before starting the
         // other) blocks the child process on the unread pipe while this process blocks on
         // ReadToEnd/WaitForExit, deadlocking both.
-        process.OutputDataReceived += (_, e) => { if (e.Data != null) { stdOut.AppendLine(e.Data); } };
-        process.ErrorDataReceived += (_, e) => { if (e.Data != null) { stdErr.AppendLine(e.Data); } };
+        process.OutputDataReceived += (_, e) =>
+        {
+            if (e.Data is null)
+            {
+                outputCompleted.TrySetResult();
+            }
+            else
+            {
+                lock (outputGate)
+                {
+                    stdOut.AppendLine(e.Data);
+                }
+            }
+        };
+        process.ErrorDataReceived += (_, e) =>
+        {
+            if (e.Data is null)
+            {
+                errorCompleted.TrySetResult();
+            }
+            else
+            {
+                lock (outputGate)
+                {
+                    stdErr.AppendLine(e.Data);
+                }
+            }
+        };
 
         process.Start();
         process.BeginOutputReadLine();
         process.BeginErrorReadLine();
-        WaitForExitOrCancellation(process, request.CancellationToken);
+        WaitForExitOrCancellation(process, request.CancellationToken, outputCompleted.Task, errorCompleted.Task);
 
         if (process.ExitCode == 0)
         {
             return null;
         }
 
-        string combinedOutput = (stdOut.ToString() + stdErr).Trim();
+        string combinedOutput;
+        lock (outputGate)
+        {
+            combinedOutput = (stdOut.ToString() + stdErr).Trim();
+        }
 
         // Built directly from the same `arguments` list actually passed to ProcessStartInfo,
         // rather than reconstructed from individual request fields — that reconstruction had
@@ -466,15 +499,22 @@ public sealed class BuildStatePreparationService : IBuildStatePreparationService
     // scale of a dotnet build/restore invocation (seconds at minimum).
     private const int ProcessPollIntervalMs = 100;
     private const int ProcessExitAfterKillTimeoutMs = 5_000;
+    private const int OutputDrainTimeoutMs = 1_000;
 
-    private static void WaitForExitOrCancellation(Process process, CancellationToken cancellationToken)
+    private static void WaitForExitOrCancellation(
+        Process process,
+        CancellationToken cancellationToken,
+        Task outputCompleted,
+        Task errorCompleted)
     {
         WaitForExitOrCancellationCore(process.WaitForExit, () => TryKillProcessTree(process), process.Id, cancellationToken);
 
-        // The timed overload only observes process termination. Complete the parameterless
-        // wait before consuming the asynchronously populated StringBuilders so the final
-        // OutputDataReceived/ErrorDataReceived callbacks have drained as documented by Process.
-        process.WaitForExit();
+        // Process.WaitForExit() would wait indefinitely for asynchronous output callbacks after
+        // the child has already exited. On macOS, an exited dotnet build can leave an inherited
+        // output descriptor open and make that wait hang the CLI forever. Preserve normal complete
+        // diagnostics by waiting briefly for both terminal callbacks, but bound the wait so an
+        // orphaned descriptor cannot prevent preflight completion or benchmark evidence.
+        Task.WaitAll([outputCompleted, errorCompleted], OutputDrainTimeoutMs, cancellationToken);
 
         // The loop above can also exit normally (WaitForExit(ProcessPollIntervalMs) returned true)
         // in the same interval the token was cancelled, without ever reaching the check inside the

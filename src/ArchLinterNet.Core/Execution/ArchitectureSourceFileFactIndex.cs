@@ -40,6 +40,7 @@ public sealed class ArchitectureSourceFileFactIndex
     private readonly IArchitectureFileSystem _fileSystem;
     private readonly IReadOnlyList<(string SourcePath, string AssemblyName)> _sourcePathAssemblyOwnership;
     private readonly CancellationToken _cancellationToken;
+    private readonly AnalysisSessionProfilingCounters? _profilingCounters;
     private readonly Lazy<FactIndexData> _data;
 
     public ArchitectureSourceFileFactIndex(
@@ -56,7 +57,7 @@ public sealed class ArchitectureSourceFileFactIndex
             preprocessorSymbols,
             fileSystem,
             default,
-            cancellationToken)
+            new ConstructionOptions(cancellationToken, ProfilingCounters: null))
     {
     }
 
@@ -67,6 +68,10 @@ public sealed class ArchitectureSourceFileFactIndex
         ProjectDiscoveryResult? ProjectDiscovery,
         IReadOnlyDictionary<string, string>? SourceRootAssemblyOwnership);
 
+    internal readonly record struct ConstructionOptions(
+        CancellationToken CancellationToken,
+        AnalysisSessionProfilingCounters? ProfilingCounters);
+
     internal ArchitectureSourceFileFactIndex(
         IReadOnlyCollection<Assembly> targetAssemblies,
         string repositoryRoot,
@@ -74,7 +79,7 @@ public sealed class ArchitectureSourceFileFactIndex
         IReadOnlyList<string>? preprocessorSymbols,
         IArchitectureFileSystem? fileSystem,
         ProjectOwnership projectOwnership,
-        CancellationToken cancellationToken = default)
+        ConstructionOptions options = default)
     {
         _targetAssemblies = targetAssemblies ?? throw new ArgumentNullException(nameof(targetAssemblies));
         _repositoryRoot = repositoryRoot ?? throw new ArgumentNullException(nameof(repositoryRoot));
@@ -86,7 +91,8 @@ public sealed class ArchitectureSourceFileFactIndex
             _sourceRoots,
             projectOwnership.ProjectDiscovery,
             projectOwnership.SourceRootAssemblyOwnership);
-        _cancellationToken = cancellationToken;
+        _cancellationToken = options.CancellationToken;
+        _profilingCounters = options.ProfilingCounters;
         _data = new Lazy<FactIndexData>(BuildData);
     }
 
@@ -132,6 +138,7 @@ public sealed class ArchitectureSourceFileFactIndex
 
     private FactIndexData BuildData()
     {
+        _profilingCounters?.RecordFactIndexMaterialization();
         _cancellationToken.ThrowIfCancellationRequested();
 
         List<Assembly> sortedAssemblies = _targetAssemblies
@@ -288,6 +295,7 @@ public sealed class ArchitectureSourceFileFactIndex
     // owning assembly can be determined from the most specific known project subtree.
     private Dictionary<SourceFactKey, List<(string FilePath, ArchitectureTypeKind Kind)>> RunSourceScan()
     {
+        _profilingCounters?.RecordSourceScanPass();
         Dictionary<SourceFactKey, List<(string FilePath, ArchitectureTypeKind Kind)>> sourceMap = [];
         IReadOnlyList<(string SourceRoot, string AssemblyName)> ownershipEntries = _sourcePathAssemblyOwnership
             .Select(static entry => (entry.SourcePath, entry.AssemblyName))
@@ -399,6 +407,10 @@ public sealed class ArchitectureSourceFileFactIndex
 
         if (ArchitectureGeneratedFileFilter.IsExcluded(relativeToRoot)) return;
         if (!TryReadSourceText(absoluteFile, out string sourceText)) return;
+
+        // Count only files that passed generated-file exclusion and were successfully read,
+        // i.e. the files the parser actually receives.
+        _profilingCounters?.RecordSourceFileScanned();
 
         string normalizedFilePath = NormalizePath(_repositoryRoot, absoluteFile);
         AddParsedTypes(sourceMap, assemblyName, normalizedFilePath, sourceText);

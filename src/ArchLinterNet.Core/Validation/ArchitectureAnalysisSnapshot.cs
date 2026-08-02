@@ -30,6 +30,7 @@ public sealed class ArchitectureAnalysisSnapshot : IDisposable
     private readonly IArchitectureContractExecutor _contractExecutor;
     private readonly IArchitectureContractHandlerRegistry _handlerRegistry;
     private readonly IReadOnlyCollection<string>? _requestedContractIds;
+    private readonly AnalysisSessionProfilingCounters _profilingCounters;
     private readonly object _gate = new();
     private readonly Dictionary<string, ValidationOutcome> _evaluatedModes = new(StringComparer.Ordinal);
     private ArchitectureAnalysisSnapshotCounters _counters;
@@ -64,12 +65,18 @@ public sealed class ArchitectureAnalysisSnapshot : IDisposable
         _contractExecutor = contractExecutor;
         _handlerRegistry = handlerRegistry;
         _requestedContractIds = requestedContractIds;
+        _profilingCounters = setup.Runner.Session.Context.ProfilingCounters;
 
         _counters = new ArchitectureAnalysisSnapshotCounters
         {
             PolicyCompositions = policyCompositions,
             ProjectGraphEvaluations = projectGraphEvaluations,
-            AssemblyLoads = assemblyLoads
+            AssemblyLoads = assemblyLoads,
+            DiscoveredProjectCount = setup.Runner.Session.Context.ProjectDiscovery?.DiscoveredProjects.Count ?? 0,
+            RetainedAssemblyCount = setup.Runner.Session.Context.TargetAssemblies.Count,
+            SelectedAssemblyCount = setup.Runner.Session.Context.TargetAssemblies.Count
+                + setup.Runner.Session.Context.MissingAssemblyNames.Count,
+            SnapshotMaterializations = 1,
         };
     }
 
@@ -86,7 +93,21 @@ public sealed class ArchitectureAnalysisSnapshot : IDisposable
         {
             lock (_gate)
             {
-                return _counters;
+                Dictionary<string, int> contractFamilyResultCounts =
+                    new(_counters.ContractFamilyResultCounts, StringComparer.Ordinal);
+                foreach ((string family, int count) in _profilingCounters.ContractFamilyResultCounts)
+                {
+                    contractFamilyResultCounts.TryGetValue(family, out int current);
+                    contractFamilyResultCounts[family] = current + count;
+                }
+
+                return _counters with
+                {
+                    FactIndexMaterializations = _profilingCounters.FactIndexMaterializations,
+                    SourceScanPasses = _profilingCounters.SourceScanPasses,
+                    SourceFilesScanned = _profilingCounters.SourceFilesScanned,
+                    ContractFamilyResultCounts = contractFamilyResultCounts,
+                };
             }
         }
     }
@@ -264,9 +285,13 @@ public sealed class ArchitectureAnalysisSnapshot : IDisposable
         ArchitectureContractExecutionResult execution;
         using (timing?.Measure("contract_checks"))
         {
+            _profilingCounters.ResetContractFamilyResultCounts();
             execution = _contractExecutor.Execute(
                 runner.Session, mode, _handlerRegistry, _includeAsmdefContracts, timing);
         }
+
+        RecordContractFamilyResultCounts(execution.ContractFamilyResultCounts);
+        _profilingCounters.ResetContractFamilyResultCounts();
 
         allViolations.AddRange(execution.Violations);
 
@@ -333,6 +358,15 @@ public sealed class ArchitectureAnalysisSnapshot : IDisposable
             .ToList();
     }
 
+    // This is deliberately a snapshot copy, not the internal mutable counter record. Hosts use
+    // it when cancellation interrupts evaluation before a ValidationOutcome can expose inputs.
+    public IReadOnlyList<string> GetProfileInputPaths() => GetPolicyImportPaths()
+        .Concat(GetResolvedAssemblyPaths()
+            .SelectMany(path => new[] { path, BuildReceiptStore.ReceiptPathFor(path) }))
+        .Concat(GetDiscoveredProjectPaths())
+        .Distinct(StringComparer.OrdinalIgnoreCase)
+        .ToArray();
+
     private IReadOnlyList<string> GetResolvedAssemblyPaths()
     {
         IArchitectureContractRunner? runner = _setup?.Runner;
@@ -347,6 +381,21 @@ public sealed class ArchitectureAnalysisSnapshot : IDisposable
             .Select(path => Path.GetFullPath(path!))
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToList();
+    }
+
+    private void RecordContractFamilyResultCounts(IReadOnlyDictionary<string, int> resultCounts)
+    {
+        lock (_gate)
+        {
+            Dictionary<string, int> totals = new(_counters.ContractFamilyResultCounts, StringComparer.Ordinal);
+            foreach ((string family, int count) in resultCounts)
+            {
+                totals.TryGetValue(family, out int current);
+                totals[family] = current + count;
+            }
+
+            _counters = _counters with { ContractFamilyResultCounts = totals };
+        }
     }
 
     private IReadOnlyList<string> GetDiscoveredProjectPaths()

@@ -1,3 +1,4 @@
+using ArchLinterNet.Core.Profiling;
 using ArchLinterNet.Core.Reporting;
 using ArchLinterNet.Core.Validation;
 
@@ -8,7 +9,8 @@ namespace ArchLinterNet.Testing;
 // (ArchitectureValidationSnapshotSession) so both produce identically-shaped results.
 internal static class ArchitectureValidationResultMapper
 {
-    public static ArchitectureValidationResult ToResult(ValidationOutcome outcome, ValidationTiming? timing, string mode)
+    public static ArchitectureValidationResult ToResult(
+        ValidationOutcome outcome, ValidationTiming? timing, string mode, AnalysisProfile? profile = null)
     {
         return new ArchitectureValidationResult(new ArchitectureValidationResultParams(
             outcome.Passed,
@@ -28,6 +30,7 @@ internal static class ArchitectureValidationResultMapper
             PreflightBlocked = outcome.PreflightBlocked,
             Mode = mode,
             SubtractiveMatcherParticipation = outcome.SubtractiveMatcherParticipation,
+            Profile = profile,
         });
     }
 }

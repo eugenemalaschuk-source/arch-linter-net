@@ -55,6 +55,10 @@ public sealed class ArchitectureAnalysisContext : IDisposable
 
     public IReadOnlyList<string> DiscoveredProjectPaths { get; }
 
+    // The session receives this one shared recorder when it creates lazily-materialized indexes.
+    // ArchitectureAnalysisSnapshot projects the values through its immutable public counters.
+    internal AnalysisSessionProfilingCounters ProfilingCounters { get; } = new();
+
     // Set once by ArchitectureRunnerSetupService at construction time. Deep type/IL/source scanning
     // and fact-index materialization code (spread across many ArchitectureAnalysisSession partial-
     // class files) reads this to check cancellation at its own natural per-file/per-type loop
