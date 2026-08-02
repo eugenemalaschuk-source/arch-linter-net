@@ -27,6 +27,8 @@ internal sealed partial class ValidateCommandHandler
         public IReadOnlyList<string> InputPaths { get; set; } = Array.Empty<string>();
 
         public AnalysisProfileOutput? Output { get; set; }
+
+        public int RenderedSinkCount { get; set; }
     }
 
     private void WriteCancelledProfile(ValidateCommandOptions options, ValidationProfileExecutionState state)
@@ -37,6 +39,7 @@ internal sealed partial class ValidateCommandHandler
             state.Timing,
             AnalysisProfileCompletionStatus.Cancelled,
             cancellationObserved: true,
+            state.RenderedSinkCount,
             state.Output,
             state.InputPaths);
     }
@@ -52,6 +55,7 @@ internal sealed partial class ValidateCommandHandler
         ValidationTiming? timing,
         AnalysisProfileCompletionStatus completionStatus,
         bool cancellationObserved,
+        int renderedSinkCount,
         AnalysisProfileOutput? output = null,
         IReadOnlyList<string>? inputPaths = null)
     {
@@ -70,7 +74,7 @@ internal sealed partial class ValidateCommandHandler
         AnalysisProfile profile = AnalysisProfileBuilder.Build(
             counters,
             timing,
-            ResolveRenderedSinkCount(options),
+            renderedSinkCount,
             ResolveOutputSinkCount(options),
             completionStatus,
             cancellationObserved,
@@ -151,42 +155,23 @@ internal sealed partial class ValidateCommandHandler
         }
     }
 
-    // Distinct formats actually needing rendering — matches exactly what ReportCoordinator itself
-    // dedupes internally (see StdoutOrAnySinkNeeds/ResolveHumanContent et al.): the same format
-    // requested for multiple destinations still renders once. Legacy (no --report) always renders
-    // exactly one format.
-    private static int ResolveRenderedSinkCount(ValidateCommandOptions options)
-    {
-        return options.AdditionalSinks.Count > 0
-            ? options.AdditionalSinks.Select(sink => sink.Format).Distinct().Count()
-            : 1;
-    }
-
     private static int ResolveOutputSinkCount(ValidateCommandOptions options)
     {
         return options.AdditionalSinks.Count > 0 ? options.AdditionalSinks.Count : 1;
     }
 
     private static AnalysisProfileCompletionStatus ResolveCompletionStatus(
-        ValidationOutcome outcome, bool cancelled, bool outputFailed)
+        ValidationOutcome outcome, bool cancelled)
     {
-        return ResolveCompletionStatus(outcome.PreflightBlocked, outcome.Passed, cancelled, outputFailed);
+        return ResolveCompletionStatus(outcome.PreflightBlocked, outcome.Passed, cancelled);
     }
 
     private static AnalysisProfileCompletionStatus ResolveCompletionStatus(
-        bool preflightBlocked, bool passed, bool cancelled, bool outputFailed)
+        bool preflightBlocked, bool passed, bool cancelled)
     {
         if (cancelled)
         {
             return AnalysisProfileCompletionStatus.Cancelled;
-        }
-
-        // The profile contract has no separate runtime-publication status; a failed sink means
-        // this command did not complete successfully, so keep Success reserved for fully
-        // published validation results.
-        if (outputFailed)
-        {
-            return AnalysisProfileCompletionStatus.PreparationFailure;
         }
 
         if (preflightBlocked)

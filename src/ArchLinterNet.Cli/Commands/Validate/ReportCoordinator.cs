@@ -29,6 +29,11 @@ internal readonly record struct RouteResult(
     // short of that. Files already renamed into place before cancellation was observed stay
     // committed — there is no code path that undoes a completed rename.
     public bool Cancelled { get; init; }
+
+    // Formats whose normal report document finished rendering. This is separate from configured
+    // sinks because cancellation can happen before rendering, and one rendered format may feed
+    // several destinations.
+    public IReadOnlyList<string> RenderedFormats { get; init; } = Array.Empty<string>();
 }
 
 internal sealed class ReportCoordinator
@@ -54,23 +59,25 @@ internal sealed class ReportCoordinator
         string mode,
         ValidationOutcome outcome,
         IReadOnlyList<ReportSink> additionalSinks,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        ValidationTiming? timing = null)
     {
         bool isReportMode = additionalSinks.Count > 0;
         return RouteOutcomes(
             stdoutFormat, new[] { (mode, outcome) }, additionalSinks, isSingleMode: true, isReportMode,
-            cancellationToken);
+            cancellationToken, timing);
     }
 
     public RouteResult RouteCombinedOutcomes(
         string stdoutFormat,
         IReadOnlyList<(string Mode, ValidationOutcome Outcome)> outcomesByMode,
         IReadOnlyList<ReportSink> additionalSinks,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        ValidationTiming? timing = null)
     {
         bool isReportMode = additionalSinks.Count > 0;
         return RouteOutcomes(
-            stdoutFormat, outcomesByMode, additionalSinks, isSingleMode: false, isReportMode, cancellationToken);
+            stdoutFormat, outcomesByMode, additionalSinks, isSingleMode: false, isReportMode, cancellationToken, timing);
     }
 
     private RouteResult RouteOutcomes(
@@ -79,61 +86,74 @@ internal sealed class ReportCoordinator
         IReadOnlyList<ReportSink> additionalSinks,
         bool isSingleMode,
         bool isReportMode,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        ValidationTiming? timing)
     {
         IReadOnlyList<ReportSink> requiredSinks = isReportMode
             ? additionalSinks
             : new[] { new ReportSink(stdoutFormat, ReportDestinationType.Stdout) };
+        SinkDistributionEvidence evidence = SinkDistributionEvidence.Empty();
 
         // Legacy combined human: write each mode sequentially (pre-#364 behavior). isReportMode is
         // false here by construction (legacyCombinedHuman requires !isReportMode, and isReportMode
         // is additionalSinks.Count > 0), so there are no file/stream sinks to stage or commit —
         // the per-mode stdout writes below are the entire required publication for this call.
         bool legacyCombinedHuman = !isReportMode && !isSingleMode && stdoutFormat == FormatHuman;
-        if (legacyCombinedHuman)
+        try
         {
-            return WriteLegacyCombinedHuman(outcomesByMode, requiredSinks, cancellationToken);
-        }
-
-        // Checked before any rendering or stream write. DistributeToSinks below only guards
-        // file-sink staging/commit — it never ran early enough to stop the plain stdout dispatch a
-        // few lines down, which also publishes directly to _console.Out. Without this guard, a
-        // token already cancelled by the time this method runs would still let a normal document
-        // reach stdout before any cancellation evidence is reported.
-        if (cancellationToken.IsCancellationRequested)
-        {
-            return BuildRouteResult(requiredSinks, SinkDistributionEvidence.Empty(), cancelled: true);
-        }
-
-        string? humanContent = ResolveHumanContent(
-            StdoutOrAnySinkNeeds(FormatHuman, stdoutFormat, additionalSinks, isReportMode), isSingleMode, outcomesByMode,
-            cancellationToken);
-        string? jsonContent = ResolveStructuredContent(
-            StdoutOrAnySinkNeeds(FormatJson, stdoutFormat, additionalSinks, isReportMode),
-            isSingleMode, outcomesByMode, FormatSingleJson, FormatCombinedJson, cancellationToken);
-        string? sarifContent = ResolveStructuredContent(
-            StdoutOrAnySinkNeeds(FormatSarif, stdoutFormat, additionalSinks, isReportMode),
-            isSingleMode, outcomesByMode, FormatSingleSarif, FormatCombinedSarif, cancellationToken);
-
-        if (!isReportMode)
-        {
-            // Rendering above is fast, synchronous, in-memory formatting (no I/O) — one check
-            // right before the one required write is enough; no per-line check is needed inside
-            // formatting itself. There are no --report sinks on this path (isReportMode is false),
-            // so once this single write succeeds, publication for this call is complete.
-            if (cancellationToken.IsCancellationRequested)
+            if (legacyCombinedHuman)
             {
-                return BuildRouteResult(requiredSinks, SinkDistributionEvidence.Empty(), cancelled: true);
+                return WriteLegacyCombinedHuman(outcomesByMode, requiredSinks, evidence, cancellationToken, timing);
             }
 
-            _console.Out.WriteLine(DispatchFormat(stdoutFormat, humanContent, jsonContent, sarifContent));
-            SinkDistributionEvidence evidence = SinkDistributionEvidence.Empty();
-            evidence.DeliveredStreamPaths.Add(StreamFailureMarker(ReportDestinationType.Stdout));
-            return BuildRouteResult(requiredSinks, evidence, cancelled: false);
-        }
+            // Checked before any rendering or stream write. DistributeToSinks below only guards
+            // file-sink staging/commit — it never ran early enough to stop the plain stdout dispatch a
+            // few lines down, which also publishes directly to _console.Out. Without this guard, a
+            // token already cancelled by the time this method runs would still let a normal document
+            // reach stdout before any cancellation evidence is reported.
+            if (cancellationToken.IsCancellationRequested)
+            {
+                return BuildRouteResult(requiredSinks, evidence, cancelled: true);
+            }
 
-        return DistributeToSinks(
-            additionalSinks, BuildContentByFormat(humanContent, jsonContent, sarifContent), cancellationToken);
+            string? humanContent = RenderContent(
+                StdoutOrAnySinkNeeds(FormatHuman, stdoutFormat, additionalSinks, isReportMode), FormatHuman,
+                () => FormatHumanContent(isSingleMode, outcomesByMode, cancellationToken), evidence, timing);
+            string? jsonContent = RenderContent(
+                StdoutOrAnySinkNeeds(FormatJson, stdoutFormat, additionalSinks, isReportMode), FormatJson,
+                () => FormatStructuredContent(
+                    isSingleMode, outcomesByMode, FormatSingleJson, FormatCombinedJson, cancellationToken),
+                evidence, timing);
+            string? sarifContent = RenderContent(
+                StdoutOrAnySinkNeeds(FormatSarif, stdoutFormat, additionalSinks, isReportMode), FormatSarif,
+                () => FormatStructuredContent(
+                    isSingleMode, outcomesByMode, FormatSingleSarif, FormatCombinedSarif, cancellationToken),
+                evidence, timing);
+
+            if (!isReportMode)
+            {
+                // Rendering above is fast, synchronous, in-memory formatting (no I/O) — one check
+                // right before the one required write is enough; no per-line check is needed inside
+                // formatting itself. There are no --report sinks on this path (isReportMode is false),
+                // so once this single write succeeds, publication for this call is complete.
+                if (cancellationToken.IsCancellationRequested)
+                {
+                    return BuildRouteResult(requiredSinks, evidence, cancelled: true);
+                }
+
+                using (timing?.Measure("output_stream_write"))
+                    _console.Out.WriteLine(DispatchFormat(stdoutFormat, humanContent, jsonContent, sarifContent));
+                evidence.DeliveredStreamPaths.Add(StreamFailureMarker(ReportDestinationType.Stdout));
+                return BuildRouteResult(requiredSinks, evidence, cancelled: false);
+            }
+
+            return DistributeToSinks(
+                additionalSinks, BuildContentByFormat(humanContent, jsonContent, sarifContent), cancellationToken, timing, evidence);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            return BuildRouteResult(requiredSinks, evidence, cancelled: true);
+        }
     }
 
     // No file/stream sinks are possible on this path (see caller) — cancellation observed between
@@ -143,9 +163,10 @@ internal sealed class ReportCoordinator
     private RouteResult WriteLegacyCombinedHuman(
         IReadOnlyList<(string Mode, ValidationOutcome Outcome)> outcomesByMode,
         IReadOnlyList<ReportSink> requiredSinks,
-        CancellationToken cancellationToken)
+        SinkDistributionEvidence evidence,
+        CancellationToken cancellationToken,
+        ValidationTiming? timing)
     {
-        SinkDistributionEvidence evidence = SinkDistributionEvidence.Empty();
         foreach ((_, ValidationOutcome outcome) in outcomesByMode)
         {
             if (cancellationToken.IsCancellationRequested)
@@ -153,7 +174,12 @@ internal sealed class ReportCoordinator
                 return BuildRouteResult(requiredSinks, evidence, cancelled: true);
             }
 
-            _console.Out.WriteLine(FormatSingleHuman(outcome, cancellationToken));
+            string content;
+            using (timing?.Measure("render_human"))
+                content = FormatSingleHuman(outcome, cancellationToken);
+            evidence.RecordRenderedFormat(FormatHuman);
+            using (timing?.Measure("output_stream_write"))
+                _console.Out.WriteLine(content);
             if (!evidence.DeliveredStreamPaths.Contains(StreamFailureMarker(ReportDestinationType.Stdout)))
             {
                 evidence.DeliveredStreamPaths.Add(StreamFailureMarker(ReportDestinationType.Stdout));
@@ -163,35 +189,42 @@ internal sealed class ReportCoordinator
         return BuildRouteResult(Array.Empty<ReportSink>(), evidence, cancelled: false);
     }
 
-    private string? ResolveHumanContent(
-        string? neededHuman,
+    private string FormatHumanContent(
         bool isSingleMode,
         IReadOnlyList<(string Mode, ValidationOutcome Outcome)> outcomesByMode,
         CancellationToken cancellationToken)
     {
-        if (neededHuman is null)
-        {
-            return null;
-        }
-
         return isSingleMode
             ? FormatSingleHuman(outcomesByMode[0].Outcome, cancellationToken)
             : FormatCombinedHuman(outcomesByMode, cancellationToken);
     }
 
-    private static string? ResolveStructuredContent(
+    private static string? RenderContent(
         string? needed,
-        bool isSingleMode,
-        IReadOnlyList<(string Mode, ValidationOutcome Outcome)> outcomesByMode,
-        Func<string, ValidationOutcome, CancellationToken, string> formatSingle,
-        Func<IReadOnlyList<(string Mode, ValidationOutcome Outcome)>, CancellationToken, string> formatCombined,
-        CancellationToken cancellationToken)
+        string format,
+        Func<string> render,
+        SinkDistributionEvidence evidence,
+        ValidationTiming? timing)
     {
         if (needed is null)
         {
             return null;
         }
 
+        string content;
+        using (timing?.Measure($"render_{format}"))
+            content = render();
+        evidence.RecordRenderedFormat(format);
+        return content;
+    }
+
+    private static string FormatStructuredContent(
+        bool isSingleMode,
+        IReadOnlyList<(string Mode, ValidationOutcome Outcome)> outcomesByMode,
+        Func<string, ValidationOutcome, CancellationToken, string> formatSingle,
+        Func<IReadOnlyList<(string Mode, ValidationOutcome Outcome)>, CancellationToken, string> formatCombined,
+        CancellationToken cancellationToken)
+    {
         return isSingleMode
             ? formatSingle(outcomesByMode[0].Mode, outcomesByMode[0].Outcome, cancellationToken)
             : formatCombined(outcomesByMode, cancellationToken);
@@ -245,21 +278,31 @@ internal sealed class ReportCoordinator
         IReadOnlyDictionary<string, string> contentByFormat,
         CancellationToken cancellationToken = default)
     {
-        return DistributeToSinks(additionalSinks, contentByFormat, cancellationToken);
+        return DistributeToSinks(
+            additionalSinks, contentByFormat, cancellationToken, timing: null, evidence: SinkDistributionEvidence.Empty());
     }
 
     private RouteResult DistributeToSinks(
         IReadOnlyList<ReportSink> additionalSinks,
         IReadOnlyDictionary<string, string> contentByFormat,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        ValidationTiming? timing,
+        SinkDistributionEvidence evidence)
     {
-        SinkDistributionEvidence evidence = SinkDistributionEvidence.Empty();
         List<(string TempPath, string TargetPath)> pendingRenames = new();
 
         // Checked before each file sink is staged (not once up front) — cancellation observed
-        // between two file sinks must stop staging the remaining ones, not just an
-        // already-cancelled token checked before the loop started.
-        if (StageAllFileSinks(additionalSinks, contentByFormat, evidence, pendingRenames, cancellationToken))
+        // between two file sinks must stop staging the remaining ones, not just an already-
+        // cancelled token checked before the loop started.
+        bool cancelledDuringStaging = false;
+        if (additionalSinks.Any(sink => sink.DestinationType == ReportDestinationType.File))
+        {
+            using (timing?.Measure("output_staging"))
+                cancelledDuringStaging = StageAllFileSinks(
+                    additionalSinks, contentByFormat, evidence, pendingRenames, cancellationToken);
+        }
+
+        if (cancelledDuringStaging)
         {
             DeletePendingTemps(pendingRenames);
             return BuildRouteResult(additionalSinks, evidence, cancelled: true);
@@ -268,8 +311,16 @@ internal sealed class ReportCoordinator
         // Do not emit a normal stream document until every file artifact passed staging. Otherwise
         // a later file-stage failure leaves a successful --report ...=stderr stream
         // carrying only a normal report while the process exits 2 with no output_status evidence.
+        bool cancelledDuringStreamWrite = false;
         if (evidence.FailedPaths.Count == 0
-            && WriteStreamSinksInOrder(additionalSinks, contentByFormat, evidence, cancellationToken))
+            && additionalSinks.Any(sink => sink.DestinationType != ReportDestinationType.File))
+        {
+            using (timing?.Measure("output_stream_write"))
+                cancelledDuringStreamWrite = WriteStreamSinksInOrder(
+                    additionalSinks, contentByFormat, evidence, cancellationToken);
+        }
+
+        if (cancelledDuringStreamWrite)
         {
             DeletePendingTemps(pendingRenames);
             return BuildRouteResult(additionalSinks, evidence, cancelled: true);
@@ -282,7 +333,8 @@ internal sealed class ReportCoordinator
         }
         else if (pendingRenames.Count > 0)
         {
-            cancelledMidCommit = CommitPendingRenames(pendingRenames, evidence, cancellationToken);
+            using (timing?.Measure("output_commit"))
+                cancelledMidCommit = CommitPendingRenames(pendingRenames, evidence, cancellationToken);
         }
         // else: nothing staged needs committing — a stream-only run (or a run with no additional
         // sinks at all) has already fully published by this point. Deliberately not re-checking
@@ -472,7 +524,7 @@ internal sealed class ReportCoordinator
         }
     }
 
-    // Bundles the five accumulator lists DistributeToSinks builds up together (they are always
+    // Bundles the six accumulator lists DistributeToSinks builds up together (they are always
     // passed as one group to BuildRouteResult) so that method stays under the parameter-count
     // limit rather than taking each list as its own parameter. Mutated in place by StageFileSink/
     // WriteStreamSink/CommitPendingRenames — the record wraps List<T> references, so passing one
@@ -482,9 +534,18 @@ internal sealed class ReportCoordinator
         List<string> CommittedPaths,
         List<string> StagedPaths,
         List<string> ErrorDetails,
-        List<string> DeliveredStreamPaths)
+        List<string> DeliveredStreamPaths,
+        List<string> RenderedFormats)
     {
-        public static SinkDistributionEvidence Empty() => new(new(), new(), new(), new(), new());
+        public static SinkDistributionEvidence Empty() => new(new(), new(), new(), new(), new(), new());
+
+        public void RecordRenderedFormat(string format)
+        {
+            if (!RenderedFormats.Contains(format, StringComparer.Ordinal))
+            {
+                RenderedFormats.Add(format);
+            }
+        }
     }
 
     private static RouteResult BuildRouteResult(
@@ -496,7 +557,10 @@ internal sealed class ReportCoordinator
         {
             return new RouteResult(
                 ReportRouteStatus.AllSucceeded, Array.Empty<string>(), evidence.CommittedPaths, evidence.StagedPaths,
-                Array.Empty<string>(), Array.Empty<string>(), evidence.DeliveredStreamPaths);
+                Array.Empty<string>(), Array.Empty<string>(), evidence.DeliveredStreamPaths)
+            {
+                RenderedFormats = evidence.RenderedFormats.ToArray(),
+            };
         }
 
         // Every configured File sink is required regardless of whether content happened to be
@@ -519,7 +583,8 @@ internal sealed class ReportCoordinator
             status, evidence.FailedPaths, evidence.CommittedPaths, evidence.StagedPaths, uncommittedPaths,
             evidence.ErrorDetails, evidence.DeliveredStreamPaths)
         {
-            Cancelled = cancelled
+            Cancelled = cancelled,
+            RenderedFormats = evidence.RenderedFormats.ToArray(),
         };
     }
 

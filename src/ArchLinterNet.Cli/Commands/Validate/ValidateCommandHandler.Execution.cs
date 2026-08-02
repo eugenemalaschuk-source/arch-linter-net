@@ -107,15 +107,16 @@ internal sealed partial class ValidateCommandHandler
         }
 
         RouteResult result = _coordinator.RouteSingleOutcome(
-            options.Format, mode, outcome, options.AdditionalSinks, _cancellationToken);
+            options.Format, mode, outcome, options.AdditionalSinks, _cancellationToken, timing);
         profileState.Output = CreateOutputProfile(result);
+        profileState.RenderedSinkCount = result.RenderedFormats.Count;
         if (options.TimingsEnabled)
         {
             timing?.WriteReport(_console.Error);
         }
 
         WriteProfile(options, counters, timing,
-            ResolveCompletionStatus(outcome, result.Cancelled, outputFailed: result.FailedPaths.Count > 0), result.Cancelled,
+            ResolveCompletionStatus(outcome, result.Cancelled), result.Cancelled, profileState.RenderedSinkCount,
             profileState.Output, profileState.InputPaths);
 
         if (result.Cancelled)
@@ -235,8 +236,9 @@ internal sealed partial class ValidateCommandHandler
         }
 
         RouteResult result = _coordinator.RouteCombinedOutcomes(
-            options.Format, outcomesByMode, options.AdditionalSinks, _cancellationToken);
+            options.Format, outcomesByMode, options.AdditionalSinks, _cancellationToken, timing);
         profileState.Output = CreateOutputProfile(result);
+        profileState.RenderedSinkCount = result.RenderedFormats.Count;
 
         if (options.TimingsEnabled)
         {
@@ -250,9 +252,8 @@ internal sealed partial class ValidateCommandHandler
         WriteProfile(
             options, snapshot.Counters, timing,
             ResolveCompletionStatus(
-                outcomesByMode[0].Outcome.PreflightBlocked, allPassed, result.Cancelled,
-                outputFailed: result.FailedPaths.Count > 0),
-            result.Cancelled, profileState.Output, profileState.InputPaths);
+                outcomesByMode[0].Outcome.PreflightBlocked, allPassed, result.Cancelled),
+            result.Cancelled, profileState.RenderedSinkCount, profileState.Output, profileState.InputPaths);
 
         if (result.Cancelled)
         {

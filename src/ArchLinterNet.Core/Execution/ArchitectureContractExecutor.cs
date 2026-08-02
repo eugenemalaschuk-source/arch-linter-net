@@ -99,6 +99,7 @@ internal sealed class ArchitectureContractExecutor : IArchitectureContractExecut
                 }
 
                 AddResultCount(resultCounts, CoverageFamily, resultCount);
+                session.Context.ProfilingCounters.RecordContractFamilyResults(CoverageFamily, resultCount);
             }
         }
     }
@@ -140,6 +141,7 @@ internal sealed class ArchitectureContractExecutor : IArchitectureContractExecut
                 }
 
                 AddResultCount(resultCounts, family, violations.Length + cycleCount);
+                session.Context.ProfilingCounters.RecordContractFamilyResults(family, violations.Length + cycleCount);
             }
         }
     }

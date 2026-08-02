@@ -122,6 +122,8 @@ public sealed class ArchitectureAnalysisSnapshotTests
 
         public bool DelayExecution { get; set; }
 
+        public Action<ArchitectureAnalysisSession>? BeforeReturn { get; set; }
+
         // When set for a mode, Execute actually runs this real ArchitectureDependencyContract
         // against the session (via ArchitectureAnalysisSession.CheckContract) instead of
         // no-op'ing — needed so tests can observe the session's real mutable unmatched-ignore-list
@@ -150,6 +152,8 @@ public sealed class ArchitectureAnalysisSnapshotTests
                 List<ArchitectureViolation> violations = ContractByMode.TryGetValue(mode, out ArchitectureDependencyContract? contract)
                     ? session.CheckContract(contract)
                     : new List<ArchitectureViolation>();
+
+                BeforeReturn?.Invoke(session);
 
                 return new ArchitectureContractExecutionResult(
                     violations,
@@ -376,6 +380,26 @@ public sealed class ArchitectureAnalysisSnapshotTests
 
         Assert.Throws<OperationCanceledException>(() => snapshot.Evaluate("audit"));
         Assert.That(fixture.ContractExecutor.CallCountByMode, Does.Not.ContainKey("audit"));
+    }
+
+    [Test]
+    public void Counters_CancelledDuringContractExecution_RetainsPartialFamilyResults()
+    {
+        Fixture fixture = CreateFixture();
+        fixture.ContractExecutor.BeforeReturn = session =>
+        {
+            session.Context.ProfilingCounters.RecordContractFamilyResults("dependency", 2);
+            throw new OperationCanceledException("cancelled after completed dependency contracts");
+        };
+
+        using ArchitectureAnalysisSnapshot snapshot = fixture.ApplicationService.CreateSnapshot(CreateSnapshotRequest());
+
+        Assert.Throws<OperationCanceledException>(() => snapshot.Evaluate("strict"));
+        Assert.Multiple(() =>
+        {
+            Assert.That(snapshot.Cancelled, Is.True);
+            Assert.That(snapshot.Counters.ContractFamilyResultCounts["dependency"], Is.EqualTo(2));
+        });
     }
 
     // A snapshot cancelled during construction (before RunBuildStatePreflight even starts here)

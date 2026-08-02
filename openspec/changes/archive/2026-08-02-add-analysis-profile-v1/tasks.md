@@ -3,11 +3,11 @@
 - [x] 1.1 Add `src/ArchLinterNet.Core/Profiling/AnalysisProfileId.cs` with `AnalysisProfileId.V1 = "analysis-profile/v1"`.
 - [x] 1.2 Add `AnalysisProfileCompletionStatus` enum (`Success`, `ValidationFailure`, `PreparationFailure`, `Cancelled`).
 - [x] 1.3 Add `AnalysisProfileReservedFieldStatus` enum (`NotApplicable`) and `AnalysisProfileCacheCounters`/`AnalysisProfileConcurrencyCounters` reserved sub-records.
-- [x] 1.4 Add `AnalysisProfilePhaseMeasurement` record (`Name`, `Indent`, `Ordinal`, `Count`, nullable `ElapsedMs`).
+- [x] 1.4 Add `AnalysisProfilePhaseMeasurement` record (`Name`, `Indent`, `Ordinal`, `Count`, nullable `ElapsedMs`, nullable `ProcessorTimeMs`).
 - [x] 1.5 Add `AnalysisProfileMeasurements` record (nullable `PeakWorkingSetBytes`, `AllocatedBytesTotal`).
 - [x] 1.6 Add `AnalysisProfileCounters` record extending `ArchitectureAnalysisSnapshotCounters` fields plus actual project/assembly/source inventories, contract-family execution/result counts, `RenderedSinkCount`, `OutputSinkCount`, `Cache`, and `Concurrency`.
-- [x] 1.7 Add `AnalysisProfile` top-level record (`SchemaId`, `CompletionStatus`, `CancellationObserved`, `Counters`, `Phases`, `Measurements`).
-- [x] 1.8 Add `AnalysisProfileBuilder` that assembles an `AnalysisProfile` from `ValidationTiming?`, `ArchitectureAnalysisSnapshotCounters`, sink counts, and completion status.
+- [x] 1.7 Add `AnalysisProfile` top-level record (`SchemaId`, `CompletionStatus`, `CancellationObserved`, `Counters`, `Phases`, top-level `Output`, `Measurements`).
+- [x] 1.8 Add `AnalysisProfileBuilder` that assembles an `AnalysisProfile` from `ValidationTiming?`, `ArchitectureAnalysisSnapshotCounters`, sink counts, completion status, and actual output evidence.
 - [x] 1.9 Add deterministic JSON serialization for `AnalysisProfile` (stable property order, camelCase or matching existing JSON conventions).
 
 ## 2. CLI integration
@@ -45,10 +45,10 @@
 
 ## 7. Benchmark harness and evidence
 
-- [x] 7.1 Add `[Explicit]` NUnit harness under `tests/ArchLinterNet.Core.Tests/AnalysisProfile/` implementing the 7 declared scenarios against `large-multi-host`, 10 runs each, separating restore/build from analysis time, computing median/p95.
+- [x] 7.1 Add `[Explicit]` NUnit harness under `tests/ArchLinterNet.Core.Tests/AnalysisProfile/` implementing the 7 declared scenarios against `large-multi-host`, 10 runs each, validating priming/measured statuses, separating restore/build from analysis time, computing median/p95, and retaining each raw profile in the generated evidence JSON.
 - [x] 7.2 Confirm the harness is excluded from `rtk make test`/`rtk make acceptance`.
 - [x] 7.3 Run the harness for real on this development machine and record actual results.
-- [x] 7.4 Write `docs/internal/analysis-profile-pre-optimization-baseline.md` with the real results, environment metadata, and a non-universality disclaimer (mirroring `docs/internal/checkpoint-a-evidence.md`).
+- [x] 7.4 Write `docs/internal/analysis-profile-pre-optimization-baseline.md` plus its raw-profile JSON evidence with the real results, environment metadata, and a non-universality disclaimer (mirroring `docs/internal/checkpoint-a-evidence.md`).
 
 ## 8. Documentation
 

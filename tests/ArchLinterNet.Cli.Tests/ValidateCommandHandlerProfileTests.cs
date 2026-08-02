@@ -306,7 +306,9 @@ public sealed class ValidateCommandHandlerProfileTests
         Assert.Multiple(() =>
         {
             Assert.That(document.RootElement.GetProperty("CompletionStatus").GetString(),
-                Is.EqualTo("PreparationFailure"));
+                Is.EqualTo("Success"));
+            Assert.That(document.RootElement.GetProperty("Counters").GetProperty("RenderedSinkCount").GetInt32(),
+                Is.EqualTo(1));
             Assert.That(output.GetProperty("OutputFailed").GetBoolean(), Is.True);
             Assert.That(output.GetProperty("FailedSinkCount").GetInt32(), Is.EqualTo(1));
             Assert.That(output.GetProperty("CommittedSinkCount").GetInt32(), Is.EqualTo(0));

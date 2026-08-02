@@ -13,12 +13,15 @@ namespace ArchLinterNet.Core.Tests;
 //   rtk dotnet test tests/ArchLinterNet.Core.Tests --filter FullyQualifiedName~AnalysisProfileBenchmarkHarness
 //
 // Results are written to a JSON file under the OS temp directory (path printed to the NUnit
-// output) — hand-transcribe real numbers from that file into
-// docs/internal/analysis-profile-pre-optimization-baseline.md; never fabricate the numbers there.
+// output). Each sample retains its complete raw analysis profile so processor time, allocations,
+// memory, publication evidence, and deterministic counters remain available for #409. Copy that
+// file into docs/internal/analysis-profile-pre-optimization-baseline-results.json, then update
+// docs/internal/analysis-profile-pre-optimization-baseline.md from the same run; never fabricate
+// the numbers there.
 [TestFixture]
 [Explicit("Hardware-sensitive benchmark harness — run manually to refresh pre-optimization evidence, never in CI.")]
 [Category("Benchmark")]
-// ~70 real CLI subprocess invocations across 7 scenarios legitimately take several minutes —
+// 95 real CLI subprocess invocations across 7 scenarios legitimately take several minutes —
 // see PerTestDurationGuardAttribute's own suggested remedy for a test that needs more than its
 // default 15s budget.
 [CancelAfter(600_000)]
@@ -52,7 +55,7 @@ public sealed class AnalysisProfileBenchmarkHarness
         using AdoptionAcceptanceFixture warmFixture = AdoptionAcceptanceFixture.Create("large-multi-host");
         List<RunSample> warmSeries = RunSeries(
             warmFixture.Root, warmFixture.PolicyPath, mode: "strict", ensureBuilt: true,
-            extraArgs: null, count: RunsPerScenario, prime: true);
+            extraArgs: null, count: RunsPerScenario, prime: true, expectedPrimeStatus: "Success");
         summaries.Add(Summarize(
             "2-immediate-warm-strict-repeat", "Same fixture, repeat --ensure-built runs (no persistent cache exists yet — #365)",
             warmSeries, expectedStatus: "Success"));
@@ -61,7 +64,7 @@ public sealed class AnalysisProfileBenchmarkHarness
         using AdoptionAcceptanceFixture legacyFixture = AdoptionAcceptanceFixture.Create("large-multi-host");
         List<RunSample> legacyStrict = RunSeries(
             legacyFixture.Root, legacyFixture.PolicyPath, mode: "strict", ensureBuilt: true,
-            extraArgs: null, count: RunsPerScenario, prime: true);
+            extraArgs: null, count: RunsPerScenario, prime: true, expectedPrimeStatus: "Success");
         List<RunSample> legacyAudit = RunSeries(
             legacyFixture.Root, legacyFixture.PolicyPath, mode: "audit", ensureBuilt: true,
             extraArgs: null, count: RunsPerScenario, prime: false);
@@ -72,13 +75,14 @@ public sealed class AnalysisProfileBenchmarkHarness
             "3-strict-and-audit-separate-processes",
             "Sum of one strict process + one audit process (10 paired runs)",
             legacyPairedTotals.Count, Median(legacyPairedTotals), Percentile95(legacyPairedTotals),
-            Median(legacyStrict.Select(r => r.PreflightMs).ToList()), "Success/Success"));
+            Median(legacyStrict.Select(r => r.PreflightMs).ToList()), "Success/Success",
+            legacyStrict.Concat(legacyAudit).ToList()));
 
         // Scenario 4: combined strict+audit from one #363 snapshot.
         using AdoptionAcceptanceFixture combinedFixture = AdoptionAcceptanceFixture.Create("large-multi-host");
         List<RunSample> combinedSeries = RunSeries(
             combinedFixture.Root, combinedFixture.PolicyPath, mode: "strict,audit", ensureBuilt: true,
-            extraArgs: null, count: RunsPerScenario, prime: true);
+            extraArgs: null, count: RunsPerScenario, prime: true, expectedPrimeStatus: "Success");
         summaries.Add(Summarize(
             "4-combined-strict-audit-one-snapshot", "One process, --mode strict,audit (one #363 snapshot)", combinedSeries,
             expectedStatus: "Success"));
@@ -87,7 +91,8 @@ public sealed class AnalysisProfileBenchmarkHarness
         using AdoptionAcceptanceFixture sinkFixture = AdoptionAcceptanceFixture.Create("large-multi-host");
         List<RunSample> oneSink = RunSeries(
             sinkFixture.Root, sinkFixture.PolicyPath, mode: "strict", ensureBuilt: true,
-            extraArgs: ["--report", "json=stdout"], count: RunsPerScenario, prime: true);
+            extraArgs: ["--report", "json=stdout"], count: RunsPerScenario, prime: true,
+            expectedPrimeStatus: "Success");
         // --report only allows one sink per destination (stdout can carry one format at a time —
         // see ValidateCommandDefinition.ParseReportSinks), so the three-sink comparison spreads
         // across stdout + two files, matching the existing Checkpoint A three-sink scenario
@@ -110,7 +115,7 @@ public sealed class AnalysisProfileBenchmarkHarness
         string failingPolicyPath = Path.Combine(successFixture.Root, "dependencies.failing.arch.yml");
         List<RunSample> validationFailureSeries = RunSeries(
             successFixture.Root, failingPolicyPath, mode: "strict", ensureBuilt: true,
-            extraArgs: null, count: RunsPerScenario, prime: true);
+            extraArgs: null, count: RunsPerScenario, prime: true, expectedPrimeStatus: "ValidationFailure");
         summaries.Add(Summarize(
             "7b-validation-failure-completion-path", "Intentionally-failing policy variant", validationFailureSeries,
             expectedStatus: "ValidationFailure"));
@@ -147,16 +152,20 @@ public sealed class AnalysisProfileBenchmarkHarness
         List<double> analysisMs = includedSamples.Select(s => s.AnalysisMs).ToList();
         return new ScenarioSummary(
             id, description, includedSamples.Count, Median(analysisMs), Percentile95(analysisMs),
-            Median(includedSamples.Select(s => s.PreflightMs).ToList()), expectedStatus);
+            Median(includedSamples.Select(s => s.PreflightMs).ToList()), expectedStatus, includedSamples);
     }
 
     private static List<RunSample> RunSeries(
         string fixtureRoot, string policyPath, string mode, bool ensureBuilt, IReadOnlyList<string>? extraArgs,
-        int count, bool prime)
+        int count, bool prime, string? expectedPrimeStatus = null)
     {
         if (prime)
         {
-            RunOnce(fixtureRoot, policyPath, mode, ensureBuilt: true, extraArgs: null);
+            RunSample primeSample = RunOnce(fixtureRoot, policyPath, mode, ensureBuilt, extraArgs);
+            Assert.That(expectedPrimeStatus, Is.Not.Null,
+                "Every requested priming run must declare the completion status it is expected to produce.");
+            Assert.That(primeSample.CompletionStatus, Is.EqualTo(expectedPrimeStatus),
+                $"Priming run failed for policy '{policyPath}' mode '{mode}'. The measured warm samples are invalid.");
         }
 
         List<RunSample> samples = new(count);
@@ -225,8 +234,9 @@ public sealed class AnalysisProfileBenchmarkHarness
             $"No profile written for policy '{policyPath}' mode '{mode}'.{Environment.NewLine}stdout:{stdout}{Environment.NewLine}stderr:{stderr}");
 
         using JsonDocument document = JsonDocument.Parse(File.ReadAllText(profilePath));
+        JsonElement profile = document.RootElement.Clone();
         File.Delete(profilePath);
-        JsonElement root = document.RootElement;
+        JsonElement root = profile;
         string completionStatus = root.GetProperty("CompletionStatus").GetString()!;
 
         // Only the single-mode Validate() path wraps its work in a "total" Measure() call — the
@@ -260,7 +270,9 @@ public sealed class AnalysisProfileBenchmarkHarness
 
         double totalMs = explicitTotalMs ?? indentZeroSumMs;
 
-        return new RunSample(totalMs, preflightMs, Math.Max(0, totalMs - preflightMs), completionStatus, wallClock.Elapsed.TotalMilliseconds);
+        return new RunSample(
+            totalMs, preflightMs, Math.Max(0, totalMs - preflightMs), completionStatus, wallClock.Elapsed.TotalMilliseconds,
+            profile);
     }
 
     private static double Median(List<double> values)
@@ -277,9 +289,18 @@ public sealed class AnalysisProfileBenchmarkHarness
         return sorted[Math.Clamp(index, 0, sorted.Count - 1)];
     }
 
-    private sealed record RunSample(double TotalMs, double PreflightMs, double AnalysisMs, string CompletionStatus, double WallClockMs);
+    // Preserve the complete profile rather than only its elapsed fields. This is the raw baseline
+    // evidence for #409, including per-phase ProcessorTimeMs, Measurements, Output, and every
+    // deterministic counter for each individual process.
+    private sealed record RunSample(
+        double TotalMs,
+        double PreflightMs,
+        double AnalysisMs,
+        string CompletionStatus,
+        double WallClockMs,
+        JsonElement Profile);
 
     private sealed record ScenarioSummary(
         string ScenarioId, string Description, int SampleCount, double MedianAnalysisMs, double P95AnalysisMs,
-        double MedianPreflightMs, string CompletionStatus);
+        double MedianPreflightMs, string CompletionStatus, IReadOnlyList<RunSample> Samples);
 }

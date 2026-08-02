@@ -7,7 +7,7 @@ This is the stability contract for `analysis-profile/v1` (`AnalysisProfileId.V1`
 | Field | Type | Determinism | Meaning |
 |---|---|---|---|
 | `SchemaId` | string | deterministic | Always `"analysis-profile/v1"`. |
-| `CompletionStatus` | enum | deterministic | `Success`, `ValidationFailure`, `PreparationFailure`, or `Cancelled` — the actual outcome of the profiled run. |
+| `CompletionStatus` | enum | deterministic | `Success`, `ValidationFailure`, `PreparationFailure`, or `Cancelled` — the actual analysis outcome of the profiled run. A report-publication failure is represented by `Output.OutputFailed`; it does not rewrite a completed analysis as `PreparationFailure`. |
 | `CancellationObserved` | bool | deterministic | `true` only when cooperative cancellation was observed during the run (see `openspec/specs/cooperative-cancellation/spec.md`). |
 | `Counters` | object | deterministic | See below. |
 | `Phases` | array | mixed | `Name`/`Indent`/`Ordinal`/`Count` are deterministic; `ElapsedMs` and `ProcessorTimeMs` are environment-dependent measurements, `null` when no `ValidationTiming` instance backed the run. |
@@ -31,7 +31,7 @@ This is the stability contract for `analysis-profile/v1` (`AnalysisProfileId.V1`
 | `SourceFilesScanned` | Number of owned C# source files parsed by the fact-index source scan. | `ArchitectureSourceFileFactIndex.RunSourceScan` via `ArchitectureAnalysisSnapshotCounters` |
 | `ContractFamilyCounts` | Map of contract-family name → number of contracts executed for that family across every evaluated mode. Repeated family phases are summed, never overwritten by the last mode. | `ValidationTiming` per-family `Count` (see `ArchitectureContractExecutor`) |
 | `ContractFamilyResultCounts` | Map of contract-family name → findings/cycles (and coverage summaries) produced across every evaluated mode. | `ArchitectureContractExecutor` result inventory |
-| `RenderedSinkCount` | Number of distinct output formats rendered (human/json/sarif), deduplicated across destinations. | CLI: `ValidateCommandHandler.Profile.cs`. Testing API: always `0` (no CLI-style sinks exist for a direct `ArchitectureValidationBuilder` call). |
+| `RenderedSinkCount` | Number of distinct normal-report formats (human/json/sarif) whose rendering actually completed, deduplicated across destinations. It is `0` when cancellation interrupts before the first completed render, even if sinks were configured. | CLI: `ReportCoordinator` routing evidence. Testing API: always `0` (no CLI-style sinks exist for a direct `ArchitectureValidationBuilder` call). |
 | `OutputSinkCount` | Number of configured output destinations (stdout/stderr/file). | Same as above. |
 | `Cache` | Reserved for issue #365. `Status` is `NotApplicable`, `Lookups`/`Hits` are `0` until then. | `AnalysisProfileCacheCounters` |
 | `Concurrency` | Reserved for issue #408. `Status` is `NotApplicable`, `Workers` is `0` until then. | `AnalysisProfileConcurrencyCounters` |
@@ -42,8 +42,9 @@ This is the stability contract for `analysis-profile/v1` (`AnalysisProfileId.V1`
 `StagedSinkCount` records file sinks that passed staging, including ones later committed.
 `FailedSinkCount` and `UncommittedSinkCount` preserve the routing result when publication fails or is cancelled.
 `OutputFailed` is true for partial or total output failure; it is false for fully committed and cancellation-only routing outcomes.
+When `OutputFailed` is true after analysis completed, `CompletionStatus` still describes that completed analysis (`Success` or `ValidationFailure`); the CLI's runtime-error exit is described by `Output`, not misclassified as a preparation failure.
 
-## Phase names (from `ValidationTiming`, unchanged by this capability)
+## Phase names
 
 | Phase | Indent | Meaning |
 |---|---|---|
@@ -62,6 +63,12 @@ This is the stability contract for `analysis-profile/v1` (`AnalysisProfileId.V1`
 | `contract_checks` | 0 | Wraps every per-family phase below. |
 | `<family name>` (e.g. `dependency`, `layer`, `cycle`, `coverage`, ...) | 1 | One phase per contract family in `ArchitectureContractCatalog.FamiliesInOrder`, each carrying a deterministic `Count` of contracts executed for that family. |
 | `post_processing` | 0 | Unmatched-ignore resolution and related post-processing. |
+| `render_human` | 0 | Render a normal human report document after the analysis outcome is known. Recorded only once that rendering completes. |
+| `render_json` | 0 | Render a normal JSON report document after the analysis outcome is known. Recorded only once that rendering completes. |
+| `render_sarif` | 0 | Render a normal SARIF report document after the analysis outcome is known. Recorded only once that rendering completes. |
+| `output_staging` | 0 | Stage normal file report sinks before any file commit. |
+| `output_stream_write` | 0 | Write normal report content to stdout/stderr destinations. |
+| `output_commit` | 0 | Commit successfully staged normal file report sinks by rename. |
 
 Every phase also records `ProcessorTimeMs`, the process CPU-time delta measured during that phase. It is an environment-dependent measurement and can overlap for nested phases.
 

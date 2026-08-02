@@ -93,11 +93,20 @@ public sealed class ArchitectureAnalysisSnapshot : IDisposable
         {
             lock (_gate)
             {
+                Dictionary<string, int> contractFamilyResultCounts =
+                    new(_counters.ContractFamilyResultCounts, StringComparer.Ordinal);
+                foreach ((string family, int count) in _profilingCounters.ContractFamilyResultCounts)
+                {
+                    contractFamilyResultCounts.TryGetValue(family, out int current);
+                    contractFamilyResultCounts[family] = current + count;
+                }
+
                 return _counters with
                 {
                     FactIndexMaterializations = _profilingCounters.FactIndexMaterializations,
                     SourceScanPasses = _profilingCounters.SourceScanPasses,
                     SourceFilesScanned = _profilingCounters.SourceFilesScanned,
+                    ContractFamilyResultCounts = contractFamilyResultCounts,
                 };
             }
         }
@@ -276,12 +285,15 @@ public sealed class ArchitectureAnalysisSnapshot : IDisposable
         ArchitectureContractExecutionResult execution;
         using (timing?.Measure("contract_checks"))
         {
+            _profilingCounters.ResetContractFamilyResultCounts();
             execution = _contractExecutor.Execute(
                 runner.Session, mode, _handlerRegistry, _includeAsmdefContracts, timing);
         }
 
-        allViolations.AddRange(execution.Violations);
         RecordContractFamilyResultCounts(execution.ContractFamilyResultCounts);
+        _profilingCounters.ResetContractFamilyResultCounts();
+
+        allViolations.AddRange(execution.Violations);
 
         cancellationToken.ThrowIfCancellationRequested();
 
@@ -355,21 +367,6 @@ public sealed class ArchitectureAnalysisSnapshot : IDisposable
         .Distinct(StringComparer.OrdinalIgnoreCase)
         .ToArray();
 
-    private void RecordContractFamilyResultCounts(IReadOnlyDictionary<string, int> resultCounts)
-    {
-        lock (_gate)
-        {
-            Dictionary<string, int> totals = new(_counters.ContractFamilyResultCounts, StringComparer.Ordinal);
-            foreach ((string family, int count) in resultCounts)
-            {
-                totals.TryGetValue(family, out int current);
-                totals[family] = current + count;
-            }
-
-            _counters = _counters with { ContractFamilyResultCounts = totals };
-        }
-    }
-
     private IReadOnlyList<string> GetResolvedAssemblyPaths()
     {
         IArchitectureContractRunner? runner = _setup?.Runner;
@@ -384,6 +381,21 @@ public sealed class ArchitectureAnalysisSnapshot : IDisposable
             .Select(path => Path.GetFullPath(path!))
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToList();
+    }
+
+    private void RecordContractFamilyResultCounts(IReadOnlyDictionary<string, int> resultCounts)
+    {
+        lock (_gate)
+        {
+            Dictionary<string, int> totals = new(_counters.ContractFamilyResultCounts, StringComparer.Ordinal);
+            foreach ((string family, int count) in resultCounts)
+            {
+                totals.TryGetValue(family, out int current);
+                totals[family] = current + count;
+            }
+
+            _counters = _counters with { ContractFamilyResultCounts = totals };
+        }
     }
 
     private IReadOnlyList<string> GetDiscoveredProjectPaths()
