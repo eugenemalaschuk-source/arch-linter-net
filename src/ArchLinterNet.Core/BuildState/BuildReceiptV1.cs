@@ -9,4 +9,11 @@ public sealed record BuildReceiptV1(
     string? Configuration,
     string? TargetFramework,
     string BuildInputFingerprint,
-    string AssemblyContentDigest);
+    string AssemblyContentDigest,
+    string? EvaluatedManifestFingerprint = null,
+    CacheEligibility? CacheEligibility = null,
+    IReadOnlyList<string>? CacheIneligibilityReasons = null)
+{
+    public IReadOnlyList<string> CacheIneligibilityReasons { get; init; } =
+        CacheIneligibilityReasons ?? Array.Empty<string>();
+}

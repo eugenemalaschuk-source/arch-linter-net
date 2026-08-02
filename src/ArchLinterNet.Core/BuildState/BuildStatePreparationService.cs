@@ -599,6 +599,19 @@ public sealed class BuildStatePreparationService : IBuildStatePreparationService
             string fingerprint = BuildStateCanonicalHasher.ComputeBuildInputFingerprint(
                 project.Path, request.RepositoryRoot, request.CancellationToken);
             string assemblyDigest = BuildStateCanonicalHasher.ComputeContentDigest(assemblyPath, request.CancellationToken);
+            EvaluatedBuildInputManifestV1 manifest = EvaluatedBuildInputManifestCollector.Collect(
+                project.Path, request.RepositoryRoot, request.RequestedConfiguration, request.RequestedTargetFramework,
+                cancellationToken: request.CancellationToken);
+            EvaluatedBuildInputManifestV1 publicationCheck = EvaluatedBuildInputManifestCollector.Collect(
+                project.Path, request.RepositoryRoot, request.RequestedConfiguration, request.RequestedTargetFramework,
+                cancellationToken: request.CancellationToken);
+            string publicationAssemblyDigest = BuildStateCanonicalHasher.ComputeContentDigest(assemblyPath, request.CancellationToken);
+
+            if (!string.Equals(manifest.Digest, publicationCheck.Digest, StringComparison.Ordinal)
+                || !string.Equals(assemblyDigest, publicationAssemblyDigest, StringComparison.Ordinal))
+            {
+                continue;
+            }
 
             // Re-checked immediately before the write that actually publishes trusted receipt
             // evidence — hashing above already observes the token per file/project, but this is
@@ -617,7 +630,10 @@ public sealed class BuildStatePreparationService : IBuildStatePreparationService
                 request.RequestedConfiguration,
                 request.RequestedTargetFramework,
                 fingerprint,
-                assemblyDigest));
+                assemblyDigest,
+                manifest.Digest,
+                manifest.Eligibility,
+                manifest.IneligibilityReasons));
         }
     }
 }

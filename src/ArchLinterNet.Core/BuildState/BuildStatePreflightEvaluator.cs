@@ -156,7 +156,7 @@ public static class BuildStatePreflightEvaluator
 
         return CheckReceiptIdentity(project, request, assemblyPath, receipt)
             ?? CheckReceiptFreshness(project, request, assemblyPath, receipt)
-            ?? Diagnostic(project, BuildStatePreflightState.Current, Evidence(project) with { ExpectedOutputPath = assemblyPath });
+            ?? CurrentDiagnostic(project, request, assemblyPath, receipt);
     }
 
     private static BuildStatePreflightDiagnostic? CheckReceiptIdentity(
@@ -246,6 +246,44 @@ public static class BuildStatePreflightEvaluator
         }
 
         return null;
+    }
+
+    private static BuildStatePreflightDiagnostic CurrentDiagnostic(
+        ArchitectureDiscoveredProject project, BuildStatePreflightRequest request, string assemblyPath, BuildReceiptV1 receipt)
+    {
+        EvaluatedBuildInputManifestV1 manifest = EvaluatedBuildInputManifestCollector.Collect(
+            project.Path, request.RepositoryRoot, request.RequestedConfiguration, request.RequestedTargetFramework,
+            cancellationToken: request.CancellationToken);
+        EvaluatedBuildInputManifestV1 publicationCheck = EvaluatedBuildInputManifestCollector.Collect(
+            project.Path, request.RepositoryRoot, request.RequestedConfiguration, request.RequestedTargetFramework,
+            cancellationToken: request.CancellationToken);
+        List<string> reasons = manifest.IneligibilityReasons.ToList();
+        CacheEligibility eligibility = manifest.Eligibility;
+        if (!string.Equals(manifest.Digest, publicationCheck.Digest, StringComparison.Ordinal))
+        {
+            reasons.Add("input-changed-during-verification");
+            eligibility = CacheEligibility.CacheIneligible;
+        }
+        if (receipt.EvaluatedManifestFingerprint == null || receipt.CacheEligibility == null)
+        {
+            reasons.Add("legacy-receipt-missing-evaluated-manifest");
+            eligibility = CacheEligibility.CacheIneligible;
+        }
+        else if (!string.Equals(receipt.EvaluatedManifestFingerprint, manifest.Digest, StringComparison.Ordinal)
+            || receipt.CacheEligibility != CacheEligibility.VerifiedCacheEligible)
+        {
+            reasons.Add("receipt-manifest-mismatch");
+            eligibility = CacheEligibility.CacheIneligible;
+        }
+
+        return Diagnostic(project, BuildStatePreflightState.Current, Evidence(project) with
+        {
+            ExpectedOutputPath = assemblyPath,
+            CacheEligibility = eligibility == CacheEligibility.VerifiedCacheEligible
+                ? "verified-cache-eligible"
+                : "cache-ineligible",
+            CacheIneligibilityReasons = reasons.OrderBy(reason => reason, StringComparer.Ordinal).Distinct(StringComparer.Ordinal).ToArray()
+        });
     }
 
     // A dependent project whose own artifact is otherwise current cannot be trusted if a project
