@@ -3069,7 +3069,6 @@ static class ArchLinterNet.Core.Profiling.AnalysisProfileJsonWriter
   method static string Write(ArchLinterNet.Core.Profiling.AnalysisProfile profile)
 sealed class ArchLinterNet.Core.Profiling.AnalysisProfileMeasurements : System.IEquatable<ArchLinterNet.Core.Profiling.AnalysisProfileMeasurements>
   ctor()
-  method static ArchLinterNet.Core.Profiling.AnalysisProfileMeasurements Capture(long allocatedBytesAtStart)
   method ArchLinterNet.Core.Profiling.AnalysisProfileMeasurements <Clone>$()
   method bool Equals(ArchLinterNet.Core.Profiling.AnalysisProfileMeasurements? other)
   method bool Equals(object? obj)
