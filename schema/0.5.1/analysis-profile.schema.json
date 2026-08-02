@@ -4,7 +4,7 @@
   "title": "ArchLinterNet analysis profile v1",
   "description": "Machine-readable analysis-profile/v1 document: deterministic counters plus optional environment-dependent measurements. Not yet registered in compatibility-manifest.json — see openspec/specs/packaged-schema-registry/spec.md.",
   "type": "object",
-  "required": ["SchemaId", "CompletionStatus", "CancellationObserved", "Counters", "Phases"],
+  "required": ["SchemaId", "CompletionStatus", "CancellationObserved", "Counters", "Phases", "Output"],
   "properties": {
     "SchemaId": { "const": "analysis-profile/v1" },
     "CompletionStatus": { "enum": ["Success", "ValidationFailure", "PreparationFailure", "Cancelled"] },
@@ -12,20 +12,27 @@
     "Counters": {
       "type": "object",
       "required": [
-        "PolicyCompositions", "ProjectGraphEvaluations", "AssemblyLoads", "ModesEvaluated",
+        "PolicyCompositions", "ProjectGraphEvaluations", "AssemblyLoads", "DiscoveredProjectCount", "RetainedAssemblyCount", "SelectedAssemblyCount", "ModesEvaluated",
         "SnapshotMaterializations", "FactIndexMaterializations", "SourceScanPasses", "SourceFilesScanned",
-        "ContractFamilyCounts", "RenderedSinkCount", "OutputSinkCount", "Cache", "Concurrency"
+        "ContractFamilyCounts", "ContractFamilyResultCounts", "RenderedSinkCount", "OutputSinkCount", "Cache", "Concurrency"
       ],
       "properties": {
         "PolicyCompositions": { "type": "integer", "minimum": 0 },
         "ProjectGraphEvaluations": { "type": "integer", "minimum": 0 },
         "AssemblyLoads": { "type": "integer", "minimum": 0 },
+        "DiscoveredProjectCount": { "type": "integer", "minimum": 0 },
+        "RetainedAssemblyCount": { "type": "integer", "minimum": 0 },
+        "SelectedAssemblyCount": { "type": "integer", "minimum": 0 },
         "ModesEvaluated": { "type": "integer", "minimum": 0 },
         "SnapshotMaterializations": { "type": "integer", "minimum": 0 },
         "FactIndexMaterializations": { "type": "integer", "minimum": 0 },
         "SourceScanPasses": { "type": "integer", "minimum": 0 },
         "SourceFilesScanned": { "type": "integer", "minimum": 0 },
         "ContractFamilyCounts": {
+          "type": "object",
+          "additionalProperties": { "type": "integer", "minimum": 0 }
+        },
+        "ContractFamilyResultCounts": {
           "type": "object",
           "additionalProperties": { "type": "integer", "minimum": 0 }
         },
@@ -63,10 +70,23 @@
           "Indent": { "type": "integer", "minimum": 0 },
           "Ordinal": { "type": "integer", "minimum": 0 },
           "Count": { "type": ["integer", "null"], "minimum": 0 },
-          "ElapsedMs": { "type": ["number", "null"], "minimum": 0 }
+          "ElapsedMs": { "type": ["number", "null"], "minimum": 0 },
+          "ProcessorTimeMs": { "type": ["number", "null"], "minimum": 0 }
         },
         "additionalProperties": false
       }
+    },
+    "Output": {
+      "type": "object",
+      "required": ["CommittedSinkCount", "FailedSinkCount", "StagedSinkCount", "UncommittedSinkCount", "OutputFailed"],
+      "properties": {
+        "CommittedSinkCount": { "type": "integer", "minimum": 0 },
+        "FailedSinkCount": { "type": "integer", "minimum": 0 },
+        "StagedSinkCount": { "type": "integer", "minimum": 0 },
+        "UncommittedSinkCount": { "type": "integer", "minimum": 0 },
+        "OutputFailed": { "type": "boolean" }
+      },
+      "additionalProperties": false
     },
     "Measurements": {
       "type": ["object", "null"],

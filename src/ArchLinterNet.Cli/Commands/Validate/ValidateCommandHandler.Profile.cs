@@ -1,3 +1,5 @@
+using System.Diagnostics;
+using ArchLinterNet.Core.BuildState;
 using ArchLinterNet.Core.Profiling;
 using ArchLinterNet.Core.Reporting;
 using ArchLinterNet.Core.Validation;
@@ -21,6 +23,10 @@ internal sealed partial class ValidateCommandHandler
         public ValidationTiming? Timing { get; set; }
 
         public ArchitectureAnalysisSnapshotCounters? Counters { get; set; }
+
+        public IReadOnlyList<string> InputPaths { get; set; } = Array.Empty<string>();
+
+        public AnalysisProfileOutput? Output { get; set; }
     }
 
     private void WriteCancelledProfile(ValidateCommandOptions options, ValidationProfileExecutionState state)
@@ -30,7 +36,9 @@ internal sealed partial class ValidateCommandHandler
             state.Counters ?? new ArchitectureAnalysisSnapshotCounters(),
             state.Timing,
             AnalysisProfileCompletionStatus.Cancelled,
-            cancellationObserved: true);
+            cancellationObserved: true,
+            state.Output,
+            state.InputPaths);
     }
 
     // No-op unless --profile was requested — omitting it leaves command output completely
@@ -43,14 +51,21 @@ internal sealed partial class ValidateCommandHandler
         ArchitectureAnalysisSnapshotCounters counters,
         ValidationTiming? timing,
         AnalysisProfileCompletionStatus completionStatus,
-        bool cancellationObserved)
+        bool cancellationObserved,
+        AnalysisProfileOutput? output = null,
+        IReadOnlyList<string>? inputPaths = null)
     {
         if (options.ProfileDestination is null)
         {
             return;
         }
 
-        AnalysisProfileMeasurements measurements = AnalysisProfileMeasurements.Capture(_allocatedBytesAtStart);
+        AnalysisProfileMeasurements measurements = CaptureMeasurements();
+
+        if (IsProfileInputCollision(options, inputPaths ?? Array.Empty<string>()))
+        {
+            return;
+        }
 
         AnalysisProfile profile = AnalysisProfileBuilder.Build(
             counters,
@@ -59,9 +74,63 @@ internal sealed partial class ValidateCommandHandler
             ResolveOutputSinkCount(options),
             completionStatus,
             cancellationObserved,
-            measurements);
+            measurements,
+            output);
 
         WriteProfileToDestination(options.ProfileDestination, AnalysisProfileJsonWriter.Write(profile));
+    }
+
+    private bool IsProfileInputCollision(ValidateCommandOptions options, IReadOnlyList<string> inputPaths)
+    {
+        if (!TryGetProfileFilePath(options, out string? profilePath))
+        {
+            return false;
+        }
+
+        string? inputPath = inputPaths.FirstOrDefault(path =>
+            string.Equals(profilePath, Path.GetFullPath(path), StringComparison.OrdinalIgnoreCase));
+        if (inputPath is null)
+        {
+            return false;
+        }
+
+        _console.Error.WriteLine(
+            $"--profile destination '{options.ProfileDestination}' matches input file '{inputPath}'; profile was not written");
+        return true;
+    }
+
+    private static IReadOnlyList<string> CreateProfileInputPaths(IEnumerable<string> inputPaths)
+    {
+        return inputPaths
+            .SelectMany(path => new[] { path, BuildReceiptStore.ReceiptPathFor(path) })
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+    }
+
+    private static AnalysisProfileOutput CreateOutputProfile(RouteResult result)
+    {
+        int committedSinkCount = result.CommittedPaths
+            .Concat(result.DeliveredStreamPaths)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Count();
+        return new AnalysisProfileOutput
+        {
+            CommittedSinkCount = committedSinkCount,
+            FailedSinkCount = result.FailedPaths.Distinct(StringComparer.OrdinalIgnoreCase).Count(),
+            StagedSinkCount = result.StagedPaths.Distinct(StringComparer.OrdinalIgnoreCase).Count(),
+            UncommittedSinkCount = result.UncommittedPaths.Distinct(StringComparer.OrdinalIgnoreCase).Count(),
+            OutputFailed = result.Status != ReportRouteStatus.AllSucceeded,
+        };
+    }
+
+    private AnalysisProfileMeasurements CaptureMeasurements()
+    {
+        long peakWorkingSetBytes = Process.GetCurrentProcess().PeakWorkingSet64;
+        return new AnalysisProfileMeasurements
+        {
+            PeakWorkingSetBytes = peakWorkingSetBytes > 0 ? peakWorkingSetBytes : null,
+            AllocatedBytesTotal = Math.Max(0, GC.GetTotalAllocatedBytes(precise: false) - _allocatedBytesAtStart),
+        };
     }
 
     private void WriteProfileToDestination(string destination, string json)

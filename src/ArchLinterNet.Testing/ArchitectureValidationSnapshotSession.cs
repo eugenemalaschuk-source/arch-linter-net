@@ -36,7 +36,7 @@ public sealed class ArchitectureValidationSnapshotSession(
             ? AnalysisProfileBuilder.Build(
                 snapshot.Counters, timing, renderedSinkCount: 0, outputSinkCount: 0,
                 ArchitectureValidationBuilder.ResolveCompletionStatus(outcome), cancellationObserved: false,
-                AnalysisProfileMeasurements.Capture(allocatedBytesAtStart))
+                ArchitectureValidationBuilder.CaptureMeasurements(allocatedBytesAtStart))
             : null;
 
         return ArchitectureValidationResultMapper.ToResult(outcome, timing, mode, profile);

@@ -10,6 +10,8 @@ namespace ArchLinterNet.Cli.Commands.Validate;
 
 internal sealed partial class ValidateCommandHandler
 {
+    private const string CancellationCountersDataKey = "ArchLinterNet.AnalysisProfile.Counters";
+    private const string CancellationInputPathsDataKey = "ArchLinterNet.AnalysisProfile.InputPaths";
     private const string FormatHuman = "human";
     private const string FormatJson = "json";
     private const string FormatSarif = "sarif";
@@ -49,12 +51,14 @@ internal sealed partial class ValidateCommandHandler
         // what deadline) that a generic "cancelled" message would silently discard.
         catch (BuildStateProcessCleanupTimedOutException ex)
         {
+            CaptureCancelledProfileState(profileState, ex);
             WriteCancelledProfile(options, profileState);
             WriteCancellation(options, errorFormat, ex);
             return CliExitCodes.InvalidArgumentsOrRuntimeError;
         }
-        catch (OperationCanceledException)
+        catch (OperationCanceledException ex)
         {
+            CaptureCancelledProfileState(profileState, ex);
             WriteCancelledProfile(options, profileState);
             WriteCancellation(options, errorFormat);
             return CliExitCodes.InvalidArgumentsOrRuntimeError;
@@ -390,6 +394,11 @@ internal sealed partial class ValidateCommandHandler
             return CliExitCodes.InvalidArgumentsOrRuntimeError;
         }
 
+        if (!PreValidateProfileDestination(options))
+        {
+            return CliExitCodes.InvalidArgumentsOrRuntimeError;
+        }
+
         return null;
     }
 
@@ -583,6 +592,30 @@ internal sealed partial class ValidateCommandHandler
         }
 
         return true;
+    }
+
+    private bool PreValidateProfileDestination(ValidateCommandOptions options)
+    {
+        if (!TryGetProfileFilePath(options, out string? profilePath)
+            || _fileSystem.CanWriteToDirectory(profilePath!))
+        {
+            return true;
+        }
+
+        _console.Error.WriteLine($"Cannot write profile to '{options.ProfileDestination}': destination is not writable");
+        return false;
+    }
+
+    private static void CaptureCancelledProfileState(ValidationProfileExecutionState state, OperationCanceledException exception)
+    {
+        if (exception.Data[CancellationCountersDataKey] is not ArchitectureAnalysisSnapshotCounters counters
+            || exception.Data[CancellationInputPathsDataKey] is not IReadOnlyList<string> inputPaths)
+        {
+            return;
+        }
+
+        state.Counters = counters;
+        state.InputPaths = CreateProfileInputPaths(inputPaths);
     }
 
     private static bool TryGetPolicyDiagnostic(Exception exception, out ArchitecturePolicyDiagnostic? diagnostic)

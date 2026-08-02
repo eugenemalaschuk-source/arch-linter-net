@@ -1067,6 +1067,7 @@ sealed class ArchLinterNet.Core.Execution.Abstractions.ArchitectureContractExecu
   property System.Collections.Generic.IReadOnlyCollection<ArchLinterNet.Core.Model.ArchitectureViolation> Violations {get;init;}
   property System.Collections.Generic.IReadOnlyCollection<ArchLinterNet.Core.Reporting.ArchitectureCoverageSummary> CoverageSummaries {get;init;}
   property System.Collections.Generic.IReadOnlyCollection<string> Cycles {get;init;}
+  property System.Collections.Generic.IReadOnlyDictionary<string,int> ContractFamilyResultCounts {get;init;}
 sealed class ArchLinterNet.Core.Execution.Abstractions.ArchitectureHandlerResult : System.IEquatable<ArchLinterNet.Core.Execution.Abstractions.ArchitectureHandlerResult>
   ctor(System.Collections.Generic.IReadOnlyCollection<ArchLinterNet.Core.Model.ArchitectureViolation> Violations, System.Collections.Generic.IReadOnlyCollection<string> Cycles)
   method ArchLinterNet.Core.Execution.Abstractions.ArchitectureHandlerResult <Clone>$()
@@ -3007,11 +3008,12 @@ sealed class ArchLinterNet.Core.Profiling.AnalysisProfile : System.IEquatable<Ar
   property ArchLinterNet.Core.Profiling.AnalysisProfileCompletionStatus CompletionStatus {get;init;}
   property ArchLinterNet.Core.Profiling.AnalysisProfileCounters Counters {get;init;}
   property ArchLinterNet.Core.Profiling.AnalysisProfileMeasurements? Measurements {get;init;}
+  property ArchLinterNet.Core.Profiling.AnalysisProfileOutput Output {get;init;}
   property System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Profiling.AnalysisProfilePhaseMeasurement> Phases {get;init;}
   property bool CancellationObserved {get;init;}
   property string SchemaId {get;init;}
 static class ArchLinterNet.Core.Profiling.AnalysisProfileBuilder
-  method static ArchLinterNet.Core.Profiling.AnalysisProfile Build(ArchLinterNet.Core.Validation.ArchitectureAnalysisSnapshotCounters snapshotCounters, ArchLinterNet.Core.Reporting.ValidationTiming? timing, int renderedSinkCount, int outputSinkCount, ArchLinterNet.Core.Profiling.AnalysisProfileCompletionStatus completionStatus, bool cancellationObserved, ArchLinterNet.Core.Profiling.AnalysisProfileMeasurements? measurements = null)
+  method static ArchLinterNet.Core.Profiling.AnalysisProfile Build(ArchLinterNet.Core.Validation.ArchitectureAnalysisSnapshotCounters snapshotCounters, ArchLinterNet.Core.Reporting.ValidationTiming? timing, int renderedSinkCount, int outputSinkCount, ArchLinterNet.Core.Profiling.AnalysisProfileCompletionStatus completionStatus, bool cancellationObserved, ArchLinterNet.Core.Profiling.AnalysisProfileMeasurements? measurements = null, ArchLinterNet.Core.Profiling.AnalysisProfileOutput? output = null)
 sealed class ArchLinterNet.Core.Profiling.AnalysisProfileCacheCounters : System.IEquatable<ArchLinterNet.Core.Profiling.AnalysisProfileCacheCounters>
   ctor()
   method ArchLinterNet.Core.Profiling.AnalysisProfileCacheCounters <Clone>$()
@@ -3053,13 +3055,17 @@ sealed class ArchLinterNet.Core.Profiling.AnalysisProfileCounters : System.IEqua
   property ArchLinterNet.Core.Profiling.AnalysisProfileCacheCounters Cache {get;init;}
   property ArchLinterNet.Core.Profiling.AnalysisProfileConcurrencyCounters Concurrency {get;init;}
   property System.Collections.Generic.IReadOnlyDictionary<string,int> ContractFamilyCounts {get;init;}
+  property System.Collections.Generic.IReadOnlyDictionary<string,int> ContractFamilyResultCounts {get;init;}
   property int AssemblyLoads {get;init;}
+  property int DiscoveredProjectCount {get;init;}
   property int FactIndexMaterializations {get;init;}
   property int ModesEvaluated {get;init;}
   property int OutputSinkCount {get;init;}
   property int PolicyCompositions {get;init;}
   property int ProjectGraphEvaluations {get;init;}
   property int RenderedSinkCount {get;init;}
+  property int RetainedAssemblyCount {get;init;}
+  property int SelectedAssemblyCount {get;init;}
   property int SnapshotMaterializations {get;init;}
   property int SourceFilesScanned {get;init;}
   property int SourceScanPasses {get;init;}
@@ -3078,17 +3084,32 @@ sealed class ArchLinterNet.Core.Profiling.AnalysisProfileMeasurements : System.I
   operator ==(ArchLinterNet.Core.Profiling.AnalysisProfileMeasurements? left, ArchLinterNet.Core.Profiling.AnalysisProfileMeasurements? right)
   property long? AllocatedBytesTotal {get;init;}
   property long? PeakWorkingSetBytes {get;init;}
+sealed class ArchLinterNet.Core.Profiling.AnalysisProfileOutput : System.IEquatable<ArchLinterNet.Core.Profiling.AnalysisProfileOutput>
+  ctor()
+  method ArchLinterNet.Core.Profiling.AnalysisProfileOutput <Clone>$()
+  method bool Equals(ArchLinterNet.Core.Profiling.AnalysisProfileOutput? other)
+  method bool Equals(object? obj)
+  method int GetHashCode()
+  method string ToString()
+  operator !=(ArchLinterNet.Core.Profiling.AnalysisProfileOutput? left, ArchLinterNet.Core.Profiling.AnalysisProfileOutput? right)
+  operator ==(ArchLinterNet.Core.Profiling.AnalysisProfileOutput? left, ArchLinterNet.Core.Profiling.AnalysisProfileOutput? right)
+  property bool OutputFailed {get;init;}
+  property int CommittedSinkCount {get;init;}
+  property int FailedSinkCount {get;init;}
+  property int StagedSinkCount {get;init;}
+  property int UncommittedSinkCount {get;init;}
 sealed class ArchLinterNet.Core.Profiling.AnalysisProfilePhaseMeasurement : System.IEquatable<ArchLinterNet.Core.Profiling.AnalysisProfilePhaseMeasurement>
-  ctor(string Name, int Indent, int Ordinal, int? Count, double? ElapsedMs)
+  ctor(string Name, int Indent, int Ordinal, int? Count, double? ElapsedMs, double? ProcessorTimeMs)
   method ArchLinterNet.Core.Profiling.AnalysisProfilePhaseMeasurement <Clone>$()
   method bool Equals(ArchLinterNet.Core.Profiling.AnalysisProfilePhaseMeasurement? other)
   method bool Equals(object? obj)
   method int GetHashCode()
   method string ToString()
-  method void Deconstruct(out string Name, out int Indent, out int Ordinal, out int? Count, out double? ElapsedMs)
+  method void Deconstruct(out string Name, out int Indent, out int Ordinal, out int? Count, out double? ElapsedMs, out double? ProcessorTimeMs)
   operator !=(ArchLinterNet.Core.Profiling.AnalysisProfilePhaseMeasurement? left, ArchLinterNet.Core.Profiling.AnalysisProfilePhaseMeasurement? right)
   operator ==(ArchLinterNet.Core.Profiling.AnalysisProfilePhaseMeasurement? left, ArchLinterNet.Core.Profiling.AnalysisProfilePhaseMeasurement? right)
   property double? ElapsedMs {get;init;}
+  property double? ProcessorTimeMs {get;init;}
   property int Indent {get;init;}
   property int Ordinal {get;init;}
   property int? Count {get;init;}
@@ -3380,6 +3401,7 @@ sealed class ArchLinterNet.Core.Validation.ArchitectureAnalysisSnapshot : System
   method void Dispose()
   property ArchLinterNet.Core.BuildState.BuildStatePreflightResult Preflight {get;}
   property ArchLinterNet.Core.Validation.ArchitectureAnalysisSnapshotCounters Counters {get;}
+  property System.Collections.Generic.IReadOnlyList<string> ProfileInputPaths {get;}
   property bool Cancelled {get;}
   property bool Failed {get;}
   property bool IsDisposed {get;}
@@ -3393,11 +3415,15 @@ sealed class ArchLinterNet.Core.Validation.ArchitectureAnalysisSnapshotCounters 
   method string ToString()
   operator !=(ArchLinterNet.Core.Validation.ArchitectureAnalysisSnapshotCounters? left, ArchLinterNet.Core.Validation.ArchitectureAnalysisSnapshotCounters? right)
   operator ==(ArchLinterNet.Core.Validation.ArchitectureAnalysisSnapshotCounters? left, ArchLinterNet.Core.Validation.ArchitectureAnalysisSnapshotCounters? right)
+  property System.Collections.Generic.IReadOnlyDictionary<string,int> ContractFamilyResultCounts {get;init;}
   property int AssemblyLoads {get;init;}
+  property int DiscoveredProjectCount {get;init;}
   property int FactIndexMaterializations {get;init;}
   property int ModesEvaluated {get;init;}
   property int PolicyCompositions {get;init;}
   property int ProjectGraphEvaluations {get;init;}
+  property int RetainedAssemblyCount {get;init;}
+  property int SelectedAssemblyCount {get;init;}
   property int SnapshotMaterializations {get;init;}
   property int SourceFilesScanned {get;init;}
   property int SourceScanPasses {get;init;}

@@ -28,7 +28,8 @@ public sealed partial class ArchitectureSourceFileFactIndexTests
     private static ArchitectureSourceFileFactIndex BuildIndex(
         string repoRoot,
         string sourceRoot,
-        Dictionary<string, string> files)
+        Dictionary<string, string> files,
+        AnalysisSessionProfilingCounters? profilingCounters = null)
     {
         string absoluteRepoRoot = FakePaths.Root(repoRoot);
         var fs = new FakeArchitectureFileSystem();
@@ -63,7 +64,31 @@ public sealed partial class ArchitectureSourceFileFactIndexTests
                 SourceRootAssemblyOwnership: new Dictionary<string, string>(StringComparer.Ordinal)
                 {
                     [sourceRoot] = TestAssemblyName
-                }));
+                }),
+            profilingCounters: profilingCounters);
+    }
+
+    [Test]
+    public void AllFacts_SourceFilesScanned_ExcludesGeneratedFilesBeforeCountingParsedInputs()
+    {
+        const string Source = "namespace ArchLinterNet.Core.Tests.SourceFactFixtures { public sealed class CountedFixture { } }";
+        AnalysisSessionProfilingCounters counters = new();
+        ArchitectureSourceFileFactIndex index = BuildIndex(
+            "/fake/repo", "src",
+            new Dictionary<string, string>
+            {
+                ["CountedFixture.cs"] = Source,
+                ["CountedFixture.g.cs"] = Source,
+            },
+            counters);
+
+        _ = index.AllFacts;
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(counters.SourceScanPasses, Is.EqualTo(1));
+            Assert.That(counters.SourceFilesScanned, Is.EqualTo(1));
+        });
     }
 
     // ── Single type per file ──────────────────────────────────────────────────────────

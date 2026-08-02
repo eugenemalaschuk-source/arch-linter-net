@@ -68,7 +68,7 @@ public sealed class ValidateCommandHandlerProfileTests
             IReadOnlyCollection<ArchitectureClassificationRoleFact> classificationRoles,
             ArchitectureClassificationPathDeferredNotice? classificationPathDeferred,
             IReadOnlyCollection<BuildStatePreflightDiagnostic> preflightDiagnostics) =>
-            throw new NotSupportedException();
+            "{\"status\":\"passed\"}";
 
         public string FormatResultAsSarif(
             string mode, IReadOnlyCollection<ArchitectureViolation> violations, IReadOnlyCollection<string> cycles,
@@ -226,6 +226,23 @@ public sealed class ValidateCommandHandlerProfileTests
     }
 
     [Test]
+    public void Execute_ProfileFileDestinationNotWritable_IsRejectedBeforeAnalysis()
+    {
+        FakeCliConsole console = new();
+        FakeFileSystem fileSystem = new(exists: true, writable: false);
+        ValidateCommandHandler handler = new(new FakeCliRuntime(), console, fileSystem);
+
+        int exitCode = handler.Execute(BaseOptions(profileDestination: "profiles/result.json"));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(exitCode, Is.EqualTo(CliExitCodes.InvalidArgumentsOrRuntimeError));
+            Assert.That(console.StdErr, Does.Contain("Cannot write profile to 'profiles/result.json'"));
+            Assert.That(fileSystem.DirectWrites, Is.Empty);
+        });
+    }
+
+    [Test]
     public void Execute_CancelledDuringAnalysis_WritesCancelledProfile()
     {
         FakeCliConsole console = new();
@@ -244,6 +261,53 @@ public sealed class ValidateCommandHandlerProfileTests
             using JsonDocument document = JsonDocument.Parse(fileSystem.DirectWrites["cancelled-profile.json"]);
             Assert.That(document.RootElement.GetProperty("CompletionStatus").GetString(), Is.EqualTo("Cancelled"));
             Assert.That(document.RootElement.GetProperty("CancellationObserved").GetBoolean(), Is.True);
+        });
+    }
+
+    [Test]
+    public void Execute_CancelledAfterDynamicInputDiscovery_DoesNotOverwriteThatInput()
+    {
+        OperationCanceledException cancellation = new("cancelled");
+        cancellation.Data["ArchLinterNet.AnalysisProfile.Counters"] =
+            new ArchitectureAnalysisSnapshotCounters { PolicyCompositions = 1, AssemblyLoads = 1 };
+        cancellation.Data["ArchLinterNet.AnalysisProfile.InputPaths"] = new[] { Path.GetFullPath("imported-policy.yml") };
+        FakeCliConsole console = new();
+        FakeFileSystem fileSystem = new(exists: true);
+        ValidateCommandHandler handler = new(
+            new FakeCliRuntime { ExceptionToThrow = cancellation }, console, fileSystem);
+
+        int exitCode = handler.Execute(BaseOptions(profileDestination: "imported-policy.yml"));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(exitCode, Is.EqualTo(CliExitCodes.InvalidArgumentsOrRuntimeError));
+            Assert.That(fileSystem.DirectWrites, Is.Empty);
+            Assert.That(console.StdErr, Does.Contain("profile was not written"));
+        });
+    }
+
+    [Test]
+    public void Execute_ReportOutputFailure_RecordsActualPublicationResultInProfile()
+    {
+        FakeCliConsole console = new();
+        FakeFileSystem fileSystem = new(exists: true);
+        ValidateCommandHandler handler = new(new FakeCliRuntime(), console, fileSystem);
+        ValidateCommandOptions options = BaseOptions(profileDestination: "profile.json") with
+        {
+            AdditionalSinks = [new ReportSink("json", ReportDestinationType.File, "report.json")],
+        };
+
+        int exitCode = handler.Execute(options);
+
+        Assert.That(exitCode, Is.EqualTo(CliExitCodes.InvalidArgumentsOrRuntimeError));
+        using JsonDocument document = JsonDocument.Parse(fileSystem.DirectWrites["profile.json"]);
+        JsonElement output = document.RootElement.GetProperty("Output");
+        Assert.Multiple(() =>
+        {
+            Assert.That(output.GetProperty("OutputFailed").GetBoolean(), Is.True);
+            Assert.That(output.GetProperty("FailedSinkCount").GetInt32(), Is.EqualTo(1));
+            Assert.That(output.GetProperty("CommittedSinkCount").GetInt32(), Is.EqualTo(0));
+            Assert.That(output.GetProperty("UncommittedSinkCount").GetInt32(), Is.EqualTo(1));
         });
     }
 
@@ -299,7 +363,7 @@ public sealed class ValidateCommandHandlerProfileTests
         public string StdErr => _stderr.ToString();
     }
 
-    private sealed class FakeFileSystem(bool exists) : IFileSystem
+    private sealed class FakeFileSystem(bool exists, bool writable = true) : IFileSystem
     {
         public Dictionary<string, string> DirectWrites { get; } = new();
 
@@ -322,6 +386,6 @@ public sealed class ValidateCommandHandlerProfileTests
         {
         }
 
-        public bool CanWriteToDirectory(string path) => true;
+        public bool CanWriteToDirectory(string path) => writable;
     }
 }

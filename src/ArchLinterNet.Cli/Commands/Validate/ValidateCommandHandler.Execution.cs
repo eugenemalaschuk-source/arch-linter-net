@@ -51,6 +51,9 @@ internal sealed partial class ValidateCommandHandler
         (ValidationOutcome outcome, ArchitectureAnalysisSnapshotCounters counters) =
             _runtime.ValidateWithCounters(request, timing);
         profileState.Counters = counters;
+        profileState.InputPaths = CreateProfileInputPaths(outcome.PolicyImportPaths
+            .Concat(outcome.ResolvedAssemblyPaths)
+            .Concat(outcome.DiscoveredProjectPaths));
 
         string? importCollision = FindImportFileCollision(options, outcome.PolicyImportPaths);
         if (importCollision is not null)
@@ -100,12 +103,14 @@ internal sealed partial class ValidateCommandHandler
 
         RouteResult result = _coordinator.RouteSingleOutcome(
             options.Format, mode, outcome, options.AdditionalSinks, _cancellationToken);
+        profileState.Output = CreateOutputProfile(result);
         if (options.TimingsEnabled)
         {
             timing?.WriteReport(_console.Error);
         }
 
-        WriteProfile(options, counters, timing, ResolveCompletionStatus(outcome, result.Cancelled), result.Cancelled);
+        WriteProfile(options, counters, timing, ResolveCompletionStatus(outcome, result.Cancelled), result.Cancelled,
+            profileState.Output, profileState.InputPaths);
 
         if (result.Cancelled)
         {
@@ -154,14 +159,24 @@ internal sealed partial class ValidateCommandHandler
 
         using ArchitectureAnalysisSnapshot snapshot = _runtime.CreateSnapshot(snapshotRequest, timing);
         profileState.Counters = snapshot.Counters;
+        profileState.InputPaths = CreateProfileInputPaths(snapshot.ProfileInputPaths);
 
         bool allPassed = true;
         List<(string Mode, ValidationOutcome Outcome)> outcomesByMode = new();
-        foreach (string mode in modes)
+        try
         {
-            ValidationOutcome outcome = snapshot.Evaluate(mode, timing);
-            outcomesByMode.Add((mode, outcome));
-            allPassed &= outcome.Passed;
+            foreach (string mode in modes)
+            {
+                ValidationOutcome outcome = snapshot.Evaluate(mode, timing);
+                outcomesByMode.Add((mode, outcome));
+                allPassed &= outcome.Passed;
+            }
+        }
+        finally
+        {
+            // Source/fact-index counters can advance inside Evaluate. Retain the final snapshot
+            // view even when cooperative cancellation prevents this method from returning.
+            profileState.Counters = snapshot.Counters;
         }
 
         // All modes share the same policy document and build-state snapshot; check imports and
@@ -215,6 +230,7 @@ internal sealed partial class ValidateCommandHandler
 
         RouteResult result = _coordinator.RouteCombinedOutcomes(
             options.Format, outcomesByMode, options.AdditionalSinks, _cancellationToken);
+        profileState.Output = CreateOutputProfile(result);
 
         if (options.TimingsEnabled)
         {
@@ -228,7 +244,7 @@ internal sealed partial class ValidateCommandHandler
         WriteProfile(
             options, snapshot.Counters, timing,
             ResolveCompletionStatus(outcomesByMode[0].Outcome.PreflightBlocked, allPassed, result.Cancelled),
-            result.Cancelled);
+            result.Cancelled, profileState.Output, profileState.InputPaths);
 
         if (result.Cancelled)
         {

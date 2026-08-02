@@ -9,4 +9,5 @@ public sealed record AnalysisProfilePhaseMeasurement(
     int Indent,
     int Ordinal,
     int? Count,
-    double? ElapsedMs);
+    double? ElapsedMs,
+    double? ProcessorTimeMs);

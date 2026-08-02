@@ -16,11 +16,18 @@ public sealed class AnalysisProfileBuilderTests
         PolicyCompositions = 1,
         ProjectGraphEvaluations = 1,
         AssemblyLoads = 1,
+        DiscoveredProjectCount = 3,
+        RetainedAssemblyCount = 2,
+        SelectedAssemblyCount = 3,
         ModesEvaluated = modes,
         SnapshotMaterializations = 1,
         FactIndexMaterializations = 1,
         SourceScanPasses = 1,
         SourceFilesScanned = 7,
+        ContractFamilyResultCounts = new Dictionary<string, int>(StringComparer.Ordinal)
+        {
+            ["dependency"] = 4,
+        },
     };
 
     private static ValidationTiming TimingWithContractFamilies()
@@ -102,6 +109,10 @@ public sealed class AnalysisProfileBuilderTests
             Assert.That(profile.Counters.FactIndexMaterializations, Is.EqualTo(1));
             Assert.That(profile.Counters.SourceScanPasses, Is.EqualTo(1));
             Assert.That(profile.Counters.SourceFilesScanned, Is.EqualTo(7));
+            Assert.That(profile.Counters.DiscoveredProjectCount, Is.EqualTo(3));
+            Assert.That(profile.Counters.RetainedAssemblyCount, Is.EqualTo(2));
+            Assert.That(profile.Counters.SelectedAssemblyCount, Is.EqualTo(3));
+            Assert.That(profile.Counters.ContractFamilyResultCounts["dependency"], Is.EqualTo(4));
         });
     }
 
@@ -190,5 +201,30 @@ public sealed class AnalysisProfileBuilderTests
 
         Assert.That(profile.SchemaId, Is.EqualTo("analysis-profile/v1"));
         Assert.That(profile.SchemaId, Is.EqualTo(AnalysisProfileId.V1));
+    }
+
+    [Test]
+    public void Build_OutputAndProcessorTime_ArePreserved()
+    {
+        AnalysisProfileOutput output = new()
+        {
+            CommittedSinkCount = 1,
+            FailedSinkCount = 1,
+            StagedSinkCount = 2,
+            UncommittedSinkCount = 1,
+            OutputFailed = true,
+        };
+
+        AnalysisProfile profile = AnalysisProfileBuilder.Build(
+            Counters(), TimingWithContractFamilies(), renderedSinkCount: 2, outputSinkCount: 2,
+            AnalysisProfileCompletionStatus.ValidationFailure, cancellationObserved: false, output: output);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(profile.Output, Is.EqualTo(output));
+            Assert.That(profile.Phases, Is.Not.Empty);
+            Assert.That(profile.Phases, Has.All.Matches<AnalysisProfilePhaseMeasurement>(
+                phase => phase.ProcessorTimeMs is >= 0));
+        });
     }
 }

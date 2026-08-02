@@ -72,6 +72,10 @@ public sealed class ArchitectureAnalysisSnapshot : IDisposable
             PolicyCompositions = policyCompositions,
             ProjectGraphEvaluations = projectGraphEvaluations,
             AssemblyLoads = assemblyLoads,
+            DiscoveredProjectCount = setup.Runner.Session.Context.ProjectDiscovery?.DiscoveredProjects.Count ?? 0,
+            RetainedAssemblyCount = setup.Runner.Session.Context.TargetAssemblies.Count,
+            SelectedAssemblyCount = setup.Runner.Session.Context.TargetAssemblies.Count
+                + setup.Runner.Session.Context.MissingAssemblyNames.Count,
             SnapshotMaterializations = 1,
         };
     }
@@ -277,6 +281,7 @@ public sealed class ArchitectureAnalysisSnapshot : IDisposable
         }
 
         allViolations.AddRange(execution.Violations);
+        RecordContractFamilyResultCounts(execution.ContractFamilyResultCounts);
 
         cancellationToken.ThrowIfCancellationRequested();
 
@@ -339,6 +344,29 @@ public sealed class ArchitectureAnalysisSnapshot : IDisposable
             .Select(source => Path.GetFullPath(Path.Combine(_repositoryRoot, source.SourcePath)))
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToList();
+    }
+
+    // This is deliberately a snapshot copy, not the internal mutable counter record. Hosts use
+    // it when cancellation interrupts evaluation before a ValidationOutcome can expose inputs.
+    public IReadOnlyList<string> ProfileInputPaths => GetPolicyImportPaths()
+        .Concat(GetResolvedAssemblyPaths())
+        .Concat(GetDiscoveredProjectPaths())
+        .Distinct(StringComparer.OrdinalIgnoreCase)
+        .ToArray();
+
+    private void RecordContractFamilyResultCounts(IReadOnlyDictionary<string, int> resultCounts)
+    {
+        lock (_gate)
+        {
+            Dictionary<string, int> totals = new(_counters.ContractFamilyResultCounts, StringComparer.Ordinal);
+            foreach ((string family, int count) in resultCounts)
+            {
+                totals.TryGetValue(family, out int current);
+                totals[family] = current + count;
+            }
+
+            _counters = _counters with { ContractFamilyResultCounts = totals };
+        }
     }
 
     private IReadOnlyList<string> GetResolvedAssemblyPaths()

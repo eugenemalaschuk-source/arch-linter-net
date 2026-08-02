@@ -10,7 +10,8 @@ This is the stability contract for `analysis-profile/v1` (`AnalysisProfileId.V1`
 | `CompletionStatus` | enum | deterministic | `Success`, `ValidationFailure`, `PreparationFailure`, or `Cancelled` — the actual outcome of the profiled run. |
 | `CancellationObserved` | bool | deterministic | `true` only when cooperative cancellation was observed during the run (see `openspec/specs/cooperative-cancellation/spec.md`). |
 | `Counters` | object | deterministic | See below. |
-| `Phases` | array | mixed | `Name`/`Indent`/`Ordinal`/`Count` are deterministic; `ElapsedMs` is an environment-dependent measurement, `null` when no `ValidationTiming` instance backed the run. |
+| `Phases` | array | mixed | `Name`/`Indent`/`Ordinal`/`Count` are deterministic; `ElapsedMs` and `ProcessorTimeMs` are environment-dependent measurements, `null` when no `ValidationTiming` instance backed the run. |
+| `Output` | object | host-dependent | Actual report-publication result: committed, failed, staged, and uncommitted sink counts plus `OutputFailed`. |
 | `Measurements` | object or null | environment-dependent | `null` when no `ValidationTiming` instance backed the run. |
 
 ## `Counters` (deterministic)
@@ -20,16 +21,27 @@ This is the stability contract for `analysis-profile/v1` (`AnalysisProfileId.V1`
 | `PolicyCompositions` | Number of times the policy document was composed. Always `1` for one snapshot's lifetime. | `ArchitectureAnalysisSnapshotCounters.PolicyCompositions` |
 | `ProjectGraphEvaluations` | `1` ordinarily/no-restore, `2` after an `--ensure-built` post-build reload. | `ArchitectureAnalysisSnapshotCounters.ProjectGraphEvaluations` |
 | `AssemblyLoads` | Target-assembly load *operations* performed while creating the snapshot (not the retained assembly count). | `ArchitectureAnalysisSnapshotCounters.AssemblyLoads` |
+| `DiscoveredProjectCount` | Projects discovered for the retained snapshot after any post-build reload. | `ArchitectureAnalysisContext.ProjectDiscovery` |
+| `RetainedAssemblyCount` | Successfully resolved target assemblies retained by the snapshot. | `ArchitectureAnalysisContext.TargetAssemblies` |
+| `SelectedAssemblyCount` | Target assemblies selected for resolution, including selected assemblies that were missing. | `TargetAssemblies` + `MissingAssemblyNames` |
 | `ModesEvaluated` | Number of distinct modes (`strict`/`audit`) evaluated so far against the snapshot. | `ArchitectureAnalysisSnapshotCounters.ModesEvaluated` |
 | `SnapshotMaterializations` | Number of logical retained snapshots materialized for this profile. A successful snapshot always reports `1`; an internal post-build runner reload is not a second logical snapshot. | `ArchitectureAnalysisSnapshotCounters.SnapshotMaterializations` |
 | `FactIndexMaterializations` | Number of lazy `ArchitectureSourceFileFactIndex` data builds for the retained snapshot. It is `0` when no contract accesses the index and otherwise `1`; it never exceeds `1` for a snapshot. | `ArchitectureSourceFileFactIndex.BuildData` via `ArchitectureAnalysisSnapshotCounters` |
 | `SourceScanPasses` | Number of source-tree scan passes performed while materializing the fact index. It is `0` when no source-root scan is needed and otherwise `1`. | `ArchitectureSourceFileFactIndex.RunSourceScan` via `ArchitectureAnalysisSnapshotCounters` |
 | `SourceFilesScanned` | Number of owned C# source files parsed by the fact-index source scan. | `ArchitectureSourceFileFactIndex.RunSourceScan` via `ArchitectureAnalysisSnapshotCounters` |
 | `ContractFamilyCounts` | Map of contract-family name → number of contracts executed for that family across every evaluated mode. Repeated family phases are summed, never overwritten by the last mode. | `ValidationTiming` per-family `Count` (see `ArchitectureContractExecutor`) |
+| `ContractFamilyResultCounts` | Map of contract-family name → findings/cycles (and coverage summaries) produced across every evaluated mode. | `ArchitectureContractExecutor` result inventory |
 | `RenderedSinkCount` | Number of distinct output formats rendered (human/json/sarif), deduplicated across destinations. | CLI: `ValidateCommandHandler.Profile.cs`. Testing API: always `0` (no CLI-style sinks exist for a direct `ArchitectureValidationBuilder` call). |
 | `OutputSinkCount` | Number of configured output destinations (stdout/stderr/file). | Same as above. |
 | `Cache` | Reserved for issue #365. `Status` is `NotApplicable`, `Lookups`/`Hits` are `0` until then. | `AnalysisProfileCacheCounters` |
 | `Concurrency` | Reserved for issue #408. `Status` is `NotApplicable`, `Workers` is `0` until then. | `AnalysisProfileConcurrencyCounters` |
+
+## `Output` (actual publication)
+
+`CommittedSinkCount` includes committed file sinks and successfully delivered stream sinks.
+`StagedSinkCount` records file sinks that passed staging, including ones later committed.
+`FailedSinkCount` and `UncommittedSinkCount` preserve the routing result when publication fails or is cancelled.
+`OutputFailed` is true for partial or total output failure; it is false for fully committed and cancellation-only routing outcomes.
 
 ## Phase names (from `ValidationTiming`, unchanged by this capability)
 
@@ -50,6 +62,8 @@ This is the stability contract for `analysis-profile/v1` (`AnalysisProfileId.V1`
 | `contract_checks` | 0 | Wraps every per-family phase below. |
 | `<family name>` (e.g. `dependency`, `layer`, `cycle`, `coverage`, ...) | 1 | One phase per contract family in `ArchitectureContractCatalog.FamiliesInOrder`, each carrying a deterministic `Count` of contracts executed for that family. |
 | `post_processing` | 0 | Unmatched-ignore resolution and related post-processing. |
+
+Every phase also records `ProcessorTimeMs`, the process CPU-time delta measured during that phase. It is an environment-dependent measurement and can overlap for nested phases.
 
 ## Benchmark scenario IDs (see `docs/internal/analysis-profile-pre-optimization-baseline.md`)
 

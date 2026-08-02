@@ -14,5 +14,7 @@ public sealed record AnalysisProfile
 
     public required IReadOnlyList<AnalysisProfilePhaseMeasurement> Phases { get; init; }
 
+    public required AnalysisProfileOutput Output { get; init; }
+
     public AnalysisProfileMeasurements? Measurements { get; init; }
 }

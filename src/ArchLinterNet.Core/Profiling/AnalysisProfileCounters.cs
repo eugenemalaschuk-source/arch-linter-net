@@ -14,6 +14,12 @@ public sealed record AnalysisProfileCounters
 
     public required int AssemblyLoads { get; init; }
 
+    public required int DiscoveredProjectCount { get; init; }
+
+    public required int RetainedAssemblyCount { get; init; }
+
+    public required int SelectedAssemblyCount { get; init; }
+
     public required int ModesEvaluated { get; init; }
 
     public required int SnapshotMaterializations { get; init; }
@@ -29,6 +35,8 @@ public sealed record AnalysisProfileCounters
     // ArchitectureContractExecutor.ExecuteStandardFamily/ExecuteCoverageFamily), not re-derived
     // independently, so it always matches what actually ran.
     public required IReadOnlyDictionary<string, int> ContractFamilyCounts { get; init; }
+
+    public required IReadOnlyDictionary<string, int> ContractFamilyResultCounts { get; init; }
 
     // Number of distinct output formats rendered for this run (human/json/sarif), deduplicated —
     // requesting the same format for multiple destinations still renders it once. See
@@ -53,12 +61,16 @@ public sealed record AnalysisProfileCounters
             PolicyCompositions = snapshotCounters.PolicyCompositions,
             ProjectGraphEvaluations = snapshotCounters.ProjectGraphEvaluations,
             AssemblyLoads = snapshotCounters.AssemblyLoads,
+            DiscoveredProjectCount = snapshotCounters.DiscoveredProjectCount,
+            RetainedAssemblyCount = snapshotCounters.RetainedAssemblyCount,
+            SelectedAssemblyCount = snapshotCounters.SelectedAssemblyCount,
             ModesEvaluated = snapshotCounters.ModesEvaluated,
             SnapshotMaterializations = snapshotCounters.SnapshotMaterializations,
             FactIndexMaterializations = snapshotCounters.FactIndexMaterializations,
             SourceScanPasses = snapshotCounters.SourceScanPasses,
             SourceFilesScanned = snapshotCounters.SourceFilesScanned,
             ContractFamilyCounts = contractFamilyCounts,
+            ContractFamilyResultCounts = snapshotCounters.ContractFamilyResultCounts,
             RenderedSinkCount = renderedSinkCount,
             OutputSinkCount = outputSinkCount,
         };

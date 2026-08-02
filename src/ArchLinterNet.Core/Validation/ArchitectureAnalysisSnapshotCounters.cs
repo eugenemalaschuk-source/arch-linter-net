@@ -12,6 +12,15 @@ public sealed record ArchitectureAnalysisSnapshotCounters
 
     public int AssemblyLoads { get; init; }
 
+    // Actual inventory retained by the completed snapshot. AssemblyLoads measures operations;
+    // these counts describe the resulting graph and can therefore differ when resolution reuses
+    // an already-loaded assembly or when a selected assembly is missing.
+    public int DiscoveredProjectCount { get; init; }
+
+    public int RetainedAssemblyCount { get; init; }
+
+    public int SelectedAssemblyCount { get; init; }
+
     public int ModesEvaluated { get; init; }
 
     // One logical snapshot object is materialized for every successful CreateSnapshot call.
@@ -25,4 +34,9 @@ public sealed record ArchitectureAnalysisSnapshotCounters
     public int SourceScanPasses { get; init; }
 
     public int SourceFilesScanned { get; init; }
+
+    // Finding/cycle results produced by each contract family across every evaluated mode.
+    // Unlike ContractFamilyCounts, this measures results, not contracts invoked.
+    public IReadOnlyDictionary<string, int> ContractFamilyResultCounts { get; init; } =
+        new Dictionary<string, int>(StringComparer.Ordinal);
 }

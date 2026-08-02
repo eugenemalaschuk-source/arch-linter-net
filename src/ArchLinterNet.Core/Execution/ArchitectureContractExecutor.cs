@@ -28,6 +28,7 @@ internal sealed class ArchitectureContractExecutor : IArchitectureContractExecut
         var standardFamilyFindings = new StandardFamilyFindings();
         List<ArchitectureViolation> coverageViolations = new();
         List<ArchitectureCoverageSummary> coverageSummaries = new();
+        Dictionary<string, int> resultCounts = new(StringComparer.Ordinal);
 
         // Iterating the catalog's families rather than a hardcoded per-family list means a new
         // violations-or-cycles-shaped family (added to ArchitectureContractCatalog.Build plus a
@@ -40,7 +41,7 @@ internal sealed class ArchitectureContractExecutor : IArchitectureContractExecut
 
             if (family == CoverageFamily)
             {
-                ExecuteCoverageFamily(session, mode, handlerRegistry, timing, coverageViolations, coverageSummaries);
+                ExecuteCoverageFamily(session, mode, handlerRegistry, timing, coverageViolations, coverageSummaries, resultCounts);
                 continue;
             }
 
@@ -49,7 +50,7 @@ internal sealed class ArchitectureContractExecutor : IArchitectureContractExecut
                 continue;
             }
 
-            ExecuteStandardFamily(session, mode, family, handlerRegistry, timing, standardFamilyFindings);
+            ExecuteStandardFamily(session, mode, family, handlerRegistry, timing, standardFamilyFindings, resultCounts);
         }
 
         return new ArchitectureContractExecutionResult(
@@ -58,7 +59,8 @@ internal sealed class ArchitectureContractExecutor : IArchitectureContractExecut
             coverageViolations,
             coverageSummaries)
         {
-            CycleFindings = standardFamilyFindings.CycleFindings
+            CycleFindings = standardFamilyFindings.CycleFindings,
+            ContractFamilyResultCounts = resultCounts,
         };
     }
 
@@ -68,7 +70,8 @@ internal sealed class ArchitectureContractExecutor : IArchitectureContractExecut
         IArchitectureContractHandlerRegistry handlerRegistry,
         ValidationTiming? timing,
         List<ArchitectureViolation> coverageViolations,
-        List<ArchitectureCoverageSummary> coverageSummaries)
+        List<ArchitectureCoverageSummary> coverageSummaries,
+        IDictionary<string, int> resultCounts)
     {
         int coverageCount = 0;
         using (timing?.MeasureContractFamily(CoverageFamily, () => coverageCount))
@@ -78,17 +81,24 @@ internal sealed class ArchitectureContractExecutor : IArchitectureContractExecut
                 session.Context.CancellationToken.ThrowIfCancellationRequested();
                 coverageCount++;
                 int identityCursor = session.FindingIdentityCursor;
-                coverageViolations.AddRange(session.AttachFindingIdentities(
+                int resultCount = 0;
+                IReadOnlyCollection<ArchitectureViolation> violations = session.AttachFindingIdentities(
                         handlerRegistry.Execute(CoverageFamily, session, contract).Violations,
                         identityCursor)
-                    .Select(violation => session.Document.Provenance.Enrich(violation, contract)));
+                    .Select(violation => session.Document.Provenance.Enrich(violation, contract))
+                    .ToArray();
+                coverageViolations.AddRange(violations);
+                resultCount += violations.Count;
 
                 ArchitectureCoverageSummary? summary =
                     session.BuildCoverageSummary((ArchitectureCoverageContract)contract);
                 if (summary != null)
                 {
                     coverageSummaries.Add(summary);
+                    resultCount++;
                 }
+
+                AddResultCount(resultCounts, CoverageFamily, resultCount);
             }
         }
     }
@@ -99,7 +109,8 @@ internal sealed class ArchitectureContractExecutor : IArchitectureContractExecut
         string family,
         IArchitectureContractHandlerRegistry handlerRegistry,
         ValidationTiming? timing,
-        StandardFamilyFindings findings)
+        StandardFamilyFindings findings,
+        IDictionary<string, int> resultCounts)
     {
         int count = 0;
         using (timing?.MeasureContractFamily(family, () => count))
@@ -110,12 +121,16 @@ internal sealed class ArchitectureContractExecutor : IArchitectureContractExecut
                 count++;
                 int identityCursor = session.FindingIdentityCursor;
                 ArchitectureHandlerResult result = handlerRegistry.Execute(family, session, contract);
-                findings.Violations.AddRange(session.AttachFindingIdentities(result.Violations, identityCursor)
-                    .Select(violation => session.Document.Provenance.Enrich(violation, contract)));
+                IReadOnlyCollection<ArchitectureViolation> violations = session.AttachFindingIdentities(result.Violations, identityCursor)
+                    .Select(violation => session.Document.Provenance.Enrich(violation, contract))
+                    .ToArray();
+                findings.Violations.AddRange(violations);
                 string cycleIdPrefix = contract.Id is null ? string.Empty : $"[{contract.Id}] ";
+                int cycleCount = 0;
                 foreach (string cycle in result.Cycles)
                 {
                     findings.Cycles.Add(cycle);
+                    cycleCount++;
                     string normalizedPath = cycleIdPrefix.Length > 0 && cycle.StartsWith(cycleIdPrefix, StringComparison.Ordinal)
                         ? cycle[cycleIdPrefix.Length..]
                         : cycle;
@@ -123,8 +138,16 @@ internal sealed class ArchitectureContractExecutor : IArchitectureContractExecut
                         new ArchitectureCycleFinding(contract.Name, contract.Id, normalizedPath),
                         contract));
                 }
+
+                AddResultCount(resultCounts, family, violations.Count + cycleCount);
             }
         }
+    }
+
+    private static void AddResultCount(IDictionary<string, int> resultCounts, string family, int count)
+    {
+        resultCounts.TryGetValue(family, out int current);
+        resultCounts[family] = current + count;
     }
 
     private sealed class StandardFamilyFindings

@@ -11,14 +11,14 @@ public sealed class ValidationTiming
     {
         int ordinal = _nextOrdinal++;
         var sw = Stopwatch.StartNew();
-        return new PhaseTiming(name, sw, indent, countProvider: null, this, ordinal);
+        return new PhaseTiming(name, sw, Process.GetCurrentProcess().TotalProcessorTime, indent, countProvider: null, this, ordinal);
     }
 
     public IDisposable MeasureContractFamily(string name, Func<int> countProvider, int indent = 1)
     {
         int ordinal = _nextOrdinal++;
         var sw = Stopwatch.StartNew();
-        return new PhaseTiming(name, sw, indent, countProvider, this, ordinal);
+        return new PhaseTiming(name, sw, Process.GetCurrentProcess().TotalProcessorTime, indent, countProvider, this, ordinal);
     }
 
     public void WriteReport(TextWriter writer)
@@ -76,28 +76,30 @@ public sealed class ValidationTiming
     // phase/count data without changing WriteReport's own human-text rendering.
     internal IReadOnlyList<Entry> Entries => _entries;
 
-    internal void Add(string name, long elapsedMs, int indent, int? count, int ordinal)
+    internal void Add(string name, long elapsedMs, double processorTimeMs, int indent, int? count, int ordinal)
     {
-        _entries.Add(new Entry(name, elapsedMs, indent, count, ordinal));
+        _entries.Add(new Entry(name, elapsedMs, processorTimeMs, indent, count, ordinal));
     }
 
-    internal sealed record Entry(string Name, long ElapsedMs, int Indent, int? Count, int Ordinal);
+    internal sealed record Entry(string Name, long ElapsedMs, double ProcessorTimeMs, int Indent, int? Count, int Ordinal);
 
     private sealed class PhaseTiming : IDisposable
     {
         private readonly string _name;
         private readonly Stopwatch _sw;
+        private readonly TimeSpan _processorTimeAtStart;
         private readonly int _indent;
         private readonly Func<int>? _countProvider;
         private readonly ValidationTiming _owner;
         private readonly int _ordinal;
         private bool _disposed;
 
-        public PhaseTiming(string name, Stopwatch sw, int indent, Func<int>? countProvider,
+        public PhaseTiming(string name, Stopwatch sw, TimeSpan processorTimeAtStart, int indent, Func<int>? countProvider,
             ValidationTiming owner, int ordinal)
         {
             _name = name;
             _sw = sw;
+            _processorTimeAtStart = processorTimeAtStart;
             _indent = indent;
             _countProvider = countProvider;
             _owner = owner;
@@ -111,7 +113,8 @@ public sealed class ValidationTiming
             _disposed = true;
             _sw.Stop();
             int? count = _countProvider?.Invoke();
-            _owner.Add(_name, _sw.ElapsedMilliseconds, _indent, count, _ordinal);
+            double processorTimeMs = Math.Max(0, (Process.GetCurrentProcess().TotalProcessorTime - _processorTimeAtStart).TotalMilliseconds);
+            _owner.Add(_name, _sw.ElapsedMilliseconds, processorTimeMs, _indent, count, _ordinal);
         }
     }
 }

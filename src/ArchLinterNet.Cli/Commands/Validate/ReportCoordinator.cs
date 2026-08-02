@@ -123,7 +123,9 @@ internal sealed class ReportCoordinator
             }
 
             _console.Out.WriteLine(DispatchFormat(stdoutFormat, humanContent, jsonContent, sarifContent));
-            return BuildRouteResult(additionalSinks, SinkDistributionEvidence.Empty(), cancelled: false);
+            SinkDistributionEvidence evidence = SinkDistributionEvidence.Empty();
+            evidence.DeliveredStreamPaths.Add(StreamFailureMarker(ReportDestinationType.Stdout));
+            return BuildRouteResult(additionalSinks, evidence, cancelled: false);
         }
 
         return DistributeToSinks(
@@ -138,6 +140,7 @@ internal sealed class ReportCoordinator
         IReadOnlyList<(string Mode, ValidationOutcome Outcome)> outcomesByMode,
         CancellationToken cancellationToken)
     {
+        SinkDistributionEvidence evidence = SinkDistributionEvidence.Empty();
         foreach ((_, ValidationOutcome outcome) in outcomesByMode)
         {
             if (cancellationToken.IsCancellationRequested)
@@ -148,7 +151,8 @@ internal sealed class ReportCoordinator
             _console.Out.WriteLine(FormatSingleHuman(outcome, cancellationToken));
         }
 
-        return BuildRouteResult(Array.Empty<ReportSink>(), SinkDistributionEvidence.Empty(), cancelled: false);
+        evidence.DeliveredStreamPaths.Add(StreamFailureMarker(ReportDestinationType.Stdout));
+        return BuildRouteResult(Array.Empty<ReportSink>(), evidence, cancelled: false);
     }
 
     private string? ResolveHumanContent(

@@ -319,7 +319,6 @@ public sealed class ArchitectureSourceFileFactIndex
                     continue;
                 }
 
-                _profilingCounters?.RecordSourceFileScanned();
                 ProcessSourceFile(sourceMap, assemblyName, absoluteRoot, absoluteFile);
             }
         }
@@ -406,6 +405,10 @@ public sealed class ArchitectureSourceFileFactIndex
 
         if (ArchitectureGeneratedFileFilter.IsExcluded(relativeToRoot)) return;
         if (!TryReadSourceText(absoluteFile, out string sourceText)) return;
+
+        // Count only files that passed generated-file exclusion and were successfully read,
+        // i.e. the files the parser actually receives.
+        _profilingCounters?.RecordSourceFileScanned();
 
         string normalizedFilePath = NormalizePath(_repositoryRoot, absoluteFile);
         AddParsedTypes(sourceMap, assemblyName, normalizedFilePath, sourceText);

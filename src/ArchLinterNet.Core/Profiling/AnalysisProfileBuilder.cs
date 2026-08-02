@@ -15,12 +15,14 @@ public static class AnalysisProfileBuilder
         int outputSinkCount,
         AnalysisProfileCompletionStatus completionStatus,
         bool cancellationObserved,
-        AnalysisProfileMeasurements? measurements = null)
+        AnalysisProfileMeasurements? measurements = null,
+        AnalysisProfileOutput? output = null)
     {
         IReadOnlyList<AnalysisProfilePhaseMeasurement> phases = timing is null
             ? Array.Empty<AnalysisProfilePhaseMeasurement>()
             : timing.Entries
-                .Select(entry => new AnalysisProfilePhaseMeasurement(entry.Name, entry.Indent, entry.Ordinal, entry.Count, entry.ElapsedMs))
+                .Select(entry => new AnalysisProfilePhaseMeasurement(
+                    entry.Name, entry.Indent, entry.Ordinal, entry.Count, entry.ElapsedMs, entry.ProcessorTimeMs))
                 .ToList();
 
         // Only MeasureContractFamily entries carry a Count (see ArchitectureContractExecutor);
@@ -48,6 +50,14 @@ public static class AnalysisProfileBuilder
             CancellationObserved = cancellationObserved,
             Counters = counters,
             Phases = phases,
+            Output = output ?? new AnalysisProfileOutput
+            {
+                CommittedSinkCount = 0,
+                FailedSinkCount = 0,
+                StagedSinkCount = 0,
+                UncommittedSinkCount = 0,
+                OutputFailed = false,
+            },
             Measurements = measurements,
         };
     }

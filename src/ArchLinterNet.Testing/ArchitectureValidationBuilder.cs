@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using ArchLinterNet.Core.BuildState;
 using ArchLinterNet.Core.Composition;
 using ArchLinterNet.Core.Profiling;
@@ -198,7 +199,7 @@ public sealed class ArchitectureValidationBuilder
             ? AnalysisProfileBuilder.Build(
                 counters, timing, renderedSinkCount: 0, outputSinkCount: 0,
                 ResolveCompletionStatus(outcome), cancellationObserved: false,
-                AnalysisProfileMeasurements.Capture(allocatedBytesAtStart))
+                CaptureMeasurements(allocatedBytesAtStart))
             : null;
 
         return ArchitectureValidationResultMapper.ToResult(outcome, timing, mode, profile);
@@ -216,6 +217,16 @@ public sealed class ArchitectureValidationBuilder
         }
 
         return outcome.Passed ? AnalysisProfileCompletionStatus.Success : AnalysisProfileCompletionStatus.ValidationFailure;
+    }
+
+    internal static AnalysisProfileMeasurements CaptureMeasurements(long allocatedBytesAtStart)
+    {
+        long peakWorkingSetBytes = Process.GetCurrentProcess().PeakWorkingSet64;
+        return new AnalysisProfileMeasurements
+        {
+            PeakWorkingSetBytes = peakWorkingSetBytes > 0 ? peakWorkingSetBytes : null,
+            AllocatedBytesTotal = Math.Max(0, GC.GetTotalAllocatedBytes(precise: false) - allocatedBytesAtStart),
+        };
     }
 
     private string RequireBaselinePath()

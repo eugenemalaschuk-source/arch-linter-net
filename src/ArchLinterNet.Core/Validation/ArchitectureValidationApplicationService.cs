@@ -15,6 +15,10 @@ public sealed class ArchitectureValidationApplicationService(
     IBuildStatePreparationService buildStatePreparationService)
     : IArchitectureValidationApplicationService
 {
+    // Exception.Data lets hosts recover completed profile evidence without changing the exact
+    // OperationCanceledException type that existing API consumers observe.
+    private const string CancellationCountersDataKey = "ArchLinterNet.AnalysisProfile.Counters";
+    private const string CancellationInputPathsDataKey = "ArchLinterNet.AnalysisProfile.InputPaths";
     private const string ErrorSeverity = "error";
     private const string ModeStrict = "strict";
     private const string ModeAudit = "audit";
@@ -45,8 +49,16 @@ public sealed class ArchitectureValidationApplicationService(
             // CreateSnapshot uses when it doesn't know which modes will be evaluated.
             using ArchitectureAnalysisSnapshot snapshot = CreateSnapshotCore(
                 AnalysisSnapshotRequest.FromValidationRequest(request), request.Mode, timing);
-            ValidationOutcome outcome = snapshot.Evaluate(request.Mode, timing);
-            return (outcome, snapshot.Counters);
+            try
+            {
+                ValidationOutcome outcome = snapshot.Evaluate(request.Mode, timing);
+                return (outcome, snapshot.Counters);
+            }
+            catch (OperationCanceledException ex)
+            {
+                AttachCancellationProfileState(ex, snapshot.Counters, snapshot.ProfileInputPaths);
+                throw;
+            }
         }
     }
 
@@ -151,12 +163,42 @@ public sealed class ArchitectureValidationApplicationService(
                 // validated its one mode's contract IDs exactly as before this change, above.
                 requestedContractIds: modeHint == null ? request.ContractIds : null);
         }
-        catch (OperationCanceledException)
+        catch (OperationCanceledException ex)
         {
             // A snapshot cancelled during construction is never exposed as usable: nothing is
             // returned on this path, so release whatever this attempt already acquired (the
             // assembly load scope owned by `setup`) instead of leaving it to finalization.
             setup?.Runner.Session.Context.Dispose();
+            string repositoryRoot = setup?.RepositoryRoot
+                ?? Path.GetDirectoryName(Path.GetFullPath(request.PolicyPath))
+                ?? Environment.CurrentDirectory;
+            IEnumerable<string> policyInputPaths = document?.Provenance.Sources
+                .Select(source => Path.GetFullPath(Path.Combine(repositoryRoot, source.SourcePath)))
+                ?? Array.Empty<string>();
+            IEnumerable<string> setupInputPaths = setup is null
+                ? Array.Empty<string>()
+                : setup.Runner.Session.Context.TargetAssemblies
+                    .Select(SafeAssemblyLocation)
+                    .Where(path => !string.IsNullOrEmpty(path))
+                    .Select(path => Path.GetFullPath(path!))
+                    .Concat(setup.Runner.Session.Context.DiscoveredProjectPaths);
+            IReadOnlyList<string> inputPaths = policyInputPaths
+                .Append(Path.GetFullPath(request.PolicyPath))
+                .Concat(request.BaselinePath is null ? Array.Empty<string>() : [Path.GetFullPath(request.BaselinePath)])
+                .Concat(setupInputPaths)
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToArray();
+            ArchitectureAnalysisSnapshotCounters counters = new()
+            {
+                PolicyCompositions = document is null ? 0 : 1,
+                ProjectGraphEvaluations = setup is null ? 0 : 1,
+                AssemblyLoads = setup?.AssemblyLoads ?? 0,
+                DiscoveredProjectCount = setup?.Runner.Session.Context.ProjectDiscovery?.DiscoveredProjects.Count ?? 0,
+                RetainedAssemblyCount = setup?.Runner.Session.Context.TargetAssemblies.Count ?? 0,
+                SelectedAssemblyCount = (setup?.Runner.Session.Context.TargetAssemblies.Count ?? 0)
+                    + (setup?.Runner.Session.Context.MissingAssemblyNames.Count ?? 0),
+            };
+            AttachCancellationProfileState(ex, counters, inputPaths);
             throw;
         }
         catch (Exception ex) when (document is not null
@@ -343,5 +385,26 @@ public sealed class ArchitectureValidationApplicationService(
         HashSet<string> ids = new(catalog.AvailableContractIds(ModeStrict), StringComparer.OrdinalIgnoreCase);
         ids.UnionWith(catalog.AvailableContractIds(ModeAudit));
         return ids;
+    }
+
+    private static string? SafeAssemblyLocation(System.Reflection.Assembly assembly)
+    {
+        try
+        {
+            return assembly.Location;
+        }
+        catch (NotSupportedException)
+        {
+            return null;
+        }
+    }
+
+    private static void AttachCancellationProfileState(
+        OperationCanceledException exception,
+        ArchitectureAnalysisSnapshotCounters counters,
+        IReadOnlyList<string> inputPaths)
+    {
+        exception.Data[CancellationCountersDataKey] = counters;
+        exception.Data[CancellationInputPathsDataKey] = inputPaths;
     }
 }
