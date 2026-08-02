@@ -514,7 +514,7 @@ public sealed class BuildStatePreparationService : IBuildStatePreparationService
         // output descriptor open and make that wait hang the CLI forever. Preserve normal complete
         // diagnostics by waiting briefly for both terminal callbacks, but bound the wait so an
         // orphaned descriptor cannot prevent preflight completion or benchmark evidence.
-        Task.WaitAll([outputCompleted, errorCompleted], OutputDrainTimeoutMs);
+        Task.WaitAll([outputCompleted, errorCompleted], OutputDrainTimeoutMs, cancellationToken);
 
         // The loop above can also exit normally (WaitForExit(ProcessPollIntervalMs) returned true)
         // in the same interval the token was cancelled, without ever reaching the check inside the
