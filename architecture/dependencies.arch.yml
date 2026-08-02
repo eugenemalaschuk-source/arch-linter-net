@@ -24,6 +24,8 @@ layers:
     namespace: ArchLinterNet.Core.Graph
   core_validation:
     namespace: ArchLinterNet.Core.Validation
+  core_profiling:
+    namespace: ArchLinterNet.Core.Profiling
   core_asmdef:
     namespace: ArchLinterNet.Core.Asmdef
   core_composition:

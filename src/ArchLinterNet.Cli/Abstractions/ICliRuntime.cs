@@ -16,6 +16,19 @@ internal interface ICliRuntime
 
     ArchitectureAnalysisSnapshot CreateSnapshot(AnalysisSnapshotRequest request, ValidationTiming? timing);
 
+    /// <summary>
+    /// Same behavior as <see cref="Validate"/>, plus the snapshot's typed counters — needed by the
+    /// <c>--profile</c> option (issue #374). Default interface implementation delegates to
+    /// <see cref="Validate"/> with empty counters, so every existing test fake implementing this
+    /// interface keeps compiling unaffected — only <see cref="ArchLinterNet.Cli.Infrastructure.CliRuntime"/>
+    /// overrides it with the real snapshot counters.
+    /// </summary>
+    (ValidationOutcome Outcome, ArchitectureAnalysisSnapshotCounters Counters) ValidateWithCounters(
+        ValidationRequest request, ValidationTiming? timing)
+    {
+        return (Validate(request, timing), new ArchitectureAnalysisSnapshotCounters());
+    }
+
     string FormatResultForCiArtifacts( // NOSONAR: each parameter represents a semantically distinct section of the CI artifact payload; grouping would obscure the data contract
         string mode,
         bool passed,

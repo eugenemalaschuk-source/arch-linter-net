@@ -40,6 +40,12 @@ internal sealed class CliRuntime : ICliRuntime
         return _engine.Validate(request, timing);
     }
 
+    public (ValidationOutcome Outcome, ArchitectureAnalysisSnapshotCounters Counters) ValidateWithCounters(
+        ValidationRequest request, ValidationTiming? timing)
+    {
+        return _engine.ValidateWithCounters(request, timing);
+    }
+
     public ArchitectureAnalysisSnapshot CreateSnapshot(AnalysisSnapshotRequest request, ValidationTiming? timing)
     {
         return _engine.CreateSnapshot(request, timing);

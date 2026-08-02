@@ -20,4 +20,8 @@ internal sealed record ValidateCommandOptions(
     public IReadOnlyList<ReportSink> AdditionalSinks { get; init; } = Array.Empty<ReportSink>();
 
     public string? ReportParseError { get; init; }
+
+    // null = --profile not requested (no behavior change). Otherwise "stdout", "stderr", or a file
+    // path, independent of --timings/--report. See openspec/specs/analysis-profile/spec.md.
+    public string? ProfileDestination { get; init; }
 }

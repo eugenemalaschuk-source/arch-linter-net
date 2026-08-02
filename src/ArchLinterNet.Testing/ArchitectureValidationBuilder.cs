@@ -1,5 +1,6 @@
 using ArchLinterNet.Core.BuildState;
 using ArchLinterNet.Core.Composition;
+using ArchLinterNet.Core.Profiling;
 using ArchLinterNet.Core.Reporting;
 using ArchLinterNet.Core.Validation;
 
@@ -16,6 +17,7 @@ public sealed class ArchitectureValidationBuilder
     private string? _baselinePath;
     private bool _enforceUnmatchedIgnoredViolationsPolicy;
     private bool _collectTimings;
+    private bool _collectProfile;
     private BuildPreparationMode _preparationMode = BuildPreparationMode.Ordinary;
     private bool _noRestore;
     private string? _requestedConfiguration;
@@ -59,6 +61,18 @@ public sealed class ArchitectureValidationBuilder
     public ArchitectureValidationBuilder WithTimings()
     {
         _collectTimings = true;
+        return this;
+    }
+
+    // Opt-in mirror of the CLI's --profile option — see
+    // openspec/specs/analysis-profile/spec.md, "Testing API exposes the same profile semantics as
+    // the CLI". Implies timing collection internally (a profile needs a real ValidationTiming
+    // instance for contract-family counts) without also enabling WithTimings()' own effects
+    // (there are none beyond exposing ArchitectureValidationResult.Timing, which this leaves
+    // populated as a side effect — same as calling both would already do).
+    public ArchitectureValidationBuilder WithProfile()
+    {
+        _collectProfile = true;
         return this;
     }
 
@@ -152,9 +166,9 @@ public sealed class ArchitectureValidationBuilder
             CancellationToken = _cancellationToken,
         };
 
-        ValidationTiming? timing = _collectTimings ? new ValidationTiming() : null;
+        ValidationTiming? timing = _collectTimings || _collectProfile ? new ValidationTiming() : null;
         ArchitectureAnalysisSnapshot snapshot = _engine.Value.CreateSnapshot(request, timing);
-        return new ArchitectureValidationSnapshotSession(snapshot, timing);
+        return new ArchitectureValidationSnapshotSession(snapshot, timing, _collectProfile);
     }
 
     private ArchitectureValidationResult Validate(string mode)
@@ -174,10 +188,31 @@ public sealed class ArchitectureValidationBuilder
             CancellationToken = _cancellationToken,
         };
 
-        ValidationTiming? timing = _collectTimings ? new ValidationTiming() : null;
-        ValidationOutcome outcome = _engine.Value.Validate(request, timing);
+        ValidationTiming? timing = _collectTimings || _collectProfile ? new ValidationTiming() : null;
+        (ValidationOutcome outcome, ArchitectureAnalysisSnapshotCounters counters) =
+            _engine.Value.ValidateWithCounters(request, timing);
 
-        return ArchitectureValidationResultMapper.ToResult(outcome, timing, mode);
+        AnalysisProfile? profile = _collectProfile
+            ? AnalysisProfileBuilder.Build(
+                counters, timing, renderedSinkCount: 0, outputSinkCount: 0,
+                ResolveCompletionStatus(outcome), cancellationObserved: false)
+            : null;
+
+        return ArchitectureValidationResultMapper.ToResult(outcome, timing, mode, profile);
+    }
+
+    // outcome.PreflightBlocked wins over Passed the same way the CLI's own resolver does (see
+    // ValidateCommandHandler.Profile.cs) — neither this builder's Validate nor
+    // ArchitectureValidationSnapshotSession.Evaluate catches cancellation (an
+    // OperationCanceledException just propagates), so Cancelled is never resolved here.
+    internal static AnalysisProfileCompletionStatus ResolveCompletionStatus(ValidationOutcome outcome)
+    {
+        if (outcome.PreflightBlocked)
+        {
+            return AnalysisProfileCompletionStatus.PreparationFailure;
+        }
+
+        return outcome.Passed ? AnalysisProfileCompletionStatus.Success : AnalysisProfileCompletionStatus.ValidationFailure;
     }
 
     private string RequireBaselinePath()

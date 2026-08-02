@@ -549,6 +549,7 @@ contracts:
                 "ArchLinterNet.Core.Graph",
                 "ArchLinterNet.Core.IO",
                 "ArchLinterNet.Core.Model",
+                "ArchLinterNet.Core.Profiling",
                 "ArchLinterNet.Core.Reporting",
                 "ArchLinterNet.Core.Resolution",
                 "ArchLinterNet.Core.Scanning",

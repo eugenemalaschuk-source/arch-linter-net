@@ -72,12 +72,16 @@ public sealed class ValidationTiming
         }
     }
 
+    // Read-only view for AnalysisProfileBuilder (ArchLinterNet.Core.Profiling) to derive deterministic
+    // phase/count data without changing WriteReport's own human-text rendering.
+    internal IReadOnlyList<Entry> Entries => _entries;
+
     internal void Add(string name, long elapsedMs, int indent, int? count, int ordinal)
     {
         _entries.Add(new Entry(name, elapsedMs, indent, count, ordinal));
     }
 
-    private sealed record Entry(string Name, long ElapsedMs, int Indent, int? Count, int Ordinal);
+    internal sealed record Entry(string Name, long ElapsedMs, int Indent, int? Count, int Ordinal);
 
     private sealed class PhaseTiming : IDisposable
     {

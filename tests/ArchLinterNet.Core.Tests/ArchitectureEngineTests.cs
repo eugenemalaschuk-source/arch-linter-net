@@ -220,6 +220,10 @@ public sealed class ArchitectureEngineTests
         public ArchitectureAnalysisSnapshot CreateSnapshot(AnalysisSnapshotRequest request, ValidationTiming? timing = null) =>
             throw new NotSupportedException();
 
+        public (ValidationOutcome Outcome, ArchitectureAnalysisSnapshotCounters Counters) ValidateWithCounters(
+            ValidationRequest request, ValidationTiming? timing = null) =>
+            throw new NotSupportedException();
+
         public void Dispose()
         {
             WasDisposed = true;
@@ -251,6 +255,10 @@ public sealed class ArchitectureEngineTests
         }
 
         public ArchitectureAnalysisSnapshot CreateSnapshot(AnalysisSnapshotRequest request, ValidationTiming? timing = null) =>
+            throw new NotSupportedException();
+
+        public (ValidationOutcome Outcome, ArchitectureAnalysisSnapshotCounters Counters) ValidateWithCounters(
+            ValidationRequest request, ValidationTiming? timing = null) =>
             throw new NotSupportedException();
     }
 }

@@ -25,6 +25,12 @@ public sealed class ArchitectureValidationApplicationService(
     // (see openspec/specs/analysis-snapshot/spec.md, "Single-mode validation remains simple").
     public ValidationOutcome Validate(ValidationRequest request, ValidationTiming? timing = null)
     {
+        return ValidateWithCounters(request, timing).Outcome;
+    }
+
+    public (ValidationOutcome Outcome, ArchitectureAnalysisSnapshotCounters Counters) ValidateWithCounters(
+        ValidationRequest request, ValidationTiming? timing = null)
+    {
         if (request.Mode is not (ModeStrict or ModeAudit))
         {
             throw new ArgumentException($"Invalid mode: {request.Mode}. Use 'strict' or 'audit'.", nameof(request));
@@ -39,7 +45,8 @@ public sealed class ArchitectureValidationApplicationService(
             // CreateSnapshot uses when it doesn't know which modes will be evaluated.
             using ArchitectureAnalysisSnapshot snapshot = CreateSnapshotCore(
                 AnalysisSnapshotRequest.FromValidationRequest(request), request.Mode, timing);
-            return snapshot.Evaluate(request.Mode, timing);
+            ValidationOutcome outcome = snapshot.Evaluate(request.Mode, timing);
+            return (outcome, snapshot.Counters);
         }
     }
 

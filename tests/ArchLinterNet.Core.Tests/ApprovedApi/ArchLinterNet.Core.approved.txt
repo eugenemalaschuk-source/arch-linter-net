@@ -99,6 +99,7 @@ sealed class ArchLinterNet.Core.BuildState.BuildStateResolvedAssemblies : System
 interface ArchLinterNet.Core.BuildState.IBuildStatePreparationService
   method ArchLinterNet.Core.BuildState.BuildStatePreflightResult Prepare(ArchLinterNet.Core.BuildState.BuildStatePreflightRequest request)
 sealed class ArchLinterNet.Core.Composition.ArchitectureEngine : System.IAsyncDisposable, System.IDisposable
+  method (ArchLinterNet.Core.Validation.ValidationOutcome Outcome, ArchLinterNet.Core.Validation.ArchitectureAnalysisSnapshotCounters Counters) ValidateWithCounters(ArchLinterNet.Core.Validation.ValidationRequest request, ArchLinterNet.Core.Reporting.ValidationTiming? timing = null)
   method ArchLinterNet.Core.Asmdef.AsmdefValidationOutcome ValidateAsmdef(ArchLinterNet.Core.Asmdef.AsmdefValidationRequest request)
   method ArchLinterNet.Core.Graph.ArchitectureExplainOutcome Explain(ArchLinterNet.Core.Graph.ArchitectureExplainRequest request)
   method ArchLinterNet.Core.Graph.ArchitectureGraphOutcome BuildGraph(ArchLinterNet.Core.Graph.ArchitectureGraphRequest request)
@@ -2994,6 +2995,102 @@ sealed class ArchLinterNet.Core.Model.UnmatchedIgnoreDiagnostic : ArchLinterNet.
   property string ForbiddenReference {get;init;}
   property string Reason {get;init;}
   property string SourceType {get;init;}
+sealed class ArchLinterNet.Core.Profiling.AnalysisProfile : System.IEquatable<ArchLinterNet.Core.Profiling.AnalysisProfile>
+  ctor()
+  method ArchLinterNet.Core.Profiling.AnalysisProfile <Clone>$()
+  method bool Equals(ArchLinterNet.Core.Profiling.AnalysisProfile? other)
+  method bool Equals(object? obj)
+  method int GetHashCode()
+  method string ToString()
+  operator !=(ArchLinterNet.Core.Profiling.AnalysisProfile? left, ArchLinterNet.Core.Profiling.AnalysisProfile? right)
+  operator ==(ArchLinterNet.Core.Profiling.AnalysisProfile? left, ArchLinterNet.Core.Profiling.AnalysisProfile? right)
+  property ArchLinterNet.Core.Profiling.AnalysisProfileCompletionStatus CompletionStatus {get;init;}
+  property ArchLinterNet.Core.Profiling.AnalysisProfileCounters Counters {get;init;}
+  property ArchLinterNet.Core.Profiling.AnalysisProfileMeasurements? Measurements {get;init;}
+  property System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Profiling.AnalysisProfilePhaseMeasurement> Phases {get;init;}
+  property bool CancellationObserved {get;init;}
+  property string SchemaId {get;init;}
+static class ArchLinterNet.Core.Profiling.AnalysisProfileBuilder
+  method static ArchLinterNet.Core.Profiling.AnalysisProfile Build(ArchLinterNet.Core.Validation.ArchitectureAnalysisSnapshotCounters snapshotCounters, ArchLinterNet.Core.Reporting.ValidationTiming? timing, int renderedSinkCount, int outputSinkCount, ArchLinterNet.Core.Profiling.AnalysisProfileCompletionStatus completionStatus, bool cancellationObserved, ArchLinterNet.Core.Profiling.AnalysisProfileMeasurements? measurements = null)
+sealed class ArchLinterNet.Core.Profiling.AnalysisProfileCacheCounters : System.IEquatable<ArchLinterNet.Core.Profiling.AnalysisProfileCacheCounters>
+  ctor()
+  method ArchLinterNet.Core.Profiling.AnalysisProfileCacheCounters <Clone>$()
+  method bool Equals(ArchLinterNet.Core.Profiling.AnalysisProfileCacheCounters? other)
+  method bool Equals(object? obj)
+  method int GetHashCode()
+  method string ToString()
+  operator !=(ArchLinterNet.Core.Profiling.AnalysisProfileCacheCounters? left, ArchLinterNet.Core.Profiling.AnalysisProfileCacheCounters? right)
+  operator ==(ArchLinterNet.Core.Profiling.AnalysisProfileCacheCounters? left, ArchLinterNet.Core.Profiling.AnalysisProfileCacheCounters? right)
+  property ArchLinterNet.Core.Profiling.AnalysisProfileReservedFieldStatus Status {get;init;}
+  property int Hits {get;init;}
+  property int Lookups {get;init;}
+enum ArchLinterNet.Core.Profiling.AnalysisProfileCompletionStatus : int
+  enum-member Cancelled = 3
+  enum-member PreparationFailure = 2
+  enum-member Success = 0
+  enum-member ValidationFailure = 1
+sealed class ArchLinterNet.Core.Profiling.AnalysisProfileConcurrencyCounters : System.IEquatable<ArchLinterNet.Core.Profiling.AnalysisProfileConcurrencyCounters>
+  ctor()
+  method ArchLinterNet.Core.Profiling.AnalysisProfileConcurrencyCounters <Clone>$()
+  method bool Equals(ArchLinterNet.Core.Profiling.AnalysisProfileConcurrencyCounters? other)
+  method bool Equals(object? obj)
+  method int GetHashCode()
+  method string ToString()
+  operator !=(ArchLinterNet.Core.Profiling.AnalysisProfileConcurrencyCounters? left, ArchLinterNet.Core.Profiling.AnalysisProfileConcurrencyCounters? right)
+  operator ==(ArchLinterNet.Core.Profiling.AnalysisProfileConcurrencyCounters? left, ArchLinterNet.Core.Profiling.AnalysisProfileConcurrencyCounters? right)
+  property ArchLinterNet.Core.Profiling.AnalysisProfileReservedFieldStatus Status {get;init;}
+  property int Workers {get;init;}
+sealed class ArchLinterNet.Core.Profiling.AnalysisProfileCounters : System.IEquatable<ArchLinterNet.Core.Profiling.AnalysisProfileCounters>
+  ctor()
+  method ArchLinterNet.Core.Profiling.AnalysisProfileCounters <Clone>$()
+  method bool Equals(ArchLinterNet.Core.Profiling.AnalysisProfileCounters? other)
+  method bool Equals(object? obj)
+  method int GetHashCode()
+  method static ArchLinterNet.Core.Profiling.AnalysisProfileCounters From(ArchLinterNet.Core.Validation.ArchitectureAnalysisSnapshotCounters snapshotCounters, System.Collections.Generic.IReadOnlyDictionary<string,int> contractFamilyCounts, int renderedSinkCount, int outputSinkCount)
+  method string ToString()
+  operator !=(ArchLinterNet.Core.Profiling.AnalysisProfileCounters? left, ArchLinterNet.Core.Profiling.AnalysisProfileCounters? right)
+  operator ==(ArchLinterNet.Core.Profiling.AnalysisProfileCounters? left, ArchLinterNet.Core.Profiling.AnalysisProfileCounters? right)
+  property ArchLinterNet.Core.Profiling.AnalysisProfileCacheCounters Cache {get;init;}
+  property ArchLinterNet.Core.Profiling.AnalysisProfileConcurrencyCounters Concurrency {get;init;}
+  property System.Collections.Generic.IReadOnlyDictionary<string,int> ContractFamilyCounts {get;init;}
+  property int AssemblyLoads {get;init;}
+  property int ModesEvaluated {get;init;}
+  property int OutputSinkCount {get;init;}
+  property int PolicyCompositions {get;init;}
+  property int ProjectGraphEvaluations {get;init;}
+  property int RenderedSinkCount {get;init;}
+static class ArchLinterNet.Core.Profiling.AnalysisProfileId
+  field const string V1 = "analysis-profile/v1"
+static class ArchLinterNet.Core.Profiling.AnalysisProfileJsonWriter
+  method static string Write(ArchLinterNet.Core.Profiling.AnalysisProfile profile)
+sealed class ArchLinterNet.Core.Profiling.AnalysisProfileMeasurements : System.IEquatable<ArchLinterNet.Core.Profiling.AnalysisProfileMeasurements>
+  ctor()
+  method ArchLinterNet.Core.Profiling.AnalysisProfileMeasurements <Clone>$()
+  method bool Equals(ArchLinterNet.Core.Profiling.AnalysisProfileMeasurements? other)
+  method bool Equals(object? obj)
+  method int GetHashCode()
+  method string ToString()
+  operator !=(ArchLinterNet.Core.Profiling.AnalysisProfileMeasurements? left, ArchLinterNet.Core.Profiling.AnalysisProfileMeasurements? right)
+  operator ==(ArchLinterNet.Core.Profiling.AnalysisProfileMeasurements? left, ArchLinterNet.Core.Profiling.AnalysisProfileMeasurements? right)
+  property long? AllocatedBytesTotal {get;init;}
+  property long? PeakWorkingSetBytes {get;init;}
+sealed class ArchLinterNet.Core.Profiling.AnalysisProfilePhaseMeasurement : System.IEquatable<ArchLinterNet.Core.Profiling.AnalysisProfilePhaseMeasurement>
+  ctor(string Name, int Indent, int Ordinal, int? Count, double? ElapsedMs)
+  method ArchLinterNet.Core.Profiling.AnalysisProfilePhaseMeasurement <Clone>$()
+  method bool Equals(ArchLinterNet.Core.Profiling.AnalysisProfilePhaseMeasurement? other)
+  method bool Equals(object? obj)
+  method int GetHashCode()
+  method string ToString()
+  method void Deconstruct(out string Name, out int Indent, out int Ordinal, out int? Count, out double? ElapsedMs)
+  operator !=(ArchLinterNet.Core.Profiling.AnalysisProfilePhaseMeasurement? left, ArchLinterNet.Core.Profiling.AnalysisProfilePhaseMeasurement? right)
+  operator ==(ArchLinterNet.Core.Profiling.AnalysisProfilePhaseMeasurement? left, ArchLinterNet.Core.Profiling.AnalysisProfilePhaseMeasurement? right)
+  property double? ElapsedMs {get;init;}
+  property int Indent {get;init;}
+  property int Ordinal {get;init;}
+  property int? Count {get;init;}
+  property string Name {get;init;}
+enum ArchLinterNet.Core.Profiling.AnalysisProfileReservedFieldStatus : int
+  enum-member NotApplicable = 0
 static class ArchLinterNet.Core.Reporting.ArchitectureBaselineSarifFormatter
   method static string Format(System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Model.BaselineLifecycleEntry> entries, string toolVersion)
 sealed class ArchLinterNet.Core.Reporting.ArchitectureCoverageSummary : System.IEquatable<ArchLinterNet.Core.Reporting.ArchitectureCoverageSummary>
@@ -3248,6 +3345,7 @@ interface ArchLinterNet.Core.Validation.Abstractions.IArchitecturePublicApiAppli
   method ArchLinterNet.Core.Validation.PublicApiMigrateOutcome Migrate(ArchLinterNet.Core.Validation.PublicApiMigrateRequest request)
   method ArchLinterNet.Core.Validation.PublicApiUpdateOutcome Update(ArchLinterNet.Core.Validation.PublicApiUpdateRequest request)
 interface ArchLinterNet.Core.Validation.Abstractions.IArchitectureValidationApplicationService
+  method (ArchLinterNet.Core.Validation.ValidationOutcome Outcome, ArchLinterNet.Core.Validation.ArchitectureAnalysisSnapshotCounters Counters) ValidateWithCounters(ArchLinterNet.Core.Validation.ValidationRequest request, ArchLinterNet.Core.Reporting.ValidationTiming? timing = null)
   method ArchLinterNet.Core.Validation.ArchitectureAnalysisSnapshot CreateSnapshot(ArchLinterNet.Core.Validation.AnalysisSnapshotRequest request, ArchLinterNet.Core.Reporting.ValidationTiming? timing = null)
   method ArchLinterNet.Core.Validation.ValidationOutcome Validate(ArchLinterNet.Core.Validation.ValidationRequest request, ArchLinterNet.Core.Reporting.ValidationTiming? timing = null)
 sealed class ArchLinterNet.Core.Validation.AnalysisSnapshotRequest : System.IEquatable<ArchLinterNet.Core.Validation.AnalysisSnapshotRequest>
@@ -3313,6 +3411,7 @@ sealed class ArchLinterNet.Core.Validation.ArchitecturePublicApiApplicationServi
   method ArchLinterNet.Core.Validation.PublicApiUpdateOutcome Update(ArchLinterNet.Core.Validation.PublicApiUpdateRequest request)
 sealed class ArchLinterNet.Core.Validation.ArchitectureValidationApplicationService : ArchLinterNet.Core.Validation.Abstractions.IArchitectureValidationApplicationService
   ctor(ArchLinterNet.Core.Execution.Abstractions.IArchitectureRunnerSetupService runnerSetupService, ArchLinterNet.Core.Execution.Abstractions.IArchitectureContractHandlerRegistry handlerRegistry, ArchLinterNet.Core.Execution.Abstractions.IArchitectureContractExecutor contractExecutor, ArchLinterNet.Core.BuildState.IBuildStatePreparationService buildStatePreparationService)
+  method (ArchLinterNet.Core.Validation.ValidationOutcome Outcome, ArchLinterNet.Core.Validation.ArchitectureAnalysisSnapshotCounters Counters) ValidateWithCounters(ArchLinterNet.Core.Validation.ValidationRequest request, ArchLinterNet.Core.Reporting.ValidationTiming? timing = null)
   method ArchLinterNet.Core.Validation.ArchitectureAnalysisSnapshot CreateSnapshot(ArchLinterNet.Core.Validation.AnalysisSnapshotRequest request, ArchLinterNet.Core.Reporting.ValidationTiming? timing = null)
   method ArchLinterNet.Core.Validation.ValidationOutcome Validate(ArchLinterNet.Core.Validation.ValidationRequest request, ArchLinterNet.Core.Reporting.ValidationTiming? timing = null)
 static class ArchLinterNet.Core.Validation.ArchitectureValidationService

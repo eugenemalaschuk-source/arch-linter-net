@@ -536,10 +536,17 @@ internal sealed partial class ValidateCommandHandler
 
     private int ExecuteSingleMode(ValidateCommandOptions options, string mode, string errorFormat)
     {
-        ValidationTiming? timing = options.TimingsEnabled ? new ValidationTiming() : null;
+        // A profile always needs a real ValidationTiming instance to derive contract-family
+        // counts (see AnalysisProfileBuilder) even when --timings' human report was not
+        // requested — WriteReport below stays gated on TimingsEnabled specifically, so omitting
+        // --timings while using --profile still prints nothing extra to stderr.
+        ValidationTiming? timing = options.TimingsEnabled || options.ProfileDestination is not null
+            ? new ValidationTiming()
+            : null;
         ValidationRequest request = BuildValidationRequest(options, mode);
 
-        ValidationOutcome outcome = _runtime.Validate(request, timing);
+        (ValidationOutcome outcome, ArchitectureAnalysisSnapshotCounters counters) =
+            _runtime.ValidateWithCounters(request, timing);
 
         string? importCollision = FindImportFileCollision(options, outcome.PolicyImportPaths);
         if (importCollision is not null)
@@ -564,7 +571,13 @@ internal sealed partial class ValidateCommandHandler
 
         RouteResult result = _coordinator.RouteSingleOutcome(
             options.Format, mode, outcome, options.AdditionalSinks, _cancellationToken);
-        timing?.WriteReport(_console.Error);
+        if (options.TimingsEnabled)
+        {
+            timing?.WriteReport(_console.Error);
+        }
+
+        WriteProfile(options, counters, timing, ResolveCompletionStatus(outcome, result.Cancelled), result.Cancelled);
+
         if (result.Cancelled)
         {
             WriteCancelledRouting(options, errorFormat, result, isSingleMode: true, new[] { (mode, outcome) });
@@ -586,7 +599,11 @@ internal sealed partial class ValidateCommandHandler
     // openspec/specs/analysis-snapshot/spec.md.
     private int ExecuteCombinedModes(ValidateCommandOptions options, IReadOnlyList<string> modes, string errorFormat)
     {
-        ValidationTiming? timing = options.TimingsEnabled ? new ValidationTiming() : null;
+        // See the identical comment in ExecuteSingleMode: a profile needs a real ValidationTiming
+        // instance regardless of whether --timings' human report was also requested.
+        ValidationTiming? timing = options.TimingsEnabled || options.ProfileDestination is not null
+            ? new ValidationTiming()
+            : null;
         AnalysisSnapshotRequest snapshotRequest = new()
         {
             PolicyPath = options.PolicyPath,
@@ -639,7 +656,20 @@ internal sealed partial class ValidateCommandHandler
         RouteResult result = _coordinator.RouteCombinedOutcomes(
             options.Format, outcomesByMode, options.AdditionalSinks, _cancellationToken);
 
-        timing?.WriteReport(_console.Error);
+        if (options.TimingsEnabled)
+        {
+            timing?.WriteReport(_console.Error);
+        }
+
+        // A blocked preflight blocks every requested mode identically (see
+        // openspec/specs/analysis-snapshot/spec.md, "Invalid build state fails the whole
+        // snapshot"), so the first outcome's PreflightBlocked reflects every mode's; allPassed
+        // reflects every mode's Passed, unlike the single-mode overload's one outcome.
+        WriteProfile(
+            options, snapshot.Counters, timing,
+            ResolveCompletionStatus(outcomesByMode[0].Outcome.PreflightBlocked, allPassed, result.Cancelled),
+            result.Cancelled);
+
         if (result.Cancelled)
         {
             WriteCancelledRouting(options, errorFormat, result, isSingleMode: false, outcomesByMode);
