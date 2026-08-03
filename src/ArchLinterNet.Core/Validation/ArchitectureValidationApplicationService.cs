@@ -142,7 +142,6 @@ public sealed class ArchitectureValidationApplicationService(
             state.Setup = postBuildSetup;
             state.ProjectGraphEvaluations++;
             state.AssemblyLoads += postBuildSetup.AssemblyLoads;
-            runner = postBuildSetup.Runner;
         }
 
         request.CancellationToken.ThrowIfCancellationRequested();
@@ -163,7 +162,7 @@ public sealed class ArchitectureValidationApplicationService(
             requestedContractIds: modeHint == null ? request.ContractIds : null);
     }
 
-    private ArchitectureAnalysisSnapshotCounters BuildCancellationCounters(SnapshotConstructionState state)
+    private static ArchitectureAnalysisSnapshotCounters BuildCancellationCounters(SnapshotConstructionState state)
     {
         ArchitectureRunnerSetup? setup = state.Setup;
         return new ArchitectureAnalysisSnapshotCounters
@@ -178,7 +177,7 @@ public sealed class ArchitectureValidationApplicationService(
         };
     }
 
-    private static IReadOnlyList<string> BuildCancellationInputPaths(
+    private static string[] BuildCancellationInputPaths(
         AnalysisSnapshotRequest request, SnapshotConstructionState state)
     {
         string repositoryRoot = state.Setup?.RepositoryRoot
@@ -271,9 +270,9 @@ public sealed class ArchitectureValidationApplicationService(
             request.NoRestore,
             request.RequestedConfiguration,
             request.RequestedTargetFramework,
-            request.CancellationToken,
             request.RequestedPlatform,
-            request.RequestedRuntimeIdentifier));
+            request.RequestedRuntimeIdentifier,
+            request.CancellationToken));
     }
 
     private readonly record struct ComposedPolicy(

@@ -10,6 +10,6 @@ public sealed record BuildStatePreflightRequest(
     bool NoRestore = false,
     string? RequestedConfiguration = null,
     string? RequestedTargetFramework = null,
-    CancellationToken CancellationToken = default,
     string? RequestedPlatform = null,
-    string? RequestedRuntimeIdentifier = null);
+    string? RequestedRuntimeIdentifier = null,
+    CancellationToken CancellationToken = default);

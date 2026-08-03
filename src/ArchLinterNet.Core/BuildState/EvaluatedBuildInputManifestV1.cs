@@ -37,23 +37,21 @@ public static class EvaluatedBuildInputManifestCollector
         string project = BuildStatePathResolution.ResolveAbsoluteProjectPath(root, projectPath);
         string projectDirectory = Path.GetDirectoryName(project)
             ?? throw new InvalidOperationException($"Cannot determine project directory for '{projectPath}'.");
-        SortedDictionary<string, string> inputs = new(StringComparer.Ordinal);
-        SortedSet<string> reasons = new(StringComparer.Ordinal);
-        ManifestCollectionBudget budget = new();
+        ManifestCollectionContext context = new(root);
 
-        AddFile(project, root, inputs, reasons, budget, cancellationToken);
-        if (!budget.IsExhausted)
+        AddFile(project, context, cancellationToken);
+        if (!context.Budget.IsExhausted)
         {
-            AddAncestorImports(projectDirectory, root, inputs, reasons, budget, cancellationToken);
+            AddAncestorImports(projectDirectory, context, cancellationToken);
         }
-        if (!budget.IsExhausted)
+        if (!context.Budget.IsExhausted)
         {
-            CollectProjectXml(project, root, inputs, reasons, budget, cancellationToken);
+            CollectProjectXml(project, context, cancellationToken);
         }
 
         // Default SDK compile items are deterministic under the project root. Explicit globs are
         // rejected below because static glob semantics can be changed by imports/properties.
-        if (!budget.IsExhausted)
+        if (!context.Budget.IsExhausted)
         {
             foreach (string source in Directory.EnumerateFiles(projectDirectory, "*.cs", new EnumerationOptions
             {
@@ -62,37 +60,37 @@ public static class EvaluatedBuildInputManifestCollector
             })
                          .Where(path => !IsBuildOutput(path, projectDirectory)))
             {
-                AddFile(source, root, inputs, reasons, budget, cancellationToken);
-                if (budget.IsExhausted)
+                AddFile(source, context, cancellationToken);
+                if (context.Budget.IsExhausted)
                 {
                     break;
                 }
             }
         }
 
-        AddContextValue("context:configuration", configuration, inputs);
-        AddContextValue("context:targetFramework", targetFramework, inputs);
-        AddContextValue("context:platform", platform, inputs);
-        AddContextValue("context:runtimeIdentifier", runtimeIdentifier, inputs);
+        AddContextValue("context:configuration", configuration, context.Inputs);
+        AddContextValue("context:targetFramework", targetFramework, context.Inputs);
+        AddContextValue("context:platform", platform, context.Inputs);
+        AddContextValue("context:runtimeIdentifier", runtimeIdentifier, context.Inputs);
 
         // Static XML inspection cannot prove evaluated SDK imports, global properties,
         // generators, framework packs, or compiler task inputs. It is evidence for stale
         // diagnostics only, never authorization for a persistent cache.
-        reasons.Add("evaluated-msbuild-evidence-incomplete");
+        context.Reasons.Add("evaluated-msbuild-evidence-incomplete");
 
-        string canonical = string.Join('\n', inputs.Select(entry => $"{entry.Key}:{entry.Value}"));
+        string canonical = string.Join('\n', context.Inputs.Select(entry => $"{entry.Key}:{entry.Value}"));
         string digest = Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(
             "analysis-build-state/v1\nmanifest\n" + canonical)));
+        // "evaluated-msbuild-evidence-incomplete" is always added above, so reasons is never
+        // empty: this collector cannot yet prove eligibility and every result is ineligible.
         return new EvaluatedBuildInputManifestV1(
             digest,
-            reasons.Count == 0 ? CacheEligibility.VerifiedCacheEligible : CacheEligibility.CacheIneligible,
-            reasons.ToArray(),
-            inputs.Select(entry => entry.Key).ToArray());
+            CacheEligibility.CacheIneligible,
+            context.Reasons.ToArray(),
+            context.Inputs.Select(entry => entry.Key).ToArray());
     }
 
-    private static void CollectProjectXml(
-        string projectPath, string root, SortedDictionary<string, string> inputs, SortedSet<string> reasons,
-        ManifestCollectionBudget budget, CancellationToken cancellationToken)
+    private static void CollectProjectXml(string projectPath, ManifestCollectionContext context, CancellationToken cancellationToken)
     {
         XDocument document;
         try
@@ -106,81 +104,76 @@ public static class EvaluatedBuildInputManifestCollector
         }
         catch (Exception ex) when (ex is IOException or System.Xml.XmlException)
         {
-            reasons.Add("project-xml-uninspectable");
+            context.Reasons.Add("project-xml-uninspectable");
             return;
         }
 
         XElement project = document.Root!;
         if (!string.Equals(project.Name.LocalName, "Project", StringComparison.Ordinal))
         {
-            reasons.Add("project-xml-uninspectable");
+            context.Reasons.Add("project-xml-uninspectable");
             return;
         }
 
         string directory = Path.GetDirectoryName(projectPath)!;
-        AddOptionalValue("sdk", project.Attribute("Sdk")?.Value, inputs, reasons, budget);
+        AddOptionalValue("sdk", project.Attribute("Sdk")?.Value, context);
         foreach (XElement element in project.Descendants())
         {
-            if (budget.IsExhausted)
+            if (context.Budget.IsExhausted)
             {
                 break;
             }
             cancellationToken.ThrowIfCancellationRequested();
-            CollectElement(element, directory, root, inputs, reasons, budget, cancellationToken);
+            CollectElement(element, directory, context, cancellationToken);
         }
     }
 
-    private static void CollectElement(XElement element, string directory, string root, SortedDictionary<string, string> inputs,
-        SortedSet<string> reasons, ManifestCollectionBudget budget, CancellationToken cancellationToken)
+    private static void CollectElement(XElement element, string directory, ManifestCollectionContext context, CancellationToken cancellationToken)
     {
         string name = element.Name.LocalName;
         if (name is "Import" or "Compile" or "AdditionalFiles" or "EditorConfigFiles" or "Analyzer")
         {
-            CollectPathInput(element, name, directory, root, inputs, reasons, budget, cancellationToken);
+            CollectPathInput(element, name, directory, context, cancellationToken);
         }
         else if (name is "PackageReference" or "ProjectReference" or "FrameworkReference" or "Reference")
         {
-            CollectReferenceInput(element, name, directory, root, inputs, reasons, budget, cancellationToken);
+            CollectReferenceInput(element, name, directory, context, cancellationToken);
         }
     }
 
-    private static void CollectPathInput(XElement element, string name, string directory, string root,
-        SortedDictionary<string, string> inputs, SortedSet<string> reasons, ManifestCollectionBudget budget,
+    private static void CollectPathInput(XElement element, string name, string directory, ManifestCollectionContext context,
         CancellationToken cancellationToken)
     {
         string? include = element.Attribute("Include")?.Value ?? element.Attribute("Project")?.Value;
         if (string.IsNullOrWhiteSpace(include) || ContainsDynamicExpression(include))
         {
-            reasons.Add($"uninspectable-{name.ToLowerInvariant()}-input");
+            context.Reasons.Add($"uninspectable-{name.ToLowerInvariant()}-input");
             return;
         }
 
-        AddFile(Path.GetFullPath(Path.Combine(directory, include)), root, inputs, reasons,
-            budget, cancellationToken, name.ToLowerInvariant());
-        if (name == "Analyzer") reasons.Add("analyzer-or-generator-identity-unverified");
+        AddFile(Path.GetFullPath(Path.Combine(directory, include)), context, cancellationToken, name.ToLowerInvariant());
+        if (name == "Analyzer") context.Reasons.Add("analyzer-or-generator-identity-unverified");
     }
 
-    private static void CollectReferenceInput(XElement element, string name, string directory, string root,
-        SortedDictionary<string, string> inputs, SortedSet<string> reasons, ManifestCollectionBudget budget,
+    private static void CollectReferenceInput(XElement element, string name, string directory, ManifestCollectionContext context,
         CancellationToken cancellationToken)
     {
         string identity = element.Attribute("Include")?.Value ?? string.Empty;
         string version = element.Attribute("Version")?.Value ?? element.Element(element.Name.Namespace + "Version")?.Value ?? string.Empty;
         if (string.IsNullOrWhiteSpace(identity) || ContainsDynamicExpression(identity) || ContainsDynamicExpression(version))
         {
-            reasons.Add($"uninspectable-{name.ToLowerInvariant()}-identity");
+            context.Reasons.Add($"uninspectable-{name.ToLowerInvariant()}-identity");
             return;
         }
 
-        AddOptionalValue($"reference:{name}:{identity}", version, inputs, reasons, budget);
+        AddOptionalValue($"reference:{name}:{identity}", version, context);
         if (name == "ProjectReference")
         {
-            AddFile(Path.GetFullPath(Path.Combine(directory, identity)), root, inputs, reasons,
-                budget, cancellationToken, "projectreference");
+            AddFile(Path.GetFullPath(Path.Combine(directory, identity)), context, cancellationToken, "projectreference");
             return;
         }
 
-        reasons.Add(name switch
+        context.Reasons.Add(name switch
         {
             "PackageReference" => "package-reference-identity-unverified",
             "FrameworkReference" => "framework-reference-identity-unverified",
@@ -188,82 +181,80 @@ public static class EvaluatedBuildInputManifestCollector
         });
     }
 
-    private static void AddAncestorImports(string directory, string root, SortedDictionary<string, string> inputs,
-        SortedSet<string> reasons, ManifestCollectionBudget budget, CancellationToken cancellationToken)
+    private static void AddAncestorImports(string directory, ManifestCollectionContext context, CancellationToken cancellationToken)
     {
         for (DirectoryInfo? current = new(directory); current != null; current = current.Parent)
         {
-            if (budget.IsExhausted)
+            if (context.Budget.IsExhausted)
             {
                 return;
             }
             foreach (string name in new[] { "Directory.Build.props", "Directory.Build.targets", "Directory.Build.rsp", "Directory.Packages.props" })
             {
-                if (budget.IsExhausted)
+                if (context.Budget.IsExhausted)
                 {
                     return;
                 }
                 string path = Path.Combine(current.FullName, name);
                 if (File.Exists(path))
                 {
-                    AddFile(path, root, inputs, reasons, budget, cancellationToken);
+                    AddFile(path, context, cancellationToken);
                 }
             }
 
-            if (PathsEqual(current.FullName, root))
+            if (PathsEqual(current.FullName, context.Root))
             {
                 return;
             }
         }
 
-        reasons.Add("project-outside-repository");
+        context.Reasons.Add("project-outside-repository");
     }
 
-    private static void AddFile(string path, string root, SortedDictionary<string, string> inputs, SortedSet<string> reasons,
-        ManifestCollectionBudget budget, CancellationToken cancellationToken, string? kind = null)
+    private static void AddFile(string path, ManifestCollectionContext context, CancellationToken cancellationToken, string? kind = null)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        if (budget.IsExhausted)
+        if (context.Budget.IsExhausted)
         {
             return;
         }
 
         string fullPath = Path.GetFullPath(path);
-        if (!IsContained(fullPath, root))
+        if (!IsContained(fullPath, context.Root))
         {
-            reasons.Add("repository-escape");
+            context.Reasons.Add("repository-escape");
             return;
         }
 
-        if (HasReparsePointAncestor(fullPath, root))
+        if (HasReparsePointAncestor(fullPath, context.Root))
         {
-            reasons.Add("symlink-input-unverified");
+            context.Reasons.Add("symlink-input-unverified");
             return;
         }
 
         if (!File.Exists(fullPath))
         {
-            reasons.Add(kind == null ? "missing-input" : $"missing-{kind}-input");
+            context.Reasons.Add(kind == null ? "missing-input" : $"missing-{kind}-input");
             return;
         }
 
         FileInfo file = new(fullPath);
         if (file.LinkTarget != null || (file.Attributes & FileAttributes.ReparsePoint) != 0)
         {
-            reasons.Add("symlink-input-unverified");
+            context.Reasons.Add("symlink-input-unverified");
             return;
         }
 
-        if (!budget.TryAddFile(file.Length, reasons))
+        if (!context.Budget.TryAddFile(file.Length, context.Reasons))
         {
             return;
         }
 
-        string logicalPath = Path.GetRelativePath(root, fullPath).Replace('\\', '/');
+        string logicalPath = Path.GetRelativePath(context.Root, fullPath).Replace('\\', '/');
         string digest = BuildStateCanonicalHasher.ComputeContentDigest(fullPath, cancellationToken);
-        if (!inputs.TryAdd($"file:{logicalPath}", digest))
+        if (!context.Inputs.TryAdd($"file:{logicalPath}", digest))
         {
-            reasons.Add("ambiguous-input-path");
+            context.Reasons.Add("ambiguous-input-path");
         }
     }
 
@@ -271,19 +262,26 @@ public static class EvaluatedBuildInputManifestCollector
         value.Contains("$()", StringComparison.Ordinal) || value.Contains('$')
         || value.Contains("@(", StringComparison.Ordinal) || value.Contains('*') || value.Contains('?');
 
-    private static void AddOptionalValue(string name, string? value, SortedDictionary<string, string> inputs,
-        SortedSet<string> reasons, ManifestCollectionBudget budget)
+    private static void AddOptionalValue(string name, string? value, ManifestCollectionContext context)
     {
-        if (!inputs.ContainsKey(name) && !budget.TryAddOptionalValue(reasons))
+        if (!context.Inputs.ContainsKey(name) && !context.Budget.TryAddOptionalValue(context.Reasons))
         {
             return;
         }
 
-        inputs[name] = value ?? string.Empty;
+        context.Inputs[name] = value ?? string.Empty;
     }
 
     private static void AddContextValue(string name, string? value, SortedDictionary<string, string> inputs) =>
         inputs[name] = value ?? string.Empty;
+
+    private sealed class ManifestCollectionContext(string root)
+    {
+        public string Root { get; } = root;
+        public SortedDictionary<string, string> Inputs { get; } = new(StringComparer.Ordinal);
+        public SortedSet<string> Reasons { get; } = new(StringComparer.Ordinal);
+        public ManifestCollectionBudget Budget { get; } = new();
+    }
 
     private static bool IsBuildOutput(string path, string projectDirectory)
     {
