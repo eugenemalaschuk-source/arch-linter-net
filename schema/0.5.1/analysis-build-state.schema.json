@@ -11,7 +11,14 @@
     "Configuration": { "type": ["string", "null"] },
     "TargetFramework": { "type": ["string", "null"] },
     "BuildInputFingerprint": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
-    "AssemblyContentDigest": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+    "AssemblyContentDigest": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "EvaluatedManifestFingerprint": { "type": ["string", "null"], "pattern": "^[0-9a-f]{64}$" },
+    "CacheEligibility": { "type": ["integer", "null"], "enum": [0, 1, null] },
+    "CacheIneligibilityReasons": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 },
+      "uniqueItems": true
+    }
   },
   "additionalProperties": false,
   "x-archlinternet-envelope": "analysis-build-state/v1"
