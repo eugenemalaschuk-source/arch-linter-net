@@ -53,13 +53,13 @@ static class ArchLinterNet.Core.BuildState.BuildStateCanonicalHasher
 static class ArchLinterNet.Core.BuildState.BuildStatePreflightEvaluator
   method static ArchLinterNet.Core.BuildState.BuildStatePreflightResult Evaluate(ArchLinterNet.Core.BuildState.BuildStatePreflightRequest request)
 sealed class ArchLinterNet.Core.BuildState.BuildStatePreflightRequest : System.IEquatable<ArchLinterNet.Core.BuildState.BuildStatePreflightRequest>
-  ctor(string RepositoryRoot, ArchLinterNet.Core.Discovery.ProjectDiscoveryResult ProjectDiscovery, ArchLinterNet.Core.BuildState.BuildStateResolvedAssemblies Resolution, ArchLinterNet.Core.BuildState.BuildPreparationMode PreparationMode, bool NoRestore = false, string? RequestedConfiguration = null, string? RequestedTargetFramework = null, System.Threading.CancellationToken CancellationToken = null, string? RequestedPlatform = null, string? RequestedRuntimeIdentifier = null)
+  ctor(string RepositoryRoot, ArchLinterNet.Core.Discovery.ProjectDiscoveryResult ProjectDiscovery, ArchLinterNet.Core.BuildState.BuildStateResolvedAssemblies Resolution, ArchLinterNet.Core.BuildState.BuildPreparationMode PreparationMode, bool NoRestore = false, string? RequestedConfiguration = null, string? RequestedTargetFramework = null, string? RequestedPlatform = null, string? RequestedRuntimeIdentifier = null, System.Threading.CancellationToken CancellationToken = null)
   method ArchLinterNet.Core.BuildState.BuildStatePreflightRequest <Clone>$()
   method bool Equals(ArchLinterNet.Core.BuildState.BuildStatePreflightRequest? other)
   method bool Equals(object? obj)
   method int GetHashCode()
   method string ToString()
-  method void Deconstruct(out string RepositoryRoot, out ArchLinterNet.Core.Discovery.ProjectDiscoveryResult ProjectDiscovery, out ArchLinterNet.Core.BuildState.BuildStateResolvedAssemblies Resolution, out ArchLinterNet.Core.BuildState.BuildPreparationMode PreparationMode, out bool NoRestore, out string? RequestedConfiguration, out string? RequestedTargetFramework, out System.Threading.CancellationToken CancellationToken, out string? RequestedPlatform, out string? RequestedRuntimeIdentifier)
+  method void Deconstruct(out string RepositoryRoot, out ArchLinterNet.Core.Discovery.ProjectDiscoveryResult ProjectDiscovery, out ArchLinterNet.Core.BuildState.BuildStateResolvedAssemblies Resolution, out ArchLinterNet.Core.BuildState.BuildPreparationMode PreparationMode, out bool NoRestore, out string? RequestedConfiguration, out string? RequestedTargetFramework, out string? RequestedPlatform, out string? RequestedRuntimeIdentifier, out System.Threading.CancellationToken CancellationToken)
   operator !=(ArchLinterNet.Core.BuildState.BuildStatePreflightRequest? left, ArchLinterNet.Core.BuildState.BuildStatePreflightRequest? right)
   operator ==(ArchLinterNet.Core.BuildState.BuildStatePreflightRequest? left, ArchLinterNet.Core.BuildState.BuildStatePreflightRequest? right)
   property ArchLinterNet.Core.BuildState.BuildPreparationMode PreparationMode {get;init;}
