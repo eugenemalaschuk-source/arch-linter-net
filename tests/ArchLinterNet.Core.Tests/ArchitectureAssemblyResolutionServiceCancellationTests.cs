@@ -1,4 +1,5 @@
 using System.Reflection;
+using ArchLinterNet.Core.BuildState;
 using ArchLinterNet.Core.Contracts;
 using ArchLinterNet.Core.Discovery;
 using ArchLinterNet.Core.Execution;
@@ -140,7 +141,7 @@ public sealed class ArchitectureAssemblyResolutionServiceCancellationTests
             document, "/fake/repo", discovery, resolveAssemblyOutputs: true, mode: null, selectedContractIds: null);
         try
         {
-            Assert.That(resolution.SelectedAssemblyArtifactPaths, Is.EqualTo(new[] { ArtifactPath }));
+            Assert.That(resolution.SelectedAssemblyArtifactPaths, Is.EqualTo(new[] { Path.GetFullPath(ArtifactPath) }));
         }
         finally
         {
@@ -149,7 +150,7 @@ public sealed class ArchitectureAssemblyResolutionServiceCancellationTests
     }
 
     [Test]
-    public void ResolvePostBuild_MaterializesProbingPathReferencesBeforeCacheLookup()
+    public void ResolvePostBuild_DefersProbingPathReferenceMaterializationUntilCacheRequestsIt()
     {
         string tempDirectory = Path.Combine(Path.GetTempPath(), $"arch-linter-post-build-scope-{Guid.NewGuid():N}");
         Directory.CreateDirectory(tempDirectory);
@@ -189,11 +190,30 @@ public sealed class ArchitectureAssemblyResolutionServiceCancellationTests
                 IArchitectureAssemblyLoadScopeArtifactInventory inventory =
                     (IArchitectureAssemblyLoadScopeArtifactInventory)resolution.IsolatedLoadScope!;
 
-                Assert.Multiple(() =>
-                {
-                    Assert.That(inventory.LoadedAssemblyPaths, Has.Member(copiedCorePath));
-                    Assert.That(inventory.LoadedAssemblyPaths, Has.Member(copiedCelPath));
-                });
+                Assert.That(
+                    inventory.LoadedAssemblyArtifacts.Select(artifact => artifact.AssemblyPath),
+                    Is.EquivalentTo(new[] { copiedCorePath }));
+                Assert.That(
+                    inventory.LoadedAssemblyArtifacts.Single().AssemblyContentDigest,
+                    Is.EqualTo(BuildStateCanonicalHasher.ComputeContentDigest(copiedCorePath)));
+
+                Assert.That(
+                    inventory.LoadedAssemblyArtifacts.Select(artifact => artifact.AssemblyPath),
+                    Does.Not.Contain(copiedCelPath),
+                    "Reference closure materialization is cache-only and must not alter a normal post-build resolution.");
+
+                using CancellationTokenSource cancelled = new();
+                cancelled.Cancel();
+                Assert.Throws<OperationCanceledException>(() => inventory.MaterializeProbingPathReferences(
+                    resolution.ResolvedAssemblies,
+                    maximumAdditionalArtifactCount: 16,
+                    maximumAdditionalArtifactBytes: 64L * 1024 * 1024,
+                    cancellationToken: cancelled.Token));
+                Assert.That(inventory.MaterializeProbingPathReferences(
+                    resolution.ResolvedAssemblies,
+                    maximumAdditionalArtifactCount: 0,
+                    maximumAdditionalArtifactBytes: 64L * 1024 * 1024,
+                    cancellationToken: CancellationToken.None), Is.False);
             }
             finally
             {

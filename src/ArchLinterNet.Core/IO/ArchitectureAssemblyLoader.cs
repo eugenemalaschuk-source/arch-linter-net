@@ -1,6 +1,8 @@
 using System.Reflection;
 using System.Runtime.Loader;
+using System.Security.Cryptography;
 using ArchLinterNet.Core.IO.Abstractions;
+using ArchLinterNet.Core.Model;
 
 namespace ArchLinterNet.Core.IO;
 
@@ -35,7 +37,8 @@ public sealed class ArchitectureAssemblyLoader : IArchitectureAssemblyLoader
     {
         private readonly IReadOnlyList<string> _probingPaths;
         private readonly IReadOnlyDictionary<string, string> _exactAssemblyPaths;
-        private readonly HashSet<string> _loadedAssemblyPaths = new(StringComparer.OrdinalIgnoreCase);
+        private readonly Dictionary<string, ArchitectureLoadedAssemblyArtifact> _loadedArtifactsByPath =
+            new(StringComparer.OrdinalIgnoreCase);
         private readonly Dictionary<string, Assembly> _loadedAssembliesByPath = new(StringComparer.OrdinalIgnoreCase);
         private readonly object _loadedAssemblyPathsGate = new();
 
@@ -53,13 +56,13 @@ public sealed class ArchitectureAssemblyLoader : IArchitectureAssemblyLoader
             return LoadAssemblyFromStream(path);
         }
 
-        public IReadOnlyCollection<string> LoadedAssemblyPaths
+        public IReadOnlyCollection<ArchitectureLoadedAssemblyArtifact> LoadedAssemblyArtifacts
         {
             get
             {
                 lock (_loadedAssemblyPathsGate)
                 {
-                    return _loadedAssemblyPaths.ToArray();
+                    return _loadedArtifactsByPath.Values.ToArray();
                 }
             }
         }
@@ -69,13 +72,20 @@ public sealed class ArchitectureAssemblyLoader : IArchitectureAssemblyLoader
         // so both a miss and a later lookup compare the same complete scoped artifact set. Missing
         // framework/external references remain CLR-resolved on demand and are not treated as a
         // probing-path artifact owned by this scope.
-        public void MaterializeProbingPathReferences(IEnumerable<Assembly> rootAssemblies)
+        public bool MaterializeProbingPathReferences(
+            IEnumerable<Assembly> rootAssemblies,
+            int maximumAdditionalArtifactCount,
+            long maximumAdditionalArtifactBytes,
+            CancellationToken cancellationToken)
         {
             Queue<Assembly> pending = new(rootAssemblies);
             HashSet<string> visited = new(StringComparer.Ordinal);
+            int additionalArtifactCount = 0;
+            long additionalArtifactBytes = 0;
 
             while (pending.Count > 0)
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 Assembly assembly = pending.Dequeue();
                 string identity = assembly.FullName ?? assembly.GetName().Name ?? string.Empty;
                 if (!visited.Add(identity))
@@ -85,6 +95,7 @@ public sealed class ArchitectureAssemblyLoader : IArchitectureAssemblyLoader
 
                 foreach (AssemblyName reference in assembly.GetReferencedAssemblies())
                 {
+                    cancellationToken.ThrowIfCancellationRequested();
                     string? simpleName = reference.Name;
                     if (string.IsNullOrWhiteSpace(simpleName))
                     {
@@ -97,20 +108,37 @@ public sealed class ArchitectureAssemblyLoader : IArchitectureAssemblyLoader
                         continue;
                     }
 
+                    string fullCandidate = Path.GetFullPath(candidate);
+                    if (IsLoaded(fullCandidate))
+                    {
+                        continue;
+                    }
+
                     try
                     {
-                        pending.Enqueue(LoadAssemblyFromStream(candidate));
+                        long candidateBytes = GetArtifactSize(fullCandidate);
+                        if (additionalArtifactCount >= maximumAdditionalArtifactCount
+                            || candidateBytes > maximumAdditionalArtifactBytes - additionalArtifactBytes)
+                        {
+                            return false;
+                        }
+
+                        pending.Enqueue(LoadAssemblyFromStream(fullCandidate));
+                        additionalArtifactCount++;
+                        additionalArtifactBytes += candidateBytes;
                     }
                     catch (Exception ex) when (ex is BadImageFormatException or IOException
                         or UnauthorizedAccessException)
                     {
-                        // This eagerly captured closure is cache evidence, not a new analysis
-                        // resolution path. Preserve the pre-existing lazy-load behavior for an
-                        // unreadable optional reference; if analysis consumes it later, its normal
-                        // resolution will still surface the original error.
+                        // Cache authorization needs a complete byte inventory. A local reference
+                        // that cannot be captured is not evidence that can safely authorize a
+                        // hit; normal evaluation still retains its historical lazy resolution.
+                        return false;
                     }
                 }
             }
+
+            return true;
         }
 
         protected override Assembly? Load(AssemblyName assemblyName)
@@ -143,7 +171,9 @@ public sealed class ArchitectureAssemblyLoader : IArchitectureAssemblyLoader
             }
 
             using FileStream assemblyStream = File.OpenRead(fullPath);
+            string assemblyContentDigest = ComputeStreamDigest(assemblyStream);
             string pdbPath = Path.ChangeExtension(fullPath, ".pdb");
+            string pdbContentDigest = "missing";
             Assembly assembly;
             if (!File.Exists(pdbPath))
             {
@@ -152,6 +182,7 @@ public sealed class ArchitectureAssemblyLoader : IArchitectureAssemblyLoader
             else
             {
                 using FileStream pdbStream = File.OpenRead(pdbPath);
+                pdbContentDigest = ComputeStreamDigest(pdbStream);
                 assembly = LoadFromStream(assemblyStream, pdbStream);
             }
 
@@ -163,7 +194,10 @@ public sealed class ArchitectureAssemblyLoader : IArchitectureAssemblyLoader
                 }
 
                 _loadedAssembliesByPath.Add(fullPath, assembly);
-                _loadedAssemblyPaths.Add(fullPath);
+                _loadedArtifactsByPath.Add(fullPath, new ArchitectureLoadedAssemblyArtifact(
+                    fullPath,
+                    assemblyContentDigest,
+                    pdbContentDigest));
             }
 
             return assembly;
@@ -176,6 +210,34 @@ public sealed class ArchitectureAssemblyLoader : IArchitectureAssemblyLoader
                 : _probingPaths
                     .Select(path => Path.Combine(path, $"{simpleName}.dll"))
                     .FirstOrDefault(File.Exists);
+        }
+
+        private bool IsLoaded(string fullPath)
+        {
+            lock (_loadedAssemblyPathsGate)
+            {
+                return _loadedAssembliesByPath.ContainsKey(fullPath);
+            }
+        }
+
+        private static long GetArtifactSize(string assemblyPath)
+        {
+            long assemblyBytes = new FileInfo(assemblyPath).Length;
+            string pdbPath = Path.ChangeExtension(assemblyPath, ".pdb");
+            return checked(assemblyBytes + (File.Exists(pdbPath) ? new FileInfo(pdbPath).Length : 0));
+        }
+
+        private static string ComputeStreamDigest(Stream stream)
+        {
+            long position = stream.Position;
+            try
+            {
+                return Convert.ToHexStringLower(SHA256.HashData(stream));
+            }
+            finally
+            {
+                stream.Position = position;
+            }
         }
     }
 }

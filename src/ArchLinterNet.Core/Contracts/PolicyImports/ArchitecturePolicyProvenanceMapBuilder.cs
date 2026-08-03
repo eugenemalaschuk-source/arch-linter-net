@@ -84,7 +84,8 @@ internal sealed class ArchitecturePolicyProvenanceMapBuilder
     {
         return new ArchitecturePolicyProvenanceIndex(
             sources.Select(source => source.Descriptor).ToArray(),
-            _nodes);
+            _nodes,
+            sources.Select(source => source.ContentIdentity).ToArray());
     }
 
     private ArchitecturePolicySourceLocation CreateLocation(
@@ -186,6 +187,7 @@ internal static class ArchitecturePolicyProvenanceFactory
             policyPath,
             policyPath,
             policyPath,
+            ArchitectureLoadedTextIdentityFactory.FromText(policyPath, yaml),
             root,
             Array.Empty<string>());
         var builder = new ArchitecturePolicyProvenanceMapBuilder();

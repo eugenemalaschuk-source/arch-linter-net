@@ -199,4 +199,61 @@ public sealed class AnalysisCachePopulationTests
             Assert.That(cacheEnabled.GetHashCode(), Is.EqualTo(cacheDisabled.GetHashCode()));
         });
     }
+
+    [Test]
+    public void TryPopulateCompletedOutcome_CapturedArtifactMutationIsRejectedBeforePublication()
+    {
+        AnalysisCachePopulation.TestManifestCollectorOverride =
+            (_, _, _, _, _, _, _) => new EvaluatedBuildInputManifestV1(
+                "verified-manifest", CacheEligibility.VerifiedCacheEligible,
+                Array.Empty<string>(), Array.Empty<string>());
+        AnalysisCacheLocation location = new(_cacheRoot, AnalysisCacheMode.ExplicitPath);
+        string artifactPath = Path.Combine(_repoRoot, "bin", "Selected.dll");
+        Directory.CreateDirectory(Path.GetDirectoryName(artifactPath)!);
+        File.WriteAllText(artifactPath, "artifact-v1");
+        AnalysisCacheCapturedFileIdentity captured = AnalysisCacheCapturedFileIdentity.FromPath(
+            artifactPath,
+            BuildStateCanonicalHasher.ComputeContentDigest(artifactPath));
+
+        AnalysisCachePopulation.LookupPreparation preparation = AnalysisCachePopulation.TryLookupWithCapturedEvidence(
+            location, CreateKey(), new[] { _projectPath }, new[] { artifactPath }, new[] { captured },
+            Array.Empty<ArchitectureLoadedTextIdentity>(), _repoRoot, null, null, null, null,
+            hasUnfingerprintedSourceInputs: false);
+        Assert.That(preparation.Authorization, Is.Not.Null);
+
+        File.WriteAllText(artifactPath, "artifact-v2");
+        ValidationOutcome outcome = SampleValidationOutcome();
+        AnalysisCachePopulation.AttachAuthorization(outcome, preparation.Authorization!, new[] { artifactPath }, new[] { captured });
+
+        AnalysisCachePopulation.Outcome population = AnalysisCachePopulation.TryPopulateCompletedOutcome(outcome);
+
+        Assert.That(population.RejectReason, Is.EqualTo(AnalysisCacheRejectReason.InputChangedDuringExecution));
+    }
+
+    [Test]
+    public void TryLookupWithCapturedEvidence_PolicyOrBaselineMutationIsRejectedBeforeLookup()
+    {
+        AnalysisCachePopulation.TestManifestCollectorOverride =
+            (_, _, _, _, _, _, _) => new EvaluatedBuildInputManifestV1(
+                "verified-manifest", CacheEligibility.VerifiedCacheEligible,
+                Array.Empty<string>(), Array.Empty<string>());
+        AnalysisCacheLocation location = new(_cacheRoot, AnalysisCacheMode.ExplicitPath);
+        string policyPath = Path.Combine(_repoRoot, "architecture", "dependencies.arch.yml");
+        Directory.CreateDirectory(Path.GetDirectoryName(policyPath)!);
+        File.WriteAllText(policyPath, "version: 1\nname: before\n");
+        ArchitectureLoadedTextIdentity captured = ArchitectureLoadedTextIdentityFactory.FromPath(policyPath);
+
+        File.WriteAllText(policyPath, "version: 1\nname: after\n");
+        AnalysisCachePopulation.LookupPreparation preparation = AnalysisCachePopulation.TryLookupWithCapturedEvidence(
+            location, CreateKey(), new[] { _projectPath }, Array.Empty<string>(),
+            Array.Empty<AnalysisCacheCapturedFileIdentity>(), new[] { captured }, _repoRoot,
+            null, null, null, null, hasUnfingerprintedSourceInputs: false);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(preparation.Lookup.Outcome, Is.EqualTo(AnalysisCacheLookupOutcome.Reject));
+            Assert.That(preparation.Lookup.Reason, Is.EqualTo(AnalysisCacheRejectReason.InputChangedDuringExecution));
+            Assert.That(preparation.Authorization, Is.Null);
+        });
+    }
 }

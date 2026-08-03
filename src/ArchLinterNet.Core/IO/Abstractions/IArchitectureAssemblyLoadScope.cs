@@ -1,4 +1,5 @@
 using System.Reflection;
+using ArchLinterNet.Core.Model;
 
 namespace ArchLinterNet.Core.IO.Abstractions;
 
@@ -17,7 +18,11 @@ public interface IArchitectureAssemblyLoadScope : IDisposable
 // loading API merely to transport snapshot-local cache evidence.
 internal interface IArchitectureAssemblyLoadScopeArtifactInventory
 {
-    IReadOnlyCollection<string> LoadedAssemblyPaths { get; }
+    IReadOnlyCollection<ArchitectureLoadedAssemblyArtifact> LoadedAssemblyArtifacts { get; }
 
-    void MaterializeProbingPathReferences(IEnumerable<Assembly> rootAssemblies);
+    bool MaterializeProbingPathReferences(
+        IEnumerable<Assembly> rootAssemblies,
+        int maximumAdditionalArtifactCount,
+        long maximumAdditionalArtifactBytes,
+        CancellationToken cancellationToken);
 }

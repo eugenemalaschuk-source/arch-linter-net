@@ -207,10 +207,6 @@ public sealed class ArchitectureAssemblyResolutionService : IArchitectureAssembl
                 }
             }
 
-            if (isolatedLoadScope is IArchitectureAssemblyLoadScopeArtifactInventory artifactInventory)
-            {
-                artifactInventory.MaterializeProbingPathReferences(assemblies);
-            }
         }
         catch
         {

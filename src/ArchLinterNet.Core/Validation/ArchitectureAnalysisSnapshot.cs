@@ -203,7 +203,12 @@ public sealed class ArchitectureAnalysisSnapshot : IDisposable
                     // This opaque plan was captured before contract execution. It is associated
                     // by object identity rather than stored on ValidationOutcome itself, so its
                     // transient cache state cannot change that public record's equality contract.
-                    AnalysisCachePopulation.AttachAuthorization(outcome, authorization, GetCacheArtifactPaths());
+                    CacheArtifactEvidence artifacts = GetCacheArtifactEvidence();
+                    AnalysisCachePopulation.AttachAuthorization(
+                        outcome,
+                        authorization,
+                        artifacts.Paths,
+                        artifacts.CapturedIdentities);
                 }
 
                 _evaluatedModes[mode] = outcome;
@@ -416,15 +421,20 @@ public sealed class ArchitectureAnalysisSnapshot : IDisposable
 
         CancellationToken cancellationToken = _setup?.Runner.Session.Context.CancellationToken ?? default;
 
+        ArchitectureAnalysisContext? context = _setup?.Runner.Session.Context;
+        bool cacheArtifactClosureComplete = context?.MaterializeCacheArtifactReferences(cancellationToken) ?? true;
+
         // Some contract families (for example project-metadata contracts) use the configured
         // project paths without materializing a Roslyn project.  Those inputs are nevertheless
         // part of the cached result and must be fingerprinted before the first lookup.  Prefer
         // the materialized paths when available, but fall back to explicit analysis.projects.
         IReadOnlyList<string> cacheProjectPaths = GetCacheProjectPaths();
         IReadOnlyList<string> policyImportPaths = GetPolicyImportPaths();
+        CacheKeyInputEvidence keyInputs = GetCacheKeyInputEvidence(cache);
+        CacheArtifactEvidence artifacts = GetCacheArtifactEvidence();
 
         AnalysisCacheKey key = new(
-            AnalysisCacheKey.ComputePolicyDigest(policyImportPaths, _repositoryRoot, cancellationToken),
+            AnalysisCacheKey.ComputePolicyDigest(keyInputs.PolicyInputs, _repositoryRoot),
             AnalysisCacheKey.NormalizeMode(mode),
             cache.ConditionSetName,
             AnalysisCacheKey.ComputeContractIdsDigest(cache.ContractIds),
@@ -434,17 +444,19 @@ public sealed class ArchitectureAnalysisSnapshot : IDisposable
             cache.Platform,
             cache.RuntimeIdentifier,
             AnalysisCacheKey.ComputePreprocessorSymbolsDigest(cache.PreprocessorSymbols),
-            AnalysisCacheKey.ComputeBaselineDigest(cache.BaselinePath, cancellationToken),
+            keyInputs.BaselineInput?.ContentDigest ?? string.Empty,
             _includeAsmdefContracts,
             _enforceUnmatchedIgnoredViolationsPolicy);
 
         AnalysisCachePopulation.LookupPreparation preparation;
         using (timing?.Measure("cache_lookup"))
         {
-            preparation = AnalysisCachePopulation.TryLookupWithAuthorization(
-                cache.Location, key, cacheProjectPaths, GetCacheArtifactPaths(), _repositoryRoot,
+            preparation = AnalysisCachePopulation.TryLookupWithCapturedEvidence(
+                cache.Location, key, cacheProjectPaths, artifacts.Paths, artifacts.CapturedIdentities,
+                keyInputs.AllInputs, _repositoryRoot,
                 cache.Configuration, cache.TargetFramework, cache.Platform, cache.RuntimeIdentifier,
-                HasUnfingerprintedSourceInputs(mode), cancellationToken);
+                HasUnfingerprintedSourceInputs(mode) || !cacheArtifactClosureComplete || !keyInputs.IsComplete,
+                cancellationToken);
         }
 
         AnalysisCacheLookupResult lookup = preparation.Lookup;
@@ -495,15 +507,58 @@ public sealed class ArchitectureAnalysisSnapshot : IDisposable
         .Distinct(StringComparer.OrdinalIgnoreCase)
         .ToArray();
 
-    private IReadOnlyList<string> GetCacheArtifactPaths() => GetLoadedAssemblyArtifactPaths()
-        .SelectMany(path => new[]
+    private CacheArtifactEvidence GetCacheArtifactEvidence()
+    {
+        var paths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var captures = new Dictionary<string, AnalysisCacheCapturedFileIdentity>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (ArchitectureLoadedAssemblyArtifact artifact in GetLoadedAssemblyArtifacts())
         {
-            path,
-            Path.ChangeExtension(path, ".pdb"),
-            BuildReceiptStore.ReceiptPathFor(path),
-        })
-        .Distinct(StringComparer.OrdinalIgnoreCase)
-        .ToArray();
+            string assemblyPath = Path.GetFullPath(artifact.AssemblyPath);
+            string pdbPath = Path.ChangeExtension(assemblyPath, ".pdb");
+            AddCaptured(assemblyPath, artifact.AssemblyContentDigest);
+            AddCaptured(pdbPath, artifact.PdbContentDigest);
+            paths.Add(BuildReceiptStore.ReceiptPathFor(assemblyPath));
+        }
+
+        // Non-isolated assemblies have no stream capture. Retain the old FromPath behavior for
+        // those paths; post-build assemblies and their cache-specific reference closure above use
+        // their exact in-memory byte identities instead.
+        foreach (string path in GetSelectedAssemblyArtifactPaths())
+        {
+            string assemblyPath = Path.GetFullPath(path);
+            paths.Add(assemblyPath);
+            paths.Add(Path.ChangeExtension(assemblyPath, ".pdb"));
+            paths.Add(BuildReceiptStore.ReceiptPathFor(assemblyPath));
+        }
+
+        return new CacheArtifactEvidence(paths.ToArray(), captures.Values.ToArray());
+
+        void AddCaptured(string path, string contentDigest)
+        {
+            string fullPath = Path.GetFullPath(path);
+            paths.Add(fullPath);
+            captures[fullPath] = AnalysisCacheCapturedFileIdentity.FromPath(fullPath, contentDigest);
+        }
+    }
+
+    private CacheKeyInputEvidence GetCacheKeyInputEvidence(AnalysisSnapshotCacheContext cache)
+    {
+        ArchitectureLoadedTextIdentity[] policyInputs = _document.Provenance.SourceContentIdentities.ToArray();
+        bool complete = policyInputs.Length == _document.Provenance.Sources.Count;
+        ArchitectureLoadedTextIdentity? baselineInput = null;
+
+        if (cache.BaselinePath is not null)
+        {
+            baselineInput = _document.BaselineContentIdentity;
+            complete &= baselineInput is not null;
+        }
+
+        ArchitectureLoadedTextIdentity[] allInputs = baselineInput is null
+            ? policyInputs
+            : policyInputs.Append(baselineInput).ToArray();
+        return new CacheKeyInputEvidence(policyInputs, baselineInput, allInputs, complete);
+    }
 
     // Project-aware Roslyn method-body analysis lazily evaluates a project's complete source and
     // reference set. Until that dynamic set is captured as exact byte manifests, it is unsafe to
@@ -547,8 +602,8 @@ public sealed class ArchitectureAnalysisSnapshot : IDisposable
     private IReadOnlyList<string> GetSelectedAssemblyArtifactPaths() =>
         _setup?.Runner.Session.Context.SelectedAssemblyArtifactPaths ?? Array.Empty<string>();
 
-    private IReadOnlyList<string> GetLoadedAssemblyArtifactPaths() =>
-        _setup?.Runner.Session.Context.LoadedAssemblyArtifactPaths ?? Array.Empty<string>();
+    private IReadOnlyList<ArchitectureLoadedAssemblyArtifact> GetLoadedAssemblyArtifacts() =>
+        _setup?.Runner.Session.Context.LoadedAssemblyArtifacts ?? Array.Empty<ArchitectureLoadedAssemblyArtifact>();
 
     private void RecordContractFamilyResultCounts(IReadOnlyDictionary<string, int> resultCounts)
     {
@@ -595,6 +650,16 @@ public sealed class ArchitectureAnalysisSnapshot : IDisposable
             return null;
         }
     }
+
+    private sealed record CacheArtifactEvidence(
+        IReadOnlyList<string> Paths,
+        IReadOnlyList<AnalysisCacheCapturedFileIdentity> CapturedIdentities);
+
+    private sealed record CacheKeyInputEvidence(
+        IReadOnlyList<ArchitectureLoadedTextIdentity> PolicyInputs,
+        ArchitectureLoadedTextIdentity? BaselineInput,
+        IReadOnlyList<ArchitectureLoadedTextIdentity> AllInputs,
+        bool IsComplete);
 
     private IReadOnlyList<ArchitectureUnmatchedIgnoredViolation> ResolveUnmatchedIgnoredViolations(
         IArchitectureContractRunner runner, int unmatchedStartIndex)

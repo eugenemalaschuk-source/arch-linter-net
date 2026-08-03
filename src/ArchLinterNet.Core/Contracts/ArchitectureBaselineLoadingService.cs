@@ -24,13 +24,14 @@ public sealed class ArchitectureBaselineLoadingService : IArchitectureBaselineLo
 
     public void LoadAndMerge(ArchitectureContractDocument document, string baselinePath)
     {
-        ArchitectureBaselineDocument baseline = LoadFromPath(baselinePath);
-        MergeAndValidate(document, baseline);
+        LoadedBaseline baseline = LoadWithIdentity(baselinePath);
+        MergeAndValidate(document, baseline.Document);
+        document.BaselineContentIdentity = baseline.ContentIdentity;
     }
 
     public ArchitectureBaselineDocument Load(string baselinePath)
     {
-        return LoadFromPath(baselinePath);
+        return LoadWithIdentity(baselinePath).Document;
     }
 
     public string ReadRawText(string baselinePath)
@@ -44,6 +45,11 @@ public sealed class ArchitectureBaselineLoadingService : IArchitectureBaselineLo
     }
 
     internal ArchitectureBaselineDocument LoadFromPath(string baselinePath)
+    {
+        return LoadWithIdentity(baselinePath).Document;
+    }
+
+    private LoadedBaseline LoadWithIdentity(string baselinePath)
     {
         if (!_fileSystem.FileExists(baselinePath))
         {
@@ -64,8 +70,14 @@ public sealed class ArchitectureBaselineLoadingService : IArchitectureBaselineLo
         }
 
         ValidateBaseline(document);
-        return document;
+        return new LoadedBaseline(
+            document,
+            ArchitectureLoadedTextIdentityFactory.FromText(baselinePath, yaml));
     }
+
+    private sealed record LoadedBaseline(
+        ArchitectureBaselineDocument Document,
+        ArchitectureLoadedTextIdentity ContentIdentity);
 
     private static void ValidateBaseline(ArchitectureBaselineDocument document)
     {

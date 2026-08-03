@@ -1,5 +1,6 @@
 using System.Runtime.CompilerServices;
 using ArchLinterNet.Core.BuildState;
+using ArchLinterNet.Core.Model;
 using ArchLinterNet.Core.Validation;
 
 namespace ArchLinterNet.Core.Caching;
@@ -32,7 +33,9 @@ public static class AnalysisCachePopulation
         string? RuntimeIdentifier,
         bool HasUnfingerprintedSourceInputs,
         IReadOnlyList<AnalysisCacheProjectManifest> ProjectManifests,
-        IReadOnlyList<AnalysisCacheArtifactManifest> ArtifactManifests);
+        IReadOnlyList<AnalysisCacheArtifactManifest> ArtifactManifests,
+        IReadOnlyList<AnalysisCacheCapturedFileIdentity> CapturedArtifactIdentities,
+        IReadOnlyList<ArchitectureLoadedTextIdentity> KeyInputIdentities);
 
     internal readonly record struct LookupPreparation(
         AnalysisCacheLookupResult Lookup,
@@ -76,6 +79,7 @@ public static class AnalysisCachePopulation
         PreparedAuthorization? authorization = Prepare(
             location, key, discoveredProjectPaths, Array.Empty<string>(), repositoryRoot, configuration,
             targetFramework, platform, runtimeIdentifier, hasUnfingerprintedSourceInputs: false,
+            Array.Empty<AnalysisCacheCapturedFileIdentity>(), Array.Empty<ArchitectureLoadedTextIdentity>(),
             cancellationToken, out Outcome rejected);
         if (authorization is null)
         {
@@ -101,10 +105,35 @@ public static class AnalysisCachePopulation
         bool hasUnfingerprintedSourceInputs,
         CancellationToken cancellationToken = default)
     {
+        return TryLookupWithCapturedEvidence(
+            location, key, discoveredProjectPaths, artifactPaths,
+            Array.Empty<AnalysisCacheCapturedFileIdentity>(), Array.Empty<ArchitectureLoadedTextIdentity>(),
+            repositoryRoot, configuration, targetFramework, platform, runtimeIdentifier,
+            hasUnfingerprintedSourceInputs, cancellationToken);
+    }
+
+    // Snapshot-only entry point: captures are derived from the exact stream/text values already
+    // consumed by the snapshot. Prepare revalidates their paths before lookup and publication;
+    // it never substitutes a later re-read for the identity persisted in the artifact manifests.
+    internal static LookupPreparation TryLookupWithCapturedEvidence(
+        AnalysisCacheLocation? location,
+        AnalysisCacheKey key,
+        IReadOnlyList<string> discoveredProjectPaths,
+        IReadOnlyList<string> artifactPaths,
+        IReadOnlyList<AnalysisCacheCapturedFileIdentity> capturedArtifactIdentities,
+        IReadOnlyList<ArchitectureLoadedTextIdentity> keyInputIdentities,
+        string repositoryRoot,
+        string? configuration,
+        string? targetFramework,
+        string? platform,
+        string? runtimeIdentifier,
+        bool hasUnfingerprintedSourceInputs,
+        CancellationToken cancellationToken = default)
+    {
         PreparedAuthorization? authorization = Prepare(
             location, key, discoveredProjectPaths, artifactPaths, repositoryRoot, configuration,
             targetFramework, platform, runtimeIdentifier, hasUnfingerprintedSourceInputs,
-            cancellationToken, out Outcome rejected);
+            capturedArtifactIdentities, keyInputIdentities, cancellationToken, out Outcome rejected);
         if (authorization is null)
         {
             AnalysisCacheLookupResult lookup = rejected.RejectReason == AnalysisCacheRejectReason.Disabled
@@ -146,6 +175,19 @@ public static class AnalysisCachePopulation
         PreparedAuthorization authorization,
         IReadOnlyList<string> completedArtifactPaths)
     {
+        AttachAuthorization(
+            outcome,
+            authorization,
+            completedArtifactPaths,
+            Array.Empty<AnalysisCacheCapturedFileIdentity>());
+    }
+
+    internal static void AttachAuthorization(
+        ValidationOutcome outcome,
+        PreparedAuthorization authorization,
+        IReadOnlyList<string> completedArtifactPaths,
+        IReadOnlyList<AnalysisCacheCapturedFileIdentity> completedArtifactIdentities)
+    {
         ArgumentNullException.ThrowIfNull(outcome);
         ArgumentNullException.ThrowIfNull(authorization);
 
@@ -160,6 +202,8 @@ public static class AnalysisCachePopulation
             authorization.Platform,
             authorization.RuntimeIdentifier,
             authorization.HasUnfingerprintedSourceInputs,
+            completedArtifactIdentities,
+            authorization.KeyInputIdentities,
             default,
             out Outcome rejected);
 
@@ -192,7 +236,8 @@ public static class AnalysisCachePopulation
             captured.Initial.Location, captured.Initial.Key, captured.Initial.DiscoveredProjectPaths,
             captured.Initial.ArtifactPaths, captured.Initial.RepositoryRoot, captured.Initial.Configuration,
             captured.Initial.TargetFramework, captured.Initial.Platform, captured.Initial.RuntimeIdentifier,
-            captured.Initial.HasUnfingerprintedSourceInputs, cancellationToken, out Outcome rejected);
+            captured.Initial.HasUnfingerprintedSourceInputs, captured.Initial.CapturedArtifactIdentities,
+            captured.Initial.KeyInputIdentities, cancellationToken, out Outcome rejected);
         if (currentInitial is null)
         {
             return rejected;
@@ -210,7 +255,8 @@ public static class AnalysisCachePopulation
             captured.Completion.Location, captured.Completion.Key, captured.Completion.DiscoveredProjectPaths,
             captured.Completion.ArtifactPaths, captured.Completion.RepositoryRoot, captured.Completion.Configuration,
             captured.Completion.TargetFramework, captured.Completion.Platform, captured.Completion.RuntimeIdentifier,
-            captured.Completion.HasUnfingerprintedSourceInputs, cancellationToken, out rejected);
+            captured.Completion.HasUnfingerprintedSourceInputs, captured.Completion.CapturedArtifactIdentities,
+            captured.Completion.KeyInputIdentities, cancellationToken, out rejected);
         if (currentCompletion is null)
         {
             return rejected;
@@ -238,6 +284,8 @@ public static class AnalysisCachePopulation
         string? platform,
         string? runtimeIdentifier,
         bool hasUnfingerprintedSourceInputs,
+        IReadOnlyList<AnalysisCacheCapturedFileIdentity> capturedArtifactIdentities,
+        IReadOnlyList<ArchitectureLoadedTextIdentity> keyInputIdentities,
         CancellationToken cancellationToken,
         out Outcome rejected)
     {
@@ -253,6 +301,13 @@ public static class AnalysisCachePopulation
             return null;
         }
 
+        if (!CapturedTextInputsMatch(keyInputIdentities, cancellationToken)
+            || !CapturedArtifactsMatch(capturedArtifactIdentities, cancellationToken))
+        {
+            rejected = new Outcome(AnalysisCacheRejectReason.InputChangedDuringExecution, 0, 0, 0);
+            return null;
+        }
+
         List<AnalysisCacheProjectManifest> manifests = new(discoveredProjectPaths.Count);
         try
         {
@@ -265,11 +320,11 @@ public static class AnalysisCachePopulation
                     ToRepositoryRelative(projectPath, repositoryRoot), manifest));
             }
 
-            List<AnalysisCacheArtifactManifest> artifacts = artifactPaths
-                .Distinct(StringComparer.OrdinalIgnoreCase)
-                .Select(path => AnalysisCacheArtifactManifest.FromPath(path, repositoryRoot, cancellationToken))
-                .OrderBy(manifest => manifest.ArtifactPath, StringComparer.Ordinal)
-                .ToList();
+            List<AnalysisCacheArtifactManifest> artifacts = BuildArtifactManifests(
+                artifactPaths,
+                capturedArtifactIdentities,
+                repositoryRoot,
+                cancellationToken);
 
             int ineligible = manifests.Count(manifest => manifest.Eligibility != CacheEligibility.VerifiedCacheEligible);
             if (ineligible > 0)
@@ -282,7 +337,7 @@ public static class AnalysisCachePopulation
             return new PreparedAuthorization(
                 location, key, discoveredProjectPaths.ToArray(), artifactPaths.ToArray(), repositoryRoot,
                 configuration, targetFramework, platform, runtimeIdentifier, hasUnfingerprintedSourceInputs,
-                manifests, artifacts);
+                manifests, artifacts, capturedArtifactIdentities.ToArray(), keyInputIdentities.ToArray());
         }
         catch (OperationCanceledException)
         {
@@ -309,7 +364,78 @@ public static class AnalysisCachePopulation
         captured.ProjectManifests.OrderBy(manifest => manifest.ProjectPath, StringComparer.Ordinal)
             .SequenceEqual(current.ProjectManifests.OrderBy(manifest => manifest.ProjectPath, StringComparer.Ordinal))
         && captured.ArtifactManifests.OrderBy(manifest => manifest.ArtifactPath, StringComparer.Ordinal)
-            .SequenceEqual(current.ArtifactManifests.OrderBy(manifest => manifest.ArtifactPath, StringComparer.Ordinal));
+            .SequenceEqual(current.ArtifactManifests.OrderBy(manifest => manifest.ArtifactPath, StringComparer.Ordinal))
+        && captured.KeyInputIdentities.OrderBy(identity => identity.FullPath, StringComparer.Ordinal)
+            .SequenceEqual(current.KeyInputIdentities.OrderBy(identity => identity.FullPath, StringComparer.Ordinal));
+
+    private static List<AnalysisCacheArtifactManifest> BuildArtifactManifests(
+        IReadOnlyList<string> artifactPaths,
+        IReadOnlyList<AnalysisCacheCapturedFileIdentity> capturedArtifactIdentities,
+        string repositoryRoot,
+        CancellationToken cancellationToken)
+    {
+        Dictionary<string, string> capturedDigests = capturedArtifactIdentities
+            .ToDictionary(identity => Path.GetFullPath(identity.FullPath), identity => identity.ContentDigest,
+                StringComparer.OrdinalIgnoreCase);
+
+        return artifactPaths
+            .Select(Path.GetFullPath)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Select(path => capturedDigests.TryGetValue(path, out string? capturedDigest)
+                ? AnalysisCacheArtifactManifest.FromContentDigest(path, repositoryRoot, capturedDigest)
+                : AnalysisCacheArtifactManifest.FromPath(path, repositoryRoot, cancellationToken))
+            .OrderBy(manifest => manifest.ArtifactPath, StringComparer.Ordinal)
+            .ToList();
+    }
+
+    private static bool CapturedTextInputsMatch(
+        IReadOnlyList<ArchitectureLoadedTextIdentity> identities,
+        CancellationToken cancellationToken)
+    {
+        foreach (ArchitectureLoadedTextIdentity identity in identities)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            try
+            {
+                if (!ArchitectureLoadedTextIdentityFactory.FromPath(identity.FullPath).Equals(identity))
+                {
+                    return false;
+                }
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException)
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private static bool CapturedArtifactsMatch(
+        IReadOnlyList<AnalysisCacheCapturedFileIdentity> identities,
+        CancellationToken cancellationToken)
+    {
+        foreach (AnalysisCacheCapturedFileIdentity identity in identities)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            try
+            {
+                string currentDigest = File.Exists(identity.FullPath)
+                    ? BuildStateCanonicalHasher.ComputeContentDigest(identity.FullPath, cancellationToken)
+                    : "missing";
+                if (!string.Equals(identity.ContentDigest, currentDigest, StringComparison.Ordinal))
+                {
+                    return false;
+                }
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException)
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
 
     private static string ToRepositoryRelative(string projectPath, string repositoryRoot) =>
         BuildStateCanonicalHasher.ToRepositoryRelativePath(projectPath, repositoryRoot);

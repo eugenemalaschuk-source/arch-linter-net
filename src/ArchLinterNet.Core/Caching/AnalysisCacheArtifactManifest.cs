@@ -23,6 +23,16 @@ public sealed record AnalysisCacheArtifactManifest(string ArtifactPath, string C
         return new AnalysisCacheArtifactManifest(identity, digest);
     }
 
+    internal static AnalysisCacheArtifactManifest FromContentDigest(
+        string artifactPath,
+        string repositoryRoot,
+        string contentDigest)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(contentDigest);
+        string fullPath = Path.GetFullPath(artifactPath);
+        return new AnalysisCacheArtifactManifest(BuildPortableIdentity(fullPath, repositoryRoot), contentDigest);
+    }
+
     private static string BuildPortableIdentity(string fullPath, string repositoryRoot)
     {
         string canonicalRoot = Path.GetFullPath(repositoryRoot);

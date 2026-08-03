@@ -1,6 +1,7 @@
 using System.Security.Cryptography;
 using System.Text;
 using ArchLinterNet.Core.BuildState;
+using ArchLinterNet.Core.Model;
 
 namespace ArchLinterNet.Core.Caching;
 
@@ -127,6 +128,24 @@ public sealed record AnalysisCacheKey(
             .Select(path => (
                 RelativePath: BuildStateCanonicalHasher.ToRepositoryRelativePath(path, repositoryRoot),
                 Digest: BuildStateCanonicalHasher.ComputeContentDigest(path, cancellationToken)))
+            .OrderBy(entry => entry.RelativePath, StringComparer.Ordinal)
+            .ToList();
+
+        string canonical = string.Join('\n', entries.Select(entry => $"{entry.RelativePath}:{entry.Digest}"));
+        return HashHex(canonical);
+    }
+
+    // The snapshot already parsed these decoded-text values. Do not re-read the mutable policy
+    // paths merely to construct a key: that could pair a document loaded from state A with a key
+    // for state B. Prepare revalidates the identities before lookup and publication.
+    internal static string ComputePolicyDigest(
+        IEnumerable<ArchitectureLoadedTextIdentity> policyInputs,
+        string repositoryRoot)
+    {
+        List<(string RelativePath, string Digest)> entries = policyInputs
+            .Select(input => (
+                RelativePath: BuildStateCanonicalHasher.ToRepositoryRelativePath(input.FullPath, repositoryRoot),
+                Digest: input.ContentDigest))
             .OrderBy(entry => entry.RelativePath, StringComparer.Ordinal)
             .ToList();
 
