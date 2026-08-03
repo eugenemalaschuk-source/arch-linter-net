@@ -76,8 +76,11 @@ public sealed class ArchitectureAnalysisContext : IDisposable
     // post-build resolution so a cache-disabled run retains the historical lazy-load behavior.
     internal bool MaterializeCacheArtifactReferences(CancellationToken cancellationToken)
     {
-        return _isolatedLoadScope is not IArchitectureAssemblyLoadScopeArtifactInventory inventory
-            || inventory.MaterializeProbingPathReferences(
+        // Assembly.Load/Assembly.LoadFrom can expose mutable path-backed assemblies and lazily
+        // load arbitrary default-context references. Until that path has the same exact-byte
+        // inventory as the isolated scope, it cannot authorize a cache hit or publication.
+        return _isolatedLoadScope is IArchitectureAssemblyLoadScopeArtifactInventory inventory
+            && inventory.MaterializeProbingPathReferences(
                 TargetAssemblies,
                 maximumAdditionalArtifactCount: 256,
                 maximumAdditionalArtifactBytes: 512L * 1024 * 1024,

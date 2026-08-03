@@ -5,6 +5,7 @@ using ArchLinterNet.Core.Discovery;
 using ArchLinterNet.Core.Execution;
 using ArchLinterNet.Core.IO;
 using ArchLinterNet.Core.IO.Abstractions;
+using ArchLinterNet.Core.Model;
 using NUnit.Framework;
 
 namespace ArchLinterNet.Core.Tests;
@@ -224,5 +225,67 @@ public sealed class ArchitectureAssemblyResolutionServiceCancellationTests
         {
             Directory.Delete(tempDirectory, recursive: true);
         }
+    }
+
+    [Test]
+    public void IsolatedLoadScope_LoadsTheSameBufferedBytesItFingerprints()
+    {
+        string tempDirectory = Path.Combine(Path.GetTempPath(), $"arch-linter-buffered-load-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(tempDirectory);
+        try
+        {
+            string coreAssemblyPath = typeof(ArchitectureAssemblyLoader).Assembly.Location;
+            string replacementAssemblyPath = Path.Combine(Path.GetDirectoryName(coreAssemblyPath)!, "ArchLinterNet.CEL.dll");
+            string copiedAssemblyPath = Path.Combine(tempDirectory, "ArchLinterNet.Core.dll");
+            File.Copy(coreAssemblyPath, copiedAssemblyPath);
+            string expectedDigest = BuildStateCanonicalHasher.ComputeContentDigest(copiedAssemblyPath);
+
+            IArchitectureAssemblyLoadScope scope = ArchitectureAssemblyLoader.Real.CreateIsolatedLoadScope(
+                new[] { tempDirectory }, new Dictionary<string, string>(StringComparer.Ordinal));
+            try
+            {
+                ArchitectureAssemblyLoader.TestAfterArtifactBytesCaptured = path =>
+                {
+                    if (string.Equals(path, copiedAssemblyPath, StringComparison.OrdinalIgnoreCase))
+                    {
+                        File.Copy(replacementAssemblyPath, copiedAssemblyPath, overwrite: true);
+                    }
+                };
+
+                Assembly loaded = scope.LoadFrom(copiedAssemblyPath);
+                ArchitectureLoadedAssemblyArtifact artifact = ((IArchitectureAssemblyLoadScopeArtifactInventory)scope)
+                    .LoadedAssemblyArtifacts.Single();
+
+                Assert.Multiple(() =>
+                {
+                    Assert.That(loaded.GetName().Name, Is.EqualTo("ArchLinterNet.Core"));
+                    Assert.That(artifact.AssemblyContentDigest, Is.EqualTo(expectedDigest));
+                    Assert.That(
+                        BuildStateCanonicalHasher.ComputeContentDigest(copiedAssemblyPath),
+                        Is.Not.EqualTo(expectedDigest));
+                });
+            }
+            finally
+            {
+                ArchitectureAssemblyLoader.TestAfterArtifactBytesCaptured = null;
+                scope.Dispose();
+            }
+        }
+        finally
+        {
+            Directory.Delete(tempDirectory, recursive: true);
+        }
+    }
+
+    [Test]
+    public void AnalysisContext_WithoutIsolatedArtifactInventoryIsCacheIneligible()
+    {
+        using var context = new ArchitectureAnalysisContext(
+            repositoryRoot: Path.GetTempPath(),
+            targetAssemblies: new[] { typeof(ArchitectureAssemblyLoader).Assembly },
+            missingAssemblyNames: Array.Empty<string>(),
+            assemblyProbingPaths: Array.Empty<string>());
+
+        Assert.That(context.MaterializeCacheArtifactReferences(CancellationToken.None), Is.False);
     }
 }

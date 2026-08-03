@@ -7,20 +7,10 @@ using NUnit.Framework;
 
 namespace ArchLinterNet.Core.Tests;
 
-// Finding #7: ArchitectureValidationBuilder.CreateSnapshot()'s session previously only ever
-// consulted the cache for lookups — ArchitectureValidationSnapshotSession.Evaluate never called
-// AnalysisCachePopulation.TryPopulate, so a Testing snapshot miss could never seed a later
-// snapshot's hit. This exercises the real engine (ArchitectureValidationBuilder ->
-// ArchitectureAnalysisSnapshot.Evaluate), with AnalysisCachePopulation.TestManifestCollectorOverride
-// substituted for the real EvaluatedBuildInputManifestCollector — which always reports
-// CacheIneligible for this repository's own MSBuild evidence today (see design.md) — so the test
-// can prove a genuine write-then-hit round trip instead of only ever observing IneligibleBuildInput.
-//
 // The policy below deliberately uses a project-metadata-only contract (analysis.target_assemblies
-// left empty) so build-state preflight never blocks the run (see
-// ArchitectureRunnerSetupServiceDiscoveryTests.BuildRunner_ProjectMetadataOnlyPolicy_...) while
-// analysis.projects still drives real project discovery, giving genuinely non-empty
-// DiscoveredProjectPaths to key the cache on.
+// left empty) so build-state preflight never blocks the run. It has no isolated assembly scope,
+// and therefore must remain cache-ineligible until ordinary resolution supplies the equivalent
+// exact-byte root/reference inventory.
 [TestFixture]
 public sealed class AnalysisCacheSnapshotSessionPopulationTests
 {
@@ -78,89 +68,53 @@ public sealed class AnalysisCacheSnapshotSessionPopulationTests
         new("fixed-digest", CacheEligibility.VerifiedCacheEligible, Array.Empty<string>(), Array.Empty<string>());
 
     [Test]
-    public void CreateSnapshot_Evaluate_PopulatesCacheOnMissThenHitsOnSecondSnapshot()
+    public void CreateSnapshot_Evaluate_WithoutArtifactInventoryIsCacheIneligible()
     {
         AnalysisCachePopulation.TestManifestCollectorOverride = AlwaysEligible;
 
-        using (ArchitectureValidationSnapshotSession session1 =
-               new ArchitectureValidationBuilder(_policyPath).WithCache(AnalysisCacheOptions.AtPath(_cacheRoot)).CreateSnapshot())
-        {
-            ArchitectureValidationResult result1 = session1.ValidateStrict();
+        using ArchitectureValidationSnapshotSession session =
+            new ArchitectureValidationBuilder(_policyPath).WithCache(AnalysisCacheOptions.AtPath(_cacheRoot)).CreateSnapshot();
 
-            Assert.That(result1.PreflightBlocked, Is.False);
-            Assert.That(session1.Counters.CacheLookups, Is.Not.Null);
-            Assert.That(session1.Counters.CacheLookups!.Misses, Is.EqualTo(1));
-        }
+        ArchitectureValidationResult result = session.ValidateStrict();
+        AnalysisCacheLookupStats lookup = session.Counters.CacheLookups!;
 
-        Assert.That(
-            Directory.Exists(_cacheRoot) && Directory.EnumerateFiles(_cacheRoot, "*.json", SearchOption.AllDirectories).Any(),
-            Is.True,
-            "A completed, non-cancelled snapshot miss must populate a reusable cache entry.");
-
-        using (ArchitectureValidationSnapshotSession session2 =
-               new ArchitectureValidationBuilder(_policyPath).WithCache(AnalysisCacheOptions.AtPath(_cacheRoot)).CreateSnapshot())
-        {
-            ArchitectureValidationResult result2 = session2.ValidateStrict();
-
-            Assert.That(result2.PreflightBlocked, Is.False);
-            Assert.That(session2.Counters.CacheLookups, Is.Not.Null);
-            Assert.That(session2.Counters.CacheLookups!.Hits, Is.EqualTo(1));
-        }
-    }
-
-    // Finding #8: the Testing host previously left CorruptionEvents at zero entirely and never
-    // added lookups.Rejects into the scalar Rejects total — a corrupt lookup on this run must show
-    // up in both, and Rejects must always equal the sum of RejectReasonCounts. This exercises the
-    // real engine end to end via ArchitectureValidationBuilder (not the snapshot session): a first
-    // Validate() populates a real entry (via the fake eligible-manifest collector), the entry file
-    // is hand-corrupted, and a second Validate() must observe a corrupt lookup reject while its own
-    // population attempt succeeds again (overwriting the corrupt entry) — Rejects must equal
-    // lookups.Rejects (1) + population rejects (0) = 1.
-    [Test]
-    public void ValidateStrict_WithCorruptedExistingEntry_AggregatesRejectsAndCorruptionEventsAcrossBothSides()
-    {
-        AnalysisCachePopulation.TestManifestCollectorOverride = AlwaysEligible;
-
-        ArchitectureValidationResult first = new ArchitectureValidationBuilder(_policyPath)
-            .WithProfile()
-            .WithCache(AnalysisCacheOptions.AtPath(_cacheRoot))
-            .ValidateStrict();
-        Assert.That(first.PreflightBlocked, Is.False);
-
-        string entryPath = Directory.EnumerateFiles(_cacheRoot, "*.json", SearchOption.AllDirectories).Single();
-        File.WriteAllText(entryPath, "{ not valid json");
-
-        ArchitectureValidationResult second = new ArchitectureValidationBuilder(_policyPath)
-            .WithProfile()
-            .WithCache(AnalysisCacheOptions.AtPath(_cacheRoot))
-            .ValidateStrict();
-
-        Assert.That(second.Profile, Is.Not.Null);
-        Core.Profiling.AnalysisProfileCacheCounters cache = second.Profile!.Counters.Cache;
         Assert.Multiple(() =>
         {
-            Assert.That(cache.RejectReasonCounts.GetValueOrDefault("Corrupt"), Is.EqualTo(1));
-            Assert.That(cache.CorruptionEvents, Is.EqualTo(1));
+            Assert.That(result.PreflightBlocked, Is.False);
+            Assert.That(lookup.Rejects, Is.EqualTo(1));
+            Assert.That(lookup.RejectReasonCounts["IneligibleBuildInput"], Is.EqualTo(1));
+            Assert.That(Directory.Exists(_cacheRoot), Is.False);
+        });
+    }
+
+    [Test]
+    public void ValidateStrict_WithoutArtifactInventory_DoesNotReadExistingCacheEntry()
+    {
+        AnalysisCachePopulation.TestManifestCollectorOverride = AlwaysEligible;
+
+        Directory.CreateDirectory(_cacheRoot);
+        File.WriteAllText(Path.Combine(_cacheRoot, "untrusted.json"), "{ not valid json");
+
+        ArchitectureValidationResult result = new ArchitectureValidationBuilder(_policyPath)
+            .WithProfile()
+            .WithCache(AnalysisCacheOptions.AtPath(_cacheRoot))
+            .ValidateStrict();
+
+        Assert.That(result.Profile, Is.Not.Null);
+        Core.Profiling.AnalysisProfileCacheCounters cache = result.Profile!.Counters.Cache;
+        Assert.Multiple(() =>
+        {
+            Assert.That(cache.RejectReasonCounts.GetValueOrDefault("IneligibleBuildInput"), Is.EqualTo(1));
+            Assert.That(cache.CorruptionEvents, Is.Zero);
             Assert.That(cache.Rejects, Is.EqualTo(cache.RejectReasonCounts.Values.Sum()));
             Assert.That(cache.Rejects, Is.EqualTo(1));
         });
     }
 
-    // Finding #3: a cache hit must never be accepted once cancellation has been observed — an
-    // already-populated entry exists here (via the same fake-eligible-manifest harness as the test
-    // above), but the snapshot's session cancellation token is cancelled before Evaluate() runs.
-    // Before the fix, TryEvaluateFromCache never checked cancellation at all and could return a
-    // successful cached outcome instead of surfacing OperationCanceledException.
     [Test]
-    public void Evaluate_CancelledBeforeLookupAccepted_ThrowsInsteadOfReturningCachedHit()
+    public void Evaluate_CancelledBeforeCacheEligibilityIsResolved_Throws()
     {
         AnalysisCachePopulation.TestManifestCollectorOverride = AlwaysEligible;
-
-        // Seed a real, hit-eligible entry via the Testing builder's independent-run path
-        // (uncancelled).
-        new ArchitectureValidationBuilder(_policyPath).WithCache(AnalysisCacheOptions.AtPath(_cacheRoot)).ValidateStrict();
-
-        Assert.That(Directory.Exists(_cacheRoot) && Directory.EnumerateFiles(_cacheRoot, "*.json", SearchOption.AllDirectories).Any(), Is.True);
 
         using ArchitectureEngine engine = new ArchitectureEngineBuilder().AddArchLinterNetCore().Build();
         using CancellationTokenSource cts = new();
@@ -174,7 +128,7 @@ public sealed class AnalysisCacheSnapshotSessionPopulationTests
         using ArchitectureAnalysisSnapshot snapshot = engine.CreateSnapshot(request);
 
         // Cancel only after construction succeeded — this simulates cancellation observed during
-        // (or immediately before) the lookup itself, not during policy/project setup.
+        // cache setup, rather than during policy/project setup.
         cts.Cancel();
 
         Assert.Throws<OperationCanceledException>(() => snapshot.Evaluate("strict"));
@@ -277,7 +231,7 @@ public sealed class AnalysisCacheSnapshotSessionPopulationTests
     }
 
     [Test]
-    public void CreateSnapshot_InputFingerprintChangesBeforePopulation_DoesNotPublishStaleOutcome()
+    public void CreateSnapshot_WithoutArtifactInventory_DoesNotCollectBuildInputManifests()
     {
         int collectionCount = 0;
         AnalysisCachePopulation.TestManifestCollectorOverride =
@@ -295,8 +249,8 @@ public sealed class AnalysisCacheSnapshotSessionPopulationTests
 
         Assert.Multiple(() =>
         {
-            Assert.That(collectionCount, Is.GreaterThanOrEqualTo(3),
-                "authorization must be captured before analysis, after lazy scope materialization, and before Put");
+            Assert.That(collectionCount, Is.Zero,
+                "runs without an exact artifact inventory must fail closed before build-input fingerprinting");
             Assert.That(Directory.Exists(_cacheRoot) && Directory.EnumerateFiles(_cacheRoot, "*.json", SearchOption.AllDirectories).Any(), Is.False);
         });
     }

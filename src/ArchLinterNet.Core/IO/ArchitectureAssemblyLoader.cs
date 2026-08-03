@@ -8,7 +8,13 @@ namespace ArchLinterNet.Core.IO;
 
 public sealed class ArchitectureAssemblyLoader : IArchitectureAssemblyLoader
 {
+    private const int MaximumBufferedArtifactBytes = 256 * 1024 * 1024;
+
     public static readonly ArchitectureAssemblyLoader Real = new();
+
+    // Test-only synchronization point for proving that a write after capture cannot change the
+    // bytes passed to LoadFromStream. Production code never assigns this callback.
+    internal static Action<string>? TestAfterArtifactBytesCaptured { get; set; }
 
     public IReadOnlyList<Assembly> GetLoadedAssemblies()
     {
@@ -123,7 +129,7 @@ public sealed class ArchitectureAssemblyLoader : IArchitectureAssemblyLoader
                             return false;
                         }
 
-                        pending.Enqueue(LoadAssemblyFromStream(fullCandidate));
+                        pending.Enqueue(LoadAssemblyFromStream(fullCandidate, cancellationToken));
                         additionalArtifactCount++;
                         additionalArtifactBytes += candidateBytes;
                     }
@@ -159,7 +165,7 @@ public sealed class ArchitectureAssemblyLoader : IArchitectureAssemblyLoader
             Unload();
         }
 
-        private Assembly LoadAssemblyFromStream(string path)
+        private Assembly LoadAssemblyFromStream(string path, CancellationToken cancellationToken = default)
         {
             string fullPath = Path.GetFullPath(path);
             lock (_loadedAssemblyPathsGate)
@@ -170,19 +176,28 @@ public sealed class ArchitectureAssemblyLoader : IArchitectureAssemblyLoader
                 }
             }
 
-            using FileStream assemblyStream = File.OpenRead(fullPath);
-            string assemblyContentDigest = ComputeStreamDigest(assemblyStream);
+            byte[] assemblyBytes = ReadArtifactBytes(fullPath, cancellationToken);
+            string assemblyContentDigest = Convert.ToHexStringLower(SHA256.HashData(assemblyBytes));
             string pdbPath = Path.ChangeExtension(fullPath, ".pdb");
             string pdbContentDigest = "missing";
+            byte[]? pdbBytes = null;
+            if (File.Exists(pdbPath))
+            {
+                pdbBytes = ReadArtifactBytes(pdbPath, cancellationToken);
+                pdbContentDigest = Convert.ToHexStringLower(SHA256.HashData(pdbBytes));
+            }
+
+            TestAfterArtifactBytesCaptured?.Invoke(fullPath);
+
+            using var assemblyStream = new MemoryStream(assemblyBytes, writable: false);
             Assembly assembly;
-            if (!File.Exists(pdbPath))
+            if (pdbBytes is null)
             {
                 assembly = LoadFromStream(assemblyStream);
             }
             else
             {
-                using FileStream pdbStream = File.OpenRead(pdbPath);
-                pdbContentDigest = ComputeStreamDigest(pdbStream);
+                using var pdbStream = new MemoryStream(pdbBytes, writable: false);
                 assembly = LoadFromStream(assemblyStream, pdbStream);
             }
 
@@ -227,17 +242,31 @@ public sealed class ArchitectureAssemblyLoader : IArchitectureAssemblyLoader
             return checked(assemblyBytes + (File.Exists(pdbPath) ? new FileInfo(pdbPath).Length : 0));
         }
 
-        private static string ComputeStreamDigest(Stream stream)
+        private static byte[] ReadArtifactBytes(string path, CancellationToken cancellationToken)
         {
-            long position = stream.Position;
-            try
+            using FileStream stream = File.OpenRead(path);
+            long length = stream.Length;
+            if (length > MaximumBufferedArtifactBytes)
             {
-                return Convert.ToHexStringLower(SHA256.HashData(stream));
+                throw new IOException(
+                    $"Artifact '{path}' exceeds the {MaximumBufferedArtifactBytes}-byte isolated-load buffer limit.");
             }
-            finally
+
+            byte[] bytes = GC.AllocateUninitializedArray<byte>(checked((int)length));
+            int offset = 0;
+            while (offset < bytes.Length)
             {
-                stream.Position = position;
+                cancellationToken.ThrowIfCancellationRequested();
+                int read = stream.Read(bytes, offset, bytes.Length - offset);
+                if (read == 0)
+                {
+                    throw new EndOfStreamException($"Artifact '{path}' changed while it was being captured.");
+                }
+
+                offset += read;
             }
+
+            return bytes;
         }
     }
 }
