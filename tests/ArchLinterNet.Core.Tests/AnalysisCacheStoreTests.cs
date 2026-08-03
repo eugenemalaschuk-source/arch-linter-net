@@ -265,6 +265,23 @@ public sealed class AnalysisCacheStoreTests
         Assert.That(result.Reason, Is.EqualTo(AnalysisCacheRejectReason.SizeExceeded));
     }
 
+    // Finding #7's companion bound: an unreasonable project-manifest count must be rejected before
+    // any I/O too, independent of whether the serialized bytes alone would fit under MaxEntryBytes.
+    [Test]
+    public void Put_ExceedingMaxProjectManifestCount_IsRejectedBeforeWrite()
+    {
+        AnalysisCacheKey key = CreateKey();
+        AnalysisCacheProjectManifest[] tooManyManifests = Enumerable.Range(0, 4097)
+            .Select(i => EligibleManifest($"src/P{i}/P{i}.csproj", $"digest-{i}"))
+            .ToArray();
+
+        AnalysisCacheStore.PutResult putResult = AnalysisCacheStore.Put(_location, key, tooManyManifests, SampleOutcome());
+
+        Assert.That(putResult.RejectReason, Is.EqualTo(AnalysisCacheRejectReason.SizeExceeded));
+        Assert.That(putResult.BytesWritten, Is.EqualTo(0));
+        Assert.That(Directory.Exists(_root) && Directory.EnumerateFiles(_root, "*.json", SearchOption.AllDirectories).Any(), Is.False);
+    }
+
     // Finding #7: the write side must enforce the same bound the read side always has. A cache
     // entry whose Violations list alone would serialize past MaxEntryBytes must never be published
     // at all — a subsequent TryGet must not need to reject it as SizeExceeded because Put already
