@@ -10,6 +10,8 @@ namespace ArchLinterNet.Core.Tests;
 [Category("E2E")]
 public sealed class BuildStatePreflightTests
 {
+    private static readonly string[] _staleManifestReasons = { "evaluated-msbuild-evidence-incomplete" };
+
     private string _repoRoot = null!;
 
     [SetUp]
@@ -165,7 +167,7 @@ public sealed class BuildStatePreflightTests
         BuildReceiptStore.Write(assemblyPath, new BuildReceiptV1(
             projectPath, "Fixture", "Debug", "net10.0", fingerprint,
             BuildStateCanonicalHasher.ComputeContentDigest(assemblyPath), "stale-manifest-digest", CacheEligibility.CacheIneligible,
-            new[] { "evaluated-msbuild-evidence-incomplete" }));
+            _staleManifestReasons));
 
         BuildStatePreflightResult result = BuildStatePreflightEvaluator.Evaluate(new BuildStatePreflightRequest(
             _repoRoot, SingleProjectDiscovery(projectPath, "Fixture"), SingleAssemblyResolution(assemblyPath),
