@@ -101,8 +101,8 @@ public static class EvaluatedBuildInputManifestCollector
             return;
         }
 
-        XElement? project = document.Root;
-        if (project == null || !string.Equals(project.Name.LocalName, "Project", StringComparison.Ordinal))
+        XElement project = document.Root!;
+        if (!string.Equals(project.Name.LocalName, "Project", StringComparison.Ordinal))
         {
             reasons.Add("project-xml-uninspectable");
             return;
@@ -113,56 +113,66 @@ public static class EvaluatedBuildInputManifestCollector
         foreach (XElement element in project.Descendants())
         {
             cancellationToken.ThrowIfCancellationRequested();
-            string name = element.Name.LocalName;
-            string? include = element.Attribute("Include")?.Value ?? element.Attribute("Project")?.Value;
-            if (name is "Import" or "Compile" or "AdditionalFiles" or "EditorConfigFiles" or "Analyzer")
-            {
-                if (string.IsNullOrWhiteSpace(include) || ContainsDynamicExpression(include))
-                {
-                    reasons.Add($"uninspectable-{name.ToLowerInvariant()}-input");
-                    continue;
-                }
-
-                string candidate = Path.GetFullPath(Path.Combine(directory, include));
-                AddFile(candidate, root, inputs, reasons, ref collectedBytes, cancellationToken, name.ToLowerInvariant());
-                if (name == "Analyzer")
-                {
-                    // A path digest proves a local analyzer but not an arbitrary package-selected
-                    // analyzer/generator graph; no cache can reuse it without that evidence.
-                    reasons.Add("analyzer-or-generator-identity-unverified");
-                }
-            }
-            else if (name is "PackageReference" or "ProjectReference" or "FrameworkReference" or "Reference")
-            {
-                string identity = element.Attribute("Include")?.Value ?? string.Empty;
-                string version = element.Attribute("Version")?.Value ?? element.Element(element.Name.Namespace + "Version")?.Value ?? string.Empty;
-                if (string.IsNullOrWhiteSpace(identity) || ContainsDynamicExpression(identity) || ContainsDynamicExpression(version))
-                {
-                    reasons.Add($"uninspectable-{name.ToLowerInvariant()}-identity");
-                }
-                else
-                {
-                    AddValue($"reference:{name}:{identity}", version, inputs);
-                    if (name == "ProjectReference")
-                    {
-                        AddFile(Path.GetFullPath(Path.Combine(directory, identity)), root, inputs, reasons,
-                            ref collectedBytes, cancellationToken, "projectreference");
-                    }
-                    else if (name == "PackageReference")
-                    {
-                        reasons.Add("package-reference-identity-unverified");
-                    }
-                    else if (name == "FrameworkReference")
-                    {
-                        reasons.Add("framework-reference-identity-unverified");
-                    }
-                    else
-                    {
-                        reasons.Add("assembly-reference-identity-unverified");
-                    }
-                }
-            }
+            CollectElement(element, directory, root, inputs, reasons, ref collectedBytes, cancellationToken);
         }
+    }
+
+    private static void CollectElement(XElement element, string directory, string root, SortedDictionary<string, string> inputs,
+        SortedSet<string> reasons, ref long collectedBytes, CancellationToken cancellationToken)
+    {
+        string name = element.Name.LocalName;
+        if (name is "Import" or "Compile" or "AdditionalFiles" or "EditorConfigFiles" or "Analyzer")
+        {
+            CollectPathInput(element, name, directory, root, inputs, reasons, ref collectedBytes, cancellationToken);
+        }
+        else if (name is "PackageReference" or "ProjectReference" or "FrameworkReference" or "Reference")
+        {
+            CollectReferenceInput(element, name, directory, root, inputs, reasons, ref collectedBytes, cancellationToken);
+        }
+    }
+
+    private static void CollectPathInput(XElement element, string name, string directory, string root,
+        SortedDictionary<string, string> inputs, SortedSet<string> reasons, ref long collectedBytes,
+        CancellationToken cancellationToken)
+    {
+        string? include = element.Attribute("Include")?.Value ?? element.Attribute("Project")?.Value;
+        if (string.IsNullOrWhiteSpace(include) || ContainsDynamicExpression(include))
+        {
+            reasons.Add($"uninspectable-{name.ToLowerInvariant()}-input");
+            return;
+        }
+
+        AddFile(Path.GetFullPath(Path.Combine(directory, include)), root, inputs, reasons,
+            ref collectedBytes, cancellationToken, name.ToLowerInvariant());
+        if (name == "Analyzer") reasons.Add("analyzer-or-generator-identity-unverified");
+    }
+
+    private static void CollectReferenceInput(XElement element, string name, string directory, string root,
+        SortedDictionary<string, string> inputs, SortedSet<string> reasons, ref long collectedBytes,
+        CancellationToken cancellationToken)
+    {
+        string identity = element.Attribute("Include")?.Value ?? string.Empty;
+        string version = element.Attribute("Version")?.Value ?? element.Element(element.Name.Namespace + "Version")?.Value ?? string.Empty;
+        if (string.IsNullOrWhiteSpace(identity) || ContainsDynamicExpression(identity) || ContainsDynamicExpression(version))
+        {
+            reasons.Add($"uninspectable-{name.ToLowerInvariant()}-identity");
+            return;
+        }
+
+        AddValue($"reference:{name}:{identity}", version, inputs);
+        if (name == "ProjectReference")
+        {
+            AddFile(Path.GetFullPath(Path.Combine(directory, identity)), root, inputs, reasons,
+                ref collectedBytes, cancellationToken, "projectreference");
+            return;
+        }
+
+        reasons.Add(name switch
+        {
+            "PackageReference" => "package-reference-identity-unverified",
+            "FrameworkReference" => "framework-reference-identity-unverified",
+            _ => "assembly-reference-identity-unverified"
+        });
     }
 
     private static void AddAncestorImports(string directory, string root, SortedDictionary<string, string> inputs,
@@ -245,7 +255,7 @@ public static class EvaluatedBuildInputManifestCollector
     }
 
     private static bool ContainsDynamicExpression(string value) =>
-        value.Contains("$()", StringComparison.Ordinal) || value.Contains("$", StringComparison.Ordinal)
+        value.Contains("$()", StringComparison.Ordinal) || value.Contains('$')
         || value.Contains("@(", StringComparison.Ordinal) || value.Contains('*') || value.Contains('?');
 
     private static void AddValue(string name, string? value, SortedDictionary<string, string> inputs) =>
@@ -262,7 +272,7 @@ public static class EvaluatedBuildInputManifestCollector
         path.StartsWith(root.TrimEnd(Path.DirectorySeparatorChar) + Path.DirectorySeparatorChar, StringComparison.Ordinal)
         || PathsEqual(path, root);
 
-    private static bool IsBudgetExhausted(IReadOnlySet<string> reasons) =>
+    private static bool IsBudgetExhausted(SortedSet<string> reasons) =>
         reasons.Contains("input-limit-exceeded") || reasons.Contains("input-byte-limit-exceeded");
 
     private static bool HasReparsePointAncestor(string path, string root)
