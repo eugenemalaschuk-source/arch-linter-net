@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using ArchLinterNet.Core.BuildState;
+using ArchLinterNet.Core.Caching;
 using ArchLinterNet.Core.Composition;
 using ArchLinterNet.Core.Profiling;
 using ArchLinterNet.Core.Reporting;
@@ -19,6 +20,7 @@ public sealed class ArchitectureValidationBuilder
     private bool _enforceUnmatchedIgnoredViolationsPolicy;
     private bool _collectTimings;
     private bool _collectProfile;
+    private AnalysisCacheOptions _cacheOptions = AnalysisCacheOptions.Disabled;
     private BuildPreparationMode _preparationMode = BuildPreparationMode.Ordinary;
     private bool _noRestore;
     private string? _requestedConfiguration;
@@ -76,6 +78,15 @@ public sealed class ArchitectureValidationBuilder
     public ArchitectureValidationBuilder WithProfile()
     {
         _collectProfile = true;
+        return this;
+    }
+
+    // Opt-in mirror of the CLI's --cache option — disabled/auto/explicit-path semantics, resolved
+    // and safety-validated by the same ArchLinterNet.Core.Caching engine the CLI uses. See
+    // openspec/specs/analysis-cache/spec.md, "CLI, Testing API and generic CI guidance agree".
+    public ArchitectureValidationBuilder WithCache(AnalysisCacheOptions options)
+    {
+        _cacheOptions = options;
         return this;
     }
 
@@ -204,6 +215,8 @@ public sealed class ArchitectureValidationBuilder
         (ValidationOutcome outcome, ArchitectureAnalysisSnapshotCounters counters) =
             _engine.Value.ValidateWithCounters(request, timing);
 
+        AnalysisCacheRejectReason? cacheRejectReason = TryPopulateCache(mode, outcome, counters);
+
         AnalysisProfile? profile = _collectProfile
             ? AnalysisProfileBuilder.Build(
                 counters, timing, renderedSinkCount: 0, outputSinkCount: 0,
@@ -211,10 +224,96 @@ public sealed class ArchitectureValidationBuilder
                 new ArchLinterNet.Core.Profiling.AnalysisProfileBuildOptions
                 {
                     Measurements = CaptureMeasurements(allocatedBytesAtStart),
+                    Cache = BuildCacheProfileCounters(cacheRejectReason),
                 })
             : null;
 
         return ArchitectureValidationResultMapper.ToResult(outcome, timing, mode, profile);
+    }
+
+    // Testing's population counterpart to ValidateCommandHandler.Cache.cs's TryPopulateCache —
+    // same AnalysisCachePopulation entry point, so CLI and Testing observe identical
+    // reuse-authorization semantics (one shared Core implementation, not two).
+    private AnalysisCacheRejectReason? TryPopulateCache(
+        string mode, ValidationOutcome outcome, ArchitectureAnalysisSnapshotCounters counters)
+    {
+        if (_cacheOptions.Mode == AnalysisCacheMode.Disabled)
+        {
+            return AnalysisCacheRejectReason.Disabled;
+        }
+
+        AnalysisCacheLocation? location;
+        try
+        {
+            location = AnalysisCacheLocationResolver.Resolve(_cacheOptions);
+        }
+        catch (AnalysisCacheLocationRejectedException)
+        {
+            return AnalysisCacheRejectReason.PathUnsafe;
+        }
+
+        string repositoryRoot = Path.GetDirectoryName(Path.GetFullPath(_policyPath)) ?? Environment.CurrentDirectory;
+
+        try
+        {
+            IReadOnlyList<string> policyFiles = outcome.PolicyImportPaths.Count > 0
+                ? outcome.PolicyImportPaths
+                : new[] { _policyPath };
+            AnalysisCacheKey key = new(
+                AnalysisCacheKey.ComputeRepositoryRootDigest(repositoryRoot),
+                AnalysisCacheKey.ComputePolicyDigest(policyFiles),
+                AnalysisCacheKey.ComputeModeSet(new[] { mode }),
+                _conditionSetName,
+                AnalysisCacheKey.ComputeContractIdsDigest(_contractIds ?? Array.Empty<string>()),
+                _requestedConfiguration,
+                _requestedTargetFramework,
+                _requestedPlatform,
+                _requestedRuntimeIdentifier);
+
+            AnalysisCacheFactsV1 facts = new(
+                outcome.Passed,
+                outcome.Violations.Count,
+                outcome.CoverageFindings.Count,
+                outcome.Cycles.Count,
+                outcome.UnmatchedIgnoredViolations.Count,
+                outcome.PolicyConsistencyFindings.Count,
+                outcome.ClassificationConflicts.Count,
+                outcome.ClassificationMetadataFailures.Count,
+                counters.DiscoveredProjectCount,
+                counters.RetainedAssemblyCount,
+                counters.SelectedAssemblyCount);
+
+            return AnalysisCachePopulation.TryPopulate(
+                location, key, outcome.DiscoveredProjectPaths, repositoryRoot,
+                _requestedConfiguration, _requestedTargetFramework, _requestedPlatform, _requestedRuntimeIdentifier,
+                facts, _cancellationToken).RejectReason;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            // Same fail-safe rationale as ValidateCommandHandler.Cache.cs's TryPopulateCache: a
+            // best-effort population side operation must never turn a completed validation into
+            // an unexplained exception.
+            return AnalysisCacheRejectReason.IneligibleBuildInput;
+        }
+    }
+
+    private AnalysisProfileCacheCounters BuildCacheProfileCounters(AnalysisCacheRejectReason? rejectReason)
+    {
+        if (_cacheOptions.Mode == AnalysisCacheMode.Disabled)
+        {
+            return new AnalysisProfileCacheCounters();
+        }
+
+        return new AnalysisProfileCacheCounters
+        {
+            Status = AnalysisProfileReservedFieldStatus.Active,
+            Writes = rejectReason is null ? 1 : 0,
+            Rejects = rejectReason is null ? 0 : 1,
+            Mode = _cacheOptions.ModeCategory,
+            RejectReasonCounts = rejectReason is null
+                ? new Dictionary<string, int>(StringComparer.Ordinal)
+                : new Dictionary<string, int>(StringComparer.Ordinal) { [rejectReason.ToString()!] = 1 },
+        };
     }
 
     // outcome.PreflightBlocked wins over Passed the same way the CLI's own resolver does (see

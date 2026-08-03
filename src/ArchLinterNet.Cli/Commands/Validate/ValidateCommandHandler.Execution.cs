@@ -115,6 +115,14 @@ internal sealed partial class ValidateCommandHandler
             timing?.WriteReport(_console.Error);
         }
 
+        // A completed, non-cancelled run is eligible to populate the cache regardless of
+        // Passed/Violations — see openspec/specs/analysis-cache/spec.md; population itself
+        // still gates on every discovered project being #406 VerifiedCacheEligible.
+        if (!result.Cancelled)
+        {
+            TryPopulateCache(options, outcome, counters, profileState.Cache);
+        }
+
         WriteProfile(
             options,
             profileState,
@@ -247,6 +255,11 @@ internal sealed partial class ValidateCommandHandler
         if (options.TimingsEnabled)
         {
             timing?.WriteReport(_console.Error);
+        }
+
+        if (!result.Cancelled)
+        {
+            TryPopulateCache(options, outcomesByMode[0].Outcome, snapshot.Counters, profileState.Cache);
         }
 
         // A blocked preflight blocks every requested mode identically (see

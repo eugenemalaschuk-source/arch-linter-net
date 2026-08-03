@@ -124,6 +124,198 @@ sealed class ArchLinterNet.Core.BuildState.EvaluatedBuildInputManifestV1 : Syste
   property string Digest {get;init;}
 interface ArchLinterNet.Core.BuildState.IBuildStatePreparationService
   method ArchLinterNet.Core.BuildState.BuildStatePreflightResult Prepare(ArchLinterNet.Core.BuildState.BuildStatePreflightRequest request)
+enum ArchLinterNet.Core.Caching.AnalysisCacheEntryCompletionStatus : int
+  enum-member Success = 0
+sealed class ArchLinterNet.Core.Caching.AnalysisCacheEntrySummary : System.IEquatable<ArchLinterNet.Core.Caching.AnalysisCacheEntrySummary>
+  ctor(string EntryFileName, bool Readable, string? KeyDigest, System.DateTimeOffset? CreatedAtUtc, int? ProjectCount, bool? Passed)
+  method ArchLinterNet.Core.Caching.AnalysisCacheEntrySummary <Clone>$()
+  method bool Equals(ArchLinterNet.Core.Caching.AnalysisCacheEntrySummary? other)
+  method bool Equals(object? obj)
+  method int GetHashCode()
+  method string ToString()
+  method void Deconstruct(out string EntryFileName, out bool Readable, out string? KeyDigest, out System.DateTimeOffset? CreatedAtUtc, out int? ProjectCount, out bool? Passed)
+  operator !=(ArchLinterNet.Core.Caching.AnalysisCacheEntrySummary? left, ArchLinterNet.Core.Caching.AnalysisCacheEntrySummary? right)
+  operator ==(ArchLinterNet.Core.Caching.AnalysisCacheEntrySummary? left, ArchLinterNet.Core.Caching.AnalysisCacheEntrySummary? right)
+  property System.DateTimeOffset? CreatedAtUtc {get;init;}
+  property bool Readable {get;init;}
+  property bool? Passed {get;init;}
+  property int? ProjectCount {get;init;}
+  property string EntryFileName {get;init;}
+  property string? KeyDigest {get;init;}
+sealed class ArchLinterNet.Core.Caching.AnalysisCacheEntryV1 : System.IEquatable<ArchLinterNet.Core.Caching.AnalysisCacheEntryV1>
+  ctor()
+  method ArchLinterNet.Core.Caching.AnalysisCacheEntryV1 <Clone>$()
+  method bool Equals(ArchLinterNet.Core.Caching.AnalysisCacheEntryV1? other)
+  method bool Equals(object? obj)
+  method int GetHashCode()
+  method string ToString()
+  operator !=(ArchLinterNet.Core.Caching.AnalysisCacheEntryV1? left, ArchLinterNet.Core.Caching.AnalysisCacheEntryV1? right)
+  operator ==(ArchLinterNet.Core.Caching.AnalysisCacheEntryV1? left, ArchLinterNet.Core.Caching.AnalysisCacheEntryV1? right)
+  property ArchLinterNet.Core.Caching.AnalysisCacheEntryCompletionStatus CompletionStatus {get;init;}
+  property ArchLinterNet.Core.Caching.AnalysisCacheFactsV1 Facts {get;init;}
+  property System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Caching.AnalysisCacheProjectManifest> ProjectManifests {get;init;}
+  property System.DateTimeOffset CreatedAtUtc {get;init;}
+  property int FormatVersion {get;init;}
+  property string ContentDigest {get;init;}
+  property string KeyDigest {get;init;}
+  property string SchemaId {get;init;}
+  property string ToolVersion {get;init;}
+static class ArchLinterNet.Core.Caching.AnalysisCacheEnvelope
+  field const int FormatVersion = 1
+  field const string ProductSchemaVersion = "0.5.1"
+  field const string SchemaId = "analysis-cache/v1"
+  property static string ToolVersion {get;}
+sealed class ArchLinterNet.Core.Caching.AnalysisCacheFactsV1 : System.IEquatable<ArchLinterNet.Core.Caching.AnalysisCacheFactsV1>
+  ctor(bool Passed, int ViolationCount, int CoverageFindingCount, int CycleCount, int UnmatchedIgnoredViolationCount, int PolicyConsistencyFindingCount, int ClassificationConflictCount, int ClassificationMetadataFailureCount, int DiscoveredProjectCount, int RetainedAssemblyCount, int SelectedAssemblyCount)
+  method ArchLinterNet.Core.Caching.AnalysisCacheFactsV1 <Clone>$()
+  method bool Equals(ArchLinterNet.Core.Caching.AnalysisCacheFactsV1? other)
+  method bool Equals(object? obj)
+  method int GetHashCode()
+  method string ToString()
+  method void Deconstruct(out bool Passed, out int ViolationCount, out int CoverageFindingCount, out int CycleCount, out int UnmatchedIgnoredViolationCount, out int PolicyConsistencyFindingCount, out int ClassificationConflictCount, out int ClassificationMetadataFailureCount, out int DiscoveredProjectCount, out int RetainedAssemblyCount, out int SelectedAssemblyCount)
+  operator !=(ArchLinterNet.Core.Caching.AnalysisCacheFactsV1? left, ArchLinterNet.Core.Caching.AnalysisCacheFactsV1? right)
+  operator ==(ArchLinterNet.Core.Caching.AnalysisCacheFactsV1? left, ArchLinterNet.Core.Caching.AnalysisCacheFactsV1? right)
+  property bool Passed {get;init;}
+  property int ClassificationConflictCount {get;init;}
+  property int ClassificationMetadataFailureCount {get;init;}
+  property int CoverageFindingCount {get;init;}
+  property int CycleCount {get;init;}
+  property int DiscoveredProjectCount {get;init;}
+  property int PolicyConsistencyFindingCount {get;init;}
+  property int RetainedAssemblyCount {get;init;}
+  property int SelectedAssemblyCount {get;init;}
+  property int UnmatchedIgnoredViolationCount {get;init;}
+  property int ViolationCount {get;init;}
+sealed class ArchLinterNet.Core.Caching.AnalysisCacheKey : System.IEquatable<ArchLinterNet.Core.Caching.AnalysisCacheKey>
+  ctor(string RepositoryRootDigest, string PolicyDigest, string ModeSet, string? ConditionSetName, string ContractIdsDigest, string? Configuration, string? TargetFramework, string? Platform, string? RuntimeIdentifier)
+  method ArchLinterNet.Core.Caching.AnalysisCacheKey <Clone>$()
+  method bool Equals(ArchLinterNet.Core.Caching.AnalysisCacheKey? other)
+  method bool Equals(object? obj)
+  method int GetHashCode()
+  method static string ComputeContractIdsDigest(System.Collections.Generic.IEnumerable<string> contractIds)
+  method static string ComputeModeSet(System.Collections.Generic.IEnumerable<string> modes)
+  method static string ComputePolicyDigest(System.Collections.Generic.IEnumerable<string> policyFilePaths, System.Threading.CancellationToken cancellationToken = null)
+  method static string ComputeRepositoryRootDigest(string repositoryRoot)
+  method string ToString()
+  method void Deconstruct(out string RepositoryRootDigest, out string PolicyDigest, out string ModeSet, out string? ConditionSetName, out string ContractIdsDigest, out string? Configuration, out string? TargetFramework, out string? Platform, out string? RuntimeIdentifier)
+  operator !=(ArchLinterNet.Core.Caching.AnalysisCacheKey? left, ArchLinterNet.Core.Caching.AnalysisCacheKey? right)
+  operator ==(ArchLinterNet.Core.Caching.AnalysisCacheKey? left, ArchLinterNet.Core.Caching.AnalysisCacheKey? right)
+  property string ContractIdsDigest {get;init;}
+  property string Digest {get;}
+  property string ModeSet {get;init;}
+  property string PolicyDigest {get;init;}
+  property string RepositoryRootDigest {get;init;}
+  property string? ConditionSetName {get;init;}
+  property string? Configuration {get;init;}
+  property string? Platform {get;init;}
+  property string? RuntimeIdentifier {get;init;}
+  property string? TargetFramework {get;init;}
+sealed class ArchLinterNet.Core.Caching.AnalysisCacheLocation : System.IEquatable<ArchLinterNet.Core.Caching.AnalysisCacheLocation>
+  ctor(string RootPath, ArchLinterNet.Core.Caching.AnalysisCacheMode Mode)
+  method ArchLinterNet.Core.Caching.AnalysisCacheLocation <Clone>$()
+  method bool Equals(ArchLinterNet.Core.Caching.AnalysisCacheLocation? other)
+  method bool Equals(object? obj)
+  method int GetHashCode()
+  method string ToString()
+  method void Deconstruct(out string RootPath, out ArchLinterNet.Core.Caching.AnalysisCacheMode Mode)
+  operator !=(ArchLinterNet.Core.Caching.AnalysisCacheLocation? left, ArchLinterNet.Core.Caching.AnalysisCacheLocation? right)
+  operator ==(ArchLinterNet.Core.Caching.AnalysisCacheLocation? left, ArchLinterNet.Core.Caching.AnalysisCacheLocation? right)
+  property ArchLinterNet.Core.Caching.AnalysisCacheMode Mode {get;init;}
+  property string RootPath {get;init;}
+sealed class ArchLinterNet.Core.Caching.AnalysisCacheLocationRejectedException : System.Exception
+  ctor(string message)
+static class ArchLinterNet.Core.Caching.AnalysisCacheLocationResolver
+  method static ArchLinterNet.Core.Caching.AnalysisCacheLocation? Resolve(ArchLinterNet.Core.Caching.AnalysisCacheOptions options)
+enum ArchLinterNet.Core.Caching.AnalysisCacheLookupOutcome : int
+  enum-member Hit = 0
+  enum-member Miss = 1
+  enum-member Reject = 2
+sealed class ArchLinterNet.Core.Caching.AnalysisCacheLookupResult : System.IEquatable<ArchLinterNet.Core.Caching.AnalysisCacheLookupResult>
+  ctor(ArchLinterNet.Core.Caching.AnalysisCacheLookupOutcome Outcome, ArchLinterNet.Core.Caching.AnalysisCacheRejectReason? Reason, ArchLinterNet.Core.Caching.AnalysisCacheEntryV1? Entry, long BytesRead)
+  method ArchLinterNet.Core.Caching.AnalysisCacheLookupResult <Clone>$()
+  method bool Equals(ArchLinterNet.Core.Caching.AnalysisCacheLookupResult? other)
+  method bool Equals(object? obj)
+  method int GetHashCode()
+  method static ArchLinterNet.Core.Caching.AnalysisCacheLookupResult Hit(ArchLinterNet.Core.Caching.AnalysisCacheEntryV1 entry, long bytesRead)
+  method static ArchLinterNet.Core.Caching.AnalysisCacheLookupResult Miss(ArchLinterNet.Core.Caching.AnalysisCacheRejectReason reason, long bytesRead = 0)
+  method static ArchLinterNet.Core.Caching.AnalysisCacheLookupResult Reject(ArchLinterNet.Core.Caching.AnalysisCacheRejectReason reason, long bytesRead = 0)
+  method string ToString()
+  method void Deconstruct(out ArchLinterNet.Core.Caching.AnalysisCacheLookupOutcome Outcome, out ArchLinterNet.Core.Caching.AnalysisCacheRejectReason? Reason, out ArchLinterNet.Core.Caching.AnalysisCacheEntryV1? Entry, out long BytesRead)
+  operator !=(ArchLinterNet.Core.Caching.AnalysisCacheLookupResult? left, ArchLinterNet.Core.Caching.AnalysisCacheLookupResult? right)
+  operator ==(ArchLinterNet.Core.Caching.AnalysisCacheLookupResult? left, ArchLinterNet.Core.Caching.AnalysisCacheLookupResult? right)
+  property ArchLinterNet.Core.Caching.AnalysisCacheEntryV1? Entry {get;init;}
+  property ArchLinterNet.Core.Caching.AnalysisCacheLookupOutcome Outcome {get;init;}
+  property ArchLinterNet.Core.Caching.AnalysisCacheRejectReason? Reason {get;init;}
+  property long BytesRead {get;init;}
+enum ArchLinterNet.Core.Caching.AnalysisCacheMode : int
+  enum-member Auto = 1
+  enum-member Disabled = 0
+  enum-member ExplicitPath = 2
+sealed class ArchLinterNet.Core.Caching.AnalysisCacheOptions : System.IEquatable<ArchLinterNet.Core.Caching.AnalysisCacheOptions>
+  ctor(ArchLinterNet.Core.Caching.AnalysisCacheMode Mode, string? ExplicitPath = null)
+  method ArchLinterNet.Core.Caching.AnalysisCacheOptions <Clone>$()
+  method bool Equals(ArchLinterNet.Core.Caching.AnalysisCacheOptions? other)
+  method bool Equals(object? obj)
+  method int GetHashCode()
+  method static ArchLinterNet.Core.Caching.AnalysisCacheOptions AtPath(string path)
+  method string ToString()
+  method void Deconstruct(out ArchLinterNet.Core.Caching.AnalysisCacheMode Mode, out string? ExplicitPath)
+  operator !=(ArchLinterNet.Core.Caching.AnalysisCacheOptions? left, ArchLinterNet.Core.Caching.AnalysisCacheOptions? right)
+  operator ==(ArchLinterNet.Core.Caching.AnalysisCacheOptions? left, ArchLinterNet.Core.Caching.AnalysisCacheOptions? right)
+  property ArchLinterNet.Core.Caching.AnalysisCacheMode Mode {get;init;}
+  property static ArchLinterNet.Core.Caching.AnalysisCacheOptions Auto {get;}
+  property static ArchLinterNet.Core.Caching.AnalysisCacheOptions Disabled {get;}
+  property string ModeCategory {get;}
+  property string? ExplicitPath {get;init;}
+static class ArchLinterNet.Core.Caching.AnalysisCachePopulation
+  method static ArchLinterNet.Core.Caching.AnalysisCacheLookupResult TryLookup(ArchLinterNet.Core.Caching.AnalysisCacheLocation? location, ArchLinterNet.Core.Caching.AnalysisCacheKey key, System.Collections.Generic.IReadOnlyList<string> discoveredProjectPaths, string repositoryRoot, string? configuration, string? targetFramework, string? platform, string? runtimeIdentifier, System.Threading.CancellationToken cancellationToken = null)
+  method static ArchLinterNet.Core.Caching.AnalysisCachePopulation.Outcome TryPopulate(ArchLinterNet.Core.Caching.AnalysisCacheLocation? location, ArchLinterNet.Core.Caching.AnalysisCacheKey key, System.Collections.Generic.IReadOnlyList<string> discoveredProjectPaths, string repositoryRoot, string? configuration, string? targetFramework, string? platform, string? runtimeIdentifier, ArchLinterNet.Core.Caching.AnalysisCacheFactsV1 facts, System.Threading.CancellationToken cancellationToken = null)
+readonly struct ArchLinterNet.Core.Caching.AnalysisCachePopulation.Outcome : System.IEquatable<ArchLinterNet.Core.Caching.AnalysisCachePopulation.Outcome>
+  ctor(ArchLinterNet.Core.Caching.AnalysisCacheRejectReason? RejectReason, int ProjectsEvaluated)
+  method bool Equals(ArchLinterNet.Core.Caching.AnalysisCachePopulation.Outcome other)
+  method bool Equals(object obj)
+  method int GetHashCode()
+  method string ToString()
+  method void Deconstruct(out ArchLinterNet.Core.Caching.AnalysisCacheRejectReason? RejectReason, out int ProjectsEvaluated)
+  operator !=(ArchLinterNet.Core.Caching.AnalysisCachePopulation.Outcome left, ArchLinterNet.Core.Caching.AnalysisCachePopulation.Outcome right)
+  operator ==(ArchLinterNet.Core.Caching.AnalysisCachePopulation.Outcome left, ArchLinterNet.Core.Caching.AnalysisCachePopulation.Outcome right)
+  property ArchLinterNet.Core.Caching.AnalysisCacheRejectReason? RejectReason {get;init;}
+  property int ProjectsEvaluated {get;init;}
+sealed class ArchLinterNet.Core.Caching.AnalysisCacheProjectManifest : System.IEquatable<ArchLinterNet.Core.Caching.AnalysisCacheProjectManifest>
+  ctor(string ProjectPath, string ManifestDigest, ArchLinterNet.Core.BuildState.CacheEligibility Eligibility)
+  method ArchLinterNet.Core.Caching.AnalysisCacheProjectManifest <Clone>$()
+  method bool Equals(ArchLinterNet.Core.Caching.AnalysisCacheProjectManifest? other)
+  method bool Equals(object? obj)
+  method int GetHashCode()
+  method static ArchLinterNet.Core.Caching.AnalysisCacheProjectManifest FromManifest(string projectPath, ArchLinterNet.Core.BuildState.EvaluatedBuildInputManifestV1 manifest)
+  method string ToString()
+  method void Deconstruct(out string ProjectPath, out string ManifestDigest, out ArchLinterNet.Core.BuildState.CacheEligibility Eligibility)
+  operator !=(ArchLinterNet.Core.Caching.AnalysisCacheProjectManifest? left, ArchLinterNet.Core.Caching.AnalysisCacheProjectManifest? right)
+  operator ==(ArchLinterNet.Core.Caching.AnalysisCacheProjectManifest? left, ArchLinterNet.Core.Caching.AnalysisCacheProjectManifest? right)
+  property ArchLinterNet.Core.BuildState.CacheEligibility Eligibility {get;init;}
+  property string ManifestDigest {get;init;}
+  property string ProjectPath {get;init;}
+enum ArchLinterNet.Core.Caching.AnalysisCacheRejectReason : int
+  enum-member Cancelled = 12
+  enum-member Corrupt = 2
+  enum-member Disabled = 0
+  enum-member ForeignSchema = 4
+  enum-member IncompatibleFormatVersion = 5
+  enum-member IncompatibleToolVersion = 6
+  enum-member IncompleteOriginalRun = 11
+  enum-member IneligibleBuildInput = 10
+  enum-member IntegrityMismatch = 8
+  enum-member KeyMismatch = 7
+  enum-member Missing = 1
+  enum-member PathUnsafe = 13
+  enum-member ProjectSetMismatch = 9
+  enum-member SizeExceeded = 14
+  enum-member Truncated = 3
+static class ArchLinterNet.Core.Caching.AnalysisCacheStore
+  method static ArchLinterNet.Core.Caching.AnalysisCacheLookupResult TryGet(ArchLinterNet.Core.Caching.AnalysisCacheLocation location, ArchLinterNet.Core.Caching.AnalysisCacheKey key, System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Caching.AnalysisCacheProjectManifest> currentManifests)
+  method static ArchLinterNet.Core.Caching.AnalysisCacheRejectReason? Put(ArchLinterNet.Core.Caching.AnalysisCacheLocation location, ArchLinterNet.Core.Caching.AnalysisCacheKey key, System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Caching.AnalysisCacheProjectManifest> projectManifests, ArchLinterNet.Core.Caching.AnalysisCacheFactsV1 facts, System.Threading.CancellationToken cancellationToken = null)
+  method static System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Caching.AnalysisCacheEntrySummary> Inspect(ArchLinterNet.Core.Caching.AnalysisCacheLocation location)
+  method static void Clear(ArchLinterNet.Core.Caching.AnalysisCacheLocation location)
 sealed class ArchLinterNet.Core.Composition.ArchitectureEngine : System.IAsyncDisposable, System.IDisposable
   method (ArchLinterNet.Core.Validation.ValidationOutcome Outcome, ArchLinterNet.Core.Validation.ArchitectureAnalysisSnapshotCounters Counters) ValidateWithCounters(ArchLinterNet.Core.Validation.ValidationRequest request, ArchLinterNet.Core.Reporting.ValidationTiming? timing = null)
   method ArchLinterNet.Core.Asmdef.AsmdefValidationOutcome ValidateAsmdef(ArchLinterNet.Core.Asmdef.AsmdefValidationRequest request)
@@ -3049,6 +3241,7 @@ sealed class ArchLinterNet.Core.Profiling.AnalysisProfileBuildOptions : System.I
   method string ToString()
   operator !=(ArchLinterNet.Core.Profiling.AnalysisProfileBuildOptions? left, ArchLinterNet.Core.Profiling.AnalysisProfileBuildOptions? right)
   operator ==(ArchLinterNet.Core.Profiling.AnalysisProfileBuildOptions? left, ArchLinterNet.Core.Profiling.AnalysisProfileBuildOptions? right)
+  property ArchLinterNet.Core.Profiling.AnalysisProfileCacheCounters? Cache {get;init;}
   property ArchLinterNet.Core.Profiling.AnalysisProfileMeasurements? Measurements {get;init;}
   property ArchLinterNet.Core.Profiling.AnalysisProfileOutput? Output {get;init;}
 static class ArchLinterNet.Core.Profiling.AnalysisProfileBuilder
@@ -3063,8 +3256,18 @@ sealed class ArchLinterNet.Core.Profiling.AnalysisProfileCacheCounters : System.
   operator !=(ArchLinterNet.Core.Profiling.AnalysisProfileCacheCounters? left, ArchLinterNet.Core.Profiling.AnalysisProfileCacheCounters? right)
   operator ==(ArchLinterNet.Core.Profiling.AnalysisProfileCacheCounters? left, ArchLinterNet.Core.Profiling.AnalysisProfileCacheCounters? right)
   property ArchLinterNet.Core.Profiling.AnalysisProfileReservedFieldStatus Status {get;init;}
+  property System.Collections.Generic.IReadOnlyDictionary<string,int> RejectReasonCounts {get;init;}
+  property int CancelledBeforePublish {get;init;}
+  property int CorruptionEvents {get;init;}
   property int Hits {get;init;}
+  property int IneligibleUnitCount {get;init;}
   property int Lookups {get;init;}
+  property int Misses {get;init;}
+  property int Rejects {get;init;}
+  property int Writes {get;init;}
+  property long BytesRead {get;init;}
+  property long BytesWritten {get;init;}
+  property string Mode {get;init;}
 enum ArchLinterNet.Core.Profiling.AnalysisProfileCompletionStatus : int
   enum-member Cancelled = 3
   enum-member PreparationFailure = 2
@@ -3154,6 +3357,7 @@ sealed class ArchLinterNet.Core.Profiling.AnalysisProfilePhaseMeasurement : Syst
   property int? Count {get;init;}
   property string Name {get;init;}
 enum ArchLinterNet.Core.Profiling.AnalysisProfileReservedFieldStatus : int
+  enum-member Active = 1
   enum-member NotApplicable = 0
 static class ArchLinterNet.Core.Reporting.ArchitectureBaselineSarifFormatter
   method static string Format(System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Model.BaselineLifecycleEntry> entries, string toolVersion)

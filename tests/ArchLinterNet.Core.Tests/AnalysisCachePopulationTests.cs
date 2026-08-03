@@ -1,0 +1,78 @@
+using ArchLinterNet.Core.Caching;
+using NUnit.Framework;
+
+namespace ArchLinterNet.Core.Tests;
+
+[TestFixture]
+public sealed class AnalysisCachePopulationTests
+{
+    private string _repoRoot = null!;
+    private string _projectPath = null!;
+    private string _cacheRoot = null!;
+
+    [SetUp]
+    public void SetUp()
+    {
+        _repoRoot = Path.Combine(Path.GetTempPath(), "arch-linter-net-cache-population-tests", Guid.NewGuid().ToString("N"));
+        string projectDir = Path.Combine(_repoRoot, "src", "Sample");
+        Directory.CreateDirectory(projectDir);
+        _projectPath = Path.Combine(projectDir, "Sample.csproj");
+        File.WriteAllText(_projectPath, "<Project Sdk=\"Microsoft.NET.Sdk\"><PropertyGroup><TargetFramework>net10.0</TargetFramework></PropertyGroup></Project>");
+        _cacheRoot = Path.Combine(_repoRoot, ".cache");
+    }
+
+    [TearDown]
+    public void TearDown()
+    {
+        if (Directory.Exists(_repoRoot))
+        {
+            Directory.Delete(_repoRoot, recursive: true);
+        }
+    }
+
+    private static AnalysisCacheKey CreateKey() => new(
+        "repo", "policy", "strict", null, "contracts", null, null, null, null);
+
+    // Documents the current, intentional state (see design.md): #406's
+    // EvaluatedBuildInputManifestCollector always reports CacheIneligible for real MSBuild
+    // evidence today, so populating from an actual discovered project is always rejected — a
+    // cache entry is never fabricated from unproven build-input evidence.
+    [Test]
+    public void TryPopulate_RealProject_IsIneligibleBuildInputToday()
+    {
+        AnalysisCacheLocation location = new(_cacheRoot, AnalysisCacheMode.ExplicitPath);
+        AnalysisCacheFactsV1 facts = new(true, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1);
+
+        AnalysisCachePopulation.Outcome outcome = AnalysisCachePopulation.TryPopulate(
+            location, CreateKey(), new[] { _projectPath }, _repoRoot,
+            null, null, null, null, facts);
+
+        Assert.That(outcome.RejectReason, Is.EqualTo(AnalysisCacheRejectReason.IneligibleBuildInput));
+        Assert.That(outcome.ProjectsEvaluated, Is.EqualTo(1));
+        Assert.That(Directory.Exists(_cacheRoot) && Directory.EnumerateFiles(_cacheRoot, "*.json", SearchOption.AllDirectories).Any(), Is.False);
+    }
+
+    [Test]
+    public void TryPopulate_Disabled_ReturnsDisabledReason()
+    {
+        AnalysisCacheFactsV1 facts = new(true, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1);
+
+        AnalysisCachePopulation.Outcome outcome = AnalysisCachePopulation.TryPopulate(
+            location: null, CreateKey(), new[] { _projectPath }, _repoRoot, null, null, null, null, facts);
+
+        Assert.That(outcome.RejectReason, Is.EqualTo(AnalysisCacheRejectReason.Disabled));
+    }
+
+    [Test]
+    public void TryPopulate_NoDiscoveredProjects_IsIneligible()
+    {
+        AnalysisCacheLocation location = new(_cacheRoot, AnalysisCacheMode.ExplicitPath);
+        AnalysisCacheFactsV1 facts = new(true, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
+
+        AnalysisCachePopulation.Outcome outcome = AnalysisCachePopulation.TryPopulate(
+            location, CreateKey(), Array.Empty<string>(), _repoRoot, null, null, null, null, facts);
+
+        Assert.That(outcome.RejectReason, Is.EqualTo(AnalysisCacheRejectReason.IneligibleBuildInput));
+        Assert.That(outcome.ProjectsEvaluated, Is.EqualTo(0));
+    }
+}

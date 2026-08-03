@@ -399,6 +399,11 @@ internal sealed partial class ValidateCommandHandler
             return CliExitCodes.InvalidArgumentsOrRuntimeError;
         }
 
+        if (!PreValidateCacheDestination(options, out _))
+        {
+            return CliExitCodes.InvalidArgumentsOrRuntimeError;
+        }
+
         return null;
     }
 

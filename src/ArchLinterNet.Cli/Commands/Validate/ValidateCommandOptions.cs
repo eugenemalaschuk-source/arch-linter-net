@@ -26,4 +26,8 @@ internal sealed record ValidateCommandOptions(
     // null = --profile not requested (no behavior change). Otherwise "stdout", "stderr", or a file
     // path, independent of --timings/--report. See openspec/specs/analysis-profile/spec.md.
     public string? ProfileDestination { get; init; }
+
+    // null = --cache not requested (persistent cache disabled, no behavior change). Otherwise
+    // "auto" or an explicit path. See openspec/specs/analysis-cache/spec.md.
+    public string? CacheDestination { get; init; }
 }
