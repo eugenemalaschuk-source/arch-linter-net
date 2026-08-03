@@ -118,7 +118,7 @@ public sealed class EvaluatedBuildInputManifestTests
     }
 
     [Test]
-    public void Collect_OversizedProject_StopsBeforeSubsequentCollectionPhases()
+    public void Collect_ProjectExactlyFillingByteBudget_StopsBeforeSubsequentCollectionPhases()
     {
         using ManifestFixture fixture = ManifestFixture.Create(string.Empty);
         using (FileStream stream = File.Open(fixture.ProjectPath, FileMode.Open, FileAccess.Write))
@@ -129,9 +129,45 @@ public sealed class EvaluatedBuildInputManifestTests
 
         EvaluatedBuildInputManifestV1 result = fixture.Collect();
 
+        Assert.That(result.IneligibilityReasons, Does.Contain("input-byte-budget-exhausted"));
+        Assert.That(result.Inputs, Does.Not.Contain("file:src/Fixture/Late.cs"));
+        Assert.That(result.Inputs, Does.Not.Contain("sdk"));
+        Assert.That(result.Inputs, Does.Contain("context:configuration"));
+    }
+
+    [Test]
+    public void Collect_ProjectExceedingByteBudget_StopsBeforeSubsequentCollectionPhases()
+    {
+        using ManifestFixture fixture = ManifestFixture.Create(string.Empty);
+        using (FileStream stream = File.Open(fixture.ProjectPath, FileMode.Open, FileAccess.Write))
+        {
+            stream.SetLength(64L * 1024 * 1024 + 1);
+        }
+        File.WriteAllText(Path.Combine(fixture.ProjectDirectory, "Late.cs"), "namespace Fixture; public class Late {} ");
+
+        EvaluatedBuildInputManifestV1 result = fixture.Collect();
+
         Assert.That(result.IneligibilityReasons, Does.Contain("input-byte-limit-exceeded"));
         Assert.That(result.Inputs, Does.Not.Contain("file:src/Fixture/Late.cs"));
-        Assert.That(result.Inputs, Does.Not.Contain("context:configuration"));
+        Assert.That(result.Inputs, Does.Not.Contain("sdk"));
+        Assert.That(result.Inputs, Does.Contain("context:runtimeIdentifier"));
+    }
+
+    [Test]
+    public void Collect_ExhaustedBudget_PreservesDistinctConfigurationAndRuntimeContexts()
+    {
+        using ManifestFixture fixture = ManifestFixture.Create(string.Empty);
+        using (FileStream stream = File.Open(fixture.ProjectPath, FileMode.Open, FileAccess.Write))
+        {
+            stream.SetLength(64L * 1024 * 1024);
+        }
+
+        EvaluatedBuildInputManifestV1 debug = fixture.Collect(configuration: "Debug", platform: "AnyCPU", runtimeIdentifier: "linux-x64");
+        EvaluatedBuildInputManifestV1 release = fixture.Collect(configuration: "Release", platform: "x64", runtimeIdentifier: "linux-x64");
+        EvaluatedBuildInputManifestV1 differentRuntime = fixture.Collect(configuration: "Debug", platform: "AnyCPU", runtimeIdentifier: "win-x64");
+
+        Assert.That(release.Digest, Is.Not.EqualTo(debug.Digest));
+        Assert.That(differentRuntime.Digest, Is.Not.EqualTo(debug.Digest));
     }
 
     [Test]
@@ -144,7 +180,7 @@ public sealed class EvaluatedBuildInputManifestTests
         EvaluatedBuildInputManifestV1 result = fixture.Collect();
 
         Assert.That(result.IneligibilityReasons, Does.Contain("input-limit-exceeded"));
-        Assert.That(result.Inputs.Count, Is.LessThanOrEqualTo(10_000));
+        Assert.That(result.Inputs.Count, Is.LessThanOrEqualTo(10_004));
     }
 
     [Test]
