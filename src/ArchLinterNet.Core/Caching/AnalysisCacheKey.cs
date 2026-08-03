@@ -24,8 +24,8 @@ public sealed record AnalysisCacheKey(
     {
         get
         {
-            string canonical = string.Join('\n', new[]
-            {
+            string canonical = string.Join(
+                '\n',
                 AnalysisCacheEnvelope.SchemaId,
                 $"format:{AnalysisCacheEnvelope.FormatVersion}",
                 $"tool:{AnalysisCacheEnvelope.ToolVersion}",
@@ -37,8 +37,7 @@ public sealed record AnalysisCacheKey(
                 $"configuration:{Configuration ?? string.Empty}",
                 $"tfm:{TargetFramework ?? string.Empty}",
                 $"platform:{Platform ?? string.Empty}",
-                $"rid:{RuntimeIdentifier ?? string.Empty}",
-            });
+                $"rid:{RuntimeIdentifier ?? string.Empty}");
             return HashHex(canonical);
         }
     }

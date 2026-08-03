@@ -15,8 +15,8 @@ internal static class AnalysisCacheContentDigest
             .OrderBy(manifest => manifest.ProjectPath, StringComparer.Ordinal)
             .Select(manifest => $"{manifest.ProjectPath}|{manifest.ManifestDigest}|{manifest.Eligibility}");
 
-        string canonical = string.Join('\n', new[]
-        {
+        string canonical = string.Join(
+            '\n',
             AnalysisCacheEnvelope.SchemaId,
             $"format:{entry.FormatVersion}",
             $"key:{entry.KeyDigest}",
@@ -24,8 +24,7 @@ internal static class AnalysisCacheContentDigest
             $"created:{entry.CreatedAtUtc:O}",
             $"status:{entry.CompletionStatus}",
             $"manifests:{string.Join(';', manifestLines)}",
-            $"facts:{FormatFacts(entry.Facts)}",
-        });
+            $"facts:{FormatFacts(entry.Facts)}");
 
         return Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(canonical)));
     }
