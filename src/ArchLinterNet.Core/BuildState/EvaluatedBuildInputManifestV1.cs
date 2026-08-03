@@ -42,29 +42,38 @@ public static class EvaluatedBuildInputManifestCollector
         long collectedBytes = 0;
 
         AddFile(project, root, inputs, reasons, ref collectedBytes, cancellationToken);
-        AddAncestorImports(projectDirectory, root, inputs, reasons, ref collectedBytes, cancellationToken);
-        CollectProjectXml(project, root, inputs, reasons, ref collectedBytes, cancellationToken);
+        if (!IsBudgetExhausted(reasons))
+        {
+            AddAncestorImports(projectDirectory, root, inputs, reasons, ref collectedBytes, cancellationToken);
+        }
+        if (!IsBudgetExhausted(reasons))
+        {
+            CollectProjectXml(project, root, inputs, reasons, ref collectedBytes, cancellationToken);
+        }
 
         // Default SDK compile items are deterministic under the project root. Explicit globs are
         // rejected below because static glob semantics can be changed by imports/properties.
-        foreach (string source in Directory.EnumerateFiles(projectDirectory, "*.cs", new EnumerationOptions
+        if (!IsBudgetExhausted(reasons))
         {
-            RecurseSubdirectories = true,
-            AttributesToSkip = FileAttributes.ReparsePoint
-        })
-                     .Where(path => !IsBuildOutput(path, projectDirectory)))
-        {
-            AddFile(source, root, inputs, reasons, ref collectedBytes, cancellationToken);
-            if (IsBudgetExhausted(reasons))
+            foreach (string source in Directory.EnumerateFiles(projectDirectory, "*.cs", new EnumerationOptions
             {
-                break;
+                RecurseSubdirectories = true,
+                AttributesToSkip = FileAttributes.ReparsePoint
+            })
+                         .Where(path => !IsBuildOutput(path, projectDirectory)))
+            {
+                AddFile(source, root, inputs, reasons, ref collectedBytes, cancellationToken);
+                if (IsBudgetExhausted(reasons))
+                {
+                    break;
+                }
             }
         }
 
-        AddValue("context:configuration", configuration, inputs);
-        AddValue("context:targetFramework", targetFramework, inputs);
-        AddValue("context:platform", platform, inputs);
-        AddValue("context:runtimeIdentifier", runtimeIdentifier, inputs);
+        AddValue("context:configuration", configuration, inputs, reasons);
+        AddValue("context:targetFramework", targetFramework, inputs, reasons);
+        AddValue("context:platform", platform, inputs, reasons);
+        AddValue("context:runtimeIdentifier", runtimeIdentifier, inputs, reasons);
 
         // Static XML inspection cannot prove evaluated SDK imports, global properties,
         // generators, framework packs, or compiler task inputs. It is evidence for stale
@@ -109,9 +118,13 @@ public static class EvaluatedBuildInputManifestCollector
         }
 
         string directory = Path.GetDirectoryName(projectPath)!;
-        AddValue("sdk", project.Attribute("Sdk")?.Value, inputs);
+        AddValue("sdk", project.Attribute("Sdk")?.Value, inputs, reasons);
         foreach (XElement element in project.Descendants())
         {
+            if (IsBudgetExhausted(reasons))
+            {
+                break;
+            }
             cancellationToken.ThrowIfCancellationRequested();
             CollectElement(element, directory, root, inputs, reasons, ref collectedBytes, cancellationToken);
         }
@@ -159,7 +172,7 @@ public static class EvaluatedBuildInputManifestCollector
             return;
         }
 
-        AddValue($"reference:{name}:{identity}", version, inputs);
+        AddValue($"reference:{name}:{identity}", version, inputs, reasons);
         if (name == "ProjectReference")
         {
             AddFile(Path.GetFullPath(Path.Combine(directory, identity)), root, inputs, reasons,
@@ -180,8 +193,16 @@ public static class EvaluatedBuildInputManifestCollector
     {
         for (DirectoryInfo? current = new(directory); current != null; current = current.Parent)
         {
+            if (IsBudgetExhausted(reasons))
+            {
+                return;
+            }
             foreach (string name in new[] { "Directory.Build.props", "Directory.Build.targets", "Directory.Build.rsp", "Directory.Packages.props" })
             {
+                if (IsBudgetExhausted(reasons))
+                {
+                    return;
+                }
                 string path = Path.Combine(current.FullName, name);
                 if (File.Exists(path))
                 {
@@ -258,8 +279,21 @@ public static class EvaluatedBuildInputManifestCollector
         value.Contains("$()", StringComparison.Ordinal) || value.Contains('$')
         || value.Contains("@(", StringComparison.Ordinal) || value.Contains('*') || value.Contains('?');
 
-    private static void AddValue(string name, string? value, SortedDictionary<string, string> inputs) =>
+    private static void AddValue(string name, string? value, SortedDictionary<string, string> inputs, SortedSet<string> reasons)
+    {
+        if (IsBudgetExhausted(reasons))
+        {
+            return;
+        }
+
+        if (!inputs.ContainsKey(name) && inputs.Count >= MaximumInputs)
+        {
+            reasons.Add("input-limit-exceeded");
+            return;
+        }
+
         inputs[name] = value ?? string.Empty;
+    }
 
     private static bool IsBuildOutput(string path, string projectDirectory)
     {
@@ -280,6 +314,12 @@ public static class EvaluatedBuildInputManifestCollector
         DirectoryInfo? current = new(Path.GetDirectoryName(path)!);
         while (current != null)
         {
+            if (!current.Exists)
+            {
+                current = current.Parent;
+                continue;
+            }
+
             if (current.LinkTarget != null || (current.Attributes & FileAttributes.ReparsePoint) != 0)
             {
                 return true;

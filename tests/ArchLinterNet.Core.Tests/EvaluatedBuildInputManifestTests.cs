@@ -118,6 +118,47 @@ public sealed class EvaluatedBuildInputManifestTests
     }
 
     [Test]
+    public void Collect_OversizedProject_StopsBeforeSubsequentCollectionPhases()
+    {
+        using ManifestFixture fixture = ManifestFixture.Create(string.Empty);
+        using (FileStream stream = File.Open(fixture.ProjectPath, FileMode.Open, FileAccess.Write))
+        {
+            stream.SetLength(64L * 1024 * 1024);
+        }
+        File.WriteAllText(Path.Combine(fixture.ProjectDirectory, "Late.cs"), "namespace Fixture; public class Late {} ");
+
+        EvaluatedBuildInputManifestV1 result = fixture.Collect();
+
+        Assert.That(result.IneligibilityReasons, Does.Contain("input-byte-limit-exceeded"));
+        Assert.That(result.Inputs, Does.Not.Contain("file:src/Fixture/Late.cs"));
+        Assert.That(result.Inputs, Does.Not.Contain("context:configuration"));
+    }
+
+    [Test]
+    public void Collect_ReferenceValuesExceedingInputBudget_AreRejected()
+    {
+        string references = string.Join(string.Empty, Enumerable.Range(0, 10_001)
+            .Select(index => $"<PackageReference Include=\"Package{index}\" Version=\"1.0.0\" />"));
+        using ManifestFixture fixture = ManifestFixture.Create($"<ItemGroup>{references}</ItemGroup>");
+
+        EvaluatedBuildInputManifestV1 result = fixture.Collect();
+
+        Assert.That(result.IneligibilityReasons, Does.Contain("input-limit-exceeded"));
+        Assert.That(result.Inputs.Count, Is.LessThanOrEqualTo(10_000));
+    }
+
+    [Test]
+    public void Collect_MissingNestedCompileInput_ReportsMissingInsteadOfSymlink()
+    {
+        using ManifestFixture fixture = ManifestFixture.Create("<ItemGroup><Compile Include=\"missing/Thing.cs\" /></ItemGroup>");
+
+        EvaluatedBuildInputManifestV1 result = fixture.Collect();
+
+        Assert.That(result.IneligibilityReasons, Does.Contain("missing-compile-input"));
+        Assert.That(result.IneligibilityReasons, Does.Not.Contain("symlink-input-unverified"));
+    }
+
+    [Test]
     [Platform(Exclude = "Win", Reason = "Creating symbolic links requires a Windows developer privilege.")]
     public void Collect_ExplicitSymlinkInput_IsRejected()
     {
