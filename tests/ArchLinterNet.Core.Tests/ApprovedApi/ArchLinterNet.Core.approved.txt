@@ -258,7 +258,8 @@ sealed class ArchLinterNet.Core.Caching.AnalysisCacheLookupResult : System.IEqua
 sealed class ArchLinterNet.Core.Caching.AnalysisCacheLookupStats
   ctor()
   method ArchLinterNet.Core.Caching.AnalysisCacheLookupStats Snapshot()
-  method void RecordLookup(ArchLinterNet.Core.Caching.AnalysisCacheLookupResult result, int ineligibleUnitCount = 0)
+  method void RecordLookup(ArchLinterNet.Core.Caching.AnalysisCacheLookupResult result)
+  method void RecordLookup(ArchLinterNet.Core.Caching.AnalysisCacheLookupResult result, int ineligibleUnitCount)
   property System.Collections.Generic.IReadOnlyDictionary<string,int> RejectReasonCounts {get;}
   property int Hits {get;}
   property int IneligibleUnitCount {get;}
