@@ -134,6 +134,22 @@ public sealed class EvaluatedBuildInputManifestTests
     }
 
     [Test]
+    [Platform(Exclude = "Win", Reason = "Creating symbolic links requires a Windows developer privilege.")]
+    public void Collect_InputBelowSymlinkDirectory_IsRejectedBeforeHashing()
+    {
+        using ManifestFixture fixture = ManifestFixture.Create("<ItemGroup><Compile Include=\"linked/Linked.cs\" /></ItemGroup>");
+        string targetDirectory = Path.Combine(fixture.ProjectDirectory, "target");
+        Directory.CreateDirectory(targetDirectory);
+        File.WriteAllText(Path.Combine(targetDirectory, "Linked.cs"), "namespace Fixture; public class Linked {} ");
+        Directory.CreateSymbolicLink(Path.Combine(fixture.ProjectDirectory, "linked"), targetDirectory);
+
+        EvaluatedBuildInputManifestV1 result = fixture.Collect();
+
+        Assert.That(result.IneligibilityReasons, Does.Contain("symlink-input-unverified"));
+        Assert.That(result.Inputs, Does.Not.Contain("file:src/Fixture/linked/Linked.cs"));
+    }
+
+    [Test]
     public void Collect_EquivalentCheckoutRoots_HasEquivalentDigest()
     {
         using ManifestFixture first = ManifestFixture.Create(string.Empty);

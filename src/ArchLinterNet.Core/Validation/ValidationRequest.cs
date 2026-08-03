@@ -33,5 +33,9 @@ public sealed record ValidationRequest
 
     public string? RequestedTargetFramework { get; init; }
 
+    public string? RequestedPlatform { get; init; }
+
+    public string? RequestedRuntimeIdentifier { get; init; }
+
     public CancellationToken CancellationToken { get; init; } = default;
 }

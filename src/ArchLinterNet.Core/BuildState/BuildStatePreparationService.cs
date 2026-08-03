@@ -234,7 +234,8 @@ public sealed class BuildStatePreparationService : IBuildStatePreparationService
             string? assemblyPath = projectDirectory == null
                 ? null
                 : FindBuiltAssembly(
-                    projectDirectory, project.AssemblyName, request.RequestedConfiguration, request.RequestedTargetFramework);
+                    projectDirectory, project.AssemblyName, request.RequestedConfiguration, request.RequestedTargetFramework,
+                    request.RequestedRuntimeIdentifier);
 
             if (assemblyPath == null)
             {
@@ -265,7 +266,7 @@ public sealed class BuildStatePreparationService : IBuildStatePreparationService
     // violate — ambiguity is intentionally accepted there since ordinary preflight has no
     // request-vs-observed mismatch to check.
     private static string? FindBuiltAssembly(
-        string projectDirectory, string assemblyName, string? configuration, string? targetFramework)
+        string projectDirectory, string assemblyName, string? configuration, string? targetFramework, string? runtimeIdentifier)
     {
         string binDirectory = Path.Combine(projectDirectory, "bin");
         if (!Directory.Exists(binDirectory))
@@ -279,16 +280,17 @@ public sealed class BuildStatePreparationService : IBuildStatePreparationService
             return null;
         }
 
-        if (configuration == null && targetFramework == null)
+        if (configuration == null && targetFramework == null && runtimeIdentifier == null)
         {
             return candidates.OrderByDescending(File.GetLastWriteTimeUtc).First();
         }
 
         return candidates.FirstOrDefault(path => MatchesRequestedOutputPath(
-            Path.GetRelativePath(binDirectory, path), configuration, targetFramework));
+            Path.GetRelativePath(binDirectory, path), configuration, targetFramework, runtimeIdentifier));
     }
 
-    private static bool MatchesRequestedOutputPath(string relativePath, string? configuration, string? targetFramework)
+    private static bool MatchesRequestedOutputPath(string relativePath, string? configuration, string? targetFramework,
+        string? runtimeIdentifier)
     {
         // Array-form Split (not the two-char params overload) to avoid Sonar S3220: the params
         // overload partially matches `Split(char separator, int count, StringSplitOptions)`,
@@ -301,8 +303,10 @@ public sealed class BuildStatePreparationService : IBuildStatePreparationService
             || (segments.Length > 0 && string.Equals(segments[0], configuration, StringComparison.OrdinalIgnoreCase));
         bool targetFrameworkMatches = targetFramework == null
             || (segments.Length > 1 && string.Equals(segments[1], targetFramework, StringComparison.OrdinalIgnoreCase));
+        bool runtimeIdentifierMatches = runtimeIdentifier == null
+            || segments.Any(segment => string.Equals(segment, runtimeIdentifier, StringComparison.OrdinalIgnoreCase));
 
-        return configurationMatches && targetFrameworkMatches;
+        return configurationMatches && targetFrameworkMatches && runtimeIdentifierMatches;
     }
 
     // Resolves an absolute path to the `dotnet` host executable rather than passing the bare
@@ -396,6 +400,15 @@ public sealed class BuildStatePreparationService : IBuildStatePreparationService
             // the whole graph build even though the caller only asked to validate one specific
             // framework.
             AddFrameworkArgument(arguments, request.RequestedTargetFramework);
+            if (request.RequestedPlatform != null)
+            {
+                arguments.Add($"-p:Platform={request.RequestedPlatform}");
+            }
+            if (request.RequestedRuntimeIdentifier != null)
+            {
+                arguments.Add("-r");
+                arguments.Add(request.RequestedRuntimeIdentifier);
+            }
 
             return RunDotnetCommand(request, arguments, "build", BuildStatePreflightState.BuildFailed);
         }

@@ -271,7 +271,9 @@ public sealed class ArchitectureValidationApplicationService(
             request.NoRestore,
             request.RequestedConfiguration,
             request.RequestedTargetFramework,
-            request.CancellationToken));
+            request.CancellationToken,
+            request.RequestedPlatform,
+            request.RequestedRuntimeIdentifier));
     }
 
     private readonly record struct ComposedPolicy(

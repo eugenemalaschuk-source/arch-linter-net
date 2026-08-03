@@ -3434,6 +3434,8 @@ sealed class ArchLinterNet.Core.Validation.AnalysisSnapshotRequest : System.IEqu
   property string? BaselinePath {get;init;}
   property string? ConditionSetName {get;init;}
   property string? RequestedConfiguration {get;init;}
+  property string? RequestedPlatform {get;init;}
+  property string? RequestedRuntimeIdentifier {get;init;}
   property string? RequestedTargetFramework {get;init;}
 sealed class ArchLinterNet.Core.Validation.ArchitectureAnalysisSnapshot : System.IDisposable
   method ArchLinterNet.Core.Validation.ValidationOutcome Evaluate(string mode, ArchLinterNet.Core.Reporting.ValidationTiming? timing = null)
@@ -3974,4 +3976,6 @@ sealed class ArchLinterNet.Core.Validation.ValidationRequest : System.IEquatable
   property string? BaselinePath {get;init;}
   property string? ConditionSetName {get;init;}
   property string? RequestedConfiguration {get;init;}
+  property string? RequestedPlatform {get;init;}
+  property string? RequestedRuntimeIdentifier {get;init;}
   property string? RequestedTargetFramework {get;init;}

@@ -296,7 +296,9 @@ public static class BuildStatePreflightEvaluator
             eligibility = CacheEligibility.CacheIneligible;
         }
         else if (!string.Equals(receipt.EvaluatedManifestFingerprint, manifest.Digest, StringComparison.Ordinal)
-            || receipt.CacheEligibility != CacheEligibility.VerifiedCacheEligible)
+            || receipt.CacheEligibility != manifest.Eligibility
+            || !receipt.CacheIneligibilityReasons.OrderBy(reason => reason, StringComparer.Ordinal)
+                .SequenceEqual(manifest.IneligibilityReasons.OrderBy(reason => reason, StringComparer.Ordinal), StringComparer.Ordinal))
         {
             reasons.Add("receipt-manifest-mismatch");
             eligibility = CacheEligibility.CacheIneligible;

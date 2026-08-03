@@ -55,6 +55,10 @@ public static class EvaluatedBuildInputManifestCollector
                      .Where(path => !IsBuildOutput(path, projectDirectory)))
         {
             AddFile(source, root, inputs, reasons, ref collectedBytes, cancellationToken);
+            if (IsBudgetExhausted(reasons))
+            {
+                break;
+            }
         }
 
         AddValue("context:configuration", configuration, inputs);
@@ -188,10 +192,21 @@ public static class EvaluatedBuildInputManifestCollector
         ref long collectedBytes, CancellationToken cancellationToken, string? kind = null)
     {
         cancellationToken.ThrowIfCancellationRequested();
+        if (IsBudgetExhausted(reasons))
+        {
+            return;
+        }
+
         string fullPath = Path.GetFullPath(path);
         if (!IsContained(fullPath, root))
         {
             reasons.Add("repository-escape");
+            return;
+        }
+
+        if (HasReparsePointAncestor(fullPath, root))
+        {
+            reasons.Add("symlink-input-unverified");
             return;
         }
 
@@ -202,7 +217,7 @@ public static class EvaluatedBuildInputManifestCollector
         }
 
         FileInfo file = new(fullPath);
-        if (file.LinkTarget != null)
+        if (file.LinkTarget != null || (file.Attributes & FileAttributes.ReparsePoint) != 0)
         {
             reasons.Add("symlink-input-unverified");
             return;
@@ -246,6 +261,30 @@ public static class EvaluatedBuildInputManifestCollector
     private static bool IsContained(string path, string root) =>
         path.StartsWith(root.TrimEnd(Path.DirectorySeparatorChar) + Path.DirectorySeparatorChar, StringComparison.Ordinal)
         || PathsEqual(path, root);
+
+    private static bool IsBudgetExhausted(IReadOnlySet<string> reasons) =>
+        reasons.Contains("input-limit-exceeded") || reasons.Contains("input-byte-limit-exceeded");
+
+    private static bool HasReparsePointAncestor(string path, string root)
+    {
+        DirectoryInfo? current = new(Path.GetDirectoryName(path)!);
+        while (current != null)
+        {
+            if (current.LinkTarget != null || (current.Attributes & FileAttributes.ReparsePoint) != 0)
+            {
+                return true;
+            }
+
+            if (PathsEqual(current.FullName, root))
+            {
+                return false;
+            }
+
+            current = current.Parent;
+        }
+
+        return true;
+    }
 
     private static bool PathsEqual(string left, string right) =>
         string.Equals(Path.TrimEndingDirectorySeparator(left), Path.TrimEndingDirectorySeparator(right), StringComparison.Ordinal);
