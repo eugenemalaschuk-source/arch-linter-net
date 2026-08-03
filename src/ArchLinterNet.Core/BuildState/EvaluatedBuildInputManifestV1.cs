@@ -312,6 +312,12 @@ public static class EvaluatedBuildInputManifestCollector
             }
 
             OptionalInputCount++;
+            if (OptionalInputCount == MaximumInputs)
+            {
+                IsExhausted = true;
+                reasons.Add("input-count-budget-exhausted");
+            }
+
             return true;
         }
 

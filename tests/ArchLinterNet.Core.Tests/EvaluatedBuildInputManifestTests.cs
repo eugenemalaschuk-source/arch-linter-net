@@ -184,6 +184,24 @@ public sealed class EvaluatedBuildInputManifestTests
     }
 
     [Test]
+    public void Collect_ReferenceValuesExactlyFillingInputBudget_StopsBeforeSourceTraversal()
+    {
+        // The project file and its SDK consume the first two optional input slots, so 9,998
+        // reference identities fill the 10,000-entry budget exactly.
+        string references = string.Join(string.Empty, Enumerable.Range(0, 9_998)
+            .Select(index => $"<PackageReference Include=\"Package{index}\" Version=\"1.0.0\" />"));
+        using ManifestFixture fixture = ManifestFixture.Create($"<ItemGroup>{references}</ItemGroup>");
+        File.WriteAllText(Path.Combine(fixture.ProjectDirectory, "Late.cs"), "namespace Fixture; public class Late {} ");
+
+        EvaluatedBuildInputManifestV1 result = fixture.Collect();
+
+        Assert.That(result.IneligibilityReasons, Does.Contain("input-count-budget-exhausted"));
+        Assert.That(result.IneligibilityReasons, Does.Not.Contain("input-limit-exceeded"));
+        Assert.That(result.Inputs.Count, Is.EqualTo(10_004));
+        Assert.That(result.Inputs, Does.Not.Contain("file:src/Fixture/Late.cs"));
+    }
+
+    [Test]
     public void Collect_MissingNestedCompileInput_ReportsMissingInsteadOfSymlink()
     {
         using ManifestFixture fixture = ManifestFixture.Create("<ItemGroup><Compile Include=\"missing/Thing.cs\" /></ItemGroup>");
