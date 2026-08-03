@@ -67,7 +67,8 @@ public sealed class PackagedSchemaRegistryTests
     {
         BuildReceiptV1 receipt = new(
             "src/Product/Product.csproj", "Product", "Debug", "net10.0",
-            new string('a', 64), new string('b', 64));
+            new string('a', 64), new string('b', 64), new string('c', 64),
+            CacheEligibility.CacheIneligible, ["package-reference-identity-unverified"]);
         string receiptJson = JsonSerializer.Serialize(receipt);
 
         PackagedSchemaRegistry registry = new();

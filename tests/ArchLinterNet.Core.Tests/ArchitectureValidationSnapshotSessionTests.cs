@@ -92,4 +92,22 @@ public sealed class ArchitectureValidationSnapshotSessionTests
 
         Assert.Throws<OperationCanceledException>(() => builder.CreateSnapshot());
     }
+
+    // Issue #406: WithEnsureBuilt/WithNoRestore feed the same platform/runtime-identifier
+    // preparation request as the CLI's --ensure-built --platform/--runtime-identifier options
+    // (see ValidateCommandHandler.Execution.cs). No project_patterns are configured here, so
+    // preflight has nothing to evaluate against and the run proceeds unblocked — this only proves
+    // the requested platform/runtime identifier flow through to preparation without error.
+    [Test]
+    public void WithEnsureBuilt_PlatformAndRuntimeIdentifier_FlowThroughToValidation()
+    {
+        string policyPath = CreateHarmlessPolicyPath();
+        var builder = new ArchitectureValidationBuilder(policyPath)
+            .WithEnsureBuilt(configuration: "Debug", targetFramework: "net10.0", platform: "AnyCPU", runtimeIdentifier: "linux-x64")
+            .WithNoRestore();
+
+        ArchitectureValidationResult result = builder.ValidateStrict();
+
+        Assert.That(result.Passed, Is.True);
+    }
 }

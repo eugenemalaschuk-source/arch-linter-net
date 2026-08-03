@@ -45,6 +45,8 @@ internal sealed class ValidateCommandDefinition(ValidateCommandHandler handler)
                                 Requested build configuration for build-state preflight
                                 (e.g. Debug, Release)
               --framework <tfm> Requested target framework for build-state preflight
+              --platform <platform> Requested platform for build-state preflight
+              --runtime <rid>     Requested runtime identifier for build-state preflight
           -f, --format <fmt>    Stdout output format: human, json, or sarif
                                 (default: human). See --report for additional
                                 output destinations.
@@ -94,6 +96,8 @@ internal sealed class ValidateCommandDefinition(ValidateCommandHandler handler)
         Option<bool> noRestoreOption = new("--no-restore");
         Option<string> configurationOption = new("--configuration");
         Option<string> targetFrameworkOption = new("--framework");
+        Option<string> platformOption = new("--platform");
+        Option<string> runtimeIdentifierOption = new("--runtime");
         Option<bool> helpOption = new("--help");
         helpOption.Aliases.Add("-h");
         Option<bool> versionOption = new("--version");
@@ -115,6 +119,8 @@ internal sealed class ValidateCommandDefinition(ValidateCommandHandler handler)
         command.Options.Add(noRestoreOption);
         command.Options.Add(configurationOption);
         command.Options.Add(targetFrameworkOption);
+        command.Options.Add(platformOption);
+        command.Options.Add(runtimeIdentifierOption);
         command.Options.Add(helpOption);
         command.Options.Add(versionOption);
 
@@ -131,6 +137,8 @@ internal sealed class ValidateCommandDefinition(ValidateCommandHandler handler)
             noRestoreOption,
             configurationOption,
             targetFrameworkOption,
+            platformOption,
+            runtimeIdentifierOption,
             helpOption,
             versionOption)));
 
@@ -165,6 +173,8 @@ internal sealed class ValidateCommandDefinition(ValidateCommandHandler handler)
         Option<bool> noRestoreOption,
         Option<string> configurationOption,
         Option<string> targetFrameworkOption,
+        Option<string> platformOption,
+        Option<string> runtimeIdentifierOption,
         Option<bool> helpOption,
         Option<bool> versionOption)
     {
@@ -195,7 +205,9 @@ internal sealed class ValidateCommandDefinition(ValidateCommandHandler handler)
             parseResult.GetValue(ensureBuiltOption),
             parseResult.GetValue(noRestoreOption),
             parseResult.GetValue(configurationOption),
-            parseResult.GetValue(targetFrameworkOption))
+            parseResult.GetValue(targetFrameworkOption),
+            parseResult.GetValue(platformOption),
+            parseResult.GetValue(runtimeIdentifierOption))
         {
             IsFormatExplicit = isFormatExplicit,
             AdditionalSinks = additionalSinks,

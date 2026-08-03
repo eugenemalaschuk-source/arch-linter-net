@@ -122,3 +122,36 @@ The `ArchLinterNet.Testing` API SHALL expose preflight diagnostics on the valida
 - **WHEN** a Testing API caller validates a project graph with a missing artifact and does not call `WithEnsureBuilt()`
 - **THEN** the returned result's preflight diagnostics include a `missing-artifact` entry and no contract results are produced
 
+### Requirement: Preflight exposes evaluated-manifest eligibility consistently
+The build-state preflight result, CLI diagnostics, and Testing API SHALL expose the same per-analysis-unit evaluated-manifest eligibility and sorted invalidation reasons. A cache-ineligible outcome SHALL not be presented as a cache hit or authorization, and it SHALL not redefine the existing primary ordinary-preflight state categories.
+
+#### Scenario: Legacy receipt lacks evaluated evidence
+- **WHEN** an otherwise current legacy receipt lacks the evaluated manifest and required artifact verification evidence
+- **THEN** ordinary preflight retains its existing result while the cache eligibility is `cache-ineligible` with an explicit reason
+
+#### Scenario: Machine-readable consumer observes the result
+- **WHEN** CLI or Testing API emits build-state/profile diagnostics for a selected project
+- **THEN** both projections contain the same eligibility value and invalidation reasons
+
+### Requirement: Every selected analysis unit has an eligibility outcome
+The system SHALL attach exactly one cache eligibility outcome to every selected analysis unit, including missing, stale, wrong-context, unverifiable, cancelled, and preparation-failed outcomes. `Platform` and runtime identifier SHALL participate in receipt and eligibility context.
+
+#### Scenario: Preflight blocks a project
+- **WHEN** preflight returns any state other than current
+- **THEN** the diagnostic contains `cache-ineligible` and stable reason codes
+
+### Requirement: Production validation preserves Platform and runtime identifier
+The system SHALL preserve optional Platform and RuntimeIdentifier from public validation and snapshot requests through build-state preflight, output resolution, receipt publication, receipt verification, and evaluated-manifest collection. A requested Platform or RuntimeIdentifier that differs from receipt/output evidence SHALL produce a blocking wrong-context diagnostic and SHALL NOT share a cache-authorization context with another value.
+
+#### Scenario: Validation request selects Platform
+- **WHEN** a CLI, Testing, or application-service validation request specifies Platform
+- **THEN** the preflight request, manifest, selected output, and emitted receipt contain that same Platform
+
+#### Scenario: Validation request selects runtime identifier
+- **WHEN** a CLI, Testing, or application-service validation request specifies RuntimeIdentifier
+- **THEN** the preflight request, manifest, selected output, and emitted receipt contain that same RuntimeIdentifier
+
+#### Scenario: Receipt context differs
+- **WHEN** a receipt was published for a different requested Platform or RuntimeIdentifier
+- **THEN** preflight reports a blocking wrong-context diagnostic before classifying the artifact current
+

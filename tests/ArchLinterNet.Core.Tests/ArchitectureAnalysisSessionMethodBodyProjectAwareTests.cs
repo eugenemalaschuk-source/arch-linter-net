@@ -203,6 +203,7 @@ public sealed class ArchitectureAnalysisSessionMethodBodyProjectAwareTests
     }
 
     [Test]
+    [CancelAfter(30_000)]
     public void CheckMethodBodyContract_ProjectAwareResolutionAvailable_ConditionSetSymbolDefined_IncludesConditionalBlock()
     {
         var contract = new ArchitectureMethodBodyContract
@@ -223,6 +224,7 @@ public sealed class ArchitectureAnalysisSessionMethodBodyProjectAwareTests
     }
 
     [Test]
+    [CancelAfter(30_000)]
     public void CheckMethodBodyContract_ProjectAwareResolutionAvailable_ConditionSetSymbolNotDefined_ExcludesConditionalBlock()
     {
         var contract = new ArchitectureMethodBodyContract

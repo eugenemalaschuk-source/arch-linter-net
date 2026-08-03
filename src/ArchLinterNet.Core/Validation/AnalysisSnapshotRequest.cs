@@ -30,6 +30,10 @@ public sealed record AnalysisSnapshotRequest
 
     public string? RequestedTargetFramework { get; init; }
 
+    public string? RequestedPlatform { get; init; }
+
+    public string? RequestedRuntimeIdentifier { get; init; }
+
     public CancellationToken CancellationToken { get; init; } = default;
 
     public ValidationRequest ForMode(string mode)
@@ -48,6 +52,8 @@ public sealed record AnalysisSnapshotRequest
             NoRestore = NoRestore,
             RequestedConfiguration = RequestedConfiguration,
             RequestedTargetFramework = RequestedTargetFramework,
+            RequestedPlatform = RequestedPlatform,
+            RequestedRuntimeIdentifier = RequestedRuntimeIdentifier,
             CancellationToken = CancellationToken
         };
     }
@@ -67,6 +73,8 @@ public sealed record AnalysisSnapshotRequest
             NoRestore = request.NoRestore,
             RequestedConfiguration = request.RequestedConfiguration,
             RequestedTargetFramework = request.RequestedTargetFramework,
+            RequestedPlatform = request.RequestedPlatform,
+            RequestedRuntimeIdentifier = request.RequestedRuntimeIdentifier,
             CancellationToken = request.CancellationToken
         };
     }

@@ -10,7 +10,11 @@ public sealed record BuildStatePreflightEvidence(
     string? ExpectedOutputPath = null,
     IReadOnlyCollection<string>? SearchedPaths = null,
     string? BuildCommand = null,
-    string? Detail = null)
+    string? Detail = null,
+    string? CacheEligibility = null,
+    IReadOnlyCollection<string>? CacheIneligibilityReasons = null)
 {
     public IReadOnlyCollection<string> SearchedPaths { get; init; } = SearchedPaths ?? Array.Empty<string>();
+    public IReadOnlyCollection<string> CacheIneligibilityReasons { get; init; } =
+        CacheIneligibilityReasons ?? Array.Empty<string>();
 }

@@ -10,6 +10,8 @@ namespace ArchLinterNet.Core.Tests;
 [Category("E2E")]
 public sealed class BuildStatePreflightTests
 {
+    private static readonly string[] _staleManifestReasons = { "evaluated-msbuild-evidence-incomplete" };
+
     private string _repoRoot = null!;
 
     [SetUp]
@@ -93,6 +95,8 @@ public sealed class BuildStatePreflightTests
         Assert.That(result.Blocked, Is.True);
         Assert.That(result.Diagnostics.Single().State, Is.EqualTo(BuildStatePreflightState.MissingArtifact));
         Assert.That(result.Diagnostics.Single().Evidence.BuildCommand, Does.Contain("dotnet build"));
+        Assert.That(result.Diagnostics.Single().Evidence.CacheEligibility, Is.EqualTo("cache-ineligible"));
+        Assert.That(result.Diagnostics.Single().Evidence.CacheIneligibilityReasons, Does.Contain("preflight-missingartifact"));
     }
 
     [Test]
@@ -108,6 +112,7 @@ public sealed class BuildStatePreflightTests
 
         Assert.That(result.Blocked, Is.True);
         Assert.That(result.Diagnostics.Single().State, Is.EqualTo(BuildStatePreflightState.UnverifiableArtifact));
+        Assert.That(result.Diagnostics.Single().Evidence.CacheEligibility, Is.EqualTo("cache-ineligible"));
     }
 
     [Test]
@@ -128,6 +133,48 @@ public sealed class BuildStatePreflightTests
 
         Assert.That(result.Blocked, Is.False);
         Assert.That(result.Diagnostics.Single().State, Is.EqualTo(BuildStatePreflightState.Current));
+    }
+
+    [Test]
+    public void Evaluate_MatchingCacheIneligibleReceipt_DoesNotReportManifestMismatch()
+    {
+        string projectPath = CreateProjectFixture("Fixture", "class C {}");
+        string assemblyPath = CreateFakeAssemblyFile("Fixture");
+        string fingerprint = BuildStateCanonicalHasher.ComputeBuildInputFingerprint(projectPath, _repoRoot);
+        EvaluatedBuildInputManifestV1 manifest = EvaluatedBuildInputManifestCollector.Collect(projectPath, _repoRoot);
+        BuildReceiptStore.Write(assemblyPath, new BuildReceiptV1(
+            projectPath, "Fixture", "Debug", "net10.0", fingerprint,
+            BuildStateCanonicalHasher.ComputeContentDigest(assemblyPath), manifest.Digest, manifest.Eligibility,
+            manifest.IneligibilityReasons));
+
+        BuildStatePreflightResult result = BuildStatePreflightEvaluator.Evaluate(new BuildStatePreflightRequest(
+            _repoRoot, SingleProjectDiscovery(projectPath, "Fixture"), SingleAssemblyResolution(assemblyPath),
+            BuildPreparationMode.Ordinary));
+
+        Assert.That(result.Diagnostics.Single().State, Is.EqualTo(BuildStatePreflightState.Current));
+        Assert.That(result.Diagnostics.Single().Evidence.CacheIneligibilityReasons,
+            Does.Contain("evaluated-msbuild-evidence-incomplete"));
+        Assert.That(result.Diagnostics.Single().Evidence.CacheIneligibilityReasons,
+            Does.Not.Contain("receipt-manifest-mismatch"));
+    }
+
+    [Test]
+    public void Evaluate_StaleEvaluatedManifestFingerprint_ReportsReceiptManifestMismatch()
+    {
+        string projectPath = CreateProjectFixture("Fixture", "class C {}");
+        string assemblyPath = CreateFakeAssemblyFile("Fixture");
+        string fingerprint = BuildStateCanonicalHasher.ComputeBuildInputFingerprint(projectPath, _repoRoot);
+        BuildReceiptStore.Write(assemblyPath, new BuildReceiptV1(
+            projectPath, "Fixture", "Debug", "net10.0", fingerprint,
+            BuildStateCanonicalHasher.ComputeContentDigest(assemblyPath), "stale-manifest-digest", CacheEligibility.CacheIneligible,
+            _staleManifestReasons));
+
+        BuildStatePreflightResult result = BuildStatePreflightEvaluator.Evaluate(new BuildStatePreflightRequest(
+            _repoRoot, SingleProjectDiscovery(projectPath, "Fixture"), SingleAssemblyResolution(assemblyPath),
+            BuildPreparationMode.Ordinary));
+
+        Assert.That(result.Diagnostics.Single().State, Is.EqualTo(BuildStatePreflightState.Current));
+        Assert.That(result.Diagnostics.Single().Evidence.CacheIneligibilityReasons, Does.Contain("receipt-manifest-mismatch"));
     }
 
     [Test]
@@ -189,6 +236,46 @@ public sealed class BuildStatePreflightTests
 
         Assert.That(result.Blocked, Is.True);
         Assert.That(result.Diagnostics.Single().State, Is.EqualTo(BuildStatePreflightState.WrongConfiguration));
+    }
+
+    [Test]
+    public void Evaluate_RequestedPlatformMismatchesReceipt_ReportsWrongConfiguration()
+    {
+        string projectPath = CreateProjectFixture("Fixture", "class C {}");
+        string assemblyPath = CreateFakeAssemblyFile("Fixture");
+        string fingerprint = BuildStateCanonicalHasher.ComputeBuildInputFingerprint(projectPath, _repoRoot);
+        BuildReceiptStore.Write(assemblyPath, new BuildReceiptV1(
+            projectPath, "Fixture", "Debug", "net10.0", fingerprint,
+            BuildStateCanonicalHasher.ComputeContentDigest(assemblyPath), Platform: "AnyCPU"));
+
+        BuildStatePreflightResult result = BuildStatePreflightEvaluator.Evaluate(new BuildStatePreflightRequest(
+            _repoRoot, SingleProjectDiscovery(projectPath, "Fixture"), SingleAssemblyResolution(assemblyPath),
+            BuildPreparationMode.Ordinary, RequestedPlatform: "x64"));
+
+        BuildStatePreflightDiagnostic diagnostic = result.Diagnostics.Single();
+        Assert.That(diagnostic.State, Is.EqualTo(BuildStatePreflightState.WrongConfiguration));
+        Assert.That(diagnostic.Evidence.RequestedConfiguration, Is.EqualTo("x64"));
+        Assert.That(diagnostic.Evidence.ObservedConfiguration, Is.EqualTo("AnyCPU"));
+    }
+
+    [Test]
+    public void Evaluate_RequestedRuntimeIdentifierMismatchesReceipt_ReportsWrongConfiguration()
+    {
+        string projectPath = CreateProjectFixture("Fixture", "class C {}");
+        string assemblyPath = CreateFakeAssemblyFile("Fixture");
+        string fingerprint = BuildStateCanonicalHasher.ComputeBuildInputFingerprint(projectPath, _repoRoot);
+        BuildReceiptStore.Write(assemblyPath, new BuildReceiptV1(
+            projectPath, "Fixture", "Debug", "net10.0", fingerprint,
+            BuildStateCanonicalHasher.ComputeContentDigest(assemblyPath), RuntimeIdentifier: "linux-x64"));
+
+        BuildStatePreflightResult result = BuildStatePreflightEvaluator.Evaluate(new BuildStatePreflightRequest(
+            _repoRoot, SingleProjectDiscovery(projectPath, "Fixture"), SingleAssemblyResolution(assemblyPath),
+            BuildPreparationMode.Ordinary, RequestedRuntimeIdentifier: "win-x64"));
+
+        BuildStatePreflightDiagnostic diagnostic = result.Diagnostics.Single();
+        Assert.That(diagnostic.State, Is.EqualTo(BuildStatePreflightState.WrongConfiguration));
+        Assert.That(diagnostic.Evidence.RequestedConfiguration, Is.EqualTo("win-x64"));
+        Assert.That(diagnostic.Evidence.ObservedConfiguration, Is.EqualTo("linux-x64"));
     }
 
     [Test]

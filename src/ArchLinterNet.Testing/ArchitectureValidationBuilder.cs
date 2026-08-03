@@ -23,6 +23,8 @@ public sealed class ArchitectureValidationBuilder
     private bool _noRestore;
     private string? _requestedConfiguration;
     private string? _requestedTargetFramework;
+    private string? _requestedPlatform;
+    private string? _requestedRuntimeIdentifier;
     private CancellationToken _cancellationToken;
 
     public ArchitectureValidationBuilder(string policyPath)
@@ -77,11 +79,14 @@ public sealed class ArchitectureValidationBuilder
         return this;
     }
 
-    public ArchitectureValidationBuilder WithEnsureBuilt(string? configuration = null, string? targetFramework = null)
+    public ArchitectureValidationBuilder WithEnsureBuilt(string? configuration = null, string? targetFramework = null,
+        string? platform = null, string? runtimeIdentifier = null)
     {
         _preparationMode = BuildPreparationMode.EnsureBuilt;
         _requestedConfiguration = configuration;
         _requestedTargetFramework = targetFramework;
+        _requestedPlatform = platform;
+        _requestedRuntimeIdentifier = runtimeIdentifier;
         return this;
     }
 
@@ -165,6 +170,8 @@ public sealed class ArchitectureValidationBuilder
             NoRestore = _noRestore,
             RequestedConfiguration = _requestedConfiguration,
             RequestedTargetFramework = _requestedTargetFramework,
+            RequestedPlatform = _requestedPlatform,
+            RequestedRuntimeIdentifier = _requestedRuntimeIdentifier,
             CancellationToken = _cancellationToken,
         };
 
@@ -188,6 +195,8 @@ public sealed class ArchitectureValidationBuilder
             NoRestore = _noRestore,
             RequestedConfiguration = _requestedConfiguration,
             RequestedTargetFramework = _requestedTargetFramework,
+            RequestedPlatform = _requestedPlatform,
+            RequestedRuntimeIdentifier = _requestedRuntimeIdentifier,
             CancellationToken = _cancellationToken,
         };
 
