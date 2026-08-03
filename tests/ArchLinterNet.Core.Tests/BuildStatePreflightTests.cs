@@ -195,6 +195,46 @@ public sealed class BuildStatePreflightTests
     }
 
     [Test]
+    public void Evaluate_RequestedPlatformMismatchesReceipt_ReportsWrongConfiguration()
+    {
+        string projectPath = CreateProjectFixture("Fixture", "class C {}");
+        string assemblyPath = CreateFakeAssemblyFile("Fixture");
+        string fingerprint = BuildStateCanonicalHasher.ComputeBuildInputFingerprint(projectPath, _repoRoot);
+        BuildReceiptStore.Write(assemblyPath, new BuildReceiptV1(
+            projectPath, "Fixture", "Debug", "net10.0", fingerprint,
+            BuildStateCanonicalHasher.ComputeContentDigest(assemblyPath), Platform: "AnyCPU"));
+
+        BuildStatePreflightResult result = BuildStatePreflightEvaluator.Evaluate(new BuildStatePreflightRequest(
+            _repoRoot, SingleProjectDiscovery(projectPath, "Fixture"), SingleAssemblyResolution(assemblyPath),
+            BuildPreparationMode.Ordinary, RequestedPlatform: "x64"));
+
+        BuildStatePreflightDiagnostic diagnostic = result.Diagnostics.Single();
+        Assert.That(diagnostic.State, Is.EqualTo(BuildStatePreflightState.WrongConfiguration));
+        Assert.That(diagnostic.Evidence.RequestedConfiguration, Is.EqualTo("x64"));
+        Assert.That(diagnostic.Evidence.ObservedConfiguration, Is.EqualTo("AnyCPU"));
+    }
+
+    [Test]
+    public void Evaluate_RequestedRuntimeIdentifierMismatchesReceipt_ReportsWrongConfiguration()
+    {
+        string projectPath = CreateProjectFixture("Fixture", "class C {}");
+        string assemblyPath = CreateFakeAssemblyFile("Fixture");
+        string fingerprint = BuildStateCanonicalHasher.ComputeBuildInputFingerprint(projectPath, _repoRoot);
+        BuildReceiptStore.Write(assemblyPath, new BuildReceiptV1(
+            projectPath, "Fixture", "Debug", "net10.0", fingerprint,
+            BuildStateCanonicalHasher.ComputeContentDigest(assemblyPath), RuntimeIdentifier: "linux-x64"));
+
+        BuildStatePreflightResult result = BuildStatePreflightEvaluator.Evaluate(new BuildStatePreflightRequest(
+            _repoRoot, SingleProjectDiscovery(projectPath, "Fixture"), SingleAssemblyResolution(assemblyPath),
+            BuildPreparationMode.Ordinary, RequestedRuntimeIdentifier: "win-x64"));
+
+        BuildStatePreflightDiagnostic diagnostic = result.Diagnostics.Single();
+        Assert.That(diagnostic.State, Is.EqualTo(BuildStatePreflightState.WrongConfiguration));
+        Assert.That(diagnostic.Evidence.RequestedConfiguration, Is.EqualTo("win-x64"));
+        Assert.That(diagnostic.Evidence.ObservedConfiguration, Is.EqualTo("linux-x64"));
+    }
+
+    [Test]
     public void Evaluate_RequestedTargetFrameworkNotInProjectButArtifactMissing_ReportsMissingArtifact()
     {
         // Per the normative precedence order, missing-artifact is checked before

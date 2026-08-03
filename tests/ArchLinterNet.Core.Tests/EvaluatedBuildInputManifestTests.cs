@@ -64,6 +64,76 @@ public sealed class EvaluatedBuildInputManifestTests
     }
 
     [Test]
+    public void Collect_MalformedProjectXml_IsCacheIneligible()
+    {
+        using ManifestFixture fixture = ManifestFixture.Create(string.Empty);
+        File.WriteAllText(fixture.ProjectPath, "<Project>");
+
+        EvaluatedBuildInputManifestV1 result = fixture.Collect();
+
+        Assert.That(result.Eligibility, Is.EqualTo(CacheEligibility.CacheIneligible));
+        Assert.That(result.IneligibilityReasons, Does.Contain("project-xml-uninspectable"));
+    }
+
+    [Test]
+    public void Collect_ExplicitMissingCompileInput_IsCacheIneligible()
+    {
+        using ManifestFixture fixture = ManifestFixture.Create("<ItemGroup><Compile Include=\"Missing.cs\" /></ItemGroup>");
+
+        EvaluatedBuildInputManifestV1 result = fixture.Collect();
+
+        Assert.That(result.Eligibility, Is.EqualTo(CacheEligibility.CacheIneligible));
+        Assert.That(result.IneligibilityReasons, Does.Contain("missing-compile-input"));
+    }
+
+    [Test]
+    public void Collect_LocalAnalyzerInput_IsHashedButCacheIneligible()
+    {
+        using ManifestFixture fixture = ManifestFixture.Create("<ItemGroup><Analyzer Include=\"tools/Fixture.Analyzers.dll\" /></ItemGroup>");
+        string analyzer = Path.Combine(fixture.ProjectDirectory, "tools", "Fixture.Analyzers.dll");
+        Directory.CreateDirectory(Path.GetDirectoryName(analyzer)!);
+        File.WriteAllText(analyzer, "not-an-assembly");
+
+        EvaluatedBuildInputManifestV1 result = fixture.Collect();
+
+        Assert.That(result.Inputs, Does.Contain("file:src/Fixture/tools/Fixture.Analyzers.dll"));
+        Assert.That(result.IneligibilityReasons, Does.Contain("analyzer-or-generator-identity-unverified"));
+    }
+
+    [Test]
+    public void Collect_InputExceedingByteBudget_IsRejectedBeforeHashing()
+    {
+        using ManifestFixture fixture = ManifestFixture.Create(string.Empty);
+        string largeSource = Path.Combine(fixture.ProjectDirectory, "Large.cs");
+        using (FileStream stream = File.Create(largeSource))
+        {
+            stream.SetLength(64L * 1024 * 1024);
+        }
+
+        EvaluatedBuildInputManifestV1 result = fixture.Collect();
+
+        Assert.That(result.Eligibility, Is.EqualTo(CacheEligibility.CacheIneligible));
+        Assert.That(result.IneligibilityReasons, Does.Contain("input-byte-limit-exceeded"));
+        Assert.That(result.Inputs, Does.Not.Contain("file:src/Fixture/Large.cs"));
+    }
+
+    [Test]
+    [Platform(Exclude = "Win", Reason = "Creating symbolic links requires a Windows developer privilege.")]
+    public void Collect_ExplicitSymlinkInput_IsRejected()
+    {
+        using ManifestFixture fixture = ManifestFixture.Create("<ItemGroup><Compile Include=\"Linked.cs\" /></ItemGroup>");
+        string target = Path.Combine(fixture.ProjectDirectory, "Real.cs");
+        File.WriteAllText(target, "namespace Fixture; public class Real {} ");
+        File.CreateSymbolicLink(Path.Combine(fixture.ProjectDirectory, "Linked.cs"), target);
+
+        EvaluatedBuildInputManifestV1 result = fixture.Collect();
+
+        Assert.That(result.Eligibility, Is.EqualTo(CacheEligibility.CacheIneligible));
+        Assert.That(result.IneligibilityReasons, Does.Contain("symlink-input-unverified"));
+        Assert.That(result.Inputs, Does.Not.Contain("file:src/Fixture/Linked.cs"));
+    }
+
+    [Test]
     public void Collect_EquivalentCheckoutRoots_HasEquivalentDigest()
     {
         using ManifestFixture first = ManifestFixture.Create(string.Empty);
