@@ -104,7 +104,7 @@ internal static class ArchitectureValidationCacheSupport
             Rejects = populationRejects + (lookups?.Rejects ?? 0),
             BytesRead = lookups?.BytesRead ?? 0,
             BytesWritten = populationOutcome.BytesWritten,
-            IneligibleUnitCount = populationOutcome.IneligibleProjectCount,
+            IneligibleUnitCount = populationOutcome.IneligibleProjectCount + (lookups?.IneligibleUnitCount ?? 0),
             CorruptionEvents = AnalysisCacheCorruptionClassifier.CountCorruptionEvents(rejectReasonCounts),
             CancelledBeforePublish = populationOutcome.PopulationAttempted
                 && populationOutcome.RejectReason == AnalysisCacheRejectReason.Cancelled ? 1 : 0,

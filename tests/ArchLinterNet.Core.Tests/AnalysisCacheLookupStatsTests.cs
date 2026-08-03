@@ -21,4 +21,16 @@ public sealed class AnalysisCacheLookupStatsTests
             Assert.That(stats.RejectReasonCounts, Is.Empty);
         });
     }
+
+    [Test]
+    public void RecordLookup_IneligibleProjectUnits_AreIncludedInSnapshot()
+    {
+        AnalysisCacheLookupStats stats = new();
+
+        stats.RecordLookup(
+            AnalysisCacheLookupResult.Reject(AnalysisCacheRejectReason.IneligibleBuildInput),
+            ineligibleUnitCount: 3);
+
+        Assert.That(stats.Snapshot().IneligibleUnitCount, Is.EqualTo(3));
+    }
 }

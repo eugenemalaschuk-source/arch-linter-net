@@ -10,13 +10,18 @@ public sealed class AnalysisCacheLookupStats
     private int _hits;
     private int _misses;
     private int _rejects;
+    private int _ineligibleUnitCount;
     private long _bytesRead;
     private readonly Dictionary<string, int> _rejectReasonCounts = new(StringComparer.Ordinal);
 
-    public void RecordLookup(AnalysisCacheLookupResult result)
+    // An ineligible project is discovered while preparing a lookup, before a post-run population
+    // authorization can exist. Carry that observed count with the lookup so profile accounting
+    // does not drop it merely because TOCTOU-safe population correctly skips the later write.
+    public void RecordLookup(AnalysisCacheLookupResult result, int ineligibleUnitCount = 0)
     {
         _lookups++;
         _bytesRead += result.BytesRead;
+        _ineligibleUnitCount += Math.Max(0, ineligibleUnitCount);
 
         switch (result.Outcome)
         {
@@ -54,6 +59,7 @@ public sealed class AnalysisCacheLookupStats
             _hits = _hits,
             _misses = _misses,
             _rejects = _rejects,
+            _ineligibleUnitCount = _ineligibleUnitCount,
             _bytesRead = _bytesRead,
         };
         foreach ((string key, int value) in _rejectReasonCounts)
@@ -71,6 +77,8 @@ public sealed class AnalysisCacheLookupStats
     public int Misses => _misses;
 
     public int Rejects => _rejects;
+
+    public int IneligibleUnitCount => _ineligibleUnitCount;
 
     public long BytesRead => _bytesRead;
 

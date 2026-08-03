@@ -197,7 +197,7 @@ internal sealed partial class ValidateCommandHandler
             Rejects = state.Rejects + (lookups?.Rejects ?? 0),
             BytesRead = lookups?.BytesRead ?? 0,
             BytesWritten = state.BytesWritten,
-            IneligibleUnitCount = state.IneligibleUnitCount,
+            IneligibleUnitCount = state.IneligibleUnitCount + (lookups?.IneligibleUnitCount ?? 0),
             CorruptionEvents = AnalysisCacheCorruptionClassifier.CountCorruptionEvents(rejectReasonCounts),
             CancelledBeforePublish = state.CancelledBeforePublish,
             Mode = ResolveCacheOptions(options).ModeCategory,

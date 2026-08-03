@@ -451,7 +451,7 @@ public sealed class ArchitectureAnalysisSnapshot : IDisposable
 
         lock (_gate)
         {
-            _cacheStats.RecordLookup(lookup);
+            _cacheStats.RecordLookup(lookup, preparation.IneligibleUnitCount);
         }
 
         if (lookup.Outcome != AnalysisCacheLookupOutcome.Hit || lookup.Entry is null)

@@ -28,7 +28,8 @@ public static class AnalysisCachePopulation
 
     internal readonly record struct LookupPreparation(
         AnalysisCacheLookupResult Lookup,
-        PreparedAuthorization? Authorization);
+        PreparedAuthorization? Authorization,
+        int IneligibleUnitCount = 0);
 
     // PopulationAttempted distinguishes a cache hit/no-cache path (no write attempted) from a
     // rejected publication. Hosts must not turn a hit into a synthetic Write in their profile.
@@ -101,7 +102,7 @@ public static class AnalysisCachePopulation
             AnalysisCacheLookupResult lookup = rejected.RejectReason == AnalysisCacheRejectReason.Disabled
                 ? AnalysisCacheLookupResult.Miss(AnalysisCacheRejectReason.Disabled)
                 : AnalysisCacheLookupResult.Reject(rejected.RejectReason ?? AnalysisCacheRejectReason.Corrupt);
-            return new LookupPreparation(lookup, null);
+            return new LookupPreparation(lookup, null, rejected.IneligibleProjectCount);
         }
 
         return new LookupPreparation(
