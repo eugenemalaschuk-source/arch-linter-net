@@ -157,6 +157,25 @@ public sealed class BuildStatePreflightTests
     }
 
     [Test]
+    public void Evaluate_StaleEvaluatedManifestFingerprint_ReportsReceiptManifestMismatch()
+    {
+        string projectPath = CreateProjectFixture("Fixture", "class C {}");
+        string assemblyPath = CreateFakeAssemblyFile("Fixture");
+        string fingerprint = BuildStateCanonicalHasher.ComputeBuildInputFingerprint(projectPath, _repoRoot);
+        BuildReceiptStore.Write(assemblyPath, new BuildReceiptV1(
+            projectPath, "Fixture", "Debug", "net10.0", fingerprint,
+            BuildStateCanonicalHasher.ComputeContentDigest(assemblyPath), "stale-manifest-digest", CacheEligibility.CacheIneligible,
+            new[] { "evaluated-msbuild-evidence-incomplete" }));
+
+        BuildStatePreflightResult result = BuildStatePreflightEvaluator.Evaluate(new BuildStatePreflightRequest(
+            _repoRoot, SingleProjectDiscovery(projectPath, "Fixture"), SingleAssemblyResolution(assemblyPath),
+            BuildPreparationMode.Ordinary));
+
+        Assert.That(result.Diagnostics.Single().State, Is.EqualTo(BuildStatePreflightState.Current));
+        Assert.That(result.Diagnostics.Single().Evidence.CacheIneligibilityReasons, Does.Contain("receipt-manifest-mismatch"));
+    }
+
+    [Test]
     public void Evaluate_SourceChangedSinceReceipt_ReportsStaleArtifact()
     {
         string projectPath = CreateProjectFixture("Fixture", "class C {}");

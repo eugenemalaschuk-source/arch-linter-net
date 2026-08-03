@@ -76,6 +76,55 @@ public sealed class EvaluatedBuildInputManifestTests
     }
 
     [Test]
+    public void Collect_WellFormedXmlWithWrongRootElement_IsUninspectable()
+    {
+        using ManifestFixture fixture = ManifestFixture.Create(string.Empty);
+        File.WriteAllText(fixture.ProjectPath, "<NotAProject />");
+
+        EvaluatedBuildInputManifestV1 result = fixture.Collect();
+
+        Assert.That(result.IneligibilityReasons, Does.Contain("project-xml-uninspectable"));
+    }
+
+    [Test]
+    public void Collect_ReferenceMissingIncludeAttribute_IsUninspectableIdentity()
+    {
+        using ManifestFixture fixture = ManifestFixture.Create("<ItemGroup><PackageReference Version=\"1.0.0\" /></ItemGroup>");
+
+        EvaluatedBuildInputManifestV1 result = fixture.Collect();
+
+        Assert.That(result.IneligibilityReasons, Does.Contain("uninspectable-packagereference-identity"));
+    }
+
+    [Test]
+    public void Collect_FrameworkReferenceAndAssemblyReference_AreIdentityUnverified()
+    {
+        using ManifestFixture fixture = ManifestFixture.Create(
+            "<ItemGroup><FrameworkReference Include=\"Microsoft.NETCore.App\" />" +
+            "<Reference Include=\"System.Data\" /></ItemGroup>");
+
+        EvaluatedBuildInputManifestV1 result = fixture.Collect();
+
+        Assert.That(result.IneligibilityReasons, Does.Contain("framework-reference-identity-unverified"));
+        Assert.That(result.IneligibilityReasons, Does.Contain("assembly-reference-identity-unverified"));
+    }
+
+    [Test]
+    public void Collect_AncestorDirectoryBuildProps_IsIncludedAsInputAndChangesDigest()
+    {
+        using ManifestFixture fixture = ManifestFixture.Create(string.Empty);
+        string ancestorProps = Path.Combine(fixture.Root, "Directory.Build.props");
+        File.WriteAllText(ancestorProps, "<Project />");
+
+        EvaluatedBuildInputManifestV1 first = fixture.Collect();
+        File.WriteAllText(ancestorProps, "<Project><PropertyGroup><X>1</X></PropertyGroup></Project>");
+        EvaluatedBuildInputManifestV1 second = fixture.Collect();
+
+        Assert.That(first.Inputs, Does.Contain("file:Directory.Build.props"));
+        Assert.That(second.Digest, Is.Not.EqualTo(first.Digest));
+    }
+
+    [Test]
     public void Collect_ExplicitMissingCompileInput_IsCacheIneligible()
     {
         using ManifestFixture fixture = ManifestFixture.Create("<ItemGroup><Compile Include=\"Missing.cs\" /></ItemGroup>");
