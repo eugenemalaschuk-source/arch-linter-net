@@ -49,7 +49,7 @@ public static class BuildStatePreflightEvaluator
 
         ElevateInconsistentDependencyArtifacts(discoveredProjects, diagnosticsByProjectPath);
 
-        return new BuildStatePreflightResult(diagnosticsByProjectPath.Values.ToArray());
+        return new BuildStatePreflightResult(diagnosticsByProjectPath.Values.Select(EnsureCacheEligibility).ToArray());
     }
 
     // Shared with BuildStatePreparationService.CheckRestorePrerequisites so --no-restore checks
@@ -214,6 +214,32 @@ public static class BuildStatePreflightEvaluator
                 });
         }
 
+        if (request.RequestedPlatform != null
+            && !string.Equals(receipt.Platform, request.RequestedPlatform, StringComparison.OrdinalIgnoreCase))
+        {
+            return Diagnostic(project, BuildStatePreflightState.WrongConfiguration,
+                Evidence(project) with
+                {
+                    RequestedConfiguration = request.RequestedPlatform,
+                    ObservedConfiguration = receipt.Platform,
+                    ExpectedOutputPath = assemblyPath,
+                    Detail = "Receipt platform does not match the requested platform."
+                });
+        }
+
+        if (request.RequestedRuntimeIdentifier != null
+            && !string.Equals(receipt.RuntimeIdentifier, request.RequestedRuntimeIdentifier, StringComparison.OrdinalIgnoreCase))
+        {
+            return Diagnostic(project, BuildStatePreflightState.WrongConfiguration,
+                Evidence(project) with
+                {
+                    RequestedConfiguration = request.RequestedRuntimeIdentifier,
+                    ObservedConfiguration = receipt.RuntimeIdentifier,
+                    ExpectedOutputPath = assemblyPath,
+                    Detail = "Receipt runtime identifier does not match the requested runtime identifier."
+                });
+        }
+
         return null;
     }
 
@@ -253,10 +279,10 @@ public static class BuildStatePreflightEvaluator
     {
         EvaluatedBuildInputManifestV1 manifest = EvaluatedBuildInputManifestCollector.Collect(
             project.Path, request.RepositoryRoot, request.RequestedConfiguration, request.RequestedTargetFramework,
-            cancellationToken: request.CancellationToken);
+            request.RequestedPlatform, request.RequestedRuntimeIdentifier, request.CancellationToken);
         EvaluatedBuildInputManifestV1 publicationCheck = EvaluatedBuildInputManifestCollector.Collect(
             project.Path, request.RepositoryRoot, request.RequestedConfiguration, request.RequestedTargetFramework,
-            cancellationToken: request.CancellationToken);
+            request.RequestedPlatform, request.RequestedRuntimeIdentifier, request.CancellationToken);
         List<string> reasons = manifest.IneligibilityReasons.ToList();
         CacheEligibility eligibility = manifest.Eligibility;
         if (!string.Equals(manifest.Digest, publicationCheck.Digest, StringComparison.Ordinal))
@@ -284,6 +310,23 @@ public static class BuildStatePreflightEvaluator
                 : "cache-ineligible",
             CacheIneligibilityReasons = reasons.OrderBy(reason => reason, StringComparer.Ordinal).Distinct(StringComparer.Ordinal).ToArray()
         });
+    }
+
+    internal static BuildStatePreflightDiagnostic EnsureCacheEligibility(BuildStatePreflightDiagnostic diagnostic)
+    {
+        if (diagnostic.Evidence.CacheEligibility != null)
+        {
+            return diagnostic;
+        }
+
+        return diagnostic with
+        {
+            Evidence = diagnostic.Evidence with
+            {
+                CacheEligibility = "cache-ineligible",
+                CacheIneligibilityReasons = [$"preflight-{diagnostic.State.ToString().ToLowerInvariant()}"]
+            }
+        };
     }
 
     // A dependent project whose own artifact is otherwise current cannot be trusted if a project

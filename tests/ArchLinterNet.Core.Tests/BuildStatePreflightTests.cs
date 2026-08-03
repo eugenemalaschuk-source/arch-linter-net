@@ -93,6 +93,8 @@ public sealed class BuildStatePreflightTests
         Assert.That(result.Blocked, Is.True);
         Assert.That(result.Diagnostics.Single().State, Is.EqualTo(BuildStatePreflightState.MissingArtifact));
         Assert.That(result.Diagnostics.Single().Evidence.BuildCommand, Does.Contain("dotnet build"));
+        Assert.That(result.Diagnostics.Single().Evidence.CacheEligibility, Is.EqualTo("cache-ineligible"));
+        Assert.That(result.Diagnostics.Single().Evidence.CacheIneligibilityReasons, Does.Contain("preflight-missingartifact"));
     }
 
     [Test]
@@ -108,6 +110,7 @@ public sealed class BuildStatePreflightTests
 
         Assert.That(result.Blocked, Is.True);
         Assert.That(result.Diagnostics.Single().State, Is.EqualTo(BuildStatePreflightState.UnverifiableArtifact));
+        Assert.That(result.Diagnostics.Single().Evidence.CacheEligibility, Is.EqualTo("cache-ineligible"));
     }
 
     [Test]

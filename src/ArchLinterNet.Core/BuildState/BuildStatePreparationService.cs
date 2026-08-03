@@ -30,14 +30,18 @@ public sealed class BuildStatePreparationService : IBuildStatePreparationService
             BuildStatePreflightResult restoreCheck = CheckRestorePrerequisites(request);
             if (restoreCheck.Blocked)
             {
-                return restoreCheck;
+                return WithCacheEligibility(restoreCheck);
             }
         }
 
-        return request.PreparationMode == BuildPreparationMode.EnsureBuilt
+        BuildStatePreflightResult result = request.PreparationMode == BuildPreparationMode.EnsureBuilt
             ? EnsureBuilt(request)
             : BuildStatePreflightEvaluator.Evaluate(request);
+        return WithCacheEligibility(result);
     }
+
+    private static BuildStatePreflightResult WithCacheEligibility(BuildStatePreflightResult result) =>
+        new(result.Diagnostics.Select(BuildStatePreflightEvaluator.EnsureCacheEligibility).ToArray());
 
     // dotnet restore/build resolves prerequisites from the local NuGet cache without network
     // access whenever a project has already been restored once; the presence of
@@ -601,10 +605,10 @@ public sealed class BuildStatePreparationService : IBuildStatePreparationService
             string assemblyDigest = BuildStateCanonicalHasher.ComputeContentDigest(assemblyPath, request.CancellationToken);
             EvaluatedBuildInputManifestV1 manifest = EvaluatedBuildInputManifestCollector.Collect(
                 project.Path, request.RepositoryRoot, request.RequestedConfiguration, request.RequestedTargetFramework,
-                cancellationToken: request.CancellationToken);
+                request.RequestedPlatform, request.RequestedRuntimeIdentifier, request.CancellationToken);
             EvaluatedBuildInputManifestV1 publicationCheck = EvaluatedBuildInputManifestCollector.Collect(
                 project.Path, request.RepositoryRoot, request.RequestedConfiguration, request.RequestedTargetFramework,
-                cancellationToken: request.CancellationToken);
+                request.RequestedPlatform, request.RequestedRuntimeIdentifier, request.CancellationToken);
             string publicationAssemblyDigest = BuildStateCanonicalHasher.ComputeContentDigest(assemblyPath, request.CancellationToken);
 
             if (!string.Equals(manifest.Digest, publicationCheck.Digest, StringComparison.Ordinal)
@@ -633,7 +637,9 @@ public sealed class BuildStatePreparationService : IBuildStatePreparationService
                 assemblyDigest,
                 manifest.Digest,
                 manifest.Eligibility,
-                manifest.IneligibilityReasons));
+                manifest.IneligibilityReasons,
+                request.RequestedPlatform,
+                request.RequestedRuntimeIdentifier));
         }
     }
 }

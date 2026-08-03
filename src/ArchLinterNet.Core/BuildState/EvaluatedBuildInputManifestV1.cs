@@ -22,6 +22,7 @@ public sealed record EvaluatedBuildInputManifestV1(
 public static class EvaluatedBuildInputManifestCollector
 {
     private const int MaximumInputs = 10_000;
+    private const long MaximumInputBytes = 64L * 1024 * 1024;
 
     public static EvaluatedBuildInputManifestV1 Collect(
         string projectPath,
@@ -38,17 +39,22 @@ public static class EvaluatedBuildInputManifestCollector
             ?? throw new InvalidOperationException($"Cannot determine project directory for '{projectPath}'.");
         SortedDictionary<string, string> inputs = new(StringComparer.Ordinal);
         SortedSet<string> reasons = new(StringComparer.Ordinal);
+        long collectedBytes = 0;
 
-        AddFile(project, root, inputs, reasons, cancellationToken);
-        AddAncestorImports(projectDirectory, root, inputs, reasons, cancellationToken);
-        CollectProjectXml(project, root, inputs, reasons, cancellationToken);
+        AddFile(project, root, inputs, reasons, ref collectedBytes, cancellationToken);
+        AddAncestorImports(projectDirectory, root, inputs, reasons, ref collectedBytes, cancellationToken);
+        CollectProjectXml(project, root, inputs, reasons, ref collectedBytes, cancellationToken);
 
         // Default SDK compile items are deterministic under the project root. Explicit globs are
         // rejected below because static glob semantics can be changed by imports/properties.
-        foreach (string source in Directory.EnumerateFiles(projectDirectory, "*.cs", SearchOption.AllDirectories)
+        foreach (string source in Directory.EnumerateFiles(projectDirectory, "*.cs", new EnumerationOptions
+        {
+            RecurseSubdirectories = true,
+            AttributesToSkip = FileAttributes.ReparsePoint
+        })
                      .Where(path => !IsBuildOutput(path, projectDirectory)))
         {
-            AddFile(source, root, inputs, reasons, cancellationToken);
+            AddFile(source, root, inputs, reasons, ref collectedBytes, cancellationToken);
         }
 
         AddValue("context:configuration", configuration, inputs);
@@ -56,10 +62,10 @@ public static class EvaluatedBuildInputManifestCollector
         AddValue("context:platform", platform, inputs);
         AddValue("context:runtimeIdentifier", runtimeIdentifier, inputs);
 
-        if (inputs.Count > MaximumInputs)
-        {
-            reasons.Add("input-limit-exceeded");
-        }
+        // Static XML inspection cannot prove evaluated SDK imports, global properties,
+        // generators, framework packs, or compiler task inputs. It is evidence for stale
+        // diagnostics only, never authorization for a persistent cache.
+        reasons.Add("evaluated-msbuild-evidence-incomplete");
 
         string canonical = string.Join('\n', inputs.Select(entry => $"{entry.Key}:{entry.Value}"));
         string digest = Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(
@@ -73,7 +79,7 @@ public static class EvaluatedBuildInputManifestCollector
 
     private static void CollectProjectXml(
         string projectPath, string root, SortedDictionary<string, string> inputs, SortedSet<string> reasons,
-        CancellationToken cancellationToken)
+        ref long collectedBytes, CancellationToken cancellationToken)
     {
         XDocument document;
         try
@@ -114,7 +120,7 @@ public static class EvaluatedBuildInputManifestCollector
                 }
 
                 string candidate = Path.GetFullPath(Path.Combine(directory, include));
-                AddFile(candidate, root, inputs, reasons, cancellationToken, name.ToLowerInvariant());
+                AddFile(candidate, root, inputs, reasons, ref collectedBytes, cancellationToken, name.ToLowerInvariant());
                 if (name == "Analyzer")
                 {
                     // A path digest proves a local analyzer but not an arbitrary package-selected
@@ -136,7 +142,7 @@ public static class EvaluatedBuildInputManifestCollector
                     if (name == "ProjectReference")
                     {
                         AddFile(Path.GetFullPath(Path.Combine(directory, identity)), root, inputs, reasons,
-                            cancellationToken, "projectreference");
+                            ref collectedBytes, cancellationToken, "projectreference");
                     }
                     else if (name == "PackageReference")
                     {
@@ -156,7 +162,7 @@ public static class EvaluatedBuildInputManifestCollector
     }
 
     private static void AddAncestorImports(string directory, string root, SortedDictionary<string, string> inputs,
-        SortedSet<string> reasons, CancellationToken cancellationToken)
+        SortedSet<string> reasons, ref long collectedBytes, CancellationToken cancellationToken)
     {
         for (DirectoryInfo? current = new(directory); current != null; current = current.Parent)
         {
@@ -165,7 +171,7 @@ public static class EvaluatedBuildInputManifestCollector
                 string path = Path.Combine(current.FullName, name);
                 if (File.Exists(path))
                 {
-                    AddFile(path, root, inputs, reasons, cancellationToken);
+                    AddFile(path, root, inputs, reasons, ref collectedBytes, cancellationToken);
                 }
             }
 
@@ -179,7 +185,7 @@ public static class EvaluatedBuildInputManifestCollector
     }
 
     private static void AddFile(string path, string root, SortedDictionary<string, string> inputs, SortedSet<string> reasons,
-        CancellationToken cancellationToken, string? kind = null)
+        ref long collectedBytes, CancellationToken cancellationToken, string? kind = null)
     {
         cancellationToken.ThrowIfCancellationRequested();
         string fullPath = Path.GetFullPath(path);
@@ -195,8 +201,28 @@ public static class EvaluatedBuildInputManifestCollector
             return;
         }
 
+        FileInfo file = new(fullPath);
+        if (file.LinkTarget != null)
+        {
+            reasons.Add("symlink-input-unverified");
+            return;
+        }
+
+        if (inputs.Count >= MaximumInputs)
+        {
+            reasons.Add("input-limit-exceeded");
+            return;
+        }
+
+        if (file.Length > MaximumInputBytes - collectedBytes)
+        {
+            reasons.Add("input-byte-limit-exceeded");
+            return;
+        }
+
         string logicalPath = Path.GetRelativePath(root, fullPath).Replace('\\', '/');
         string digest = BuildStateCanonicalHasher.ComputeContentDigest(fullPath, cancellationToken);
+        collectedBytes += file.Length;
         if (!inputs.TryAdd($"file:{logicalPath}", digest))
         {
             reasons.Add("ambiguous-input-path");

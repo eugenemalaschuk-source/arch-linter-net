@@ -12,7 +12,9 @@ public sealed record BuildReceiptV1(
     string AssemblyContentDigest,
     string? EvaluatedManifestFingerprint = null,
     CacheEligibility? CacheEligibility = null,
-    IReadOnlyList<string>? CacheIneligibilityReasons = null)
+    IReadOnlyList<string>? CacheIneligibilityReasons = null,
+    string? Platform = null,
+    string? RuntimeIdentifier = null)
 {
     public IReadOnlyList<string> CacheIneligibilityReasons { get; init; } =
         CacheIneligibilityReasons ?? Array.Empty<string>();
