@@ -261,7 +261,7 @@ public sealed class ArchitectureValidationBuilder
                 : new[] { _policyPath };
             AnalysisCacheKey key = new(
                 AnalysisCacheKey.ComputeRepositoryRootDigest(repositoryRoot),
-                AnalysisCacheKey.ComputePolicyDigest(policyFiles),
+                AnalysisCacheKey.ComputePolicyDigest(policyFiles, _cancellationToken),
                 AnalysisCacheKey.ComputeModeSet(new[] { mode }),
                 _conditionSetName,
                 AnalysisCacheKey.ComputeContractIdsDigest(_contractIds ?? Array.Empty<string>()),

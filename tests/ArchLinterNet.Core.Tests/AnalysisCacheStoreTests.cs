@@ -226,4 +226,113 @@ public sealed class AnalysisCacheStoreTests
 
         Assert.Throws<AnalysisCacheLocationRejectedException>(() => AnalysisCacheStore.Clear(unsafeLocation));
     }
+
+    [Test]
+    public void Clear_NoCacheDirectory_IsNoOp()
+    {
+        Assert.DoesNotThrow(() => AnalysisCacheStore.Clear(_location));
+    }
+
+    [Test]
+    public void Inspect_NoCacheDirectory_ReturnsEmpty()
+    {
+        IReadOnlyList<AnalysisCacheEntrySummary> summaries = AnalysisCacheStore.Inspect(_location);
+
+        Assert.That(summaries, Is.Empty);
+    }
+
+    [Test]
+    public void TryGet_EntryLargerThanMaxBytes_IsSizeExceeded()
+    {
+        AnalysisCacheKey key = CreateKey();
+        AnalysisCacheProjectManifest[] manifests = { EligibleManifest() };
+        AnalysisCacheStore.Put(_location, key, manifests, SampleFacts());
+
+        string entryPath = Directory.EnumerateFiles(_root, "*.json", SearchOption.AllDirectories).Single();
+        File.WriteAllBytes(entryPath, new byte[9 * 1024 * 1024]);
+
+        AnalysisCacheLookupResult result = AnalysisCacheStore.TryGet(_location, key, manifests);
+        Assert.That(result.Outcome, Is.EqualTo(AnalysisCacheLookupOutcome.Reject));
+        Assert.That(result.Reason, Is.EqualTo(AnalysisCacheRejectReason.SizeExceeded));
+    }
+
+    [Test]
+    public void TryGet_IncompatibleFormatVersion_IsRejected()
+    {
+        AnalysisCacheKey key = CreateKey();
+        AnalysisCacheProjectManifest[] manifests = { EligibleManifest() };
+        AnalysisCacheStore.Put(_location, key, manifests, SampleFacts());
+
+        string entryPath = Directory.EnumerateFiles(_root, "*.json", SearchOption.AllDirectories).Single();
+        string content = File.ReadAllText(entryPath).Replace(
+            $"\"FormatVersion\":{AnalysisCacheEnvelope.FormatVersion}", "\"FormatVersion\":999999");
+        File.WriteAllText(entryPath, content);
+
+        AnalysisCacheLookupResult result = AnalysisCacheStore.TryGet(_location, key, manifests);
+        Assert.That(result.Outcome, Is.EqualTo(AnalysisCacheLookupOutcome.Reject));
+        Assert.That(
+            result.Reason,
+            Is.EqualTo(AnalysisCacheRejectReason.IncompatibleFormatVersion).Or.EqualTo(AnalysisCacheRejectReason.IntegrityMismatch));
+    }
+
+    [Test]
+    public void TryGet_IncompatibleToolVersion_IsRejected()
+    {
+        AnalysisCacheKey key = CreateKey();
+        AnalysisCacheProjectManifest[] manifests = { EligibleManifest() };
+        AnalysisCacheStore.Put(_location, key, manifests, SampleFacts());
+
+        string entryPath = Directory.EnumerateFiles(_root, "*.json", SearchOption.AllDirectories).Single();
+        string content = File.ReadAllText(entryPath).Replace(AnalysisCacheEnvelope.ToolVersion, "0.0.0-unknown");
+        File.WriteAllText(entryPath, content);
+
+        AnalysisCacheLookupResult result = AnalysisCacheStore.TryGet(_location, key, manifests);
+        Assert.That(result.Outcome, Is.EqualTo(AnalysisCacheLookupOutcome.Reject));
+        Assert.That(
+            result.Reason,
+            Is.EqualTo(AnalysisCacheRejectReason.IncompatibleToolVersion).Or.EqualTo(AnalysisCacheRejectReason.IntegrityMismatch));
+    }
+
+    [Test]
+    public void TryGet_FewerCurrentProjectsThanStored_IsProjectSetMismatch()
+    {
+        AnalysisCacheKey key = CreateKey();
+        AnalysisCacheProjectManifest[] manifests =
+        {
+            EligibleManifest(),
+            EligibleManifest("src/B/B.csproj", "digest-b"),
+        };
+        AnalysisCacheStore.Put(_location, key, manifests, SampleFacts());
+
+        AnalysisCacheLookupResult result = AnalysisCacheStore.TryGet(_location, key, new[] { EligibleManifest() });
+
+        Assert.That(result.Outcome, Is.EqualTo(AnalysisCacheLookupOutcome.Reject));
+        Assert.That(result.Reason, Is.EqualTo(AnalysisCacheRejectReason.ProjectSetMismatch));
+    }
+
+    [Test]
+    public void Inspect_UnreadableEntry_IsReportedNotReadable()
+    {
+        AnalysisCacheStore.Put(_location, CreateKey(), new[] { EligibleManifest() }, SampleFacts());
+        string entryPath = Directory.EnumerateFiles(_root, "*.json", SearchOption.AllDirectories).Single();
+        File.WriteAllText(entryPath, "{ not valid json");
+
+        IReadOnlyList<AnalysisCacheEntrySummary> summaries = AnalysisCacheStore.Inspect(_location);
+
+        Assert.That(summaries.Count, Is.EqualTo(1));
+        Assert.That(summaries[0].Readable, Is.False);
+    }
+
+    [Test]
+    public void Inspect_EmptyEntryFile_IsReportedNotReadable()
+    {
+        AnalysisCacheStore.Put(_location, CreateKey(), new[] { EligibleManifest() }, SampleFacts());
+        string entryPath = Directory.EnumerateFiles(_root, "*.json", SearchOption.AllDirectories).Single();
+        File.WriteAllText(entryPath, string.Empty);
+
+        IReadOnlyList<AnalysisCacheEntrySummary> summaries = AnalysisCacheStore.Inspect(_location);
+
+        Assert.That(summaries.Count, Is.EqualTo(1));
+        Assert.That(summaries[0].Readable, Is.False);
+    }
 }

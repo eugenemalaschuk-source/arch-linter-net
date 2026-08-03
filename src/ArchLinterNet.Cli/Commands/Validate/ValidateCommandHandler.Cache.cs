@@ -96,7 +96,7 @@ internal sealed partial class ValidateCommandHandler
         AnalysisCachePopulation.Outcome populationOutcome;
         try
         {
-            AnalysisCacheKey key = BuildCacheKey(options, outcome, repositoryRoot);
+            AnalysisCacheKey key = BuildCacheKey(options, outcome, repositoryRoot, _cancellationToken);
             AnalysisCacheFactsV1 facts = new(
                 outcome.Passed,
                 outcome.Violations.Count,
@@ -157,7 +157,7 @@ internal sealed partial class ValidateCommandHandler
     }
 
     private static AnalysisCacheKey BuildCacheKey(
-        ValidateCommandOptions options, ValidationOutcome outcome, string repositoryRoot)
+        ValidateCommandOptions options, ValidationOutcome outcome, string repositoryRoot, CancellationToken cancellationToken)
     {
         IReadOnlyList<string> policyFiles = outcome.PolicyImportPaths.Count > 0
             ? outcome.PolicyImportPaths
@@ -165,7 +165,7 @@ internal sealed partial class ValidateCommandHandler
 
         return new AnalysisCacheKey(
             AnalysisCacheKey.ComputeRepositoryRootDigest(repositoryRoot),
-            AnalysisCacheKey.ComputePolicyDigest(policyFiles),
+            AnalysisCacheKey.ComputePolicyDigest(policyFiles, cancellationToken),
             AnalysisCacheKey.ComputeModeSet(options.Mode.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries)),
             options.ConditionSetName,
             AnalysisCacheKey.ComputeContractIdsDigest(options.ContractIds),
