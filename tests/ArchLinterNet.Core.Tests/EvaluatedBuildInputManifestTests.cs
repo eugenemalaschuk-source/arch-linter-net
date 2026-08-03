@@ -171,7 +171,7 @@ public sealed class EvaluatedBuildInputManifestTests
     }
 
     [Test]
-    public void Collect_ReferenceValuesExceedingInputBudget_AreRejected()
+    public void Collect_ReferenceValuesBeyondInputBudget_StopAtExactBudgetBoundary()
     {
         string references = string.Join(string.Empty, Enumerable.Range(0, 10_001)
             .Select(index => $"<PackageReference Include=\"Package{index}\" Version=\"1.0.0\" />"));
@@ -179,8 +179,8 @@ public sealed class EvaluatedBuildInputManifestTests
 
         EvaluatedBuildInputManifestV1 result = fixture.Collect();
 
-        Assert.That(result.IneligibilityReasons, Does.Contain("input-limit-exceeded"));
-        Assert.That(result.Inputs.Count, Is.LessThanOrEqualTo(10_004));
+        Assert.That(result.IneligibilityReasons, Does.Contain("input-count-budget-exhausted"));
+        Assert.That(result.Inputs.Count, Is.EqualTo(10_004));
     }
 
     [Test]
