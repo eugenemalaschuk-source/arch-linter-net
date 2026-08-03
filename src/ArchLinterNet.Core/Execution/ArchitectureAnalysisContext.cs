@@ -16,7 +16,8 @@ public sealed class ArchitectureAnalysisContext : IDisposable
         IReadOnlyCollection<string> assemblyProbingPaths,
         IReadOnlyCollection<ArchitectureProjectDiscoveryDiagnostic>? discoveryDiagnostics = null,
         ProjectDiscoveryResult? projectDiscovery = null,
-        IArchitectureAssemblyLoadScope? isolatedLoadScope = null)
+        IArchitectureAssemblyLoadScope? isolatedLoadScope = null,
+        IReadOnlyCollection<string>? selectedAssemblyArtifactPaths = null)
     {
         if (string.IsNullOrWhiteSpace(repositoryRoot))
         {
@@ -39,6 +40,13 @@ public sealed class ArchitectureAnalysisContext : IDisposable
             .ToArray()
             ?? Array.Empty<string>();
         _isolatedLoadScope = isolatedLoadScope;
+        SelectedAssemblyArtifactPaths = (selectedAssemblyArtifactPaths ?? targetAssemblies
+                .Select(SafeAssemblyLocation)
+                .Where(static path => path is not null)
+                .Cast<string>())
+            .Select(Path.GetFullPath)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
     }
 
     public string RepositoryRoot { get; }
@@ -54,6 +62,18 @@ public sealed class ArchitectureAnalysisContext : IDisposable
     public ProjectDiscoveryResult? ProjectDiscovery { get; }
 
     public IReadOnlyList<string> DiscoveredProjectPaths { get; }
+
+    // ResolutionResult supplies exact selected paths (including post-build LoadFromStream
+    // assemblies), while the isolated scope adds references it materializes lazily from its
+    // probing paths. These are physical files, not Assembly.Location-derived guesses.
+    internal IReadOnlyList<string> SelectedAssemblyArtifactPaths { get; }
+
+    internal IReadOnlyList<string> LoadedAssemblyArtifactPaths => SelectedAssemblyArtifactPaths
+        .Concat((_isolatedLoadScope as IArchitectureAssemblyLoadScopeArtifactInventory)?.LoadedAssemblyPaths
+            ?? Array.Empty<string>())
+        .Select(Path.GetFullPath)
+        .Distinct(StringComparer.OrdinalIgnoreCase)
+        .ToArray();
 
     // The session receives this one shared recorder when it creates lazily-materialized indexes.
     // ArchitectureAnalysisSnapshot projects the values through its immutable public counters.
@@ -74,5 +94,17 @@ public sealed class ArchitectureAnalysisContext : IDisposable
 
         _disposed = true;
         _isolatedLoadScope?.Dispose();
+    }
+
+    private static string? SafeAssemblyLocation(Assembly assembly)
+    {
+        try
+        {
+            return string.IsNullOrEmpty(assembly.Location) ? null : assembly.Location;
+        }
+        catch (NotSupportedException)
+        {
+            return null;
+        }
     }
 }

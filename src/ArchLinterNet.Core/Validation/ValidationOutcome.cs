@@ -1,4 +1,3 @@
-using ArchLinterNet.Core.Caching;
 using ArchLinterNet.Core.Model;
 using ArchLinterNet.Core.Reporting;
 
@@ -80,10 +79,4 @@ public sealed record ValidationOutcome(
     // blocked execution (BuildBlockedOutcome) or no contract declared these matchers.
     public IReadOnlyList<ArchitectureSubtractiveMatcherParticipation> SubtractiveMatcherParticipation { get; init; } =
         Array.Empty<ArchitectureSubtractiveMatcherParticipation>();
-
-    // Captured by ArchitectureAnalysisSnapshot before contract execution and intentionally not
-    // part of the public result/output model. Hosts hand the completed outcome back to
-    // AnalysisCachePopulation, which uses this opaque state to revalidate pre-analysis inputs
-    // immediately before publication instead of constructing authorization from post-run files.
-    internal AnalysisCachePopulation.PreparedAuthorization? CachePopulationAuthorization { get; init; }
 }

@@ -200,10 +200,10 @@ public sealed class ArchitectureAnalysisSnapshot : IDisposable
                     && !outcome.PreflightBlocked
                     && _cacheAuthorizations.Remove(mode, out AnalysisCachePopulation.PreparedAuthorization? authorization))
                 {
-                    // This opaque plan was captured before contract execution. Hosts use it only
-                    // through AnalysisCachePopulation.TryPopulateCompletedOutcome, which
-                    // re-derives it immediately before Put and rejects any changed input.
-                    outcome = outcome with { CachePopulationAuthorization = authorization };
+                    // This opaque plan was captured before contract execution. It is associated
+                    // by object identity rather than stored on ValidationOutcome itself, so its
+                    // transient cache state cannot change that public record's equality contract.
+                    AnalysisCachePopulation.AttachAuthorization(outcome, authorization, GetCacheArtifactPaths());
                 }
 
                 _evaluatedModes[mode] = outcome;
@@ -444,7 +444,7 @@ public sealed class ArchitectureAnalysisSnapshot : IDisposable
             preparation = AnalysisCachePopulation.TryLookupWithAuthorization(
                 cache.Location, key, cacheProjectPaths, GetCacheArtifactPaths(), _repositoryRoot,
                 cache.Configuration, cache.TargetFramework, cache.Platform, cache.RuntimeIdentifier,
-                HasUnfingerprintedSourceInputs(), cancellationToken);
+                HasUnfingerprintedSourceInputs(mode), cancellationToken);
         }
 
         AnalysisCacheLookupResult lookup = preparation.Lookup;
@@ -495,7 +495,7 @@ public sealed class ArchitectureAnalysisSnapshot : IDisposable
         .Distinct(StringComparer.OrdinalIgnoreCase)
         .ToArray();
 
-    private IReadOnlyList<string> GetCacheArtifactPaths() => GetResolvedAssemblyPaths()
+    private IReadOnlyList<string> GetCacheArtifactPaths() => GetLoadedAssemblyArtifactPaths()
         .SelectMany(path => new[]
         {
             path,
@@ -513,28 +513,42 @@ public sealed class ArchitectureAnalysisSnapshot : IDisposable
     // source roots for execution; those roots have no policy provenance and are covered by their
     // corresponding project manifests, so they must not make an otherwise metadata-only run
     // ineligible.
-    private bool HasUnfingerprintedSourceInputs() => HasExplicitSourceRoots()
+    private bool HasUnfingerprintedSourceInputs(string mode) => HasExplicitSourceRoots()
         || _document.Contracts.StrictMethodBody.Count > 0
-        || _document.Contracts.AuditMethodBody.Count > 0;
+        || _document.Contracts.AuditMethodBody.Count > 0
+        || HasSelectedAsmdefContracts(mode);
+
+    private bool HasSelectedAsmdefContracts(string mode)
+    {
+        if (!_includeAsmdefContracts || _setup is not { } setup)
+        {
+            return false;
+        }
+
+        ArchitectureContractCatalog catalog = ArchitectureContractCatalog.Build(_document);
+        return catalog.ContractsFor(mode, "asmdef").Any(setup.Runner.Session.IsContractSelected);
+    }
 
     private bool HasExplicitSourceRoots() => _document.Provenance.TryGetLocation(
         "/analysis/source_roots", out _);
 
     private IReadOnlyList<string> GetResolvedAssemblyPaths()
     {
-        IArchitectureContractRunner? runner = _setup?.Runner;
-        if (runner is null)
-        {
-            return Array.Empty<string>();
-        }
-
-        return runner.Session.Context.TargetAssemblies
+        return GetSelectedAssemblyArtifactPaths()
+            .Concat(_setup?.Runner.Session.Context.TargetAssemblies
             .Select(SafeAssemblyLocation)
             .Where(path => !string.IsNullOrEmpty(path))
             .Select(path => Path.GetFullPath(path!))
+            ?? Array.Empty<string>())
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToList();
     }
+
+    private IReadOnlyList<string> GetSelectedAssemblyArtifactPaths() =>
+        _setup?.Runner.Session.Context.SelectedAssemblyArtifactPaths ?? Array.Empty<string>();
+
+    private IReadOnlyList<string> GetLoadedAssemblyArtifactPaths() =>
+        _setup?.Runner.Session.Context.LoadedAssemblyArtifactPaths ?? Array.Empty<string>();
 
     private void RecordContractFamilyResultCounts(IReadOnlyDictionary<string, int> resultCounts)
     {

@@ -187,7 +187,7 @@ public sealed class ArchitectureRunnerSetupService(
     {
         return new ArchitectureAnalysisContext(repositoryRoot, resolution.ResolvedAssemblies,
             resolution.MissingAssemblyNames, resolution.AssemblyProbingPaths, discovery.Diagnostics, attemptedDiscovery,
-            resolution.IsolatedLoadScope)
+            resolution.IsolatedLoadScope, resolution.SelectedAssemblyArtifactPaths)
         {
             CancellationToken = cancellationToken
         };

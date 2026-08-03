@@ -228,6 +228,55 @@ public sealed class AnalysisCacheSnapshotSessionPopulationTests
     }
 
     [Test]
+    public void ValidateStrict_SelectedAsmdefContract_IsCacheIneligible()
+    {
+        string assetsDirectory = Path.Combine(_tempDir, "Assets");
+        Directory.CreateDirectory(assetsDirectory);
+        File.WriteAllText(Path.Combine(assetsDirectory, "Runtime.asmdef"), """
+            { "name": "Runtime", "references": ["Editor"] }
+            """);
+        File.WriteAllText(Path.Combine(assetsDirectory, "Editor.asmdef"), """
+            { "name": "Editor", "includePlatforms": ["Editor"] }
+            """);
+        File.WriteAllText(_policyPath, """
+            version: 1
+            name: Test
+            layers: {}
+            analysis:
+              target_assemblies: [ArchLinterNet.Core]
+              projects: ["src/Fixture/Fixture.csproj"]
+            contracts:
+              strict_project_metadata:
+                - id: project-metadata
+                  name: project-metadata
+                  projects:
+                    - src/Fixture/Fixture.csproj
+                  required_properties:
+                    TargetFramework: net10.0
+              strict_asmdef:
+                - id: runtime-no-editor
+                  name: runtime-no-editor
+                  source_assemblies: [Runtime]
+                  forbidden_editor_refs: true
+            """);
+        AnalysisCachePopulation.TestManifestCollectorOverride = AlwaysEligible;
+
+        ArchitectureValidationResult result = new ArchitectureValidationBuilder(_policyPath)
+            .WithContracts("runtime-no-editor")
+            .WithProfile()
+            .WithCache(AnalysisCacheOptions.AtPath(_cacheRoot))
+            .ValidateStrict();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(result.PreflightBlocked, Is.False);
+            Assert.That(result.Profile, Is.Not.Null);
+            Assert.That(result.Profile!.Counters.Cache.RejectReasonCounts["IneligibleBuildInput"], Is.EqualTo(1));
+            Assert.That(Directory.Exists(_cacheRoot), Is.False);
+        });
+    }
+
+    [Test]
     public void CreateSnapshot_InputFingerprintChangesBeforePopulation_DoesNotPublishStaleOutcome()
     {
         int collectionCount = 0;
@@ -246,7 +295,8 @@ public sealed class AnalysisCacheSnapshotSessionPopulationTests
 
         Assert.Multiple(() =>
         {
-            Assert.That(collectionCount, Is.EqualTo(2), "authorization must be captured before analysis and revalidated before Put");
+            Assert.That(collectionCount, Is.GreaterThanOrEqualTo(3),
+                "authorization must be captured before analysis, after lazy scope materialization, and before Put");
             Assert.That(Directory.Exists(_cacheRoot) && Directory.EnumerateFiles(_cacheRoot, "*.json", SearchOption.AllDirectories).Any(), Is.False);
         });
     }

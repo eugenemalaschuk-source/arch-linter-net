@@ -1,3 +1,4 @@
+using System.Runtime.CompilerServices;
 using ArchLinterNet.Core.BuildState;
 using ArchLinterNet.Core.Validation;
 
@@ -8,6 +9,13 @@ namespace ArchLinterNet.Core.Caching;
 // between execution and population could publish an old result under a new input digest.
 public static class AnalysisCachePopulation
 {
+    private sealed record CompletedAuthorization(
+        PreparedAuthorization Initial,
+        PreparedAuthorization? Completion,
+        Outcome CompletionRejection);
+
+    private static readonly ConditionalWeakTable<ValidationOutcome, CompletedAuthorization> _authorizations = new();
+
     internal static Func<string, string, string?, string?, string?, string?, CancellationToken, EvaluatedBuildInputManifestV1>?
         TestManifestCollectorOverride
     { get; set; }
@@ -127,9 +135,41 @@ public static class AnalysisCachePopulation
             targetFramework, platform, runtimeIdentifier, hasUnfingerprintedSourceInputs: false, cancellationToken).Lookup;
     }
 
+    // Called by ArchitectureAnalysisSnapshot after a cache miss completed its real evaluation.
+    // The initial authorization proves the selected artifacts did not change during execution;
+    // completion captures the full path set the isolated scope actually loaded, including lazy
+    // probing-path references whose Assembly.Location is empty after LoadFromStream.
+    // ConditionalWeakTable keys by object identity and neither changes nor prolongs the public
+    // ValidationOutcome record's value/equality contract.
+    internal static void AttachAuthorization(
+        ValidationOutcome outcome,
+        PreparedAuthorization authorization,
+        IReadOnlyList<string> completedArtifactPaths)
+    {
+        ArgumentNullException.ThrowIfNull(outcome);
+        ArgumentNullException.ThrowIfNull(authorization);
+
+        PreparedAuthorization? completion = Prepare(
+            authorization.Location,
+            authorization.Key,
+            authorization.DiscoveredProjectPaths,
+            completedArtifactPaths,
+            authorization.RepositoryRoot,
+            authorization.Configuration,
+            authorization.TargetFramework,
+            authorization.Platform,
+            authorization.RuntimeIdentifier,
+            authorization.HasUnfingerprintedSourceInputs,
+            default,
+            out Outcome rejected);
+
+        _authorizations.Remove(outcome);
+        _authorizations.Add(outcome, new CompletedAuthorization(authorization, completion, rejected));
+    }
+
     // Called by CLI and Testing hosts after a completed snapshot Evaluate. The opaque prepared
-    // authorization lives on ValidationOutcome internally, so consumers cannot accidentally
-    // manufacture a post-analysis authorization from changed files.
+    // authorization is snapshot-owned transient state; consumers cannot manufacture a
+    // post-analysis authorization from changed files.
     public static Outcome TryPopulateCompletedOutcome(ValidationOutcome outcome, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(outcome);
@@ -138,30 +178,53 @@ public static class AnalysisCachePopulation
             return new Outcome(AnalysisCacheRejectReason.IncompleteOriginalRun, 0, 0, 0);
         }
 
-        PreparedAuthorization? captured = outcome.CachePopulationAuthorization;
-        if (captured is null)
+        if (!_authorizations.TryGetValue(outcome, out CompletedAuthorization? captured))
         {
             return Outcome.Skipped;
         }
 
-        PreparedAuthorization? current = Prepare(
-            captured.Location, captured.Key, captured.DiscoveredProjectPaths, captured.ArtifactPaths,
-            captured.RepositoryRoot, captured.Configuration, captured.TargetFramework, captured.Platform,
-            captured.RuntimeIdentifier, captured.HasUnfingerprintedSourceInputs, cancellationToken, out Outcome rejected);
-        if (current is null)
+        if (captured.Completion is null)
+        {
+            return captured.CompletionRejection;
+        }
+
+        PreparedAuthorization? currentInitial = Prepare(
+            captured.Initial.Location, captured.Initial.Key, captured.Initial.DiscoveredProjectPaths,
+            captured.Initial.ArtifactPaths, captured.Initial.RepositoryRoot, captured.Initial.Configuration,
+            captured.Initial.TargetFramework, captured.Initial.Platform, captured.Initial.RuntimeIdentifier,
+            captured.Initial.HasUnfingerprintedSourceInputs, cancellationToken, out Outcome rejected);
+        if (currentInitial is null)
         {
             return rejected;
         }
 
-        if (!AuthorizationMatches(captured, current))
+        if (!AuthorizationMatches(captured.Initial, currentInitial))
         {
             return new Outcome(AnalysisCacheRejectReason.InputChangedDuringExecution,
-                current.ProjectManifests.Count,
-                current.ProjectManifests.Count(manifest => manifest.Eligibility != CacheEligibility.VerifiedCacheEligible),
+                currentInitial.ProjectManifests.Count,
+                currentInitial.ProjectManifests.Count(manifest => manifest.Eligibility != CacheEligibility.VerifiedCacheEligible),
                 0);
         }
 
-        return Put(captured, AnalysisCacheOutcomeMapper.ToCacheOutcome(outcome), cancellationToken);
+        PreparedAuthorization? currentCompletion = Prepare(
+            captured.Completion.Location, captured.Completion.Key, captured.Completion.DiscoveredProjectPaths,
+            captured.Completion.ArtifactPaths, captured.Completion.RepositoryRoot, captured.Completion.Configuration,
+            captured.Completion.TargetFramework, captured.Completion.Platform, captured.Completion.RuntimeIdentifier,
+            captured.Completion.HasUnfingerprintedSourceInputs, cancellationToken, out rejected);
+        if (currentCompletion is null)
+        {
+            return rejected;
+        }
+
+        if (!AuthorizationMatches(captured.Completion, currentCompletion))
+        {
+            return new Outcome(AnalysisCacheRejectReason.InputChangedDuringExecution,
+                currentCompletion.ProjectManifests.Count,
+                currentCompletion.ProjectManifests.Count(manifest => manifest.Eligibility != CacheEligibility.VerifiedCacheEligible),
+                0);
+        }
+
+        return Put(captured.Completion, AnalysisCacheOutcomeMapper.ToCacheOutcome(outcome), cancellationToken);
     }
 
     private static PreparedAuthorization? Prepare(

@@ -10,3 +10,14 @@ public interface IArchitectureAssemblyLoadScope : IDisposable
 {
     Assembly LoadFrom(string path);
 }
+
+// Internal capability deliberately separate from the public load-scope abstraction: callers only
+// need LoadFrom/Dispose, while Core's cache authorization needs the physical identity of stream-
+// loaded assemblies. Keeping this implementation detail non-public avoids expanding the public
+// loading API merely to transport snapshot-local cache evidence.
+internal interface IArchitectureAssemblyLoadScopeArtifactInventory
+{
+    IReadOnlyCollection<string> LoadedAssemblyPaths { get; }
+
+    void MaterializeProbingPathReferences(IEnumerable<Assembly> rootAssemblies);
+}
