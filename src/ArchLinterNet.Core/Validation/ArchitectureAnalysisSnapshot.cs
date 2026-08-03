@@ -95,7 +95,7 @@ public sealed class ArchitectureAnalysisSnapshot : IDisposable
             {
                 Dictionary<string, int> contractFamilyResultCounts =
                     new(_counters.ContractFamilyResultCounts, StringComparer.Ordinal);
-                foreach ((string family, int count) in _profilingCounters.ContractFamilyResultCounts)
+                foreach ((string family, int count) in _profilingCounters.GetContractFamilyResultCounts())
                 {
                     contractFamilyResultCounts.TryGetValue(family, out int current);
                     contractFamilyResultCounts[family] = current + count;

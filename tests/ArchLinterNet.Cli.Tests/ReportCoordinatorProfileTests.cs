@@ -6,6 +6,8 @@ namespace ArchLinterNet.Cli.Tests;
 
 public sealed partial class ReportCoordinatorTests
 {
+    private static readonly string[] _allReportFormats = { "human", "json", "sarif" };
+
     [Test]
     public void RouteSingleOutcome_CompletedRendersAndPublicationPhases_AreProfiled()
     {
@@ -34,7 +36,7 @@ public sealed partial class ReportCoordinatorTests
         Assert.Multiple(() =>
         {
             Assert.That(result.Status, Is.EqualTo(ReportRouteStatus.AllSucceeded));
-            Assert.That(result.RenderedFormats, Is.EquivalentTo(new[] { "human", "json", "sarif" }));
+            Assert.That(result.RenderedFormats, Is.EquivalentTo(_allReportFormats));
             Assert.That(timingReport.ToString(), Does.Contain("render_human"));
             Assert.That(timingReport.ToString(), Does.Contain("render_json"));
             Assert.That(timingReport.ToString(), Does.Contain("render_sarif"));

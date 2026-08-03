@@ -477,7 +477,7 @@ public sealed class BuildStatePreparationService : IBuildStatePreparationService
         process.Start();
         process.BeginOutputReadLine();
         process.BeginErrorReadLine();
-        WaitForExitOrCancellation(process, request.CancellationToken, outputCompleted.Task, errorCompleted.Task);
+        WaitForExitOrCancellation(process, outputCompleted.Task, errorCompleted.Task, request.CancellationToken);
 
         if (process.ExitCode == 0)
         {
@@ -520,9 +520,9 @@ public sealed class BuildStatePreparationService : IBuildStatePreparationService
 
     private static void WaitForExitOrCancellation(
         Process process,
-        CancellationToken cancellationToken,
         Task outputCompleted,
-        Task errorCompleted)
+        Task errorCompleted,
+        CancellationToken cancellationToken)
     {
         WaitForExitOrCancellationCore(process.WaitForExit, () => TryKillProcessTree(process), process.Id, cancellationToken);
 

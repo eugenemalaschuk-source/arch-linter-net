@@ -35,13 +35,9 @@ internal sealed partial class ValidateCommandHandler
     {
         WriteProfile(
             options,
-            state.Counters ?? new ArchitectureAnalysisSnapshotCounters(),
-            state.Timing,
+            state,
             AnalysisProfileCompletionStatus.Cancelled,
-            cancellationObserved: true,
-            state.RenderedSinkCount,
-            state.Output,
-            state.InputPaths);
+            cancellationObserved: true);
     }
 
     // No-op unless --profile was requested — omitting it leaves command output completely
@@ -51,13 +47,9 @@ internal sealed partial class ValidateCommandHandler
     // itself is issue #418's explicit scope, not #374's (see design.md).
     private void WriteProfile(
         ValidateCommandOptions options,
-        ArchitectureAnalysisSnapshotCounters counters,
-        ValidationTiming? timing,
+        ValidationProfileExecutionState state,
         AnalysisProfileCompletionStatus completionStatus,
-        bool cancellationObserved,
-        int renderedSinkCount,
-        AnalysisProfileOutput? output = null,
-        IReadOnlyList<string>? inputPaths = null)
+        bool cancellationObserved)
     {
         if (options.ProfileDestination is null)
         {
@@ -66,22 +58,22 @@ internal sealed partial class ValidateCommandHandler
 
         AnalysisProfileMeasurements measurements = CaptureMeasurements();
 
-        if (IsProfileInputCollision(options, inputPaths ?? Array.Empty<string>()))
+        if (IsProfileInputCollision(options, state.InputPaths))
         {
             return;
         }
 
         AnalysisProfile profile = AnalysisProfileBuilder.Build(
-            counters,
-            timing,
-            renderedSinkCount,
+            state.Counters ?? new ArchitectureAnalysisSnapshotCounters(),
+            state.Timing,
+            state.RenderedSinkCount,
             ResolveOutputSinkCount(options),
             completionStatus,
             cancellationObserved,
             new AnalysisProfileBuildOptions
             {
                 Measurements = measurements,
-                Output = output,
+                Output = state.Output,
             });
 
         WriteProfileToDestination(options.ProfileDestination, AnalysisProfileJsonWriter.Write(profile));

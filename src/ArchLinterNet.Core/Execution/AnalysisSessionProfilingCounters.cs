@@ -19,14 +19,11 @@ internal sealed class AnalysisSessionProfilingCounters
 
     public int SourceFilesScanned => Volatile.Read(ref _sourceFilesScanned);
 
-    public IReadOnlyDictionary<string, int> ContractFamilyResultCounts
+    public IReadOnlyDictionary<string, int> GetContractFamilyResultCounts()
     {
-        get
+        lock (_gate)
         {
-            lock (_gate)
-            {
-                return new Dictionary<string, int>(_contractFamilyResultCounts, StringComparer.Ordinal);
-            }
+            return new Dictionary<string, int>(_contractFamilyResultCounts, StringComparer.Ordinal);
         }
     }
 

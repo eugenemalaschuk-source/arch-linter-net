@@ -59,25 +59,25 @@ internal sealed partial class ReportCoordinator
         string mode,
         ValidationOutcome outcome,
         IReadOnlyList<ReportSink> additionalSinks,
-        CancellationToken cancellationToken = default,
-        ValidationTiming? timing = null)
+        ValidationTiming? timing = null,
+        CancellationToken cancellationToken = default)
     {
         bool isReportMode = additionalSinks.Count > 0;
         return RouteOutcomes(
             stdoutFormat, new[] { (mode, outcome) }, additionalSinks, isSingleMode: true, isReportMode,
-            cancellationToken, timing);
+            timing, cancellationToken);
     }
 
     public RouteResult RouteCombinedOutcomes(
         string stdoutFormat,
         IReadOnlyList<(string Mode, ValidationOutcome Outcome)> outcomesByMode,
         IReadOnlyList<ReportSink> additionalSinks,
-        CancellationToken cancellationToken = default,
-        ValidationTiming? timing = null)
+        ValidationTiming? timing = null,
+        CancellationToken cancellationToken = default)
     {
         bool isReportMode = additionalSinks.Count > 0;
         return RouteOutcomes(
-            stdoutFormat, outcomesByMode, additionalSinks, isSingleMode: false, isReportMode, cancellationToken, timing);
+            stdoutFormat, outcomesByMode, additionalSinks, isSingleMode: false, isReportMode, timing, cancellationToken);
     }
 
     private RouteResult RouteOutcomes(
@@ -86,8 +86,8 @@ internal sealed partial class ReportCoordinator
         IReadOnlyList<ReportSink> additionalSinks,
         bool isSingleMode,
         bool isReportMode,
-        CancellationToken cancellationToken,
-        ValidationTiming? timing)
+        ValidationTiming? timing,
+        CancellationToken cancellationToken)
     {
         IReadOnlyList<ReportSink> requiredSinks = isReportMode
             ? additionalSinks
@@ -103,7 +103,7 @@ internal sealed partial class ReportCoordinator
         {
             if (legacyCombinedHuman)
             {
-                return WriteLegacyCombinedHuman(outcomesByMode, requiredSinks, evidence, cancellationToken, timing);
+                return WriteLegacyCombinedHuman(outcomesByMode, requiredSinks, evidence, timing, cancellationToken);
             }
 
             // Checked before any rendering or stream write. DistributeToSinks below only guards
@@ -148,7 +148,7 @@ internal sealed partial class ReportCoordinator
             }
 
             return DistributeToSinks(
-                additionalSinks, BuildContentByFormat(humanContent, jsonContent, sarifContent), cancellationToken, timing, evidence);
+                additionalSinks, BuildContentByFormat(humanContent, jsonContent, sarifContent), timing, evidence, cancellationToken);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
@@ -164,8 +164,8 @@ internal sealed partial class ReportCoordinator
         IReadOnlyList<(string Mode, ValidationOutcome Outcome)> outcomesByMode,
         IReadOnlyList<ReportSink> requiredSinks,
         SinkDistributionEvidence evidence,
-        CancellationToken cancellationToken,
-        ValidationTiming? timing)
+        ValidationTiming? timing,
+        CancellationToken cancellationToken)
     {
         foreach ((_, ValidationOutcome outcome) in outcomesByMode)
         {
@@ -199,15 +199,16 @@ internal sealed partial class ReportCoordinator
         CancellationToken cancellationToken = default)
     {
         return DistributeToSinks(
-            additionalSinks, contentByFormat, cancellationToken, timing: null, evidence: SinkDistributionEvidence.Empty());
+            additionalSinks, contentByFormat, timing: null, evidence: SinkDistributionEvidence.Empty(),
+            cancellationToken: cancellationToken);
     }
 
     private RouteResult DistributeToSinks(
         IReadOnlyList<ReportSink> additionalSinks,
         IReadOnlyDictionary<string, string> contentByFormat,
-        CancellationToken cancellationToken,
         ValidationTiming? timing,
-        SinkDistributionEvidence evidence)
+        SinkDistributionEvidence evidence,
+        CancellationToken cancellationToken)
     {
         List<(string TempPath, string TargetPath)> pendingRenames = new();
 

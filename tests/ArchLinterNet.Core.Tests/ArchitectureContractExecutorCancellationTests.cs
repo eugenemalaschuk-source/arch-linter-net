@@ -101,8 +101,8 @@ public sealed class ArchitectureContractExecutorCancellationTests
 
         Assert.Multiple(() =>
         {
-            Assert.That(context.ProfilingCounters.ContractFamilyResultCounts, Has.Count.EqualTo(1));
-            Assert.That(context.ProfilingCounters.ContractFamilyResultCounts["dependency"], Is.EqualTo(1));
+            Assert.That(context.ProfilingCounters.GetContractFamilyResultCounts(), Has.Count.EqualTo(1));
+            Assert.That(context.ProfilingCounters.GetContractFamilyResultCounts()["dependency"], Is.EqualTo(1));
         });
     }
 
