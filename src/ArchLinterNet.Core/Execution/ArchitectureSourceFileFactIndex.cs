@@ -57,7 +57,7 @@ public sealed class ArchitectureSourceFileFactIndex
             preprocessorSymbols,
             fileSystem,
             default,
-            new ConstructionOptions(cancellationToken, ProfilingCounters: null))
+            new ConstructionOptions(ProfilingCounters: null, CancellationToken: cancellationToken))
     {
     }
 
@@ -69,8 +69,8 @@ public sealed class ArchitectureSourceFileFactIndex
         IReadOnlyDictionary<string, string>? SourceRootAssemblyOwnership);
 
     internal readonly record struct ConstructionOptions(
-        CancellationToken CancellationToken,
-        AnalysisSessionProfilingCounters? ProfilingCounters);
+        AnalysisSessionProfilingCounters? ProfilingCounters,
+        CancellationToken CancellationToken);
 
     internal ArchitectureSourceFileFactIndex(
         IReadOnlyCollection<Assembly> targetAssemblies,

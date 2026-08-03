@@ -107,7 +107,7 @@ internal sealed partial class ValidateCommandHandler
         }
 
         RouteResult result = _coordinator.RouteSingleOutcome(
-            options.Format, mode, outcome, options.AdditionalSinks, _cancellationToken, timing);
+            options.Format, mode, outcome, options.AdditionalSinks, timing, _cancellationToken);
         profileState.Output = CreateOutputProfile(result);
         profileState.RenderedSinkCount = result.RenderedFormats.Count;
         if (options.TimingsEnabled)
@@ -115,9 +115,11 @@ internal sealed partial class ValidateCommandHandler
             timing?.WriteReport(_console.Error);
         }
 
-        WriteProfile(options, counters, timing,
-            ResolveCompletionStatus(outcome, result.Cancelled), result.Cancelled, profileState.RenderedSinkCount,
-            profileState.Output, profileState.InputPaths);
+        WriteProfile(
+            options,
+            profileState,
+            ResolveCompletionStatus(outcome, result.Cancelled),
+            result.Cancelled);
 
         if (result.Cancelled)
         {
@@ -238,7 +240,7 @@ internal sealed partial class ValidateCommandHandler
         }
 
         RouteResult result = _coordinator.RouteCombinedOutcomes(
-            options.Format, outcomesByMode, options.AdditionalSinks, _cancellationToken, timing);
+            options.Format, outcomesByMode, options.AdditionalSinks, timing, _cancellationToken);
         profileState.Output = CreateOutputProfile(result);
         profileState.RenderedSinkCount = result.RenderedFormats.Count;
 
@@ -252,10 +254,11 @@ internal sealed partial class ValidateCommandHandler
         // snapshot"), so the first outcome's PreflightBlocked reflects every mode's; allPassed
         // reflects every mode's Passed, unlike the single-mode overload's one outcome.
         WriteProfile(
-            options, snapshot.Counters, timing,
+            options,
+            profileState,
             ResolveCompletionStatus(
                 outcomesByMode[0].Outcome.PreflightBlocked, allPassed, result.Cancelled),
-            result.Cancelled, profileState.RenderedSinkCount, profileState.Output, profileState.InputPaths);
+            result.Cancelled);
 
         if (result.Cancelled)
         {

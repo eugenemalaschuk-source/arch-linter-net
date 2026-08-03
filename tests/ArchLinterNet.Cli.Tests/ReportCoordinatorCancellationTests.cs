@@ -14,6 +14,7 @@ public sealed partial class ReportCoordinatorTests
     private static readonly string[] _oneJsonPath = { "one.json" };
     private static readonly string[] _oneJsonAndTwoSarifPaths = { "one.json", "two.sarif" };
     private static readonly string[] _pkgACycle = { "pkg-a -> pkg-b -> pkg-a" };
+    private static readonly string[] _stdoutPath = { "<stdout>" };
 
     // Issue #375: cancellation observed before staging even begins must report zero committed
     // files, Cancelled=true, and never call WriteAllTextToTemp for any sink.
@@ -34,7 +35,7 @@ public sealed partial class ReportCoordinatorTests
         cts.Cancel();
 
         RouteResult result = coordinator.RouteSingleOutcome(
-            "human", "strict", PassedOutcome, sinks, cts.Token);
+            "human", "strict", PassedOutcome, sinks, cancellationToken: cts.Token);
 
         Assert.Multiple(() =>
         {
@@ -73,7 +74,7 @@ public sealed partial class ReportCoordinatorTests
         };
 
         RouteResult result = coordinator.RouteSingleOutcome(
-            "human", "strict", PassedOutcome, sinks, cts.Token);
+            "human", "strict", PassedOutcome, sinks, cancellationToken: cts.Token);
 
         Assert.Multiple(() =>
         {
@@ -108,7 +109,7 @@ public sealed partial class ReportCoordinatorTests
         RouteResult result = coordinator.RouteErrorToAllSinks(
             new[] { new ReportSink("json", ReportDestinationType.File, "error.json") },
             new Dictionary<string, string> { ["json"] = "{}" },
-            cts.Token);
+            cancellationToken: cts.Token);
 
         Assert.Multiple(() =>
         {
@@ -129,7 +130,7 @@ public sealed partial class ReportCoordinatorTests
         cts.Cancel();
 
         RouteResult result = coordinator.RouteSingleOutcome(
-            "json", "strict", PassedOutcome, Array.Empty<ReportSink>(), cts.Token);
+            "json", "strict", PassedOutcome, Array.Empty<ReportSink>(), cancellationToken: cts.Token);
 
         Assert.Multiple(() =>
         {
@@ -149,7 +150,7 @@ public sealed partial class ReportCoordinatorTests
 
         RouteResult result = coordinator.RouteSingleOutcome(
             "human", "strict", PassedOutcome,
-            [new ReportSink("json", ReportDestinationType.Stdout)], cts.Token);
+            [new ReportSink("json", ReportDestinationType.Stdout)], cancellationToken: cts.Token);
 
         Assert.Multiple(() =>
         {
@@ -168,13 +169,13 @@ public sealed partial class ReportCoordinatorTests
         var coordinator = new ReportCoordinator(runtime, console, new StubFileSystem());
 
         RouteResult result = coordinator.RouteCombinedOutcomes(
-            "human", [("strict", PassedOutcome), ("audit", PassedOutcome)], Array.Empty<ReportSink>(), cts.Token);
+            "human", [("strict", PassedOutcome), ("audit", PassedOutcome)], Array.Empty<ReportSink>(), cancellationToken: cts.Token);
 
         Assert.Multiple(() =>
         {
             Assert.That(result.Cancelled, Is.True);
             Assert.That(result.Status, Is.EqualTo(ReportRouteStatus.PartialOutput));
-            Assert.That(result.DeliveredStreamPaths, Is.EquivalentTo(new[] { "<stdout>" }));
+            Assert.That(result.DeliveredStreamPaths, Is.EquivalentTo(_stdoutPath));
             Assert.That(result.UncommittedPaths, Is.Empty);
         });
     }
@@ -203,7 +204,7 @@ public sealed partial class ReportCoordinatorTests
         var coordinator = new ReportCoordinator(runtime, console, new StubFileSystem());
 
         RouteResult result = coordinator.RouteSingleOutcome(
-            "human", "strict", ViolationsAndCyclesOutcome, Array.Empty<ReportSink>(), cts.Token);
+            "human", "strict", ViolationsAndCyclesOutcome, Array.Empty<ReportSink>(), cancellationToken: cts.Token);
 
         Assert.Multiple(() =>
         {
@@ -226,7 +227,7 @@ public sealed partial class ReportCoordinatorTests
         var outcomesByMode = new[] { ("strict", PassedOutcome), ("audit", FailedOutcome) };
         var sinks = new[] { new ReportSink("json", ReportDestinationType.File, "results.json") };
 
-        RouteResult result = coordinator.RouteCombinedOutcomes("human", outcomesByMode, sinks, cts.Token);
+        RouteResult result = coordinator.RouteCombinedOutcomes("human", outcomesByMode, sinks, cancellationToken: cts.Token);
 
         Assert.Multiple(() =>
         {
