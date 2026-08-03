@@ -25,6 +25,8 @@ public sealed record AnalysisCacheEntryV1
 
     public required IReadOnlyList<AnalysisCacheProjectManifest> ProjectManifests { get; init; }
 
+    public required IReadOnlyList<AnalysisCacheArtifactManifest> ArtifactManifests { get; init; }
+
     public required AnalysisCacheOutcomeV1 Outcome { get; init; }
 
     // SHA-256 over the canonical form of every field above (see

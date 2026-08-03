@@ -1,5 +1,8 @@
+using ArchLinterNet.Core.BuildState;
 using ArchLinterNet.Core.Caching;
 using ArchLinterNet.Core.Model;
+using ArchLinterNet.Core.Reporting;
+using ArchLinterNet.Core.Validation;
 using NUnit.Framework;
 
 namespace ArchLinterNet.Core.Tests;
@@ -25,6 +28,8 @@ public sealed class AnalysisCachePopulationTests
     [TearDown]
     public void TearDown()
     {
+        AnalysisCachePopulation.TestManifestCollectorOverride = null;
+
         if (Directory.Exists(_repoRoot))
         {
             Directory.Delete(_repoRoot, recursive: true);
@@ -78,5 +83,48 @@ public sealed class AnalysisCachePopulationTests
 
         Assert.That(outcome.RejectReason, Is.EqualTo(AnalysisCacheRejectReason.IneligibleBuildInput));
         Assert.That(outcome.ProjectsEvaluated, Is.EqualTo(0));
+    }
+
+    [Test]
+    public void TryPopulateCompletedOutcome_PreflightBlocked_IsNeverPublished()
+    {
+        ValidationOutcome blocked = new(
+            false, Array.Empty<ArchitectureViolation>(), Array.Empty<string>(), Array.Empty<ArchitectureViolation>(), "off",
+            Array.Empty<ArchitectureUnmatchedIgnoredViolation>(), "off", Array.Empty<PolicyConsistencyDiagnostic>(), "off",
+            Array.Empty<ArchitectureCoverageSummary>(), Array.Empty<ArchitectureClassificationConflict>(),
+            Array.Empty<ArchitectureClassificationMetadataFailure>())
+        {
+            PreflightBlocked = true,
+        };
+
+        AnalysisCachePopulation.Outcome outcome = AnalysisCachePopulation.TryPopulateCompletedOutcome(blocked);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(outcome.RejectReason, Is.EqualTo(AnalysisCacheRejectReason.IncompleteOriginalRun));
+            Assert.That(outcome.PopulationAttempted, Is.True);
+            Assert.That(Directory.Exists(_cacheRoot), Is.False);
+        });
+    }
+
+    [Test]
+    public void TryLookupWithAuthorization_ExplicitSourceInputs_IsIneligibleAndDoesNotAuthorizeReuse()
+    {
+        AnalysisCachePopulation.TestManifestCollectorOverride =
+            (_, _, _, _, _, _, _) => new EvaluatedBuildInputManifestV1(
+                "verified-manifest", CacheEligibility.VerifiedCacheEligible,
+                Array.Empty<string>(), Array.Empty<string>());
+        AnalysisCacheLocation location = new(_cacheRoot, AnalysisCacheMode.ExplicitPath);
+
+        AnalysisCachePopulation.LookupPreparation preparation = AnalysisCachePopulation.TryLookupWithAuthorization(
+            location, CreateKey(), new[] { _projectPath }, Array.Empty<string>(), _repoRoot,
+            null, null, null, null, hasUnfingerprintedSourceInputs: true);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(preparation.Lookup.Outcome, Is.EqualTo(AnalysisCacheLookupOutcome.Reject));
+            Assert.That(preparation.Lookup.Reason, Is.EqualTo(AnalysisCacheRejectReason.IneligibleBuildInput));
+            Assert.That(preparation.Authorization, Is.Null);
+        });
     }
 }

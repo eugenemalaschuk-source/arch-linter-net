@@ -35,6 +35,8 @@ public sealed class ArchitectureAnalysisSnapshot : IDisposable
     private readonly AnalysisSessionProfilingCounters _profilingCounters;
     private readonly object _gate = new();
     private readonly Dictionary<string, ValidationOutcome> _evaluatedModes = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, AnalysisCachePopulation.PreparedAuthorization> _cacheAuthorizations =
+        new(StringComparer.Ordinal);
     private readonly AnalysisCacheLookupStats _cacheStats = new();
     private ArchitectureAnalysisSnapshotCounters _counters;
     private bool _disposed;
@@ -193,6 +195,16 @@ public sealed class ArchitectureAnalysisSnapshot : IDisposable
                 ValidationOutcome? cachedOutcome = _preflight.Blocked ? null : TryEvaluateFromCache(mode, timing);
                 ValidationOutcome outcome = cachedOutcome
                     ?? (_preflight.Blocked ? BuildBlockedOutcome() : EvaluateCore(mode, timing));
+
+                if (cachedOutcome is null
+                    && !outcome.PreflightBlocked
+                    && _cacheAuthorizations.Remove(mode, out AnalysisCachePopulation.PreparedAuthorization? authorization))
+                {
+                    // This opaque plan was captured before contract execution. Hosts use it only
+                    // through AnalysisCachePopulation.TryPopulateCompletedOutcome, which
+                    // re-derives it immediately before Put and rejects any changed input.
+                    outcome = outcome with { CachePopulationAuthorization = authorization };
+                }
 
                 _evaluatedModes[mode] = outcome;
                 _counters = _counters with { ModesEvaluated = _evaluatedModes.Count };
@@ -404,7 +416,11 @@ public sealed class ArchitectureAnalysisSnapshot : IDisposable
 
         CancellationToken cancellationToken = _setup?.Runner.Session.Context.CancellationToken ?? default;
 
-        IReadOnlyList<string> discoveredProjectPaths = GetDiscoveredProjectPaths();
+        // Some contract families (for example project-metadata contracts) use the configured
+        // project paths without materializing a Roslyn project.  Those inputs are nevertheless
+        // part of the cached result and must be fingerprinted before the first lookup.  Prefer
+        // the materialized paths when available, but fall back to explicit analysis.projects.
+        IReadOnlyList<string> cacheProjectPaths = GetCacheProjectPaths();
         IReadOnlyList<string> policyImportPaths = GetPolicyImportPaths();
 
         AnalysisCacheKey key = new(
@@ -412,7 +428,7 @@ public sealed class ArchitectureAnalysisSnapshot : IDisposable
             AnalysisCacheKey.NormalizeMode(mode),
             cache.ConditionSetName,
             AnalysisCacheKey.ComputeContractIdsDigest(cache.ContractIds),
-            AnalysisCacheKey.ComputeWorkspaceDigest(discoveredProjectPaths, _repositoryRoot),
+            AnalysisCacheKey.ComputeWorkspaceDigest(cacheProjectPaths, _repositoryRoot),
             cache.Configuration,
             cache.TargetFramework,
             cache.Platform,
@@ -422,13 +438,16 @@ public sealed class ArchitectureAnalysisSnapshot : IDisposable
             _includeAsmdefContracts,
             _enforceUnmatchedIgnoredViolationsPolicy);
 
-        AnalysisCacheLookupResult lookup;
+        AnalysisCachePopulation.LookupPreparation preparation;
         using (timing?.Measure("cache_lookup"))
         {
-            lookup = AnalysisCachePopulation.TryLookup(
-                cache.Location, key, discoveredProjectPaths, _repositoryRoot,
-                cache.Configuration, cache.TargetFramework, cache.Platform, cache.RuntimeIdentifier, cancellationToken);
+            preparation = AnalysisCachePopulation.TryLookupWithAuthorization(
+                cache.Location, key, cacheProjectPaths, GetCacheArtifactPaths(), _repositoryRoot,
+                cache.Configuration, cache.TargetFramework, cache.Platform, cache.RuntimeIdentifier,
+                HasUnfingerprintedSourceInputs(), cancellationToken);
         }
+
+        AnalysisCacheLookupResult lookup = preparation.Lookup;
 
         lock (_gate)
         {
@@ -437,6 +456,11 @@ public sealed class ArchitectureAnalysisSnapshot : IDisposable
 
         if (lookup.Outcome != AnalysisCacheLookupOutcome.Hit || lookup.Entry is null)
         {
+            if (preparation.Authorization is not null)
+            {
+                _cacheAuthorizations[mode] = preparation.Authorization;
+            }
+
             return null;
         }
 
@@ -451,7 +475,7 @@ public sealed class ArchitectureAnalysisSnapshot : IDisposable
 
         return AnalysisCacheOutcomeMapper.FromCacheOutcome(
             lookup.Entry.Outcome, _repositoryRoot, policyImportPaths, GetResolvedAssemblyPaths(),
-            discoveredProjectPaths, _document.SourceExpansion);
+            GetDiscoveredProjectPaths(), _document.SourceExpansion);
     }
 
     private IReadOnlyList<string> GetPolicyImportPaths()
@@ -470,6 +494,31 @@ public sealed class ArchitectureAnalysisSnapshot : IDisposable
         .Concat(GetDiscoveredProjectPaths())
         .Distinct(StringComparer.OrdinalIgnoreCase)
         .ToArray();
+
+    private IReadOnlyList<string> GetCacheArtifactPaths() => GetResolvedAssemblyPaths()
+        .SelectMany(path => new[]
+        {
+            path,
+            Path.ChangeExtension(path, ".pdb"),
+            BuildReceiptStore.ReceiptPathFor(path),
+        })
+        .Distinct(StringComparer.OrdinalIgnoreCase)
+        .ToArray();
+
+    // Project-aware Roslyn method-body analysis lazily evaluates a project's complete source and
+    // reference set. Until that dynamic set is captured as exact byte manifests, it is unsafe to
+    // authorize a cached outcome from only selected PE/PDB/receipt fingerprints; fail closed.
+    // Explicit analysis.source_roots are likewise intentionally cache-ineligible because they can
+    // include files outside discovered project manifests. Project discovery also synthesizes
+    // source roots for execution; those roots have no policy provenance and are covered by their
+    // corresponding project manifests, so they must not make an otherwise metadata-only run
+    // ineligible.
+    private bool HasUnfingerprintedSourceInputs() => HasExplicitSourceRoots()
+        || _document.Contracts.StrictMethodBody.Count > 0
+        || _document.Contracts.AuditMethodBody.Count > 0;
+
+    private bool HasExplicitSourceRoots() => _document.Provenance.TryGetLocation(
+        "/analysis/source_roots", out _);
 
     private IReadOnlyList<string> GetResolvedAssemblyPaths()
     {
@@ -505,6 +554,20 @@ public sealed class ArchitectureAnalysisSnapshot : IDisposable
     private IReadOnlyList<string> GetDiscoveredProjectPaths()
     {
         return _setup?.Runner.Session.Context.DiscoveredProjectPaths ?? Array.Empty<string>();
+    }
+
+    private IReadOnlyList<string> GetCacheProjectPaths()
+    {
+        IReadOnlyList<string> discoveredPaths = GetDiscoveredProjectPaths();
+        if (discoveredPaths.Count > 0 || _document.Analysis.Projects.Count == 0)
+        {
+            return discoveredPaths;
+        }
+
+        return _document.Analysis.Projects
+            .Select(path => Path.GetFullPath(Path.Combine(_repositoryRoot, path)))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
     }
 
     private static string? SafeAssemblyLocation(Assembly assembly)
@@ -559,6 +622,7 @@ public sealed class ArchitectureAnalysisSnapshot : IDisposable
 
             _disposed = true;
             _evaluatedModes.Clear();
+            _cacheAuthorizations.Clear();
             ArchitectureRunnerSetup? setup = _setup;
             _setup = null;
             setup?.Runner.Session.Context.Dispose();

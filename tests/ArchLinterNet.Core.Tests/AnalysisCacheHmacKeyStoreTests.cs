@@ -8,37 +8,47 @@ namespace ArchLinterNet.Core.Tests;
 // cover the key-store contract directly: idempotent read-or-create, persistence across calls,
 // per-root independence, and safe concurrent first use.
 [TestFixture]
+[NonParallelizable]
 public sealed class AnalysisCacheHmacKeyStoreTests
 {
     private string _root = null!;
+    private string _authenticationParent = null!;
 
     [SetUp]
     public void SetUp()
     {
         _root = Path.Combine(Path.GetTempPath(), "arch-linter-net-hmac-key-tests", Guid.NewGuid().ToString("N"));
+        _authenticationParent = Path.Combine(Path.GetTempPath(), "arch-linter-net-hmac-auth-tests", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(_authenticationParent);
+        AnalysisCacheHmacKeyStore.TestAuthenticationParentOverride = _authenticationParent;
     }
 
     [TearDown]
     public void TearDown()
     {
+        AnalysisCacheHmacKeyStore.TestAuthenticationParentOverride = null;
         if (Directory.Exists(_root))
         {
             Directory.Delete(_root, recursive: true);
         }
+
+        if (Directory.Exists(_authenticationParent))
+        {
+            Directory.Delete(_authenticationParent, recursive: true);
+        }
     }
 
     [Test]
-    public void GetOrCreateKey_FirstCall_PersistsA256BitKeyOutsideTheEntryTree()
+    public void GetOrCreateKey_FirstCall_PersistsA256BitKeyOutsideTheCacheRoot()
     {
         byte[] key = AnalysisCacheHmacKeyStore.GetOrCreateKey(_root);
 
         Assert.That(key.Length, Is.EqualTo(32));
-        string keyPath = Path.Combine(_root, ".keys", "hmac-v1.key");
+        string keyPath = AnalysisCacheHmacKeyStore.GetKeyPath(_root);
         Assert.That(File.Exists(keyPath), Is.True);
+        Assert.That(keyPath.StartsWith(_root + Path.DirectorySeparatorChar, StringComparison.Ordinal), Is.False);
 
-        // Never inside the sharded *.json entry tree — a bare `Clear()`-style wipe of every *.json
-        // file must never remove this by accident.
-        Assert.That(Directory.EnumerateFiles(_root, "*.json", SearchOption.AllDirectories), Is.Empty);
+        Assert.That(keyPath, Does.Contain(".archlinternet-analysis-cache-auth"));
     }
 
     [Test]
@@ -91,12 +101,79 @@ public sealed class AnalysisCacheHmacKeyStoreTests
     [Test]
     public void GetOrCreateKey_CorruptExistingKeyFile_SelfHealsToANewValidKey()
     {
-        string keyDirectory = Path.Combine(_root, ".keys");
-        Directory.CreateDirectory(keyDirectory);
-        File.WriteAllBytes(Path.Combine(keyDirectory, "hmac-v1.key"), new byte[] { 1, 2, 3 });
+        string keyPath = AnalysisCacheHmacKeyStore.GetKeyPath(_root);
+        Directory.CreateDirectory(Path.GetDirectoryName(keyPath)!);
+        File.WriteAllBytes(keyPath, new byte[] { 1, 2, 3 });
 
         byte[] key = AnalysisCacheHmacKeyStore.GetOrCreateKey(_root);
 
         Assert.That(key.Length, Is.EqualTo(32));
+    }
+
+    [Test]
+    public void GetOrCreateKey_AuthenticationDirectorySymlink_IsRejectedWithoutTouchingTarget()
+    {
+        if (OperatingSystem.IsWindows())
+        {
+            Assert.Ignore("Symlink creation requires elevated privileges on Windows by default.");
+            return;
+        }
+
+        string outsideTarget = Path.Combine(Path.GetTempPath(), "arch-linter-net-hmac-outside-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(outsideTarget);
+        try
+        {
+            string authenticationDirectory = Path.Combine(_authenticationParent, ".archlinternet-analysis-cache-auth");
+            Directory.CreateSymbolicLink(authenticationDirectory, outsideTarget);
+
+            Assert.Throws<AnalysisCacheLocationRejectedException>(() => AnalysisCacheHmacKeyStore.GetOrCreateKey(_root));
+            Assert.That(Directory.EnumerateFileSystemEntries(outsideTarget), Is.Empty);
+        }
+        finally
+        {
+            string authenticationDirectory = Path.Combine(_authenticationParent, ".archlinternet-analysis-cache-auth");
+            if (Directory.Exists(authenticationDirectory))
+            {
+                new DirectoryInfo(authenticationDirectory).Delete();
+            }
+
+            if (Directory.Exists(outsideTarget))
+            {
+                Directory.Delete(outsideTarget, recursive: true);
+            }
+        }
+    }
+
+    [Test]
+    public void GetOrCreateKey_KeyFileSymlink_IsRejectedWithoutTouchingTarget()
+    {
+        if (OperatingSystem.IsWindows())
+        {
+            Assert.Ignore("Symlink creation requires elevated privileges on Windows by default.");
+            return;
+        }
+
+        string outsideTarget = Path.Combine(Path.GetTempPath(), "arch-linter-net-hmac-key-outside-" + Guid.NewGuid().ToString("N"));
+        File.WriteAllText(outsideTarget, "outside key target");
+        string keyPath = AnalysisCacheHmacKeyStore.GetKeyPath(_root);
+        Directory.CreateDirectory(Path.GetDirectoryName(keyPath)!);
+        File.CreateSymbolicLink(keyPath, outsideTarget);
+        try
+        {
+            Assert.Throws<AnalysisCacheLocationRejectedException>(() => AnalysisCacheHmacKeyStore.GetOrCreateKey(_root));
+            Assert.That(File.ReadAllText(outsideTarget), Is.EqualTo("outside key target"));
+        }
+        finally
+        {
+            if (File.Exists(keyPath))
+            {
+                new FileInfo(keyPath).Delete();
+            }
+
+            if (File.Exists(outsideTarget))
+            {
+                File.Delete(outsideTarget);
+            }
+        }
     }
 }

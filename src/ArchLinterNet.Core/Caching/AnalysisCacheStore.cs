@@ -35,9 +35,19 @@ public static class AnalysisCacheStore
         AnalysisCacheKey key,
         IReadOnlyList<AnalysisCacheProjectManifest> currentManifests)
     {
+        return TryGet(location, key, currentManifests, Array.Empty<AnalysisCacheArtifactManifest>());
+    }
+
+    public static AnalysisCacheLookupResult TryGet(
+        AnalysisCacheLocation location,
+        AnalysisCacheKey key,
+        IReadOnlyList<AnalysisCacheProjectManifest> currentManifests,
+        IReadOnlyList<AnalysisCacheArtifactManifest> currentArtifacts)
+    {
         ArgumentNullException.ThrowIfNull(location);
         ArgumentNullException.ThrowIfNull(key);
         ArgumentNullException.ThrowIfNull(currentManifests);
+        ArgumentNullException.ThrowIfNull(currentArtifacts);
 
         if (IsRootUnsafe(location))
         {
@@ -67,14 +77,24 @@ public static class AnalysisCacheStore
         }
 
         FileInfo info = new(entryPath);
-        if (info.Length == 0)
+        long entryLength;
+        try
+        {
+            entryLength = info.Length;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            return AnalysisCacheLookupResult.Reject(AnalysisCacheRejectReason.Corrupt);
+        }
+
+        if (entryLength == 0)
         {
             return AnalysisCacheLookupResult.Reject(AnalysisCacheRejectReason.Truncated);
         }
 
-        if (info.Length > MaxEntryBytes)
+        if (entryLength > MaxEntryBytes)
         {
-            return AnalysisCacheLookupResult.Reject(AnalysisCacheRejectReason.SizeExceeded, info.Length);
+            return AnalysisCacheLookupResult.Reject(AnalysisCacheRejectReason.SizeExceeded, entryLength);
         }
 
         byte[] bytes;
@@ -82,7 +102,7 @@ public static class AnalysisCacheStore
         {
             bytes = File.ReadAllBytes(entryPath);
         }
-        catch (IOException)
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
             return AnalysisCacheLookupResult.Reject(AnalysisCacheRejectReason.Corrupt);
         }
@@ -92,23 +112,29 @@ public static class AnalysisCacheStore
         {
             entry = JsonSerializer.Deserialize<AnalysisCacheEntryV1>(bytes, AnalysisCacheJson.Options);
         }
-        catch (JsonException)
+        catch (Exception ex) when (ex is JsonException or NotSupportedException)
         {
             return AnalysisCacheLookupResult.Reject(AnalysisCacheRejectReason.Corrupt, bytes.Length);
         }
 
         return entry is null
             ? AnalysisCacheLookupResult.Reject(AnalysisCacheRejectReason.Corrupt, bytes.Length)
-            : Authorize(entry, key, currentManifests, bytes.Length, canonicalRoot);
+            : Authorize(entry, key, currentManifests, currentArtifacts, bytes.Length, canonicalRoot);
     }
 
     private static AnalysisCacheLookupResult Authorize(
         AnalysisCacheEntryV1 entry,
         AnalysisCacheKey key,
         IReadOnlyList<AnalysisCacheProjectManifest> currentManifests,
+        IReadOnlyList<AnalysisCacheArtifactManifest> currentArtifacts,
         long bytesRead,
         string cacheRootPath)
     {
+        if (!HasValidStructure(entry))
+        {
+            return AnalysisCacheLookupResult.Reject(AnalysisCacheRejectReason.Corrupt, bytesRead);
+        }
+
         if (!string.Equals(entry.SchemaId, AnalysisCacheEnvelope.SchemaId, StringComparison.Ordinal))
         {
             return AnalysisCacheLookupResult.Reject(AnalysisCacheRejectReason.ForeignSchema, bytesRead);
@@ -123,9 +149,9 @@ public static class AnalysisCacheStore
         // tampered/poisoned entry cannot forge a matching tag without also knowing this cache
         // root's local AnalysisCacheHmacKeyStore secret. Compared in constant time (see
         // AnalysisCacheContentDigest.Verify) to avoid a timing side channel on the check.
-        if (!AnalysisCacheContentDigest.Verify(entry, cacheRootPath, entry.ContentDigest))
+        if (!AnalysisCacheContentDigest.TryVerify(entry, cacheRootPath, entry.ContentDigest, out AnalysisCacheRejectReason digestFailure))
         {
-            return AnalysisCacheLookupResult.Reject(AnalysisCacheRejectReason.IntegrityMismatch, bytesRead);
+            return AnalysisCacheLookupResult.Reject(digestFailure, bytesRead);
         }
 
         if (!string.Equals(entry.KeyDigest, key.Digest, StringComparison.Ordinal))
@@ -148,6 +174,11 @@ public static class AnalysisCacheStore
             return AnalysisCacheLookupResult.Reject(AnalysisCacheRejectReason.ProjectSetMismatch, bytesRead);
         }
 
+        if (!ArtifactManifestsMatch(entry.ArtifactManifests, currentArtifacts))
+        {
+            return AnalysisCacheLookupResult.Reject(AnalysisCacheRejectReason.ArtifactSetMismatch, bytesRead);
+        }
+
         if (entry.ProjectManifests.Any(manifest => manifest.Eligibility != BuildState.CacheEligibility.VerifiedCacheEligible))
         {
             return AnalysisCacheLookupResult.Reject(AnalysisCacheRejectReason.IneligibleBuildInput, bytesRead);
@@ -155,6 +186,45 @@ public static class AnalysisCacheStore
 
         return AnalysisCacheLookupResult.Hit(entry, bytesRead);
     }
+
+    private static bool HasValidStructure(AnalysisCacheEntryV1 entry)
+    {
+        if (string.IsNullOrWhiteSpace(entry.SchemaId)
+            || string.IsNullOrWhiteSpace(entry.KeyDigest)
+            || string.IsNullOrWhiteSpace(entry.Mode)
+            || string.IsNullOrWhiteSpace(entry.ToolVersion)
+            || string.IsNullOrWhiteSpace(entry.ContentDigest)
+            || entry.ProjectManifests is null
+            || entry.ArtifactManifests is null
+            || entry.Outcome is null)
+        {
+            return false;
+        }
+
+        return entry.ProjectManifests.All(manifest => manifest is not null
+                && !string.IsNullOrWhiteSpace(manifest.ProjectPath)
+                && !string.IsNullOrWhiteSpace(manifest.ManifestDigest))
+            && entry.ArtifactManifests.All(manifest => manifest is not null
+                && !string.IsNullOrWhiteSpace(manifest.ArtifactPath)
+                && !string.IsNullOrWhiteSpace(manifest.ContentDigest))
+            && HasValidOutcome(entry.Outcome);
+    }
+
+    private static bool HasValidOutcome(AnalysisCacheOutcomeV1 outcome) =>
+        outcome.Violations is not null
+        && outcome.Cycles is not null
+        && outcome.CoverageFindings is not null
+        && outcome.UnmatchedIgnoredViolations is not null
+        && outcome.PolicyConsistencyFindings is not null
+        && outcome.ClassificationConflicts is not null
+        && outcome.ClassificationMetadataFailures is not null
+        && outcome.ClassificationRoles is not null
+        && outcome.CycleFindings is not null
+        && outcome.CoverageSummaries is not null
+        && outcome.SubtractiveMatcherParticipation is not null
+        && outcome.CoverageConfig is not null
+        && outcome.UnmatchedIgnoredViolationsConfig is not null
+        && outcome.PolicyConsistencyConfig is not null;
 
     // Finding #4: this must be genuine set equivalence, not a lookup-and-hope. The prior
     // implementation dictionary-ized `current` by ProjectPath and looked up each `stored` entry in
@@ -216,6 +286,25 @@ public static class AnalysisCacheStore
         return false;
     }
 
+    private static bool ArtifactManifestsMatch(
+        IReadOnlyList<AnalysisCacheArtifactManifest> stored,
+        IReadOnlyList<AnalysisCacheArtifactManifest> current)
+    {
+        if (stored.Count != current.Count || HasDuplicateArtifactPath(stored) || HasDuplicateArtifactPath(current))
+        {
+            return false;
+        }
+
+        return stored.OrderBy(manifest => manifest.ArtifactPath, StringComparer.Ordinal)
+            .SequenceEqual(current.OrderBy(manifest => manifest.ArtifactPath, StringComparer.Ordinal));
+    }
+
+    private static bool HasDuplicateArtifactPath(IReadOnlyList<AnalysisCacheArtifactManifest> manifests)
+    {
+        HashSet<string> seen = new(StringComparer.Ordinal);
+        return manifests.Any(manifest => !seen.Add(manifest.ArtifactPath));
+    }
+
     // Publishes exactly once per entry via a same-directory temp file + atomic rename, observing
     // cancellation immediately before that rename (#375's cancellation-safe publication
     // requirement) so a cancelled populate call can never expose a reusable entry.
@@ -226,9 +315,21 @@ public static class AnalysisCacheStore
         AnalysisCacheOutcomeV1 outcome,
         CancellationToken cancellationToken = default)
     {
+        return Put(location, key, projectManifests, Array.Empty<AnalysisCacheArtifactManifest>(), outcome, cancellationToken);
+    }
+
+    public static PutResult Put(
+        AnalysisCacheLocation location,
+        AnalysisCacheKey key,
+        IReadOnlyList<AnalysisCacheProjectManifest> projectManifests,
+        IReadOnlyList<AnalysisCacheArtifactManifest> artifactManifests,
+        AnalysisCacheOutcomeV1 outcome,
+        CancellationToken cancellationToken = default)
+    {
         ArgumentNullException.ThrowIfNull(location);
         ArgumentNullException.ThrowIfNull(key);
         ArgumentNullException.ThrowIfNull(projectManifests);
+        ArgumentNullException.ThrowIfNull(artifactManifests);
         ArgumentNullException.ThrowIfNull(outcome);
 
         if (projectManifests.Count == 0
@@ -240,6 +341,11 @@ public static class AnalysisCacheStore
         if (projectManifests.Count > MaxProjectManifests)
         {
             return PutResult.Rejected(AnalysisCacheRejectReason.SizeExceeded);
+        }
+
+        if (HasDuplicateProjectPath(projectManifests) || HasDuplicateArtifactPath(artifactManifests))
+        {
+            return PutResult.Rejected(AnalysisCacheRejectReason.ProjectSetMismatch);
         }
 
         if (IsRootUnsafe(location))
@@ -266,13 +372,18 @@ public static class AnalysisCacheStore
             CreatedAtUtc = DateTimeOffset.UtcNow,
             CompletionStatus = AnalysisCacheEntryCompletionStatus.Success,
             ProjectManifests = projectManifests.OrderBy(manifest => manifest.ProjectPath, StringComparer.Ordinal).ToArray(),
+            ArtifactManifests = artifactManifests.OrderBy(manifest => manifest.ArtifactPath, StringComparer.Ordinal).ToArray(),
             Outcome = outcome,
             ContentDigest = string.Empty,
         };
-        AnalysisCacheEntryV1 entry = entryWithoutDigest with
+        if (!AnalysisCacheContentDigest.TryCompute(
+                entryWithoutDigest, Path.GetFullPath(location.RootPath), out string? contentDigest,
+                out AnalysisCacheRejectReason digestFailure))
         {
-            ContentDigest = AnalysisCacheContentDigest.Compute(entryWithoutDigest, Path.GetFullPath(location.RootPath)),
-        };
+            return PutResult.Rejected(digestFailure);
+        }
+
+        AnalysisCacheEntryV1 entry = entryWithoutDigest with { ContentDigest = contentDigest! };
 
         byte[] bytes = JsonSerializer.SerializeToUtf8Bytes(entry, AnalysisCacheJson.Options);
 
@@ -292,8 +403,15 @@ public static class AnalysisCacheStore
         // while resolving outside the cache root on disk.
         string canonicalRoot = Path.GetFullPath(location.RootPath);
         string directory = Path.GetDirectoryName(entryPath)!;
-        Directory.CreateDirectory(directory);
-        if (FileSystemContainmentGuard.HasReparsePointAncestor(directory, canonicalRoot))
+        try
+        {
+            Directory.CreateDirectory(directory);
+            if (FileSystemContainmentGuard.HasReparsePointAncestor(directory, canonicalRoot))
+            {
+                return PutResult.Rejected(AnalysisCacheRejectReason.PathUnsafe);
+            }
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
             return PutResult.Rejected(AnalysisCacheRejectReason.PathUnsafe);
         }
@@ -317,10 +435,10 @@ public static class AnalysisCacheStore
             File.Move(tempPath, entryPath, overwrite: true);
             return PutResult.Success(bytes.LongLength);
         }
-        catch
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
             TryDelete(tempPath);
-            throw;
+            return PutResult.Rejected(AnalysisCacheRejectReason.PathUnsafe);
         }
     }
 
@@ -328,12 +446,12 @@ public static class AnalysisCacheStore
     {
         ArgumentNullException.ThrowIfNull(location);
 
-        if (!Directory.Exists(location.RootPath))
+        if (IsRootUnsafe(location))
         {
             return Array.Empty<AnalysisCacheEntrySummary>();
         }
 
-        if (IsRootUnsafe(location))
+        if (!Directory.Exists(location.RootPath))
         {
             return Array.Empty<AnalysisCacheEntrySummary>();
         }
@@ -421,7 +539,8 @@ public static class AnalysisCacheStore
             }
 
             AnalysisCacheEntryV1? entry = JsonSerializer.Deserialize<AnalysisCacheEntryV1>(bytes, AnalysisCacheJson.Options);
-            if (entry is null || !AnalysisCacheContentDigest.Verify(entry, canonicalRoot, entry.ContentDigest))
+            if (entry is null || !HasValidStructure(entry)
+                || !AnalysisCacheContentDigest.TryVerify(entry, canonicalRoot, entry.ContentDigest, out _))
             {
                 return new AnalysisCacheEntrySummary(relativeName, Readable: false, null, null, null, null);
             }
@@ -429,7 +548,8 @@ public static class AnalysisCacheStore
             return new AnalysisCacheEntrySummary(
                 relativeName, Readable: true, entry.KeyDigest, entry.CreatedAtUtc, entry.ProjectManifests.Count, entry.Outcome.Passed);
         }
-        catch (Exception ex) when (ex is IOException or JsonException)
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException
+            or ArgumentException or InvalidOperationException)
         {
             return new AnalysisCacheEntrySummary(relativeName, Readable: false, null, null, null, null);
         }
@@ -438,6 +558,12 @@ public static class AnalysisCacheStore
     public static void Clear(AnalysisCacheLocation location)
     {
         ArgumentNullException.ThrowIfNull(location);
+
+        if (IsRootUnsafe(location))
+        {
+            throw new AnalysisCacheLocationRejectedException(
+                $"Refusing to clear cache root '{location.RootPath}' because it is itself a symlink/reparse point.");
+        }
 
         if (!Directory.Exists(location.RootPath))
         {
@@ -449,12 +575,6 @@ public static class AnalysisCacheStore
         {
             throw new AnalysisCacheLocationRejectedException(
                 $"Refusing to clear unsafe cache root '{location.RootPath}'.");
-        }
-
-        if (FileSystemContainmentGuard.IsReparsePoint(canonicalRoot))
-        {
-            throw new AnalysisCacheLocationRejectedException(
-                $"Refusing to clear cache root '{location.RootPath}' because it is itself a symlink/reparse point.");
         }
 
         foreach (string file in EnumerateFilesNotFollowingSymlinks(canonicalRoot, "*")

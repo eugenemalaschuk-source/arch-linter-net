@@ -61,6 +61,7 @@ public sealed class AnalysisCacheSchemaValidationTests
             {
                 new AnalysisCacheProjectManifest("src/A/A.csproj", "digest-a", CacheEligibility.VerifiedCacheEligible),
             },
+            ArtifactManifests = Array.Empty<AnalysisCacheArtifactManifest>(),
             Outcome = outcome,
             ContentDigest = string.Empty,
         };

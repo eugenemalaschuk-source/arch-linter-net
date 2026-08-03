@@ -58,18 +58,48 @@ public static class FileSystemContainmentGuard
         || path.StartsWith(root + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase);
 
     public static bool IsReparsePoint(FileSystemInfo info) =>
-        info.LinkTarget != null || (info.Attributes & FileAttributes.ReparsePoint) != 0;
+        (info.Attributes & FileAttributes.ReparsePoint) != 0;
 
     public static bool IsReparsePoint(string path)
     {
+        // File.Exists/Directory.Exists return false for a broken symlink, which would turn a
+        // pre-created dangling link into an apparent missing path and let a later CreateNew or
+        // CreateDirectory cross it. For an existing path, probe it using its actual filesystem
+        // shape first. FileAttributes.ReparsePoint describes the final filesystem object, unlike
+        // LinkTarget on macOS, which can report an ancestor's /var alias as the target of an
+        // ordinary child path. For a missing path, enumerate its direct parent: this detects a
+        // dangling link without asking FileInfo/DirectoryInfo to resolve a non-existent child
+        // through that alias.
+        if (Directory.Exists(path))
+        {
+            return IsReparsePoint(new DirectoryInfo(path));
+        }
+
         if (File.Exists(path))
         {
             return IsReparsePoint(new FileInfo(path));
         }
 
-        if (Directory.Exists(path))
+        string? parent = Path.GetDirectoryName(path);
+        if (string.IsNullOrEmpty(parent) || !Directory.Exists(parent))
         {
-            return IsReparsePoint(new DirectoryInfo(path));
+            return false;
+        }
+
+        try
+        {
+            string fileName = Path.GetFileName(path);
+            string? existingPath = Directory.EnumerateFileSystemEntries(parent, "*", SearchOption.TopDirectoryOnly)
+                .SingleOrDefault(candidate => string.Equals(Path.GetFileName(candidate), fileName, StringComparison.Ordinal));
+            if (existingPath is not null)
+            {
+                return (File.GetAttributes(existingPath) & FileAttributes.ReparsePoint) != 0;
+            }
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            // An unreadable candidate is handled by the caller as a typed cache rejection; do
+            // not turn this defensive probe itself into a validation failure.
         }
 
         return false;

@@ -40,11 +40,69 @@ internal static class AnalysisCacheContentDigest
             && CryptographicOperations.FixedTimeEquals(expectedBytes, storedBytes);
     }
 
+    // Cache persistence is optional. Key-store access, malformed-but-deserializable object graphs,
+    // and serialization failures must therefore become a typed cache miss/recompute path rather
+    // than escaping from a lookup and failing validation itself.
+    public static bool TryVerify(
+        AnalysisCacheEntryV1 entry,
+        string cacheRootPath,
+        string storedTagHex,
+        out AnalysisCacheRejectReason failureReason)
+    {
+        try
+        {
+            bool valid = Verify(entry, cacheRootPath, storedTagHex);
+            failureReason = valid ? default : AnalysisCacheRejectReason.IntegrityMismatch;
+            return valid;
+        }
+        catch (AnalysisCacheLocationRejectedException)
+        {
+            failureReason = AnalysisCacheRejectReason.PathUnsafe;
+            return false;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException
+            or ArgumentException or InvalidOperationException)
+        {
+            failureReason = AnalysisCacheRejectReason.Corrupt;
+            return false;
+        }
+    }
+
+    public static bool TryCompute(
+        AnalysisCacheEntryV1 entry,
+        string cacheRootPath,
+        out string? contentDigest,
+        out AnalysisCacheRejectReason failureReason)
+    {
+        try
+        {
+            contentDigest = Compute(entry, cacheRootPath);
+            failureReason = default;
+            return true;
+        }
+        catch (AnalysisCacheLocationRejectedException)
+        {
+            contentDigest = null;
+            failureReason = AnalysisCacheRejectReason.PathUnsafe;
+            return false;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException
+            or ArgumentException or InvalidOperationException)
+        {
+            contentDigest = null;
+            failureReason = AnalysisCacheRejectReason.Corrupt;
+            return false;
+        }
+    }
+
     private static string BuildCanonicalForm(AnalysisCacheEntryV1 entry)
     {
         IEnumerable<string> manifestLines = entry.ProjectManifests
             .OrderBy(manifest => manifest.ProjectPath, StringComparer.Ordinal)
             .Select(manifest => $"{manifest.ProjectPath}|{manifest.ManifestDigest}|{manifest.Eligibility}");
+        IEnumerable<string> artifactLines = entry.ArtifactManifests
+            .OrderBy(manifest => manifest.ArtifactPath, StringComparer.Ordinal)
+            .Select(manifest => $"{manifest.ArtifactPath}|{manifest.ContentDigest}");
 
         return string.Join(
             '\n',
@@ -56,6 +114,7 @@ internal static class AnalysisCacheContentDigest
             $"created:{entry.CreatedAtUtc:O}",
             $"status:{entry.CompletionStatus}",
             $"manifests:{string.Join(';', manifestLines)}",
+            $"artifacts:{string.Join(';', artifactLines)}",
             $"outcome:{FormatOutcome(entry.Outcome)}");
     }
 

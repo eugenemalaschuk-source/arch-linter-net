@@ -92,8 +92,9 @@ internal sealed partial class ValidateCommandHandler
         }
     }
 
-    // Populates only after a completed, non-cancelled run — a preflight-blocked or cancelled
-    // attempt never reaches here. One entry per requested mode (see finding #4: a combined
+    // Populates only after a completed, non-cancelled run. A preflight-blocked outcome reaches
+    // this boundary only to record its typed IncompleteOriginalRun rejection; it can never be
+    // published. One entry per requested mode (see finding #4: a combined
     // "strict,audit" request never collapses more than one mode's outcome under one key). Gated
     // internally on #406 VerifiedCacheEligible for every discovered project, so nothing is ever
     // persisted from an unproven build-input manifest.
@@ -109,42 +110,12 @@ internal sealed partial class ValidateCommandHandler
             return;
         }
 
-        AnalysisCacheLocation? location;
-        try
-        {
-            location = AnalysisCacheLocationResolver.Resolve(ResolveCacheOptions(options));
-        }
-        catch (AnalysisCacheLocationRejectedException)
-        {
-            // Already reported as a runtime error by PreValidateCacheDestination before
-            // execution started; nothing left to populate.
-            RecordCacheReject(state, AnalysisCacheRejectReason.PathUnsafe);
-            return;
-        }
-
-        state.AttemptedPopulation = true;
         state.Lookups = counters.CacheLookups;
-        string repositoryRoot = string.IsNullOrEmpty(outcome.RepositoryRoot)
-            ? Path.GetDirectoryName(Path.GetFullPath(options.PolicyPath)) ?? Environment.CurrentDirectory
-            : outcome.RepositoryRoot;
 
         AnalysisCachePopulation.Outcome populationOutcome;
         try
         {
-            AnalysisCacheKey key = BuildCacheKey(options, mode, outcome, repositoryRoot, _cancellationToken);
-            AnalysisCacheOutcomeV1 cacheOutcome = AnalysisCacheOutcomeMapper.ToCacheOutcome(outcome);
-
-            populationOutcome = AnalysisCachePopulation.TryPopulate(
-                location,
-                key,
-                outcome.DiscoveredProjectPaths,
-                repositoryRoot,
-                options.Configuration,
-                options.TargetFramework,
-                options.Platform,
-                options.RuntimeIdentifier,
-                cacheOutcome,
-                _cancellationToken);
+            populationOutcome = AnalysisCachePopulation.TryPopulateCompletedOutcome(outcome, _cancellationToken);
         }
         catch (OperationCanceledException)
         {
@@ -163,6 +134,13 @@ internal sealed partial class ValidateCommandHandler
             RecordCacheReject(state, AnalysisCacheRejectReason.IneligibleBuildInput);
             return;
         }
+
+        if (!populationOutcome.PopulationAttempted)
+        {
+            return;
+        }
+
+        state.AttemptedPopulation = true;
 
         state.IneligibleUnitCount += populationOutcome.IneligibleProjectCount;
 
@@ -187,37 +165,6 @@ internal sealed partial class ValidateCommandHandler
         string key = reason.ToString();
         state.RejectReasonCounts.TryGetValue(key, out int existing);
         state.RejectReasonCounts[key] = existing + 1;
-    }
-
-    private static AnalysisCacheKey BuildCacheKey(
-        ValidateCommandOptions options, string mode, ValidationOutcome outcome, string repositoryRoot, CancellationToken cancellationToken)
-    {
-        IReadOnlyList<string> policyFiles = outcome.PolicyImportPaths.Count > 0
-            ? outcome.PolicyImportPaths
-            : new[] { options.PolicyPath };
-
-        return new AnalysisCacheKey(
-            AnalysisCacheKey.ComputePolicyDigest(policyFiles, repositoryRoot, cancellationToken),
-            AnalysisCacheKey.NormalizeMode(mode),
-            options.ConditionSetName,
-            AnalysisCacheKey.ComputeContractIdsDigest(options.ContractIds),
-            AnalysisCacheKey.ComputeWorkspaceDigest(outcome.DiscoveredProjectPaths, repositoryRoot),
-            options.Configuration,
-            options.TargetFramework,
-            options.Platform,
-            options.RuntimeIdentifier,
-            // Finding #2: the CLI never exposes --preprocessor-symbols or an asmdef-contracts
-            // toggle today, and always builds its ValidationRequest/AnalysisSnapshotRequest with
-            // PreprocessorSymbols left at its null default, IncludeAsmdefContracts at its true
-            // default, and EnforceUnmatchedIgnoredViolationsPolicy hardcoded true (see
-            // ValidateCommandHandler.Execution.cs's BuildValidationRequest/ExecuteCombinedModes) —
-            // these constants match that exactly, so the population-side key here always agrees
-            // with ArchitectureAnalysisSnapshot.TryEvaluateFromCache's own lookup-side key for the
-            // same run.
-            AnalysisCacheKey.ComputePreprocessorSymbolsDigest(null),
-            AnalysisCacheKey.ComputeBaselineDigest(options.BaselinePath, cancellationToken),
-            IncludeAsmdefContracts: true,
-            EnforceUnmatchedIgnoredViolationsPolicy: true);
     }
 
     private static AnalysisProfileCacheCounters BuildCacheProfileCounters(ValidateCommandOptions options, CacheExecutionState state)

@@ -1,3 +1,4 @@
+using System.Text.Json.Nodes;
 using ArchLinterNet.Core.BuildState;
 using ArchLinterNet.Core.Caching;
 using ArchLinterNet.Core.Model;
@@ -54,6 +55,22 @@ public sealed class AnalysisCacheStoreTests
         ClassificationConflicts: Array.Empty<ArchitectureClassificationConflict>(),
         ClassificationMetadataFailures: Array.Empty<ArchitectureClassificationMetadataFailure>());
 
+    private static void DeleteDirectoryLink(string path)
+    {
+        try
+        {
+            // Directory.CreateSymbolicLink creates a directory link. DirectoryInfo.Delete removes
+            // that link itself without recursively following its target, unlike the File.Delete
+            // cleanup that throws on Linux/macOS for this shape.
+            new DirectoryInfo(path).Delete();
+        }
+        catch (DirectoryNotFoundException)
+        {
+            // A rejected cache operation must not remove the link, but this keeps cleanup safe if
+            // a platform has already removed the link while preserving the target assertion.
+        }
+    }
+
     [Test]
     public void TryGet_NoEntry_ReturnsMissing()
     {
@@ -102,6 +119,70 @@ public sealed class AnalysisCacheStoreTests
 
         Assert.That(result.Outcome, Is.EqualTo(AnalysisCacheLookupOutcome.Reject));
         Assert.That(result.Reason, Is.EqualTo(AnalysisCacheRejectReason.ProjectSetMismatch));
+    }
+
+    [Test]
+    public void TryGet_ArtifactFingerprintChanged_IsArtifactSetMismatch()
+    {
+        AnalysisCacheKey key = CreateKey();
+        AnalysisCacheProjectManifest[] manifests = { EligibleManifest() };
+        AnalysisCacheArtifactManifest[] originalArtifacts =
+        {
+            new("src/A/bin/Debug/net10.0/A.dll", "pe-before"),
+            new("src/A/bin/Debug/net10.0/A.pdb", "pdb-before"),
+            new("src/A/bin/Debug/net10.0/A.dll.archlinternet-receipt.json", "receipt-before"),
+        };
+
+        AnalysisCacheStore.PutResult put = AnalysisCacheStore.Put(_location, key, manifests, originalArtifacts, SampleOutcome());
+        Assert.That(put.RejectReason, Is.Null);
+
+        AnalysisCacheArtifactManifest[] changedArtifacts = originalArtifacts
+            .Select(manifest => manifest.ArtifactPath.EndsWith(".dll", StringComparison.Ordinal)
+                ? manifest with { ContentDigest = "pe-after" }
+                : manifest)
+            .ToArray();
+        AnalysisCacheLookupResult result = AnalysisCacheStore.TryGet(_location, key, manifests, changedArtifacts);
+
+        Assert.That(result.Outcome, Is.EqualTo(AnalysisCacheLookupOutcome.Reject));
+        Assert.That(result.Reason, Is.EqualTo(AnalysisCacheRejectReason.ArtifactSetMismatch));
+    }
+
+    [Test]
+    public void ArtifactManifest_ArtifactBytesChange_ChangesTheContentDigest()
+    {
+        string artifactPath = Path.Combine(_root, "Sample.dll");
+        Directory.CreateDirectory(_root);
+        File.WriteAllBytes(artifactPath, new byte[] { 1, 2, 3 });
+
+        AnalysisCacheArtifactManifest before = AnalysisCacheArtifactManifest.FromPath(artifactPath, _root);
+        File.WriteAllBytes(artifactPath, new byte[] { 1, 2, 4 });
+        AnalysisCacheArtifactManifest after = AnalysisCacheArtifactManifest.FromPath(artifactPath, _root);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(after.ArtifactPath, Is.EqualTo(before.ArtifactPath));
+            Assert.That(after.ContentDigest, Is.Not.EqualTo(before.ContentDigest));
+        });
+    }
+
+    [Test]
+    public void TryGet_SyntacticallyValidEntryWithNullOutcome_IsTypedCorruptReject()
+    {
+        AnalysisCacheKey key = CreateKey();
+        AnalysisCacheProjectManifest[] manifests = { EligibleManifest() };
+        AnalysisCacheStore.Put(_location, key, manifests, SampleOutcome());
+
+        string entryPath = Directory.EnumerateFiles(_root, "*.json", SearchOption.AllDirectories).Single();
+        JsonObject entry = JsonNode.Parse(File.ReadAllText(entryPath))!.AsObject();
+        entry["Outcome"] = null;
+        File.WriteAllText(entryPath, entry.ToJsonString());
+
+        Assert.DoesNotThrow(() =>
+        {
+            AnalysisCacheLookupResult result = AnalysisCacheStore.TryGet(_location, key, manifests);
+            Assert.That(result.Outcome, Is.EqualTo(AnalysisCacheLookupOutcome.Reject));
+            Assert.That(result.Reason, Is.EqualTo(AnalysisCacheRejectReason.Corrupt));
+        });
     }
 
     [Test]
@@ -561,11 +642,7 @@ public sealed class AnalysisCacheStoreTests
         }
         finally
         {
-            if (File.Exists(_root) || Directory.Exists(_root))
-            {
-                File.Delete(_root);
-            }
-
+            DeleteDirectoryLink(_root);
             Directory.Delete(outsideTarget, recursive: true);
         }
     }
@@ -592,7 +669,7 @@ public sealed class AnalysisCacheStoreTests
         }
         finally
         {
-            File.Delete(_root);
+            DeleteDirectoryLink(_root);
             Directory.Delete(outsideTarget, recursive: true);
         }
     }
@@ -621,7 +698,7 @@ public sealed class AnalysisCacheStoreTests
         }
         finally
         {
-            File.Delete(_root);
+            DeleteDirectoryLink(_root);
             Directory.Delete(outsideTarget, recursive: true);
         }
     }

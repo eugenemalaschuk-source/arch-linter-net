@@ -41,49 +41,25 @@ internal static class ArchitectureValidationCacheSupport
     {
         if (context.CacheOptions is null || context.CacheOptions.Mode == AnalysisCacheMode.Disabled)
         {
-            return new AnalysisCachePopulation.Outcome(AnalysisCacheRejectReason.Disabled, 0, 0, 0);
+            return AnalysisCachePopulation.Outcome.Skipped;
         }
 
-        AnalysisCacheLocation? location;
         try
         {
-            location = AnalysisCacheLocationResolver.Resolve(context.CacheOptions);
+            // The snapshot performs the actual lookup with this same resolved location. Retain
+            // the Testing API's former typed PathUnsafe profile result when the location was
+            // rejected before snapshot construction, rather than treating that configuration
+            // failure as a successful skipped population.
+            _ = AnalysisCacheLocationResolver.Resolve(context.CacheOptions);
         }
         catch (AnalysisCacheLocationRejectedException)
         {
             return new AnalysisCachePopulation.Outcome(AnalysisCacheRejectReason.PathUnsafe, 0, 0, 0);
         }
 
-        string repositoryRoot = string.IsNullOrEmpty(outcome.RepositoryRoot)
-            ? Path.GetDirectoryName(Path.GetFullPath(context.PolicyPath)) ?? Environment.CurrentDirectory
-            : outcome.RepositoryRoot;
-
         try
         {
-            IReadOnlyList<string> policyFiles = outcome.PolicyImportPaths.Count > 0
-                ? outcome.PolicyImportPaths
-                : new[] { context.PolicyPath };
-            AnalysisCacheKey key = new(
-                AnalysisCacheKey.ComputePolicyDigest(policyFiles, repositoryRoot, context.CancellationToken),
-                AnalysisCacheKey.NormalizeMode(mode),
-                context.ConditionSetName,
-                AnalysisCacheKey.ComputeContractIdsDigest(context.ContractIds ?? Array.Empty<string>()),
-                AnalysisCacheKey.ComputeWorkspaceDigest(outcome.DiscoveredProjectPaths, repositoryRoot),
-                context.RequestedConfiguration,
-                context.RequestedTargetFramework,
-                context.RequestedPlatform,
-                context.RequestedRuntimeIdentifier,
-                AnalysisCacheKey.ComputePreprocessorSymbolsDigest(null),
-                AnalysisCacheKey.ComputeBaselineDigest(context.BaselinePath, context.CancellationToken),
-                IncludeAsmdefContracts: true,
-                context.EnforceUnmatchedIgnoredViolationsPolicy);
-
-            AnalysisCacheOutcomeV1 cacheOutcome = AnalysisCacheOutcomeMapper.ToCacheOutcome(outcome);
-
-            return AnalysisCachePopulation.TryPopulate(
-                location, key, outcome.DiscoveredProjectPaths, repositoryRoot,
-                context.RequestedConfiguration, context.RequestedTargetFramework, context.RequestedPlatform,
-                context.RequestedRuntimeIdentifier, cacheOutcome, context.CancellationToken);
+            return AnalysisCachePopulation.TryPopulateCompletedOutcome(outcome, context.CancellationToken);
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
@@ -106,7 +82,7 @@ internal static class ArchitectureValidationCacheSupport
         Dictionary<string, int> rejectReasonCounts = lookups is null
             ? new Dictionary<string, int>(StringComparer.Ordinal)
             : new Dictionary<string, int>(lookups.RejectReasonCounts, StringComparer.Ordinal);
-        if (populationOutcome.RejectReason is { } reason)
+        if (populationOutcome.PopulationAttempted && populationOutcome.RejectReason is { } reason)
         {
             string key = reason.ToString();
             rejectReasonCounts.TryGetValue(key, out int existing);
@@ -116,7 +92,7 @@ internal static class ArchitectureValidationCacheSupport
         // Finding #8: Rejects aggregates both population-side rejects (this call's own populate
         // attempt) and read-side/lookup rejects (lookups.Rejects) — the scalar total must always
         // match the sum of rejectReasonCounts above, which already merges both sides.
-        int populationRejects = populationOutcome.RejectReason is null ? 0 : 1;
+        int populationRejects = populationOutcome.PopulationAttempted && populationOutcome.RejectReason is not null ? 1 : 0;
 
         return new AnalysisProfileCacheCounters
         {
@@ -124,13 +100,14 @@ internal static class ArchitectureValidationCacheSupport
             Lookups = lookups?.Lookups ?? 0,
             Hits = lookups?.Hits ?? 0,
             Misses = lookups?.Misses ?? 0,
-            Writes = populationOutcome.RejectReason is null ? 1 : 0,
+            Writes = populationOutcome.PopulationAttempted && populationOutcome.RejectReason is null ? 1 : 0,
             Rejects = populationRejects + (lookups?.Rejects ?? 0),
             BytesRead = lookups?.BytesRead ?? 0,
             BytesWritten = populationOutcome.BytesWritten,
             IneligibleUnitCount = populationOutcome.IneligibleProjectCount,
             CorruptionEvents = AnalysisCacheCorruptionClassifier.CountCorruptionEvents(rejectReasonCounts),
-            CancelledBeforePublish = populationOutcome.RejectReason == AnalysisCacheRejectReason.Cancelled ? 1 : 0,
+            CancelledBeforePublish = populationOutcome.PopulationAttempted
+                && populationOutcome.RejectReason == AnalysisCacheRejectReason.Cancelled ? 1 : 0,
             Mode = context.CacheOptions.ModeCategory,
             RejectReasonCounts = rejectReasonCounts,
         };

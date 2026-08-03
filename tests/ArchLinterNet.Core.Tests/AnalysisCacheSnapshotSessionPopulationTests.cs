@@ -191,4 +191,63 @@ public sealed class AnalysisCacheSnapshotSessionPopulationTests
 
         Assert.That(Directory.Exists(_cacheRoot), Is.False);
     }
+
+    [Test]
+    public void CreateSnapshot_ExplicitSourceRoots_IsIneligibleEvenWhenProjectInputsAreEligible()
+    {
+        File.WriteAllText(_policyPath, """
+            version: 1
+            name: Test
+            layers: {}
+            analysis:
+              target_assemblies: []
+              projects: ["src/Fixture/Fixture.csproj"]
+              source_roots: ["src"]
+            contracts:
+              strict_project_metadata:
+                - name: project-metadata
+                  projects:
+                    - src/Fixture/Fixture.csproj
+                  required_properties:
+                    TargetFramework: net10.0
+            """);
+        AnalysisCachePopulation.TestManifestCollectorOverride = AlwaysEligible;
+
+        using ArchitectureValidationSnapshotSession session =
+            new ArchitectureValidationBuilder(_policyPath).WithCache(AnalysisCacheOptions.AtPath(_cacheRoot)).CreateSnapshot();
+
+        session.ValidateStrict();
+
+        AnalysisCacheLookupStats lookup = session.Counters.CacheLookups!;
+        Assert.Multiple(() =>
+        {
+            Assert.That(lookup.Rejects, Is.EqualTo(1));
+            Assert.That(lookup.RejectReasonCounts["IneligibleBuildInput"], Is.EqualTo(1));
+            Assert.That(Directory.Exists(_cacheRoot) && Directory.EnumerateFiles(_cacheRoot, "*.json", SearchOption.AllDirectories).Any(), Is.False);
+        });
+    }
+
+    [Test]
+    public void CreateSnapshot_InputFingerprintChangesBeforePopulation_DoesNotPublishStaleOutcome()
+    {
+        int collectionCount = 0;
+        AnalysisCachePopulation.TestManifestCollectorOverride =
+            (projectPath, repositoryRoot, configuration, targetFramework, platform, runtimeIdentifier, cancellationToken) =>
+                new(
+                    Interlocked.Increment(ref collectionCount) == 1 ? "before-analysis" : "after-analysis",
+                    CacheEligibility.VerifiedCacheEligible,
+                    Array.Empty<string>(),
+                    Array.Empty<string>());
+
+        using ArchitectureValidationSnapshotSession session =
+            new ArchitectureValidationBuilder(_policyPath).WithCache(AnalysisCacheOptions.AtPath(_cacheRoot)).CreateSnapshot();
+
+        session.ValidateStrict();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(collectionCount, Is.EqualTo(2), "authorization must be captured before analysis and revalidated before Put");
+            Assert.That(Directory.Exists(_cacheRoot) && Directory.EnumerateFiles(_cacheRoot, "*.json", SearchOption.AllDirectories).Any(), Is.False);
+        });
+    }
 }

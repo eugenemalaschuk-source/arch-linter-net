@@ -1,23 +1,46 @@
 using ArchLinterNet.Core.BuildState;
+using ArchLinterNet.Core.Validation;
 
 namespace ArchLinterNet.Core.Caching;
 
-// One shared population/lookup implementation for CLI and Testing — not two independently
-// maintained ones (matching the analysis-profile/v1 pattern: one AnalysisProfileBuilder for both
-// hosts). Computes each discovered project's #406 evaluated-build-input manifest and gates
-// AnalysisCacheStore.Put on every one of them being VerifiedCacheEligible.
+// Shared authorization capture for both cache lookup and post-analysis publication. A successful
+// lookup and a later write must use the same pre-analysis input snapshot; otherwise a mutation
+// between execution and population could publish an old result under a new input digest.
 public static class AnalysisCachePopulation
 {
-    // Test-only injection seam (internal, visible only to ArchLinterNet.Core.Tests via
-    // InternalsVisibleTo). EvaluatedBuildInputManifestCollector.Collect always reports
-    // CacheIneligible for every project discovered from this repository's own MSBuild evaluation
-    // ("evaluated-msbuild-evidence-incomplete" — see design.md's #406 gate), which makes it
-    // impossible to exercise a real eligible-manifest cache write/hit against the live engine from
-    // any test that doesn't fake the collector. Production code paths never set this — it defaults
-    // to the real collector below and stays that way for every CLI/Testing execution.
     internal static Func<string, string, string?, string?, string?, string?, CancellationToken, EvaluatedBuildInputManifestV1>?
         TestManifestCollectorOverride
     { get; set; }
+
+    internal sealed record PreparedAuthorization(
+        AnalysisCacheLocation Location,
+        AnalysisCacheKey Key,
+        IReadOnlyList<string> DiscoveredProjectPaths,
+        IReadOnlyList<string> ArtifactPaths,
+        string RepositoryRoot,
+        string? Configuration,
+        string? TargetFramework,
+        string? Platform,
+        string? RuntimeIdentifier,
+        bool HasUnfingerprintedSourceInputs,
+        IReadOnlyList<AnalysisCacheProjectManifest> ProjectManifests,
+        IReadOnlyList<AnalysisCacheArtifactManifest> ArtifactManifests);
+
+    internal readonly record struct LookupPreparation(
+        AnalysisCacheLookupResult Lookup,
+        PreparedAuthorization? Authorization);
+
+    // PopulationAttempted distinguishes a cache hit/no-cache path (no write attempted) from a
+    // rejected publication. Hosts must not turn a hit into a synthetic Write in their profile.
+    public readonly record struct Outcome(
+        AnalysisCacheRejectReason? RejectReason,
+        int ProjectsEvaluated,
+        int IneligibleProjectCount,
+        long BytesWritten,
+        bool PopulationAttempted = true)
+    {
+        public static Outcome Skipped => new(null, 0, 0, 0, PopulationAttempted: false);
+    }
 
     private static EvaluatedBuildInputManifestV1 CollectManifest(
         string projectPath, string repositoryRoot, string? configuration, string? targetFramework,
@@ -27,13 +50,8 @@ public static class AnalysisCachePopulation
             projectPath, repositoryRoot, configuration, targetFramework, platform, runtimeIdentifier, cancellationToken);
     }
 
-    // ProjectsEvaluated: how many discovered projects had a manifest recomputed.
-    // IneligibleProjectCount: how many of those were not VerifiedCacheEligible (0 whenever
-    // RejectReason is null — a successful populate implies every project was eligible).
-    // BytesWritten: 0 unless RejectReason is null (see AnalysisCacheStore.PutResult).
-    public readonly record struct Outcome(
-        AnalysisCacheRejectReason? RejectReason, int ProjectsEvaluated, int IneligibleProjectCount, long BytesWritten);
-
+    // Compatibility entry point used by direct callers and focused store tests. The snapshot path
+    // below supplies a prepared authorization so it can prove pre/post-execution equivalence.
     public static Outcome TryPopulate(
         AnalysisCacheLocation? location,
         AnalysisCacheKey key,
@@ -46,37 +64,52 @@ public static class AnalysisCachePopulation
         AnalysisCacheOutcomeV1 outcome,
         CancellationToken cancellationToken = default)
     {
-        if (location is null)
+        PreparedAuthorization? authorization = Prepare(
+            location, key, discoveredProjectPaths, Array.Empty<string>(), repositoryRoot, configuration,
+            targetFramework, platform, runtimeIdentifier, hasUnfingerprintedSourceInputs: false,
+            cancellationToken, out Outcome rejected);
+        if (authorization is null)
         {
-            return new Outcome(AnalysisCacheRejectReason.Disabled, 0, 0, 0);
+            return rejected;
         }
 
-        if (discoveredProjectPaths.Count == 0)
-        {
-            return new Outcome(AnalysisCacheRejectReason.IneligibleBuildInput, 0, 0, 0);
-        }
-
-        List<AnalysisCacheProjectManifest> manifests = new(discoveredProjectPaths.Count);
-        foreach (string projectPath in discoveredProjectPaths)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            EvaluatedBuildInputManifestV1 manifest = CollectManifest(
-                projectPath, repositoryRoot, configuration, targetFramework, platform, runtimeIdentifier, cancellationToken);
-            manifests.Add(AnalysisCacheProjectManifest.FromManifest(
-                ToRepositoryRelative(projectPath, repositoryRoot), manifest));
-        }
-
-        int ineligibleCount = manifests.Count(manifest => manifest.Eligibility != CacheEligibility.VerifiedCacheEligible);
-
-        AnalysisCacheStore.PutResult putResult = AnalysisCacheStore.Put(location, key, manifests, outcome, cancellationToken);
-        return new Outcome(putResult.RejectReason, manifests.Count, ineligibleCount, putResult.BytesWritten);
+        return Put(authorization, outcome, cancellationToken);
     }
 
-    // Re-derives each stored project's manifest and checks it against the given cache entry's
-    // key/authorization chain — the read-side counterpart used by `cache inspect`-style
-    // consumers and by tests that want to prove Put/TryGet symmetry against a real manifest
-    // instead of a hand-built fake. Also the read side of ArchitectureAnalysisSnapshot's own
-    // cache-hit short-circuit (see AnalysisCacheStore.TryGet/Authorize).
+    // The cache-hit path calls this from ArchitectureAnalysisSnapshot before contract execution.
+    // The returned prepared authorization is retained only on a non-hit and used to prove the
+    // input state did not change before a later publication.
+    internal static LookupPreparation TryLookupWithAuthorization(
+        AnalysisCacheLocation? location,
+        AnalysisCacheKey key,
+        IReadOnlyList<string> discoveredProjectPaths,
+        IReadOnlyList<string> artifactPaths,
+        string repositoryRoot,
+        string? configuration,
+        string? targetFramework,
+        string? platform,
+        string? runtimeIdentifier,
+        bool hasUnfingerprintedSourceInputs,
+        CancellationToken cancellationToken = default)
+    {
+        PreparedAuthorization? authorization = Prepare(
+            location, key, discoveredProjectPaths, artifactPaths, repositoryRoot, configuration,
+            targetFramework, platform, runtimeIdentifier, hasUnfingerprintedSourceInputs,
+            cancellationToken, out Outcome rejected);
+        if (authorization is null)
+        {
+            AnalysisCacheLookupResult lookup = rejected.RejectReason == AnalysisCacheRejectReason.Disabled
+                ? AnalysisCacheLookupResult.Miss(AnalysisCacheRejectReason.Disabled)
+                : AnalysisCacheLookupResult.Reject(rejected.RejectReason ?? AnalysisCacheRejectReason.Corrupt);
+            return new LookupPreparation(lookup, null);
+        }
+
+        return new LookupPreparation(
+            AnalysisCacheStore.TryGet(
+                authorization.Location, authorization.Key, authorization.ProjectManifests, authorization.ArtifactManifests),
+            authorization);
+    }
+
     public static AnalysisCacheLookupResult TryLookup(
         AnalysisCacheLocation? location,
         AnalysisCacheKey key,
@@ -88,23 +121,131 @@ public static class AnalysisCachePopulation
         string? runtimeIdentifier,
         CancellationToken cancellationToken = default)
     {
+        return TryLookupWithAuthorization(
+            location, key, discoveredProjectPaths, Array.Empty<string>(), repositoryRoot, configuration,
+            targetFramework, platform, runtimeIdentifier, hasUnfingerprintedSourceInputs: false, cancellationToken).Lookup;
+    }
+
+    // Called by CLI and Testing hosts after a completed snapshot Evaluate. The opaque prepared
+    // authorization lives on ValidationOutcome internally, so consumers cannot accidentally
+    // manufacture a post-analysis authorization from changed files.
+    public static Outcome TryPopulateCompletedOutcome(ValidationOutcome outcome, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(outcome);
+        if (outcome.PreflightBlocked)
+        {
+            return new Outcome(AnalysisCacheRejectReason.IncompleteOriginalRun, 0, 0, 0);
+        }
+
+        PreparedAuthorization? captured = outcome.CachePopulationAuthorization;
+        if (captured is null)
+        {
+            return Outcome.Skipped;
+        }
+
+        PreparedAuthorization? current = Prepare(
+            captured.Location, captured.Key, captured.DiscoveredProjectPaths, captured.ArtifactPaths,
+            captured.RepositoryRoot, captured.Configuration, captured.TargetFramework, captured.Platform,
+            captured.RuntimeIdentifier, captured.HasUnfingerprintedSourceInputs, cancellationToken, out Outcome rejected);
+        if (current is null)
+        {
+            return rejected;
+        }
+
+        if (!AuthorizationMatches(captured, current))
+        {
+            return new Outcome(AnalysisCacheRejectReason.InputChangedDuringExecution,
+                current.ProjectManifests.Count,
+                current.ProjectManifests.Count(manifest => manifest.Eligibility != CacheEligibility.VerifiedCacheEligible),
+                0);
+        }
+
+        return Put(captured, AnalysisCacheOutcomeMapper.ToCacheOutcome(outcome), cancellationToken);
+    }
+
+    private static PreparedAuthorization? Prepare(
+        AnalysisCacheLocation? location,
+        AnalysisCacheKey key,
+        IReadOnlyList<string> discoveredProjectPaths,
+        IReadOnlyList<string> artifactPaths,
+        string repositoryRoot,
+        string? configuration,
+        string? targetFramework,
+        string? platform,
+        string? runtimeIdentifier,
+        bool hasUnfingerprintedSourceInputs,
+        CancellationToken cancellationToken,
+        out Outcome rejected)
+    {
         if (location is null)
         {
-            return AnalysisCacheLookupResult.Miss(AnalysisCacheRejectReason.Disabled);
+            rejected = new Outcome(AnalysisCacheRejectReason.Disabled, 0, 0, 0, PopulationAttempted: false);
+            return null;
+        }
+
+        if (hasUnfingerprintedSourceInputs || discoveredProjectPaths.Count == 0)
+        {
+            rejected = new Outcome(AnalysisCacheRejectReason.IneligibleBuildInput, 0, 0, 0);
+            return null;
         }
 
         List<AnalysisCacheProjectManifest> manifests = new(discoveredProjectPaths.Count);
-        foreach (string projectPath in discoveredProjectPaths)
+        try
         {
-            cancellationToken.ThrowIfCancellationRequested();
-            EvaluatedBuildInputManifestV1 manifest = CollectManifest(
-                projectPath, repositoryRoot, configuration, targetFramework, platform, runtimeIdentifier, cancellationToken);
-            manifests.Add(AnalysisCacheProjectManifest.FromManifest(
-                ToRepositoryRelative(projectPath, repositoryRoot), manifest));
-        }
+            foreach (string projectPath in discoveredProjectPaths)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                EvaluatedBuildInputManifestV1 manifest = CollectManifest(
+                    projectPath, repositoryRoot, configuration, targetFramework, platform, runtimeIdentifier, cancellationToken);
+                manifests.Add(AnalysisCacheProjectManifest.FromManifest(
+                    ToRepositoryRelative(projectPath, repositoryRoot), manifest));
+            }
 
-        return AnalysisCacheStore.TryGet(location, key, manifests);
+            List<AnalysisCacheArtifactManifest> artifacts = artifactPaths
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .Select(path => AnalysisCacheArtifactManifest.FromPath(path, repositoryRoot, cancellationToken))
+                .OrderBy(manifest => manifest.ArtifactPath, StringComparer.Ordinal)
+                .ToList();
+
+            int ineligible = manifests.Count(manifest => manifest.Eligibility != CacheEligibility.VerifiedCacheEligible);
+            if (ineligible > 0)
+            {
+                rejected = new Outcome(AnalysisCacheRejectReason.IneligibleBuildInput, manifests.Count, ineligible, 0);
+                return null;
+            }
+
+            rejected = default;
+            return new PreparedAuthorization(
+                location, key, discoveredProjectPaths.ToArray(), artifactPaths.ToArray(), repositoryRoot,
+                configuration, targetFramework, platform, runtimeIdentifier, hasUnfingerprintedSourceInputs,
+                manifests, artifacts);
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException)
+        {
+            rejected = new Outcome(AnalysisCacheRejectReason.IneligibleBuildInput, manifests.Count, manifests.Count, 0);
+            return null;
+        }
     }
+
+    private static Outcome Put(PreparedAuthorization authorization, AnalysisCacheOutcomeV1 outcome, CancellationToken cancellationToken)
+    {
+        AnalysisCacheStore.PutResult putResult = AnalysisCacheStore.Put(
+            authorization.Location, authorization.Key, authorization.ProjectManifests,
+            authorization.ArtifactManifests, outcome, cancellationToken);
+        int ineligible = authorization.ProjectManifests.Count(manifest =>
+            manifest.Eligibility != CacheEligibility.VerifiedCacheEligible);
+        return new Outcome(putResult.RejectReason, authorization.ProjectManifests.Count, ineligible, putResult.BytesWritten);
+    }
+
+    private static bool AuthorizationMatches(PreparedAuthorization captured, PreparedAuthorization current) =>
+        captured.ProjectManifests.OrderBy(manifest => manifest.ProjectPath, StringComparer.Ordinal)
+            .SequenceEqual(current.ProjectManifests.OrderBy(manifest => manifest.ProjectPath, StringComparer.Ordinal))
+        && captured.ArtifactManifests.OrderBy(manifest => manifest.ArtifactPath, StringComparer.Ordinal)
+            .SequenceEqual(current.ArtifactManifests.OrderBy(manifest => manifest.ArtifactPath, StringComparer.Ordinal));
 
     private static string ToRepositoryRelative(string projectPath, string repositoryRoot) =>
         BuildStateCanonicalHasher.ToRepositoryRelativePath(projectPath, repositoryRoot);

@@ -7,7 +7,10 @@ public static class AnalysisCacheEnvelope
 {
     public const string SchemaId = "analysis-cache/v1";
 
-    public const int FormatVersion = 1;
+    // Format 2 adds immutable artifact byte manifests. Version-1 entries are intentionally not
+    // reusable because they authorize only project inputs, not the PE/PDB/receipt bytes consumed
+    // by the original run.
+    public const int FormatVersion = 2;
 
     // The product/schema version segment used by the default `--cache auto` location
     // (`ArchLinterNet/0.5.1/analysis-cache/v1`), matching the packaged schema version already

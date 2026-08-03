@@ -4,10 +4,10 @@
   "title": "ArchLinterNet analysis cache v1",
   "description": "Machine-readable analysis-cache/v1 persisted entry: the AnalysisCacheEntryV1 envelope AnalysisCacheStore reads/writes under a resolved cache root. Not yet registered in compatibility-manifest.json — see openspec/specs/packaged-schema-registry/spec.md. The Outcome.Violations[].Payload discriminator ($kind) is restricted to the 18 known concrete IArchitectureDiagnosticPayload record types AnalysisCacheDiagnosticPayloadConverter enumerates; each payload's own fields are intentionally left permissive here (additionalProperties not restricted per-kind) rather than fully duplicating each of the 18 shapes in this schema — the closed-set safety guarantee lives in the converter's C# switch statement, not in this schema.",
   "type": "object",
-  "required": ["SchemaId", "FormatVersion", "KeyDigest", "Mode", "ToolVersion", "CreatedAtUtc", "CompletionStatus", "ProjectManifests", "Outcome", "ContentDigest"],
+  "required": ["SchemaId", "FormatVersion", "KeyDigest", "Mode", "ToolVersion", "CreatedAtUtc", "CompletionStatus", "ProjectManifests", "ArtifactManifests", "Outcome", "ContentDigest"],
   "properties": {
     "SchemaId": { "const": "analysis-cache/v1" },
-    "FormatVersion": { "type": "integer", "minimum": 1 },
+    "FormatVersion": { "const": 2 },
     "KeyDigest": { "type": "string", "pattern": "^[0-9a-f]{8,}$" },
     "Mode": { "type": "string", "enum": ["strict", "audit"] },
     "ToolVersion": { "type": "string", "minLength": 1 },
@@ -22,6 +22,18 @@
           "ProjectPath": { "type": "string" },
           "ManifestDigest": { "type": "string" },
           "Eligibility": { "type": "string" }
+        },
+        "additionalProperties": false
+      }
+    },
+    "ArtifactManifests": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["ArtifactPath", "ContentDigest"],
+        "properties": {
+          "ArtifactPath": { "type": "string", "minLength": 1 },
+          "ContentDigest": { "type": "string", "minLength": 1 }
         },
         "additionalProperties": false
       }

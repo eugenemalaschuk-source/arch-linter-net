@@ -72,4 +72,24 @@ public sealed class AnalysisCacheTestingApiIntegrationTests
             }
         }
     }
+
+    [Test]
+    public void ValidateStrict_WithUnsafeCachePath_ReportsTypedPathUnsafeReject()
+    {
+        string unsafeRoot = OperatingSystem.IsWindows() ? Path.GetPathRoot(Environment.SystemDirectory)! : "/";
+        var builder = new ArchitectureValidationBuilder(WriteHarmlessPolicy())
+            .WithProfile()
+            .WithCache(AnalysisCacheOptions.AtPath(unsafeRoot));
+
+        ArchitectureValidationResult result = builder.ValidateStrict();
+
+        Assert.That(result.Profile, Is.Not.Null);
+        Core.Profiling.AnalysisProfileCacheCounters cache = result.Profile!.Counters.Cache;
+        Assert.Multiple(() =>
+        {
+            Assert.That(cache.Status, Is.EqualTo(AnalysisProfileReservedFieldStatus.Active));
+            Assert.That(cache.Rejects, Is.EqualTo(1));
+            Assert.That(cache.RejectReasonCounts["PathUnsafe"], Is.EqualTo(1));
+        });
+    }
 }
