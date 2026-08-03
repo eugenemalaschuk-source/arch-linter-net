@@ -561,7 +561,11 @@ public sealed class AnalysisCacheStoreTests
         }
         finally
         {
-            File.Delete(_root);
+            if (File.Exists(_root) || Directory.Exists(_root))
+            {
+                File.Delete(_root);
+            }
+
             Directory.Delete(outsideTarget, recursive: true);
         }
     }
