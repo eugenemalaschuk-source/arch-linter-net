@@ -39,6 +39,11 @@ public static class AnalysisCacheStore
         ArgumentNullException.ThrowIfNull(key);
         ArgumentNullException.ThrowIfNull(currentManifests);
 
+        if (IsRootUnsafe(location))
+        {
+            return AnalysisCacheLookupResult.Reject(AnalysisCacheRejectReason.PathUnsafe);
+        }
+
         string entryPath;
         try
         {
@@ -94,14 +99,15 @@ public static class AnalysisCacheStore
 
         return entry is null
             ? AnalysisCacheLookupResult.Reject(AnalysisCacheRejectReason.Corrupt, bytes.Length)
-            : Authorize(entry, key, currentManifests, bytes.Length);
+            : Authorize(entry, key, currentManifests, bytes.Length, canonicalRoot);
     }
 
     private static AnalysisCacheLookupResult Authorize(
         AnalysisCacheEntryV1 entry,
         AnalysisCacheKey key,
         IReadOnlyList<AnalysisCacheProjectManifest> currentManifests,
-        long bytesRead)
+        long bytesRead,
+        string cacheRootPath)
     {
         if (!string.Equals(entry.SchemaId, AnalysisCacheEnvelope.SchemaId, StringComparison.Ordinal))
         {
@@ -113,7 +119,11 @@ public static class AnalysisCacheStore
             return AnalysisCacheLookupResult.Reject(AnalysisCacheRejectReason.IncompatibleFormatVersion, bytesRead);
         }
 
-        if (!string.Equals(entry.ContentDigest, AnalysisCacheContentDigest.Compute(entry), StringComparison.Ordinal))
+        // Finding #1: a keyed HMAC verification, not a plain-hash recompute-and-compare — a
+        // tampered/poisoned entry cannot forge a matching tag without also knowing this cache
+        // root's local AnalysisCacheHmacKeyStore secret. Compared in constant time (see
+        // AnalysisCacheContentDigest.Verify) to avoid a timing side channel on the check.
+        if (!AnalysisCacheContentDigest.Verify(entry, cacheRootPath, entry.ContentDigest))
         {
             return AnalysisCacheLookupResult.Reject(AnalysisCacheRejectReason.IntegrityMismatch, bytesRead);
         }
@@ -146,6 +156,14 @@ public static class AnalysisCacheStore
         return AnalysisCacheLookupResult.Hit(entry, bytesRead);
     }
 
+    // Finding #4: this must be genuine set equivalence, not a lookup-and-hope. The prior
+    // implementation dictionary-ized `current` by ProjectPath and looked up each `stored` entry in
+    // it — a forged stored list with a duplicate path (e.g. [A, A] when current is [A, B]) has the
+    // same Count and both stored entries resolve through byPath[A], so B is never verified and the
+    // entry could still authorize as a Hit. Reject any duplicate ProjectPath on either side first
+    // (fail closed, never throw — a malformed/tampered entry is just another Reject reason), then
+    // compare as two canonical ordered collections of (ProjectPath, ManifestDigest, Eligibility)
+    // for exact one-to-one equality.
     private static bool ProjectManifestsMatch(
         IReadOnlyList<AnalysisCacheProjectManifest> stored, IReadOnlyList<AnalysisCacheProjectManifest> current)
     {
@@ -154,24 +172,48 @@ public static class AnalysisCacheStore
             return false;
         }
 
-        Dictionary<string, AnalysisCacheProjectManifest> byPath =
-            current.ToDictionary(manifest => manifest.ProjectPath, StringComparer.Ordinal);
-
-        foreach (AnalysisCacheProjectManifest storedManifest in stored)
+        if (HasDuplicateProjectPath(stored) || HasDuplicateProjectPath(current))
         {
-            if (!byPath.TryGetValue(storedManifest.ProjectPath, out AnalysisCacheProjectManifest? currentManifest))
-            {
-                return false;
-            }
+            return false;
+        }
 
-            if (!string.Equals(storedManifest.ManifestDigest, currentManifest.ManifestDigest, StringComparison.Ordinal)
-                || storedManifest.Eligibility != currentManifest.Eligibility)
+        var storedOrdered = stored
+            .OrderBy(manifest => manifest.ProjectPath, StringComparer.Ordinal)
+            .Select(manifest => (manifest.ProjectPath, manifest.ManifestDigest, manifest.Eligibility))
+            .ToList();
+        var currentOrdered = current
+            .OrderBy(manifest => manifest.ProjectPath, StringComparer.Ordinal)
+            .Select(manifest => (manifest.ProjectPath, manifest.ManifestDigest, manifest.Eligibility))
+            .ToList();
+
+        for (int i = 0; i < storedOrdered.Count; i++)
+        {
+            (string StoredPath, string StoredDigest, CacheEligibility StoredEligibility) storedEntry = storedOrdered[i];
+            (string CurrentPath, string CurrentDigest, CacheEligibility CurrentEligibility) currentEntry = currentOrdered[i];
+
+            if (!string.Equals(storedEntry.StoredPath, currentEntry.CurrentPath, StringComparison.Ordinal)
+                || !string.Equals(storedEntry.StoredDigest, currentEntry.CurrentDigest, StringComparison.Ordinal)
+                || storedEntry.StoredEligibility != currentEntry.CurrentEligibility)
             {
                 return false;
             }
         }
 
         return true;
+    }
+
+    private static bool HasDuplicateProjectPath(IReadOnlyList<AnalysisCacheProjectManifest> manifests)
+    {
+        HashSet<string> seen = new(StringComparer.Ordinal);
+        foreach (AnalysisCacheProjectManifest manifest in manifests)
+        {
+            if (!seen.Add(manifest.ProjectPath))
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     // Publishes exactly once per entry via a same-directory temp file + atomic rename, observing
@@ -200,6 +242,11 @@ public static class AnalysisCacheStore
             return PutResult.Rejected(AnalysisCacheRejectReason.SizeExceeded);
         }
 
+        if (IsRootUnsafe(location))
+        {
+            return PutResult.Rejected(AnalysisCacheRejectReason.PathUnsafe);
+        }
+
         string entryPath;
         try
         {
@@ -222,7 +269,10 @@ public static class AnalysisCacheStore
             Outcome = outcome,
             ContentDigest = string.Empty,
         };
-        AnalysisCacheEntryV1 entry = entryWithoutDigest with { ContentDigest = AnalysisCacheContentDigest.Compute(entryWithoutDigest) };
+        AnalysisCacheEntryV1 entry = entryWithoutDigest with
+        {
+            ContentDigest = AnalysisCacheContentDigest.Compute(entryWithoutDigest, Path.GetFullPath(location.RootPath)),
+        };
 
         byte[] bytes = JsonSerializer.SerializeToUtf8Bytes(entry, AnalysisCacheJson.Options);
 
@@ -279,6 +329,11 @@ public static class AnalysisCacheStore
         ArgumentNullException.ThrowIfNull(location);
 
         if (!Directory.Exists(location.RootPath))
+        {
+            return Array.Empty<AnalysisCacheEntrySummary>();
+        }
+
+        if (IsRootUnsafe(location))
         {
             return Array.Empty<AnalysisCacheEntrySummary>();
         }
@@ -366,7 +421,7 @@ public static class AnalysisCacheStore
             }
 
             AnalysisCacheEntryV1? entry = JsonSerializer.Deserialize<AnalysisCacheEntryV1>(bytes, AnalysisCacheJson.Options);
-            if (entry is null || !string.Equals(entry.ContentDigest, AnalysisCacheContentDigest.Compute(entry), StringComparison.Ordinal))
+            if (entry is null || !AnalysisCacheContentDigest.Verify(entry, canonicalRoot, entry.ContentDigest))
             {
                 return new AnalysisCacheEntrySummary(relativeName, Readable: false, null, null, null, null);
             }
@@ -394,6 +449,12 @@ public static class AnalysisCacheStore
         {
             throw new AnalysisCacheLocationRejectedException(
                 $"Refusing to clear unsafe cache root '{location.RootPath}'.");
+        }
+
+        if (FileSystemContainmentGuard.IsReparsePoint(canonicalRoot))
+        {
+            throw new AnalysisCacheLocationRejectedException(
+                $"Refusing to clear cache root '{location.RootPath}' because it is itself a symlink/reparse point.");
         }
 
         foreach (string file in EnumerateFilesNotFollowingSymlinks(canonicalRoot, "*")
@@ -432,6 +493,20 @@ public static class AnalysisCacheStore
         }
 
         return candidate;
+    }
+
+    // Finding #5: the cache root itself must be rejected when it is a symlink/reparse-point
+    // directory, in every mode — not only AnalysisCacheMode.ExplicitPath (the mode
+    // AnalysisCacheLocationResolver.ResolveExplicitRoot already validates at resolution time).
+    // `--cache auto`'s ResolveAutoRoot never runs that same symlink check, and AnalysisCacheStore
+    // is a public API any caller can invoke directly with a hand-built AnalysisCacheLocation, so a
+    // pre-created root-level symlink pointing outside the intended cache root must be caught here,
+    // at the start of every operation, before Directory.Exists/enumeration/any I/O touches it —
+    // TryGet, Put, Inspect, and Clear all call this first.
+    private static bool IsRootUnsafe(AnalysisCacheLocation location)
+    {
+        string canonicalRoot = Path.GetFullPath(location.RootPath);
+        return Directory.Exists(canonicalRoot) && FileSystemContainmentGuard.IsReparsePoint(canonicalRoot);
     }
 
     private static bool IsContained(string path, string root) =>

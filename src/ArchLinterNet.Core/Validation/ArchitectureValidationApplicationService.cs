@@ -177,7 +177,9 @@ public sealed class ArchitectureValidationApplicationService(
                 request.RequestedConfiguration,
                 request.RequestedTargetFramework,
                 request.RequestedPlatform,
-                request.RequestedRuntimeIdentifier);
+                request.RequestedRuntimeIdentifier,
+                request.PreprocessorSymbols,
+                request.BaselinePath);
     }
 
     private static ArchitectureAnalysisSnapshotCounters BuildCancellationCounters(SnapshotConstructionState state)

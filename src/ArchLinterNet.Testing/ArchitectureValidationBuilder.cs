@@ -189,7 +189,28 @@ public sealed class ArchitectureValidationBuilder
 
         ValidationTiming? timing = _collectTimings || _collectProfile ? new ValidationTiming() : null;
         ArchitectureAnalysisSnapshot snapshot = _engine.Value.CreateSnapshot(request, timing);
-        return new ArchitectureValidationSnapshotSession(snapshot, timing, _collectProfile, allocatedBytesAtStart);
+        return new ArchitectureValidationSnapshotSession(
+            snapshot, timing, _collectProfile, allocatedBytesAtStart, BuildCacheContext());
+    }
+
+    // Finding #7: carried into the session so ArchitectureValidationSnapshotSession.Evaluate can
+    // populate the cache after a completed miss the same way Validate() below already does — one
+    // shared ArchitectureValidationCacheSupport implementation, not a second independently
+    // maintained copy.
+    private ArchitectureValidationCacheSupport.CacheContext BuildCacheContext()
+    {
+        return new ArchitectureValidationCacheSupport.CacheContext(
+            _cacheOptions,
+            _policyPath,
+            _conditionSetName,
+            _contractIds,
+            _requestedConfiguration,
+            _requestedTargetFramework,
+            _requestedPlatform,
+            _requestedRuntimeIdentifier,
+            _cancellationToken,
+            _baselinePath,
+            _enforceUnmatchedIgnoredViolationsPolicy);
     }
 
     private ArchitectureValidationResult Validate(string mode)
@@ -217,7 +238,8 @@ public sealed class ArchitectureValidationBuilder
         (ValidationOutcome outcome, ArchitectureAnalysisSnapshotCounters counters) =
             _engine.Value.ValidateWithCounters(request, timing);
 
-        AnalysisCachePopulation.Outcome populationOutcome = TryPopulateCache(mode, outcome);
+        AnalysisCachePopulation.Outcome populationOutcome =
+            ArchitectureValidationCacheSupport.TryPopulateCache(BuildCacheContext(), mode, outcome);
 
         AnalysisProfile? profile = _collectProfile
             ? AnalysisProfileBuilder.Build(
@@ -226,7 +248,8 @@ public sealed class ArchitectureValidationBuilder
                 new ArchLinterNet.Core.Profiling.AnalysisProfileBuildOptions
                 {
                     Measurements = CaptureMeasurements(allocatedBytesAtStart),
-                    Cache = BuildCacheProfileCounters(counters, populationOutcome),
+                    Cache = ArchitectureValidationCacheSupport.BuildCacheProfileCounters(
+                        BuildCacheContext(), counters, populationOutcome),
                 })
             : null;
 
@@ -248,100 +271,6 @@ public sealed class ArchitectureValidationBuilder
         {
             return null;
         }
-    }
-
-    // Testing's population counterpart to ValidateCommandHandler.Cache.cs's TryPopulateCache —
-    // same AnalysisCachePopulation entry point, so CLI and Testing observe identical
-    // reuse-authorization semantics (one shared Core implementation, not two). Uses the
-    // authoritative outcome.RepositoryRoot (see finding #2) rather than re-deriving it from the
-    // policy path, and a portable, repository-relative AnalysisCacheKey (see finding #5).
-    private AnalysisCachePopulation.Outcome TryPopulateCache(string mode, ValidationOutcome outcome)
-    {
-        if (_cacheOptions.Mode == AnalysisCacheMode.Disabled)
-        {
-            return new AnalysisCachePopulation.Outcome(AnalysisCacheRejectReason.Disabled, 0, 0, 0);
-        }
-
-        AnalysisCacheLocation? location;
-        try
-        {
-            location = AnalysisCacheLocationResolver.Resolve(_cacheOptions);
-        }
-        catch (AnalysisCacheLocationRejectedException)
-        {
-            return new AnalysisCachePopulation.Outcome(AnalysisCacheRejectReason.PathUnsafe, 0, 0, 0);
-        }
-
-        string repositoryRoot = string.IsNullOrEmpty(outcome.RepositoryRoot)
-            ? Path.GetDirectoryName(Path.GetFullPath(_policyPath)) ?? Environment.CurrentDirectory
-            : outcome.RepositoryRoot;
-
-        try
-        {
-            IReadOnlyList<string> policyFiles = outcome.PolicyImportPaths.Count > 0
-                ? outcome.PolicyImportPaths
-                : new[] { _policyPath };
-            AnalysisCacheKey key = new(
-                AnalysisCacheKey.ComputePolicyDigest(policyFiles, repositoryRoot, _cancellationToken),
-                AnalysisCacheKey.NormalizeMode(mode),
-                _conditionSetName,
-                AnalysisCacheKey.ComputeContractIdsDigest(_contractIds ?? Array.Empty<string>()),
-                AnalysisCacheKey.ComputeWorkspaceDigest(outcome.DiscoveredProjectPaths, repositoryRoot),
-                _requestedConfiguration,
-                _requestedTargetFramework,
-                _requestedPlatform,
-                _requestedRuntimeIdentifier);
-
-            AnalysisCacheOutcomeV1 cacheOutcome = AnalysisCacheOutcomeMapper.ToCacheOutcome(outcome);
-
-            return AnalysisCachePopulation.TryPopulate(
-                location, key, outcome.DiscoveredProjectPaths, repositoryRoot,
-                _requestedConfiguration, _requestedTargetFramework, _requestedPlatform, _requestedRuntimeIdentifier,
-                cacheOutcome, _cancellationToken);
-        }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
-        {
-            // Same fail-safe rationale as ValidateCommandHandler.Cache.cs's TryPopulateCache: a
-            // best-effort population side operation must never turn a completed validation into
-            // an unexplained exception.
-            return new AnalysisCachePopulation.Outcome(AnalysisCacheRejectReason.IneligibleBuildInput, 0, 0, 0);
-        }
-    }
-
-    private AnalysisProfileCacheCounters BuildCacheProfileCounters(
-        ArchitectureAnalysisSnapshotCounters counters, AnalysisCachePopulation.Outcome populationOutcome)
-    {
-        if (_cacheOptions.Mode == AnalysisCacheMode.Disabled)
-        {
-            return new AnalysisProfileCacheCounters();
-        }
-
-        AnalysisCacheLookupStats? lookups = counters.CacheLookups;
-        Dictionary<string, int> rejectReasonCounts = lookups is null
-            ? new Dictionary<string, int>(StringComparer.Ordinal)
-            : new Dictionary<string, int>(lookups.RejectReasonCounts, StringComparer.Ordinal);
-        if (populationOutcome.RejectReason is { } reason)
-        {
-            string key = reason.ToString();
-            rejectReasonCounts.TryGetValue(key, out int existing);
-            rejectReasonCounts[key] = existing + 1;
-        }
-
-        return new AnalysisProfileCacheCounters
-        {
-            Status = AnalysisProfileReservedFieldStatus.Active,
-            Lookups = lookups?.Lookups ?? 0,
-            Hits = lookups?.Hits ?? 0,
-            Misses = lookups?.Misses ?? 0,
-            Writes = populationOutcome.RejectReason is null ? 1 : 0,
-            Rejects = populationOutcome.RejectReason is null ? 0 : 1,
-            BytesRead = lookups?.BytesRead ?? 0,
-            BytesWritten = populationOutcome.BytesWritten,
-            IneligibleUnitCount = populationOutcome.IneligibleProjectCount,
-            CancelledBeforePublish = populationOutcome.RejectReason == AnalysisCacheRejectReason.Cancelled ? 1 : 0,
-            Mode = _cacheOptions.ModeCategory,
-            RejectReasonCounts = rejectReasonCounts,
-        };
     }
 
     // outcome.PreflightBlocked wins over Passed the same way the CLI's own resolver does (see

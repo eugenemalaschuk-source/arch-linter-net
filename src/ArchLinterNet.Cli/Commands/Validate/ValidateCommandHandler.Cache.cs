@@ -205,7 +205,19 @@ internal sealed partial class ValidateCommandHandler
             options.Configuration,
             options.TargetFramework,
             options.Platform,
-            options.RuntimeIdentifier);
+            options.RuntimeIdentifier,
+            // Finding #2: the CLI never exposes --preprocessor-symbols or an asmdef-contracts
+            // toggle today, and always builds its ValidationRequest/AnalysisSnapshotRequest with
+            // PreprocessorSymbols left at its null default, IncludeAsmdefContracts at its true
+            // default, and EnforceUnmatchedIgnoredViolationsPolicy hardcoded true (see
+            // ValidateCommandHandler.Execution.cs's BuildValidationRequest/ExecuteCombinedModes) —
+            // these constants match that exactly, so the population-side key here always agrees
+            // with ArchitectureAnalysisSnapshot.TryEvaluateFromCache's own lookup-side key for the
+            // same run.
+            AnalysisCacheKey.ComputePreprocessorSymbolsDigest(null),
+            AnalysisCacheKey.ComputeBaselineDigest(options.BaselinePath, cancellationToken),
+            IncludeAsmdefContracts: true,
+            EnforceUnmatchedIgnoredViolationsPolicy: true);
     }
 
     private static AnalysisProfileCacheCounters BuildCacheProfileCounters(ValidateCommandOptions options, CacheExecutionState state)
@@ -230,36 +242,19 @@ internal sealed partial class ValidateCommandHandler
             Hits = lookups?.Hits ?? 0,
             Misses = lookups?.Misses ?? 0,
             Writes = state.Writes,
-            Rejects = state.Rejects,
+            // Finding #8: the scalar Rejects total must aggregate both sides — population-side
+            // rejects (state.Rejects, via RecordCacheReject) and read-side/lookup rejects
+            // (lookups.Rejects) — the same way rejectReasonCounts above already merges both. A
+            // corrupt lookup alone (Lookups=1, one Corrupt reason count, zero population attempts)
+            // must report Rejects=1, not 0.
+            Rejects = state.Rejects + (lookups?.Rejects ?? 0),
             BytesRead = lookups?.BytesRead ?? 0,
             BytesWritten = state.BytesWritten,
             IneligibleUnitCount = state.IneligibleUnitCount,
-            CorruptionEvents = CountCorruptionEvents(rejectReasonCounts),
+            CorruptionEvents = AnalysisCacheCorruptionClassifier.CountCorruptionEvents(rejectReasonCounts),
             CancelledBeforePublish = state.CancelledBeforePublish,
             Mode = ResolveCacheOptions(options).ModeCategory,
             RejectReasonCounts = rejectReasonCounts,
         };
-    }
-
-    private static readonly string[] _corruptionReasonKeys =
-    {
-        nameof(AnalysisCacheRejectReason.Corrupt),
-        nameof(AnalysisCacheRejectReason.Truncated),
-        nameof(AnalysisCacheRejectReason.IntegrityMismatch),
-        nameof(AnalysisCacheRejectReason.ForeignSchema),
-    };
-
-    private static int CountCorruptionEvents(IReadOnlyDictionary<string, int> rejectReasonCounts)
-    {
-        int total = 0;
-        foreach (string key in _corruptionReasonKeys)
-        {
-            if (rejectReasonCounts.TryGetValue(key, out int count))
-            {
-                total += count;
-            }
-        }
-
-        return total;
     }
 }

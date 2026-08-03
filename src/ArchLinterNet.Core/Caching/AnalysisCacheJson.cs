@@ -11,6 +11,11 @@ internal static class AnalysisCacheJson
     // can never construct or execute an arbitrary CLR type from untrusted on-disk bytes.
     public static readonly JsonSerializerOptions Options = new()
     {
-        Converters = { new JsonStringEnumConverter(), new AnalysisCacheDiagnosticPayloadConverter() },
+        Converters =
+        {
+            new JsonStringEnumConverter(),
+            new AnalysisCacheDiagnosticPayloadConverter(),
+            new AnalysisCacheClassificationMetadataValueConverter(),
+        },
     };
 }

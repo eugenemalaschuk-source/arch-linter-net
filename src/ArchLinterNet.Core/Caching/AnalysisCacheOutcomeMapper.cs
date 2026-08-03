@@ -24,7 +24,12 @@ public static class AnalysisCacheOutcomeMapper
             outcome.PolicyConsistencyFindings.ToArray(),
             outcome.PolicyConsistencyConfig,
             outcome.ClassificationConflicts.ToArray(),
-            outcome.ClassificationMetadataFailures.ToArray());
+            outcome.ClassificationMetadataFailures.ToArray(),
+            outcome.ClassificationRoles.ToArray(),
+            outcome.ClassificationPathDeferred,
+            outcome.CycleFindings.ToArray(),
+            outcome.CoverageSummaries.ToArray(),
+            outcome.SubtractiveMatcherParticipation.ToArray());
     }
 
     // Reconstructs a ValidationOutcome from a cache hit. PolicyImportPaths/ResolvedAssemblyPaths/
@@ -55,7 +60,7 @@ public static class AnalysisCacheOutcomeMapper
             cached.UnmatchedIgnoredViolationsConfig,
             cached.PolicyConsistencyFindings.ToArray(),
             cached.PolicyConsistencyConfig,
-            Array.Empty<ArchitectureCoverageSummary>(),
+            cached.CoverageSummaries.ToArray(),
             cached.ClassificationConflicts.ToArray(),
             cached.ClassificationMetadataFailures.ToArray())
         {
@@ -65,6 +70,10 @@ public static class AnalysisCacheOutcomeMapper
             DiscoveredProjectPaths = discoveredProjectPaths,
             SourceExpansion = sourceExpansion,
             PreflightBlocked = false,
+            ClassificationRoles = cached.ClassificationRoles.ToArray(),
+            ClassificationPathDeferred = cached.ClassificationPathDeferred,
+            CycleFindings = cached.CycleFindings.ToArray(),
+            SubtractiveMatcherParticipation = cached.SubtractiveMatcherParticipation.ToArray(),
         };
     }
 }

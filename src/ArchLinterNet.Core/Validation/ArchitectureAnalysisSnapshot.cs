@@ -386,6 +386,15 @@ public sealed class ArchitectureAnalysisSnapshot : IDisposable
     // proof) requires the discovered project set to already be known, and every requested mode
     // shares that one snapshot's setup regardless of hit/miss. Returns null on Miss/Reject so the
     // caller falls back to the real pipeline exactly as before this change.
+    // Finding #3: the session cancellation token is threaded through the entire lookup —
+    // ComputePolicyDigest (which hashes every policy file's content and can be a real I/O-bound
+    // operation for a large import graph) and TryLookup (which recomputes a #406 manifest per
+    // discovered project) both observe it, and a hit is never accepted once cancellation has been
+    // requested. Falling back to null here (rather than accepting a stale/racy hit) means Evaluate's
+    // caller proceeds into EvaluateCore, whose own ThrowIfCancellationRequested calls immediately
+    // surface the real OperationCanceledException — cancellation here never silently turns into an
+    // unexplained cache-derived result, it just defers to the same cancellation path recomputation
+    // already uses.
     private ValidationOutcome? TryEvaluateFromCache(string mode, ValidationTiming? timing)
     {
         if (_cacheContext is not { } cache)
@@ -393,11 +402,13 @@ public sealed class ArchitectureAnalysisSnapshot : IDisposable
             return null;
         }
 
+        CancellationToken cancellationToken = _setup?.Runner.Session.Context.CancellationToken ?? default;
+
         IReadOnlyList<string> discoveredProjectPaths = GetDiscoveredProjectPaths();
         IReadOnlyList<string> policyImportPaths = GetPolicyImportPaths();
 
         AnalysisCacheKey key = new(
-            AnalysisCacheKey.ComputePolicyDigest(policyImportPaths, _repositoryRoot),
+            AnalysisCacheKey.ComputePolicyDigest(policyImportPaths, _repositoryRoot, cancellationToken),
             AnalysisCacheKey.NormalizeMode(mode),
             cache.ConditionSetName,
             AnalysisCacheKey.ComputeContractIdsDigest(cache.ContractIds),
@@ -405,14 +416,18 @@ public sealed class ArchitectureAnalysisSnapshot : IDisposable
             cache.Configuration,
             cache.TargetFramework,
             cache.Platform,
-            cache.RuntimeIdentifier);
+            cache.RuntimeIdentifier,
+            AnalysisCacheKey.ComputePreprocessorSymbolsDigest(cache.PreprocessorSymbols),
+            AnalysisCacheKey.ComputeBaselineDigest(cache.BaselinePath, cancellationToken),
+            _includeAsmdefContracts,
+            _enforceUnmatchedIgnoredViolationsPolicy);
 
         AnalysisCacheLookupResult lookup;
         using (timing?.Measure("cache_lookup"))
         {
             lookup = AnalysisCachePopulation.TryLookup(
                 cache.Location, key, discoveredProjectPaths, _repositoryRoot,
-                cache.Configuration, cache.TargetFramework, cache.Platform, cache.RuntimeIdentifier);
+                cache.Configuration, cache.TargetFramework, cache.Platform, cache.RuntimeIdentifier, cancellationToken);
         }
 
         lock (_gate)
@@ -421,6 +436,15 @@ public sealed class ArchitectureAnalysisSnapshot : IDisposable
         }
 
         if (lookup.Outcome != AnalysisCacheLookupOutcome.Hit || lookup.Entry is null)
+        {
+            return null;
+        }
+
+        // A hit is never accepted once cancellation has been observed — this is checked after the
+        // lookup completes (not merely before it starts) because ComputePolicyDigest/TryLookup
+        // above can themselves take real time, and this run's own cancellation could have been
+        // requested during either of them.
+        if (cancellationToken.IsCancellationRequested)
         {
             return null;
         }

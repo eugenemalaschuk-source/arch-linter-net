@@ -45,7 +45,12 @@
         "PolicyConsistencyFindings": { "type": "array", "items": { "type": "object" } },
         "PolicyConsistencyConfig": { "enum": ["error", "warn", "off"] },
         "ClassificationConflicts": { "type": "array", "items": { "type": "object" } },
-        "ClassificationMetadataFailures": { "type": "array", "items": { "type": "object" } }
+        "ClassificationMetadataFailures": { "type": "array", "items": { "type": "object" } },
+        "ClassificationRoles": { "type": "array", "items": { "type": "object" } },
+        "ClassificationPathDeferred": { "type": ["object", "null"] },
+        "CycleFindings": { "type": "array", "items": { "type": "object" } },
+        "CoverageSummaries": { "type": "array", "items": { "type": "object" } },
+        "SubtractiveMatcherParticipation": { "type": "array", "items": { "type": "object" } }
       },
       "additionalProperties": false
     },

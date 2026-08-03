@@ -14,4 +14,12 @@ public sealed record AnalysisSnapshotCacheContext(
     string? Configuration,
     string? TargetFramework,
     string? Platform,
-    string? RuntimeIdentifier);
+    string? RuntimeIdentifier,
+    // Finding #2: threaded through so TryEvaluateFromCache's AnalysisCacheKey folds in every
+    // remaining result-affecting AnalysisSnapshotRequest dimension — see AnalysisCacheKey's own
+    // remarks. IncludeAsmdefContracts/EnforceUnmatchedIgnoredViolationsPolicy are not carried here:
+    // the snapshot already stores both directly (they compose the policy itself), so
+    // TryEvaluateFromCache reads its own _includeAsmdefContracts/_enforceUnmatchedIgnoredViolationsPolicy
+    // fields instead of a second copy.
+    IReadOnlyList<string>? PreprocessorSymbols = null,
+    string? BaselinePath = null);

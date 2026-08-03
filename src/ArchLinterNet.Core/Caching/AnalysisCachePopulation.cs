@@ -8,6 +8,25 @@ namespace ArchLinterNet.Core.Caching;
 // AnalysisCacheStore.Put on every one of them being VerifiedCacheEligible.
 public static class AnalysisCachePopulation
 {
+    // Test-only injection seam (internal, visible only to ArchLinterNet.Core.Tests via
+    // InternalsVisibleTo). EvaluatedBuildInputManifestCollector.Collect always reports
+    // CacheIneligible for every project discovered from this repository's own MSBuild evaluation
+    // ("evaluated-msbuild-evidence-incomplete" — see design.md's #406 gate), which makes it
+    // impossible to exercise a real eligible-manifest cache write/hit against the live engine from
+    // any test that doesn't fake the collector. Production code paths never set this — it defaults
+    // to the real collector below and stays that way for every CLI/Testing execution.
+    internal static Func<string, string, string?, string?, string?, string?, CancellationToken, EvaluatedBuildInputManifestV1>?
+        TestManifestCollectorOverride
+    { get; set; }
+
+    private static EvaluatedBuildInputManifestV1 CollectManifest(
+        string projectPath, string repositoryRoot, string? configuration, string? targetFramework,
+        string? platform, string? runtimeIdentifier, CancellationToken cancellationToken)
+    {
+        return (TestManifestCollectorOverride ?? EvaluatedBuildInputManifestCollector.Collect)(
+            projectPath, repositoryRoot, configuration, targetFramework, platform, runtimeIdentifier, cancellationToken);
+    }
+
     // ProjectsEvaluated: how many discovered projects had a manifest recomputed.
     // IneligibleProjectCount: how many of those were not VerifiedCacheEligible (0 whenever
     // RejectReason is null — a successful populate implies every project was eligible).
@@ -41,7 +60,7 @@ public static class AnalysisCachePopulation
         foreach (string projectPath in discoveredProjectPaths)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            EvaluatedBuildInputManifestV1 manifest = EvaluatedBuildInputManifestCollector.Collect(
+            EvaluatedBuildInputManifestV1 manifest = CollectManifest(
                 projectPath, repositoryRoot, configuration, targetFramework, platform, runtimeIdentifier, cancellationToken);
             manifests.Add(AnalysisCacheProjectManifest.FromManifest(
                 ToRepositoryRelative(projectPath, repositoryRoot), manifest));
@@ -78,7 +97,7 @@ public static class AnalysisCachePopulation
         foreach (string projectPath in discoveredProjectPaths)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            EvaluatedBuildInputManifestV1 manifest = EvaluatedBuildInputManifestCollector.Collect(
+            EvaluatedBuildInputManifestV1 manifest = CollectManifest(
                 projectPath, repositoryRoot, configuration, targetFramework, platform, runtimeIdentifier, cancellationToken);
             manifests.Add(AnalysisCacheProjectManifest.FromManifest(
                 ToRepositoryRelative(projectPath, repositoryRoot), manifest));

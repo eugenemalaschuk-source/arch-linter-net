@@ -74,7 +74,17 @@ public sealed class AnalysisCacheHitReconstructionTests
                     new[] { "R001" }, new[] { "no_infra_from_domain" }, new[] { "Domain" }),
             },
             PolicyConsistencyConfig: "warn",
-            CoverageSummaries: Array.Empty<ArchitectureCoverageSummary>(),
+            CoverageSummaries: new[]
+            {
+                new ArchitectureCoverageSummary(
+                    "no_infra_from_domain", "R001", "namespace",
+                    new ArchitectureCoverageSummaryCounts(Covered: 1, Excluded: 0, Uncovered: 1, Stale: 0, Unknown: 0),
+                    ExcludedItems: Array.Empty<ArchitectureCoverageSummaryExcludedItem>(),
+                    UncoveredItems: new[] { new ArchitectureCoverageSummaryEvidenceItem("MyApp.Domain.Order", "no matching rule") },
+                    StaleItems: Array.Empty<ArchitectureCoverageSummaryEvidenceItem>(),
+                    UnknownItems: Array.Empty<ArchitectureCoverageSummaryEvidenceItem>(),
+                    CoveredItems: new[] { new ArchitectureCoverageSummaryEvidenceItem("MyApp.Domain.Customer", "layers.domain") }),
+            },
             ClassificationConflicts: new[]
             {
                 new ArchitectureClassificationConflict("MyApp.Domain.Order", ArchitectureClassificationSource.TypeAttribute, "Domain", "Infrastructure", "role: Domain vs Infrastructure"),
@@ -82,7 +92,28 @@ public sealed class AnalysisCacheHitReconstructionTests
             ClassificationMetadataFailures: new[]
             {
                 new ArchitectureClassificationMetadataFailure("MyApp.Domain.Order", ArchitectureClassificationSource.TypeAttribute, "team", "missing-value"),
-            });
+            })
+        {
+            // Finding #6: these five fields were previously omitted from the cache envelope
+            // entirely — non-trivial data here so the canonical-JSON round-trip equality assertion
+            // below actually exercises them, not merely their empty/default shape.
+            ClassificationRoles = new[]
+            {
+                new ArchitectureClassificationRoleFact(
+                    "MyApp.Domain.Order", "Domain", ArchitectureClassificationSource.TypeAttribute, "MyApp.Domain.DomainAttribute",
+                    new Dictionary<string, object> { ["team"] = "payments", ["stable"] = true, ["weight"] = 1.5m }),
+            },
+            ClassificationPathDeferred = new ArchitectureClassificationPathDeferredNotice(2),
+            CycleFindings = new[]
+            {
+                new ArchitectureCycleFinding("no_cycles", "R010", "MyApp.A -> MyApp.B -> MyApp.A"),
+            },
+            SubtractiveMatcherParticipation = new[]
+            {
+                new ArchitectureSubtractiveMatcherParticipation(
+                    "no_infra_from_domain", "no_infra_from_domain", "exclude_types_matching", 0, Matched: true),
+            },
+        };
     }
 
     [Test]
@@ -137,6 +168,23 @@ public sealed class AnalysisCacheHitReconstructionTests
             }
 
             Assert.That(reconstructed.Cycles, Is.EqualTo(original.Cycles));
+
+            // Finding #6: the five previously-omitted result-bearing fields, explicitly.
+            Assert.That(reconstructed.CycleFindings.Count, Is.EqualTo(1));
+            Assert.That(reconstructed.CycleFindings.Single().Path, Is.EqualTo("MyApp.A -> MyApp.B -> MyApp.A"));
+            Assert.That(reconstructed.ClassificationRoles.Count, Is.EqualTo(1));
+            ArchitectureClassificationRoleFact role = reconstructed.ClassificationRoles.Single();
+            Assert.That(role.Subject, Is.EqualTo("MyApp.Domain.Order"));
+            Assert.That(role.Role, Is.EqualTo("Domain"));
+            Assert.That(role.Metadata["team"], Is.EqualTo("payments"));
+            Assert.That(role.Metadata["stable"], Is.EqualTo(true));
+            Assert.That(role.Metadata["weight"], Is.EqualTo(1.5m));
+            Assert.That(reconstructed.ClassificationPathDeferred, Is.Not.Null);
+            Assert.That(reconstructed.ClassificationPathDeferred!.DeclaredEntryCount, Is.EqualTo(2));
+            Assert.That(reconstructed.CoverageSummaries.Count, Is.EqualTo(1));
+            Assert.That(reconstructed.CoverageSummaries.Single().Counts.Covered, Is.EqualTo(1));
+            Assert.That(reconstructed.SubtractiveMatcherParticipation.Count, Is.EqualTo(1));
+            Assert.That(reconstructed.SubtractiveMatcherParticipation.Single().Field, Is.EqualTo("exclude_types_matching"));
 
             // Byte-identical, using the product's own definition of identity: re-mapping the
             // reconstructed outcome back to AnalysisCacheOutcomeV1 and comparing its canonical JSON

@@ -1,4 +1,5 @@
 using ArchLinterNet.Core.Model;
+using ArchLinterNet.Core.Reporting;
 
 namespace ArchLinterNet.Core.Caching;
 
@@ -13,16 +14,18 @@ namespace ArchLinterNet.Core.Caching;
 // see AnalysisCacheOutcomeMapper for the ValidationOutcome <-> AnalysisCacheOutcomeV1 mapping used
 // by the ArchitectureAnalysisSnapshot short-circuit seam.
 //
-// Deliberately out of scope for this entry (disclosed, not silently dropped — see design.md
-// "Cache boundary decision, v2"): ArchitectureCoverageSummary (coverage-detail display),
-// ArchitectureClassificationRoleFact / ArchitectureClassificationPathDeferredNotice (explain-only
-// detail), ArchitectureSourceExpansionInventory and ArchitectureSubtractiveMatcherParticipation
-// (source-set/matcher explain evidence), and BuildStatePreflightDiagnostic (preflight only ever ran
-// against project/output facts already re-verified fresh by AnalysisCachePopulation's own
-// eligibility gate, and a preflight-blocked run is never cache-eligible to begin with). None of
-// these determine findings identity, ordering, or exit category — they are supplementary
-// explain/report detail. A cache hit reconstructs them as empty/default; a future change can widen
-// this envelope (bumping AnalysisCacheEnvelope.FormatVersion) if a caller needs them restored too.
+// Finding #6: a cache hit was not equivalent to the uncached result — this envelope originally
+// omitted ValidationOutcome.CycleFindings (distinct from the plain-string Cycles above; exposed by
+// the Testing result mapper and used as structured finding evidence), ClassificationRoles,
+// ClassificationPathDeferred, CoverageSummaries, and SubtractiveMatcherParticipation. All five are
+// now carried below and round-tripped by AnalysisCacheOutcomeMapper.
+//
+// Still deliberately out of scope for this entry (disclosed, not silently dropped — see design.md
+// "Cache boundary decision, v2"): RepositoryRoot/PolicyImportPaths/ResolvedAssemblyPaths/
+// DiscoveredProjectPaths/SourceExpansion (inputs re-supplied by the live run context on
+// reconstruction — see AnalysisCacheOutcomeMapper.FromCacheOutcome's own parameters, not results)
+// and PreflightDiagnostics/PreflightBlocked (population only ever happens after a completed
+// non-preflight-blocked run, so there is never a preflight diagnostic to cache in the first place).
 public sealed record AnalysisCacheOutcomeV1(
     bool Passed,
     IReadOnlyList<ArchitectureViolation> Violations,
@@ -34,4 +37,22 @@ public sealed record AnalysisCacheOutcomeV1(
     IReadOnlyList<PolicyConsistencyDiagnostic> PolicyConsistencyFindings,
     string PolicyConsistencyConfig,
     IReadOnlyList<ArchitectureClassificationConflict> ClassificationConflicts,
-    IReadOnlyList<ArchitectureClassificationMetadataFailure> ClassificationMetadataFailures);
+    IReadOnlyList<ArchitectureClassificationMetadataFailure> ClassificationMetadataFailures,
+    IReadOnlyList<ArchitectureClassificationRoleFact>? ClassificationRoles = null,
+    ArchitectureClassificationPathDeferredNotice? ClassificationPathDeferred = null,
+    IReadOnlyList<ArchitectureCycleFinding>? CycleFindings = null,
+    IReadOnlyList<ArchitectureCoverageSummary>? CoverageSummaries = null,
+    IReadOnlyList<ArchitectureSubtractiveMatcherParticipation>? SubtractiveMatcherParticipation = null)
+{
+    public IReadOnlyList<ArchitectureClassificationRoleFact> ClassificationRoles { get; init; } =
+        ClassificationRoles ?? Array.Empty<ArchitectureClassificationRoleFact>();
+
+    public IReadOnlyList<ArchitectureCycleFinding> CycleFindings { get; init; } =
+        CycleFindings ?? Array.Empty<ArchitectureCycleFinding>();
+
+    public IReadOnlyList<ArchitectureCoverageSummary> CoverageSummaries { get; init; } =
+        CoverageSummaries ?? Array.Empty<ArchitectureCoverageSummary>();
+
+    public IReadOnlyList<ArchitectureSubtractiveMatcherParticipation> SubtractiveMatcherParticipation { get; init; } =
+        SubtractiveMatcherParticipation ?? Array.Empty<ArchitectureSubtractiveMatcherParticipation>();
+}

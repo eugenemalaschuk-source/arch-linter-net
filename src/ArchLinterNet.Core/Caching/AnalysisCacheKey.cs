@@ -34,7 +34,21 @@ public sealed record AnalysisCacheKey(
     string? Configuration,
     string? TargetFramework,
     string? Platform,
-    string? RuntimeIdentifier)
+    string? RuntimeIdentifier,
+    // Finding #2: every remaining result-affecting dimension on AnalysisSnapshotRequest/
+    // ValidationRequest folded into the key — a run that differs only in one of these must derive
+    // a different AnalysisCacheKey.Digest and can never reuse another run's outcome.
+    // PreprocessorSymbolsDigest: an order-independent set digest (see
+    // ComputePreprocessorSymbolsDigest), empty string when no symbols were requested — symbols
+    // change which #if/#else branches conditional-compilation-aware contracts observe.
+    string PreprocessorSymbolsDigest = "",
+    // BaselineDigest: a content digest (see ComputeBaselineDigest) of the configured baseline
+    // file, empty string when no baseline is configured — the baseline's own path is deliberately
+    // not part of this (matching PolicyDigest's own "content, never the absolute path" contract),
+    // so only a changed baseline's content invalidates reuse, not where it happens to live on disk.
+    string BaselineDigest = "",
+    bool IncludeAsmdefContracts = true,
+    bool EnforceUnmatchedIgnoredViolationsPolicy = false)
 {
     public string Digest
     {
@@ -53,7 +67,11 @@ public sealed record AnalysisCacheKey(
                 $"configuration:{Configuration ?? string.Empty}",
                 $"tfm:{TargetFramework ?? string.Empty}",
                 $"platform:{Platform ?? string.Empty}",
-                $"rid:{RuntimeIdentifier ?? string.Empty}");
+                $"rid:{RuntimeIdentifier ?? string.Empty}",
+                $"symbols:{PreprocessorSymbolsDigest}",
+                $"baseline:{BaselineDigest}",
+                $"asmdef:{IncludeAsmdefContracts}",
+                $"enforceunmatched:{EnforceUnmatchedIgnoredViolationsPolicy}");
             return HashHex(canonical);
         }
     }
@@ -62,6 +80,34 @@ public sealed record AnalysisCacheKey(
     {
         string joined = string.Join(',', contractIds.OrderBy(id => id, StringComparer.Ordinal));
         return HashHex(joined);
+    }
+
+    // Order-independent, same shape as ComputeContractIdsDigest — two requests naming the same
+    // preprocessor symbols in a different order must derive the same digest, but a genuinely
+    // different symbol set must not.
+    public static string ComputePreprocessorSymbolsDigest(IEnumerable<string>? preprocessorSymbols)
+    {
+        if (preprocessorSymbols is null)
+        {
+            return string.Empty;
+        }
+
+        string joined = string.Join(',', preprocessorSymbols.OrderBy(symbol => symbol, StringComparer.Ordinal));
+        return joined.Length == 0 ? string.Empty : HashHex(joined);
+    }
+
+    // Content digest of the configured baseline file — mirrors ComputePolicyDigest's own
+    // "content, never the checkout-specific absolute path" contract. Empty string (never hashed)
+    // when no baseline is configured, so "no baseline" and "a baseline whose content happens to
+    // hash to some value" can never collide.
+    public static string ComputeBaselineDigest(string? baselinePath, CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrEmpty(baselinePath))
+        {
+            return string.Empty;
+        }
+
+        return BuildStateCanonicalHasher.ComputeContentDigest(baselinePath, cancellationToken);
     }
 
     // One key per mode (see openspec/specs/analysis-cache/spec.md, "One reuse-authorization unit

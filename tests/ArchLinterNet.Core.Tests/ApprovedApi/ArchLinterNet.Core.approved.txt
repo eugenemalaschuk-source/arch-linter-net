@@ -130,6 +130,8 @@ static class ArchLinterNet.Core.BuildState.FileSystemContainmentGuard
   method static bool IsReparsePoint(string path)
 interface ArchLinterNet.Core.BuildState.IBuildStatePreparationService
   method ArchLinterNet.Core.BuildState.BuildStatePreflightResult Prepare(ArchLinterNet.Core.BuildState.BuildStatePreflightRequest request)
+static class ArchLinterNet.Core.Caching.AnalysisCacheCorruptionClassifier
+  method static int CountCorruptionEvents(System.Collections.Generic.IReadOnlyDictionary<string,int> rejectReasonCounts)
 enum ArchLinterNet.Core.Caching.AnalysisCacheEntryCompletionStatus : int
   enum-member Success = 0
 sealed class ArchLinterNet.Core.Caching.AnalysisCacheEntrySummary : System.IEquatable<ArchLinterNet.Core.Caching.AnalysisCacheEntrySummary>
@@ -173,23 +175,29 @@ static class ArchLinterNet.Core.Caching.AnalysisCacheEnvelope
   field const string SchemaId = "analysis-cache/v1"
   property static string ToolVersion {get;}
 sealed class ArchLinterNet.Core.Caching.AnalysisCacheKey : System.IEquatable<ArchLinterNet.Core.Caching.AnalysisCacheKey>
-  ctor(string PolicyDigest, string Mode, string? ConditionSetName, string ContractIdsDigest, string WorkspaceDigest, string? Configuration, string? TargetFramework, string? Platform, string? RuntimeIdentifier)
+  ctor(string PolicyDigest, string Mode, string? ConditionSetName, string ContractIdsDigest, string WorkspaceDigest, string? Configuration, string? TargetFramework, string? Platform, string? RuntimeIdentifier, string PreprocessorSymbolsDigest = "", string BaselineDigest = "", bool IncludeAsmdefContracts = true, bool EnforceUnmatchedIgnoredViolationsPolicy = false)
   method ArchLinterNet.Core.Caching.AnalysisCacheKey <Clone>$()
   method bool Equals(ArchLinterNet.Core.Caching.AnalysisCacheKey? other)
   method bool Equals(object? obj)
   method int GetHashCode()
+  method static string ComputeBaselineDigest(string? baselinePath, System.Threading.CancellationToken cancellationToken = null)
   method static string ComputeContractIdsDigest(System.Collections.Generic.IEnumerable<string> contractIds)
   method static string ComputePolicyDigest(System.Collections.Generic.IEnumerable<string> policyFilePaths, string repositoryRoot, System.Threading.CancellationToken cancellationToken = null)
+  method static string ComputePreprocessorSymbolsDigest(System.Collections.Generic.IEnumerable<string>? preprocessorSymbols)
   method static string ComputeWorkspaceDigest(System.Collections.Generic.IEnumerable<string> discoveredProjectPaths, string repositoryRoot)
   method static string NormalizeMode(string mode)
   method string ToString()
-  method void Deconstruct(out string PolicyDigest, out string Mode, out string? ConditionSetName, out string ContractIdsDigest, out string WorkspaceDigest, out string? Configuration, out string? TargetFramework, out string? Platform, out string? RuntimeIdentifier)
+  method void Deconstruct(out string PolicyDigest, out string Mode, out string? ConditionSetName, out string ContractIdsDigest, out string WorkspaceDigest, out string? Configuration, out string? TargetFramework, out string? Platform, out string? RuntimeIdentifier, out string PreprocessorSymbolsDigest, out string BaselineDigest, out bool IncludeAsmdefContracts, out bool EnforceUnmatchedIgnoredViolationsPolicy)
   operator !=(ArchLinterNet.Core.Caching.AnalysisCacheKey? left, ArchLinterNet.Core.Caching.AnalysisCacheKey? right)
   operator ==(ArchLinterNet.Core.Caching.AnalysisCacheKey? left, ArchLinterNet.Core.Caching.AnalysisCacheKey? right)
+  property bool EnforceUnmatchedIgnoredViolationsPolicy {get;init;}
+  property bool IncludeAsmdefContracts {get;init;}
+  property string BaselineDigest {get;init;}
   property string ContractIdsDigest {get;init;}
   property string Digest {get;}
   property string Mode {get;init;}
   property string PolicyDigest {get;init;}
+  property string PreprocessorSymbolsDigest {get;init;}
   property string WorkspaceDigest {get;init;}
   property string? ConditionSetName {get;init;}
   property string? Configuration {get;init;}
@@ -267,21 +275,26 @@ static class ArchLinterNet.Core.Caching.AnalysisCacheOutcomeMapper
   method static ArchLinterNet.Core.Caching.AnalysisCacheOutcomeV1 ToCacheOutcome(ArchLinterNet.Core.Validation.ValidationOutcome outcome)
   method static ArchLinterNet.Core.Validation.ValidationOutcome FromCacheOutcome(ArchLinterNet.Core.Caching.AnalysisCacheOutcomeV1 cached, string repositoryRoot, System.Collections.Generic.IReadOnlyList<string> policyImportPaths, System.Collections.Generic.IReadOnlyList<string> resolvedAssemblyPaths, System.Collections.Generic.IReadOnlyList<string> discoveredProjectPaths, ArchLinterNet.Core.Model.ArchitectureSourceExpansionInventory sourceExpansion)
 sealed class ArchLinterNet.Core.Caching.AnalysisCacheOutcomeV1 : System.IEquatable<ArchLinterNet.Core.Caching.AnalysisCacheOutcomeV1>
-  ctor(bool Passed, System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Model.ArchitectureViolation> Violations, System.Collections.Generic.IReadOnlyList<string> Cycles, System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Model.ArchitectureViolation> CoverageFindings, string CoverageConfig, System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Model.ArchitectureUnmatchedIgnoredViolation> UnmatchedIgnoredViolations, string UnmatchedIgnoredViolationsConfig, System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Model.PolicyConsistencyDiagnostic> PolicyConsistencyFindings, string PolicyConsistencyConfig, System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Model.ArchitectureClassificationConflict> ClassificationConflicts, System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Model.ArchitectureClassificationMetadataFailure> ClassificationMetadataFailures)
+  ctor(bool Passed, System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Model.ArchitectureViolation> Violations, System.Collections.Generic.IReadOnlyList<string> Cycles, System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Model.ArchitectureViolation> CoverageFindings, string CoverageConfig, System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Model.ArchitectureUnmatchedIgnoredViolation> UnmatchedIgnoredViolations, string UnmatchedIgnoredViolationsConfig, System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Model.PolicyConsistencyDiagnostic> PolicyConsistencyFindings, string PolicyConsistencyConfig, System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Model.ArchitectureClassificationConflict> ClassificationConflicts, System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Model.ArchitectureClassificationMetadataFailure> ClassificationMetadataFailures, System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Model.ArchitectureClassificationRoleFact>? ClassificationRoles = null, ArchLinterNet.Core.Model.ArchitectureClassificationPathDeferredNotice? ClassificationPathDeferred = null, System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Model.ArchitectureCycleFinding>? CycleFindings = null, System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Reporting.ArchitectureCoverageSummary>? CoverageSummaries = null, System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Model.ArchitectureSubtractiveMatcherParticipation>? SubtractiveMatcherParticipation = null)
   method ArchLinterNet.Core.Caching.AnalysisCacheOutcomeV1 <Clone>$()
   method bool Equals(ArchLinterNet.Core.Caching.AnalysisCacheOutcomeV1? other)
   method bool Equals(object? obj)
   method int GetHashCode()
   method string ToString()
-  method void Deconstruct(out bool Passed, out System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Model.ArchitectureViolation> Violations, out System.Collections.Generic.IReadOnlyList<string> Cycles, out System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Model.ArchitectureViolation> CoverageFindings, out string CoverageConfig, out System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Model.ArchitectureUnmatchedIgnoredViolation> UnmatchedIgnoredViolations, out string UnmatchedIgnoredViolationsConfig, out System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Model.PolicyConsistencyDiagnostic> PolicyConsistencyFindings, out string PolicyConsistencyConfig, out System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Model.ArchitectureClassificationConflict> ClassificationConflicts, out System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Model.ArchitectureClassificationMetadataFailure> ClassificationMetadataFailures)
+  method void Deconstruct(out bool Passed, out System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Model.ArchitectureViolation> Violations, out System.Collections.Generic.IReadOnlyList<string> Cycles, out System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Model.ArchitectureViolation> CoverageFindings, out string CoverageConfig, out System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Model.ArchitectureUnmatchedIgnoredViolation> UnmatchedIgnoredViolations, out string UnmatchedIgnoredViolationsConfig, out System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Model.PolicyConsistencyDiagnostic> PolicyConsistencyFindings, out string PolicyConsistencyConfig, out System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Model.ArchitectureClassificationConflict> ClassificationConflicts, out System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Model.ArchitectureClassificationMetadataFailure> ClassificationMetadataFailures, out System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Model.ArchitectureClassificationRoleFact>? ClassificationRoles, out ArchLinterNet.Core.Model.ArchitectureClassificationPathDeferredNotice? ClassificationPathDeferred, out System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Model.ArchitectureCycleFinding>? CycleFindings, out System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Reporting.ArchitectureCoverageSummary>? CoverageSummaries, out System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Model.ArchitectureSubtractiveMatcherParticipation>? SubtractiveMatcherParticipation)
   operator !=(ArchLinterNet.Core.Caching.AnalysisCacheOutcomeV1? left, ArchLinterNet.Core.Caching.AnalysisCacheOutcomeV1? right)
   operator ==(ArchLinterNet.Core.Caching.AnalysisCacheOutcomeV1? left, ArchLinterNet.Core.Caching.AnalysisCacheOutcomeV1? right)
+  property ArchLinterNet.Core.Model.ArchitectureClassificationPathDeferredNotice? ClassificationPathDeferred {get;init;}
   property System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Model.ArchitectureClassificationConflict> ClassificationConflicts {get;init;}
   property System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Model.ArchitectureClassificationMetadataFailure> ClassificationMetadataFailures {get;init;}
+  property System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Model.ArchitectureClassificationRoleFact> ClassificationRoles {get;init;}
+  property System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Model.ArchitectureCycleFinding> CycleFindings {get;init;}
+  property System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Model.ArchitectureSubtractiveMatcherParticipation> SubtractiveMatcherParticipation {get;init;}
   property System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Model.ArchitectureUnmatchedIgnoredViolation> UnmatchedIgnoredViolations {get;init;}
   property System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Model.ArchitectureViolation> CoverageFindings {get;init;}
   property System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Model.ArchitectureViolation> Violations {get;init;}
   property System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Model.PolicyConsistencyDiagnostic> PolicyConsistencyFindings {get;init;}
+  property System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Reporting.ArchitectureCoverageSummary> CoverageSummaries {get;init;}
   property System.Collections.Generic.IReadOnlyList<string> Cycles {get;init;}
   property bool Passed {get;init;}
   property string CoverageConfig {get;init;}
@@ -3652,17 +3665,19 @@ interface ArchLinterNet.Core.Validation.Abstractions.IArchitectureValidationAppl
   method ArchLinterNet.Core.Validation.ArchitectureAnalysisSnapshot CreateSnapshot(ArchLinterNet.Core.Validation.AnalysisSnapshotRequest request, ArchLinterNet.Core.Reporting.ValidationTiming? timing = null)
   method ArchLinterNet.Core.Validation.ValidationOutcome Validate(ArchLinterNet.Core.Validation.ValidationRequest request, ArchLinterNet.Core.Reporting.ValidationTiming? timing = null)
 sealed class ArchLinterNet.Core.Validation.AnalysisSnapshotCacheContext : System.IEquatable<ArchLinterNet.Core.Validation.AnalysisSnapshotCacheContext>
-  ctor(ArchLinterNet.Core.Caching.AnalysisCacheLocation Location, string? ConditionSetName, System.Collections.Generic.IReadOnlyCollection<string> ContractIds, string? Configuration, string? TargetFramework, string? Platform, string? RuntimeIdentifier)
+  ctor(ArchLinterNet.Core.Caching.AnalysisCacheLocation Location, string? ConditionSetName, System.Collections.Generic.IReadOnlyCollection<string> ContractIds, string? Configuration, string? TargetFramework, string? Platform, string? RuntimeIdentifier, System.Collections.Generic.IReadOnlyList<string>? PreprocessorSymbols = null, string? BaselinePath = null)
   method ArchLinterNet.Core.Validation.AnalysisSnapshotCacheContext <Clone>$()
   method bool Equals(ArchLinterNet.Core.Validation.AnalysisSnapshotCacheContext? other)
   method bool Equals(object? obj)
   method int GetHashCode()
   method string ToString()
-  method void Deconstruct(out ArchLinterNet.Core.Caching.AnalysisCacheLocation Location, out string? ConditionSetName, out System.Collections.Generic.IReadOnlyCollection<string> ContractIds, out string? Configuration, out string? TargetFramework, out string? Platform, out string? RuntimeIdentifier)
+  method void Deconstruct(out ArchLinterNet.Core.Caching.AnalysisCacheLocation Location, out string? ConditionSetName, out System.Collections.Generic.IReadOnlyCollection<string> ContractIds, out string? Configuration, out string? TargetFramework, out string? Platform, out string? RuntimeIdentifier, out System.Collections.Generic.IReadOnlyList<string>? PreprocessorSymbols, out string? BaselinePath)
   operator !=(ArchLinterNet.Core.Validation.AnalysisSnapshotCacheContext? left, ArchLinterNet.Core.Validation.AnalysisSnapshotCacheContext? right)
   operator ==(ArchLinterNet.Core.Validation.AnalysisSnapshotCacheContext? left, ArchLinterNet.Core.Validation.AnalysisSnapshotCacheContext? right)
   property ArchLinterNet.Core.Caching.AnalysisCacheLocation Location {get;init;}
   property System.Collections.Generic.IReadOnlyCollection<string> ContractIds {get;init;}
+  property System.Collections.Generic.IReadOnlyList<string>? PreprocessorSymbols {get;init;}
+  property string? BaselinePath {get;init;}
   property string? ConditionSetName {get;init;}
   property string? Configuration {get;init;}
   property string? Platform {get;init;}

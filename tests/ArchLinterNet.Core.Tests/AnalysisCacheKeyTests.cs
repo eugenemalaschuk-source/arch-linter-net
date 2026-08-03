@@ -106,4 +106,85 @@ public sealed class AnalysisCacheKeyTests
     {
         Assert.That(AnalysisCacheKey.NormalizeMode("STRICT"), Is.EqualTo("strict"));
     }
+
+    // Finding #2: every remaining result-affecting AnalysisSnapshotRequest/ValidationRequest
+    // dimension must be folded into AnalysisCacheKey — one invalidation regression per dimension,
+    // same everything else, only that one field differs.
+    [Test]
+    public void Digest_ChangesWhenPreprocessorSymbolsDigestChanges()
+    {
+        AnalysisCacheKey a = CreateKey() with { PreprocessorSymbolsDigest = AnalysisCacheKey.ComputePreprocessorSymbolsDigest(new[] { "DEBUG" }) };
+        AnalysisCacheKey b = CreateKey() with { PreprocessorSymbolsDigest = AnalysisCacheKey.ComputePreprocessorSymbolsDigest(new[] { "RELEASE" }) };
+        Assert.That(a.Digest, Is.Not.EqualTo(b.Digest));
+    }
+
+    [Test]
+    public void ComputePreprocessorSymbolsDigest_IsOrderIndependentButSetSensitive()
+    {
+        string a = AnalysisCacheKey.ComputePreprocessorSymbolsDigest(new[] { "B", "A" });
+        string b = AnalysisCacheKey.ComputePreprocessorSymbolsDigest(new[] { "A", "B" });
+        string c = AnalysisCacheKey.ComputePreprocessorSymbolsDigest(new[] { "A" });
+
+        Assert.That(a, Is.EqualTo(b));
+        Assert.That(a, Is.Not.EqualTo(c));
+    }
+
+    [Test]
+    public void ComputePreprocessorSymbolsDigest_NullAndEmpty_AreBothEmptyString()
+    {
+        Assert.That(AnalysisCacheKey.ComputePreprocessorSymbolsDigest(null), Is.Empty);
+        Assert.That(AnalysisCacheKey.ComputePreprocessorSymbolsDigest(Array.Empty<string>()), Is.Empty);
+    }
+
+    [Test]
+    public void Digest_ChangesWhenBaselineDigestChanges()
+    {
+        AnalysisCacheKey a = CreateKey() with { BaselineDigest = "baseline-a" };
+        AnalysisCacheKey b = CreateKey() with { BaselineDigest = "baseline-b" };
+        Assert.That(a.Digest, Is.Not.EqualTo(b.Digest));
+    }
+
+    // Finding #2's "content, not just path" requirement: a changed baseline file must invalidate
+    // reuse even when the baseline's own path is unchanged.
+    [Test]
+    public void ComputeBaselineDigest_ChangesWhenBaselineContentChanges()
+    {
+        string baselinePath = Path.Combine(Path.GetTempPath(), $"arch-linter-baseline-{Guid.NewGuid():N}.json");
+        try
+        {
+            File.WriteAllText(baselinePath, "{\"version\":1}");
+            string digestBefore = AnalysisCacheKey.ComputeBaselineDigest(baselinePath);
+
+            File.WriteAllText(baselinePath, "{\"version\":2}");
+            string digestAfter = AnalysisCacheKey.ComputeBaselineDigest(baselinePath);
+
+            Assert.That(digestBefore, Is.Not.EqualTo(digestAfter));
+        }
+        finally
+        {
+            File.Delete(baselinePath);
+        }
+    }
+
+    [Test]
+    public void ComputeBaselineDigest_NoBaseline_IsEmptyString()
+    {
+        Assert.That(AnalysisCacheKey.ComputeBaselineDigest(null), Is.Empty);
+    }
+
+    [Test]
+    public void Digest_ChangesWhenIncludeAsmdefContractsChanges()
+    {
+        AnalysisCacheKey a = CreateKey() with { IncludeAsmdefContracts = true };
+        AnalysisCacheKey b = CreateKey() with { IncludeAsmdefContracts = false };
+        Assert.That(a.Digest, Is.Not.EqualTo(b.Digest));
+    }
+
+    [Test]
+    public void Digest_ChangesWhenEnforceUnmatchedIgnoredViolationsPolicyChanges()
+    {
+        AnalysisCacheKey a = CreateKey() with { EnforceUnmatchedIgnoredViolationsPolicy = true };
+        AnalysisCacheKey b = CreateKey() with { EnforceUnmatchedIgnoredViolationsPolicy = false };
+        Assert.That(a.Digest, Is.Not.EqualTo(b.Digest));
+    }
 }

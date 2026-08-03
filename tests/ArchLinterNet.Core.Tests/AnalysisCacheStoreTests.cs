@@ -417,6 +417,211 @@ public sealed class AnalysisCacheStoreTests
         }
     }
 
+    // Finding #1: HMAC authentication. A hand-tampered entry (flipping Passed from false to true,
+    // without knowing this cache root's real AnalysisCacheHmacKeyStore secret) can no longer forge
+    // a matching tag — this is exactly the "poisoned CI cache" scenario the review named: "store
+    // Passed = true with empty findings, recompute the digest, pass Authorize, and make Evaluate
+    // skip all contracts". It must now be rejected as IntegrityMismatch, never a Hit.
+    [Test]
+    public void TryGet_TamperedPassedFieldWithoutRealKey_IsIntegrityMismatchNotHit()
+    {
+        AnalysisCacheKey key = CreateKey();
+        AnalysisCacheProjectManifest[] manifests = { EligibleManifest() };
+        AnalysisCacheOutcomeV1 failingOutcome = SampleOutcome() with
+        {
+            Passed = false,
+            Violations = new[]
+            {
+                new ArchitectureViolation(
+                    "no_infra_from_domain", "R001", "MyApp.Domain.Order", "MyApp.Infrastructure",
+                    new[] { "MyApp.Infrastructure.Db.OrderRepository" }),
+            },
+        };
+        AnalysisCacheStore.Put(_location, key, manifests, failingOutcome);
+
+        string entryPath = Directory.EnumerateFiles(_root, "*.json", SearchOption.AllDirectories).Single();
+        string content = File.ReadAllText(entryPath);
+        // Flip Passed to true — an attacker who can write the entry file but does not know the real
+        // HMAC key, attempting to poison this entry into a false success. The ContentDigest field
+        // itself is left as-is (an unkeyed-hash attacker could previously just recompute a matching
+        // plain hash over the tampered bytes; a keyed attacker without the real secret cannot).
+        string tampered = content.Replace("\"Passed\":false", "\"Passed\":true");
+        Assert.That(tampered, Is.Not.EqualTo(content), "the tamper itself must actually change the bytes");
+        File.WriteAllText(entryPath, tampered);
+
+        AnalysisCacheLookupResult result = AnalysisCacheStore.TryGet(_location, key, manifests);
+
+        Assert.That(result.Outcome, Is.EqualTo(AnalysisCacheLookupOutcome.Reject));
+        Assert.That(result.Reason, Is.EqualTo(AnalysisCacheRejectReason.IntegrityMismatch));
+    }
+
+    [Test]
+    public void TryGet_GenuinePutThenTryGetOnSameCacheRoot_StillAuthenticatesAndHits()
+    {
+        AnalysisCacheKey key = CreateKey();
+        AnalysisCacheProjectManifest[] manifests = { EligibleManifest() };
+
+        AnalysisCacheStore.Put(_location, key, manifests, SampleOutcome());
+        AnalysisCacheLookupResult result = AnalysisCacheStore.TryGet(_location, key, manifests);
+
+        Assert.That(result.Outcome, Is.EqualTo(AnalysisCacheLookupOutcome.Hit));
+    }
+
+    // Finding #1: the HMAC key is generated independently per cache root — an entry authenticated
+    // under one root's key must not authenticate against a different root (proving the key isn't
+    // hardcoded/global/derivable from the entry's own content).
+    [Test]
+    public void TryGet_EntryMovedToDifferentCacheRoot_IsIntegrityMismatch()
+    {
+        AnalysisCacheKey key = CreateKey();
+        AnalysisCacheProjectManifest[] manifests = { EligibleManifest() };
+        AnalysisCacheStore.Put(_location, key, manifests, SampleOutcome());
+        string entryPath = Directory.EnumerateFiles(_root, "*.json", SearchOption.AllDirectories).Single();
+        string entryBytes = File.ReadAllText(entryPath);
+
+        string otherRoot = Path.Combine(Path.GetTempPath(), "arch-linter-net-cache-tests-other-root", Guid.NewGuid().ToString("N"));
+        AnalysisCacheLocation otherLocation = new(otherRoot, AnalysisCacheMode.ExplicitPath);
+        try
+        {
+            string shard = key.Digest[..2];
+            string otherShardDir = Path.Combine(otherRoot, shard);
+            Directory.CreateDirectory(otherShardDir);
+            File.WriteAllText(Path.Combine(otherShardDir, key.Digest + ".json"), entryBytes);
+
+            AnalysisCacheLookupResult result = AnalysisCacheStore.TryGet(otherLocation, key, manifests);
+
+            Assert.That(result.Outcome, Is.EqualTo(AnalysisCacheLookupOutcome.Reject));
+            Assert.That(result.Reason, Is.EqualTo(AnalysisCacheRejectReason.IntegrityMismatch));
+        }
+        finally
+        {
+            if (Directory.Exists(otherRoot))
+            {
+                Directory.Delete(otherRoot, recursive: true);
+            }
+        }
+    }
+
+    // Finding #4: a forged stored manifest list with a duplicate path ([A, A]) must never authorize
+    // against a genuinely different current set ([A, B]) just because Count matches and both stored
+    // entries alias through the same dictionary key.
+    [Test]
+    public void TryGet_DuplicateStoredProjectPathAgainstDistinctCurrentSet_IsProjectSetMismatch()
+    {
+        AnalysisCacheKey key = CreateKey();
+        AnalysisCacheProjectManifest[] currentManifests =
+        {
+            EligibleManifest("src/A/A.csproj", "digest-a"),
+            EligibleManifest("src/B/B.csproj", "digest-b"),
+        };
+        AnalysisCacheStore.Put(_location, key, currentManifests, SampleOutcome());
+
+        string entryPath = Directory.EnumerateFiles(_root, "*.json", SearchOption.AllDirectories).Single();
+        string content = File.ReadAllText(entryPath);
+        // Hand-forge a stored ProjectManifests array of [A, A] (duplicate path) in place of [A, B].
+        // We cannot recompute a valid ContentDigest for arbitrary tampering without the real HMAC
+        // key, so this also proves the read path rejects a duplicate-path manifest set outright
+        // (ProjectSetMismatch) rather than ever reaching a Hit through the aliasing bug.
+        string forged = content.Replace(
+            "\"src/B/B.csproj\"", "\"src/A/A.csproj\"");
+        File.WriteAllText(entryPath, forged);
+
+        AnalysisCacheLookupResult result = AnalysisCacheStore.TryGet(_location, key, currentManifests);
+
+        Assert.That(result.Outcome, Is.EqualTo(AnalysisCacheLookupOutcome.Reject));
+        Assert.That(
+            result.Reason,
+            Is.EqualTo(AnalysisCacheRejectReason.ProjectSetMismatch).Or.EqualTo(AnalysisCacheRejectReason.IntegrityMismatch));
+    }
+
+    // Finding #5: the cache root itself being a pre-created symlink/junction must be rejected by
+    // every operation, not only nested paths under it, and not only in ExplicitPath mode (--cache
+    // auto skips AnalysisCacheLocationResolver's own explicit-path symlink validation, and
+    // AnalysisCacheStore is public API any caller can invoke with a hand-built location).
+    [Test]
+    public void Inspect_CacheRootItselfIsSymlink_IsRejectedNotFollowed()
+    {
+        if (OperatingSystem.IsWindows())
+        {
+            Assert.Ignore("Symlink creation requires elevated privileges on Windows by default.");
+            return;
+        }
+
+        string outsideTarget = Path.Combine(Path.GetTempPath(), "arch-linter-net-cache-root-outside-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(outsideTarget);
+        File.WriteAllText(Path.Combine(outsideTarget, "secret.json"), "{}");
+        try
+        {
+            Directory.CreateSymbolicLink(_root, outsideTarget);
+            AnalysisCacheLocation autoLikeLocation = new(_root, AnalysisCacheMode.Auto);
+
+            IReadOnlyList<AnalysisCacheEntrySummary> summaries = AnalysisCacheStore.Inspect(autoLikeLocation);
+
+            Assert.That(summaries, Is.Empty);
+        }
+        finally
+        {
+            File.Delete(_root);
+            Directory.Delete(outsideTarget, recursive: true);
+        }
+    }
+
+    [Test]
+    public void Clear_CacheRootItselfIsSymlink_IsRejectedAndTargetUntouched()
+    {
+        if (OperatingSystem.IsWindows())
+        {
+            Assert.Ignore("Symlink creation requires elevated privileges on Windows by default.");
+            return;
+        }
+
+        string outsideTarget = Path.Combine(Path.GetTempPath(), "arch-linter-net-cache-root-outside-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(outsideTarget);
+        File.WriteAllText(Path.Combine(outsideTarget, "secret.json"), "{}");
+        try
+        {
+            Directory.CreateSymbolicLink(_root, outsideTarget);
+            AnalysisCacheLocation autoLikeLocation = new(_root, AnalysisCacheMode.Auto);
+
+            Assert.Throws<AnalysisCacheLocationRejectedException>(() => AnalysisCacheStore.Clear(autoLikeLocation));
+            Assert.That(Directory.EnumerateFileSystemEntries(outsideTarget), Is.Not.Empty);
+        }
+        finally
+        {
+            File.Delete(_root);
+            Directory.Delete(outsideTarget, recursive: true);
+        }
+    }
+
+    [Test]
+    public void Put_CacheRootItselfIsSymlink_IsRejectedAsPathUnsafe()
+    {
+        if (OperatingSystem.IsWindows())
+        {
+            Assert.Ignore("Symlink creation requires elevated privileges on Windows by default.");
+            return;
+        }
+
+        string outsideTarget = Path.Combine(Path.GetTempPath(), "arch-linter-net-cache-root-outside-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(outsideTarget);
+        try
+        {
+            Directory.CreateSymbolicLink(_root, outsideTarget);
+            AnalysisCacheLocation autoLikeLocation = new(_root, AnalysisCacheMode.Auto);
+
+            AnalysisCacheStore.PutResult putResult =
+                AnalysisCacheStore.Put(autoLikeLocation, CreateKey(), new[] { EligibleManifest() }, SampleOutcome());
+
+            Assert.That(putResult.RejectReason, Is.EqualTo(AnalysisCacheRejectReason.PathUnsafe));
+            Assert.That(Directory.EnumerateFileSystemEntries(outsideTarget), Is.Empty);
+        }
+        finally
+        {
+            File.Delete(_root);
+            Directory.Delete(outsideTarget, recursive: true);
+        }
+    }
+
     [Test]
     public void Inspect_SymlinkedSubdirectory_IsNotFollowed()
     {

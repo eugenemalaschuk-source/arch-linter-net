@@ -27,7 +27,7 @@ public sealed class AnalysisCacheSchemaValidationTests
         return JsonSchema.FromText(File.ReadAllText(schemaPath));
     }
 
-    private static AnalysisCacheEntryV1 BuildSampleEntry()
+    private static AnalysisCacheEntryV1 BuildSampleEntry(string cacheRootPath)
     {
         ArchitectureViolation violationWithPayload = new(
             "no_infra_from_domain", "R001", "MyApp.Domain.Order", "MyApp.Infrastructure",
@@ -65,22 +65,33 @@ public sealed class AnalysisCacheSchemaValidationTests
             ContentDigest = string.Empty,
         };
 
-        return withoutDigest with { ContentDigest = AnalysisCacheContentDigest.Compute(withoutDigest) };
+        return withoutDigest with { ContentDigest = AnalysisCacheContentDigest.Compute(withoutDigest, cacheRootPath) };
     }
 
     [Test]
     public void RealCacheEntry_ValidatesAgainstSchema()
     {
-        AnalysisCacheEntryV1 entry = BuildSampleEntry();
-        byte[] bytes = JsonSerializer.SerializeToUtf8Bytes(entry, AnalysisCacheJson.Options);
-        string json = System.Text.Encoding.UTF8.GetString(bytes);
+        string cacheRoot = Path.Combine(Path.GetTempPath(), "arch-linter-net-cache-schema-key-tests", Guid.NewGuid().ToString("N"));
+        try
+        {
+            AnalysisCacheEntryV1 entry = BuildSampleEntry(cacheRoot);
+            byte[] bytes = JsonSerializer.SerializeToUtf8Bytes(entry, AnalysisCacheJson.Options);
+            string json = System.Text.Encoding.UTF8.GetString(bytes);
 
-        EvaluationResults evaluation = LoadSchema().Evaluate(
-            JsonNode.Parse(json), new EvaluationOptions { OutputFormat = OutputFormat.List });
+            EvaluationResults evaluation = LoadSchema().Evaluate(
+                JsonNode.Parse(json), new EvaluationOptions { OutputFormat = OutputFormat.List });
 
-        Assert.That(evaluation.IsValid, Is.True,
-            string.Join(Environment.NewLine, evaluation.Details.Where(d => !d.IsValid)
-                .Select(d => d.EvaluationPath + ": " + string.Join(",", d.Errors?.Values ?? []))));
+            Assert.That(evaluation.IsValid, Is.True,
+                string.Join(Environment.NewLine, evaluation.Details.Where(d => !d.IsValid)
+                    .Select(d => d.EvaluationPath + ": " + string.Join(",", d.Errors?.Values ?? []))));
+        }
+        finally
+        {
+            if (Directory.Exists(cacheRoot))
+            {
+                Directory.Delete(cacheRoot, recursive: true);
+            }
+        }
     }
 
     [Test]
@@ -90,7 +101,7 @@ public sealed class AnalysisCacheSchemaValidationTests
         AnalysisCacheLocation location = new(root, AnalysisCacheMode.ExplicitPath);
         try
         {
-            AnalysisCacheEntryV1 entry = BuildSampleEntry();
+            AnalysisCacheEntryV1 entry = BuildSampleEntry(root);
             AnalysisCacheKey key = new("policy", entry.Mode, null, "contracts", "workspace", null, null, null, null);
             AnalysisCacheStore.PutResult putResult = AnalysisCacheStore.Put(
                 location, key, entry.ProjectManifests, entry.Outcome);

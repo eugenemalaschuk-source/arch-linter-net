@@ -36,6 +36,19 @@ public sealed class ValidateCommandHandlerProfileTests
         // counting (defeating the point of the test this supports).
         public IReadOnlyList<string> PolicyImportPaths { get; init; } = Array.Empty<string>();
 
+        // Finding #8 support: lets a test inject a lookup-side reject (e.g. a corrupt cache entry)
+        // without needing a real cache root/entry on disk — ValidateWithCounters below returns it
+        // verbatim as part of ArchitectureAnalysisSnapshotCounters.CacheLookups.
+        public ArchLinterNet.Core.Caching.AnalysisCacheLookupStats? CacheLookupStats { get; init; }
+
+        public (ValidationOutcome Outcome, ArchitectureAnalysisSnapshotCounters Counters) ValidateWithCounters(
+            ValidationRequest request, ValidationTiming? timing)
+        {
+            ValidationOutcome outcome = Validate(request, timing);
+            ArchitectureAnalysisSnapshotCounters counters = new() { CacheLookups = CacheLookupStats };
+            return (outcome, counters);
+        }
+
         public bool TryParseGraphLevel(string value, out ArchitectureGraphLevel level)
         {
             level = ArchitectureGraphLevel.Namespace;
@@ -243,6 +256,41 @@ public sealed class ValidateCommandHandlerProfileTests
         {
             Directory.Delete(projectDir, recursive: true);
         }
+    }
+
+    // Finding #8: the scalar Rejects counter must aggregate both population-side rejects (this
+    // run's own populate attempt — always IneligibleBuildInput here, since FakeCliRuntime reports
+    // no discovered projects) and read-side/lookup rejects (a corrupt cache entry, injected via
+    // CacheLookupStats without needing a real on-disk cache root). Before the fix, a corrupt lookup
+    // alone reported Lookups=1, a Corrupt reason count of 1, but Rejects stayed 0 for the
+    // population-only total.
+    [Test]
+    public void Execute_CacheAuto_WithCorruptLookupAndIneligiblePopulation_AggregatesRejectsAcrossBothSides()
+    {
+        ArchLinterNet.Core.Caching.AnalysisCacheLookupStats lookupStats = new();
+        lookupStats.RecordLookup(ArchLinterNet.Core.Caching.AnalysisCacheLookupResult.Reject(
+            ArchLinterNet.Core.Caching.AnalysisCacheRejectReason.Corrupt, bytesRead: 128));
+
+        FakeCliConsole console = new();
+        FakeCliRuntime runtime = new() { CacheLookupStats = lookupStats };
+        ValidateCommandHandler handler = new(runtime, console, new FakeFileSystem(exists: true));
+
+        int exitCode = handler.Execute(CacheOptions(cacheDestination: "auto"));
+
+        Assert.That(exitCode, Is.EqualTo(CliExitCodes.Success), console.StdErr);
+        string[] lines = console.StdOut.Split('\n', StringSplitOptions.RemoveEmptyEntries);
+        using JsonDocument document = JsonDocument.Parse(lines[^1]);
+        JsonElement cache = document.RootElement.GetProperty("Counters").GetProperty("Cache");
+        Assert.Multiple(() =>
+        {
+            Assert.That(cache.GetProperty("Rejects").GetInt32(), Is.EqualTo(2), "population reject (1) + lookup reject (1)");
+            Assert.That(cache.GetProperty("RejectReasonCounts").GetProperty("Corrupt").GetInt32(), Is.EqualTo(1));
+            Assert.That(cache.GetProperty("RejectReasonCounts").GetProperty("IneligibleBuildInput").GetInt32(), Is.EqualTo(1));
+            Assert.That(cache.GetProperty("CorruptionEvents").GetInt32(), Is.EqualTo(1));
+
+            int sumOfReasonCounts = cache.GetProperty("RejectReasonCounts").EnumerateObject().Sum(p => p.Value.GetInt32());
+            Assert.That(cache.GetProperty("Rejects").GetInt32(), Is.EqualTo(sumOfReasonCounts));
+        });
     }
 
     [Test]
