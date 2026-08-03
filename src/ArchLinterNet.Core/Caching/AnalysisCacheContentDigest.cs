@@ -1,5 +1,6 @@
 using System.Security.Cryptography;
 using System.Text;
+using System.Text.Json;
 
 namespace ArchLinterNet.Core.Caching;
 
@@ -20,27 +21,25 @@ internal static class AnalysisCacheContentDigest
             AnalysisCacheEnvelope.SchemaId,
             $"format:{entry.FormatVersion}",
             $"key:{entry.KeyDigest}",
+            $"mode:{entry.Mode}",
             $"tool:{entry.ToolVersion}",
             $"created:{entry.CreatedAtUtc:O}",
             $"status:{entry.CompletionStatus}",
             $"manifests:{string.Join(';', manifestLines)}",
-            $"facts:{FormatFacts(entry.Facts)}");
+            $"outcome:{FormatOutcome(entry.Outcome)}");
 
         return Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(canonical)));
     }
 
-    private static string FormatFacts(AnalysisCacheFactsV1 facts) => string.Join('|', new object[]
-    {
-        facts.Passed,
-        facts.ViolationCount,
-        facts.CoverageFindingCount,
-        facts.CycleCount,
-        facts.UnmatchedIgnoredViolationCount,
-        facts.PolicyConsistencyFindingCount,
-        facts.ClassificationConflictCount,
-        facts.ClassificationMetadataFailureCount,
-        facts.DiscoveredProjectCount,
-        facts.RetainedAssemblyCount,
-        facts.SelectedAssemblyCount,
-    });
+    // The reusable outcome carries deeply nested findings (violations with a closed-set polymorphic
+    // Payload, baseline identities, policy locations, ...). Hand-canonicalizing every nested field
+    // the way the rest of this method does for its own flat fields would duplicate
+    // AnalysisCacheDiagnosticPayloadConverter's own closed-set knowledge for no integrity benefit:
+    // System.Text.Json (via AnalysisCacheJson.Options, the same options used to persist the entry)
+    // already writes object/collection properties in a fixed, deterministic declared-property and
+    // list order, so hashing its own serialized bytes is an equally strong, drift-free integrity
+    // input. This digest is recomputed from Entry.Outcome and compared byte-for-byte on every read
+    // (see AnalysisCacheStore.Authorize) — any bit of the outcome changing changes this hash.
+    private static string FormatOutcome(AnalysisCacheOutcomeV1 outcome) =>
+        Convert.ToHexStringLower(SHA256.HashData(JsonSerializer.SerializeToUtf8Bytes(outcome, AnalysisCacheJson.Options)));
 }

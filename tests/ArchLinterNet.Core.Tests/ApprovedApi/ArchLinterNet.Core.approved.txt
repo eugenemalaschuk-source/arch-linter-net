@@ -50,6 +50,7 @@ sealed class ArchLinterNet.Core.BuildState.BuildReceiptV1 : System.IEquatable<Ar
 static class ArchLinterNet.Core.BuildState.BuildStateCanonicalHasher
   method static string ComputeBuildInputFingerprint(string projectPath, string repositoryRoot, System.Threading.CancellationToken cancellationToken = null)
   method static string ComputeContentDigest(string filePath, System.Threading.CancellationToken cancellationToken = null)
+  method static string ToRepositoryRelativePath(string absolutePath, string repositoryRoot)
 static class ArchLinterNet.Core.BuildState.BuildStatePreflightEvaluator
   method static ArchLinterNet.Core.BuildState.BuildStatePreflightResult Evaluate(ArchLinterNet.Core.BuildState.BuildStatePreflightRequest request)
 sealed class ArchLinterNet.Core.BuildState.BuildStatePreflightRequest : System.IEquatable<ArchLinterNet.Core.BuildState.BuildStatePreflightRequest>
@@ -122,6 +123,11 @@ sealed class ArchLinterNet.Core.BuildState.EvaluatedBuildInputManifestV1 : Syste
   property System.Collections.Generic.IReadOnlyList<string> IneligibilityReasons {get;init;}
   property System.Collections.Generic.IReadOnlyList<string> Inputs {get;init;}
   property string Digest {get;init;}
+static class ArchLinterNet.Core.BuildState.FileSystemContainmentGuard
+  method static bool HasReparsePointAncestor(string path, string root)
+  method static bool IsContained(string path, string root)
+  method static bool IsReparsePoint(System.IO.FileSystemInfo info)
+  method static bool IsReparsePoint(string path)
 interface ArchLinterNet.Core.BuildState.IBuildStatePreparationService
   method ArchLinterNet.Core.BuildState.BuildStatePreflightResult Prepare(ArchLinterNet.Core.BuildState.BuildStatePreflightRequest request)
 enum ArchLinterNet.Core.Caching.AnalysisCacheEntryCompletionStatus : int
@@ -152,12 +158,13 @@ sealed class ArchLinterNet.Core.Caching.AnalysisCacheEntryV1 : System.IEquatable
   operator !=(ArchLinterNet.Core.Caching.AnalysisCacheEntryV1? left, ArchLinterNet.Core.Caching.AnalysisCacheEntryV1? right)
   operator ==(ArchLinterNet.Core.Caching.AnalysisCacheEntryV1? left, ArchLinterNet.Core.Caching.AnalysisCacheEntryV1? right)
   property ArchLinterNet.Core.Caching.AnalysisCacheEntryCompletionStatus CompletionStatus {get;init;}
-  property ArchLinterNet.Core.Caching.AnalysisCacheFactsV1 Facts {get;init;}
+  property ArchLinterNet.Core.Caching.AnalysisCacheOutcomeV1 Outcome {get;init;}
   property System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Caching.AnalysisCacheProjectManifest> ProjectManifests {get;init;}
   property System.DateTimeOffset CreatedAtUtc {get;init;}
   property int FormatVersion {get;init;}
   property string ContentDigest {get;init;}
   property string KeyDigest {get;init;}
+  property string Mode {get;init;}
   property string SchemaId {get;init;}
   property string ToolVersion {get;init;}
 static class ArchLinterNet.Core.Caching.AnalysisCacheEnvelope
@@ -165,46 +172,25 @@ static class ArchLinterNet.Core.Caching.AnalysisCacheEnvelope
   field const string ProductSchemaVersion = "0.5.1"
   field const string SchemaId = "analysis-cache/v1"
   property static string ToolVersion {get;}
-sealed class ArchLinterNet.Core.Caching.AnalysisCacheFactsV1 : System.IEquatable<ArchLinterNet.Core.Caching.AnalysisCacheFactsV1>
-  ctor(bool Passed, int ViolationCount, int CoverageFindingCount, int CycleCount, int UnmatchedIgnoredViolationCount, int PolicyConsistencyFindingCount, int ClassificationConflictCount, int ClassificationMetadataFailureCount, int DiscoveredProjectCount, int RetainedAssemblyCount, int SelectedAssemblyCount)
-  method ArchLinterNet.Core.Caching.AnalysisCacheFactsV1 <Clone>$()
-  method bool Equals(ArchLinterNet.Core.Caching.AnalysisCacheFactsV1? other)
-  method bool Equals(object? obj)
-  method int GetHashCode()
-  method string ToString()
-  method void Deconstruct(out bool Passed, out int ViolationCount, out int CoverageFindingCount, out int CycleCount, out int UnmatchedIgnoredViolationCount, out int PolicyConsistencyFindingCount, out int ClassificationConflictCount, out int ClassificationMetadataFailureCount, out int DiscoveredProjectCount, out int RetainedAssemblyCount, out int SelectedAssemblyCount)
-  operator !=(ArchLinterNet.Core.Caching.AnalysisCacheFactsV1? left, ArchLinterNet.Core.Caching.AnalysisCacheFactsV1? right)
-  operator ==(ArchLinterNet.Core.Caching.AnalysisCacheFactsV1? left, ArchLinterNet.Core.Caching.AnalysisCacheFactsV1? right)
-  property bool Passed {get;init;}
-  property int ClassificationConflictCount {get;init;}
-  property int ClassificationMetadataFailureCount {get;init;}
-  property int CoverageFindingCount {get;init;}
-  property int CycleCount {get;init;}
-  property int DiscoveredProjectCount {get;init;}
-  property int PolicyConsistencyFindingCount {get;init;}
-  property int RetainedAssemblyCount {get;init;}
-  property int SelectedAssemblyCount {get;init;}
-  property int UnmatchedIgnoredViolationCount {get;init;}
-  property int ViolationCount {get;init;}
 sealed class ArchLinterNet.Core.Caching.AnalysisCacheKey : System.IEquatable<ArchLinterNet.Core.Caching.AnalysisCacheKey>
-  ctor(string RepositoryRootDigest, string PolicyDigest, string ModeSet, string? ConditionSetName, string ContractIdsDigest, string? Configuration, string? TargetFramework, string? Platform, string? RuntimeIdentifier)
+  ctor(string PolicyDigest, string Mode, string? ConditionSetName, string ContractIdsDigest, string WorkspaceDigest, string? Configuration, string? TargetFramework, string? Platform, string? RuntimeIdentifier)
   method ArchLinterNet.Core.Caching.AnalysisCacheKey <Clone>$()
   method bool Equals(ArchLinterNet.Core.Caching.AnalysisCacheKey? other)
   method bool Equals(object? obj)
   method int GetHashCode()
   method static string ComputeContractIdsDigest(System.Collections.Generic.IEnumerable<string> contractIds)
-  method static string ComputeModeSet(System.Collections.Generic.IEnumerable<string> modes)
-  method static string ComputePolicyDigest(System.Collections.Generic.IEnumerable<string> policyFilePaths, System.Threading.CancellationToken cancellationToken = null)
-  method static string ComputeRepositoryRootDigest(string repositoryRoot)
+  method static string ComputePolicyDigest(System.Collections.Generic.IEnumerable<string> policyFilePaths, string repositoryRoot, System.Threading.CancellationToken cancellationToken = null)
+  method static string ComputeWorkspaceDigest(System.Collections.Generic.IEnumerable<string> discoveredProjectPaths, string repositoryRoot)
+  method static string NormalizeMode(string mode)
   method string ToString()
-  method void Deconstruct(out string RepositoryRootDigest, out string PolicyDigest, out string ModeSet, out string? ConditionSetName, out string ContractIdsDigest, out string? Configuration, out string? TargetFramework, out string? Platform, out string? RuntimeIdentifier)
+  method void Deconstruct(out string PolicyDigest, out string Mode, out string? ConditionSetName, out string ContractIdsDigest, out string WorkspaceDigest, out string? Configuration, out string? TargetFramework, out string? Platform, out string? RuntimeIdentifier)
   operator !=(ArchLinterNet.Core.Caching.AnalysisCacheKey? left, ArchLinterNet.Core.Caching.AnalysisCacheKey? right)
   operator ==(ArchLinterNet.Core.Caching.AnalysisCacheKey? left, ArchLinterNet.Core.Caching.AnalysisCacheKey? right)
   property string ContractIdsDigest {get;init;}
   property string Digest {get;}
-  property string ModeSet {get;init;}
+  property string Mode {get;init;}
   property string PolicyDigest {get;init;}
-  property string RepositoryRootDigest {get;init;}
+  property string WorkspaceDigest {get;init;}
   property string? ConditionSetName {get;init;}
   property string? Configuration {get;init;}
   property string? Platform {get;init;}
@@ -247,6 +233,16 @@ sealed class ArchLinterNet.Core.Caching.AnalysisCacheLookupResult : System.IEqua
   property ArchLinterNet.Core.Caching.AnalysisCacheLookupOutcome Outcome {get;init;}
   property ArchLinterNet.Core.Caching.AnalysisCacheRejectReason? Reason {get;init;}
   property long BytesRead {get;init;}
+sealed class ArchLinterNet.Core.Caching.AnalysisCacheLookupStats
+  ctor()
+  method ArchLinterNet.Core.Caching.AnalysisCacheLookupStats Snapshot()
+  method void RecordLookup(ArchLinterNet.Core.Caching.AnalysisCacheLookupResult result)
+  property System.Collections.Generic.IReadOnlyDictionary<string,int> RejectReasonCounts {get;}
+  property int Hits {get;}
+  property int Lookups {get;}
+  property int Misses {get;}
+  property int Rejects {get;}
+  property long BytesRead {get;}
 enum ArchLinterNet.Core.Caching.AnalysisCacheMode : int
   enum-member Auto = 1
   enum-member Disabled = 0
@@ -267,20 +263,46 @@ sealed class ArchLinterNet.Core.Caching.AnalysisCacheOptions : System.IEquatable
   property static ArchLinterNet.Core.Caching.AnalysisCacheOptions Disabled {get;}
   property string ModeCategory {get;}
   property string? ExplicitPath {get;init;}
+static class ArchLinterNet.Core.Caching.AnalysisCacheOutcomeMapper
+  method static ArchLinterNet.Core.Caching.AnalysisCacheOutcomeV1 ToCacheOutcome(ArchLinterNet.Core.Validation.ValidationOutcome outcome)
+  method static ArchLinterNet.Core.Validation.ValidationOutcome FromCacheOutcome(ArchLinterNet.Core.Caching.AnalysisCacheOutcomeV1 cached, string repositoryRoot, System.Collections.Generic.IReadOnlyList<string> policyImportPaths, System.Collections.Generic.IReadOnlyList<string> resolvedAssemblyPaths, System.Collections.Generic.IReadOnlyList<string> discoveredProjectPaths, ArchLinterNet.Core.Model.ArchitectureSourceExpansionInventory sourceExpansion)
+sealed class ArchLinterNet.Core.Caching.AnalysisCacheOutcomeV1 : System.IEquatable<ArchLinterNet.Core.Caching.AnalysisCacheOutcomeV1>
+  ctor(bool Passed, System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Model.ArchitectureViolation> Violations, System.Collections.Generic.IReadOnlyList<string> Cycles, System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Model.ArchitectureViolation> CoverageFindings, string CoverageConfig, System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Model.ArchitectureUnmatchedIgnoredViolation> UnmatchedIgnoredViolations, string UnmatchedIgnoredViolationsConfig, System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Model.PolicyConsistencyDiagnostic> PolicyConsistencyFindings, string PolicyConsistencyConfig, System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Model.ArchitectureClassificationConflict> ClassificationConflicts, System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Model.ArchitectureClassificationMetadataFailure> ClassificationMetadataFailures)
+  method ArchLinterNet.Core.Caching.AnalysisCacheOutcomeV1 <Clone>$()
+  method bool Equals(ArchLinterNet.Core.Caching.AnalysisCacheOutcomeV1? other)
+  method bool Equals(object? obj)
+  method int GetHashCode()
+  method string ToString()
+  method void Deconstruct(out bool Passed, out System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Model.ArchitectureViolation> Violations, out System.Collections.Generic.IReadOnlyList<string> Cycles, out System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Model.ArchitectureViolation> CoverageFindings, out string CoverageConfig, out System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Model.ArchitectureUnmatchedIgnoredViolation> UnmatchedIgnoredViolations, out string UnmatchedIgnoredViolationsConfig, out System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Model.PolicyConsistencyDiagnostic> PolicyConsistencyFindings, out string PolicyConsistencyConfig, out System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Model.ArchitectureClassificationConflict> ClassificationConflicts, out System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Model.ArchitectureClassificationMetadataFailure> ClassificationMetadataFailures)
+  operator !=(ArchLinterNet.Core.Caching.AnalysisCacheOutcomeV1? left, ArchLinterNet.Core.Caching.AnalysisCacheOutcomeV1? right)
+  operator ==(ArchLinterNet.Core.Caching.AnalysisCacheOutcomeV1? left, ArchLinterNet.Core.Caching.AnalysisCacheOutcomeV1? right)
+  property System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Model.ArchitectureClassificationConflict> ClassificationConflicts {get;init;}
+  property System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Model.ArchitectureClassificationMetadataFailure> ClassificationMetadataFailures {get;init;}
+  property System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Model.ArchitectureUnmatchedIgnoredViolation> UnmatchedIgnoredViolations {get;init;}
+  property System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Model.ArchitectureViolation> CoverageFindings {get;init;}
+  property System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Model.ArchitectureViolation> Violations {get;init;}
+  property System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Model.PolicyConsistencyDiagnostic> PolicyConsistencyFindings {get;init;}
+  property System.Collections.Generic.IReadOnlyList<string> Cycles {get;init;}
+  property bool Passed {get;init;}
+  property string CoverageConfig {get;init;}
+  property string PolicyConsistencyConfig {get;init;}
+  property string UnmatchedIgnoredViolationsConfig {get;init;}
 static class ArchLinterNet.Core.Caching.AnalysisCachePopulation
   method static ArchLinterNet.Core.Caching.AnalysisCacheLookupResult TryLookup(ArchLinterNet.Core.Caching.AnalysisCacheLocation? location, ArchLinterNet.Core.Caching.AnalysisCacheKey key, System.Collections.Generic.IReadOnlyList<string> discoveredProjectPaths, string repositoryRoot, string? configuration, string? targetFramework, string? platform, string? runtimeIdentifier, System.Threading.CancellationToken cancellationToken = null)
-  method static ArchLinterNet.Core.Caching.AnalysisCachePopulation.Outcome TryPopulate(ArchLinterNet.Core.Caching.AnalysisCacheLocation? location, ArchLinterNet.Core.Caching.AnalysisCacheKey key, System.Collections.Generic.IReadOnlyList<string> discoveredProjectPaths, string repositoryRoot, string? configuration, string? targetFramework, string? platform, string? runtimeIdentifier, ArchLinterNet.Core.Caching.AnalysisCacheFactsV1 facts, System.Threading.CancellationToken cancellationToken = null)
+  method static ArchLinterNet.Core.Caching.AnalysisCachePopulation.Outcome TryPopulate(ArchLinterNet.Core.Caching.AnalysisCacheLocation? location, ArchLinterNet.Core.Caching.AnalysisCacheKey key, System.Collections.Generic.IReadOnlyList<string> discoveredProjectPaths, string repositoryRoot, string? configuration, string? targetFramework, string? platform, string? runtimeIdentifier, ArchLinterNet.Core.Caching.AnalysisCacheOutcomeV1 outcome, System.Threading.CancellationToken cancellationToken = null)
 readonly struct ArchLinterNet.Core.Caching.AnalysisCachePopulation.Outcome : System.IEquatable<ArchLinterNet.Core.Caching.AnalysisCachePopulation.Outcome>
-  ctor(ArchLinterNet.Core.Caching.AnalysisCacheRejectReason? RejectReason, int ProjectsEvaluated)
+  ctor(ArchLinterNet.Core.Caching.AnalysisCacheRejectReason? RejectReason, int ProjectsEvaluated, int IneligibleProjectCount, long BytesWritten)
   method bool Equals(ArchLinterNet.Core.Caching.AnalysisCachePopulation.Outcome other)
   method bool Equals(object obj)
   method int GetHashCode()
   method string ToString()
-  method void Deconstruct(out ArchLinterNet.Core.Caching.AnalysisCacheRejectReason? RejectReason, out int ProjectsEvaluated)
+  method void Deconstruct(out ArchLinterNet.Core.Caching.AnalysisCacheRejectReason? RejectReason, out int ProjectsEvaluated, out int IneligibleProjectCount, out long BytesWritten)
   operator !=(ArchLinterNet.Core.Caching.AnalysisCachePopulation.Outcome left, ArchLinterNet.Core.Caching.AnalysisCachePopulation.Outcome right)
   operator ==(ArchLinterNet.Core.Caching.AnalysisCachePopulation.Outcome left, ArchLinterNet.Core.Caching.AnalysisCachePopulation.Outcome right)
   property ArchLinterNet.Core.Caching.AnalysisCacheRejectReason? RejectReason {get;init;}
+  property int IneligibleProjectCount {get;init;}
   property int ProjectsEvaluated {get;init;}
+  property long BytesWritten {get;init;}
 sealed class ArchLinterNet.Core.Caching.AnalysisCacheProjectManifest : System.IEquatable<ArchLinterNet.Core.Caching.AnalysisCacheProjectManifest>
   ctor(string ProjectPath, string ManifestDigest, ArchLinterNet.Core.BuildState.CacheEligibility Eligibility)
   method ArchLinterNet.Core.Caching.AnalysisCacheProjectManifest <Clone>$()
@@ -313,9 +335,22 @@ enum ArchLinterNet.Core.Caching.AnalysisCacheRejectReason : int
   enum-member Truncated = 3
 static class ArchLinterNet.Core.Caching.AnalysisCacheStore
   method static ArchLinterNet.Core.Caching.AnalysisCacheLookupResult TryGet(ArchLinterNet.Core.Caching.AnalysisCacheLocation location, ArchLinterNet.Core.Caching.AnalysisCacheKey key, System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Caching.AnalysisCacheProjectManifest> currentManifests)
-  method static ArchLinterNet.Core.Caching.AnalysisCacheRejectReason? Put(ArchLinterNet.Core.Caching.AnalysisCacheLocation location, ArchLinterNet.Core.Caching.AnalysisCacheKey key, System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Caching.AnalysisCacheProjectManifest> projectManifests, ArchLinterNet.Core.Caching.AnalysisCacheFactsV1 facts, System.Threading.CancellationToken cancellationToken = null)
+  method static ArchLinterNet.Core.Caching.AnalysisCacheStore.PutResult Put(ArchLinterNet.Core.Caching.AnalysisCacheLocation location, ArchLinterNet.Core.Caching.AnalysisCacheKey key, System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Caching.AnalysisCacheProjectManifest> projectManifests, ArchLinterNet.Core.Caching.AnalysisCacheOutcomeV1 outcome, System.Threading.CancellationToken cancellationToken = null)
   method static System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Caching.AnalysisCacheEntrySummary> Inspect(ArchLinterNet.Core.Caching.AnalysisCacheLocation location)
   method static void Clear(ArchLinterNet.Core.Caching.AnalysisCacheLocation location)
+readonly struct ArchLinterNet.Core.Caching.AnalysisCacheStore.PutResult : System.IEquatable<ArchLinterNet.Core.Caching.AnalysisCacheStore.PutResult>
+  ctor(ArchLinterNet.Core.Caching.AnalysisCacheRejectReason? RejectReason, long BytesWritten)
+  method bool Equals(ArchLinterNet.Core.Caching.AnalysisCacheStore.PutResult other)
+  method bool Equals(object obj)
+  method int GetHashCode()
+  method static ArchLinterNet.Core.Caching.AnalysisCacheStore.PutResult Rejected(ArchLinterNet.Core.Caching.AnalysisCacheRejectReason reason)
+  method static ArchLinterNet.Core.Caching.AnalysisCacheStore.PutResult Success(long bytesWritten)
+  method string ToString()
+  method void Deconstruct(out ArchLinterNet.Core.Caching.AnalysisCacheRejectReason? RejectReason, out long BytesWritten)
+  operator !=(ArchLinterNet.Core.Caching.AnalysisCacheStore.PutResult left, ArchLinterNet.Core.Caching.AnalysisCacheStore.PutResult right)
+  operator ==(ArchLinterNet.Core.Caching.AnalysisCacheStore.PutResult left, ArchLinterNet.Core.Caching.AnalysisCacheStore.PutResult right)
+  property ArchLinterNet.Core.Caching.AnalysisCacheRejectReason? RejectReason {get;init;}
+  property long BytesWritten {get;init;}
 sealed class ArchLinterNet.Core.Composition.ArchitectureEngine : System.IAsyncDisposable, System.IDisposable
   method (ArchLinterNet.Core.Validation.ValidationOutcome Outcome, ArchLinterNet.Core.Validation.ArchitectureAnalysisSnapshotCounters Counters) ValidateWithCounters(ArchLinterNet.Core.Validation.ValidationRequest request, ArchLinterNet.Core.Reporting.ValidationTiming? timing = null)
   method ArchLinterNet.Core.Asmdef.AsmdefValidationOutcome ValidateAsmdef(ArchLinterNet.Core.Asmdef.AsmdefValidationRequest request)
@@ -3616,6 +3651,23 @@ interface ArchLinterNet.Core.Validation.Abstractions.IArchitectureValidationAppl
   method (ArchLinterNet.Core.Validation.ValidationOutcome Outcome, ArchLinterNet.Core.Validation.ArchitectureAnalysisSnapshotCounters Counters) ValidateWithCounters(ArchLinterNet.Core.Validation.ValidationRequest request, ArchLinterNet.Core.Reporting.ValidationTiming? timing = null)
   method ArchLinterNet.Core.Validation.ArchitectureAnalysisSnapshot CreateSnapshot(ArchLinterNet.Core.Validation.AnalysisSnapshotRequest request, ArchLinterNet.Core.Reporting.ValidationTiming? timing = null)
   method ArchLinterNet.Core.Validation.ValidationOutcome Validate(ArchLinterNet.Core.Validation.ValidationRequest request, ArchLinterNet.Core.Reporting.ValidationTiming? timing = null)
+sealed class ArchLinterNet.Core.Validation.AnalysisSnapshotCacheContext : System.IEquatable<ArchLinterNet.Core.Validation.AnalysisSnapshotCacheContext>
+  ctor(ArchLinterNet.Core.Caching.AnalysisCacheLocation Location, string? ConditionSetName, System.Collections.Generic.IReadOnlyCollection<string> ContractIds, string? Configuration, string? TargetFramework, string? Platform, string? RuntimeIdentifier)
+  method ArchLinterNet.Core.Validation.AnalysisSnapshotCacheContext <Clone>$()
+  method bool Equals(ArchLinterNet.Core.Validation.AnalysisSnapshotCacheContext? other)
+  method bool Equals(object? obj)
+  method int GetHashCode()
+  method string ToString()
+  method void Deconstruct(out ArchLinterNet.Core.Caching.AnalysisCacheLocation Location, out string? ConditionSetName, out System.Collections.Generic.IReadOnlyCollection<string> ContractIds, out string? Configuration, out string? TargetFramework, out string? Platform, out string? RuntimeIdentifier)
+  operator !=(ArchLinterNet.Core.Validation.AnalysisSnapshotCacheContext? left, ArchLinterNet.Core.Validation.AnalysisSnapshotCacheContext? right)
+  operator ==(ArchLinterNet.Core.Validation.AnalysisSnapshotCacheContext? left, ArchLinterNet.Core.Validation.AnalysisSnapshotCacheContext? right)
+  property ArchLinterNet.Core.Caching.AnalysisCacheLocation Location {get;init;}
+  property System.Collections.Generic.IReadOnlyCollection<string> ContractIds {get;init;}
+  property string? ConditionSetName {get;init;}
+  property string? Configuration {get;init;}
+  property string? Platform {get;init;}
+  property string? RuntimeIdentifier {get;init;}
+  property string? TargetFramework {get;init;}
 sealed class ArchLinterNet.Core.Validation.AnalysisSnapshotRequest : System.IEquatable<ArchLinterNet.Core.Validation.AnalysisSnapshotRequest>
   ctor()
   method ArchLinterNet.Core.Validation.AnalysisSnapshotRequest <Clone>$()
@@ -3628,6 +3680,7 @@ sealed class ArchLinterNet.Core.Validation.AnalysisSnapshotRequest : System.IEqu
   operator !=(ArchLinterNet.Core.Validation.AnalysisSnapshotRequest? left, ArchLinterNet.Core.Validation.AnalysisSnapshotRequest? right)
   operator ==(ArchLinterNet.Core.Validation.AnalysisSnapshotRequest? left, ArchLinterNet.Core.Validation.AnalysisSnapshotRequest? right)
   property ArchLinterNet.Core.BuildState.BuildPreparationMode PreparationMode {get;init;}
+  property ArchLinterNet.Core.Caching.AnalysisCacheLocation? CacheLocation {get;init;}
   property System.Collections.Generic.IReadOnlyCollection<string>? ContractIds {get;init;}
   property System.Collections.Generic.IReadOnlyList<string>? PreprocessorSymbols {get;init;}
   property System.Threading.CancellationToken CancellationToken {get;init;}
@@ -3646,6 +3699,7 @@ sealed class ArchLinterNet.Core.Validation.ArchitectureAnalysisSnapshot : System
   method System.Collections.Generic.IReadOnlyList<string> GetProfileInputPaths()
   method void Dispose()
   property ArchLinterNet.Core.BuildState.BuildStatePreflightResult Preflight {get;}
+  property ArchLinterNet.Core.Caching.AnalysisCacheLookupStats CacheStats {get;}
   property ArchLinterNet.Core.Validation.ArchitectureAnalysisSnapshotCounters Counters {get;}
   property bool Cancelled {get;}
   property bool Failed {get;}
@@ -3660,6 +3714,7 @@ sealed class ArchLinterNet.Core.Validation.ArchitectureAnalysisSnapshotCounters 
   method string ToString()
   operator !=(ArchLinterNet.Core.Validation.ArchitectureAnalysisSnapshotCounters? left, ArchLinterNet.Core.Validation.ArchitectureAnalysisSnapshotCounters? right)
   operator ==(ArchLinterNet.Core.Validation.ArchitectureAnalysisSnapshotCounters? left, ArchLinterNet.Core.Validation.ArchitectureAnalysisSnapshotCounters? right)
+  property ArchLinterNet.Core.Caching.AnalysisCacheLookupStats? CacheLookups {get;init;}
   property System.Collections.Generic.IReadOnlyDictionary<string,int> ContractFamilyResultCounts {get;init;}
   property int AssemblyLoads {get;init;}
   property int DiscoveredProjectCount {get;init;}
@@ -4158,6 +4213,7 @@ sealed class ArchLinterNet.Core.Validation.ValidationOutcome : System.IEquatable
   property bool PreflightBlocked {get;init;}
   property string CoverageConfig {get;init;}
   property string PolicyConsistencyConfig {get;init;}
+  property string RepositoryRoot {get;init;}
   property string UnmatchedIgnoredViolationsConfig {get;init;}
 sealed class ArchLinterNet.Core.Validation.ValidationRequest : System.IEquatable<ArchLinterNet.Core.Validation.ValidationRequest>
   ctor()
@@ -4169,6 +4225,7 @@ sealed class ArchLinterNet.Core.Validation.ValidationRequest : System.IEquatable
   operator !=(ArchLinterNet.Core.Validation.ValidationRequest? left, ArchLinterNet.Core.Validation.ValidationRequest? right)
   operator ==(ArchLinterNet.Core.Validation.ValidationRequest? left, ArchLinterNet.Core.Validation.ValidationRequest? right)
   property ArchLinterNet.Core.BuildState.BuildPreparationMode PreparationMode {get;init;}
+  property ArchLinterNet.Core.Caching.AnalysisCacheLocation? CacheLocation {get;init;}
   property System.Collections.Generic.IReadOnlyCollection<string>? ContractIds {get;init;}
   property System.Collections.Generic.IReadOnlyList<string>? PreprocessorSymbols {get;init;}
   property System.Threading.CancellationToken CancellationToken {get;init;}

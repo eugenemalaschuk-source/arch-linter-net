@@ -1,5 +1,6 @@
 using System.Reflection;
 using ArchLinterNet.Core.BuildState;
+using ArchLinterNet.Core.Caching;
 using ArchLinterNet.Core.Contracts;
 using ArchLinterNet.Core.Execution;
 using ArchLinterNet.Core.Execution.Abstractions;
@@ -30,9 +31,11 @@ public sealed class ArchitectureAnalysisSnapshot : IDisposable
     private readonly IArchitectureContractExecutor _contractExecutor;
     private readonly IArchitectureContractHandlerRegistry _handlerRegistry;
     private readonly IReadOnlyCollection<string>? _requestedContractIds;
+    private readonly AnalysisSnapshotCacheContext? _cacheContext;
     private readonly AnalysisSessionProfilingCounters _profilingCounters;
     private readonly object _gate = new();
     private readonly Dictionary<string, ValidationOutcome> _evaluatedModes = new(StringComparer.Ordinal);
+    private readonly AnalysisCacheLookupStats _cacheStats = new();
     private ArchitectureAnalysisSnapshotCounters _counters;
     private bool _disposed;
     private bool _cancelled;
@@ -51,7 +54,8 @@ public sealed class ArchitectureAnalysisSnapshot : IDisposable
         int policyCompositions,
         int projectGraphEvaluations,
         int assemblyLoads,
-        IReadOnlyCollection<string>? requestedContractIds = null)
+        IReadOnlyCollection<string>? requestedContractIds = null,
+        AnalysisSnapshotCacheContext? cacheContext = null)
     {
         _document = document;
         _setup = setup;
@@ -65,6 +69,7 @@ public sealed class ArchitectureAnalysisSnapshot : IDisposable
         _contractExecutor = contractExecutor;
         _handlerRegistry = handlerRegistry;
         _requestedContractIds = requestedContractIds;
+        _cacheContext = cacheContext;
         _profilingCounters = setup.Runner.Session.Context.ProfilingCounters;
 
         _counters = new ArchitectureAnalysisSnapshotCounters
@@ -107,6 +112,7 @@ public sealed class ArchitectureAnalysisSnapshot : IDisposable
                     SourceScanPasses = _profilingCounters.SourceScanPasses,
                     SourceFilesScanned = _profilingCounters.SourceFilesScanned,
                     ContractFamilyResultCounts = contractFamilyResultCounts,
+                    CacheLookups = _cacheContext is null ? null : _cacheStats.Snapshot(),
                 };
             }
         }
@@ -119,6 +125,21 @@ public sealed class ArchitectureAnalysisSnapshot : IDisposable
             lock (_gate)
             {
                 return _disposed;
+            }
+        }
+    }
+
+    // Real analysis-cache/v1 lookup instrumentation for whatever this snapshot's Evaluate calls
+    // actually did — see AnalysisProfileCacheCounters, which ValidateCommandHandler.Profile.cs and
+    // ArchitectureValidationBuilder now source Lookups/Hits/Misses/BytesRead from instead of leaving
+    // them at 0.
+    public AnalysisCacheLookupStats CacheStats
+    {
+        get
+        {
+            lock (_gate)
+            {
+                return _cacheStats.Snapshot();
             }
         }
     }
@@ -169,7 +190,9 @@ public sealed class ArchitectureAnalysisSnapshot : IDisposable
                 // per mode, keeps combined execution semantically equivalent to separate runs.
                 EnsureRequestedContractIdsAreKnownForMode(mode);
 
-                ValidationOutcome outcome = _preflight.Blocked ? BuildBlockedOutcome() : EvaluateCore(mode, timing);
+                ValidationOutcome? cachedOutcome = _preflight.Blocked ? null : TryEvaluateFromCache(mode, timing);
+                ValidationOutcome outcome = cachedOutcome
+                    ?? (_preflight.Blocked ? BuildBlockedOutcome() : EvaluateCore(mode, timing));
 
                 _evaluatedModes[mode] = outcome;
                 _counters = _counters with { ModesEvaluated = _evaluatedModes.Count };
@@ -236,6 +259,7 @@ public sealed class ArchitectureAnalysisSnapshot : IDisposable
             Array.Empty<ArchitectureCoverageSummary>(), Array.Empty<ArchitectureClassificationConflict>(),
             Array.Empty<ArchitectureClassificationMetadataFailure>())
         {
+            RepositoryRoot = _repositoryRoot,
             PreflightDiagnostics = _preflight.Diagnostics,
             PreflightBlocked = true,
             PolicyImportPaths = GetPolicyImportPaths(),
@@ -336,6 +360,7 @@ public sealed class ArchitectureAnalysisSnapshot : IDisposable
             policyConsistencyFindings, _policyConsistencyConfig, execution.CoverageSummaries,
             classificationConflicts, classificationMetadataFailures)
         {
+            RepositoryRoot = _repositoryRoot,
             CycleFindings = execution.CycleFindings,
             ClassificationRoles = classificationRoles,
             ClassificationPathDeferred = classificationPathDeferred,
@@ -348,6 +373,61 @@ public sealed class ArchitectureAnalysisSnapshot : IDisposable
                 .Skip(subtractiveMatcherStartIndex)
                 .ToList()
         };
+    }
+
+    // The real cache-hit short-circuit (issue #365's deferred follow-up, now implemented): when
+    // this run configured a cache location, a hit here reconstructs a ValidationOutcome directly
+    // from the persisted AnalysisCacheOutcomeV1 and skips EvaluateCore entirely — configuration_check,
+    // policy_consistency_check, contract_checks (contract execution, including source scanning and
+    // coverage/classification computation) and post_processing never run for this mode. Policy
+    // composition, project discovery, and assembly loading already happened in
+    // ArchitectureValidationApplicationService.BuildSnapshot before this snapshot existed — they are
+    // not skipped, since #406 per-project manifest recomputation (the actual reuse-authorization
+    // proof) requires the discovered project set to already be known, and every requested mode
+    // shares that one snapshot's setup regardless of hit/miss. Returns null on Miss/Reject so the
+    // caller falls back to the real pipeline exactly as before this change.
+    private ValidationOutcome? TryEvaluateFromCache(string mode, ValidationTiming? timing)
+    {
+        if (_cacheContext is not { } cache)
+        {
+            return null;
+        }
+
+        IReadOnlyList<string> discoveredProjectPaths = GetDiscoveredProjectPaths();
+        IReadOnlyList<string> policyImportPaths = GetPolicyImportPaths();
+
+        AnalysisCacheKey key = new(
+            AnalysisCacheKey.ComputePolicyDigest(policyImportPaths, _repositoryRoot),
+            AnalysisCacheKey.NormalizeMode(mode),
+            cache.ConditionSetName,
+            AnalysisCacheKey.ComputeContractIdsDigest(cache.ContractIds),
+            AnalysisCacheKey.ComputeWorkspaceDigest(discoveredProjectPaths, _repositoryRoot),
+            cache.Configuration,
+            cache.TargetFramework,
+            cache.Platform,
+            cache.RuntimeIdentifier);
+
+        AnalysisCacheLookupResult lookup;
+        using (timing?.Measure("cache_lookup"))
+        {
+            lookup = AnalysisCachePopulation.TryLookup(
+                cache.Location, key, discoveredProjectPaths, _repositoryRoot,
+                cache.Configuration, cache.TargetFramework, cache.Platform, cache.RuntimeIdentifier);
+        }
+
+        lock (_gate)
+        {
+            _cacheStats.RecordLookup(lookup);
+        }
+
+        if (lookup.Outcome != AnalysisCacheLookupOutcome.Hit || lookup.Entry is null)
+        {
+            return null;
+        }
+
+        return AnalysisCacheOutcomeMapper.FromCacheOutcome(
+            lookup.Entry.Outcome, _repositoryRoot, policyImportPaths, GetResolvedAssemblyPaths(),
+            discoveredProjectPaths, _document.SourceExpansion);
     }
 
     private IReadOnlyList<string> GetPolicyImportPaths()

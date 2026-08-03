@@ -8,7 +8,12 @@ namespace ArchLinterNet.Core.Caching;
 // AnalysisCacheStore.Put on every one of them being VerifiedCacheEligible.
 public static class AnalysisCachePopulation
 {
-    public readonly record struct Outcome(AnalysisCacheRejectReason? RejectReason, int ProjectsEvaluated);
+    // ProjectsEvaluated: how many discovered projects had a manifest recomputed.
+    // IneligibleProjectCount: how many of those were not VerifiedCacheEligible (0 whenever
+    // RejectReason is null — a successful populate implies every project was eligible).
+    // BytesWritten: 0 unless RejectReason is null (see AnalysisCacheStore.PutResult).
+    public readonly record struct Outcome(
+        AnalysisCacheRejectReason? RejectReason, int ProjectsEvaluated, int IneligibleProjectCount, long BytesWritten);
 
     public static Outcome TryPopulate(
         AnalysisCacheLocation? location,
@@ -19,17 +24,17 @@ public static class AnalysisCachePopulation
         string? targetFramework,
         string? platform,
         string? runtimeIdentifier,
-        AnalysisCacheFactsV1 facts,
+        AnalysisCacheOutcomeV1 outcome,
         CancellationToken cancellationToken = default)
     {
         if (location is null)
         {
-            return new Outcome(AnalysisCacheRejectReason.Disabled, 0);
+            return new Outcome(AnalysisCacheRejectReason.Disabled, 0, 0, 0);
         }
 
         if (discoveredProjectPaths.Count == 0)
         {
-            return new Outcome(AnalysisCacheRejectReason.IneligibleBuildInput, 0);
+            return new Outcome(AnalysisCacheRejectReason.IneligibleBuildInput, 0, 0, 0);
         }
 
         List<AnalysisCacheProjectManifest> manifests = new(discoveredProjectPaths.Count);
@@ -42,14 +47,17 @@ public static class AnalysisCachePopulation
                 ToRepositoryRelative(projectPath, repositoryRoot), manifest));
         }
 
-        AnalysisCacheRejectReason? rejectReason = AnalysisCacheStore.Put(location, key, manifests, facts, cancellationToken);
-        return new Outcome(rejectReason, manifests.Count);
+        int ineligibleCount = manifests.Count(manifest => manifest.Eligibility != CacheEligibility.VerifiedCacheEligible);
+
+        AnalysisCacheStore.PutResult putResult = AnalysisCacheStore.Put(location, key, manifests, outcome, cancellationToken);
+        return new Outcome(putResult.RejectReason, manifests.Count, ineligibleCount, putResult.BytesWritten);
     }
 
     // Re-derives each stored project's manifest and checks it against the given cache entry's
     // key/authorization chain — the read-side counterpart used by `cache inspect`-style
     // consumers and by tests that want to prove Put/TryGet symmetry against a real manifest
-    // instead of a hand-built fake.
+    // instead of a hand-built fake. Also the read side of ArchitectureAnalysisSnapshot's own
+    // cache-hit short-circuit (see AnalysisCacheStore.TryGet/Authorize).
     public static AnalysisCacheLookupResult TryLookup(
         AnalysisCacheLocation? location,
         AnalysisCacheKey key,
@@ -79,10 +87,6 @@ public static class AnalysisCachePopulation
         return AnalysisCacheStore.TryGet(location, key, manifests);
     }
 
-    private static string ToRepositoryRelative(string projectPath, string repositoryRoot)
-    {
-        string full = Path.GetFullPath(projectPath);
-        string root = Path.GetFullPath(repositoryRoot);
-        return Path.GetRelativePath(root, full).Replace(Path.DirectorySeparatorChar, '/').Replace(Path.AltDirectorySeparatorChar, '/');
-    }
+    private static string ToRepositoryRelative(string projectPath, string repositoryRoot) =>
+        BuildStateCanonicalHasher.ToRepositoryRelativePath(projectPath, repositoryRoot);
 }

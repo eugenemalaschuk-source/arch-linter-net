@@ -25,6 +25,17 @@ public sealed class ValidateCommandHandlerProfileTests
 
         public Exception? ExceptionToThrow { get; init; }
 
+        // Empty by default (every pre-existing test keeps its original "no discovered projects"
+        // behavior). Set to a non-empty list to exercise real (non-zero) cache population counters
+        // — see Execute_CacheAuto_WithDiscoveredProjects_ReportsNonZeroIneligibleUnitCount below.
+        public IReadOnlyList<string> DiscoveredProjectPaths { get; init; } = Array.Empty<string>();
+
+        // Must point at a real, readable file whenever DiscoveredProjectPaths is non-empty — the
+        // cache key's policy digest reads this file's content, and a nonexistent policy path would
+        // make population fail with an IOException before ever reaching real per-project eligibility
+        // counting (defeating the point of the test this supports).
+        public IReadOnlyList<string> PolicyImportPaths { get; init; } = Array.Empty<string>();
+
         public bool TryParseGraphLevel(string value, out ArchitectureGraphLevel level)
         {
             level = ArchitectureGraphLevel.Namespace;
@@ -50,7 +61,12 @@ public sealed class ValidateCommandHandlerProfileTests
                 PolicyConsistencyConfig: "off",
                 CoverageSummaries: Array.Empty<ArchitectureCoverageSummary>(),
                 ClassificationConflicts: Array.Empty<ArchitectureClassificationConflict>(),
-                ClassificationMetadataFailures: Array.Empty<ArchitectureClassificationMetadataFailure>());
+                ClassificationMetadataFailures: Array.Empty<ArchitectureClassificationMetadataFailure>())
+            {
+                DiscoveredProjectPaths = DiscoveredProjectPaths,
+                PolicyImportPaths = PolicyImportPaths,
+                RepositoryRoot = Path.GetTempPath(),
+            };
         }
 
         public ArchitectureAnalysisSnapshot CreateSnapshot(AnalysisSnapshotRequest request, ValidationTiming? timing) =>
@@ -185,6 +201,48 @@ public sealed class ValidateCommandHandlerProfileTests
             Assert.That(cache.GetProperty("Writes").GetInt32(), Is.EqualTo(0));
             Assert.That(cache.GetProperty("RejectReasonCounts").GetProperty("IneligibleBuildInput").GetInt32(), Is.EqualTo(1));
         });
+    }
+
+    // Review finding #6: "only Writes and Rejects are populated ... a run that rejects N projects
+    // as ineligible still reports IneligibleUnitCount = 0". With a real (non-empty)
+    // DiscoveredProjectPaths, AnalysisCachePopulation.TryPopulate now recomputes a manifest per
+    // project and reports how many were ineligible — that count now reaches the profile.
+    [Test]
+    public void Execute_CacheAuto_WithDiscoveredProjects_ReportsNonZeroIneligibleUnitCount()
+    {
+        string projectDir = Path.Combine(Path.GetTempPath(), $"arch-linter-profile-cache-project-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(projectDir);
+        string realProjectPath = Path.Combine(projectDir, "Sample.csproj");
+        File.WriteAllText(
+            realProjectPath,
+            "<Project Sdk=\"Microsoft.NET.Sdk\"><PropertyGroup><TargetFramework>net10.0</TargetFramework></PropertyGroup></Project>");
+        try
+        {
+            FakeCliConsole console = new();
+            FakeCliRuntime runtime = new()
+            {
+                DiscoveredProjectPaths = new[] { realProjectPath },
+                PolicyImportPaths = new[] { realProjectPath },
+            };
+            ValidateCommandHandler handler = new(runtime, console, new FakeFileSystem(exists: true));
+
+            int exitCode = handler.Execute(CacheOptions(cacheDestination: "auto"));
+
+            Assert.That(exitCode, Is.EqualTo(CliExitCodes.Success), console.StdErr);
+            string[] lines = console.StdOut.Split('\n', StringSplitOptions.RemoveEmptyEntries);
+            using JsonDocument document = JsonDocument.Parse(lines[^1]);
+            JsonElement cache = document.RootElement.GetProperty("Counters").GetProperty("Cache");
+            Assert.Multiple(() =>
+            {
+                Assert.That(cache.GetProperty("IneligibleUnitCount").GetInt32(), Is.GreaterThan(0));
+                Assert.That(cache.GetProperty("Writes").GetInt32(), Is.EqualTo(0));
+                Assert.That(cache.GetProperty("BytesWritten").GetInt64(), Is.EqualTo(0));
+            });
+        }
+        finally
+        {
+            Directory.Delete(projectDir, recursive: true);
+        }
     }
 
     [Test]

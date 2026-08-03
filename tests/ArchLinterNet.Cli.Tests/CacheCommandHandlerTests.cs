@@ -3,6 +3,7 @@ using ArchLinterNet.Cli.Abstractions;
 using ArchLinterNet.Cli.Commands.Cache;
 using ArchLinterNet.Core.BuildState;
 using ArchLinterNet.Core.Caching;
+using ArchLinterNet.Core.Model;
 using NUnit.Framework;
 
 namespace ArchLinterNet.Cli.Tests;
@@ -27,6 +28,19 @@ public sealed class CacheCommandHandlerTests
             Directory.Delete(root, recursive: true);
         }
     }
+
+    private static AnalysisCacheOutcomeV1 SampleOutcome() => new(
+        true,
+        Array.Empty<ArchitectureViolation>(),
+        Array.Empty<string>(),
+        Array.Empty<ArchitectureViolation>(),
+        "off",
+        Array.Empty<ArchitectureUnmatchedIgnoredViolation>(),
+        "off",
+        Array.Empty<PolicyConsistencyDiagnostic>(),
+        "off",
+        Array.Empty<ArchitectureClassificationConflict>(),
+        Array.Empty<ArchitectureClassificationMetadataFailure>());
 
     private sealed class FakeCliConsole : ICliConsole
     {
@@ -68,9 +82,9 @@ public sealed class CacheCommandHandlerTests
             AnalysisCacheLocation location = new(root, AnalysisCacheMode.ExplicitPath);
             AnalysisCacheStore.Put(
                 location,
-                new AnalysisCacheKey("repo", "policy", "strict", null, "contracts", null, null, null, null),
+                new AnalysisCacheKey("policy", "strict", null, "contracts", "workspace", null, null, null, null),
                 new[] { new AnalysisCacheProjectManifest("src/A/A.csproj", "digest", CacheEligibility.VerifiedCacheEligible) },
-                new AnalysisCacheFactsV1(true, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1));
+                SampleOutcome());
 
             FakeCliConsole console = new();
             CacheCommandHandler handler = new(console);
@@ -96,9 +110,9 @@ public sealed class CacheCommandHandlerTests
             AnalysisCacheLocation location = new(root, AnalysisCacheMode.ExplicitPath);
             AnalysisCacheStore.Put(
                 location,
-                new AnalysisCacheKey("repo", "policy", "strict", null, "contracts", null, null, null, null),
+                new AnalysisCacheKey("policy", "strict", null, "contracts", "workspace", null, null, null, null),
                 new[] { new AnalysisCacheProjectManifest("src/A/A.csproj", "digest", CacheEligibility.VerifiedCacheEligible) },
-                new AnalysisCacheFactsV1(true, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1));
+                SampleOutcome());
 
             FakeCliConsole console = new();
             CacheCommandHandler handler = new(console);

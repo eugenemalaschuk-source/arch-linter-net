@@ -1,4 +1,5 @@
 using System.Text.Json;
+using ArchLinterNet.Core.BuildState;
 
 namespace ArchLinterNet.Core.Caching;
 
@@ -12,6 +13,22 @@ namespace ArchLinterNet.Core.Caching;
 public static class AnalysisCacheStore
 {
     private const long MaxEntryBytes = 8L * 1024 * 1024;
+
+    // Bounds the manifest list too — an entry with an unbounded project-manifest count could still
+    // stay under MaxEntryBytes for small per-project digests while still being an unreasonable
+    // amount of reuse-authorization state to recompute on every lookup.
+    private const int MaxProjectManifests = 4096;
+
+    // Result of a Put attempt, including bytes actually written (0 when nothing was published) so
+    // callers can populate real AnalysisProfileCacheCounters.BytesWritten instead of leaving it 0
+    // for every successful populate (see openspec/specs/analysis-cache/spec.md and issue #365's
+    // review finding on ValidateCommandHandler.Cache.cs's profile counters).
+    public readonly record struct PutResult(AnalysisCacheRejectReason? RejectReason, long BytesWritten)
+    {
+        public static PutResult Success(long bytesWritten) => new(null, bytesWritten);
+
+        public static PutResult Rejected(AnalysisCacheRejectReason reason) => new(reason, 0);
+    }
 
     public static AnalysisCacheLookupResult TryGet(
         AnalysisCacheLocation location,
@@ -28,6 +45,13 @@ public static class AnalysisCacheStore
             entryPath = ResolveEntryPath(location, key.Digest);
         }
         catch (AnalysisCacheLocationRejectedException)
+        {
+            return AnalysisCacheLookupResult.Reject(AnalysisCacheRejectReason.PathUnsafe);
+        }
+
+        string canonicalRoot = Path.GetFullPath(location.RootPath);
+        if (FileSystemContainmentGuard.HasReparsePointAncestor(entryPath, canonicalRoot)
+            || FileSystemContainmentGuard.IsReparsePoint(entryPath))
         {
             return AnalysisCacheLookupResult.Reject(AnalysisCacheRejectReason.PathUnsafe);
         }
@@ -153,22 +177,27 @@ public static class AnalysisCacheStore
     // Publishes exactly once per entry via a same-directory temp file + atomic rename, observing
     // cancellation immediately before that rename (#375's cancellation-safe publication
     // requirement) so a cancelled populate call can never expose a reusable entry.
-    public static AnalysisCacheRejectReason? Put(
+    public static PutResult Put(
         AnalysisCacheLocation location,
         AnalysisCacheKey key,
         IReadOnlyList<AnalysisCacheProjectManifest> projectManifests,
-        AnalysisCacheFactsV1 facts,
+        AnalysisCacheOutcomeV1 outcome,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(location);
         ArgumentNullException.ThrowIfNull(key);
         ArgumentNullException.ThrowIfNull(projectManifests);
-        ArgumentNullException.ThrowIfNull(facts);
+        ArgumentNullException.ThrowIfNull(outcome);
 
         if (projectManifests.Count == 0
             || projectManifests.Any(manifest => manifest.Eligibility != BuildState.CacheEligibility.VerifiedCacheEligible))
         {
-            return AnalysisCacheRejectReason.IneligibleBuildInput;
+            return PutResult.Rejected(AnalysisCacheRejectReason.IneligibleBuildInput);
+        }
+
+        if (projectManifests.Count > MaxProjectManifests)
+        {
+            return PutResult.Rejected(AnalysisCacheRejectReason.SizeExceeded);
         }
 
         string entryPath;
@@ -178,26 +207,48 @@ public static class AnalysisCacheStore
         }
         catch (AnalysisCacheLocationRejectedException)
         {
-            return AnalysisCacheRejectReason.PathUnsafe;
+            return PutResult.Rejected(AnalysisCacheRejectReason.PathUnsafe);
         }
 
         AnalysisCacheEntryV1 entryWithoutDigest = new()
         {
             FormatVersion = AnalysisCacheEnvelope.FormatVersion,
             KeyDigest = key.Digest,
+            Mode = key.Mode,
             ToolVersion = AnalysisCacheEnvelope.ToolVersion,
             CreatedAtUtc = DateTimeOffset.UtcNow,
             CompletionStatus = AnalysisCacheEntryCompletionStatus.Success,
             ProjectManifests = projectManifests.OrderBy(manifest => manifest.ProjectPath, StringComparer.Ordinal).ToArray(),
-            Facts = facts,
+            Outcome = outcome,
             ContentDigest = string.Empty,
         };
         AnalysisCacheEntryV1 entry = entryWithoutDigest with { ContentDigest = AnalysisCacheContentDigest.Compute(entryWithoutDigest) };
 
+        byte[] bytes = JsonSerializer.SerializeToUtf8Bytes(entry, AnalysisCacheJson.Options);
+
+        // Enforced before any I/O — a write that would only ever be rejected as SizeExceeded by
+        // every subsequent TryGet must never reach the filesystem at all (see
+        // openspec/specs/analysis-cache/spec.md, "Miss and reject outcomes are typed and fail safe").
+        if (bytes.LongLength > MaxEntryBytes)
+        {
+            return PutResult.Rejected(AnalysisCacheRejectReason.SizeExceeded);
+        }
+
+        // Reparse-point ancestor check happens immediately before I/O, on the resolved entry path's
+        // directory chain up to and including the cache root — mirrors
+        // EvaluatedBuildInputManifestCollector's own symlink defense (see
+        // FileSystemContainmentGuard). A lexical prefix match (already verified by ResolveEntryPath)
+        // is not sufficient: a pre-created symlinked shard directory would still pass that check
+        // while resolving outside the cache root on disk.
+        string canonicalRoot = Path.GetFullPath(location.RootPath);
         string directory = Path.GetDirectoryName(entryPath)!;
         Directory.CreateDirectory(directory);
+        if (FileSystemContainmentGuard.HasReparsePointAncestor(directory, canonicalRoot))
+        {
+            return PutResult.Rejected(AnalysisCacheRejectReason.PathUnsafe);
+        }
+
         string tempPath = Path.Combine(directory, $".tmp-{Guid.NewGuid():N}.json");
-        byte[] bytes = JsonSerializer.SerializeToUtf8Bytes(entry, AnalysisCacheJson.Options);
 
         try
         {
@@ -210,11 +261,11 @@ public static class AnalysisCacheStore
             if (cancellationToken.IsCancellationRequested)
             {
                 TryDelete(tempPath);
-                return AnalysisCacheRejectReason.Cancelled;
+                return PutResult.Rejected(AnalysisCacheRejectReason.Cancelled);
             }
 
             File.Move(tempPath, entryPath, overwrite: true);
-            return null;
+            return PutResult.Success(bytes.LongLength);
         }
         catch
         {
@@ -234,7 +285,7 @@ public static class AnalysisCacheStore
 
         string canonicalRoot = Path.GetFullPath(location.RootPath);
         List<AnalysisCacheEntrySummary> summaries = new();
-        foreach (string file in Directory.EnumerateFiles(canonicalRoot, "*.json", SearchOption.AllDirectories)
+        foreach (string file in EnumerateFilesNotFollowingSymlinks(canonicalRoot, "*.json")
                      .Where(file => IsContained(file, canonicalRoot))
                      .OrderBy(file => file, StringComparer.Ordinal))
         {
@@ -242,6 +293,65 @@ public static class AnalysisCacheStore
         }
 
         return summaries;
+    }
+
+    // Manual recursive walk instead of Directory.EnumerateFiles(..., SearchOption.AllDirectories):
+    // that overload follows symlinked/junction subdirectories, which would let a pre-created link
+    // under the cache root make Inspect/Clear read or delete files outside the cache root entirely.
+    // Every directory is checked for being a reparse point itself before this recurses into it —
+    // its *contents* are never enumerated in that case, matching EvaluatedBuildInputManifestCollector's
+    // "reject reparse points before I/O" pattern (FileSystemContainmentGuard).
+    private static IEnumerable<string> EnumerateFilesNotFollowingSymlinks(string directory, string searchPattern)
+    {
+        foreach (string file in SafeEnumerateFiles(directory, searchPattern))
+        {
+            yield return file;
+        }
+
+        foreach (string subdirectory in SafeEnumerateDirectories(directory))
+        {
+            if (FileSystemContainmentGuard.IsReparsePoint(subdirectory))
+            {
+                continue;
+            }
+
+            foreach (string file in EnumerateFilesNotFollowingSymlinks(subdirectory, searchPattern))
+            {
+                yield return file;
+            }
+        }
+    }
+
+    private static IEnumerable<string> SafeEnumerateFiles(string directory, string searchPattern)
+    {
+        try
+        {
+            return Directory.EnumerateFiles(directory, searchPattern, SearchOption.TopDirectoryOnly);
+        }
+        catch (IOException)
+        {
+            return Array.Empty<string>();
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return Array.Empty<string>();
+        }
+    }
+
+    private static IEnumerable<string> SafeEnumerateDirectories(string directory)
+    {
+        try
+        {
+            return Directory.EnumerateDirectories(directory, "*", SearchOption.TopDirectoryOnly);
+        }
+        catch (IOException)
+        {
+            return Array.Empty<string>();
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return Array.Empty<string>();
+        }
     }
 
     private static AnalysisCacheEntrySummary BuildSummary(string file, string canonicalRoot)
@@ -262,7 +372,7 @@ public static class AnalysisCacheStore
             }
 
             return new AnalysisCacheEntrySummary(
-                relativeName, Readable: true, entry.KeyDigest, entry.CreatedAtUtc, entry.ProjectManifests.Count, entry.Facts.Passed);
+                relativeName, Readable: true, entry.KeyDigest, entry.CreatedAtUtc, entry.ProjectManifests.Count, entry.Outcome.Passed);
         }
         catch (Exception ex) when (ex is IOException or JsonException)
         {
@@ -286,7 +396,7 @@ public static class AnalysisCacheStore
                 $"Refusing to clear unsafe cache root '{location.RootPath}'.");
         }
 
-        foreach (string file in Directory.EnumerateFiles(canonicalRoot, "*", SearchOption.AllDirectories)
+        foreach (string file in EnumerateFilesNotFollowingSymlinks(canonicalRoot, "*")
                      .Where(file => IsContained(file, canonicalRoot)))
         {
             TryDelete(file);
@@ -302,11 +412,23 @@ public static class AnalysisCacheStore
 
         string canonicalRoot = Path.GetFullPath(location.RootPath);
         string shard = keyDigest[..2];
-        string candidate = Path.GetFullPath(Path.Combine(canonicalRoot, shard, keyDigest + ".json"));
+        string shardDirectory = Path.Combine(canonicalRoot, shard);
+        string candidate = Path.GetFullPath(Path.Combine(shardDirectory, keyDigest + ".json"));
 
         if (!IsContained(candidate, canonicalRoot))
         {
             throw new AnalysisCacheLocationRejectedException("Resolved cache entry path escapes the cache root.");
+        }
+
+        // A lexical prefix match is not sufficient on its own: a symlink/junction pre-created at
+        // the shard directory (or any existing ancestor between it and the cache root) would still
+        // pass IsContained above while resolving to a location outside the cache root on disk. Only
+        // *existing* ancestors are inspected — a shard directory that does not exist yet (the normal
+        // first-write case) cannot be a reparse point.
+        if (FileSystemContainmentGuard.HasReparsePointAncestor(shardDirectory, canonicalRoot))
+        {
+            throw new AnalysisCacheLocationRejectedException(
+                "Resolved cache entry path crosses a symlink or junction under the cache root.");
         }
 
         return candidate;

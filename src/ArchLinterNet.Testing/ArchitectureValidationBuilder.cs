@@ -183,6 +183,7 @@ public sealed class ArchitectureValidationBuilder
             RequestedTargetFramework = _requestedTargetFramework,
             RequestedPlatform = _requestedPlatform,
             RequestedRuntimeIdentifier = _requestedRuntimeIdentifier,
+            CacheLocation = ResolveCacheLocationForExecution(),
             CancellationToken = _cancellationToken,
         };
 
@@ -208,6 +209,7 @@ public sealed class ArchitectureValidationBuilder
             RequestedTargetFramework = _requestedTargetFramework,
             RequestedPlatform = _requestedPlatform,
             RequestedRuntimeIdentifier = _requestedRuntimeIdentifier,
+            CacheLocation = ResolveCacheLocationForExecution(),
             CancellationToken = _cancellationToken,
         };
 
@@ -215,7 +217,7 @@ public sealed class ArchitectureValidationBuilder
         (ValidationOutcome outcome, ArchitectureAnalysisSnapshotCounters counters) =
             _engine.Value.ValidateWithCounters(request, timing);
 
-        AnalysisCacheRejectReason? cacheRejectReason = TryPopulateCache(mode, outcome, counters);
+        AnalysisCachePopulation.Outcome populationOutcome = TryPopulateCache(mode, outcome);
 
         AnalysisProfile? profile = _collectProfile
             ? AnalysisProfileBuilder.Build(
@@ -224,22 +226,40 @@ public sealed class ArchitectureValidationBuilder
                 new ArchLinterNet.Core.Profiling.AnalysisProfileBuildOptions
                 {
                     Measurements = CaptureMeasurements(allocatedBytesAtStart),
-                    Cache = BuildCacheProfileCounters(cacheRejectReason),
+                    Cache = BuildCacheProfileCounters(counters, populationOutcome),
                 })
             : null;
 
         return ArchitectureValidationResultMapper.ToResult(outcome, timing, mode, profile);
     }
 
-    // Testing's population counterpart to ValidateCommandHandler.Cache.cs's TryPopulateCache —
-    // same AnalysisCachePopulation entry point, so CLI and Testing observe identical
-    // reuse-authorization semantics (one shared Core implementation, not two).
-    private AnalysisCacheRejectReason? TryPopulateCache(
-        string mode, ValidationOutcome outcome, ArchitectureAnalysisSnapshotCounters counters)
+    private AnalysisCacheLocation? ResolveCacheLocationForExecution()
     {
         if (_cacheOptions.Mode == AnalysisCacheMode.Disabled)
         {
-            return AnalysisCacheRejectReason.Disabled;
+            return null;
+        }
+
+        try
+        {
+            return AnalysisCacheLocationResolver.Resolve(_cacheOptions);
+        }
+        catch (AnalysisCacheLocationRejectedException)
+        {
+            return null;
+        }
+    }
+
+    // Testing's population counterpart to ValidateCommandHandler.Cache.cs's TryPopulateCache —
+    // same AnalysisCachePopulation entry point, so CLI and Testing observe identical
+    // reuse-authorization semantics (one shared Core implementation, not two). Uses the
+    // authoritative outcome.RepositoryRoot (see finding #2) rather than re-deriving it from the
+    // policy path, and a portable, repository-relative AnalysisCacheKey (see finding #5).
+    private AnalysisCachePopulation.Outcome TryPopulateCache(string mode, ValidationOutcome outcome)
+    {
+        if (_cacheOptions.Mode == AnalysisCacheMode.Disabled)
+        {
+            return new AnalysisCachePopulation.Outcome(AnalysisCacheRejectReason.Disabled, 0, 0, 0);
         }
 
         AnalysisCacheLocation? location;
@@ -249,10 +269,12 @@ public sealed class ArchitectureValidationBuilder
         }
         catch (AnalysisCacheLocationRejectedException)
         {
-            return AnalysisCacheRejectReason.PathUnsafe;
+            return new AnalysisCachePopulation.Outcome(AnalysisCacheRejectReason.PathUnsafe, 0, 0, 0);
         }
 
-        string repositoryRoot = Path.GetDirectoryName(Path.GetFullPath(_policyPath)) ?? Environment.CurrentDirectory;
+        string repositoryRoot = string.IsNullOrEmpty(outcome.RepositoryRoot)
+            ? Path.GetDirectoryName(Path.GetFullPath(_policyPath)) ?? Environment.CurrentDirectory
+            : outcome.RepositoryRoot;
 
         try
         {
@@ -260,59 +282,65 @@ public sealed class ArchitectureValidationBuilder
                 ? outcome.PolicyImportPaths
                 : new[] { _policyPath };
             AnalysisCacheKey key = new(
-                AnalysisCacheKey.ComputeRepositoryRootDigest(repositoryRoot),
-                AnalysisCacheKey.ComputePolicyDigest(policyFiles, _cancellationToken),
-                AnalysisCacheKey.ComputeModeSet(new[] { mode }),
+                AnalysisCacheKey.ComputePolicyDigest(policyFiles, repositoryRoot, _cancellationToken),
+                AnalysisCacheKey.NormalizeMode(mode),
                 _conditionSetName,
                 AnalysisCacheKey.ComputeContractIdsDigest(_contractIds ?? Array.Empty<string>()),
+                AnalysisCacheKey.ComputeWorkspaceDigest(outcome.DiscoveredProjectPaths, repositoryRoot),
                 _requestedConfiguration,
                 _requestedTargetFramework,
                 _requestedPlatform,
                 _requestedRuntimeIdentifier);
 
-            AnalysisCacheFactsV1 facts = new(
-                outcome.Passed,
-                outcome.Violations.Count,
-                outcome.CoverageFindings.Count,
-                outcome.Cycles.Count,
-                outcome.UnmatchedIgnoredViolations.Count,
-                outcome.PolicyConsistencyFindings.Count,
-                outcome.ClassificationConflicts.Count,
-                outcome.ClassificationMetadataFailures.Count,
-                counters.DiscoveredProjectCount,
-                counters.RetainedAssemblyCount,
-                counters.SelectedAssemblyCount);
+            AnalysisCacheOutcomeV1 cacheOutcome = AnalysisCacheOutcomeMapper.ToCacheOutcome(outcome);
 
             return AnalysisCachePopulation.TryPopulate(
                 location, key, outcome.DiscoveredProjectPaths, repositoryRoot,
                 _requestedConfiguration, _requestedTargetFramework, _requestedPlatform, _requestedRuntimeIdentifier,
-                facts, _cancellationToken).RejectReason;
+                cacheOutcome, _cancellationToken);
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
             // Same fail-safe rationale as ValidateCommandHandler.Cache.cs's TryPopulateCache: a
             // best-effort population side operation must never turn a completed validation into
             // an unexplained exception.
-            return AnalysisCacheRejectReason.IneligibleBuildInput;
+            return new AnalysisCachePopulation.Outcome(AnalysisCacheRejectReason.IneligibleBuildInput, 0, 0, 0);
         }
     }
 
-    private AnalysisProfileCacheCounters BuildCacheProfileCounters(AnalysisCacheRejectReason? rejectReason)
+    private AnalysisProfileCacheCounters BuildCacheProfileCounters(
+        ArchitectureAnalysisSnapshotCounters counters, AnalysisCachePopulation.Outcome populationOutcome)
     {
         if (_cacheOptions.Mode == AnalysisCacheMode.Disabled)
         {
             return new AnalysisProfileCacheCounters();
         }
 
+        AnalysisCacheLookupStats? lookups = counters.CacheLookups;
+        Dictionary<string, int> rejectReasonCounts = lookups is null
+            ? new Dictionary<string, int>(StringComparer.Ordinal)
+            : new Dictionary<string, int>(lookups.RejectReasonCounts, StringComparer.Ordinal);
+        if (populationOutcome.RejectReason is { } reason)
+        {
+            string key = reason.ToString();
+            rejectReasonCounts.TryGetValue(key, out int existing);
+            rejectReasonCounts[key] = existing + 1;
+        }
+
         return new AnalysisProfileCacheCounters
         {
             Status = AnalysisProfileReservedFieldStatus.Active,
-            Writes = rejectReason is null ? 1 : 0,
-            Rejects = rejectReason is null ? 0 : 1,
+            Lookups = lookups?.Lookups ?? 0,
+            Hits = lookups?.Hits ?? 0,
+            Misses = lookups?.Misses ?? 0,
+            Writes = populationOutcome.RejectReason is null ? 1 : 0,
+            Rejects = populationOutcome.RejectReason is null ? 0 : 1,
+            BytesRead = lookups?.BytesRead ?? 0,
+            BytesWritten = populationOutcome.BytesWritten,
+            IneligibleUnitCount = populationOutcome.IneligibleProjectCount,
+            CancelledBeforePublish = populationOutcome.RejectReason == AnalysisCacheRejectReason.Cancelled ? 1 : 0,
             Mode = _cacheOptions.ModeCategory,
-            RejectReasonCounts = rejectReason is null
-                ? new Dictionary<string, int>(StringComparer.Ordinal)
-                : new Dictionary<string, int>(StringComparer.Ordinal) { [rejectReason.ToString()!] = 1 },
+            RejectReasonCounts = rejectReasonCounts,
         };
     }
 

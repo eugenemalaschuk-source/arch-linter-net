@@ -120,7 +120,7 @@ internal sealed partial class ValidateCommandHandler
         // still gates on every discovered project being #406 VerifiedCacheEligible.
         if (!result.Cancelled)
         {
-            TryPopulateCache(options, outcome, counters, profileState.Cache);
+            TryPopulateCache(options, mode, outcome, counters, profileState.Cache);
         }
 
         WriteProfile(
@@ -173,6 +173,7 @@ internal sealed partial class ValidateCommandHandler
             RequestedTargetFramework = options.TargetFramework,
             RequestedPlatform = options.Platform,
             RequestedRuntimeIdentifier = options.RuntimeIdentifier,
+            CacheLocation = ResolveCacheLocationForExecution(options),
             CancellationToken = _cancellationToken,
         };
 
@@ -257,9 +258,16 @@ internal sealed partial class ValidateCommandHandler
             timing?.WriteReport(_console.Error);
         }
 
+        // One cache entry per requested mode — see finding #4: a combined "strict,audit" request
+        // must never collapse more than one mode's outcome under a single "strict,audit"-shaped
+        // key. Each mode's own outcome (and this snapshot's shared discovery/eligibility state) is
+        // populated independently.
         if (!result.Cancelled)
         {
-            TryPopulateCache(options, outcomesByMode[0].Outcome, snapshot.Counters, profileState.Cache);
+            foreach ((string mode, ValidationOutcome modeOutcome) in outcomesByMode)
+            {
+                TryPopulateCache(options, mode, modeOutcome, snapshot.Counters, profileState.Cache);
+            }
         }
 
         // A blocked preflight blocks every requested mode identically (see
@@ -304,6 +312,7 @@ internal sealed partial class ValidateCommandHandler
             RequestedTargetFramework = options.TargetFramework,
             RequestedPlatform = options.Platform,
             RequestedRuntimeIdentifier = options.RuntimeIdentifier,
+            CacheLocation = ResolveCacheLocationForExecution(options),
             CancellationToken = _cancellationToken,
         };
     }

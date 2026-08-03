@@ -1,5 +1,6 @@
 using ArchLinterNet.Core.BuildState;
 using ArchLinterNet.Core.Caching;
+using ArchLinterNet.Core.Model;
 using NUnit.Framework;
 
 namespace ArchLinterNet.Core.Tests;
@@ -27,11 +28,11 @@ public sealed class AnalysisCacheStoreTests
     }
 
     private static AnalysisCacheKey CreateKey(string suffix = "") => new(
-        RepositoryRootDigest: "repo-digest" + suffix,
-        PolicyDigest: "policy-digest",
-        ModeSet: "strict",
+        PolicyDigest: "policy-digest" + suffix,
+        Mode: "strict",
         ConditionSetName: null,
         ContractIdsDigest: "contract-digest",
+        WorkspaceDigest: "workspace-digest",
         Configuration: "Debug",
         TargetFramework: "net10.0",
         Platform: null,
@@ -40,11 +41,18 @@ public sealed class AnalysisCacheStoreTests
     private static AnalysisCacheProjectManifest EligibleManifest(string path = "src/A/A.csproj", string digest = "digest-a") =>
         new(path, digest, CacheEligibility.VerifiedCacheEligible);
 
-    private static AnalysisCacheFactsV1 SampleFacts() => new(
-        Passed: true, ViolationCount: 0, CoverageFindingCount: 0, CycleCount: 0,
-        UnmatchedIgnoredViolationCount: 0, PolicyConsistencyFindingCount: 0,
-        ClassificationConflictCount: 0, ClassificationMetadataFailureCount: 0,
-        DiscoveredProjectCount: 1, RetainedAssemblyCount: 1, SelectedAssemblyCount: 1);
+    private static AnalysisCacheOutcomeV1 SampleOutcome() => new(
+        Passed: true,
+        Violations: Array.Empty<ArchitectureViolation>(),
+        Cycles: Array.Empty<string>(),
+        CoverageFindings: Array.Empty<ArchitectureViolation>(),
+        CoverageConfig: "off",
+        UnmatchedIgnoredViolations: Array.Empty<ArchitectureUnmatchedIgnoredViolation>(),
+        UnmatchedIgnoredViolationsConfig: "off",
+        PolicyConsistencyFindings: Array.Empty<PolicyConsistencyDiagnostic>(),
+        PolicyConsistencyConfig: "off",
+        ClassificationConflicts: Array.Empty<ArchitectureClassificationConflict>(),
+        ClassificationMetadataFailures: Array.Empty<ArchitectureClassificationMetadataFailure>());
 
     [Test]
     public void TryGet_NoEntry_ReturnsMissing()
@@ -61,14 +69,15 @@ public sealed class AnalysisCacheStoreTests
         AnalysisCacheKey key = CreateKey();
         AnalysisCacheProjectManifest[] manifests = { EligibleManifest() };
 
-        AnalysisCacheRejectReason? putReject = AnalysisCacheStore.Put(_location, key, manifests, SampleFacts());
-        Assert.That(putReject, Is.Null);
+        AnalysisCacheStore.PutResult putResult = AnalysisCacheStore.Put(_location, key, manifests, SampleOutcome());
+        Assert.That(putResult.RejectReason, Is.Null);
+        Assert.That(putResult.BytesWritten, Is.GreaterThan(0));
 
         AnalysisCacheLookupResult result = AnalysisCacheStore.TryGet(_location, key, manifests);
 
         Assert.That(result.Outcome, Is.EqualTo(AnalysisCacheLookupOutcome.Hit));
         Assert.That(result.Entry, Is.Not.Null);
-        Assert.That(result.Entry!.Facts.Passed, Is.True);
+        Assert.That(result.Entry!.Outcome.Passed, Is.True);
     }
 
     [Test]
@@ -76,9 +85,9 @@ public sealed class AnalysisCacheStoreTests
     {
         AnalysisCacheProjectManifest ineligible = new("src/A/A.csproj", "digest", CacheEligibility.CacheIneligible);
 
-        AnalysisCacheRejectReason? reject = AnalysisCacheStore.Put(_location, CreateKey(), new[] { ineligible }, SampleFacts());
+        AnalysisCacheStore.PutResult putResult = AnalysisCacheStore.Put(_location, CreateKey(), new[] { ineligible }, SampleOutcome());
 
-        Assert.That(reject, Is.EqualTo(AnalysisCacheRejectReason.IneligibleBuildInput));
+        Assert.That(putResult.RejectReason, Is.EqualTo(AnalysisCacheRejectReason.IneligibleBuildInput));
         Assert.That(Directory.Exists(_root) && Directory.EnumerateFiles(_root, "*.json", SearchOption.AllDirectories).Any(), Is.False);
     }
 
@@ -86,7 +95,7 @@ public sealed class AnalysisCacheStoreTests
     public void TryGet_ProjectManifestDigestChanged_IsProjectSetMismatch()
     {
         AnalysisCacheKey key = CreateKey();
-        AnalysisCacheStore.Put(_location, key, new[] { EligibleManifest() }, SampleFacts());
+        AnalysisCacheStore.Put(_location, key, new[] { EligibleManifest() }, SampleOutcome());
 
         AnalysisCacheLookupResult result = AnalysisCacheStore.TryGet(
             _location, key, new[] { EligibleManifest(digest: "changed-digest") });
@@ -100,7 +109,7 @@ public sealed class AnalysisCacheStoreTests
     {
         AnalysisCacheKey key = CreateKey();
         AnalysisCacheProjectManifest[] manifests = { EligibleManifest() };
-        AnalysisCacheStore.Put(_location, key, manifests, SampleFacts());
+        AnalysisCacheStore.Put(_location, key, manifests, SampleOutcome());
 
         // Simulate: the stored entry claims eligibility, but a re-verification pass would now
         // find it ineligible. Directly craft this scenario by writing a manifest set whose
@@ -115,7 +124,7 @@ public sealed class AnalysisCacheStoreTests
     {
         AnalysisCacheKey key = CreateKey();
         AnalysisCacheProjectManifest[] manifests = { EligibleManifest() };
-        AnalysisCacheStore.Put(_location, key, manifests, SampleFacts());
+        AnalysisCacheStore.Put(_location, key, manifests, SampleOutcome());
 
         // A different key digests to a different file entirely, so this is really exercising
         // that a hand-tampered file claiming a stale KeyDigest is rejected, not merely missing.
@@ -134,7 +143,7 @@ public sealed class AnalysisCacheStoreTests
     {
         AnalysisCacheKey key = CreateKey();
         AnalysisCacheProjectManifest[] manifests = { EligibleManifest() };
-        AnalysisCacheStore.Put(_location, key, manifests, SampleFacts());
+        AnalysisCacheStore.Put(_location, key, manifests, SampleOutcome());
 
         string entryPath = Directory.EnumerateFiles(_root, "*.json", SearchOption.AllDirectories).Single();
         File.WriteAllText(entryPath, "{ not valid json");
@@ -149,7 +158,7 @@ public sealed class AnalysisCacheStoreTests
     {
         AnalysisCacheKey key = CreateKey();
         AnalysisCacheProjectManifest[] manifests = { EligibleManifest() };
-        AnalysisCacheStore.Put(_location, key, manifests, SampleFacts());
+        AnalysisCacheStore.Put(_location, key, manifests, SampleOutcome());
 
         string entryPath = Directory.EnumerateFiles(_root, "*.json", SearchOption.AllDirectories).Single();
         File.WriteAllText(entryPath, string.Empty);
@@ -164,7 +173,7 @@ public sealed class AnalysisCacheStoreTests
     {
         AnalysisCacheKey key = CreateKey();
         AnalysisCacheProjectManifest[] manifests = { EligibleManifest() };
-        AnalysisCacheStore.Put(_location, key, manifests, SampleFacts());
+        AnalysisCacheStore.Put(_location, key, manifests, SampleOutcome());
 
         string entryPath = Directory.EnumerateFiles(_root, "*.json", SearchOption.AllDirectories).Single();
         string content = File.ReadAllText(entryPath).Replace(AnalysisCacheEnvelope.SchemaId, "some-other-cache/v1");
@@ -183,9 +192,9 @@ public sealed class AnalysisCacheStoreTests
         using CancellationTokenSource cts = new();
         cts.Cancel();
 
-        AnalysisCacheRejectReason? reject = AnalysisCacheStore.Put(_location, key, manifests, SampleFacts(), cts.Token);
+        AnalysisCacheStore.PutResult putResult = AnalysisCacheStore.Put(_location, key, manifests, SampleOutcome(), cts.Token);
 
-        Assert.That(reject, Is.EqualTo(AnalysisCacheRejectReason.Cancelled));
+        Assert.That(putResult.RejectReason, Is.EqualTo(AnalysisCacheRejectReason.Cancelled));
         bool anyPublishedEntry = Directory.Exists(_root)
             && Directory.EnumerateFiles(_root, "*.json", SearchOption.AllDirectories)
                 .Any(file => !Path.GetFileName(file).StartsWith(".tmp-", StringComparison.Ordinal));
@@ -198,8 +207,8 @@ public sealed class AnalysisCacheStoreTests
     [Test]
     public void Inspect_ReturnsDeterministicSummaryWithoutAbsolutePaths()
     {
-        AnalysisCacheStore.Put(_location, CreateKey("a"), new[] { EligibleManifest() }, SampleFacts());
-        AnalysisCacheStore.Put(_location, CreateKey("b"), new[] { EligibleManifest("src/B/B.csproj", "digest-b") }, SampleFacts());
+        AnalysisCacheStore.Put(_location, CreateKey("a"), new[] { EligibleManifest() }, SampleOutcome());
+        AnalysisCacheStore.Put(_location, CreateKey("b"), new[] { EligibleManifest("src/B/B.csproj", "digest-b") }, SampleOutcome());
 
         IReadOnlyList<AnalysisCacheEntrySummary> summaries = AnalysisCacheStore.Inspect(_location);
 
@@ -212,7 +221,7 @@ public sealed class AnalysisCacheStoreTests
     [Test]
     public void Clear_RemovesAllPublishedEntries()
     {
-        AnalysisCacheStore.Put(_location, CreateKey("a"), new[] { EligibleManifest() }, SampleFacts());
+        AnalysisCacheStore.Put(_location, CreateKey("a"), new[] { EligibleManifest() }, SampleOutcome());
         AnalysisCacheStore.Clear(_location);
 
         Assert.That(AnalysisCacheStore.Inspect(_location), Is.Empty);
@@ -246,7 +255,7 @@ public sealed class AnalysisCacheStoreTests
     {
         AnalysisCacheKey key = CreateKey();
         AnalysisCacheProjectManifest[] manifests = { EligibleManifest() };
-        AnalysisCacheStore.Put(_location, key, manifests, SampleFacts());
+        AnalysisCacheStore.Put(_location, key, manifests, SampleOutcome());
 
         string entryPath = Directory.EnumerateFiles(_root, "*.json", SearchOption.AllDirectories).Single();
         File.WriteAllBytes(entryPath, new byte[9 * 1024 * 1024]);
@@ -256,12 +265,35 @@ public sealed class AnalysisCacheStoreTests
         Assert.That(result.Reason, Is.EqualTo(AnalysisCacheRejectReason.SizeExceeded));
     }
 
+    // Finding #7: the write side must enforce the same bound the read side always has. A cache
+    // entry whose Violations list alone would serialize past MaxEntryBytes must never be published
+    // at all — a subsequent TryGet must not need to reject it as SizeExceeded because Put already
+    // refused to write it.
+    [Test]
+    public void Put_EntryLargerThanMaxBytes_IsRejectedBeforeWrite()
+    {
+        AnalysisCacheKey key = CreateKey();
+        AnalysisCacheProjectManifest[] manifests = { EligibleManifest() };
+        ArchitectureViolation[] oversizedViolations = Enumerable.Range(0, 200_000)
+            .Select(i => new ArchitectureViolation(
+                $"contract-{i}", $"id-{i}", $"Namespace.Type{i}", $"Forbidden.Namespace{i}",
+                new[] { $"Forbidden.Namespace{i}.Reference" }))
+            .ToArray();
+        AnalysisCacheOutcomeV1 oversizedOutcome = SampleOutcome() with { Violations = oversizedViolations };
+
+        AnalysisCacheStore.PutResult putResult = AnalysisCacheStore.Put(_location, key, manifests, oversizedOutcome);
+
+        Assert.That(putResult.RejectReason, Is.EqualTo(AnalysisCacheRejectReason.SizeExceeded));
+        Assert.That(putResult.BytesWritten, Is.EqualTo(0));
+        Assert.That(Directory.Exists(_root) && Directory.EnumerateFiles(_root, "*.json", SearchOption.AllDirectories).Any(), Is.False);
+    }
+
     [Test]
     public void TryGet_IncompatibleFormatVersion_IsRejected()
     {
         AnalysisCacheKey key = CreateKey();
         AnalysisCacheProjectManifest[] manifests = { EligibleManifest() };
-        AnalysisCacheStore.Put(_location, key, manifests, SampleFacts());
+        AnalysisCacheStore.Put(_location, key, manifests, SampleOutcome());
 
         string entryPath = Directory.EnumerateFiles(_root, "*.json", SearchOption.AllDirectories).Single();
         string content = File.ReadAllText(entryPath).Replace(
@@ -280,7 +312,7 @@ public sealed class AnalysisCacheStoreTests
     {
         AnalysisCacheKey key = CreateKey();
         AnalysisCacheProjectManifest[] manifests = { EligibleManifest() };
-        AnalysisCacheStore.Put(_location, key, manifests, SampleFacts());
+        AnalysisCacheStore.Put(_location, key, manifests, SampleOutcome());
 
         string entryPath = Directory.EnumerateFiles(_root, "*.json", SearchOption.AllDirectories).Single();
         string content = File.ReadAllText(entryPath).Replace(AnalysisCacheEnvelope.ToolVersion, "0.0.0-unknown");
@@ -302,7 +334,7 @@ public sealed class AnalysisCacheStoreTests
             EligibleManifest(),
             EligibleManifest("src/B/B.csproj", "digest-b"),
         };
-        AnalysisCacheStore.Put(_location, key, manifests, SampleFacts());
+        AnalysisCacheStore.Put(_location, key, manifests, SampleOutcome());
 
         AnalysisCacheLookupResult result = AnalysisCacheStore.TryGet(_location, key, new[] { EligibleManifest() });
 
@@ -313,7 +345,7 @@ public sealed class AnalysisCacheStoreTests
     [Test]
     public void Inspect_UnreadableEntry_IsReportedNotReadable()
     {
-        AnalysisCacheStore.Put(_location, CreateKey(), new[] { EligibleManifest() }, SampleFacts());
+        AnalysisCacheStore.Put(_location, CreateKey(), new[] { EligibleManifest() }, SampleOutcome());
         string entryPath = Directory.EnumerateFiles(_root, "*.json", SearchOption.AllDirectories).Single();
         File.WriteAllText(entryPath, "{ not valid json");
 
@@ -326,7 +358,7 @@ public sealed class AnalysisCacheStoreTests
     [Test]
     public void Inspect_EmptyEntryFile_IsReportedNotReadable()
     {
-        AnalysisCacheStore.Put(_location, CreateKey(), new[] { EligibleManifest() }, SampleFacts());
+        AnalysisCacheStore.Put(_location, CreateKey(), new[] { EligibleManifest() }, SampleOutcome());
         string entryPath = Directory.EnumerateFiles(_root, "*.json", SearchOption.AllDirectories).Single();
         File.WriteAllText(entryPath, string.Empty);
 
@@ -334,5 +366,64 @@ public sealed class AnalysisCacheStoreTests
 
         Assert.That(summaries.Count, Is.EqualTo(1));
         Assert.That(summaries[0].Readable, Is.False);
+    }
+
+    // Finding #3: a symlinked shard directory pre-created under the cache root must not let Put/
+    // TryGet/Inspect/Clear read or write through it to a location outside the cache root.
+    [Test]
+    public void Put_ShardDirectoryIsSymlink_IsRejectedAsPathUnsafe()
+    {
+        if (OperatingSystem.IsWindows())
+        {
+            Assert.Ignore("Symlink creation requires elevated privileges on Windows by default.");
+            return;
+        }
+
+        string outsideTarget = Path.Combine(Path.GetTempPath(), "arch-linter-net-cache-outside-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(outsideTarget);
+        try
+        {
+            AnalysisCacheKey key = CreateKey();
+            string shard = key.Digest[..2];
+            Directory.CreateDirectory(_root);
+            string shardPath = Path.Combine(_root, shard);
+            Directory.CreateSymbolicLink(shardPath, outsideTarget);
+
+            AnalysisCacheStore.PutResult putResult = AnalysisCacheStore.Put(_location, key, new[] { EligibleManifest() }, SampleOutcome());
+
+            Assert.That(putResult.RejectReason, Is.EqualTo(AnalysisCacheRejectReason.PathUnsafe));
+            Assert.That(Directory.EnumerateFileSystemEntries(outsideTarget), Is.Empty);
+        }
+        finally
+        {
+            Directory.Delete(outsideTarget, recursive: true);
+        }
+    }
+
+    [Test]
+    public void Inspect_SymlinkedSubdirectory_IsNotFollowed()
+    {
+        if (OperatingSystem.IsWindows())
+        {
+            Assert.Ignore("Symlink creation requires elevated privileges on Windows by default.");
+            return;
+        }
+
+        string outsideTarget = Path.Combine(Path.GetTempPath(), "arch-linter-net-cache-outside-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(outsideTarget);
+        File.WriteAllText(Path.Combine(outsideTarget, "secret.json"), "{}");
+        try
+        {
+            Directory.CreateDirectory(_root);
+            Directory.CreateSymbolicLink(Path.Combine(_root, "linked"), outsideTarget);
+
+            IReadOnlyList<AnalysisCacheEntrySummary> summaries = AnalysisCacheStore.Inspect(_location);
+
+            Assert.That(summaries, Is.Empty);
+        }
+        finally
+        {
+            Directory.Delete(outsideTarget, recursive: true);
+        }
     }
 }

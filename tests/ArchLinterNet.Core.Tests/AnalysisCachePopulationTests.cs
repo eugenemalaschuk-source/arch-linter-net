@@ -1,4 +1,5 @@
 using ArchLinterNet.Core.Caching;
+using ArchLinterNet.Core.Model;
 using NUnit.Framework;
 
 namespace ArchLinterNet.Core.Tests;
@@ -31,7 +32,12 @@ public sealed class AnalysisCachePopulationTests
     }
 
     private static AnalysisCacheKey CreateKey() => new(
-        "repo", "policy", "strict", null, "contracts", null, null, null, null);
+        "policy", "strict", null, "contracts", "workspace", null, null, null, null);
+
+    private static AnalysisCacheOutcomeV1 SampleOutcome() => new(
+        true, Array.Empty<ArchitectureViolation>(), Array.Empty<string>(), Array.Empty<ArchitectureViolation>(), "off",
+        Array.Empty<ArchitectureUnmatchedIgnoredViolation>(), "off", Array.Empty<PolicyConsistencyDiagnostic>(), "off",
+        Array.Empty<ArchitectureClassificationConflict>(), Array.Empty<ArchitectureClassificationMetadataFailure>());
 
     // Documents the current, intentional state (see design.md): #406's
     // EvaluatedBuildInputManifestCollector always reports CacheIneligible for real MSBuild
@@ -41,24 +47,23 @@ public sealed class AnalysisCachePopulationTests
     public void TryPopulate_RealProject_IsIneligibleBuildInputToday()
     {
         AnalysisCacheLocation location = new(_cacheRoot, AnalysisCacheMode.ExplicitPath);
-        AnalysisCacheFactsV1 facts = new(true, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1);
 
         AnalysisCachePopulation.Outcome outcome = AnalysisCachePopulation.TryPopulate(
             location, CreateKey(), new[] { _projectPath }, _repoRoot,
-            null, null, null, null, facts);
+            null, null, null, null, SampleOutcome());
 
         Assert.That(outcome.RejectReason, Is.EqualTo(AnalysisCacheRejectReason.IneligibleBuildInput));
         Assert.That(outcome.ProjectsEvaluated, Is.EqualTo(1));
+        Assert.That(outcome.IneligibleProjectCount, Is.EqualTo(1));
+        Assert.That(outcome.BytesWritten, Is.EqualTo(0));
         Assert.That(Directory.Exists(_cacheRoot) && Directory.EnumerateFiles(_cacheRoot, "*.json", SearchOption.AllDirectories).Any(), Is.False);
     }
 
     [Test]
     public void TryPopulate_Disabled_ReturnsDisabledReason()
     {
-        AnalysisCacheFactsV1 facts = new(true, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1);
-
         AnalysisCachePopulation.Outcome outcome = AnalysisCachePopulation.TryPopulate(
-            location: null, CreateKey(), new[] { _projectPath }, _repoRoot, null, null, null, null, facts);
+            location: null, CreateKey(), new[] { _projectPath }, _repoRoot, null, null, null, null, SampleOutcome());
 
         Assert.That(outcome.RejectReason, Is.EqualTo(AnalysisCacheRejectReason.Disabled));
     }
@@ -67,10 +72,9 @@ public sealed class AnalysisCachePopulationTests
     public void TryPopulate_NoDiscoveredProjects_IsIneligible()
     {
         AnalysisCacheLocation location = new(_cacheRoot, AnalysisCacheMode.ExplicitPath);
-        AnalysisCacheFactsV1 facts = new(true, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
 
         AnalysisCachePopulation.Outcome outcome = AnalysisCachePopulation.TryPopulate(
-            location, CreateKey(), Array.Empty<string>(), _repoRoot, null, null, null, null, facts);
+            location, CreateKey(), Array.Empty<string>(), _repoRoot, null, null, null, null, SampleOutcome());
 
         Assert.That(outcome.RejectReason, Is.EqualTo(AnalysisCacheRejectReason.IneligibleBuildInput));
         Assert.That(outcome.ProjectsEvaluated, Is.EqualTo(0));

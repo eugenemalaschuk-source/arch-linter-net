@@ -12,6 +12,11 @@ public sealed record AnalysisCacheEntryV1
 
     public required string KeyDigest { get; init; }
 
+    // The single strict/audit mode this entry's Outcome was evaluated for — see finding #4:
+    // one entry per mode, never a combined-mode entry summarizing more than one outcome under a
+    // "strict,audit"-shaped key.
+    public required string Mode { get; init; }
+
     public required string ToolVersion { get; init; }
 
     public required DateTimeOffset CreatedAtUtc { get; init; }
@@ -20,7 +25,7 @@ public sealed record AnalysisCacheEntryV1
 
     public required IReadOnlyList<AnalysisCacheProjectManifest> ProjectManifests { get; init; }
 
-    public required AnalysisCacheFactsV1 Facts { get; init; }
+    public required AnalysisCacheOutcomeV1 Outcome { get; init; }
 
     // SHA-256 over the canonical form of every field above (see
     // AnalysisCacheContentDigest.Compute) — verified on every read before any other field is
