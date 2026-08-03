@@ -161,6 +161,8 @@ internal sealed partial class ValidateCommandHandler
             NoRestore = options.NoRestore,
             RequestedConfiguration = options.Configuration,
             RequestedTargetFramework = options.TargetFramework,
+            RequestedPlatform = options.Platform,
+            RequestedRuntimeIdentifier = options.RuntimeIdentifier,
             CancellationToken = _cancellationToken,
         };
 
@@ -284,6 +286,8 @@ internal sealed partial class ValidateCommandHandler
             NoRestore = options.NoRestore,
             RequestedConfiguration = options.Configuration,
             RequestedTargetFramework = options.TargetFramework,
+            RequestedPlatform = options.Platform,
+            RequestedRuntimeIdentifier = options.RuntimeIdentifier,
             CancellationToken = _cancellationToken,
         };
     }

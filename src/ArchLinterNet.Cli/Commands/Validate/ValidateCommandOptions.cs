@@ -13,7 +13,9 @@ internal sealed record ValidateCommandOptions(
     bool EnsureBuilt = false,
     bool NoRestore = false,
     string? Configuration = null,
-    string? TargetFramework = null)
+    string? TargetFramework = null,
+    string? Platform = null,
+    string? RuntimeIdentifier = null)
 {
     public bool IsFormatExplicit { get; init; }
 

@@ -39,4 +39,23 @@ public sealed class AnalysisSnapshotRequestTests
 
         Assert.That(snapshotRequest.CancellationToken, Is.EqualTo(cts.Token));
     }
+
+    [Test]
+    public void PlatformAndRuntimeIdentifier_SurviveRequestRoundTrip()
+    {
+        var snapshotRequest = new AnalysisSnapshotRequest
+        {
+            PolicyPath = "policy.yml",
+            RequestedPlatform = "x64",
+            RequestedRuntimeIdentifier = "linux-x64",
+        };
+
+        ValidationRequest validationRequest = snapshotRequest.ForMode("strict");
+        AnalysisSnapshotRequest roundTripped = AnalysisSnapshotRequest.FromValidationRequest(validationRequest);
+
+        Assert.That(validationRequest.RequestedPlatform, Is.EqualTo("x64"));
+        Assert.That(validationRequest.RequestedRuntimeIdentifier, Is.EqualTo("linux-x64"));
+        Assert.That(roundTripped.RequestedPlatform, Is.EqualTo("x64"));
+        Assert.That(roundTripped.RequestedRuntimeIdentifier, Is.EqualTo("linux-x64"));
+    }
 }

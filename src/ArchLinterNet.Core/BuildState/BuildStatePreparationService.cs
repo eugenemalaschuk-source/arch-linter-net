@@ -30,14 +30,18 @@ public sealed class BuildStatePreparationService : IBuildStatePreparationService
             BuildStatePreflightResult restoreCheck = CheckRestorePrerequisites(request);
             if (restoreCheck.Blocked)
             {
-                return restoreCheck;
+                return WithCacheEligibility(restoreCheck);
             }
         }
 
-        return request.PreparationMode == BuildPreparationMode.EnsureBuilt
+        BuildStatePreflightResult result = request.PreparationMode == BuildPreparationMode.EnsureBuilt
             ? EnsureBuilt(request)
             : BuildStatePreflightEvaluator.Evaluate(request);
+        return WithCacheEligibility(result);
     }
+
+    private static BuildStatePreflightResult WithCacheEligibility(BuildStatePreflightResult result) =>
+        new(result.Diagnostics.Select(BuildStatePreflightEvaluator.EnsureCacheEligibility).ToArray());
 
     // dotnet restore/build resolves prerequisites from the local NuGet cache without network
     // access whenever a project has already been restored once; the presence of
@@ -230,7 +234,8 @@ public sealed class BuildStatePreparationService : IBuildStatePreparationService
             string? assemblyPath = projectDirectory == null
                 ? null
                 : FindBuiltAssembly(
-                    projectDirectory, project.AssemblyName, request.RequestedConfiguration, request.RequestedTargetFramework);
+                    projectDirectory, project.AssemblyName, request.RequestedConfiguration, request.RequestedTargetFramework,
+                    request.RequestedRuntimeIdentifier);
 
             if (assemblyPath == null)
             {
@@ -261,7 +266,7 @@ public sealed class BuildStatePreparationService : IBuildStatePreparationService
     // violate — ambiguity is intentionally accepted there since ordinary preflight has no
     // request-vs-observed mismatch to check.
     private static string? FindBuiltAssembly(
-        string projectDirectory, string assemblyName, string? configuration, string? targetFramework)
+        string projectDirectory, string assemblyName, string? configuration, string? targetFramework, string? runtimeIdentifier)
     {
         string binDirectory = Path.Combine(projectDirectory, "bin");
         if (!Directory.Exists(binDirectory))
@@ -275,16 +280,17 @@ public sealed class BuildStatePreparationService : IBuildStatePreparationService
             return null;
         }
 
-        if (configuration == null && targetFramework == null)
+        if (configuration == null && targetFramework == null && runtimeIdentifier == null)
         {
             return candidates.OrderByDescending(File.GetLastWriteTimeUtc).First();
         }
 
         return candidates.FirstOrDefault(path => MatchesRequestedOutputPath(
-            Path.GetRelativePath(binDirectory, path), configuration, targetFramework));
+            Path.GetRelativePath(binDirectory, path), configuration, targetFramework, runtimeIdentifier));
     }
 
-    private static bool MatchesRequestedOutputPath(string relativePath, string? configuration, string? targetFramework)
+    private static bool MatchesRequestedOutputPath(string relativePath, string? configuration, string? targetFramework,
+        string? runtimeIdentifier)
     {
         // Array-form Split (not the two-char params overload) to avoid Sonar S3220: the params
         // overload partially matches `Split(char separator, int count, StringSplitOptions)`,
@@ -297,8 +303,10 @@ public sealed class BuildStatePreparationService : IBuildStatePreparationService
             || (segments.Length > 0 && string.Equals(segments[0], configuration, StringComparison.OrdinalIgnoreCase));
         bool targetFrameworkMatches = targetFramework == null
             || (segments.Length > 1 && string.Equals(segments[1], targetFramework, StringComparison.OrdinalIgnoreCase));
+        bool runtimeIdentifierMatches = runtimeIdentifier == null
+            || segments.Any(segment => string.Equals(segment, runtimeIdentifier, StringComparison.OrdinalIgnoreCase));
 
-        return configurationMatches && targetFrameworkMatches;
+        return configurationMatches && targetFrameworkMatches && runtimeIdentifierMatches;
     }
 
     // Resolves an absolute path to the `dotnet` host executable rather than passing the bare
@@ -392,6 +400,15 @@ public sealed class BuildStatePreparationService : IBuildStatePreparationService
             // the whole graph build even though the caller only asked to validate one specific
             // framework.
             AddFrameworkArgument(arguments, request.RequestedTargetFramework);
+            if (request.RequestedPlatform != null)
+            {
+                arguments.Add($"-p:Platform={request.RequestedPlatform}");
+            }
+            if (request.RequestedRuntimeIdentifier != null)
+            {
+                arguments.Add("-r");
+                arguments.Add(request.RequestedRuntimeIdentifier);
+            }
 
             return RunDotnetCommand(request, arguments, "build", BuildStatePreflightState.BuildFailed);
         }
@@ -599,6 +616,19 @@ public sealed class BuildStatePreparationService : IBuildStatePreparationService
             string fingerprint = BuildStateCanonicalHasher.ComputeBuildInputFingerprint(
                 project.Path, request.RepositoryRoot, request.CancellationToken);
             string assemblyDigest = BuildStateCanonicalHasher.ComputeContentDigest(assemblyPath, request.CancellationToken);
+            EvaluatedBuildInputManifestV1 manifest = EvaluatedBuildInputManifestCollector.Collect(
+                project.Path, request.RepositoryRoot, request.RequestedConfiguration, request.RequestedTargetFramework,
+                request.RequestedPlatform, request.RequestedRuntimeIdentifier, request.CancellationToken);
+            EvaluatedBuildInputManifestV1 publicationCheck = EvaluatedBuildInputManifestCollector.Collect(
+                project.Path, request.RepositoryRoot, request.RequestedConfiguration, request.RequestedTargetFramework,
+                request.RequestedPlatform, request.RequestedRuntimeIdentifier, request.CancellationToken);
+            string publicationAssemblyDigest = BuildStateCanonicalHasher.ComputeContentDigest(assemblyPath, request.CancellationToken);
+
+            if (!string.Equals(manifest.Digest, publicationCheck.Digest, StringComparison.Ordinal)
+                || !string.Equals(assemblyDigest, publicationAssemblyDigest, StringComparison.Ordinal))
+            {
+                continue;
+            }
 
             // Re-checked immediately before the write that actually publishes trusted receipt
             // evidence — hashing above already observes the token per file/project, but this is
@@ -617,7 +647,12 @@ public sealed class BuildStatePreparationService : IBuildStatePreparationService
                 request.RequestedConfiguration,
                 request.RequestedTargetFramework,
                 fingerprint,
-                assemblyDigest));
+                assemblyDigest,
+                manifest.Digest,
+                manifest.Eligibility,
+                manifest.IneligibilityReasons,
+                request.RequestedPlatform,
+                request.RequestedRuntimeIdentifier));
         }
     }
 }

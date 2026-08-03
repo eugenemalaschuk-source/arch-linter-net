@@ -27,20 +27,25 @@ static class ArchLinterNet.Core.BuildState.BuildReceiptStore
   method static string ReceiptPathFor(string assemblyPath)
   method static void Write(string assemblyPath, ArchLinterNet.Core.BuildState.BuildReceiptV1 receipt)
 sealed class ArchLinterNet.Core.BuildState.BuildReceiptV1 : System.IEquatable<ArchLinterNet.Core.BuildState.BuildReceiptV1>
-  ctor(string ProjectPath, string AssemblyName, string? Configuration, string? TargetFramework, string BuildInputFingerprint, string AssemblyContentDigest)
+  ctor(string ProjectPath, string AssemblyName, string? Configuration, string? TargetFramework, string BuildInputFingerprint, string AssemblyContentDigest, string? EvaluatedManifestFingerprint = null, ArchLinterNet.Core.BuildState.CacheEligibility? CacheEligibility = null, System.Collections.Generic.IReadOnlyList<string>? CacheIneligibilityReasons = null, string? Platform = null, string? RuntimeIdentifier = null)
   method ArchLinterNet.Core.BuildState.BuildReceiptV1 <Clone>$()
   method bool Equals(ArchLinterNet.Core.BuildState.BuildReceiptV1? other)
   method bool Equals(object? obj)
   method int GetHashCode()
   method string ToString()
-  method void Deconstruct(out string ProjectPath, out string AssemblyName, out string? Configuration, out string? TargetFramework, out string BuildInputFingerprint, out string AssemblyContentDigest)
+  method void Deconstruct(out string ProjectPath, out string AssemblyName, out string? Configuration, out string? TargetFramework, out string BuildInputFingerprint, out string AssemblyContentDigest, out string? EvaluatedManifestFingerprint, out ArchLinterNet.Core.BuildState.CacheEligibility? CacheEligibility, out System.Collections.Generic.IReadOnlyList<string>? CacheIneligibilityReasons, out string? Platform, out string? RuntimeIdentifier)
   operator !=(ArchLinterNet.Core.BuildState.BuildReceiptV1? left, ArchLinterNet.Core.BuildState.BuildReceiptV1? right)
   operator ==(ArchLinterNet.Core.BuildState.BuildReceiptV1? left, ArchLinterNet.Core.BuildState.BuildReceiptV1? right)
+  property ArchLinterNet.Core.BuildState.CacheEligibility? CacheEligibility {get;init;}
+  property System.Collections.Generic.IReadOnlyList<string> CacheIneligibilityReasons {get;init;}
   property string AssemblyContentDigest {get;init;}
   property string AssemblyName {get;init;}
   property string BuildInputFingerprint {get;init;}
   property string ProjectPath {get;init;}
   property string? Configuration {get;init;}
+  property string? EvaluatedManifestFingerprint {get;init;}
+  property string? Platform {get;init;}
+  property string? RuntimeIdentifier {get;init;}
   property string? TargetFramework {get;init;}
 static class ArchLinterNet.Core.BuildState.BuildStateCanonicalHasher
   method static string ComputeBuildInputFingerprint(string projectPath, string repositoryRoot, System.Threading.CancellationToken cancellationToken = null)
@@ -48,13 +53,13 @@ static class ArchLinterNet.Core.BuildState.BuildStateCanonicalHasher
 static class ArchLinterNet.Core.BuildState.BuildStatePreflightEvaluator
   method static ArchLinterNet.Core.BuildState.BuildStatePreflightResult Evaluate(ArchLinterNet.Core.BuildState.BuildStatePreflightRequest request)
 sealed class ArchLinterNet.Core.BuildState.BuildStatePreflightRequest : System.IEquatable<ArchLinterNet.Core.BuildState.BuildStatePreflightRequest>
-  ctor(string RepositoryRoot, ArchLinterNet.Core.Discovery.ProjectDiscoveryResult ProjectDiscovery, ArchLinterNet.Core.BuildState.BuildStateResolvedAssemblies Resolution, ArchLinterNet.Core.BuildState.BuildPreparationMode PreparationMode, bool NoRestore = false, string? RequestedConfiguration = null, string? RequestedTargetFramework = null, System.Threading.CancellationToken CancellationToken = null)
+  ctor(string RepositoryRoot, ArchLinterNet.Core.Discovery.ProjectDiscoveryResult ProjectDiscovery, ArchLinterNet.Core.BuildState.BuildStateResolvedAssemblies Resolution, ArchLinterNet.Core.BuildState.BuildPreparationMode PreparationMode, bool NoRestore = false, string? RequestedConfiguration = null, string? RequestedTargetFramework = null, string? RequestedPlatform = null, string? RequestedRuntimeIdentifier = null, System.Threading.CancellationToken CancellationToken = null)
   method ArchLinterNet.Core.BuildState.BuildStatePreflightRequest <Clone>$()
   method bool Equals(ArchLinterNet.Core.BuildState.BuildStatePreflightRequest? other)
   method bool Equals(object? obj)
   method int GetHashCode()
   method string ToString()
-  method void Deconstruct(out string RepositoryRoot, out ArchLinterNet.Core.Discovery.ProjectDiscoveryResult ProjectDiscovery, out ArchLinterNet.Core.BuildState.BuildStateResolvedAssemblies Resolution, out ArchLinterNet.Core.BuildState.BuildPreparationMode PreparationMode, out bool NoRestore, out string? RequestedConfiguration, out string? RequestedTargetFramework, out System.Threading.CancellationToken CancellationToken)
+  method void Deconstruct(out string RepositoryRoot, out ArchLinterNet.Core.Discovery.ProjectDiscoveryResult ProjectDiscovery, out ArchLinterNet.Core.BuildState.BuildStateResolvedAssemblies Resolution, out ArchLinterNet.Core.BuildState.BuildPreparationMode PreparationMode, out bool NoRestore, out string? RequestedConfiguration, out string? RequestedTargetFramework, out string? RequestedPlatform, out string? RequestedRuntimeIdentifier, out System.Threading.CancellationToken CancellationToken)
   operator !=(ArchLinterNet.Core.BuildState.BuildStatePreflightRequest? left, ArchLinterNet.Core.BuildState.BuildStatePreflightRequest? right)
   operator ==(ArchLinterNet.Core.BuildState.BuildStatePreflightRequest? left, ArchLinterNet.Core.BuildState.BuildStatePreflightRequest? right)
   property ArchLinterNet.Core.BuildState.BuildPreparationMode PreparationMode {get;init;}
@@ -64,6 +69,8 @@ sealed class ArchLinterNet.Core.BuildState.BuildStatePreflightRequest : System.I
   property bool NoRestore {get;init;}
   property string RepositoryRoot {get;init;}
   property string? RequestedConfiguration {get;init;}
+  property string? RequestedPlatform {get;init;}
+  property string? RequestedRuntimeIdentifier {get;init;}
   property string? RequestedTargetFramework {get;init;}
 sealed class ArchLinterNet.Core.BuildState.BuildStatePreflightResult : System.IEquatable<ArchLinterNet.Core.BuildState.BuildStatePreflightResult>
   ctor(System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Model.BuildStatePreflightDiagnostic> Diagnostics)
@@ -96,6 +103,25 @@ sealed class ArchLinterNet.Core.BuildState.BuildStateResolvedAssemblies : System
   operator ==(ArchLinterNet.Core.BuildState.BuildStateResolvedAssemblies? left, ArchLinterNet.Core.BuildState.BuildStateResolvedAssemblies? right)
   property System.Collections.Generic.IReadOnlyCollection<System.Reflection.Assembly> ResolvedAssemblies {get;init;}
   property System.Collections.Generic.IReadOnlyCollection<string> MissingAssemblyNames {get;init;}
+enum ArchLinterNet.Core.BuildState.CacheEligibility : int
+  enum-member CacheIneligible = 1
+  enum-member VerifiedCacheEligible = 0
+static class ArchLinterNet.Core.BuildState.EvaluatedBuildInputManifestCollector
+  method static ArchLinterNet.Core.BuildState.EvaluatedBuildInputManifestV1 Collect(string projectPath, string repositoryRoot, string? configuration = null, string? targetFramework = null, string? platform = null, string? runtimeIdentifier = null, System.Threading.CancellationToken cancellationToken = null)
+sealed class ArchLinterNet.Core.BuildState.EvaluatedBuildInputManifestV1 : System.IEquatable<ArchLinterNet.Core.BuildState.EvaluatedBuildInputManifestV1>
+  ctor(string Digest, ArchLinterNet.Core.BuildState.CacheEligibility Eligibility, System.Collections.Generic.IReadOnlyList<string> IneligibilityReasons, System.Collections.Generic.IReadOnlyList<string> Inputs)
+  method ArchLinterNet.Core.BuildState.EvaluatedBuildInputManifestV1 <Clone>$()
+  method bool Equals(ArchLinterNet.Core.BuildState.EvaluatedBuildInputManifestV1? other)
+  method bool Equals(object? obj)
+  method int GetHashCode()
+  method string ToString()
+  method void Deconstruct(out string Digest, out ArchLinterNet.Core.BuildState.CacheEligibility Eligibility, out System.Collections.Generic.IReadOnlyList<string> IneligibilityReasons, out System.Collections.Generic.IReadOnlyList<string> Inputs)
+  operator !=(ArchLinterNet.Core.BuildState.EvaluatedBuildInputManifestV1? left, ArchLinterNet.Core.BuildState.EvaluatedBuildInputManifestV1? right)
+  operator ==(ArchLinterNet.Core.BuildState.EvaluatedBuildInputManifestV1? left, ArchLinterNet.Core.BuildState.EvaluatedBuildInputManifestV1? right)
+  property ArchLinterNet.Core.BuildState.CacheEligibility Eligibility {get;init;}
+  property System.Collections.Generic.IReadOnlyList<string> IneligibilityReasons {get;init;}
+  property System.Collections.Generic.IReadOnlyList<string> Inputs {get;init;}
+  property string Digest {get;init;}
 interface ArchLinterNet.Core.BuildState.IBuildStatePreparationService
   method ArchLinterNet.Core.BuildState.BuildStatePreflightResult Prepare(ArchLinterNet.Core.BuildState.BuildStatePreflightRequest request)
 sealed class ArchLinterNet.Core.Composition.ArchitectureEngine : System.IAsyncDisposable, System.IDisposable
@@ -2247,19 +2273,21 @@ sealed class ArchLinterNet.Core.Model.BuildStatePreflightDiagnostic : ArchLinter
   property ArchLinterNet.Core.Model.BuildStatePreflightState State {get;init;}
   property bool IsBlocking {get;}
 sealed class ArchLinterNet.Core.Model.BuildStatePreflightEvidence : System.IEquatable<ArchLinterNet.Core.Model.BuildStatePreflightEvidence>
-  ctor(string ProjectPath, string AssemblyName, string? RequestedConfiguration = null, string? ObservedConfiguration = null, string? RequestedTargetFramework = null, string? ObservedTargetFramework = null, string? ExpectedOutputPath = null, System.Collections.Generic.IReadOnlyCollection<string>? SearchedPaths = null, string? BuildCommand = null, string? Detail = null)
+  ctor(string ProjectPath, string AssemblyName, string? RequestedConfiguration = null, string? ObservedConfiguration = null, string? RequestedTargetFramework = null, string? ObservedTargetFramework = null, string? ExpectedOutputPath = null, System.Collections.Generic.IReadOnlyCollection<string>? SearchedPaths = null, string? BuildCommand = null, string? Detail = null, string? CacheEligibility = null, System.Collections.Generic.IReadOnlyCollection<string>? CacheIneligibilityReasons = null)
   method ArchLinterNet.Core.Model.BuildStatePreflightEvidence <Clone>$()
   method bool Equals(ArchLinterNet.Core.Model.BuildStatePreflightEvidence? other)
   method bool Equals(object? obj)
   method int GetHashCode()
   method string ToString()
-  method void Deconstruct(out string ProjectPath, out string AssemblyName, out string? RequestedConfiguration, out string? ObservedConfiguration, out string? RequestedTargetFramework, out string? ObservedTargetFramework, out string? ExpectedOutputPath, out System.Collections.Generic.IReadOnlyCollection<string>? SearchedPaths, out string? BuildCommand, out string? Detail)
+  method void Deconstruct(out string ProjectPath, out string AssemblyName, out string? RequestedConfiguration, out string? ObservedConfiguration, out string? RequestedTargetFramework, out string? ObservedTargetFramework, out string? ExpectedOutputPath, out System.Collections.Generic.IReadOnlyCollection<string>? SearchedPaths, out string? BuildCommand, out string? Detail, out string? CacheEligibility, out System.Collections.Generic.IReadOnlyCollection<string>? CacheIneligibilityReasons)
   operator !=(ArchLinterNet.Core.Model.BuildStatePreflightEvidence? left, ArchLinterNet.Core.Model.BuildStatePreflightEvidence? right)
   operator ==(ArchLinterNet.Core.Model.BuildStatePreflightEvidence? left, ArchLinterNet.Core.Model.BuildStatePreflightEvidence? right)
+  property System.Collections.Generic.IReadOnlyCollection<string> CacheIneligibilityReasons {get;init;}
   property System.Collections.Generic.IReadOnlyCollection<string> SearchedPaths {get;init;}
   property string AssemblyName {get;init;}
   property string ProjectPath {get;init;}
   property string? BuildCommand {get;init;}
+  property string? CacheEligibility {get;init;}
   property string? Detail {get;init;}
   property string? ExpectedOutputPath {get;init;}
   property string? ObservedConfiguration {get;init;}
@@ -3406,6 +3434,8 @@ sealed class ArchLinterNet.Core.Validation.AnalysisSnapshotRequest : System.IEqu
   property string? BaselinePath {get;init;}
   property string? ConditionSetName {get;init;}
   property string? RequestedConfiguration {get;init;}
+  property string? RequestedPlatform {get;init;}
+  property string? RequestedRuntimeIdentifier {get;init;}
   property string? RequestedTargetFramework {get;init;}
 sealed class ArchLinterNet.Core.Validation.ArchitectureAnalysisSnapshot : System.IDisposable
   method ArchLinterNet.Core.Validation.ValidationOutcome Evaluate(string mode, ArchLinterNet.Core.Reporting.ValidationTiming? timing = null)
@@ -3946,4 +3976,6 @@ sealed class ArchLinterNet.Core.Validation.ValidationRequest : System.IEquatable
   property string? BaselinePath {get;init;}
   property string? ConditionSetName {get;init;}
   property string? RequestedConfiguration {get;init;}
+  property string? RequestedPlatform {get;init;}
+  property string? RequestedRuntimeIdentifier {get;init;}
   property string? RequestedTargetFramework {get;init;}
