@@ -15,7 +15,7 @@ namespace ArchLinterNet.Core.Validation;
 // requested modes (strict/audit — coverage rides inside each mode via the strict_coverage/
 // audit_coverage families) can be evaluated from the same fact set. See
 // docs/internal/analysis-build-state-blueprint.md, "Snapshot ownership".
-public sealed class ArchitectureAnalysisSnapshot : IDisposable
+public sealed partial class ArchitectureAnalysisSnapshot : IDisposable
 {
     private const string ErrorSeverity = "error";
 
@@ -224,6 +224,9 @@ public sealed class ArchitectureAnalysisSnapshot : IDisposable
 
                 _cancellationToken.ThrowIfCancellationRequested();
                 ValidationOutcome? cachedOutcome = _preflight.Blocked ? null : TryEvaluateFromCache(mode, timing);
+                WorkSnapshot? workBefore = cachedOutcome is null && !_preflight.Blocked
+                    ? CaptureWorkSnapshot()
+                    : null;
                 ValidationOutcome outcome = cachedOutcome
                     ?? (_preflight.Blocked ? BuildBlockedOutcome() : EvaluateCore(mode, timing));
 
@@ -240,7 +243,7 @@ public sealed class ArchitectureAnalysisSnapshot : IDisposable
                         authorization,
                         artifacts.Paths,
                         artifacts.CapturedIdentities,
-                        CreateWorkProvenance());
+                        CreateWorkProvenance(workBefore!.Value));
                 }
 
                 _evaluatedModes[mode] = outcome;
@@ -658,17 +661,6 @@ public sealed class ArchitectureAnalysisSnapshot : IDisposable
 
     private IReadOnlyList<ArchitectureLoadedAssemblyArtifact> GetLoadedAssemblyArtifacts() =>
         _setup?.Runner.Session.Context.LoadedAssemblyArtifacts ?? Array.Empty<ArchitectureLoadedAssemblyArtifact>();
-
-    private AnalysisCacheWorkProvenanceV1 CreateWorkProvenance()
-    {
-        AnalysisSessionProfilingCounters? profiling = _profilingCounters;
-        return new AnalysisCacheWorkProvenanceV1(
-            _counters.AssemblyLoads,
-            profiling?.FactIndexMaterializations ?? 0,
-            profiling?.SourceScanPasses ?? 0,
-            profiling?.ContractExecutions ?? 0,
-            GetLoadedAssemblyArtifacts().Sum(artifact => artifact.BytesLoaded));
-    }
 
     private void RecordContractFamilyResultCounts(IReadOnlyDictionary<string, int> resultCounts)
     {
