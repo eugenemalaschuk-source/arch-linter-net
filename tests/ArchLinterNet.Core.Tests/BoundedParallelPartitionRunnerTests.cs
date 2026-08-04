@@ -183,4 +183,145 @@ public sealed class BoundedParallelPartitionRunnerTests
         Assert.That(thrown, Is.InstanceOf<InvalidOperationException>());
         Assert.That(thrown, Is.Not.InstanceOf<AggregateException>());
     }
+
+    // With more than one genuine partition failure, selection must depend only on partition
+    // index, never on which thread happened to finish (or throw) first. Index 7 throws
+    // immediately; index 2 throws only after a deliberate delay — a scheduling-order-dependent
+    // selection (e.g. "first exception seen in AggregateException.InnerExceptions") would likely
+    // surface index 7's failure instead, since it completes first.
+    [Test]
+    public void Run_MultipleGenuineFailures_DeterministicallySurfacesLowestPartitionIndex()
+    {
+        List<int> items = Enumerable.Range(0, 10).ToList();
+
+        Exception? thrown = null;
+        try
+        {
+            _runner.Run(
+                items,
+                effectiveMaxParallelism: 8,
+                (item, index) =>
+                {
+                    if (index == 7)
+                    {
+                        throw new InvalidOperationException("from-7");
+                    }
+
+                    if (index == 2)
+                    {
+                        Thread.Sleep(75);
+                        throw new InvalidOperationException("from-2");
+                    }
+
+                    return item;
+                },
+                CancellationToken.None);
+        }
+        catch (Exception ex)
+        {
+            thrown = ex;
+        }
+
+        Assert.That(thrown, Is.InstanceOf<InvalidOperationException>());
+        Assert.That(((InvalidOperationException)thrown!).Message, Is.EqualTo("from-2"));
+    }
+
+    // Mirrors the exact shape ArchitectureTypeIndex's and ArchitectureSourceFileFactIndex's
+    // per-partition delegates use: check cancellation first, only then perform the "long call"
+    // that check exists to guard. This proves a partition whose delegate body has already started
+    // running (Parallel.For already let it through — not merely never scheduled against an
+    // already-cancelled token) still stops at its own check before entering that long call, using
+    // deterministic signaling rather than a pre-cancelled token or sleep-based timing.
+    [Test]
+    public void Run_CancellationWhileAnotherPartitionIsStillRunning_UnstartedLongWorkIsNeverEntered()
+    {
+        List<int> items = new() { 0, 1 };
+        using CancellationTokenSource cts = new();
+        using CountdownEvent bothStarted = new(2);
+        using ManualResetEventSlim releaseSlowPartition = new(false);
+        int longWorkEntries = 0;
+
+        Task canceller = Task.Run(() =>
+        {
+            Assert.That(bothStarted.Wait(TimeSpan.FromSeconds(5)), Is.True, "both partitions must start running");
+            cts.Cancel();
+        });
+
+        Exception? thrown = null;
+        try
+        {
+            _runner.Run<int, int>(
+                items,
+                effectiveMaxParallelism: 2,
+                (item, index) =>
+                {
+                    bothStarted.Signal();
+                    if (index == 0)
+                    {
+                        // Represents a partition already committed to its own long call when
+                        // cancellation is requested elsewhere — allowed to finish undisturbed.
+                        releaseSlowPartition.Wait(TimeSpan.FromSeconds(5));
+                        return item;
+                    }
+
+                    // The delegate body has genuinely started (Parallel.For already scheduled it —
+                    // this is not a pre-cancelled-token no-op), so only its own explicit check,
+                    // not Parallel.For's own pre-iteration gate, can stop it here.
+                    SpinWait.SpinUntil(() => cts.IsCancellationRequested, TimeSpan.FromSeconds(5));
+                    cts.Token.ThrowIfCancellationRequested();
+                    Interlocked.Increment(ref longWorkEntries);
+                    return item;
+                },
+                cts.Token,
+                parallelEligibilityThreshold: 1);
+        }
+        catch (Exception ex)
+        {
+            thrown = ex;
+        }
+        finally
+        {
+            releaseSlowPartition.Set();
+        }
+
+        Assert.That(canceller.Wait(TimeSpan.FromSeconds(5)), Is.True);
+        Assert.That(thrown, Is.InstanceOf<OperationCanceledException>());
+        Assert.That(longWorkEntries, Is.EqualTo(0));
+    }
+
+    // Issue #408 review: the "callers can substitute a fake" claim on
+    // BoundedParallelPartitionRunner's own remarks must be genuinely true, not aspirational —
+    // verified here by using a fake implementation of the same interface
+    // ArchitectureTypeIndex/ArchitectureSourceFileFactIndex hold.
+    [Test]
+    public void IBoundedParallelPartitionRunner_FakeImplementation_IsGenuinelySubstitutable()
+    {
+        IBoundedParallelPartitionRunner fake = new SequentialFakePartitionRunner();
+        List<int> items = Enumerable.Range(0, 10).ToList();
+
+        int[] result = fake.Run(items, effectiveMaxParallelism: 4, static (item, _) => item * 2, CancellationToken.None);
+
+        Assert.That(result, Is.EqualTo(items.Select(i => i * 2)));
+    }
+
+    private sealed class SequentialFakePartitionRunner : IBoundedParallelPartitionRunner
+    {
+        public TResult[] Run<TItem, TResult>(
+            IReadOnlyList<TItem> items,
+            int effectiveMaxParallelism,
+            Func<TItem, int, TResult> computePartition,
+            CancellationToken cancellationToken,
+            AnalysisSessionProfilingCounters? profilingCounters = null,
+            int parallelEligibilityThreshold = BoundedParallelPartitionRunner.DefaultParallelEligibilityThreshold)
+        {
+            TResult[] results = new TResult[items.Count];
+            for (int i = 0; i < items.Count; i++)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                results[i] = computePartition(items[i], i);
+            }
+
+            return results;
+        }
+    }
 }

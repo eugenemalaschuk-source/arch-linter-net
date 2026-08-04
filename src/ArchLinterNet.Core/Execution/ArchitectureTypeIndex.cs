@@ -11,7 +11,7 @@ public sealed class ArchitectureTypeIndex
     private readonly IReadOnlyCollection<Assembly> _targetAssemblies;
     private readonly int _maxParallelism;
     private readonly AnalysisSessionProfilingCounters? _profilingCounters;
-    private readonly BoundedParallelPartitionRunner _partitionRunner;
+    private readonly IBoundedParallelPartitionRunner _partitionRunner;
     private readonly CancellationToken _cancellationToken;
     private readonly Lazy<Type[]> _allTypes;
 
@@ -25,7 +25,7 @@ public sealed class ArchitectureTypeIndex
         int maxParallelism,
         AnalysisSessionProfilingCounters? profilingCounters,
         CancellationToken cancellationToken = default,
-        BoundedParallelPartitionRunner? partitionRunner = null)
+        IBoundedParallelPartitionRunner? partitionRunner = null)
     {
         _targetAssemblies = targetAssemblies ?? throw new ArgumentNullException(nameof(targetAssemblies));
         _maxParallelism = maxParallelism;

@@ -43,7 +43,7 @@ public sealed partial class ArchitectureSourceFileFactIndex
     private readonly AnalysisSessionProfilingCounters? _profilingCounters;
     private readonly int _maxParallelism;
     private readonly int _parallelEligibilityThreshold;
-    private readonly BoundedParallelPartitionRunner _partitionRunner;
+    private readonly IBoundedParallelPartitionRunner _partitionRunner;
     private readonly Lazy<FactIndexData> _data;
 
     public ArchitectureSourceFileFactIndex(
@@ -76,7 +76,7 @@ public sealed partial class ArchitectureSourceFileFactIndex
         CancellationToken CancellationToken,
         int MaxParallelism = 0,
         int? ParallelEligibilityThresholdOverride = null,
-        BoundedParallelPartitionRunner? PartitionRunner = null);
+        IBoundedParallelPartitionRunner? PartitionRunner = null);
 
     internal ArchitectureSourceFileFactIndex(
         IReadOnlyCollection<Assembly> targetAssemblies,
