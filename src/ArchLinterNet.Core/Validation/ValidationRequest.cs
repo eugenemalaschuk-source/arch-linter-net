@@ -1,4 +1,5 @@
 using ArchLinterNet.Core.BuildState;
+using ArchLinterNet.Core.Caching;
 
 namespace ArchLinterNet.Core.Validation;
 
@@ -36,6 +37,12 @@ public sealed record ValidationRequest
     public string? RequestedPlatform { get; init; }
 
     public string? RequestedRuntimeIdentifier { get; init; }
+
+    // Null (the default) leaves analysis-cache/v1 completely uninvolved — every mode always runs
+    // the full pipeline, exactly as before this option existed. Non-null enables both the
+    // cache-hit short-circuit inside ArchitectureAnalysisSnapshot.Evaluate and (via the caller's own
+    // post-run population call) writing a verified entry after a completed run.
+    public AnalysisCacheLocation? CacheLocation { get; init; }
 
     public CancellationToken CancellationToken { get; init; } = default;
 }

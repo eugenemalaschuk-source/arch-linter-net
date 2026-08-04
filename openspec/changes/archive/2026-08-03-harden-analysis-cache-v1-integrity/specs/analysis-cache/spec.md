@@ -1,0 +1,109 @@
+## ADDED Requirements
+
+### Requirement: Cache entry authenticity is a keyed HMAC tag, not an unkeyed hash
+The system SHALL authenticate each `AnalysisCacheEntryV1.ContentDigest` as an HMAC-SHA256 tag keyed by a local, cache-root-scoped secret (`AnalysisCacheHmacKeyStore`), not an unkeyed content hash. The secret SHALL be a 256-bit value generated via a cryptographically secure random number generator on first use of a given cache root, persisted outside the sharded entry tree so a `Clear()` of every entry file never removes it, and read-or-created idempotently and safely under a concurrent first-use race (every caller observes the exact same key for a given root, never two different keys). The stored tag SHALL be compared using a constant-time comparison, never a short-circuiting string/ordinal comparison. This control defeats a hand-edited/poisoned entry file; it does not defeat an attacker with read/write access to the key file itself — that residual is an accepted local-trust-boundary limit, stated here rather than left implicit.
+
+#### Scenario: A hand-tampered entry without the real key is rejected
+- **WHEN** an entry file's `Outcome.Passed` (or any other field folded into the canonical form) is edited directly on disk by a party that does not know the cache root's HMAC key
+- **THEN** `AnalysisCacheStore.TryGet` returns `Reject(IntegrityMismatch)`, never a `Hit`
+
+#### Scenario: A genuine round trip on the same cache root still authenticates
+- **WHEN** `AnalysisCacheStore.Put` publishes an entry and `TryGet` is called against the same cache root with the same key and matching project manifests
+- **THEN** the result is `Hit`
+
+#### Scenario: Two cache roots derive independent keys
+- **WHEN** `AnalysisCacheHmacKeyStore.GetOrCreateKey` is called for two distinct cache root paths
+- **THEN** the two returned keys are different, and an entry authenticated under one root's key does not authenticate against the other root
+
+## MODIFIED Requirements
+
+### Requirement: A versioned analysis-cache/v1 envelope is available
+The system SHALL provide an `AnalysisCacheEntryV1` model identified by the constant schema id `analysis-cache/v1` (`AnalysisCacheEnvelope.SchemaId`), composed only of concrete, non-polymorphic record types (`AnalysisCacheProjectManifest`, `AnalysisCacheOutcomeV1`, `AnalysisCacheEntryCompletionStatus`) plus one explicit closed-set converter (`AnalysisCacheDiagnosticPayloadConverter`) for `IArchitectureDiagnosticPayload`'s 18 concrete record types and one explicit closed-set converter (`AnalysisCacheClassificationMetadataValueConverter`) for `ArchitectureClassificationRoleFact.Metadata`'s string/bool/decimal `object` values, and a canonical `ContentDigest` computed by explicit ordinal field concatenation for scalar/manifest fields and a deterministic canonical-JSON hash for the nested `Outcome`, rather than reliance on JSON property ordering. Each entry is scoped to exactly one requested mode (`AnalysisCacheEntryV1.Mode`), never a joined mode set. `AnalysisCacheOutcomeV1` SHALL carry every result-bearing field a cache hit must reconstruct: `Passed`, `Violations`, `Cycles`, `CoverageFindings`/`CoverageConfig`, `UnmatchedIgnoredViolations`/`UnmatchedIgnoredViolationsConfig`, `PolicyConsistencyFindings`/`PolicyConsistencyConfig`, `ClassificationConflicts`, `ClassificationMetadataFailures`, `ClassificationRoles`, `ClassificationPathDeferred`, `CycleFindings`, `CoverageSummaries`, and `SubtractiveMatcherParticipation`.
+
+#### Scenario: Entry deserialization never executes arbitrary types
+- **WHEN** a cache entry file is deserialized
+- **THEN** only the closed set of concrete `AnalysisCacheEntryV1` record types — including the 18 known `IArchitectureDiagnosticPayload` types discriminated by an explicit `$kind` switch, and classification metadata values restricted to string/bool/decimal — can be constructed, with no polymorphic or `$type`-discriminated conversion, and an unrecognized `$kind` value or metadata value shape raises `JsonException` rather than constructing anything
+
+#### Scenario: Content digest is stable across canonicalization
+- **WHEN** the same logical entry fields are provided in different construction order
+- **THEN** the computed `ContentDigest` is identical
+
+#### Scenario: A hit reconstructs byte-identical findings, ordering, and exit category
+- **WHEN** `AnalysisCacheStore.TryGet` returns `Hit` for a key whose `Outcome` was populated from a prior completed run's `ValidationOutcome`
+- **THEN** `AnalysisCacheOutcomeMapper.FromCacheOutcome` reconstructs a `ValidationOutcome` whose `Violations` (including `Payload`/`Identity`), `Cycles`, `CycleFindings`, `UnmatchedIgnoredViolations`, `PolicyConsistencyFindings`, `ClassificationConflicts`/`ClassificationMetadataFailures`/`ClassificationRoles`/`ClassificationPathDeferred`, `CoverageSummaries`, `SubtractiveMatcherParticipation`, and `Passed` are exactly what was cached, in the same order
+
+### Requirement: Cache location resolution rejects unsafe paths
+The system SHALL reject an explicit cache path that is empty, resolves to a filesystem root, is an existing file, or is a symlink/reparse-point directory, raising `AnalysisCacheLocationRejectedException` before any cache I/O occurs. In addition, every `AnalysisCacheStore` read/write/inspect/clear operation SHALL reject a resolved entry path whose containing shard directory (or any existing ancestor between it and the cache root) is itself a reparse point, checked immediately before touching the filesystem, and `Inspect`/`Clear` SHALL enumerate the cache root's contents without following a symlinked subdirectory. Every `AnalysisCacheStore` operation (`TryGet`, `Put`, `Inspect`, `Clear`) SHALL additionally reject the cache root itself being a symlink/reparse-point directory, checked before any `Directory.Exists`/enumeration/I/O, regardless of `AnalysisCacheMode` — including `Auto`, whose location resolution does not run `ExplicitPath`'s own root-symlink validation.
+
+#### Scenario: Filesystem root rejected
+- **WHEN** `--cache /` (or a drive root on Windows) is used
+- **THEN** the CLI reports a runtime error before analysis begins and no cache directory is created
+
+#### Scenario: Symlinked directory rejected
+- **WHEN** an explicit cache path is a symbolic link or reparse point
+- **THEN** location resolution throws `AnalysisCacheLocationRejectedException` and no entry is read or written
+
+#### Scenario: Symlinked shard directory does not escape containment
+- **WHEN** a shard directory under an otherwise-valid cache root is pre-created as a symlink or junction pointing outside the root
+- **THEN** `AnalysisCacheStore.Put`/`TryGet` reject the operation as `PathUnsafe` and no file is read from or written to the link's target
+
+#### Scenario: Inspect and Clear do not follow symlinked subdirectories
+- **WHEN** a subdirectory under the cache root is a symlink or junction
+- **THEN** `AnalysisCacheStore.Inspect`/`Clear` do not enumerate, read, or delete anything through it
+
+#### Scenario: A pre-created symlinked cache root is rejected in every mode
+- **WHEN** a cache root path (resolved via any `AnalysisCacheMode`, including `Auto`) is itself a pre-created symlink or junction pointing outside the intended root
+- **THEN** `AnalysisCacheStore.Inspect`/`Clear`/`TryGet`/`Put` reject or no-op without following it, and `Clear` deletes nothing under the link's target
+
+### Requirement: Reuse authorization requires more than a fingerprint match
+The system SHALL require every cache hit to prove, in addition to a matching `AnalysisCacheKey` digest: identical `AnalysisCacheEnvelope.ToolVersion`, matching `FormatVersion`/`SchemaId`, a verified keyed-HMAC `ContentDigest`, an original `AnalysisCacheEntryCompletionStatus.Success` completion, and — for every affected project — an identical, still-`VerifiedCacheEligible` `EvaluatedBuildInputManifestV1` digest (per #406), compared as genuine one-to-one ordered-set equality after rejecting any duplicate `ProjectPath` on either side (a forged stored list with a duplicate path SHALL NOT authorize against a distinct current project set merely by matching count). `AnalysisCacheKey` SHALL additionally fold in every remaining result-affecting request dimension: an order-independent `PreprocessorSymbolsDigest`, a content-based `BaselineDigest` (never the baseline's path), `IncludeAsmdefContracts`, and `EnforceUnmatchedIgnoredViolationsPolicy`. The lookup path (`ArchitectureAnalysisSnapshot.TryEvaluateFromCache`) SHALL thread the session's `CancellationToken` through its policy-digest and manifest-lookup computation and SHALL NOT accept a `Hit` once cancellation has been observed. A cache entry SHALL be treated as untrusted optimization data until all checks pass.
+
+#### Scenario: Matching key but ineligible project is rejected
+- **WHEN** a stored entry's key digest matches but any of its project manifests is not `VerifiedCacheEligible`
+- **THEN** `AnalysisCacheStore.TryGet` returns `Reject(IneligibleBuildInput)`, never a `Hit`
+
+#### Scenario: Project manifest digest changed
+- **WHEN** a stored entry's project manifest digest does not match the freshly recomputed manifest digest for the same project/context
+- **THEN** `AnalysisCacheStore.TryGet` returns `Reject(ProjectSetMismatch)`
+
+#### Scenario: A duplicated stored project path does not authorize against a distinct current set
+- **WHEN** a stored manifest list contains a duplicate `ProjectPath` (e.g. `[A, A]`) while the current discovered set is genuinely different (e.g. `[A, B]`)
+- **THEN** `AnalysisCacheStore.TryGet` returns `Reject(ProjectSetMismatch)`, never a `Hit`
+
+#### Scenario: A request differing only in preprocessor symbols, baseline content, asmdef inclusion, or unmatched-ignore enforcement derives a different key
+- **WHEN** two otherwise-identical requests differ only in `PreprocessorSymbols`, baseline file content, `IncludeAsmdefContracts`, or `EnforceUnmatchedIgnoredViolationsPolicy`
+- **THEN** their `AnalysisCacheKey.Digest` values differ
+
+#### Scenario: A cancelled lookup never returns a stale hit
+- **WHEN** the session's `CancellationToken` is observed as cancelled during or immediately after `TryEvaluateFromCache`'s lookup
+- **THEN** the lookup is not accepted as a `Hit` and evaluation falls back to (and observes cancellation via) the normal recomputation path
+
+### Requirement: CLI and Testing API share one cache implementation
+The system SHALL expose equivalent disabled/auto/explicit-path cache semantics through the CLI's `--cache` option and `ArchLinterNet.Testing`'s `ArchitectureValidationBuilder.WithCache()`, both backed by the same `ArchLinterNet.Core.Caching.AnalysisCacheStore`/`AnalysisCachePopulation` implementation and the same shared `ArchLinterNet.Testing.ArchitectureValidationCacheSupport` population/profile-counter logic for both of the Testing host's execution paths (`ArchitectureValidationBuilder.Validate()`'s independent per-mode runs and `ArchitectureValidationSnapshotSession.Evaluate()`'s shared-snapshot runs). A completed, non-cancelled `ArchitectureValidationSnapshotSession.Evaluate` call SHALL populate the cache the same way `ValidateCommandHandler`'s combined-mode execution already does, not merely perform lookups.
+
+#### Scenario: CLI and Testing populate identically
+- **WHEN** the CLI and the Testing API validate the same policy with the same `--cache`/`WithCache()` location and configuration
+- **THEN** they derive the same `AnalysisCacheKey` digest and observe the same authorization outcome
+
+#### Scenario: A Testing snapshot miss seeds a later snapshot hit
+- **WHEN** `ArchitectureValidationSnapshotSession.Evaluate(mode)` completes a non-cancelled miss against a configured cache location
+- **THEN** the cache is populated for that mode, and a second session evaluating the same mode against the same policy/inputs observes a `Hit`
+
+### Requirement: analysis-profile/v1 instrumentation reflects real cache activity
+The system SHALL populate `AnalysisProfile.Counters.Cache` with real `Lookups`/`Hits`/`Misses`/`Rejects`/`Writes`/`BytesRead`/`BytesWritten`/`IneligibleUnitCount`/`CorruptionEvents`/`CancelledBeforePublish`/`Mode`/`RejectReasonCounts` whenever `--cache`/`WithCache()` is used with anything other than disabled, setting `Status` to `Active`; `Status` SHALL remain `NotApplicable` (all fields at their zero/default value) when the cache is disabled. `Lookups`/`Hits`/`Misses`/`BytesRead` SHALL be sourced from real `AnalysisCachePopulation.TryLookup` calls made by the cache-hit short-circuit, and `IneligibleUnitCount`/`BytesWritten`/`CorruptionEvents` SHALL be sourced from real `AnalysisCachePopulation`/`AnalysisCacheStore` outcomes, never left hardcoded at zero when the underlying activity was non-zero. The scalar `Rejects` counter SHALL equal the sum of `RejectReasonCounts`' values — aggregating both population-side rejects and lookup-side (read) rejects consistently — in both the CLI and Testing hosts.
+
+#### Scenario: Cache-enabled run reports Active status
+- **WHEN** a `validate --cache auto --profile stdout` run completes
+- **THEN** the profile's `Counters.Cache.Status` equals `Active` and `Counters.Cache.Mode` equals `"auto"`
+
+#### Scenario: Cache-disabled run reports NotApplicable
+- **WHEN** a `validate --profile stdout` run completes without `--cache`
+- **THEN** the profile's `Counters.Cache.Status` equals `NotApplicable`
+
+#### Scenario: Ineligible projects are counted, not just rejected
+- **WHEN** a `--cache`-enabled run discovers at least one project whose #406 evaluated-build-input manifest is not `VerifiedCacheEligible`
+- **THEN** `Counters.Cache.IneligibleUnitCount` is greater than zero
+
+#### Scenario: A lookup-side reject is reflected in the scalar Rejects total
+- **WHEN** a `--cache`-enabled run observes a corrupt cache entry on lookup (a read-side reject) with zero population-side rejects
+- **THEN** `Counters.Cache.Rejects` equals the sum of `Counters.Cache.RejectReasonCounts`' values, in both the CLI and Testing hosts

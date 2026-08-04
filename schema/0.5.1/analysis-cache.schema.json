@@ -1,0 +1,111 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://archlinternet.dev/schema/0.5.1/analysis-cache.schema.json",
+  "title": "ArchLinterNet analysis cache v1",
+  "description": "Machine-readable analysis-cache/v1 persisted entry: the AnalysisCacheEntryV1 envelope AnalysisCacheStore reads/writes under a resolved cache root. Not yet registered in compatibility-manifest.json — see openspec/specs/packaged-schema-registry/spec.md. The Outcome.Violations[].Payload discriminator ($kind) is restricted to the 18 known concrete IArchitectureDiagnosticPayload record types AnalysisCacheDiagnosticPayloadConverter enumerates; each payload's own fields are intentionally left permissive here (additionalProperties not restricted per-kind) rather than fully duplicating each of the 18 shapes in this schema — the closed-set safety guarantee lives in the converter's C# switch statement, not in this schema.",
+  "type": "object",
+  "required": ["SchemaId", "FormatVersion", "KeyDigest", "Mode", "ToolVersion", "CreatedAtUtc", "CompletionStatus", "ProjectManifests", "ArtifactManifests", "Outcome", "ContentDigest"],
+  "properties": {
+    "SchemaId": { "const": "analysis-cache/v1" },
+    "FormatVersion": { "const": 2 },
+    "KeyDigest": { "type": "string", "pattern": "^[0-9a-f]{8,}$" },
+    "Mode": { "type": "string", "enum": ["strict", "audit"] },
+    "ToolVersion": { "type": "string", "minLength": 1 },
+    "CreatedAtUtc": { "type": "string", "format": "date-time" },
+    "CompletionStatus": { "enum": ["Success", "Cancelled", "Failed"] },
+    "ProjectManifests": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["ProjectPath", "ManifestDigest", "Eligibility"],
+        "properties": {
+          "ProjectPath": { "type": "string" },
+          "ManifestDigest": { "type": "string" },
+          "Eligibility": { "type": "string" }
+        },
+        "additionalProperties": false
+      }
+    },
+    "ArtifactManifests": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["ArtifactPath", "ContentDigest"],
+        "properties": {
+          "ArtifactPath": { "type": "string", "minLength": 1 },
+          "ContentDigest": { "type": "string", "minLength": 1 }
+        },
+        "additionalProperties": false
+      }
+    },
+    "Outcome": {
+      "type": "object",
+      "required": [
+        "Passed", "Violations", "Cycles", "CoverageFindings", "CoverageConfig",
+        "UnmatchedIgnoredViolations", "UnmatchedIgnoredViolationsConfig",
+        "PolicyConsistencyFindings", "PolicyConsistencyConfig",
+        "ClassificationConflicts", "ClassificationMetadataFailures"
+      ],
+      "properties": {
+        "Passed": { "type": "boolean" },
+        "Violations": { "type": "array", "items": { "$ref": "#/$defs/violation" } },
+        "Cycles": { "type": "array", "items": { "type": "string" } },
+        "CoverageFindings": { "type": "array", "items": { "$ref": "#/$defs/violation" } },
+        "CoverageConfig": { "enum": ["error", "warn", "off"] },
+        "UnmatchedIgnoredViolations": { "type": "array", "items": { "type": "object" } },
+        "UnmatchedIgnoredViolationsConfig": { "enum": ["error", "warn", "off"] },
+        "PolicyConsistencyFindings": { "type": "array", "items": { "type": "object" } },
+        "PolicyConsistencyConfig": { "enum": ["error", "warn", "off"] },
+        "ClassificationConflicts": { "type": "array", "items": { "type": "object" } },
+        "ClassificationMetadataFailures": { "type": "array", "items": { "type": "object" } },
+        "ClassificationRoles": { "type": "array", "items": { "type": "object" } },
+        "ClassificationPathDeferred": { "type": ["object", "null"] },
+        "CycleFindings": { "type": "array", "items": { "type": "object" } },
+        "CoverageSummaries": { "type": "array", "items": { "type": "object" } },
+        "SubtractiveMatcherParticipation": { "type": "array", "items": { "type": "object" } }
+      },
+      "additionalProperties": false
+    },
+    "ContentDigest": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+  },
+  "additionalProperties": false,
+  "x-archlinternet-envelope": "analysis-cache/v1",
+  "$defs": {
+    "violation": {
+      "type": "object",
+      "required": ["ContractName", "SourceType", "ForbiddenNamespace", "ForbiddenReferences"],
+      "properties": {
+        "ContractName": { "type": "string" },
+        "ContractId": { "type": ["string", "null"] },
+        "SourceType": { "type": "string" },
+        "ForbiddenNamespace": { "type": "string" },
+        "ForbiddenReferences": { "type": "array", "items": { "type": "string" } },
+        "MatchedNamespacePrefixes": { "type": ["array", "null"], "items": { "type": "string" } },
+        "Payload": {
+          "type": ["object", "null"],
+          "properties": {
+            "$kind": {
+              "type": "string",
+              "enum": [
+                "FrameworkReferenceAllowOnlyPayload", "PackageDependencyPayload", "FrameworkReferencePayload",
+                "ConfigurationPayload", "ProjectMetadataPayload", "CompositionPayload", "TypePlacementPayload",
+                "ExternalDependencyPayload", "DependencyPayload", "PortBoundaryPayload", "AttributeUsagePayload",
+                "InheritancePayload", "InterfaceImplementationPayload", "LayoutConventionPayload",
+                "ContextAllowOnlyPayload", "ContextDependencyPayload", "PackageAllowOnlyPayload",
+                "PublicApiSurfacePayload"
+              ]
+            },
+            "value": { "type": "object" }
+          },
+          "required": ["$kind", "value"],
+          "additionalProperties": false
+        },
+        "PolicyLocation": { "type": ["object", "null"] },
+        "Identity": { "type": ["object", "null"] },
+        "Identities": { "type": "array", "items": { "type": "object" } },
+        "RelatedPolicyLocations": { "type": "array", "items": { "type": "object" } }
+      },
+      "additionalProperties": false
+    }
+  }
+}

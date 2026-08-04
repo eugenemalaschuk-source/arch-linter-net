@@ -36,6 +36,10 @@ internal sealed class ValidateCommandDefinition(ValidateCommandHandler handler)
               --profile <dest>  Write a machine-readable analysis-profile/v1 JSON
                                 document to stdout, stderr, or a file path.
                                 Independent of --timings/--report.
+              --cache <dest>    Opt into the persistent analysis-cache/v1 (disabled by
+                                default). "auto" uses the platform user-cache
+                                namespace; any other value is a caller-selected
+                                directory, validated for safe containment.
               --ensure-built    Build the selected project graph once, verify it via an
                                 ArchLinterNet build receipt, then validate (never implicit;
                                 opt-in only)
@@ -92,6 +96,7 @@ internal sealed class ValidateCommandDefinition(ValidateCommandHandler handler)
         Option<string[]> reportOption = new("--report") { AllowMultipleArgumentsPerToken = true };
         Option<bool> timingsOption = new("--timings");
         Option<string> profileOption = new("--profile");
+        Option<string> cacheOption = new("--cache");
         Option<bool> ensureBuiltOption = new("--ensure-built");
         Option<bool> noRestoreOption = new("--no-restore");
         Option<string> configurationOption = new("--configuration");
@@ -115,6 +120,7 @@ internal sealed class ValidateCommandDefinition(ValidateCommandHandler handler)
         command.Options.Add(reportOption);
         command.Options.Add(timingsOption);
         command.Options.Add(profileOption);
+        command.Options.Add(cacheOption);
         command.Options.Add(ensureBuiltOption);
         command.Options.Add(noRestoreOption);
         command.Options.Add(configurationOption);
@@ -133,6 +139,7 @@ internal sealed class ValidateCommandDefinition(ValidateCommandHandler handler)
             reportOption,
             timingsOption,
             profileOption,
+            cacheOption,
             ensureBuiltOption,
             noRestoreOption,
             configurationOption,
@@ -169,6 +176,7 @@ internal sealed class ValidateCommandDefinition(ValidateCommandHandler handler)
         Option<string[]> reportOption,
         Option<bool> timingsOption,
         Option<string> profileOption,
+        Option<string> cacheOption,
         Option<bool> ensureBuiltOption,
         Option<bool> noRestoreOption,
         Option<string> configurationOption,
@@ -213,6 +221,7 @@ internal sealed class ValidateCommandDefinition(ValidateCommandHandler handler)
             AdditionalSinks = additionalSinks,
             ReportParseError = reportParseError,
             ProfileDestination = parseResult.GetValue(profileOption),
+            CacheDestination = parseResult.GetValue(cacheOption),
         };
     }
 

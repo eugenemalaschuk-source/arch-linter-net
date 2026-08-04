@@ -40,11 +40,24 @@
         "OutputSinkCount": { "type": "integer", "minimum": 0 },
         "Cache": {
           "type": "object",
-          "required": ["Status", "Lookups", "Hits"],
+          "required": ["Status", "Lookups", "Hits", "Misses", "Rejects", "Writes", "BytesRead", "BytesWritten", "IneligibleUnitCount", "CorruptionEvents", "CancelledBeforePublish", "Mode", "RejectReasonCounts"],
           "properties": {
-            "Status": { "enum": ["NotApplicable"] },
+            "Status": { "enum": ["NotApplicable", "Active"] },
             "Lookups": { "type": "integer", "minimum": 0 },
-            "Hits": { "type": "integer", "minimum": 0 }
+            "Hits": { "type": "integer", "minimum": 0 },
+            "Misses": { "type": "integer", "minimum": 0 },
+            "Rejects": { "type": "integer", "minimum": 0 },
+            "Writes": { "type": "integer", "minimum": 0 },
+            "BytesRead": { "type": "integer", "minimum": 0 },
+            "BytesWritten": { "type": "integer", "minimum": 0 },
+            "IneligibleUnitCount": { "type": "integer", "minimum": 0 },
+            "CorruptionEvents": { "type": "integer", "minimum": 0 },
+            "CancelledBeforePublish": { "type": "integer", "minimum": 0 },
+            "Mode": { "enum": ["disabled", "auto", "path"] },
+            "RejectReasonCounts": {
+              "type": "object",
+              "additionalProperties": { "type": "integer", "minimum": 0 }
+            }
           },
           "additionalProperties": false
         },

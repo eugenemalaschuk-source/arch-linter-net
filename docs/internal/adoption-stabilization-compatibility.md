@@ -354,7 +354,12 @@ A cache entry also requires:
 - successful completed-session status;
 - no cancellation/partial marker.
 
-Corrupt, foreign, incompatible, or poisoned content causes verified recomputation. CI caches are optimization artifacts, never trusted correctness evidence.
+Each entry's tag is an HMAC with a per-cache-root local secret stored in a sibling authentication
+namespace, never beneath the cache root. Generic CI cache configuration may restore the cache root
+as untrusted optimization data, but it must exclude that sibling authentication namespace so an
+archive cannot replace both an entry and the key that validates it. Corrupt, foreign,
+incompatible, or poisoned content causes verified recomputation. CI caches are optimization
+artifacts, never trusted correctness evidence.
 
 ## Profiling and optimization checkpoints
 

@@ -39,6 +39,14 @@ public sealed record ValidationOutcome(
 
     public bool PreflightBlocked { get; init; }
 
+    // The authoritative repository root this analysis resolved (ArchitectureAnalysisSnapshot's own
+    // RepositoryRoot, itself produced by IArchitectureRepositoryRootResolver) — never re-derived by
+    // a host from Path.GetDirectoryName(policyPath), which disagrees with the real root whenever the
+    // policy file lives under a conventional "architecture/" subfolder (see
+    // ArchitectureRepositoryRootResolver.ResolveFrom). Threaded through so CLI/Testing cache
+    // population and lookup use the same root the pipeline itself used, not their own ad-hoc guess.
+    public string RepositoryRoot { get; init; } = string.Empty;
+
     // All source file paths in the policy import graph, including the root document.
     // Populated by ArchitectureAnalysisSnapshot after policy loading.
     public IReadOnlyList<string> PolicyImportPaths { get; init; } =

@@ -21,10 +21,12 @@ public sealed class ArchitecturePolicyProvenanceIndex
 
     internal ArchitecturePolicyProvenanceIndex(
         IReadOnlyList<ArchitecturePolicySourceDescriptor> sources,
-        IReadOnlyDictionary<string, ArchitecturePolicySourceLocation> nodes)
+        IReadOnlyDictionary<string, ArchitecturePolicySourceLocation> nodes,
+        IReadOnlyList<ArchitectureLoadedTextIdentity>? sourceContentIdentities = null)
     {
         Sources = sources;
         _nodes = new Dictionary<string, ArchitecturePolicySourceLocation>(nodes, StringComparer.Ordinal);
+        SourceContentIdentities = sourceContentIdentities ?? Array.Empty<ArchitectureLoadedTextIdentity>();
     }
 
     public static ArchitecturePolicyProvenanceIndex Empty { get; } =
@@ -32,6 +34,10 @@ public sealed class ArchitecturePolicyProvenanceIndex
             new Dictionary<string, ArchitecturePolicySourceLocation>(StringComparer.Ordinal));
 
     public IReadOnlyList<ArchitecturePolicySourceDescriptor> Sources { get; }
+
+    // Internal cache evidence: one decoded-text identity per policy source, captured while the
+    // loader still owns the exact text that was parsed and composed into the document.
+    internal IReadOnlyList<ArchitectureLoadedTextIdentity> SourceContentIdentities { get; }
 
     public IReadOnlyDictionary<string, ArchitecturePolicySourceLocation> Nodes => _nodes;
 

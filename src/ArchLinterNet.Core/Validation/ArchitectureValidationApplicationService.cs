@@ -159,7 +159,27 @@ public sealed class ArchitectureValidationApplicationService(
             policyCompositions: state.PolicyCompositions,
             projectGraphEvaluations: state.ProjectGraphEvaluations,
             assemblyLoads: state.AssemblyLoads,
-            requestedContractIds: modeHint == null ? request.ContractIds : null);
+            requestedContractIds: modeHint == null ? request.ContractIds : null,
+            cacheContext: BuildCacheContext(request));
+    }
+
+    // Null whenever the caller did not configure a cache location (ValidationRequest.CacheLocation /
+    // AnalysisSnapshotRequest.CacheLocation stay null by default) — Evaluate() then never attempts a
+    // cache lookup and behaves exactly as before this option existed.
+    private static AnalysisSnapshotCacheContext? BuildCacheContext(AnalysisSnapshotRequest request)
+    {
+        return request.CacheLocation is not { } location
+            ? null
+            : new AnalysisSnapshotCacheContext(
+                location,
+                request.ConditionSetName,
+                request.ContractIds ?? Array.Empty<string>(),
+                request.RequestedConfiguration,
+                request.RequestedTargetFramework,
+                request.RequestedPlatform,
+                request.RequestedRuntimeIdentifier,
+                request.PreprocessorSymbols,
+                request.BaselinePath);
     }
 
     private static ArchitectureAnalysisSnapshotCounters BuildCancellationCounters(SnapshotConstructionState state)

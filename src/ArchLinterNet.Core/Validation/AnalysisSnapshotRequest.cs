@@ -1,4 +1,5 @@
 using ArchLinterNet.Core.BuildState;
+using ArchLinterNet.Core.Caching;
 
 namespace ArchLinterNet.Core.Validation;
 
@@ -34,6 +35,9 @@ public sealed record AnalysisSnapshotRequest
 
     public string? RequestedRuntimeIdentifier { get; init; }
 
+    // See ValidationRequest.CacheLocation — null leaves the cache completely uninvolved.
+    public AnalysisCacheLocation? CacheLocation { get; init; }
+
     public CancellationToken CancellationToken { get; init; } = default;
 
     public ValidationRequest ForMode(string mode)
@@ -54,6 +58,7 @@ public sealed record AnalysisSnapshotRequest
             RequestedTargetFramework = RequestedTargetFramework,
             RequestedPlatform = RequestedPlatform,
             RequestedRuntimeIdentifier = RequestedRuntimeIdentifier,
+            CacheLocation = CacheLocation,
             CancellationToken = CancellationToken
         };
     }
@@ -75,6 +80,7 @@ public sealed record AnalysisSnapshotRequest
             RequestedTargetFramework = request.RequestedTargetFramework,
             RequestedPlatform = request.RequestedPlatform,
             RequestedRuntimeIdentifier = request.RequestedRuntimeIdentifier,
+            CacheLocation = request.CacheLocation,
             CancellationToken = request.CancellationToken
         };
     }

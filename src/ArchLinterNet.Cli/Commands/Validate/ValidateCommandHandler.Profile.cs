@@ -29,6 +29,8 @@ internal sealed partial class ValidateCommandHandler
         public AnalysisProfileOutput? Output { get; set; }
 
         public int RenderedSinkCount { get; set; }
+
+        public CacheExecutionState Cache { get; } = new();
     }
 
     private void WriteCancelledProfile(ValidateCommandOptions options, ValidationProfileExecutionState state)
@@ -74,6 +76,7 @@ internal sealed partial class ValidateCommandHandler
             {
                 Measurements = measurements,
                 Output = state.Output,
+                Cache = BuildCacheProfileCounters(options, state.Cache),
             });
 
         WriteProfileToDestination(options.ProfileDestination, AnalysisProfileJsonWriter.Write(profile));

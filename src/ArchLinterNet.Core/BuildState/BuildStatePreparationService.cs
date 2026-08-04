@@ -388,7 +388,10 @@ public sealed class BuildStatePreparationService : IBuildStatePreparationService
                 }
             }
 
-            List<string> arguments = new() { "build", solutionPath, "--nologo", "--no-restore" };
+            // A project can be both a solution entry and a ProjectReference. Keep that shared
+            // project from being built by two MSBuild nodes concurrently, which races on its obj
+            // files on macOS (for example, GraphLib.csproj.FileListAbsolute.txt).
+            List<string> arguments = new() { "build", solutionPath, "--nologo", "--no-restore", "-m:1" };
             if (request.RequestedConfiguration != null)
             {
                 arguments.Add("-c");

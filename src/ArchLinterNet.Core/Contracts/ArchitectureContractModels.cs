@@ -51,6 +51,11 @@ public sealed class ArchitectureContractDocument
     public ArchitecturePolicyProvenanceIndex Provenance { get; internal set; } =
         ArchitecturePolicyProvenanceIndex.Empty;
 
+    // Set only by ArchitectureBaselineLoadingService after it has parsed the baseline text. This
+    // remains internal because it is transient cache-authorization evidence, not policy data.
+    [YamlIgnore]
+    internal ArchitectureLoadedTextIdentity? BaselineContentIdentity { get; set; }
+
     // Deterministic record of what `source_sets` resolved to and which contract instances were
     // expanded from which authored contract. Populated once by ArchitectureSourceSetExpander during
     // ArchitecturePolicyDocumentLoader.Load, and empty for every policy that declares no set.

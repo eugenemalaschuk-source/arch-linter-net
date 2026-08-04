@@ -40,6 +40,10 @@ public static class AnalysisProfileBuilder
 
         AnalysisProfileCounters counters = AnalysisProfileCounters.From(
             snapshotCounters, contractFamilyCounts, renderedSinkCount, outputSinkCount);
+        if (options?.Cache is not null)
+        {
+            counters = counters with { Cache = options.Cache };
+        }
 
         return new AnalysisProfile
         {

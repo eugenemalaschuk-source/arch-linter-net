@@ -11,6 +11,7 @@ internal sealed record ArchitecturePolicySource(
     string FullPath,
     string PhysicalPath,
     string FileIdentity,
+    ArchitectureLoadedTextIdentity ContentIdentity,
     YamlMappingNode Root,
     IReadOnlyList<string> Imports)
 {
@@ -94,7 +95,14 @@ internal sealed partial class ArchitecturePolicySourceParser
             }
         }
 
-        return new ArchitecturePolicySource(descriptor, fullPath, physicalPath, fileIdentity, root, imports);
+        return new ArchitecturePolicySource(
+            descriptor,
+            fullPath,
+            physicalPath,
+            fileIdentity,
+            ArchitectureLoadedTextIdentityFactory.FromText(physicalPath, yaml),
+            root,
+            imports);
     }
 
     public static void ValidatePortableImport(
