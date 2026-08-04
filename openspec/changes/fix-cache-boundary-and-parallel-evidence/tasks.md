@@ -16,4 +16,4 @@
 - [x] 3.1 Retain paired strict/audit raw profiles and calculate wall-clock/allocation/resource distributions.
 - [x] 3.2 Add exact source/package/configuration identity and #374 baseline/post/delta comparison.
 - [x] 3.3 Regenerate raw JSON and Markdown only after Core gates pass.
-- [ ] 3.4 Run targeted tests, full correctness gates, OpenSpec validation, push the branch, and perform a fresh PR review.
+- [x] 3.4 Run targeted tests, full correctness gates, OpenSpec validation, push the branch, and perform a fresh PR review.
