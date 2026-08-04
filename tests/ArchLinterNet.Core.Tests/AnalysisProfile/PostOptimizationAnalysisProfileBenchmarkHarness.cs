@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Runtime.InteropServices;
+using System.Security.Cryptography;
 using System.Text.Json;
 using ArchLinterNet.Core.Resolution;
 using NUnit.Framework;
@@ -365,10 +366,15 @@ public sealed class PostOptimizationAnalysisProfileBenchmarkHarness
         IReadOnlyList<RunSample> UnsuccessfulRuns,
         string SampleExclusionPolicy);
 
-    private sealed record EnvironmentIdentity(string OperatingSystem, string Runtime, string Architecture, int ProcessorCount, string CliFileVersion, string Configuration)
+    private sealed record EnvironmentIdentity(
+        string OperatingSystem, string Runtime, string Architecture, int ProcessorCount, string CliFileVersion,
+        string CliAssemblySha256, string SourceCommit, string Configuration)
     {
         public static EnvironmentIdentity Create() => new(RuntimeInformation.OSDescription, RuntimeInformation.FrameworkDescription,
-            RuntimeInformation.ProcessArchitecture.ToString(), Environment.ProcessorCount, FileVersionInfo.GetVersionInfo(CliDllPath()).FileVersion ?? "unknown", "Debug");
+            RuntimeInformation.ProcessArchitecture.ToString(), Environment.ProcessorCount,
+            FileVersionInfo.GetVersionInfo(CliDllPath()).FileVersion ?? "unknown",
+            Convert.ToHexStringLower(SHA256.HashData(File.ReadAllBytes(CliDllPath()))),
+            Environment.GetEnvironmentVariable("ARCH_LINTER_SOURCE_SHA") ?? "unknown", "Debug");
     }
 
     private sealed class TemporaryDirectory : IDisposable
