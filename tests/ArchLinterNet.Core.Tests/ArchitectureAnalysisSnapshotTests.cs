@@ -51,7 +51,8 @@ public sealed partial class ArchitectureAnalysisSnapshotTests
             bool enableUnmatchedIgnoreTracking = true,
             ValidationTiming? timing = null,
             string? mode = null,
-            CancellationToken cancellationToken = default)
+            CancellationToken cancellationToken = default,
+            int? maxParallelism = null)
         {
             BuildRunnerCallCount++;
             LastCancellationTokenReceived = cancellationToken;
@@ -67,10 +68,10 @@ public sealed partial class ArchitectureAnalysisSnapshotTests
             ArchitectureContractDocument document, string policyPath, string? conditionSetName = null,
             IReadOnlyList<string>? preprocessorSymbols = null, HashSet<string>? selectedContractIds = null,
             bool enableUnmatchedIgnoreTracking = true, ValidationTiming? timing = null, string? mode = null,
-            CancellationToken cancellationToken = default)
+            CancellationToken cancellationToken = default, int? maxParallelism = null)
         {
             return BuildRunner(document, policyPath, conditionSetName, preprocessorSymbols, selectedContractIds,
-                enableUnmatchedIgnoreTracking, timing, mode, cancellationToken);
+                enableUnmatchedIgnoreTracking, timing, mode, cancellationToken, maxParallelism);
         }
     }
 

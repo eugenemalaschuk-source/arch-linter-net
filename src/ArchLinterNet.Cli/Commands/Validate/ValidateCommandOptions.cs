@@ -30,4 +30,8 @@ internal sealed record ValidateCommandOptions(
     // null = --cache not requested (persistent cache disabled, no behavior change). Otherwise
     // "auto" or an explicit path. See openspec/specs/analysis-cache/spec.md.
     public string? CacheDestination { get; init; }
+
+    // null = --max-parallelism not requested (resolves to the default degree). See
+    // openspec/specs/bounded-parallel-scanning/spec.md.
+    public int? MaxParallelism { get; init; }
 }

@@ -156,7 +156,66 @@ public sealed class AnalysisProfileBuilderTests
             Assert.That(profile.Counters.Cache.Lookups, Is.EqualTo(0));
             Assert.That(profile.Counters.Cache.Hits, Is.EqualTo(0));
             Assert.That(profile.Counters.Concurrency.Status, Is.EqualTo(AnalysisProfileReservedFieldStatus.NotApplicable));
-            Assert.That(profile.Counters.Concurrency.Workers, Is.EqualTo(0));
+            Assert.That(profile.Counters.Concurrency.MaxParallelism, Is.EqualTo(0));
+            Assert.That(profile.Counters.Concurrency.ScheduledWorkItems, Is.EqualTo(0));
+            Assert.That(profile.Counters.Concurrency.CompletedWorkItems, Is.EqualTo(0));
+            Assert.That(profile.Counters.Concurrency.ObservedMaxConcurrency, Is.EqualTo(0));
+            Assert.That(profile.Counters.Concurrency.MergeOperations, Is.EqualTo(0));
+        });
+    }
+
+    // Issue #408: Counters.Concurrency reports Active with real scheduling evidence once a
+    // parallel-eligible scanning phase actually ran, and NotApplicable/all-zero when it didn't
+    // (e.g. --max-parallelism 1 or a small target/source set) — see
+    // openspec/specs/analysis-profile/spec.md, "Cache and concurrency fields are populated when
+    // their capability is active".
+    [Test]
+    public void Build_ParallelEligibleRun_ReportsActiveConcurrencyWithRealCounters()
+    {
+        ArchitectureAnalysisSnapshotCounters counters = Counters() with
+        {
+            MaxParallelism = 4,
+            ParallelScheduledWorkItems = 6,
+            ParallelCompletedWorkItems = 6,
+            ParallelObservedMaxConcurrency = 4,
+            ParallelMergeOperations = 2,
+        };
+
+        AnalysisProfile profile = AnalysisProfileBuilder.Build(
+            counters, timing: null, renderedSinkCount: 1, outputSinkCount: 1,
+            AnalysisProfileCompletionStatus.Success, cancellationObserved: false);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(profile.Counters.Concurrency.Status, Is.EqualTo(AnalysisProfileReservedFieldStatus.Active));
+            Assert.That(profile.Counters.Concurrency.MaxParallelism, Is.EqualTo(4));
+            Assert.That(profile.Counters.Concurrency.ScheduledWorkItems, Is.EqualTo(6));
+            Assert.That(profile.Counters.Concurrency.CompletedWorkItems, Is.EqualTo(6));
+            Assert.That(profile.Counters.Concurrency.ObservedMaxConcurrency, Is.EqualTo(4));
+            Assert.That(profile.Counters.Concurrency.MergeOperations, Is.EqualTo(2));
+        });
+    }
+
+    [Test]
+    public void Build_SequentialModeRun_ReportsNotApplicableConcurrencyWithMaxParallelismZeroed()
+    {
+        // MaxParallelism is otherwise "the resolved effective degree regardless of whether it was
+        // used" — but the NotApplicable/all-zero contract takes precedence, so a resolved value of
+        // 1 (or any other) must not leak through when no phase actually ran in parallel.
+        ArchitectureAnalysisSnapshotCounters counters = Counters() with
+        {
+            MaxParallelism = 4,
+            ParallelScheduledWorkItems = 0,
+        };
+
+        AnalysisProfile profile = AnalysisProfileBuilder.Build(
+            counters, timing: null, renderedSinkCount: 1, outputSinkCount: 1,
+            AnalysisProfileCompletionStatus.Success, cancellationObserved: false);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(profile.Counters.Concurrency.Status, Is.EqualTo(AnalysisProfileReservedFieldStatus.NotApplicable));
+            Assert.That(profile.Counters.Concurrency.MaxParallelism, Is.EqualTo(0));
         });
     }
 

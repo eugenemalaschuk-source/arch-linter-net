@@ -73,6 +73,31 @@ public sealed record AnalysisProfileCounters
             ContractFamilyResultCounts = snapshotCounters.ContractFamilyResultCounts,
             RenderedSinkCount = renderedSinkCount,
             OutputSinkCount = outputSinkCount,
+            Concurrency = BuildConcurrencyCounters(snapshotCounters),
+        };
+    }
+
+    // NotApplicable means every numeric field is 0 — including MaxParallelism, which is otherwise
+    // "the resolved degree regardless of whether it was used" and must not leak through when no
+    // phase actually ran in parallel. See
+    // openspec/specs/analysis-profile/spec.md, "Cache and concurrency fields are populated when
+    // their capability is active".
+    private static AnalysisProfileConcurrencyCounters BuildConcurrencyCounters(
+        ArchitectureAnalysisSnapshotCounters snapshotCounters)
+    {
+        if (snapshotCounters.ParallelScheduledWorkItems <= 0)
+        {
+            return new AnalysisProfileConcurrencyCounters();
+        }
+
+        return new AnalysisProfileConcurrencyCounters
+        {
+            Status = AnalysisProfileReservedFieldStatus.Active,
+            MaxParallelism = snapshotCounters.MaxParallelism,
+            ScheduledWorkItems = snapshotCounters.ParallelScheduledWorkItems,
+            CompletedWorkItems = snapshotCounters.ParallelCompletedWorkItems,
+            ObservedMaxConcurrency = snapshotCounters.ParallelObservedMaxConcurrency,
+            MergeOperations = snapshotCounters.ParallelMergeOperations,
         };
     }
 }
