@@ -1515,7 +1515,7 @@ sealed class ArchLinterNet.Core.Execution.ArchitectureAssemblyResolutionService 
   ctor(ArchLinterNet.Core.IO.Abstractions.IArchitectureFileSystem fileSystem, ArchLinterNet.Core.IO.Abstractions.IArchitectureEnvironment environment, ArchLinterNet.Core.IO.Abstractions.IArchitectureAssemblyLoader assemblyLoader)
   method ArchLinterNet.Core.Execution.ResolutionResult Resolve(ArchLinterNet.Core.Contracts.ArchitectureContractDocument document, string repositoryRoot, ArchLinterNet.Core.Discovery.ProjectDiscoveryResult discovery, bool resolveAssemblyOutputs, string? mode, System.Collections.Generic.HashSet<string>? selectedContractIds, System.Threading.CancellationToken cancellationToken = null)
   method ArchLinterNet.Core.Execution.ResolutionResult ResolveFromDocument(ArchLinterNet.Core.Contracts.ArchitectureContractDocument document, string? repositoryRoot = null, System.Threading.CancellationToken cancellationToken = null)
-  method ArchLinterNet.Core.Execution.ResolutionResult ResolvePostBuild(ArchLinterNet.Core.Contracts.ArchitectureContractDocument document, string repositoryRoot, ArchLinterNet.Core.Discovery.ProjectDiscoveryResult discovery, bool resolveAssemblyOutputs, string? mode, System.Collections.Generic.HashSet<string>? selectedContractIds, System.Threading.CancellationToken cancellationToken = null)
+  method ArchLinterNet.Core.Execution.ResolutionResult ResolvePostBuild(ArchLinterNet.Core.Contracts.ArchitectureContractDocument document, string repositoryRoot, ArchLinterNet.Core.Discovery.ProjectDiscoveryResult discovery, bool resolveAssemblyOutputs, string? mode, System.Collections.Generic.HashSet<string>? selectedContractIds, System.Threading.CancellationToken cancellationToken = null, System.Collections.Generic.IReadOnlyDictionary<string,string>? expectedArtifactContentDigests = null)
 sealed class ArchLinterNet.Core.Execution.ArchitectureContractCatalog
   method System.Collections.Generic.HashSet<string> AvailableContractIds(string mode)
   method System.Collections.Generic.HashSet<string> ContractIdsInGroup(string group)
@@ -1687,7 +1687,7 @@ sealed class ArchLinterNet.Core.Execution.ArchitectureTypeIndex
   method System.Type[] FindTypesInNamespace(string namespacePrefix)
 interface ArchLinterNet.Core.Execution.IArchitectureAssemblyResolutionService
   method ArchLinterNet.Core.Execution.ResolutionResult Resolve(ArchLinterNet.Core.Contracts.ArchitectureContractDocument document, string repositoryRoot, ArchLinterNet.Core.Discovery.ProjectDiscoveryResult discovery, bool resolveAssemblyOutputs, string? mode, System.Collections.Generic.HashSet<string>? selectedContractIds, System.Threading.CancellationToken cancellationToken = null)
-  method ArchLinterNet.Core.Execution.ResolutionResult ResolvePostBuild(ArchLinterNet.Core.Contracts.ArchitectureContractDocument document, string repositoryRoot, ArchLinterNet.Core.Discovery.ProjectDiscoveryResult discovery, bool resolveAssemblyOutputs, string? mode, System.Collections.Generic.HashSet<string>? selectedContractIds, System.Threading.CancellationToken cancellationToken = null)
+  method ArchLinterNet.Core.Execution.ResolutionResult ResolvePostBuild(ArchLinterNet.Core.Contracts.ArchitectureContractDocument document, string repositoryRoot, ArchLinterNet.Core.Discovery.ProjectDiscoveryResult discovery, bool resolveAssemblyOutputs, string? mode, System.Collections.Generic.HashSet<string>? selectedContractIds, System.Threading.CancellationToken cancellationToken = null, System.Collections.Generic.IReadOnlyDictionary<string,string>? expectedArtifactContentDigests = null)
 static class ArchLinterNet.Core.Execution.LayerTemplateExpander
   method static System.Collections.Generic.List<ArchLinterNet.Core.Contracts.Families.ArchitectureLayerContract> Expand(System.Collections.Generic.IEnumerable<ArchLinterNet.Core.Contracts.Families.ArchitectureLayerTemplateContract> templates)
 static class ArchLinterNet.Core.Execution.MaxParallelismResolver
@@ -1803,7 +1803,7 @@ interface ArchLinterNet.Core.Graph.IArchitectureGraphFormatter
 interface ArchLinterNet.Core.IO.Abstractions.IArchitectureAssemblyLoadScope : System.IDisposable
   method System.Reflection.Assembly LoadFrom(string path)
 interface ArchLinterNet.Core.IO.Abstractions.IArchitectureAssemblyLoader
-  method ArchLinterNet.Core.IO.Abstractions.IArchitectureAssemblyLoadScope CreateIsolatedLoadScope(System.Collections.Generic.IReadOnlyList<string> probingPaths, System.Collections.Generic.IReadOnlyDictionary<string,string> exactAssemblyPaths)
+  method ArchLinterNet.Core.IO.Abstractions.IArchitectureAssemblyLoadScope CreateIsolatedLoadScope(System.Collections.Generic.IReadOnlyList<string> probingPaths, System.Collections.Generic.IReadOnlyDictionary<string,string> exactAssemblyPaths, System.Collections.Generic.IReadOnlyDictionary<string,string>? expectedArtifactContentDigests = null)
   method System.Collections.Generic.IReadOnlyList<System.Reflection.Assembly> GetLoadedAssemblies()
   method System.Reflection.Assembly Load(System.Reflection.AssemblyName assemblyName)
   method System.Reflection.Assembly LoadFrom(string path)
@@ -1824,7 +1824,7 @@ interface ArchLinterNet.Core.IO.Abstractions.IRoslynCompilationFactory
 sealed class ArchLinterNet.Core.IO.ArchitectureAssemblyLoader : ArchLinterNet.Core.IO.Abstractions.IArchitectureAssemblyLoader
   ctor()
   field static readonly ArchLinterNet.Core.IO.ArchitectureAssemblyLoader Real
-  method ArchLinterNet.Core.IO.Abstractions.IArchitectureAssemblyLoadScope CreateIsolatedLoadScope(System.Collections.Generic.IReadOnlyList<string> probingPaths, System.Collections.Generic.IReadOnlyDictionary<string,string> exactAssemblyPaths)
+  method ArchLinterNet.Core.IO.Abstractions.IArchitectureAssemblyLoadScope CreateIsolatedLoadScope(System.Collections.Generic.IReadOnlyList<string> probingPaths, System.Collections.Generic.IReadOnlyDictionary<string,string> exactAssemblyPaths, System.Collections.Generic.IReadOnlyDictionary<string,string>? expectedArtifactContentDigests = null)
   method System.Collections.Generic.IReadOnlyList<System.Reflection.Assembly> GetLoadedAssemblies()
   method System.Reflection.Assembly Load(System.Reflection.AssemblyName assemblyName)
   method System.Reflection.Assembly LoadFrom(string path)

@@ -157,7 +157,8 @@ public sealed class ArchitectureRunnerSetupService(
         {
             resolution = assemblyResolutionService.ResolvePostBuild(
                 document, preparation.RepositoryRoot, preparation.ProjectDiscovery,
-                preparation.ResolveAssemblyOutputs, mode, selectedContractIds, cancellationToken);
+                preparation.ResolveAssemblyOutputs, mode, selectedContractIds, cancellationToken,
+                preparation.CapturedArtifactContentDigests);
         }
 
         ArchitectureAnalysisContext context = CreateAnalysisContext(

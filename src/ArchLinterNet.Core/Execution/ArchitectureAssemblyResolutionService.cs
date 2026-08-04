@@ -26,7 +26,8 @@ public interface IArchitectureAssemblyResolutionService
         bool resolveAssemblyOutputs,
         string? mode,
         HashSet<string>? selectedContractIds,
-        CancellationToken cancellationToken = default);
+        CancellationToken cancellationToken = default,
+        IReadOnlyDictionary<string, string>? expectedArtifactContentDigests = null);
 }
 
 public sealed class ArchitectureAssemblyResolutionService : IArchitectureAssemblyResolutionService
@@ -62,7 +63,8 @@ public sealed class ArchitectureAssemblyResolutionService : IArchitectureAssembl
         CancellationToken cancellationToken = default)
     {
         return Resolve(document, repositoryRoot, discovery, resolveAssemblyOutputs, mode, selectedContractIds,
-            forceIsolatedLoading: false, exactPostBuildAssemblyPaths: null, cancellationToken);
+            forceIsolatedLoading: false, exactPostBuildAssemblyPaths: null,
+            expectedArtifactContentDigests: null, cancellationToken);
     }
 
     public ResolutionResult ResolvePostBuild(
@@ -72,10 +74,12 @@ public sealed class ArchitectureAssemblyResolutionService : IArchitectureAssembl
         bool resolveAssemblyOutputs,
         string? mode,
         HashSet<string>? selectedContractIds,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        IReadOnlyDictionary<string, string>? expectedArtifactContentDigests = null)
     {
         return Resolve(document, repositoryRoot, discovery, resolveAssemblyOutputs, mode, selectedContractIds,
-            forceIsolatedLoading: true, exactPostBuildAssemblyPaths: discovery.ResolvedAssemblyPaths, cancellationToken);
+            forceIsolatedLoading: true, exactPostBuildAssemblyPaths: discovery.ResolvedAssemblyPaths,
+            expectedArtifactContentDigests, cancellationToken);
     }
 
     private ResolutionResult Resolve(
@@ -87,6 +91,7 @@ public sealed class ArchitectureAssemblyResolutionService : IArchitectureAssembl
         HashSet<string>? selectedContractIds,
         bool forceIsolatedLoading,
         IReadOnlyDictionary<string, string>? exactPostBuildAssemblyPaths,
+        IReadOnlyDictionary<string, string>? expectedArtifactContentDigests,
         CancellationToken cancellationToken)
     {
         // A scope: project coverage contract needs every discovered project to reach
@@ -131,7 +136,8 @@ public sealed class ArchitectureAssemblyResolutionService : IArchitectureAssembl
         return document.Analysis.TargetAssemblies.Count == 0 && projectCoverageCanReportUnresolvedProjects
             ? new ResolutionResult(Array.Empty<Assembly>(), Array.Empty<string>(), Array.Empty<string>())
             : ResolveFromDocument(document, repositoryRoot, _fileSystem, _environment, _assemblyLoader,
-                forceIsolatedLoading, exactPostBuildAssemblyPaths, discovery.AssemblySearchPaths, cancellationToken);
+                forceIsolatedLoading, exactPostBuildAssemblyPaths, discovery.AssemblySearchPaths,
+                expectedArtifactContentDigests, cancellationToken);
     }
 
     public ResolutionResult ResolveFromDocument(
@@ -141,7 +147,7 @@ public sealed class ArchitectureAssemblyResolutionService : IArchitectureAssembl
     {
         return ResolveFromDocument(document, repositoryRoot, _fileSystem, _environment, _assemblyLoader,
             forceIsolatedLoading: false, exactPostBuildAssemblyPaths: null, additionalProbingPaths: null,
-            cancellationToken);
+            expectedArtifactContentDigests: null, cancellationToken);
     }
 
     private static ResolutionResult ResolveFromDocument(
@@ -153,6 +159,7 @@ public sealed class ArchitectureAssemblyResolutionService : IArchitectureAssembl
         bool forceIsolatedLoading,
         IReadOnlyDictionary<string, string>? exactPostBuildAssemblyPaths,
         IReadOnlyCollection<string>? additionalProbingPaths,
+        IReadOnlyDictionary<string, string>? expectedArtifactContentDigests,
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(document);
@@ -175,7 +182,7 @@ public sealed class ArchitectureAssemblyResolutionService : IArchitectureAssembl
         IReadOnlyDictionary<string, string> exactPaths = exactPostBuildAssemblyPaths
             ?? new Dictionary<string, string>(StringComparer.Ordinal);
         IArchitectureAssemblyLoadScope? isolatedLoadScope = forceIsolatedLoading
-            ? assemblyLoader.CreateIsolatedLoadScope(probingPaths, exactPaths)
+            ? assemblyLoader.CreateIsolatedLoadScope(probingPaths, exactPaths, expectedArtifactContentDigests)
             : null;
 
         // Ownership of isolatedLoadScope transfers to the returned ResolutionResult only when this
