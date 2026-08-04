@@ -18,8 +18,8 @@ public sealed class EvaluatedBuildInputManifestTests
         File.WriteAllText(linked, "namespace Shared; public class Linked { public int Value; } ");
         EvaluatedBuildInputManifestV1 second = fixture.Collect();
 
-        Assert.That(first.Eligibility, Is.EqualTo(CacheEligibility.CacheIneligible));
-        Assert.That(first.IneligibilityReasons, Does.Contain("evaluated-msbuild-evidence-incomplete"));
+        Assert.That(first.Eligibility, Is.EqualTo(CacheEligibility.VerifiedCacheEligible));
+        Assert.That(first.IneligibilityReasons, Is.Empty);
         Assert.That(second.Digest, Is.Not.EqualTo(first.Digest));
     }
 

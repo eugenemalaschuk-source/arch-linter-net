@@ -85,3 +85,13 @@ Every phase also records `ProcessorTimeMs`, the process CPU-time delta measured 
 | `7c-preparation-failure-completion-path` | Never-built fixture copy, `--no-restore`, no receipts — build-state preflight blocks. |
 
 Scenario 6 ("sequential execution before #408") is not a separate timed variant — every scenario above already runs sequentially, since no parallel-scanning capability exists yet. Scenario 7's "success" path is already demonstrated by scenarios 1–5.
+
+## Post-optimization evidence (issue #409)
+
+`PostOptimizationAnalysisProfileBenchmarkHarness.RunPostOptimizationMatrix`
+produces `docs/internal/analysis-profile-post-optimization-results.json` and
+`docs/internal/analysis-profile-post-optimization-evidence.md`. It adds cache
+first-population/warm-hit and sequential/default-parallel scenarios while
+retaining the strict/audit and sink comparisons. The harness is Explicit/manual
+because its timing is hardware-sensitive; each applicable row contains ten
+valid samples and profile counters remain the correctness gate.

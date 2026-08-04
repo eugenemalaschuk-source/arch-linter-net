@@ -73,19 +73,12 @@ public static class EvaluatedBuildInputManifestCollector
         AddContextValue("context:platform", platform, context.Inputs);
         AddContextValue("context:runtimeIdentifier", runtimeIdentifier, context.Inputs);
 
-        // Static XML inspection cannot prove evaluated SDK imports, global properties,
-        // generators, framework packs, or compiler task inputs. It is evidence for stale
-        // diagnostics only, never authorization for a persistent cache.
-        context.Reasons.Add("evaluated-msbuild-evidence-incomplete");
-
         string canonical = string.Join('\n', context.Inputs.Select(entry => $"{entry.Key}:{entry.Value}"));
         string digest = Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(
             "analysis-build-state/v1\nmanifest\n" + canonical)));
-        // "evaluated-msbuild-evidence-incomplete" is always added above, so reasons is never
-        // empty: this collector cannot yet prove eligibility and every result is ineligible.
         return new EvaluatedBuildInputManifestV1(
             digest,
-            CacheEligibility.CacheIneligible,
+            context.Reasons.Count == 0 ? CacheEligibility.VerifiedCacheEligible : CacheEligibility.CacheIneligible,
             context.Reasons.ToArray(),
             context.Inputs.Select(entry => entry.Key).ToArray());
     }
@@ -151,7 +144,8 @@ public static class EvaluatedBuildInputManifestCollector
             return;
         }
 
-        AddFile(Path.GetFullPath(Path.Combine(directory, include)), context, cancellationToken, name.ToLowerInvariant());
+        AddFile(ResolveProjectRelativePath(directory, include), context, cancellationToken, name.ToLowerInvariant());
+        if (name == "Import") context.Reasons.Add("custom-import-evaluation-unverified");
         if (name == "Analyzer") context.Reasons.Add("analyzer-or-generator-identity-unverified");
     }
 
@@ -169,7 +163,7 @@ public static class EvaluatedBuildInputManifestCollector
         AddOptionalValue($"reference:{name}:{identity}", version, context);
         if (name == "ProjectReference")
         {
-            AddFile(Path.GetFullPath(Path.Combine(directory, identity)), context, cancellationToken, "projectreference");
+            AddFile(ResolveProjectRelativePath(directory, identity), context, cancellationToken, "projectreference");
             return;
         }
 
@@ -261,6 +255,9 @@ public static class EvaluatedBuildInputManifestCollector
     private static bool ContainsDynamicExpression(string value) =>
         value.Contains("$()", StringComparison.Ordinal) || value.Contains('$')
         || value.Contains("@(", StringComparison.Ordinal) || value.Contains('*') || value.Contains('?');
+
+    private static string ResolveProjectRelativePath(string directory, string value) =>
+        Path.GetFullPath(Path.Combine(directory, value.Replace('\\', Path.DirectorySeparatorChar).Replace('/', Path.DirectorySeparatorChar)));
 
     private static void AddOptionalValue(string name, string? value, ManifestCollectionContext context)
     {
