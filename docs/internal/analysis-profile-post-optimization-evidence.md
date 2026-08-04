@@ -9,9 +9,9 @@ deterministic counters, and paired strict/audit profiles are checked in as
 [`analysis-profile-post-optimization-results.json`](analysis-profile-post-optimization-results.json).
 
 The manual `PostOptimizationAnalysisProfileBenchmarkHarness` ran the **Debug**
-CLI built from final runtime commit `903061c6b019127da921c903284cd05441e5d11e`
+CLI built from final runtime commit `e1da749cff29bb921478d78d703d2ad9d9f8fdb3`
 (file version `0.1.0.0`, assembly SHA-256
-`d04c6114b9233ec624d1f44c185ea3c39a62a86ff174578eccb12c65887881b0`) on
+`358f69192eb01990bbb68f7c4a881a5051972085269b1e04e3cd804f1a9d0248`) on
 macOS 15.7.7 x64, .NET 10.0.10, six logical processors. `Analysis-only`
 excludes preflight and output; `Command total` includes all measured work.
 
@@ -19,25 +19,25 @@ excludes preflight and output; `Command total` includes all measured work.
 
 | Scenario | Analysis median / p95 (ms) | Command median / p95 (ms) | Wall-clock median / p95 (ms) | Allocation median / p95 (bytes) |
 |---|---:|---:|---:|---:|
-| Warm strict, cache disabled | 518 / 1060 | 6025.5 / 7595 | 6505.5 / 8230.9 | 13,371,092 / 13,388,488 |
-| Cache first population | 784 / 964 | 5324.5 / 6246 | 5977.0 / 7005.7 | 137,526,392 / 137,560,040 |
-| Verified warm cache hit | 619.5 / 723 | 4924 / 5282 | 5308.1 / 5664.8 | 66,949,168 / 66,954,352 |
-| Sequential (`--max-parallelism 1`) | 437 / 514 | 4684 / 4926 | 5058.1 / 5340.2 | 13,371,744 / 13,401,800 |
-| Default bounded parallelism | 442.5 / 456 | 4577 / 4817 | 4959.4 / 5193.3 | 13,911,952 / 13,927,064 |
-| Separate strict + audit processes | 822 / 851 | 9295 / 9452 | 10048.0 / 10200.8 | 26,423,256 / 26,440,856 |
-| Combined strict + audit session | 417.5 / 443 | 4603.5 / 4859 | 4997.4 / 5262.2 | 13,760,104 / 13,777,424 |
-| One report sink | 441 / 446 | 4607 / 4797 | 4981.6 / 5166.5 | 13,548,168 / 13,580,248 |
-| Human + JSON + SARIF sinks | 437.5 / 442 | 4532 / 4793 | 4905.8 / 5166.6 | 13,660,652 / 13,677,320 |
+| Warm strict, cache disabled | 428.5 / 433 | 4533 / 4669 | 4892.4 / 5028.1 | 13,370,848 / 13,375,872 |
+| Cache first population | 733 / 864 | 4813 / 4976 | 5414.7 / 5577.5 | 137,530,428 / 137,539,552 |
+| Verified warm cache hit | 605.5 / 623 | 4725 / 4846 | 5081.3 / 5209.4 | 66,949,236 / 67,010,624 |
+| Sequential (`--max-parallelism 1`) | 435.5 / 478 | 4475 / 4660 | 4836.6 / 5018.8 | 13,370,848 / 13,387,176 |
+| Default bounded parallelism | 434.5 / 449 | 4468.5 / 4566 | 4825.4 / 4926.8 | 13,912,808 / 13,928,912 |
+| Separate strict + audit processes | 812 / 837 | 8940.5 / 9099 | 9657.7 / 9854.6 | 26,423,388 / 26,446,920 |
+| Combined strict + audit session | 412 / 420 | 4471.5 / 4701 | 4849.8 / 5085.0 | 13,759,892 / 13,777,832 |
+| One report sink | 428.5 / 465 | 4478.5 / 4885 | 4840.9 / 5261.1 | 13,548,060 / 13,559,888 |
+| Human + JSON + SARIF sinks | 433 / 461 | 4529 / 4677 | 4889.9 / 5148.9 | 13,659,364 / 13,679,776 |
 
 ## #374 baseline comparison
 
 | Comparable scenario | #374 baseline median (ms) | Post median (ms) | Delta (ms) |
 |---|---:|---:|---:|
-| Immediate warm strict | 344 | 518 | +174 |
-| Separate strict + audit | 687.5 | 822 | +134.5 |
-| Combined strict + audit | 329.5 | 417.5 | +88 |
-| One report sink | 343.5 | 441 | +97.5 |
-| Three report sinks | 348 | 437.5 | +89.5 |
+| Immediate warm strict | 344 | 428.5 | +84.5 |
+| Separate strict + audit | 687.5 | 812 | +124.5 |
+| Combined strict + audit | 329.5 | 412 | +82.5 |
+| One report sink | 343.5 | 428.5 | +85 |
+| Three report sinks | 348 | 433 | +85 |
 
 The #374 corpus did not measure comparable verified-cache or bounded-parallel
 counters; those scenarios are therefore reported as new evidence, not invented
