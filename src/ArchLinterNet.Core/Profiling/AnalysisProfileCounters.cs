@@ -73,6 +73,22 @@ public sealed record AnalysisProfileCounters
             ContractFamilyResultCounts = snapshotCounters.ContractFamilyResultCounts,
             RenderedSinkCount = renderedSinkCount,
             OutputSinkCount = outputSinkCount,
+            Concurrency = BuildConcurrencyCounters(snapshotCounters),
+        };
+    }
+
+    private static AnalysisProfileConcurrencyCounters BuildConcurrencyCounters(
+        ArchitectureAnalysisSnapshotCounters snapshotCounters)
+    {
+        bool active = snapshotCounters.ParallelScheduledWorkItems > 0;
+        return new AnalysisProfileConcurrencyCounters
+        {
+            Status = active ? AnalysisProfileReservedFieldStatus.Active : AnalysisProfileReservedFieldStatus.NotApplicable,
+            MaxParallelism = snapshotCounters.MaxParallelism,
+            ScheduledWorkItems = snapshotCounters.ParallelScheduledWorkItems,
+            CompletedWorkItems = snapshotCounters.ParallelCompletedWorkItems,
+            ObservedMaxConcurrency = snapshotCounters.ParallelObservedMaxConcurrency,
+            MergeOperations = snapshotCounters.ParallelMergeOperations,
         };
     }
 }

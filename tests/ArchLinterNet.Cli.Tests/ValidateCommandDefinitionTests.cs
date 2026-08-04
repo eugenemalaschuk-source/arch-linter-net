@@ -118,6 +118,25 @@ public sealed class ValidateCommandDefinitionTests
         Assert.That(runtime.LastTiming, Is.Not.Null);
     }
 
+    // Issue #408: --max-parallelism reaches ValidationRequest.MaxParallelism unchanged; omitting it
+    // leaves the request's resolution to Core (MaxParallelismResolver). See
+    // openspec/specs/bounded-parallel-scanning/spec.md.
+    [Test]
+    public void CreateRootCommand_MaxParallelismOption_IsPropagated()
+    {
+        (RecordingRuntime runtime, _) = Run(["--max-parallelism", "8"]);
+
+        Assert.That(runtime.LastRequest!.MaxParallelism, Is.EqualTo(8));
+    }
+
+    [Test]
+    public void CreateRootCommand_WithoutMaxParallelismOption_LeavesRequestValueNull()
+    {
+        (RecordingRuntime runtime, _) = Run([]);
+
+        Assert.That(runtime.LastRequest!.MaxParallelism, Is.Null);
+    }
+
     [Test]
     public void CreateRootCommand_ReportOption_AcceptsValidReportSink()
     {

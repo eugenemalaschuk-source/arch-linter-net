@@ -38,6 +38,9 @@ public sealed record AnalysisSnapshotRequest
     // See ValidationRequest.CacheLocation — null leaves the cache completely uninvolved.
     public AnalysisCacheLocation? CacheLocation { get; init; }
 
+    // See ValidationRequest.MaxParallelism.
+    public int? MaxParallelism { get; init; }
+
     public CancellationToken CancellationToken { get; init; } = default;
 
     public ValidationRequest ForMode(string mode)
@@ -59,6 +62,7 @@ public sealed record AnalysisSnapshotRequest
             RequestedPlatform = RequestedPlatform,
             RequestedRuntimeIdentifier = RequestedRuntimeIdentifier,
             CacheLocation = CacheLocation,
+            MaxParallelism = MaxParallelism,
             CancellationToken = CancellationToken
         };
     }
@@ -81,6 +85,7 @@ public sealed record AnalysisSnapshotRequest
             RequestedPlatform = request.RequestedPlatform,
             RequestedRuntimeIdentifier = request.RequestedRuntimeIdentifier,
             CacheLocation = request.CacheLocation,
+            MaxParallelism = request.MaxParallelism,
             CancellationToken = request.CancellationToken
         };
     }

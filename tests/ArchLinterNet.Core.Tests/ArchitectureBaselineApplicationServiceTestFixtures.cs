@@ -38,7 +38,8 @@ internal sealed class FakeRunnerSetupService : IArchitectureRunnerSetupService
         bool enableUnmatchedIgnoreTracking = true,
         ValidationTiming? timing = null,
         string? mode = null,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        int? maxParallelism = null)
     {
         BuildRunnerCalled = true;
         SelectedContractIdsReceived = selectedContractIds;
@@ -50,10 +51,10 @@ internal sealed class FakeRunnerSetupService : IArchitectureRunnerSetupService
         ArchitectureContractDocument document, string policyPath, string? conditionSetName = null,
         IReadOnlyList<string>? preprocessorSymbols = null, HashSet<string>? selectedContractIds = null,
         bool enableUnmatchedIgnoreTracking = true, ValidationTiming? timing = null, string? mode = null,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default, int? maxParallelism = null)
     {
         return BuildRunner(document, policyPath, conditionSetName, preprocessorSymbols, selectedContractIds,
-            enableUnmatchedIgnoreTracking, timing, mode, cancellationToken);
+            enableUnmatchedIgnoreTracking, timing, mode, cancellationToken, maxParallelism);
     }
 }
 
