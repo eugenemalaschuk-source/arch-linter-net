@@ -15,6 +15,10 @@ public sealed record ArchitectureRunnerPreparation(
     IReadOnlyList<string> MissingAssemblyNames,
     bool IsMetadataReferenceClosureComplete)
 {
+    public IReadOnlyList<string> PreparedProjectPaths => ProjectDiscovery.DiscoveredProjects
+        .Select(project => Path.GetFullPath(Path.Combine(RepositoryRoot, project.Path)))
+        .ToArray();
+
     public bool HasCompleteRootSelection => MissingAssemblyNames.Count == 0;
 
     public bool HasCompleteArtifactSelection => HasCompleteRootSelection && IsMetadataReferenceClosureComplete;

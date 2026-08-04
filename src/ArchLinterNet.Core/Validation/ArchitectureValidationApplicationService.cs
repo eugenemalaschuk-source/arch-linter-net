@@ -180,9 +180,7 @@ public sealed class ArchitectureValidationApplicationService(
                 preparedRepositoryRoot: preparation.RepositoryRoot,
                 preparedArtifactPaths: preparation.SelectedAssemblyArtifactPaths,
                 preparedArtifactContentDigests: preparation.CapturedArtifactContentDigests,
-                preparedProjectPaths: preparation.ProjectDiscovery.DiscoveredProjects
-                    .Select(project => Path.GetFullPath(Path.Combine(preparation.RepositoryRoot, project.Path)))
-                    .ToArray(),
+                preparedProjectPaths: preparation.PreparedProjectPaths,
                 preparedArtifactClosureComplete: preparation.HasCompleteArtifactSelection,
                 materializeSetup: () => preparation.HasCompleteRootSelection
                     ? runnerSetupService.MaterializePreparedRunner(

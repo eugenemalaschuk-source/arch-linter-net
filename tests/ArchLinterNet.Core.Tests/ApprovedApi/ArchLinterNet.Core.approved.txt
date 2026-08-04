@@ -1656,6 +1656,7 @@ sealed class ArchLinterNet.Core.Execution.ArchitectureRunnerPreparation : System
   property ArchLinterNet.Core.Discovery.ProjectDiscoveryResult ProjectDiscovery {get;init;}
   property System.Collections.Generic.IReadOnlyDictionary<string,string> CapturedArtifactContentDigests {get;init;}
   property System.Collections.Generic.IReadOnlyList<string> MissingAssemblyNames {get;init;}
+  property System.Collections.Generic.IReadOnlyList<string> PreparedProjectPaths {get;}
   property System.Collections.Generic.IReadOnlyList<string> SelectedAssemblyArtifactPaths {get;init;}
   property System.Collections.Generic.IReadOnlyList<string>? PreprocessorSymbols {get;init;}
   property bool HasCompleteArtifactSelection {get;}
