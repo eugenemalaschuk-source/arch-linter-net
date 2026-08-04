@@ -1,5 +1,6 @@
 using System.Reflection;
 using ArchLinterNet.Core.Execution;
+using ArchLinterNet.Core.Scanning;
 using NUnit.Framework;
 
 namespace ArchLinterNet.Core.Tests;
@@ -110,5 +111,63 @@ public sealed class ArchitectureTypeIndexBoundedParallelTests
 
         Assert.That(thrown, Is.InstanceOf<OperationCanceledException>());
         Assert.That(thrown, Is.Not.InstanceOf<AggregateException>());
+    }
+
+    // Issue #408 review: a pre-cancelled token never actually reaches the per-partition delegate's
+    // own check, since BoundedParallelPartitionRunner's real Run() (sequential or parallel path)
+    // already refuses to schedule any iteration against an already-cancelled token — the test
+    // above proves overall behavior but not this specific boundary. This test isolates the real
+    // per-partition delegate LoadAllTypes() builds (the actual production lambda, not a hand-rolled
+    // stand-in) using a fake IBoundedParallelPartitionRunner that performs NO cancellation check of
+    // its own before invoking it, so the delegate's own
+    // `_cancellationToken.ThrowIfCancellationRequested()` is the only thing that can stop it — and
+    // an injectable type-loading provider proves it was never invoked, not merely that the overall
+    // call eventually threw (GetLoadableTypes' own later per-type check would also eventually throw
+    // for a non-empty assembly, which would let a removed boundary check go undetected by a
+    // black-box "did it throw" assertion alone).
+    [Test]
+    public void AllTypes_RealPerPartitionDelegate_ChecksCancellationBeforeInvokingTypeProvider()
+    {
+        using CancellationTokenSource cts = new();
+        cts.Cancel();
+        bool providerInvoked = false;
+
+        var index = new ArchitectureTypeIndex(
+            _manyAssemblies,
+            maxParallelism: 4,
+            profilingCounters: null,
+            cts.Token,
+            partitionRunner: new NoCancellationCheckPartitionRunner(),
+            loadableTypesProvider: (assembly, token) =>
+            {
+                providerInvoked = true;
+                return ArchitectureTypeScanner.GetLoadableTypes(assembly, token);
+            });
+
+        Assert.Throws<OperationCanceledException>(() => index.AllTypes());
+        Assert.That(providerInvoked, Is.False);
+    }
+
+    private sealed class NoCancellationCheckPartitionRunner : IBoundedParallelPartitionRunner
+    {
+        public TResult[] Run<TItem, TResult>(
+            IReadOnlyList<TItem> items,
+            int effectiveMaxParallelism,
+            Func<TItem, int, TResult> computePartition,
+            CancellationToken cancellationToken,
+            AnalysisSessionProfilingCounters? profilingCounters = null,
+            int parallelEligibilityThreshold = BoundedParallelPartitionRunner.DefaultParallelEligibilityThreshold)
+        {
+            TResult[] results = new TResult[items.Count];
+            for (int i = 0; i < items.Count; i++)
+            {
+                // Deliberately no cancellation check here — the point of this fake is to isolate
+                // whether the caller-supplied delegate observes cancellation on its own, rather
+                // than inheriting that guarantee from the runner's own pre-iteration check.
+                results[i] = computePartition(items[i], i);
+            }
+
+            return results;
+        }
     }
 }

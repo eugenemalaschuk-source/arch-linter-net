@@ -90,12 +90,26 @@ internal sealed class BoundedParallelPartitionRunner : IBoundedParallelPartition
             // observes cancellation between iterations, before ever invoking every delegate — the
             // deterministic scan below still runs and reports the correct outcome either way.
         }
-        catch (AggregateException)
+        catch (AggregateException aggregate)
         {
             // Every exception a partition delegate can throw is already caught and recorded into
-            // `failures` above, so this should be unreachable in practice; kept as a safety net
-            // rather than trusted for exception selection (which the scan below performs
-            // deterministically by partition index instead).
+            // `failures` above, so Parallel.For itself throwing here should be unreachable in
+            // practice — but silently swallowing it here would risk falling through to the merge
+            // below and returning partial/default results as if the run had succeeded. Surface any
+            // genuine (non-cancellation) failure the same deterministic way as a partition-captured
+            // one; only let this be a no-op when every inner exception really is cancellation tied
+            // to the caller's own token, in which case the check below reports it correctly.
+            IReadOnlyCollection<Exception> outerInner = aggregate.Flatten().InnerExceptions;
+            Exception? outerGenuineFailure = outerInner.FirstOrDefault(static e => e is not OperationCanceledException);
+            if (outerGenuineFailure is not null)
+            {
+                ExceptionDispatchInfo.Capture(outerGenuineFailure).Throw();
+            }
+
+            if (!cancellationToken.IsCancellationRequested)
+            {
+                throw;
+            }
         }
 
         // Deterministic: the lowest-index partition with a genuine (non-cancellation) failure

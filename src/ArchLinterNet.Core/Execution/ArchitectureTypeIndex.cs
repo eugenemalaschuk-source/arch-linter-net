@@ -12,6 +12,7 @@ public sealed class ArchitectureTypeIndex
     private readonly int _maxParallelism;
     private readonly AnalysisSessionProfilingCounters? _profilingCounters;
     private readonly IBoundedParallelPartitionRunner _partitionRunner;
+    private readonly Func<Assembly, CancellationToken, IEnumerable<Type>> _loadableTypesProvider;
     private readonly CancellationToken _cancellationToken;
     private readonly Lazy<Type[]> _allTypes;
 
@@ -25,12 +26,14 @@ public sealed class ArchitectureTypeIndex
         int maxParallelism,
         AnalysisSessionProfilingCounters? profilingCounters,
         CancellationToken cancellationToken = default,
-        IBoundedParallelPartitionRunner? partitionRunner = null)
+        IBoundedParallelPartitionRunner? partitionRunner = null,
+        Func<Assembly, CancellationToken, IEnumerable<Type>>? loadableTypesProvider = null)
     {
         _targetAssemblies = targetAssemblies ?? throw new ArgumentNullException(nameof(targetAssemblies));
         _maxParallelism = maxParallelism;
         _profilingCounters = profilingCounters;
         _partitionRunner = partitionRunner ?? new BoundedParallelPartitionRunner();
+        _loadableTypesProvider = loadableTypesProvider ?? ArchitectureTypeScanner.GetLoadableTypes;
         _cancellationToken = cancellationToken;
         _allTypes = new Lazy<Type[]>(LoadAllTypes);
     }
@@ -101,9 +104,12 @@ public sealed class ArchitectureTypeIndex
             {
                 // Checked before the potentially long Assembly.GetTypes() call inside
                 // GetLoadableTypes, not only inside its own per-type iterator — matches the
-                // sequential path's per-assembly boundary check.
+                // sequential path's per-assembly boundary check. See
+                // ArchitectureTypeIndexBoundedParallelTests for a regression test that proves this
+                // specific line — not the partition runner's own pre-iteration check, nor
+                // GetLoadableTypes' own later per-type check — is what stops execution here.
                 _cancellationToken.ThrowIfCancellationRequested();
-                return ArchitectureTypeScanner.GetLoadableTypes(assembly, _cancellationToken).ToArray();
+                return _loadableTypesProvider(assembly, _cancellationToken).ToArray();
             },
             _cancellationToken,
             _profilingCounters);
