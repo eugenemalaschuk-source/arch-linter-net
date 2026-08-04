@@ -63,20 +63,14 @@ public sealed class BoundedParallelScanningTestingApiIntegrationTests
         Assert.Throws<ArgumentException>(() => builder.ValidateStrict());
     }
 
+    // Note: this fixture's policy targets a single assembly with no source roots, so its scanning
+    // phases always take the sequential path (partition count below the parallel-eligibility
+    // threshold) regardless of the requested max parallelism — real end-to-end evidence that
+    // MaxParallelism is *not* leaked when Status is NotApplicable lives in
+    // AnalysisProfileBuilderTests (unit-level, where the parallel-eligible case can be simulated
+    // directly instead of depending on a real multi-assembly target set to force scheduling).
     [Test]
-    public void ValidateStrict_WithProfileAndDefaultMaxParallelism_ReportsResolvedMaxParallelism()
-    {
-        ArchitectureValidationResult result =
-            new ArchitectureValidationBuilder(WriteHarmlessPolicy()).WithProfile().ValidateStrict();
-
-        Assert.That(result.Profile, Is.Not.Null);
-        Assert.That(
-            result.Profile!.Counters.Concurrency.MaxParallelism,
-            Is.EqualTo(Math.Max(1, Math.Min(Environment.ProcessorCount, 4))));
-    }
-
-    [Test]
-    public void ValidateStrict_WithProfileAndMaxParallelismOne_ReportsNotApplicableConcurrency()
+    public void ValidateStrict_WithProfileAndMaxParallelismOne_ReportsNotApplicableConcurrencyWithMaxParallelismZeroed()
     {
         ArchitectureValidationResult result = new ArchitectureValidationBuilder(WriteHarmlessPolicy())
             .WithProfile()
@@ -84,9 +78,13 @@ public sealed class BoundedParallelScanningTestingApiIntegrationTests
             .ValidateStrict();
 
         Assert.That(result.Profile, Is.Not.Null);
-        Assert.That(
-            result.Profile!.Counters.Concurrency.Status,
-            Is.EqualTo(AnalysisProfileReservedFieldStatus.NotApplicable));
+        Assert.Multiple(() =>
+        {
+            Assert.That(
+                result.Profile!.Counters.Concurrency.Status,
+                Is.EqualTo(AnalysisProfileReservedFieldStatus.NotApplicable));
+            Assert.That(result.Profile.Counters.Concurrency.MaxParallelism, Is.EqualTo(0));
+        });
     }
 
     // Bounded parallel scanning must not change the existing per-mode cache-lookup-then-scan

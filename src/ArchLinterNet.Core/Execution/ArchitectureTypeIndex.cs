@@ -97,7 +97,14 @@ public sealed class ArchitectureTypeIndex
         Type[][] perAssemblyTypes = _partitionRunner.Run(
             assemblies,
             _maxParallelism,
-            (assembly, _) => ArchitectureTypeScanner.GetLoadableTypes(assembly, _cancellationToken).ToArray(),
+            (assembly, _) =>
+            {
+                // Checked before the potentially long Assembly.GetTypes() call inside
+                // GetLoadableTypes, not only inside its own per-type iterator — matches the
+                // sequential path's per-assembly boundary check.
+                _cancellationToken.ThrowIfCancellationRequested();
+                return ArchitectureTypeScanner.GetLoadableTypes(assembly, _cancellationToken).ToArray();
+            },
             _cancellationToken,
             _profilingCounters);
 

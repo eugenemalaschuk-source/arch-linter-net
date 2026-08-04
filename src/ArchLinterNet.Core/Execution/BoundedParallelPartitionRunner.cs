@@ -1,3 +1,5 @@
+using System.Runtime.ExceptionServices;
+
 namespace ArchLinterNet.Core.Execution;
 
 // Partition-then-deterministic-merge helper shared by ArchitectureTypeIndex.LoadAllTypes and
@@ -71,12 +73,24 @@ internal sealed class BoundedParallelPartitionRunner
         }
         catch (AggregateException aggregate)
         {
-            OperationCanceledException? cancellation = aggregate.InnerExceptions
-                .OfType<OperationCanceledException>()
-                .FirstOrDefault();
-            if (cancellation is not null)
+            // A genuine partition failure must never be masked as cancellation just because another
+            // concurrently-running partition also observed cancellation and threw
+            // OperationCanceledException — thread scheduling determines which inner exception a
+            // naive "first cancellation wins" check would pick, which could silently discard a real
+            // bug. Surface any non-cancellation failure first, deterministically and with its
+            // original stack trace preserved; only report cancellation once every inner exception is
+            // confirmed to be one, and only using the caller's own token (never a stray
+            // OperationCanceledException a partition happened to throw for an unrelated reason).
+            IReadOnlyCollection<Exception> inner = aggregate.Flatten().InnerExceptions;
+            Exception? genuineFailure = inner.FirstOrDefault(static e => e is not OperationCanceledException);
+            if (genuineFailure is not null)
             {
-                throw cancellation;
+                ExceptionDispatchInfo.Capture(genuineFailure).Throw();
+            }
+
+            if (cancellationToken.IsCancellationRequested)
+            {
+                throw new OperationCanceledException(cancellationToken);
             }
 
             throw;

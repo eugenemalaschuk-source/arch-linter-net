@@ -197,11 +197,14 @@ public sealed class AnalysisProfileBuilderTests
     }
 
     [Test]
-    public void Build_SequentialModeRun_ReportsNotApplicableConcurrencyDespiteResolvedMaxParallelism()
+    public void Build_SequentialModeRun_ReportsNotApplicableConcurrencyWithMaxParallelismZeroed()
     {
+        // MaxParallelism is otherwise "the resolved effective degree regardless of whether it was
+        // used" — but the NotApplicable/all-zero contract takes precedence, so a resolved value of
+        // 1 (or any other) must not leak through when no phase actually ran in parallel.
         ArchitectureAnalysisSnapshotCounters counters = Counters() with
         {
-            MaxParallelism = 1,
+            MaxParallelism = 4,
             ParallelScheduledWorkItems = 0,
         };
 
@@ -209,7 +212,11 @@ public sealed class AnalysisProfileBuilderTests
             counters, timing: null, renderedSinkCount: 1, outputSinkCount: 1,
             AnalysisProfileCompletionStatus.Success, cancellationObserved: false);
 
-        Assert.That(profile.Counters.Concurrency.Status, Is.EqualTo(AnalysisProfileReservedFieldStatus.NotApplicable));
+        Assert.Multiple(() =>
+        {
+            Assert.That(profile.Counters.Concurrency.Status, Is.EqualTo(AnalysisProfileReservedFieldStatus.NotApplicable));
+            Assert.That(profile.Counters.Concurrency.MaxParallelism, Is.EqualTo(0));
+        });
     }
 
     [TestCase(AnalysisProfileCompletionStatus.Success)]

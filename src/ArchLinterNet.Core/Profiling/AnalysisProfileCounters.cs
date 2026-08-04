@@ -77,13 +77,22 @@ public sealed record AnalysisProfileCounters
         };
     }
 
+    // NotApplicable means every numeric field is 0 — including MaxParallelism, which is otherwise
+    // "the resolved degree regardless of whether it was used" and must not leak through when no
+    // phase actually ran in parallel. See
+    // openspec/specs/analysis-profile/spec.md, "Cache and concurrency fields are populated when
+    // their capability is active".
     private static AnalysisProfileConcurrencyCounters BuildConcurrencyCounters(
         ArchitectureAnalysisSnapshotCounters snapshotCounters)
     {
-        bool active = snapshotCounters.ParallelScheduledWorkItems > 0;
+        if (snapshotCounters.ParallelScheduledWorkItems <= 0)
+        {
+            return new AnalysisProfileConcurrencyCounters();
+        }
+
         return new AnalysisProfileConcurrencyCounters
         {
-            Status = active ? AnalysisProfileReservedFieldStatus.Active : AnalysisProfileReservedFieldStatus.NotApplicable,
+            Status = AnalysisProfileReservedFieldStatus.Active,
             MaxParallelism = snapshotCounters.MaxParallelism,
             ScheduledWorkItems = snapshotCounters.ParallelScheduledWorkItems,
             CompletedWorkItems = snapshotCounters.ParallelCompletedWorkItems,
