@@ -199,6 +199,17 @@ public sealed class ArchitectureAssemblyResolutionServiceCancellationTests
                 Assert.That(
                     inventory.LoadedAssemblyArtifacts.Single().AssemblyContentDigest,
                     Is.EqualTo(BuildStateCanonicalHasher.ComputeContentDigest(copiedCorePath)));
+                // BytesLoaded is the exact byte count captured from the stream(s) actually handed to
+                // AssemblyLoadContext.LoadFromStream — no .pdb was copied alongside copiedCorePath
+                // here, so this must equal just the dll's own length, not dll+pdb.
+                Assert.That(
+                    inventory.LoadedAssemblyArtifacts.Single().BytesLoaded,
+                    Is.EqualTo(new FileInfo(copiedCorePath).Length));
+                // No .pdb was copied alongside copiedCorePath, so PdbContentDigest must be the
+                // "missing" sentinel rather than a real hash.
+                Assert.That(
+                    inventory.LoadedAssemblyArtifacts.Single().PdbContentDigest,
+                    Is.EqualTo("missing"));
 
                 Assert.That(
                     inventory.LoadedAssemblyArtifacts.Select(artifact => artifact.AssemblyPath),
