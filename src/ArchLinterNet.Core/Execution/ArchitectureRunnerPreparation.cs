@@ -11,6 +11,7 @@ public sealed record ArchitectureRunnerPreparation(
     ProjectDiscoveryResult ProjectDiscovery,
     bool ResolveAssemblyOutputs,
     IReadOnlyList<string> SelectedAssemblyArtifactPaths,
+    IReadOnlyDictionary<string, string> CapturedArtifactContentDigests,
     IReadOnlyList<string> MissingAssemblyNames,
     bool IsMetadataReferenceClosureComplete)
 {

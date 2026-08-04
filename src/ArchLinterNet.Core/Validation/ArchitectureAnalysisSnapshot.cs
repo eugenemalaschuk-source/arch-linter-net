@@ -32,9 +32,11 @@ public sealed class ArchitectureAnalysisSnapshot : IDisposable
     private readonly IArchitectureContractHandlerRegistry _handlerRegistry;
     private readonly IReadOnlyCollection<string>? _requestedContractIds;
     private readonly AnalysisSnapshotCacheContext? _cacheContext;
+    private readonly CancellationToken _cancellationToken;
     private AnalysisSessionProfilingCounters? _profilingCounters;
     private readonly Func<ArchitectureRunnerSetup>? _materializeSetup;
     private readonly IReadOnlyList<string> _preparedArtifactPaths;
+    private readonly IReadOnlyDictionary<string, string> _preparedArtifactContentDigests;
     private readonly IReadOnlyList<string> _preparedProjectPaths;
     private readonly bool _preparedArtifactClosureComplete;
     private readonly object _gate = new();
@@ -64,9 +66,11 @@ public sealed class ArchitectureAnalysisSnapshot : IDisposable
         AnalysisSnapshotCacheContext? cacheContext = null,
         string? preparedRepositoryRoot = null,
         IReadOnlyList<string>? preparedArtifactPaths = null,
+        IReadOnlyDictionary<string, string>? preparedArtifactContentDigests = null,
         IReadOnlyList<string>? preparedProjectPaths = null,
         bool preparedArtifactClosureComplete = true,
-        Func<ArchitectureRunnerSetup>? materializeSetup = null)
+        Func<ArchitectureRunnerSetup>? materializeSetup = null,
+        CancellationToken cancellationToken = default)
     {
         _document = document;
         _setup = setup;
@@ -82,9 +86,12 @@ public sealed class ArchitectureAnalysisSnapshot : IDisposable
         _handlerRegistry = handlerRegistry;
         _requestedContractIds = requestedContractIds;
         _cacheContext = cacheContext;
+        _cancellationToken = cancellationToken;
         _profilingCounters = setup?.Runner.Session.Context.ProfilingCounters;
         _materializeSetup = materializeSetup;
         _preparedArtifactPaths = preparedArtifactPaths ?? Array.Empty<string>();
+        _preparedArtifactContentDigests = preparedArtifactContentDigests
+            ?? new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         _preparedProjectPaths = preparedProjectPaths ?? Array.Empty<string>();
         _preparedArtifactClosureComplete = preparedArtifactClosureComplete
             && (setup is null || setup.Runner.Session.Context.SelectedAssemblyArtifactPaths.Count > 0);
@@ -215,8 +222,8 @@ public sealed class ArchitectureAnalysisSnapshot : IDisposable
                 // per mode, keeps combined execution semantically equivalent to separate runs.
                 EnsureRequestedContractIdsAreKnownForMode(mode);
 
-                ValidationOutcome? cacheCandidate = TryEvaluateFromCache(mode, timing);
-                ValidationOutcome? cachedOutcome = _preflight.Blocked ? null : cacheCandidate;
+                _cancellationToken.ThrowIfCancellationRequested();
+                ValidationOutcome? cachedOutcome = _preflight.Blocked ? null : TryEvaluateFromCache(mode, timing);
                 ValidationOutcome outcome = cachedOutcome
                     ?? (_preflight.Blocked ? BuildBlockedOutcome() : EvaluateCore(mode, timing));
 
@@ -232,7 +239,8 @@ public sealed class ArchitectureAnalysisSnapshot : IDisposable
                         outcome,
                         authorization,
                         artifacts.Paths,
-                        artifacts.CapturedIdentities);
+                        artifacts.CapturedIdentities,
+                        CreateWorkProvenance());
                 }
 
                 _evaluatedModes[mode] = outcome;
@@ -417,15 +425,6 @@ public sealed class ArchitectureAnalysisSnapshot : IDisposable
 
     // A cache hit reconstructs its outcome without materializing the runner or executing contracts.
     // Metadata planning still precedes lookup; the lazy runner materializes only after a miss.
-    // Finding #3: the session cancellation token is threaded through the entire lookup —
-    // ComputePolicyDigest (which hashes every policy file's content and can be a real I/O-bound
-    // operation for a large import graph) and TryLookup (which recomputes a #406 manifest per
-    // discovered project) both observe it, and a hit is never accepted once cancellation has been
-    // requested. Falling back to null here (rather than accepting a stale/racy hit) means Evaluate's
-    // caller proceeds into EvaluateCore, whose own ThrowIfCancellationRequested calls immediately
-    // surface the real OperationCanceledException — cancellation here never silently turns into an
-    // unexplained cache-derived result, it just defers to the same cancellation path recomputation
-    // already uses.
     private ValidationOutcome? TryEvaluateFromCache(string mode, ValidationTiming? timing)
     {
         if (_cacheContext is not { } cache)
@@ -446,7 +445,8 @@ public sealed class ArchitectureAnalysisSnapshot : IDisposable
             return null;
         }
 
-        CancellationToken cancellationToken = _setup?.Runner.Session.Context.CancellationToken ?? default;
+        CancellationToken cancellationToken = _setup?.Runner.Session.Context.CancellationToken ?? _cancellationToken;
+        cancellationToken.ThrowIfCancellationRequested();
 
         ArchitectureAnalysisContext? context = _setup?.Runner.Session.Context;
         bool cacheArtifactClosureComplete = context?.MaterializeCacheArtifactReferences(cancellationToken)
@@ -513,28 +513,14 @@ public sealed class ArchitectureAnalysisSnapshot : IDisposable
             return null;
         }
 
-        ArchitectureContractCatalog catalog = ArchitectureContractCatalog.Build(_document);
-        int avoidedContracts = catalog.ContractsFor(mode)
-            .Count(contract => _requestedContractIds is null || _requestedContractIds.Count == 0
-                || (contract.Id is not null && _requestedContractIds.Contains(contract.Id)));
-        long avoidedBytes = _preparedArtifactPaths.Sum(path =>
-        {
-            try
-            {
-                return new FileInfo(path).Length;
-            }
-            catch (IOException)
-            {
-                return 0L;
-            }
-        });
+        AnalysisCacheWorkProvenanceV1 work = lookup.Entry.WorkProvenance;
         _counters = _counters with
         {
-            AvoidedAssemblyLoads = _counters.AvoidedAssemblyLoads + GetSelectedAssemblyArtifactPaths().Count,
-            AvoidedFactIndexMaterializations = _counters.AvoidedFactIndexMaterializations + (avoidedContracts > 0 ? 1 : 0),
-            AvoidedSourceScanPasses = _counters.AvoidedSourceScanPasses + (HasExplicitSourceRoots() ? 1 : 0),
-            AvoidedContractExecutions = _counters.AvoidedContractExecutions + avoidedContracts,
-            AvoidedArtifactBytesLoaded = _counters.AvoidedArtifactBytesLoaded + avoidedBytes,
+            AvoidedAssemblyLoads = _counters.AvoidedAssemblyLoads + work.AssemblyLoads,
+            AvoidedFactIndexMaterializations = _counters.AvoidedFactIndexMaterializations + work.FactIndexMaterializations,
+            AvoidedSourceScanPasses = _counters.AvoidedSourceScanPasses + work.SourceScanPasses,
+            AvoidedContractExecutions = _counters.AvoidedContractExecutions + work.ContractExecutions,
+            AvoidedArtifactBytesLoaded = _counters.AvoidedArtifactBytesLoaded + work.ArtifactBytesLoaded,
         };
 
         return AnalysisCacheOutcomeMapper.FromCacheOutcome(
@@ -593,6 +579,11 @@ public sealed class ArchitectureAnalysisSnapshot : IDisposable
             paths.Add(assemblyPath);
             paths.Add(Path.ChangeExtension(assemblyPath, ".pdb"));
             paths.Add(BuildReceiptStore.ReceiptPathFor(assemblyPath));
+        }
+
+        foreach ((string path, string digest) in _preparedArtifactContentDigests)
+        {
+            AddCaptured(path, digest);
         }
 
         return new CacheArtifactEvidence(paths.ToArray(), captures.Values.ToArray());
@@ -667,6 +658,17 @@ public sealed class ArchitectureAnalysisSnapshot : IDisposable
 
     private IReadOnlyList<ArchitectureLoadedAssemblyArtifact> GetLoadedAssemblyArtifacts() =>
         _setup?.Runner.Session.Context.LoadedAssemblyArtifacts ?? Array.Empty<ArchitectureLoadedAssemblyArtifact>();
+
+    private AnalysisCacheWorkProvenanceV1 CreateWorkProvenance()
+    {
+        AnalysisSessionProfilingCounters? profiling = _profilingCounters;
+        return new AnalysisCacheWorkProvenanceV1(
+            _counters.AssemblyLoads,
+            profiling?.FactIndexMaterializations ?? 0,
+            profiling?.SourceScanPasses ?? 0,
+            profiling?.ContractExecutions ?? 0,
+            GetLoadedAssemblyArtifacts().Sum(artifact => artifact.BytesLoaded));
+    }
 
     private void RecordContractFamilyResultCounts(IReadOnlyDictionary<string, int> resultCounts)
     {

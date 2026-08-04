@@ -315,7 +315,8 @@ public static class AnalysisCacheStore
         AnalysisCacheOutcomeV1 outcome,
         CancellationToken cancellationToken = default)
     {
-        return Put(location, key, projectManifests, Array.Empty<AnalysisCacheArtifactManifest>(), outcome, cancellationToken);
+        return Put(location, key, projectManifests, Array.Empty<AnalysisCacheArtifactManifest>(), outcome,
+            cancellationToken: cancellationToken);
     }
 
     public static PutResult Put(
@@ -324,6 +325,7 @@ public static class AnalysisCacheStore
         IReadOnlyList<AnalysisCacheProjectManifest> projectManifests,
         IReadOnlyList<AnalysisCacheArtifactManifest> artifactManifests,
         AnalysisCacheOutcomeV1 outcome,
+        AnalysisCacheWorkProvenanceV1? workProvenance = null,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(location);
@@ -374,6 +376,7 @@ public static class AnalysisCacheStore
             ProjectManifests = projectManifests.OrderBy(manifest => manifest.ProjectPath, StringComparer.Ordinal).ToArray(),
             ArtifactManifests = artifactManifests.OrderBy(manifest => manifest.ArtifactPath, StringComparer.Ordinal).ToArray(),
             Outcome = outcome,
+            WorkProvenance = workProvenance ?? new AnalysisCacheWorkProvenanceV1(0, 0, 0, 0, 0),
             ContentDigest = string.Empty,
         };
         if (!AnalysisCacheContentDigest.TryCompute(

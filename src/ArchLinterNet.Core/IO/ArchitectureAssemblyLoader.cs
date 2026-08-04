@@ -212,7 +212,8 @@ public sealed class ArchitectureAssemblyLoader : IArchitectureAssemblyLoader
                 _loadedArtifactsByPath.Add(fullPath, new ArchitectureLoadedAssemblyArtifact(
                     fullPath,
                     assemblyContentDigest,
-                    pdbContentDigest));
+                    pdbContentDigest,
+                    assemblyBytes.LongLength + (pdbBytes?.LongLength ?? 0)));
             }
 
             return assembly;

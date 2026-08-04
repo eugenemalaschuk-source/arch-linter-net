@@ -1,5 +1,6 @@
 using System.Reflection.Metadata;
 using System.Reflection.PortableExecutable;
+using ArchLinterNet.Core.BuildState;
 using ArchLinterNet.Core.Contracts;
 using ArchLinterNet.Core.Contracts.Abstractions;
 using ArchLinterNet.Core.Contracts.Families;
@@ -127,9 +128,10 @@ public sealed class ArchitectureRunnerSetupService(
 
         (IReadOnlyList<string> closure, bool closureComplete) = BuildMetadataReferenceClosure(
             selectedPaths, discovery, cancellationToken);
+        IReadOnlyDictionary<string, string> capturedDigests = CaptureArtifactDigests(closure, cancellationToken);
         return new ArchitectureRunnerPreparation(
             repositoryRoot, symbols, discovery, resolveAssemblyOutputs,
-            closure, missing, closureComplete);
+            closure, capturedDigests, missing, closureComplete);
     }
 
     public ArchitectureRunnerSetup MaterializePreparedRunner(
@@ -147,6 +149,8 @@ public sealed class ArchitectureRunnerSetupService(
         {
             throw new InvalidOperationException("Prepared artifact selection is incomplete and cannot be materialized.");
         }
+
+        VerifyPreparedArtifacts(preparation, cancellationToken);
 
         ResolutionResult resolution;
         using (timing?.Measure("assembly_resolution", indent: 1))
@@ -310,6 +314,48 @@ public sealed class ArchitectureRunnerSetupService(
         }
 
         return (closure.OrderBy(path => path, StringComparer.OrdinalIgnoreCase).ToArray(), complete);
+    }
+
+    private static IReadOnlyDictionary<string, string> CaptureArtifactDigests(
+        IReadOnlyList<string> artifactPaths,
+        CancellationToken cancellationToken)
+    {
+        Dictionary<string, string> digests = new(StringComparer.OrdinalIgnoreCase);
+        foreach (string artifactPath in artifactPaths)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            Add(artifactPath);
+            Add(Path.ChangeExtension(artifactPath, ".pdb"));
+            Add(BuildReceiptStore.ReceiptPathFor(artifactPath));
+        }
+
+        return digests;
+
+        void Add(string path)
+        {
+            string fullPath = Path.GetFullPath(path);
+            digests[fullPath] = File.Exists(fullPath)
+                ? BuildStateCanonicalHasher.ComputeContentDigest(fullPath, cancellationToken)
+                : "missing";
+        }
+    }
+
+    private static void VerifyPreparedArtifacts(
+        ArchitectureRunnerPreparation preparation,
+        CancellationToken cancellationToken)
+    {
+        foreach ((string path, string preparedDigest) in preparation.CapturedArtifactContentDigests)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            string currentDigest = File.Exists(path)
+                ? BuildStateCanonicalHasher.ComputeContentDigest(path, cancellationToken)
+                : "missing";
+            if (!string.Equals(preparedDigest, currentDigest, StringComparison.Ordinal))
+            {
+                throw new InvalidOperationException(
+                    $"Prepared artifact '{path}' changed after cache authorization; reprepare is required.");
+            }
+        }
     }
 
     private static bool ShouldResolveAssemblyOutputs(

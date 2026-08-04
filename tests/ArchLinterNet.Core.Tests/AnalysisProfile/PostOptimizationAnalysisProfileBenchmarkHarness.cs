@@ -300,7 +300,7 @@ public sealed class PostOptimizationAnalysisProfileBenchmarkHarness
             double elapsed = phase.GetProperty("ElapsedMs").GetDouble();
             if (name == "total") totalMs = elapsed;
             else if (phase.GetProperty("Indent").GetInt32() == 0) topLevelMs += elapsed;
-            if (name == "build_state_preflight") preflightMs += elapsed;
+            if (name is "build_state_preflight" or "post_ensure_built_preflight") preflightMs += elapsed;
             if (_outputPhaseNames.Contains(name)) outputMs += elapsed;
         }
 
@@ -365,10 +365,24 @@ public sealed class PostOptimizationAnalysisProfileBenchmarkHarness
 
     private static string ConcurrencyStatus(RunSample sample) => sample.Profile.GetProperty("Counters").GetProperty("Concurrency").GetProperty("Status").GetString()!;
 
-    private static double? AllocatedBytes(RunSample sample) =>
-        sample.Profile.TryGetProperty("Measurements", out JsonElement measurements)
-        && measurements.TryGetProperty("AllocatedBytesTotal", out JsonElement allocated)
-        && allocated.ValueKind == JsonValueKind.Number ? allocated.GetDouble() : null;
+    private static double? AllocatedBytes(RunSample sample)
+    {
+        IReadOnlyList<JsonElement> profiles = sample.PairedProfiles ?? [sample.Profile];
+        double total = 0;
+        foreach (JsonElement profile in profiles)
+        {
+            if (!profile.TryGetProperty("Measurements", out JsonElement measurements)
+                || !measurements.TryGetProperty("AllocatedBytesTotal", out JsonElement allocated)
+                || allocated.ValueKind != JsonValueKind.Number)
+            {
+                return null;
+            }
+
+            total += allocated.GetDouble();
+        }
+
+        return total;
+    }
 
     private static double Median(IEnumerable<double> values)
     {

@@ -29,6 +29,8 @@ public sealed record AnalysisCacheEntryV1
 
     public required AnalysisCacheOutcomeV1 Outcome { get; init; }
 
+    public AnalysisCacheWorkProvenanceV1 WorkProvenance { get; init; } = new(0, 0, 0, 0, 0);
+
     // SHA-256 over the canonical form of every field above (see
     // AnalysisCacheContentDigest.Compute) — verified on every read before any other field is
     // trusted.

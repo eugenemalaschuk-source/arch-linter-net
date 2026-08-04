@@ -13,7 +13,8 @@ public static class AnalysisCachePopulation
     private sealed record CompletedAuthorization(
         PreparedAuthorization Initial,
         PreparedAuthorization? Completion,
-        Outcome CompletionRejection);
+        Outcome CompletionRejection,
+        AnalysisCacheWorkProvenanceV1 WorkProvenance);
 
     private static readonly ConditionalWeakTable<ValidationOutcome, CompletedAuthorization> _authorizations = new();
 
@@ -174,14 +175,16 @@ public static class AnalysisCachePopulation
             outcome,
             authorization,
             completedArtifactPaths,
-            Array.Empty<AnalysisCacheCapturedFileIdentity>());
+            Array.Empty<AnalysisCacheCapturedFileIdentity>(),
+            new AnalysisCacheWorkProvenanceV1(0, 0, 0, 0, 0));
     }
 
     internal static void AttachAuthorization(
         ValidationOutcome outcome,
         PreparedAuthorization authorization,
         IReadOnlyList<string> completedArtifactPaths,
-        IReadOnlyList<AnalysisCacheCapturedFileIdentity> completedArtifactIdentities)
+        IReadOnlyList<AnalysisCacheCapturedFileIdentity> completedArtifactIdentities,
+        AnalysisCacheWorkProvenanceV1? workProvenance = null)
     {
         ArgumentNullException.ThrowIfNull(outcome);
         ArgumentNullException.ThrowIfNull(authorization);
@@ -203,7 +206,8 @@ public static class AnalysisCachePopulation
             out Outcome rejected);
 
         _authorizations.Remove(outcome);
-        _authorizations.Add(outcome, new CompletedAuthorization(authorization, completion, rejected));
+        _authorizations.Add(outcome, new CompletedAuthorization(authorization, completion, rejected,
+            workProvenance ?? new AnalysisCacheWorkProvenanceV1(0, 0, 0, 0, 0)));
     }
 
     // Called by CLI and Testing hosts after a completed snapshot Evaluate. The opaque prepared
@@ -265,7 +269,8 @@ public static class AnalysisCachePopulation
                 0);
         }
 
-        return Put(captured.Completion, AnalysisCacheOutcomeMapper.ToCacheOutcome(outcome), cancellationToken);
+        return Put(captured.Completion, AnalysisCacheOutcomeMapper.ToCacheOutcome(outcome),
+            captured.WorkProvenance, cancellationToken);
     }
 
     private static PreparedAuthorization? Prepare(
@@ -345,11 +350,15 @@ public static class AnalysisCachePopulation
         }
     }
 
-    private static Outcome Put(PreparedAuthorization authorization, AnalysisCacheOutcomeV1 outcome, CancellationToken cancellationToken)
+    private static Outcome Put(
+        PreparedAuthorization authorization,
+        AnalysisCacheOutcomeV1 outcome,
+        AnalysisCacheWorkProvenanceV1 workProvenance,
+        CancellationToken cancellationToken)
     {
         AnalysisCacheStore.PutResult putResult = AnalysisCacheStore.Put(
             authorization.Location, authorization.Key, authorization.ProjectManifests,
-            authorization.ArtifactManifests, outcome, cancellationToken);
+            authorization.ArtifactManifests, outcome, workProvenance, cancellationToken);
         int ineligible = authorization.ProjectManifests.Count(manifest =>
             manifest.Eligibility != CacheEligibility.VerifiedCacheEligible);
         return new Outcome(putResult.RejectReason, authorization.ProjectManifests.Count, ineligible, putResult.BytesWritten);

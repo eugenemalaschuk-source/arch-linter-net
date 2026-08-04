@@ -179,6 +179,7 @@ public sealed class ArchitectureValidationApplicationService(
                 cacheContext: BuildCacheContext(request),
                 preparedRepositoryRoot: preparation.RepositoryRoot,
                 preparedArtifactPaths: preparation.SelectedAssemblyArtifactPaths,
+                preparedArtifactContentDigests: preparation.CapturedArtifactContentDigests,
                 preparedProjectPaths: preparation.ProjectDiscovery.DiscoveredProjects
                     .Select(project => Path.GetFullPath(Path.Combine(preparation.RepositoryRoot, project.Path)))
                     .ToArray(),
@@ -188,7 +189,8 @@ public sealed class ArchitectureValidationApplicationService(
                         state.Policy.Document, preparation, state.Policy.SelectedContractIds,
                         state.Policy.EnableUnmatchedIgnoreTracking, timing, modeHint,
                         request.CancellationToken, request.MaxParallelism)
-                    : BuildRunnerFor(state.Policy, request, modeHint, timing));
+                    : BuildRunnerFor(state.Policy, request, modeHint, timing),
+                cancellationToken: request.CancellationToken);
         }
 
         using (timing?.Measure("load_and_setup"))
@@ -232,7 +234,8 @@ public sealed class ArchitectureValidationApplicationService(
             projectGraphEvaluations: state.ProjectGraphEvaluations,
             assemblyLoads: state.AssemblyLoads,
             requestedContractIds: modeHint == null ? request.ContractIds : null,
-            cacheContext: BuildCacheContext(request));
+            cacheContext: BuildCacheContext(request),
+            cancellationToken: request.CancellationToken);
     }
 
     // Null whenever the caller did not configure a cache location (ValidationRequest.CacheLocation /
@@ -332,7 +335,7 @@ public sealed class ArchitectureValidationApplicationService(
     // without project discovery.
     private BuildStatePreflightResult RunBuildStatePreflight(AnalysisSnapshotRequest request, IArchitectureContractRunner runner)
     {
-        Discovery.ProjectDiscoveryResult? discovery = runner.Session.Context.ProjectDiscovery;
+        var discovery = runner.Session.Context.ProjectDiscovery;
         if (discovery == null || discovery.DiscoveredProjects.Count == 0)
         {
             return new BuildStatePreflightResult(Array.Empty<BuildStatePreflightDiagnostic>());
