@@ -40,6 +40,11 @@ internal sealed class ValidateCommandDefinition(ValidateCommandHandler handler)
                                 default). "auto" uses the platform user-cache
                                 namespace; any other value is a caller-selected
                                 directory, validated for safe containment.
+              --max-parallelism <n>
+                                Bound the degree of parallel assembly/fact scanning
+                                (default: max(1, min(processor count, 4))). Must be
+                                a positive integer; 1 is a fully supported
+                                sequential mode.
               --ensure-built    Build the selected project graph once, verify it via an
                                 ArchLinterNet build receipt, then validate (never implicit;
                                 opt-in only)
@@ -97,6 +102,7 @@ internal sealed class ValidateCommandDefinition(ValidateCommandHandler handler)
         Option<bool> timingsOption = new("--timings");
         Option<string> profileOption = new("--profile");
         Option<string> cacheOption = new("--cache");
+        Option<int?> maxParallelismOption = new("--max-parallelism");
         Option<bool> ensureBuiltOption = new("--ensure-built");
         Option<bool> noRestoreOption = new("--no-restore");
         Option<string> configurationOption = new("--configuration");
@@ -121,6 +127,7 @@ internal sealed class ValidateCommandDefinition(ValidateCommandHandler handler)
         command.Options.Add(timingsOption);
         command.Options.Add(profileOption);
         command.Options.Add(cacheOption);
+        command.Options.Add(maxParallelismOption);
         command.Options.Add(ensureBuiltOption);
         command.Options.Add(noRestoreOption);
         command.Options.Add(configurationOption);
@@ -140,6 +147,7 @@ internal sealed class ValidateCommandDefinition(ValidateCommandHandler handler)
             timingsOption,
             profileOption,
             cacheOption,
+            maxParallelismOption,
             ensureBuiltOption,
             noRestoreOption,
             configurationOption,
@@ -177,6 +185,7 @@ internal sealed class ValidateCommandDefinition(ValidateCommandHandler handler)
         Option<bool> timingsOption,
         Option<string> profileOption,
         Option<string> cacheOption,
+        Option<int?> maxParallelismOption,
         Option<bool> ensureBuiltOption,
         Option<bool> noRestoreOption,
         Option<string> configurationOption,
@@ -222,6 +231,7 @@ internal sealed class ValidateCommandDefinition(ValidateCommandHandler handler)
             ReportParseError = reportParseError,
             ProfileDestination = parseResult.GetValue(profileOption),
             CacheDestination = parseResult.GetValue(cacheOption),
+            MaxParallelism = parseResult.GetValue(maxParallelismOption),
         };
     }
 

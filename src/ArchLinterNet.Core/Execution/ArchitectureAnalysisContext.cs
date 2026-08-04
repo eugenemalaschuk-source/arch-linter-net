@@ -97,6 +97,13 @@ public sealed class ArchitectureAnalysisContext : IDisposable
     // boundaries, instead of every one of those methods taking a CancellationToken parameter.
     public CancellationToken CancellationToken { get; init; }
 
+    // Resolved, always-valid effective degree of bounded parallel scanning for this run (see
+    // MaxParallelismResolver). Defaults to 0 (unset) when a caller constructs this context
+    // directly without going through ArchitectureRunnerSetupService — BoundedParallelPartitionRunner
+    // treats any value <= 1 as "run sequentially," so an unset value degrades safely rather than
+    // parallelizing unexpectedly.
+    public int MaxParallelism { get; init; }
+
     public void Dispose()
     {
         if (_disposed)

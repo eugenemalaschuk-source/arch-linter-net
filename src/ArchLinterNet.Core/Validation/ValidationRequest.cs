@@ -44,5 +44,10 @@ public sealed record ValidationRequest
     // post-run population call) writing a verified entry after a completed run.
     public AnalysisCacheLocation? CacheLocation { get; init; }
 
+    // Null (the default) resolves to max(1, min(Environment.ProcessorCount, 4)) — bounded parallel
+    // scanning applies automatically. A positive override is validated and honored; `1` is a
+    // first-class supported sequential mode. See openspec/specs/bounded-parallel-scanning/spec.md.
+    public int? MaxParallelism { get; init; }
+
     public CancellationToken CancellationToken { get; init; } = default;
 }

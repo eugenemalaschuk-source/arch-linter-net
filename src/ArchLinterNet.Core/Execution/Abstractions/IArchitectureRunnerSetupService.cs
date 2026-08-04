@@ -38,7 +38,8 @@ public interface IArchitectureRunnerSetupService
         bool enableUnmatchedIgnoreTracking = true,
         ValidationTiming? timing = null,
         string? mode = null,
-        CancellationToken cancellationToken = default);
+        CancellationToken cancellationToken = default,
+        int? maxParallelism = null);
 
     // The post-ensure-built pass must build a runner from fresh artifacts, not by delegating to
     // ordinary same-simple-name assembly resolution.
@@ -51,5 +52,6 @@ public interface IArchitectureRunnerSetupService
         bool enableUnmatchedIgnoreTracking = true,
         ValidationTiming? timing = null,
         string? mode = null,
-        CancellationToken cancellationToken = default);
+        CancellationToken cancellationToken = default,
+        int? maxParallelism = null);
 }

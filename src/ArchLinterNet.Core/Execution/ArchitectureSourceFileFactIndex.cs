@@ -29,7 +29,7 @@ namespace ArchLinterNet.Core.Execution;
 // - Record detection requires Roslyn source analysis; reflection falls back to Class/Struct.
 // - Paths normalized to forward slashes, relative to repositoryRoot.
 // - All public collections are returned in deterministic (ordinal-sorted) order.
-public sealed class ArchitectureSourceFileFactIndex
+public sealed partial class ArchitectureSourceFileFactIndex
 {
     private static readonly StringComparer _ordinal = StringComparer.Ordinal;
 
@@ -41,6 +41,9 @@ public sealed class ArchitectureSourceFileFactIndex
     private readonly IReadOnlyList<(string SourcePath, string AssemblyName)> _sourcePathAssemblyOwnership;
     private readonly CancellationToken _cancellationToken;
     private readonly AnalysisSessionProfilingCounters? _profilingCounters;
+    private readonly int _maxParallelism;
+    private readonly int _parallelEligibilityThreshold;
+    private readonly IBoundedParallelPartitionRunner _partitionRunner;
     private readonly Lazy<FactIndexData> _data;
 
     public ArchitectureSourceFileFactIndex(
@@ -70,7 +73,10 @@ public sealed class ArchitectureSourceFileFactIndex
 
     internal readonly record struct ConstructionOptions(
         AnalysisSessionProfilingCounters? ProfilingCounters,
-        CancellationToken CancellationToken);
+        CancellationToken CancellationToken,
+        int MaxParallelism = 0,
+        int? ParallelEligibilityThresholdOverride = null,
+        IBoundedParallelPartitionRunner? PartitionRunner = null);
 
     internal ArchitectureSourceFileFactIndex(
         IReadOnlyCollection<Assembly> targetAssemblies,
@@ -93,6 +99,10 @@ public sealed class ArchitectureSourceFileFactIndex
             projectOwnership.SourceRootAssemblyOwnership);
         _cancellationToken = options.CancellationToken;
         _profilingCounters = options.ProfilingCounters;
+        _maxParallelism = options.MaxParallelism;
+        _parallelEligibilityThreshold =
+            options.ParallelEligibilityThresholdOverride ?? BoundedParallelPartitionRunner.DefaultParallelEligibilityThreshold;
+        _partitionRunner = options.PartitionRunner ?? new BoundedParallelPartitionRunner();
         _data = new Lazy<FactIndexData>(BuildData);
     }
 
@@ -257,32 +267,34 @@ public sealed class ArchitectureSourceFileFactIndex
 
     // Step 1: walk every loadable type in each assembly and collect one BaseFact per
     // (assemblyName, fullTypeName). Assemblies are already sorted alphabetically before this call.
+    // Bounded-parallel across assemblies (issue #408): each assembly's reflection pass is
+    // independent, so partitions run concurrently and are merged strictly in the pre-sorted
+    // assembly order — never completion order — so factsByName's content and per-key ordering are
+    // byte-identical to the prior sequential implementation at every parallelism level. See
+    // openspec/specs/bounded-parallel-scanning/spec.md, "Source-file fact index materialization is
+    // parallelized without changing output order or content".
     private Dictionary<string, List<BaseFact>> RunReflectionPass(List<Assembly> sortedAssemblies)
     {
-        Dictionary<string, List<BaseFact>> factsByName = new(_ordinal);
-        foreach (Assembly assembly in sortedAssemblies)
-        {
-            _cancellationToken.ThrowIfCancellationRequested();
-            string assemblyName = assembly.GetName().Name ?? string.Empty;
-            foreach (Type type in ArchitectureTypeScanner.GetLoadableTypes(assembly, _cancellationToken))
-            {
-                _cancellationToken.ThrowIfCancellationRequested();
-                string? fullName = SafeFullName(type);
-                if (string.IsNullOrEmpty(fullName)) continue;
+        Dictionary<string, List<BaseFact>>[] perAssemblyFacts = _partitionRunner.Run(
+            sortedAssemblies,
+            _maxParallelism,
+            (assembly, _) => BuildReflectionFactsForAssembly(assembly),
+            _cancellationToken,
+            _profilingCounters,
+            _parallelEligibilityThreshold);
 
-                string ns = SafeNamespace(type);
-                if (!factsByName.TryGetValue(fullName, out List<BaseFact>? list))
+        Dictionary<string, List<BaseFact>> factsByName = new(_ordinal);
+        foreach (Dictionary<string, List<BaseFact>> assemblyFacts in perAssemblyFacts)
+        {
+            foreach (KeyValuePair<string, List<BaseFact>> entry in assemblyFacts)
+            {
+                if (!factsByName.TryGetValue(entry.Key, out List<BaseFact>? list))
                 {
                     list = [];
-                    factsByName[fullName] = list;
+                    factsByName[entry.Key] = list;
                 }
 
-                list.Add(new BaseFact(
-                    assemblyName,
-                    ns,
-                    fullName,
-                    GetSimpleTypeName(type),
-                    GetTypeKindFromReflection(type)));
+                list.AddRange(entry.Value);
             }
         }
 
@@ -293,35 +305,36 @@ public sealed class ArchitectureSourceFileFactIndex
     // (assemblyName, fullTypeName) → [(file, kind)]. Preprocessor symbols are forwarded so
     // conditional declarations match the compiled assembly. Each file is correlated only when its
     // owning assembly can be determined from the most specific known project subtree.
+    // Bounded-parallel across source roots (issue #408): each root's own file enumeration/parse is
+    // independent, merged strictly in source-root declaration order — never completion order.
     private Dictionary<SourceFactKey, List<(string FilePath, ArchitectureTypeKind Kind)>> RunSourceScan()
     {
         _profilingCounters?.RecordSourceScanPass();
-        Dictionary<SourceFactKey, List<(string FilePath, ArchitectureTypeKind Kind)>> sourceMap = [];
         IReadOnlyList<(string SourceRoot, string AssemblyName)> ownershipEntries = _sourcePathAssemblyOwnership
             .Select(static entry => (entry.SourcePath, entry.AssemblyName))
             .ToList();
 
-        foreach (string sourceRoot in _sourceRoots)
-        {
-            _cancellationToken.ThrowIfCancellationRequested();
-            string normalizedSourceRoot = NormalizeRelativePath(sourceRoot);
-            string absoluteRoot = Path.Combine(_repositoryRoot, normalizedSourceRoot);
-            if (!_fileSystem.DirectoryExists(absoluteRoot)) continue;
+        Dictionary<SourceFactKey, List<(string FilePath, ArchitectureTypeKind Kind)>>[] perRootMaps =
+            _partitionRunner.Run(
+                _sourceRoots,
+                _maxParallelism,
+                (sourceRoot, _) => ScanSourceRoot(sourceRoot, ownershipEntries),
+                _cancellationToken,
+                _profilingCounters,
+                _parallelEligibilityThreshold);
 
-            foreach (string absoluteFile in _fileSystem.EnumerateFiles(
-                absoluteRoot,
-                "*.cs",
-                SearchOption.AllDirectories))
+        Dictionary<SourceFactKey, List<(string FilePath, ArchitectureTypeKind Kind)>> sourceMap = [];
+        foreach (Dictionary<SourceFactKey, List<(string FilePath, ArchitectureTypeKind Kind)>> rootMap in perRootMaps)
+        {
+            foreach (KeyValuePair<SourceFactKey, List<(string FilePath, ArchitectureTypeKind Kind)>> entry in rootMap)
             {
-                _cancellationToken.ThrowIfCancellationRequested();
-                string normalizedFilePath = NormalizePath(_repositoryRoot, absoluteFile);
-                string? assemblyName = ResolveOwnedAssemblyName(normalizedFilePath, ownershipEntries);
-                if (assemblyName == null)
+                if (!sourceMap.TryGetValue(entry.Key, out List<(string FilePath, ArchitectureTypeKind Kind)>? entries))
                 {
-                    continue;
+                    entries = [];
+                    sourceMap[entry.Key] = entries;
                 }
 
-                ProcessSourceFile(sourceMap, assemblyName, absoluteRoot, absoluteFile);
+                entries.AddRange(entry.Value);
             }
         }
 

@@ -63,10 +63,14 @@
         },
         "Concurrency": {
           "type": "object",
-          "required": ["Status", "Workers"],
+          "required": ["Status", "MaxParallelism", "ScheduledWorkItems", "CompletedWorkItems", "ObservedMaxConcurrency", "MergeOperations"],
           "properties": {
-            "Status": { "enum": ["NotApplicable"] },
-            "Workers": { "type": "integer", "minimum": 0 }
+            "Status": { "enum": ["NotApplicable", "Active"] },
+            "MaxParallelism": { "type": "integer", "minimum": 0 },
+            "ScheduledWorkItems": { "type": "integer", "minimum": 0 },
+            "CompletedWorkItems": { "type": "integer", "minimum": 0 },
+            "ObservedMaxConcurrency": { "type": "integer", "minimum": 0 },
+            "MergeOperations": { "type": "integer", "minimum": 0 }
           },
           "additionalProperties": false
         }

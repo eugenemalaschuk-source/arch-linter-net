@@ -9,12 +9,31 @@ namespace ArchLinterNet.Core.Execution;
 public sealed class ArchitectureTypeIndex
 {
     private readonly IReadOnlyCollection<Assembly> _targetAssemblies;
+    private readonly int _maxParallelism;
+    private readonly AnalysisSessionProfilingCounters? _profilingCounters;
+    private readonly IBoundedParallelPartitionRunner _partitionRunner;
+    private readonly Func<Assembly, CancellationToken, IEnumerable<Type>> _loadableTypesProvider;
     private readonly CancellationToken _cancellationToken;
     private readonly Lazy<Type[]> _allTypes;
 
     public ArchitectureTypeIndex(IReadOnlyCollection<Assembly> targetAssemblies, CancellationToken cancellationToken = default)
+        : this(targetAssemblies, maxParallelism: 0, profilingCounters: null, cancellationToken)
+    {
+    }
+
+    internal ArchitectureTypeIndex(
+        IReadOnlyCollection<Assembly> targetAssemblies,
+        int maxParallelism,
+        AnalysisSessionProfilingCounters? profilingCounters,
+        CancellationToken cancellationToken = default,
+        IBoundedParallelPartitionRunner? partitionRunner = null,
+        Func<Assembly, CancellationToken, IEnumerable<Type>>? loadableTypesProvider = null)
     {
         _targetAssemblies = targetAssemblies ?? throw new ArgumentNullException(nameof(targetAssemblies));
+        _maxParallelism = maxParallelism;
+        _profilingCounters = profilingCounters;
+        _partitionRunner = partitionRunner ?? new BoundedParallelPartitionRunner();
+        _loadableTypesProvider = loadableTypesProvider ?? ArchitectureTypeScanner.GetLoadableTypes;
         _cancellationToken = cancellationToken;
         _allTypes = new Lazy<Type[]>(LoadAllTypes);
     }
@@ -71,15 +90,34 @@ public sealed class ArchitectureTypeIndex
 
     private Type[] LoadAllTypes()
     {
-        // Checked per assembly (not once up front) — this is the same reflection-pass boundary
-        // ArchitectureSourceFileFactIndex.RunReflectionPass already checks at, so a large
-        // multi-assembly target set can be interrupted between assemblies instead of running the
-        // whole SelectMany to completion first.
+        // Bounded-parallel across assemblies (issue #408): each assembly's type load is
+        // independent and read-only, so partitions can run concurrently. The merge step below
+        // flattens strictly in original assembly order — never completion order — so output is
+        // byte-identical to the prior sequential implementation at every parallelism level. See
+        // openspec/specs/bounded-parallel-scanning/spec.md, "Type loading is parallelized without
+        // changing output order or content".
+        List<Assembly> assemblies = _targetAssemblies.Distinct().ToList();
+        Type[][] perAssemblyTypes = _partitionRunner.Run(
+            assemblies,
+            _maxParallelism,
+            (assembly, _) =>
+            {
+                // Checked before the potentially long Assembly.GetTypes() call inside
+                // GetLoadableTypes, not only inside its own per-type iterator — matches the
+                // sequential path's per-assembly boundary check. See
+                // ArchitectureTypeIndexBoundedParallelTests for a regression test that proves this
+                // specific line — not the partition runner's own pre-iteration check, nor
+                // GetLoadableTypes' own later per-type check — is what stops execution here.
+                _cancellationToken.ThrowIfCancellationRequested();
+                return _loadableTypesProvider(assembly, _cancellationToken).ToArray();
+            },
+            _cancellationToken,
+            _profilingCounters);
+
         List<Type> types = new();
-        foreach (Assembly assembly in _targetAssemblies.Distinct())
+        foreach (Type[] assemblyTypes in perAssemblyTypes)
         {
-            _cancellationToken.ThrowIfCancellationRequested();
-            types.AddRange(ArchitectureTypeScanner.GetLoadableTypes(assembly, _cancellationToken));
+            types.AddRange(assemblyTypes);
         }
 
         return types.ToArray();

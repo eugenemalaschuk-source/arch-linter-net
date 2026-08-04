@@ -37,6 +37,20 @@ public sealed record ArchitectureAnalysisSnapshotCounters
 
     public int SourceFilesScanned { get; init; }
 
+    // Bounded parallel scanning (issue #408) instrumentation — see AnalysisProfileConcurrencyCounters,
+    // which analysis-profile/v1 sources these from. MaxParallelism is the resolved effective degree
+    // for this snapshot (see MaxParallelismResolver); the rest are zero when every scanning phase
+    // took the sequential path.
+    public int MaxParallelism { get; init; }
+
+    public int ParallelScheduledWorkItems { get; init; }
+
+    public int ParallelCompletedWorkItems { get; init; }
+
+    public int ParallelObservedMaxConcurrency { get; init; }
+
+    public int ParallelMergeOperations { get; init; }
+
     // Finding/cycle results produced by each contract family across every evaluated mode.
     // Unlike ContractFamilyCounts, this measures results, not contracts invoked.
     public IReadOnlyDictionary<string, int> ContractFamilyResultCounts { get; init; } =

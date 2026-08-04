@@ -84,6 +84,7 @@ public sealed class ArchitectureAnalysisSnapshot : IDisposable
             SelectedAssemblyCount = setup.Runner.Session.Context.TargetAssemblies.Count
                 + setup.Runner.Session.Context.MissingAssemblyNames.Count,
             SnapshotMaterializations = 1,
+            MaxParallelism = setup.Runner.Session.Context.MaxParallelism,
         };
     }
 
@@ -115,6 +116,10 @@ public sealed class ArchitectureAnalysisSnapshot : IDisposable
                     SourceFilesScanned = _profilingCounters.SourceFilesScanned,
                     ContractFamilyResultCounts = contractFamilyResultCounts,
                     CacheLookups = _cacheContext is null ? null : _cacheStats.Snapshot(),
+                    ParallelScheduledWorkItems = _profilingCounters.ParallelScheduledWorkItems,
+                    ParallelCompletedWorkItems = _profilingCounters.ParallelCompletedWorkItems,
+                    ParallelObservedMaxConcurrency = _profilingCounters.ParallelObservedMaxConcurrency,
+                    ParallelMergeOperations = _profilingCounters.ParallelMergeOperations,
                 };
             }
         }

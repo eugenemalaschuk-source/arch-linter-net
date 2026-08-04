@@ -77,6 +77,11 @@ public sealed class ArchitectureValidationApplicationService(
     private ArchitectureAnalysisSnapshot CreateSnapshotCore(
         AnalysisSnapshotRequest request, string? modeHint, ValidationTiming? timing)
     {
+        // Fail fast on an invalid override before any policy/project/assembly work begins — see
+        // openspec/specs/bounded-parallel-scanning/spec.md, "Zero or negative values are rejected
+        // before scanning begins".
+        MaxParallelismResolver.Resolve(request.MaxParallelism);
+
         SnapshotConstructionState state = new();
         try
         {
@@ -362,11 +367,11 @@ public sealed class ArchitectureValidationApplicationService(
             ? runnerSetupService.BuildRunnerForPostBuild(
                 policy.Document, request.PolicyPath, request.ConditionSetName, request.PreprocessorSymbols,
                 policy.SelectedContractIds, policy.EnableUnmatchedIgnoreTracking, timing, modeHint,
-                request.CancellationToken)
+                request.CancellationToken, request.MaxParallelism)
             : runnerSetupService.BuildRunner(
                 policy.Document, request.PolicyPath, request.ConditionSetName, request.PreprocessorSymbols,
                 policy.SelectedContractIds, policy.EnableUnmatchedIgnoreTracking, timing, modeHint,
-                request.CancellationToken);
+                request.CancellationToken, request.MaxParallelism);
     }
 
     private static void EnsureValidSeverityConfig(string value, string settingName)

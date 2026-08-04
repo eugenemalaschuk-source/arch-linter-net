@@ -27,6 +27,7 @@ public sealed class ArchitectureValidationBuilder
     private string? _requestedTargetFramework;
     private string? _requestedPlatform;
     private string? _requestedRuntimeIdentifier;
+    private int? _maxParallelism;
     private CancellationToken _cancellationToken;
 
     public ArchitectureValidationBuilder(string policyPath)
@@ -107,6 +108,16 @@ public sealed class ArchitectureValidationBuilder
         return this;
     }
 
+    // Opt-in mirror of the CLI's --max-parallelism option — bounds the degree of parallel
+    // assembly/fact scanning. Null (the default) resolves to max(1, min(Environment.ProcessorCount,
+    // 4)); 1 is a first-class supported sequential mode. See
+    // openspec/specs/bounded-parallel-scanning/spec.md.
+    public ArchitectureValidationBuilder WithMaxParallelism(int? maxDegreeOfParallelism)
+    {
+        _maxParallelism = maxDegreeOfParallelism;
+        return this;
+    }
+
     /// <summary>Bounds this builder's validation/snapshot calls with a caller-supplied cancellation token.</summary>
     public ArchitectureValidationBuilder WithCancellation(CancellationToken cancellationToken)
     {
@@ -184,6 +195,7 @@ public sealed class ArchitectureValidationBuilder
             RequestedPlatform = _requestedPlatform,
             RequestedRuntimeIdentifier = _requestedRuntimeIdentifier,
             CacheLocation = ResolveCacheLocationForExecution(),
+            MaxParallelism = _maxParallelism,
             CancellationToken = _cancellationToken,
         };
 
@@ -231,6 +243,7 @@ public sealed class ArchitectureValidationBuilder
             RequestedPlatform = _requestedPlatform,
             RequestedRuntimeIdentifier = _requestedRuntimeIdentifier,
             CacheLocation = ResolveCacheLocationForExecution(),
+            MaxParallelism = _maxParallelism,
             CancellationToken = _cancellationToken,
         };
 

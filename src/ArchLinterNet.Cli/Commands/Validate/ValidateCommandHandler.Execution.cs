@@ -174,6 +174,7 @@ internal sealed partial class ValidateCommandHandler
             RequestedPlatform = options.Platform,
             RequestedRuntimeIdentifier = options.RuntimeIdentifier,
             CacheLocation = ResolveCacheLocationForExecution(options),
+            MaxParallelism = options.MaxParallelism,
             CancellationToken = _cancellationToken,
         };
 
@@ -313,6 +314,7 @@ internal sealed partial class ValidateCommandHandler
             RequestedPlatform = options.Platform,
             RequestedRuntimeIdentifier = options.RuntimeIdentifier,
             CacheLocation = ResolveCacheLocationForExecution(options),
+            MaxParallelism = options.MaxParallelism,
             CancellationToken = _cancellationToken,
         };
     }
