@@ -121,6 +121,8 @@ public sealed class EvaluatedBuildInputManifestTests
         EvaluatedBuildInputManifestV1 second = fixture.Collect();
 
         Assert.That(first.Inputs, Does.Contain("file:Directory.Build.props"));
+        Assert.That(first.Eligibility, Is.EqualTo(CacheEligibility.CacheIneligible));
+        Assert.That(first.IneligibilityReasons, Does.Contain("ancestor-build-file-evaluation-unverified"));
         Assert.That(second.Digest, Is.Not.EqualTo(first.Digest));
     }
 

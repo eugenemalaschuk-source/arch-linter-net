@@ -44,6 +44,8 @@ public sealed class PostOptimizationAnalysisProfileBenchmarkHarness
         AssertEquivalent(disabled.MeasuredSamples[0], warmHit.MeasuredSamples[0], "cached and uncached canonical findings");
         Assert.That(warmHit.MeasuredSamples.All(static sample => CacheCounter(sample, "Hits") > 0), Is.True,
             "Every warm-hit sample must expose a verified cache hit.");
+        Assert.That(warmHit.MeasuredSamples.All(sample => Counter(sample, "AssemblyLoads") < Counter(disabled.MeasuredSamples[0], "AssemblyLoads")), Is.True,
+            "A verified warm hit must expose avoided assembly-load work.");
 
         SampleSeries sequential = RunSeries(fixture, "strict", ["--ensure-built", "--max-parallelism", "1"], RunsPerScenario, prime: false);
         SampleSeries parallel = RunSeries(fixture, "strict", ["--ensure-built"], RunsPerScenario, prime: false);
@@ -53,6 +55,10 @@ public sealed class PostOptimizationAnalysisProfileBenchmarkHarness
         Assert.That(parallel.MeasuredSamples.All(static sample =>
                 ConcurrencyCounter(sample, "ObservedMaxConcurrency") <= ConcurrencyCounter(sample, "MaxParallelism")),
             Is.True, "Observed concurrency must not exceed the resolved bound.");
+        Assert.That(parallel.MeasuredSamples.All(static sample =>
+                ConcurrencyStatus(sample) == "Active" && ConcurrencyCounter(sample, "ScheduledWorkItems") > 0
+                && ConcurrencyCounter(sample, "ObservedMaxConcurrency") > 1), Is.True,
+            "Parallel evidence must execute bounded work with observed concurrency greater than one.");
 
         SampleSeries legacyStrict = RunSeries(fixture, "strict", ["--ensure-built", "--max-parallelism", "1"], RunsPerScenario, prime: false);
         SampleSeries legacyAudit = RunSeries(fixture, "audit", ["--ensure-built", "--max-parallelism", "1"], RunsPerScenario, prime: false);
@@ -184,7 +190,9 @@ public sealed class PostOptimizationAnalysisProfileBenchmarkHarness
             Median(samples.Select(static sample => sample.AnalysisOnlyMs)), Percentile95(samples.Select(static sample => sample.AnalysisOnlyMs)),
             Median(samples.Select(static sample => sample.OutputMs)), Percentile95(samples.Select(static sample => sample.OutputMs)),
             Median(samples.Select(static sample => sample.CommandTotalMs)), Percentile95(samples.Select(static sample => sample.CommandTotalMs)),
-            Median(samples.Select(static sample => sample.PreflightMs)), samples, series.PrimingSamples);
+            Median(samples.Select(static sample => sample.PreflightMs)),
+            Median(samples.Select(static sample => sample.WallClockMs)), Percentile95(samples.Select(static sample => sample.WallClockMs)),
+            MedianOptional(samples.Select(AllocatedBytes)), Percentile95Optional(samples.Select(AllocatedBytes)), samples, series.PrimingSamples);
     }
 
     private static ScenarioSummary Pair(string id, string description, SampleSeries strict, SampleSeries audit)
@@ -197,7 +205,7 @@ public sealed class PostOptimizationAnalysisProfileBenchmarkHarness
         strict.CommandTotalMs + audit.CommandTotalMs, strict.PreflightMs + audit.PreflightMs,
         strict.AnalysisOnlyMs + audit.AnalysisOnlyMs, strict.OutputMs + audit.OutputMs,
         "Success/Success", 0, false, strict.WallClockMs + audit.WallClockMs,
-        strict.CanonicalResult + audit.CanonicalResult, strict.Profile);
+        strict.CanonicalResult + audit.CanonicalResult, strict.Profile, [strict.Profile, audit.Profile]);
 
     private static RunSample RunOnce(
         AdoptionAcceptanceFixture fixture, string mode, IReadOnlyList<string> arguments, string? policyPath = null)
@@ -307,6 +315,13 @@ public sealed class PostOptimizationAnalysisProfileBenchmarkHarness
 
     private static int ConcurrencyCounter(RunSample sample, string name) => sample.Profile.GetProperty("Counters").GetProperty("Concurrency").GetProperty(name).GetInt32();
 
+    private static string ConcurrencyStatus(RunSample sample) => sample.Profile.GetProperty("Counters").GetProperty("Concurrency").GetProperty("Status").GetString()!;
+
+    private static double? AllocatedBytes(RunSample sample) =>
+        sample.Profile.TryGetProperty("Measurements", out JsonElement measurements)
+        && measurements.TryGetProperty("AllocatedBytesTotal", out JsonElement allocated)
+        && allocated.ValueKind == JsonValueKind.Number ? allocated.GetDouble() : null;
+
     private static double Median(IEnumerable<double> values)
     {
         List<double> sorted = values.Order().ToList();
@@ -320,18 +335,28 @@ public sealed class PostOptimizationAnalysisProfileBenchmarkHarness
         return sorted[(int)Math.Ceiling(sorted.Count * 0.95) - 1];
     }
 
+    private static double? MedianOptional(IEnumerable<double?> values) =>
+        values.Where(static value => value.HasValue).Select(static value => value!.Value).DefaultIfEmpty().Any()
+            ? Median(values.Where(static value => value.HasValue).Select(static value => value!.Value)) : null;
+
+    private static double? Percentile95Optional(IEnumerable<double?> values) =>
+        values.Where(static value => value.HasValue).Select(static value => value!.Value).DefaultIfEmpty().Any()
+            ? Percentile95(values.Where(static value => value.HasValue).Select(static value => value!.Value)) : null;
+
     private static string CliDllPath() => Path.Combine(new ArchitectureRepositoryRootResolver().Resolve(), "src", "ArchLinterNet.Cli", "bin", "Debug", "net10.0", "ArchLinterNet.Cli.dll");
 
     private static string ResultsPath() => Path.Combine(new ArchitectureRepositoryRootResolver().Resolve(), "docs", "internal", "analysis-profile-post-optimization-results.json");
 
     private sealed record RunSample(double CommandTotalMs, double PreflightMs, double AnalysisOnlyMs, double OutputMs,
-        string CompletionStatus, int ExitCode, bool OutputFailed, double WallClockMs, string CanonicalResult, JsonElement Profile);
+        string CompletionStatus, int ExitCode, bool OutputFailed, double WallClockMs, string CanonicalResult, JsonElement Profile,
+        IReadOnlyList<JsonElement>? PairedProfiles = null);
 
     private sealed record SampleSeries(IReadOnlyList<RunSample> MeasuredSamples, IReadOnlyList<RunSample> PrimingSamples);
 
     private sealed record ScenarioSummary(string ScenarioId, string Description, int SampleCount,
         double MedianAnalysisOnlyMs, double P95AnalysisOnlyMs, double MedianOutputMs, double P95OutputMs,
         double MedianCommandTotalMs, double P95CommandTotalMs, double MedianPreflightMs,
+        double MedianWallClockMs, double P95WallClockMs, double? MedianAllocatedBytes, double? P95AllocatedBytes,
         IReadOnlyList<RunSample> Samples, IReadOnlyList<RunSample> PrimingSamples);
 
     private sealed record BenchmarkEvidence(

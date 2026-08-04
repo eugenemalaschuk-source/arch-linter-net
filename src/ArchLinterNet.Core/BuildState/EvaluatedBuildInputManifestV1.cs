@@ -193,6 +193,10 @@ public static class EvaluatedBuildInputManifestCollector
                 if (File.Exists(path))
                 {
                     AddFile(path, context, cancellationToken);
+                    // Ancestor build files are active MSBuild evaluation surfaces. Until their
+                    // transitive imports, analyzers, references, and expressions are evaluated,
+                    // their opaque digest cannot authorize persistent cache reuse.
+                    context.Reasons.Add("ancestor-build-file-evaluation-unverified");
                 }
             }
 

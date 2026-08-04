@@ -1,5 +1,8 @@
 version: 1
 name: Synthetic large multi-host adopter
+layers:
+  synthetic:
+    namespace: Synthetic
 analysis:
   target_assemblies:
     - Synthetic.HostA
@@ -23,3 +26,10 @@ analysis:
     - src/Synthetic.HostH/Synthetic.HostH.csproj
     - src/Synthetic.SharedLib1/Synthetic.SharedLib1.csproj
     - src/Synthetic.SharedLib2/Synthetic.SharedLib2.csproj
+contracts:
+  strict:
+    - id: synthetic-full-assembly-scan
+      name: synthetic-full-assembly-scan
+      source: synthetic
+      forbidden: []
+      reason: Exercise the representative dependency scan workload for release profiling.
