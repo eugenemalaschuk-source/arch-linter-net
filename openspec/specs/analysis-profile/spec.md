@@ -29,11 +29,15 @@ The system SHALL populate `AnalysisProfile.Counters` from the same `Architecture
 - **THEN** `Counters.RenderedSinkCount` and `Counters.OutputSinkCount` differ accordingly, while `Counters.PolicyCompositions`, `Counters.ProjectGraphEvaluations`, `Counters.AssemblyLoads`, and every contract-family count are identical between the two profiles
 
 ### Requirement: Cache and concurrency fields are explicitly reserved
-The system SHALL include `Counters.Cache` and `Counters.Concurrency` sub-records in `AnalysisProfile.Counters` with all numeric fields set to `0` and an explicit `NotApplicable` status, since no persistent cache (#365) or parallel scanning (#408) exists yet. These fields SHALL use names and shapes stable enough for #365/#408 to populate with real values later without renaming or restructuring them.
+The system SHALL include `Counters.Cache` and `Counters.Concurrency` sub-records in `AnalysisProfile.Counters`. `Counters.Concurrency` SHALL keep all numeric fields at `0` and `Status` at `NotApplicable`, since parallel scanning (#408) does not exist yet. `Counters.Cache` SHALL report real `Lookups`, `Hits`, `Misses`, `Rejects`, `Writes`, `BytesRead`, `BytesWritten`, `IneligibleUnitCount`, `CorruptionEvents`, `CancelledBeforePublish`, `Mode` (`"disabled"`/`"auto"`/`"path"`, never a resolved absolute path), and `RejectReasonCounts` whenever the `analysis-cache` capability's `--cache`/`WithCache()` option is used with anything other than disabled, with `Status` set to `Active`; when the cache is disabled (the default), `Status` SHALL remain `NotApplicable` and every numeric field SHALL be `0`. Both sections SHALL use names and shapes stable enough for their owning capability to extend without renaming or restructuring them.
 
 #### Scenario: Reserved fields report not-applicable today
-- **WHEN** any `AnalysisProfile` is built by the current implementation
+- **WHEN** an `AnalysisProfile` is built for a run that did not enable the cache
 - **THEN** `Counters.Cache.Status` and `Counters.Concurrency.Status` both equal `NotApplicable`, and their numeric fields equal `0`
+
+#### Scenario: Cache-enabled run reports active status and real counters
+- **WHEN** an `AnalysisProfile` is built for a run that enabled the cache via `--cache`/`WithCache()`
+- **THEN** `Counters.Cache.Status` equals `Active`, `Counters.Cache.Mode` reflects the configured mode category, and `Writes`/`Rejects`/`RejectReasonCounts` reflect the real population attempt made for that run
 
 ### Requirement: The profile records a typed completion status including cancellation
 The system SHALL include a `CompletionStatus` field on `AnalysisProfile` with exactly the values `Success`, `ValidationFailure`, `PreparationFailure`, and `Cancelled`, reflecting the actual outcome of the profiled run. `CompletionStatus.Cancelled` SHALL be used when cooperative cancellation was observed during the run, distinct from a generic failure. A profile marked `Cancelled` records that cancellation was observed; it makes no atomic-publication guarantee about the profile artifact file itself.
@@ -100,3 +104,4 @@ The system SHALL provide a repeatable benchmark harness, excluded from the defau
 #### Scenario: Checked-in evidence discloses its environment and non-universality
 - **WHEN** the pre-optimization evidence document is read
 - **THEN** it states the observed reference environment and explicitly disclaims that the recorded medians/p95 are a universal speed contract
+

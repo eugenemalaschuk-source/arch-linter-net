@@ -1,6 +1,7 @@
 using System.Reflection;
 using ArchLinterNet.Core.Discovery;
 using ArchLinterNet.Core.IO.Abstractions;
+using ArchLinterNet.Core.Model;
 
 namespace ArchLinterNet.Core.Execution;
 
@@ -16,7 +17,8 @@ public sealed class ArchitectureAnalysisContext : IDisposable
         IReadOnlyCollection<string> assemblyProbingPaths,
         IReadOnlyCollection<ArchitectureProjectDiscoveryDiagnostic>? discoveryDiagnostics = null,
         ProjectDiscoveryResult? projectDiscovery = null,
-        IArchitectureAssemblyLoadScope? isolatedLoadScope = null)
+        IArchitectureAssemblyLoadScope? isolatedLoadScope = null,
+        IReadOnlyCollection<string>? selectedAssemblyArtifactPaths = null)
     {
         if (string.IsNullOrWhiteSpace(repositoryRoot))
         {
@@ -39,6 +41,13 @@ public sealed class ArchitectureAnalysisContext : IDisposable
             .ToArray()
             ?? Array.Empty<string>();
         _isolatedLoadScope = isolatedLoadScope;
+        SelectedAssemblyArtifactPaths = (selectedAssemblyArtifactPaths ?? targetAssemblies
+                .Select(SafeAssemblyLocation)
+                .Where(static path => path is not null)
+                .Cast<string>())
+            .Select(Path.GetFullPath)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
     }
 
     public string RepositoryRoot { get; }
@@ -54,6 +63,29 @@ public sealed class ArchitectureAnalysisContext : IDisposable
     public ProjectDiscoveryResult? ProjectDiscovery { get; }
 
     public IReadOnlyList<string> DiscoveredProjectPaths { get; }
+
+    // ResolutionResult supplies exact selected paths (including post-build LoadFromStream
+    // assemblies). These are physical files, not Assembly.Location-derived guesses.
+    internal IReadOnlyList<string> SelectedAssemblyArtifactPaths { get; }
+
+    internal IReadOnlyList<ArchitectureLoadedAssemblyArtifact> LoadedAssemblyArtifacts =>
+        (_isolatedLoadScope as IArchitectureAssemblyLoadScopeArtifactInventory)?.LoadedAssemblyArtifacts.ToArray()
+        ?? Array.Empty<ArchitectureLoadedAssemblyArtifact>();
+
+    // Cache evidence alone needs the eager local reference closure. Keep it out of ordinary
+    // post-build resolution so a cache-disabled run retains the historical lazy-load behavior.
+    internal bool MaterializeCacheArtifactReferences(CancellationToken cancellationToken)
+    {
+        // Assembly.Load/Assembly.LoadFrom can expose mutable path-backed assemblies and lazily
+        // load arbitrary default-context references. Until that path has the same exact-byte
+        // inventory as the isolated scope, it cannot authorize a cache hit or publication.
+        return _isolatedLoadScope is IArchitectureAssemblyLoadScopeArtifactInventory inventory
+            && inventory.MaterializeProbingPathReferences(
+                TargetAssemblies,
+                maximumAdditionalArtifactCount: 256,
+                maximumAdditionalArtifactBytes: 512L * 1024 * 1024,
+                cancellationToken: cancellationToken);
+    }
 
     // The session receives this one shared recorder when it creates lazily-materialized indexes.
     // ArchitectureAnalysisSnapshot projects the values through its immutable public counters.
@@ -74,5 +106,17 @@ public sealed class ArchitectureAnalysisContext : IDisposable
 
         _disposed = true;
         _isolatedLoadScope?.Dispose();
+    }
+
+    private static string? SafeAssemblyLocation(Assembly assembly)
+    {
+        try
+        {
+            return string.IsNullOrEmpty(assembly.Location) ? null : assembly.Location;
+        }
+        catch (NotSupportedException)
+        {
+            return null;
+        }
     }
 }

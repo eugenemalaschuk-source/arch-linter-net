@@ -86,6 +86,18 @@ public static class BuildStateCanonicalHasher
         return Convert.ToHexStringLower(SHA256.HashData(File.ReadAllBytes(filePath)));
     }
 
+    // Promoted to public for AnalysisCacheKey (see openspec/specs/analysis-build-state-fingerprints/
+    // spec.md, "Portable path normalization and containment") — portable identity must use
+    // repository-relative paths with '/' separators, never an absolute checkout path, so a cache
+    // key built from this stays equivalent across two checkouts of the same repository content.
+    public static string ToRepositoryRelativePath(string absolutePath, string repositoryRoot)
+    {
+        string full = Path.GetFullPath(absolutePath);
+        string rootFull = Path.GetFullPath(repositoryRoot);
+        string relative = Path.GetRelativePath(rootFull, full);
+        return relative.Replace(Path.DirectorySeparatorChar, '/').Replace(Path.AltDirectorySeparatorChar, '/');
+    }
+
     private static IEnumerable<string> EnumerateRelevantFiles(string projectDirectory)
     {
         if (!Directory.Exists(projectDirectory))
@@ -142,13 +154,5 @@ public static class BuildStateCanonicalHasher
         return segments.Length > 0
             && (string.Equals(segments[0], "bin", StringComparison.OrdinalIgnoreCase)
                 || string.Equals(segments[0], "obj", StringComparison.OrdinalIgnoreCase));
-    }
-
-    private static string ToRepositoryRelativePath(string absolutePath, string repositoryRoot)
-    {
-        string full = Path.GetFullPath(absolutePath);
-        string rootFull = Path.GetFullPath(repositoryRoot);
-        string relative = Path.GetRelativePath(rootFull, full);
-        return relative.Replace(Path.DirectorySeparatorChar, '/').Replace(Path.AltDirectorySeparatorChar, '/');
     }
 }

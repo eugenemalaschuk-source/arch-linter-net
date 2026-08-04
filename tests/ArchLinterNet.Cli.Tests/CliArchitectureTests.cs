@@ -3,6 +3,7 @@ using System.Text.Json;
 using ArchLinterNet.Cli;
 using ArchLinterNet.Cli.Abstractions;
 using ArchLinterNet.Cli.Commands.Baseline;
+using ArchLinterNet.Cli.Commands.Cache;
 using ArchLinterNet.Cli.Commands.Explain;
 using ArchLinterNet.Cli.Commands.Graph;
 using ArchLinterNet.Cli.Commands.Policy;
@@ -37,6 +38,7 @@ public sealed class CliArchitectureTests
             Assert.That(composition.SubcommandModules.Select(static module => module.GetType()), Is.EquivalentTo(new[]
             {
                 typeof(BaselineCommandModule),
+                typeof(CacheCommandModule),
                 typeof(GraphCommandModule),
                 typeof(ExplainCommandModule),
                 typeof(PolicyCommandModule),
@@ -45,7 +47,7 @@ public sealed class CliArchitectureTests
             }));
             Assert.That(
                 composition.RootCommandFactory.Create().Subcommands.Select(static command => command.Name),
-                Is.EquivalentTo(new[] { "baseline", "graph", "explain", "policy", "public-api", "schema" }));
+                Is.EquivalentTo(new[] { "baseline", "cache", "graph", "explain", "policy", "public-api", "schema" }));
         });
     }
 

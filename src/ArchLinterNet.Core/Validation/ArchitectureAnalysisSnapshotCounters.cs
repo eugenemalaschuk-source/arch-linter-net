@@ -1,3 +1,5 @@
+using ArchLinterNet.Core.Caching;
+
 namespace ArchLinterNet.Core.Validation;
 
 // Minimal typed counters for #363: composition/evaluation counts only. Full profiling/timing
@@ -39,4 +41,9 @@ public sealed record ArchitectureAnalysisSnapshotCounters
     // Unlike ContractFamilyCounts, this measures results, not contracts invoked.
     public IReadOnlyDictionary<string, int> ContractFamilyResultCounts { get; init; } =
         new Dictionary<string, int>(StringComparer.Ordinal);
+
+    // Real analysis-cache/v1 lookup instrumentation for this snapshot (see
+    // ArchitectureAnalysisSnapshot.CacheStats) — null whenever no cache location was configured for
+    // this request, so a host can distinguish "cache not used" from "used, zero lookups so far".
+    public AnalysisCacheLookupStats? CacheLookups { get; init; }
 }

@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using ArchLinterNet.Core.BuildState;
+using ArchLinterNet.Core.Caching;
 using ArchLinterNet.Core.Composition;
 using ArchLinterNet.Core.Profiling;
 using ArchLinterNet.Core.Reporting;
@@ -19,6 +20,7 @@ public sealed class ArchitectureValidationBuilder
     private bool _enforceUnmatchedIgnoredViolationsPolicy;
     private bool _collectTimings;
     private bool _collectProfile;
+    private AnalysisCacheOptions _cacheOptions = AnalysisCacheOptions.Disabled;
     private BuildPreparationMode _preparationMode = BuildPreparationMode.Ordinary;
     private bool _noRestore;
     private string? _requestedConfiguration;
@@ -76,6 +78,15 @@ public sealed class ArchitectureValidationBuilder
     public ArchitectureValidationBuilder WithProfile()
     {
         _collectProfile = true;
+        return this;
+    }
+
+    // Opt-in mirror of the CLI's --cache option — disabled/auto/explicit-path semantics, resolved
+    // and safety-validated by the same ArchLinterNet.Core.Caching engine the CLI uses. See
+    // openspec/specs/analysis-cache/spec.md, "CLI, Testing API and generic CI guidance agree".
+    public ArchitectureValidationBuilder WithCache(AnalysisCacheOptions options)
+    {
+        _cacheOptions = options;
         return this;
     }
 
@@ -172,12 +183,34 @@ public sealed class ArchitectureValidationBuilder
             RequestedTargetFramework = _requestedTargetFramework,
             RequestedPlatform = _requestedPlatform,
             RequestedRuntimeIdentifier = _requestedRuntimeIdentifier,
+            CacheLocation = ResolveCacheLocationForExecution(),
             CancellationToken = _cancellationToken,
         };
 
         ValidationTiming? timing = _collectTimings || _collectProfile ? new ValidationTiming() : null;
         ArchitectureAnalysisSnapshot snapshot = _engine.Value.CreateSnapshot(request, timing);
-        return new ArchitectureValidationSnapshotSession(snapshot, timing, _collectProfile, allocatedBytesAtStart);
+        return new ArchitectureValidationSnapshotSession(
+            snapshot, timing, _collectProfile, allocatedBytesAtStart, BuildCacheContext());
+    }
+
+    // Finding #7: carried into the session so ArchitectureValidationSnapshotSession.Evaluate can
+    // populate the cache after a completed miss the same way Validate() below already does — one
+    // shared ArchitectureValidationCacheSupport implementation, not a second independently
+    // maintained copy.
+    private ArchitectureValidationCacheSupport.CacheContext BuildCacheContext()
+    {
+        return new ArchitectureValidationCacheSupport.CacheContext(
+            _cacheOptions,
+            _policyPath,
+            _conditionSetName,
+            _contractIds,
+            _requestedConfiguration,
+            _requestedTargetFramework,
+            _requestedPlatform,
+            _requestedRuntimeIdentifier,
+            _cancellationToken,
+            _baselinePath,
+            _enforceUnmatchedIgnoredViolationsPolicy);
     }
 
     private ArchitectureValidationResult Validate(string mode)
@@ -197,12 +230,16 @@ public sealed class ArchitectureValidationBuilder
             RequestedTargetFramework = _requestedTargetFramework,
             RequestedPlatform = _requestedPlatform,
             RequestedRuntimeIdentifier = _requestedRuntimeIdentifier,
+            CacheLocation = ResolveCacheLocationForExecution(),
             CancellationToken = _cancellationToken,
         };
 
         ValidationTiming? timing = _collectTimings || _collectProfile ? new ValidationTiming() : null;
         (ValidationOutcome outcome, ArchitectureAnalysisSnapshotCounters counters) =
             _engine.Value.ValidateWithCounters(request, timing);
+
+        AnalysisCachePopulation.Outcome populationOutcome =
+            ArchitectureValidationCacheSupport.TryPopulateCache(BuildCacheContext(), mode, outcome);
 
         AnalysisProfile? profile = _collectProfile
             ? AnalysisProfileBuilder.Build(
@@ -211,10 +248,29 @@ public sealed class ArchitectureValidationBuilder
                 new ArchLinterNet.Core.Profiling.AnalysisProfileBuildOptions
                 {
                     Measurements = CaptureMeasurements(allocatedBytesAtStart),
+                    Cache = ArchitectureValidationCacheSupport.BuildCacheProfileCounters(
+                        BuildCacheContext(), counters, populationOutcome),
                 })
             : null;
 
         return ArchitectureValidationResultMapper.ToResult(outcome, timing, mode, profile);
+    }
+
+    private AnalysisCacheLocation? ResolveCacheLocationForExecution()
+    {
+        if (_cacheOptions.Mode == AnalysisCacheMode.Disabled)
+        {
+            return null;
+        }
+
+        try
+        {
+            return AnalysisCacheLocationResolver.Resolve(_cacheOptions);
+        }
+        catch (AnalysisCacheLocationRejectedException)
+        {
+            return null;
+        }
     }
 
     // outcome.PreflightBlocked wins over Passed the same way the CLI's own resolver does (see
