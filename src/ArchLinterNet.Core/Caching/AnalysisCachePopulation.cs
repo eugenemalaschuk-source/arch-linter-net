@@ -62,8 +62,9 @@ public static class AnalysisCachePopulation
             projectPath, repositoryRoot, configuration, targetFramework, platform, runtimeIdentifier, cancellationToken);
     }
 
-    // Compatibility entry point used by direct callers and focused store tests. The snapshot path
-    // below supplies a prepared authorization so it can prove pre/post-execution equivalence.
+    // This public compatibility entry point cannot receive the authoritative artifact evidence
+    // required for reuse authorization. Keep its source-compatible signature, but fail closed
+    // rather than allowing a direct caller to create an artifact-less cache entry.
     public static Outcome TryPopulate(
         AnalysisCacheLocation? location,
         AnalysisCacheKey key,
@@ -76,17 +77,9 @@ public static class AnalysisCachePopulation
         AnalysisCacheOutcomeV1 outcome,
         CancellationToken cancellationToken = default)
     {
-        PreparedAuthorization? authorization = Prepare(
-            location, key, discoveredProjectPaths, Array.Empty<string>(), repositoryRoot, configuration,
-            targetFramework, platform, runtimeIdentifier, hasUnfingerprintedSourceInputs: false,
-            Array.Empty<AnalysisCacheCapturedFileIdentity>(), Array.Empty<ArchitectureLoadedTextIdentity>(),
-            cancellationToken, out Outcome rejected);
-        if (authorization is null)
-        {
-            return rejected;
-        }
-
-        return Put(authorization, outcome, cancellationToken);
+        return location is null
+            ? new Outcome(AnalysisCacheRejectReason.Disabled, 0, 0, 0, PopulationAttempted: false)
+            : new Outcome(AnalysisCacheRejectReason.IneligibleBuildInput, 0, 0, 0);
     }
 
     // The cache-hit path calls this from ArchitectureAnalysisSnapshot before contract execution.
@@ -159,9 +152,11 @@ public static class AnalysisCachePopulation
         string? runtimeIdentifier,
         CancellationToken cancellationToken = default)
     {
-        return TryLookupWithAuthorization(
-            location, key, discoveredProjectPaths, Array.Empty<string>(), repositoryRoot, configuration,
-            targetFramework, platform, runtimeIdentifier, hasUnfingerprintedSourceInputs: false, cancellationToken).Lookup;
+        // The public signature has no channel for exact selected/reference artifact identities.
+        // Do not consult the store: a stored artifact-less envelope is never reusable.
+        return location is null
+            ? AnalysisCacheLookupResult.Miss(AnalysisCacheRejectReason.Disabled)
+            : AnalysisCacheLookupResult.Reject(AnalysisCacheRejectReason.IneligibleBuildInput);
     }
 
     // Called by ArchitectureAnalysisSnapshot after a cache miss completed its real evaluation.

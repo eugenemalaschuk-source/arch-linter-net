@@ -50,13 +50,18 @@ public sealed class AnalysisCachePopulationTests
         Array.Empty<ArchitectureCoverageSummary>(), Array.Empty<ArchitectureClassificationConflict>(),
         Array.Empty<ArchitectureClassificationMetadataFailure>());
 
-    // Documents the current, intentional state (see design.md): #406's
-    // EvaluatedBuildInputManifestCollector always reports CacheIneligible for real MSBuild
-    // evidence today, so populating from an actual discovered project is always rejected — a
-    // cache entry is never fabricated from unproven build-input evidence.
     [Test]
-    public void TryPopulate_RealProject_IsIneligibleBuildInputToday()
+    public void TryPopulate_WithoutArtifactEvidence_IsIneligibleAndDoesNotWrite()
     {
+        int collectionCount = 0;
+        AnalysisCachePopulation.TestManifestCollectorOverride =
+            (_, _, _, _, _, _, _) =>
+            {
+                collectionCount++;
+                return new EvaluatedBuildInputManifestV1(
+                    "verified-manifest", CacheEligibility.VerifiedCacheEligible,
+                    Array.Empty<string>(), Array.Empty<string>());
+            };
         AnalysisCacheLocation location = new(_cacheRoot, AnalysisCacheMode.ExplicitPath);
 
         AnalysisCachePopulation.Outcome outcome = AnalysisCachePopulation.TryPopulate(
@@ -64,10 +69,47 @@ public sealed class AnalysisCachePopulationTests
             null, null, null, null, SampleOutcome());
 
         Assert.That(outcome.RejectReason, Is.EqualTo(AnalysisCacheRejectReason.IneligibleBuildInput));
-        Assert.That(outcome.ProjectsEvaluated, Is.EqualTo(1));
-        Assert.That(outcome.IneligibleProjectCount, Is.EqualTo(1));
+        Assert.That(outcome.ProjectsEvaluated, Is.Zero);
+        Assert.That(outcome.IneligibleProjectCount, Is.Zero);
         Assert.That(outcome.BytesWritten, Is.EqualTo(0));
+        Assert.That(collectionCount, Is.Zero);
         Assert.That(Directory.Exists(_cacheRoot) && Directory.EnumerateFiles(_cacheRoot, "*.json", SearchOption.AllDirectories).Any(), Is.False);
+    }
+
+    [Test]
+    public void TryLookup_WithoutArtifactEvidence_RejectsMatchingArtifactlessEntryWithoutReadingIt()
+    {
+        int collectionCount = 0;
+        AnalysisCachePopulation.TestManifestCollectorOverride =
+            (_, _, _, _, _, _, _) =>
+            {
+                collectionCount++;
+                return new EvaluatedBuildInputManifestV1(
+                    "verified-manifest", CacheEligibility.VerifiedCacheEligible,
+                    Array.Empty<string>(), Array.Empty<string>());
+            };
+        AnalysisCacheLocation location = new(_cacheRoot, AnalysisCacheMode.ExplicitPath);
+        IReadOnlyList<AnalysisCacheProjectManifest> projectManifests = new[]
+        {
+            AnalysisCacheProjectManifest.FromManifest(
+                BuildStateCanonicalHasher.ToRepositoryRelativePath(_projectPath, _repoRoot),
+                new EvaluatedBuildInputManifestV1(
+                    "verified-manifest", CacheEligibility.VerifiedCacheEligible,
+                    Array.Empty<string>(), Array.Empty<string>())),
+        };
+        AnalysisCacheStore.PutResult stored = AnalysisCacheStore.Put(location, CreateKey(), projectManifests, SampleOutcome());
+
+        AnalysisCacheLookupResult lookup = AnalysisCachePopulation.TryLookup(
+            location, CreateKey(), new[] { _projectPath }, _repoRoot, null, null, null, null);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(stored.RejectReason, Is.Null);
+            Assert.That(lookup.Outcome, Is.EqualTo(AnalysisCacheLookupOutcome.Reject));
+            Assert.That(lookup.Reason, Is.EqualTo(AnalysisCacheRejectReason.IneligibleBuildInput));
+            Assert.That(lookup.BytesRead, Is.Zero);
+            Assert.That(collectionCount, Is.Zero);
+        });
     }
 
     [Test]
