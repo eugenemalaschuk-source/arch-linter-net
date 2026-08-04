@@ -417,15 +417,14 @@ public sealed class ArchitectureAnalysisSnapshot : IDisposable
 
     // The real cache-hit short-circuit (issue #365's deferred follow-up, now implemented): when
     // this run configured a cache location, a hit here reconstructs a ValidationOutcome directly
-    // from the persisted AnalysisCacheOutcomeV1 and skips EvaluateCore entirely — configuration_check,
-    // policy_consistency_check, contract_checks (contract execution, including source scanning and
-    // coverage/classification computation) and post_processing never run for this mode. Policy
-    // composition, project discovery, and assembly loading already happened in
-    // ArchitectureValidationApplicationService.BuildSnapshot before this snapshot existed — they are
-    // not skipped, since #406 per-project manifest recomputation (the actual reuse-authorization
-    // proof) requires the discovered project set to already be known, and every requested mode
-    // shares that one snapshot's setup regardless of hit/miss. Returns null on Miss/Reject so the
-    // caller falls back to the real pipeline exactly as before this change.
+    // from the persisted AnalysisCacheOutcomeV1 and skips runner materialization as well as
+    // EvaluateCore — configuration_check, policy_consistency_check, contract_checks (contract
+    // execution, including source scanning and coverage/classification computation), and
+    // post_processing never run for this mode. Policy composition, project discovery, and
+    // metadata-only artifact planning already happened in BuildSnapshot because #406's per-project
+    // manifest recomputation needs the discovered project set. The lazy runner materializes only
+    // after a miss, and is shared by later misses for another requested mode. Returns null on
+    // Miss/Reject so the caller falls back to the real pipeline.
     // Finding #3: the session cancellation token is threaded through the entire lookup —
     // ComputePolicyDigest (which hashes every policy file's content and can be a real I/O-bound
     // operation for a large import graph) and TryLookup (which recomputes a #406 manifest per
