@@ -4,17 +4,6 @@ layers:
   synthetic:
     namespace: Synthetic
 analysis:
-  target_assemblies:
-    - Synthetic.HostA
-    - Synthetic.HostB
-    - Synthetic.HostC
-    - Synthetic.HostD
-    - Synthetic.HostE
-    - Synthetic.HostF
-    - Synthetic.HostG
-    - Synthetic.HostH
-    - Synthetic.SharedLib1
-    - Synthetic.SharedLib2
   projects:
     - src/Synthetic.HostA/Synthetic.HostA.csproj
     - src/Synthetic.HostB/Synthetic.HostB.csproj
@@ -33,3 +22,10 @@ contracts:
       source: synthetic
       forbidden: []
       reason: Exercise the representative dependency scan workload for release profiling.
+  strict_layout_conventions:
+    - id: synthetic-fact-index-scan
+      name: synthetic-fact-index-scan
+      files_matching:
+        namespace_segment: Synthetic
+      forbidden_name_prefix: __never__
+      reason: Materialize the type/source fact index across every synthetic assembly partition.

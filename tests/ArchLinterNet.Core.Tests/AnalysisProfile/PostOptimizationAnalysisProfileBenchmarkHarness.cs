@@ -30,6 +30,11 @@ public sealed class PostOptimizationAnalysisProfileBenchmarkHarness
 
         List<ScenarioSummary> scenarios = new();
         using AdoptionAcceptanceFixture fixture = AdoptionAcceptanceFixture.Create("large-multi-host");
+        fixture.Build();
+        // The measured ordinary/cache runs must not hide build recovery work. Establish the
+        // receipt-backed build state once, outside the timing dataset, then exercise the
+        // metadata-only preparation path against those exact artifacts.
+        ValidateSuccess(RunOnce(fixture, "strict", ["--ensure-built", "--max-parallelism", "1"]), "fixture build-state priming");
 
         SampleSeries disabled = RunSeries(fixture, "strict", ["--ensure-built", "--max-parallelism", "1"], RunsPerScenario, prime: true);
         scenarios.Add(Summarize("2-immediate-warm-strict-repeat-cache-disabled", "Warm strict repeat with cache disabled", disabled));
@@ -42,24 +47,31 @@ public sealed class PostOptimizationAnalysisProfileBenchmarkHarness
 
         SampleSeries warmHit = RunWarmHitSeries(fixture, cache.Path, RunsPerScenario);
         scenarios.Add(Summarize("6b-cache-verified-warm-hit", "Verified warm cache hit after population", warmHit));
-        AssertEquivalent(disabled.MeasuredSamples[0], warmHit.MeasuredSamples[0], "cached and uncached canonical findings");
-        Assert.That(warmHit.MeasuredSamples.All(static sample => CacheCounter(sample, "Hits") > 0), Is.True,
-            "Every warm-hit sample must expose a verified cache hit.");
-        Assert.That(warmHit.MeasuredSamples.All(sample => Counter(sample, "AssemblyLoads") < Counter(disabled.MeasuredSamples[0], "AssemblyLoads")), Is.True,
-            "A verified warm hit must expose avoided assembly-load work.");
+        AssertEquivalentSamples(disabled.MeasuredSamples, warmHit.MeasuredSamples, "cached and uncached canonical findings");
+        Assert.That(warmHit.MeasuredSamples.All(static sample =>
+                CacheCounter(sample, "Hits") == 1
+                && Counter(sample, "AssemblyLoads") == 0
+                && CacheCounter(sample, "AvoidedAssemblyLoads") > 0
+                && (CacheCounter(sample, "AvoidedFactIndexMaterializations") > 0
+                    || CacheCounter(sample, "AvoidedContractExecutions") > 0)
+                && !sample.Profile.GetProperty("Phases").EnumerateArray()
+                    .Any(phase => phase.GetProperty("Name").GetString() == "contract_checks")), Is.True,
+            "Every warm hit must avoid CLR loading and fact/contract work, without contract_checks.");
 
         SampleSeries sequential = RunSeries(fixture, "strict", ["--ensure-built", "--max-parallelism", "1"], RunsPerScenario, prime: false);
         SampleSeries parallel = RunSeries(fixture, "strict", ["--ensure-built"], RunsPerScenario, prime: false);
         scenarios.Add(Summarize("7a-sequential-max-parallelism-1", "Fully supported sequential execution", sequential));
         scenarios.Add(Summarize("7b-bounded-parallel-default", "Documented default bounded parallel assembly/fact scanning", parallel));
-        AssertEquivalent(sequential.MeasuredSamples[0], parallel.MeasuredSamples[0], "sequential and parallel canonical findings");
+        AssertEquivalentSamples(sequential.MeasuredSamples, parallel.MeasuredSamples, "sequential and parallel canonical findings");
         Assert.That(parallel.MeasuredSamples.All(static sample =>
-                ConcurrencyCounter(sample, "ObservedMaxConcurrency") <= ConcurrencyCounter(sample, "MaxParallelism")),
-            Is.True, "Observed concurrency must not exceed the resolved bound.");
-        Assert.That(parallel.MeasuredSamples.All(static sample =>
-                ConcurrencyStatus(sample) == "Active" && ConcurrencyCounter(sample, "ScheduledWorkItems") > 0
-                && ConcurrencyCounter(sample, "ObservedMaxConcurrency") > 1), Is.True,
-            "Parallel evidence must execute bounded work with observed concurrency greater than one.");
+                ConcurrencyStatus(sample) == "Active"
+                && ConcurrencyCounter(sample, "MaxParallelism") > 1
+                && ConcurrencyCounter(sample, "ScheduledWorkItems") >= 4
+                && ConcurrencyCounter(sample, "CompletedWorkItems") == ConcurrencyCounter(sample, "ScheduledWorkItems")
+                && ConcurrencyCounter(sample, "ObservedMaxConcurrency") >= 2
+                && ConcurrencyCounter(sample, "MergeOperations") > 0
+                && Counter(sample, "FactIndexMaterializations") > 0), Is.True,
+            "Parallel evidence must activate bounded fact work, complete every partition, and merge deterministically.");
 
         SampleSeries legacyStrict = RunSeries(fixture, "strict", ["--ensure-built", "--max-parallelism", "1"], RunsPerScenario, prime: false);
         SampleSeries legacyAudit = RunSeries(fixture, "audit", ["--ensure-built", "--max-parallelism", "1"], RunsPerScenario, prime: false);
@@ -69,7 +81,7 @@ public sealed class PostOptimizationAnalysisProfileBenchmarkHarness
         scenarios.Add(Summarize("4-combined-strict-audit-one-snapshot", "Combined strict and audit from one snapshot", combined));
         Assert.That(combined.MeasuredSamples.All(static sample =>
             Counter(sample, "PolicyCompositions") == 1 && Counter(sample, "ProjectGraphEvaluations") == 2), Is.True,
-            "Combined execution must compose policy once; --ensure-built records initial evaluation plus its required post-build reload.");
+            "Combined execution must compose policy once; --ensure-built records initial evaluation plus its required post-build preparation.");
 
         SampleSeries oneSink = RunSeries(fixture, "strict", ["--ensure-built", "--report", "json=one.json", "--max-parallelism", "1"], RunsPerScenario, prime: false);
         SampleSeries threeSinks = RunSeries(fixture, "strict", [
@@ -173,6 +185,24 @@ public sealed class PostOptimizationAnalysisProfileBenchmarkHarness
         Assert.That(right.CanonicalResult, Is.EqualTo(left.CanonicalResult), $"Mismatch in {comparison}.");
     }
 
+    private static void AssertEquivalentSamples(
+        IReadOnlyList<RunSample> baseline, IReadOnlyList<RunSample> candidate, string comparison)
+    {
+        Assert.That(candidate.Count, Is.EqualTo(baseline.Count), $"Sample-count mismatch in {comparison}.");
+        for (int index = 0; index < baseline.Count; index++)
+        {
+            RunSample left = baseline[index];
+            RunSample right = candidate[index];
+            Assert.Multiple(() =>
+            {
+                AssertEquivalent(left, right, $"{comparison} sample {index + 1}");
+                Assert.That(right.CompletionStatus, Is.EqualTo(left.CompletionStatus));
+                Assert.That(right.ExitCode, Is.EqualTo(left.ExitCode));
+                Assert.That(right.OutputFailed, Is.EqualTo(left.OutputFailed));
+            });
+        }
+    }
+
     private static void AssertOutputOnlyDifference(RunSample oneSink, RunSample threeSinks)
     {
         AssertEquivalent(oneSink, threeSinks, "one- and three-sink canonical findings");
@@ -206,7 +236,8 @@ public sealed class PostOptimizationAnalysisProfileBenchmarkHarness
         strict.CommandTotalMs + audit.CommandTotalMs, strict.PreflightMs + audit.PreflightMs,
         strict.AnalysisOnlyMs + audit.AnalysisOnlyMs, strict.OutputMs + audit.OutputMs,
         "Success/Success", 0, false, strict.WallClockMs + audit.WallClockMs,
-        strict.CanonicalResult + audit.CanonicalResult, strict.Profile, [strict.Profile, audit.Profile]);
+        strict.CanonicalResult + audit.CanonicalResult, strict.RawResult + audit.RawResult,
+        strict.Profile, [strict.Profile, audit.Profile]);
 
     private static RunSample RunOnce(
         AdoptionAcceptanceFixture fixture, string mode, IReadOnlyList<string> arguments, string? policyPath = null)
@@ -240,13 +271,14 @@ public sealed class PostOptimizationAnalysisProfileBenchmarkHarness
         string stderr = stderrTask.GetAwaiter().GetResult();
         wallClock.Stop();
 
-        Assert.That(File.Exists(profilePath), Is.True, $"No profile produced. stderr:{Environment.NewLine}{stderr}");
+        Assert.That(File.Exists(profilePath), Is.True,
+            $"No profile produced (exit {process.ExitCode}). stdout:{Environment.NewLine}{stdout}{Environment.NewLine}stderr:{Environment.NewLine}{stderr}");
         try
         {
             using JsonDocument document = JsonDocument.Parse(File.ReadAllText(profilePath));
             JsonElement profile = document.RootElement.Clone();
             string resultJson = jsonReportPath is null ? stdout : File.ReadAllText(jsonReportPath);
-            return CreateRunSample(profile, ExtractCanonicalResult(resultJson), process.ExitCode, wallClock.Elapsed.TotalMilliseconds);
+            return CreateRunSample(profile, ExtractCanonicalResult(resultJson), resultJson, process.ExitCode, wallClock.Elapsed.TotalMilliseconds);
         }
         finally
         {
@@ -254,7 +286,8 @@ public sealed class PostOptimizationAnalysisProfileBenchmarkHarness
         }
     }
 
-    private static RunSample CreateRunSample(JsonElement profile, string canonicalResult, int exitCode, double wallClockMs)
+    private static RunSample CreateRunSample(
+        JsonElement profile, string canonicalResult, string rawResult, int exitCode, double wallClockMs)
     {
         JsonElement root = profile;
         double preflightMs = 0;
@@ -274,12 +307,13 @@ public sealed class PostOptimizationAnalysisProfileBenchmarkHarness
         double commandTotalMs = totalMs is { } total ? total + outputMs : topLevelMs;
         return new RunSample(commandTotalMs, preflightMs, Math.Max(0, commandTotalMs - preflightMs - outputMs), outputMs,
             root.GetProperty("CompletionStatus").GetString()!, exitCode,
-            root.GetProperty("Output").GetProperty("OutputFailed").GetBoolean(), wallClockMs, canonicalResult, profile);
+            root.GetProperty("Output").GetProperty("OutputFailed").GetBoolean(), wallClockMs, canonicalResult, rawResult, profile);
     }
 
     private static void ValidateSuccess(RunSample sample, string context)
     {
-        Assert.That(sample.CompletionStatus, Is.EqualTo("Success"), $"Unexpected completion for {context}.");
+        Assert.That(sample.CompletionStatus, Is.EqualTo("Success"),
+            $"Unexpected completion for {context}. preflight:{Environment.NewLine}{PreflightDiagnostics(sample.RawResult)}");
         Assert.That(sample.ExitCode, Is.EqualTo(0), $"Unexpected exit category for {context}.");
         Assert.That(sample.OutputFailed, Is.False, $"Unexpected output failure for {context}.");
     }
@@ -295,6 +329,19 @@ public sealed class PostOptimizationAnalysisProfileBenchmarkHarness
         ];
         return string.Join("\n", canonicalFields.Select(field =>
             root.TryGetProperty(field, out JsonElement value) ? value.GetRawText() : "null"));
+    }
+
+    private static string PreflightDiagnostics(string json)
+    {
+        using JsonDocument document = JsonDocument.Parse(json);
+        if (!document.RootElement.TryGetProperty("preflight_diagnostics", out JsonElement diagnostics))
+        {
+            return json;
+        }
+
+        return string.Join(Environment.NewLine, diagnostics.EnumerateArray().Select(diagnostic => string.Join(", ",
+            diagnostic.EnumerateObject().Where(property => property.Name is "state" or "project_path" or "assembly_name" or "detail" or "cache_eligibility" or "cache_ineligibility_reasons")
+                .Select(property => $"{property.Name}={property.Value.GetRawText()}"))));
     }
 
     private static string? FindJsonReportPath(string fixtureRoot, IReadOnlyList<string> arguments)
@@ -349,7 +396,7 @@ public sealed class PostOptimizationAnalysisProfileBenchmarkHarness
     private static string ResultsPath() => Path.Combine(new ArchitectureRepositoryRootResolver().Resolve(), "docs", "internal", "analysis-profile-post-optimization-results.json");
 
     private sealed record RunSample(double CommandTotalMs, double PreflightMs, double AnalysisOnlyMs, double OutputMs,
-        string CompletionStatus, int ExitCode, bool OutputFailed, double WallClockMs, string CanonicalResult, JsonElement Profile,
+        string CompletionStatus, int ExitCode, bool OutputFailed, double WallClockMs, string CanonicalResult, string RawResult, JsonElement Profile,
         IReadOnlyList<JsonElement>? PairedProfiles = null);
 
     private sealed record SampleSeries(IReadOnlyList<RunSample> MeasuredSamples, IReadOnlyList<RunSample> PrimingSamples);

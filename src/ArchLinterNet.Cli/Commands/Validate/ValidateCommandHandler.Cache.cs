@@ -166,7 +166,8 @@ internal sealed partial class ValidateCommandHandler
         state.RejectReasonCounts[key] = existing + 1;
     }
 
-    private static AnalysisProfileCacheCounters BuildCacheProfileCounters(ValidateCommandOptions options, CacheExecutionState state)
+    private static AnalysisProfileCacheCounters BuildCacheProfileCounters(
+        ValidateCommandOptions options, CacheExecutionState state, ArchitectureAnalysisSnapshotCounters? counters)
     {
         AnalysisCacheLookupStats? lookups = state.Lookups;
         Dictionary<string, int> rejectReasonCounts = new(state.RejectReasonCounts, StringComparer.Ordinal);
@@ -199,6 +200,11 @@ internal sealed partial class ValidateCommandHandler
             IneligibleUnitCount = state.IneligibleUnitCount + (lookups?.IneligibleUnitCount ?? 0),
             CorruptionEvents = AnalysisCacheCorruptionClassifier.CountCorruptionEvents(rejectReasonCounts),
             CancelledBeforePublish = state.CancelledBeforePublish,
+            AvoidedAssemblyLoads = counters?.AvoidedAssemblyLoads ?? 0,
+            AvoidedFactIndexMaterializations = counters?.AvoidedFactIndexMaterializations ?? 0,
+            AvoidedSourceScanPasses = counters?.AvoidedSourceScanPasses ?? 0,
+            AvoidedContractExecutions = counters?.AvoidedContractExecutions ?? 0,
+            AvoidedArtifactBytesLoaded = counters?.AvoidedArtifactBytesLoaded ?? 0,
             Mode = ResolveCacheOptions(options).ModeCategory,
             RejectReasonCounts = rejectReasonCounts,
         };

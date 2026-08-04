@@ -32,7 +32,11 @@ public sealed class ArchitectureAnalysisSnapshot : IDisposable
     private readonly IArchitectureContractHandlerRegistry _handlerRegistry;
     private readonly IReadOnlyCollection<string>? _requestedContractIds;
     private readonly AnalysisSnapshotCacheContext? _cacheContext;
-    private readonly AnalysisSessionProfilingCounters _profilingCounters;
+    private AnalysisSessionProfilingCounters? _profilingCounters;
+    private readonly Func<ArchitectureRunnerSetup>? _materializeSetup;
+    private readonly IReadOnlyList<string> _preparedArtifactPaths;
+    private readonly IReadOnlyList<string> _preparedProjectPaths;
+    private readonly bool _preparedArtifactClosureComplete;
     private readonly object _gate = new();
     private readonly Dictionary<string, ValidationOutcome> _evaluatedModes = new(StringComparer.Ordinal);
     private readonly Dictionary<string, AnalysisCachePopulation.PreparedAuthorization> _cacheAuthorizations =
@@ -44,7 +48,7 @@ public sealed class ArchitectureAnalysisSnapshot : IDisposable
 
     internal ArchitectureAnalysisSnapshot(
         ArchitectureContractDocument document,
-        ArchitectureRunnerSetup setup,
+        ArchitectureRunnerSetup? setup,
         BuildStatePreflightResult preflight,
         string unmatchedConfig,
         string policyConsistencyConfig,
@@ -57,11 +61,17 @@ public sealed class ArchitectureAnalysisSnapshot : IDisposable
         int projectGraphEvaluations,
         int assemblyLoads,
         IReadOnlyCollection<string>? requestedContractIds = null,
-        AnalysisSnapshotCacheContext? cacheContext = null)
+        AnalysisSnapshotCacheContext? cacheContext = null,
+        string? preparedRepositoryRoot = null,
+        IReadOnlyList<string>? preparedArtifactPaths = null,
+        IReadOnlyList<string>? preparedProjectPaths = null,
+        bool preparedArtifactClosureComplete = true,
+        Func<ArchitectureRunnerSetup>? materializeSetup = null)
     {
         _document = document;
         _setup = setup;
-        _repositoryRoot = setup.RepositoryRoot;
+        _repositoryRoot = setup?.RepositoryRoot ?? preparedRepositoryRoot
+            ?? throw new ArgumentException("A prepared repository root is required when setup is lazy.", nameof(preparedRepositoryRoot));
         _preflight = preflight;
         _unmatchedConfig = unmatchedConfig;
         _policyConsistencyConfig = policyConsistencyConfig;
@@ -72,19 +82,26 @@ public sealed class ArchitectureAnalysisSnapshot : IDisposable
         _handlerRegistry = handlerRegistry;
         _requestedContractIds = requestedContractIds;
         _cacheContext = cacheContext;
-        _profilingCounters = setup.Runner.Session.Context.ProfilingCounters;
+        _profilingCounters = setup?.Runner.Session.Context.ProfilingCounters;
+        _materializeSetup = materializeSetup;
+        _preparedArtifactPaths = preparedArtifactPaths ?? Array.Empty<string>();
+        _preparedProjectPaths = preparedProjectPaths ?? Array.Empty<string>();
+        _preparedArtifactClosureComplete = preparedArtifactClosureComplete
+            && (setup is null || setup.Runner.Session.Context.SelectedAssemblyArtifactPaths.Count > 0);
 
         _counters = new ArchitectureAnalysisSnapshotCounters
         {
             PolicyCompositions = policyCompositions,
             ProjectGraphEvaluations = projectGraphEvaluations,
             AssemblyLoads = assemblyLoads,
-            DiscoveredProjectCount = setup.Runner.Session.Context.ProjectDiscovery?.DiscoveredProjects.Count ?? 0,
-            RetainedAssemblyCount = setup.Runner.Session.Context.TargetAssemblies.Count,
-            SelectedAssemblyCount = setup.Runner.Session.Context.TargetAssemblies.Count
-                + setup.Runner.Session.Context.MissingAssemblyNames.Count,
+            DiscoveredProjectCount = setup?.Runner.Session.Context.ProjectDiscovery?.DiscoveredProjects.Count
+                ?? _preparedProjectPaths.Count,
+            RetainedAssemblyCount = setup?.Runner.Session.Context.TargetAssemblies.Count ?? 0,
+            SelectedAssemblyCount = setup is null
+                ? _preparedArtifactPaths.Count
+                : setup.Runner.Session.Context.TargetAssemblies.Count + setup.Runner.Session.Context.MissingAssemblyNames.Count,
             SnapshotMaterializations = 1,
-            MaxParallelism = setup.Runner.Session.Context.MaxParallelism,
+            MaxParallelism = setup?.Runner.Session.Context.MaxParallelism ?? 0,
         };
     }
 
@@ -103,7 +120,8 @@ public sealed class ArchitectureAnalysisSnapshot : IDisposable
             {
                 Dictionary<string, int> contractFamilyResultCounts =
                     new(_counters.ContractFamilyResultCounts, StringComparer.Ordinal);
-                foreach ((string family, int count) in _profilingCounters.GetContractFamilyResultCounts())
+                foreach ((string family, int count) in _profilingCounters?.GetContractFamilyResultCounts()
+                         ?? new Dictionary<string, int>(StringComparer.Ordinal))
                 {
                     contractFamilyResultCounts.TryGetValue(family, out int current);
                     contractFamilyResultCounts[family] = current + count;
@@ -111,15 +129,15 @@ public sealed class ArchitectureAnalysisSnapshot : IDisposable
 
                 return _counters with
                 {
-                    FactIndexMaterializations = _profilingCounters.FactIndexMaterializations,
-                    SourceScanPasses = _profilingCounters.SourceScanPasses,
-                    SourceFilesScanned = _profilingCounters.SourceFilesScanned,
+                    FactIndexMaterializations = _profilingCounters?.FactIndexMaterializations ?? 0,
+                    SourceScanPasses = _profilingCounters?.SourceScanPasses ?? 0,
+                    SourceFilesScanned = _profilingCounters?.SourceFilesScanned ?? 0,
                     ContractFamilyResultCounts = contractFamilyResultCounts,
                     CacheLookups = _cacheContext is null ? null : _cacheStats.Snapshot(),
-                    ParallelScheduledWorkItems = _profilingCounters.ParallelScheduledWorkItems,
-                    ParallelCompletedWorkItems = _profilingCounters.ParallelCompletedWorkItems,
-                    ParallelObservedMaxConcurrency = _profilingCounters.ParallelObservedMaxConcurrency,
-                    ParallelMergeOperations = _profilingCounters.ParallelMergeOperations,
+                    ParallelScheduledWorkItems = _profilingCounters?.ParallelScheduledWorkItems ?? 0,
+                    ParallelCompletedWorkItems = _profilingCounters?.ParallelCompletedWorkItems ?? 0,
+                    ParallelObservedMaxConcurrency = _profilingCounters?.ParallelObservedMaxConcurrency ?? 0,
+                    ParallelMergeOperations = _profilingCounters?.ParallelMergeOperations ?? 0,
                 };
             }
         }
@@ -197,7 +215,8 @@ public sealed class ArchitectureAnalysisSnapshot : IDisposable
                 // per mode, keeps combined execution semantically equivalent to separate runs.
                 EnsureRequestedContractIdsAreKnownForMode(mode);
 
-                ValidationOutcome? cachedOutcome = _preflight.Blocked ? null : TryEvaluateFromCache(mode, timing);
+                ValidationOutcome? cacheCandidate = TryEvaluateFromCache(mode, timing);
+                ValidationOutcome? cachedOutcome = _preflight.Blocked ? null : cacheCandidate;
                 ValidationOutcome outcome = cachedOutcome
                     ?? (_preflight.Blocked ? BuildBlockedOutcome() : EvaluateCore(mode, timing));
 
@@ -293,8 +312,7 @@ public sealed class ArchitectureAnalysisSnapshot : IDisposable
 
     private ValidationOutcome EvaluateCore(string mode, ValidationTiming? timing)
     {
-        IArchitectureContractRunner runner = _setup?.Runner
-            ?? throw new ObjectDisposedException(nameof(ArchitectureAnalysisSnapshot));
+        IArchitectureContractRunner runner = EnsureSetup().Runner;
         List<ArchitectureViolation> allViolations = new();
 
         // ArchitectureAnalysisSession.UnmatchedIgnoredViolations is one mutable list that every
@@ -331,13 +349,13 @@ public sealed class ArchitectureAnalysisSnapshot : IDisposable
         ArchitectureContractExecutionResult execution;
         using (timing?.Measure("contract_checks"))
         {
-            _profilingCounters.ResetContractFamilyResultCounts();
+            _profilingCounters?.ResetContractFamilyResultCounts();
             execution = _contractExecutor.Execute(
                 runner.Session, mode, _handlerRegistry, _includeAsmdefContracts, timing);
         }
 
         RecordContractFamilyResultCounts(execution.ContractFamilyResultCounts);
-        _profilingCounters.ResetContractFamilyResultCounts();
+        _profilingCounters?.ResetContractFamilyResultCounts();
 
         allViolations.AddRange(execution.Violations);
 
@@ -424,10 +442,24 @@ public sealed class ArchitectureAnalysisSnapshot : IDisposable
             return null;
         }
 
+        // Do not spend manifest-collection work on a plan that could not independently prove
+        // the current artifact closure. This is both fail-closed and observable to profile
+        // consumers as the same typed cache rejection used by other incomplete inputs.
+        if (!_preparedArtifactClosureComplete)
+        {
+            lock (_gate)
+            {
+                _cacheStats.RecordLookup(AnalysisCacheLookupResult.Reject(AnalysisCacheRejectReason.IneligibleBuildInput));
+            }
+
+            return null;
+        }
+
         CancellationToken cancellationToken = _setup?.Runner.Session.Context.CancellationToken ?? default;
 
         ArchitectureAnalysisContext? context = _setup?.Runner.Session.Context;
-        bool cacheArtifactClosureComplete = context?.MaterializeCacheArtifactReferences(cancellationToken) ?? true;
+        bool cacheArtifactClosureComplete = context?.MaterializeCacheArtifactReferences(cancellationToken)
+            ?? _preparedArtifactClosureComplete;
 
         // Some contract families (for example project-metadata contracts) use the configured
         // project paths without materializing a Roslyn project.  Those inputs are nevertheless
@@ -490,6 +522,30 @@ public sealed class ArchitectureAnalysisSnapshot : IDisposable
             return null;
         }
 
+        ArchitectureContractCatalog catalog = ArchitectureContractCatalog.Build(_document);
+        int avoidedContracts = catalog.ContractsFor(mode)
+            .Count(contract => _requestedContractIds is null || _requestedContractIds.Count == 0
+                || (contract.Id is not null && _requestedContractIds.Contains(contract.Id)));
+        long avoidedBytes = _preparedArtifactPaths.Sum(path =>
+        {
+            try
+            {
+                return new FileInfo(path).Length;
+            }
+            catch (IOException)
+            {
+                return 0L;
+            }
+        });
+        _counters = _counters with
+        {
+            AvoidedAssemblyLoads = _counters.AvoidedAssemblyLoads + GetSelectedAssemblyArtifactPaths().Count,
+            AvoidedFactIndexMaterializations = _counters.AvoidedFactIndexMaterializations + (avoidedContracts > 0 ? 1 : 0),
+            AvoidedSourceScanPasses = _counters.AvoidedSourceScanPasses + (HasExplicitSourceRoots() ? 1 : 0),
+            AvoidedContractExecutions = _counters.AvoidedContractExecutions + avoidedContracts,
+            AvoidedArtifactBytesLoaded = _counters.AvoidedArtifactBytesLoaded + avoidedBytes,
+        };
+
         return AnalysisCacheOutcomeMapper.FromCacheOutcome(
             lookup.Entry.Outcome, _repositoryRoot, policyImportPaths, GetResolvedAssemblyPaths(),
             GetDiscoveredProjectPaths(), _document.SourceExpansion);
@@ -530,6 +586,17 @@ public sealed class ArchitectureAnalysisSnapshot : IDisposable
         // those paths; post-build assemblies and their cache-specific reference closure above use
         // their exact in-memory byte identities instead.
         foreach (string path in GetSelectedAssemblyArtifactPaths())
+        {
+            string assemblyPath = Path.GetFullPath(path);
+            paths.Add(assemblyPath);
+            paths.Add(Path.ChangeExtension(assemblyPath, ".pdb"));
+            paths.Add(BuildReceiptStore.ReceiptPathFor(assemblyPath));
+        }
+
+        // Keep the independently planned metadata closure in the authorization even after a
+        // miss materializes a narrower CLR-root set. Cache entries validate this current-run
+        // plan; they never get to select a replacement closure themselves.
+        foreach (string path in _preparedArtifactPaths)
         {
             string assemblyPath = Path.GetFullPath(path);
             paths.Add(assemblyPath);
@@ -605,7 +672,7 @@ public sealed class ArchitectureAnalysisSnapshot : IDisposable
     }
 
     private IReadOnlyList<string> GetSelectedAssemblyArtifactPaths() =>
-        _setup?.Runner.Session.Context.SelectedAssemblyArtifactPaths ?? Array.Empty<string>();
+        _setup?.Runner.Session.Context.SelectedAssemblyArtifactPaths ?? _preparedArtifactPaths;
 
     private IReadOnlyList<ArchitectureLoadedAssemblyArtifact> GetLoadedAssemblyArtifacts() =>
         _setup?.Runner.Session.Context.LoadedAssemblyArtifacts ?? Array.Empty<ArchitectureLoadedAssemblyArtifact>();
@@ -627,7 +694,7 @@ public sealed class ArchitectureAnalysisSnapshot : IDisposable
 
     private IReadOnlyList<string> GetDiscoveredProjectPaths()
     {
-        return _setup?.Runner.Session.Context.DiscoveredProjectPaths ?? Array.Empty<string>();
+        return _setup?.Runner.Session.Context.DiscoveredProjectPaths ?? _preparedProjectPaths;
     }
 
     private IReadOnlyList<string> GetCacheProjectPaths()
@@ -711,5 +778,27 @@ public sealed class ArchitectureAnalysisSnapshot : IDisposable
             _setup = null;
             setup?.Runner.Session.Context.Dispose();
         }
+    }
+
+    private ArchitectureRunnerSetup EnsureSetup()
+    {
+        if (_setup is not null)
+        {
+            return _setup;
+        }
+
+        ArchitectureRunnerSetup setup = _materializeSetup?.Invoke()
+            ?? throw new ObjectDisposedException(nameof(ArchitectureAnalysisSnapshot));
+        _setup = setup;
+        _profilingCounters = setup.Runner.Session.Context.ProfilingCounters;
+        _counters = _counters with
+        {
+            AssemblyLoads = _counters.AssemblyLoads + setup.AssemblyLoads,
+            RetainedAssemblyCount = setup.Runner.Session.Context.TargetAssemblies.Count,
+            SelectedAssemblyCount = setup.Runner.Session.Context.TargetAssemblies.Count
+                + setup.Runner.Session.Context.MissingAssemblyNames.Count,
+            MaxParallelism = setup.Runner.Session.Context.MaxParallelism,
+        };
+        return setup;
     }
 }

@@ -124,6 +124,73 @@ public sealed class ArchitectureValidationApplicationService(
         }
 
         request.CancellationToken.ThrowIfCancellationRequested();
+        if (request.CacheLocation is not null)
+        {
+            ArchitectureRunnerPreparation preparation;
+            using (timing?.Measure("metadata_preparation"))
+            {
+                preparation = runnerSetupService.PrepareRunner(
+                    state.Policy.Document, request.PolicyPath, request.ConditionSetName,
+                    request.PreprocessorSymbols, state.Policy.SelectedContractIds, modeHint,
+                    request.CancellationToken);
+            }
+
+            state.ProjectGraphEvaluations = 1;
+            BuildStatePreflightResult preparedPreflight;
+            using (timing?.Measure("build_state_preflight"))
+                preparedPreflight = RunBuildStatePreflight(request, preparation);
+
+            if (!preparedPreflight.Blocked && request.PreparationMode == BuildPreparationMode.EnsureBuilt)
+            {
+                // The build/receipt pass above is metadata-only. Rebuild the plan from the
+                // current post-build artifacts before hashing or loading anything; a cache entry
+                // can therefore never authorize the pre-build bytes.
+                using (timing?.Measure("post_ensure_built_metadata_preparation"))
+                {
+                    preparation = runnerSetupService.PrepareRunner(
+                        state.Policy.Document, request.PolicyPath, request.ConditionSetName,
+                        request.PreprocessorSymbols, state.Policy.SelectedContractIds, modeHint,
+                        request.CancellationToken);
+                }
+
+                state.ProjectGraphEvaluations++;
+                using (timing?.Measure("post_ensure_built_preflight"))
+                    preparedPreflight = RunBuildStatePreflight(
+                        request with { PreparationMode = BuildPreparationMode.Ordinary }, preparation);
+            }
+
+            state.Preparation = preparation;
+
+            return new ArchitectureAnalysisSnapshot(
+                state.Policy.Document,
+                setup: null,
+                preparedPreflight,
+                state.Policy.UnmatchedConfig,
+                state.Policy.PolicyConsistencyConfig,
+                state.Policy.CoverageConfig,
+                request.EnforceUnmatchedIgnoredViolationsPolicy,
+                request.IncludeAsmdefContracts,
+                contractExecutor,
+                handlerRegistry,
+                policyCompositions: state.PolicyCompositions,
+                projectGraphEvaluations: state.ProjectGraphEvaluations,
+                assemblyLoads: 0,
+                requestedContractIds: modeHint == null ? request.ContractIds : null,
+                cacheContext: BuildCacheContext(request),
+                preparedRepositoryRoot: preparation.RepositoryRoot,
+                preparedArtifactPaths: preparation.SelectedAssemblyArtifactPaths,
+                preparedProjectPaths: preparation.ProjectDiscovery.DiscoveredProjects
+                    .Select(project => Path.GetFullPath(Path.Combine(preparation.RepositoryRoot, project.Path)))
+                    .ToArray(),
+                preparedArtifactClosureComplete: preparation.HasCompleteArtifactSelection,
+                materializeSetup: () => preparation.HasCompleteRootSelection
+                    ? runnerSetupService.MaterializePreparedRunner(
+                        state.Policy.Document, preparation, state.Policy.SelectedContractIds,
+                        state.Policy.EnableUnmatchedIgnoreTracking, timing, modeHint,
+                        request.CancellationToken, request.MaxParallelism)
+                    : BuildRunnerFor(state.Policy, request, modeHint, timing));
+        }
+
         using (timing?.Measure("load_and_setup"))
             state.Setup = BuildRunnerFor(state.Policy, request, modeHint, timing);
 
@@ -300,6 +367,41 @@ public sealed class ArchitectureValidationApplicationService(
             request.CancellationToken));
     }
 
+    private BuildStatePreflightResult RunBuildStatePreflight(
+        AnalysisSnapshotRequest request, ArchitectureRunnerPreparation preparation)
+    {
+        if (preparation.ProjectDiscovery.DiscoveredProjects.Count == 0)
+        {
+            return new BuildStatePreflightResult(Array.Empty<BuildStatePreflightDiagnostic>());
+        }
+
+        Dictionary<string, string> paths = preparation.ProjectDiscovery.ResolvedAssemblyPaths
+            .Where(pair => preparation.SelectedAssemblyArtifactPaths.Contains(pair.Value, StringComparer.OrdinalIgnoreCase))
+            .ToDictionary(pair => pair.Key, pair => pair.Value, StringComparer.Ordinal);
+        BuildStateResolvedAssemblies resolution = new(
+            Array.Empty<System.Reflection.Assembly>(), preparation.MissingAssemblyNames)
+        {
+            ResolvedAssemblyPaths = paths
+        };
+
+        if (resolution.ResolvedAssemblyPaths.Count == 0 && resolution.MissingAssemblyNames.Count == 0)
+        {
+            return new BuildStatePreflightResult(Array.Empty<BuildStatePreflightDiagnostic>());
+        }
+
+        return buildStatePreparationService.Prepare(new BuildStatePreflightRequest(
+            preparation.RepositoryRoot,
+            preparation.ProjectDiscovery,
+            resolution,
+            request.PreparationMode,
+            request.NoRestore,
+            request.RequestedConfiguration,
+            request.RequestedTargetFramework,
+            request.RequestedPlatform,
+            request.RequestedRuntimeIdentifier,
+            request.CancellationToken));
+    }
+
     private readonly record struct ComposedPolicy(
         ArchitectureContractDocument Document,
         string UnmatchedConfig,
@@ -312,6 +414,7 @@ public sealed class ArchitectureValidationApplicationService(
     {
         public ArchitectureContractDocument? Document { get; set; }
         public ArchitectureRunnerSetup? Setup { get; set; }
+        public ArchitectureRunnerPreparation? Preparation { get; set; }
         public ComposedPolicy Policy { get; set; }
         public int PolicyCompositions { get; set; }
         public int ProjectGraphEvaluations { get; set; }
