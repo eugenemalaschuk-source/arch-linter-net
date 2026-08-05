@@ -429,13 +429,47 @@ public sealed class PostOptimizationAnalysisProfileBenchmarkHarness
 
     private sealed record EnvironmentIdentity(
         string OperatingSystem, string Runtime, string Architecture, int ProcessorCount, string CliFileVersion,
-        string CliAssemblySha256, string SourceCommit, string Configuration)
+        string CliAssemblySha256, string CliPackageId, string CliPackageVersion, string CliPackageSha256,
+        string SourceCommit, string Configuration)
     {
-        public static EnvironmentIdentity Create() => new(RuntimeInformation.OSDescription, RuntimeInformation.FrameworkDescription,
-            RuntimeInformation.ProcessArchitecture.ToString(), Environment.ProcessorCount,
-            FileVersionInfo.GetVersionInfo(CliDllPath()).FileVersion ?? "unknown",
-            Convert.ToHexStringLower(SHA256.HashData(File.ReadAllBytes(CliDllPath()))),
-            Environment.GetEnvironmentVariable("ARCH_LINTER_SOURCE_SHA") ?? "unknown", "Debug");
+        public static EnvironmentIdentity Create()
+        {
+            PackageIdentity package = PackageIdentity.Create(new ArchitectureRepositoryRootResolver().Resolve());
+            return new EnvironmentIdentity(
+                RuntimeInformation.OSDescription, RuntimeInformation.FrameworkDescription,
+                RuntimeInformation.ProcessArchitecture.ToString(), Environment.ProcessorCount,
+                FileVersionInfo.GetVersionInfo(CliDllPath()).FileVersion ?? "unknown",
+                Convert.ToHexStringLower(SHA256.HashData(File.ReadAllBytes(CliDllPath()))),
+                package.Id, package.Version, package.Sha256,
+                Environment.GetEnvironmentVariable("ARCH_LINTER_SOURCE_SHA") ?? "unknown", "Debug");
+        }
+    }
+
+    private sealed record PackageIdentity(string Id, string Version, string Sha256)
+    {
+        private const string PackageId = "ArchLinterNet.Cli";
+        private const string PackageExtension = ".nupkg";
+
+        public static PackageIdentity Create(string repositoryRoot)
+        {
+            string packagesDirectory = Path.Combine(repositoryRoot, "nupkg");
+            IReadOnlyList<string> packages = Directory.EnumerateFiles(packagesDirectory, $"{PackageId}.*{PackageExtension}")
+                .OrderBy(static path => path, StringComparer.Ordinal)
+                .ToArray();
+            if (packages.Count != 1)
+            {
+                throw new InvalidOperationException(
+                    $"Expected exactly one {PackageId} package in {packagesDirectory}, but found {packages.Count}. Run `rtk make pack` before recording evidence.");
+            }
+
+            string packagePath = packages[0];
+            string fileName = Path.GetFileName(packagePath);
+            string version = fileName[PackageId.Length..^PackageExtension.Length].TrimStart('.');
+            return new PackageIdentity(
+                PackageId,
+                version,
+                Convert.ToHexStringLower(SHA256.HashData(File.ReadAllBytes(packagePath))));
+        }
     }
 
     private sealed class TemporaryDirectory : IDisposable

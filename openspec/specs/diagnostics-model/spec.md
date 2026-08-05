@@ -1,7 +1,8 @@
 # diagnostics-model Specification
 
 ## Purpose
-TBD - created by archiving change split-diagnostics-model. Update Purpose after archive.
+Define the typed, extensible diagnostic model that preserves kind-specific
+evidence and provenance across every ArchLinterNet output adapter.
 ## Requirements
 ### Requirement: Typed diagnostic envelope
 The system SHALL represent each architecture diagnostic as a sealed subtype of an abstract `ArchitectureDiagnostic` base, discriminated by an `ArchitectureDiagnosticKind` value, with one subtype per kind: dependency violation, cycle, unmatched ignore, configuration violation, and external dependency violation.
@@ -206,4 +207,3 @@ comparison projections SHALL consume that identity without reconstructing it fro
 #### Scenario: Rendering does not affect a finding identity
 - **WHEN** the same validation result is rendered sequentially to human, JSON, SARIF, or Testing output
 - **THEN** every projection SHALL expose the same canonical identity for the finding.
-
