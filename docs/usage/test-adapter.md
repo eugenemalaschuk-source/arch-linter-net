@@ -49,4 +49,8 @@ The policy file should remain the source of truth. Test projects should load the
 
 ## Parity note
 
-The CLI is the primary execution surface for user workflows such as baseline generation, JSON output, timings, and condition-set selection. If a test adapter lacks a CLI capability, prefer the CLI for that workflow or add a separate backlog task for API parity.
+The CLI is the primary execution surface for user workflows such as baseline generation, JSON output, timings, and condition-set selection. The Testing API shares the policy, normalized finding, baseline, cache, profile, bounded-parallelism, and cancellation semantics that it exposes; callers retain explicit snapshot ownership through `CreateSnapshot()`.
+
+Use `WithBaseline(path).VerifyBaseline()` for a read-only CI gate. Keep
+baseline/API capture and update actions in a reviewed local workflow; test code
+must not automatically approve or rewrite them. See [Adopt or Upgrade to 0.5.1](../guides/migration-to-0-5-1.md#solution-shapes).

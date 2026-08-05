@@ -27,7 +27,7 @@ dotnet run --project src/ArchLinterNet.Cli -- \
 After the CLI package is available on NuGet.org:
 
 ```bash
-dotnet tool install --global ArchLinterNet.Cli
+dotnet tool install --global ArchLinterNet.Cli --version 0.5.1
 arch-linter-net --help
 ```
 
@@ -44,7 +44,7 @@ For repository-pinned usage, create or update a tool manifest:
 ```bash
 dotnet new tool-manifest
 
-dotnet tool install ArchLinterNet.Cli
+dotnet tool install ArchLinterNet.Cli --version 0.5.1
 
 dotnet tool restore
 
@@ -100,6 +100,8 @@ For local tools, prefer:
 ```
 
 See [CI integration](../guides/ci-integration.md) for strict + audit workflows.
+For the 0.5.1 greenfield and upgrade paths, including prepared/offline
+environments, see [Adopt or Upgrade to 0.5.1](../guides/migration-to-0-5-1.md).
 
 ## NuGet.org links
 
