@@ -49,17 +49,20 @@ public sealed class CheckpointBReleaseGateTests
                 "--policy", fixture.PolicyPath,
                 "--strict",
                 "--format", "json",
+                "--ensure-built",
                 "--max-parallelism", "1");
             AssertFixtureOracle(fixtureId, sequential);
             CommandResult defaultParallelism = candidate.RunTool(fixture.Root,
                 "--policy", fixture.PolicyPath,
                 "--strict",
-                "--format", "json");
+                "--format", "json",
+                "--ensure-built");
             string profilePath = Path.Combine(fixture.Root, "checkpoint-b-profile.json");
             CommandResult profiled = candidate.RunTool(fixture.Root,
                 "--policy", fixture.PolicyPath,
                 "--strict",
                 "--format", "json",
+                "--ensure-built",
                 "--profile", profilePath);
 
             Assert.Multiple(() =>
@@ -96,7 +99,7 @@ public sealed class CheckpointBReleaseGateTests
             : root.GetProperty("findings");
         Assert.Multiple(() =>
         {
-            Assert.That(result.ExitCode, Is.EqualTo(0), $"{fixtureId} must complete successfully.");
+            Assert.That(result.ExitCode, Is.EqualTo(0), $"{fixtureId} must complete successfully.{Environment.NewLine}{result.CombinedOutput}");
             Assert.That(findings.ValueKind, Is.EqualTo(JsonValueKind.Array), fixtureId);
             Assert.That(findings.GetArrayLength(), Is.Zero, $"{fixtureId} must have no findings.");
         });
@@ -397,7 +400,7 @@ public sealed class CheckpointBReleaseGateTests
         {
             using AdoptionAcceptanceFixture fixture = AdoptionAcceptanceFixture.Create("small");
             fixture.Build();
-            CommandResult result = RunTool(fixture.Root, "--policy", fixture.PolicyPath, "--strict", "--format", "json");
+            CommandResult result = RunTool(fixture.Root, "--policy", fixture.PolicyPath, "--mode", "strict", "--format", "json", "--ensure-built");
             AssertFixtureOracle(fixture.Id, result);
             return Passed("generic-ci-neutral");
         }
@@ -408,7 +411,7 @@ public sealed class CheckpointBReleaseGateTests
             Assert.That(documentation, Does.Contain("arch-linter-net --policy"));
             using AdoptionAcceptanceFixture fixture = AdoptionAcceptanceFixture.Create("small");
             fixture.Build();
-            CommandResult result = RunTool(fixture.Root, "--policy", fixture.PolicyPath, "--strict", "--format", "json");
+            CommandResult result = RunTool(fixture.Root, "--policy", fixture.PolicyPath, "--mode", "strict", "--format", "json", "--ensure-built");
             AssertFixtureOracle(fixture.Id, result);
             return Passed("documented-entrypoints");
         }
@@ -417,7 +420,7 @@ public sealed class CheckpointBReleaseGateTests
         {
             using AdoptionAcceptanceFixture fixture = AdoptionAcceptanceFixture.Create("small");
             fixture.Build();
-            CommandResult result = RunTool(fixture.Root, "--policy", fixture.PolicyPath, "--strict", "--format", "json");
+            CommandResult result = RunTool(fixture.Root, "--policy", fixture.PolicyPath, "--strict", "--format", "json", "--ensure-built");
             Assert.Multiple(() =>
             {
                 AssertFixtureOracle(fixture.Id, result);
