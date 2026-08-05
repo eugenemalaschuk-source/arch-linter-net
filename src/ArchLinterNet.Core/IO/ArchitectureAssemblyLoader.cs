@@ -33,9 +33,10 @@ public sealed class ArchitectureAssemblyLoader : IArchitectureAssemblyLoader
 
     public IArchitectureAssemblyLoadScope CreateIsolatedLoadScope(
         IReadOnlyList<string> probingPaths,
-        IReadOnlyDictionary<string, string> exactAssemblyPaths)
+        IReadOnlyDictionary<string, string> exactAssemblyPaths,
+        IReadOnlyDictionary<string, string>? expectedArtifactContentDigests = null)
     {
-        return new IsolatedAssemblyLoadScope(probingPaths, exactAssemblyPaths);
+        return new IsolatedAssemblyLoadScope(probingPaths, exactAssemblyPaths, expectedArtifactContentDigests);
     }
 
     private sealed class IsolatedAssemblyLoadScope : AssemblyLoadContext, IArchitectureAssemblyLoadScope,
@@ -43,6 +44,7 @@ public sealed class ArchitectureAssemblyLoader : IArchitectureAssemblyLoader
     {
         private readonly IReadOnlyList<string> _probingPaths;
         private readonly IReadOnlyDictionary<string, string> _exactAssemblyPaths;
+        private readonly IReadOnlyDictionary<string, string> _expectedArtifactContentDigests;
         private readonly Dictionary<string, ArchitectureLoadedAssemblyArtifact> _loadedArtifactsByPath =
             new(StringComparer.OrdinalIgnoreCase);
         private readonly Dictionary<string, Assembly> _loadedAssembliesByPath = new(StringComparer.OrdinalIgnoreCase);
@@ -50,11 +52,14 @@ public sealed class ArchitectureAssemblyLoader : IArchitectureAssemblyLoader
 
         public IsolatedAssemblyLoadScope(
             IReadOnlyList<string> probingPaths,
-            IReadOnlyDictionary<string, string> exactAssemblyPaths)
+            IReadOnlyDictionary<string, string> exactAssemblyPaths,
+            IReadOnlyDictionary<string, string>? expectedArtifactContentDigests)
             : base(isCollectible: true)
         {
             _probingPaths = probingPaths;
             _exactAssemblyPaths = exactAssemblyPaths;
+            _expectedArtifactContentDigests = expectedArtifactContentDigests
+                ?? new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         }
 
         public Assembly LoadFrom(string path)
@@ -178,6 +183,7 @@ public sealed class ArchitectureAssemblyLoader : IArchitectureAssemblyLoader
 
             byte[] assemblyBytes = ReadArtifactBytes(fullPath, cancellationToken);
             string assemblyContentDigest = Convert.ToHexStringLower(SHA256.HashData(assemblyBytes));
+            VerifyExpectedDigest(fullPath, assemblyContentDigest);
             string pdbPath = Path.ChangeExtension(fullPath, ".pdb");
             string pdbContentDigest = "missing";
             byte[]? pdbBytes = null;
@@ -185,6 +191,7 @@ public sealed class ArchitectureAssemblyLoader : IArchitectureAssemblyLoader
             {
                 pdbBytes = ReadArtifactBytes(pdbPath, cancellationToken);
                 pdbContentDigest = Convert.ToHexStringLower(SHA256.HashData(pdbBytes));
+                VerifyExpectedDigest(pdbPath, pdbContentDigest);
             }
 
             TestAfterArtifactBytesCaptured?.Invoke(fullPath);
@@ -212,7 +219,8 @@ public sealed class ArchitectureAssemblyLoader : IArchitectureAssemblyLoader
                 _loadedArtifactsByPath.Add(fullPath, new ArchitectureLoadedAssemblyArtifact(
                     fullPath,
                     assemblyContentDigest,
-                    pdbContentDigest));
+                    pdbContentDigest,
+                    assemblyBytes.LongLength + (pdbBytes?.LongLength ?? 0)));
             }
 
             return assembly;
@@ -267,6 +275,17 @@ public sealed class ArchitectureAssemblyLoader : IArchitectureAssemblyLoader
             }
 
             return bytes;
+        }
+
+        private void VerifyExpectedDigest(string path, string actualDigest)
+        {
+            string fullPath = Path.GetFullPath(path);
+            if (_expectedArtifactContentDigests.TryGetValue(fullPath, out string? expectedDigest)
+                && !string.Equals(expectedDigest, actualDigest, StringComparison.Ordinal))
+            {
+                throw new InvalidOperationException(
+                    $"Prepared artifact '{fullPath}' changed before LoadFromStream; reprepare is required.");
+            }
         }
     }
 }

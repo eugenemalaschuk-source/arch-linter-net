@@ -16,6 +16,7 @@ internal sealed class AnalysisSessionProfilingCounters
     private int _parallelCompletedWorkItems;
     private int _parallelObservedMaxConcurrency;
     private int _parallelMergeOperations;
+    private int _contractExecutions;
 
     public int FactIndexMaterializations => Volatile.Read(ref _factIndexMaterializations);
 
@@ -33,6 +34,8 @@ internal sealed class AnalysisSessionProfilingCounters
     public int ParallelObservedMaxConcurrency => Volatile.Read(ref _parallelObservedMaxConcurrency);
 
     public int ParallelMergeOperations => Volatile.Read(ref _parallelMergeOperations);
+
+    public int ContractExecutions => Volatile.Read(ref _contractExecutions);
 
     public IReadOnlyDictionary<string, int> GetContractFamilyResultCounts()
     {
@@ -54,6 +57,8 @@ internal sealed class AnalysisSessionProfilingCounters
     public void RecordParallelCompleted() => Interlocked.Increment(ref _parallelCompletedWorkItems);
 
     public void RecordParallelMerge() => Interlocked.Increment(ref _parallelMergeOperations);
+
+    public void RecordContractExecution() => Interlocked.Increment(ref _contractExecutions);
 
     // Lock-free running maximum: only ever raises the recorded value, never lowers it, and is
     // safe under concurrent callers each reporting their own momentary in-flight worker count.

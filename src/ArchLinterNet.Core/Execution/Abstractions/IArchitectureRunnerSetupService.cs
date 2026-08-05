@@ -54,4 +54,31 @@ public interface IArchitectureRunnerSetupService
         string? mode = null,
         CancellationToken cancellationToken = default,
         int? maxParallelism = null);
+
+    // Planning is intentionally metadata-only. Implementations that cannot prove an independent
+    // artifact selection leave the plan incomplete; callers then fail closed for cache reuse.
+    ArchitectureRunnerPreparation PrepareRunner(
+        ArchitectureContractDocument document,
+        string policyPath,
+        string? conditionSetName = null,
+        IReadOnlyList<string>? preprocessorSymbols = null,
+        HashSet<string>? selectedContractIds = null,
+        string? mode = null,
+        CancellationToken cancellationToken = default)
+    {
+        throw new NotSupportedException("Metadata-only runner preparation is not implemented by this setup service.");
+    }
+
+    ArchitectureRunnerSetup MaterializePreparedRunner(
+        ArchitectureContractDocument document,
+        ArchitectureRunnerPreparation preparation,
+        HashSet<string>? selectedContractIds = null,
+        bool enableUnmatchedIgnoreTracking = true,
+        ValidationTiming? timing = null,
+        string? mode = null,
+        CancellationToken cancellationToken = default,
+        int? maxParallelism = null)
+    {
+        throw new NotSupportedException("Prepared runner materialization is not implemented by this setup service.");
+    }
 }

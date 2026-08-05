@@ -80,6 +80,7 @@ internal sealed class ArchitectureContractExecutor : IArchitectureContractExecut
             {
                 session.Context.CancellationToken.ThrowIfCancellationRequested();
                 coverageCount[0]++;
+                session.Context.ProfilingCounters.RecordContractExecution();
                 int identityCursor = session.FindingIdentityCursor;
                 int resultCount = 0;
                 ArchitectureViolation[] violations = session.AttachFindingIdentities(
@@ -120,6 +121,7 @@ internal sealed class ArchitectureContractExecutor : IArchitectureContractExecut
             {
                 session.Context.CancellationToken.ThrowIfCancellationRequested();
                 count[0]++;
+                session.Context.ProfilingCounters.RecordContractExecution();
                 int identityCursor = session.FindingIdentityCursor;
                 ArchitectureHandlerResult result = handlerRegistry.Execute(family, session, contract);
                 ArchitectureViolation[] violations = session.AttachFindingIdentities(result.Violations, identityCursor)

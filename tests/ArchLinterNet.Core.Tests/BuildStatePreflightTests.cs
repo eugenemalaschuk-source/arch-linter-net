@@ -136,7 +136,7 @@ public sealed class BuildStatePreflightTests
     }
 
     [Test]
-    public void Evaluate_MatchingCacheIneligibleReceipt_DoesNotReportManifestMismatch()
+    public void Evaluate_MatchingCacheEligibleReceipt_DoesNotReportManifestMismatch()
     {
         string projectPath = CreateProjectFixture("Fixture", "class C {}");
         string assemblyPath = CreateFakeAssemblyFile("Fixture");
@@ -152,10 +152,8 @@ public sealed class BuildStatePreflightTests
             BuildPreparationMode.Ordinary));
 
         Assert.That(result.Diagnostics.Single().State, Is.EqualTo(BuildStatePreflightState.Current));
-        Assert.That(result.Diagnostics.Single().Evidence.CacheIneligibilityReasons,
-            Does.Contain("evaluated-msbuild-evidence-incomplete"));
-        Assert.That(result.Diagnostics.Single().Evidence.CacheIneligibilityReasons,
-            Does.Not.Contain("receipt-manifest-mismatch"));
+        Assert.That(manifest.Eligibility, Is.EqualTo(CacheEligibility.VerifiedCacheEligible));
+        Assert.That(result.Diagnostics.Single().Evidence.CacheIneligibilityReasons, Is.Empty);
     }
 
     [Test]

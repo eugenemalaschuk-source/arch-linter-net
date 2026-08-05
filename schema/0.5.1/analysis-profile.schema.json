@@ -40,7 +40,7 @@
         "OutputSinkCount": { "type": "integer", "minimum": 0 },
         "Cache": {
           "type": "object",
-          "required": ["Status", "Lookups", "Hits", "Misses", "Rejects", "Writes", "BytesRead", "BytesWritten", "IneligibleUnitCount", "CorruptionEvents", "CancelledBeforePublish", "Mode", "RejectReasonCounts"],
+          "required": ["Status", "Lookups", "Hits", "Misses", "Rejects", "Writes", "BytesRead", "BytesWritten", "IneligibleUnitCount", "CorruptionEvents", "CancelledBeforePublish", "AvoidedAssemblyLoads", "AvoidedFactIndexMaterializations", "AvoidedSourceScanPasses", "AvoidedContractExecutions", "AvoidedArtifactBytesLoaded", "Mode", "RejectReasonCounts"],
           "properties": {
             "Status": { "enum": ["NotApplicable", "Active"] },
             "Lookups": { "type": "integer", "minimum": 0 },
@@ -53,6 +53,11 @@
             "IneligibleUnitCount": { "type": "integer", "minimum": 0 },
             "CorruptionEvents": { "type": "integer", "minimum": 0 },
             "CancelledBeforePublish": { "type": "integer", "minimum": 0 },
+            "AvoidedAssemblyLoads": { "type": "integer", "minimum": 0 },
+            "AvoidedFactIndexMaterializations": { "type": "integer", "minimum": 0 },
+            "AvoidedSourceScanPasses": { "type": "integer", "minimum": 0 },
+            "AvoidedContractExecutions": { "type": "integer", "minimum": 0 },
+            "AvoidedArtifactBytesLoaded": { "type": "integer", "minimum": 0 },
             "Mode": { "enum": ["disabled", "auto", "path"] },
             "RejectReasonCounts": {
               "type": "object",

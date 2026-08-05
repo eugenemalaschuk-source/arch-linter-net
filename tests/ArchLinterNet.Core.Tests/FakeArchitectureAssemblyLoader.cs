@@ -36,7 +36,8 @@ internal sealed class FakeArchitectureAssemblyLoader : IArchitectureAssemblyLoad
 
     public IArchitectureAssemblyLoadScope CreateIsolatedLoadScope(
         IReadOnlyList<string> probingPaths,
-        IReadOnlyDictionary<string, string> exactAssemblyPaths)
+        IReadOnlyDictionary<string, string> exactAssemblyPaths,
+        IReadOnlyDictionary<string, string>? expectedArtifactContentDigests = null)
     {
         throw new InvalidOperationException("Fake loader does not support isolated assembly loading.");
     }

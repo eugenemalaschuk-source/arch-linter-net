@@ -28,6 +28,16 @@ public sealed record AnalysisProfileCacheCounters
 
     public int CancelledBeforePublish { get; init; }
 
+    public int AvoidedAssemblyLoads { get; init; }
+
+    public int AvoidedFactIndexMaterializations { get; init; }
+
+    public int AvoidedSourceScanPasses { get; init; }
+
+    public int AvoidedContractExecutions { get; init; }
+
+    public long AvoidedArtifactBytesLoaded { get; init; }
+
     // "disabled" | "auto" | "path" — never the resolved absolute cache location.
     public string Mode { get; init; } = "disabled";
 

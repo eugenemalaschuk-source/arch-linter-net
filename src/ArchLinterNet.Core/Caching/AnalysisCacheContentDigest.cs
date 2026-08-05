@@ -115,6 +115,7 @@ internal static class AnalysisCacheContentDigest
             $"status:{entry.CompletionStatus}",
             $"manifests:{string.Join(';', manifestLines)}",
             $"artifacts:{string.Join(';', artifactLines)}",
+            $"work:{entry.WorkProvenance.AssemblyLoads}|{entry.WorkProvenance.FactIndexMaterializations}|{entry.WorkProvenance.SourceScanPasses}|{entry.WorkProvenance.ContractExecutions}|{entry.WorkProvenance.ArtifactBytesLoaded}",
             $"outcome:{FormatOutcome(entry.Outcome)}");
     }
 

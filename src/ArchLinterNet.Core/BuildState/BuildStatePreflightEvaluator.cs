@@ -59,6 +59,7 @@ public static class BuildStatePreflightEvaluator
     internal static bool IsRelevantToResolution(ArchitectureDiscoveredProject project, BuildStateResolvedAssemblies resolution)
     {
         return resolution.ResolvedAssemblies.Any(a => string.Equals(a.GetName().Name, project.AssemblyName, StringComparison.Ordinal))
+            || resolution.ResolvedAssemblyPaths.ContainsKey(project.AssemblyName)
             || resolution.MissingAssemblyNames.Contains(project.AssemblyName, StringComparer.Ordinal);
     }
 
@@ -118,7 +119,18 @@ public static class BuildStatePreflightEvaluator
     {
         assemblyPath = null;
 
-        if (missing.Contains(project.AssemblyName) || !resolvedByName.TryGetValue(project.AssemblyName, out Assembly? assembly))
+        if (missing.Contains(project.AssemblyName))
+        {
+            return MissingArtifactDiagnostic(project, request);
+        }
+
+        if (request.Resolution.ResolvedAssemblyPaths.TryGetValue(project.AssemblyName, out string? plannedPath))
+        {
+            assemblyPath = Path.GetFullPath(plannedPath);
+            return File.Exists(assemblyPath) ? null : MissingArtifactDiagnostic(project, request);
+        }
+
+        if (!resolvedByName.TryGetValue(project.AssemblyName, out Assembly? assembly))
         {
             return MissingArtifactDiagnostic(project, request);
         }

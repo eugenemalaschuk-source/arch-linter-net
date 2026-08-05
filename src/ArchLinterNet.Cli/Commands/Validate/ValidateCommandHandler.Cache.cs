@@ -10,9 +10,8 @@ namespace ArchLinterNet.Cli.Commands.Validate;
 // cache-hit short-circuit (ArchitectureAnalysisSnapshot.Evaluate consults the cache directly — see
 // ResolveCacheOptions/BuildValidationRequest passing CacheLocation through), and population
 // (writing one verified entry per requested mode after a completed, non-cancelled run whose
-// discovered projects are all #406 VerifiedCacheEligible — never true for this repository's own
-// MSBuild evaluation today, since EvaluatedBuildInputManifestCollector always reports
-// CacheIneligible/"evaluated-msbuild-evidence-incomplete"; see design.md).
+// discovered projects are all #406 VerifiedCacheEligible. The manifest collector proves only
+// statically inspectable inputs; any unverified input remains cache-ineligible.
 internal sealed partial class ValidateCommandHandler
 {
     private const string CacheDestinationAuto = "auto";
@@ -167,7 +166,8 @@ internal sealed partial class ValidateCommandHandler
         state.RejectReasonCounts[key] = existing + 1;
     }
 
-    private static AnalysisProfileCacheCounters BuildCacheProfileCounters(ValidateCommandOptions options, CacheExecutionState state)
+    private static AnalysisProfileCacheCounters BuildCacheProfileCounters(
+        ValidateCommandOptions options, CacheExecutionState state, ArchitectureAnalysisSnapshotCounters? counters)
     {
         AnalysisCacheLookupStats? lookups = state.Lookups;
         Dictionary<string, int> rejectReasonCounts = new(state.RejectReasonCounts, StringComparer.Ordinal);
@@ -200,6 +200,11 @@ internal sealed partial class ValidateCommandHandler
             IneligibleUnitCount = state.IneligibleUnitCount + (lookups?.IneligibleUnitCount ?? 0),
             CorruptionEvents = AnalysisCacheCorruptionClassifier.CountCorruptionEvents(rejectReasonCounts),
             CancelledBeforePublish = state.CancelledBeforePublish,
+            AvoidedAssemblyLoads = counters?.AvoidedAssemblyLoads ?? 0,
+            AvoidedFactIndexMaterializations = counters?.AvoidedFactIndexMaterializations ?? 0,
+            AvoidedSourceScanPasses = counters?.AvoidedSourceScanPasses ?? 0,
+            AvoidedContractExecutions = counters?.AvoidedContractExecutions ?? 0,
+            AvoidedArtifactBytesLoaded = counters?.AvoidedArtifactBytesLoaded ?? 0,
             Mode = ResolveCacheOptions(options).ModeCategory,
             RejectReasonCounts = rejectReasonCounts,
         };

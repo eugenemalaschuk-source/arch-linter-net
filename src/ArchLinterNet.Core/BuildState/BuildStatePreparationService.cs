@@ -1,5 +1,4 @@
 using System.Diagnostics;
-using System.Reflection;
 using System.Text;
 using System.Text.Json;
 using ArchLinterNet.Core.Discovery;
@@ -219,7 +218,7 @@ public sealed class BuildStatePreparationService : IBuildStatePreparationService
 
     private static BuildStateResolvedAssemblies ResolveBuiltAssemblies(BuildStatePreflightRequest request)
     {
-        List<Assembly> resolved = new();
+        Dictionary<string, string> resolvedPaths = new(StringComparer.Ordinal);
         List<string> missing = new();
 
         // Only the same set that was actually built (relevant + transitive closure) — a
@@ -243,17 +242,16 @@ public sealed class BuildStatePreparationService : IBuildStatePreparationService
                 continue;
             }
 
-            // Assembly.LoadFrom (not Assembly.Load(byte[])) so the resulting Assembly.Location is
-            // populated — BuildStatePreflightEvaluator.CheckArtifactPresence reads it to locate
-            // the artifact/receipt. The trade-off is a known one: on Windows, LoadFrom keeps an
-            // exclusive handle/mapping on the file for the life of this process, so a *second*
-            // --ensure-built rebuild targeting the same output path within the same process can
-            // fail to overwrite it (MSB3026). See BuildStatePreflightAssemblyReloadTests and the
-            // Windows-excluded regression tests below for this documented limitation.
-            resolved.Add(Assembly.LoadFrom(assemblyPath));
+            // Build-state verification needs a physical artifact identity, not a CLR Assembly.
+            // Keeping this path metadata-only lets cache preparation perform --ensure-built and
+            // receipt verification before cache lookup without creating an AssemblyLoadContext.
+            resolvedPaths[project.AssemblyName] = assemblyPath;
         }
 
-        return new BuildStateResolvedAssemblies(resolved, missing);
+        return new BuildStateResolvedAssemblies(Array.Empty<System.Reflection.Assembly>(), missing)
+        {
+            ResolvedAssemblyPaths = resolvedPaths
+        };
     }
 
     // Standard SDK-style output layout is bin/<Configuration>/<TFM>/<AssemblyName>.dll. When the

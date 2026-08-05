@@ -7,4 +7,5 @@ namespace ArchLinterNet.Core.Model;
 internal sealed record ArchitectureLoadedAssemblyArtifact(
     string AssemblyPath,
     string AssemblyContentDigest,
-    string PdbContentDigest);
+    string PdbContentDigest,
+    long BytesLoaded);

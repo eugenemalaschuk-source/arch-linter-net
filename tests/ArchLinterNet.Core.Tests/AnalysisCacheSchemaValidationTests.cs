@@ -63,6 +63,12 @@ public sealed class AnalysisCacheSchemaValidationTests
             },
             ArtifactManifests = Array.Empty<AnalysisCacheArtifactManifest>(),
             Outcome = outcome,
+            WorkProvenance = new AnalysisCacheWorkProvenanceV1(
+                AssemblyLoads: 10,
+                FactIndexMaterializations: 1,
+                SourceScanPasses: 1,
+                ContractExecutions: 2,
+                ArtifactBytesLoaded: 155392),
             ContentDigest = string.Empty,
         };
 
@@ -123,6 +129,32 @@ public sealed class AnalysisCacheSchemaValidationTests
             if (Directory.Exists(root))
             {
                 Directory.Delete(root, recursive: true);
+            }
+        }
+    }
+
+    [Test]
+    public void LegacyCacheEntry_WithoutWorkProvenance_ValidatesAgainstSchema()
+    {
+        string cacheRoot = Path.Combine(Path.GetTempPath(), "arch-linter-net-cache-schema-legacy", Guid.NewGuid().ToString("N"));
+        try
+        {
+            AnalysisCacheEntryV1 entry = BuildSampleEntry(cacheRoot);
+            JsonObject json = JsonNode.Parse(JsonSerializer.Serialize(entry, AnalysisCacheJson.Options))!.AsObject();
+            Assert.That(json.Remove("WorkProvenance"), Is.True);
+
+            EvaluationResults evaluation = LoadSchema().Evaluate(
+                json, new EvaluationOptions { OutputFormat = OutputFormat.List });
+
+            Assert.That(evaluation.IsValid, Is.True,
+                string.Join(Environment.NewLine, evaluation.Details.Where(d => !d.IsValid)
+                    .Select(d => d.EvaluationPath + ": " + string.Join(",", d.Errors?.Values ?? []))));
+        }
+        finally
+        {
+            if (Directory.Exists(cacheRoot))
+            {
+                Directory.Delete(cacheRoot, recursive: true);
             }
         }
     }

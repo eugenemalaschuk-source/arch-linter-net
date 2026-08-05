@@ -55,7 +55,9 @@ public sealed class ArchitectureAssemblyResolutionServiceCancellationTests
             throw new InvalidOperationException("Not expected on the isolated-loading path.");
 
         public IArchitectureAssemblyLoadScope CreateIsolatedLoadScope(
-            IReadOnlyList<string> probingPaths, IReadOnlyDictionary<string, string> exactAssemblyPaths) =>
+            IReadOnlyList<string> probingPaths,
+            IReadOnlyDictionary<string, string> exactAssemblyPaths,
+            IReadOnlyDictionary<string, string>? expectedArtifactContentDigests = null) =>
             ScopeToReturn;
     }
 
@@ -197,6 +199,17 @@ public sealed class ArchitectureAssemblyResolutionServiceCancellationTests
                 Assert.That(
                     inventory.LoadedAssemblyArtifacts.Single().AssemblyContentDigest,
                     Is.EqualTo(BuildStateCanonicalHasher.ComputeContentDigest(copiedCorePath)));
+                // BytesLoaded is the exact byte count captured from the stream(s) actually handed to
+                // AssemblyLoadContext.LoadFromStream — no .pdb was copied alongside copiedCorePath
+                // here, so this must equal just the dll's own length, not dll+pdb.
+                Assert.That(
+                    inventory.LoadedAssemblyArtifacts.Single().BytesLoaded,
+                    Is.EqualTo(new FileInfo(copiedCorePath).Length));
+                // No .pdb was copied alongside copiedCorePath, so PdbContentDigest must be the
+                // "missing" sentinel rather than a real hash.
+                Assert.That(
+                    inventory.LoadedAssemblyArtifacts.Single().PdbContentDigest,
+                    Is.EqualTo("missing"));
 
                 Assert.That(
                     inventory.LoadedAssemblyArtifacts.Select(artifact => artifact.AssemblyPath),
@@ -270,6 +283,36 @@ public sealed class ArchitectureAssemblyResolutionServiceCancellationTests
                 ArchitectureAssemblyLoader.TestAfterArtifactBytesCaptured = null;
                 scope.Dispose();
             }
+        }
+        finally
+        {
+            Directory.Delete(tempDirectory, recursive: true);
+        }
+    }
+
+    [Test]
+    public void IsolatedLoadScope_RejectsBytesThatNoLongerMatchPreparedDigest()
+    {
+        string tempDirectory = Path.Combine(Path.GetTempPath(), $"arch-linter-prepared-digest-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(tempDirectory);
+        try
+        {
+            string coreAssemblyPath = typeof(ArchitectureAssemblyLoader).Assembly.Location;
+            string replacementAssemblyPath = Path.Combine(Path.GetDirectoryName(coreAssemblyPath)!, "ArchLinterNet.CEL.dll");
+            string copiedAssemblyPath = Path.Combine(tempDirectory, "ArchLinterNet.Core.dll");
+            File.Copy(coreAssemblyPath, copiedAssemblyPath);
+
+            var expectedDigests = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+            {
+                [Path.GetFullPath(copiedAssemblyPath)] = BuildStateCanonicalHasher.ComputeContentDigest(copiedAssemblyPath)
+            };
+            File.Copy(replacementAssemblyPath, copiedAssemblyPath, overwrite: true);
+
+            using IArchitectureAssemblyLoadScope scope = ArchitectureAssemblyLoader.Real.CreateIsolatedLoadScope(
+                new[] { tempDirectory }, new Dictionary<string, string>(StringComparer.Ordinal), expectedDigests);
+
+            InvalidOperationException exception = Assert.Throws<InvalidOperationException>(() => scope.LoadFrom(copiedAssemblyPath))!;
+            Assert.That(exception.Message, Does.Contain("changed before LoadFromStream"));
         }
         finally
         {

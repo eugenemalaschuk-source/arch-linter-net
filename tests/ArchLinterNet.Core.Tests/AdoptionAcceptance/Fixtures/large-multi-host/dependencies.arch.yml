@@ -1,17 +1,9 @@
 version: 1
 name: Synthetic large multi-host adopter
+layers:
+  synthetic:
+    namespace: Synthetic
 analysis:
-  target_assemblies:
-    - Synthetic.HostA
-    - Synthetic.HostB
-    - Synthetic.HostC
-    - Synthetic.HostD
-    - Synthetic.HostE
-    - Synthetic.HostF
-    - Synthetic.HostG
-    - Synthetic.HostH
-    - Synthetic.SharedLib1
-    - Synthetic.SharedLib2
   projects:
     - src/Synthetic.HostA/Synthetic.HostA.csproj
     - src/Synthetic.HostB/Synthetic.HostB.csproj
@@ -23,3 +15,17 @@ analysis:
     - src/Synthetic.HostH/Synthetic.HostH.csproj
     - src/Synthetic.SharedLib1/Synthetic.SharedLib1.csproj
     - src/Synthetic.SharedLib2/Synthetic.SharedLib2.csproj
+contracts:
+  strict:
+    - id: synthetic-full-assembly-scan
+      name: synthetic-full-assembly-scan
+      source: synthetic
+      forbidden: []
+      reason: Exercise the representative dependency scan workload for release profiling.
+  strict_layout_conventions:
+    - id: synthetic-fact-index-scan
+      name: synthetic-fact-index-scan
+      files_matching:
+        namespace_segment: Synthetic
+      forbidden_name_prefix: __never__
+      reason: Materialize the type/source fact index across every synthetic assembly partition.

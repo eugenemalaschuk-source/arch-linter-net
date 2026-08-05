@@ -12,5 +12,6 @@ public interface IArchitectureAssemblyLoader
 
     IArchitectureAssemblyLoadScope CreateIsolatedLoadScope(
         IReadOnlyList<string> probingPaths,
-        IReadOnlyDictionary<string, string> exactAssemblyPaths);
+        IReadOnlyDictionary<string, string> exactAssemblyPaths,
+        IReadOnlyDictionary<string, string>? expectedArtifactContentDigests = null);
 }

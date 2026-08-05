@@ -51,6 +51,18 @@ public sealed record ArchitectureAnalysisSnapshotCounters
 
     public int ParallelMergeOperations { get; init; }
 
+    // Work a verified cache hit skipped relative to materializing and evaluating this prepared
+    // snapshot. These are distinct from cache hit counts so a profile can prove what was avoided.
+    public int AvoidedAssemblyLoads { get; init; }
+
+    public int AvoidedFactIndexMaterializations { get; init; }
+
+    public int AvoidedSourceScanPasses { get; init; }
+
+    public int AvoidedContractExecutions { get; init; }
+
+    public long AvoidedArtifactBytesLoaded { get; init; }
+
     // Finding/cycle results produced by each contract family across every evaluated mode.
     // Unlike ContractFamilyCounts, this measures results, not contracts invoked.
     public IReadOnlyDictionary<string, int> ContractFamilyResultCounts { get; init; } =

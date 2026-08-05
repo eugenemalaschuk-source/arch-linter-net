@@ -66,6 +66,25 @@
       },
       "additionalProperties": false
     },
+    "WorkProvenance": {
+      "description": "Measured population work avoided by a verified cache hit. Optional for analysis-cache/v1 entries written before provenance was introduced; absent values deserialize as zero work.",
+      "type": "object",
+      "required": [
+        "AssemblyLoads",
+        "FactIndexMaterializations",
+        "SourceScanPasses",
+        "ContractExecutions",
+        "ArtifactBytesLoaded"
+      ],
+      "properties": {
+        "AssemblyLoads": { "type": "integer", "minimum": 0 },
+        "FactIndexMaterializations": { "type": "integer", "minimum": 0 },
+        "SourceScanPasses": { "type": "integer", "minimum": 0 },
+        "ContractExecutions": { "type": "integer", "minimum": 0 },
+        "ArtifactBytesLoaded": { "type": "integer", "minimum": 0 }
+      },
+      "additionalProperties": false
+    },
     "ContentDigest": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
   },
   "additionalProperties": false,

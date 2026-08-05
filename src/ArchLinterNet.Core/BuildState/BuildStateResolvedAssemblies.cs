@@ -9,4 +9,10 @@ namespace ArchLinterNet.Core.BuildState;
 // approved Execution importer) map from ResolutionResult to this type at the call boundary.
 public sealed record BuildStateResolvedAssemblies(
     IReadOnlyCollection<Assembly> ResolvedAssemblies,
-    IReadOnlyCollection<string> MissingAssemblyNames);
+    IReadOnlyCollection<string> MissingAssemblyNames)
+{
+    // Metadata-only preparation uses this map before any CLR Assembly exists. It is deliberately
+    // optional to retain the established Assembly-based public seam for existing callers.
+    public IReadOnlyDictionary<string, string> ResolvedAssemblyPaths { get; init; } =
+        new Dictionary<string, string>(StringComparer.Ordinal);
+}
