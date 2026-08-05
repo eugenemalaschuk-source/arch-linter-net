@@ -54,3 +54,10 @@ The system SHALL throw `InvalidOperationException` when `analysis.target_assembl
 - **WHEN** `target_assemblies` list is empty, `analysis.solution` is set, but no projects could be discovered or none had a resolvable build output
 - **THEN** the system throws `InvalidOperationException` indicating assemblies must be defined, in addition to any Configuration diagnostics describing why discovery found nothing
 
+### Requirement: Artifact planning is metadata-only and complete
+The system SHALL separate output/reference selection from CLR loading and SHALL compute a complete metadata-only reference closure for cache authorization. If the closure cannot be proven complete, it SHALL mark cache reuse ineligible.
+
+#### Scenario: Unsupported closure input fails closed
+- **WHEN** planning cannot resolve a selected artifact or its reference closure metadata
+- **THEN** cache reuse is rejected before a cache outcome is accepted
+
