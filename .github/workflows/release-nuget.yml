@@ -51,9 +51,9 @@ jobs:
     env:
       ARCH_LINTER_SOURCE_SHA: ${{ github.sha }}
       CHECKPOINT_B_CANDIDATE_VERSION: ${{ needs.prepare-candidate.outputs.package_version }}
-      CHECKPOINT_B_PACKAGE_MANIFEST: artifacts/candidate/package-manifest.json
-      CHECKPOINT_B_PACKAGE_FEED: artifacts/candidate
-      CHECKPOINT_B_EVIDENCE_DIRECTORY: artifacts/checkpoint-b/${{ matrix.id }}
+      CHECKPOINT_B_PACKAGE_MANIFEST: ${{ github.workspace }}/artifacts/candidate/package-manifest.json
+      CHECKPOINT_B_PACKAGE_FEED: ${{ github.workspace }}/artifacts/candidate
+      CHECKPOINT_B_EVIDENCE_DIRECTORY: ${{ github.workspace }}/artifacts/checkpoint-b/${{ matrix.id }}
       CHECKPOINT_B_PLATFORM: ${{ matrix.id }}
       CHECKPOINT_B_SHELL: ${{ matrix.shell }}
 
