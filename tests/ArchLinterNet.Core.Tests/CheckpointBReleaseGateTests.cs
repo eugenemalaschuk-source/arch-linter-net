@@ -444,7 +444,7 @@ public sealed class CheckpointBReleaseGateTests
                 ["--policy", fixture.PolicyPath, "--strict", "--ensure-built", "--cache", cache, "--report", $"json={output}"]);
             startInfo.Environment["DOTNET_CLI_DISABLE_COLOR"] = "1";
             using Process process = Process.Start(startInfo) ?? throw new InvalidOperationException("Failed to start the CLI.");
-            Assert.That(SpinWait.SpinUntil(() => TargetAssemblyIsMapped(process.Id, "Synthetic.Small.dll"), TimeSpan.FromSeconds(30)),
+            Assert.That(SpinWait.SpinUntil(() => TargetAssemblyIsMappedByProcessTree(process.Id, "Synthetic.Small.dll"), TimeSpan.FromSeconds(30)),
                 Is.True, "CLI did not materialize the selected target assembly before cancellation.");
             SendTermination(process.Id);
             bool exited = process.WaitForExit(15_000);
@@ -707,12 +707,43 @@ public sealed class CheckpointBReleaseGateTests
             Assert.That(result.ExitCode, Is.EqualTo(0), result.CombinedOutput);
         }
 
-        private static bool TargetAssemblyIsMapped(int processId, string assemblyFileName)
+        private static bool TargetAssemblyIsMappedByProcessTree(int processId, string assemblyFileName)
         {
-            string mapsPath = $"/proc/{processId}/maps";
+            return EnumerateProcessTree(processId).Any(process => TargetAssemblyIsMapped(process, assemblyFileName));
+        }
+
+        private static IEnumerable<int> EnumerateProcessTree(int processId)
+        {
+            yield return processId;
+            string childrenPath = $"/proc/{processId}/task/{processId}/children";
+            string children;
             try
             {
-                return File.ReadLines(mapsPath).Any(line => line.EndsWith(assemblyFileName, StringComparison.Ordinal));
+                children = File.ReadAllText(childrenPath);
+            }
+            catch (IOException)
+            {
+                yield break;
+            }
+
+            foreach (string child in children.Split(' ', StringSplitOptions.RemoveEmptyEntries))
+            {
+                if (int.TryParse(child, out int childProcessId))
+                {
+                    foreach (int descendant in EnumerateProcessTree(childProcessId))
+                    {
+                        yield return descendant;
+                    }
+                }
+            }
+        }
+
+        private static bool TargetAssemblyIsMapped(int processId, string assemblyFileName)
+        {
+            try
+            {
+                return File.ReadLines($"/proc/{processId}/maps")
+                    .Any(line => line.EndsWith(assemblyFileName, StringComparison.Ordinal));
             }
             catch (IOException)
             {
