@@ -48,4 +48,4 @@
 - [x] 8.5 Add test: multiple symbols work correctly — `#if DEBUG` visible with `[UNITY_EDITOR, DEBUG]`
 - [x] 8.6 Add test: unknown condition set name in CLI produces exit code 2
 - [x] 8.7 Add test: policy with `analysis.condition_sets` and `default_condition_set` loads successfully
-- [x] 8.8 Run `rtk make acceptance` to verify no regressions
+- [x] 8.8 Run `make acceptance` to verify no regressions

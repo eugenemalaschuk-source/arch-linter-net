@@ -26,6 +26,6 @@
 - [x] 3.2 Add adversarial tests for `MaxIterations`, `MaxCostUnits`, warm evaluation
   reuse/no-compile-work, and concurrent reuse across independent contexts.
 - [x] 3.3 Update existing stub-based tests to assert shipped evaluator behavior, then run
-  `rtk make fmt`, `rtk make acceptance`, and `rtk openspec validate --all --strict`.
+  `make fmt`, `make acceptance`, and `openspec validate --all --strict`.
 - [x] 3.4 Synchronize the canonical `cel-profile-v1` spec to the shipped behavior, archive the
-  change, and re-run `rtk openspec validate --all`.
+  change, and re-run `openspec validate --all`.

@@ -6,8 +6,8 @@
 
 ## 2. Validation
 
-- [x] 2.1 Run `rtk make fmt`
-- [x] 2.2 Run `rtk make acceptance`
+- [x] 2.1 Run `make fmt`
+- [x] 2.2 Run `make acceptance`
 
 ## 3. Spec synchronization and archive
 

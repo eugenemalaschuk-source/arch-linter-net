@@ -24,4 +24,4 @@
 - [x] 4.2 Add semantic, missing-reference, consistency, ignored-violation, monolithic compatibility, and shared-entry-point provenance tests
 - [x] 4.3 Add human, JSON, and SARIF serialization compatibility tests using portable paths
 - [x] 4.4 Synchronize implementation decisions with the delta specs and internal import architecture documentation
-- [x] 4.5 Run `rtk make fmt`, `rtk make acceptance`, and `rtk openspec validate --all`, fixing and rerunning until green
+- [x] 4.5 Run `make fmt`, `make acceptance`, and `openspec validate --all`, fixing and rerunning until green

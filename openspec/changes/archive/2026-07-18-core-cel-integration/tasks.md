@@ -52,6 +52,6 @@
 ## 9. Spec sync and validation
 
 - [x] 9.1 Run `openspec validate --all`.
-- [ ] 9.2 Run `rtk make fmt`, inspect the diff.
-- [ ] 9.3 Run `rtk make acceptance` and fix any issue-related failures.
+- [ ] 9.2 Run `make fmt`, inspect the diff.
+- [ ] 9.3 Run `make acceptance` and fix any issue-related failures.
 - [ ] 9.4 Run `openspec archive core-cel-integration`.

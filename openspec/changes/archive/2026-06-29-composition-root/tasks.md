@@ -24,7 +24,7 @@
 ## 5. Architecture governance
 
 - [x] 5.1 Add a contract to `architecture/dependencies.arch.yml` restricting `Microsoft.Extensions.DependencyInjection` imports to `ArchLinterNet.Core.Composition`.
-- [x] 5.2 Run `rtk make lint-architecture` and resolve any new findings.
+- [x] 5.2 Run `make lint-architecture` and resolve any new findings.
 
 ## 6. Tests
 
@@ -35,5 +35,5 @@
 
 ## 7. Validation
 
-- [x] 7.1 Run `rtk make fmt`.
-- [x] 7.2 Run `rtk make acceptance` (this repo has no Taskfile/`task` CLI; `make acceptance` is the documented equivalent per AGENTS.md) and fix failures.
+- [x] 7.1 Run `make fmt`.
+- [x] 7.2 Run `make acceptance` (this repo has no Taskfile/`task` CLI; `make acceptance` is the documented equivalent per AGENTS.md) and fix failures.

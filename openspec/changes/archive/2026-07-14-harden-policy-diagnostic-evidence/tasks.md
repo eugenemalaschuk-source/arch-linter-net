@@ -17,7 +17,7 @@
 - [x] 3.1 Run focused regression tests, `make fmt`, and `make acceptance`.
 - [x] 3.2 Synchronize and archive the OpenSpec change, then validate all specs.
 
-> Validation note: `rtk make fmt` ran but its workflow formatter cannot start
+> Validation note: `make fmt` ran but its workflow formatter cannot start
 > because this Windows environment has no WSL `/bin/bash`. The scoped
-> `rtk dotnet format ArchLinterNet.slnx --no-restore --verify-no-changes` and
-> `rtk make acceptance` checks passed.
+> `dotnet format ArchLinterNet.slnx --no-restore --verify-no-changes` and
+> `make acceptance` checks passed.

@@ -21,6 +21,6 @@
 
 ## 4. Validation
 
-- [x] 4.1 Run `rtk openspec validate --all`.
-- [x] 4.2 Run `rtk make fmt-docs`.
-- [x] 4.3 Run `rtk make acceptance`.
+- [x] 4.1 Run `openspec validate --all`.
+- [x] 4.2 Run `make fmt-docs`.
+- [x] 4.3 Run `make acceptance`.

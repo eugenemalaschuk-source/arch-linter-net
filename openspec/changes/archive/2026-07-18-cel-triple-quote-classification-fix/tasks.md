@@ -11,4 +11,4 @@
 - [x] Correct `cel-profile-v1` spec.
 - [x] Pin the second-pass upstream repositories to exact reviewed commit SHAs in the corpus
       mining manifest.
-- [x] Run `rtk make fmt` and `rtk make acceptance`.
+- [x] Run `make fmt` and `make acceptance`.

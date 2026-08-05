@@ -31,4 +31,4 @@
 
 ## 7. Verification
 
-- [x] 7.1 Run `rtk make acceptance` to verify all tests pass
+- [x] 7.1 Run `make acceptance` to verify all tests pass

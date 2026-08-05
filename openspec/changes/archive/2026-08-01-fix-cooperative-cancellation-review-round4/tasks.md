@@ -29,4 +29,4 @@
 - [x] 4.1 Add deterministic regression tests proving genuine mid-enumeration cancellation for each fixed
       boundary (custom side-effecting `IEnumerable<Assembly>`/`IArchitectureFileSystem` wrappers, not just
       pre-cancelled-token tests).
-- [x] 4.2 Run `rtk make test` (CEL.Tests, Core.Tests, Cli.Tests) and `openspec validate --all`.
+- [x] 4.2 Run `make test` (CEL.Tests, Core.Tests, Cli.Tests) and `openspec validate --all`.

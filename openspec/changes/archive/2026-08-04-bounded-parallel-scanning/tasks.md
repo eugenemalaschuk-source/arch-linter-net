@@ -42,7 +42,7 @@
 
 ## 7. Spec sync and validation
 
-- [x] 7.1 Run `rtk make fmt` and `rtk make acceptance`; fix any issue-related failures.
+- [x] 7.1 Run `make fmt` and `make acceptance`; fix any issue-related failures.
 - [x] 7.2 Reconcile `openspec/changes/bounded-parallel-scanning/specs/**` against the actual implemented behavior.
 - [x] 7.3 Run `openspec validate --all`.
 - [x] 7.4 Run `openspec archive bounded-parallel-scanning`.

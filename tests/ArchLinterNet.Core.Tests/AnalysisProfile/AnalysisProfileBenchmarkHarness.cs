@@ -10,7 +10,7 @@ namespace ArchLinterNet.Core.Tests;
 // produces checked-in pre-optimization evidence": correctness tests gate deterministic counters
 // and invariants, never hardware-specific duration limits. Run manually:
 //
-//   rtk dotnet test tests/ArchLinterNet.Core.Tests --filter FullyQualifiedName~AnalysisProfileBenchmarkHarness
+//   dotnet test tests/ArchLinterNet.Core.Tests --filter FullyQualifiedName~AnalysisProfileBenchmarkHarness
 //
 // Results are written directly to docs/internal/analysis-profile-pre-optimization-baseline-results.json
 // so the complete raw profile from every sample is committed alongside the human-readable baseline.
@@ -57,7 +57,7 @@ public sealed class AnalysisProfileBenchmarkHarness
     public void RunBenchmarkMatrix()
     {
         Assert.That(File.Exists(CliDllPath()), Is.True,
-            $"CLI not built at {CliDllPath()} — run `rtk dotnet build` first.");
+            $"CLI not built at {CliDllPath()} — run `dotnet build` first.");
 
         List<ScenarioSummary> summaries = new();
 

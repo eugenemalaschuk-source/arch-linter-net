@@ -56,4 +56,4 @@
 
 - [x] 8.1 Update user-facing docs where `type_placement_contracts` is documented to add the new `layout_conventions` family (only if contract surface is user-visible per AGENTS.md doc policy).
 - [x] 8.2 Run `openspec validate --all` and resolve any issues.
-- [x] 8.3 Run `rtk make fmt` and `rtk make acceptance`; fix any failures.
+- [x] 8.3 Run `make fmt` and `make acceptance`; fix any failures.

@@ -25,8 +25,8 @@
 - [x] 5.5 CLI tests: `--mode strict,audit` builds one snapshot and reports both outcomes; single-mode invocation output/exit-code unchanged. (`CombinedMode_*` tests in `CliIntegrationTests.cs`.)
 
 ## 6. Validation
-- [x] 6.1 Run `rtk make fmt`.
-- [x] 6.2 Run `rtk make acceptance` (lint-code-size, lint-dotnet-format, lint-architecture, all tests) and fix issue-related failures. (Fixed a real regression this change introduced: passing `mode=null` unconditionally into the existing mode-aware assembly-resolution/coverage-bypass logic broke a strict-mode-only test; fixed by threading a `modeHint` through so single-mode `Validate` keeps its exact original mode-scoped behavior.)
+- [x] 6.1 Run `make fmt`.
+- [x] 6.2 Run `make acceptance` (lint-code-size, lint-dotnet-format, lint-architecture, all tests) and fix issue-related failures. (Fixed a real regression this change introduced: passing `mode=null` unconditionally into the existing mode-aware assembly-resolution/coverage-bypass logic broke a strict-mode-only test; fixed by threading a `modeHint` through so single-mode `Validate` keeps its exact original mode-scoped behavior.)
 
 ## 7. Spec sync and archive
 - [x] 7.1 Compare implementation against this proposal/design/spec; update the delta spec if behavior differs. (Implementation matches; no delta spec changes needed.)

@@ -21,6 +21,6 @@
 
 ## 5. Verification
 
-- [x] 5.1 Run `rtk make restore`
-- [x] 5.2 Run `rtk make test` — all tests pass
-- [x] 5.3 Run `rtk make lint` — no lint or architecture violations
+- [x] 5.1 Run `make restore`
+- [x] 5.2 Run `make test` — all tests pass
+- [x] 5.3 Run `make lint` — no lint or architecture violations

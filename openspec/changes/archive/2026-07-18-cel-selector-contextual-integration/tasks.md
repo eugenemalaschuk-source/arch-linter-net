@@ -57,9 +57,9 @@
 
 ## 9. Verification
 
-- [x] 9.1 Run `rtk make restore` if any project references changed.
-- [x] 9.2 Run `rtk make fmt`.
-- [x] 9.3 Run `rtk make lint` (includes `lint-architecture`, `lint-code-size`, `lint-dotnet-format`) and resolve any findings, including file-size warnings/errors for touched files.
-- [x] 9.4 Run `rtk make test` and confirm all suites pass, including the new CEL selector/contextual fixtures.
-- [x] 9.5 Run `rtk make acceptance` and confirm it passes fully.
+- [x] 9.1 Run `make restore` if any project references changed.
+- [x] 9.2 Run `make fmt`.
+- [x] 9.3 Run `make lint` (includes `lint-architecture`, `lint-code-size`, `lint-dotnet-format`) and resolve any findings, including file-size warnings/errors for touched files.
+- [x] 9.4 Run `make test` and confirm all suites pass, including the new CEL selector/contextual fixtures.
+- [x] 9.5 Run `make acceptance` and confirm it passes fully.
 - [x] 9.6 Run `openspec validate --all` and confirm every spec still passes before archiving.
