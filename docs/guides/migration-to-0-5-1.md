@@ -64,6 +64,7 @@ layers:
     namespace: Example.Product.Infrastructure
 
 analysis:
+  solution: Example.Product.slnx
   target_assemblies:
     - Example.Product.Domain
     - Example.Product.Application
@@ -78,7 +79,11 @@ contracts:
       reason: Application code depends on abstractions rather than concrete infrastructure.
 ```
 
-The release-qualified schema ID is useful editor feedback. Installed package
+Set `analysis.solution` to the actual solution file. It lets the CLI discover
+the selected projects and their output directories; `target_assemblies` alone
+does not recursively search every project's `bin/<Configuration>/<TFM>` path.
+For a single-project repository, use its `.csproj` in `analysis.projects`
+instead. The release-qualified schema ID is useful editor feedback. Installed package
 bytes, not an unversioned web URL, are the release source of truth; see
 [Offline schemas](#offline-schemas).
 
@@ -102,7 +107,7 @@ validation:
 
 ```bash
 dotnet restore
-dotnet build --no-restore
+dotnet build Example.Product.slnx --no-restore
 dotnet arch-linter-net --policy architecture/arch.yml --mode strict
 ```
 
@@ -343,7 +348,8 @@ dotnet arch-linter-net cache inspect --cache .architecture-cache
 dotnet arch-linter-net cache clear --cache .architecture-cache
 ```
 
-`--cache` is disabled by default. `auto` uses the platform user-cache namespace;
+`--cache` is disabled by default. It persists verified `analysis-cache/v1`
+entries only when explicitly selected. `auto` uses the platform user-cache namespace;
 an explicit path must be safe and caller-owned. A cache hit is used only after
 integrity and input eligibility checks; a miss, rejection, corruption, changed
 input, or cancellation recomputes or fails safely and never becomes success.

@@ -9,7 +9,7 @@ public sealed class AdoptionMigrationGuidanceDocumentationTests
     [Test]
     public void MigrationGuide_SeparatesGreenfieldAndUpgradePathsWithSafeReleaseBoundary()
     {
-        string guide = ReadDocumentation("guides/migration-to-0-5-1.md");
+        string guide = ReadNormalizedDocumentation("guides/migration-to-0-5-1.md");
 
         Assert.Multiple(() =>
         {
@@ -19,6 +19,8 @@ public sealed class AdoptionMigrationGuidanceDocumentationTests
             Assert.That(guide, Does.Contain("Checkpoint A is internal integration evidence"));
             Assert.That(guide, Does.Contain("not a package release or a support promise"));
             Assert.That(guide, Does.Contain("dotnet arch-linter-net policy check"));
+            Assert.That(guide, Does.Contain("solution: Example.Product.slnx"));
+            Assert.That(guide, Does.Contain("dotnet build Example.Product.slnx --no-restore"));
             Assert.That(guide, Does.Contain("--ensure-built --no-restore"));
             Assert.That(guide, Does.Contain("changed`, `stale`, or `ambiguous`"));
             Assert.That(guide, Does.Contain("CI uses read-only `baseline verify`"));
@@ -29,7 +31,7 @@ public sealed class AdoptionMigrationGuidanceDocumentationTests
     [Test]
     public void MigrationGuide_DocumentsInstalledSchemasReportsAndExecutionControls()
     {
-        string guide = ReadDocumentation("guides/migration-to-0-5-1.md");
+        string guide = ReadNormalizedDocumentation("guides/migration-to-0-5-1.md");
 
         Assert.Multiple(() =>
         {
@@ -48,7 +50,7 @@ public sealed class AdoptionMigrationGuidanceDocumentationTests
     [Test]
     public void ReferenceEntrypoints_PreserveArgumentsStreamsAndExitStatus()
     {
-        string entrypoints = ReadDocumentation("guides/reference-entrypoints.md");
+        string entrypoints = ReadNormalizedDocumentation("guides/reference-entrypoints.md");
 
         Assert.Multiple(() =>
         {
@@ -66,6 +68,8 @@ public sealed class AdoptionMigrationGuidanceDocumentationTests
             Assert.That(entrypoints, Does.Contain("$LASTEXITCODE"));
             Assert.That(entrypoints, Does.Contain("Do not use `Invoke-Expression`"));
             Assert.That(entrypoints, Does.Contain("do not interpolate untrusted values"));
+            Assert.That(entrypoints, Does.Contain("task --exit-code architecture"));
+            Assert.That(entrypoints, Does.Contain("does not preserve the product exit code"));
         });
     }
 
@@ -92,6 +96,12 @@ public sealed class AdoptionMigrationGuidanceDocumentationTests
     {
         return File.ReadAllText(Path.Combine(
             RepositoryRoot(), "docs", relativePath.Replace('/', Path.DirectorySeparatorChar)));
+    }
+
+    private static string ReadNormalizedDocumentation(string relativePath)
+    {
+        return string.Join(' ', ReadDocumentation(relativePath)
+            .Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries));
     }
 
     private static string RepositoryRoot()

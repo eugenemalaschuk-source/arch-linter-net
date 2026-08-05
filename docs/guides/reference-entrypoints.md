@@ -2,8 +2,11 @@
 
 These are thin consumer-owned templates for ArchLinterNet 0.5.1. They pin or
 restore the tool, pass structured arguments, invoke one validation command per
-requested session, preserve stdout/stderr, and propagate its exact exit code.
-They do not generate a policy, create a baseline, approve debt, or write an API
+requested session, and preserve stdout/stderr. POSIX, PowerShell, Task with
+`--exit-code`, and direct CI invocations propagate the exact product exit code.
+GNU Make cannot do so for a failing recipe, so its template writes that exact
+code to an artifact for the outer shell/CI caller to propagate. The templates
+do not generate a policy, create a baseline, approve debt, or write an API
 snapshot automatically.
 
 Examples use the synthetic `Example.Product` policy path. Replace values with
@@ -81,33 +84,42 @@ must remain exit `2`.
 
 ## Make
 
-Keep the pinned local tool in the repository and let Make return the command's
-status without hiding output:
+GNU Make does not preserve the product exit code when a recipe fails: its own
+process exits `2` for both product status `1` and `2`. Keep the exact product
+status in a machine-readable artifact, then make the *outer* shell or CI caller
+return that saved value. Do not use a plain failing recipe as a three-state CI
+interface.
 
 ```make
 .PHONY: architecture
 
 architecture:
-	dotnet tool restore
-	dotnet arch-linter-net --policy architecture/arch.yml --mode strict
+	@mkdir -p artifacts
+	@set +e; \
+	  dotnet arch-linter-net --policy architecture/arch.yml --mode strict; \
+	  status=$$?; \
+	  printf '%s\n' $$status > artifacts/architecture.exit-code; \
+	  exit 0
 ```
 
-Use a separate target for an audit artifact if the pipeline intentionally keeps
-audit non-blocking. Do not attach `|| true` to the strict target.
+Restore the pinned tool before the target, then call Make and re-emit its saved
+product status from the surrounding POSIX shell or CI step:
 
-```make
-.PHONY: architecture-audit
-
-architecture-audit:
-	dotnet arch-linter-net --policy architecture/arch.yml --mode audit \
-		--report json=artifacts/architecture-audit.json
+```bash
+dotnet tool restore
+make architecture
+status=$(cat artifacts/architecture.exit-code)
+exit "$status"
 ```
+
+The product is still invoked exactly once. The artifact is a status channel,
+not a replacement for JSON/SARIF reports.
 
 ## Taskfile
 
-Task passes the command exit code through when the task contains one command.
-Use an argument list rather than a shell-composed string where your Taskfile
-version supports it:
+Task's normal failure exit code is Task's own code, not necessarily the product
+status. Invoke the task with `--exit-code` to preserve the ArchLinterNet `0`/`1`/`2`
+contract. Use a fixed command rather than a shell-composed string:
 
 ```yaml
 version: '3'
@@ -121,7 +133,11 @@ tasks:
 The command is a fixed literal: do not append untrusted values through Task's
 template interpolation. Keep tool restore as a distinct bootstrap task when it
 is not already performed by the environment. The `architecture` task invokes
-ArchLinterNet once.
+ArchLinterNet once, and its caller must use:
+
+```bash
+task --exit-code architecture
+```
 
 ## Tilt
 

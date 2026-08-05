@@ -31,9 +31,13 @@ shell, PowerShell, Make, Taskfile, Tilt, GitHub Actions, and generic CI
 reference entrypoints. Each wrapper example SHALL locate or install a pinned
 release, pass structured arguments without string-evaluated command
 construction, invoke the product once per requested validation session,
-preserve standard output and standard error routing, and propagate the exact
-product exit code. PowerShell examples SHALL use native command invocation and
-`$LASTEXITCODE` explicitly.
+preserve standard output and standard error routing. Direct CLI, POSIX,
+PowerShell, Task invoked with `--exit-code`, and generic-CI examples SHALL
+propagate the exact product exit code. The Make example SHALL state that GNU
+Make cannot preserve a failed recipe's exact exit code and SHALL write that code
+to a machine-readable artifact for the outer shell or CI caller to propagate.
+PowerShell examples SHALL use native command invocation and `$LASTEXITCODE`
+explicitly.
 
 #### Scenario: A POSIX consumer supplies an argument with whitespace
 - **WHEN** a consumer adapts the documented POSIX entrypoint with a policy path
@@ -45,6 +49,13 @@ product exit code. PowerShell examples SHALL use native command invocation and
   with code 1 or 2
 - **THEN** it returns that same value through `$LASTEXITCODE` without replacing
   the command's standard streams
+
+#### Scenario: A Make validation fails
+- **WHEN** the documented Make target runs a validation that exits with code 1
+  or 2
+- **THEN** its outer shell or CI caller reads and returns the exact saved status
+  artifact instead of interpreting GNU Make's own failure status as the product
+  status
 
 ### Requirement: Offline and non-interactive guidance uses installed contracts
 The guide and linked references SHALL document the installed `schema list` and
