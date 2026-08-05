@@ -17,9 +17,15 @@ The GitHub Release is the durable human-facing release record. The workflow does
 
 0.5.1 is the one public adoption-stabilization release. Checkpoint A is
 internal evidence only; a green packed-artifact Checkpoint B is the only release
-authorization. Before publication, verify the [0.5.1 release notes](release-notes-0-5-1.md),
-[migration guide](../guides/migration-to-0-5-1.md), and installed-schema
-commands against the candidate packages.
+authorization. The manual release workflow runs this gate on freshly packed
+`0.5.1` candidates for Linux x64, Windows x64/PowerShell, macOS arm64, and real
+macOS x86_64 before it creates its reviewable package artifacts. The run uploads
+`checkpoint-b-release-evidence-0.5.1`; inspect its JSON and Markdown files for
+the package digests, commit, matrix, gate status, exclusions, and explicit
+authorization statement. A missing platform artifact or failed Checkpoint B
+test blocks packaging and publication. Before publication, verify the
+[0.5.1 release notes](release-notes-0-5-1.md), [migration guide](../guides/migration-to-0-5-1.md),
+and installed-schema commands against the candidate packages.
 
 ## Versioning
 
@@ -116,6 +122,8 @@ Run the release workflow with `publish: false`.
 
 Expected dry-run result:
 
+- the four-platform packed-artifact Checkpoint B matrix and aggregated release
+  evidence pass for the candidate;
 - restore, Release build, and acceptance validation pass;
 - release notes are generated as workflow artifacts;
 - package artifacts are built with one calculated package version;

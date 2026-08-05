@@ -5,15 +5,22 @@
 Define the single, versioned compatibility and architecture contract for ArchLinterNet 0.5.1 across policy authoring, exact identity, baselines, API snapshots, diagnostics, build state, output, cache, profiling, cancellation, packaged schemas, and supported execution environments.
 ## Requirements
 ### Requirement: One public 0.5.1 release boundary
-The system SHALL expose one public stabilization release boundary, `0.5.1`, governed by compatibility envelope `adoption-stabilization/v1`. Checkpoint A is internal integration evidence only; only the complete Checkpoint B contract and acceptance corpus may authorize publishing 0.5.1.
+The system SHALL expose one public stabilization release boundary, `0.5.1`,
+governed by compatibility envelope `adoption-stabilization/v1`. Checkpoint A is
+internal integration evidence only; only a complete, reproducible Checkpoint B
+packed-artifact acceptance matrix and release-evidence summary may authorize
+publishing 0.5.1.
 
 #### Scenario: Checkpoint A succeeds
 - **WHEN** the safety-critical Checkpoint A scenarios pass
-- **THEN** development may continue but no intermediate public stabilization version is implied or authorized
+- **THEN** development may continue but no intermediate public stabilization
+  version is implied or authorized
 
 #### Scenario: Unrelated design slices progress independently
-- **WHEN** one child task has an approved applicable design slice and another unrelated slice remains open
-- **THEN** the first task may proceed without redefining the unresolved slice or waiting for the complete issue to close
+- **WHEN** one child task has an approved applicable design slice and another
+  unrelated slice remains open
+- **THEN** the first task may proceed without redefining the unresolved slice or
+  waiting for the complete issue to close
 
 ### Requirement: Release-matched compatibility registry
 The system SHALL publish one `adoption-stabilization/v1` registry for 0.5.1 that identifies every shipped persisted or machine-readable contract by logical schema id, document version, packaged resource path, and compatibility behavior. The 0.5.1 registry SHALL contain exactly the formats whose owning slices implement their writers and validate real generated output:
