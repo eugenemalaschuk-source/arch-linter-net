@@ -2,9 +2,9 @@ namespace ArchLinterNet.Core.Tests;
 
 internal static class CheckpointBReleaseGateProcessTree
 {
-    public static bool TargetAssemblyIsMapped(int processId, string assemblyFileName)
+    public static bool HasReadAtLeast(int processId, long minimumBytes)
     {
-        return Enumerate(processId).Any(process => IsMapped(process, assemblyFileName));
+        return Enumerate(processId).Any(process => ReadCharacterCount(process) >= minimumBytes);
     }
 
     private static IEnumerable<int> Enumerate(int processId)
@@ -32,16 +32,19 @@ internal static class CheckpointBReleaseGateProcessTree
         }
     }
 
-    private static bool IsMapped(int processId, string assemblyFileName)
+    private static long ReadCharacterCount(int processId)
     {
         try
         {
-            return File.ReadLines($"/proc/{processId}/maps")
-                .Any(line => line.EndsWith(assemblyFileName, StringComparison.Ordinal));
+            string? value = File.ReadLines($"/proc/{processId}/io")
+                .FirstOrDefault(line => line.StartsWith("rchar:", StringComparison.Ordinal));
+            return value is null || !long.TryParse(value.AsSpan("rchar:".Length).Trim(), out long bytes)
+                ? 0
+                : bytes;
         }
         catch (IOException)
         {
-            return false;
+            return 0;
         }
     }
 }

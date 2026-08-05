@@ -22,11 +22,11 @@ evidence value can turn an untested property into a release assertion.
   barrier, invoked inside `ValidateStrict` immediately before the engine begins
   work. It is a caller-supplied testing composition seam, not a Core runtime
   switch.
-- The Linux CLI oracle walks the CLI process tree until `/proc/<pid>/maps`
-  proves that the selected target assembly has been materialized by the real
-  tool host, then sends its native termination signal and inspects
-  output/cache postconditions. This keeps the packaged Core runtime free of
-  test-controlled behavior.
+- The Linux CLI oracle adds a deliberately oversized embedded resource to the
+  selected target, then observes `/proc/<pid>/io` until the real tool host has
+  read at least half of that artifact while it remains running. It then sends
+  its native termination signal and inspects output/cache postconditions. This
+  keeps the packaged Core runtime free of test-controlled behavior.
 - Each oracle returns `CheckpointScenarioResult`; the test collects those
   values rather than manufacturing `Passed` entries in the coordinator.
 

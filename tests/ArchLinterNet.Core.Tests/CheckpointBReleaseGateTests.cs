@@ -437,6 +437,8 @@ public sealed class CheckpointBReleaseGateTests
             }
 
             using AdoptionAcceptanceFixture fixture = AdoptionAcceptanceFixture.Create("small");
+            long cancellationArtifactBytes = fixture.AddLargeEmbeddedResource(
+                "checkpoint-b-cancellation.bin", 96 * 1024 * 1024);
             fixture.Build();
             string output = Path.Combine(fixture.Root, "cancelled-report.json");
             string cache = Path.Combine(fixture.Root, "cancelled-cache");
@@ -446,8 +448,11 @@ public sealed class CheckpointBReleaseGateTests
             using Process process = Process.Start(startInfo) ?? throw new InvalidOperationException("Failed to start the CLI.");
             try
             {
-                Assert.That(SpinWait.SpinUntil(() => CheckpointBReleaseGateProcessTree.TargetAssemblyIsMapped(process.Id, "Synthetic.Small.dll"), TimeSpan.FromSeconds(30)),
-                    Is.True, "CLI did not materialize the selected target assembly before cancellation.");
+                Assert.That(SpinWait.SpinUntil(
+                        () => !process.HasExited && CheckpointBReleaseGateProcessTree.HasReadAtLeast(
+                            process.Id, cancellationArtifactBytes / 2),
+                        TimeSpan.FromSeconds(30)),
+                    Is.True, "CLI did not read the deliberately oversized target assembly before cancellation.");
                 SendTermination(process.Id);
                 bool exited = process.WaitForExit(15_000);
                 if (!exited)
@@ -498,13 +503,6 @@ public sealed class CheckpointBReleaseGateTests
             ProcessStartInfo startInfo = CreateShellStartInfo(workingDirectory, arguments);
             startInfo.Environment["DOTNET_CLI_DISABLE_COLOR"] = "1";
             return Run(startInfo);
-        }
-
-        private Process StartTool(string workingDirectory, params string[] arguments)
-        {
-            ProcessStartInfo startInfo = CreateShellStartInfo(workingDirectory, arguments);
-            startInfo.Environment["DOTNET_CLI_DISABLE_COLOR"] = "1";
-            return Process.Start(startInfo) ?? throw new InvalidOperationException("Failed to start the CLI.");
         }
 
         public void Dispose()
