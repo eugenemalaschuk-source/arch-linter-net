@@ -239,6 +239,7 @@ public sealed class CheckpointBReleaseGateTests
                 {
                     Console.WriteLine("cancelled");
                 }
+                return 0;
                 """);
 
             CommandResult restore = RunDotnet(consumerDirectory, "restore", "--configfile", "NuGet.Config");
