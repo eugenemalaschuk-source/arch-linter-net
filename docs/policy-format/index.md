@@ -12,6 +12,10 @@ semantics: existing `architecture/dependencies.arch.yml` files and arbitrary
 names remain valid. Large policies can use ordered local fragments; see
 [Policy imports](imports.md).
 
+For the 0.5.1 migration path from an existing root/fragment policy, including
+explicit baseline identity review and offline schema discovery, see [Adopt or
+Upgrade to 0.5.1](../guides/migration-to-0-5-1.md).
+
 ## Top-level structure
 
 ```yaml

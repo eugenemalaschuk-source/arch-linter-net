@@ -2,6 +2,11 @@
 
 A good CI setup separates blocking strict validation from non-blocking audit visibility.
 
+The provider-neutral 0.5.1 contract, offline schema commands, sequential mode,
+and safe POSIX/PowerShell/Make/Task/Tilt templates are in [0.5.1 reference
+entrypoints](reference-entrypoints.md). GitHub Actions below is one example
+provider, not a product dependency.
+
 ## Recommended GitHub Actions workflow
 
 ```yaml
