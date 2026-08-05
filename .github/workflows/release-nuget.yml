@@ -80,7 +80,19 @@ jobs:
       - name: Verify immutable candidate packages
         run: python3 tools/release/package_manifest.py verify --packages-dir artifacts/candidate --manifest artifacts/candidate/package-manifest.json
 
-      - name: Run packed-artifact Checkpoint B
+      - name: Run packed-artifact Checkpoint B with bash
+        if: ${{ matrix.shell == 'bash' }}
+        shell: bash
+        run: dotnet test tests/ArchLinterNet.Core.Tests --no-restore --filter FullyQualifiedName~CheckpointBReleaseGateTests
+
+      - name: Run packed-artifact Checkpoint B with zsh
+        if: ${{ matrix.shell == 'zsh' }}
+        shell: zsh {0}
+        run: dotnet test tests/ArchLinterNet.Core.Tests --no-restore --filter FullyQualifiedName~CheckpointBReleaseGateTests
+
+      - name: Run packed-artifact Checkpoint B with PowerShell
+        if: ${{ matrix.shell == 'pwsh' }}
+        shell: pwsh
         run: dotnet test tests/ArchLinterNet.Core.Tests --no-restore --filter FullyQualifiedName~CheckpointBReleaseGateTests
 
       - name: Upload Checkpoint B platform evidence
@@ -117,6 +129,18 @@ jobs:
           npm install -g --ignore-scripts @fission-ai/openspec@1.6.0
           openspec validate --all --strict
 
+      - name: Download immutable candidate manifest
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+        with:
+          name: nuget-candidate-${{ needs.prepare-candidate.outputs.package_version }}
+          path: artifacts/candidate
+
+      - name: Verify immutable candidate manifest
+        run: python3 tools/release/package_manifest.py verify --packages-dir artifacts/candidate --manifest artifacts/candidate/package-manifest.json
+
+      - name: Record passed repository gates
+        run: python3 tools/release/create_repository_gate_evidence.py --candidate-manifest artifacts/candidate/package-manifest.json --source-commit "$GITHUB_SHA" --output artifacts/checkpoint-b/repository-gates.json
+
       - name: Download platform evidence
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
         with:
@@ -125,12 +149,12 @@ jobs:
           merge-multiple: true
 
       - name: Generate deterministic release evidence
-        run: python3 tools/release/aggregate_checkpoint_b_evidence.py --input-dir artifacts/checkpoint-b/platforms --output-dir artifacts/checkpoint-b/release-evidence
+        run: python3 tools/release/aggregate_checkpoint_b_evidence.py --input-dir artifacts/checkpoint-b/platforms --candidate-manifest artifacts/candidate/package-manifest.json --repository-gates artifacts/checkpoint-b/repository-gates.json --output-dir artifacts/checkpoint-b/release-evidence
 
       - name: Upload release evidence
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: checkpoint-b-release-evidence-0.5.1
+          name: checkpoint-b-release-evidence-${{ needs.prepare-candidate.outputs.package_version }}
           path: artifacts/checkpoint-b/release-evidence
           if-no-files-found: error
 

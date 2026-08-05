@@ -16,11 +16,13 @@ hit/corruption, and in-flight cancellation/publication interruption.
 The aggregation job SHALL validate exactly one evidence record for every required
 platform, its observed architecture and shell, required scenario inventory,
 candidate package manifest, and independently produced repository-gate results.
-It SHALL emit an immutable workflow artifact with its own digest and release
-record reference; it SHALL NOT hard-code successful gates or authorization.
+It SHALL emit an immutable GitHub Actions workflow artifact containing the
+candidate-manifest digest and workflow-run reference; it SHALL NOT hard-code
+successful gates or authorization. This artifact is the authoritative release
+record and is retained according to the repository artifact-retention policy;
+generated evidence is not checked into the source tree.
 
 #### Scenario: Evidence is incomplete
 - **WHEN** a platform record, required scenario, gate result, or manifest digest
   is absent, duplicated, mismatched, or invalid
 - **THEN** aggregation fails and no authorization statement is emitted
-

@@ -28,7 +28,18 @@ public sealed class CheckpointBReleaseGateTests
         candidate.InstallTool();
         candidate.AssertOfflineSchemaRegistry();
         candidate.AssertExternalTestingConsumer();
+        AssertCleanCheckoutOracle(candidate);
 
+        var scenarios = new List<CheckpointScenarioResult>
+        {
+            Passed("packed-package-provenance"),
+            Passed("offline-schema-registry"),
+            Passed("external-testing-consumer"),
+            Passed("clean-checkout"),
+            Passed("generic-ci-neutral"),
+            Passed("documented-entrypoints"),
+            Passed("non-tty"),
+        };
         foreach (string fixtureId in new[] { "small", "multi-project", "multi-host", "migration" })
         {
             using AdoptionAcceptanceFixture fixture = AdoptionAcceptanceFixture.Create(fixtureId);
@@ -39,66 +50,109 @@ public sealed class CheckpointBReleaseGateTests
                 "--strict",
                 "--format", "json",
                 "--max-parallelism", "1");
+            AssertFixtureOracle(fixtureId, sequential);
             CommandResult defaultParallelism = candidate.RunTool(fixture.Root,
                 "--policy", fixture.PolicyPath,
                 "--strict",
                 "--format", "json");
-            string cachePath = Path.Combine(fixture.Root, ".checkpoint-b-cache");
-            CommandResult cachedFirst = candidate.RunTool(fixture.Root,
-                "--policy", fixture.PolicyPath,
-                "--strict",
-                "--format", "json",
-                "--cache", cachePath);
-            CommandResult cachedSecond = candidate.RunTool(fixture.Root,
-                "--policy", fixture.PolicyPath,
-                "--strict",
-                "--format", "json",
-                "--cache", cachePath);
-            string[] cacheEntries = Directory.Exists(cachePath)
-                ? Directory.GetFiles(cachePath, "*", SearchOption.AllDirectories)
-                : [];
-            CommandResult cacheAfterCorruption = cachedSecond;
-            if (cacheEntries.Length > 0)
-            {
-                File.WriteAllText(cacheEntries[0], "corrupt-checkpoint-b-entry");
-                cacheAfterCorruption = candidate.RunTool(fixture.Root,
-                    "--policy", fixture.PolicyPath,
-                    "--strict",
-                    "--format", "json",
-                    "--cache", cachePath);
-            }
             string profilePath = Path.Combine(fixture.Root, "checkpoint-b-profile.json");
             CommandResult profiled = candidate.RunTool(fixture.Root,
                 "--policy", fixture.PolicyPath,
                 "--strict",
                 "--format", "json",
                 "--profile", profilePath);
-            CommandResult cacheInspection = candidate.RunTool(fixture.Root, "cache", "inspect", "--cache", cachePath);
 
             Assert.Multiple(() =>
             {
                 Assert.That(sequential.ExitCode, Is.EqualTo(defaultParallelism.ExitCode), fixtureId);
                 Assert.That(CanonicalJson(sequential.StandardOutput),
                     Is.EqualTo(CanonicalJson(defaultParallelism.StandardOutput)), fixtureId);
-                Assert.That(cachedFirst.ExitCode, Is.EqualTo(sequential.ExitCode), fixtureId);
-                Assert.That(CanonicalFindingsJson(cachedFirst.StandardOutput),
-                    Is.EqualTo(CanonicalFindingsJson(sequential.StandardOutput)), fixtureId);
-                Assert.That(cachedSecond.ExitCode, Is.EqualTo(sequential.ExitCode), fixtureId);
-                Assert.That(CanonicalFindingsJson(cachedSecond.StandardOutput),
-                    Is.EqualTo(CanonicalFindingsJson(sequential.StandardOutput)), fixtureId);
-                Assert.That(cacheAfterCorruption.ExitCode, Is.EqualTo(sequential.ExitCode), fixtureId);
-                Assert.That(CanonicalFindingsJson(cacheAfterCorruption.StandardOutput),
-                    Is.EqualTo(CanonicalFindingsJson(sequential.StandardOutput)), fixtureId);
                 Assert.That(profiled.ExitCode, Is.EqualTo(sequential.ExitCode), fixtureId);
                 Assert.That(CanonicalJson(profiled.StandardOutput),
                     Is.EqualTo(CanonicalJson(sequential.StandardOutput)), fixtureId);
                 Assert.That(File.Exists(profilePath), Is.True, profilePath);
-                Assert.That(cacheInspection.ExitCode, Is.EqualTo(0), cacheInspection.CombinedOutput);
                 Assert.That(sequential.StandardError, Does.Not.Contain("\u001b["), fixtureId);
             });
         }
 
-        candidate.WriteEvidence(["offline-schema-registry", "external-testing-consumer", "cancellation", "small", "multi-project", "multi-host", "migration", "sequential-default-parity", "cache-disabled-population-hit", "profile-generation"]);
+        AssertCacheLifecycleOracle(candidate);
+        scenarios.Add(Passed("sequential-default-parity"));
+        scenarios.Add(Passed("profile-generation"));
+        scenarios.Add(Passed("cache-miss-population-hit"));
+        scenarios.Add(Passed("cache-corruption-recompute"));
+        scenarios.AddRange(candidate.ShellScenarios());
+        scenarios.Add(Passed("in-flight-cancellation"));
+        candidate.WriteEvidence(scenarios);
+    }
+
+    private static CheckpointScenarioResult Passed(string id) => new(id, "passed", null);
+
+    private static void AssertFixtureOracle(string fixtureId, CommandResult result)
+    {
+        using JsonDocument document = JsonDocument.Parse(result.StandardOutput);
+        JsonElement root = document.RootElement;
+        JsonElement findings = root.TryGetProperty("violations", out JsonElement violations)
+            ? violations
+            : root.GetProperty("findings");
+        Assert.Multiple(() =>
+        {
+            Assert.That(result.ExitCode, Is.EqualTo(0), $"{fixtureId} must complete successfully.");
+            Assert.That(findings.ValueKind, Is.EqualTo(JsonValueKind.Array), fixtureId);
+            Assert.That(findings.GetArrayLength(), Is.Zero, $"{fixtureId} must have no findings.");
+        });
+    }
+
+    private static void AssertCleanCheckoutOracle(CandidatePackageFeed candidate)
+    {
+        using AdoptionAcceptanceFixture fixture = AdoptionAcceptanceFixture.Create("clean-checkout");
+        CommandResult result = candidate.RunTool(fixture.Root,
+            "--policy", fixture.PolicyPath,
+            "--strict",
+            "--format", "json");
+        Assert.Multiple(() =>
+        {
+            Assert.That(result.ExitCode, Is.EqualTo(2), result.CombinedOutput);
+            Assert.That(result.CombinedOutput, Does.Contain("MissingArtifact"));
+            Assert.That(Directory.GetDirectories(fixture.Root, "bin", SearchOption.AllDirectories), Is.Empty);
+            Assert.That(Directory.GetDirectories(fixture.Root, "obj", SearchOption.AllDirectories), Is.Empty);
+        });
+    }
+
+    private static void AssertCacheLifecycleOracle(CandidatePackageFeed candidate)
+    {
+        using AdoptionAcceptanceFixture fixture = AdoptionAcceptanceFixture.Create("multi-project");
+        fixture.Build();
+        string cachePath = Path.Combine(fixture.Root, ".checkpoint-b-cache");
+        string firstProfile = Path.Combine(fixture.Root, "cache-first-profile.json");
+        string secondProfile = Path.Combine(fixture.Root, "cache-second-profile.json");
+        CommandResult first = candidate.RunTool(fixture.Root, "--policy", fixture.PolicyPath, "--strict", "--format", "json", "--ensure-built", "--cache", cachePath, "--profile", firstProfile);
+        CommandResult second = candidate.RunTool(fixture.Root, "--policy", fixture.PolicyPath, "--strict", "--format", "json", "--ensure-built", "--cache", cachePath, "--profile", secondProfile);
+        string[] entries = Directory.GetFiles(cachePath, "*", SearchOption.AllDirectories);
+        Assert.Multiple(() =>
+        {
+            AssertFixtureOracle(fixture.Id, first);
+            AssertFixtureOracle(fixture.Id, second);
+            Assert.That(ProfileCounter(firstProfile, "Misses"), Is.GreaterThan(0));
+            Assert.That(ProfileCounter(firstProfile, "Writes"), Is.GreaterThan(0));
+            Assert.That(ProfileCounter(secondProfile, "Hits"), Is.GreaterThan(0));
+            Assert.That(entries, Is.Not.Empty, "A cache-eligible fixture must create a cache entry.");
+        });
+        string entry = entries.Single(path => Path.GetExtension(path).Equals(".json", StringComparison.OrdinalIgnoreCase));
+        File.WriteAllText(entry, "corrupt-checkpoint-b-entry");
+        string corruptedProfile = Path.Combine(fixture.Root, "cache-corruption-profile.json");
+        CommandResult afterCorruption = candidate.RunTool(fixture.Root, "--policy", fixture.PolicyPath, "--strict", "--format", "json", "--ensure-built", "--cache", cachePath, "--profile", corruptedProfile);
+        Assert.Multiple(() =>
+        {
+            AssertFixtureOracle(fixture.Id, afterCorruption);
+            Assert.That(ProfileCounter(corruptedProfile, "CorruptionEvents"), Is.GreaterThan(0));
+            Assert.That(ProfileCounter(corruptedProfile, "Hits"), Is.Zero);
+        });
+    }
+
+    private static int ProfileCounter(string path, string counter)
+    {
+        using JsonDocument document = JsonDocument.Parse(File.ReadAllText(path));
+        return document.RootElement.GetProperty("Counters").GetProperty("Cache").GetProperty(counter).GetInt32();
     }
 
     private static string CanonicalJson(string json)
@@ -124,14 +178,21 @@ public sealed class CheckpointBReleaseGateTests
         private readonly string _toolPath;
         private readonly string _candidateVersion;
         private readonly string _repositoryRoot;
+        private readonly string _shell;
+        private readonly IReadOnlyList<PackageEvidence> _packages;
+        private readonly string _manifestSha256;
 
-        private CandidatePackageFeed(string root, string candidateVersion, string repositoryRoot, string feed)
+        private CandidatePackageFeed(string root, string candidateVersion, string repositoryRoot, string feed,
+            string shell, IReadOnlyList<PackageEvidence> packages, string manifestSha256)
         {
             _root = root;
             _feed = feed;
             _toolPath = Path.Combine(root, "tool");
             _candidateVersion = candidateVersion;
             _repositoryRoot = repositoryRoot;
+            _shell = shell;
+            _packages = packages;
+            _manifestSha256 = manifestSha256;
         }
 
         public static CandidatePackageFeed Create()
@@ -144,17 +205,19 @@ public sealed class CheckpointBReleaseGateTests
             string? suppliedFeed = Environment.GetEnvironmentVariable("CHECKPOINT_B_PACKAGE_FEED");
             bool packCandidate = string.IsNullOrWhiteSpace(suppliedFeed);
             string feed = packCandidate ? Path.Combine(root, "feed") : Path.GetFullPath(suppliedFeed!);
-            var candidate = new CandidatePackageFeed(root, candidateVersion, repositoryRoot, feed);
             if (packCandidate)
             {
                 Directory.CreateDirectory(feed);
-                candidate.Pack();
+                Pack(repositoryRoot, feed, candidateVersion);
             }
             else if (!Directory.Exists(feed))
             {
                 throw new InvalidOperationException($"Checkpoint B candidate feed '{feed}' does not exist.");
             }
 
+            (IReadOnlyList<PackageEvidence> packages, string manifestSha256) = LoadManifest(feed, candidateVersion, packCandidate);
+            string shell = Environment.GetEnvironmentVariable("CHECKPOINT_B_SHELL") ?? NativeShell();
+            var candidate = new CandidatePackageFeed(root, candidateVersion, repositoryRoot, feed, shell, packages, manifestSha256);
             candidate.PopulateIsolatedDependencyCache();
             return candidate;
         }
@@ -178,6 +241,8 @@ public sealed class CheckpointBReleaseGateTests
                     Assert.That(Sha256(packagePath), Has.Length.EqualTo(64));
                 });
             }
+
+            Assert.That(_packages.Select(package => package.Id), Is.EqualTo(_packageIds));
 
             using ZipArchive core = ZipFile.OpenRead(PackagePath("ArchLinterNet.Core"));
             Assert.That(ReadEntry(core, "ArchLinterNet.Core.nuspec"), Does.Contain("ArchLinterNet.CEL"));
@@ -258,12 +323,22 @@ public sealed class CheckpointBReleaseGateTests
                 string policyPath = Path.Combine(AppContext.BaseDirectory, "checkpoint-b-policy.yml");
                 File.WriteAllText(policyPath, "version: 1\\nname: Synthetic Checkpoint B cancellation consumer\\n\\nlayers:\\n  consumer:\\n    namespace: CheckpointB.Consumer\\n\\nanalysis:\\n  target_assemblies: [CheckpointBConsumer]\\n");
                 using var cancellation = new CancellationTokenSource();
+                using var enteredValidation = new ManualResetEventSlim();
+                var builder = new ArchitectureValidationBuilder(policyPath)
+                    .WithCancellation(cancellation.Token);
+                Task task = Task.Run(() =>
+                {
+                    enteredValidation.Set();
+                    _ = builder.ValidateStrict();
+                });
+                if (!enteredValidation.Wait(TimeSpan.FromSeconds(10)))
+                {
+                    return 2;
+                }
                 cancellation.Cancel();
                 try
                 {
-                    _ = new ArchitectureValidationBuilder(policyPath)
-                        .WithCancellation(cancellation.Token)
-                        .ValidateStrict();
+                    task.GetAwaiter().GetResult();
                     return 1;
                 }
                 catch (OperationCanceledException)
@@ -275,6 +350,14 @@ public sealed class CheckpointBReleaseGateTests
 
             CommandResult restore = RunIsolatedDotnet(consumerDirectory, "restore", "--configfile", "NuGet.Config", "--no-cache");
             CommandResult result = RunIsolatedDotnet(consumerDirectory, "run", "--no-restore");
+            string assemblyLocation = result.StandardOutput.Split(Environment.NewLine)
+                .Single(line => line.EndsWith("ArchLinterNet.Testing.dll", StringComparison.OrdinalIgnoreCase));
+            using ZipArchive testingPackage = ZipFile.OpenRead(PackagePath("ArchLinterNet.Testing"));
+            ZipArchiveEntry packageAssembly = testingPackage.Entries.Single(entry =>
+                entry.FullName.EndsWith("/ArchLinterNet.Testing.dll", StringComparison.OrdinalIgnoreCase));
+            using Stream packageAssemblyStream = packageAssembly.Open();
+            string packageAssemblySha256 = Convert.ToHexStringLower(SHA256.HashData(packageAssemblyStream));
+            string assets = File.ReadAllText(Path.Combine(consumerDirectory, "obj", "project.assets.json"));
             Assert.Multiple(() =>
             {
                 Assert.That(restore.ExitCode, Is.EqualTo(0), restore.CombinedOutput);
@@ -283,24 +366,28 @@ public sealed class CheckpointBReleaseGateTests
                 Assert.That(result.StandardOutput, Does.Contain("cancelled"));
                 Assert.That(result.StandardOutput, Does.Not.Contain(_repositoryRoot));
                 Assert.That(result.StandardOutput, Does.Contain(Path.Combine(_root, "nuget-packages")));
+                Assert.That(assets, Does.Contain($"ArchLinterNet.Testing/{_candidateVersion}"));
+                Assert.That(Sha256(assemblyLocation), Is.EqualTo(packageAssemblySha256));
+                Assert.That(result.StandardOutput, Does.Not.Contain("successful"));
             });
+        }
+
+        public IReadOnlyList<CheckpointScenarioResult> ShellScenarios()
+        {
+            return _shell switch
+            {
+                "bash" or "zsh" =>
+                [Passed("posix-entrypoint"), new CheckpointScenarioResult("powershell-entrypoint", "not_applicable", "PowerShell is exercised by the Windows platform job.")],
+                "pwsh" =>
+                [Passed("powershell-entrypoint"), new CheckpointScenarioResult("posix-entrypoint", "not_applicable", "POSIX shells are exercised by Linux and macOS platform jobs.")],
+                _ => throw new AssertionException($"Unsupported Checkpoint B shell adapter '{_shell}'."),
+            };
         }
 
         public CommandResult RunTool(string workingDirectory, params string[] arguments)
         {
-            var startInfo = new ProcessStartInfo(ToolPath())
-            {
-                RedirectStandardOutput = true,
-                RedirectStandardError = true,
-                UseShellExecute = false,
-                WorkingDirectory = workingDirectory,
-            };
+            ProcessStartInfo startInfo = CreateShellStartInfo(workingDirectory, arguments);
             startInfo.Environment["DOTNET_CLI_DISABLE_COLOR"] = "1";
-            foreach (string argument in arguments)
-            {
-                startInfo.ArgumentList.Add(argument);
-            }
-
             return Run(startInfo);
         }
 
@@ -312,7 +399,7 @@ public sealed class CheckpointBReleaseGateTests
             }
         }
 
-        public void WriteEvidence(IReadOnlyList<string> scenarios)
+        public void WriteEvidence(IReadOnlyList<CheckpointScenarioResult> scenarios)
         {
             string? directory = Environment.GetEnvironmentVariable("CHECKPOINT_B_EVIDENCE_DIRECTORY");
             if (string.IsNullOrWhiteSpace(directory))
@@ -323,6 +410,7 @@ public sealed class CheckpointBReleaseGateTests
             Directory.CreateDirectory(directory);
             var evidence = new
             {
+                schema = "checkpoint-b-platform-evidence/v1",
                 checkpoint = "B",
                 result = "passed",
                 candidate_version = _candidateVersion,
@@ -331,18 +419,18 @@ public sealed class CheckpointBReleaseGateTests
                 platform = System.Runtime.InteropServices.RuntimeInformation.OSDescription,
                 runtime = System.Runtime.InteropServices.RuntimeInformation.FrameworkDescription,
                 architecture = System.Runtime.InteropServices.RuntimeInformation.ProcessArchitecture.ToString(),
-                shell = Environment.GetEnvironmentVariable("CHECKPOINT_B_SHELL") ?? "unknown",
+                shell = _shell,
                 synthetic_identities_only = true,
-                packages = _packageIds.Select(packageId => new
-                {
-                    id = packageId,
-                    version = _candidateVersion,
-                    sha256 = Sha256(PackagePath(packageId)),
-                }),
-                scenarios = scenarios.OrderBy(static scenario => scenario, StringComparer.Ordinal),
+                candidate_manifest_sha256 = _manifestSha256,
+                packages = _packages,
+                scenarios = scenarios.OrderBy(static scenario => scenario.Id, StringComparer.Ordinal),
             };
-            string fileName = $"checkpoint-b-{System.Runtime.InteropServices.RuntimeInformation.ProcessArchitecture.ToString().ToLowerInvariant()}-{Guid.NewGuid():N}.json";
-            File.WriteAllText(Path.Combine(directory, fileName), JsonSerializer.Serialize(evidence, new JsonSerializerOptions { WriteIndented = true }));
+            string fileName = "checkpoint-b-platform-evidence.json";
+            File.WriteAllText(Path.Combine(directory, fileName), JsonSerializer.Serialize(evidence, new JsonSerializerOptions
+            {
+                WriteIndented = true,
+                PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower,
+            }));
         }
 
         private CommandResult RunIsolatedDotnet(string workingDirectory, params string[] arguments)
@@ -403,18 +491,104 @@ public sealed class CheckpointBReleaseGateTests
             return path;
         }
 
-        private void Pack()
+        private ProcessStartInfo CreateShellStartInfo(string workingDirectory, IReadOnlyList<string> arguments)
         {
-            CommandResult result = RunDotnet(_repositoryRoot,
+            var startInfo = new ProcessStartInfo
+            {
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                UseShellExecute = false,
+                WorkingDirectory = workingDirectory,
+            };
+            if (_shell is "bash" or "zsh")
+            {
+                startInfo.FileName = _shell;
+                startInfo.ArgumentList.Add("-c");
+                startInfo.ArgumentList.Add("exec \"$@\"");
+                startInfo.ArgumentList.Add("checkpoint-b-shell-adapter");
+            }
+            else if (_shell == "pwsh")
+            {
+                startInfo.FileName = "pwsh";
+                startInfo.ArgumentList.Add("-NoProfile");
+                startInfo.ArgumentList.Add("-NonInteractive");
+                startInfo.ArgumentList.Add("-Command");
+                startInfo.ArgumentList.Add("& $args[0] @($args[1..($args.Length - 1)]); exit $LASTEXITCODE");
+            }
+            else
+            {
+                throw new AssertionException($"Unsupported Checkpoint B shell adapter '{_shell}'.");
+            }
+
+            startInfo.ArgumentList.Add(ToolPath());
+            foreach (string argument in arguments)
+            {
+                startInfo.ArgumentList.Add(argument);
+            }
+
+            return startInfo;
+        }
+
+        private static void Pack(string repositoryRoot, string feed, string candidateVersion)
+        {
+            CommandResult result = RunDotnet(repositoryRoot,
                 "pack", "ArchLinterNet.slnx",
                 "--configuration", "Release",
-                "--output", _feed,
+                "--output", feed,
                 "--no-restore",
-                $"-p:Version={_candidateVersion}",
-                $"-p:PackageVersion={_candidateVersion}",
+                $"-p:Version={candidateVersion}",
+                $"-p:PackageVersion={candidateVersion}",
                 "--nologo");
             Assert.That(result.ExitCode, Is.EqualTo(0), result.CombinedOutput);
         }
+
+        private static (IReadOnlyList<PackageEvidence> Packages, string ManifestSha256) LoadManifest(
+            string feed, string candidateVersion, bool createdLocally)
+        {
+            string? manifestPath = Environment.GetEnvironmentVariable("CHECKPOINT_B_PACKAGE_MANIFEST");
+            if (!createdLocally && string.IsNullOrWhiteSpace(manifestPath))
+            {
+                throw new InvalidOperationException("Checkpoint B requires CHECKPOINT_B_PACKAGE_MANIFEST for supplied packages.");
+            }
+
+            if (!string.IsNullOrWhiteSpace(manifestPath))
+            {
+                string path = Path.GetFullPath(manifestPath);
+                using JsonDocument document = JsonDocument.Parse(File.ReadAllText(path));
+                JsonElement root = document.RootElement;
+                Assert.That(root.GetProperty("schema").GetString(), Is.EqualTo("checkpoint-b-candidate-manifest/v1"));
+                Assert.That(root.GetProperty("version").GetString(), Is.EqualTo(candidateVersion));
+                PackageEvidence[] packages = root.GetProperty("packages").EnumerateArray()
+                    .Select(package => new PackageEvidence(
+                        package.GetProperty("id").GetString()!,
+                        package.GetProperty("version").GetString()!,
+                        package.GetProperty("file").GetString()!,
+                        package.GetProperty("size").GetInt64(),
+                        package.GetProperty("sha256").GetString()!))
+                    .ToArray();
+                foreach (PackageEvidence package in packages)
+                {
+                    string packagePath = Path.Combine(feed, package.File);
+                    Assert.Multiple(() =>
+                    {
+                        Assert.That(new FileInfo(packagePath).Length, Is.EqualTo(package.Size), package.File);
+                        Assert.That(Sha256(packagePath), Is.EqualTo(package.Sha256), package.File);
+                    });
+                }
+
+                return (packages, Sha256(path));
+            }
+
+            PackageEvidence[] localPackages = _packageIds.Select(packageId =>
+            {
+                string path = Path.Combine(feed, $"{packageId}.{candidateVersion}.nupkg");
+                return new PackageEvidence(packageId, candidateVersion, Path.GetFileName(path), new FileInfo(path).Length, Sha256(path));
+            }).ToArray();
+            string localManifest = JsonSerializer.Serialize(localPackages);
+            return (localPackages, Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(localManifest))));
+        }
+
+        private static string NativeShell() => OperatingSystem.IsWindows() ? "pwsh" : "bash";
 
         private string PackagePath(string packageId)
         {
@@ -471,4 +645,8 @@ public sealed class CheckpointBReleaseGateTests
     {
         public string CombinedOutput => $"stdout:{Environment.NewLine}{StandardOutput}{Environment.NewLine}stderr:{Environment.NewLine}{StandardError}";
     }
+
+    private sealed record PackageEvidence(string Id, string Version, string File, long Size, string Sha256);
+
+    private sealed record CheckpointScenarioResult(string Id, string Result, string? Reason);
 }
