@@ -627,7 +627,10 @@ public sealed class CheckpointBReleaseGateTests
                 startInfo.ArgumentList.Add("-NoProfile");
                 startInfo.ArgumentList.Add("-NonInteractive");
                 startInfo.ArgumentList.Add("-Command");
-                startInfo.ArgumentList.Add("& $args[0] @($args[1..($args.Length - 1)]); exit $LASTEXITCODE");
+                string command = string.Join(" ", new[] { ToolPath() }.Concat(arguments)
+                    .Select(value => $"'{value.Replace("'", "''", StringComparison.Ordinal)}'"));
+                startInfo.ArgumentList.Add($"& {command}; exit $LASTEXITCODE");
+                return startInfo;
             }
             else
             {
