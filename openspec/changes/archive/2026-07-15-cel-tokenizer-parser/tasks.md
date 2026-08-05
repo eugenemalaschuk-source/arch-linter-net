@@ -54,5 +54,5 @@
 
 ## 7. Validation
 
-- [x] 7.1 `rtk make fmt`
-- [x] 7.2 `rtk make acceptance`
+- [x] 7.1 `make fmt`
+- [x] 7.2 `make acceptance`

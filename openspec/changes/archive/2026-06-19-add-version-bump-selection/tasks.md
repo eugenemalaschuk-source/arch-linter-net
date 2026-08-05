@@ -59,5 +59,5 @@
 ## 5. Validation
 
 - [x] 5.1 Run tests: `uv run python -m unittest discover -s tests/release`
-- [x] 5.2 Run `rtk make acceptance` to confirm no regressions
+- [x] 5.2 Run `make acceptance` to confirm no regressions
 - [x] 5.3 Review all changes for correctness: test coverage, workflow YAML syntax

@@ -28,7 +28,7 @@
 ## 5. Architecture governance
 
 - [x] 5.1 Confirm `architecture/dependencies.arch.yml` already restricts `Microsoft.Extensions.DependencyInjection` imports to `ArchLinterNet.Core.Composition` (added in the prior composition-root change) and that no new handler/registry code violates it.
-- [x] 5.2 Run `rtk make lint-architecture` and resolve any new findings.
+- [x] 5.2 Run `make lint-architecture` and resolve any new findings.
 
 ## 6. Tests
 
@@ -39,5 +39,5 @@
 
 ## 7. Validation
 
-- [x] 7.1 Run `rtk make fmt`.
-- [x] 7.2 Run `rtk task acceptance:fresh` (or `rtk make acceptance` if no `task` CLI is available) and fix failures.
+- [x] 7.1 Run `make fmt`.
+- [x] 7.2 Run `task acceptance:fresh` (or `make acceptance` if no `task` CLI is available) and fix failures.

@@ -14,4 +14,4 @@
       found during this pass.
 - [x] Update `cel-profile-v1` spec.
 - [x] Update the corpus mining manifest.
-- [x] Run `rtk make fmt` and `rtk make acceptance`.
+- [x] Run `make fmt` and `make acceptance`.

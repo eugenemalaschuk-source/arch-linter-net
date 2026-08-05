@@ -47,7 +47,7 @@
 
 ## 8. Validation and documentation
 
-- [x] 8.1 Run `rtk make fmt` and inspect formatting changes.
-- [x] 8.2 Run `rtk make acceptance` (lint + full test suite); fixed a self-architecture layer-boundary violation (`BuildState` importing `Execution` — resolved by introducing `BuildStateResolvedAssemblies` instead of reusing `Execution.ResolutionResult`), an exhaustive layer-template test fixture gap, a `code-size` threshold breach (split the `FormatResultForCiArtifacts` interface overload into the `BuildStatePreflight` partial), and two behavioral regressions in `analysis.target_assemblies`-only policies (preflight now explicitly does not apply to that mode — see the new "preflight applies to project-graph-driven resolution" requirement).
+- [x] 8.1 Run `make fmt` and inspect formatting changes.
+- [x] 8.2 Run `make acceptance` (lint + full test suite); fixed a self-architecture layer-boundary violation (`BuildState` importing `Execution` — resolved by introducing `BuildStateResolvedAssemblies` instead of reusing `Execution.ResolutionResult`), an exhaustive layer-template test fixture gap, a `code-size` threshold breach (split the `FormatResultForCiArtifacts` interface overload into the `BuildStatePreflight` partial), and two behavioral regressions in `analysis.target_assemblies`-only policies (preflight now explicitly does not apply to that mode — see the new "preflight applies to project-graph-driven resolution" requirement).
 - [x] 8.3 CLI `--help` text documents `--ensure-built`/`--no-restore`/`--configuration`/`--framework` (this repository's CLI reference is the in-tool help text; no separate `docs/` reference page exists for other `validate` flags either).
 - [x] 8.4 Synchronize `openspec/specs/analysis-build-state-preflight/spec.md` with actual implemented behavior; run `openspec validate --all`; run `openspec archive analysis-build-state-preflight`.

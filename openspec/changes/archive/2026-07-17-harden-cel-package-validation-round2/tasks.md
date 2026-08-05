@@ -9,9 +9,9 @@
 
 ## 3. Validation
 
-- [x] 3.1 Run `rtk make fmt`
-- [x] 3.2 Run `rtk make acceptance`
-- [x] 3.3 Run `rtk make lint-docs`
+- [x] 3.1 Run `make fmt`
+- [x] 3.2 Run `make acceptance`
+- [x] 3.3 Run `make lint-docs`
 
 ## 4. Spec synchronization and archive
 

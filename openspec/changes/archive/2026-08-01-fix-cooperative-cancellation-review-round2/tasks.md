@@ -33,4 +33,4 @@
 ## 5. Validation
 
 - [x] 5.1 Add deterministic regression tests for each fixed boundary.
-- [x] 5.2 Run `rtk make test` (Core.Tests and Cli.Tests) and `openspec validate --all`.
+- [x] 5.2 Run `make test` (Core.Tests and Cli.Tests) and `openspec validate --all`.

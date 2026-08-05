@@ -65,7 +65,7 @@ public sealed class CelBenchmarksProjectDependencyTests
         // the raw "..\..\src\ArchLinterNet.CEL\ArchLinterNet.CEL.csproj" straight through silently
         // produces a bogus, non-existent path on Linux/macOS CI runners. Normalize both '\' and '/'
         // to the current platform's separator before combining, so this test resolves the same real
-        // file on every OS `rtk make acceptance` runs on.
+        // file on every OS `make acceptance` runs on.
         var normalizedReference = projectReferences[0]
             .Replace('\\', Path.DirectorySeparatorChar)
             .Replace('/', Path.DirectorySeparatorChar);
@@ -213,8 +213,8 @@ public sealed class CelBenchmarksProjectDependencyTests
         var assetsPath = Path.Combine(
             FindRepositoryRoot(), "benchmarks", "ArchLinterNet.CEL.Benchmarks", "obj", "project.assets.json");
         Assert.That(File.Exists(assetsPath), Is.True,
-            $"Expected a restored 'project.assets.json' at '{assetsPath}' — run 'rtk dotnet restore' " +
-            "(or 'rtk make restore') before running this test.");
+            $"Expected a restored 'project.assets.json' at '{assetsPath}' — run 'dotnet restore' " +
+            "(or 'make restore') before running this test.");
         return assetsPath;
     }
 

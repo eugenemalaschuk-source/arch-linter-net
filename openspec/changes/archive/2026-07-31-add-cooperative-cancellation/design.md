@@ -268,7 +268,7 @@ running a `dotnet build` (seconds at minimum) will ever notice.
   `IArchitectureAssemblyResolutionService` changes two `internal`/public interfaces other code may implement.
   → **Mitigation**: grep confirms `ArchitectureProjectDiscoveryService`/`ArchitectureAssemblyResolutionService`
   are the only implementations in the solution; default-parameter overloads are not viable on interface
-  methods, so this is a genuine (but contained, compiler-caught) signature change — `rtk make acceptance`
+  methods, so this is a genuine (but contained, compiler-caught) signature change — `make acceptance`
   will surface any missed call site immediately.
 - **[Trade-off]** No new `--timeout` CLI flag means a caller who wants a hard wall-clock limit must still
   wrap the process externally. Accepted as explicitly out of this issue's scope.
@@ -278,7 +278,7 @@ running a `dotnet build` (seconds at minimum) will ever notice.
 Not applicable in the deploy/rollback sense — this is a library/CLI feature addition with no data migration,
 no schema version bump, and no breaking change to any existing non-cancelled code path. Rollout is: implement,
 test (unit tests for each phase's cancellation behavior plus the existing `BuildStatePreflightTests`-style
-cancellation test extended to the new surfaces), validate via `rtk make acceptance`, ship in the next release
+cancellation test extended to the new surfaces), validate via `make acceptance`, ship in the next release
 following this repo's normal `manual-nuget-release`/`release-version-bump` process (unchanged by this issue).
 
 ## Open Questions (resolved during implementation)

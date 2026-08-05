@@ -19,23 +19,13 @@ Some developer tools are installed by repository scripts rather than by a manife
 
 | Tool | Reviewed version | Immutable input |
 |---|---:|---|
-| RTK | `v0.42.4` | release commit `8a7dd7e5570d7744d4b6508479a3674fe8c49286` |
 | OpenSpec | `1.6.0` | exact npm package version |
-
-RTK's Cargo fallbacks build the reviewed release commit. The Unix remote installer is loaded from that commit and receives the reviewed release version explicitly. The Windows fallback resolves the fixed release tag instead of the moving latest release.
 
 ## Upgrade procedure
 
 Manual bootstrap pins must be upgraded in a dedicated pull request:
 
 1. Review the upstream release notes, repository changes, and any security advisories.
-
-1. For RTK, select a reviewed release tag and the exact upstream commit referenced by that release. Verify that the commit's `Cargo.toml` version matches the intended release.
-
-1. Update `RTK_VERSION`/`RtkVersion` and `RTK_COMMIT`/`RtkCommit` together in:
-
-   - `tools/scripts/configure_rtk_unix.sh`;
-   - `tools/scripts/configure_rtk_windows.ps1`.
 
 1. For OpenSpec, verify the published package version against the upstream `package.json`, then update the exact version in:
 
@@ -47,12 +37,11 @@ Manual bootstrap pins must be upgraded in a dedicated pull request:
 1. Validate script syntax and the repository gates:
 
    ```bash
-   sh -n tools/scripts/configure_rtk_unix.sh
    bash -n tools/scripts/install_unix_tools.sh
-   rtk make acceptance
+   make acceptance
    ```
 
-   On Windows, parse the two PowerShell scripts and run `rtk make acceptance` before merging.
+   On Windows, parse the installer PowerShell script and run `make acceptance` before merging.
 
 1. Confirm the diff changes only the intended dependency pins and any required compatibility updates.
 

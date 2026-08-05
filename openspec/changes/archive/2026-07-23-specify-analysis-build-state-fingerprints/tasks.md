@@ -31,7 +31,7 @@
 
 ## 5. Validation and review
 
-- [ ] 5.1 Confirm `rtk openspec validate --all` in PR CI after archival.
+- [ ] 5.1 Confirm `openspec validate --all` in PR CI after archival.
 - [ ] 5.2 Confirm repository Markdown/docs validation in PR CI after archival.
 - [x] 5.3 Review the contract against issue #387 acceptance scenarios and the #355 Analysis/build-state slice.
 - [x] 5.4 Archive the change and publish the main capability spec in this PR as explicitly requested by the maintainer.

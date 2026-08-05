@@ -33,11 +33,11 @@
 
 ## 7. Validation
 
-- [x] 7.1 Run `rtk make restore` to pull new project into the restore graph
-- [x] 7.2 Run `rtk make fmt` and inspect formatting changes
-- [x] 7.3 Run `rtk make acceptance` and confirm all tests pass including self-policy
-- [x] 7.4 Run `rtk make pack` and inspect `nupkg/ArchLinterNet.Core.*.nupkg` `.nuspec` to confirm `ArchLinterNet.CEL` appears as a dependency
-- [x] 7.5 Run focused CEL tests: `rtk dotnet test tests/ArchLinterNet.CEL.Tests --no-restore`
+- [x] 7.1 Run `make restore` to pull new project into the restore graph
+- [x] 7.2 Run `make fmt` and inspect formatting changes
+- [x] 7.3 Run `make acceptance` and confirm all tests pass including self-policy
+- [x] 7.4 Run `make pack` and inspect `nupkg/ArchLinterNet.Core.*.nupkg` `.nuspec` to confirm `ArchLinterNet.CEL` appears as a dependency
+- [x] 7.5 Run focused CEL tests: `dotnet test tests/ArchLinterNet.CEL.Tests --no-restore`
 
 ## 8. Spec Synchronization and Archive
 

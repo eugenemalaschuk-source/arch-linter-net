@@ -47,5 +47,5 @@
 
 ## 7. Verification
 
-- [x] 7.1 Run `rtk make acceptance` (lint + all tests)
+- [x] 7.1 Run `make acceptance` (lint + all tests)
 - [x] 7.2 Fix any lint or test failures

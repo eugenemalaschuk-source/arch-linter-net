@@ -440,7 +440,7 @@ pipeline, context construction (stable-handle vs. name-based), compile-once/eval
 evaluation broken out by operator/built-in category, `CelCompilationKey` cache-identity behavior,
 concurrent reuse of one compiled predicate, and deterministic `BudgetExceeded`/`SchemaMismatch`
 diagnostic paths. See `benchmarks/ArchLinterNet.CEL.Benchmarks/README.md` for what each class
-measures and how to run it (`rtk make benchmark-cel`, optional — not part of `make acceptance`),
+measures and how to run it (`make benchmark-cel`, optional — not part of `make acceptance`),
 and `benchmarks/ArchLinterNet.CEL.Benchmarks/RESULTS.md` for the recorded baseline run (hardware,
 runtime, per-class numbers, and allocation findings). Results are inputs to #330's
 packaging/reconciliation pass and to #163's Core integration guidance, not a standing performance

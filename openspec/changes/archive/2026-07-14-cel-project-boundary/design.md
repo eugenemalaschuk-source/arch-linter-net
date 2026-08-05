@@ -41,7 +41,7 @@ Three contracts (`cel-must-not-depend-on-core`, `cel-must-not-depend-on-cli`, `c
 
 ### D4 — Package validation is shell-based, not a test fixture
 
-The acceptance criteria require inspecting the produced `.nuspec` to confirm Core declares a CEL dependency. This validation runs as `rtk make pack` followed by manual inspection of the `nupkg/` artifact, rather than as a new test fixture. A test fixture would require the pack step to run first, creating a fragile ordering dependency. The CI pack job already validates this.
+The acceptance criteria require inspecting the produced `.nuspec` to confirm Core declares a CEL dependency. This validation runs as `make pack` followed by manual inspection of the `nupkg/` artifact, rather than as a new test fixture. A test fixture would require the pack step to run first, creating a fragile ordering dependency. The CI pack job already validates this.
 
 *Alternative considered*: An NUnit test that unzips the `.nupkg` and asserts the dependency. Deferred — this is follow-up infrastructure under story #322.
 

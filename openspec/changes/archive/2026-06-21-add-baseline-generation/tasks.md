@@ -91,7 +91,7 @@
 - [x] 9.16 CLI integration — `baseline generate --config --output` produces valid file
 - [x] 9.17 CLI integration — `validate --baseline` consumes baseline and filters violations
 - [x] 9.18 CLI integration — unknown contract ID in baseline produces error exit code 2
-- [x] 9.19 Run full acceptance gate (`rtk make acceptance`) — no regressions
+- [x] 9.19 Run full acceptance gate (`make acceptance`) — no regressions
 
 ## 10. Documentation
 
@@ -105,5 +105,5 @@
 ## 11. Integration and Validation
 
 - [x] 11.1 Verify baseline generation against the project's own `architecture/dependencies.arch.yml` (test that self-validation passes with generated baseline)
-- [x] 11.2 Run `rtk make acceptance` — all lint and test targets pass
-- [x] 11.3 Run `rtk make lint-architecture` — self-architecture validation passes with generated baseline
+- [x] 11.2 Run `make acceptance` — all lint and test targets pass
+- [x] 11.3 Run `make lint-architecture` — self-architecture validation passes with generated baseline

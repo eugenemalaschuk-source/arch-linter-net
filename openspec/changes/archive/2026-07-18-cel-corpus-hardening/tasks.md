@@ -9,4 +9,4 @@
       (octal escapes, keyword casing, string-prefix/identifier disambiguation).
 - [x] Update `cel-profile-v1` spec to state the required rejection shape.
 - [x] Record the scenario manifest in `docs/internal/`.
-- [x] Run `rtk make fmt` and `rtk make acceptance`.
+- [x] Run `make fmt` and `make acceptance`.

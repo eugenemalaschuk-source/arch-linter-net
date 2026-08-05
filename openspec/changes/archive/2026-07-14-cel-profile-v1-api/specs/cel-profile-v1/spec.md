@@ -205,10 +205,10 @@ All public types, members, parameters, and XML doc comments in `ArchLinterNet.CE
 
 ### Requirement: Compile-time API shape tests pass under make acceptance
 
-`tests/ArchLinterNet.CEL.Tests/` SHALL contain `CelApiShapeTests.cs` verifying the builder chain types and result property accessibility, and `CelExternalConsumerSampleTests.cs` showing the complete happy-path interaction model using only `ArchLinterNet.CEL`. Both files SHALL compile and all tests SHALL pass under `rtk make acceptance`. Neither file SHALL contain a `using` directive for `ArchLinterNet.Core`.
+`tests/ArchLinterNet.CEL.Tests/` SHALL contain `CelApiShapeTests.cs` verifying the builder chain types and result property accessibility, and `CelExternalConsumerSampleTests.cs` showing the complete happy-path interaction model using only `ArchLinterNet.CEL`. Both files SHALL compile and all tests SHALL pass under `make acceptance`. Neither file SHALL contain a `using` directive for `ArchLinterNet.Core`.
 
 #### Scenario: API shape tests compile and pass
 
-- **WHEN** `rtk make acceptance` is run
+- **WHEN** `make acceptance` is run
 - **THEN** all tests in `CelApiShapeTests.cs` and `CelExternalConsumerSampleTests.cs` pass
 - **AND** the test assembly does not reference `ArchLinterNet.Core` for any test in those files

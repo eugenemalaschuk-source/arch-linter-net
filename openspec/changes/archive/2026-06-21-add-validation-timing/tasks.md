@@ -37,6 +37,6 @@
 
 ## 6. Final Verification
 
-- [x] 6.1 Run `rtk make acceptance` and confirm all tests pass
+- [x] 6.1 Run `make acceptance` and confirm all tests pass
 - [x] 6.2 Run `arch-linter-net --policy architecture/dependencies.arch.yml --strict --timings` and capture baseline timing for reference in #19
 - [x] 6.3 Run `arch-linter-net --policy architecture/dependencies.arch.yml --strict` without `--timings` and confirm output unchanged

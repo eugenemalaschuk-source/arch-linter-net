@@ -68,7 +68,7 @@
 
 ## 11. Validation
 
-- [x] 11.1 Run `rtk make restore` to verify all NuGet packages resolve
-- [x] 11.2 Run `rtk dotnet build ArchLinterNet.slnx` to verify the solution compiles with no errors (TreatWarningsAsErrors is on)
-- [x] 11.3 Run `rtk make test` to verify all tests pass
-- [x] 11.4 Run `rtk make lint` to verify code quality checks pass
+- [x] 11.1 Run `make restore` to verify all NuGet packages resolve
+- [x] 11.2 Run `dotnet build ArchLinterNet.slnx` to verify the solution compiles with no errors (TreatWarningsAsErrors is on)
+- [x] 11.3 Run `make test` to verify all tests pass
+- [x] 11.4 Run `make lint` to verify code quality checks pass

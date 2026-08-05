@@ -25,7 +25,7 @@
 
 ## 4. Validation
 
-- [ ] 4.1 Run `rtk openspec validate --all --strict`.
+- [ ] 4.1 Run `openspec validate --all --strict`.
 - [ ] 4.2 Run repository documentation/acceptance validation.
 - [x] 4.3 Perform the current-state cross-slice audit and record unresolved child-owned reconciliation.
 - [x] 4.4 Record that the complete Checkpoint B walkthrough and final repository-wide reconciliation remain required before closing #355.

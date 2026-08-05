@@ -22,7 +22,7 @@
 
 ## 5. Validation and sync
 
-- [ ] 5.1 Run `rtk make fmt`.
-- [ ] 5.2 Run `rtk task acceptance:fresh`.
-- [ ] 5.3 Sync the final spec text with the implementation, then run `rtk openspec archive add-namespace-coverage-contracts`.
-- [ ] 5.4 Run `rtk openspec validate --all`.
+- [ ] 5.1 Run `make fmt`.
+- [ ] 5.2 Run `task acceptance:fresh`.
+- [ ] 5.3 Sync the final spec text with the implementation, then run `openspec archive add-namespace-coverage-contracts`.
+- [ ] 5.4 Run `openspec validate --all`.

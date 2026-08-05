@@ -25,7 +25,7 @@ BUNDLE_OS := windows
 # for this project, so pin SHELL explicitly to a discovered Git Bash install — the recipes
 # throughout make/*.mk are plain POSIX shell that Git Bash (installed with Git for Windows,
 # already required to clone this repo) runs natively.
-# Override with `rtk make GIT_BASH=<path to bash.exe>` for a non-default Git for Windows install.
+# Override with `make GIT_BASH=<path to bash.exe>` for a non-default Git for Windows install.
 _empty :=
 _space := $(_empty) $(_empty)
 

@@ -32,7 +32,7 @@
 ## 4. Validation
 
 - [x] 4.1 Review both workflow files for separation: CI validates only, release workflow packs/publishes only manually.
-- [x] 4.2 Run `rtk make restore` if needed for no-restore targets.
-- [x] 4.3 Run `rtk make acceptance` and resolve any lint, architecture, formatting, or test failures caused by the change.
+- [x] 4.2 Run `make restore` if needed for no-restore targets.
+- [x] 4.3 Run `make acceptance` and resolve any lint, architecture, formatting, or test failures caused by the change.
 - [ ] 4.4 After merge, run the manual release workflow with `publish=false` and confirm versioned `.nupkg` artifacts upload successfully.
 - [ ] 4.5 After artifact inspection, run the manual release workflow with `publish=true` and confirm packages are available from NuGet.org and documentation is deployed to GitHub Pages.

@@ -42,7 +42,7 @@
 - [x] 6.6 Add diagnostic-shape tests: `Category == "binder"`, `profileId` parameter present, `identifier`/`expectedType`/`actualType` parameters present where applicable.
 - [x] 6.7 Update `CelEnvironmentParsingTests.cs`, `CelApiShapeTests.cs`, `CelExternalConsumerSampleTests.cs`, `CelInternalApiCoverageTests.cs` confirming `NotYetImplemented` is no longer returned for syntactically-and-semantically-valid input (repurposed every test that asserted the old blanket stub behavior for valid input).
 - [x] 6.8 Add a public-API-shape test asserting no `ArchLinterNet.CEL.Binding` type or bound-node type is publicly visible.
-- [x] 6.9 Run `rtk dotnet test tests/ArchLinterNet.CEL.Tests --no-restore` and fix failures.
+- [x] 6.9 Run `dotnet test tests/ArchLinterNet.CEL.Tests --no-restore` and fix failures.
 
 ## 7. Docs and spec sync
 
@@ -53,6 +53,6 @@
 
 ## 8. Validation and PR
 
-- [x] 8.1 Run `rtk make fmt` and inspect formatting changes.
-- [x] 8.2 Run `rtk make acceptance` (lint + full test suite) and fix any issue-related failures.
+- [x] 8.1 Run `make fmt` and inspect formatting changes.
+- [x] 8.2 Run `make acceptance` (lint + full test suite) and fix any issue-related failures.
 - [ ] 8.3 Open the pull request closing #326.

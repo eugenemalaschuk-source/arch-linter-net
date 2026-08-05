@@ -24,10 +24,10 @@
 
 ## 5. Validation
 
-- [x] 5.1 Run `rtk make fmt` and inspect formatting changes — required re-indenting embedded heredoc content in the new CI step to match the YAML block scalar's indentation (flush-left content broke YAML parsing)
-- [x] 5.2 Run `rtk make acceptance`
-- [x] 5.3 Run `rtk make pack` and manually inspect `nupkg/ArchLinterNet.CEL.*.nupkg` contents (README, XML doc, nuspec)
-- [x] 5.4 Run `rtk make lint-docs`
+- [x] 5.1 Run `make fmt` and inspect formatting changes — required re-indenting embedded heredoc content in the new CI step to match the YAML block scalar's indentation (flush-left content broke YAML parsing)
+- [x] 5.2 Run `make acceptance`
+- [x] 5.3 Run `make pack` and manually inspect `nupkg/ArchLinterNet.CEL.*.nupkg` contents (README, XML doc, nuspec)
+- [x] 5.4 Run `make lint-docs`
 
 ## 6. Spec synchronization and archive
 

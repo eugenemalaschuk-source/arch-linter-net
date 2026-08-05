@@ -106,7 +106,7 @@ The system SHALL provide a documented dictionary of every phase name and counter
 The system SHALL provide a repeatable benchmark harness, excluded from the default correctness test run, that exercises the declared pre-optimization scenario matrix against a synthetic large multi-host fixture at least ten times per scenario. Before computing statistics, it SHALL verify every priming and measured sample's expected `CompletionStatus`, CLI exit category, and `Output.OutputFailed` state. It SHALL report consistently bounded analysis-only time (excluding build/preflight and rendering/publication phases), output time (the documented rendering/staging/stream/commit phase set), and command-total time, with median and p95 for each per scenario. The resulting checked-in evidence SHALL retain each sample's complete raw profile (including processor time, measurements, output evidence, and deterministic counters) in `docs/internal/analysis-profile-pre-optimization-baseline-results.json`, alongside observed environment metadata, and is explicitly not presented as a universal or hardware-independent performance guarantee.
 
 #### Scenario: Benchmark harness is excluded from the correctness gate
-- **WHEN** `rtk make test` or `rtk make acceptance` runs
+- **WHEN** `make test` or `make acceptance` runs
 - **THEN** the benchmark harness does not execute as part of that run
 
 #### Scenario: Checked-in evidence discloses its environment and non-universality

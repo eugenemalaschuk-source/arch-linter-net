@@ -6,58 +6,37 @@
 - Solution file: `ArchLinterNet.slnx` (`.slnx` format, not `.sln`).
 - `TreatWarningsAsErrors` enabled globally in `Directory.Build.props`.
 
-## RTK — mandatory CLI prefix
-Every shell command MUST be prefixed with `rtk`:
-```
-rtk make acceptance
-rtk dotnet restore
-```
-
-RTK itself is bootstrapped the same way as the rest of the developer toolchain:
-- `Brewfile` includes `brew "rtk"` for macOS/Linux Homebrew installs.
-- `make bundle` runs the platform-specific `tools/scripts/configure_rtk_*` script.
-- `make rtk-init` re-runs only the RTK agent integration setup.
-
-If `rtk` is missing and therefore cannot prefix commands yet, run only the RTK bootstrap script directly, then restart the shell/session and return to the mandatory `rtk` prefix:
-```
-pwsh -NoProfile -ExecutionPolicy Bypass -File tools/scripts/configure_rtk_windows.ps1
-sh tools/scripts/configure_rtk_unix.sh
-```
-
-Bootstrap dependencies after RTK is available: `rtk brew bundle` (macOS) or `rtk make bundle`.
-Pinned bootstrap versions and their upgrade procedure are documented in `docs/internal/dependency-maintenance.md`.
-
 ## Key commands
 ```
-rtk make setup                # full bootstrap: bundle + restore + venv (run once)
-rtk make restore              # NuGet restore (required before any --no-restore target)
-rtk make fmt                  # dotnet format — auto-format all C# code
-rtk make lint                 # lint-code-size + lint-dotnet-format + lint-architecture
-rtk make lint-architecture    # strict self-architecture validation (via Core.Tests)
-rtk make lint-code-size       # file size lint (warn ≥500, error ≥800 lines)
-rtk make test                 # run all tests
-rtk make acceptance           # lint + all tests
-rtk make architecture-coverage-report  # full-solution coverage report (Markdown + JSON) on demand
+make setup                # full bootstrap: bundle + restore + venv (run once)
+make restore              # NuGet restore (required before any --no-restore target)
+make fmt                  # dotnet format — auto-format all C# code
+make lint                 # lint-code-size + lint-dotnet-format + lint-architecture
+make lint-architecture    # strict self-architecture validation (via Core.Tests)
+make lint-code-size       # file size lint (warn ≥500, error ≥800 lines)
+make test                 # run all tests
+make acceptance           # lint + all tests
+make architecture-coverage-report  # full-solution coverage report (Markdown + JSON) on demand
 ```
 All `dotnet test`/`dotnet format` targets use `--no-restore` — run `restore` first when adding/changing dependencies.
 
 Run a single test project:
 ```
-rtk dotnet test tests/ArchLinterNet.Core.Tests --no-restore
+dotnet test tests/ArchLinterNet.Core.Tests --no-restore
 ```
 
 Run the CLI directly:
 ```
-rtk dotnet run --project src/ArchLinterNet.Cli -- --policy architecture/dependencies.arch.yml --mode strict
+dotnet run --project src/ArchLinterNet.Cli -- --policy architecture/dependencies.arch.yml --mode strict
 ```
 
 ## Docs workflow
 ```
-rtk make venv                 # create Python virtual environment (one-time)
-rtk make docs-serve           # start local preview at http://127.0.0.1:8000
-rtk make docs-build           # build static site to site/
-rtk make fmt-docs             # auto-format markdown documentation
-rtk make lint-docs            # verify MkDocs documentation structure
+make venv                 # create Python virtual environment (one-time)
+make docs-serve           # start local preview at http://127.0.0.1:8000
+make docs-build           # build static site to site/
+make fmt-docs             # auto-format markdown documentation
+make lint-docs            # verify MkDocs documentation structure
 ```
 
 ## Windows developer setup
@@ -65,7 +44,7 @@ All `make` targets run natively on Windows via **Git Bash** — WSL is not requi
 
 - Prerequisite: [Git for Windows](https://git-scm.com/download/win) (already required to clone this repo), which installs Git Bash.
 - `make/paths.mk` pins `SHELL` to a discovered `bash.exe` from a standard Git for Windows install location, overriding whatever GNU Make would otherwise resolve from `PATH` (which can pick up the unrelated WSL `bash.exe` shim at `C:\Windows\System32\bash.exe` and fail if no WSL distro is registered).
-- If Git is installed in a non-default location, point at it explicitly: `rtk make GIT_BASH="D:/Git/bin/bash.exe" fmt`.
+- If Git is installed in a non-default location, point at it explicitly: `make GIT_BASH="D:/Git/bin/bash.exe" fmt`.
 - If `bash.exe` cannot be found at all, `make` fails immediately with an actionable error naming the fix, instead of failing deep inside a recipe with a WSL error.
 - macOS/Linux targets are unaffected — this Windows-only `SHELL` override only applies when `$(OS)` is `Windows_NT`; `BUNDLE_OS`/`bundle-unix`/the `Brewfile` flow are unchanged.
 

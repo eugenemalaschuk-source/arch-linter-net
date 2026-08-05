@@ -24,10 +24,6 @@ Execute these phases in order:
 
 Do not reorder or skip phases. Keep the user informed at meaningful phase boundaries and stop only for a real access, safety, source-of-truth, or environment blocker.
 
-## Command policy
-
-Every supported shell command must use the `rtk` prefix. Read the repository instructions first and inspect `rtk --help` when needed. Use a direct command only when RTK cannot perform the operation, and record the reason. Never report success without observing the command result.
-
 ## 1. Branch lifecycle
 
 Complete this phase before changing files.
@@ -101,9 +97,9 @@ Execute in order:
 
 1. Add or update relevant tests.
 1. Run focused tests when useful.
-1. Run `rtk make fmt`.
+1. Run `make fmt`.
 1. Inspect formatting changes.
-1. Run `rtk make acceptance`.
+1. Run `make acceptance`.
 1. Fix issue-related failures.
 1. Rerun validation until it passes.
 
@@ -130,8 +126,8 @@ Before opening the PR, verify:
 - the issue scope is complete;
 - the branch is issue-specific and is not `main`;
 - tests were updated where needed;
-- `rtk make fmt` passed;
-- `rtk make acceptance` passed;
+- `make fmt` passed;
+- `make acceptance` passed;
 - specs match implementation;
 - `opsx-archive` completed when applicable;
 - the diff contains no unrelated files, secrets, temporary files, or local artifacts.

@@ -54,7 +54,7 @@
 - [x] 6.11 Add test group: `ResolveContainingLayer` specificity ranking
 - [x] 6.12 Add test group: literal beats glob in tiebreaking
 - [x] 6.13 Add test group: diagnostics include pattern and concrete match
-- [x] 6.14 Run `rtk make acceptance` to verify no regressions
+- [x] 6.14 Run `make acceptance` to verify no regressions
 
 ## 7. Schema, docs, and samples
 
@@ -62,4 +62,4 @@
 - [x] 7.2 Add glob pattern example to architecture policy documentation
 - [x] 7.3 Add glob pattern sample to sample policy YAML
 - [x] 7.4 Update AI-facing policy-authoring guidance with glob constraints
-- [x] 7.5 Verify documentation builds with `rtk make docs-build`
+- [x] 7.5 Verify documentation builds with `make docs-build`

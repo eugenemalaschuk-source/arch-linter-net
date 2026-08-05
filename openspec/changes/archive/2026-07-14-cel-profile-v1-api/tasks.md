@@ -78,8 +78,8 @@
 
 ## 17. Validation
 
-- [x] 17.1 Run `rtk make fmt` and fix any formatting issues
-- [x] 17.2 Run `rtk make acceptance` and fix any failures
-- [x] 17.3 Run `rtk make lint-architecture` and verify no CEL → Core reverse dependency
+- [x] 17.1 Run `make fmt` and fix any formatting issues
+- [x] 17.2 Run `make acceptance` and fix any failures
+- [x] 17.3 Run `make lint-architecture` and verify no CEL → Core reverse dependency
 - [x] 17.4 Verify `InternalsVisibleTo` in `ArchLinterNet.CEL.csproj` does not include `ArchLinterNet.Core`
 - [x] 17.5 Verify `cel-engine-architecture.md` is not listed in `mkdocs.yml`

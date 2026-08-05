@@ -3,7 +3,6 @@
 ## Bootstrap & environment:
 ##   make setup                — full project bootstrap: bundle + restore + venv
 ##   make bundle               — install development tools for the current OS
-##   make rtk-init             — install/configure RTK without telemetry
 ##   make restore              — restore NuGet packages for all .NET projects
 ##   make venv                 — create local Python virtual environment via uv
 ##
