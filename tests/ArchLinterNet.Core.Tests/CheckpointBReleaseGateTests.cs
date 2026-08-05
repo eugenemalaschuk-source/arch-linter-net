@@ -331,28 +331,21 @@ public sealed class CheckpointBReleaseGateTests
                 string policyPath = Path.Combine(AppContext.BaseDirectory, "checkpoint-b-policy.yml");
                 File.WriteAllText(policyPath, "version: 1\\nname: Synthetic Checkpoint B cancellation consumer\\n\\nlayers:\\n  consumer:\\n    namespace: CheckpointB.Consumer\\n\\nanalysis:\\n  target_assemblies: [CheckpointBConsumer]\\n");
                 using var cancellation = new CancellationTokenSource();
-                using var enteredValidation = new ManualResetEventSlim();
-                using var releaseValidation = new ManualResetEventSlim();
+                string barrierPath = Path.Combine(AppContext.BaseDirectory, "checkpoint-b-testing-validation-entered");
+                Environment.SetEnvironmentVariable("ARCH_LINTER_TEST_VALIDATION_BARRIER", barrierPath);
                 string cachePath = Path.Combine(AppContext.BaseDirectory, "checkpoint-b-cancelled-cache");
                 var builder = new ArchitectureValidationBuilder(policyPath)
                     .WithCancellation(cancellation.Token)
-                    .WithCache(AnalysisCacheOptions.AtPath(cachePath))
-                    .WithValidationEntryBarrier(() =>
-                    {
-                        enteredValidation.Set();
-                        releaseValidation.Wait(TimeSpan.FromSeconds(10));
-                    });
+                    .WithCache(AnalysisCacheOptions.AtPath(cachePath));
                 Task task = Task.Run(() =>
                 {
-                    enteredValidation.Set();
                     _ = builder.ValidateStrict();
                 });
-                if (!enteredValidation.Wait(TimeSpan.FromSeconds(10)))
+                if (!SpinWait.SpinUntil(() => File.Exists(barrierPath), TimeSpan.FromSeconds(10)))
                 {
                     return 2;
                 }
                 cancellation.Cancel();
-                releaseValidation.Set();
                 try
                 {
                     task.GetAwaiter().GetResult();
@@ -439,33 +432,31 @@ public sealed class CheckpointBReleaseGateTests
 
             using AdoptionAcceptanceFixture fixture = AdoptionAcceptanceFixture.Create("small");
             fixture.Build();
-            string pipe = Path.Combine(fixture.Root, "checkpoint-b-cancellation-pipe.yml");
-            string policy = Path.Combine(fixture.Root, "checkpoint-b-cancellation-root.yml");
-            CreateFifo(pipe);
-            File.WriteAllText(policy, """
-                version: 1
-                name: Checkpoint B CLI cancellation
-                imports: [checkpoint-b-cancellation-pipe.yml]
-                analysis:
-                  target_assemblies: [Synthetic.Small]
-                  projects: [Synthetic.Small.csproj]
-                """);
+            string barrier = Path.Combine(fixture.Root, "checkpoint-b-validation-entered");
             string output = Path.Combine(fixture.Root, "cancelled-report.json");
             string cache = Path.Combine(fixture.Root, "cancelled-cache");
-            using Process process = StartTool(fixture.Root, "--policy", policy, "--strict", "--cache", cache,
-                "--report", $"json={output}");
-            Task<Stream> writer = Task.Run<Stream>(() => new FileStream(pipe, FileMode.Open, FileAccess.Write, FileShare.Read));
-            Assert.That(writer.Wait(TimeSpan.FromSeconds(15)), Is.True, "CLI did not enter policy import validation.");
-            using Stream ignoredWriter = writer.GetAwaiter().GetResult();
-            SendInterrupt(process.Id);
+            ProcessStartInfo startInfo = CreateShellStartInfo(fixture.Root,
+                ["--policy", fixture.PolicyPath, "--strict", "--ensure-built", "--cache", cache, "--report", $"json={output}"]);
+            startInfo.Environment["DOTNET_CLI_DISABLE_COLOR"] = "1";
+            startInfo.Environment["ARCH_LINTER_TEST_VALIDATION_BARRIER"] = barrier;
+            using Process process = Process.Start(startInfo) ?? throw new InvalidOperationException("Failed to start the CLI.");
+            Assert.That(SpinWait.SpinUntil(() => File.Exists(barrier), TimeSpan.FromSeconds(15)), Is.True,
+                "CLI did not enter validation before cancellation.");
+            SendTermination(process.Id);
+            bool exited = process.WaitForExit(15_000);
+            if (!exited)
+            {
+                process.Kill(entireProcessTree: true);
+                process.WaitForExit();
+            }
             string standardOutput = process.StandardOutput.ReadToEnd();
             string standardError = process.StandardError.ReadToEnd();
-            Assert.That(process.WaitForExit(15_000), Is.True, "Interrupted CLI did not exit.");
             string[] cacheFiles = Directory.Exists(cache)
                 ? Directory.EnumerateFiles(cache, "*", SearchOption.AllDirectories).ToArray()
                 : [];
             Assert.Multiple(() =>
             {
+                Assert.That(exited, Is.True, "Interrupted CLI did not exit.");
                 Assert.That(process.ExitCode, Is.EqualTo(2), $"stdout:{standardOutput}{Environment.NewLine}stderr:{standardError}");
                 Assert.That(standardOutput + standardError, Does.Contain("cancelled"));
                 Assert.That(File.Exists(output), Is.False, "Cancellation must not publish a final report.");
@@ -700,26 +691,14 @@ public sealed class CheckpointBReleaseGateTests
 
         private static string NativeShell() => OperatingSystem.IsWindows() ? "pwsh" : "bash";
 
-        private static void CreateFifo(string path)
-        {
-            CommandResult result = Run(new ProcessStartInfo("mkfifo")
-            {
-                RedirectStandardOutput = true,
-                RedirectStandardError = true,
-                UseShellExecute = false,
-                ArgumentList = { path },
-            });
-            Assert.That(result.ExitCode, Is.EqualTo(0), result.CombinedOutput);
-        }
-
-        private static void SendInterrupt(int processId)
+        private static void SendTermination(int processId)
         {
             CommandResult result = Run(new ProcessStartInfo("kill")
             {
                 RedirectStandardOutput = true,
                 RedirectStandardError = true,
                 UseShellExecute = false,
-                ArgumentList = { "-INT", processId.ToString(System.Globalization.CultureInfo.InvariantCulture) },
+                ArgumentList = { "-TERM", processId.ToString(System.Globalization.CultureInfo.InvariantCulture) },
             });
             Assert.That(result.ExitCode, Is.EqualTo(0), result.CombinedOutput);
         }

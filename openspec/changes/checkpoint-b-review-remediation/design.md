@@ -18,12 +18,12 @@ evidence value can turn an untested property into a release assertion.
 
 ## Decisions
 
-- The external Testing consumer uses a policy-import filesystem barrier: the
-  validator enters a blocking import read before cancellation is requested.
-  This proves cancellation after validation starts without a production hook.
-- CLI cancellation uses the same barrier in a child process and interrupts it
-  with its native cancellation signal; profile/output/cache postconditions are
-  then inspected from the caller.
+- Both the external Testing consumer and the CLI use a narrowly opt-in
+  validation test barrier. It creates a marker from inside snapshot evaluation,
+  before cache lookup or contract execution, then waits on the real
+  cancellation token; without its test-only environment variable it is inert.
+  The CLI child is interrupted with its native signal and its output/cache
+  postconditions are inspected from the caller.
 - Each oracle returns `CheckpointScenarioResult`; the test collects those
   values rather than manufacturing `Passed` entries in the coordinator.
 
