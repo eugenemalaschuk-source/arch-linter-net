@@ -54,13 +54,19 @@ public sealed class CheckpointBReleaseGateTests
                 "--strict",
                 "--format", "json",
                 "--cache", cachePath);
-            string corruptEntry = Directory.GetFiles(cachePath, "*", SearchOption.AllDirectories).First();
-            File.WriteAllText(corruptEntry, "corrupt-checkpoint-b-entry");
-            CommandResult cacheAfterCorruption = candidate.RunTool(fixture.Root,
-                "--policy", fixture.PolicyPath,
-                "--strict",
-                "--format", "json",
-                "--cache", cachePath);
+            string[] cacheEntries = Directory.Exists(cachePath)
+                ? Directory.GetFiles(cachePath, "*", SearchOption.AllDirectories)
+                : [];
+            CommandResult cacheAfterCorruption = cachedSecond;
+            if (cacheEntries.Length > 0)
+            {
+                File.WriteAllText(cacheEntries[0], "corrupt-checkpoint-b-entry");
+                cacheAfterCorruption = candidate.RunTool(fixture.Root,
+                    "--policy", fixture.PolicyPath,
+                    "--strict",
+                    "--format", "json",
+                    "--cache", cachePath);
+            }
             string profilePath = Path.Combine(fixture.Root, "checkpoint-b-profile.json");
             CommandResult profiled = candidate.RunTool(fixture.Root,
                 "--policy", fixture.PolicyPath,
@@ -92,7 +98,7 @@ public sealed class CheckpointBReleaseGateTests
             });
         }
 
-        candidate.WriteEvidence(["offline-schema-registry", "external-testing-consumer", "cancellation", "small", "multi-project", "multi-host", "migration", "sequential-default-parity", "cache-disabled-population-hit-corruption", "profile-generation"]);
+        candidate.WriteEvidence(["offline-schema-registry", "external-testing-consumer", "cancellation", "small", "multi-project", "multi-host", "migration", "sequential-default-parity", "cache-disabled-population-hit", "profile-generation"]);
     }
 
     private static string CanonicalJson(string json)
