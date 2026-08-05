@@ -67,11 +67,9 @@ jobs:
 
       - name: Restore
         run: make restore
-        shell: ${{ matrix.shell }}
 
       - name: Run packed-artifact Checkpoint B
         run: dotnet test tests/ArchLinterNet.Core.Tests --no-restore --filter FullyQualifiedName~CheckpointBReleaseGateTests
-        shell: ${{ matrix.shell }}
 
       - name: Upload Checkpoint B platform evidence
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0
