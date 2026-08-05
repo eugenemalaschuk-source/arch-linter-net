@@ -15,7 +15,7 @@ namespace ArchLinterNet.Core.Validation;
 // requested modes (strict/audit — coverage rides inside each mode via the strict_coverage/
 // audit_coverage families) can be evaluated from the same fact set. See
 // docs/internal/analysis-build-state-blueprint.md, "Snapshot ownership".
-public sealed class ArchitectureAnalysisSnapshot : IDisposable
+public sealed partial class ArchitectureAnalysisSnapshot : IDisposable
 {
     private const string ErrorSeverity = "error";
 
@@ -32,7 +32,13 @@ public sealed class ArchitectureAnalysisSnapshot : IDisposable
     private readonly IArchitectureContractHandlerRegistry _handlerRegistry;
     private readonly IReadOnlyCollection<string>? _requestedContractIds;
     private readonly AnalysisSnapshotCacheContext? _cacheContext;
-    private readonly AnalysisSessionProfilingCounters _profilingCounters;
+    private readonly CancellationToken _cancellationToken;
+    private AnalysisSessionProfilingCounters? _profilingCounters;
+    private readonly Func<ArchitectureRunnerSetup>? _materializeSetup;
+    private readonly IReadOnlyList<string> _preparedArtifactPaths;
+    private readonly IReadOnlyDictionary<string, string> _preparedArtifactContentDigests;
+    private readonly IReadOnlyList<string> _preparedProjectPaths;
+    private readonly bool _preparedArtifactClosureComplete;
     private readonly object _gate = new();
     private readonly Dictionary<string, ValidationOutcome> _evaluatedModes = new(StringComparer.Ordinal);
     private readonly Dictionary<string, AnalysisCachePopulation.PreparedAuthorization> _cacheAuthorizations =
@@ -44,7 +50,7 @@ public sealed class ArchitectureAnalysisSnapshot : IDisposable
 
     internal ArchitectureAnalysisSnapshot(
         ArchitectureContractDocument document,
-        ArchitectureRunnerSetup setup,
+        ArchitectureRunnerSetup? setup,
         BuildStatePreflightResult preflight,
         string unmatchedConfig,
         string policyConsistencyConfig,
@@ -57,11 +63,19 @@ public sealed class ArchitectureAnalysisSnapshot : IDisposable
         int projectGraphEvaluations,
         int assemblyLoads,
         IReadOnlyCollection<string>? requestedContractIds = null,
-        AnalysisSnapshotCacheContext? cacheContext = null)
+        AnalysisSnapshotCacheContext? cacheContext = null,
+        string? preparedRepositoryRoot = null,
+        IReadOnlyList<string>? preparedArtifactPaths = null,
+        IReadOnlyDictionary<string, string>? preparedArtifactContentDigests = null,
+        IReadOnlyList<string>? preparedProjectPaths = null,
+        bool preparedArtifactClosureComplete = true,
+        Func<ArchitectureRunnerSetup>? materializeSetup = null,
+        CancellationToken cancellationToken = default)
     {
         _document = document;
         _setup = setup;
-        _repositoryRoot = setup.RepositoryRoot;
+        _repositoryRoot = setup?.RepositoryRoot ?? preparedRepositoryRoot
+            ?? throw new ArgumentException("A prepared repository root is required when setup is lazy.", nameof(preparedRepositoryRoot));
         _preflight = preflight;
         _unmatchedConfig = unmatchedConfig;
         _policyConsistencyConfig = policyConsistencyConfig;
@@ -72,19 +86,29 @@ public sealed class ArchitectureAnalysisSnapshot : IDisposable
         _handlerRegistry = handlerRegistry;
         _requestedContractIds = requestedContractIds;
         _cacheContext = cacheContext;
-        _profilingCounters = setup.Runner.Session.Context.ProfilingCounters;
+        _cancellationToken = cancellationToken;
+        _profilingCounters = setup?.Runner.Session.Context.ProfilingCounters;
+        _materializeSetup = materializeSetup;
+        _preparedArtifactPaths = preparedArtifactPaths ?? Array.Empty<string>();
+        _preparedArtifactContentDigests = preparedArtifactContentDigests
+            ?? new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        _preparedProjectPaths = preparedProjectPaths ?? Array.Empty<string>();
+        _preparedArtifactClosureComplete = preparedArtifactClosureComplete
+            && (setup is null || setup.Runner.Session.Context.SelectedAssemblyArtifactPaths.Count > 0);
 
         _counters = new ArchitectureAnalysisSnapshotCounters
         {
             PolicyCompositions = policyCompositions,
             ProjectGraphEvaluations = projectGraphEvaluations,
             AssemblyLoads = assemblyLoads,
-            DiscoveredProjectCount = setup.Runner.Session.Context.ProjectDiscovery?.DiscoveredProjects.Count ?? 0,
-            RetainedAssemblyCount = setup.Runner.Session.Context.TargetAssemblies.Count,
-            SelectedAssemblyCount = setup.Runner.Session.Context.TargetAssemblies.Count
-                + setup.Runner.Session.Context.MissingAssemblyNames.Count,
+            DiscoveredProjectCount = setup?.Runner.Session.Context.ProjectDiscovery?.DiscoveredProjects.Count
+                ?? _preparedProjectPaths.Count,
+            RetainedAssemblyCount = setup?.Runner.Session.Context.TargetAssemblies.Count ?? 0,
+            SelectedAssemblyCount = setup is null
+                ? _preparedArtifactPaths.Count
+                : setup.Runner.Session.Context.TargetAssemblies.Count + setup.Runner.Session.Context.MissingAssemblyNames.Count,
             SnapshotMaterializations = 1,
-            MaxParallelism = setup.Runner.Session.Context.MaxParallelism,
+            MaxParallelism = setup?.Runner.Session.Context.MaxParallelism ?? 0,
         };
     }
 
@@ -103,7 +127,8 @@ public sealed class ArchitectureAnalysisSnapshot : IDisposable
             {
                 Dictionary<string, int> contractFamilyResultCounts =
                     new(_counters.ContractFamilyResultCounts, StringComparer.Ordinal);
-                foreach ((string family, int count) in _profilingCounters.GetContractFamilyResultCounts())
+                foreach ((string family, int count) in _profilingCounters?.GetContractFamilyResultCounts()
+                         ?? new Dictionary<string, int>(StringComparer.Ordinal))
                 {
                     contractFamilyResultCounts.TryGetValue(family, out int current);
                     contractFamilyResultCounts[family] = current + count;
@@ -111,15 +136,15 @@ public sealed class ArchitectureAnalysisSnapshot : IDisposable
 
                 return _counters with
                 {
-                    FactIndexMaterializations = _profilingCounters.FactIndexMaterializations,
-                    SourceScanPasses = _profilingCounters.SourceScanPasses,
-                    SourceFilesScanned = _profilingCounters.SourceFilesScanned,
+                    FactIndexMaterializations = _profilingCounters?.FactIndexMaterializations ?? 0,
+                    SourceScanPasses = _profilingCounters?.SourceScanPasses ?? 0,
+                    SourceFilesScanned = _profilingCounters?.SourceFilesScanned ?? 0,
                     ContractFamilyResultCounts = contractFamilyResultCounts,
                     CacheLookups = _cacheContext is null ? null : _cacheStats.Snapshot(),
-                    ParallelScheduledWorkItems = _profilingCounters.ParallelScheduledWorkItems,
-                    ParallelCompletedWorkItems = _profilingCounters.ParallelCompletedWorkItems,
-                    ParallelObservedMaxConcurrency = _profilingCounters.ParallelObservedMaxConcurrency,
-                    ParallelMergeOperations = _profilingCounters.ParallelMergeOperations,
+                    ParallelScheduledWorkItems = _profilingCounters?.ParallelScheduledWorkItems ?? 0,
+                    ParallelCompletedWorkItems = _profilingCounters?.ParallelCompletedWorkItems ?? 0,
+                    ParallelObservedMaxConcurrency = _profilingCounters?.ParallelObservedMaxConcurrency ?? 0,
+                    ParallelMergeOperations = _profilingCounters?.ParallelMergeOperations ?? 0,
                 };
             }
         }
@@ -197,7 +222,11 @@ public sealed class ArchitectureAnalysisSnapshot : IDisposable
                 // per mode, keeps combined execution semantically equivalent to separate runs.
                 EnsureRequestedContractIdsAreKnownForMode(mode);
 
+                _cancellationToken.ThrowIfCancellationRequested();
                 ValidationOutcome? cachedOutcome = _preflight.Blocked ? null : TryEvaluateFromCache(mode, timing);
+                WorkSnapshot? workBefore = cachedOutcome is null && !_preflight.Blocked
+                    ? CaptureWorkSnapshot()
+                    : null;
                 ValidationOutcome outcome = cachedOutcome
                     ?? (_preflight.Blocked ? BuildBlockedOutcome() : EvaluateCore(mode, timing));
 
@@ -213,7 +242,8 @@ public sealed class ArchitectureAnalysisSnapshot : IDisposable
                         outcome,
                         authorization,
                         artifacts.Paths,
-                        artifacts.CapturedIdentities);
+                        artifacts.CapturedIdentities,
+                        CreateWorkProvenance(workBefore!.Value));
                 }
 
                 _evaluatedModes[mode] = outcome;
@@ -293,8 +323,7 @@ public sealed class ArchitectureAnalysisSnapshot : IDisposable
 
     private ValidationOutcome EvaluateCore(string mode, ValidationTiming? timing)
     {
-        IArchitectureContractRunner runner = _setup?.Runner
-            ?? throw new ObjectDisposedException(nameof(ArchitectureAnalysisSnapshot));
+        IArchitectureContractRunner runner = EnsureSetup().Runner;
         List<ArchitectureViolation> allViolations = new();
 
         // ArchitectureAnalysisSession.UnmatchedIgnoredViolations is one mutable list that every
@@ -331,13 +360,13 @@ public sealed class ArchitectureAnalysisSnapshot : IDisposable
         ArchitectureContractExecutionResult execution;
         using (timing?.Measure("contract_checks"))
         {
-            _profilingCounters.ResetContractFamilyResultCounts();
+            _profilingCounters?.ResetContractFamilyResultCounts();
             execution = _contractExecutor.Execute(
                 runner.Session, mode, _handlerRegistry, _includeAsmdefContracts, timing);
         }
 
         RecordContractFamilyResultCounts(execution.ContractFamilyResultCounts);
-        _profilingCounters.ResetContractFamilyResultCounts();
+        _profilingCounters?.ResetContractFamilyResultCounts();
 
         allViolations.AddRange(execution.Violations);
 
@@ -397,26 +426,8 @@ public sealed class ArchitectureAnalysisSnapshot : IDisposable
         };
     }
 
-    // The real cache-hit short-circuit (issue #365's deferred follow-up, now implemented): when
-    // this run configured a cache location, a hit here reconstructs a ValidationOutcome directly
-    // from the persisted AnalysisCacheOutcomeV1 and skips EvaluateCore entirely — configuration_check,
-    // policy_consistency_check, contract_checks (contract execution, including source scanning and
-    // coverage/classification computation) and post_processing never run for this mode. Policy
-    // composition, project discovery, and assembly loading already happened in
-    // ArchitectureValidationApplicationService.BuildSnapshot before this snapshot existed — they are
-    // not skipped, since #406 per-project manifest recomputation (the actual reuse-authorization
-    // proof) requires the discovered project set to already be known, and every requested mode
-    // shares that one snapshot's setup regardless of hit/miss. Returns null on Miss/Reject so the
-    // caller falls back to the real pipeline exactly as before this change.
-    // Finding #3: the session cancellation token is threaded through the entire lookup —
-    // ComputePolicyDigest (which hashes every policy file's content and can be a real I/O-bound
-    // operation for a large import graph) and TryLookup (which recomputes a #406 manifest per
-    // discovered project) both observe it, and a hit is never accepted once cancellation has been
-    // requested. Falling back to null here (rather than accepting a stale/racy hit) means Evaluate's
-    // caller proceeds into EvaluateCore, whose own ThrowIfCancellationRequested calls immediately
-    // surface the real OperationCanceledException — cancellation here never silently turns into an
-    // unexplained cache-derived result, it just defers to the same cancellation path recomputation
-    // already uses.
+    // A cache hit reconstructs its outcome without materializing the runner or executing contracts.
+    // Metadata planning still precedes lookup; the lazy runner materializes only after a miss.
     private ValidationOutcome? TryEvaluateFromCache(string mode, ValidationTiming? timing)
     {
         if (_cacheContext is not { } cache)
@@ -424,10 +435,25 @@ public sealed class ArchitectureAnalysisSnapshot : IDisposable
             return null;
         }
 
-        CancellationToken cancellationToken = _setup?.Runner.Session.Context.CancellationToken ?? default;
+        // Do not spend manifest-collection work on a plan that could not independently prove
+        // the current artifact closure. This is both fail-closed and observable to profile
+        // consumers as the same typed cache rejection used by other incomplete inputs.
+        if (!_preparedArtifactClosureComplete)
+        {
+            lock (_gate)
+            {
+                _cacheStats.RecordLookup(AnalysisCacheLookupResult.Reject(AnalysisCacheRejectReason.IneligibleBuildInput));
+            }
+
+            return null;
+        }
+
+        CancellationToken cancellationToken = _setup?.Runner.Session.Context.CancellationToken ?? _cancellationToken;
+        cancellationToken.ThrowIfCancellationRequested();
 
         ArchitectureAnalysisContext? context = _setup?.Runner.Session.Context;
-        bool cacheArtifactClosureComplete = context?.MaterializeCacheArtifactReferences(cancellationToken) ?? true;
+        bool cacheArtifactClosureComplete = context?.MaterializeCacheArtifactReferences(cancellationToken)
+            ?? _preparedArtifactClosureComplete;
 
         // Some contract families (for example project-metadata contracts) use the configured
         // project paths without materializing a Roslyn project.  Those inputs are nevertheless
@@ -490,6 +516,16 @@ public sealed class ArchitectureAnalysisSnapshot : IDisposable
             return null;
         }
 
+        AnalysisCacheWorkProvenanceV1 work = lookup.Entry.WorkProvenance;
+        _counters = _counters with
+        {
+            AvoidedAssemblyLoads = _counters.AvoidedAssemblyLoads + work.AssemblyLoads,
+            AvoidedFactIndexMaterializations = _counters.AvoidedFactIndexMaterializations + work.FactIndexMaterializations,
+            AvoidedSourceScanPasses = _counters.AvoidedSourceScanPasses + work.SourceScanPasses,
+            AvoidedContractExecutions = _counters.AvoidedContractExecutions + work.ContractExecutions,
+            AvoidedArtifactBytesLoaded = _counters.AvoidedArtifactBytesLoaded + work.ArtifactBytesLoaded,
+        };
+
         return AnalysisCacheOutcomeMapper.FromCacheOutcome(
             lookup.Entry.Outcome, _repositoryRoot, policyImportPaths, GetResolvedAssemblyPaths(),
             GetDiscoveredProjectPaths(), _document.SourceExpansion);
@@ -535,6 +571,22 @@ public sealed class ArchitectureAnalysisSnapshot : IDisposable
             paths.Add(assemblyPath);
             paths.Add(Path.ChangeExtension(assemblyPath, ".pdb"));
             paths.Add(BuildReceiptStore.ReceiptPathFor(assemblyPath));
+        }
+
+        // Keep the independently planned metadata closure in the authorization even after a
+        // miss materializes a narrower CLR-root set. Cache entries validate this current-run
+        // plan; they never get to select a replacement closure themselves.
+        foreach (string path in _preparedArtifactPaths)
+        {
+            string assemblyPath = Path.GetFullPath(path);
+            paths.Add(assemblyPath);
+            paths.Add(Path.ChangeExtension(assemblyPath, ".pdb"));
+            paths.Add(BuildReceiptStore.ReceiptPathFor(assemblyPath));
+        }
+
+        foreach ((string path, string digest) in _preparedArtifactContentDigests)
+        {
+            AddCaptured(path, digest);
         }
 
         return new CacheArtifactEvidence(paths.ToArray(), captures.Values.ToArray());
@@ -605,7 +657,7 @@ public sealed class ArchitectureAnalysisSnapshot : IDisposable
     }
 
     private IReadOnlyList<string> GetSelectedAssemblyArtifactPaths() =>
-        _setup?.Runner.Session.Context.SelectedAssemblyArtifactPaths ?? Array.Empty<string>();
+        _setup?.Runner.Session.Context.SelectedAssemblyArtifactPaths ?? _preparedArtifactPaths;
 
     private IReadOnlyList<ArchitectureLoadedAssemblyArtifact> GetLoadedAssemblyArtifacts() =>
         _setup?.Runner.Session.Context.LoadedAssemblyArtifacts ?? Array.Empty<ArchitectureLoadedAssemblyArtifact>();
@@ -627,7 +679,7 @@ public sealed class ArchitectureAnalysisSnapshot : IDisposable
 
     private IReadOnlyList<string> GetDiscoveredProjectPaths()
     {
-        return _setup?.Runner.Session.Context.DiscoveredProjectPaths ?? Array.Empty<string>();
+        return _setup?.Runner.Session.Context.DiscoveredProjectPaths ?? _preparedProjectPaths;
     }
 
     private IReadOnlyList<string> GetCacheProjectPaths()
@@ -711,5 +763,27 @@ public sealed class ArchitectureAnalysisSnapshot : IDisposable
             _setup = null;
             setup?.Runner.Session.Context.Dispose();
         }
+    }
+
+    private ArchitectureRunnerSetup EnsureSetup()
+    {
+        if (_setup is not null)
+        {
+            return _setup;
+        }
+
+        ArchitectureRunnerSetup setup = _materializeSetup?.Invoke()
+            ?? throw new ObjectDisposedException(nameof(ArchitectureAnalysisSnapshot));
+        _setup = setup;
+        _profilingCounters = setup.Runner.Session.Context.ProfilingCounters;
+        _counters = _counters with
+        {
+            AssemblyLoads = _counters.AssemblyLoads + setup.AssemblyLoads,
+            RetainedAssemblyCount = setup.Runner.Session.Context.TargetAssemblies.Count,
+            SelectedAssemblyCount = setup.Runner.Session.Context.TargetAssemblies.Count
+                + setup.Runner.Session.Context.MissingAssemblyNames.Count,
+            MaxParallelism = setup.Runner.Session.Context.MaxParallelism,
+        };
+        return setup;
     }
 }

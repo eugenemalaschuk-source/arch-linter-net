@@ -1,3 +1,6 @@
+using System.Reflection.Metadata;
+using System.Reflection.PortableExecutable;
+using ArchLinterNet.Core.BuildState;
 using ArchLinterNet.Core.Contracts;
 using ArchLinterNet.Core.Contracts.Abstractions;
 using ArchLinterNet.Core.Contracts.Families;
@@ -82,6 +85,91 @@ public sealed class ArchitectureRunnerSetupService(
             enableUnmatchedIgnoreTracking, timing, mode, loadPostBuildArtifacts: true, cancellationToken, maxParallelism);
     }
 
+    public ArchitectureRunnerPreparation PrepareRunner(
+        ArchitectureContractDocument document,
+        string policyPath,
+        string? conditionSetName = null,
+        IReadOnlyList<string>? preprocessorSymbols = null,
+        HashSet<string>? selectedContractIds = null,
+        string? mode = null,
+        CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        string repositoryRoot = repositoryRootResolver.ResolveFrom(policyPath);
+        IReadOnlyList<string>? symbols = ResolveSymbols(document, conditionSetName, preprocessorSymbols);
+        // Preparation must independently select the current project's output artifacts even when
+        // an authored target_assemblies list would let ordinary execution use probing. This is
+        // metadata-only and does not alter normal cache-disabled resolution precedence.
+        bool resolveAssemblyOutputs = true;
+        ProjectDiscoveryResult discovery = projectDiscoveryService.ResolveAndApply(
+            document, repositoryRoot, resolveAssemblyOutputs, cancellationToken);
+
+        IReadOnlyList<string> targetNames = document.Analysis.TargetAssemblies
+            .Where(static name => !string.IsNullOrWhiteSpace(name))
+            .Select(static name => name.Trim())
+            .Distinct(StringComparer.Ordinal)
+            .ToArray();
+        List<string> selectedPaths = new();
+        List<string> missing = new();
+        foreach (string name in targetNames)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (discovery.ResolvedAssemblyPaths.TryGetValue(name, out string? path) && File.Exists(path))
+            {
+                selectedPaths.Add(Path.GetFullPath(path));
+            }
+            else
+            {
+                // An ambient/default-context match would require CLR loading and is not valid
+                // cache authorization evidence. Treat it as incomplete instead.
+                missing.Add(name);
+            }
+        }
+
+        (IReadOnlyList<string> closure, bool closureComplete) = BuildMetadataReferenceClosure(
+            selectedPaths, discovery, cancellationToken);
+        IReadOnlyDictionary<string, string> capturedDigests = CaptureArtifactDigests(closure, cancellationToken);
+        return new ArchitectureRunnerPreparation(
+            repositoryRoot, symbols, discovery, resolveAssemblyOutputs,
+            closure, capturedDigests, missing, closureComplete);
+    }
+
+    public ArchitectureRunnerSetup MaterializePreparedRunner(
+        ArchitectureContractDocument document,
+        ArchitectureRunnerPreparation preparation,
+        HashSet<string>? selectedContractIds = null,
+        bool enableUnmatchedIgnoreTracking = true,
+        ValidationTiming? timing = null,
+        string? mode = null,
+        CancellationToken cancellationToken = default,
+        int? maxParallelism = null)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        if (!preparation.HasCompleteRootSelection)
+        {
+            throw new InvalidOperationException("Prepared artifact selection is incomplete and cannot be materialized.");
+        }
+
+        VerifyPreparedArtifacts(preparation, cancellationToken);
+
+        ResolutionResult resolution;
+        using (timing?.Measure("assembly_resolution", indent: 1))
+        {
+            resolution = assemblyResolutionService.ResolvePostBuild(
+                document, preparation.RepositoryRoot, preparation.ProjectDiscovery,
+                preparation.ResolveAssemblyOutputs, mode, selectedContractIds, cancellationToken,
+                preparation.CapturedArtifactContentDigests);
+        }
+
+        ArchitectureAnalysisContext context = CreateAnalysisContext(
+            preparation.RepositoryRoot, resolution, preparation.ProjectDiscovery,
+            ReferenceEquals(preparation.ProjectDiscovery, ProjectDiscoveryResult.Empty) ? null : preparation.ProjectDiscovery,
+            cancellationToken, maxParallelism);
+        ArchitectureContractRunner runner = CreateRunner(
+            context, document, selectedContractIds, enableUnmatchedIgnoreTracking, preparation.PreprocessorSymbols);
+        return new ArchitectureRunnerSetup(preparation.RepositoryRoot, runner) { AssemblyLoads = resolution.AssemblyLoads };
+    }
+
     private ArchitectureRunnerSetup BuildRunnerCore(
         ArchitectureContractDocument document,
         string policyPath,
@@ -101,15 +189,9 @@ public sealed class ArchitectureRunnerSetupService(
         using (timing?.Measure("root_resolution", indent: 1))
             repositoryRoot = repositoryRootResolver.ResolveFrom(policyPath);
 
-        IReadOnlyList<string>? symbols = preprocessorSymbols;
+        IReadOnlyList<string>? symbols;
         using (timing?.Measure("condition_set_resolution", indent: 1))
-        {
-            if (symbols == null &&
-                !conditionSetResolutionService.TryResolve(document, conditionSetName, out symbols, out string? resolveError))
-            {
-                throw new InvalidOperationException(resolveError);
-            }
-        }
+            symbols = ResolveSymbols(document, conditionSetName, preprocessorSymbols);
 
         cancellationToken.ThrowIfCancellationRequested();
 
@@ -146,6 +228,134 @@ public sealed class ArchitectureRunnerSetupService(
             runner = CreateRunner(context, document, selectedContractIds, enableUnmatchedIgnoreTracking, symbols);
 
             return new ArchitectureRunnerSetup(repositoryRoot, runner) { AssemblyLoads = resolution.AssemblyLoads };
+        }
+    }
+
+    private IReadOnlyList<string>? ResolveSymbols(
+        ArchitectureContractDocument document, string? conditionSetName, IReadOnlyList<string>? preprocessorSymbols)
+    {
+        if (preprocessorSymbols != null)
+        {
+            return preprocessorSymbols;
+        }
+
+        if (!conditionSetResolutionService.TryResolve(document, conditionSetName, out IReadOnlyList<string>? symbols,
+                out string? resolveError))
+        {
+            throw new InvalidOperationException(resolveError);
+        }
+
+        return symbols;
+    }
+
+    private static (IReadOnlyList<string> Paths, bool Complete) BuildMetadataReferenceClosure(
+        IReadOnlyCollection<string> roots, ProjectDiscoveryResult discovery, CancellationToken cancellationToken)
+    {
+        Dictionary<string, string> candidates = new(StringComparer.OrdinalIgnoreCase);
+        foreach (string path in roots.Concat(discovery.ResolvedAssemblyPaths.Values))
+        {
+            if (File.Exists(path))
+            {
+                candidates[Path.GetFileNameWithoutExtension(path)] = Path.GetFullPath(path);
+            }
+        }
+
+        if (AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES") is string trustedPlatformAssemblies)
+        {
+            foreach (string path in trustedPlatformAssemblies.Split(Path.PathSeparator, StringSplitOptions.RemoveEmptyEntries))
+            {
+                if (File.Exists(path))
+                {
+                    candidates.TryAdd(Path.GetFileNameWithoutExtension(path), Path.GetFullPath(path));
+                }
+            }
+        }
+
+        Queue<string> pending = new(roots.Select(Path.GetFullPath));
+        HashSet<string> closure = new(StringComparer.OrdinalIgnoreCase);
+        // A project-only metadata contract has no exact PE/PDB root inventory. Do not make it
+        // reusable merely because its reference walk is vacuously empty.
+        bool complete = roots.Count > 0;
+        while (pending.Count > 0)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            string path = pending.Dequeue();
+            if (!closure.Add(path))
+            {
+                continue;
+            }
+
+            try
+            {
+                using FileStream stream = File.OpenRead(path);
+                using PEReader reader = new(stream, PEStreamOptions.LeaveOpen);
+                if (!reader.HasMetadata)
+                {
+                    complete = false;
+                    continue;
+                }
+
+                MetadataReader metadata = reader.GetMetadataReader();
+                foreach (AssemblyReferenceHandle handle in metadata.AssemblyReferences)
+                {
+                    string name = metadata.GetString(metadata.GetAssemblyReference(handle).Name);
+                    if (string.IsNullOrWhiteSpace(name) || !candidates.TryGetValue(name, out string? referencePath))
+                    {
+                        complete = false;
+                        continue;
+                    }
+
+                    pending.Enqueue(referencePath);
+                }
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or BadImageFormatException)
+            {
+                complete = false;
+            }
+        }
+
+        return (closure.OrderBy(path => path, StringComparer.OrdinalIgnoreCase).ToArray(), complete);
+    }
+
+    private static IReadOnlyDictionary<string, string> CaptureArtifactDigests(
+        IReadOnlyList<string> artifactPaths,
+        CancellationToken cancellationToken)
+    {
+        Dictionary<string, string> digests = new(StringComparer.OrdinalIgnoreCase);
+        foreach (string artifactPath in artifactPaths)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            Add(artifactPath);
+            Add(Path.ChangeExtension(artifactPath, ".pdb"));
+            Add(BuildReceiptStore.ReceiptPathFor(artifactPath));
+        }
+
+        return digests;
+
+        void Add(string path)
+        {
+            string fullPath = Path.GetFullPath(path);
+            digests[fullPath] = File.Exists(fullPath)
+                ? BuildStateCanonicalHasher.ComputeContentDigest(fullPath, cancellationToken)
+                : "missing";
+        }
+    }
+
+    private static void VerifyPreparedArtifacts(
+        ArchitectureRunnerPreparation preparation,
+        CancellationToken cancellationToken)
+    {
+        foreach ((string path, string preparedDigest) in preparation.CapturedArtifactContentDigests)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            string currentDigest = File.Exists(path)
+                ? BuildStateCanonicalHasher.ComputeContentDigest(path, cancellationToken)
+                : "missing";
+            if (!string.Equals(preparedDigest, currentDigest, StringComparison.Ordinal))
+            {
+                throw new InvalidOperationException(
+                    $"Prepared artifact '{path}' changed after cache authorization; reprepare is required.");
+            }
         }
     }
 

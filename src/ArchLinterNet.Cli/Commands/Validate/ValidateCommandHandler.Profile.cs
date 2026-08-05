@@ -76,7 +76,7 @@ internal sealed partial class ValidateCommandHandler
             {
                 Measurements = measurements,
                 Output = state.Output,
-                Cache = BuildCacheProfileCounters(options, state.Cache),
+                Cache = BuildCacheProfileCounters(options, state.Cache, state.Counters),
             });
 
         WriteProfileToDestination(options.ProfileDestination, AnalysisProfileJsonWriter.Write(profile));

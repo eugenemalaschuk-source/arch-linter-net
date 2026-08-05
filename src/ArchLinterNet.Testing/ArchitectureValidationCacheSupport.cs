@@ -108,6 +108,11 @@ internal static class ArchitectureValidationCacheSupport
             CorruptionEvents = AnalysisCacheCorruptionClassifier.CountCorruptionEvents(rejectReasonCounts),
             CancelledBeforePublish = populationOutcome.PopulationAttempted
                 && populationOutcome.RejectReason == AnalysisCacheRejectReason.Cancelled ? 1 : 0,
+            AvoidedAssemblyLoads = counters.AvoidedAssemblyLoads,
+            AvoidedFactIndexMaterializations = counters.AvoidedFactIndexMaterializations,
+            AvoidedSourceScanPasses = counters.AvoidedSourceScanPasses,
+            AvoidedContractExecutions = counters.AvoidedContractExecutions,
+            AvoidedArtifactBytesLoaded = counters.AvoidedArtifactBytesLoaded,
             Mode = context.CacheOptions.ModeCategory,
             RejectReasonCounts = rejectReasonCounts,
         };
