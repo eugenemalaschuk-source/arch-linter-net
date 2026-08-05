@@ -11,6 +11,10 @@ Use `arch-linter-net schema list` offline to inspect the release registry, or `a
 
 Release-qualified editor IDs are immutable: `https://archlinternet.dev/schema/0.5.1/dependencies.arch.schema.json` for a root policy and `https://archlinternet.dev/schema/0.5.1/dependencies.arch.fragment.schema.json` for an imported fragment.
 
+For an installed release, prefer `schema list` and `schema print` over a
+repository URL. The [0.5.1 migration guide](../guides/migration-to-0-5-1.md#offline-schemas)
+shows the complete offline discovery workflow for every shipped format.
+
 ### Normalized finding v1 compatibility
 
 Machine consumers should validate each finding against the packaged

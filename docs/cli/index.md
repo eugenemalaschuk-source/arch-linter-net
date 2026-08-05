@@ -64,6 +64,11 @@ The command exits `0` for valid static policy/configuration and reports fact-dep
 | `--json` | Shortcut for `--format json` | |
 | `--report <format>=<destination>` | Repeatable. Route a format (`human`, `json`, `sarif`) to a destination (`stdout`, `stderr`, or a file path). Multiple `--report` flags are allowed. Format strings are computed once and dispatched to all requesting sinks. | |
 | `--timings` | Print phase-level timing report to stderr. | |
+| `--profile <destination>` | Write an opt-in `analysis-profile/v1` document to `stdout`, `stderr`, or a file. Independent of reports and timings. | |
+| `--cache <auto\|path>` | Opt into verified `analysis-cache/v1`. Omitted means no persistent cache. | |
+| `--max-parallelism <n>` | Bound assembly/fact scanning. `1` is the supported sequential mode. | `max(1, min(processor count, 4))` |
+| `--ensure-built` | Explicitly build and verify the selected project graph before validation. | |
+| `--no-restore` | Fail closed when restore is required instead of restoring; useful with `--ensure-built` in prepared environments. | |
 | `-h`, `--help` | Show help message. | |
 | `-v`, `--version` | Show version. | |
 
@@ -268,6 +273,8 @@ Safety rules worth knowing before wiring this into a pipeline:
 
 ## Related pages
 
+- [Adopt or upgrade to 0.5.1](../guides/migration-to-0-5-1.md)
+- [0.5.1 reference entrypoints](../guides/reference-entrypoints.md)
 - [Output formats](../usage/output-formats.md)
 - [Exit codes](../usage/exit-codes.md)
 - [Timings](../usage/timings.md)

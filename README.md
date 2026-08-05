@@ -17,7 +17,9 @@ ArchLinterNet turns architectural decisions into executable contracts: layered b
 
 The goal is not just to lint dependencies. ArchLinterNet makes architecture rules explicit, reviewable, enforceable, and safe to evolve as a normal part of development.
 
-> Status: early preview. The YAML policy surface is being stabilized for the first public `0.x` NuGet and .NET tool releases.
+> Status: 0.5.1 is the single public adoption-stabilization release target.
+> Checkpoint A is internal evidence only; the packed-artifact Checkpoint B is
+> the release authorization gate. See the [0.5.1 migration guide](docs/guides/migration-to-0-5-1.md).
 
 ## Why ArchLinterNet?
 
@@ -123,6 +125,8 @@ Public product documentation is published through MkDocs and GitHub Pages:
 - [Contract families](https://eugenemalaschuk-source.github.io/arch-linter-net/contracts/)
 - [Coverage contracts](https://eugenemalaschuk-source.github.io/arch-linter-net/contracts/coverage/)
 - [CI integration](https://eugenemalaschuk-source.github.io/arch-linter-net/guides/ci-integration/)
+- [Adopt or upgrade to 0.5.1](https://eugenemalaschuk-source.github.io/arch-linter-net/guides/migration-to-0-5-1/)
+- [0.5.1 reference entrypoints](https://eugenemalaschuk-source.github.io/arch-linter-net/guides/reference-entrypoints/)
 - [AI policy authoring](https://eugenemalaschuk-source.github.io/arch-linter-net/ai/)
 - [Supported capabilities and non-goals](https://eugenemalaschuk-source.github.io/arch-linter-net/policy-format/supported-capabilities/)
 

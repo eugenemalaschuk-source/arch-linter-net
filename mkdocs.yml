@@ -66,6 +66,8 @@ nav:
       - Coverage contracts: contracts/coverage.md
   - Guides:
       - Adopt in an existing repository: guides/adoption.md
+      - Adopt or upgrade to 0.5.1: guides/migration-to-0-5-1.md
+      - 0.5.1 reference entrypoints: guides/reference-entrypoints.md
       - Clean architecture policy: guides/clean-architecture.md
       - Unity boundaries: guides/unity-boundaries.md
       - Troubleshooting: guides/troubleshooting.md
@@ -78,6 +80,7 @@ nav:
       - Policy review checklist: ai/policy-review-checklist.md
   - Reference:
       - YAML schema: reference/yaml-schema.md
+      - 0.5.1 release notes: reference/release-notes-0-5-1.md
       - NuGet package metadata: reference/nuget-metadata.md
       - Release process: reference/release-process.md
 

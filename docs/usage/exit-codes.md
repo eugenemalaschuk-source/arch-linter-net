@@ -38,6 +38,12 @@ Exit code `2` means the run could not be trusted as normal validation. Examples:
 
 When a `--report` file sink fails, the validation result is still reported. The exit code is `2` with a typed status: `output-failed` if no file sinks wrote, or `partial-output` if some sinks succeeded and some failed. The error is written to stderr (human format) or as a JSON error with `output_status` field (json/sarif format).
 
+Cancellation also exits `2` with typed `cancelled` completion. A cancellation
+observed before full publication wins over a clean result; it must not be
+treated as a passed gate or a reusable partial cache entry. The [0.5.1 migration
+guide](../guides/migration-to-0-5-1.md) describes the corresponding report and
+artifact evidence.
+
 CI should fail closed on exit code `2`.
 
 ## Strict + audit CI pattern

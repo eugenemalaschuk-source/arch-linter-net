@@ -2,6 +2,10 @@
 
 This page summarizes what ArchLinterNet can and cannot validate for AI policy authors. The machine-readable version is `archlinternet.capabilities.json`.
 
+For release-qualified 0.5.1 adoption, migration, output, and execution guidance,
+use [Adopt or Upgrade to 0.5.1](../guides/migration-to-0-5-1.md) as the canonical
+user path. Checkpoint A is internal evidence, not a release authorization.
+
 ## Supported policy structure
 
 Each run uses one selected root policy; `architecture/arch.yml` is the

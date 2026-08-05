@@ -13,6 +13,14 @@ A completed public release is recorded in three places:
 
 The GitHub Release is the durable human-facing release record. The workflow does not commit generated changelog files to the repository.
 
+## 0.5.1 stabilization boundary
+
+0.5.1 is the one public adoption-stabilization release. Checkpoint A is
+internal evidence only; a green packed-artifact Checkpoint B is the only release
+authorization. Before publication, verify the [0.5.1 release notes](release-notes-0-5-1.md),
+[migration guide](../guides/migration-to-0-5-1.md), and installed-schema
+commands against the candidate packages.
+
 ## Versioning
 
 ArchLinterNet follows Semantic Versioning 2.0.
