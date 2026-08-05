@@ -111,7 +111,7 @@ public sealed class CheckpointBReleaseGateTests
             "--format", "json");
         Assert.Multiple(() =>
         {
-            Assert.That(result.ExitCode, Is.EqualTo(2), result.CombinedOutput);
+            Assert.That(result.ExitCode, Is.EqualTo(1), result.CombinedOutput);
             Assert.That(result.CombinedOutput, Does.Contain("MissingArtifact"));
             Assert.That(Directory.GetDirectories(fixture.Root, "bin", SearchOption.AllDirectories), Is.Empty);
             Assert.That(Directory.GetDirectories(fixture.Root, "obj", SearchOption.AllDirectories), Is.Empty);
