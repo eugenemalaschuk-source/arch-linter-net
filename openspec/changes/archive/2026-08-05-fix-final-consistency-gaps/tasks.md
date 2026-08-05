@@ -5,8 +5,8 @@
 
 ## 2. Evidence and issue wording
 
-- [ ] 2.1 Teach the post-optimization harness to capture the selected CLI package ID, version, and SHA-256 digest, then regenerate its JSON and Markdown evidence.
-- [ ] 2.2 Correct #354's stale queue wording and update the final audit with the completed reconciliation.
+- [x] 2.1 Teach the post-optimization harness to capture the selected CLI package ID, version, and SHA-256 digest, then regenerate its JSON and Markdown evidence.
+- [x] 2.2 Correct #354's stale queue wording and update the final audit with the completed reconciliation.
 
 ## 3. Verification and archival
 

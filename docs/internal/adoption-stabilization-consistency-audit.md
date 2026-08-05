@@ -7,9 +7,10 @@ the `adoption-stabilization-compatibility` specification with the implementation
 child capability specifications, schema registry, CLI and Testing surfaces,
 acceptance corpus, evidence, and public documentation on 2026-08-05.
 
-**Result: coherent for Checkpoint B.** All implementation/documentation children
-listed by #354 are closed, no contract contradiction was found, and #366 may run
-the packed-artifact release matrix. This audit is not Checkpoint B and does not
+**Result: coherent for Checkpoint B after the PR #431 review corrections.** All
+implementation/documentation children listed by #354 are closed, no unresolved
+contract contradiction remains, and #366 may run the packed-artifact release
+matrix once this PR is merged. This audit is not Checkpoint B and does not
 authorize publishing 0.5.1.
 
 OpenSpec is not otherwise applicable to #411: it changes no product behaviour,
@@ -48,7 +49,7 @@ parallelism tasks in #354 are closed. #403 supplies the shared synthetic corpus;
 | CLI, Testing, and generic CI | Equivalent load-bearing semantics | The shared acceptance corpus and migration/reference-entrypoint guidance use one policy/result model; provider-specific GitHub Actions content is documented as an example, not a product semantic dependency. |
 | Privacy and examples | Synthetic adopter-facing evidence only | Corpus fixture names, namespaces, policies, reports, and migration examples are synthetic. Repository-maintenance links remain product metadata, not adopter identities. |
 
-## Divergence corrected
+## Divergences corrected
 
 The audit found one repository-state divergence: the already merged cache-boundary
 and parallel-evidence implementation still had a completed active OpenSpec change.
@@ -56,6 +57,18 @@ It is now archived as
 `2026-08-05-fix-cache-boundary-and-parallel-evidence`; its nine requirement
 additions were synchronized into the six owning capability specifications.
 There are no remaining active changes or contradictory active capability claims.
+
+PR #431 review then identified four final consistency defects. This corrective
+change resolves them in their owners: `diagnostics-model` now has a substantive
+purpose with no archive placeholder; #354's authoritative queue identifies #373
+as completed rather than in progress; `analysis-snapshot` consistently defines
+metadata-only `CreateSnapshot` preparation, cache lookup before runner
+materialization, and `AssemblyLoads` as lazy post-miss loads; and the generated
+post-optimization JSON and Markdown record source, executed Debug binary, and
+the selected packed CLI package ID/version/SHA-256 separately. The correction is
+archived through `fix-final-consistency-gaps` and
+`reconcile-snapshot-lazy-wording`, so those owning specifications are the single
+source of truth.
 
 ## Migration and support-contract disposition
 
@@ -78,7 +91,8 @@ single 0.5.1 release contract rather than overclaiming a released support matrix
 
 - `rtk openspec archive fix-cache-boundary-and-parallel-evidence --yes` — passed;
   archived and synchronized the completed child change.
-- `rtk openspec validate --all` — passed: 113 specifications/changes.
+- `rtk openspec validate --all` — passed after archiving both completed
+  corrective changes.
 - The final implementation validation remains `rtk make fmt` followed by
   `rtk make acceptance`; those commands are run for this audit change before PR.
 

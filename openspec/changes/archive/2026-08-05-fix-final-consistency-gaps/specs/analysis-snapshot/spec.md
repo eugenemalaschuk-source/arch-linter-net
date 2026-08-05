@@ -3,11 +3,11 @@
 ### Requirement: Snapshot composes policy once and evaluates the project graph as few times as build state requires
 The system SHALL provide `ArchitectureAnalysisSnapshot`, constructed via `IArchitectureValidationApplicationService.CreateSnapshot(AnalysisSnapshotRequest, ValidationTiming?)`, which composes the effective policy exactly once for the snapshot's lifetime and runs build-state preflight exactly once. Ordinary and no-restore preparation SHALL evaluate the selected project graph and create one immutable metadata-only preparation plan containing the selected verified artifact paths and identity evidence; it SHALL NOT load target assemblies into a CLR context. Explicit `--ensure-built` preparation SHALL evaluate the project graph a second time after a successful build and replace the plan with one for the exact verified post-build output paths; it SHALL NOT choose a target through environment/policy probing precedence. The policy document composed at the start of `CreateSnapshot` SHALL be reused for that second pass rather than recomposed. `Evaluate` SHALL materialize a runner from the plan only after its cache lookup misses.
 
-#### Scenario: Creating a snapshot performs metadata-only setup once for ordinary preparation
+#### Scenario: Creating a snapshot performs setup once for ordinary preparation
 - **WHEN** `CreateSnapshot` is called for a policy and selected projects without `--ensure-built`
 - **THEN** policy composition, project discovery, and metadata-only artifact planning each execute exactly once, producing one immutable preparation plan retained by the snapshot without CLR assembly loading
 
-#### Scenario: Ensure-built reuses the composed policy across its second planning pass
+#### Scenario: Ensure-built reuses the composed policy across its second pass
 - **WHEN** `CreateSnapshot` is called with `--ensure-built` preparation and the build succeeds
 - **THEN** policy composition (policy load, baseline merge, severity validation, contract-ID selection) executes exactly once, while project discovery and metadata-only artifact planning execute a second time for the exact verified post-build outputs
 
@@ -41,6 +41,6 @@ The system SHALL expose `ArchitectureAnalysisSnapshotCounters` from `Architectur
 - **WHEN** a snapshot is created with `--ensure-built` preparation and the build succeeds, triggering a post-build reload
 - **THEN** `Counters.PolicyCompositions` equals `1` and `Counters.ProjectGraphEvaluations` equals `2`
 
-#### Scenario: Cache hits avoid assembly loads
+#### Scenario: Counters exclude assemblies that were already loaded
 - **WHEN** every evaluated mode is served by a verified cache hit and no runner is materialized
 - **THEN** `Counters.AssemblyLoads` equals `0` even though the snapshot retains a verified metadata-only artifact plan

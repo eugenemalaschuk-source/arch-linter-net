@@ -1,25 +1,30 @@
 # analysis-snapshot Specification
 
 ## Purpose
-Let one composed policy, one project-graph evaluation, and one assembly load serve every requested `strict`/`audit` validation view (coverage included, via the existing `strict_coverage`/`audit_coverage` families) for one session, instead of every mode independently repeating that setup — while keeping ordinary single-mode validation exactly as simple and behaviorally unchanged as it was before this capability existed.
+Let one composed policy and one project-graph preparation plan serve every
+requested `strict`/`audit` validation view (coverage included, via the existing
+`strict_coverage`/`audit_coverage` families), with zero CLR assembly loads for
+cache-only outcomes and at most one lazy runner materialization shared by
+cache-miss evaluations — while keeping ordinary single-mode validation exactly
+as simple and behaviorally unchanged as it was before this capability existed.
 ## Requirements
 ### Requirement: Snapshot composes policy once and evaluates the project graph as few times as build state requires
-The system SHALL provide `ArchitectureAnalysisSnapshot`, constructed via `IArchitectureValidationApplicationService.CreateSnapshot(AnalysisSnapshotRequest, ValidationTiming?)`, which composes the effective policy exactly once for the snapshot's lifetime and runs build-state preflight exactly once. Ordinary and no-restore preparation evaluate the selected project graph and resolve/load target assemblies exactly once. Explicit `--ensure-built` preparation SHALL evaluate the project graph and resolve/load target assemblies a second time after a successful build, loading every target from its exact verified post-build output path in an isolated scope; it SHALL NOT reuse a same-simple-name assembly already loaded in the process or choose a target through environment/policy probing precedence. The policy document composed at the start of `CreateSnapshot` SHALL be reused for that second pass rather than recomposed.
+The system SHALL provide `ArchitectureAnalysisSnapshot`, constructed via `IArchitectureValidationApplicationService.CreateSnapshot(AnalysisSnapshotRequest, ValidationTiming?)`, which composes the effective policy exactly once for the snapshot's lifetime and runs build-state preflight exactly once. Ordinary and no-restore preparation SHALL evaluate the selected project graph and create one immutable metadata-only preparation plan containing the selected verified artifact paths and identity evidence; it SHALL NOT load target assemblies into a CLR context. Explicit `--ensure-built` preparation SHALL evaluate the project graph a second time after a successful build and replace the plan with one for the exact verified post-build output paths; it SHALL NOT choose a target through environment/policy probing precedence. The policy document composed at the start of `CreateSnapshot` SHALL be reused for that second pass rather than recomposed. `Evaluate` SHALL materialize a runner from the plan only after its cache lookup misses.
 
 #### Scenario: Creating a snapshot performs setup once for ordinary preparation
 - **WHEN** `CreateSnapshot` is called for a policy and selected projects without `--ensure-built`
-- **THEN** policy composition, project discovery, and assembly resolution/load each execute exactly once, producing one `ArchitectureRunnerSetup` retained by the snapshot
+- **THEN** policy composition, project discovery, and metadata-only artifact planning each execute exactly once, producing one immutable preparation plan retained by the snapshot without CLR assembly loading
 
 #### Scenario: Ensure-built reuses the composed policy across its second pass
 - **WHEN** `CreateSnapshot` is called with `--ensure-built` preparation and the build succeeds
-- **THEN** policy composition (policy load, baseline merge, severity validation, contract-ID selection) executes exactly once, while project discovery and assembly resolution/load execute a second time from an isolated post-build loading scope that contains the newly built artifacts
+- **THEN** policy composition (policy load, baseline merge, severity validation, contract-ID selection) executes exactly once, while project discovery and metadata-only artifact planning execute a second time for the exact verified post-build outputs
 
 ### Requirement: One snapshot serves multiple mode evaluations
-The system SHALL let `ArchitectureAnalysisSnapshot.Evaluate(string mode, ValidationTiming?)` be called for `strict` and/or `audit` against the same snapshot, executing contract checks (including the `strict_coverage`/`audit_coverage` families) against the snapshot's one composed session without re-running policy composition, project discovery, or assembly resolution.
+The system SHALL let `ArchitectureAnalysisSnapshot.Evaluate(string mode, ValidationTiming?)` be called for `strict` and/or `audit` against the same immutable preparation plan without re-running policy composition, project discovery, or artifact planning. Each evaluation SHALL perform its cache lookup before runner/session materialization. Cache-only outcomes SHALL not create a session; when any evaluation misses, the snapshot SHALL materialize one runner/session and reuse it for later misses without re-running policy composition, project discovery, artifact planning, or target-assembly loading.
 
 #### Scenario: Strict and audit evaluated from one snapshot
 - **WHEN** a caller calls `Evaluate("strict")` followed by `Evaluate("audit")` on the same snapshot
-- **THEN** both calls read from the same `ArchitectureAnalysisSession`, and no new session, project discovery, or assembly load occurs between the two calls
+- **THEN** either call may return from cache without a session, and if either call misses, both miss-path evaluations use the one lazily materialized `ArchitectureAnalysisSession` without a second project discovery, artifact plan, or assembly load
 
 #### Scenario: Combined execution matches separate runs
 - **WHEN** `Evaluate("strict")` and `Evaluate("audit")` are called on one snapshot for a policy and target assemblies
@@ -102,7 +107,7 @@ The system SHALL let the CLI `validate` command's `--mode` option accept a comma
 
 #### Scenario: Requesting strict and audit together builds one snapshot
 - **WHEN** the CLI `validate` command runs with `--mode strict,audit`
-- **THEN** the command performs one policy composition, project discovery, and assembly load, evaluates both modes against the resulting snapshot, and reports both outcomes
+- **THEN** the command performs one policy composition and project discovery, evaluates both modes against one prepared snapshot, and materializes at most one runner only if an evaluated mode misses cache
 
 #### Scenario: Combined JSON output is one valid document
 - **WHEN** the CLI `validate` command runs with `--mode strict,audit --format json`
@@ -117,7 +122,7 @@ The system SHALL let the CLI `validate` command's `--mode` option accept a comma
 - **THEN** the command's behavior, output (including the single-document JSON/SARIF shape), and exit code are identical to before this change
 
 ### Requirement: Typed counters record actual composition and evaluation counts
-The system SHALL expose `ArchitectureAnalysisSnapshotCounters` from `ArchitectureAnalysisSnapshot.Counters`, recording the actual number of policy compositions, project-graph evaluations, and assembly loads performed for the snapshot, and the number of distinct modes evaluated so far. `AssemblyLoads` SHALL count only target-assembly load operations performed while creating the snapshot, not the number of assemblies retained in its final context; a target already loaded before snapshot creation contributes zero. `PolicyCompositions` SHALL always equal `1` (the policy document is never recomposed within one snapshot's lifetime, even across an `--ensure-built` reload). `ProjectGraphEvaluations` SHALL equal `1` for ordinary/no-restore preparation and SHALL equal `2` when `--ensure-built` preparation triggers a post-build reload — it SHALL NOT be hardcoded independently of how many passes actually ran.
+The system SHALL expose `ArchitectureAnalysisSnapshotCounters` from `ArchitectureAnalysisSnapshot.Counters`, recording the actual number of policy compositions, project-graph evaluations, and target-assembly load operations performed for the snapshot, and the number of distinct modes evaluated so far. `AssemblyLoads` SHALL count only target-assembly load operations performed while lazily materializing the runner after a cache miss, not assemblies retained by the metadata-only preparation plan; a snapshot served entirely by cache hits contributes zero. `PolicyCompositions` SHALL always equal `1` (the policy document is never recomposed within one snapshot's lifetime, even across an `--ensure-built` reload). `ProjectGraphEvaluations` SHALL equal `1` for ordinary/no-restore preparation and SHALL equal `2` when `--ensure-built` preparation triggers a post-build reload — it SHALL NOT be hardcoded independently of how many passes actually ran.
 
 #### Scenario: Counters reflect one composition and multiple mode evaluations
 - **WHEN** a snapshot created without `--ensure-built` has `Evaluate("strict")` and `Evaluate("audit")` both called
@@ -128,8 +133,8 @@ The system SHALL expose `ArchitectureAnalysisSnapshotCounters` from `Architectur
 - **THEN** `Counters.PolicyCompositions` equals `1` and `Counters.ProjectGraphEvaluations` equals `2`
 
 #### Scenario: Counters exclude assemblies that were already loaded
-- **WHEN** a target assembly was already loaded before snapshot creation and no target-assembly load operation occurs during setup
-- **THEN** `Counters.AssemblyLoads` equals `0` even though the snapshot retains that target assembly
+- **WHEN** every evaluated mode is served by a verified cache hit and no runner is materialized
+- **THEN** `Counters.AssemblyLoads` equals `0` even though the snapshot retains a verified metadata-only artifact plan
 
 ### Requirement: Snapshot defers runner materialization until a cache miss requires it
 The system SHALL construct a snapshot from an immutable preparation plan without CLR assembly loading. Each `Evaluate(mode)` SHALL perform that mode's cache lookup before runner/session materialization; a hit SHALL return without `BuildRunnerFor` or an assembly load context. The first miss SHALL materialize exactly one runner for the snapshot, and later misses SHALL reuse that runner while a hit in one mode SHALL not prevent evaluation of another mode.
@@ -148,4 +153,3 @@ The system SHALL dispose correctly before or after runner materialization and SH
 #### Scenario: Unmaterialized snapshot is disposed
 - **WHEN** a snapshot with only cache hits is disposed
 - **THEN** no assembly load scope is created and later evaluation throws `ObjectDisposedException`
-
