@@ -211,6 +211,8 @@ jobs:
         run: dotnet build ArchLinterNet.slnx --configuration Release --no-restore -p:Version="$PACKAGE_VERSION"
 
       - name: Acceptance
+        env:
+          CHECKPOINT_B_CANDIDATE_VERSION: ${{ env.PACKAGE_VERSION }}
         run: make acceptance
 
       - name: Prepare NuGet package release notes
