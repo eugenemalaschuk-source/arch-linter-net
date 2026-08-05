@@ -24,21 +24,21 @@ public sealed class CheckpointBReleaseGateTests
     {
         using CandidatePackageFeed candidate = CandidatePackageFeed.Create();
 
-        candidate.AssertPackageSet();
+        CheckpointScenarioResult packageProvenance = candidate.AssertPackageProvenance();
         candidate.InstallTool();
         candidate.AssertOfflineSchemaRegistry();
-        candidate.AssertExternalTestingConsumer();
+        CheckpointScenarioResult cancellation = candidate.AssertExternalTestingConsumer();
         AssertCleanCheckoutOracle(candidate);
 
         var scenarios = new List<CheckpointScenarioResult>
         {
-            Passed("packed-package-provenance"),
-            Passed("offline-schema-registry"),
-            Passed("external-testing-consumer"),
-            Passed("clean-checkout"),
-            Passed("generic-ci-neutral"),
-            Passed("documented-entrypoints"),
-            Passed("non-tty"),
+            packageProvenance,
+            candidate.AssertOfflineSchemaRegistry(),
+            cancellation,
+            AssertCleanCheckoutOracle(candidate),
+            candidate.AssertGenericCiNeutralInvocation(),
+            candidate.AssertDocumentedEntrypoint(),
+            candidate.AssertNonTtyInvocation(),
         };
         foreach (string fixtureId in new[] { "small", "multi-project", "multi-host", "migration" })
         {
@@ -81,7 +81,7 @@ public sealed class CheckpointBReleaseGateTests
         scenarios.Add(Passed("cache-miss-population-hit"));
         scenarios.Add(Passed("cache-corruption-recompute"));
         scenarios.AddRange(candidate.ShellScenarios());
-        scenarios.Add(Passed("in-flight-cancellation"));
+        scenarios.Add(candidate.AssertCliInFlightCancellation());
         candidate.WriteEvidence(scenarios);
     }
 
@@ -102,7 +102,7 @@ public sealed class CheckpointBReleaseGateTests
         });
     }
 
-    private static void AssertCleanCheckoutOracle(CandidatePackageFeed candidate)
+    private static CheckpointScenarioResult AssertCleanCheckoutOracle(CandidatePackageFeed candidate)
     {
         using AdoptionAcceptanceFixture fixture = AdoptionAcceptanceFixture.Create("clean-checkout");
         CommandResult result = candidate.RunTool(fixture.Root,
@@ -116,6 +116,7 @@ public sealed class CheckpointBReleaseGateTests
             Assert.That(Directory.GetDirectories(fixture.Root, "bin", SearchOption.AllDirectories), Is.Empty);
             Assert.That(Directory.GetDirectories(fixture.Root, "obj", SearchOption.AllDirectories), Is.Empty);
         });
+        return Passed("clean-checkout");
     }
 
     private static void AssertCacheLifecycleOracle(CandidatePackageFeed candidate)
@@ -222,7 +223,7 @@ public sealed class CheckpointBReleaseGateTests
             return candidate;
         }
 
-        public void AssertPackageSet()
+        public CheckpointScenarioResult AssertPackageProvenance()
         {
             string[] packagePaths = Directory.GetFiles(_feed, "*.nupkg")
                 .OrderBy(static path => path, StringComparer.Ordinal)
@@ -256,6 +257,8 @@ public sealed class CheckpointBReleaseGateTests
             {
                 Assert.That(core.GetEntry($"contentFiles/any/any/schema/0.5.1/{schema}"), Is.Not.Null, schema);
             }
+
+            return Passed("packed-package-provenance");
         }
 
         public void InstallTool()
@@ -272,7 +275,7 @@ public sealed class CheckpointBReleaseGateTests
             Assert.That(File.Exists(ToolPath()), Is.True, ToolPath());
         }
 
-        public void AssertOfflineSchemaRegistry()
+        public CheckpointScenarioResult AssertOfflineSchemaRegistry()
         {
             string offlineDirectory = Path.Combine(_root, "offline");
             Directory.CreateDirectory(offlineDirectory);
@@ -288,9 +291,10 @@ public sealed class CheckpointBReleaseGateTests
                 Assert.That(print.ExitCode, Is.EqualTo(0), print.CombinedOutput);
                 Assert.That(print.StandardOutput, Does.Contain("analysis-cache/v1"));
             });
+            return Passed("offline-schema-registry");
         }
 
-        public void AssertExternalTestingConsumer()
+        public CheckpointScenarioResult AssertExternalTestingConsumer()
         {
             string consumerDirectory = Path.Combine(_root, "testing-consumer");
             Directory.CreateDirectory(consumerDirectory);
@@ -316,6 +320,7 @@ public sealed class CheckpointBReleaseGateTests
                 </Project>
                 """);
             File.WriteAllText(Path.Combine(consumerDirectory, "Program.cs"), """
+                using ArchLinterNet.Core.Caching;
                 using ArchLinterNet.Testing;
 
                 Console.WriteLine(typeof(ArchitectureValidationBuilder).Assembly.FullName);
@@ -324,8 +329,16 @@ public sealed class CheckpointBReleaseGateTests
                 File.WriteAllText(policyPath, "version: 1\\nname: Synthetic Checkpoint B cancellation consumer\\n\\nlayers:\\n  consumer:\\n    namespace: CheckpointB.Consumer\\n\\nanalysis:\\n  target_assemblies: [CheckpointBConsumer]\\n");
                 using var cancellation = new CancellationTokenSource();
                 using var enteredValidation = new ManualResetEventSlim();
+                using var releaseValidation = new ManualResetEventSlim();
+                string cachePath = Path.Combine(AppContext.BaseDirectory, "checkpoint-b-cancelled-cache");
                 var builder = new ArchitectureValidationBuilder(policyPath)
-                    .WithCancellation(cancellation.Token);
+                    .WithCancellation(cancellation.Token)
+                    .WithCache(AnalysisCacheOptions.AtPath(cachePath))
+                    .WithValidationEntryBarrier(() =>
+                    {
+                        enteredValidation.Set();
+                        releaseValidation.Wait(TimeSpan.FromSeconds(10));
+                    });
                 Task task = Task.Run(() =>
                 {
                     enteredValidation.Set();
@@ -336,6 +349,7 @@ public sealed class CheckpointBReleaseGateTests
                     return 2;
                 }
                 cancellation.Cancel();
+                releaseValidation.Set();
                 try
                 {
                     task.GetAwaiter().GetResult();
@@ -345,6 +359,11 @@ public sealed class CheckpointBReleaseGateTests
                 {
                     Console.WriteLine("cancelled");
                 }
+                if (Directory.Exists(cachePath) && Directory.EnumerateFiles(cachePath, "*", SearchOption.AllDirectories).Any())
+                {
+                    return 3;
+                }
+                Console.WriteLine("cancelled-in-flight-no-cache-or-output");
                 return 0;
                 """);
 
@@ -369,7 +388,88 @@ public sealed class CheckpointBReleaseGateTests
                 Assert.That(assets, Does.Contain(Path.Combine(_root, "nuget-packages")));
                 Assert.That(Sha256(assemblyLocation), Is.EqualTo(packageAssemblySha256));
                 Assert.That(result.StandardOutput, Does.Not.Contain("successful"));
+                Assert.That(result.StandardOutput, Does.Contain("cancelled-in-flight-no-cache-or-output"));
             });
+            return Passed("external-testing-consumer");
+        }
+
+        public CheckpointScenarioResult AssertGenericCiNeutralInvocation()
+        {
+            using AdoptionAcceptanceFixture fixture = AdoptionAcceptanceFixture.Create("small");
+            fixture.Build();
+            CommandResult result = RunTool(fixture.Root, "--policy", fixture.PolicyPath, "--strict", "--format", "json");
+            AssertFixtureOracle(fixture.Id, result);
+            return Passed("generic-ci-neutral");
+        }
+
+        public CheckpointScenarioResult AssertDocumentedEntrypoint()
+        {
+            string documentation = File.ReadAllText(Path.Combine(_repositoryRoot, "docs", "guides", "reference-entrypoints.md"));
+            Assert.That(documentation, Does.Contain("arch-linter-net --policy"));
+            using AdoptionAcceptanceFixture fixture = AdoptionAcceptanceFixture.Create("small");
+            fixture.Build();
+            CommandResult result = RunTool(fixture.Root, "--policy", fixture.PolicyPath, "--strict", "--format", "json");
+            AssertFixtureOracle(fixture.Id, result);
+            return Passed("documented-entrypoints");
+        }
+
+        public CheckpointScenarioResult AssertNonTtyInvocation()
+        {
+            using AdoptionAcceptanceFixture fixture = AdoptionAcceptanceFixture.Create("small");
+            fixture.Build();
+            CommandResult result = RunTool(fixture.Root, "--policy", fixture.PolicyPath, "--strict", "--format", "json");
+            Assert.Multiple(() =>
+            {
+                AssertFixtureOracle(fixture.Id, result);
+                Assert.That(result.StandardError, Does.Not.Contain("\u001b["));
+            });
+            return Passed("non-tty");
+        }
+
+        public CheckpointScenarioResult AssertCliInFlightCancellation()
+        {
+            if (OperatingSystem.IsWindows())
+            {
+                return new CheckpointScenarioResult("in-flight-cancellation", "not_applicable",
+                    "The POSIX CLI interruption oracle runs on Linux and macOS.");
+            }
+
+            using AdoptionAcceptanceFixture fixture = AdoptionAcceptanceFixture.Create("small");
+            fixture.Build();
+            string pipe = Path.Combine(fixture.Root, "checkpoint-b-cancellation-pipe.yml");
+            string policy = Path.Combine(fixture.Root, "checkpoint-b-cancellation-root.yml");
+            CreateFifo(pipe);
+            File.WriteAllText(policy, """
+                version: 1
+                name: Checkpoint B CLI cancellation
+                imports: [checkpoint-b-cancellation-pipe.yml]
+                analysis:
+                  target_assemblies: [Synthetic.Small]
+                  projects: [Synthetic.Small.csproj]
+                """);
+            string output = Path.Combine(fixture.Root, "cancelled-report.json");
+            string cache = Path.Combine(fixture.Root, "cancelled-cache");
+            using Process process = StartTool(fixture.Root, "--policy", policy, "--strict", "--cache", cache,
+                "--report", $"json={output}");
+            Task<Stream> writer = Task.Run<Stream>(() => new FileStream(pipe, FileMode.Open, FileAccess.Write, FileShare.Read));
+            Assert.That(writer.Wait(TimeSpan.FromSeconds(15)), Is.True, "CLI did not enter policy import validation.");
+            using Stream ignoredWriter = writer.GetAwaiter().GetResult();
+            SendInterrupt(process.Id);
+            string standardOutput = process.StandardOutput.ReadToEnd();
+            string standardError = process.StandardError.ReadToEnd();
+            Assert.That(process.WaitForExit(15_000), Is.True, "Interrupted CLI did not exit.");
+            string[] cacheFiles = Directory.Exists(cache)
+                ? Directory.EnumerateFiles(cache, "*", SearchOption.AllDirectories).ToArray()
+                : [];
+            Assert.Multiple(() =>
+            {
+                Assert.That(process.ExitCode, Is.EqualTo(2), $"stdout:{standardOutput}{Environment.NewLine}stderr:{standardError}");
+                Assert.That(standardOutput + standardError, Does.Contain("cancelled"));
+                Assert.That(File.Exists(output), Is.False, "Cancellation must not publish a final report.");
+                Assert.That(cacheFiles, Is.Empty);
+                Assert.That(Directory.GetFiles(fixture.Root, "*.tmp", SearchOption.AllDirectories), Is.Empty);
+            });
+            return Passed("in-flight-cancellation");
         }
 
         public IReadOnlyList<CheckpointScenarioResult> ShellScenarios()
@@ -389,6 +489,13 @@ public sealed class CheckpointBReleaseGateTests
             ProcessStartInfo startInfo = CreateShellStartInfo(workingDirectory, arguments);
             startInfo.Environment["DOTNET_CLI_DISABLE_COLOR"] = "1";
             return Run(startInfo);
+        }
+
+        private Process StartTool(string workingDirectory, params string[] arguments)
+        {
+            ProcessStartInfo startInfo = CreateShellStartInfo(workingDirectory, arguments);
+            startInfo.Environment["DOTNET_CLI_DISABLE_COLOR"] = "1";
+            return Process.Start(startInfo) ?? throw new InvalidOperationException("Failed to start the CLI.");
         }
 
         public void Dispose()
@@ -589,6 +696,30 @@ public sealed class CheckpointBReleaseGateTests
         }
 
         private static string NativeShell() => OperatingSystem.IsWindows() ? "pwsh" : "bash";
+
+        private static void CreateFifo(string path)
+        {
+            CommandResult result = Run(new ProcessStartInfo("mkfifo")
+            {
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                UseShellExecute = false,
+                ArgumentList = { path },
+            });
+            Assert.That(result.ExitCode, Is.EqualTo(0), result.CombinedOutput);
+        }
+
+        private static void SendInterrupt(int processId)
+        {
+            CommandResult result = Run(new ProcessStartInfo("kill")
+            {
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                UseShellExecute = false,
+                ArgumentList = { "-INT", processId.ToString(System.Globalization.CultureInfo.InvariantCulture) },
+            });
+            Assert.That(result.ExitCode, Is.EqualTo(0), result.CombinedOutput);
+        }
 
         private string PackagePath(string packageId)
         {

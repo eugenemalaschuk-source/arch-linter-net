@@ -1,7 +1,9 @@
 # checkpoint-b-candidate-provenance Specification
 
 ## Purpose
-TBD - created by archiving change harden-checkpoint-b-release-provenance. Update Purpose after archive.
+Define the immutable candidate package boundary used by Checkpoint B: the same
+manifested NuGet files are consumed by isolated adopters, checked on every
+required platform, and re-verified immediately before publication.
 ## Requirements
 ### Requirement: One immutable candidate package set is validated and published
 The release workflow SHALL resolve the release version before packing, pack one
@@ -26,4 +28,3 @@ manifest.
 - **WHEN** a machine has cached or configured external package sources
 - **THEN** the Checkpoint B consumer resolves only the candidate package paths
   and digests from the isolated feed
-

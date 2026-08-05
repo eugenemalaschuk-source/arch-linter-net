@@ -88,10 +88,11 @@ def _read_records(input_directory: Path, manifest: dict[str, Any], manifest_dige
         if record.get("packages") != manifest["packages"]:
             raise ValueError(f"{path} package inventory differs from the candidate manifest.")
         scenarios = record.get("scenarios")
-        if not isinstance(scenarios, list) or {
-            scenario.get("id") for scenario in scenarios if isinstance(scenario, dict)
-        } != _REQUIRED_SCENARIOS:
+        if not isinstance(scenarios, list) or len(scenarios) != len(_REQUIRED_SCENARIOS):
             raise ValueError(f"{path} has an incomplete scenario inventory.")
+        scenario_ids = [scenario.get("id") for scenario in scenarios if isinstance(scenario, dict)]
+        if len(scenario_ids) != len(scenarios) or set(scenario_ids) != _REQUIRED_SCENARIOS:
+            raise ValueError(f"{path} has missing, unexpected, or duplicate scenario IDs.")
         for scenario in scenarios:
             if not isinstance(scenario, dict) or scenario.get("result") not in {"passed", "not_applicable"}:
                 raise ValueError(f"{path} contains a failed or malformed scenario result.")
