@@ -126,8 +126,8 @@ jobs:
         run: |
           make restore
           make acceptance
-          npm install -g --ignore-scripts @fission-ai/openspec@1.6.0
-          openspec validate --all --strict
+          npm ci --ignore-scripts --prefix tools/openspec
+          npm exec --prefix tools/openspec -- openspec validate --all --strict
 
       - name: Download immutable candidate manifest
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
