@@ -30,8 +30,8 @@
 
 ## 5. Integration and Acceptance
 
-- [x] 5.1 Run `rtk make acceptance` to verify all existing tests pass
-- [x] 5.2 Run `rtk make lint` to verify code quality
+- [x] 5.1 Run `make acceptance` to verify all existing tests pass
+- [x] 5.2 Run `make lint` to verify code quality
 - [x] 5.3 Validate at least one Unity-style rule (core code forbidden from using `UnityEditor` namespace via method body)
 - [x] 5.4 Validate at least one server-style rule (domain code forbidden from using infrastructure SDK namespaces via method body)
 

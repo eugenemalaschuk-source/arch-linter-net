@@ -14,5 +14,5 @@
 ## 3. Synchronization and validation
 
 - [x] 3.1 Review the OpenSpec deltas against the implemented documentation and acceptance behavior, updating them if needed.
-- [x] 3.2 Run `make fmt` through RTK and address formatting changes.
-- [x] 3.3 Run `make acceptance` through RTK and resolve all failures.
+- [x] 3.2 Run `make fmt` through and address formatting changes.
+- [x] 3.3 Run `make acceptance` through and resolve all failures.

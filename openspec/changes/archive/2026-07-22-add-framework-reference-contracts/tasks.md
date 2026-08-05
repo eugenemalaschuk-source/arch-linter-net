@@ -55,6 +55,6 @@
 
 ## 8. Self-architecture and validation
 
-- [x] 8.1 Run `rtk make fmt` and inspect formatting changes.
-- [x] 8.2 Run `rtk make acceptance` (lint-code-size, lint-dotnet-format, lint-architecture, all tests) and fix issue-related failures.
+- [x] 8.1 Run `make fmt` and inspect formatting changes.
+- [x] 8.2 Run `make acceptance` (lint-code-size, lint-dotnet-format, lint-architecture, all tests) and fix issue-related failures.
 - [x] 8.3 Run `openspec validate --all` after spec synchronization.

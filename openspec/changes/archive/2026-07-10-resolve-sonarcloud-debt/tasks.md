@@ -71,6 +71,6 @@
 
 ## 14. Validation
 
-- [x] 14.1 Run `rtk make acceptance` — full lint + test suite
+- [x] 14.1 Run `make acceptance` — full lint + test suite
 - [x] 14.2 Run `dotnet build` — verify `TreatWarningsAsErrors` is clean
 - [ ] 14.3 Trigger SonarCloud analysis on the merged PR — confirm zero new-code issues

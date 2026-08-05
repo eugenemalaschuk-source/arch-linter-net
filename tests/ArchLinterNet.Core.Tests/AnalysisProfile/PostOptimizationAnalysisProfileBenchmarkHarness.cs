@@ -26,7 +26,7 @@ public sealed class PostOptimizationAnalysisProfileBenchmarkHarness
     public void RunPostOptimizationMatrix()
     {
         Assert.That(File.Exists(CliDllPath()), Is.True,
-            $"CLI not built at {CliDllPath()} — run `rtk dotnet build src/ArchLinterNet.Cli --no-restore` first.");
+            $"CLI not built at {CliDllPath()} — run `dotnet build src/ArchLinterNet.Cli --no-restore` first.");
 
         List<ScenarioSummary> scenarios = new();
         using AdoptionAcceptanceFixture fixture = AdoptionAcceptanceFixture.Create("large-multi-host");

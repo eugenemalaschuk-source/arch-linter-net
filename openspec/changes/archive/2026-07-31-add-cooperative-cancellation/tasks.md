@@ -42,7 +42,7 @@
 - [x] 3.3 Add a `CancellationToken` parameter to `IArchitectureAssemblyResolutionService.Resolve` and
       `ResolvePostBuild` and their implementation(s), checked once per resolved/missing assembly name.
 - [x] 3.4 Update every call site of the three interfaces above (grep for implementers/callers) to pass the
-      token through; confirm via `rtk make restore` + a full build that no call site was missed.
+      token through; confirm via `make restore` + a full build that no call site was missed.
 
 ## 4. Scanning and fact-index materialization
 
@@ -153,11 +153,11 @@
 
 ## 11. Self-architecture and coverage
 
-- [x] 11.1 Run `rtk make lint-architecture` after the interface/signature changes in sections 3 and 5 to
+- [x] 11.1 Run `make lint-architecture` after the interface/signature changes in sections 3 and 5 to
       confirm no new layering violation was introduced (token-only parameters should not require any new
       cross-layer import).
 - [x] 11.2 Check `architecture/dependencies.arch.yml`'s `self-policy-rule-input-coverage` contract_ids list
-      for whether any new file/namespace this change adds needs an entry; add one only if `rtk make
+      for whether any new file/namespace this change adds needs an entry; add one only if `make
       lint-architecture` actually flags a gap.
 
 ## 12. Documentation and spec synchronization

@@ -57,7 +57,7 @@ Alternative considered:
 ## Migration Plan
 
 1. Add the OpenSpec delta and implement the workflow, README, docs, and coverage-target updates.
-2. Validate locally with `rtk make fmt` and `rtk make acceptance`.
+2. Validate locally with `make fmt` and `make acceptance`.
 3. Merge the change and open a test pull request from a repository branch to confirm SonarCloud PR decoration, quality-gate status, and the direct SonarCloud PR-analysis link.
 4. After the first decorated PR run, configure GitHub branch protection manually to require the Sonar-created check if desired.
 

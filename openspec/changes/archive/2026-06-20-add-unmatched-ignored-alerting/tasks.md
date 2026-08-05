@@ -60,7 +60,7 @@
 - [x] 8.6 Integration test: method-body contract — matched/unmatched ignores (Roslyn + IL)
 - [x] 8.7 Integration test: `warn` severity does not fail, `off` skips detection
 - [x] 8.8 Integration test: unmatched ignores in both strict and audit modes
-- [x] 8.9 Run acceptance gate: `rtk make acceptance`
+- [x] 8.9 Run acceptance gate: `make acceptance`
 
 ## 9. Documentation
 

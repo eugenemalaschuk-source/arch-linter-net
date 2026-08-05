@@ -10,14 +10,14 @@ allocation findings, and conclusions feeding #330/#163).
 ## Running
 
 ```
-rtk make benchmark-cel                                   # run every benchmark class
-rtk make benchmark-cel BENCHMARK_FILTER='*EvaluationBenchmarks*'  # run one class
+make benchmark-cel                                   # run every benchmark class
+make benchmark-cel BENCHMARK_FILTER='*EvaluationBenchmarks*'  # run one class
 ```
 
 Equivalent direct invocation:
 
 ```
-rtk dotnet run -c Release --project benchmarks/ArchLinterNet.CEL.Benchmarks -- --filter '*'
+dotnet run -c Release --project benchmarks/ArchLinterNet.CEL.Benchmarks -- --filter '*'
 ```
 
 A `-c Release` build is required — BenchmarkDotNet refuses to run unoptimized builds by default.

@@ -11,4 +11,4 @@
 - [x] Update/replace the now-outdated octal-rejection tests; add raw-triple-quote-escape,
       invalid-escape-in-triple-quote, malformed-octal, and budget-consistency regression tests.
 - [x] Update `cel-profile-v1` spec and the corpus mining manifest.
-- [x] Run `rtk make fmt` and `rtk make acceptance`.
+- [x] Run `make fmt` and `make acceptance`.

@@ -47,4 +47,4 @@
 - [x] 6.5 Add tests for ignored violations in external contracts.
 - [x] 6.6 Add diagnostics/JSON tests for external group and forbidden reference reporting.
 - [x] 6.7 Add CLI or testing-adapter coverage for external contracts if existing integration test infrastructure supports it cleanly.
-- [x] 6.8 Run `rtk make restore` if needed, then `rtk make acceptance` before marking implementation complete.
+- [x] 6.8 Run `make restore` if needed, then `make acceptance` before marking implementation complete.

@@ -34,7 +34,7 @@
 - [x] 4.4 Add a parity test that runs the same violation through Human, JSON and SARIF formatters and asserts the
       source project, forbidden package group/allowed groups, and matched package references are equivalent across
       all three (per issue acceptance criterion).
-- [x] 4.5 Run `rtk dotnet test tests/ArchLinterNet.Core.Tests --no-restore` and confirm the full package-family suite
+- [x] 4.5 Run `dotnet test tests/ArchLinterNet.Core.Tests --no-restore` and confirm the full package-family suite
       (`PackageDependencyContractTests`, `PackageAllowOnlyContractTests`, formatter/SARIF tests) passes.
 
 ## 5. Docs

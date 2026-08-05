@@ -30,7 +30,7 @@
 - [x] 6.4 Fixture test (`LayerExclusionAcceptanceTests.cs`) — multi-module policy: `ModulesCore` layer over `LayerExclusionAcceptanceFixtures.Modules.*` excluding `*.Infrastructure`/`*.Persistence`; an external-dependency rule scoped to `ModulesCore` proves a vendor persistence SDK reference is blocked in a Domain type and unblocked (out of scope) in Infrastructure/Persistence types.
 - [x] 6.5 Policy-consistency tests (`PolicyConsistencyCheckTests.cs`): typo'd exclude entry produces `unmatched-layer-exclusion`; matching entry does not; layer with no exclude entries produces nothing.
 - [x] 6.6 `DescribeLayer_WithExclude_IncludesExcludingClause` / `DescribeLayer_WithoutExclude_IsUnchanged` cover the layer-description provenance requirement (superseding the originally planned explain-command-specific test — see Spec synchronization below).
-- [x] 6.7 Self-architecture regression: `rtk make lint-architecture` passes against this repo's own policy; full `rtk make acceptance` (lint + CEL/Core/Cli test suites, 2514 tests) passes with no regressions.
+- [x] 6.7 Self-architecture regression: `make lint-architecture` passes against this repo's own policy; full `make acceptance` (lint + CEL/Core/Cli test suites, 2514 tests) passes with no regressions.
 
 ## 7. Documentation
 
