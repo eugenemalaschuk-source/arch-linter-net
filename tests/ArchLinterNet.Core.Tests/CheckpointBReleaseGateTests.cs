@@ -136,7 +136,7 @@ public sealed class CheckpointBReleaseGateTests
             string[] packagePaths = Directory.GetFiles(_feed, "*.nupkg")
                 .OrderBy(static path => path, StringComparer.Ordinal)
                 .ToArray();
-            Assert.That(packagePaths.Select(Path.GetFileNameWithoutExtension), Has.Count.EqualTo(4));
+            Assert.That(packagePaths, Has.Length.EqualTo(4));
 
             foreach (string packageId in _packageIds)
             {
