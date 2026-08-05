@@ -1,18 +1,18 @@
 ## Context
 
-The Core package already embeds a manifest-backed registry and six implemented release contracts. The source schemas and public producers for normalized findings, persistent cache entries, and profiling documents have since landed, but their resources remain outside the manifest, embedded-resource list, contentFiles list, and consistency tests.
+The Core package already embeds a manifest-backed registry and six implemented release contracts, including normalized finding. The source schemas and public producers for persistent cache entries and profiling documents have since landed, but their resources remain outside the manifest, embedded-resource list, contentFiles list, and consistency tests.
 
 ## Goals / Non-Goals
 
 **Goals:**
 
-- Add the three exact existing source schemas to the immutable 0.5.1 manifest and package distribution.
+- Add the two exact existing cache/profile source schemas to the immutable 0.5.1 manifest and package distribution while retaining normalized-finding coverage.
 - Validate output produced through current public paths against registry bytes and prove a packed CLI/Core can discover those bytes offline.
 - Keep the source, manifest, embedded resources, content files, documentation, and capabilities inventory executable and synchronized.
 
 **Non-Goals:**
 
-- Change the three schema shapes, writer behavior, or compatibility semantics.
+- Change schema shapes, writer behavior, or compatibility semantics.
 - Add remote schema retrieval, mutable IDs, or automatic document migration.
 - Rework the existing registry foundation or its prior entries.
 
@@ -24,7 +24,7 @@ The Core package already embeds a manifest-backed registry and six implemented r
 
 3. **Extend the current registry integration tests.** Generate each sample with the appropriate public producer, validate it against the resource returned by `TryRead`, and assert registry/package/manifest consistency. Add an offline packed-tool smoke test only through local build artifacts, never a network source.
 
-4. **Reject unknown versions at existing format readers.** No compatibility fallback is added: the existing finding reader and cache/profile serializers continue to make unsupported values explicit.
+4. **Preserve actual support boundaries.** The existing finding and cache readers retain explicit compatibility checks; profile is a generated-output writer contract without a public reader.
 
 ## Risks / Trade-offs
 
@@ -35,7 +35,7 @@ The Core package already embeds a manifest-backed registry and six implemented r
 
 ## Migration Plan
 
-The change is additive for release 0.5.1: installed packages gain three discoverable logical IDs. Existing IDs and bytes remain unchanged. Rollback consists of restoring the preceding package version; no persisted document is rewritten.
+The change is additive for release 0.5.1: installed packages gain two discoverable logical IDs. Existing IDs and bytes, including normalized-finding, remain unchanged. Rollback consists of restoring the preceding package version; no persisted document is rewritten.
 
 ## Open Questions
 

@@ -1,12 +1,12 @@
 ## 1. Registry and package resources
 
-- [x] 1.1 Add immutable manifest descriptors and SHA-256 digests for the existing normalized-finding, analysis-cache, and analysis-profile source schemas.
-- [x] 1.2 Embed the exact source schemas in Core and publish them under the release-matched NuGet `contentFiles` schema path.
+- [x] 1.1 Add immutable manifest descriptors and SHA-256 digests for the deferred analysis-cache and analysis-profile source schemas.
+- [x] 1.2 Embed the exact cache/profile source schemas in Core and publish them under the release-matched NuGet `contentFiles` schema path.
 
 ## 2. Executable release-contract tests
 
-- [x] 2.1 Extend registry tests to verify the complete deterministic list, exact resource bytes, identity, digests, and real public-producer output for all three formats.
-- [x] 2.2 Extend package/offline smoke coverage to validate local-package discovery and `schema print` byte equivalence for the newly registered formats.
+- [x] 2.1 Extend registry tests to retain normalized-finding coverage and verify cache/profile resources, identity, digests, and real public-producer output.
+- [x] 2.2 Extend package/offline smoke coverage to validate local-package discovery and `schema print` byte equivalence for the newly registered cache/profile formats.
 
 ## 3. Documentation and specification synchronization
 

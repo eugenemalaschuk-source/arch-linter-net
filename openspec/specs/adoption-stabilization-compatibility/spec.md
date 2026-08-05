@@ -27,7 +27,7 @@ The system SHALL publish one `adoption-stabilization/v1` registry for 0.5.1 that
 | Normalized finding | `finding/v1`, JSON `schema_version: 1` | writes v1; unknown schema versions fail and unknown v1 kinds follow the documented strict/non-strict rule |
 | Analysis/build state | `analysis-build-state/v1` | reuses the approved fingerprint/receipt contract |
 | Analysis cache | `analysis-cache/v1`, envelope format version 2 | writes and inspects verified cache entries; unsupported versions fail explicitly |
-| Analysis profile | `analysis-profile/v1` | writes deterministic counters and optional measurements; unsupported versions fail explicitly |
+| Analysis profile | `analysis-profile/v1` | writes deterministic counters and optional measurements; the package declares write-only support until a public reader exists |
 | Compatibility registry | `adoption-stabilization/v1` | writes the release-matched registry |
 
 Packaged JSON Schemas and text-format contracts SHALL use immutable release-qualified ids under `https://archlinternet.dev/schema/0.5.1/` and SHALL be shipped in the CLI and applicable NuGet packages. Unversioned web schema URLs MAY remain convenience aliases but SHALL NOT be the compatibility source of truth.

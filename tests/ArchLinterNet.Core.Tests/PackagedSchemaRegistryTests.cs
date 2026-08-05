@@ -32,7 +32,19 @@ public sealed class PackagedSchemaRegistryTests
             Assert.That(schemas.All(static schema => schema.SchemaId.Contains("/schema/0.5.1/", StringComparison.Ordinal)), Is.True);
             Assert.That(schemas.All(static schema => schema.ResourcePath.StartsWith("schema/0.5.1/", StringComparison.Ordinal)), Is.True);
             Assert.That(schemas.All(static schema => schema.Sha256.Length == 64), Is.True);
-            Assert.That(schemas.All(static schema => schema.SupportsRead && schema.SupportsWrite), Is.True);
+            Assert.That(
+                schemas.Select(static schema => (schema.LogicalId, schema.SupportsRead, schema.SupportsWrite)),
+                Is.EqualTo(new[]
+                {
+                    ("analysis-build-state", true, true),
+                    ("analysis-cache", true, true),
+                    ("analysis-profile", false, true),
+                    ("api-snapshot", true, true),
+                    ("baseline", true, true),
+                    ("normalized-finding", true, true),
+                    ("policy-fragment", true, true),
+                    ("policy-root", true, true),
+                }));
             Assert.That(schemas.All(static schema => !string.IsNullOrWhiteSpace(schema.MigrationNote)), Is.True);
             Assert.That(schemas.All(static schema => !string.IsNullOrWhiteSpace(schema.OwningCapability)), Is.True);
         });
@@ -49,6 +61,7 @@ public sealed class PackagedSchemaRegistryTests
             Assert.Multiple(() =>
             {
                 Assert.That(Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(schema))), Is.EqualTo(descriptor.Sha256));
+                Assert.That(schema, Does.Not.Contain("Not yet registered in compatibility-manifest.json"));
                 using JsonDocument document = JsonDocument.Parse(schema);
                 Assert.That(document.RootElement.GetProperty("$id").GetString(), Is.EqualTo(descriptor.SchemaId));
             });
