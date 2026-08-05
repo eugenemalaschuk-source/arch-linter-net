@@ -204,42 +204,6 @@ jobs:
           echo "package_version=$PACKAGE_VERSION" >> "$GITHUB_OUTPUT"
           echo "target_tag=$TARGET_TAG" >> "$GITHUB_OUTPUT"
 
-      - name: Generate release notes
-        shell: bash
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          mkdir -p artifacts/release-notes
-
-          payload="$(jq -n \
-            --arg tag_name "$TARGET_TAG" \
-            --arg target_commitish "$GITHUB_SHA" \
-            --arg configuration_file_path ".github/release.yml" \
-            '{ tag_name: $tag_name, target_commitish: $target_commitish, configuration_file_path: $configuration_file_path }')"
-
-          if [ -n "$PREVIOUS_TAG" ]; then
-            payload="$(echo "$payload" | jq --arg previous_tag_name "$PREVIOUS_TAG" '. + { previous_tag_name: $previous_tag_name }')"
-          fi
-
-          gh api \
-            --method POST \
-            repos/${{ github.repository }}/releases/generate-notes \
-            --input - <<< "$payload" \
-            --jq '.body' \
-            | tee artifacts/release-notes/release-notes.md
-
-          echo "Generated release notes for $TARGET_TAG"
-          echo "---"
-          cat artifacts/release-notes/release-notes.md
-          echo "---"
-
-      - name: Upload release notes artifact
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
-        with:
-          name: release-notes-${{ env.PACKAGE_VERSION }}
-          path: artifacts/release-notes/release-notes.md
-          if-no-files-found: error
-
       - name: Restore
         run: make restore
 
@@ -289,6 +253,11 @@ jobs:
       target_tag: ${{ needs.prepare-candidate.outputs.target_tag }}
 
     steps:
+      - name: Checkout release metadata
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+
       - name: Download validated candidate packages
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
         with:
@@ -297,6 +266,28 @@ jobs:
 
       - name: Verify candidate manifest before publication
         run: python3 tools/release/package_manifest.py verify --packages-dir artifacts/packages --manifest artifacts/packages/package-manifest.json
+
+      - name: Generate release notes after Checkpoint B
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TARGET_TAG: ${{ needs.prepare-candidate.outputs.target_tag }}
+        run: |
+          mkdir -p artifacts/release-notes
+          jq -n \
+            --arg tag_name "$TARGET_TAG" \
+            --arg target_commitish "$GITHUB_SHA" \
+            --arg configuration_file_path ".github/release.yml" \
+            '{ tag_name: $tag_name, target_commitish: $target_commitish, configuration_file_path: $configuration_file_path }' \
+            | gh api --method POST repos/${{ github.repository }}/releases/generate-notes --input - --jq '.body' \
+            | tee artifacts/release-notes/release-notes.md
+
+      - name: Upload release notes artifact
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: release-notes-${{ needs.prepare-candidate.outputs.package_version }}
+          path: artifacts/release-notes/release-notes.md
+          if-no-files-found: error
 
       - name: NuGet login
         if: ${{ inputs.publish == true }}
