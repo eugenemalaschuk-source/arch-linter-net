@@ -1,5 +1,4 @@
 using ArchLinterNet.Core.Profiling;
-using ArchLinterNet.Core.Resolution;
 using ArchLinterNet.Core.Schema;
 using ArchLinterNet.Testing;
 using Json.Schema;
@@ -7,17 +6,16 @@ using NUnit.Framework;
 
 namespace ArchLinterNet.Core.Tests;
 
-// Issue #374: a real generated profile validates against schema/0.5.1/analysis-profile.schema.json,
-// which is NOT yet registered in the packaged schema registry — registration is #410's scope.
-// See openspec/specs/analysis-profile/spec.md and openspec/specs/packaged-schema-registry/spec.md.
+// A real generated profile validates against the exact release-matched resource returned by
+// PackagedSchemaRegistry. See openspec/specs/analysis-profile/spec.md.
 [TestFixture]
 public sealed class AnalysisProfileSchemaValidationTests
 {
     private static JsonSchema LoadSchema()
     {
-        string repositoryRoot = new ArchitectureRepositoryRootResolver().Resolve();
-        string schemaPath = Path.Combine(repositoryRoot, "schema", "0.5.1", "analysis-profile.schema.json");
-        return JsonSchema.FromText(File.ReadAllText(schemaPath));
+        PackagedSchemaRegistry registry = new();
+        Assert.That(registry.TryRead("analysis-profile", out string schemaText), Is.True);
+        return JsonSchema.FromText(schemaText);
     }
 
     private static string WriteHarmlessPolicy()
@@ -56,10 +54,10 @@ public sealed class AnalysisProfileSchemaValidationTests
     }
 
     [Test]
-    public void PackagedSchemaRegistry_DoesNotYetListAnalysisProfile()
+    public void PackagedSchemaRegistry_ListsAnalysisProfile()
     {
         PackagedSchemaRegistry registry = new();
 
-        Assert.That(registry.List().Select(descriptor => descriptor.LogicalId), Does.Not.Contain("analysis-profile"));
+        Assert.That(registry.List().Select(descriptor => descriptor.LogicalId), Does.Contain("analysis-profile"));
     }
 }

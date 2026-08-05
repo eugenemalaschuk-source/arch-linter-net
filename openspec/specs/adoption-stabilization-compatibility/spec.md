@@ -24,10 +24,11 @@ The system SHALL publish one `adoption-stabilization/v1` registry for 0.5.1 that
 | Imported fragment | `policy-fragment/v1` | writes/validates the release-matched fragment schema |
 | Baseline | `baseline/v2`, YAML `version: 2`, identity `identity_version: 1` | writes v2; reads v1 and v2 |
 | Public API snapshot | `api-snapshot/v1`, document `version: 1` | writes v1 |
+| Normalized finding | `finding/v1`, JSON `schema_version: 1` | writes v1; unknown schema versions fail and unknown v1 kinds follow the documented strict/non-strict rule |
 | Analysis/build state | `analysis-build-state/v1` | reuses the approved fingerprint/receipt contract |
+| Analysis cache | `analysis-cache/v1`, envelope format version 2 | writes and inspects verified cache entries; unsupported versions fail explicitly |
+| Analysis profile | `analysis-profile/v1` | writes deterministic counters and optional measurements; unsupported versions fail explicitly |
 | Compatibility registry | `adoption-stabilization/v1` | writes the release-matched registry |
-
-`finding/v1`, `analysis-cache/v1`, and `analysis-profile/v1` remain planned format identities. They SHALL NOT be published in the immutable 0.5.1 package registry until their owning slices implement writers and validate real generated output against their packaged contracts.
 
 Packaged JSON Schemas and text-format contracts SHALL use immutable release-qualified ids under `https://archlinternet.dev/schema/0.5.1/` and SHALL be shipped in the CLI and applicable NuGet packages. Unversioned web schema URLs MAY remain convenience aliases but SHALL NOT be the compatibility source of truth.
 

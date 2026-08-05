@@ -26,7 +26,7 @@ public sealed class PackagedSchemaRegistryTests
         {
             Assert.That(schemas.Select(static schema => schema.LogicalId), Is.EqualTo(new[]
             {
-                "analysis-build-state", "api-snapshot", "baseline", "normalized-finding", "policy-fragment", "policy-root",
+                "analysis-build-state", "analysis-cache", "analysis-profile", "api-snapshot", "baseline", "normalized-finding", "policy-fragment", "policy-root",
             }));
             Assert.That(schemas.Single(static schema => schema.LogicalId == "baseline").DocumentVersion, Is.EqualTo("v2"));
             Assert.That(schemas.All(static schema => schema.SchemaId.Contains("/schema/0.5.1/", StringComparison.Ordinal)), Is.True);
