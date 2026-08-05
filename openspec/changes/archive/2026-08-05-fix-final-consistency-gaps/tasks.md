@@ -10,5 +10,5 @@
 
 ## 3. Verification and archival
 
-- [ ] 3.1 Run focused evidence tests, formatting, OpenSpec validation, and full acceptance.
-- [ ] 3.2 Archive this corrective change and verify the synchronized specifications.
+- [x] 3.1 Run focused evidence tests, formatting, OpenSpec validation, and full acceptance.
+- [x] 3.2 Archive this corrective change and verify the synchronized specifications.
