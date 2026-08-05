@@ -125,14 +125,13 @@ public sealed class CheckpointBReleaseGateTests
         private readonly string _candidateVersion;
         private readonly string _repositoryRoot;
 
-        private CandidatePackageFeed(string root, string candidateVersion, string repositoryRoot)
+        private CandidatePackageFeed(string root, string candidateVersion, string repositoryRoot, string feed)
         {
             _root = root;
-            _feed = Path.Combine(root, "feed");
+            _feed = feed;
             _toolPath = Path.Combine(root, "tool");
             _candidateVersion = candidateVersion;
             _repositoryRoot = repositoryRoot;
-            Directory.CreateDirectory(_feed);
         }
 
         public static CandidatePackageFeed Create()
@@ -142,8 +141,21 @@ public sealed class CheckpointBReleaseGateTests
             string repositoryRoot = new ArchitectureRepositoryRootResolver().Resolve();
             string candidateVersion = Environment.GetEnvironmentVariable(CandidateVersionEnvironmentVariable)
                 ?? DefaultCandidateVersion;
-            var candidate = new CandidatePackageFeed(root, candidateVersion, repositoryRoot);
-            candidate.Pack();
+            string? suppliedFeed = Environment.GetEnvironmentVariable("CHECKPOINT_B_PACKAGE_FEED");
+            bool packCandidate = string.IsNullOrWhiteSpace(suppliedFeed);
+            string feed = packCandidate ? Path.Combine(root, "feed") : Path.GetFullPath(suppliedFeed!);
+            var candidate = new CandidatePackageFeed(root, candidateVersion, repositoryRoot, feed);
+            if (packCandidate)
+            {
+                Directory.CreateDirectory(feed);
+                candidate.Pack();
+            }
+            else if (!Directory.Exists(feed))
+            {
+                throw new InvalidOperationException($"Checkpoint B candidate feed '{feed}' does not exist.");
+            }
+
+            candidate.PopulateIsolatedDependencyCache();
             return candidate;
         }
 
@@ -183,11 +195,13 @@ public sealed class CheckpointBReleaseGateTests
 
         public void InstallTool()
         {
-            CommandResult result = RunDotnet(_root,
+            string configPath = WriteIsolatedNuGetConfig(_root);
+            CommandResult result = RunIsolatedDotnet(_root,
                 "tool", "install", "ArchLinterNet.Cli",
                 "--tool-path", _toolPath,
-                "--add-source", _feed,
+                "--configfile", configPath,
                 "--version", _candidateVersion,
+                "--no-cache",
                 "--ignore-failed-sources");
             Assert.That(result.ExitCode, Is.EqualTo(0), result.CombinedOutput);
             Assert.That(File.Exists(ToolPath()), Is.True, ToolPath());
@@ -240,6 +254,7 @@ public sealed class CheckpointBReleaseGateTests
                 using ArchLinterNet.Testing;
 
                 Console.WriteLine(typeof(ArchitectureValidationBuilder).Assembly.FullName);
+                Console.WriteLine(typeof(ArchitectureValidationBuilder).Assembly.Location);
                 string policyPath = Path.Combine(AppContext.BaseDirectory, "checkpoint-b-policy.yml");
                 File.WriteAllText(policyPath, "version: 1\\nname: Synthetic Checkpoint B cancellation consumer\\n\\nlayers:\\n  consumer:\\n    namespace: CheckpointB.Consumer\\n\\nanalysis:\\n  target_assemblies: [CheckpointBConsumer]\\n");
                 using var cancellation = new CancellationTokenSource();
@@ -258,8 +273,8 @@ public sealed class CheckpointBReleaseGateTests
                 return 0;
                 """);
 
-            CommandResult restore = RunDotnet(consumerDirectory, "restore", "--configfile", "NuGet.Config");
-            CommandResult result = RunDotnet(consumerDirectory, "run", "--no-restore");
+            CommandResult restore = RunIsolatedDotnet(consumerDirectory, "restore", "--configfile", "NuGet.Config", "--no-cache");
+            CommandResult result = RunIsolatedDotnet(consumerDirectory, "run", "--no-restore");
             Assert.Multiple(() =>
             {
                 Assert.That(restore.ExitCode, Is.EqualTo(0), restore.CombinedOutput);
@@ -267,6 +282,7 @@ public sealed class CheckpointBReleaseGateTests
                 Assert.That(result.StandardOutput, Does.Contain("ArchLinterNet.Testing"));
                 Assert.That(result.StandardOutput, Does.Contain("cancelled"));
                 Assert.That(result.StandardOutput, Does.Not.Contain(_repositoryRoot));
+                Assert.That(result.StandardOutput, Does.Contain(Path.Combine(_root, "nuget-packages")));
             });
         }
 
@@ -327,6 +343,64 @@ public sealed class CheckpointBReleaseGateTests
             };
             string fileName = $"checkpoint-b-{System.Runtime.InteropServices.RuntimeInformation.ProcessArchitecture.ToString().ToLowerInvariant()}-{Guid.NewGuid():N}.json";
             File.WriteAllText(Path.Combine(directory, fileName), JsonSerializer.Serialize(evidence, new JsonSerializerOptions { WriteIndented = true }));
+        }
+
+        private CommandResult RunIsolatedDotnet(string workingDirectory, params string[] arguments)
+        {
+            var startInfo = new ProcessStartInfo("dotnet")
+            {
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                UseShellExecute = false,
+                WorkingDirectory = workingDirectory,
+            };
+            startInfo.Environment["NUGET_PACKAGES"] = Path.Combine(_root, "nuget-packages");
+            startInfo.Environment["NUGET_HTTP_CACHE_PATH"] = Path.Combine(_root, "nuget-http-cache");
+            startInfo.Environment["NUGET_PLUGINS_CACHE_PATH"] = Path.Combine(_root, "nuget-plugins-cache");
+            foreach (string argument in arguments)
+            {
+                startInfo.ArgumentList.Add(argument);
+            }
+
+            return Run(startInfo);
+        }
+
+        private void PopulateIsolatedDependencyCache()
+        {
+            string bootstrapDirectory = Path.Combine(_root, "dependency-bootstrap");
+            Directory.CreateDirectory(bootstrapDirectory);
+            File.WriteAllText(Path.Combine(bootstrapDirectory, "CheckpointBDependencies.csproj"), """
+                <Project Sdk="Microsoft.NET.Sdk">
+                  <PropertyGroup><TargetFramework>net10.0</TargetFramework></PropertyGroup>
+                  <ItemGroup>
+                    <PackageReference Include="Buildalyzer" Version="9.0.0" />
+                    <PackageReference Include="JsonSchema.Net" Version="7.3.4" />
+                    <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="4.14.0" />
+                    <PackageReference Include="Microsoft.CodeAnalysis.VisualBasic" Version="4.14.0" />
+                    <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="9.0.0" />
+                    <PackageReference Include="System.CommandLine" Version="2.0.9" />
+                    <PackageReference Include="System.Security.Cryptography.Xml" Version="9.0.18" />
+                    <PackageReference Include="YamlDotNet" Version="16.3.0" />
+                  </ItemGroup>
+                </Project>
+                """);
+            CommandResult result = RunIsolatedDotnet(bootstrapDirectory, "restore");
+            Assert.That(result.ExitCode, Is.EqualTo(0), result.CombinedOutput);
+        }
+
+        private string WriteIsolatedNuGetConfig(string directory)
+        {
+            string path = Path.Combine(directory, "NuGet.Config");
+            File.WriteAllText(path, $"""
+                <?xml version="1.0" encoding="utf-8"?>
+                <configuration>
+                  <packageSources>
+                    <clear />
+                    <add key="checkpoint-b-candidate" value="{_feed}" />
+                  </packageSources>
+                </configuration>
+                """);
+            return path;
         }
 
         private void Pack()

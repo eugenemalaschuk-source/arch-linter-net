@@ -29,6 +29,7 @@ permissions:
 jobs:
   checkpoint-b:
     name: Checkpoint B (${{ matrix.id }})
+    needs: prepare-candidate
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 30
     strategy:
@@ -49,7 +50,9 @@ jobs:
             shell: zsh
     env:
       ARCH_LINTER_SOURCE_SHA: ${{ github.sha }}
-      CHECKPOINT_B_CANDIDATE_VERSION: 0.5.1
+      CHECKPOINT_B_CANDIDATE_VERSION: ${{ needs.prepare-candidate.outputs.package_version }}
+      CHECKPOINT_B_PACKAGE_MANIFEST: artifacts/candidate/package-manifest.json
+      CHECKPOINT_B_PACKAGE_FEED: artifacts/candidate
       CHECKPOINT_B_EVIDENCE_DIRECTORY: artifacts/checkpoint-b/${{ matrix.id }}
       CHECKPOINT_B_PLATFORM: ${{ matrix.id }}
       CHECKPOINT_B_SHELL: ${{ matrix.shell }}
@@ -68,6 +71,15 @@ jobs:
       - name: Restore
         run: make restore
 
+      - name: Download immutable candidate packages
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+        with:
+          name: nuget-candidate-${{ needs.prepare-candidate.outputs.package_version }}
+          path: artifacts/candidate
+
+      - name: Verify immutable candidate packages
+        run: python3 tools/release/package_manifest.py verify --packages-dir artifacts/candidate --manifest artifacts/candidate/package-manifest.json
+
       - name: Run packed-artifact Checkpoint B
         run: dotnet test tests/ArchLinterNet.Core.Tests --no-restore --filter FullyQualifiedName~CheckpointBReleaseGateTests
 
@@ -80,7 +92,7 @@ jobs:
 
   checkpoint-b-evidence:
     name: Aggregate Checkpoint B evidence
-    needs: checkpoint-b
+    needs: [checkpoint-b, prepare-candidate]
     runs-on: ubuntu-latest
     timeout-minutes: 30
 
@@ -102,7 +114,8 @@ jobs:
         run: |
           make restore
           make acceptance
-          openspec validate --all
+          npm install -g --ignore-scripts @fission-ai/openspec@1.6.0
+          openspec validate --all --strict
 
       - name: Download platform evidence
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
@@ -121,13 +134,11 @@ jobs:
           path: artifacts/checkpoint-b/release-evidence
           if-no-files-found: error
 
-  release:
-    name: Build NuGet packages
+  prepare-candidate:
+    name: Prepare immutable NuGet candidate
     runs-on: ubuntu-latest
-    needs: checkpoint-b-evidence
     permissions:
-      contents: write
-      id-token: write
+      contents: read
 
     outputs:
       package_version: ${{ steps.release_metadata.outputs.package_version }}
@@ -230,14 +241,38 @@ jobs:
       - name: Pack Testing
         run: dotnet pack src/ArchLinterNet.Testing/ArchLinterNet.Testing.csproj --configuration Release --no-build --output "$PACKAGE_OUTPUT" -p:PackageVersion="$PACKAGE_VERSION" -p:Version="$PACKAGE_VERSION" -p:PackageReleaseNotes="$PACKAGE_RELEASE_NOTES"
 
+      - name: Create immutable candidate manifest
+        run: python3 tools/release/package_manifest.py create --packages-dir "$PACKAGE_OUTPUT" --version "$PACKAGE_VERSION" --source-commit "$GITHUB_SHA" --output artifacts/packages/package-manifest.json
+
       - name: Upload package artifacts
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: nuget-packages-${{ env.PACKAGE_VERSION }}
+          name: nuget-candidate-${{ env.PACKAGE_VERSION }}
           path: |
-            ${{ env.PACKAGE_OUTPUT }}/*.nupkg
-            ${{ env.PACKAGE_OUTPUT }}/*.snupkg
+            ${{ env.PACKAGE_OUTPUT }}/
           if-no-files-found: error
+
+  release:
+    name: Publish verified NuGet candidate
+    needs: [prepare-candidate, checkpoint-b-evidence]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      id-token: write
+
+    outputs:
+      package_version: ${{ needs.prepare-candidate.outputs.package_version }}
+      target_tag: ${{ needs.prepare-candidate.outputs.target_tag }}
+
+    steps:
+      - name: Download validated candidate packages
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+        with:
+          name: nuget-candidate-${{ needs.prepare-candidate.outputs.package_version }}
+          path: artifacts/packages
+
+      - name: Verify candidate manifest before publication
+        run: python3 tools/release/package_manifest.py verify --packages-dir artifacts/packages --manifest artifacts/packages/package-manifest.json
 
       - name: NuGet login
         if: ${{ inputs.publish == true }}
@@ -246,11 +281,11 @@ jobs:
         with:
           user: ${{ secrets.NUGET_USER }}
 
-      - name: Publish to NuGet.org
+      - name: Publish verified packages to NuGet.org
         if: ${{ inputs.publish == true }}
         shell: bash
         run: |
-          for package in "$PACKAGE_OUTPUT"/*.nupkg; do
+          for package in artifacts/packages/*.nupkg; do
             dotnet nuget push "$package" --source https://api.nuget.org/v3/index.json --api-key "${{ steps.nuget-login.outputs.NUGET_API_KEY }}" --skip-duplicate
           done
 
@@ -271,7 +306,7 @@ jobs:
       - name: Download package artifacts
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
         with:
-          name: nuget-packages-${{ needs.release.outputs.package_version }}
+          name: nuget-candidate-${{ needs.release.outputs.package_version }}
           path: artifacts/packages
 
       - name: Create GitHub Release
