@@ -223,7 +223,6 @@ public sealed partial class ArchitectureAnalysisSnapshot : IDisposable
                 EnsureRequestedContractIdsAreKnownForMode(mode);
 
                 _cancellationToken.ThrowIfCancellationRequested();
-                ValidationTestBarrier.WaitForCancellationIfEnabled(_cancellationToken);
                 ValidationOutcome? cachedOutcome = _preflight.Blocked ? null : TryEvaluateFromCache(mode, timing);
                 WorkSnapshot? workBefore = cachedOutcome is null && !_preflight.Blocked
                     ? CaptureWorkSnapshot()

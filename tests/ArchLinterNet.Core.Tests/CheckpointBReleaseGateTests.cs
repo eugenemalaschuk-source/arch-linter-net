@@ -331,21 +331,27 @@ public sealed class CheckpointBReleaseGateTests
                 string policyPath = Path.Combine(AppContext.BaseDirectory, "checkpoint-b-policy.yml");
                 File.WriteAllText(policyPath, "version: 1\\nname: Synthetic Checkpoint B cancellation consumer\\n\\nlayers:\\n  consumer:\\n    namespace: CheckpointB.Consumer\\n\\nanalysis:\\n  target_assemblies: [CheckpointBConsumer]\\n");
                 using var cancellation = new CancellationTokenSource();
-                string barrierPath = Path.Combine(AppContext.BaseDirectory, "checkpoint-b-testing-validation-entered");
-                Environment.SetEnvironmentVariable("ARCH_LINTER_TEST_VALIDATION_BARRIER", barrierPath);
+                using var enteredValidation = new ManualResetEventSlim();
+                using var releaseValidation = new ManualResetEventSlim();
                 string cachePath = Path.Combine(AppContext.BaseDirectory, "checkpoint-b-cancelled-cache");
                 var builder = new ArchitectureValidationBuilder(policyPath)
                     .WithCancellation(cancellation.Token)
-                    .WithCache(AnalysisCacheOptions.AtPath(cachePath));
+                    .WithCache(AnalysisCacheOptions.AtPath(cachePath))
+                    .WithValidationEntryBarrier(() =>
+                    {
+                        enteredValidation.Set();
+                        releaseValidation.Wait(TimeSpan.FromSeconds(10));
+                    });
                 Task task = Task.Run(() =>
                 {
                     _ = builder.ValidateStrict();
                 });
-                if (!SpinWait.SpinUntil(() => File.Exists(barrierPath), TimeSpan.FromSeconds(10)))
+                if (!enteredValidation.Wait(TimeSpan.FromSeconds(10)))
                 {
                     return 2;
                 }
                 cancellation.Cancel();
+                releaseValidation.Set();
                 try
                 {
                     task.GetAwaiter().GetResult();
@@ -424,24 +430,22 @@ public sealed class CheckpointBReleaseGateTests
 
         public CheckpointScenarioResult AssertCliInFlightCancellation()
         {
-            if (OperatingSystem.IsWindows())
+            if (!OperatingSystem.IsLinux())
             {
                 return new CheckpointScenarioResult("in-flight-cancellation", "not_applicable",
-                    "The POSIX CLI interruption oracle runs on Linux and macOS.");
+                    "The process-observation CLI interruption oracle runs on Linux.");
             }
 
             using AdoptionAcceptanceFixture fixture = AdoptionAcceptanceFixture.Create("small");
             fixture.Build();
-            string barrier = Path.Combine(fixture.Root, "checkpoint-b-validation-entered");
             string output = Path.Combine(fixture.Root, "cancelled-report.json");
             string cache = Path.Combine(fixture.Root, "cancelled-cache");
             ProcessStartInfo startInfo = CreateShellStartInfo(fixture.Root,
                 ["--policy", fixture.PolicyPath, "--strict", "--ensure-built", "--cache", cache, "--report", $"json={output}"]);
             startInfo.Environment["DOTNET_CLI_DISABLE_COLOR"] = "1";
-            startInfo.Environment["ARCH_LINTER_TEST_VALIDATION_BARRIER"] = barrier;
             using Process process = Process.Start(startInfo) ?? throw new InvalidOperationException("Failed to start the CLI.");
-            Assert.That(SpinWait.SpinUntil(() => File.Exists(barrier), TimeSpan.FromSeconds(15)), Is.True,
-                "CLI did not enter validation before cancellation.");
+            Assert.That(SpinWait.SpinUntil(() => TargetAssemblyIsMapped(process.Id, "Synthetic.Small.dll"), TimeSpan.FromSeconds(30)),
+                Is.True, "CLI did not materialize the selected target assembly before cancellation.");
             SendTermination(process.Id);
             bool exited = process.WaitForExit(15_000);
             if (!exited)
@@ -701,6 +705,19 @@ public sealed class CheckpointBReleaseGateTests
                 ArgumentList = { "-TERM", processId.ToString(System.Globalization.CultureInfo.InvariantCulture) },
             });
             Assert.That(result.ExitCode, Is.EqualTo(0), result.CombinedOutput);
+        }
+
+        private static bool TargetAssemblyIsMapped(int processId, string assemblyFileName)
+        {
+            string mapsPath = $"/proc/{processId}/maps";
+            try
+            {
+                return File.ReadLines(mapsPath).Any(line => line.EndsWith(assemblyFileName, StringComparison.Ordinal));
+            }
+            catch (IOException)
+            {
+                return false;
+            }
         }
 
         private string PackagePath(string packageId)
