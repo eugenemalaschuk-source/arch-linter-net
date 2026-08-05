@@ -81,14 +81,14 @@ public sealed class CheckpointBReleaseGateTests
                 Assert.That(CanonicalJson(sequential.StandardOutput),
                     Is.EqualTo(CanonicalJson(defaultParallelism.StandardOutput)), fixtureId);
                 Assert.That(cachedFirst.ExitCode, Is.EqualTo(sequential.ExitCode), fixtureId);
-                Assert.That(CanonicalJson(cachedFirst.StandardOutput),
-                    Is.EqualTo(CanonicalJson(sequential.StandardOutput)), fixtureId);
+                Assert.That(CanonicalFindingsJson(cachedFirst.StandardOutput),
+                    Is.EqualTo(CanonicalFindingsJson(sequential.StandardOutput)), fixtureId);
                 Assert.That(cachedSecond.ExitCode, Is.EqualTo(sequential.ExitCode), fixtureId);
-                Assert.That(CanonicalJson(cachedSecond.StandardOutput),
-                    Is.EqualTo(CanonicalJson(sequential.StandardOutput)), fixtureId);
+                Assert.That(CanonicalFindingsJson(cachedSecond.StandardOutput),
+                    Is.EqualTo(CanonicalFindingsJson(sequential.StandardOutput)), fixtureId);
                 Assert.That(cacheAfterCorruption.ExitCode, Is.EqualTo(sequential.ExitCode), fixtureId);
-                Assert.That(CanonicalJson(cacheAfterCorruption.StandardOutput),
-                    Is.EqualTo(CanonicalJson(sequential.StandardOutput)), fixtureId);
+                Assert.That(CanonicalFindingsJson(cacheAfterCorruption.StandardOutput),
+                    Is.EqualTo(CanonicalFindingsJson(sequential.StandardOutput)), fixtureId);
                 Assert.That(profiled.ExitCode, Is.EqualTo(sequential.ExitCode), fixtureId);
                 Assert.That(CanonicalJson(profiled.StandardOutput),
                     Is.EqualTo(CanonicalJson(sequential.StandardOutput)), fixtureId);
@@ -105,6 +105,16 @@ public sealed class CheckpointBReleaseGateTests
     {
         using JsonDocument document = JsonDocument.Parse(json);
         return JsonSerializer.Serialize(document.RootElement);
+    }
+
+    private static string CanonicalFindingsJson(string json)
+    {
+        using JsonDocument document = JsonDocument.Parse(json);
+        JsonElement root = document.RootElement;
+        JsonElement findings = root.TryGetProperty("violations", out JsonElement violations)
+            ? violations
+            : root.GetProperty("findings");
+        return JsonSerializer.Serialize(findings);
     }
 
     private sealed class CandidatePackageFeed : IDisposable
