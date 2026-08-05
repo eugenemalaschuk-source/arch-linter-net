@@ -97,6 +97,8 @@ jobs:
 
           for required_schema in \
             analysis-build-state.schema.json \
+            analysis-cache.schema.json \
+            analysis-profile.schema.json \
             api-snapshot.schema.json \
             baseline.schema.json \
             compatibility-manifest.json \
@@ -145,16 +147,26 @@ jobs:
           ./tool/arch-linter-net schema list > schemas.txt
           grep -qx $'policy-root\tv1\thttps://archlinternet.dev/schema/0.5.1/dependencies.arch.schema.json\tschema/0.5.1/dependencies.arch.schema.json' schemas.txt
           grep -qx $'normalized-finding\tv1\thttps://archlinternet.dev/schema/0.5.1/normalized-finding.schema.json\tschema/0.5.1/normalized-finding.schema.json' schemas.txt
+          grep -qx $'analysis-cache\tv1\thttps://archlinternet.dev/schema/0.5.1/analysis-cache.schema.json\tschema/0.5.1/analysis-cache.schema.json' schemas.txt
+          grep -qx $'analysis-profile\tv1\thttps://archlinternet.dev/schema/0.5.1/analysis-profile.schema.json\tschema/0.5.1/analysis-profile.schema.json' schemas.txt
           ./tool/arch-linter-net schema print policy-root > printed-schema.json
           ./tool/arch-linter-net schema print normalized-finding > printed-normalized-finding-schema.json
+          ./tool/arch-linter-net schema print analysis-cache > printed-analysis-cache-schema.json
+          ./tool/arch-linter-net schema print analysis-profile > printed-analysis-profile-schema.json
 
           core_nupkg=$(printf '%s\n' "$GITHUB_WORKSPACE"/nupkg/ArchLinterNet.Core.*.nupkg)
           unzip -p "$core_nupkg" contentFiles/any/any/schema/0.5.1/dependencies.arch.schema.json > packaged-schema.json
           unzip -p "$core_nupkg" contentFiles/any/any/schema/0.5.1/normalized-finding.schema.json > packaged-normalized-finding-schema.json
+          unzip -p "$core_nupkg" contentFiles/any/any/schema/0.5.1/analysis-cache.schema.json > packaged-analysis-cache-schema.json
+          unzip -p "$core_nupkg" contentFiles/any/any/schema/0.5.1/analysis-profile.schema.json > packaged-analysis-profile-schema.json
           cmp printed-schema.json packaged-schema.json
           cmp printed-normalized-finding-schema.json packaged-normalized-finding-schema.json
+          cmp printed-analysis-cache-schema.json packaged-analysis-cache-schema.json
+          cmp printed-analysis-profile-schema.json packaged-analysis-profile-schema.json
           sha256sum printed-schema.json
           sha256sum printed-normalized-finding-schema.json
+          sha256sum printed-analysis-cache-schema.json
+          sha256sum printed-analysis-profile-schema.json
           popd >/dev/null
 
       - name: External consumer smoke test

@@ -4,7 +4,7 @@
 TBD - created by archiving change ship-versioned-packaged-schemas. Update Purpose after archive.
 ## Requirements
 ### Requirement: Release-matched packaged schema registry
-The system SHALL ship an immutable `adoption-stabilization/v1` compatibility manifest and exact 0.5.1 schema resources only for persisted formats whose writers are implemented and whose real generated output is validated: policy root v1, policy fragment v1, baseline v2 with identity version v1, public API snapshot v1, and analysis build-state receipt v1. Finding, analysis-cache, and analysis-profile schemas SHALL NOT be published in the immutable package registry until their owning slices provide implemented writers and real-output validation.
+The system SHALL ship an immutable `adoption-stabilization/v1` compatibility manifest and exact 0.5.1 schema resources only for persisted formats whose writers are implemented and whose real generated output is validated: policy root v1, policy fragment v1, baseline v2 with identity version v1, public API snapshot v1, normalized finding v1, analysis build-state receipt v1, analysis-cache v1, and analysis-profile v1. Future formats without implemented writers and generated-output validation SHALL NOT be published in the immutable package registry.
 
 Each manifest entry SHALL contain a logical schema id, document version, packaged resource path, immutable release-qualified `$id`, SHA-256 digest, read/write support, migration or deprecation note, and owning OpenSpec capability.
 
@@ -44,4 +44,19 @@ The immutable packaged schema registry SHALL publish the implemented versioned n
 #### Scenario: Offline schema validates generated diagnostics
 - **WHEN** an installed tool lists and prints the normalized diagnostic schema offline
 - **THEN** the exact packaged schema declares the supported finding schema version and validates generated diagnostic JSON
+
+### Requirement: Packaged machine-readable output schemas
+The immutable packaged schema registry SHALL publish the implemented `finding/v1`, `analysis-cache/v1`, and `analysis-profile/v1` JSON schemas only after output produced through their public writer or command paths validates against the exact packaged resource. Each descriptor's read/write support SHALL describe an implemented public contract: finding and cache readers SHALL reject or explicitly report unsupported future versions rather than interpreting them as v1; `analysis-profile` SHALL report write-only support until a public reader exists.
+
+#### Scenario: Packaged schemas validate generated output
+- **WHEN** a finding, persisted cache entry, or profile document is generated through its implemented public path
+- **THEN** it validates against the matching exact packaged schema bytes
+
+#### Scenario: Profile reader support is absent
+- **WHEN** an installed consumer lists the `analysis-profile` descriptor
+- **THEN** it reports write support and does not report read support
+
+#### Scenario: Installed package validates output offline
+- **WHEN** a freshly packed CLI/Core package is installed from a local feed in an offline directory
+- **THEN** schema discovery and printed-resource byte equivalence for finding, cache, and profile formats succeed without a repository checkout or network access
 

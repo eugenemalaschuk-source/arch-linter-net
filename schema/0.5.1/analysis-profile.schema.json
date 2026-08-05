@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://archlinternet.dev/schema/0.5.1/analysis-profile.schema.json",
   "title": "ArchLinterNet analysis profile v1",
-  "description": "Machine-readable analysis-profile/v1 document: deterministic counters plus optional environment-dependent measurements. Not yet registered in compatibility-manifest.json — see openspec/specs/packaged-schema-registry/spec.md.",
+  "description": "Machine-readable analysis-profile/v1 document: deterministic counters plus optional environment-dependent measurements.",
   "type": "object",
   "required": ["SchemaId", "CompletionStatus", "CancellationObserved", "Counters", "Phases", "Output"],
   "properties": {

@@ -3,28 +3,23 @@ using System.Text.Json.Nodes;
 using ArchLinterNet.Core.BuildState;
 using ArchLinterNet.Core.Caching;
 using ArchLinterNet.Core.Model;
-using ArchLinterNet.Core.Resolution;
 using ArchLinterNet.Core.Schema;
 using Json.Schema;
 using NUnit.Framework;
 
 namespace ArchLinterNet.Core.Tests;
 
-// Issue #365's review finding: "persisted entries validate against the source analysis-cache/v1
-// contract" — there was no dedicated JSON Schema for the analysis-cache/v1 entry format before this
-// change. Mirrors AnalysisProfileSchemaValidationTests's pattern:
-// schema/0.5.1/analysis-cache.schema.json is NOT yet registered in the packaged schema registry
-// (registration is #410's scope), so this test loads it directly and validates a real,
-// AnalysisCacheStore-serialized AnalysisCacheEntryV1 against it — including a violation carrying a
-// real closed-set Payload, so the schema's "$kind"/"value" envelope shape is actually exercised.
+// A real AnalysisCacheStore-serialized AnalysisCacheEntryV1 validates against the exact
+// release-matched resource returned by PackagedSchemaRegistry, including a violation carrying a
+// real closed-set Payload so the schema's "$kind"/"value" envelope is exercised.
 [TestFixture]
 public sealed class AnalysisCacheSchemaValidationTests
 {
     private static JsonSchema LoadSchema()
     {
-        string repositoryRoot = new ArchitectureRepositoryRootResolver().Resolve();
-        string schemaPath = Path.Combine(repositoryRoot, "schema", "0.5.1", "analysis-cache.schema.json");
-        return JsonSchema.FromText(File.ReadAllText(schemaPath));
+        PackagedSchemaRegistry registry = new();
+        Assert.That(registry.TryRead("analysis-cache", out string schemaText), Is.True);
+        return JsonSchema.FromText(schemaText);
     }
 
     private static AnalysisCacheEntryV1 BuildSampleEntry(string cacheRootPath)
@@ -160,10 +155,10 @@ public sealed class AnalysisCacheSchemaValidationTests
     }
 
     [Test]
-    public void PackagedSchemaRegistry_DoesNotYetListAnalysisCache()
+    public void PackagedSchemaRegistry_ListsAnalysisCache()
     {
         PackagedSchemaRegistry registry = new();
 
-        Assert.That(registry.List().Select(descriptor => descriptor.LogicalId), Does.Not.Contain("analysis-cache"));
+        Assert.That(registry.List().Select(descriptor => descriptor.LogicalId), Does.Contain("analysis-cache"));
     }
 }
