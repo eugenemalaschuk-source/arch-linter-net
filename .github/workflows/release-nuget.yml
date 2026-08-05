@@ -72,7 +72,7 @@ jobs:
         run: dotnet test tests/ArchLinterNet.Core.Tests --no-restore --filter FullyQualifiedName~CheckpointBReleaseGateTests
 
       - name: Upload Checkpoint B platform evidence
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: checkpoint-b-evidence-${{ matrix.id }}
           path: artifacts/checkpoint-b/${{ matrix.id }}
@@ -115,7 +115,7 @@ jobs:
         run: python3 tools/release/aggregate_checkpoint_b_evidence.py --input-dir artifacts/checkpoint-b/platforms --output-dir artifacts/checkpoint-b/release-evidence
 
       - name: Upload release evidence
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: checkpoint-b-release-evidence-0.5.1
           path: artifacts/checkpoint-b/release-evidence
