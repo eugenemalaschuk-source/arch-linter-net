@@ -440,34 +440,45 @@ public sealed class CheckpointBReleaseGateTests
             fixture.Build();
             string output = Path.Combine(fixture.Root, "cancelled-report.json");
             string cache = Path.Combine(fixture.Root, "cancelled-cache");
-            ProcessStartInfo startInfo = CreateShellStartInfo(fixture.Root,
+            ProcessStartInfo startInfo = CreateDirectToolStartInfo(fixture.Root,
                 ["--policy", fixture.PolicyPath, "--strict", "--ensure-built", "--cache", cache, "--report", $"json={output}"]);
             startInfo.Environment["DOTNET_CLI_DISABLE_COLOR"] = "1";
             using Process process = Process.Start(startInfo) ?? throw new InvalidOperationException("Failed to start the CLI.");
-            Assert.That(SpinWait.SpinUntil(() => CheckpointBReleaseGateProcessTree.TargetAssemblyIsMapped(process.Id, "Synthetic.Small.dll"), TimeSpan.FromSeconds(30)),
-                Is.True, "CLI did not materialize the selected target assembly before cancellation.");
-            SendTermination(process.Id);
-            bool exited = process.WaitForExit(15_000);
-            if (!exited)
+            try
             {
-                process.Kill(entireProcessTree: true);
-                process.WaitForExit();
+                Assert.That(SpinWait.SpinUntil(() => CheckpointBReleaseGateProcessTree.TargetAssemblyIsMapped(process.Id, "Synthetic.Small.dll"), TimeSpan.FromSeconds(30)),
+                    Is.True, "CLI did not materialize the selected target assembly before cancellation.");
+                SendTermination(process.Id);
+                bool exited = process.WaitForExit(15_000);
+                if (!exited)
+                {
+                    process.Kill(entireProcessTree: true);
+                    process.WaitForExit();
+                }
+                string standardOutput = process.StandardOutput.ReadToEnd();
+                string standardError = process.StandardError.ReadToEnd();
+                string[] cacheFiles = Directory.Exists(cache)
+                    ? Directory.EnumerateFiles(cache, "*", SearchOption.AllDirectories).ToArray()
+                    : [];
+                Assert.Multiple(() =>
+                {
+                    Assert.That(exited, Is.True, "Interrupted CLI did not exit.");
+                    Assert.That(process.ExitCode, Is.EqualTo(2), $"stdout:{standardOutput}{Environment.NewLine}stderr:{standardError}");
+                    Assert.That(standardOutput + standardError, Does.Contain("cancelled"));
+                    Assert.That(File.Exists(output), Is.False, "Cancellation must not publish a final report.");
+                    Assert.That(cacheFiles, Is.Empty);
+                    Assert.That(Directory.GetFiles(fixture.Root, "*.tmp", SearchOption.AllDirectories), Is.Empty);
+                });
+                return Passed("in-flight-cancellation");
             }
-            string standardOutput = process.StandardOutput.ReadToEnd();
-            string standardError = process.StandardError.ReadToEnd();
-            string[] cacheFiles = Directory.Exists(cache)
-                ? Directory.EnumerateFiles(cache, "*", SearchOption.AllDirectories).ToArray()
-                : [];
-            Assert.Multiple(() =>
+            finally
             {
-                Assert.That(exited, Is.True, "Interrupted CLI did not exit.");
-                Assert.That(process.ExitCode, Is.EqualTo(2), $"stdout:{standardOutput}{Environment.NewLine}stderr:{standardError}");
-                Assert.That(standardOutput + standardError, Does.Contain("cancelled"));
-                Assert.That(File.Exists(output), Is.False, "Cancellation must not publish a final report.");
-                Assert.That(cacheFiles, Is.Empty);
-                Assert.That(Directory.GetFiles(fixture.Root, "*.tmp", SearchOption.AllDirectories), Is.Empty);
-            });
-            return Passed("in-flight-cancellation");
+                if (!process.HasExited)
+                {
+                    process.Kill(entireProcessTree: true);
+                    process.WaitForExit();
+                }
+            }
         }
 
         public IReadOnlyList<CheckpointScenarioResult> ShellScenarios()
@@ -626,6 +637,23 @@ public sealed class CheckpointBReleaseGateTests
             }
 
             startInfo.ArgumentList.Add(ToolPath());
+            foreach (string argument in arguments)
+            {
+                startInfo.ArgumentList.Add(argument);
+            }
+
+            return startInfo;
+        }
+
+        private ProcessStartInfo CreateDirectToolStartInfo(string workingDirectory, IReadOnlyList<string> arguments)
+        {
+            var startInfo = new ProcessStartInfo(ToolPath())
+            {
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                UseShellExecute = false,
+                WorkingDirectory = workingDirectory,
+            };
             foreach (string argument in arguments)
             {
                 startInfo.ArgumentList.Add(argument);
