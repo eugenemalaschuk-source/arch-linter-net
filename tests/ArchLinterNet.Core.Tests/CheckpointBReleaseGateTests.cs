@@ -387,7 +387,7 @@ public sealed class CheckpointBReleaseGateTests
                 Assert.That(result.StandardOutput, Does.Contain("cancelled"));
                 Assert.That(result.StandardOutput, Does.Not.Contain(_repositoryRoot));
                 Assert.That(assets, Does.Contain($"ArchLinterNet.Testing/{_candidateVersion}"));
-                Assert.That(assets.ToUpperInvariant(), Does.Contain(Path.Combine(_root, "nuget-packages").Replace('\\', '/').ToUpperInvariant()));
+                Assert.That(CheckpointBReleaseGateNuGetAssets.ContainsPackageFolder(assets, Path.Combine(_root, "nuget-packages")), Is.True);
                 Assert.That(Sha256(assemblyLocation), Is.EqualTo(packageAssemblySha256));
                 Assert.That(result.StandardOutput, Does.Not.Contain("successful"));
                 Assert.That(result.StandardOutput, Does.Contain("cancelled-in-flight-no-cache-or-output"));
