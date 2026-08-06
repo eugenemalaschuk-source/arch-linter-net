@@ -5,15 +5,22 @@
 Define the single, versioned compatibility and architecture contract for ArchLinterNet 0.5.1 across policy authoring, exact identity, baselines, API snapshots, diagnostics, build state, output, cache, profiling, cancellation, packaged schemas, and supported execution environments.
 ## Requirements
 ### Requirement: One public 0.5.1 release boundary
-The system SHALL expose one public stabilization release boundary, `0.5.1`, governed by compatibility envelope `adoption-stabilization/v1`. Checkpoint A is internal integration evidence only; only the complete Checkpoint B contract and acceptance corpus may authorize publishing 0.5.1.
+The system SHALL expose one public stabilization release boundary, `0.5.1`,
+governed by compatibility envelope `adoption-stabilization/v1`. Checkpoint A is
+internal integration evidence only; only a complete, reproducible Checkpoint B
+packed-artifact acceptance matrix and release-evidence summary may authorize
+publishing 0.5.1.
 
 #### Scenario: Checkpoint A succeeds
 - **WHEN** the safety-critical Checkpoint A scenarios pass
-- **THEN** development may continue but no intermediate public stabilization version is implied or authorized
+- **THEN** development may continue but no intermediate public stabilization
+  version is implied or authorized
 
 #### Scenario: Unrelated design slices progress independently
-- **WHEN** one child task has an approved applicable design slice and another unrelated slice remains open
-- **THEN** the first task may proceed without redefining the unresolved slice or waiting for the complete issue to close
+- **WHEN** one child task has an approved applicable design slice and another
+  unrelated slice remains open
+- **THEN** the first task may proceed without redefining the unresolved slice or
+  waiting for the complete issue to close
 
 ### Requirement: Release-matched compatibility registry
 The system SHALL publish one `adoption-stabilization/v1` registry for 0.5.1 that identifies every shipped persisted or machine-readable contract by logical schema id, document version, packaged resource path, and compatibility behavior. The 0.5.1 registry SHALL contain exactly the formats whose owning slices implement their writers and validate real generated output:
@@ -356,4 +363,15 @@ rewrite, or broaden such entries.
 #### Scenario: A user verifies a requalified baseline
 - **WHEN** baseline verification encounters a structured identity that no longer exactly matches after requalification
 - **THEN** verification SHALL fail with the structured lifecycle status and the user SHALL be able to follow a documented review, update/recapture, and prune path.
+
+### Requirement: Checkpoint B authorizes exact release artifacts
+Checkpoint B authorization SHALL apply only to the version-resolved package
+manifest downloaded by every platform runner and re-verified by the publishing
+job. A later pack, dry-run rerun, or package set with different metadata or
+digest SHALL require a new Checkpoint B result.
+
+#### Scenario: Publishing candidate differs from tested candidate
+- **WHEN** a publishing job observes a candidate package digest not present in
+  the successful Checkpoint B manifest
+- **THEN** it fails before publication
 

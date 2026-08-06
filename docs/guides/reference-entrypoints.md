@@ -21,14 +21,14 @@ then invokes the tool exactly once:
 ```bash
 dotnet tool install ArchLinterNet.Cli --version 0.5.1
 dotnet tool restore
-dotnet arch-linter-net --policy architecture/arch.yml --mode strict
+dotnet arch-linter-net --policy architecture/arch.yml --mode strict --ensure-built
 ```
 
 For JSON and SARIF artifacts, use product report routing rather than shell
 redirection where multiple files are needed:
 
 ```bash
-dotnet arch-linter-net --policy architecture/arch.yml --mode strict \
+dotnet arch-linter-net --policy architecture/arch.yml --mode strict --ensure-built \
   --report json=artifacts/architecture.json \
   --report sarif=artifacts/architecture.sarif
 ```
@@ -46,7 +46,7 @@ and neither evaluates arguments nor merges the tool's standard streams.
 set -u
 
 tool=(dotnet arch-linter-net)
-args=(--policy "architecture/Example Product/arch.yml" --mode strict)
+args=(--policy "architecture/Example Product/arch.yml" --mode strict --ensure-built)
 
 "${tool[@]}" "${args[@]}"
 exit "$?"
@@ -96,7 +96,7 @@ interface.
 architecture:
 	@mkdir -p artifacts
 	@set +e; \
-	  dotnet arch-linter-net --policy architecture/arch.yml --mode strict; \
+	  dotnet arch-linter-net --policy architecture/arch.yml --mode strict --ensure-built; \
 	  status=$$?; \
 	  printf '%s\n' $$status > artifacts/architecture.exit-code; \
 	  exit 0
@@ -127,7 +127,7 @@ version: '3'
 tasks:
   architecture:
     cmds:
-      - dotnet arch-linter-net --policy architecture/arch.yml --mode strict
+      - dotnet arch-linter-net --policy architecture/arch.yml --mode strict --ensure-built
 ```
 
 The command is a fixed literal: do not append untrusted values through Task's
@@ -167,7 +167,7 @@ not parse display prose to decide success.
 dotnet tool restore
 dotnet restore
 dotnet build --no-restore
-dotnet arch-linter-net --policy architecture/arch.yml --mode strict \
+dotnet arch-linter-net --policy architecture/arch.yml --mode strict --ensure-built \
   --report json=artifacts/architecture.json \
   --report sarif=artifacts/architecture.sarif
 status=$?
@@ -178,7 +178,7 @@ return status unchanged
 For a resource-constrained runner, choose the supported sequential mode:
 
 ```text
-dotnet arch-linter-net --policy architecture/arch.yml --mode strict --max-parallelism 1
+dotnet arch-linter-net --policy architecture/arch.yml --mode strict --ensure-built --max-parallelism 1
 ```
 
 For a prepared offline runner, use the installed tool's schema registry and
@@ -195,7 +195,7 @@ a caller-owned cache, opt in deliberately and retain profile evidence
 separately from reports:
 
 ```text
-dotnet arch-linter-net --policy architecture/arch.yml --mode strict \
+dotnet arch-linter-net --policy architecture/arch.yml --mode strict --ensure-built \
   --cache .architecture-cache \
   --profile artifacts/architecture-profile.json
 ```
@@ -227,7 +227,7 @@ jobs:
       - run: dotnet build --no-restore
       - name: Strict validation
         run: >-
-          dotnet arch-linter-net --policy architecture/arch.yml --mode strict
+          dotnet arch-linter-net --policy architecture/arch.yml --mode strict --ensure-built
           --report json=artifacts/architecture.json
           --report sarif=artifacts/architecture.sarif
       - name: Upload diagnostics

@@ -27,12 +27,141 @@ permissions:
   contents: read
 
 jobs:
-  release:
-    name: Build NuGet packages
+  checkpoint-b:
+    name: Checkpoint B (${{ matrix.id }})
+    needs: prepare-candidate
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - id: linux-x64
+            runner: ubuntu-latest
+            shell: bash
+          - id: windows-x64
+            runner: windows-latest
+            shell: pwsh
+          - id: macos-arm64
+            runner: macos-14
+            shell: zsh
+          - id: macos-x64
+            runner: macos-15-intel
+            shell: zsh
+    env:
+      ARCH_LINTER_SOURCE_SHA: ${{ github.sha }}
+      CHECKPOINT_B_CANDIDATE_VERSION: ${{ needs.prepare-candidate.outputs.package_version }}
+      CHECKPOINT_B_PACKAGE_MANIFEST: ${{ github.workspace }}/artifacts/candidate/package-manifest.json
+      CHECKPOINT_B_PACKAGE_FEED: ${{ github.workspace }}/artifacts/candidate
+      CHECKPOINT_B_EVIDENCE_DIRECTORY: ${{ github.workspace }}/artifacts/checkpoint-b/${{ matrix.id }}
+      CHECKPOINT_B_PLATFORM: ${{ matrix.id }}
+      CHECKPOINT_B_SHELL: ${{ matrix.shell }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Restore
+        run: make restore
+
+      - name: Download immutable candidate packages
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+        with:
+          name: nuget-candidate-${{ needs.prepare-candidate.outputs.package_version }}
+          path: artifacts/candidate
+
+      - name: Verify immutable candidate packages
+        run: python3 tools/release/package_manifest.py verify --packages-dir artifacts/candidate --manifest artifacts/candidate/package-manifest.json
+
+      - name: Run packed-artifact Checkpoint B with bash
+        if: ${{ matrix.shell == 'bash' }}
+        shell: bash
+        run: dotnet test tests/ArchLinterNet.Core.Tests --no-restore --filter FullyQualifiedName~CheckpointBReleaseGateTests
+
+      - name: Run packed-artifact Checkpoint B with zsh
+        if: ${{ matrix.shell == 'zsh' }}
+        shell: zsh {0}
+        run: dotnet test tests/ArchLinterNet.Core.Tests --no-restore --filter FullyQualifiedName~CheckpointBReleaseGateTests
+
+      - name: Run packed-artifact Checkpoint B with PowerShell
+        if: ${{ matrix.shell == 'pwsh' }}
+        shell: pwsh
+        run: dotnet test tests/ArchLinterNet.Core.Tests --no-restore --filter FullyQualifiedName~CheckpointBReleaseGateTests
+
+      - name: Upload Checkpoint B platform evidence
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: checkpoint-b-evidence-${{ matrix.id }}
+          path: artifacts/checkpoint-b/${{ matrix.id }}
+          if-no-files-found: error
+
+  checkpoint-b-evidence:
+    name: Aggregate Checkpoint B evidence
+    needs: [checkpoint-b, prepare-candidate]
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Setup uv
+        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9
+
+      - name: Restore and run repository gates
+        run: |
+          make restore
+          make acceptance
+          npm ci --ignore-scripts --prefix tools/openspec
+          npm exec --prefix tools/openspec -- openspec validate --all --strict
+
+      - name: Download immutable candidate manifest
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+        with:
+          name: nuget-candidate-${{ needs.prepare-candidate.outputs.package_version }}
+          path: artifacts/candidate
+
+      - name: Verify immutable candidate manifest
+        run: python3 tools/release/package_manifest.py verify --packages-dir artifacts/candidate --manifest artifacts/candidate/package-manifest.json
+
+      - name: Record passed repository gates
+        run: python3 tools/release/create_repository_gate_evidence.py --candidate-manifest artifacts/candidate/package-manifest.json --source-commit "$GITHUB_SHA" --output artifacts/checkpoint-b/repository-gates.json
+
+      - name: Download platform evidence
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+        with:
+          pattern: checkpoint-b-evidence-*
+          path: artifacts/checkpoint-b/platforms
+
+      - name: Generate deterministic release evidence
+        run: python3 tools/release/aggregate_checkpoint_b_evidence.py --input-dir artifacts/checkpoint-b/platforms --candidate-manifest artifacts/candidate/package-manifest.json --repository-gates artifacts/checkpoint-b/repository-gates.json --output-dir artifacts/checkpoint-b/release-evidence
+
+      - name: Upload release evidence
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: checkpoint-b-release-evidence-${{ needs.prepare-candidate.outputs.package_version }}
+          path: artifacts/checkpoint-b/release-evidence
+          if-no-files-found: error
+
+  prepare-candidate:
+    name: Prepare immutable NuGet candidate
     runs-on: ubuntu-latest
     permissions:
-      contents: write
-      id-token: write
+      contents: read
 
     outputs:
       package_version: ${{ steps.release_metadata.outputs.package_version }}
@@ -74,42 +203,6 @@ jobs:
           echo "package_version=$PACKAGE_VERSION" >> "$GITHUB_OUTPUT"
           echo "target_tag=$TARGET_TAG" >> "$GITHUB_OUTPUT"
 
-      - name: Generate release notes
-        shell: bash
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          mkdir -p artifacts/release-notes
-
-          payload="$(jq -n \
-            --arg tag_name "$TARGET_TAG" \
-            --arg target_commitish "$GITHUB_SHA" \
-            --arg configuration_file_path ".github/release.yml" \
-            '{ tag_name: $tag_name, target_commitish: $target_commitish, configuration_file_path: $configuration_file_path }')"
-
-          if [ -n "$PREVIOUS_TAG" ]; then
-            payload="$(echo "$payload" | jq --arg previous_tag_name "$PREVIOUS_TAG" '. + { previous_tag_name: $previous_tag_name }')"
-          fi
-
-          gh api \
-            --method POST \
-            repos/${{ github.repository }}/releases/generate-notes \
-            --input - <<< "$payload" \
-            --jq '.body' \
-            | tee artifacts/release-notes/release-notes.md
-
-          echo "Generated release notes for $TARGET_TAG"
-          echo "---"
-          cat artifacts/release-notes/release-notes.md
-          echo "---"
-
-      - name: Upload release notes artifact
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
-        with:
-          name: release-notes-${{ env.PACKAGE_VERSION }}
-          path: artifacts/release-notes/release-notes.md
-          if-no-files-found: error
-
       - name: Restore
         run: make restore
 
@@ -117,6 +210,8 @@ jobs:
         run: dotnet build ArchLinterNet.slnx --configuration Release --no-restore -p:Version="$PACKAGE_VERSION"
 
       - name: Acceptance
+        env:
+          CHECKPOINT_B_CANDIDATE_VERSION: ${{ env.PACKAGE_VERSION }}
         run: make acceptance
 
       - name: Prepare NuGet package release notes
@@ -135,13 +230,64 @@ jobs:
       - name: Pack Testing
         run: dotnet pack src/ArchLinterNet.Testing/ArchLinterNet.Testing.csproj --configuration Release --no-build --output "$PACKAGE_OUTPUT" -p:PackageVersion="$PACKAGE_VERSION" -p:Version="$PACKAGE_VERSION" -p:PackageReleaseNotes="$PACKAGE_RELEASE_NOTES"
 
+      - name: Create immutable candidate manifest
+        run: python3 tools/release/package_manifest.py create --packages-dir "$PACKAGE_OUTPUT" --version "$PACKAGE_VERSION" --source-commit "$GITHUB_SHA" --output artifacts/packages/package-manifest.json
+
       - name: Upload package artifacts
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: nuget-packages-${{ env.PACKAGE_VERSION }}
+          name: nuget-candidate-${{ env.PACKAGE_VERSION }}
           path: |
-            ${{ env.PACKAGE_OUTPUT }}/*.nupkg
-            ${{ env.PACKAGE_OUTPUT }}/*.snupkg
+            ${{ env.PACKAGE_OUTPUT }}/
+          if-no-files-found: error
+
+  release:
+    name: Publish verified NuGet candidate
+    needs: [prepare-candidate, checkpoint-b-evidence]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      id-token: write
+
+    outputs:
+      package_version: ${{ needs.prepare-candidate.outputs.package_version }}
+      target_tag: ${{ needs.prepare-candidate.outputs.target_tag }}
+
+    steps:
+      - name: Checkout release metadata
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+
+      - name: Download validated candidate packages
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+        with:
+          name: nuget-candidate-${{ needs.prepare-candidate.outputs.package_version }}
+          path: artifacts/packages
+
+      - name: Verify candidate manifest before publication
+        run: python3 tools/release/package_manifest.py verify --packages-dir artifacts/packages --manifest artifacts/packages/package-manifest.json
+
+      - name: Generate release notes after Checkpoint B
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TARGET_TAG: ${{ needs.prepare-candidate.outputs.target_tag }}
+        run: |
+          mkdir -p artifacts/release-notes
+          jq -n \
+            --arg tag_name "$TARGET_TAG" \
+            --arg target_commitish "$GITHUB_SHA" \
+            --arg configuration_file_path ".github/release.yml" \
+            '{ tag_name: $tag_name, target_commitish: $target_commitish, configuration_file_path: $configuration_file_path }' \
+            | gh api --method POST repos/${{ github.repository }}/releases/generate-notes --input - --jq '.body' \
+            | tee artifacts/release-notes/release-notes.md
+
+      - name: Upload release notes artifact
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: release-notes-${{ needs.prepare-candidate.outputs.package_version }}
+          path: artifacts/release-notes/release-notes.md
           if-no-files-found: error
 
       - name: NuGet login
@@ -151,11 +297,11 @@ jobs:
         with:
           user: ${{ secrets.NUGET_USER }}
 
-      - name: Publish to NuGet.org
+      - name: Publish verified packages to NuGet.org
         if: ${{ inputs.publish == true }}
         shell: bash
         run: |
-          for package in "$PACKAGE_OUTPUT"/*.nupkg; do
+          for package in artifacts/packages/*.nupkg; do
             dotnet nuget push "$package" --source https://api.nuget.org/v3/index.json --api-key "${{ steps.nuget-login.outputs.NUGET_API_KEY }}" --skip-duplicate
           done
 
@@ -176,7 +322,7 @@ jobs:
       - name: Download package artifacts
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
         with:
-          name: nuget-packages-${{ needs.release.outputs.package_version }}
+          name: nuget-candidate-${{ needs.release.outputs.package_version }}
           path: artifacts/packages
 
       - name: Create GitHub Release
