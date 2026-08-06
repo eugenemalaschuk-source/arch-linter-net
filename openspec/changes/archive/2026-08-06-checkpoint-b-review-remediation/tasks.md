@@ -6,9 +6,9 @@
 ## 2. Evidence and specification integrity
 
 - [x] 2.1 Reject duplicate scenario IDs in the evidence aggregator.
-- [ ] 2.2 Replace remaining owning-spec TBD and complete the archived validation task record.
+- [x] 2.2 Replace remaining owning-spec TBD and complete the archived validation task record.
 
 ## 3. Verification
 
-- [ ] 3.1 Run focused tests, formatting, lint, acceptance, and strict OpenSpec validation.
-- [ ] 3.2 Archive the remediation change and run a non-publishing release workflow.
+- [x] 3.1 Run focused tests, formatting, lint, acceptance, and strict OpenSpec validation.
+- [x] 3.2 Archive the remediation change and run a non-publishing release workflow.

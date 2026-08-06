@@ -19,4 +19,4 @@
 ## 4. Verification
 
 - [x] 4.1 Run focused tests, formatting, lint, acceptance, and strict OpenSpec validation.
-- [ ] 4.2 Archive the corrective OpenSpec change and run the non-publishing release workflow.
+- [x] 4.2 Archive the corrective OpenSpec change and run the non-publishing release workflow.
