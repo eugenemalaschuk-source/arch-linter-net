@@ -146,7 +146,6 @@ jobs:
         with:
           pattern: checkpoint-b-evidence-*
           path: artifacts/checkpoint-b/platforms
-          merge-multiple: true
 
       - name: Generate deterministic release evidence
         run: python3 tools/release/aggregate_checkpoint_b_evidence.py --input-dir artifacts/checkpoint-b/platforms --candidate-manifest artifacts/candidate/package-manifest.json --repository-gates artifacts/checkpoint-b/repository-gates.json --output-dir artifacts/checkpoint-b/release-evidence
