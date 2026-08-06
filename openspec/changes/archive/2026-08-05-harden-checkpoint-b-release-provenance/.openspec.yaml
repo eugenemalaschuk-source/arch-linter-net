@@ -1,0 +1,4 @@
+schema: spec-driven
+created: 2026-08-05
+goal: "Address PR #432 review findings about package provenance, evidence
+  integrity, and scenario completeness."

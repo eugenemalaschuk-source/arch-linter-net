@@ -29,6 +29,7 @@ public sealed class ArchitectureValidationBuilder
     private string? _requestedRuntimeIdentifier;
     private int? _maxParallelism;
     private CancellationToken _cancellationToken;
+    private Action? _validationEntryBarrier;
 
     public ArchitectureValidationBuilder(string policyPath)
     {
@@ -122,6 +123,16 @@ public sealed class ArchitectureValidationBuilder
     public ArchitectureValidationBuilder WithCancellation(CancellationToken cancellationToken)
     {
         _cancellationToken = cancellationToken;
+        return this;
+    }
+
+    /// <summary>
+    /// Invokes a caller-owned synchronization barrier from inside validation immediately before
+    /// the engine begins work. This is primarily useful for deterministic cancellation tests.
+    /// </summary>
+    public ArchitectureValidationBuilder WithValidationEntryBarrier(Action barrier)
+    {
+        _validationEntryBarrier = barrier ?? throw new ArgumentNullException(nameof(barrier));
         return this;
     }
 
@@ -248,6 +259,8 @@ public sealed class ArchitectureValidationBuilder
         };
 
         ValidationTiming? timing = _collectTimings || _collectProfile ? new ValidationTiming() : null;
+        _validationEntryBarrier?.Invoke();
+        _cancellationToken.ThrowIfCancellationRequested();
         (ValidationOutcome outcome, ArchitectureAnalysisSnapshotCounters counters) =
             _engine.Value.ValidateWithCounters(request, timing);
 

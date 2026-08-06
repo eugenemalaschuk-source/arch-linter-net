@@ -1,0 +1,8 @@
+{
+  "private": true,
+  "name": "arch-linter-net-openspec-tooling",
+  "version": "1.0.0",
+  "dependencies": {
+    "@fission-ai/openspec": "1.6.0"
+  }
+}

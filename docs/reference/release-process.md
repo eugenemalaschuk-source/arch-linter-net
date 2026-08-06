@@ -17,9 +17,20 @@ The GitHub Release is the durable human-facing release record. The workflow does
 
 0.5.1 is the one public adoption-stabilization release. Checkpoint A is
 internal evidence only; a green packed-artifact Checkpoint B is the only release
-authorization. Before publication, verify the [0.5.1 release notes](release-notes-0-5-1.md),
-[migration guide](../guides/migration-to-0-5-1.md), and installed-schema
-commands against the candidate packages.
+authorization. The manual release workflow resolves the release version, packs
+one immutable candidate artifact, and runs this gate against that artifact on
+Linux x64, Windows x64/PowerShell, macOS arm64, and real macOS x86_64. It then
+re-verifies the candidate manifest and publishes those exact `.nupkg` files;
+it never repacks after Checkpoint B. The run uploads
+`checkpoint-b-release-evidence-<version>` as the immutable audit record.
+Inspect its JSON and Markdown files for the package digests, candidate-manifest
+digest, commit, matrix, gate status, and explicit authorization statement. A
+missing platform artifact, invalid digest, or failed Checkpoint B test blocks
+publication. A dry-run is evidence for its own immutable artifact only: a
+subsequent publish run creates and validates a new candidate artifact. Before
+publication, verify the
+[0.5.1 release notes](release-notes-0-5-1.md), [migration guide](../guides/migration-to-0-5-1.md),
+and installed-schema commands against the candidate packages.
 
 ## Versioning
 
@@ -116,6 +127,8 @@ Run the release workflow with `publish: false`.
 
 Expected dry-run result:
 
+- the four-platform packed-artifact Checkpoint B matrix and aggregated release
+  evidence pass for the candidate;
 - restore, Release build, and acceptance validation pass;
 - release notes are generated as workflow artifacts;
 - package artifacts are built with one calculated package version;

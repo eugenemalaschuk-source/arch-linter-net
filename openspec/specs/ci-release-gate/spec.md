@@ -2,9 +2,7 @@
 
 ## Purpose
 Ensures the release workflow runs the full acceptance gate before packing and publishing packages, without altering the existing CI workflow.
-
 ## Requirements
-
 ### Requirement: Release workflow runs acceptance gate before packing packages
 The manual release workflow SHALL run the repository acceptance gate before building NuGet packages.
 
@@ -23,3 +21,15 @@ The pull request CI workflow SHALL NOT be modified by this change.
 #### Scenario: Pull request CI workflow is untouched
 - **WHEN** this change is applied
 - **THEN** the pull request CI workflow file SHALL have no diff
+
+### Requirement: Release pipeline publishes validated immutable candidates
+The manual release workflow SHALL calculate version, build final metadata,
+pack and manifest candidate packages once, validate the downloaded candidate set
+through Checkpoint B, and publish only the same digest-verified artifacts. It
+SHALL install the pinned OpenSpec CLI and run `openspec validate --all --strict`
+before evidence aggregation.
+
+#### Scenario: Strict OpenSpec validation fails
+- **WHEN** the strict OpenSpec gate fails or its pinned executable is unavailable
+- **THEN** evidence aggregation and publication do not run
+

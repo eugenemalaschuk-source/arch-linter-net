@@ -73,6 +73,25 @@ internal sealed class AdoptionAcceptanceFixture : IDisposable
         }
     }
 
+    public long AddLargeEmbeddedResource(string fileName, long byteCount)
+    {
+        if (byteCount <= 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(byteCount));
+        }
+
+        string resourcePath = Path.Combine(Root, fileName);
+        using (FileStream stream = File.Create(resourcePath))
+        {
+            stream.SetLength(byteCount);
+        }
+
+        string projectPath = ProjectPaths.Single();
+        string project = File.ReadAllText(projectPath);
+        File.WriteAllText(projectPath, project.Replace("</Project>", $"  <ItemGroup><EmbeddedResource Include=\"{fileName}\" /></ItemGroup>{Environment.NewLine}</Project>", StringComparison.Ordinal));
+        return byteCount;
+    }
+
     public void Dispose()
     {
         if (Directory.Exists(Root))
