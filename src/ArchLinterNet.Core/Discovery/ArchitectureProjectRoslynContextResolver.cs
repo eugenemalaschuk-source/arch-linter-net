@@ -18,6 +18,8 @@ internal sealed class ArchitectureProjectRoslynContextResolver : IArchitecturePr
 
         try
         {
+            IReadOnlyList<ArchitectureProjectPrimaryArtifactPreserver.Snapshot> primaryArtifacts =
+                ArchitectureProjectPrimaryArtifactPreserver.Capture(projectAbsolutePath);
             AnalyzerManager manager = new();
             IProjectAnalyzer? analyzer = manager.GetProject(IOPath.Parse(projectAbsolutePath));
 
@@ -27,7 +29,15 @@ internal sealed class ArchitectureProjectRoslynContextResolver : IArchitecturePr
                     $"Buildalyzer could not create a project analyzer for '{projectAbsolutePath}'.");
             }
 
-            IAnalyzerResults results = analyzer.Build(new EnvironmentOptions { DesignTime = true, Restore = false });
+            IAnalyzerResults results;
+            try
+            {
+                results = analyzer.Build(new EnvironmentOptions { DesignTime = true, Restore = false });
+            }
+            finally
+            {
+                ArchitectureProjectPrimaryArtifactPreserver.Restore(primaryArtifacts);
+            }
             cancellationToken.ThrowIfCancellationRequested();
 
             IAnalyzerResult? result = results.FirstOrDefault(candidate => candidate.Succeeded);
@@ -66,4 +76,5 @@ internal sealed class ArchitectureProjectRoslynContextResolver : IArchitecturePr
                 $"MSBuild evaluation threw for project '{projectAbsolutePath}': {ex.Message}");
         }
     }
+
 }

@@ -116,6 +116,27 @@ public sealed class ArchitectureProjectRoslynContextResolverTests
     }
 
     [Test]
+    public void Resolve_BuiltProject_PreservesPrimaryOutputs()
+    {
+        string outputDirectory = Path.Combine(
+            Path.GetDirectoryName(_consumerProjectPath)!, "bin", "Debug", "net10.0");
+        string assemblyPath = Path.Combine(outputDirectory, "Fixture.Consumer.dll");
+        string pdbPath = Path.Combine(outputDirectory, "Fixture.Consumer.pdb");
+        byte[] assemblyBefore = File.ReadAllBytes(assemblyPath);
+        byte[] pdbBefore = File.ReadAllBytes(pdbPath);
+
+        ArchitectureProjectRoslynResolution resolution =
+            new ArchitectureProjectRoslynContextResolver().Resolve(_consumerProjectPath);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(resolution.Succeeded, Is.True, resolution.FailureReason);
+            Assert.That(File.ReadAllBytes(assemblyPath), Is.EqualTo(assemblyBefore));
+            Assert.That(File.ReadAllBytes(pdbPath), Is.EqualTo(pdbBefore));
+        });
+    }
+
+    [Test]
     public void Resolve_ProjectNeverRestored_FailsWithReason()
     {
         string notRestoredDir = Path.Combine(_fixtureRoot, "Fixture.NotRestored");

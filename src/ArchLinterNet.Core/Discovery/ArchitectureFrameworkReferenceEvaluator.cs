@@ -25,6 +25,8 @@ internal sealed class ArchitectureFrameworkReferenceEvaluator : IArchitectureFra
 
         try
         {
+            IReadOnlyList<ArchitectureProjectPrimaryArtifactPreserver.Snapshot> primaryArtifacts =
+                ArchitectureProjectPrimaryArtifactPreserver.Capture(projectAbsolutePath);
             AnalyzerManager manager = new();
             IProjectAnalyzer? analyzer = manager.GetProject(IOPath.Parse(projectAbsolutePath));
 
@@ -46,7 +48,15 @@ internal sealed class ArchitectureFrameworkReferenceEvaluator : IArchitectureFra
             // restore is local/offline in practice (implicit SDK packages are already present in the
             // local NuGet cache alongside the installed SDK), so it does not require network access
             // for a project whose dependencies are already restorable from cache.
-            IAnalyzerResults results = analyzer.Build(new EnvironmentOptions { DesignTime = true, Restore = true });
+            IAnalyzerResults results;
+            try
+            {
+                results = analyzer.Build(new EnvironmentOptions { DesignTime = true, Restore = true });
+            }
+            finally
+            {
+                ArchitectureProjectPrimaryArtifactPreserver.Restore(primaryArtifacts);
+            }
 
             List<IAnalyzerResult> perTfmResults = results.Results
                 .Where(result => !string.IsNullOrEmpty(result.TargetFramework))
