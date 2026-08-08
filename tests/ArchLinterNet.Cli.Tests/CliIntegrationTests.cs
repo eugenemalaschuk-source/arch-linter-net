@@ -12,6 +12,7 @@ public partial class CliIntegrationTests
     private static string _passingPolicy = null!;
     private static string _failingPolicy = null!;
     private static string _coveragePolicy = null!;
+    private static string _allCoverageScopesPolicy = null!;
     private static string _graphPolicy = null!;
     private static string _passingWithIdsPolicy = null!;
 
@@ -26,6 +27,8 @@ public partial class CliIntegrationTests
             _repoRoot, "tests", "ArchLinterNet.Cli.Tests", "TestPolicies", "failing-policy.yml");
         _coveragePolicy = Path.Combine(
             _repoRoot, "tests", "ArchLinterNet.Cli.Tests", "TestPolicies", "coverage-policy.yml");
+        _allCoverageScopesPolicy = Path.Combine(
+            _repoRoot, "tests", "ArchLinterNet.Cli.Tests", "TestPolicies", "all-coverage-scopes-policy.yml");
         _graphPolicy = Path.Combine(
             _repoRoot, "tests", "ArchLinterNet.Cli.Tests", "TestPolicies", "graph-policy.yml");
         _passingWithIdsPolicy = Path.Combine(

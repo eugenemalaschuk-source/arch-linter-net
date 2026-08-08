@@ -27,7 +27,7 @@ internal static class ArchitecturePolicyEffectiveSchemaValidator
             return;
         }
 
-        string details = string.Join(
+        string details = DescribeInvalidDiscoveryCoverageRoots(instance) ?? string.Join(
             "; ",
             results.Details
                 .Where(detail => !detail.IsValid)
@@ -43,6 +43,40 @@ internal static class ArchitecturePolicyEffectiveSchemaValidator
             ArchitecturePolicyImportErrorCategory.SourceShape,
             $"Composed policy does not satisfy the effective policy schema: {details}",
             location);
+    }
+
+    private static string? DescribeInvalidDiscoveryCoverageRoots(JsonNode? instance)
+    {
+        if (instance is not JsonObject root
+            || root["contracts"] is not JsonObject contracts)
+        {
+            return null;
+        }
+
+        foreach (string groupName in new[] { "strict_coverage", "audit_coverage" })
+        {
+            if (contracts[groupName] is not JsonArray contractsInGroup)
+            {
+                continue;
+            }
+
+            for (int index = 0; index < contractsInGroup.Count; index++)
+            {
+                if (contractsInGroup[index] is not JsonObject contract
+                    || !contract.ContainsKey("roots")
+                    || contract["scope"] is not JsonValue scopeValue
+                    || !scopeValue.TryGetValue(out string? scope)
+                    || (scope != "project" && scope != "assembly"))
+                {
+                    continue;
+                }
+
+                return $"/contracts/{groupName}/{index}/roots: 'roots' is not valid for {scope} coverage; " +
+                    "that scope classifies all discovered units.";
+            }
+        }
+
+        return null;
     }
 
     private static JsonSchema LoadSchema()
