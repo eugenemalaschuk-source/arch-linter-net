@@ -76,9 +76,13 @@ public sealed class CoverageScopePolicyValidationTests
         Assert.DoesNotThrow(() => new ArchitecturePolicyDocumentLoader().Load(root));
     }
 
-    [TestCase("project")]
-    [TestCase("assembly")]
-    public void Load_ImportedDiscoveryWideCoverageWithRoots_RejectsTheInvalidField(string scope)
+    [TestCase("strict_coverage", "project")]
+    [TestCase("strict_coverage", "assembly")]
+    [TestCase("audit_coverage", "project")]
+    [TestCase("audit_coverage", "assembly")]
+    public void Load_ImportedDiscoveryWideCoverageWithRoots_RejectsTheInvalidField(
+        string coverageGroup,
+        string scope)
     {
         string root = Write("architecture/root.yml", """
             version: 1
@@ -94,7 +98,7 @@ public sealed class CoverageScopePolicyValidationTests
             """);
         Write("architecture/coverage.yml", $"""
             contracts:
-              strict_coverage:
+              {coverageGroup}:
                 - name: {scope}-coverage
                   scope: {scope}
                   roots:
@@ -106,6 +110,36 @@ public sealed class CoverageScopePolicyValidationTests
             () => new ArchitecturePolicyDocumentLoader().Load(root))!;
 
         Assert.That(exception.Message, Does.Contain("effective policy schema").And.Contain("roots"));
+    }
+
+    [Test]
+    public void Load_ImportedNamespaceCoverageWithoutRoots_UsesTheGenericSchemaDiagnostic()
+    {
+        string root = Write("architecture/root.yml", """
+            version: 1
+            name: Imported invalid namespace coverage
+            imports: [coverage.yml]
+            layers:
+              domain:
+                namespace: App.Domain
+            analysis:
+              projects: [src/App/App.csproj]
+            contracts:
+              strict: []
+            """);
+        Write("architecture/coverage.yml", """
+            contracts:
+              strict_coverage:
+                - name: namespace-coverage
+                  scope: namespace
+                  reason: Every application namespace must be governed.
+            """);
+
+        ArchitecturePolicyImportException exception = Assert.Throws<ArchitecturePolicyImportException>(
+            () => new ArchitecturePolicyDocumentLoader().Load(root))!;
+
+        Assert.That(exception.Message, Does.Contain("effective policy schema")
+            .And.Not.Contain("that scope classifies all discovered units"));
     }
 
     private string Write(string relativePath, string content)
