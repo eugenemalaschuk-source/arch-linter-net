@@ -1,0 +1,44 @@
+version: 1
+name: All issue coverage scopes
+
+layers:
+  domain:
+    namespace: App.Domain
+  application:
+    namespace: App.Application
+
+analysis:
+  projects: [src/App/App.csproj]
+
+contracts:
+  strict:
+    - id: application-does-not-depend-on-domain
+      name: application-does-not-depend-on-domain
+      source: application
+      forbidden: [domain]
+  strict_coverage:
+    - id: namespace-coverage
+      name: namespace-coverage
+      scope: namespace
+      roots:
+        - namespace: App
+      reason: Every application namespace must be governed.
+    - id: project-coverage
+      name: project-coverage
+      scope: project
+      reason: Every discovered project must be governed.
+    - id: assembly-coverage
+      name: assembly-coverage
+      scope: assembly
+      reason: Every resolved assembly must be governed.
+    - id: dependency-edge-coverage
+      name: dependency-edge-coverage
+      scope: dependency_edge
+      between:
+        - [application, domain]
+      reason: Every observed layer edge must be governed.
+    - id: rule-input-coverage
+      name: rule-input-coverage
+      scope: rule_input
+      contract_ids: [application-does-not-depend-on-domain]
+      reason: Every selected rule input must be meaningful.

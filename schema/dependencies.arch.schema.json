@@ -2041,7 +2041,7 @@
             "roots": {
               "type": "array",
               "minItems": 1,
-              "description": "Units to classify (the scan boundary the contract classifies, not coverage evidence by itself). Required for, and only valid with, scope: namespace, project, or assembly. Item shape depends on scope: namespace uses coverageNamespaceRoot, project/assembly use coverageDiscoveryRoot (see scope-specific allOf constraints below)."
+              "description": "Units to classify (the scan boundary the contract classifies, not coverage evidence by itself). Required for scope: namespace; optional for scope: semantic_role; and invalid for project, assembly, dependency_edge, and rule_input. Namespace and semantic-role roots use coverageNamespaceRoot."
             },
             "between": {
               "type": "array",
@@ -2090,23 +2090,19 @@
         {
           "if": { "properties": { "scope": { "const": "project" } }, "required": ["scope"] },
           "then": {
-            "required": ["roots"],
             "properties": {
-              "roots": { "items": { "$ref": "#/$defs/coverageDiscoveryRoot" } },
               "exclude": { "items": { "$ref": "#/$defs/coverageProjectExclusion" }, "default": [] }
             },
-            "not": { "anyOf": [{ "required": ["between"] }, { "required": ["contract_ids"] }, { "required": ["optional_inputs"] }] }
+            "not": { "anyOf": [{ "required": ["roots"] }, { "required": ["between"] }, { "required": ["contract_ids"] }, { "required": ["optional_inputs"] }] }
           }
         },
         {
           "if": { "properties": { "scope": { "const": "assembly" } }, "required": ["scope"] },
           "then": {
-            "required": ["roots"],
             "properties": {
-              "roots": { "items": { "$ref": "#/$defs/coverageDiscoveryRoot" } },
               "exclude": { "items": { "$ref": "#/$defs/coverageAssemblyExclusion" }, "default": [] }
             },
-            "not": { "anyOf": [{ "required": ["between"] }, { "required": ["contract_ids"] }, { "required": ["optional_inputs"] }] }
+            "not": { "anyOf": [{ "required": ["roots"] }, { "required": ["between"] }, { "required": ["contract_ids"] }, { "required": ["optional_inputs"] }] }
           }
         },
         {

@@ -146,6 +146,34 @@ public sealed class ArchitectureContractSchemaInstanceValidationTests
         Assert.That(Validate(Yaml, "coverageContract"), Is.False);
     }
 
+    [TestCase("project")]
+    [TestCase("assembly")]
+    public void CoverageContract_DiscoveryWideScope_AcceptsNoRoots(string scope)
+    {
+        string yaml = $"""
+            name: {scope}-coverage
+            scope: {scope}
+            reason: Every discovered {scope} must be governed.
+            """;
+
+        Assert.That(Validate(yaml, "coverageContract"), Is.True);
+    }
+
+    [TestCase("project")]
+    [TestCase("assembly")]
+    public void CoverageContract_DiscoveryWideScope_RejectsRoots(string scope)
+    {
+        string yaml = $"""
+            name: {scope}-coverage
+            scope: {scope}
+            reason: Every discovered {scope} must be governed.
+            roots:
+              - namespace: App
+            """;
+
+        Assert.That(Validate(yaml, "coverageContract"), Is.False);
+    }
+
     [Test]
     public void ClassificationOverride_NamespaceScopedWithReason_IsValid()
     {

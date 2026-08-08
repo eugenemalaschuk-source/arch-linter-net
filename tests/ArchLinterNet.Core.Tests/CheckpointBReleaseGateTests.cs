@@ -12,7 +12,7 @@ namespace ArchLinterNet.Core.Tests;
 [Category("E2E")]
 [Category("ReleaseGate")]
 [CancelAfter(300_000)]
-public sealed class CheckpointBReleaseGateTests
+public sealed partial class CheckpointBReleaseGateTests
 {
     private const string CandidateVersionEnvironmentVariable = "CHECKPOINT_B_CANDIDATE_VERSION";
     private const string DefaultCandidateVersion = "0.5.1";
@@ -260,6 +260,7 @@ public sealed class CheckpointBReleaseGateTests
             {
                 Assert.That(core.GetEntry($"contentFiles/any/any/schema/0.5.1/{schema}"), Is.Not.Null, schema);
             }
+            AssertPackedCoverageScopeSchema(core);
 
             return Passed("packed-package-provenance");
         }
