@@ -18,8 +18,7 @@ internal sealed class ArchitectureProjectRoslynContextResolver : IArchitecturePr
 
         try
         {
-            IReadOnlyList<ArchitectureProjectPrimaryArtifactPreserver.Snapshot> primaryArtifacts =
-                ArchitectureProjectPrimaryArtifactPreserver.Capture(projectAbsolutePath);
+            using ArchitectureDesignTimeBuildIsolation isolation = ArchitectureDesignTimeBuildIsolation.Create();
             AnalyzerManager manager = new();
             IProjectAnalyzer? analyzer = manager.GetProject(IOPath.Parse(projectAbsolutePath));
 
@@ -29,15 +28,9 @@ internal sealed class ArchitectureProjectRoslynContextResolver : IArchitecturePr
                     $"Buildalyzer could not create a project analyzer for '{projectAbsolutePath}'.");
             }
 
+            analyzer.SetGlobalProperty("IntermediateOutputPath", isolation.IntermediateOutputPath);
             IAnalyzerResults results;
-            try
-            {
-                results = analyzer.Build(new EnvironmentOptions { DesignTime = true, Restore = false });
-            }
-            finally
-            {
-                ArchitectureProjectPrimaryArtifactPreserver.Restore(primaryArtifacts);
-            }
+            results = analyzer.Build(new EnvironmentOptions { DesignTime = true, Restore = false });
             cancellationToken.ThrowIfCancellationRequested();
 
             IAnalyzerResult? result = results.FirstOrDefault(candidate => candidate.Succeeded);

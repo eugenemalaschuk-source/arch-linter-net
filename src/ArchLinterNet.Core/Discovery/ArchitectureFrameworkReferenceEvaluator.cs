@@ -25,8 +25,7 @@ internal sealed class ArchitectureFrameworkReferenceEvaluator : IArchitectureFra
 
         try
         {
-            IReadOnlyList<ArchitectureProjectPrimaryArtifactPreserver.Snapshot> primaryArtifacts =
-                ArchitectureProjectPrimaryArtifactPreserver.Capture(projectAbsolutePath);
+            using ArchitectureDesignTimeBuildIsolation isolation = ArchitectureDesignTimeBuildIsolation.Create();
             AnalyzerManager manager = new();
             IProjectAnalyzer? analyzer = manager.GetProject(IOPath.Parse(projectAbsolutePath));
 
@@ -41,6 +40,7 @@ internal sealed class ArchitectureFrameworkReferenceEvaluator : IArchitectureFra
             // FrameworkReference declarations (e.g. Condition="'$(Configuration)'=='Release'") instead
             // of always evaluating against MSBuild's own Configuration default.
             analyzer.SetGlobalProperty("Configuration", configuration);
+            analyzer.SetGlobalProperty("IntermediateOutputPath", isolation.IntermediateOutputPath);
 
             // Restore = true: empirically, a design-time build without a prior restore fails (no
             // project.assets.json) even for a project that declares no PackageReferences at all -
@@ -48,15 +48,7 @@ internal sealed class ArchitectureFrameworkReferenceEvaluator : IArchitectureFra
             // restore is local/offline in practice (implicit SDK packages are already present in the
             // local NuGet cache alongside the installed SDK), so it does not require network access
             // for a project whose dependencies are already restorable from cache.
-            IAnalyzerResults results;
-            try
-            {
-                results = analyzer.Build(new EnvironmentOptions { DesignTime = true, Restore = true });
-            }
-            finally
-            {
-                ArchitectureProjectPrimaryArtifactPreserver.Restore(primaryArtifacts);
-            }
+            IAnalyzerResults results = analyzer.Build(new EnvironmentOptions { DesignTime = true, Restore = true });
 
             List<IAnalyzerResult> perTfmResults = results.Results
                 .Where(result => !string.IsNullOrEmpty(result.TargetFramework))
