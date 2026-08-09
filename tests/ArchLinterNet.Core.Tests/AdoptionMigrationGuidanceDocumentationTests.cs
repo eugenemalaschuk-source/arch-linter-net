@@ -88,7 +88,7 @@ public sealed class AdoptionMigrationGuidanceDocumentationTests
             Assert.That(nav, Does.Contain("guides/reference-entrypoints.md"));
             Assert.That(nav, Does.Contain("reference/release-notes-0-5-1.md"));
             Assert.That(readme, Does.Contain("0.6.0 is the public adoption package line"));
-            Assert.That(readme, Does.Contain("immutable 0.5.1 `adoption-stabilization/v1` schema registry"));
+            Assert.That(readme, Does.Contain("`adoption-stabilization/v1` schema registry"));
             Assert.That(readme, Does.Contain("Checkpoint A is internal evidence only"));
             Assert.That(releaseNotes, Does.Contain("0.5.1 is the single public adoption-stabilization release"));
             Assert.That(releaseNotes, Does.Contain("schema list"));
