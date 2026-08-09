@@ -247,8 +247,14 @@ public sealed partial class BaselineCommandHandlerTests
         Assert.Multiple(() =>
         {
             Assert.That(result, Is.EqualTo(CliExitCodes.InvalidArgumentsOrRuntimeError));
-            Assert.That(console.ErrorText, Does.Contain("baseline cannot be pruned"));
-            Assert.That(console.ErrorText, Does.Contain("Source.D: Forbidden.D"));
+            Assert.That(console.ErrorText, Is.Empty);
+            using JsonDocument document = JsonDocument.Parse(console.OutputText);
+            Assert.That(document.RootElement.GetProperty("schema_version").GetInt32(), Is.EqualTo(1));
+            Assert.That(document.RootElement.GetProperty("status").GetString(), Is.EqualTo("error"));
+            Assert.That(document.RootElement.GetProperty("error").GetProperty("category").GetString(),
+                Is.EqualTo("configuration-error"));
+            Assert.That(document.RootElement.GetProperty("error").GetProperty("details").GetProperty("violations")[0]
+                .GetProperty("source_type").GetString(), Is.EqualTo("Source.D"));
         });
     }
 
@@ -277,7 +283,7 @@ public sealed partial class BaselineCommandHandlerTests
             new BaselinePruneCommandOptions("policy.yml", "baseline.yml", "pruned.yml", "strict", null, "json", _write, Array.Empty<string>(), false));
 
         Assert.That(exceptionResult, Is.EqualTo(CliExitCodes.InvalidArgumentsOrRuntimeError));
-        Assert.That(exceptionConsole.ErrorText, Does.Contain("Baseline prune error: prune boom"));
+        Assert.That(exceptionConsole.OutputText, Does.Contain("Baseline prune error: prune boom"));
     }
 
     [Test]
@@ -392,7 +398,7 @@ public sealed partial class BaselineCommandHandlerTests
             new BaselineDiffCommandOptions("policy.yml", "baseline.yml", "strict", null, "json", Array.Empty<string>(), false));
 
         Assert.That(exceptionResult, Is.EqualTo(CliExitCodes.InvalidArgumentsOrRuntimeError));
-        Assert.That(exceptionConsole.ErrorText, Does.Contain("Baseline diff error: diff boom"));
+        Assert.That(exceptionConsole.OutputText, Does.Contain("Baseline diff error: diff boom"));
     }
 
     [Test]
@@ -467,8 +473,13 @@ public sealed partial class BaselineCommandHandlerTests
         Assert.Multiple(() =>
         {
             Assert.That(result, Is.EqualTo(CliExitCodes.InvalidArgumentsOrRuntimeError));
-            Assert.That(console.ErrorText, Does.Contain("baseline cannot be verified"));
-            Assert.That(console.ErrorText, Does.Contain("Source.H: Forbidden.H"));
+            Assert.That(console.ErrorText, Is.Empty);
+            using JsonDocument document = JsonDocument.Parse(console.OutputText);
+            Assert.That(document.RootElement.GetProperty("kind").GetString(), Is.EqualTo("command_error"));
+            Assert.That(document.RootElement.GetProperty("error").GetProperty("message").GetString(),
+                Does.Contain("baseline cannot be verified"));
+            Assert.That(document.RootElement.GetProperty("error").GetProperty("details").GetProperty("violations")[0]
+                .GetProperty("forbidden_namespace").GetString(), Is.EqualTo("Forbidden.H"));
         });
     }
 
@@ -497,7 +508,7 @@ public sealed partial class BaselineCommandHandlerTests
             new BaselineVerifyCommandOptions("policy.yml", "baseline.yml", "strict", null, "json", Array.Empty<string>(), false));
 
         Assert.That(exceptionResult, Is.EqualTo(CliExitCodes.InvalidArgumentsOrRuntimeError));
-        Assert.That(exceptionConsole.ErrorText, Does.Contain("Baseline verify error: verify boom"));
+        Assert.That(exceptionConsole.OutputText, Does.Contain("Baseline verify error: verify boom"));
     }
 
     private static ArchitectureViolation CreateViolation(string sourceType, string forbiddenNamespace)
@@ -541,7 +552,12 @@ public sealed partial class BaselineCommandHandlerTests
         var console = new RecordingConsole();
         int result = execute(console);
         Assert.That(result, Is.EqualTo(CliExitCodes.InvalidArgumentsOrRuntimeError));
-        Assert.That(console.ErrorText, Does.Contain(expectedError));
+        Assert.That(console.ErrorText + console.OutputText, Does.Contain(expectedError));
+        if (!string.IsNullOrWhiteSpace(console.OutputText))
+        {
+            using JsonDocument document = JsonDocument.Parse(console.OutputText);
+            Assert.That(document.RootElement.GetProperty("status").GetString(), Is.EqualTo("error"));
+        }
     }
 
     private sealed class StubFileSystem(params string[] existingPaths) : IFileSystem

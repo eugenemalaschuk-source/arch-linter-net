@@ -58,11 +58,11 @@ internal sealed class BaselineUpdateCommandHandler(ICliRuntime runtime, ICliCons
             {
                 if (outcome.Error != null)
                 {
-                    console.Error.WriteLine(outcome.Error);
+                    CliErrorOutputWriter.Write(console, options.Format, "configuration-error", outcome.Error);
                 }
                 else
                 {
-                    WriteConfigurationViolations(outcome.ConfigurationViolations);
+                    WriteConfigurationViolations(options.Format, outcome.ConfigurationViolations);
                 }
 
                 return CliExitCodes.InvalidArgumentsOrRuntimeError;
@@ -94,7 +94,7 @@ internal sealed class BaselineUpdateCommandHandler(ICliRuntime runtime, ICliCons
         }
         catch (Exception ex)
         {
-            console.Error.WriteLine($"Baseline update error: {ex.Message}");
+            CliErrorOutputWriter.Write(console, options.Format, "unexpected-tool-failure", $"Baseline update error: {ex.Message}");
             return CliExitCodes.InvalidArgumentsOrRuntimeError;
         }
     }
@@ -143,12 +143,8 @@ internal sealed class BaselineUpdateCommandHandler(ICliRuntime runtime, ICliCons
         }
     }
 
-    private void WriteConfigurationViolations(IReadOnlyCollection<ArchitectureViolation> violations)
+    private void WriteConfigurationViolations(string format, IReadOnlyCollection<ArchitectureViolation> violations)
     {
-        console.Error.WriteLine("Configuration violations detected — baseline cannot be updated:");
-        foreach (ArchitectureViolation violation in violations)
-        {
-            console.Error.WriteLine($"  {violation.SourceType}: {violation.ForbiddenNamespace}");
-        }
+        CliErrorOutputWriter.WriteConfigurationViolations(console, format, "updated", violations);
     }
 }

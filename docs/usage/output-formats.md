@@ -58,6 +58,8 @@ arch-linter-net --strict --json > architecture-violations.json
 
 JSON output is written to stdout by default. Use `--report json=<path>` to write JSON to a file while routing a different format to stdout. When `--timings` is also enabled, timings are written to stderr so stdout remains parseable.
 
+For baseline-configuration and public-API snapshot or build-state failures after a command has selected `--format json`, stdout remains one parseable JSON error document and the existing exit code is retained. Those newly unified paths use a common envelope containing `schema_version: 1`, `status: "error"`, `kind: "command_error"`, and an `error` object with `category`, `message`, and typed `details` when the command has diagnostic evidence. Validation, policy-check, graph, and explain preserve their existing structured JSON error documents. Human output remains on stderr for the same failures.
+
 Current JSON output is a single top-level object with these arrays:
 
 - `violations`

@@ -53,7 +53,7 @@ internal sealed class BaselinePruneCommandHandler(ICliRuntime runtime, ICliConso
 
             if (!outcome.Succeeded)
             {
-                WriteConfigurationViolations(outcome.ConfigurationViolations);
+                WriteConfigurationViolations(options.Format, outcome.ConfigurationViolations);
                 return CliExitCodes.InvalidArgumentsOrRuntimeError;
             }
 
@@ -106,7 +106,7 @@ internal sealed class BaselinePruneCommandHandler(ICliRuntime runtime, ICliConso
         }
         catch (Exception ex)
         {
-            console.Error.WriteLine($"Baseline prune error: {ex.Message}");
+            CliErrorOutputWriter.Write(console, options.Format, "unexpected-tool-failure", $"Baseline prune error: {ex.Message}");
             return CliExitCodes.InvalidArgumentsOrRuntimeError;
         }
     }
@@ -160,13 +160,9 @@ internal sealed class BaselinePruneCommandHandler(ICliRuntime runtime, ICliConso
         }
     }
 
-    private void WriteConfigurationViolations(IReadOnlyCollection<ArchitectureViolation> violations)
+    private void WriteConfigurationViolations(string format, IReadOnlyCollection<ArchitectureViolation> violations)
     {
-        console.Error.WriteLine("Configuration violations detected — baseline cannot be pruned:");
-        foreach (ArchitectureViolation violation in violations)
-        {
-            console.Error.WriteLine($"  {violation.SourceType}: {violation.ForbiddenNamespace}");
-        }
+        CliErrorOutputWriter.WriteConfigurationViolations(console, format, "pruned", violations);
     }
 
     private static bool SamePath(string left, string right)

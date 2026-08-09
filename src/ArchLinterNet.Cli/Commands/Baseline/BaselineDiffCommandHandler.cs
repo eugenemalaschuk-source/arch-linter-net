@@ -66,7 +66,7 @@ internal sealed class BaselineDiffCommandHandler(ICliRuntime runtime, ICliConsol
 
             if (!outcome.Succeeded)
             {
-                WriteConfigurationViolations(outcome.ConfigurationViolations);
+                WriteConfigurationViolations(options.Format, outcome.ConfigurationViolations);
                 return CliExitCodes.InvalidArgumentsOrRuntimeError;
             }
 
@@ -91,18 +91,14 @@ internal sealed class BaselineDiffCommandHandler(ICliRuntime runtime, ICliConsol
         }
         catch (Exception ex)
         {
-            console.Error.WriteLine($"Baseline diff error: {ex.Message}");
+            CliErrorOutputWriter.Write(console, options.Format, "unexpected-tool-failure", $"Baseline diff error: {ex.Message}");
             return CliExitCodes.InvalidArgumentsOrRuntimeError;
         }
     }
 
-    private void WriteConfigurationViolations(IReadOnlyCollection<ArchitectureViolation> violations)
+    private void WriteConfigurationViolations(string format, IReadOnlyCollection<ArchitectureViolation> violations)
     {
-        console.Error.WriteLine("Configuration violations detected — baseline cannot be diffed:");
-        foreach (ArchitectureViolation violation in violations)
-        {
-            console.Error.WriteLine($"  {violation.SourceType}: {violation.ForbiddenNamespace}");
-        }
+        CliErrorOutputWriter.WriteConfigurationViolations(console, format, "diffed", violations);
     }
 
     /// <summary>

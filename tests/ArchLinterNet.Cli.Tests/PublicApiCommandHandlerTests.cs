@@ -208,6 +208,39 @@ public sealed partial class PublicApiCommandHandlerTests
     }
 
     [Test]
+    public void Capture_PreflightBlockedWithJson_WritesOneStructuredErrorDocument()
+    {
+        StubFileSystem fileSystem = new(PolicyPath);
+        RecordingConsole console = new();
+        StubRuntime runtime = new()
+        {
+            CaptureOutcome = new PublicApiCaptureOutcome(
+                false, null, 0, null,
+                [
+                    new BuildStatePreflightDiagnostic(
+                        "Acme.Module", null, BuildStatePreflightState.MissingArtifact,
+                        new BuildStatePreflightEvidence("Acme.Module.csproj", "Acme.Module")),
+                ],
+                "Build state preflight is blocked"),
+        };
+
+        int exitCode = new PublicApiCaptureCommandHandler(runtime, console, fileSystem).Execute(
+            new PublicApiCaptureCommandOptions(PolicyPath, ContractId, SnapshotPath, null, "json", false, false));
+
+        using JsonDocument document = JsonDocument.Parse(console.OutputText);
+        Assert.Multiple(() =>
+        {
+            Assert.That(exitCode, Is.EqualTo(CliExitCodes.InvalidArgumentsOrRuntimeError));
+            Assert.That(console.ErrorText, Is.Empty);
+            Assert.That(document.RootElement.GetProperty("schema_version").GetInt32(), Is.EqualTo(1));
+            Assert.That(document.RootElement.GetProperty("error").GetProperty("category").GetString(),
+                Is.EqualTo("build-state-preflight-failed"));
+            Assert.That(document.RootElement.GetProperty("error").GetProperty("details").GetProperty("diagnostics")[0]
+                .GetProperty("contract_name").GetString(), Is.EqualTo("Acme.Module"));
+        });
+    }
+
+    [Test]
     public void Diff_InSyncSnapshotReturnsSuccess()
     {
         RecordingConsole console = new();

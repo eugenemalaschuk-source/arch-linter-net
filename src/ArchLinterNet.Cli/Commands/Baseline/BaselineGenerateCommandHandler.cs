@@ -45,11 +45,11 @@ internal sealed class BaselineGenerateCommandHandler(ICliRuntime runtime, ICliCo
             {
                 if (outcome.Error != null)
                 {
-                    console.Error.WriteLine(outcome.Error);
+                    CliErrorOutputWriter.Write(console, options.Format, "configuration-error", outcome.Error);
                 }
                 else
                 {
-                    WriteConfigurationViolations(outcome.ConfigurationViolations);
+                    WriteConfigurationViolations(options.Format, outcome.ConfigurationViolations);
                 }
 
                 return CliExitCodes.InvalidArgumentsOrRuntimeError;
@@ -79,7 +79,7 @@ internal sealed class BaselineGenerateCommandHandler(ICliRuntime runtime, ICliCo
         }
         catch (Exception ex)
         {
-            console.Error.WriteLine($"Baseline generation error: {ex.Message}");
+            CliErrorOutputWriter.Write(console, options.Format, "unexpected-tool-failure", $"Baseline generation error: {ex.Message}");
             return CliExitCodes.InvalidArgumentsOrRuntimeError;
         }
     }
@@ -120,12 +120,8 @@ internal sealed class BaselineGenerateCommandHandler(ICliRuntime runtime, ICliCo
         }
     }
 
-    private void WriteConfigurationViolations(IReadOnlyCollection<ArchitectureViolation> violations)
+    private void WriteConfigurationViolations(string format, IReadOnlyCollection<ArchitectureViolation> violations)
     {
-        console.Error.WriteLine("Configuration violations detected — baseline cannot be generated:");
-        foreach (ArchitectureViolation violation in violations)
-        {
-            console.Error.WriteLine($"  {violation.SourceType}: {violation.ForbiddenNamespace}");
-        }
+        CliErrorOutputWriter.WriteConfigurationViolations(console, format, "generated", violations);
     }
 }

@@ -223,6 +223,6 @@ public sealed partial class BaselineCommandHandlerTests
             new BaselineMigrateCommandOptions("policy.yml", "baseline.yml", "out.yml", null, "json", false, Force: false, ShowHelp: false));
 
         Assert.That(exceptionResult, Is.EqualTo(CliExitCodes.InvalidArgumentsOrRuntimeError));
-        Assert.That(exceptionConsole.ErrorText, Does.Contain("Baseline migrate error: migrate boom"));
+        Assert.That(exceptionConsole.OutputText, Does.Contain("Baseline migrate error: migrate boom"));
     }
 }

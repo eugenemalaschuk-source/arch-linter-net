@@ -75,7 +75,7 @@ internal sealed class BaselineWriteGate(ICliConsole console, IFileSystem fileSys
 
         if (request.CommentDiagnostic != null)
         {
-            console.Error.WriteLine(request.CommentDiagnostic);
+            WriteError(request, "configuration-error", request.CommentDiagnostic);
             return false;
         }
 
@@ -108,7 +108,7 @@ internal sealed class BaselineWriteGate(ICliConsole console, IFileSystem fileSys
 
         if (request.CommentDiagnostic != null)
         {
-            console.Error.WriteLine(request.CommentDiagnostic);
+            WriteError(request, "configuration-error", request.CommentDiagnostic);
             return false;
         }
 
@@ -164,10 +164,17 @@ internal sealed class BaselineWriteGate(ICliConsole console, IFileSystem fileSys
             return true;
         }
 
-        console.Error.WriteLine(
+        WriteError(
+            request,
+            "output-conflict",
             $"'{request.OutputPath}' already exists and {request.Command} would replace its reviewed content. " +
             "Re-run with --force to replace it, or with --dry-run to review the proposed content first.");
         return false;
+    }
+
+    private void WriteError(Request request, string category, string message)
+    {
+        CliErrorOutputWriter.Write(console, request.EmitProposalToStdout ? "human" : "json", category, message);
     }
 
     /// <summary>

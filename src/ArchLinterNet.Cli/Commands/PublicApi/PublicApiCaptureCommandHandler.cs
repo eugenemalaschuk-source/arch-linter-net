@@ -1,5 +1,6 @@
 using System.Text.Json;
 using ArchLinterNet.Cli.Abstractions;
+using ArchLinterNet.Cli.Commands;
 using ArchLinterNet.Core.BuildState;
 using ArchLinterNet.Core.Validation;
 
@@ -29,7 +30,8 @@ internal sealed class PublicApiCaptureCommandHandler(ICliRuntime runtime, ICliCo
 
         if (options.OutputPath == null)
         {
-            console.Error.WriteLine("--output is required for public-api capture.");
+            CliErrorOutputWriter.Write(
+                console, options.Format, "invalid-arguments", "--output is required for public-api capture.");
             return CliExitCodes.InvalidArgumentsOrRuntimeError;
         }
 
@@ -48,7 +50,7 @@ internal sealed class PublicApiCaptureCommandHandler(ICliRuntime runtime, ICliCo
 
             if (!outcome.Succeeded)
             {
-                PublicApiCommandGuards.WriteError(console, CommandName, outcome.Error!, outcome.PreflightDiagnostics);
+                PublicApiCommandGuards.WriteError(console, options.Format, CommandName, outcome.Error!, outcome.PreflightDiagnostics);
                 return PublicApiCommandGuards.ExitCodeFor(outcome.FailureKind);
             }
 
@@ -65,7 +67,8 @@ internal sealed class PublicApiCaptureCommandHandler(ICliRuntime runtime, ICliCo
 
             if (exists && !identical && !options.Force)
             {
-                console.Error.WriteLine(
+                CliErrorOutputWriter.Write(
+                    console, options.Format, "snapshot-conflict",
                     $"Public API snapshot '{destination}' already exists and differs from the captured " +
                     "surface. Re-run with --force to replace it, or use 'arch-linter-net public-api update " +
                     "--dry-run' to review the change first.");
@@ -100,7 +103,7 @@ internal sealed class PublicApiCaptureCommandHandler(ICliRuntime runtime, ICliCo
         }
         catch (Exception ex)
         {
-            console.Error.WriteLine($"public-api capture error: {ex.Message}");
+            CliErrorOutputWriter.Write(console, options.Format, "unexpected-tool-failure", $"public-api capture error: {ex.Message}");
             return CliExitCodes.InvalidArgumentsOrRuntimeError;
         }
     }
