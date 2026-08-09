@@ -568,6 +568,26 @@ public sealed class LayerResolverTests
     }
 
     [Test]
+    public void LayerValidation_OverlapsWithEmptyEntry_IsRejected()
+    {
+        InvalidOperationException ex = Assert.Throws<InvalidOperationException>(() => new LayerNamespacesValidator().Validate(
+            new ArchitectureContractDocument
+            {
+                Layers = new Dictionary<string, ArchitectureLayer>
+                {
+                    ["domain"] = new()
+                    {
+                        Namespace = "MyApp.Domain",
+                        OverlapsWith = new List<string> { "  " }
+                    }
+                }
+            }))!;
+
+        Assert.That(ex.Message, Does.Contain("domain"));
+        Assert.That(ex.Message, Does.Contain("non-empty"));
+    }
+
+    [Test]
     public void LayerValidation_OverlapsWithSelf_IsRejected()
     {
         InvalidOperationException ex = Assert.Throws<InvalidOperationException>(() => new LayerNamespacesValidator().Validate(
@@ -639,6 +659,43 @@ public sealed class LayerResolverTests
             ArchitectureContractDocument document = new ArchitecturePolicyDocumentLoader().Load(policyPath);
 
             Assert.That(document.Layers["sales_domain"].OverlapsWith, Is.EquivalentTo(new[] { "audit_aspect" }));
+        }
+        finally
+        {
+            Directory.Delete(tempDir, true);
+        }
+    }
+
+    [TestCase("overlaps_with: audit_aspect", "must be a list of layer names")]
+    [TestCase("overlaps_with:\n      role: DomainLayer", "must be a list of layer names")]
+    [TestCase("overlaps_with:\n      - role: DomainLayer", "must be non-empty layer name strings")]
+    [TestCase("overlaps_with:\n      - \"\"", "must be non-empty layer name strings")]
+    public void LayerValidation_OverlapsWithMalformedRawShape_IsRejected(string overlapsWithYaml, string expectedMessageFragment)
+    {
+        string tempDir = Path.Combine(Path.GetTempPath(), $"arch-linter-overlaps-with-shape-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(tempDir);
+        try
+        {
+            string policyPath = Path.Combine(tempDir, "dependencies.arch.yml");
+            File.WriteAllText(policyPath, $"""
+                version: 1
+                name: Overlaps With Shape
+                layers:
+                  sales_domain:
+                    namespace: Test.Domain
+                    {overlapsWithYaml}
+                  audit_aspect:
+                    namespace: Test.Domain
+                analysis:
+                  target_assemblies: []
+                contracts:
+                  strict: []
+                """);
+
+            InvalidOperationException ex = Assert.Throws<InvalidOperationException>(
+                () => new ArchitecturePolicyDocumentLoader().Load(policyPath))!;
+
+            Assert.That(ex.Message, Does.Contain(expectedMessageFragment));
         }
         finally
         {
