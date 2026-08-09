@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Threading;
 using ArchLinterNet.Core.Discovery;
 using NUnit.Framework;
 
@@ -48,6 +49,12 @@ public sealed class ArchitectureProjectRoslynContextResolverTests
               <ItemGroup>
                 <ProjectReference Include="../Fixture.Referenced/Fixture.Referenced.csproj" />
               </ItemGroup>
+              <Target Name="MutateUnownedOutputDuringDesignTimeBuild" BeforeTargets="Build">
+                <WriteLinesToFile
+                  File="$(MSBuildProjectDirectory)/bin/Debug/net10.0/Unrelated.dll"
+                  Lines="changed-by-design-time-build"
+                  Overwrite="true" />
+              </Target>
             </Project>
             """);
         File.WriteAllText(Path.Combine(consumerDir, "Caller.cs"), """
@@ -108,11 +115,104 @@ public sealed class ArchitectureProjectRoslynContextResolverTests
         ArchitectureProjectRoslynResolution resolution =
             new ArchitectureProjectRoslynContextResolver().Resolve(_consumerProjectPath);
 
-        Assert.That(resolution.Succeeded, Is.True, resolution.FailureReason);
-        Assert.That(resolution.Context!.SourceFilePaths, Has.Some.Contains("Caller.cs"));
-        Assert.That(resolution.Context!.ReferenceAssemblyPaths,
-            Has.Some.Contains("Fixture.Referenced.dll"),
-            "Expected the referenced project's build output to be among the resolved references.");
+        string? referencedAssemblyPath = resolution.Context?.ReferenceAssemblyPaths
+            .FirstOrDefault(path => path.Contains("Fixture.Referenced.dll", StringComparison.Ordinal));
+        string projectIntermediateDirectory = Path.Combine(Path.GetDirectoryName(_consumerProjectPath)!, "obj");
+        string[] generatedCleanFiles = Directory.GetFiles(
+            projectIntermediateDirectory, "ArchLinterNet.DesignTime.*.FileListAbsolute.txt", SearchOption.AllDirectories);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(resolution.Succeeded, Is.True, resolution.FailureReason);
+            Assert.That(resolution.Context!.SourceFilePaths, Has.Some.Contains("Caller.cs"));
+            Assert.That(referencedAssemblyPath, Is.Not.Null,
+                "Expected the referenced project's build output to be among the resolved references.");
+            Assert.That(File.Exists(referencedAssemblyPath), Is.True,
+                "The referenced project assembly must remain available after Resolve returns.");
+            Assert.That(generatedCleanFiles, Is.Empty,
+                "Design-time clean manifests must be removed after resolution.");
+        });
+    }
+
+    [Test]
+    public void Resolve_BuiltProject_PreservesPrimaryOutputs()
+    {
+        string outputDirectory = Path.Combine(
+            Path.GetDirectoryName(_consumerProjectPath)!, "bin", "Debug", "net10.0");
+        string assemblyPath = Path.Combine(outputDirectory, "Fixture.Consumer.dll");
+        string pdbPath = Path.Combine(outputDirectory, "Fixture.Consumer.pdb");
+        byte[] assemblyBefore = File.ReadAllBytes(assemblyPath);
+        byte[] pdbBefore = File.ReadAllBytes(pdbPath);
+
+        ArchitectureProjectRoslynResolution resolution =
+            new ArchitectureProjectRoslynContextResolver().Resolve(_consumerProjectPath);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(resolution.Succeeded, Is.True, resolution.FailureReason);
+            Assert.That(File.ReadAllBytes(assemblyPath), Is.EqualTo(assemblyBefore));
+            Assert.That(File.ReadAllBytes(pdbPath), Is.EqualTo(pdbBefore));
+        });
+    }
+
+    [Test]
+    public void Resolve_BuiltProject_DoesNotExposeTornOutputsOrRestoreUnownedFiles()
+    {
+        string outputDirectory = Path.Combine(
+            Path.GetDirectoryName(_consumerProjectPath)!, "bin", "Debug", "net10.0");
+        string assemblyPath = Path.Combine(outputDirectory, "Fixture.Consumer.dll");
+        string pdbPath = Path.Combine(outputDirectory, "Fixture.Consumer.pdb");
+        string unownedPath = Path.Combine(outputDirectory, "Unrelated.dll");
+        byte[] assemblyBefore = File.ReadAllBytes(assemblyPath);
+        byte[] pdbBefore = File.ReadAllBytes(pdbPath);
+        File.WriteAllText(unownedPath, "before-design-time-build");
+
+        using CancellationTokenSource cancellation = new();
+        using ManualResetEventSlim readerStarted = new();
+        Exception? readerFailure = null;
+        Task reader = Task.Run(() =>
+        {
+            readerStarted.Set();
+            while (!cancellation.IsCancellationRequested)
+            {
+                try
+                {
+                    if (!File.ReadAllBytes(assemblyPath).AsSpan().SequenceEqual(assemblyBefore)
+                        || !File.ReadAllBytes(pdbPath).AsSpan().SequenceEqual(pdbBefore))
+                    {
+                        Interlocked.CompareExchange(ref readerFailure,
+                            new InvalidOperationException("A primary output changed while project context was resolving."), null);
+                        return;
+                    }
+                }
+                catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+                {
+                    Interlocked.CompareExchange(ref readerFailure, ex, null);
+                    return;
+                }
+            }
+        });
+
+        readerStarted.Wait();
+        ArchitectureProjectRoslynResolution resolution;
+        try
+        {
+            resolution = new ArchitectureProjectRoslynContextResolver().Resolve(_consumerProjectPath);
+        }
+        finally
+        {
+            cancellation.Cancel();
+            reader.GetAwaiter().GetResult();
+        }
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(resolution.Succeeded, Is.True, resolution.FailureReason);
+            Assert.That(readerFailure, Is.Null, readerFailure?.ToString());
+            Assert.That(File.ReadAllBytes(assemblyPath), Is.EqualTo(assemblyBefore));
+            Assert.That(File.ReadAllBytes(pdbPath), Is.EqualTo(pdbBefore));
+            Assert.That(File.ReadAllText(unownedPath), Does.Contain("changed-by-design-time-build"));
+        });
     }
 
     [Test]
