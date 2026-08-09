@@ -17,6 +17,8 @@ internal sealed class DiffPublicApiSubcommandModule : IPublicApiSubcommandModule
         Option<string> snapshotOption = new("--snapshot");
         Option<string> conditionSetOption = new("--condition-set");
         Option<string> formatOption = PublicApiOptionsFactory.CreateFormatOption();
+        Option<bool> ensureBuiltOption = PublicApiOptionsFactory.CreateEnsureBuiltOption();
+        Option<bool> noRestoreOption = PublicApiOptionsFactory.CreateNoRestoreOption();
         Option<bool> helpOption = PublicApiOptionsFactory.CreateHelpOption();
 
         command.Options.Add(policyOption);
@@ -24,6 +26,8 @@ internal sealed class DiffPublicApiSubcommandModule : IPublicApiSubcommandModule
         command.Options.Add(snapshotOption);
         command.Options.Add(conditionSetOption);
         command.Options.Add(formatOption);
+        command.Options.Add(ensureBuiltOption);
+        command.Options.Add(noRestoreOption);
         command.Options.Add(helpOption);
 
         command.SetAction(parseResult => handler.Execute(new PublicApiDiffCommandOptions(
@@ -32,7 +36,9 @@ internal sealed class DiffPublicApiSubcommandModule : IPublicApiSubcommandModule
             parseResult.GetValue(snapshotOption),
             parseResult.GetValue(conditionSetOption),
             PublicApiOptionsFactory.GetFormat(parseResult, formatOption),
-            parseResult.GetValue(helpOption))));
+            parseResult.GetValue(helpOption),
+            parseResult.GetValue(ensureBuiltOption),
+            parseResult.GetValue(noRestoreOption))));
 
         return command;
     }

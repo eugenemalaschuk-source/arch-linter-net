@@ -113,6 +113,41 @@ public sealed partial class PublicApiCommandHandlerTests
     }
 
     [Test]
+    public void LiveSurfaceCommands_ForwardEnsureBuiltAndNoRestore()
+    {
+        StubRuntime runtime = new()
+        {
+            CaptureOutcome = new PublicApiCaptureOutcome(true, CapturedSnapshot, 1, SnapshotPath, Array.Empty<BuildStatePreflightDiagnostic>()),
+            DiffOutcome = new PublicApiDiffOutcome(true, true, PublicApiDelta.Empty, SnapshotPath, Array.Empty<BuildStatePreflightDiagnostic>()),
+            UpdateOutcome = new PublicApiUpdateOutcome(true, CapturedSnapshot, PublicApiDelta.Empty, true, SnapshotPath, Array.Empty<BuildStatePreflightDiagnostic>()),
+            MigrateOutcome = new PublicApiMigrateOutcome(true, CapturedSnapshot, Array.Empty<string>(), Array.Empty<string>(), SnapshotPath, Array.Empty<BuildStatePreflightDiagnostic>()),
+        };
+        StubFileSystem fileSystem = new(PolicyPath);
+        RecordingConsole console = new();
+
+        _ = new PublicApiCaptureCommandHandler(runtime, console, fileSystem).Execute(
+            new PublicApiCaptureCommandOptions(PolicyPath, ContractId, SnapshotPath, null, "human", false, false, true, true));
+        _ = new PublicApiDiffCommandHandler(runtime, console, fileSystem).Execute(
+            new PublicApiDiffCommandOptions(PolicyPath, ContractId, SnapshotPath, null, "human", false, true, true));
+        _ = new PublicApiUpdateCommandHandler(runtime, console, fileSystem).Execute(
+            new PublicApiUpdateCommandOptions(PolicyPath, ContractId, SnapshotPath, null, "human", true, false, true, true));
+        _ = new PublicApiMigrateCommandHandler(runtime, console, fileSystem).Execute(
+            new PublicApiMigrateCommandOptions(PolicyPath, ContractId, SnapshotPath, null, "human", false, false, true, false, true, true));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(runtime.LastCaptureRequest!.PreparationMode, Is.EqualTo(BuildPreparationMode.EnsureBuilt));
+            Assert.That(runtime.LastCaptureRequest.NoRestore, Is.True);
+            Assert.That(runtime.LastDiffRequest!.PreparationMode, Is.EqualTo(BuildPreparationMode.EnsureBuilt));
+            Assert.That(runtime.LastDiffRequest.NoRestore, Is.True);
+            Assert.That(runtime.LastUpdateRequest!.PreparationMode, Is.EqualTo(BuildPreparationMode.EnsureBuilt));
+            Assert.That(runtime.LastUpdateRequest.NoRestore, Is.True);
+            Assert.That(runtime.LastMigrateRequest!.PreparationMode, Is.EqualTo(BuildPreparationMode.EnsureBuilt));
+            Assert.That(runtime.LastMigrateRequest.NoRestore, Is.True);
+        });
+    }
+
+    [Test]
     public void Capture_MissingContractOption_FailsWithExitCodeTwo()
     {
         RecordingConsole console = new();

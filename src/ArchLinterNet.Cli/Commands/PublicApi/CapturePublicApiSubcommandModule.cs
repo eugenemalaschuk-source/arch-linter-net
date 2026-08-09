@@ -18,6 +18,8 @@ internal sealed class CapturePublicApiSubcommandModule : IPublicApiSubcommandMod
         Option<string> conditionSetOption = new("--condition-set");
         Option<string> formatOption = PublicApiOptionsFactory.CreateFormatOption();
         Option<bool> forceOption = new("--force");
+        Option<bool> ensureBuiltOption = PublicApiOptionsFactory.CreateEnsureBuiltOption();
+        Option<bool> noRestoreOption = PublicApiOptionsFactory.CreateNoRestoreOption();
         Option<bool> helpOption = PublicApiOptionsFactory.CreateHelpOption();
 
         command.Options.Add(policyOption);
@@ -26,6 +28,8 @@ internal sealed class CapturePublicApiSubcommandModule : IPublicApiSubcommandMod
         command.Options.Add(conditionSetOption);
         command.Options.Add(formatOption);
         command.Options.Add(forceOption);
+        command.Options.Add(ensureBuiltOption);
+        command.Options.Add(noRestoreOption);
         command.Options.Add(helpOption);
 
         command.SetAction(parseResult => handler.Execute(new PublicApiCaptureCommandOptions(
@@ -35,7 +39,9 @@ internal sealed class CapturePublicApiSubcommandModule : IPublicApiSubcommandMod
             parseResult.GetValue(conditionSetOption),
             PublicApiOptionsFactory.GetFormat(parseResult, formatOption),
             parseResult.GetValue(forceOption),
-            parseResult.GetValue(helpOption))));
+            parseResult.GetValue(helpOption),
+            parseResult.GetValue(ensureBuiltOption),
+            parseResult.GetValue(noRestoreOption))));
 
         return command;
     }

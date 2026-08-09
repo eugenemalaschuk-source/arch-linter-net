@@ -4178,7 +4178,9 @@ sealed class ArchLinterNet.Core.Validation.PublicApiCaptureRequest : System.IEqu
   method string ToString()
   operator !=(ArchLinterNet.Core.Validation.PublicApiCaptureRequest? left, ArchLinterNet.Core.Validation.PublicApiCaptureRequest? right)
   operator ==(ArchLinterNet.Core.Validation.PublicApiCaptureRequest? left, ArchLinterNet.Core.Validation.PublicApiCaptureRequest? right)
+  property ArchLinterNet.Core.BuildState.BuildPreparationMode PreparationMode {get;init;}
   property System.Threading.CancellationToken CancellationToken {get;init;}
+  property bool NoRestore {get;init;}
   property string ContractId {get;init;}
   property string OutputPath {get;init;}
   property string PolicyPath {get;init;}
@@ -4209,7 +4211,9 @@ sealed class ArchLinterNet.Core.Validation.PublicApiDiffRequest : System.IEquata
   method string ToString()
   operator !=(ArchLinterNet.Core.Validation.PublicApiDiffRequest? left, ArchLinterNet.Core.Validation.PublicApiDiffRequest? right)
   operator ==(ArchLinterNet.Core.Validation.PublicApiDiffRequest? left, ArchLinterNet.Core.Validation.PublicApiDiffRequest? right)
+  property ArchLinterNet.Core.BuildState.BuildPreparationMode PreparationMode {get;init;}
   property System.Threading.CancellationToken CancellationToken {get;init;}
+  property bool NoRestore {get;init;}
   property string ContractId {get;init;}
   property string PolicyPath {get;init;}
   property string SnapshotPath {get;init;}
@@ -4246,8 +4250,10 @@ sealed class ArchLinterNet.Core.Validation.PublicApiMigrateRequest : System.IEqu
   method string ToString()
   operator !=(ArchLinterNet.Core.Validation.PublicApiMigrateRequest? left, ArchLinterNet.Core.Validation.PublicApiMigrateRequest? right)
   operator ==(ArchLinterNet.Core.Validation.PublicApiMigrateRequest? left, ArchLinterNet.Core.Validation.PublicApiMigrateRequest? right)
+  property ArchLinterNet.Core.BuildState.BuildPreparationMode PreparationMode {get;init;}
   property System.Threading.CancellationToken CancellationToken {get;init;}
   property bool AcceptDrift {get;init;}
+  property bool NoRestore {get;init;}
   property string ContractId {get;init;}
   property string OutputPath {get;init;}
   property string PolicyPath {get;init;}
@@ -4279,8 +4285,10 @@ sealed class ArchLinterNet.Core.Validation.PublicApiUpdateRequest : System.IEqua
   method string ToString()
   operator !=(ArchLinterNet.Core.Validation.PublicApiUpdateRequest? left, ArchLinterNet.Core.Validation.PublicApiUpdateRequest? right)
   operator ==(ArchLinterNet.Core.Validation.PublicApiUpdateRequest? left, ArchLinterNet.Core.Validation.PublicApiUpdateRequest? right)
+  property ArchLinterNet.Core.BuildState.BuildPreparationMode PreparationMode {get;init;}
   property System.Threading.CancellationToken CancellationToken {get;init;}
   property bool DryRun {get;init;}
+  property bool NoRestore {get;init;}
   property string ContractId {get;init;}
   property string PolicyPath {get;init;}
   property string SnapshotPath {get;init;}
