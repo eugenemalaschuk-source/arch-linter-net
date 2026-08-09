@@ -355,6 +355,46 @@ public sealed class ArchitectureContractHandlerRegistryTests
     }
 
     [Test]
+    public void CheckCycleContract_WithoutBaselineTracking_DoesNotCollectCandidates()
+    {
+        var document = new ArchitectureContractDocument
+        {
+            Version = 1,
+            Name = "Test",
+            Layers = new Dictionary<string, ArchitectureLayer>
+            {
+                ["layerA"] = new() { Namespace = "HandlerRegistryCycleFixtures.LayerA" },
+                ["layerB"] = new() { Namespace = "HandlerRegistryCycleFixtures.LayerB" },
+            },
+            Analysis = new ArchitectureAnalysisConfiguration { TargetAssemblies = new List<string>() },
+            Contracts = new ArchitectureContractGroups
+            {
+                StrictCycles =
+                [
+                    new ArchitectureCycleContract
+                    {
+                        Name = "Cycle",
+                        Id = "cycle-check",
+                        Layers = ["layerA", "layerB"],
+                    },
+                ],
+            },
+        };
+
+        Assembly fixtureAssembly = typeof(HandlerRegistryCycleFixtures.LayerA.ServiceA).Assembly;
+        var runner = new ArchitectureContractRunner(
+            CreateContext(fixtureAssembly), document, enableUnmatchedIgnoreTracking: false);
+
+        IReadOnlyCollection<string> cycles = runner.CheckCycleContract(document.Contracts.StrictCycles[0]);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(cycles, Does.Contain("layerA -> layerB -> layerA"));
+            Assert.That(runner.BaselineCandidates, Is.Empty);
+        });
+    }
+
+    [Test]
     public void AllowOnlyHandler_MatchesDirectRunnerCheck()
     {
         var document = CreateLayerFixtureDocument("layerUpper", "layerLower", new List<string> { "layerUpper", "layerLower" });

@@ -8,6 +8,11 @@ public sealed partial class ArchitectureAnalysisSession
         IReadOnlyDictionary<string, HashSet<string>> graph,
         IReadOnlyCollection<CycleCandidateEvidence> candidateEvidence)
     {
+        if (!EnableUnmatchedIgnoreTracking)
+        {
+            return;
+        }
+
         foreach (CycleCandidateEvidence evidence in candidateEvidence)
         {
             if (EdgeParticipatesInCycle(graph, evidence.SourceLayerName, evidence.TargetLayerName))
