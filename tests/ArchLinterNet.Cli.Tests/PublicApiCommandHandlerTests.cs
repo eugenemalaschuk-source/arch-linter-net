@@ -190,7 +190,10 @@ public sealed partial class PublicApiCommandHandlerTests
                 {
                     new BuildStatePreflightDiagnostic(
                         "Acme.Module", null, BuildStatePreflightState.MissingArtifact,
-                        new BuildStatePreflightEvidence("Acme.Module.csproj", "Acme.Module")),
+                        new BuildStatePreflightEvidence(
+                            "Acme.Module.csproj", "Acme.Module", "Release", "Debug", "net10.0", "net9.0",
+                            "bin/Release/net10.0/Acme.Module.dll", ["bin/Release/net10.0/Acme.Module.dll"],
+                            "dotnet build Acme.Module.csproj", "Receipt is stale")),
                 },
                 "Build state preflight is blocked"),
         };

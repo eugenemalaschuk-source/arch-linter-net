@@ -176,6 +176,29 @@ public sealed partial class BaselineCommandHandlerTests
     }
 
     [Test]
+    public void BaselineMigrate_SarifWriteConflict_PreservesNonJsonFailureRouting()
+    {
+        var runtime = new StubRuntime
+        {
+            MigrateOutcome = new BaselineMigrateOutcome(
+                true, "version: 2\nbaseline: {}\n", 1, 0, 0,
+                Array.Empty<BaselineMigrateEntryReport>(), Array.Empty<ArchitectureViolation>())
+        };
+        var console = new RecordingConsole();
+
+        int result = new BaselineMigrateCommandHandler(runtime, console, new StubFileSystem("policy.yml", "baseline.yml", "migrated.yml")).Execute(
+            new BaselineMigrateCommandOptions("policy.yml", "baseline.yml", "migrated.yml", null, "sarif", false, Force: false, ShowHelp: false));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(result, Is.EqualTo(CliExitCodes.InvalidArgumentsOrRuntimeError));
+            Assert.That(console.OutputText, Is.Empty);
+            Assert.That(console.ErrorText, Does.Contain("already exists and baseline migrate would replace"));
+            Assert.That(console.ErrorText, Does.Not.Contain("command_error"));
+        });
+    }
+
+    [Test]
     public void BaselineMigrate_ApplicationServiceError_ReportsErrorAndDoesNotWrite()
     {
         var runtime = new StubRuntime
@@ -203,19 +226,19 @@ public sealed partial class BaselineCommandHandlerTests
     {
         AssertGuardCase(console => new BaselineMigrateCommandHandler(new StubRuntime(), console, new StubFileSystem("policy.yml", "baseline.yml")).Execute(
                 new BaselineMigrateCommandOptions("policy.yml", null, "out.yml", null, "json", false, Force: false, ShowHelp: false)),
-            "--baseline is required");
+            "--baseline is required", true);
 
         AssertGuardCase(console => new BaselineMigrateCommandHandler(new StubRuntime(), console, new StubFileSystem("policy.yml", "baseline.yml")).Execute(
                 new BaselineMigrateCommandOptions("policy.yml", "baseline.yml", null, null, "json", false, Force: false, ShowHelp: false)),
-            "--output is required");
+            "--output is required", true);
 
         AssertGuardCase(console => new BaselineMigrateCommandHandler(new StubRuntime(), console, new StubFileSystem("baseline.yml")).Execute(
                 new BaselineMigrateCommandOptions("policy.yml", "baseline.yml", "out.yml", null, "json", false, Force: false, ShowHelp: false)),
-            "Policy file not found");
+            "Policy file not found", true);
 
         AssertGuardCase(console => new BaselineMigrateCommandHandler(new StubRuntime(), console, new StubFileSystem("policy.yml")).Execute(
                 new BaselineMigrateCommandOptions("policy.yml", "baseline.yml", "out.yml", null, "json", false, Force: false, ShowHelp: false)),
-            "Baseline file not found");
+            "Baseline file not found", true);
 
         var throwingRuntime = new StubRuntime { MigrateException = new InvalidOperationException("migrate boom") };
         var exceptionConsole = new RecordingConsole();
@@ -223,6 +246,6 @@ public sealed partial class BaselineCommandHandlerTests
             new BaselineMigrateCommandOptions("policy.yml", "baseline.yml", "out.yml", null, "json", false, Force: false, ShowHelp: false));
 
         Assert.That(exceptionResult, Is.EqualTo(CliExitCodes.InvalidArgumentsOrRuntimeError));
-        Assert.That(exceptionConsole.ErrorText, Does.Contain("Baseline migrate error: migrate boom"));
+        Assert.That(exceptionConsole.OutputText, Does.Contain("Baseline migrate error: migrate boom"));
     }
 }

@@ -15,15 +15,9 @@ internal sealed class BaselineGenerateCommandHandler(ICliRuntime runtime, ICliCo
             return CliExitCodes.Success;
         }
 
-        if (options.Mode is not ("strict" or "audit" or "all"))
+        if (!BaselineCommandGuards.TryValidateMode(console, options.Format, options.Mode)
+            || !BaselineCommandGuards.TryValidatePolicyFile(console, fileSystem, options.Format, options.PolicyPath))
         {
-            console.Error.WriteLine($"Invalid mode: {options.Mode}. Use 'strict', 'audit', or 'all'.");
-            return CliExitCodes.InvalidArgumentsOrRuntimeError;
-        }
-
-        if (!fileSystem.FileExists(options.PolicyPath))
-        {
-            console.Error.WriteLine($"Policy file not found: {options.PolicyPath}");
             return CliExitCodes.InvalidArgumentsOrRuntimeError;
         }
 
@@ -43,15 +37,8 @@ internal sealed class BaselineGenerateCommandHandler(ICliRuntime runtime, ICliCo
 
             if (!outcome.Succeeded)
             {
-                if (outcome.Error != null)
-                {
-                    console.Error.WriteLine(outcome.Error);
-                }
-                else
-                {
-                    WriteConfigurationViolations(outcome.ConfigurationViolations);
-                }
-
+                BaselineCommandGuards.WriteOutcomeFailure(
+                    console, options.Format, outcome.Error, outcome.ConfigurationViolations, "generated");
                 return CliExitCodes.InvalidArgumentsOrRuntimeError;
             }
 
@@ -64,7 +51,7 @@ internal sealed class BaselineGenerateCommandHandler(ICliRuntime runtime, ICliCo
             if (!gate.TryApply(
                     new BaselineWriteGate.Request(
                         "baseline generate", options.OutputPath, options.Write.DryRun, options.Write.Force,
-                        outcome.Yaml!, CommentDiagnostic: null, InPlacePath: null, EmitProposalToStdout: !json),
+                        outcome.Yaml!, CommentDiagnostic: null, InPlacePath: null, EmitProposalToStdout: !json, Format: options.Format),
                     out BaselineWriteGate.Disposition disposition, cancellationToken))
             {
                 return CliExitCodes.InvalidArgumentsOrRuntimeError;
@@ -79,7 +66,7 @@ internal sealed class BaselineGenerateCommandHandler(ICliRuntime runtime, ICliCo
         }
         catch (Exception ex)
         {
-            console.Error.WriteLine($"Baseline generation error: {ex.Message}");
+            CliErrorOutputWriter.Write(console, options.Format, "unexpected-tool-failure", $"Baseline generation error: {ex.Message}");
             return CliExitCodes.InvalidArgumentsOrRuntimeError;
         }
     }
@@ -117,15 +104,6 @@ internal sealed class BaselineGenerateCommandHandler(ICliRuntime runtime, ICliCo
         if (disposition == BaselineWriteGate.Disposition.Written)
         {
             console.Out.WriteLine($"Output: {options.OutputPath}");
-        }
-    }
-
-    private void WriteConfigurationViolations(IReadOnlyCollection<ArchitectureViolation> violations)
-    {
-        console.Error.WriteLine("Configuration violations detected — baseline cannot be generated:");
-        foreach (ArchitectureViolation violation in violations)
-        {
-            console.Error.WriteLine($"  {violation.SourceType}: {violation.ForbiddenNamespace}");
         }
     }
 }

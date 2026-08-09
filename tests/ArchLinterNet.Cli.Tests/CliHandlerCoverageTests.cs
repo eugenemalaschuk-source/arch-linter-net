@@ -1,5 +1,6 @@
 using System.CommandLine;
 using System.Text;
+using System.Text.Json;
 using ArchLinterNet.Cli.Abstractions;
 using ArchLinterNet.Cli.Commands.Explain;
 using ArchLinterNet.Cli.Commands.Graph;
@@ -48,7 +49,29 @@ public sealed class CliHandlerCoverageTests
             new GraphCommandOptions("policy.yml", mode, level, format, null, Array.Empty<string>(), false));
 
         Assert.That(result, Is.EqualTo(CliExitCodes.InvalidArgumentsOrRuntimeError));
+        if (format == "json")
+        {
+            Assert.That(console.ErrorText, Is.Empty);
+            using JsonDocument document = JsonDocument.Parse(console.OutputText);
+            Assert.That(document.RootElement.GetProperty("error").GetProperty("message").GetString(), Does.Contain(expectedError));
+            return;
+        }
+
+        Assert.That(console.OutputText, Is.Empty);
         Assert.That(console.ErrorText, Does.Contain(expectedError));
+    }
+
+    [Test]
+    public void Graph_RuntimeFailureWithJson_WritesStructuredError()
+    {
+        var console = new RecordingConsole();
+        int result = new GraphCommandHandler(new RecordingRuntime { GraphException = new InvalidOperationException("graph boom") }, console)
+            .Execute(new GraphCommandOptions("policy.yml", "strict", "namespace", "json", null, Array.Empty<string>(), false));
+
+        Assert.That(result, Is.EqualTo(CliExitCodes.InvalidArgumentsOrRuntimeError));
+        Assert.That(console.ErrorText, Is.Empty);
+        using JsonDocument document = JsonDocument.Parse(console.OutputText);
+        Assert.That(document.RootElement.GetProperty("error").GetProperty("message").GetString(), Does.Contain("graph boom"));
     }
 
     [Test]

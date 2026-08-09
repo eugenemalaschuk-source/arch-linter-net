@@ -15,27 +15,11 @@ internal sealed class BaselinePruneCommandHandler(ICliRuntime runtime, ICliConso
             return CliExitCodes.Success;
         }
 
-        if (options.Mode is not ("strict" or "audit" or "all"))
+        if (!BaselineCommandGuards.TryValidateMode(console, options.Format, options.Mode)
+            || !BaselineCommandGuards.TryRequireBaselinePath(console, options.Format, "baseline prune", options.BaselinePath)
+            || !BaselineCommandGuards.TryValidatePolicyFile(console, fileSystem, options.Format, options.PolicyPath)
+            || !BaselineCommandGuards.TryValidateBaselineFile(console, fileSystem, options.Format, options.BaselinePath))
         {
-            console.Error.WriteLine($"Invalid mode: {options.Mode}. Use 'strict', 'audit', or 'all'.");
-            return CliExitCodes.InvalidArgumentsOrRuntimeError;
-        }
-
-        if (options.BaselinePath == null)
-        {
-            console.Error.WriteLine("--baseline is required for baseline prune.");
-            return CliExitCodes.InvalidArgumentsOrRuntimeError;
-        }
-
-        if (!fileSystem.FileExists(options.PolicyPath))
-        {
-            console.Error.WriteLine($"Policy file not found: {options.PolicyPath}");
-            return CliExitCodes.InvalidArgumentsOrRuntimeError;
-        }
-
-        if (!fileSystem.FileExists(options.BaselinePath))
-        {
-            console.Error.WriteLine($"Baseline file not found: {options.BaselinePath}");
             return CliExitCodes.InvalidArgumentsOrRuntimeError;
         }
 
@@ -53,7 +37,7 @@ internal sealed class BaselinePruneCommandHandler(ICliRuntime runtime, ICliConso
 
             if (!outcome.Succeeded)
             {
-                WriteConfigurationViolations(outcome.ConfigurationViolations);
+                WriteConfigurationViolations(options.Format, outcome.ConfigurationViolations);
                 return CliExitCodes.InvalidArgumentsOrRuntimeError;
             }
 
@@ -74,7 +58,7 @@ internal sealed class BaselinePruneCommandHandler(ICliRuntime runtime, ICliConso
                 if (!gate.TryCopySource(
                         new BaselineWriteGate.Request(
                             "baseline prune", options.OutputPath, options.Write.DryRun, options.Write.Force,
-                            outcome.Yaml!, outcome.CommentDiagnostic, options.BaselinePath, !json),
+                            outcome.Yaml!, outcome.CommentDiagnostic, options.BaselinePath, !json, options.Format),
                         options.BaselinePath,
                         out disposition, cancellationToken))
                 {
@@ -90,7 +74,7 @@ internal sealed class BaselinePruneCommandHandler(ICliRuntime runtime, ICliConso
                 if (!gate.TryApply(
                         new BaselineWriteGate.Request(
                             "baseline prune", options.OutputPath, options.Write.DryRun, options.Write.Force,
-                            outcome.Yaml!, outcome.CommentDiagnostic, options.BaselinePath, !json),
+                            outcome.Yaml!, outcome.CommentDiagnostic, options.BaselinePath, !json, options.Format),
                         out disposition, cancellationToken))
                 {
                     return CliExitCodes.InvalidArgumentsOrRuntimeError;
@@ -106,7 +90,7 @@ internal sealed class BaselinePruneCommandHandler(ICliRuntime runtime, ICliConso
         }
         catch (Exception ex)
         {
-            console.Error.WriteLine($"Baseline prune error: {ex.Message}");
+            CliErrorOutputWriter.Write(console, options.Format, "unexpected-tool-failure", $"Baseline prune error: {ex.Message}");
             return CliExitCodes.InvalidArgumentsOrRuntimeError;
         }
     }
@@ -160,13 +144,9 @@ internal sealed class BaselinePruneCommandHandler(ICliRuntime runtime, ICliConso
         }
     }
 
-    private void WriteConfigurationViolations(IReadOnlyCollection<ArchitectureViolation> violations)
+    private void WriteConfigurationViolations(string format, IReadOnlyCollection<ArchitectureViolation> violations)
     {
-        console.Error.WriteLine("Configuration violations detected — baseline cannot be pruned:");
-        foreach (ArchitectureViolation violation in violations)
-        {
-            console.Error.WriteLine($"  {violation.SourceType}: {violation.ForbiddenNamespace}");
-        }
+        CliErrorOutputWriter.WriteConfigurationViolations(console, format, "pruned", violations);
     }
 
     private static bool SamePath(string left, string right)

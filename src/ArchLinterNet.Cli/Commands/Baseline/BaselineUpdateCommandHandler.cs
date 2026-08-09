@@ -15,27 +15,11 @@ internal sealed class BaselineUpdateCommandHandler(ICliRuntime runtime, ICliCons
             return CliExitCodes.Success;
         }
 
-        if (options.Mode is not ("strict" or "audit" or "all"))
+        if (!BaselineCommandGuards.TryValidateMode(console, options.Format, options.Mode)
+            || !BaselineCommandGuards.TryRequireBaselinePath(console, options.Format, "baseline update", options.BaselinePath)
+            || !BaselineCommandGuards.TryValidatePolicyFile(console, fileSystem, options.Format, options.PolicyPath)
+            || !BaselineCommandGuards.TryValidateBaselineFile(console, fileSystem, options.Format, options.BaselinePath))
         {
-            console.Error.WriteLine($"Invalid mode: {options.Mode}. Use 'strict', 'audit', or 'all'.");
-            return CliExitCodes.InvalidArgumentsOrRuntimeError;
-        }
-
-        if (options.BaselinePath == null)
-        {
-            console.Error.WriteLine("--baseline is required for baseline update.");
-            return CliExitCodes.InvalidArgumentsOrRuntimeError;
-        }
-
-        if (!fileSystem.FileExists(options.PolicyPath))
-        {
-            console.Error.WriteLine($"Policy file not found: {options.PolicyPath}");
-            return CliExitCodes.InvalidArgumentsOrRuntimeError;
-        }
-
-        if (!fileSystem.FileExists(options.BaselinePath))
-        {
-            console.Error.WriteLine($"Baseline file not found: {options.BaselinePath}");
             return CliExitCodes.InvalidArgumentsOrRuntimeError;
         }
 
@@ -56,15 +40,8 @@ internal sealed class BaselineUpdateCommandHandler(ICliRuntime runtime, ICliCons
 
             if (!outcome.Succeeded)
             {
-                if (outcome.Error != null)
-                {
-                    console.Error.WriteLine(outcome.Error);
-                }
-                else
-                {
-                    WriteConfigurationViolations(outcome.ConfigurationViolations);
-                }
-
+                BaselineCommandGuards.WriteOutcomeFailure(
+                    console, options.Format, outcome.Error, outcome.ConfigurationViolations, "updated");
                 return CliExitCodes.InvalidArgumentsOrRuntimeError;
             }
 
@@ -79,7 +56,7 @@ internal sealed class BaselineUpdateCommandHandler(ICliRuntime runtime, ICliCons
             if (!gate.TryApply(
                     new BaselineWriteGate.Request(
                         "baseline update", options.OutputPath, options.Write.DryRun, options.Write.Force,
-                        outcome.Yaml!, outcome.CommentDiagnostic, options.BaselinePath, !json),
+                        outcome.Yaml!, outcome.CommentDiagnostic, options.BaselinePath, !json, options.Format),
                     out BaselineWriteGate.Disposition disposition, cancellationToken))
             {
                 return CliExitCodes.InvalidArgumentsOrRuntimeError;
@@ -94,7 +71,7 @@ internal sealed class BaselineUpdateCommandHandler(ICliRuntime runtime, ICliCons
         }
         catch (Exception ex)
         {
-            console.Error.WriteLine($"Baseline update error: {ex.Message}");
+            CliErrorOutputWriter.Write(console, options.Format, "unexpected-tool-failure", $"Baseline update error: {ex.Message}");
             return CliExitCodes.InvalidArgumentsOrRuntimeError;
         }
     }
@@ -140,15 +117,6 @@ internal sealed class BaselineUpdateCommandHandler(ICliRuntime runtime, ICliCons
         if (disposition == BaselineWriteGate.Disposition.Written)
         {
             console.Out.WriteLine($"Output: {options.OutputPath}");
-        }
-    }
-
-    private void WriteConfigurationViolations(IReadOnlyCollection<ArchitectureViolation> violations)
-    {
-        console.Error.WriteLine("Configuration violations detected — baseline cannot be updated:");
-        foreach (ArchitectureViolation violation in violations)
-        {
-            console.Error.WriteLine($"  {violation.SourceType}: {violation.ForbiddenNamespace}");
         }
     }
 }

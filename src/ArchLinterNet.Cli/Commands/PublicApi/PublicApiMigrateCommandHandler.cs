@@ -1,5 +1,6 @@
 using System.Text.Json;
 using ArchLinterNet.Cli.Abstractions;
+using ArchLinterNet.Cli.Commands;
 using ArchLinterNet.Core.BuildState;
 using ArchLinterNet.Core.Validation;
 
@@ -29,7 +30,8 @@ internal sealed class PublicApiMigrateCommandHandler(ICliRuntime runtime, ICliCo
 
         if (options.OutputPath == null)
         {
-            console.Error.WriteLine("--output is required for public-api migrate.");
+            CliErrorOutputWriter.Write(
+                console, options.Format, "invalid-arguments", "--output is required for public-api migrate.");
             return CliExitCodes.InvalidArgumentsOrRuntimeError;
         }
 
@@ -49,8 +51,13 @@ internal sealed class PublicApiMigrateCommandHandler(ICliRuntime runtime, ICliCo
 
             if (!outcome.Succeeded)
             {
-                PublicApiCommandGuards.WriteError(console, CommandName, outcome.Error!, outcome.PreflightDiagnostics);
-                WriteDrift(outcome);
+                PublicApiCommandGuards.WriteError(
+                    console, options.Format, CommandName, outcome.Error!, outcome.PreflightDiagnostics, outcome.FailureKind,
+                    outcome.StaleDeclarations, outcome.UndeclaredSurface);
+                if (options.Format != PublicApiOptionsFactory.JsonFormat)
+                {
+                    WriteDrift(outcome);
+                }
 
                 // Only refused migration drift is a completed gate reporting a finding; an unknown
                 // contract, an unsafe path, or blocked preflight never completed at all.
@@ -68,7 +75,8 @@ internal sealed class PublicApiMigrateCommandHandler(ICliRuntime runtime, ICliCo
 
             if (!options.DryRun && exists && !identical && !options.Force)
             {
-                console.Error.WriteLine(
+                CliErrorOutputWriter.Write(
+                    console, options.Format, "snapshot-conflict",
                     $"'{destination}' already exists and differs from the migrated snapshot. Re-run with " +
                     "--force to replace it, or point --output at a new file.");
                 return CliExitCodes.InvalidArgumentsOrRuntimeError;
@@ -95,7 +103,7 @@ internal sealed class PublicApiMigrateCommandHandler(ICliRuntime runtime, ICliCo
         }
         catch (Exception ex)
         {
-            console.Error.WriteLine($"public-api migrate error: {ex.Message}");
+            CliErrorOutputWriter.Write(console, options.Format, "unexpected-tool-failure", $"public-api migrate error: {ex.Message}");
             return CliExitCodes.InvalidArgumentsOrRuntimeError;
         }
     }

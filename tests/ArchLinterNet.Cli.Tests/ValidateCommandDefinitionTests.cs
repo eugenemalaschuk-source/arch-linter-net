@@ -1,5 +1,6 @@
 using System.CommandLine;
 using System.Text;
+using System.Text.Json;
 using ArchLinterNet.Cli.Abstractions;
 using ArchLinterNet.Cli.Commands.Validate;
 using ArchLinterNet.Core.BuildState;
@@ -37,6 +38,17 @@ public sealed class ValidateCommandDefinitionTests
 
         Assert.That(runtime.LastRequest, Is.Null);
         Assert.That(console.ErrorText, Does.Contain("Invalid mode: bogus"));
+    }
+
+    [Test]
+    public void CreateRootCommand_UnrecognizedModeWithJson_WritesStructuredError()
+    {
+        (RecordingRuntime runtime, RecordingConsole console) = Run(["--format", "json", "--mode", "bogus"]);
+
+        Assert.That(runtime.LastRequest, Is.Null);
+        Assert.That(console.ErrorText, Is.Empty);
+        using JsonDocument document = JsonDocument.Parse(console.OutputText);
+        Assert.That(document.RootElement.GetProperty("error").GetProperty("message").GetString(), Does.Contain("Invalid mode: bogus"));
     }
 
     [TestCase(new string[0], "human")]
@@ -206,7 +218,9 @@ public sealed class ValidateCommandDefinitionTests
         (RecordingRuntime runtime, RecordingConsole console) = Run(["--report", "json=stdout", "--format", "json"]);
 
         Assert.That(runtime.LastRequest, Is.Null);
-        Assert.That(console.ErrorText, Does.Contain("cannot be combined with --report"));
+        Assert.That(console.ErrorText, Is.Empty);
+        using JsonDocument document = JsonDocument.Parse(console.OutputText);
+        Assert.That(document.RootElement.GetProperty("error").GetProperty("message").GetString(), Does.Contain("cannot be combined with --report"));
     }
 
     [Test]

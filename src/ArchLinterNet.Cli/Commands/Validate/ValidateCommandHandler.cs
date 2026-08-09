@@ -351,25 +351,25 @@ internal sealed partial class ValidateCommandHandler
 
         if (!TryParseModes(options.Mode, out _, out string? modeError))
         {
-            _console.Error.WriteLine(modeError);
+            WriteImmediateError(options, modeError!);
             return CliExitCodes.InvalidArgumentsOrRuntimeError;
         }
 
         if (options.Format is not (FormatHuman or FormatJson or FormatSarif))
         {
-            _console.Error.WriteLine($"Invalid format: {options.Format}. Use 'human', 'json', or 'sarif'.");
+            WriteImmediateError(options, $"Invalid format: {options.Format}. Use 'human', 'json', or 'sarif'.");
             return CliExitCodes.InvalidArgumentsOrRuntimeError;
         }
 
         if (options.ReportParseError is not null)
         {
-            _console.Error.WriteLine(options.ReportParseError);
+            WriteImmediateError(options, options.ReportParseError);
             return CliExitCodes.InvalidArgumentsOrRuntimeError;
         }
 
         if (options.IsFormatExplicit && options.AdditionalSinks.Count > 0)
         {
-            _console.Error.WriteLine(
+            WriteImmediateError(options,
                 "--format/--json cannot be combined with --report. " +
                 "Use --report <format>=stdout to route output to stdout.");
             return CliExitCodes.InvalidArgumentsOrRuntimeError;
@@ -378,14 +378,14 @@ internal sealed partial class ValidateCommandHandler
         string? reportCollision = FindReportFileCollision(options);
         if (reportCollision is not null)
         {
-            _console.Error.WriteLine(reportCollision);
+            WriteImmediateError(options, reportCollision);
             return CliExitCodes.InvalidArgumentsOrRuntimeError;
         }
 
         string? profileCollision = FindProfileFileCollision(options);
         if (profileCollision is not null)
         {
-            _console.Error.WriteLine(profileCollision);
+            WriteImmediateError(options, profileCollision);
             return CliExitCodes.InvalidArgumentsOrRuntimeError;
         }
 
@@ -591,7 +591,7 @@ internal sealed partial class ValidateCommandHandler
 
             if (!_fileSystem.CanWriteToDirectory(sink.FilePath))
             {
-                _console.Error.WriteLine($"Cannot write report to '{sink.FilePath}': destination is not writable");
+                WriteImmediateError(options, $"Cannot write report to '{sink.FilePath}': destination is not writable");
                 return false;
             }
         }
@@ -607,8 +607,13 @@ internal sealed partial class ValidateCommandHandler
             return true;
         }
 
-        _console.Error.WriteLine($"Cannot write profile to '{options.ProfileDestination}': destination is not writable");
+        WriteImmediateError(options, $"Cannot write profile to '{options.ProfileDestination}': destination is not writable");
         return false;
+    }
+
+    private void WriteImmediateError(ValidateCommandOptions options, string message)
+    {
+        CliErrorOutputWriter.Write(_console, options.Format, "invalid-arguments", message);
     }
 
     private static void CaptureCancelledProfileState(ValidationProfileExecutionState state, OperationCanceledException exception)

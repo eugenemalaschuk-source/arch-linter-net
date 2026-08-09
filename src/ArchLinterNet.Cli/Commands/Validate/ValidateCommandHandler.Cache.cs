@@ -65,7 +65,7 @@ internal sealed partial class ValidateCommandHandler
         }
         catch (AnalysisCacheLocationRejectedException ex)
         {
-            _console.Error.WriteLine($"Cannot use --cache '{options.CacheDestination}': {ex.Message}");
+            WriteImmediateError(options, $"Cannot use --cache '{options.CacheDestination}': {ex.Message}");
             return false;
         }
     }

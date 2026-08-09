@@ -83,6 +83,32 @@ public sealed partial class ExplainCommandHandlerTests
         Assert.That(console.ErrorText, Does.Contain("--source and --target are required"));
     }
 
+    [TestCase("invalid", "namespace", "Invalid mode")]
+    [TestCase("strict", "invalid", "Invalid level")]
+    public void InvalidOptionWithJson_WritesStructuredError(string mode, string level, string expectedError)
+    {
+        var console = new RecordingCliConsole();
+        int result = Handler(new ExplainStubRuntime(), console).Execute(Options(mode: mode, level: level, format: "json"));
+
+        Assert.That(result, Is.EqualTo(CliExitCodes.InvalidArgumentsOrRuntimeError));
+        Assert.That(console.ErrorText, Is.Empty);
+        using JsonDocument document = JsonDocument.Parse(console.OutputText);
+        Assert.That(document.RootElement.GetProperty("error").GetProperty("message").GetString(), Does.Contain(expectedError));
+    }
+
+    [Test]
+    public void RuntimeExceptionWithJson_WritesStructuredError()
+    {
+        var console = new RecordingCliConsole();
+        int result = Handler(new ExplainStubRuntime { ThrowException = new InvalidOperationException("engine error") }, console)
+            .Execute(Options(format: "json"));
+
+        Assert.That(result, Is.EqualTo(CliExitCodes.InvalidArgumentsOrRuntimeError));
+        Assert.That(console.ErrorText, Is.Empty);
+        using JsonDocument document = JsonDocument.Parse(console.OutputText);
+        Assert.That(document.RootElement.GetProperty("error").GetProperty("message").GetString(), Does.Contain("engine error"));
+    }
+
     [Test]
     public void TypedPolicyFailure_BypassesFileExistsAndWritesJson()
     {

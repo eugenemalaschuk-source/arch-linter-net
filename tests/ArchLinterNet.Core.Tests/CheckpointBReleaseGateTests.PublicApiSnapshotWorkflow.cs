@@ -50,7 +50,7 @@ contracts:
             Assert.That(diff.ExitCode, Is.EqualTo(0), diff.CombinedOutput);
             Assert.That(update.ExitCode, Is.EqualTo(0), update.CombinedOutput);
             Assert.That(stale.ExitCode, Is.EqualTo(2), stale.CombinedOutput);
-            Assert.That(stale.CombinedOutput, Does.Contain("StaleArtifact"));
+            Assert.That(stale.CombinedOutput, Does.Contain("stale-artifact"));
         });
         return Passed("public-api-snapshot-workflow");
     }

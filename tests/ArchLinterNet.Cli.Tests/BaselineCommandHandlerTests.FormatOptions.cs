@@ -1,3 +1,4 @@
+using System.Text.Json;
 using ArchLinterNet.Cli.Commands.Baseline;
 using NUnit.Framework;
 
@@ -43,10 +44,17 @@ public sealed partial class BaselineCommandHandlerTests
             Assert.That(diffResult, Is.EqualTo(CliExitCodes.InvalidArgumentsOrRuntimeError));
             Assert.That(verifyResult, Is.EqualTo(CliExitCodes.InvalidArgumentsOrRuntimeError));
             Assert.That(migrateResult, Is.EqualTo(CliExitCodes.InvalidArgumentsOrRuntimeError));
-            Assert.That(diffConsole.ErrorText, Does.Contain("--json cannot be combined with --format"));
-            Assert.That(verifyConsole.ErrorText, Does.Contain("--json cannot be combined with --format"));
-            Assert.That(migrateConsole.ErrorText, Does.Contain("--json cannot be combined with --format"));
+            AssertJsonError(diffConsole, "--json cannot be combined with --format");
+            AssertJsonError(verifyConsole, "--json cannot be combined with --format");
+            AssertJsonError(migrateConsole, "--json cannot be combined with --format");
         });
+    }
+
+    private static void AssertJsonError(RecordingConsole console, string message)
+    {
+        Assert.That(console.ErrorText, Is.Empty);
+        using JsonDocument document = JsonDocument.Parse(console.OutputText);
+        Assert.That(document.RootElement.GetProperty("error").GetProperty("message").GetString(), Does.Contain(message));
     }
 
     [Test]
