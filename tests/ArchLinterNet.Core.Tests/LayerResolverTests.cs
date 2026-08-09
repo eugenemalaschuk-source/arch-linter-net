@@ -609,6 +609,44 @@ public sealed class LayerResolverTests
     }
 
     [Test]
+    public void LayerValidation_OverlapsWith_LoadsFromRealYaml()
+    {
+        // Regression: the raw pre-deserialization YAML pass (ValidateLayerNodeKeys) has its own
+        // hand-maintained key whitelist independent of the C# model, so a field added only to
+        // ArchitectureLayer without also updating that whitelist would make every real policy
+        // authoring overlaps_with fail to load with "contains unknown property 'overlaps_with'"
+        // even though the model and LayerNamespacesValidator both support it.
+        string tempDir = Path.Combine(Path.GetTempPath(), $"arch-linter-overlaps-with-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(tempDir);
+        try
+        {
+            string policyPath = Path.Combine(tempDir, "dependencies.arch.yml");
+            File.WriteAllText(policyPath, """
+                version: 1
+                name: Overlaps With E2E
+                layers:
+                  sales_domain:
+                    namespace: Test.Domain
+                    overlaps_with: [audit_aspect]
+                  audit_aspect:
+                    namespace: Test.Domain
+                analysis:
+                  target_assemblies: []
+                contracts:
+                  strict: []
+                """);
+
+            ArchitectureContractDocument document = new ArchitecturePolicyDocumentLoader().Load(policyPath);
+
+            Assert.That(document.Layers["sales_domain"].OverlapsWith, Is.EquivalentTo(new[] { "audit_aspect" }));
+        }
+        finally
+        {
+            Directory.Delete(tempDir, true);
+        }
+    }
+
+    [Test]
     public void LayerValidation_WithoutNamespaceOrSelector_IsRejected()
     {
         Assert.Throws<InvalidOperationException>(() => new LayerNamespacesValidator().Validate(

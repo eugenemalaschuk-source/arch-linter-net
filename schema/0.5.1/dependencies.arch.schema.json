@@ -1,0 +1,2144 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://archlinternet.dev/schema/0.5.1/dependencies.arch.schema.json",
+  "title": "ArchLinterNet dependency architecture policy",
+  "description": "Schema for one explicitly selected ArchLinterNet root policy, regardless of filename.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "name", "layers", "analysis", "contracts"],
+  "properties": {
+    "version": {
+      "type": "integer",
+      "const": 1,
+      "description": "Policy schema version. Current supported version is 1."
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Human-readable policy name."
+    },
+    "imports": {
+      "$ref": "#/$defs/imports"
+    },
+    "layers": {
+      "type": "object",
+      "description": "Named layer definitions referenced by contracts.",
+      "additionalProperties": { "$ref": "#/$defs/layer" }
+    },
+    "external_dependencies": {
+      "type": "object",
+      "description": "Named vendor/framework dependency groups referenced by external dependency contracts.",
+      "additionalProperties": { "$ref": "#/$defs/externalDependencyGroup" },
+      "default": {}
+    },
+    "packages": {
+      "type": "object",
+      "description": "Named NuGet package groups referenced by package dependency and package allow-only contracts.",
+      "additionalProperties": { "$ref": "#/$defs/packageGroup" },
+      "default": {}
+    },
+    "framework_references": {
+      "type": "object",
+      "description": "Named MSBuild FrameworkReference groups referenced by framework dependency and framework allow-only contracts.",
+      "additionalProperties": { "$ref": "#/$defs/frameworkReferenceGroup" },
+      "default": {}
+    },
+    "source_sets": {
+      "type": "object",
+      "description": "Named reusable source sets referenced by contracts through 'sources'/'source_sets', 'project_sets', or 'allowed_only_in_assembly_sets'.",
+      "additionalProperties": { "$ref": "#/$defs/sourceSet" },
+      "default": {}
+    },
+    "legacy_runtime_layers": {
+      "type": "array",
+      "description": "Namespace prefixes used by dependency contracts with forbidden_legacy_runtime enabled.",
+      "items": { "type": "string", "minLength": 1 },
+      "default": []
+    },
+    "analysis": { "$ref": "#/$defs/analysis" },
+    "contracts": { "$ref": "#/$defs/contracts" },
+    "classification": { "$ref": "#/$defs/classification" }
+  },
+  "$defs": {
+    "imports": {
+      "type": "array",
+      "description": "Ordered explicit local policy fragments, resolved relative to this document.",
+      "minItems": 1,
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "pattern": "^(?![~/])(?!.*(?:\\\\|\\$\\{|\\$\\(|%[^%]*%|[<>:\"|?*]|\\p{Cc}))(?!.*(?:^|/)(?:CON|PRN|AUX|NUL|COM[1-9\\u00B9\\u00B2\\u00B3]|LPT[1-9\\u00B9\\u00B2\\u00B3])(?:\\.|/|$))(?!.*(?:^|/)[^/]*[. ](?:/|$))(?:\\.{1,2}|[^/]+)(?:/(?:\\.{1,2}|[^/]+))*$"
+      }
+    },
+    "sourceSet": {
+      "type": "object",
+      "additionalProperties": false,
+      "anyOf": [
+        { "required": ["members"] },
+        { "required": ["globs"] }
+      ],
+      "allOf": [
+        {
+          "if": { "properties": { "optional": { "const": true } }, "required": ["optional"] },
+          "then": { "required": ["reason"] }
+        },
+        {
+          "if": { "properties": { "kind": { "const": "project" } }, "required": ["kind"] },
+          "then": { "not": { "required": ["globs"] } }
+        }
+      ],
+      "properties": {
+        "kind": {
+          "type": "string",
+          "enum": ["assembly", "layer", "project"],
+          "default": "assembly",
+          "description": "Identity domain of this set's members. It also fixes the declared policy input its globs resolve against: 'analysis.target_assemblies' for assembly, 'layers' keys for layer, and 'analysis.projects' for project."
+        },
+        "members": {
+          "$ref": "#/$defs/nonBlankStringList",
+          "description": "Explicit members. Each must be declared in the policy input for this set's kind."
+        },
+        "globs": {
+          "$ref": "#/$defs/nonBlankStringList",
+          "description": "Constrained dotted-segment globs ('*' as a complete segment, at least one leading literal segment). Not valid for 'kind: project'."
+        },
+        "optional": {
+          "type": "boolean",
+          "default": false,
+          "description": "When true, resolving to no source is an accepted, reported state instead of a load error. Requires 'reason'."
+        },
+        "reason": { "type": "string", "minLength": 1 }
+      }
+    },
+    "stringList": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 },
+      "default": []
+    },
+    "nonBlankStringList": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1, "pattern": ".*\\S.*" },
+      "default": []
+    },
+    "exactSourceWithExclusions": {
+      "required": ["source"],
+      "anyOf": [
+        { "required": ["exclude_sources"], "properties": { "exclude_sources": { "minItems": 1 } } },
+        { "required": ["exclude_source_sets"], "properties": { "exclude_source_sets": { "minItems": 1 } } }
+      ]
+    },
+    "stringMap": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "string",
+        "minLength": 1
+      },
+      "default": {}
+    },
+    "scalarValue": {
+      "anyOf": [
+        { "type": "string", "minLength": 1 },
+        { "type": "boolean" },
+        { "type": "number" },
+        { "type": "integer" }
+      ]
+    },
+    "scalarMap": {
+      "type": "object",
+      "additionalProperties": { "$ref": "#/$defs/scalarValue" },
+      "default": {}
+    },
+    "layer": {
+      "type": "object",
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": { "required": ["namespace_suffix"] },
+          "then": { "required": ["namespace"] }
+        },
+        {
+          "if": {
+            "required": ["exclude"],
+            "properties": { "exclude": { "minItems": 1 } }
+          },
+          "then": { "required": ["namespace"] }
+        }
+      ],
+      "anyOf": [
+        { "required": ["namespace"] },
+        { "required": ["selector"] }
+      ],
+      "properties": {
+        "namespace": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Namespace prefix or constrained glob pattern. Supports '*' as a single-segment wildcard (e.g. 'App.Features.*'). Literal prefixes use exact or child-namespace semantics. See documentation for full glob syntax."
+        },
+        "namespace_suffix": {
+          "type": "string",
+          "description": "Optional namespace suffix constraint, matched after the namespace prefix."
+        },
+        "external": {
+          "type": "boolean",
+          "default": false,
+          "description": "When true, suppresses the empty-layer configuration diagnostic for this layer. Use for namespaces whose assemblies may not be available in the scan environment (external SDKs, engine types, platform-conditional namespaces)."
+        },
+        "selector": {
+          "$ref": "#/$defs/selector",
+          "description": "Matches types by discovered role and optional exact metadata in addition to an optional namespace constraint. When both are present, both constraints must match."
+        },
+        "exclude": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/layerExclusion" },
+          "default": [],
+          "description": "Subtracts matching namespaces from this layer's scope: result = union(namespace/namespace_suffix matches) - union(exclude matches). Reuses the same namespace glob grammar as namespace/namespace_suffix. A layer with no exclude entries is unaffected."
+        }
+      }
+    },
+    "layerExclusion": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["namespace"],
+      "properties": {
+        "namespace": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Namespace prefix or constrained glob pattern to subtract from the layer's matched scope. Same grammar as layer.namespace."
+        },
+        "namespace_suffix": {
+          "type": "string",
+          "description": "Optional namespace suffix constraint, matched after the exclusion's namespace prefix."
+        }
+      }
+    },
+    "selector": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["role"],
+      "properties": {
+        "role": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Exact-match role name assigned by classification. Role names are opaque strings; no fixed role catalog is enforced by this schema."
+        },
+        "metadata": {
+          "$ref": "#/$defs/scalarMap",
+          "description": "Optional exact-match, AND-combined metadata key/value constraints. All declared keys must match."
+        },
+        "when": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Optional ArchLinter CEL Profile v1 boolean predicate refining this selector over a `subject` context. See openspec/specs/cel-policy-model/spec.md."
+        }
+      }
+    },
+    "contextSelector": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["role"],
+      "properties": {
+        "role": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Exact-match role name assigned by classification, matched directly against a candidate type's resolved role rather than through a declared layers.<name>."
+        },
+        "metadata": {
+          "type": "object",
+          "additionalProperties": { "$ref": "#/$defs/contextMetadataValue" },
+          "default": {},
+          "description": "Optional metadata constraints, each evaluated by exactly one of four deterministic operators (checked in this order): a YAML sequence of literal scalars ('in' — matches any listed entry), the literal string '*' ('any' — matches any resolved value provided the key is present), a string matching '!{source.metadata.<key>}' ('not-equal-to-source' — matches when the candidate's value differs from the current source type's own resolved value for <key>; only meaningful on forbidden/allowed/exclude selectors), or any other scalar ('exact' literal match)."
+        }
+      }
+    },
+    "contextMetadataValue": {
+      "anyOf": [
+        { "$ref": "#/$defs/scalarValue" },
+        {
+          "type": "string",
+          "pattern": "^!\\{source\\.metadata\\.[A-Za-z0-9_]+\\}$",
+          "description": "not-equal-to-source reference to the current source type's own resolved metadata value for <key>."
+        },
+        {
+          "type": "array",
+          "items": { "$ref": "#/$defs/scalarValue" },
+          "minItems": 1,
+          "description": "in operator: matches if the candidate's resolved value equals any listed entry."
+        }
+      ]
+    },
+    "contextSourceSelector": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["role"],
+      "properties": {
+        "role": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Exact-match role name assigned by classification, matched directly against a candidate type's resolved role rather than through a declared layers.<name>."
+        },
+        "metadata": {
+          "type": "object",
+          "additionalProperties": { "$ref": "#/$defs/contextSourceMetadataValue" },
+          "default": {},
+          "description": "Optional metadata constraints for the contract's own `source` selector. Supports the 'exact', 'any' ('*'), and 'in' operators — not-equal-to-source ('!{source.metadata.<key>}') is rejected here because the source selector has no other source to compare against; it is valid only on forbidden/allowed/exclude selectors (see contextSelector)."
+        }
+      }
+    },
+    "contextSourceMetadataValue": {
+      "allOf": [
+        {
+          "anyOf": [
+            { "$ref": "#/$defs/scalarValue" },
+            {
+              "type": "array",
+              "items": { "$ref": "#/$defs/scalarValue" },
+              "minItems": 1,
+              "description": "in operator: matches if the candidate's resolved value equals any listed entry."
+            }
+          ]
+        },
+        {
+          "not": {
+            "type": "string",
+            "pattern": "^!\\{source\\.metadata\\.[A-Za-z0-9_]+\\}$"
+          }
+        }
+      ]
+    },
+    "expressionField": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Optional ArchLinter CEL Profile v1 boolean predicate. See openspec/specs/cel-policy-model/spec.md."
+    },
+    "contextSourceSelectorWithExpression": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["role"],
+      "description": "contextSourceSelector plus the optional `when` field, used only where openspec/specs/cel-policy-model/spec.md's closed first-wave location list allows expressions on a contextual source selector (contextDependencyContract.source, contextAllowOnlyContract.source). Port-boundary and adapter-binding source selectors keep using contextSourceSelector without `when`.",
+      "properties": {
+        "role": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Exact-match role name assigned by classification, matched directly against a candidate type's resolved role rather than through a declared layers.<name>."
+        },
+        "metadata": {
+          "type": "object",
+          "additionalProperties": { "$ref": "#/$defs/contextSourceMetadataValue" },
+          "default": {},
+          "description": "Optional metadata constraints for the contract's own `source` selector. Supports the 'exact', 'any' ('*'), and 'in' operators - not-equal-to-source ('!{source.metadata.<key>}') is rejected here because the source selector has no other source to compare against; it is valid only on forbidden/allowed/exclude selectors (see contextSelector)."
+        },
+        "when": { "$ref": "#/$defs/expressionField" }
+      }
+    },
+    "contextSelectorWithExpression": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["role"],
+      "description": "contextSelector plus the optional `when` field, used only where openspec/specs/cel-policy-model/spec.md's closed first-wave location list allows expressions on a contextual target/exclusion selector (contextDependencyContract.forbidden/exclude, contextAllowOnlyContract.allowed/exclude). Port-boundary and adapter-binding selectors keep using contextSelector without `when`.",
+      "properties": {
+        "role": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Exact-match role name assigned by classification, matched directly against a candidate type's resolved role rather than through a declared layers.<name>."
+        },
+        "metadata": {
+          "type": "object",
+          "additionalProperties": { "$ref": "#/$defs/contextMetadataValue" },
+          "default": {},
+          "description": "Optional metadata constraints, each evaluated by exactly one of four deterministic operators (checked in this order): a YAML sequence of literal scalars ('in' — matches any listed entry), the literal string '*' ('any' — matches any resolved value provided the key is present), a string matching '!{source.metadata.<key>}' ('not-equal-to-source' — matches when the candidate's value differs from the current source type's own resolved value for <key>; only meaningful on forbidden/allowed/exclude selectors), or any other scalar ('exact' literal match)."
+        },
+        "when": { "$ref": "#/$defs/expressionField" }
+      }
+    },
+    "externalDependencyGroup": {
+      "type": "object",
+      "additionalProperties": false,
+      "anyOf": [
+        {
+          "required": ["namespace_prefixes"],
+          "properties": {
+            "namespace_prefixes": {
+              "minItems": 1
+            }
+          }
+        },
+        {
+          "required": ["type_prefixes"],
+          "properties": {
+            "type_prefixes": {
+              "minItems": 1
+            }
+          }
+        }
+      ],
+      "properties": {
+        "namespace_prefixes": {
+          "$ref": "#/$defs/nonBlankStringList",
+          "description": "Namespace prefixes matched with exact or child-namespace semantics against referenced external types."
+        },
+        "type_prefixes": {
+          "$ref": "#/$defs/nonBlankStringList",
+          "description": "Full type-name prefixes matched against referenced external types."
+        }
+      }
+    },
+    "packageGroup": {
+      "type": "object",
+      "additionalProperties": false,
+      "anyOf": [
+        {
+          "required": ["package_ids"],
+          "properties": {
+            "package_ids": {
+              "minItems": 1
+            }
+          }
+        },
+        {
+          "required": ["package_prefixes"],
+          "properties": {
+            "package_prefixes": {
+              "minItems": 1
+            }
+          }
+        }
+      ],
+      "properties": {
+        "package_ids": {
+          "$ref": "#/$defs/nonBlankStringList",
+          "description": "NuGet package IDs matched exactly (case-insensitively) against declared PackageReference items."
+        },
+        "package_prefixes": {
+          "$ref": "#/$defs/nonBlankStringList",
+          "description": "NuGet package ID prefixes matched with exact or dot-segment child semantics (case-insensitively) against declared PackageReference items."
+        }
+      }
+    },
+    "frameworkReferenceGroup": {
+      "type": "object",
+      "additionalProperties": false,
+      "anyOf": [
+        {
+          "required": ["framework_names"],
+          "properties": {
+            "framework_names": {
+              "minItems": 1
+            }
+          }
+        },
+        {
+          "required": ["framework_name_prefixes"],
+          "properties": {
+            "framework_name_prefixes": {
+              "minItems": 1
+            }
+          }
+        }
+      ],
+      "properties": {
+        "framework_names": {
+          "$ref": "#/$defs/nonBlankStringList",
+          "description": "MSBuild FrameworkReference Include names matched exactly (case-insensitively) against declared FrameworkReference items."
+        },
+        "framework_name_prefixes": {
+          "$ref": "#/$defs/nonBlankStringList",
+          "description": "FrameworkReference Include name prefixes matched with exact or dot-segment child semantics (case-insensitively) against declared FrameworkReference items."
+        }
+      }
+    },
+    "classification": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Semantic-classification-model design (see openspec/changes/archive/2026-07-10-design-semantic-classification-model). `attributes`/`assembly_attributes`/`inheritance`/`namespace` extraction is implemented (see openspec/specs/attribute-role-extraction and openspec/specs/semantic-classification-model). `precedence` is enforced at runtime for these four implemented sources (a source it omits is disabled; its `yaml_override`/`path` entries have no effect either way, since those two sources are not yet implemented). `path`, `overrides`, and `exclusions` remain schema-acceptance only; declaring `overrides`/`exclusions` has no runtime effect, and declaring `path` produces a deferred-support diagnostic but no role assignment yet.",
+      "properties": {
+        "precedence": {
+          "type": "array",
+          "description": "Subsequence of the fixed source order [yaml_override, type_attribute, assembly_attribute, inheritance, namespace, path], preserving relative order with no duplicates. Sources omitted are disabled. Defaults to all six sources in the fixed order. Enumerated as an explicit oneOf of the 63 valid ordered, duplicate-free subsequences so reordering or repeating a source is rejected by the schema.",
+          "oneOf": [
+            { "const": ["yaml_override"] },
+            { "const": ["type_attribute"] },
+            { "const": ["assembly_attribute"] },
+            { "const": ["inheritance"] },
+            { "const": ["namespace"] },
+            { "const": ["path"] },
+            { "const": ["yaml_override", "type_attribute"] },
+            { "const": ["yaml_override", "assembly_attribute"] },
+            { "const": ["yaml_override", "inheritance"] },
+            { "const": ["yaml_override", "namespace"] },
+            { "const": ["yaml_override", "path"] },
+            { "const": ["type_attribute", "assembly_attribute"] },
+            { "const": ["type_attribute", "inheritance"] },
+            { "const": ["type_attribute", "namespace"] },
+            { "const": ["type_attribute", "path"] },
+            { "const": ["assembly_attribute", "inheritance"] },
+            { "const": ["assembly_attribute", "namespace"] },
+            { "const": ["assembly_attribute", "path"] },
+            { "const": ["inheritance", "namespace"] },
+            { "const": ["inheritance", "path"] },
+            { "const": ["namespace", "path"] },
+            { "const": ["yaml_override", "type_attribute", "assembly_attribute"] },
+            { "const": ["yaml_override", "type_attribute", "inheritance"] },
+            { "const": ["yaml_override", "type_attribute", "namespace"] },
+            { "const": ["yaml_override", "type_attribute", "path"] },
+            { "const": ["yaml_override", "assembly_attribute", "inheritance"] },
+            { "const": ["yaml_override", "assembly_attribute", "namespace"] },
+            { "const": ["yaml_override", "assembly_attribute", "path"] },
+            { "const": ["yaml_override", "inheritance", "namespace"] },
+            { "const": ["yaml_override", "inheritance", "path"] },
+            { "const": ["yaml_override", "namespace", "path"] },
+            { "const": ["type_attribute", "assembly_attribute", "inheritance"] },
+            { "const": ["type_attribute", "assembly_attribute", "namespace"] },
+            { "const": ["type_attribute", "assembly_attribute", "path"] },
+            { "const": ["type_attribute", "inheritance", "namespace"] },
+            { "const": ["type_attribute", "inheritance", "path"] },
+            { "const": ["type_attribute", "namespace", "path"] },
+            { "const": ["assembly_attribute", "inheritance", "namespace"] },
+            { "const": ["assembly_attribute", "inheritance", "path"] },
+            { "const": ["assembly_attribute", "namespace", "path"] },
+            { "const": ["inheritance", "namespace", "path"] },
+            { "const": ["yaml_override", "type_attribute", "assembly_attribute", "inheritance"] },
+            { "const": ["yaml_override", "type_attribute", "assembly_attribute", "namespace"] },
+            { "const": ["yaml_override", "type_attribute", "assembly_attribute", "path"] },
+            { "const": ["yaml_override", "type_attribute", "inheritance", "namespace"] },
+            { "const": ["yaml_override", "type_attribute", "inheritance", "path"] },
+            { "const": ["yaml_override", "type_attribute", "namespace", "path"] },
+            { "const": ["yaml_override", "assembly_attribute", "inheritance", "namespace"] },
+            { "const": ["yaml_override", "assembly_attribute", "inheritance", "path"] },
+            { "const": ["yaml_override", "assembly_attribute", "namespace", "path"] },
+            { "const": ["yaml_override", "inheritance", "namespace", "path"] },
+            { "const": ["type_attribute", "assembly_attribute", "inheritance", "namespace"] },
+            { "const": ["type_attribute", "assembly_attribute", "inheritance", "path"] },
+            { "const": ["type_attribute", "assembly_attribute", "namespace", "path"] },
+            { "const": ["type_attribute", "inheritance", "namespace", "path"] },
+            { "const": ["assembly_attribute", "inheritance", "namespace", "path"] },
+            { "const": ["yaml_override", "type_attribute", "assembly_attribute", "inheritance", "namespace"] },
+            { "const": ["yaml_override", "type_attribute", "assembly_attribute", "inheritance", "path"] },
+            { "const": ["yaml_override", "type_attribute", "assembly_attribute", "namespace", "path"] },
+            { "const": ["yaml_override", "type_attribute", "inheritance", "namespace", "path"] },
+            { "const": ["yaml_override", "assembly_attribute", "inheritance", "namespace", "path"] },
+            { "const": ["type_attribute", "assembly_attribute", "inheritance", "namespace", "path"] },
+            { "const": ["yaml_override", "type_attribute", "assembly_attribute", "inheritance", "namespace", "path"] }
+          ],
+          "default": ["yaml_override", "type_attribute", "assembly_attribute", "inheritance", "namespace", "path"]
+        },
+        "attributes": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/attributeClassificationEntry" },
+          "default": []
+        },
+        "assembly_attributes": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/assemblyAttributeClassificationEntry" },
+          "default": []
+        },
+        "inheritance": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/inheritanceClassificationEntry" },
+          "default": []
+        },
+        "namespace": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/namespaceClassificationEntry" },
+          "default": []
+        },
+        "path": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/pathClassificationEntry" },
+          "default": []
+        },
+        "overrides": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/classificationOverride" },
+          "default": []
+        },
+        "exclusions": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/classificationExclusion" },
+          "default": []
+        }
+      }
+    },
+    "attributeClassificationEntry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["attribute", "role"],
+      "properties": {
+        "attribute": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Full type name of the attribute, matched against attributes declared or referenced in scanned code. No binary ArchLinterNet annotation dependency is required."
+        },
+        "role": { "type": "string", "minLength": 1 },
+        "metadata": {
+          "$ref": "#/$defs/scalarMap",
+          "description": "Values use the metadata extraction syntax: constructor[<index>], property:<Name>, const:<Full.Type.NAME> (compile-time const field only, never static readonly), or a literal scalar."
+        }
+      }
+    },
+    "assemblyAttributeClassificationEntry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["attribute", "role"],
+      "properties": {
+        "attribute": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Full type name of the assembly-level attribute providing bulk defaults for a project or bounded context."
+        },
+        "role": { "type": "string", "minLength": 1 },
+        "metadata": { "$ref": "#/$defs/scalarMap" }
+      }
+    },
+    "inheritanceClassificationEntry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["base_type", "role"],
+      "properties": {
+        "base_type": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Full name of a base type or interface. Types deriving from or implementing this are assigned the declared role/metadata."
+        },
+        "role": { "type": "string", "minLength": 1 },
+        "metadata": {
+          "$ref": "#/$defs/scalarMap",
+          "description": "Inheritance evidence carries no constructor/property arguments; values must be literal scalars or const:<Full.Type.NAME> references to a compile-time const field (never static readonly)."
+        }
+      }
+    },
+    "namespaceClassificationEntry": {
+      "type": "object",
+      "additionalProperties": false,
+      "anyOf": [{ "required": ["namespace"] }, { "required": ["namespace_suffix"] }],
+      "required": ["role"],
+      "properties": {
+        "namespace": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Same namespace glob syntax already accepted by layers.<name>.namespace."
+        },
+        "namespace_suffix": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Same namespace-suffix syntax already accepted by layers.<name>.namespace_suffix."
+        },
+        "role": { "type": "string", "minLength": 1 },
+        "metadata": { "$ref": "#/$defs/scalarMap" }
+      }
+    },
+    "pathClassificationEntry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path_prefix", "role"],
+      "properties": {
+        "path_prefix": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Repository-relative source path prefix."
+        },
+        "role": { "type": "string", "minLength": 1 },
+        "metadata": { "$ref": "#/$defs/scalarMap" }
+      }
+    },
+    "classificationOverride": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["role"],
+      "description": "Exactly one of 'type', 'namespace', or 'namespace_suffix' must be declared - scopes are mutually exclusive, not combinable. 'reason' is required whenever 'namespace' or 'namespace_suffix' is the declared scope, and forbidden from substituting for a missing scope.",
+      "oneOf": [
+        {
+          "required": ["type"],
+          "not": { "anyOf": [{ "required": ["namespace"] }, { "required": ["namespace_suffix"] }] }
+        },
+        {
+          "required": ["namespace", "reason"],
+          "not": { "anyOf": [{ "required": ["type"] }, { "required": ["namespace_suffix"] }] }
+        },
+        {
+          "required": ["namespace_suffix", "reason"],
+          "not": { "anyOf": [{ "required": ["type"] }, { "required": ["namespace"] }] }
+        }
+      ],
+      "properties": {
+        "type": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Narrow, type-scoped override. Full type name. 'reason' is optional at this scope. Mutually exclusive with 'namespace'/'namespace_suffix'."
+        },
+        "namespace": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Broad, namespace-scoped override. 'reason' is required at this scope. Mutually exclusive with 'type'/'namespace_suffix'."
+        },
+        "namespace_suffix": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Broad, namespace-suffix-scoped override. 'reason' is required at this scope. Mutually exclusive with 'type'/'namespace'."
+        },
+        "role": { "type": "string", "minLength": 1 },
+        "metadata": { "$ref": "#/$defs/scalarMap" },
+        "reason": { "type": "string", "minLength": 1 }
+      }
+    },
+    "classificationExclusion": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["reason"],
+      "description": "Exactly one of 'type', 'namespace', or 'namespace_suffix' must be declared - scopes are mutually exclusive, not combinable.",
+      "oneOf": [
+        {
+          "required": ["type"],
+          "not": { "anyOf": [{ "required": ["namespace"] }, { "required": ["namespace_suffix"] }] }
+        },
+        {
+          "required": ["namespace"],
+          "not": { "anyOf": [{ "required": ["type"] }, { "required": ["namespace_suffix"] }] }
+        },
+        {
+          "required": ["namespace_suffix"],
+          "not": { "anyOf": [{ "required": ["type"] }, { "required": ["namespace"] }] }
+        }
+      ],
+      "properties": {
+        "type": { "type": "string", "minLength": 1 },
+        "namespace": { "type": "string", "minLength": 1 },
+        "namespace_suffix": { "type": "string", "minLength": 1 },
+        "reason": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Always required, regardless of scope."
+        }
+      }
+    },
+    "analysis": {
+      "type": "object",
+      "additionalProperties": false,
+      "anyOf": [
+        { "required": ["target_assemblies"] },
+        { "required": ["solution"] },
+        { "required": ["projects"] }
+      ],
+      "properties": {
+        "target_assemblies": {
+          "type": "array",
+          "description": "Assembly names to load and scan. Optional when a metadata-only or discovery-driven policy uses analysis.solution or analysis.projects instead.",
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "assembly_search_paths": {
+          "$ref": "#/$defs/stringList",
+          "description": "Additional directories used when resolving target assemblies."
+        },
+        "shared_frameworks": {
+          "$ref": "#/$defs/stringList",
+          "description": "Shared framework names (e.g. Microsoft.AspNetCore.App) whose installed directory is added to post-build (--ensure-built) assembly probing paths."
+        },
+        "source_roots": {
+          "$ref": "#/$defs/stringList",
+          "description": "Source roots used by method-body Roslyn scanning."
+        },
+        "solution": {
+          "type": "string",
+          "description": "Path to a .sln or .slnx file used for project discovery."
+        },
+        "projects": {
+          "$ref": "#/$defs/stringList",
+          "description": "Explicit .csproj paths used for project discovery. Also the universe a 'kind: project' source set resolves against."
+        },
+        "project_include": {
+          "$ref": "#/$defs/stringList",
+          "description": "Glob patterns narrowing solution-discovered projects."
+        },
+        "project_exclude": {
+          "$ref": "#/$defs/stringList",
+          "description": "Glob patterns removing solution-discovered projects."
+        },
+        "configuration": {
+          "type": "string",
+          "default": "Debug",
+          "description": "Build configuration used to locate project outputs."
+        },
+        "target_framework": {
+          "type": "string",
+          "default": "",
+          "description": "Disambiguates output selection for multi-targeted projects."
+        },
+        "unmatched_ignored_violations": {
+          "type": "string",
+          "enum": ["error", "warn", "off"],
+          "default": "error",
+          "description": "Behavior when an ignored_violations entry matches no current violation. 'error' (default) fails validation, 'warn' reports but does not fail, 'off' skips detection."
+        },
+        "policy_consistency": {
+          "type": "string",
+          "enum": ["error", "warn", "off"],
+          "default": "error",
+          "description": "Behavior when the policy-consistency check finds internal contradictions in the policy itself (duplicate IDs, allow/forbid conflicts, independence conflicts, protected-importer conflicts, layer overlaps, unreachable contracts). 'error' (default) fails validation, 'warn' reports but does not fail, 'off' suppresses findings. The check itself always runs."
+        },
+        "coverage": {
+          "type": "string",
+          "enum": ["error", "warn", "off"],
+          "default": "error",
+          "description": "Behavior when a declared coverage contract finds uncovered, unknown, stale, or empty-input first-party units. 'error' (default) fails validation, 'warn' reports but does not fail, 'off' suppresses findings even for an explicitly declared coverage contract. Backward compatibility does not depend on this default: a policy with no strict_coverage/audit_coverage contracts is unaffected regardless of this setting, because no coverage contract exists to produce a finding."
+        },
+        "condition_sets": {
+          "type": "object",
+          "description": "Named preprocessor symbol sets for conditional compilation analysis. Each key is a condition set name (e.g. 'runtime', 'editor'), each value is an array of preprocessor symbols (e.g. ['UNITY_EDITOR']). Only affects Roslyn source/method-body scanning.",
+          "default": {},
+          "additionalProperties": {
+            "type": "array",
+            "items": { "type": "string", "minLength": 1 }
+          }
+        },
+        "default_condition_set": {
+          "type": "string",
+          "description": "Name of the default condition set used when --condition-set is not provided on the CLI. Must match a key in condition_sets. When empty or unset, no preprocessor symbols are defined.",
+          "default": ""
+        }
+      }
+    },
+    "contracts": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "strict": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/dependencyContract" },
+          "default": []
+        },
+        "audit": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/dependencyContract" },
+          "default": []
+        },
+        "strict_layers": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/layerContract" },
+          "default": []
+        },
+        "audit_layers": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/layerContract" },
+          "default": []
+        },
+        "strict_allow_only": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/allowOnlyContract" },
+          "default": []
+        },
+        "audit_allow_only": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/allowOnlyContract" },
+          "default": []
+        },
+        "strict_cycles": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/cycleContract" },
+          "default": []
+        },
+        "audit_cycles": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/cycleContract" },
+          "default": []
+        },
+        "strict_method_body": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/methodBodyContract" },
+          "default": []
+        },
+        "audit_method_body": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/methodBodyContract" },
+          "default": []
+        },
+        "strict_asmdef": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/asmdefContract" },
+          "default": []
+        },
+        "audit_asmdef": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/asmdefContract" },
+          "default": []
+        },
+        "strict_independence": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/independenceContract" },
+          "default": []
+        },
+        "audit_independence": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/independenceContract" },
+          "default": []
+        },
+        "strict_assembly_independence": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/assemblyIndependenceContract" },
+          "default": []
+        },
+        "audit_assembly_independence": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/assemblyIndependenceContract" },
+          "default": []
+        },
+        "strict_assembly_dependency": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/assemblyDependencyContract" },
+          "default": []
+        },
+        "audit_assembly_dependency": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/assemblyDependencyContract" },
+          "default": []
+        },
+        "strict_assembly_allow_only": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/assemblyAllowOnlyContract" },
+          "default": []
+        },
+        "audit_assembly_allow_only": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/assemblyAllowOnlyContract" },
+          "default": []
+        },
+        "strict_package_dependency": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/packageDependencyContract" },
+          "default": []
+        },
+        "audit_package_dependency": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/packageDependencyContract" },
+          "default": []
+        },
+        "strict_package_allow_only": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/packageAllowOnlyContract" },
+          "default": []
+        },
+        "strict_project_metadata": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/projectMetadataContract" },
+          "default": []
+        },
+        "audit_package_allow_only": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/packageAllowOnlyContract" },
+          "default": []
+        },
+        "strict_framework_dependency": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/frameworkDependencyContract" },
+          "default": []
+        },
+        "audit_framework_dependency": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/frameworkDependencyContract" },
+          "default": []
+        },
+        "strict_framework_allow_only": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/frameworkAllowOnlyContract" },
+          "default": []
+        },
+        "audit_framework_allow_only": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/frameworkAllowOnlyContract" },
+          "default": []
+        },
+        "audit_project_metadata": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/projectMetadataContract" },
+          "default": []
+        },
+        "strict_protected": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/protectedContract" },
+          "default": []
+        },
+        "audit_protected": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/protectedContract" },
+          "default": []
+        },
+        "strict_external": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/externalDependencyContract" },
+          "default": []
+        },
+        "audit_external": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/externalDependencyContract" },
+          "default": []
+        },
+        "strict_external_allow_only": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/externalAllowOnlyContract" },
+          "default": []
+        },
+        "audit_external_allow_only": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/externalAllowOnlyContract" },
+          "default": []
+        },
+        "strict_layer_templates": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/layerTemplateContract" },
+          "default": []
+        },
+        "audit_layer_templates": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/layerTemplateContract" },
+          "default": []
+        },
+        "strict_acyclic_siblings": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/acyclicSiblingContract" },
+          "default": []
+        },
+        "audit_acyclic_siblings": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/acyclicSiblingContract" },
+          "default": []
+        },
+        "strict_type_placement": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/typePlacementContract" },
+          "default": []
+        },
+        "audit_type_placement": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/typePlacementContract" },
+          "default": []
+        },
+        "strict_layout_conventions": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/layoutConventionContract" },
+          "default": []
+        },
+        "audit_layout_conventions": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/layoutConventionContract" },
+          "default": []
+        },
+        "strict_public_api_surface": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/publicApiSurfaceContract" },
+          "default": []
+        },
+        "audit_public_api_surface": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/publicApiSurfaceContract" },
+          "default": []
+        },
+        "strict_attribute_usage": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/attributeUsageContract" },
+          "default": []
+        },
+        "audit_attribute_usage": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/attributeUsageContract" },
+          "default": []
+        },
+        "strict_inheritance": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/inheritanceContract" },
+          "default": []
+        },
+        "audit_inheritance": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/inheritanceContract" },
+          "default": []
+        },
+        "strict_interface_implementation": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/interfaceImplementationContract" },
+          "default": []
+        },
+        "audit_interface_implementation": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/interfaceImplementationContract" },
+          "default": []
+        },
+        "strict_composition": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/compositionContract" },
+          "default": []
+        },
+        "audit_composition": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/compositionContract" },
+          "default": []
+        },
+        "strict_coverage": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/coverageContract" },
+          "default": []
+        },
+        "audit_coverage": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/coverageContract" },
+          "default": []
+        },
+        "strict_context_dependencies": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/contextDependencyContract" },
+          "default": []
+        },
+        "audit_context_dependencies": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/contextDependencyContract" },
+          "default": []
+        },
+        "strict_context_allow_only": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/contextAllowOnlyContract" },
+          "default": []
+        },
+        "audit_context_allow_only": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/contextAllowOnlyContract" },
+          "default": []
+        },
+        "strict_port_boundaries": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/portBoundaryContract" },
+          "default": []
+        },
+        "audit_port_boundaries": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/portBoundaryContract" },
+          "default": []
+        }
+      }
+    },
+    "baseContractFields": {
+      "type": "object",
+      "properties": {
+        "name": { "type": "string", "minLength": 1 },
+        "id": { "type": "string", "minLength": 1, "description": "Stable contract identifier for CLI selection and cross-referencing." },
+        "reason": { "type": "string" }
+      }
+    },
+    "ignoredViolation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["source_type", "forbidden_reference", "reason"],
+      "properties": {
+        "source_type": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Source type name or narrow glob pattern to suppress."
+        },
+        "forbidden_reference": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Forbidden reference name or narrow glob pattern to suppress."
+        },
+        "reason": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Human-readable migration reason or issue reference."
+        }
+      }
+    },
+    "ignoredViolations": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/ignoredViolation" },
+      "default": []
+    },
+    "dependencyContract": {
+      "allOf": [
+        { "$ref": "#/$defs/baseContractFields" },
+        {
+          "type": "object",
+          "required": ["name", "source", "forbidden"],
+          "properties": {
+            "name": { "type": "string", "minLength": 1 },
+            "id": { "type": "string", "minLength": 1 },
+            "source": { "type": "string", "minLength": 1 },
+            "forbidden": { "$ref": "#/$defs/stringList" },
+            "allowed_types": { "$ref": "#/$defs/stringList" },
+            "ignored_violations": { "$ref": "#/$defs/ignoredViolations" },
+            "forbidden_legacy_runtime": { "type": "boolean", "default": false },
+            "dependency_depth": {
+              "type": "string",
+              "enum": ["direct", "transitive"],
+              "default": "direct",
+              "description": "Evaluation depth for dependency checking. 'direct' checks only immediate references (1 level). 'transitive' follows the dependency graph via BFS and reports violations at any depth."
+            },
+            "reason": { "type": "string" }
+          }
+        }
+      ],
+      "unevaluatedProperties": false
+    },
+    "layerContract": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "layers"],
+      "properties": {
+        "name": { "type": "string", "minLength": 1 },
+        "id": { "type": "string", "minLength": 1 },
+        "layers": { "$ref": "#/$defs/stringList" },
+        "ignored_violations": { "$ref": "#/$defs/ignoredViolations" },
+        "reason": { "type": "string" }
+      }
+    },
+    "allowOnlyContract": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "source", "allowed"],
+      "properties": {
+        "name": { "type": "string", "minLength": 1 },
+        "id": { "type": "string", "minLength": 1 },
+        "source": { "type": "string", "minLength": 1 },
+        "allowed": { "$ref": "#/$defs/stringList" },
+        "allowed_types": { "$ref": "#/$defs/stringList" },
+        "ignored_violations": { "$ref": "#/$defs/ignoredViolations" },
+        "reason": { "type": "string" }
+      }
+    },
+    "contextDependencyContract": {
+      "allOf": [
+        { "$ref": "#/$defs/baseContractFields" },
+        {
+          "type": "object",
+          "required": ["name", "source", "forbidden"],
+          "properties": {
+            "name": { "type": "string", "minLength": 1 },
+            "id": { "type": "string", "minLength": 1 },
+            "source": { "$ref": "#/$defs/contextSourceSelectorWithExpression" },
+            "forbidden": {
+              "type": "array",
+              "items": { "$ref": "#/$defs/contextSelectorWithExpression" },
+              "minItems": 1
+            },
+            "exclude": {
+              "type": "array",
+              "items": { "$ref": "#/$defs/contextSelectorWithExpression" },
+              "default": []
+            },
+            "ignored_violations": { "$ref": "#/$defs/ignoredViolations" },
+            "reason": { "type": "string" }
+          }
+        }
+      ],
+      "unevaluatedProperties": false
+    },
+    "contextAllowOnlyContract": {
+      "allOf": [
+        { "$ref": "#/$defs/baseContractFields" },
+        {
+          "type": "object",
+          "required": ["name", "source", "allowed"],
+          "properties": {
+            "name": { "type": "string", "minLength": 1 },
+            "id": { "type": "string", "minLength": 1 },
+            "source": { "$ref": "#/$defs/contextSourceSelectorWithExpression" },
+            "allowed": {
+              "type": "array",
+              "items": { "$ref": "#/$defs/contextSelectorWithExpression" },
+              "minItems": 1
+            },
+            "exclude": {
+              "type": "array",
+              "items": { "$ref": "#/$defs/contextSelectorWithExpression" },
+              "default": []
+            },
+            "ignored_violations": { "$ref": "#/$defs/ignoredViolations" },
+            "reason": { "type": "string" }
+          }
+        }
+      ],
+      "unevaluatedProperties": false
+    },
+    "contextMetadataSelector": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["metadata"],
+      "properties": {
+        "metadata": {
+          "type": "object",
+          "minProperties": 1,
+          "additionalProperties": { "$ref": "#/$defs/contextMetadataValue" }
+        }
+      }
+    },
+    "portBoundaryContract": {
+      "allOf": [
+        { "$ref": "#/$defs/baseContractFields" },
+        {
+          "type": "object",
+          "required": ["name", "source", "target_context", "allowed_seams", "forbidden", "reason"],
+          "properties": {
+            "name": { "type": "string", "minLength": 1 },
+            "id": { "type": "string", "minLength": 1 },
+            "source": { "$ref": "#/$defs/contextSourceSelector" },
+            "target_context": { "$ref": "#/$defs/contextMetadataSelector" },
+            "allowed_seams": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/contextSelector" } },
+            "forbidden": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/contextSelector" } },
+            "adapter_bindings": { "type": "array", "items": { "$ref": "#/$defs/adapterPortBinding" }, "default": [] },
+            "exclude": { "type": "array", "items": { "$ref": "#/$defs/contextSelector" } },
+            "ignored_violations": { "$ref": "#/$defs/ignoredViolations" },
+            "reason": { "type": "string", "minLength": 1 }
+          }
+        }
+      ],
+      "unevaluatedProperties": false
+    },
+    "adapterPortBinding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["adapter", "expected_port"],
+      "properties": {
+        "adapter": { "$ref": "#/$defs/contextSourceSelector" },
+        "expected_port": { "$ref": "#/$defs/contextSourceSelector" },
+        "allowed_contexts": { "type": "array", "items": { "$ref": "#/$defs/contextSelector" }, "default": [] }
+      }
+    },
+    "cycleContract": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "layers"],
+      "properties": {
+        "name": { "type": "string", "minLength": 1 },
+        "id": { "type": "string", "minLength": 1 },
+        "layers": { "$ref": "#/$defs/stringList" },
+        "ignored_violations": { "$ref": "#/$defs/ignoredViolations" },
+        "reason": { "type": "string" }
+      }
+    },
+    "acyclicSiblingContract": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "ancestors"],
+      "properties": {
+        "name": { "type": "string", "minLength": 1 },
+        "id": { "type": "string", "minLength": 1, "description": "Stable contract identifier for CLI selection and cross-referencing." },
+        "ancestors": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "minItems": 1
+        },
+        "ignored_violations": { "$ref": "#/$defs/ignoredViolations" },
+        "reason": { "type": "string" }
+      }
+    },
+    "methodBodyContract": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "source", "forbidden_calls"],
+      "properties": {
+        "name": { "type": "string", "minLength": 1 },
+        "id": { "type": "string", "minLength": 1 },
+        "source": { "type": "string", "minLength": 1 },
+        "forbidden_calls": { "$ref": "#/$defs/stringList" },
+        "ignored_violations": { "$ref": "#/$defs/ignoredViolations" },
+        "reason": { "type": "string" }
+      }
+    },
+    "asmdefContract": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "source_assemblies"],
+      "properties": {
+        "name": { "type": "string", "minLength": 1 },
+        "id": { "type": "string", "minLength": 1 },
+        "source_assemblies": { "$ref": "#/$defs/stringList" },
+        "forbidden_editor_refs": { "type": "boolean", "default": false },
+        "forbidden_asmdef_prefixes": { "$ref": "#/$defs/stringList" },
+        "reason": { "type": "string" }
+      }
+    },
+    "independenceContract": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "layers"],
+      "properties": {
+        "name": { "type": "string", "minLength": 1 },
+        "id": { "type": "string", "minLength": 1 },
+        "layers": { "$ref": "#/$defs/stringList" },
+        "ignored_violations": { "$ref": "#/$defs/ignoredViolations" },
+        "reason": { "type": "string" }
+      }
+    },
+    "assemblyIndependenceContract": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "assemblies"],
+      "properties": {
+        "name": { "type": "string", "minLength": 1 },
+        "id": { "type": "string", "minLength": 1 },
+        "assemblies": { "$ref": "#/$defs/stringList" },
+        "ignored_violations": { "$ref": "#/$defs/ignoredViolations" },
+        "reason": { "type": "string" }
+      }
+    },
+    "assemblyDependencyContract": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "source", "forbidden"],
+      "properties": {
+        "name": { "type": "string", "minLength": 1 },
+        "id": { "type": "string", "minLength": 1 },
+        "source": { "type": "string", "minLength": 1 },
+        "forbidden": { "$ref": "#/$defs/stringList" },
+        "dependency_depth": {
+          "type": "string",
+          "enum": ["direct"],
+          "default": "direct",
+          "description": "Evaluation depth for assembly dependency checking. Only 'direct' (the default) is supported in this release; transitive assembly-reference-path resolution is a planned follow-up and is not yet a valid value here."
+        },
+        "ignored_violations": { "$ref": "#/$defs/ignoredViolations" },
+        "reason": { "type": "string" }
+      }
+    },
+    "assemblyAllowOnlyContract": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "source", "allowed"],
+      "properties": {
+        "name": { "type": "string", "minLength": 1 },
+        "id": { "type": "string", "minLength": 1 },
+        "source": { "type": "string", "minLength": 1 },
+        "allowed": { "$ref": "#/$defs/stringList" },
+        "dependency_depth": {
+          "type": "string",
+          "enum": ["direct"],
+          "default": "direct",
+          "description": "Evaluation depth for assembly allow-only checking. Only 'direct' (the default) is supported in this release; transitive assembly-reference-path resolution is a planned follow-up and is not yet a valid value here."
+        },
+        "ignored_violations": { "$ref": "#/$defs/ignoredViolations" },
+        "reason": { "type": "string" }
+      }
+    },
+    "packageDependencyContract": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "forbidden"],
+      "anyOf": [
+        { "required": ["source"] },
+        { "required": ["sources"] },
+        { "required": ["source_sets"] }
+      ],
+      "not": { "$ref": "#/$defs/exactSourceWithExclusions" },
+      "properties": {
+        "name": { "type": "string", "minLength": 1 },
+        "id": { "type": "string", "minLength": 1 },
+        "source": { "type": "string", "minLength": 1 },
+        "sources": { "$ref": "#/$defs/nonBlankStringList" },
+        "source_sets": { "$ref": "#/$defs/nonBlankStringList" },
+        "exclude_sources": { "$ref": "#/$defs/nonBlankStringList" },
+        "exclude_source_sets": { "$ref": "#/$defs/nonBlankStringList" },
+        "forbidden": { "$ref": "#/$defs/stringList" },
+        "dependency_depth": {
+          "type": "string",
+          "enum": ["direct"],
+          "default": "direct",
+          "description": "Evaluation depth for package dependency checking. Only 'direct' (the default) is supported; there is no resolved package graph to walk transitively."
+        },
+        "ignored_violations": { "$ref": "#/$defs/ignoredViolations" },
+        "reason": { "type": "string" }
+      }
+    },
+    "packageAllowOnlyContract": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "allowed"],
+      "anyOf": [
+        { "required": ["source"] },
+        { "required": ["sources"] },
+        { "required": ["source_sets"] }
+      ],
+      "not": { "$ref": "#/$defs/exactSourceWithExclusions" },
+      "properties": {
+        "name": { "type": "string", "minLength": 1 },
+        "id": { "type": "string", "minLength": 1 },
+        "source": { "type": "string", "minLength": 1 },
+        "sources": { "$ref": "#/$defs/nonBlankStringList" },
+        "source_sets": { "$ref": "#/$defs/nonBlankStringList" },
+        "exclude_sources": { "$ref": "#/$defs/nonBlankStringList" },
+        "exclude_source_sets": { "$ref": "#/$defs/nonBlankStringList" },
+        "allowed": { "$ref": "#/$defs/stringList" },
+        "dependency_depth": {
+          "type": "string",
+          "enum": ["direct"],
+          "default": "direct",
+          "description": "Evaluation depth for package allow-only checking. Only 'direct' (the default) is supported; there is no resolved package graph to walk transitively."
+        },
+        "ignored_violations": { "$ref": "#/$defs/ignoredViolations" },
+        "reason": { "type": "string" }
+      }
+    },
+    "frameworkDependencyContract": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "forbidden"],
+      "anyOf": [
+        { "required": ["source"] },
+        { "required": ["sources"] },
+        { "required": ["source_sets"] }
+      ],
+      "not": { "$ref": "#/$defs/exactSourceWithExclusions" },
+      "properties": {
+        "name": { "type": "string", "minLength": 1 },
+        "id": { "type": "string", "minLength": 1 },
+        "source": { "type": "string", "minLength": 1 },
+        "sources": { "$ref": "#/$defs/nonBlankStringList" },
+        "source_sets": { "$ref": "#/$defs/nonBlankStringList" },
+        "exclude_sources": { "$ref": "#/$defs/nonBlankStringList" },
+        "exclude_source_sets": { "$ref": "#/$defs/nonBlankStringList" },
+        "forbidden": { "$ref": "#/$defs/stringList" },
+        "ignored_violations": { "$ref": "#/$defs/ignoredViolations" },
+        "reason": { "type": "string" }
+      }
+    },
+    "frameworkAllowOnlyContract": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "allowed"],
+      "anyOf": [
+        { "required": ["source"] },
+        { "required": ["sources"] },
+        { "required": ["source_sets"] }
+      ],
+      "not": { "$ref": "#/$defs/exactSourceWithExclusions" },
+      "properties": {
+        "name": { "type": "string", "minLength": 1 },
+        "id": { "type": "string", "minLength": 1 },
+        "source": { "type": "string", "minLength": 1 },
+        "sources": { "$ref": "#/$defs/nonBlankStringList" },
+        "source_sets": { "$ref": "#/$defs/nonBlankStringList" },
+        "exclude_sources": { "$ref": "#/$defs/nonBlankStringList" },
+        "exclude_source_sets": { "$ref": "#/$defs/nonBlankStringList" },
+        "allowed": { "$ref": "#/$defs/stringList" },
+        "ignored_violations": { "$ref": "#/$defs/ignoredViolations" },
+        "reason": { "type": "string" }
+      }
+    },
+    "projectMetadataContract": {
+      "allOf": [
+        { "$ref": "#/$defs/baseContractFields" },
+        {
+          "type": "object",
+          "required": ["name"],
+          "anyOf": [
+            {
+              "required": ["required_properties"],
+              "properties": { "required_properties": { "minProperties": 1 } }
+            },
+            {
+              "required": ["forbidden_properties"],
+              "properties": { "forbidden_properties": { "minProperties": 1 } }
+            },
+            {
+              "required": ["allowed_friend_assemblies"]
+            },
+            {
+              "required": ["forbidden_project_references"],
+              "properties": { "forbidden_project_references": { "minItems": 1 } }
+            }
+          ],
+          "properties": {
+            "name": { "type": "string", "minLength": 1 },
+            "id": { "type": "string", "minLength": 1 },
+            "projects": { "$ref": "#/$defs/nonBlankStringList" },
+            "project_sets": { "$ref": "#/$defs/nonBlankStringList" },
+            "required_properties": { "$ref": "#/$defs/scalarMap" },
+            "forbidden_properties": { "$ref": "#/$defs/scalarMap" },
+            "allowed_friend_assemblies": { "$ref": "#/$defs/nonBlankStringList" },
+            "forbidden_project_references": { "$ref": "#/$defs/nonBlankStringList" },
+            "ignored_violations": { "$ref": "#/$defs/ignoredViolations" },
+            "reason": { "type": "string" }
+          }
+        },
+        {
+          "anyOf": [
+            { "required": ["projects"] },
+            { "required": ["project_sets"] }
+          ]
+        }
+      ],
+      "unevaluatedProperties": false
+    },
+    "protectedContract": {
+      "allOf": [
+        { "$ref": "#/$defs/baseContractFields" },
+        {
+          "type": "object",
+          "required": ["name", "protected", "allowed_importers"],
+          "properties": {
+            "name": { "type": "string", "minLength": 1 },
+            "id": { "type": "string", "minLength": 1 },
+            "protected": { "$ref": "#/$defs/stringList" },
+            "allowed_importers": { "$ref": "#/$defs/stringList" },
+            "allowed_types": { "$ref": "#/$defs/stringList" },
+            "ignored_violations": { "$ref": "#/$defs/ignoredViolations" },
+            "reason": { "type": "string" }
+          }
+        }
+      ],
+      "unevaluatedProperties": false
+    },
+    "externalDependencyContract": {
+      "allOf": [
+        { "$ref": "#/$defs/baseContractFields" },
+        {
+          "type": "object",
+          "required": ["name", "forbidden"],
+          "anyOf": [
+            { "required": ["source"] },
+            { "required": ["sources"] },
+            { "required": ["source_sets"] }
+          ],
+          "not": { "$ref": "#/$defs/exactSourceWithExclusions" },
+          "properties": {
+            "name": { "type": "string", "minLength": 1 },
+            "id": { "type": "string", "minLength": 1 },
+            "source": { "type": "string", "minLength": 1 },
+            "sources": { "$ref": "#/$defs/nonBlankStringList" },
+            "source_sets": { "$ref": "#/$defs/nonBlankStringList" },
+            "exclude_sources": { "$ref": "#/$defs/nonBlankStringList" },
+            "exclude_source_sets": { "$ref": "#/$defs/nonBlankStringList" },
+            "forbidden": { "$ref": "#/$defs/stringList" },
+            "ignored_violations": { "$ref": "#/$defs/ignoredViolations" },
+            "reason": { "type": "string" }
+          }
+        }
+      ],
+      "unevaluatedProperties": false
+    },
+    "externalAllowOnlyContract": {
+      "allOf": [
+        { "$ref": "#/$defs/baseContractFields" },
+        {
+          "type": "object",
+          "required": ["name", "allowed"],
+          "anyOf": [
+            { "required": ["source"] },
+            { "required": ["sources"] },
+            { "required": ["source_sets"] }
+          ],
+          "not": { "$ref": "#/$defs/exactSourceWithExclusions" },
+          "properties": {
+            "name": { "type": "string", "minLength": 1 },
+            "id": { "type": "string", "minLength": 1 },
+            "source": { "type": "string", "minLength": 1 },
+            "sources": { "$ref": "#/$defs/nonBlankStringList" },
+            "source_sets": { "$ref": "#/$defs/nonBlankStringList" },
+            "exclude_sources": { "$ref": "#/$defs/nonBlankStringList" },
+            "exclude_source_sets": { "$ref": "#/$defs/nonBlankStringList" },
+            "allowed": { "$ref": "#/$defs/stringList" },
+            "allowed_types": { "$ref": "#/$defs/stringList" },
+            "ignored_violations": { "$ref": "#/$defs/ignoredViolations" },
+            "reason": { "type": "string" }
+          }
+        }
+      ],
+      "unevaluatedProperties": false
+    },
+    "typeMatcher": {
+      "type": "object",
+      "additionalProperties": false,
+      "minProperties": 1,
+      "properties": {
+        "name_suffix": { "type": "string", "minLength": 1 },
+        "name_prefix": { "type": "string", "minLength": 1 },
+        "namespace": { "type": "string", "minLength": 1 },
+        "layer": { "type": "string", "minLength": 1 },
+        "base_type": { "type": "string", "minLength": 1 },
+        "implements_interface": { "type": "string", "minLength": 1 },
+        "has_attribute": { "type": "string", "minLength": 1 }
+      }
+    },
+    "typePlacementContract": {
+      "allOf": [
+        { "$ref": "#/$defs/baseContractFields" },
+        {
+          "type": "object",
+          "required": ["name", "types_matching"],
+          "properties": {
+            "name": { "type": "string", "minLength": 1 },
+            "id": { "type": "string", "minLength": 1 },
+            "types_matching": { "$ref": "#/$defs/typeMatcher" },
+            "exclude_types_matching": {
+              "type": "array",
+              "items": { "$ref": "#/$defs/typeMatcher" },
+              "default": []
+            },
+            "must_reside_in_layers": { "$ref": "#/$defs/stringList" },
+            "must_reside_in_namespaces": { "$ref": "#/$defs/stringList" },
+            "must_reside_in_projects": { "$ref": "#/$defs/stringList" },
+            "must_reside_in_assemblies": { "$ref": "#/$defs/stringList" },
+            "required_name_suffix": { "type": "string", "minLength": 1 },
+            "required_name_prefix": { "type": "string", "minLength": 1 },
+            "forbidden_name_suffix": { "type": "string", "minLength": 1 },
+            "forbidden_name_prefix": { "type": "string", "minLength": 1 },
+            "ignored_violations": { "$ref": "#/$defs/ignoredViolations" },
+            "reason": { "type": "string" }
+          }
+        }
+      ],
+      "unevaluatedProperties": false
+    },
+    "layoutFileMatcher": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "folder_segment": { "type": "string", "minLength": 1 },
+        "namespace_segment": { "type": "string", "minLength": 1 },
+        "file_name_suffix": { "type": "string", "minLength": 1 },
+        "file_name_prefix": { "type": "string", "minLength": 1 },
+        "when": {
+          "$ref": "#/$defs/expressionField",
+          "description": "Optional ArchLinter CEL Profile v1 boolean predicate refining matched declared types over a `subject` context. See openspec/specs/cel-policy-model/spec.md's closed first-wave location list."
+        }
+      }
+    },
+    "requireMatchingInterface": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "name_prefix": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Expected counterpart interface name prefix, prepended to the matched class's simple name. Defaults to 'I' when omitted."
+        }
+      }
+    },
+    "layoutConventionContract": {
+      "allOf": [
+        { "$ref": "#/$defs/baseContractFields" },
+        {
+          "type": "object",
+          "required": ["name", "files_matching"],
+          "properties": {
+            "name": { "type": "string", "minLength": 1 },
+            "id": { "type": "string", "minLength": 1 },
+            "files_matching": { "$ref": "#/$defs/layoutFileMatcher" },
+            "exclude_files_matching": {
+              "type": "array",
+              "items": { "$ref": "#/$defs/layoutFileMatcher" },
+              "default": []
+            },
+            "require_type_kind": {
+              "type": "string",
+              "enum": ["class", "interface", "struct", "enum", "record", "delegate"]
+            },
+            "forbid_type_kind": {
+              "type": "string",
+              "enum": ["class", "interface", "struct", "enum", "record", "delegate"]
+            },
+            "required_name_suffix": { "type": "string", "minLength": 1 },
+            "required_name_prefix": { "type": "string", "minLength": 1 },
+            "forbidden_name_suffix": { "type": "string", "minLength": 1 },
+            "forbidden_name_prefix": { "type": "string", "minLength": 1 },
+            "require_type_name_matches_file_name": { "type": "boolean", "default": false },
+            "require_matching_interface": { "$ref": "#/$defs/requireMatchingInterface" },
+            "ignored_violations": { "$ref": "#/$defs/ignoredViolations" },
+            "reason": { "type": "string" }
+          }
+        }
+      ],
+      "unevaluatedProperties": false
+    },
+    "publicApiSurfaceContract": {
+      "allOf": [
+        { "$ref": "#/$defs/baseContractFields" },
+        {
+          "type": "object",
+          "required": ["name", "assemblies"],
+          "properties": {
+            "name": { "type": "string", "minLength": 1 },
+            "id": { "type": "string", "minLength": 1 },
+            "assemblies": { "$ref": "#/$defs/stringList" },
+            "declared_api": { "$ref": "#/$defs/stringList" },
+            "api_snapshot": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Repository-local path to a reviewed public API snapshot file, resolved relative to the policy boundary. Its entries are unioned with declared_api. An absolute or boundary-escaping path is a policy load error; a missing, unparsable, or foreign snapshot is reported as a validation violation so the first capture can still create the file."
+            },
+            "api_comparison": {
+              "type": "string",
+              "enum": ["additions_only", "exact"],
+              "default": "additions_only",
+              "description": "additions_only (default) reports undeclared exported surface only. exact additionally reports declared signatures that no longer exist (removals) and declared members whose normalized signature changed."
+            },
+            "forbid_public_constants_unless_declared": {
+              "type": "boolean",
+              "default": false,
+              "description": "When true, every exported const field must have its fully-qualified name listed in allowed_public_constants, even if its full signature is present in declared_api."
+            },
+            "allowed_public_constants": { "$ref": "#/$defs/stringList" },
+            "ignored_violations": { "$ref": "#/$defs/ignoredViolations" },
+            "reason": { "type": "string" }
+          }
+        }
+      ],
+      "unevaluatedProperties": false
+    },
+    "attributeUsageContract": {
+      "allOf": [
+        { "$ref": "#/$defs/baseContractFields" },
+        {
+          "type": "object",
+          "required": ["name"],
+          "properties": {
+            "name": { "type": "string", "minLength": 1 },
+            "id": { "type": "string", "minLength": 1 },
+            "attributes": { "$ref": "#/$defs/stringList" },
+            "attribute_prefixes": { "$ref": "#/$defs/stringList" },
+            "allowed_only_in_layers": { "$ref": "#/$defs/stringList" },
+            "allowed_only_in_namespaces": { "$ref": "#/$defs/stringList" },
+            "allowed_only_in_projects": { "$ref": "#/$defs/stringList" },
+            "allowed_only_in_assemblies": { "$ref": "#/$defs/stringList" },
+            "forbidden_in_layers": { "$ref": "#/$defs/stringList" },
+            "forbidden_in_namespaces": { "$ref": "#/$defs/stringList" },
+            "forbidden_in_projects": { "$ref": "#/$defs/stringList" },
+            "forbidden_in_assemblies": { "$ref": "#/$defs/stringList" },
+            "ignored_violations": { "$ref": "#/$defs/ignoredViolations" },
+            "reason": { "type": "string" }
+          }
+        }
+      ],
+      "unevaluatedProperties": false
+    },
+    "inheritanceContract": {
+      "allOf": [
+        { "$ref": "#/$defs/baseContractFields" },
+        {
+          "type": "object",
+          "required": ["name"],
+          "properties": {
+            "name": { "type": "string", "minLength": 1 },
+            "id": { "type": "string", "minLength": 1 },
+            "source_layers": { "$ref": "#/$defs/stringList" },
+            "source_namespaces": { "$ref": "#/$defs/stringList" },
+            "forbidden_base_types": { "$ref": "#/$defs/stringList" },
+            "forbidden_base_type_prefixes": { "$ref": "#/$defs/stringList" },
+            "ignored_violations": { "$ref": "#/$defs/ignoredViolations" },
+            "reason": { "type": "string" }
+          }
+        }
+      ],
+      "unevaluatedProperties": false
+    },
+    "interfaceImplementationContract": {
+      "allOf": [
+        { "$ref": "#/$defs/baseContractFields" },
+        {
+          "type": "object",
+          "required": ["name"],
+          "properties": {
+            "name": { "type": "string", "minLength": 1 },
+            "id": { "type": "string", "minLength": 1 },
+            "interfaces": { "$ref": "#/$defs/stringList" },
+            "interface_prefixes": { "$ref": "#/$defs/stringList" },
+            "allowed_only_in_layers": { "$ref": "#/$defs/stringList" },
+            "allowed_only_in_namespaces": { "$ref": "#/$defs/stringList" },
+            "allowed_only_in_projects": { "$ref": "#/$defs/stringList" },
+            "allowed_only_in_assemblies": { "$ref": "#/$defs/stringList" },
+            "forbidden_in_layers": { "$ref": "#/$defs/stringList" },
+            "forbidden_in_namespaces": { "$ref": "#/$defs/stringList" },
+            "forbidden_in_projects": { "$ref": "#/$defs/stringList" },
+            "forbidden_in_assemblies": { "$ref": "#/$defs/stringList" },
+            "ignored_violations": { "$ref": "#/$defs/ignoredViolations" },
+            "reason": { "type": "string" }
+          }
+        }
+      ],
+      "unevaluatedProperties": false
+    },
+    "compositionContract": {
+      "allOf": [
+        { "$ref": "#/$defs/baseContractFields" },
+        {
+          "type": "object",
+          "required": ["name", "forbidden_apis"],
+          "properties": {
+            "name": { "type": "string", "minLength": 1 },
+            "id": { "type": "string", "minLength": 1 },
+            "forbidden_apis": { "$ref": "#/$defs/stringList" },
+            "allowed_only_in_layers": { "$ref": "#/$defs/stringList" },
+            "allowed_only_in_namespaces": { "$ref": "#/$defs/stringList" },
+            "allowed_only_in_projects": { "$ref": "#/$defs/stringList" },
+            "allowed_only_in_assemblies": { "$ref": "#/$defs/stringList" },
+            "allowed_only_in_assembly_sets": { "$ref": "#/$defs/nonBlankStringList" },
+            "allowed_only_in_types": {
+              "type": "array",
+              "items": { "$ref": "#/$defs/compositionTypeSelector" },
+              "default": []
+            },
+            "ignored_violations": { "$ref": "#/$defs/ignoredViolations" },
+            "reason": { "type": "string" }
+          }
+        }
+      ],
+      "unevaluatedProperties": false
+    },
+    "compositionTypeSelector": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["assembly", "type"],
+      "properties": {
+        "assembly": { "type": "string", "minLength": 1 },
+        "type": { "type": "string", "minLength": 1 }
+      }
+    },
+    "layerTemplateContract": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "containers", "layers"],
+      "properties": {
+        "name": { "type": "string", "minLength": 1 },
+        "id": { "type": "string", "minLength": 1 },
+        "containers": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "minItems": 1
+        },
+        "exclude_containers": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "default": []
+        },
+        "layers": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/templateLayer" },
+          "minItems": 1
+        },
+        "reason": { "type": "string" },
+        "exhaustive": {
+          "type": "boolean",
+          "default": false,
+          "description": "When true, the linter checks for sibling namespaces under each container that are not mapped into any declared layer. Unmapped siblings with types produce violations."
+        }
+      }
+    },
+    "templateLayer": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name"],
+      "properties": {
+        "name": { "type": "string", "minLength": 1 },
+        "optional": { "type": "boolean", "default": false }
+      }
+    },
+    "coverageNamespaceRoot": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["namespace"],
+      "properties": {
+        "namespace": { "type": "string", "minLength": 1, "description": "Namespace prefix or glob pattern, same syntax as layers.<name>.namespace." },
+        "namespace_suffix": { "type": "string", "description": "Optional namespace suffix constraint, same syntax as layers.<name>.namespace_suffix." }
+      }
+    },
+    "coverageDiscoveryRoot": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["include"],
+      "properties": {
+        "include": { "$ref": "#/$defs/stringList", "description": "Glob patterns for project/assembly discovery roots." },
+        "exclude": { "$ref": "#/$defs/stringList", "description": "Glob patterns excluded from include, before coverage exclusion reasons apply." }
+      }
+    },
+    "coverageNamespaceExclusion": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["reason"],
+      "anyOf": [
+        { "required": ["namespace"] },
+        { "required": ["namespace_suffix"] }
+      ],
+      "properties": {
+        "namespace": { "type": "string", "minLength": 1 },
+        "namespace_suffix": { "type": "string", "minLength": 1 },
+        "reason": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Required justification for excluding this unit from coverage."
+        }
+      }
+    },
+    "coverageProjectExclusion": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["project", "reason"],
+      "properties": {
+        "project": { "type": "string", "minLength": 1 },
+        "reason": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Required justification for excluding this unit from coverage."
+        }
+      }
+    },
+    "coverageAssemblyExclusion": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["assembly", "reason"],
+      "properties": {
+        "assembly": { "type": "string", "minLength": 1 },
+        "reason": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Required justification for excluding this unit from coverage."
+        }
+      }
+    },
+    "coverageContractIdExclusion": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["contract_id", "reason"],
+      "properties": {
+        "contract_id": { "type": "string", "minLength": 1 },
+        "reason": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Required justification for excluding this referenced contract from rule-input coverage."
+        }
+      }
+    },
+    "optionalRuleInput": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["contract_id", "input", "layer", "reason"],
+      "properties": {
+        "contract_id": { "type": "string", "minLength": 1 },
+        "input": { "type": "string", "minLength": 1 },
+        "layer": { "type": "string", "minLength": 1 },
+        "reason": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Required justification for this exact planned-empty rule input."
+        }
+      }
+    },
+    "coverageSemanticRoleExclusion": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["role", "reason"],
+      "properties": {
+        "role": { "type": "string", "minLength": 1 },
+        "metadata": { "$ref": "#/$defs/scalarMap" },
+        "reason": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Required justification for excluding this semantic role fact from coverage."
+        }
+      }
+    },
+    "coverageContract": {
+      "allOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["name", "scope", "reason"],
+          "properties": {
+            "name": { "type": "string", "minLength": 1 },
+            "id": { "type": "string", "minLength": 1, "description": "Stable contract identifier for CLI selection and cross-referencing." },
+            "scope": {
+              "type": "string",
+              "enum": ["namespace", "project", "assembly", "dependency_edge", "rule_input", "semantic_role"],
+              "description": "Which kind of first-party unit this coverage contract classifies."
+            },
+            "roots": {
+              "type": "array",
+              "minItems": 1,
+              "description": "Units to classify (the scan boundary the contract classifies, not coverage evidence by itself). Required for scope: namespace; optional for scope: semantic_role; and invalid for project, assembly, dependency_edge, and rule_input. Namespace and semantic-role roots use coverageNamespaceRoot."
+            },
+            "between": {
+              "type": "array",
+              "items": {
+                "type": "array",
+                "items": { "type": "string", "minLength": 1 },
+                "minItems": 2,
+                "maxItems": 2
+              },
+              "minItems": 1,
+              "description": "Declared-layer-name pairs to classify. Required for, and only valid with, scope: dependency_edge."
+            },
+            "contract_ids": {
+              "$ref": "#/$defs/stringList",
+              "description": "Contract IDs whose rule inputs are checked for stale/empty-input status. Required for, and only valid with, scope: rule_input."
+            },
+            "exclude": {
+              "type": "array",
+              "description": "Excluded units, each carrying a required reason. Item shape depends on scope: namespace uses coverageNamespaceExclusion, project uses coverageProjectExclusion, assembly uses coverageAssemblyExclusion, rule_input uses coverageContractIdExclusion. Not valid for scope: dependency_edge (no exclusion shape defined for that scope yet)."
+            },
+            "optional_inputs": {
+              "type": "array",
+              "items": { "$ref": "#/$defs/optionalRuleInput" },
+              "default": [],
+              "description": "Exact planned-empty rule inputs. Valid only for scope: rule_input."
+            },
+            "reason": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Why this coverage contract exists."
+            },
+            "ignored_violations": { "$ref": "#/$defs/ignoredViolations" }
+          }
+        },
+        {
+          "if": { "properties": { "scope": { "const": "namespace" } }, "required": ["scope"] },
+          "then": {
+            "required": ["roots"],
+            "properties": {
+              "roots": { "items": { "$ref": "#/$defs/coverageNamespaceRoot" } },
+              "exclude": { "items": { "$ref": "#/$defs/coverageNamespaceExclusion" }, "default": [] }
+            },
+            "not": { "anyOf": [{ "required": ["between"] }, { "required": ["contract_ids"] }, { "required": ["optional_inputs"] }] }
+          }
+        },
+        {
+          "if": { "properties": { "scope": { "const": "project" } }, "required": ["scope"] },
+          "then": {
+            "properties": {
+              "exclude": { "items": { "$ref": "#/$defs/coverageProjectExclusion" }, "default": [] }
+            },
+            "not": { "anyOf": [{ "required": ["roots"] }, { "required": ["between"] }, { "required": ["contract_ids"] }, { "required": ["optional_inputs"] }] }
+          }
+        },
+        {
+          "if": { "properties": { "scope": { "const": "assembly" } }, "required": ["scope"] },
+          "then": {
+            "properties": {
+              "exclude": { "items": { "$ref": "#/$defs/coverageAssemblyExclusion" }, "default": [] }
+            },
+            "not": { "anyOf": [{ "required": ["roots"] }, { "required": ["between"] }, { "required": ["contract_ids"] }, { "required": ["optional_inputs"] }] }
+          }
+        },
+        {
+          "if": { "properties": { "scope": { "const": "dependency_edge" } }, "required": ["scope"] },
+          "then": {
+            "required": ["between"],
+            "not": { "anyOf": [{ "required": ["roots"] }, { "required": ["contract_ids"] }, { "required": ["exclude"] }, { "required": ["optional_inputs"] }] }
+          }
+        },
+        {
+          "if": { "properties": { "scope": { "const": "rule_input" } }, "required": ["scope"] },
+          "then": {
+            "required": ["contract_ids"],
+            "properties": {
+              "exclude": { "items": { "$ref": "#/$defs/coverageContractIdExclusion" }, "default": [] },
+              "optional_inputs": { "items": { "$ref": "#/$defs/optionalRuleInput" }, "default": [] }
+            },
+            "not": { "anyOf": [{ "required": ["roots"] }, { "required": ["between"] }] }
+          }
+        },
+        {
+          "if": { "properties": { "scope": { "const": "semantic_role" } }, "required": ["scope"] },
+          "then": {
+            "properties": {
+              "roots": { "items": { "$ref": "#/$defs/coverageNamespaceRoot" } },
+              "exclude": { "items": { "$ref": "#/$defs/coverageSemanticRoleExclusion" }, "default": [] }
+            },
+            "not": { "anyOf": [{ "required": ["between"] }, { "required": ["contract_ids"] }, { "required": ["optional_inputs"] }] }
+          }
+        }
+      ]
+    }
+  }
+}

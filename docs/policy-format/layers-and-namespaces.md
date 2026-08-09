@@ -204,11 +204,13 @@ it — `audited_types` above does not also need to appear in
 `sales_domain.overlaps_with`. Each entry must reference a declared layer
 name and must not be the layer's own name, or the policy fails to load.
 
-This is a local, reviewable alternative to setting
-`analysis.policy_consistency: warn` or `off`, which would also suppress
-duplicate-ID, allow/forbid-conflict, independence-conflict, protected-
-importer-conflict, and unreachable-contract findings — not just the one
-overlap being acknowledged.
+This is a local, reviewable alternative to setting `analysis.policy_consistency`
+away from its `error` default, which applies to every policy-consistency check
+at once, not just this one overlap: `warn` keeps all of them — duplicate-ID,
+allow/forbid-conflict, independence-conflict, protected-importer-conflict,
+layer-overlap, and unreachable-contract — in the diagnostics output but stops
+them from failing validation, while `off` suppresses their diagnostics
+entirely.
 
 ## External layers
 

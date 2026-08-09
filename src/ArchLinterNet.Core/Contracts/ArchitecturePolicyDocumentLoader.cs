@@ -22,6 +22,7 @@ public sealed partial class ArchitecturePolicyDocumentLoader : IArchitecturePoli
     private const string UnnamedContractName = "<unnamed>";
     private const string NamespaceSuffixKey = "namespace_suffix";
     private const string ExcludeKey = "exclude";
+    private const string OverlapsWithKey = "overlaps_with";
 
     private static readonly string[] _targetContextAllowedKeys = { "metadata" };
     private static readonly string[] _adapterBindingAllowedKeys = { "adapter", "expected_port", "allowed_contexts" };
@@ -289,6 +290,7 @@ public sealed partial class ArchitecturePolicyDocumentLoader : IArchitecturePoli
             ValidateLayerNodeKeys(layerNode, layerName);
             ValidateNamespaceValue(layerNode, layerName);
             ValidateLayerExcludeEntries(layerNode, layerName);
+            ValidateLayerOverlapsWithEntries(layerNode, layerName);
 
             bool hasNamespace = TryGetNonNullChild(layerNode, "namespace", out _);
             bool hasNamespaceSuffix = TryGetNonNullChild(layerNode, NamespaceSuffixKey, out _);
@@ -341,10 +343,38 @@ public sealed partial class ArchitecturePolicyDocumentLoader : IArchitecturePoli
                 && !string.Equals(scalar.Value, NamespaceSuffixKey, StringComparison.Ordinal)
                 && !string.Equals(scalar.Value, "external", StringComparison.Ordinal)
                 && !string.Equals(scalar.Value, "selector", StringComparison.Ordinal)
-                && !string.Equals(scalar.Value, ExcludeKey, StringComparison.Ordinal))
+                && !string.Equals(scalar.Value, ExcludeKey, StringComparison.Ordinal)
+                && !string.Equals(scalar.Value, OverlapsWithKey, StringComparison.Ordinal))
             {
                 throw new InvalidOperationException(
                     $"Layer '{layerName}' contains unknown property '{scalar.Value}'.");
+            }
+        }
+    }
+
+    // Mirrors ValidateLayerExcludeEntries: overlaps_with is a flat list of layer-name strings, so
+    // the only raw shape to guard is "sequence of non-empty scalars" - a nested mapping/sequence
+    // entry would otherwise reach ArchitectureLayer.OverlapsWith as a deserialization type error
+    // with no layer-name context instead of this actionable message.
+    private static void ValidateLayerOverlapsWithEntries(YamlMappingNode layerNode, string layerName)
+    {
+        if (!TryGetChild(layerNode, OverlapsWithKey, out YamlNode? overlapsWithNode))
+        {
+            return;
+        }
+
+        if (overlapsWithNode is not YamlSequenceNode overlapsWithSequence)
+        {
+            throw new InvalidOperationException(
+                $"Layer '{layerName}' overlaps_with must be a list of layer names.");
+        }
+
+        foreach (YamlNode entryNode in overlapsWithSequence.Children)
+        {
+            if (entryNode is not YamlScalarNode entryScalar || string.IsNullOrWhiteSpace(entryScalar.Value))
+            {
+                throw new InvalidOperationException(
+                    $"Layer '{layerName}' overlaps_with entries must be non-empty layer name strings.");
             }
         }
     }
