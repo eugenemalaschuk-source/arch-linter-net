@@ -1,3 +1,4 @@
+using ArchLinterNet.Core.Contracts.PolicyImports;
 using ArchLinterNet.Core.IO;
 using ArchLinterNet.Core.IO.Abstractions;
 
@@ -113,4 +114,30 @@ internal sealed class FakeArchitectureFileSystem : IArchitectureFileSystem
     }
 
     private static string Normalize(string path) => path.Replace('\\', '/');
+}
+
+internal sealed class FakeArchitecturePolicyPathResolver : IArchitecturePolicyPathResolver
+{
+    public ArchitecturePolicyRootPath ResolveRoot(string rootPath)
+    {
+        string normalizedPath = rootPath.Replace('\\', '/');
+        string policyDirectory = normalizedPath[..normalizedPath.LastIndexOf('/')];
+        string boundary = policyDirectory.EndsWith("/architecture", StringComparison.Ordinal)
+            ? policyDirectory[..^"/architecture".Length]
+            : policyDirectory;
+        return new ArchitecturePolicyRootPath(
+            rootPath, normalizedPath, normalizedPath, boundary, boundary, normalizedPath);
+    }
+
+    public ArchitecturePolicyResolvedPath ResolveImport(
+        ArchitecturePolicyRootPath root,
+        string declaringPath,
+        string importPath)
+    {
+        string normalizedDeclaringPath = declaringPath.Replace('\\', '/');
+        string directory = normalizedDeclaringPath[..normalizedDeclaringPath.LastIndexOf('/')];
+        string path = $"{directory}/{importPath}";
+        string portableIdentity = path[(root.BoundaryPath.Length + 1)..];
+        return new ArchitecturePolicyResolvedPath(path, path, portableIdentity, path);
+    }
 }

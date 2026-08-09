@@ -664,7 +664,7 @@ public sealed partial class ArchitecturePolicyImportTests
         }
 
         ArchitecturePolicyImportException exception = Assert.Throws<ArchitecturePolicyImportException>(
-            () => new ArchitecturePolicyDocumentLoader(fileSystem, new VirtualPolicyPathResolver()).Load(RootPath))!;
+            () => new ArchitecturePolicyDocumentLoader(fileSystem, new FakeArchitecturePolicyPathResolver()).Load(RootPath))!;
 
         Assert.That(exception.Category, Is.EqualTo(ArchitecturePolicyImportErrorCategory.GraphLimit));
     }
@@ -717,24 +717,6 @@ public sealed partial class ArchitecturePolicyImportTests
     private static bool HasTopLevel(string yaml, string field)
     {
         return yaml.Replace("\r\n", "\n", StringComparison.Ordinal).Split('\n').Contains(field, StringComparer.Ordinal);
-    }
-
-    private sealed class VirtualPolicyPathResolver : IArchitecturePolicyPathResolver
-    {
-        private const string RootDirectory = "/virtual/architecture";
-        private const string Boundary = "/virtual";
-
-        public ArchitecturePolicyRootPath ResolveRoot(string rootPath) =>
-            new(rootPath, rootPath, rootPath, Boundary, Boundary, rootPath);
-
-        public ArchitecturePolicyResolvedPath ResolveImport(
-            ArchitecturePolicyRootPath root,
-            string declaringPath,
-            string importPath)
-        {
-            string path = $"{RootDirectory}/{importPath}";
-            return new ArchitecturePolicyResolvedPath(path, path, $"architecture/{importPath}", path);
-        }
     }
 
     private static string EffectiveRootYaml()
