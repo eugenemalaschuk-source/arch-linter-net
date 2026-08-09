@@ -16,21 +16,9 @@ internal sealed class BaselineMigrateCommandHandler(ICliRuntime runtime, ICliCon
             return CliExitCodes.Success;
         }
 
-        if (options.BaselinePath == null)
+        if (!BaselineCommandGuards.TryRequireBaselinePath(console, options.Format, "baseline migrate", options.BaselinePath)
+            || !BaselineCommandGuards.TryValidateFormat(console, options.Format, options.HasFormatConflict))
         {
-            CliErrorOutputWriter.Write(console, options.Format, "invalid-arguments", "--baseline is required for baseline migrate.");
-            return CliExitCodes.InvalidArgumentsOrRuntimeError;
-        }
-
-        if (options.HasFormatConflict)
-        {
-            CliErrorOutputWriter.Write(console, options.Format, "invalid-arguments", "--json cannot be combined with --format.");
-            return CliExitCodes.InvalidArgumentsOrRuntimeError;
-        }
-
-        if (options.Format is not ("human" or "json" or "sarif"))
-        {
-            CliErrorOutputWriter.Write(console, options.Format, "invalid-format", "Invalid format. Use 'human', 'json', or 'sarif'.");
             return CliExitCodes.InvalidArgumentsOrRuntimeError;
         }
 
@@ -40,15 +28,9 @@ internal sealed class BaselineMigrateCommandHandler(ICliRuntime runtime, ICliCon
             return CliExitCodes.InvalidArgumentsOrRuntimeError;
         }
 
-        if (!fileSystem.FileExists(options.PolicyPath))
+        if (!BaselineCommandGuards.TryValidatePolicyFile(console, fileSystem, options.Format, options.PolicyPath)
+            || !BaselineCommandGuards.TryValidateBaselineFile(console, fileSystem, options.Format, options.BaselinePath))
         {
-            CliErrorOutputWriter.Write(console, options.Format, "configuration-error", $"Policy file not found: {options.PolicyPath}");
-            return CliExitCodes.InvalidArgumentsOrRuntimeError;
-        }
-
-        if (!fileSystem.FileExists(options.BaselinePath))
-        {
-            CliErrorOutputWriter.Write(console, options.Format, "configuration-error", $"Baseline file not found: {options.BaselinePath}");
             return CliExitCodes.InvalidArgumentsOrRuntimeError;
         }
 

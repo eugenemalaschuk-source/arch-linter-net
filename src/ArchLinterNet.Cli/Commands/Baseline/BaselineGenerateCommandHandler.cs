@@ -15,16 +15,9 @@ internal sealed class BaselineGenerateCommandHandler(ICliRuntime runtime, ICliCo
             return CliExitCodes.Success;
         }
 
-        if (options.Mode is not ("strict" or "audit" or "all"))
+        if (!BaselineCommandGuards.TryValidateMode(console, options.Format, options.Mode)
+            || !BaselineCommandGuards.TryValidatePolicyFile(console, fileSystem, options.Format, options.PolicyPath))
         {
-            CliErrorOutputWriter.Write(console, options.Format, "invalid-arguments",
-                $"Invalid mode: {options.Mode}. Use 'strict', 'audit', or 'all'.");
-            return CliExitCodes.InvalidArgumentsOrRuntimeError;
-        }
-
-        if (!fileSystem.FileExists(options.PolicyPath))
-        {
-            CliErrorOutputWriter.Write(console, options.Format, "configuration-error", $"Policy file not found: {options.PolicyPath}");
             return CliExitCodes.InvalidArgumentsOrRuntimeError;
         }
 
@@ -44,15 +37,8 @@ internal sealed class BaselineGenerateCommandHandler(ICliRuntime runtime, ICliCo
 
             if (!outcome.Succeeded)
             {
-                if (outcome.Error != null)
-                {
-                    CliErrorOutputWriter.Write(console, options.Format, "configuration-error", outcome.Error);
-                }
-                else
-                {
-                    WriteConfigurationViolations(options.Format, outcome.ConfigurationViolations);
-                }
-
+                BaselineCommandGuards.WriteOutcomeFailure(
+                    console, options.Format, outcome.Error, outcome.ConfigurationViolations, "generated");
                 return CliExitCodes.InvalidArgumentsOrRuntimeError;
             }
 
@@ -119,10 +105,5 @@ internal sealed class BaselineGenerateCommandHandler(ICliRuntime runtime, ICliCo
         {
             console.Out.WriteLine($"Output: {options.OutputPath}");
         }
-    }
-
-    private void WriteConfigurationViolations(string format, IReadOnlyCollection<ArchitectureViolation> violations)
-    {
-        CliErrorOutputWriter.WriteConfigurationViolations(console, format, "generated", violations);
     }
 }

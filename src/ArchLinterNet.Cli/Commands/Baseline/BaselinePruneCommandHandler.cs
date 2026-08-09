@@ -15,27 +15,11 @@ internal sealed class BaselinePruneCommandHandler(ICliRuntime runtime, ICliConso
             return CliExitCodes.Success;
         }
 
-        if (options.Mode is not ("strict" or "audit" or "all"))
+        if (!BaselineCommandGuards.TryValidateMode(console, options.Format, options.Mode)
+            || !BaselineCommandGuards.TryRequireBaselinePath(console, options.Format, "baseline prune", options.BaselinePath)
+            || !BaselineCommandGuards.TryValidatePolicyFile(console, fileSystem, options.Format, options.PolicyPath)
+            || !BaselineCommandGuards.TryValidateBaselineFile(console, fileSystem, options.Format, options.BaselinePath))
         {
-            CliErrorOutputWriter.Write(console, options.Format, "invalid-arguments", $"Invalid mode: {options.Mode}. Use 'strict', 'audit', or 'all'.");
-            return CliExitCodes.InvalidArgumentsOrRuntimeError;
-        }
-
-        if (options.BaselinePath == null)
-        {
-            CliErrorOutputWriter.Write(console, options.Format, "invalid-arguments", "--baseline is required for baseline prune.");
-            return CliExitCodes.InvalidArgumentsOrRuntimeError;
-        }
-
-        if (!fileSystem.FileExists(options.PolicyPath))
-        {
-            CliErrorOutputWriter.Write(console, options.Format, "configuration-error", $"Policy file not found: {options.PolicyPath}");
-            return CliExitCodes.InvalidArgumentsOrRuntimeError;
-        }
-
-        if (!fileSystem.FileExists(options.BaselinePath))
-        {
-            CliErrorOutputWriter.Write(console, options.Format, "configuration-error", $"Baseline file not found: {options.BaselinePath}");
             return CliExitCodes.InvalidArgumentsOrRuntimeError;
         }
 
