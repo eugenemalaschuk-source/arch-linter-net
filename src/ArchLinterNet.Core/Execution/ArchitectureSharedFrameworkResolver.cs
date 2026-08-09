@@ -191,34 +191,7 @@ internal static class ArchitectureSharedFrameworkResolver
                 continue;
             }
 
-            (string Directory, Version Version)? bestStable = null;
-            (string Directory, Version Version)? bestPrerelease = null;
-            foreach (string versionDirectory in
-                     fileSystem.EnumerateDirectories(frameworkRoot, "*", SearchOption.TopDirectoryOnly))
-            {
-                string versionName = Path.GetFileName(versionDirectory.TrimEnd('/', '\\'));
-                Version? version = TryParseVersionPrefix(versionName);
-                if (version is null || (anchorMajorVersion is int major && version.Major != major))
-                {
-                    continue;
-                }
-
-                if (versionName.Contains('-', StringComparison.Ordinal))
-                {
-                    if (bestPrerelease is null || version > bestPrerelease.Value.Version)
-                    {
-                        bestPrerelease = (versionDirectory, version);
-                    }
-                }
-                else if (bestStable is null || version > bestStable.Value.Version)
-                {
-                    bestStable = (versionDirectory, version);
-                }
-            }
-
-            // A release build is always preferred over a prerelease one, even a numerically higher
-            // prerelease; a prerelease is only used when it is the sole candidate for this framework.
-            string? selected = (bestStable ?? bestPrerelease)?.Directory;
+            string? selected = FindBestVersionDirectory(frameworkRoot, fileSystem, anchorMajorVersion);
             if (selected is not null)
             {
                 return selected;
@@ -226,6 +199,40 @@ internal static class ArchitectureSharedFrameworkResolver
         }
 
         return null;
+    }
+
+    // A release build is always preferred over a prerelease one, even a numerically higher
+    // prerelease; a prerelease is only used when it is the sole candidate under this framework root.
+    private static string? FindBestVersionDirectory(
+        string frameworkRoot, IArchitectureFileSystem fileSystem, int? anchorMajorVersion)
+    {
+        (string Directory, Version Version)? bestStable = null;
+        (string Directory, Version Version)? bestPrerelease = null;
+
+        foreach (string versionDirectory in
+                 fileSystem.EnumerateDirectories(frameworkRoot, "*", SearchOption.TopDirectoryOnly))
+        {
+            string versionName = Path.GetFileName(versionDirectory.TrimEnd('/', '\\'));
+            Version? version = TryParseVersionPrefix(versionName);
+            if (version is null || (anchorMajorVersion is int major && version.Major != major))
+            {
+                continue;
+            }
+
+            if (versionName.Contains('-', StringComparison.Ordinal))
+            {
+                if (bestPrerelease is null || version > bestPrerelease.Value.Version)
+                {
+                    bestPrerelease = (versionDirectory, version);
+                }
+            }
+            else if (bestStable is null || version > bestStable.Value.Version)
+            {
+                bestStable = (versionDirectory, version);
+            }
+        }
+
+        return (bestStable ?? bestPrerelease)?.Directory;
     }
 
     private static Version? TryParseVersionPrefix(string directoryName)
