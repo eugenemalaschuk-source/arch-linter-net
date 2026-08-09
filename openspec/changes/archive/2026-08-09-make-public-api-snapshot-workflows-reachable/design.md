@@ -40,10 +40,18 @@ build outputs was rejected because it violates the existing fail-closed model.
 ### Recreate the runner after successful preparation
 
 The service first creates a runner sufficient to identify the selected graph,
-runs preflight in the requested mode, then recreates the runner and runs
-ordinary preflight after successful `EnsureBuilt`. The second runner supplies
-the verified post-build assembly bytes to the scanner and prevents reading the
-preparation-era state.
+runs preflight in the requested mode, then recreates the runner through
+`BuildRunnerForPostBuild` and runs ordinary preflight after successful
+`EnsureBuilt`. That dedicated setup path makes the fresh project outputs
+authoritative and resolves them through `ResolvePostBuild`; the second runner
+therefore supplies verified post-build assembly bytes to the scanner instead of
+reading preparation-era or ambient state.
+
+Both preflight passes receive the effective `analysis.configuration` and
+`analysis.target_framework` selected by the policy (with the normal `Debug`
+default and no target-framework constraint when it is absent). That keeps the
+receipt-producing build and the re-verification bound to the same artifact
+selection without expanding the public CLI option surface.
 
 Reusing the original runner was rejected because it can retain missing or
 pre-build assembly resolution results. Invoking preparation as a separate

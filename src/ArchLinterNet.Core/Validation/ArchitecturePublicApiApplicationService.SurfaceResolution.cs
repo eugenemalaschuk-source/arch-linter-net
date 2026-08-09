@@ -41,10 +41,16 @@ public sealed partial class ArchitecturePublicApiApplicationService
         }
 
         ArchitectureRunnerSetup setup = runnerSetupService.BuildRunner(document, policyPath, conditionSetName, cancellationToken: cancellationToken);
+        string requestedConfiguration = string.IsNullOrWhiteSpace(document.Analysis.Configuration)
+            ? "Debug"
+            : document.Analysis.Configuration;
+        string? requestedTargetFramework = string.IsNullOrWhiteSpace(document.Analysis.TargetFramework)
+            ? null
+            : document.Analysis.TargetFramework;
         try
         {
             BuildStatePreflightResult preflight = RunBuildStatePreflight(
-                setup.Runner, preparationMode, noRestore, cancellationToken);
+                setup.Runner, preparationMode, noRestore, requestedConfiguration, requestedTargetFramework, cancellationToken);
             if (preflight.Blocked)
             {
                 return SurfaceResolution.Failed(
@@ -59,12 +65,13 @@ public sealed partial class ArchitecturePublicApiApplicationService
                 // The initial runner only identifies the graph to prepare. Recreate it after the
                 // build so the scanner consumes post-build bytes, then prove those bytes against
                 // the receipt in ordinary mode before continuing.
-                ArchitectureRunnerSetup postBuildSetup = runnerSetupService.BuildRunner(
+                ArchitectureRunnerSetup postBuildSetup = runnerSetupService.BuildRunnerForPostBuild(
                     document, policyPath, conditionSetName, cancellationToken: cancellationToken);
                 setup.Runner.Session.Context.Dispose();
                 setup = postBuildSetup;
                 preflight = RunBuildStatePreflight(
-                    setup.Runner, BuildPreparationMode.Ordinary, noRestore, cancellationToken);
+                    setup.Runner, BuildPreparationMode.Ordinary, noRestore,
+                    requestedConfiguration, requestedTargetFramework, cancellationToken);
 
                 if (preflight.Blocked)
                 {
@@ -106,6 +113,8 @@ public sealed partial class ArchitecturePublicApiApplicationService
         IArchitectureContractRunner runner,
         BuildPreparationMode preparationMode,
         bool noRestore,
+        string requestedConfiguration,
+        string? requestedTargetFramework,
         CancellationToken cancellationToken)
     {
         Discovery.ProjectDiscoveryResult? discovery = runner.Session.Context.ProjectDiscovery;
@@ -129,6 +138,8 @@ public sealed partial class ArchitecturePublicApiApplicationService
             resolution,
             preparationMode,
             noRestore,
+            requestedConfiguration,
+            requestedTargetFramework,
             CancellationToken: cancellationToken));
     }
 

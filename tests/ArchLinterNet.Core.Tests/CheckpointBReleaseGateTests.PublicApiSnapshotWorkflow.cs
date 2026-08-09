@@ -10,6 +10,9 @@ public sealed partial class CheckpointBReleaseGateTests
         Directory.CreateDirectory(Path.Combine(fixture.Root, "public-api"));
         File.AppendAllText(fixture.PolicyPath, """
 
+  configuration: Release
+  target_framework: net10.0
+
 contracts:
   strict_public_api_surface:
     - id: small-api
@@ -34,7 +37,8 @@ contracts:
             "public-api", "update", "--policy", fixture.PolicyPath, "--contract", "small-api",
             "--snapshot", Snapshot, "--dry-run", "--format", "json");
 
-        File.AppendAllText(fixture.SourcePaths.Single(), Environment.NewLine + "// stale receipt regression");
+        string sourcePath = Path.Combine(fixture.Root, "Service.cs");
+        File.AppendAllText(sourcePath, Environment.NewLine + "// stale receipt regression");
         CommandResult stale = candidate.RunTool(fixture.Root,
             "public-api", "diff", "--policy", fixture.PolicyPath, "--contract", "small-api",
             "--snapshot", Snapshot, "--format", "json");
