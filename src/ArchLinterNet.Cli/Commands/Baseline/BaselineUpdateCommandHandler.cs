@@ -17,25 +17,25 @@ internal sealed class BaselineUpdateCommandHandler(ICliRuntime runtime, ICliCons
 
         if (options.Mode is not ("strict" or "audit" or "all"))
         {
-            console.Error.WriteLine($"Invalid mode: {options.Mode}. Use 'strict', 'audit', or 'all'.");
+            CliErrorOutputWriter.Write(console, options.Format, "invalid-arguments", $"Invalid mode: {options.Mode}. Use 'strict', 'audit', or 'all'.");
             return CliExitCodes.InvalidArgumentsOrRuntimeError;
         }
 
         if (options.BaselinePath == null)
         {
-            console.Error.WriteLine("--baseline is required for baseline update.");
+            CliErrorOutputWriter.Write(console, options.Format, "invalid-arguments", "--baseline is required for baseline update.");
             return CliExitCodes.InvalidArgumentsOrRuntimeError;
         }
 
         if (!fileSystem.FileExists(options.PolicyPath))
         {
-            console.Error.WriteLine($"Policy file not found: {options.PolicyPath}");
+            CliErrorOutputWriter.Write(console, options.Format, "configuration-error", $"Policy file not found: {options.PolicyPath}");
             return CliExitCodes.InvalidArgumentsOrRuntimeError;
         }
 
         if (!fileSystem.FileExists(options.BaselinePath))
         {
-            console.Error.WriteLine($"Baseline file not found: {options.BaselinePath}");
+            CliErrorOutputWriter.Write(console, options.Format, "configuration-error", $"Baseline file not found: {options.BaselinePath}");
             return CliExitCodes.InvalidArgumentsOrRuntimeError;
         }
 
@@ -79,7 +79,7 @@ internal sealed class BaselineUpdateCommandHandler(ICliRuntime runtime, ICliCons
             if (!gate.TryApply(
                     new BaselineWriteGate.Request(
                         "baseline update", options.OutputPath, options.Write.DryRun, options.Write.Force,
-                        outcome.Yaml!, outcome.CommentDiagnostic, options.BaselinePath, !json),
+                        outcome.Yaml!, outcome.CommentDiagnostic, options.BaselinePath, !json, options.Format),
                     out BaselineWriteGate.Disposition disposition, cancellationToken))
             {
                 return CliExitCodes.InvalidArgumentsOrRuntimeError;

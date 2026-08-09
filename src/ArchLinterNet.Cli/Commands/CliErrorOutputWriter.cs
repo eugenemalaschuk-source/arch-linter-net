@@ -77,7 +77,20 @@ internal static class CliErrorOutputWriter
                 diagnostics = diagnostics.Where(diagnostic => diagnostic.IsBlocking).Select(diagnostic => new
                 {
                     contract_name = diagnostic.ContractName,
-                    state = diagnostic.State.ToString(),
+                    contract_id = diagnostic.ContractId,
+                    state = PreflightStateToken(diagnostic.State),
+                    project_path = diagnostic.Evidence.ProjectPath,
+                    assembly_name = diagnostic.Evidence.AssemblyName,
+                    requested_configuration = diagnostic.Evidence.RequestedConfiguration,
+                    observed_configuration = diagnostic.Evidence.ObservedConfiguration,
+                    requested_target_framework = diagnostic.Evidence.RequestedTargetFramework,
+                    observed_target_framework = diagnostic.Evidence.ObservedTargetFramework,
+                    expected_output_path = diagnostic.Evidence.ExpectedOutputPath,
+                    searched_paths = diagnostic.Evidence.SearchedPaths,
+                    build_command = diagnostic.Evidence.BuildCommand,
+                    detail = diagnostic.Evidence.Detail,
+                    cache_eligibility = diagnostic.Evidence.CacheEligibility,
+                    cache_ineligibility_reasons = diagnostic.Evidence.CacheIneligibilityReasons,
                 }),
             });
             return;
@@ -89,4 +102,21 @@ internal static class CliErrorOutputWriter
             console.Error.WriteLine($"  {diagnostic.State}: {diagnostic.ContractName}");
         }
     }
+
+    private static string PreflightStateToken(BuildStatePreflightState state) => state switch
+    {
+        BuildStatePreflightState.Cancelled => "cancelled",
+        BuildStatePreflightState.RestoreRequired => "restore-required",
+        BuildStatePreflightState.MissingArtifact => "missing-artifact",
+        BuildStatePreflightState.WrongConfiguration => "wrong-configuration",
+        BuildStatePreflightState.WrongTargetFramework => "wrong-target-framework",
+        BuildStatePreflightState.WrongProjectOutput => "wrong-project-output",
+        BuildStatePreflightState.InconsistentDependencyArtifact => "inconsistent-dependency-artifact",
+        BuildStatePreflightState.StaleArtifact => "stale-artifact",
+        BuildStatePreflightState.UnverifiableArtifact => "unverifiable-artifact",
+        BuildStatePreflightState.Current => "current",
+        BuildStatePreflightState.BuildFailed => "build-failed",
+        BuildStatePreflightState.RestoreFailed => "restore-failed",
+        _ => throw new ArgumentOutOfRangeException(nameof(state), state, null),
+    };
 }

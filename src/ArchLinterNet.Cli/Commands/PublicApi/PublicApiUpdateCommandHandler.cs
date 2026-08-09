@@ -52,7 +52,8 @@ internal sealed class PublicApiUpdateCommandHandler(ICliRuntime runtime, ICliCon
 
             if (!outcome.Succeeded)
             {
-                PublicApiCommandGuards.WriteError(console, options.Format, CommandName, outcome.Error!, outcome.PreflightDiagnostics);
+                PublicApiCommandGuards.WriteError(
+                    console, options.Format, CommandName, outcome.Error!, outcome.PreflightDiagnostics, outcome.FailureKind);
                 return PublicApiCommandGuards.ExitCodeFor(outcome.FailureKind);
             }
 

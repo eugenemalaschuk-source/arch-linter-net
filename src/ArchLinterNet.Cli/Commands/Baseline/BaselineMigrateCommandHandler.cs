@@ -18,37 +18,37 @@ internal sealed class BaselineMigrateCommandHandler(ICliRuntime runtime, ICliCon
 
         if (options.BaselinePath == null)
         {
-            console.Error.WriteLine("--baseline is required for baseline migrate.");
+            CliErrorOutputWriter.Write(console, options.Format, "invalid-arguments", "--baseline is required for baseline migrate.");
             return CliExitCodes.InvalidArgumentsOrRuntimeError;
         }
 
         if (options.HasFormatConflict)
         {
-            console.Error.WriteLine("--json cannot be combined with --format.");
+            CliErrorOutputWriter.Write(console, options.Format, "invalid-arguments", "--json cannot be combined with --format.");
             return CliExitCodes.InvalidArgumentsOrRuntimeError;
         }
 
         if (options.Format is not ("human" or "json" or "sarif"))
         {
-            console.Error.WriteLine("Invalid format. Use 'human', 'json', or 'sarif'.");
+            CliErrorOutputWriter.Write(console, options.Format, "invalid-format", "Invalid format. Use 'human', 'json', or 'sarif'.");
             return CliExitCodes.InvalidArgumentsOrRuntimeError;
         }
 
         if (!options.DryRun && options.OutputPath == null)
         {
-            console.Error.WriteLine("--output is required for baseline migrate unless --dry-run/--check is used.");
+            CliErrorOutputWriter.Write(console, options.Format, "invalid-arguments", "--output is required for baseline migrate unless --dry-run/--check is used.");
             return CliExitCodes.InvalidArgumentsOrRuntimeError;
         }
 
         if (!fileSystem.FileExists(options.PolicyPath))
         {
-            console.Error.WriteLine($"Policy file not found: {options.PolicyPath}");
+            CliErrorOutputWriter.Write(console, options.Format, "configuration-error", $"Policy file not found: {options.PolicyPath}");
             return CliExitCodes.InvalidArgumentsOrRuntimeError;
         }
 
         if (!fileSystem.FileExists(options.BaselinePath))
         {
-            console.Error.WriteLine($"Baseline file not found: {options.BaselinePath}");
+            CliErrorOutputWriter.Write(console, options.Format, "configuration-error", $"Baseline file not found: {options.BaselinePath}");
             return CliExitCodes.InvalidArgumentsOrRuntimeError;
         }
 
@@ -91,7 +91,7 @@ internal sealed class BaselineMigrateCommandHandler(ICliRuntime runtime, ICliCon
                         new BaselineWriteGate.Request(
                             "baseline migrate", options.OutputPath, options.DryRun, options.Force,
                             outcome.Yaml, CommentDiagnostic: null, InPlacePath: null,
-                            EmitProposalToStdout: options.Format == "human"),
+                            EmitProposalToStdout: options.Format == "human", Format: options.Format),
                         out BaselineWriteGate.Disposition disposition, cancellationToken))
                 {
                     return CliExitCodes.InvalidArgumentsOrRuntimeError;

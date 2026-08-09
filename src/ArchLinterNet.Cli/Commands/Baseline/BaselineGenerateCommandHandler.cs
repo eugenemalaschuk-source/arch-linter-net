@@ -17,13 +17,14 @@ internal sealed class BaselineGenerateCommandHandler(ICliRuntime runtime, ICliCo
 
         if (options.Mode is not ("strict" or "audit" or "all"))
         {
-            console.Error.WriteLine($"Invalid mode: {options.Mode}. Use 'strict', 'audit', or 'all'.");
+            CliErrorOutputWriter.Write(console, options.Format, "invalid-arguments",
+                $"Invalid mode: {options.Mode}. Use 'strict', 'audit', or 'all'.");
             return CliExitCodes.InvalidArgumentsOrRuntimeError;
         }
 
         if (!fileSystem.FileExists(options.PolicyPath))
         {
-            console.Error.WriteLine($"Policy file not found: {options.PolicyPath}");
+            CliErrorOutputWriter.Write(console, options.Format, "configuration-error", $"Policy file not found: {options.PolicyPath}");
             return CliExitCodes.InvalidArgumentsOrRuntimeError;
         }
 
@@ -64,7 +65,7 @@ internal sealed class BaselineGenerateCommandHandler(ICliRuntime runtime, ICliCo
             if (!gate.TryApply(
                     new BaselineWriteGate.Request(
                         "baseline generate", options.OutputPath, options.Write.DryRun, options.Write.Force,
-                        outcome.Yaml!, CommentDiagnostic: null, InPlacePath: null, EmitProposalToStdout: !json),
+                        outcome.Yaml!, CommentDiagnostic: null, InPlacePath: null, EmitProposalToStdout: !json, Format: options.Format),
                     out BaselineWriteGate.Disposition disposition, cancellationToken))
             {
                 return CliExitCodes.InvalidArgumentsOrRuntimeError;

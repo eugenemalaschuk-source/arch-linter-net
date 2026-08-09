@@ -98,12 +98,14 @@ public partial class CliIntegrationTests
     [Test]
     public void Graph_InvalidLevel_ExitsWithError()
     {
-        var (exitCode, _, stderr) = RunCli("graph", "--policy", _graphPolicy, "--level", "bogus");
+        var (exitCode, stdout, stderr) = RunCli("graph", "--policy", _graphPolicy, "--level", "bogus");
 
         Assert.Multiple(() =>
         {
             Assert.That(exitCode, Is.EqualTo(2));
-            Assert.That(stderr, Does.Contain("Invalid level"));
+            Assert.That(stderr, Is.Empty);
+            using JsonDocument document = JsonDocument.Parse(stdout);
+            Assert.That(document.RootElement.GetProperty("error").GetProperty("message").GetString(), Does.Contain("Invalid level"));
         });
     }
 
@@ -135,15 +137,17 @@ public partial class CliIntegrationTests
     [Test]
     public void Graph_UnknownContractId_ExitsTwoWithDiagnostic()
     {
-        var (exitCode, _, stderr) = RunCli(
+        var (exitCode, stdout, stderr) = RunCli(
             "graph", "--policy", _graphPolicy, "--contract", "no-execution-to-contractss");
 
         Assert.Multiple(() =>
         {
             Assert.That(exitCode, Is.EqualTo(2));
-            Assert.That(stderr, Does.Contain("Unknown contract IDs"));
-            Assert.That(stderr, Does.Contain("no-execution-to-contractss"));
-            Assert.That(stderr, Does.Contain("no-execution-to-contracts"));
+            Assert.That(stderr, Is.Empty);
+            using JsonDocument document = JsonDocument.Parse(stdout);
+            Assert.That(stdout, Does.Contain("Unknown contract IDs"));
+            Assert.That(stdout, Does.Contain("no-execution-to-contractss"));
+            Assert.That(stdout, Does.Contain("no-execution-to-contracts"));
         });
     }
 

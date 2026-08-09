@@ -69,7 +69,10 @@ internal static class PublicApiCommandGuards
         string format,
         string commandName,
         string error,
-        IReadOnlyCollection<BuildStatePreflightDiagnostic> preflightDiagnostics)
+        IReadOnlyCollection<BuildStatePreflightDiagnostic> preflightDiagnostics,
+        PublicApiFailureKind failureKind,
+        IReadOnlyCollection<string>? staleDeclarations = null,
+        IReadOnlyCollection<string>? undeclaredSurface = null)
     {
         string message = $"public-api {commandName} error: {error}";
         if (preflightDiagnostics.Any(diagnostic => diagnostic.IsBlocking))
@@ -78,6 +81,24 @@ internal static class PublicApiCommandGuards
             return;
         }
 
-        CliErrorOutputWriter.Write(console, format, "configuration-error", message);
+        string category = failureKind switch
+        {
+            PublicApiFailureKind.Drift => "public-api-drift",
+            PublicApiFailureKind.InvalidInput => "public-api-invalid-input",
+            _ => "configuration-error",
+        };
+        CliErrorOutputWriter.Write(console, format, category, message, new
+        {
+            failure_kind = FailureKindToken(failureKind),
+            stale_declarations = staleDeclarations ?? Array.Empty<string>(),
+            undeclared_surface = undeclaredSurface ?? Array.Empty<string>(),
+        });
     }
+
+    private static string FailureKindToken(PublicApiFailureKind failureKind) => failureKind switch
+    {
+        PublicApiFailureKind.Drift => "drift",
+        PublicApiFailureKind.InvalidInput => "invalid-input",
+        _ => "none",
+    };
 }

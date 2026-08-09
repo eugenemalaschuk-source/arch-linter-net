@@ -263,19 +263,19 @@ public sealed partial class BaselineCommandHandlerTests
     {
         AssertGuardCase(console => new BaselinePruneCommandHandler(new StubRuntime(), console, new StubFileSystem("policy.yml", "baseline.yml")).Execute(
                 new BaselinePruneCommandOptions("policy.yml", "baseline.yml", "pruned.yml", "invalid", null, "json", _write, Array.Empty<string>(), false)),
-            "Invalid mode");
+            "Invalid mode", true);
 
         AssertGuardCase(console => new BaselinePruneCommandHandler(new StubRuntime(), console, new StubFileSystem("policy.yml", "baseline.yml")).Execute(
                 new BaselinePruneCommandOptions("policy.yml", null, "pruned.yml", "strict", null, "json", _write, Array.Empty<string>(), false)),
-            "--baseline is required");
+            "--baseline is required", true);
 
         AssertGuardCase(console => new BaselinePruneCommandHandler(new StubRuntime(), console, new StubFileSystem("baseline.yml")).Execute(
                 new BaselinePruneCommandOptions("policy.yml", "baseline.yml", "pruned.yml", "strict", null, "json", _write, Array.Empty<string>(), false)),
-            "Policy file not found");
+            "Policy file not found", true);
 
         AssertGuardCase(console => new BaselinePruneCommandHandler(new StubRuntime(), console, new StubFileSystem("policy.yml")).Execute(
                 new BaselinePruneCommandOptions("policy.yml", "baseline.yml", "pruned.yml", "strict", null, "json", _write, Array.Empty<string>(), false)),
-            "Baseline file not found");
+            "Baseline file not found", true);
 
         var throwingRuntime = new StubRuntime { PruneException = new InvalidOperationException("prune boom") };
         var exceptionConsole = new RecordingConsole();
@@ -378,19 +378,19 @@ public sealed partial class BaselineCommandHandlerTests
     {
         AssertGuardCase(console => new BaselineDiffCommandHandler(new StubRuntime(), console, new StubFileSystem("policy.yml", "baseline.yml")).Execute(
                 new BaselineDiffCommandOptions("policy.yml", "baseline.yml", "invalid", null, "json", Array.Empty<string>(), false)),
-            "Invalid mode");
+            "Invalid mode", true);
 
         AssertGuardCase(console => new BaselineDiffCommandHandler(new StubRuntime(), console, new StubFileSystem("policy.yml", "baseline.yml")).Execute(
                 new BaselineDiffCommandOptions("policy.yml", null, "strict", null, "json", Array.Empty<string>(), false)),
-            "--baseline is required");
+            "--baseline is required", true);
 
         AssertGuardCase(console => new BaselineDiffCommandHandler(new StubRuntime(), console, new StubFileSystem("baseline.yml")).Execute(
                 new BaselineDiffCommandOptions("policy.yml", "baseline.yml", "strict", null, "json", Array.Empty<string>(), false)),
-            "Policy file not found");
+            "Policy file not found", true);
 
         AssertGuardCase(console => new BaselineDiffCommandHandler(new StubRuntime(), console, new StubFileSystem("policy.yml")).Execute(
                 new BaselineDiffCommandOptions("policy.yml", "baseline.yml", "strict", null, "json", Array.Empty<string>(), false)),
-            "Baseline file not found");
+            "Baseline file not found", true);
 
         var throwingRuntime = new StubRuntime { DiffException = new InvalidOperationException("diff boom") };
         var exceptionConsole = new RecordingConsole();
@@ -488,19 +488,27 @@ public sealed partial class BaselineCommandHandlerTests
     {
         AssertGuardCase(console => new BaselineVerifyCommandHandler(new StubRuntime(), console, new StubFileSystem("policy.yml", "baseline.yml")).Execute(
                 new BaselineVerifyCommandOptions("policy.yml", "baseline.yml", "invalid", null, "json", Array.Empty<string>(), false)),
-            "Invalid mode");
+            "Invalid mode", true);
 
         AssertGuardCase(console => new BaselineVerifyCommandHandler(new StubRuntime(), console, new StubFileSystem("policy.yml", "baseline.yml")).Execute(
                 new BaselineVerifyCommandOptions("policy.yml", null, "strict", null, "json", Array.Empty<string>(), false)),
-            "--baseline is required");
+            "--baseline is required", true);
 
         AssertGuardCase(console => new BaselineVerifyCommandHandler(new StubRuntime(), console, new StubFileSystem("baseline.yml")).Execute(
                 new BaselineVerifyCommandOptions("policy.yml", "baseline.yml", "strict", null, "json", Array.Empty<string>(), false)),
-            "Policy file not found");
+            "Policy file not found", true);
 
         AssertGuardCase(console => new BaselineVerifyCommandHandler(new StubRuntime(), console, new StubFileSystem("policy.yml")).Execute(
                 new BaselineVerifyCommandOptions("policy.yml", "baseline.yml", "strict", null, "json", Array.Empty<string>(), false)),
-            "Baseline file not found");
+            "Baseline file not found", true);
+
+        AssertGuardCase(console => new BaselineGenerateCommandHandler(new StubRuntime(), console, new StubFileSystem()).Execute(
+                new BaselineGenerateCommandOptions("policy.yml", "generated.yml", _reasons, "strict", null, "json", _write, Array.Empty<string>(), false)),
+            "Policy file not found", true);
+
+        AssertGuardCase(console => new BaselineUpdateCommandHandler(new StubRuntime(), console, new StubFileSystem("baseline.yml")).Execute(
+                new BaselineUpdateCommandOptions("policy.yml", "baseline.yml", "updated.yml", _reasons, "strict", null, "json", _write, Array.Empty<string>(), false)),
+            "Policy file not found", true);
 
         var throwingRuntime = new StubRuntime { VerifyException = new InvalidOperationException("verify boom") };
         var exceptionConsole = new RecordingConsole();
@@ -547,17 +555,24 @@ public sealed partial class BaselineCommandHandlerTests
 
     private static void AssertGuardCase(
         Func<RecordingConsole, int> execute,
-        string expectedError)
+        string expectedError,
+        bool expectsJson = false)
     {
         var console = new RecordingConsole();
         int result = execute(console);
         Assert.That(result, Is.EqualTo(CliExitCodes.InvalidArgumentsOrRuntimeError));
-        Assert.That(console.ErrorText + console.OutputText, Does.Contain(expectedError));
-        if (!string.IsNullOrWhiteSpace(console.OutputText))
+        if (expectsJson)
         {
+            Assert.That(console.ErrorText, Is.Empty);
+            Assert.That(console.OutputText, Is.Not.Empty);
             using JsonDocument document = JsonDocument.Parse(console.OutputText);
             Assert.That(document.RootElement.GetProperty("status").GetString(), Is.EqualTo("error"));
+            Assert.That(document.RootElement.GetProperty("error").GetProperty("message").GetString(), Does.Contain(expectedError));
+            return;
         }
+
+        Assert.That(console.OutputText, Is.Empty);
+        Assert.That(console.ErrorText, Does.Contain(expectedError));
     }
 
     private sealed class StubFileSystem(params string[] existingPaths) : IFileSystem

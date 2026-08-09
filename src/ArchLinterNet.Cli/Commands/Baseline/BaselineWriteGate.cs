@@ -39,7 +39,10 @@ internal sealed class BaselineWriteGate(ICliConsole console, IFileSystem fileSys
         string? InPlacePath = null,
         // False under `--json`, where the proposal travels inside the single JSON document instead:
         // printing raw YAML alongside it would make stdout unparsable.
-        bool EmitProposalToStdout = true);
+        bool EmitProposalToStdout = true,
+        // Proposal visibility and output format are separate: SARIF does not print the proposal,
+        // but its failure behavior must not be mistaken for JSON.
+        string Format = "human");
 
     /// <summary>
     /// Applies the gate. Returns false when the command must fail; on success reports how the proposal
@@ -174,7 +177,7 @@ internal sealed class BaselineWriteGate(ICliConsole console, IFileSystem fileSys
 
     private void WriteError(Request request, string category, string message)
     {
-        CliErrorOutputWriter.Write(console, request.EmitProposalToStdout ? "human" : "json", category, message);
+        CliErrorOutputWriter.Write(console, request.Format, category, message);
     }
 
     /// <summary>

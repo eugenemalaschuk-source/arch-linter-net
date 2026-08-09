@@ -18,37 +18,37 @@ internal sealed class BaselineDiffCommandHandler(ICliRuntime runtime, ICliConsol
 
         if (options.Mode is not ("strict" or "audit" or "all"))
         {
-            console.Error.WriteLine($"Invalid mode: {options.Mode}. Use 'strict', 'audit', or 'all'.");
+            CliErrorOutputWriter.Write(console, options.Format, "invalid-arguments", $"Invalid mode: {options.Mode}. Use 'strict', 'audit', or 'all'.");
             return CliExitCodes.InvalidArgumentsOrRuntimeError;
         }
 
         if (options.HasFormatConflict)
         {
-            console.Error.WriteLine("--json cannot be combined with --format.");
+            CliErrorOutputWriter.Write(console, options.Format, "invalid-arguments", "--json cannot be combined with --format.");
             return CliExitCodes.InvalidArgumentsOrRuntimeError;
         }
 
         if (options.Format is not ("human" or "json" or "sarif"))
         {
-            console.Error.WriteLine("Invalid format. Use 'human', 'json', or 'sarif'.");
+            CliErrorOutputWriter.Write(console, options.Format, "invalid-format", "Invalid format. Use 'human', 'json', or 'sarif'.");
             return CliExitCodes.InvalidArgumentsOrRuntimeError;
         }
 
         if (options.BaselinePath == null)
         {
-            console.Error.WriteLine("--baseline is required for baseline diff.");
+            CliErrorOutputWriter.Write(console, options.Format, "invalid-arguments", "--baseline is required for baseline diff.");
             return CliExitCodes.InvalidArgumentsOrRuntimeError;
         }
 
         if (!fileSystem.FileExists(options.PolicyPath))
         {
-            console.Error.WriteLine($"Policy file not found: {options.PolicyPath}");
+            CliErrorOutputWriter.Write(console, options.Format, "configuration-error", $"Policy file not found: {options.PolicyPath}");
             return CliExitCodes.InvalidArgumentsOrRuntimeError;
         }
 
         if (!fileSystem.FileExists(options.BaselinePath))
         {
-            console.Error.WriteLine($"Baseline file not found: {options.BaselinePath}");
+            CliErrorOutputWriter.Write(console, options.Format, "configuration-error", $"Baseline file not found: {options.BaselinePath}");
             return CliExitCodes.InvalidArgumentsOrRuntimeError;
         }
 

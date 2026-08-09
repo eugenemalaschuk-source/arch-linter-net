@@ -51,8 +51,13 @@ internal sealed class PublicApiMigrateCommandHandler(ICliRuntime runtime, ICliCo
 
             if (!outcome.Succeeded)
             {
-                PublicApiCommandGuards.WriteError(console, options.Format, CommandName, outcome.Error!, outcome.PreflightDiagnostics);
-                WriteDrift(outcome);
+                PublicApiCommandGuards.WriteError(
+                    console, options.Format, CommandName, outcome.Error!, outcome.PreflightDiagnostics, outcome.FailureKind,
+                    outcome.StaleDeclarations, outcome.UndeclaredSurface);
+                if (options.Format != PublicApiOptionsFactory.JsonFormat)
+                {
+                    WriteDrift(outcome);
+                }
 
                 // Only refused migration drift is a completed gate reporting a finding; an unknown
                 // contract, an unsafe path, or blocked preflight never completed at all.
