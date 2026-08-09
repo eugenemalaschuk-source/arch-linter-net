@@ -53,6 +53,13 @@ default and no target-framework constraint when it is absent). That keeps the
 receipt-producing build and the re-verification bound to the same artifact
 selection without expanding the public CLI option surface.
 
+Ordinary public-API operations run the ordinary resolver in a dedicated internal
+mode that includes discovered project-output paths even when
+`analysis.target_assemblies` is authored. This makes a later `diff` or `update`
+process select the same receipted output as `capture`; the preflight carries
+those discovered physical paths explicitly because isolated post-build
+assemblies are stream-backed and have no usable `Assembly.Location`.
+
 Reusing the original runner was rejected because it can retain missing or
 pre-build assembly resolution results. Invoking preparation as a separate
 wrapper command was rejected because it recreates the unsupported workflow the

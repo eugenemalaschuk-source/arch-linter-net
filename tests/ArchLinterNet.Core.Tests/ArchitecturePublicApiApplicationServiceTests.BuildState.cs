@@ -13,6 +13,7 @@ public sealed partial class ArchitecturePublicApiApplicationServiceTests
     [Test]
     public void Capture_EnsureBuilt_RecreatesRunnerAndReverifiesPostBuildArtifacts()
     {
+        const string ArtifactPath = "/fake/repository/root/bin/Release/net10.0/Test.dll";
         ProjectDiscoveryResult discovery = new(
             new[] { AssemblyName }, Array.Empty<string>(), Array.Empty<string>(),
             Array.Empty<ArchitectureProjectDiscoveryDiagnostic>())
@@ -20,6 +21,10 @@ public sealed partial class ArchitecturePublicApiApplicationServiceTests
             DiscoveredProjects = new[]
             {
                 new ArchitectureDiscoveredProject("Test.csproj", AssemblyName, new[] { "net10.0" }),
+            },
+            ResolvedAssemblyPaths = new Dictionary<string, string>(StringComparer.Ordinal)
+            {
+                [AssemblyName] = ArtifactPath,
             },
         };
         ArchitectureContractDocument document = Document(Contract());
@@ -62,6 +67,8 @@ public sealed partial class ArchitecturePublicApiApplicationServiceTests
                 Is.EqualTo(new[] { "Release", "Release" }));
             Assert.That(preparation.Requests.Select(request => request.RequestedTargetFramework),
                 Is.EqualTo(new[] { "net10.0", "net10.0" }));
+            Assert.That(preparation.Requests.Select(request => request.Resolution.ResolvedAssemblyPaths[AssemblyName]),
+                Is.EqualTo(new[] { ArtifactPath, ArtifactPath }));
         });
     }
 }

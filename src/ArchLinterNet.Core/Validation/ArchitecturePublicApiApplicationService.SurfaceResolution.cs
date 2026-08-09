@@ -40,7 +40,9 @@ public sealed partial class ArchitecturePublicApiApplicationService
                 $"Unknown public API surface contract '{contractId}'. Available contract ids: {availableText}.");
         }
 
-        ArchitectureRunnerSetup setup = runnerSetupService.BuildRunner(document, policyPath, conditionSetName, cancellationToken: cancellationToken);
+        ArchitectureRunnerSetup setup = runnerSetupService.BuildRunner(
+            document, policyPath, conditionSetName, mode: ArchitectureRunnerSetupService.PublicApiResolutionMode,
+            cancellationToken: cancellationToken);
         string requestedConfiguration = string.IsNullOrWhiteSpace(document.Analysis.Configuration)
             ? "Debug"
             : document.Analysis.Configuration;
@@ -66,7 +68,8 @@ public sealed partial class ArchitecturePublicApiApplicationService
                 // build so the scanner consumes post-build bytes, then prove those bytes against
                 // the receipt in ordinary mode before continuing.
                 ArchitectureRunnerSetup postBuildSetup = runnerSetupService.BuildRunnerForPostBuild(
-                    document, policyPath, conditionSetName, cancellationToken: cancellationToken);
+                    document, policyPath, conditionSetName, mode: ArchitectureRunnerSetupService.PublicApiResolutionMode,
+                    cancellationToken: cancellationToken);
                 setup.Runner.Session.Context.Dispose();
                 setup = postBuildSetup;
                 preflight = RunBuildStatePreflight(
@@ -125,7 +128,13 @@ public sealed partial class ArchitecturePublicApiApplicationService
 
         BuildStateResolvedAssemblies resolution = new(
             runner.Session.Context.TargetAssemblies,
-            runner.Session.Context.MissingAssemblyNames);
+            runner.Session.Context.MissingAssemblyNames)
+        {
+            // Post-build assembly loading is deliberately isolated and stream-backed, so those
+            // Assembly instances have no usable Location. Discovery owns the exact selected
+            // project paths; retain them for receipt verification in both preflight passes.
+            ResolvedAssemblyPaths = discovery.ResolvedAssemblyPaths,
+        };
 
         if (resolution.ResolvedAssemblies.Count == 0 && resolution.MissingAssemblyNames.Count == 0)
         {
