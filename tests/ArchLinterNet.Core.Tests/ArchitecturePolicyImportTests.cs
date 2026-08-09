@@ -648,17 +648,23 @@ public sealed partial class ArchitecturePolicyImportTests
     [Test]
     public void Load_ImportFileCountBeyondTwoHundredFiftySix_ExposesGraphLimitBeforeRead()
     {
+        const string RootPath = "/virtual/architecture/root.yml";
+        var fileSystem = new FakeArchitectureFileSystem();
         string imports = string.Join('\n', Enumerable.Range(1, 256).Select(index => $"  - f{index}.yml"));
-        string root = Write(
-            "architecture/root.yml",
-            $"version: 1\nname: Example\nimports:\n{imports}\nanalysis: {{}}\ncontracts: {{}}\n");
+        fileSystem.AddFile(
+            RootPath,
+            $"version: 1\nname: Example\nimports:\n{imports}\nanalysis: {{}}\ncontracts: {{}}\n",
+            DateTime.UnixEpoch);
         for (int index = 1; index <= 255; index++)
         {
-            Write($"architecture/f{index}.yml", $"layers:\n  layer{index}:\n    namespace: App.Layer{index}\n");
+            fileSystem.AddFile(
+                $"/virtual/architecture/f{index}.yml",
+                $"layers:\n  layer{index}:\n    namespace: App.Layer{index}\n",
+                DateTime.UnixEpoch);
         }
 
         ArchitecturePolicyImportException exception = Assert.Throws<ArchitecturePolicyImportException>(
-            () => new ArchitecturePolicyDocumentLoader().Load(root))!;
+            () => new ArchitecturePolicyDocumentLoader(fileSystem, new VirtualPolicyPathResolver()).Load(RootPath))!;
 
         Assert.That(exception.Category, Is.EqualTo(ArchitecturePolicyImportErrorCategory.GraphLimit));
     }
@@ -711,6 +717,24 @@ public sealed partial class ArchitecturePolicyImportTests
     private static bool HasTopLevel(string yaml, string field)
     {
         return yaml.Replace("\r\n", "\n", StringComparison.Ordinal).Split('\n').Contains(field, StringComparer.Ordinal);
+    }
+
+    private sealed class VirtualPolicyPathResolver : IArchitecturePolicyPathResolver
+    {
+        private const string RootDirectory = "/virtual/architecture";
+        private const string Boundary = "/virtual";
+
+        public ArchitecturePolicyRootPath ResolveRoot(string rootPath) =>
+            new(rootPath, rootPath, rootPath, Boundary, Boundary, rootPath);
+
+        public ArchitecturePolicyResolvedPath ResolveImport(
+            ArchitecturePolicyRootPath root,
+            string declaringPath,
+            string importPath)
+        {
+            string path = $"{RootDirectory}/{importPath}";
+            return new ArchitecturePolicyResolvedPath(path, path, $"architecture/{importPath}", path);
+        }
     }
 
     private static string EffectiveRootYaml()
