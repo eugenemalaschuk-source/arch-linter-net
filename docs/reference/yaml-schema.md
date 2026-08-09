@@ -9,7 +9,7 @@ policies with schema-aware editors or AI agents.
 
 The public 0.6.0 package line intentionally ships the immutable 0.5.1 `adoption-stabilization/v1` schema registry. Schema identities version persisted formats independently from package SemVer, so a 0.6.0 installation does not ship or support a `https://archlinternet.dev/schema/0.6.0/...` identity. Use `arch-linter-net schema list` offline to inspect the shipped registry, or `arch-linter-net schema print <logical-id>` to write one exact packaged schema. The 0.5.1 registry contains policy root/fragment v1, baseline v2 with identity v1, the API snapshot v1 canonical-model contract, normalized finding v1, analysis build-state receipt v1, analysis-cache v1, and analysis-profile v1. JSON diagnostics use `schema_version: 1`, a stable `kind`, and a typed `details` object; documented legacy fields remain available during the compatibility window. `PackagedSchemaRegistry.TryValidateText` parses a serialized API snapshot and validates that model against its packaged contract. Cache entries reject unsupported envelope versions. Profile is a generated-output format: its descriptor reports write support only until a public document reader is introduced.
 
-Release-qualified editor IDs are immutable: `https://archlinternet.dev/schema/0.5.1/dependencies.arch.schema.json` for a root policy and `https://archlinternet.dev/schema/0.5.1/dependencies.arch.fragment.schema.json` for an imported fragment.
+Release-qualified editor IDs are immutable: `https://archlinternet.dev/schema/0.6.1/dependencies.arch.schema.json` for a root policy and `https://archlinternet.dev/schema/0.6.1/dependencies.arch.fragment.schema.json` for an imported fragment. (The prior `0.5.1` identity is frozen at its pre-`overlaps_with` shape and no longer packaged as the current policy-root/policy-fragment schema — see `analysis.policy_consistency` above and the packaged schema registry reference.)
 
 For an installed release, prefer `schema list` and `schema print` over a
 repository URL. The [0.5.1 migration guide](../guides/migration-to-0-5-1.md#offline-schemas)
@@ -84,7 +84,7 @@ schema directive for imported partial documents:
 
 ```yaml
 # Imported fragment, even if this file is named domain.data
-# yaml-language-server: $schema=https://archlinternet.dev/schema/0.5.1/dependencies.arch.fragment.schema.json
+# yaml-language-server: $schema=https://archlinternet.dev/schema/0.6.1/dependencies.arch.fragment.schema.json
 layers:
   domain:
     namespace: Company.Domain
@@ -126,6 +126,7 @@ layers:
     exclude:                     # Optional — subtracts matching namespaces from this layer
       - namespace: <string>          # Required per entry — same glob grammar as namespace above
         namespace_suffix: <string>   # Optional
+    overlaps_with: [<string>]    # Optional — names of other layers this layer may intentionally overlap
 ```
 
 Each layer name must be a unique identifier used to reference the layer in contracts.
@@ -162,6 +163,8 @@ via namespace string matching on source-side types.
 
 For new vendor/framework leakage controls, prefer `external_dependencies` over
 modeling framework namespaces as pseudo-layers.
+
+`overlaps_with` acknowledges an intentional overlap with another named layer (declared on either side is enough); see [Overlapping layers](../policy-format/layers-and-namespaces.md#overlapping-layers).
 
 ## `external_dependencies`
 
@@ -379,10 +382,7 @@ expansion), and detects:
   dependency between the same two layers.
 - Protected-surface `allowed_importers` that conflict with a strict
   forbidden/protected rule over the same surface and importer.
-- Overlapping internal layer definitions where the same concrete type is
-  matched by more than one layer without a parent/child namespace
-  containment relationship reconciling the overlap (an external layer
-  overlapping an internal one is never flagged).
+- Overlapping internal layers: the same concrete type matched by more than one layer with no containment or `overlaps_with` reconciliation (external-internal overlap is never flagged).
 - Contracts referencing a layer whose namespace pattern can never match any
   type (structurally impossible, not just empty today).
 

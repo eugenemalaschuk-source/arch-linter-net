@@ -34,6 +34,7 @@ internal sealed class LayerNamespacesValidator : IArchitecturePolicyDocumentVali
             }
 
             ValidateExclude(document, name, layer);
+            ValidateOverlapsWith(document, name, layer);
 
             if (layer.Selector == null)
             {
@@ -118,6 +119,30 @@ internal sealed class LayerNamespacesValidator : IArchitecturePolicyDocumentVali
 
             document.Provenance.TryGetLocation(exclusionPath, out ArchitecturePolicySourceLocation? location);
             exclusion.PolicyLocation = location;
+        }
+    }
+
+    private static void ValidateOverlapsWith(ArchitectureContractDocument document, string layerName, ArchitectureLayer layer)
+    {
+        foreach (string overlapsWithName in layer.OverlapsWith)
+        {
+            if (string.IsNullOrWhiteSpace(overlapsWithName))
+            {
+                throw new InvalidOperationException(
+                    $"Layer '{layerName}' overlaps_with entries must be non-empty layer names.");
+            }
+
+            if (string.Equals(overlapsWithName, layerName, StringComparison.Ordinal))
+            {
+                throw new InvalidOperationException(
+                    $"Layer '{layerName}' overlaps_with must not reference itself.");
+            }
+
+            if (!document.Layers.ContainsKey(overlapsWithName))
+            {
+                throw new InvalidOperationException(
+                    $"Layer '{layerName}' overlaps_with references undeclared layer '{overlapsWithName}'.");
+            }
         }
     }
 

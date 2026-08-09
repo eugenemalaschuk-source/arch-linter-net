@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://archlinternet.dev/schema/0.6.1/dependencies.arch.schema.json",
+  "$id": "https://archlinternet.dev/schema/0.5.1/dependencies.arch.schema.json",
   "title": "ArchLinterNet dependency architecture policy",
   "description": "Schema for one explicitly selected ArchLinterNet root policy, regardless of filename.",
   "type": "object",
@@ -192,10 +192,6 @@
           "items": { "$ref": "#/$defs/layerExclusion" },
           "default": [],
           "description": "Subtracts matching namespaces from this layer's scope: result = union(namespace/namespace_suffix matches) - union(exclude matches). Reuses the same namespace glob grammar as namespace/namespace_suffix. A layer with no exclude entries is unaffected."
-        },
-        "overlaps_with": {
-          "$ref": "#/$defs/stringList",
-          "description": "Names of other declared layers this layer is intentionally allowed to overlap with (match the same concrete type as). Declaring the pairing on either layer is sufficient to reconcile it for the layer-overlap policy-consistency check."
         }
       }
     },
