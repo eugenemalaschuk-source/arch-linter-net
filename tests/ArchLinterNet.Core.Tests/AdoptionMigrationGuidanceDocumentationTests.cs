@@ -104,6 +104,7 @@ public sealed class AdoptionMigrationGuidanceDocumentationTests
         string releaseProcess = ReadDocumentation("reference/release-process.md");
         string readme = File.ReadAllText(Path.Combine(root, "README.md"));
         string guidance = string.Join(Environment.NewLine, readme, schemaReference, cliReference, releaseProcess);
+        string normalizedGuidance = Regex.Replace(guidance, @"\s+", " ");
         var registry = new PackagedSchemaRegistry();
         var supportedIds = registry.List()
             .Select(static schema => schema.SchemaId)
@@ -116,10 +117,10 @@ public sealed class AdoptionMigrationGuidanceDocumentationTests
 
         Assert.Multiple(() =>
         {
-            Assert.That(guidance, Does.Contain("0.6.0 package line"));
-            Assert.That(guidance, Does.Contain("0.5.1"));
-            Assert.That(guidance, Does.Contain("independently from package SemVer"));
-            Assert.That(guidance, Does.Contain("no `schema/0.6.0` identity is shipped"));
+            Assert.That(normalizedGuidance, Does.Contain("0.6.0 package line"));
+            Assert.That(normalizedGuidance, Does.Contain("0.5.1"));
+            Assert.That(normalizedGuidance, Does.Contain("independently from package SemVer"));
+            Assert.That(normalizedGuidance, Does.Contain("no `schema/0.6.0` identity is shipped"));
             Assert.That(documentedIds, Is.Not.Empty);
             Assert.That(documentedIds, Is.SubsetOf(supportedIds));
         });

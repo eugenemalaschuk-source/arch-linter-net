@@ -139,6 +139,7 @@ jobs:
           set -euo pipefail
 
           cli_version=$(printf '%s\n' "$cli_nupkg" | sed -E 's/^ArchLinterNet\.Cli\.(.+)\.nupkg$/\1/')
+          cli_assembly_version=$(printf '%s\n' "$cli_version" | sed -E 's/[-+].*$//')
           smoke_dir=$(mktemp -d)
           trap 'rm -rf "$smoke_dir"' EXIT
 
@@ -146,7 +147,9 @@ jobs:
           dotnet tool install ArchLinterNet.Cli --tool-path tool --add-source "$GITHUB_WORKSPACE/nupkg" --version "$cli_version" --ignore-failed-sources
           ./tool/arch-linter-net --version > version.txt
           ./tool/arch-linter-net schema list > schemas.txt
-          grep -qF "$cli_version" version.txt
+          # The CLI's established --version contract uses the three-part assembly version,
+          # while NuGet package versions may include a prerelease or build suffix.
+          grep -qF "$cli_assembly_version" version.txt
           grep -qx $'policy-root\tv1\thttps://archlinternet.dev/schema/0.5.1/dependencies.arch.schema.json\tschema/0.5.1/dependencies.arch.schema.json' schemas.txt
           grep -qx $'normalized-finding\tv1\thttps://archlinternet.dev/schema/0.5.1/normalized-finding.schema.json\tschema/0.5.1/normalized-finding.schema.json' schemas.txt
           grep -qx $'analysis-cache\tv1\thttps://archlinternet.dev/schema/0.5.1/analysis-cache.schema.json\tschema/0.5.1/analysis-cache.schema.json' schemas.txt
