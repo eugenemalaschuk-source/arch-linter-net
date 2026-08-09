@@ -181,7 +181,8 @@ public sealed class ArchitectureAssemblyResolutionService : IArchitectureAssembl
         // path is out of scope.
         IEnumerable<string> sharedFrameworkProbingPaths = forceIsolatedLoading
             ? ArchitectureSharedFrameworkResolver.ResolveProbingPaths(
-                document.Analysis.SharedFrameworks, document.Analysis.TargetFramework, fileSystem, environment)
+                document.Analysis.SharedFrameworks, document.Analysis.TargetFramework,
+                ExtractDiscoveredTargetFrameworks(exactPostBuildAssemblyPaths, names), fileSystem, environment)
             : Array.Empty<string>();
         IReadOnlyList<string> probingPaths = ResolveProbingPaths(document, repositoryRoot, fileSystem, environment)
             .Concat(additionalProbingPaths ?? Array.Empty<string>())
@@ -419,6 +420,37 @@ public sealed class ArchitectureAssemblyResolutionService : IArchitectureAssembl
                 yield return normalized;
             }
         }
+    }
+
+    // Derives the target framework(s) actually selected for this run's target assemblies from their
+    // resolved build output paths (".../bin/{configuration}/{targetFramework}/{assemblyName}.dll"),
+    // rather than the ArchLinterNet CLI's own runtime — see ArchitectureSharedFrameworkResolver's
+    // anchor-priority note for why the CLI's runtime major is not a safe substitute for this.
+    private static IReadOnlyCollection<string> ExtractDiscoveredTargetFrameworks(
+        IReadOnlyDictionary<string, string>? resolvedAssemblyPaths, IReadOnlyCollection<string> targetAssemblyNames)
+    {
+        if (resolvedAssemblyPaths is null || resolvedAssemblyPaths.Count == 0)
+        {
+            return Array.Empty<string>();
+        }
+
+        HashSet<string> frameworks = new(StringComparer.OrdinalIgnoreCase);
+        foreach (string name in targetAssemblyNames)
+        {
+            if (!resolvedAssemblyPaths.TryGetValue(name, out string? path))
+            {
+                continue;
+            }
+
+            string? directory = Path.GetDirectoryName(path);
+            string? framework = string.IsNullOrEmpty(directory) ? null : Path.GetFileName(directory);
+            if (!string.IsNullOrWhiteSpace(framework))
+            {
+                frameworks.Add(framework);
+            }
+        }
+
+        return frameworks;
     }
 
     private static string? GetAssemblyLocation(Assembly assembly)

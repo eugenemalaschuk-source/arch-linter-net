@@ -94,11 +94,19 @@ arch-linter-net --policy architecture/dependencies.arch.yml --strict --ensure-bu
 
 The linter resolves the named framework's installed directory on the machine
 running the CLI (honoring `DOTNET_ROOT`/`DOTNET_ROOT(X86)`, otherwise falling back
-to the currently running .NET runtime's own shared-framework store, picking the
-highest installed version) and adds it to the assembly probing paths used by
-`--ensure-built`. No hand-authored `runtimeconfig.json` or `dotnet exec` wrapper is
-required. If the named framework is not installed on that machine, the command
-fails immediately with an actionable error naming the framework and the roots it
+to the currently running .NET runtime's own shared-framework store) and adds it to
+the assembly probing paths used by `--ensure-built`. Among installed versions, it
+selects the highest one that is *compatible* with the consumer's own target
+framework, not simply the numerically highest: it anchors to a major version —
+`analysis.target_framework` when set, otherwise the major version actually resolved
+for the selected target assemblies' build output — and, within that major, always
+prefers a release build over a prerelease build. This mirrors the .NET host's own
+default roll-forward policy, which never crosses a major version. If the selected
+target assemblies target more than one distinct major version, the command fails
+immediately rather than guessing; set `analysis.target_framework` to disambiguate.
+No hand-authored `runtimeconfig.json` or `dotnet exec` wrapper is required. If the
+named framework is not installed for the anchored major, the command fails
+immediately with an actionable error naming the framework and the roots it
 searched. `shared_frameworks` only affects `--ensure-built` analysis; policies that
 never set it see no change in behavior.
 

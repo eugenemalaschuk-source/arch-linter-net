@@ -90,12 +90,22 @@ behavior.
 
 - **WHEN** more than one version directory exists under the named shared framework
 - **THEN** the system SHALL select the highest version directory whose major version
-  matches an anchor major version (derived from `analysis.target_framework` when set,
-  otherwise from the currently running runtime's own major version), preferring a
-  release build over a prerelease build with the same or lower version
+  matches an anchor major version, preferring a release build over a prerelease
+  build with the same or lower version
 - **AND** when no anchor major version can be derived, the system SHALL select the
   highest parsed version directory across all installed major versions, still
   preferring a release build over a prerelease build
+
+#### Scenario: Anchor major version priority
+
+- **WHEN** determining the anchor major version for shared-framework selection
+- **THEN** the system SHALL prefer, in order: (1) `analysis.target_framework` when
+  set, (2) the major version of the target framework(s) actually resolved for this
+  run's selected target assemblies' build output (from project discovery), (3) the
+  currently running .NET runtime's own major version as a last resort
+- **AND** the ArchLinterNet CLI's own runtime major SHALL NOT be preferred over a
+  known discovered target framework, since the CLI always runs on its own fixed
+  target framework regardless of what it analyzes
 
 #### Scenario: A higher-major prerelease build does not shadow the anchored major
 
@@ -110,6 +120,14 @@ behavior.
   the named framework matches it
 - **THEN** the system SHALL treat the framework as missing rather than selecting a
   version from a different major version
+
+#### Scenario: Ambiguous discovered major versions fail closed
+
+- **WHEN** `analysis.target_framework` is not set and the selected target assemblies'
+  discovered build output resolves to more than one distinct major version
+- **THEN** the system SHALL throw `InvalidOperationException` naming the conflicting
+  major versions and directing the author to set `analysis.target_framework`, rather
+  than selecting one of them
 
 #### Scenario: Missing shared framework fails with an actionable diagnostic
 

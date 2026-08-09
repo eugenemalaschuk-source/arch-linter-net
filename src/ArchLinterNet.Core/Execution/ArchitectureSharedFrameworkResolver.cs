@@ -15,6 +15,7 @@ internal static class ArchitectureSharedFrameworkResolver
     public static IReadOnlyList<string> ResolveProbingPaths(
         IReadOnlyList<string> sharedFrameworkNames,
         string? targetFrameworkMoniker,
+        IReadOnlyCollection<string> discoveredTargetFrameworkMonikers,
         IArchitectureFileSystem fileSystem,
         IArchitectureEnvironment environment)
     {
@@ -29,7 +30,8 @@ internal static class ArchitectureSharedFrameworkResolver
         }
 
         IReadOnlyList<string> sharedRoots = ResolveSharedRoots(fileSystem, environment);
-        int? anchorMajorVersion = ResolveAnchorMajorVersion(targetFrameworkMoniker, environment);
+        int? anchorMajorVersion = ResolveAnchorMajorVersion(
+            targetFrameworkMoniker, discoveredTargetFrameworkMonikers, environment);
         List<string> resolvedDirectories = new(names.Length);
         List<string> missingFrameworkNames = new();
 
@@ -103,12 +105,42 @@ internal static class ArchitectureSharedFrameworkResolver
     // release build over a prerelease one. Anchoring shared-framework selection the same way stops
     // a machine that also has e.g. Microsoft.AspNetCore.App 11.0.0-preview.* installed from being
     // silently selected for a net10 consumer merely because "11" sorts higher than "10".
-    private static int? ResolveAnchorMajorVersion(string? targetFrameworkMoniker, IArchitectureEnvironment environment)
+    //
+    // Priority: an explicit analysis.target_framework always wins (author intent). Otherwise, the
+    // target framework(s) actually selected for this run's discovered/resolved project output are
+    // authoritative — NOT the ArchLinterNet CLI's own runtime major, which is unrelated to what the
+    // consumer targets (the CLI is always built as net10.0 regardless of what it analyzes). The CLI's
+    // own runtime major is only a last-resort fallback when nothing else is known at all (e.g. a
+    // target_assemblies-only policy with no project discovery).
+    private static int? ResolveAnchorMajorVersion(
+        string? targetFrameworkMoniker,
+        IReadOnlyCollection<string> discoveredTargetFrameworkMonikers,
+        IArchitectureEnvironment environment)
     {
         int? fromTargetFramework = TryParseMajorFromTargetFrameworkMoniker(targetFrameworkMoniker);
         if (fromTargetFramework is not null)
         {
             return fromTargetFramework;
+        }
+
+        int[] discoveredMajors = discoveredTargetFrameworkMonikers
+            .Select(TryParseMajorFromTargetFrameworkMoniker)
+            .Where(static major => major is not null)
+            .Select(static major => major!.Value)
+            .Distinct()
+            .OrderBy(static major => major)
+            .ToArray();
+        if (discoveredMajors.Length == 1)
+        {
+            return discoveredMajors[0];
+        }
+
+        if (discoveredMajors.Length > 1)
+        {
+            throw new InvalidOperationException(
+                "analysis.shared_frameworks could not determine a single compatible major version: the "
+                + "selected target assemblies target different major versions "
+                + $"({string.Join(", ", discoveredMajors)}). Set analysis.target_framework to disambiguate.");
         }
 
         string runtimeDirectory = environment.RuntimeDirectory;

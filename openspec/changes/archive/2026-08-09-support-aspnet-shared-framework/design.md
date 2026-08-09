@@ -69,20 +69,44 @@ process-static) probing-path resolution semantics.
 ### Highest compatible version wins, anchored to a major version
 
 When more than one version directory exists under a shared framework, the resolver
-picks the highest version whose major version matches an anchor: `analysis.target_
-framework` when the policy sets it, otherwise the currently running runtime's own
-major version. This mirrors the .NET host's default roll-forward policy, which never
-crosses a major version and never prefers a prerelease build over a release build at
-the same or lower version. Without this anchor, a machine that also has a newer
-major's prerelease installed (e.g. `Microsoft.AspNetCore.App 11.0.0-preview.*`
-alongside a `net10` target) would have its numerically-higher prerelease silently
-selected instead of the intended stable major — and because `AssemblyLoadContext`
-can satisfy a requested assembly version with a higher loaded one, the failure mode
-is not a load error but silent reflection against the wrong framework's metadata.
-When no anchor major version is derivable at all, the resolver falls back to the
-highest version across all installed majors (still preferring release over
-prerelease) rather than refusing to resolve — the policy does not pin an exact
-runtime patch build, only the framework name.
+picks the highest version whose major version matches an anchor. This mirrors the
+.NET host's default roll-forward policy, which never crosses a major version and
+never prefers a prerelease build over a release build at the same or lower version.
+Without this anchor, a machine that also has a newer major's prerelease installed
+(e.g. `Microsoft.AspNetCore.App 11.0.0-preview.*` alongside a `net10` target) would
+have its numerically-higher prerelease silently selected instead of the intended
+stable major — and because `AssemblyLoadContext` can satisfy a requested assembly
+version with a higher loaded one, the failure mode is not a load error but silent
+reflection against the wrong framework's metadata. When no anchor major version is
+derivable at all, the resolver falls back to the highest version across all
+installed majors (still preferring release over prerelease) rather than refusing to
+resolve — the policy does not pin an exact runtime patch build, only the framework
+name.
+
+### Anchor priority: explicit, then discovered, then the CLI's own runtime last
+
+`analysis.target_framework` is optional and exists primarily to disambiguate
+multi-targeted project output — most policies will not set it. The first
+implementation of this anchor fell back straight to the ArchLinterNet CLI's own
+running .NET major version whenever `analysis.target_framework` was unset. That is
+wrong: the CLI is always built as `net10.0` regardless of what it analyzes, so a
+`net8` ASP.NET consumer analyzed without an explicit `analysis.target_framework`
+would have been anchored to major `10` — reproducing the exact class of bug this
+feature exists to prevent, just via a different trigger.
+
+Project discovery already resolves each selected project's real build output at
+`bin/{configuration}/{targetFramework}/`, so the target framework actually in use is
+already known without adding a second required policy field. The resolver now
+derives the target-framework segment directly from the resolved build-output paths
+of this run's selected target assemblies (`ArchitectureAssemblyResolutionService.
+ExtractDiscoveredTargetFrameworks`) and anchors to that major when
+`analysis.target_framework` is unset, before ever consulting the CLI's own runtime.
+If the selected target assemblies resolve to more than one distinct major (a
+genuinely ambiguous multi-target scenario), resolution fails closed with an
+actionable error directing the author to set `analysis.target_framework`, rather
+than silently picking one. The CLI's own runtime major remains a last resort only
+for policies with no project discovery at all (pure `analysis.target_assemblies`
+with no `analysis.solution`/`analysis.projects`), where no better signal exists.
 
 ### Fail closed on a missing framework
 

@@ -18,8 +18,13 @@ public sealed class ArchitectureSharedFrameworkResolverTests
         _environment = new FakeArchitectureEnvironment();
     }
 
-    private IReadOnlyList<string> Resolve(IReadOnlyList<string> sharedFrameworkNames, string? targetFrameworkMoniker = null) =>
-        ArchitectureSharedFrameworkResolver.ResolveProbingPaths(sharedFrameworkNames, targetFrameworkMoniker, _fileSystem, _environment);
+    private IReadOnlyList<string> Resolve(
+        IReadOnlyList<string> sharedFrameworkNames,
+        string? targetFrameworkMoniker = null,
+        IReadOnlyCollection<string>? discoveredTargetFrameworkMonikers = null) =>
+        ArchitectureSharedFrameworkResolver.ResolveProbingPaths(
+            sharedFrameworkNames, targetFrameworkMoniker,
+            discoveredTargetFrameworkMonikers ?? Array.Empty<string>(), _fileSystem, _environment);
 
     [Test]
     public void ResolveProbingPaths_NoSharedFrameworksConfigured_ReturnsEmptyWithoutTouchingEnvironment()
@@ -136,7 +141,53 @@ public sealed class ArchitectureSharedFrameworkResolverTests
     }
 
     [Test]
-    public void ResolveProbingPaths_RuntimeDirectoryAnchor_UsedWhenTargetFrameworkNotSet()
+    public void ResolveProbingPaths_DiscoveredTargetFrameworkAnchor_UsedWhenNoExplicitTargetFramework()
+    {
+        // The consumer's actually-resolved project output targets net8 while the ArchLinterNet CLI
+        // itself always runs as net10 — the CLI's own runtime major must not leak in as the anchor
+        // when discovery already knows the real target framework.
+        _environment.SetEnvironmentVariable("DOTNET_ROOT", "/opt/dotnet");
+        _fileSystem.AddDirectory("/opt/dotnet/shared");
+        _fileSystem.AddDirectory("/opt/dotnet/shared/Microsoft.AspNetCore.App");
+        _fileSystem.AddDirectory("/opt/dotnet/shared/Microsoft.AspNetCore.App/8.0.11");
+        _fileSystem.AddDirectory("/opt/dotnet/shared/Microsoft.AspNetCore.App/10.0.2");
+        _environment.RuntimeDirectory = "/opt/dotnet/shared/Microsoft.NETCore.App/10.0.0";
+
+        IReadOnlyList<string> result = Resolve(_aspNetCoreApp, discoveredTargetFrameworkMonikers: new[] { "net8.0" });
+
+        Assert.That(result, Is.EqualTo(new[] { "/opt/dotnet/shared/Microsoft.AspNetCore.App/8.0.11" }));
+    }
+
+    [Test]
+    public void ResolveProbingPaths_ExplicitTargetFrameworkTakesPrecedenceOverDiscovered()
+    {
+        _environment.SetEnvironmentVariable("DOTNET_ROOT", "/opt/dotnet");
+        _fileSystem.AddDirectory("/opt/dotnet/shared");
+        _fileSystem.AddDirectory("/opt/dotnet/shared/Microsoft.AspNetCore.App");
+        _fileSystem.AddDirectory("/opt/dotnet/shared/Microsoft.AspNetCore.App/8.0.11");
+        _fileSystem.AddDirectory("/opt/dotnet/shared/Microsoft.AspNetCore.App/10.0.2");
+
+        IReadOnlyList<string> result = Resolve(
+            _aspNetCoreApp, "net10.0", discoveredTargetFrameworkMonikers: new[] { "net8.0" });
+
+        Assert.That(result, Is.EqualTo(new[] { "/opt/dotnet/shared/Microsoft.AspNetCore.App/10.0.2" }));
+    }
+
+    [Test]
+    public void ResolveProbingPaths_AmbiguousDiscoveredMajors_ThrowsFailClosedInsteadOfPickingOne()
+    {
+        InvalidOperationException exception = Assert.Throws<InvalidOperationException>(() => Resolve(
+            _aspNetCoreApp, discoveredTargetFrameworkMonikers: new[] { "net8.0", "net10.0" }))!;
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(exception.Message, Does.Contain("8, 10"));
+            Assert.That(exception.Message, Does.Contain("analysis.target_framework"));
+        });
+    }
+
+    [Test]
+    public void ResolveProbingPaths_RuntimeDirectoryAnchor_UsedAsLastResortWhenNothingElseIsKnown()
     {
         _environment.SetEnvironmentVariable("DOTNET_ROOT", "/opt/dotnet");
         _fileSystem.AddDirectory("/opt/dotnet/shared");
