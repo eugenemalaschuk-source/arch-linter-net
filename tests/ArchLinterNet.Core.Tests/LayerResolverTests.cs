@@ -548,6 +548,67 @@ public sealed class LayerResolverTests
     }
 
     [Test]
+    public void LayerValidation_OverlapsWithUndeclaredLayer_IsRejected()
+    {
+        InvalidOperationException ex = Assert.Throws<InvalidOperationException>(() => new LayerNamespacesValidator().Validate(
+            new ArchitectureContractDocument
+            {
+                Layers = new Dictionary<string, ArchitectureLayer>
+                {
+                    ["domain"] = new()
+                    {
+                        Namespace = "MyApp.Domain",
+                        OverlapsWith = new List<string> { "nonexistent" }
+                    }
+                }
+            }))!;
+
+        Assert.That(ex.Message, Does.Contain("domain"));
+        Assert.That(ex.Message, Does.Contain("nonexistent"));
+    }
+
+    [Test]
+    public void LayerValidation_OverlapsWithSelf_IsRejected()
+    {
+        InvalidOperationException ex = Assert.Throws<InvalidOperationException>(() => new LayerNamespacesValidator().Validate(
+            new ArchitectureContractDocument
+            {
+                Layers = new Dictionary<string, ArchitectureLayer>
+                {
+                    ["domain"] = new()
+                    {
+                        Namespace = "MyApp.Domain",
+                        OverlapsWith = new List<string> { "domain" }
+                    }
+                }
+            }))!;
+
+        Assert.That(ex.Message, Does.Contain("domain"));
+        Assert.That(ex.Message, Does.Contain("not reference itself"));
+    }
+
+    [Test]
+    public void LayerValidation_ValidOverlapsWith_DoesNotThrow()
+    {
+        Assert.DoesNotThrow(() => new LayerNamespacesValidator().Validate(
+            new ArchitectureContractDocument
+            {
+                Layers = new Dictionary<string, ArchitectureLayer>
+                {
+                    ["domain"] = new()
+                    {
+                        Namespace = "MyApp.Domain",
+                        OverlapsWith = new List<string> { "cross_cutting" }
+                    },
+                    ["cross_cutting"] = new()
+                    {
+                        Namespace = "MyApp.CrossCutting"
+                    }
+                }
+            }));
+    }
+
+    [Test]
     public void LayerValidation_WithoutNamespaceOrSelector_IsRejected()
     {
         Assert.Throws<InvalidOperationException>(() => new LayerNamespacesValidator().Validate(

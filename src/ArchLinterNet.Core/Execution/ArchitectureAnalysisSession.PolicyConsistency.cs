@@ -442,6 +442,13 @@ public sealed partial class ArchitectureAnalysisSession
             return null;
         }
 
+        if (IsAcknowledgedOverlap(internalLayers, layerNameA, layerNameB))
+        {
+            // Either layer named the other in its overlaps_with list, explicitly
+            // acknowledging this specific pair. See openspec/specs/layer-contracts.
+            return null;
+        }
+
         (string, string) pairKey = (layerNameA, layerNameB);
         if (!reportedPairs.Add(pairKey))
         {
@@ -454,14 +461,27 @@ public sealed partial class ArchitectureAnalysisSession
             "<policy-consistency>",
             null,
             "layer-overlap",
-            $"Layers '{layerNameA}' and '{layerNameB}' both match type '{representativeType}' " +
-            "without an explicit documented allowance.",
+            $"Layers '{layerNameA}' and '{layerNameB}' both match type '{representativeType}'. " +
+            "Declare 'overlaps_with' on one of the layers to mark this intentional, or narrow the " +
+            "namespace/selector patterns so they no longer overlap.",
             Array.Empty<string>(),
             Array.Empty<string>(),
             new[] { layerNameA, layerNameB })
         {
             RepresentativeType = representativeType
         };
+    }
+
+    private static bool IsAcknowledgedOverlap(
+        List<KeyValuePair<string, ArchitectureLayer>> internalLayers,
+        string layerNameA,
+        string layerNameB)
+    {
+        ArchitectureLayer layerA = internalLayers.First(kvp => kvp.Key == layerNameA).Value;
+        ArchitectureLayer layerB = internalLayers.First(kvp => kvp.Key == layerNameB).Value;
+
+        return layerA.OverlapsWith.Contains(layerNameB, StringComparer.Ordinal)
+            || layerB.OverlapsWith.Contains(layerNameA, StringComparer.Ordinal);
     }
 
     private static bool IsContainmentRelationship(

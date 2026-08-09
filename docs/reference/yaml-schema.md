@@ -126,6 +126,7 @@ layers:
     exclude:                     # Optional — subtracts matching namespaces from this layer
       - namespace: <string>          # Required per entry — same glob grammar as namespace above
         namespace_suffix: <string>   # Optional
+    overlaps_with: [<string>]    # Optional — names of other layers this layer may intentionally overlap
 ```
 
 Each layer name must be a unique identifier used to reference the layer in contracts.
@@ -162,6 +163,8 @@ via namespace string matching on source-side types.
 
 For new vendor/framework leakage controls, prefer `external_dependencies` over
 modeling framework namespaces as pseudo-layers.
+
+`overlaps_with` acknowledges an intentional overlap with another named layer (declared on either side is enough); see [Overlapping layers](../policy-format/layers-and-namespaces.md#overlapping-layers).
 
 ## `external_dependencies`
 
@@ -379,10 +382,7 @@ expansion), and detects:
   dependency between the same two layers.
 - Protected-surface `allowed_importers` that conflict with a strict
   forbidden/protected rule over the same surface and importer.
-- Overlapping internal layer definitions where the same concrete type is
-  matched by more than one layer without a parent/child namespace
-  containment relationship reconciling the overlap (an external layer
-  overlapping an internal one is never flagged).
+- Overlapping internal layers: the same concrete type matched by more than one layer with no containment or `overlaps_with` reconciliation (external-internal overlap is never flagged).
 - Contracts referencing a layer whose namespace pattern can never match any
   type (structurally impossible, not just empty today).
 

@@ -192,6 +192,10 @@
           "items": { "$ref": "#/$defs/layerExclusion" },
           "default": [],
           "description": "Subtracts matching namespaces from this layer's scope: result = union(namespace/namespace_suffix matches) - union(exclude matches). Reuses the same namespace glob grammar as namespace/namespace_suffix. A layer with no exclude entries is unaffected."
+        },
+        "overlaps_with": {
+          "$ref": "#/$defs/stringList",
+          "description": "Names of other declared layers this layer is intentionally allowed to overlap with (match the same concrete type as). Declaring the pairing on either layer is sufficient to reconcile it for the layer-overlap policy-consistency check."
         }
       }
     },
