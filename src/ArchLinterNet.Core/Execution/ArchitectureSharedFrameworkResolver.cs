@@ -171,11 +171,16 @@ internal static class ArchitectureSharedFrameworkResolver
                     continue;
                 }
 
-                bool isPrerelease = versionName.Contains('-', StringComparison.Ordinal);
-                ref (string Directory, Version Version)? best = ref isPrerelease ? ref bestPrerelease : ref bestStable;
-                if (best is null || version > best.Value.Version)
+                if (versionName.Contains('-', StringComparison.Ordinal))
                 {
-                    best = (versionDirectory, version);
+                    if (bestPrerelease is null || version > bestPrerelease.Value.Version)
+                    {
+                        bestPrerelease = (versionDirectory, version);
+                    }
+                }
+                else if (bestStable is null || version > bestStable.Value.Version)
+                {
+                    bestStable = (versionDirectory, version);
                 }
             }
 
