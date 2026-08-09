@@ -29,8 +29,27 @@ public sealed class PackagedSchemaRegistryTests
                 "analysis-build-state", "analysis-cache", "analysis-profile", "api-snapshot", "baseline", "normalized-finding", "policy-fragment", "policy-root",
             }));
             Assert.That(schemas.Single(static schema => schema.LogicalId == "baseline").DocumentVersion, Is.EqualTo("v2"));
-            Assert.That(schemas.All(static schema => schema.SchemaId.Contains("/schema/0.5.1/", StringComparison.Ordinal)), Is.True);
-            Assert.That(schemas.All(static schema => schema.ResourcePath.StartsWith("schema/0.5.1/", StringComparison.Ordinal)), Is.True);
+            // policy-root/policy-fragment advanced to an independent 0.6.1 schema identity to add
+            // layers.*.overlaps_with while every other schema, and the frozen pre-overlaps_with
+            // 0.5.1 policy-root/policy-fragment bytes, remain untouched (see
+            // openspec/specs/packaged-schema-registry and schema/0.5.1/compatibility-manifest.json).
+            string[] advancedLogicalIds = { "policy-root", "policy-fragment" };
+            Assert.That(
+                schemas.Where(schema => !advancedLogicalIds.Contains(schema.LogicalId))
+                    .All(static schema => schema.SchemaId.Contains("/schema/0.5.1/", StringComparison.Ordinal)),
+                Is.True);
+            Assert.That(
+                schemas.Where(schema => advancedLogicalIds.Contains(schema.LogicalId))
+                    .All(static schema => schema.SchemaId.Contains("/schema/0.6.1/", StringComparison.Ordinal)),
+                Is.True);
+            Assert.That(
+                schemas.Where(schema => !advancedLogicalIds.Contains(schema.LogicalId))
+                    .All(static schema => schema.ResourcePath.StartsWith("schema/0.5.1/", StringComparison.Ordinal)),
+                Is.True);
+            Assert.That(
+                schemas.Where(schema => advancedLogicalIds.Contains(schema.LogicalId))
+                    .All(static schema => schema.ResourcePath.StartsWith("schema/0.6.1/", StringComparison.Ordinal)),
+                Is.True);
             Assert.That(schemas.All(static schema => schema.Sha256.Length == 64), Is.True);
             Assert.That(
                 schemas.Select(static schema => (schema.LogicalId, schema.SupportsRead, schema.SupportsWrite)),

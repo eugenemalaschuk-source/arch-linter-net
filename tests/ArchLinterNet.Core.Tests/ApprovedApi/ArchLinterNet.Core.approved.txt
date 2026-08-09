@@ -645,6 +645,7 @@ sealed class ArchLinterNet.Core.Contracts.ArchitectureLayer
   ctor()
   property ArchLinterNet.Core.Contracts.ArchitectureLayerSelector? Selector {get;set;}
   property System.Collections.Generic.List<ArchLinterNet.Core.Contracts.ArchitectureLayerExclusion> Exclude {get;set;}
+  property System.Collections.Generic.List<string> OverlapsWith {get;set;}
   property bool External {get;set;}
   property string Namespace {get;set;}
   property string NamespaceSuffix {get;set;}

@@ -10,7 +10,7 @@ public sealed partial class CheckpointBReleaseGateTests
 {
     private static void AssertPackedCoverageScopeSchema(ZipArchive core)
     {
-        ZipArchiveEntry entry = core.GetEntry("contentFiles/any/any/schema/0.5.1/dependencies.arch.schema.json")
+        ZipArchiveEntry entry = core.GetEntry("contentFiles/any/any/schema/0.6.1/dependencies.arch.schema.json")
             ?? throw new AssertionException("Packed Core package is missing the policy-root schema.");
         using var reader = new StreamReader(entry.Open());
         using JsonDocument document = JsonDocument.Parse(reader.ReadToEnd());

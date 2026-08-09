@@ -47,15 +47,19 @@ The system SHALL detect when a protected surface's `allowed_importers` includes 
 - **THEN** the policy-consistency check SHALL report a finding identifying both contracts, the protected surface, and the importer layer
 
 ### Requirement: Overlapping layer definitions are detected
-The system SHALL detect when a concrete type or namespace is matched by more than one internal layer definition without an explicit documented allowance, and SHALL report the conflict with the matched layer names and a representative concrete type/namespace.
+The system SHALL detect when a concrete type or namespace is matched by more than one internal layer definition without an acknowledged reconciliation, and SHALL report the conflict with the matched layer names and a representative concrete type/namespace. A pair is reconciled, and SHALL NOT be reported, when either layer declares the other in its `overlaps_with` list (see `layer-contracts`).
 
 #### Scenario: Two internal layers match the same type
-- **WHEN** a concrete type's namespace matches the patterns of two internal (non-external) layers and no documented allowance reconciles the overlap
+- **WHEN** a concrete type's namespace matches the patterns of two internal (non-external) layers, neither declares the other in `overlaps_with`, and no containment relationship reconciles the overlap
 - **THEN** the policy-consistency check SHALL report a finding listing both layer names and that type as the representative concrete type/namespace
 
 #### Scenario: External layer overlap is not a conflict
 - **WHEN** a concrete type's namespace matches both an internal layer and a layer marked `external: true`
 - **THEN** the policy-consistency check SHALL NOT report a layer-overlap finding for that type
+
+#### Scenario: Overlap acknowledged via overlaps_with is not a conflict
+- **WHEN** a concrete type's namespace matches the patterns of two internal layers and one of the two declares the other's name in its `overlaps_with` list
+- **THEN** the policy-consistency check SHALL NOT report a layer-overlap finding for that pair
 
 ### Requirement: Unreachable contracts are detected
 The system SHALL detect contracts whose declared source or target layer can never match any type because the layer's own pattern definition is structurally empty or mutually exclusive, and SHALL report the contract as unreachable.

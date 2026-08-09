@@ -141,6 +141,12 @@ public sealed class ArchitectureLayer
     // unchanged. See ArchitectureLayerResolver.MatchNamespace and openspec/specs/layer-contracts.
     [YamlMember(Alias = "exclude")] public List<ArchitectureLayerExclusion> Exclude { get; set; } = new();
 
+    // Names of other declared layers this layer is intentionally allowed to overlap with (match
+    // the same concrete type as). Declaring the pairing on either layer reconciles it - see
+    // ArchitectureAnalysisSession.PolicyConsistency.cs's TryCreateLayerOverlapFinding and
+    // openspec/specs/layer-contracts/spec.md.
+    [YamlMember(Alias = "overlaps_with")] public List<string> OverlapsWith { get; set; } = new();
+
     [YamlIgnore] private NamespaceGlobPattern? _cachedGlobPattern;
 
     [YamlIgnore]

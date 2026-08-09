@@ -51,7 +51,7 @@ Create `architecture/arch.yml`. A root policy must declare `version`, `name`,
 small.
 
 ```yaml
-# yaml-language-server: $schema=https://archlinternet.dev/schema/0.5.1/dependencies.arch.schema.json
+# yaml-language-server: $schema=https://archlinternet.dev/schema/0.6.1/dependencies.arch.schema.json
 version: 1
 name: Example Product architecture
 

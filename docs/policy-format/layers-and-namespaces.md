@@ -175,6 +175,43 @@ scope — most often a typo, such as `Product.Modules.*.Persistnce` instead of
 (governed by `analysis.policy_consistency`), so a silently inert exclusion is
 visible instead of hiding a mistake.
 
+## Overlapping layers
+
+Two internal (non-`external`) layers matching the same concrete type are
+reported as a `layer-overlap` policy-consistency finding, unless one is a
+namespace-prefix container of the other (e.g. a coarse `core` layer and a
+nested `core_model` sub-layer — an intentional hierarchy, not a
+contradiction).
+
+If two layers legitimately need to overlap for a reason other than
+containment — for example a broad, cross-cutting selector-based layer that is
+expected to match types already claimed by a narrower namespace-based layer —
+declare it explicitly with `overlaps_with`:
+
+```yaml
+layers:
+  sales_domain:
+    namespace: Product.Modules.Sales.Domain
+  audited_types:
+    selector:
+      role: AuditedEntity
+    overlaps_with: [sales_domain]
+```
+
+`overlaps_with` names the other layer(s) this layer is intentionally allowed
+to overlap with. Declaring the pairing on either layer is enough to reconcile
+it — `audited_types` above does not also need to appear in
+`sales_domain.overlaps_with`. Each entry must reference a declared layer
+name and must not be the layer's own name, or the policy fails to load.
+
+This is a local, reviewable alternative to setting `analysis.policy_consistency`
+away from its `error` default, which applies to every policy-consistency check
+at once, not just this one overlap: `warn` keeps all of them — duplicate-ID,
+allow/forbid-conflict, independence-conflict, protected-importer-conflict,
+layer-overlap, and unreachable-contract — in the diagnostics output but stops
+them from failing validation, while `off` suppresses their diagnostics
+entirely.
+
 ## External layers
 
 When a layer references namespaces whose assemblies may not be present in the scan environment, set `external: true`:

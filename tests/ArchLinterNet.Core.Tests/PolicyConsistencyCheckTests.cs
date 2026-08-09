@@ -438,6 +438,71 @@ public sealed class PolicyConsistencyCheckTests
     }
 
     [Test]
+    public void LayerOverlap_AcknowledgedViaOverlapsWith_NotFlagged()
+    {
+        var document = BaseDocument();
+        document.Layers["core"] = new ArchitectureLayer
+        {
+            Namespace = "ArchLinterNet.Core.Model",
+            OverlapsWith = new List<string> { "core-sibling" }
+        };
+        document.Layers["core-sibling"] = new ArchitectureLayer { Namespace = "ArchLinterNet.Core.Model" };
+        document.Contracts.StrictLayers = new List<ArchitectureLayerContract>
+        {
+            new() { Name = "noop", Layers = new List<string> { "core" } }
+        };
+
+        var runner = new ArchitectureContractRunner(CreateContext(), document);
+        var findings = runner.CheckPolicyConsistency();
+
+        Assert.That(findings.Any(f => f.CheckKind == "layer-overlap"), Is.False);
+    }
+
+    [Test]
+    public void LayerOverlap_AcknowledgedFromOtherSide_NotFlagged()
+    {
+        var document = BaseDocument();
+        document.Layers["core"] = new ArchitectureLayer { Namespace = "ArchLinterNet.Core.Model" };
+        document.Layers["core-sibling"] = new ArchitectureLayer
+        {
+            Namespace = "ArchLinterNet.Core.Model",
+            OverlapsWith = new List<string> { "core" }
+        };
+        document.Contracts.StrictLayers = new List<ArchitectureLayerContract>
+        {
+            new() { Name = "noop", Layers = new List<string> { "core" } }
+        };
+
+        var runner = new ArchitectureContractRunner(CreateContext(), document);
+        var findings = runner.CheckPolicyConsistency();
+
+        Assert.That(findings.Any(f => f.CheckKind == "layer-overlap"), Is.False);
+    }
+
+    [Test]
+    public void LayerOverlap_UnrelatedOverlapsWithEntry_DoesNotSuppressOtherPair()
+    {
+        var document = BaseDocument();
+        document.Layers["core"] = new ArchitectureLayer
+        {
+            Namespace = "ArchLinterNet.Core.Model",
+            OverlapsWith = new List<string> { "domain" }
+        };
+        document.Layers["core-sibling"] = new ArchitectureLayer { Namespace = "ArchLinterNet.Core.Model" };
+        document.Contracts.StrictLayers = new List<ArchitectureLayerContract>
+        {
+            new() { Name = "noop", Layers = new List<string> { "core" } }
+        };
+
+        var runner = new ArchitectureContractRunner(CreateContext(), document);
+        var findings = runner.CheckPolicyConsistency();
+
+        var finding = findings.FirstOrDefault(f => f.CheckKind == "layer-overlap");
+        Assert.That(finding, Is.Not.Null);
+        Assert.That(finding!.Layers, Is.EquivalentTo(new[] { "core", "core-sibling" }));
+    }
+
+    [Test]
     public void UnreachableContract_StructurallyImpossibleLayer_Detected()
     {
         var document = BaseDocument();

@@ -93,12 +93,20 @@ public sealed partial class CheckpointBReleaseGateTests
                      {
                          "analysis-build-state.schema.json", "analysis-cache.schema.json",
                          "analysis-profile.schema.json", "api-snapshot.schema.json", "baseline.schema.json",
-                         "compatibility-manifest.json", "dependencies.arch.fragment.schema.json",
-                         "dependencies.arch.schema.json", "normalized-finding.schema.json",
+                         "compatibility-manifest.json", "normalized-finding.schema.json",
                      })
             {
                 Assert.That(core.GetEntry($"contentFiles/any/any/schema/0.5.1/{schema}"), Is.Not.Null, schema);
             }
+
+            // policy-root/policy-fragment advanced to an independent 0.6.1 schema identity to add
+            // layers.*.overlaps_with; every other packaged schema stays under 0.5.1 (see
+            // schema/0.5.1/compatibility-manifest.json).
+            foreach (string schema in new[] { "dependencies.arch.fragment.schema.json", "dependencies.arch.schema.json" })
+            {
+                Assert.That(core.GetEntry($"contentFiles/any/any/schema/0.6.1/{schema}"), Is.Not.Null, schema);
+            }
+
             AssertPackedCoverageScopeSchema(core);
 
             return Passed("packed-package-provenance");
