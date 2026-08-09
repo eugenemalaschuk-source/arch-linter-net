@@ -436,14 +436,13 @@ public sealed partial class BaselineCommandHandlerTests
             Assert.That(json.RootElement.GetProperty("counts").GetProperty("matched").GetInt32(), Is.EqualTo(1));
         });
 
-        runtime.VerifyOutcome = runtime.VerifyOutcome with { InSync = true };
         var humanConsole = new RecordingConsole();
         int humanResult = new BaselineVerifyCommandHandler(runtime, humanConsole, new StubFileSystem("policy.yml", "baseline.yml")).Execute(
             new BaselineVerifyCommandOptions("policy.yml", "baseline.yml", "all", "ci", "human", Array.Empty<string>(), false));
 
-        Assert.That(humanResult, Is.EqualTo(CliExitCodes.Success));
+        Assert.That(humanResult, Is.EqualTo(CliExitCodes.ValidationFailure));
         Assert.That(humanConsole.OutputText, Does.Contain("New (unbaselined) violations: 1"));
-        Assert.That(humanConsole.OutputText, Does.Contain("Baseline is in sync."));
+        Assert.That(humanConsole.OutputText, Does.Contain("Baseline is out of sync."));
     }
 
     [Test]

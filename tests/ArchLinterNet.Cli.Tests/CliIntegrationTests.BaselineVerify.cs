@@ -67,6 +67,37 @@ baseline:
     }
 
     [Test]
+    public void BaselineVerify_NewEntries_ReportOutOfSyncInHumanAndJson()
+    {
+        string baselinePath = Path.Combine(Path.GetTempPath(), $"baseline-{Guid.NewGuid():N}.yml");
+        try
+        {
+            File.WriteAllText(baselinePath, "version: 2\nbaseline: {}\n");
+
+            var (humanExit, humanStdout, humanStderr) = RunCli("baseline", "verify",
+                "--config", _graphPolicy, "--baseline", baselinePath);
+            var (jsonExit, jsonStdout, jsonStderr) = RunCli("baseline", "verify",
+                "--config", _graphPolicy, "--baseline", baselinePath, "--json");
+
+            using var json = System.Text.Json.JsonDocument.Parse(jsonStdout);
+            Assert.Multiple(() =>
+            {
+                Assert.That(humanExit, Is.EqualTo(1), $"Verify should fail on new debt, stderr: {humanStderr}");
+                Assert.That(humanStdout, Does.Match(@"New \(unbaselined\) violations: [1-9][0-9]*"));
+                Assert.That(humanStdout, Does.Contain("Baseline is out of sync."));
+                Assert.That(jsonExit, Is.EqualTo(1), $"JSON verify should fail on new debt, stderr: {jsonStderr}");
+                Assert.That(json.RootElement.GetProperty("inSync").GetBoolean(), Is.False);
+                Assert.That(json.RootElement.GetProperty("counts").GetProperty("new").GetInt32(), Is.GreaterThan(0));
+            });
+        }
+        finally
+        {
+            if (File.Exists(baselinePath))
+                File.Delete(baselinePath);
+        }
+    }
+
+    [Test]
     public void BaselineVerify_ConfigurationError_ExitsOne()
     {
         string baselinePath = Path.Combine(Path.GetTempPath(), $"baseline-{Guid.NewGuid():N}.yml");

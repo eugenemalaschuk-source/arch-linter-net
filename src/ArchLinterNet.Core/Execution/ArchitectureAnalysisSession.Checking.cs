@@ -280,16 +280,20 @@ public sealed partial class ArchitectureAnalysisSession
             layer => layer,
             _ => new HashSet<string>(StringComparer.Ordinal),
             StringComparer.Ordinal);
+        var cycleCandidateEvidence = new List<CycleCandidateEvidence>();
 
         ArchitectureContractExecutionContext executionContext = CreateExecutionContext(contract, contract.IgnoredViolations);
 
         foreach (string sourceLayerName in contract.Layers)
         {
-            CollectCycleEdgesForLayer(contract, sourceLayerName, contractLayers, executionContext, graph);
+            CollectCycleEdgesForLayer(
+                contract, sourceLayerName, contractLayers, executionContext, graph, cycleCandidateEvidence);
         }
 
         executionContext.CollectUnmatchedIgnores(_unmatchedIgnoredViolations);
-        return ArchitectureCycleDetector.FindCycles(graph);
+        IReadOnlyCollection<string> cycles = ArchitectureCycleDetector.FindCycles(graph);
+        AddCycleBaselineCandidates(graph, cycleCandidateEvidence);
+        return cycles;
     }
 
     private void CollectCycleEdgesForLayer(
@@ -297,7 +301,8 @@ public sealed partial class ArchitectureAnalysisSession
         string sourceLayerName,
         HashSet<string> contractLayers,
         ArchitectureContractExecutionContext executionContext,
-        Dictionary<string, HashSet<string>> graph)
+        Dictionary<string, HashSet<string>> graph,
+        List<CycleCandidateEvidence> cycleCandidateEvidence)
     {
         ArchitectureLayer sourceLayer =
             ArchitectureLayerResolver.ResolveLayer(Document, contract.Name, sourceLayerName);
@@ -324,7 +329,9 @@ public sealed partial class ArchitectureAnalysisSession
                         sourceAssembly: sourceAssembly,
                         targetAssembly: ArchitectureTypeNames.SafeAssemblyName(referencedType),
                         targetType: referencedTypeName,
-                        targetMember: referencedTypeName))
+                        targetMember: referencedTypeName,
+                        observeCandidate: candidate => cycleCandidateEvidence.Add(
+                            new CycleCandidateEvidence(sourceLayerName, referencedLayerName, candidate))))
                 {
                     continue;
                 }
