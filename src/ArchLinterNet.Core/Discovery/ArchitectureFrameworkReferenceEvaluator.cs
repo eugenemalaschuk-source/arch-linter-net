@@ -25,6 +25,7 @@ internal sealed class ArchitectureFrameworkReferenceEvaluator : IArchitectureFra
 
         try
         {
+            using ArchitectureDesignTimeBuildIsolation isolation = ArchitectureDesignTimeBuildIsolation.Create(projectAbsolutePath);
             AnalyzerManager manager = new();
             IProjectAnalyzer? analyzer = manager.GetProject(IOPath.Parse(projectAbsolutePath));
 
@@ -39,6 +40,7 @@ internal sealed class ArchitectureFrameworkReferenceEvaluator : IArchitectureFra
             // FrameworkReference declarations (e.g. Condition="'$(Configuration)'=='Release'") instead
             // of always evaluating against MSBuild's own Configuration default.
             analyzer.SetGlobalProperty("Configuration", configuration);
+            analyzer.SetGlobalProperty("CleanFile", isolation.CleanFileName);
 
             // Restore = true: empirically, a design-time build without a prior restore fails (no
             // project.assets.json) even for a project that declares no PackageReferences at all -
