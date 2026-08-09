@@ -25,7 +25,7 @@ contracts:
 
         // An ordinary build deliberately creates no product receipt. The installed candidate's
         // capture command must make that otherwise-unverifiable state reachable via --ensure-built.
-        fixture.Build();
+        fixture.Build(configuration: "Release", targetFramework: "net10.0");
         const string Snapshot = "public-api/small-api.txt";
         CommandResult capture = candidate.RunTool(fixture.Root,
             "public-api", "capture", "--policy", fixture.PolicyPath, "--contract", "small-api",
