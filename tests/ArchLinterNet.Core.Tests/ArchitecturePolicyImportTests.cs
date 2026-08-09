@@ -648,17 +648,23 @@ public sealed partial class ArchitecturePolicyImportTests
     [Test]
     public void Load_ImportFileCountBeyondTwoHundredFiftySix_ExposesGraphLimitBeforeRead()
     {
+        const string RootPath = "/virtual/architecture/root.yml";
+        var fileSystem = new FakeArchitectureFileSystem();
         string imports = string.Join('\n', Enumerable.Range(1, 256).Select(index => $"  - f{index}.yml"));
-        string root = Write(
-            "architecture/root.yml",
-            $"version: 1\nname: Example\nimports:\n{imports}\nanalysis: {{}}\ncontracts: {{}}\n");
+        fileSystem.AddFile(
+            RootPath,
+            $"version: 1\nname: Example\nimports:\n{imports}\nanalysis: {{}}\ncontracts: {{}}\n",
+            DateTime.UnixEpoch);
         for (int index = 1; index <= 255; index++)
         {
-            Write($"architecture/f{index}.yml", $"layers:\n  layer{index}:\n    namespace: App.Layer{index}\n");
+            fileSystem.AddFile(
+                $"/virtual/architecture/f{index}.yml",
+                $"layers:\n  layer{index}:\n    namespace: App.Layer{index}\n",
+                DateTime.UnixEpoch);
         }
 
         ArchitecturePolicyImportException exception = Assert.Throws<ArchitecturePolicyImportException>(
-            () => new ArchitecturePolicyDocumentLoader().Load(root))!;
+            () => new ArchitecturePolicyDocumentLoader(fileSystem, new FakeArchitecturePolicyPathResolver()).Load(RootPath))!;
 
         Assert.That(exception.Category, Is.EqualTo(ArchitecturePolicyImportErrorCategory.GraphLimit));
     }
