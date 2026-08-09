@@ -1148,10 +1148,10 @@
         { "$ref": "#/$defs/baseContractFields" },
         {
           "type": "object",
-          "additionalProperties": false,
           "required": ["name", "source", "forbidden"],
           "properties": {
             "name": { "type": "string", "minLength": 1 },
+            "id": { "type": "string", "minLength": 1 },
             "source": { "type": "string", "minLength": 1 },
             "forbidden": { "$ref": "#/$defs/stringList" },
             "allowed_types": { "$ref": "#/$defs/stringList" },
@@ -1166,7 +1166,8 @@
             "reason": { "type": "string" }
           }
         }
-      ]
+      ],
+      "unevaluatedProperties": false
     },
     "layerContract": {
       "type": "object",
@@ -1199,7 +1200,6 @@
         { "$ref": "#/$defs/baseContractFields" },
         {
           "type": "object",
-          "additionalProperties": false,
           "required": ["name", "source", "forbidden"],
           "properties": {
             "name": { "type": "string", "minLength": 1 },
@@ -1219,14 +1219,14 @@
             "reason": { "type": "string" }
           }
         }
-      ]
+      ],
+      "unevaluatedProperties": false
     },
     "contextAllowOnlyContract": {
       "allOf": [
         { "$ref": "#/$defs/baseContractFields" },
         {
           "type": "object",
-          "additionalProperties": false,
           "required": ["name", "source", "allowed"],
           "properties": {
             "name": { "type": "string", "minLength": 1 },
@@ -1246,7 +1246,8 @@
             "reason": { "type": "string" }
           }
         }
-      ]
+      ],
+      "unevaluatedProperties": false
     },
     "contextMetadataSelector": {
       "type": "object",
@@ -1265,7 +1266,6 @@
         { "$ref": "#/$defs/baseContractFields" },
         {
           "type": "object",
-          "additionalProperties": false,
           "required": ["name", "source", "target_context", "allowed_seams", "forbidden", "reason"],
           "properties": {
             "name": { "type": "string", "minLength": 1 },
@@ -1280,7 +1280,8 @@
             "reason": { "type": "string", "minLength": 1 }
           }
         }
-      ]
+      ],
+      "unevaluatedProperties": false
     },
     "adapterPortBinding": {
       "type": "object",
@@ -1517,7 +1518,6 @@
         { "$ref": "#/$defs/baseContractFields" },
         {
           "type": "object",
-          "additionalProperties": false,
           "required": ["name"],
           "anyOf": [
             {
@@ -1555,14 +1555,14 @@
             { "required": ["project_sets"] }
           ]
         }
-      ]
+      ],
+      "unevaluatedProperties": false
     },
     "protectedContract": {
       "allOf": [
         { "$ref": "#/$defs/baseContractFields" },
         {
           "type": "object",
-          "additionalProperties": false,
           "required": ["name", "protected", "allowed_importers"],
           "properties": {
             "name": { "type": "string", "minLength": 1 },
@@ -1574,14 +1574,14 @@
             "reason": { "type": "string" }
           }
         }
-      ]
+      ],
+      "unevaluatedProperties": false
     },
     "externalDependencyContract": {
       "allOf": [
         { "$ref": "#/$defs/baseContractFields" },
         {
           "type": "object",
-          "additionalProperties": false,
           "required": ["name", "forbidden"],
           "anyOf": [
             { "required": ["source"] },
@@ -1602,14 +1602,14 @@
             "reason": { "type": "string" }
           }
         }
-      ]
+      ],
+      "unevaluatedProperties": false
     },
     "externalAllowOnlyContract": {
       "allOf": [
         { "$ref": "#/$defs/baseContractFields" },
         {
           "type": "object",
-          "additionalProperties": false,
           "required": ["name", "allowed"],
           "anyOf": [
             { "required": ["source"] },
@@ -1631,7 +1631,8 @@
             "reason": { "type": "string" }
           }
         }
-      ]
+      ],
+      "unevaluatedProperties": false
     },
     "typeMatcher": {
       "type": "object",
@@ -1652,7 +1653,6 @@
         { "$ref": "#/$defs/baseContractFields" },
         {
           "type": "object",
-          "additionalProperties": false,
           "required": ["name", "types_matching"],
           "properties": {
             "name": { "type": "string", "minLength": 1 },
@@ -1675,7 +1675,8 @@
             "reason": { "type": "string" }
           }
         }
-      ]
+      ],
+      "unevaluatedProperties": false
     },
     "layoutFileMatcher": {
       "type": "object",
@@ -1707,7 +1708,6 @@
         { "$ref": "#/$defs/baseContractFields" },
         {
           "type": "object",
-          "additionalProperties": false,
           "required": ["name", "files_matching"],
           "properties": {
             "name": { "type": "string", "minLength": 1 },
@@ -1736,14 +1736,14 @@
             "reason": { "type": "string" }
           }
         }
-      ]
+      ],
+      "unevaluatedProperties": false
     },
     "publicApiSurfaceContract": {
       "allOf": [
         { "$ref": "#/$defs/baseContractFields" },
         {
           "type": "object",
-          "additionalProperties": false,
           "required": ["name", "assemblies"],
           "properties": {
             "name": { "type": "string", "minLength": 1 },
@@ -1771,14 +1771,14 @@
             "reason": { "type": "string" }
           }
         }
-      ]
+      ],
+      "unevaluatedProperties": false
     },
     "attributeUsageContract": {
       "allOf": [
         { "$ref": "#/$defs/baseContractFields" },
         {
           "type": "object",
-          "additionalProperties": false,
           "required": ["name"],
           "properties": {
             "name": { "type": "string", "minLength": 1 },
@@ -1797,14 +1797,14 @@
             "reason": { "type": "string" }
           }
         }
-      ]
+      ],
+      "unevaluatedProperties": false
     },
     "inheritanceContract": {
       "allOf": [
         { "$ref": "#/$defs/baseContractFields" },
         {
           "type": "object",
-          "additionalProperties": false,
           "required": ["name"],
           "properties": {
             "name": { "type": "string", "minLength": 1 },
@@ -1817,14 +1817,14 @@
             "reason": { "type": "string" }
           }
         }
-      ]
+      ],
+      "unevaluatedProperties": false
     },
     "interfaceImplementationContract": {
       "allOf": [
         { "$ref": "#/$defs/baseContractFields" },
         {
           "type": "object",
-          "additionalProperties": false,
           "required": ["name"],
           "properties": {
             "name": { "type": "string", "minLength": 1 },
@@ -1843,14 +1843,14 @@
             "reason": { "type": "string" }
           }
         }
-      ]
+      ],
+      "unevaluatedProperties": false
     },
     "compositionContract": {
       "allOf": [
         { "$ref": "#/$defs/baseContractFields" },
         {
           "type": "object",
-          "additionalProperties": false,
           "required": ["name", "forbidden_apis"],
           "properties": {
             "name": { "type": "string", "minLength": 1 },
@@ -1870,7 +1870,8 @@
             "reason": { "type": "string" }
           }
         }
-      ]
+      ],
+      "unevaluatedProperties": false
     },
     "compositionTypeSelector": {
       "type": "object",

@@ -548,6 +548,110 @@ public sealed class ArchitectureContractSchemaInstanceValidationTests
             "runtime's no-op treatment of an empty exclusion list.");
     }
 
+    // Regression for #439: dependencyContract composed baseContractFields via allOf with an inner
+    // additionalProperties: false branch that never redeclared 'id', so a schema-valid runtime
+    // contract with an explicit id was rejected by packaged-schema validation. The fix replaces the
+    // inner additionalProperties: false with unevaluatedProperties: false at the allOf level (so
+    // 'id'/'name'/'reason' from baseContractFields are always recognized) across every contract
+    // family composed this way, not just dependencyContract.
+    [Test]
+    public void DependencyContract_WithId_IsValid()
+    {
+        const string Yaml = """
+            name: no-domain-to-infra
+            id: no-domain-to-infra
+            source: domain
+            forbidden: [infrastructure]
+            """;
+
+        Assert.That(Validate(Yaml, "dependencyContract"), Is.True);
+    }
+
+    [Test]
+    public void DependencyContract_WithoutId_IsStillValid()
+    {
+        const string Yaml = """
+            name: no-domain-to-infra
+            source: domain
+            forbidden: [infrastructure]
+            """;
+
+        Assert.That(Validate(Yaml, "dependencyContract"), Is.True);
+    }
+
+    [Test]
+    public void DependencyContract_UnknownProperty_IsStillRejected()
+    {
+        const string Yaml = """
+            name: no-domain-to-infra
+            id: no-domain-to-infra
+            source: domain
+            forbidden: [infrastructure]
+            unknown_field: nope
+            """;
+
+        Assert.That(Validate(Yaml, "dependencyContract"), Is.False,
+            "Fixing the id/additionalProperties mismatch must not broaden the contract to arbitrary properties.");
+    }
+
+    [TestCase("contextDependencyContract", "source:\n  role: DomainLayer\nforbidden:\n  - role: InfraLayer\n")]
+    [TestCase("contextAllowOnlyContract", "source:\n  role: DomainLayer\nallowed:\n  - role: DomainLayer\n")]
+    [TestCase("protectedContract", "protected: [domain]\nallowed_importers: [application]\n")]
+    [TestCase("externalDependencyContract", "source: domain\nforbidden: [System.Data]\n")]
+    [TestCase("externalAllowOnlyContract", "source: domain\nallowed: [System.Data]\n")]
+    [TestCase("typePlacementContract", "types_matching:\n  name_suffix: Repository\n")]
+    [TestCase("layoutConventionContract", "files_matching:\n  file_name_suffix: Repository.cs\n")]
+    [TestCase("publicApiSurfaceContract", "assemblies: [App.Core]\n")]
+    [TestCase("attributeUsageContract", "attributes: [System.ObsoleteAttribute]\n")]
+    [TestCase("inheritanceContract", "forbidden_base_types: [System.Exception]\n")]
+    [TestCase("interfaceImplementationContract", "interfaces: [System.IDisposable]\n")]
+    [TestCase("compositionContract", "forbidden_apis: [System.Console.WriteLine]\n")]
+    public void BaseContractFieldsFamily_WithId_IsValid(string defName, string familyFields)
+    {
+        string yaml = $"""
+            name: family-contract
+            id: family-contract
+            {familyFields}
+            """;
+
+        Assert.That(Validate(yaml, defName), Is.True,
+            $"{defName} composes baseContractFields via allOf and must accept an explicit 'id', matching runtime behavior.");
+    }
+
+    [Test]
+    public void PortBoundaryContract_WithId_IsValid()
+    {
+        const string Yaml = """
+            name: sales-to-catalog-through-port
+            id: sales-to-catalog-through-port
+            source:
+              role: SalesType
+            target_context:
+              metadata:
+                bounded_context: catalog
+            allowed_seams:
+              - role: CatalogPort
+            forbidden:
+              - role: CatalogInternal
+            reason: Sales must reach Catalog only through its declared port.
+            """;
+
+        Assert.That(Validate(Yaml, "portBoundaryContract"), Is.True);
+    }
+
+    [Test]
+    public void ProjectMetadataContract_WithId_IsValid()
+    {
+        const string Yaml = """
+            name: core-has-no-friends
+            id: core-has-no-friends
+            projects: [App.Core.csproj]
+            forbidden_project_references: [App.Legacy.csproj]
+            """;
+
+        Assert.That(Validate(Yaml, "projectMetadataContract"), Is.True);
+    }
+
     private static void CollectFailures(JsonNode instance, string defName, string location, List<string> failures)
     {
         JsonSchema subSchema = LoadSubSchema(defName);

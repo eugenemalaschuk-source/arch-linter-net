@@ -135,10 +135,10 @@ internal static class ArchitecturePolicyEffectiveSchemaValidator
                         location);
                 }
 
-                // The published schema exposes id through baseContractFields. Json Schema's
-                // additionalProperties scope inside each allOf family branch cannot see that
-                // sibling annotation, so validate the shared field here and evaluate the remaining
-                // contract against the family schema. The effective YAML itself is unchanged.
+                // Validate the shared id field here (non-empty string, with a precise composed-
+                // policy provenance location) rather than relying solely on the family schema's
+                // own error reporting, then evaluate the remaining contract against the family
+                // schema. The effective YAML itself is unchanged.
                 contract.Remove("id");
             }
         }
