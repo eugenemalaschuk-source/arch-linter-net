@@ -88,21 +88,24 @@ public sealed partial class CheckpointBReleaseGateTests
             Assert.That(ReadEntry(core, "README.md"), Does.Contain(
                 "0.6.0 is the public adoption package line"));
             Assert.That(ReadEntry(core, "README.md"), Does.Contain(
-                "immutable 0.5.1 `adoption-stabilization/v1` schema registry"));
+                "`adoption-stabilization/v1` schema registry"));
             foreach (string schema in new[]
                      {
                          "analysis-build-state.schema.json", "analysis-cache.schema.json",
                          "analysis-profile.schema.json", "api-snapshot.schema.json", "baseline.schema.json",
-                         "compatibility-manifest.json", "normalized-finding.schema.json",
+                         "normalized-finding.schema.json",
                      })
             {
                 Assert.That(core.GetEntry($"contentFiles/any/any/schema/0.5.1/{schema}"), Is.Not.Null, schema);
             }
 
             // policy-root/policy-fragment advanced to an independent 0.6.1 schema identity to add
-            // layers.*.overlaps_with; every other packaged schema stays under 0.5.1 (see
-            // schema/0.5.1/compatibility-manifest.json).
-            foreach (string schema in new[] { "dependencies.arch.fragment.schema.json", "dependencies.arch.schema.json" })
+            // layers.*.overlaps_with. The manifest itself is release-qualified, so it also advances
+            // to a new 0.6.1 generation rather than being mutated in place; every other packaged
+            // schema stays referenced at its unchanged 0.5.1 identity from within that generation
+            // (see schema/0.6.1/compatibility-manifest.json).
+            foreach (string schema in new[]
+                     { "compatibility-manifest.json", "dependencies.arch.fragment.schema.json", "dependencies.arch.schema.json" })
             {
                 Assert.That(core.GetEntry($"contentFiles/any/any/schema/0.6.1/{schema}"), Is.Not.Null, schema);
             }

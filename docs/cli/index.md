@@ -30,10 +30,11 @@ dotnet run --project src/ArchLinterNet.Cli --
 
 Installed releases expose an immutable `adoption-stabilization/v1` schema
 registry without a repository checkout or network access. The public 0.6.0
-package line intentionally ships the 0.5.1 registry because schema identities
-version persisted contracts independently from package SemVer; no
-`schema/0.6.0` identity is shipped. Use the installed command as the authority
-for the exact supported `$schema` URLs.
+package line ships a registry whose entries version persisted contracts
+independently from package SemVer: most stay at their frozen `0.5.1`
+identity, policy root/fragment advanced to `0.6.1`, and no `schema/0.6.0`
+identity is shipped. Use the installed command as the authority for the exact
+supported `$schema` URLs.
 
 ```bash
 arch-linter-net schema list
