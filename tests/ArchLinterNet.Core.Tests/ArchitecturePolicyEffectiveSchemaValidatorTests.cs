@@ -124,6 +124,34 @@ public sealed class ArchitecturePolicyEffectiveSchemaValidatorTests
     }
 
     [Test]
+    public void Validate_InvalidHashNamedLayer_UsesTheLayerObjectToSelectSchemaVariants()
+    {
+        const string Yaml = """
+            version: 1
+            name: Example
+            layers:
+              "domain#core":
+                namespace: [App.Domain]
+            analysis:
+              target_assemblies: [App]
+            contracts:
+              strict: []
+            """;
+        ArchitecturePolicyProvenanceIndex provenance = CreateProvenance(
+            ("/layers/domain#core/namespace", "layers.domain#core.namespace"));
+
+        ArchitecturePolicyImportException exception = Assert.Throws<ArchitecturePolicyImportException>(
+            () => ArchitecturePolicyEffectiveSchemaValidator.Validate(Yaml, provenance))!;
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(exception.Message, Does.Contain("/layers/domain#core/namespace"));
+            Assert.That(exception.Message, Does.Not.Contain("selector"));
+            Assert.That(exception.Diagnostic!.Location!.YamlPath, Is.EqualTo("layers.domain#core.namespace"));
+        });
+    }
+
+    [Test]
     public void Validate_InvalidDiscriminatedCoverageContract_ReportsSelectedVariantDeterministically()
     {
         const string Yaml = """
