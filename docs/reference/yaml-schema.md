@@ -294,6 +294,7 @@ analysis:
   target_assemblies:            # Required only for assembly-scanning policies — metadata-only/discovery-only policies may omit it
     - <assembly-name>
   assembly_search_paths: []     # Optional — additional probe directories
+  shared_frameworks: []         # Optional — shared framework names resolved for --ensure-built
   source_roots: []              # Optional — source directory roots for Roslyn resolution
   solution: ''                  # Optional — path to a .sln or .slnx file for project discovery
   projects: []                  # Optional — explicit list of .csproj paths for project discovery

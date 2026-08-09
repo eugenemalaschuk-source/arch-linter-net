@@ -9,6 +9,8 @@ internal sealed class FakeArchitectureEnvironment : IArchitectureEnvironment
 
     public string BaseDirectory { get; set; } = "/fake/base";
 
+    public string RuntimeDirectory { get; set; } = string.Empty;
+
     public void SetEnvironmentVariable(string name, string? value)
     {
         _variables[name] = value;

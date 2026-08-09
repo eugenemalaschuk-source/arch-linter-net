@@ -652,6 +652,36 @@ public sealed class ArchitectureContractSchemaInstanceValidationTests
         Assert.That(Validate(Yaml, "projectMetadataContract"), Is.True);
     }
 
+    [Test]
+    public void Analysis_SharedFrameworksStringList_IsValid()
+    {
+        const string Yaml = """
+            target_assemblies: [App.Core]
+            shared_frameworks: [Microsoft.AspNetCore.App]
+            """;
+
+        Assert.That(Validate(Yaml, "analysis"), Is.True);
+    }
+
+    [Test]
+    public void Analysis_SharedFrameworksOmitted_IsStillValid()
+    {
+        const string Yaml = "target_assemblies: [App.Core]\n";
+
+        Assert.That(Validate(Yaml, "analysis"), Is.True);
+    }
+
+    [Test]
+    public void Analysis_SharedFrameworksNonStringEntry_IsRejected()
+    {
+        const string Yaml = """
+            target_assemblies: [App.Core]
+            shared_frameworks: [1]
+            """;
+
+        Assert.That(Validate(Yaml, "analysis"), Is.False);
+    }
+
     private static void CollectFailures(JsonNode instance, string defName, string location, List<string> failures)
     {
         JsonSchema subSchema = LoadSubSchema(defName);

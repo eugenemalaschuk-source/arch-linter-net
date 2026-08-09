@@ -12,4 +12,6 @@ public sealed class ArchitectureEnvironment : IArchitectureEnvironment
     }
 
     public string BaseDirectory => AppContext.BaseDirectory;
+
+    public string RuntimeDirectory => System.Runtime.InteropServices.RuntimeEnvironment.GetRuntimeDirectory();
 }

@@ -67,10 +67,48 @@ The command exits `0` for valid static policy/configuration and reports fact-dep
 | `--profile <destination>` | Write an opt-in `analysis-profile/v1` document to `stdout`, `stderr`, or a file. Independent of reports and timings. | |
 | `--cache <auto\|path>` | Opt into verified `analysis-cache/v1`. Omitted means no persistent cache. | |
 | `--max-parallelism <n>` | Bound assembly/fact scanning. `1` is the supported sequential mode. | `max(1, min(processor count, 4))` |
-| `--ensure-built` | Explicitly build and verify the selected project graph before validation. | |
+| `--ensure-built` | Explicitly build and verify the selected project graph before validation. Combine with policy `analysis.shared_frameworks` (see [Analyzing an ASP.NET Core host](#analyzing-an-aspnet-core-host)) to analyze assemblies that reference a shared framework other than `Microsoft.NETCore.App`, such as `Microsoft.AspNetCore.App`. | |
 | `--no-restore` | Fail closed when restore is required instead of restoring; useful with `--ensure-built` in prepared environments. | |
 | `-h`, `--help` | Show help message. | |
 | `-v`, `--version` | Show version. | |
+
+### Analyzing an ASP.NET Core host
+
+A target assembly that references the ASP.NET Core shared framework
+(`Microsoft.AspNetCore.App`) cannot be reflected over by default: those framework
+assemblies are absent from the CLI host's own trusted platform assembly list. List
+the framework under policy `analysis.shared_frameworks` and run with
+`--ensure-built`:
+
+```yaml
+analysis:
+  target_assemblies: [MyApp.Web]
+  projects: [MyApp.Web.csproj]
+  shared_frameworks:
+    - Microsoft.AspNetCore.App
+```
+
+```bash
+arch-linter-net --policy architecture/dependencies.arch.yml --strict --ensure-built
+```
+
+The linter resolves the named framework's installed directory on the machine
+running the CLI (honoring `DOTNET_ROOT`/`DOTNET_ROOT(X86)`, otherwise falling back
+to the currently running .NET runtime's own shared-framework store) and adds it to
+the assembly probing paths used by `--ensure-built`. Among installed versions, it
+selects the highest one that is *compatible* with the consumer's own target
+framework, not simply the numerically highest: it anchors to a major version —
+`analysis.target_framework` when set, otherwise the major version actually resolved
+for the selected target assemblies' build output — and, within that major, always
+prefers a release build over a prerelease build. This mirrors the .NET host's own
+default roll-forward policy, which never crosses a major version. If the selected
+target assemblies target more than one distinct major version, the command fails
+immediately rather than guessing; set `analysis.target_framework` to disambiguate.
+No hand-authored `runtimeconfig.json` or `dotnet exec` wrapper is required. If the
+named framework is not installed for the anchored major, the command fails
+immediately with an actionable error naming the framework and the roots it
+searched. `shared_frameworks` only affects `--ensure-built` analysis; policies that
+never set it see no change in behavior.
 
 ## Examples
 
