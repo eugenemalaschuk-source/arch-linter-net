@@ -16,39 +16,12 @@ internal sealed class BaselineVerifyCommandHandler(ICliRuntime runtime, ICliCons
             return CliExitCodes.Success;
         }
 
-        if (options.Mode is not ("strict" or "audit" or "all"))
+        if (!BaselineCommandGuards.TryValidateMode(console, options.Format, options.Mode)
+            || !BaselineCommandGuards.TryValidateFormat(console, options.Format, options.HasFormatConflict)
+            || !BaselineCommandGuards.TryRequireBaselinePath(console, options.Format, "baseline verify", options.BaselinePath)
+            || !BaselineCommandGuards.TryValidatePolicyFile(console, fileSystem, options.Format, options.PolicyPath)
+            || !BaselineCommandGuards.TryValidateBaselineFile(console, fileSystem, options.Format, options.BaselinePath))
         {
-            console.Error.WriteLine($"Invalid mode: {options.Mode}. Use 'strict', 'audit', or 'all'.");
-            return CliExitCodes.InvalidArgumentsOrRuntimeError;
-        }
-
-        if (options.HasFormatConflict)
-        {
-            console.Error.WriteLine("--json cannot be combined with --format.");
-            return CliExitCodes.InvalidArgumentsOrRuntimeError;
-        }
-
-        if (options.Format is not ("human" or "json" or "sarif"))
-        {
-            console.Error.WriteLine("Invalid format. Use 'human', 'json', or 'sarif'.");
-            return CliExitCodes.InvalidArgumentsOrRuntimeError;
-        }
-
-        if (options.BaselinePath == null)
-        {
-            console.Error.WriteLine("--baseline is required for baseline verify.");
-            return CliExitCodes.InvalidArgumentsOrRuntimeError;
-        }
-
-        if (!fileSystem.FileExists(options.PolicyPath))
-        {
-            console.Error.WriteLine($"Policy file not found: {options.PolicyPath}");
-            return CliExitCodes.InvalidArgumentsOrRuntimeError;
-        }
-
-        if (!fileSystem.FileExists(options.BaselinePath))
-        {
-            console.Error.WriteLine($"Baseline file not found: {options.BaselinePath}");
             return CliExitCodes.InvalidArgumentsOrRuntimeError;
         }
 
@@ -66,7 +39,7 @@ internal sealed class BaselineVerifyCommandHandler(ICliRuntime runtime, ICliCons
 
             if (!outcome.Succeeded)
             {
-                WriteConfigurationViolations(outcome.ConfigurationViolations);
+                WriteConfigurationViolations(options.Format, outcome.ConfigurationViolations);
                 return CliExitCodes.InvalidArgumentsOrRuntimeError;
             }
 
@@ -99,17 +72,13 @@ internal sealed class BaselineVerifyCommandHandler(ICliRuntime runtime, ICliCons
         }
         catch (Exception ex)
         {
-            console.Error.WriteLine($"Baseline verify error: {ex.Message}");
+            CliErrorOutputWriter.Write(console, options.Format, "unexpected-tool-failure", $"Baseline verify error: {ex.Message}");
             return CliExitCodes.InvalidArgumentsOrRuntimeError;
         }
     }
 
-    private void WriteConfigurationViolations(IReadOnlyCollection<ArchitectureViolation> violations)
+    private void WriteConfigurationViolations(string format, IReadOnlyCollection<ArchitectureViolation> violations)
     {
-        console.Error.WriteLine("Configuration violations detected — baseline cannot be verified:");
-        foreach (ArchitectureViolation violation in violations)
-        {
-            console.Error.WriteLine($"  {violation.SourceType}: {violation.ForbiddenNamespace}");
-        }
+        CliErrorOutputWriter.WriteConfigurationViolations(console, format, "verified", violations);
     }
 }

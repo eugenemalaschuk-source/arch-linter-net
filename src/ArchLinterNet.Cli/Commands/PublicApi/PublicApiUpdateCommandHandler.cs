@@ -1,5 +1,6 @@
 using System.Text.Json;
 using ArchLinterNet.Cli.Abstractions;
+using ArchLinterNet.Cli.Commands;
 using ArchLinterNet.Core.BuildState;
 using ArchLinterNet.Core.Model;
 using ArchLinterNet.Core.Validation;
@@ -30,7 +31,8 @@ internal sealed class PublicApiUpdateCommandHandler(ICliRuntime runtime, ICliCon
 
         if (options.SnapshotPath == null)
         {
-            console.Error.WriteLine("--snapshot is required for public-api update.");
+            CliErrorOutputWriter.Write(
+                console, options.Format, "invalid-arguments", "--snapshot is required for public-api update.");
             return CliExitCodes.InvalidArgumentsOrRuntimeError;
         }
 
@@ -50,7 +52,8 @@ internal sealed class PublicApiUpdateCommandHandler(ICliRuntime runtime, ICliCon
 
             if (!outcome.Succeeded)
             {
-                PublicApiCommandGuards.WriteError(console, CommandName, outcome.Error!, outcome.PreflightDiagnostics);
+                PublicApiCommandGuards.WriteError(
+                    console, options.Format, CommandName, outcome.Error!, outcome.PreflightDiagnostics, outcome.FailureKind);
                 return PublicApiCommandGuards.ExitCodeFor(outcome.FailureKind);
             }
 
@@ -84,7 +87,7 @@ internal sealed class PublicApiUpdateCommandHandler(ICliRuntime runtime, ICliCon
         }
         catch (Exception ex)
         {
-            console.Error.WriteLine($"public-api update error: {ex.Message}");
+            CliErrorOutputWriter.Write(console, options.Format, "unexpected-tool-failure", $"public-api update error: {ex.Message}");
             return CliExitCodes.InvalidArgumentsOrRuntimeError;
         }
     }

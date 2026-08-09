@@ -16,39 +16,21 @@ internal sealed class BaselineMigrateCommandHandler(ICliRuntime runtime, ICliCon
             return CliExitCodes.Success;
         }
 
-        if (options.BaselinePath == null)
+        if (!BaselineCommandGuards.TryRequireBaselinePath(console, options.Format, "baseline migrate", options.BaselinePath)
+            || !BaselineCommandGuards.TryValidateFormat(console, options.Format, options.HasFormatConflict))
         {
-            console.Error.WriteLine("--baseline is required for baseline migrate.");
-            return CliExitCodes.InvalidArgumentsOrRuntimeError;
-        }
-
-        if (options.HasFormatConflict)
-        {
-            console.Error.WriteLine("--json cannot be combined with --format.");
-            return CliExitCodes.InvalidArgumentsOrRuntimeError;
-        }
-
-        if (options.Format is not ("human" or "json" or "sarif"))
-        {
-            console.Error.WriteLine("Invalid format. Use 'human', 'json', or 'sarif'.");
             return CliExitCodes.InvalidArgumentsOrRuntimeError;
         }
 
         if (!options.DryRun && options.OutputPath == null)
         {
-            console.Error.WriteLine("--output is required for baseline migrate unless --dry-run/--check is used.");
+            CliErrorOutputWriter.Write(console, options.Format, "invalid-arguments", "--output is required for baseline migrate unless --dry-run/--check is used.");
             return CliExitCodes.InvalidArgumentsOrRuntimeError;
         }
 
-        if (!fileSystem.FileExists(options.PolicyPath))
+        if (!BaselineCommandGuards.TryValidatePolicyFile(console, fileSystem, options.Format, options.PolicyPath)
+            || !BaselineCommandGuards.TryValidateBaselineFile(console, fileSystem, options.Format, options.BaselinePath))
         {
-            console.Error.WriteLine($"Policy file not found: {options.PolicyPath}");
-            return CliExitCodes.InvalidArgumentsOrRuntimeError;
-        }
-
-        if (!fileSystem.FileExists(options.BaselinePath))
-        {
-            console.Error.WriteLine($"Baseline file not found: {options.BaselinePath}");
             return CliExitCodes.InvalidArgumentsOrRuntimeError;
         }
 
@@ -66,13 +48,14 @@ internal sealed class BaselineMigrateCommandHandler(ICliRuntime runtime, ICliCon
 
             if (outcome.Error != null)
             {
-                console.Error.WriteLine($"Baseline migrate error: {outcome.Error}");
+                CliErrorOutputWriter.Write(
+                    console, options.Format, "configuration-error", $"Baseline migrate error: {outcome.Error}");
                 return CliExitCodes.InvalidArgumentsOrRuntimeError;
             }
 
             if (!outcome.Succeeded && outcome.ConfigurationViolations.Count > 0)
             {
-                WriteConfigurationViolations(outcome.ConfigurationViolations);
+                WriteConfigurationViolations(options.Format, outcome.ConfigurationViolations);
                 return CliExitCodes.InvalidArgumentsOrRuntimeError;
             }
 
@@ -90,7 +73,7 @@ internal sealed class BaselineMigrateCommandHandler(ICliRuntime runtime, ICliCon
                         new BaselineWriteGate.Request(
                             "baseline migrate", options.OutputPath, options.DryRun, options.Force,
                             outcome.Yaml, CommentDiagnostic: null, InPlacePath: null,
-                            EmitProposalToStdout: options.Format == "human"),
+                            EmitProposalToStdout: options.Format == "human", Format: options.Format),
                         out BaselineWriteGate.Disposition disposition, cancellationToken))
                 {
                     return CliExitCodes.InvalidArgumentsOrRuntimeError;
@@ -124,18 +107,14 @@ internal sealed class BaselineMigrateCommandHandler(ICliRuntime runtime, ICliCon
         }
         catch (Exception ex)
         {
-            console.Error.WriteLine($"Baseline migrate error: {ex.Message}");
+            CliErrorOutputWriter.Write(console, options.Format, "unexpected-tool-failure", $"Baseline migrate error: {ex.Message}");
             return CliExitCodes.InvalidArgumentsOrRuntimeError;
         }
     }
 
-    private void WriteConfigurationViolations(IReadOnlyCollection<ArchitectureViolation> violations)
+    private void WriteConfigurationViolations(string format, IReadOnlyCollection<ArchitectureViolation> violations)
     {
-        console.Error.WriteLine("Configuration violations detected — baseline cannot be migrated:");
-        foreach (ArchitectureViolation violation in violations)
-        {
-            console.Error.WriteLine($"  {violation.SourceType}: {violation.ForbiddenNamespace}");
-        }
+        CliErrorOutputWriter.WriteConfigurationViolations(console, format, "migrated", violations);
     }
 
     private static string FormatForHumans(BaselineMigrateOutcome outcome, string? outputPath, bool dryRun, bool wrote)

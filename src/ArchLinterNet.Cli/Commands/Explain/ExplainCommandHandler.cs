@@ -23,25 +23,28 @@ internal sealed class ExplainCommandHandler(ICliRuntime runtime, ICliConsole con
 
         if (options.Mode is not ("strict" or "audit" or "all"))
         {
-            console.Error.WriteLine($"Invalid mode: {options.Mode}. Use 'strict', 'audit', or 'all'.");
+            CliErrorOutputWriter.Write(console, options.Format, "invalid-arguments",
+                $"Invalid mode: {options.Mode}. Use 'strict', 'audit', or 'all'.");
             return CliExitCodes.InvalidArgumentsOrRuntimeError;
         }
 
         if (!runtime.TryParseGraphLevel(options.Level, out ArchitectureGraphLevel graphLevel))
         {
-            console.Error.WriteLine($"Invalid level: {options.Level}. Use 'namespace' or 'type'.");
+            CliErrorOutputWriter.Write(console, options.Format, "invalid-arguments",
+                $"Invalid level: {options.Level}. Use 'namespace' or 'type'.");
             return CliExitCodes.InvalidArgumentsOrRuntimeError;
         }
 
         if (options.Format is not ("human" or "json"))
         {
-            console.Error.WriteLine($"Invalid format: {options.Format}. Use 'human' or 'json'.");
+            CliErrorOutputWriter.Write(console, options.Format, "invalid-format",
+                $"Invalid format: {options.Format}. Use 'human' or 'json'.");
             return CliExitCodes.InvalidArgumentsOrRuntimeError;
         }
 
         if (string.IsNullOrEmpty(options.Source) || string.IsNullOrEmpty(options.Target))
         {
-            console.Error.WriteLine("--source and --target are required.");
+            CliErrorOutputWriter.Write(console, options.Format, "invalid-arguments", "--source and --target are required.");
             return CliExitCodes.InvalidArgumentsOrRuntimeError;
         }
 
@@ -312,7 +315,7 @@ internal sealed class ExplainCommandHandler(ICliRuntime runtime, ICliConsole con
                 return CliExitCodes.InvalidArgumentsOrRuntimeError;
             }
 
-            console.Error.WriteLine($"Explain error: {ex.Message}");
+            CliErrorOutputWriter.Write(console, options.Format, "unexpected-tool-failure", $"Explain error: {ex.Message}");
             return CliExitCodes.InvalidArgumentsOrRuntimeError;
         }
     }

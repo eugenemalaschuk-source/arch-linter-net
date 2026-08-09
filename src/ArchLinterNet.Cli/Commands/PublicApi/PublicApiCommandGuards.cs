@@ -1,4 +1,5 @@
 using ArchLinterNet.Cli.Abstractions;
+using ArchLinterNet.Cli.Commands;
 using ArchLinterNet.Core.Model;
 using ArchLinterNet.Core.Validation;
 
@@ -31,20 +32,22 @@ internal static class PublicApiCommandGuards
 
         if (string.IsNullOrWhiteSpace(contractId))
         {
-            console.Error.WriteLine($"--contract is required for public-api {commandName}.");
+            CliErrorOutputWriter.Write(
+                console, format, "invalid-arguments", $"--contract is required for public-api {commandName}.");
             return false;
         }
 
         if (!supportedFormats.Contains(format, StringComparer.Ordinal))
         {
-            console.Error.WriteLine(
+            CliErrorOutputWriter.Write(
+                console, format, "invalid-format",
                 $"Invalid format for public-api {commandName}: {format}. Use {string.Join(", ", supportedFormats)}.");
             return false;
         }
 
         if (!fileSystem.FileExists(policyPath))
         {
-            console.Error.WriteLine($"Policy file not found: {policyPath}");
+            CliErrorOutputWriter.Write(console, format, "configuration-error", $"Policy file not found: {policyPath}");
             return false;
         }
 
@@ -63,14 +66,39 @@ internal static class PublicApiCommandGuards
 
     public static void WriteError(
         ICliConsole console,
+        string format,
         string commandName,
         string error,
-        IReadOnlyCollection<BuildStatePreflightDiagnostic> preflightDiagnostics)
+        IReadOnlyCollection<BuildStatePreflightDiagnostic> preflightDiagnostics,
+        PublicApiFailureKind failureKind,
+        IReadOnlyCollection<string>? staleDeclarations = null,
+        IReadOnlyCollection<string>? undeclaredSurface = null)
     {
-        console.Error.WriteLine($"public-api {commandName} error: {error}");
-        foreach (BuildStatePreflightDiagnostic diagnostic in preflightDiagnostics.Where(d => d.IsBlocking))
+        string message = $"public-api {commandName} error: {error}";
+        if (preflightDiagnostics.Any(diagnostic => diagnostic.IsBlocking))
         {
-            console.Error.WriteLine($"  {diagnostic.State}: {diagnostic.ContractName}");
+            CliErrorOutputWriter.WritePreflightFailure(console, format, message, preflightDiagnostics);
+            return;
         }
+
+        string category = failureKind switch
+        {
+            PublicApiFailureKind.Drift => "public-api-drift",
+            PublicApiFailureKind.InvalidInput => "public-api-invalid-input",
+            _ => "configuration-error",
+        };
+        CliErrorOutputWriter.Write(console, format, category, message, new
+        {
+            failure_kind = FailureKindToken(failureKind),
+            stale_declarations = staleDeclarations ?? Array.Empty<string>(),
+            undeclared_surface = undeclaredSurface ?? Array.Empty<string>(),
+        });
     }
+
+    private static string FailureKindToken(PublicApiFailureKind failureKind) => failureKind switch
+    {
+        PublicApiFailureKind.Drift => "drift",
+        PublicApiFailureKind.InvalidInput => "invalid-input",
+        _ => "none",
+    };
 }

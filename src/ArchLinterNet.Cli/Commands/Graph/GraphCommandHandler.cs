@@ -17,19 +17,22 @@ internal sealed class GraphCommandHandler(ICliRuntime runtime, ICliConsole conso
 
         if (options.Mode is not ("strict" or "audit" or "all"))
         {
-            console.Error.WriteLine($"Invalid mode: {options.Mode}. Use 'strict', 'audit', or 'all'.");
+            CliErrorOutputWriter.Write(console, options.Format, "invalid-arguments",
+                $"Invalid mode: {options.Mode}. Use 'strict', 'audit', or 'all'.");
             return CliExitCodes.InvalidArgumentsOrRuntimeError;
         }
 
         if (!runtime.TryParseGraphLevel(options.Level, out ArchitectureGraphLevel graphLevel))
         {
-            console.Error.WriteLine($"Invalid level: {options.Level}. Use 'namespace', 'type', or 'assembly'.");
+            CliErrorOutputWriter.Write(console, options.Format, "invalid-arguments",
+                $"Invalid level: {options.Level}. Use 'namespace', 'type', or 'assembly'.");
             return CliExitCodes.InvalidArgumentsOrRuntimeError;
         }
 
         if (options.Format is not ("json" or "dot" or "mermaid"))
         {
-            console.Error.WriteLine($"Invalid format: {options.Format}. Use 'json', 'dot', or 'mermaid'.");
+            CliErrorOutputWriter.Write(console, options.Format, "invalid-format",
+                $"Invalid format: {options.Format}. Use 'json', 'dot', or 'mermaid'.");
             return CliExitCodes.InvalidArgumentsOrRuntimeError;
         }
 
@@ -66,7 +69,7 @@ internal sealed class GraphCommandHandler(ICliRuntime runtime, ICliConsole conso
                 return CliExitCodes.InvalidArgumentsOrRuntimeError;
             }
 
-            console.Error.WriteLine($"Graph export error: {ex.Message}");
+            CliErrorOutputWriter.Write(console, options.Format, "unexpected-tool-failure", $"Graph export error: {ex.Message}");
             return CliExitCodes.InvalidArgumentsOrRuntimeError;
         }
     }
