@@ -66,12 +66,23 @@ documented `--ensure-built` entrypoint every reference-entrypoints guide already
 recommends, and the isolated scope already has correct, per-invocation (not
 process-static) probing-path resolution semantics.
 
-### Highest installed version wins
+### Highest compatible version wins, anchored to a major version
 
 When more than one version directory exists under a shared framework, the resolver
-picks the highest by parsed version, matching how `dotnet` itself rolls forward
-within a shared framework's compatible range. The policy does not pin the exact
-runtime version — it names the framework, not a specific patch build.
+picks the highest version whose major version matches an anchor: `analysis.target_
+framework` when the policy sets it, otherwise the currently running runtime's own
+major version. This mirrors the .NET host's default roll-forward policy, which never
+crosses a major version and never prefers a prerelease build over a release build at
+the same or lower version. Without this anchor, a machine that also has a newer
+major's prerelease installed (e.g. `Microsoft.AspNetCore.App 11.0.0-preview.*`
+alongside a `net10` target) would have its numerically-higher prerelease silently
+selected instead of the intended stable major — and because `AssemblyLoadContext`
+can satisfy a requested assembly version with a higher loaded one, the failure mode
+is not a load error but silent reflection against the wrong framework's metadata.
+When no anchor major version is derivable at all, the resolver falls back to the
+highest version across all installed majors (still preferring release over
+prerelease) rather than refusing to resolve — the policy does not pin an exact
+runtime patch build, only the framework name.
 
 ### Fail closed on a missing framework
 

@@ -25,10 +25,30 @@ behavior.
   otherwise derive the shared-framework store from the currently running runtime's
   own installation directory
 
-#### Scenario: Highest installed version selected
+#### Scenario: Highest compatible version selected
 
 - **WHEN** more than one version directory exists under the named shared framework
-- **THEN** the system SHALL select the highest parsed version directory
+- **THEN** the system SHALL select the highest version directory whose major version
+  matches an anchor major version (derived from `analysis.target_framework` when set,
+  otherwise from the currently running runtime's own major version), preferring a
+  release build over a prerelease build with the same or lower version
+- **AND** when no anchor major version can be derived, the system SHALL select the
+  highest parsed version directory across all installed major versions, still
+  preferring a release build over a prerelease build
+
+#### Scenario: A higher-major prerelease build does not shadow the anchored major
+
+- **WHEN** the anchor major version is `10` and both a `10.x` release build and an
+  `11.0.0-preview.*` build are installed for the named framework
+- **THEN** the system SHALL select the `10.x` release build, not the numerically
+  higher `11.0.0-preview.*` build
+
+#### Scenario: No candidate exists for the anchor major version
+
+- **WHEN** an anchor major version is known and no installed version directory for
+  the named framework matches it
+- **THEN** the system SHALL treat the framework as missing rather than selecting a
+  version from a different major version
 
 #### Scenario: Missing shared framework fails with an actionable diagnostic
 

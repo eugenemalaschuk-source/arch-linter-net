@@ -6,6 +6,8 @@ namespace ArchLinterNet.Core.Tests;
 [TestFixture]
 public sealed class ArchitectureSharedFrameworkResolverTests
 {
+    private static readonly List<string> _aspNetCoreApp = new() { "Microsoft.AspNetCore.App" };
+
     private FakeArchitectureFileSystem _fileSystem = null!;
     private FakeArchitectureEnvironment _environment = null!;
 
@@ -16,11 +18,13 @@ public sealed class ArchitectureSharedFrameworkResolverTests
         _environment = new FakeArchitectureEnvironment();
     }
 
+    private IReadOnlyList<string> Resolve(IReadOnlyList<string> sharedFrameworkNames, string? targetFrameworkMoniker = null) =>
+        ArchitectureSharedFrameworkResolver.ResolveProbingPaths(sharedFrameworkNames, targetFrameworkMoniker, _fileSystem, _environment);
+
     [Test]
     public void ResolveProbingPaths_NoSharedFrameworksConfigured_ReturnsEmptyWithoutTouchingEnvironment()
     {
-        IReadOnlyList<string> result = ArchitectureSharedFrameworkResolver.ResolveProbingPaths(
-            new List<string>(), _fileSystem, _environment);
+        IReadOnlyList<string> result = Resolve(new List<string>());
 
         Assert.That(result, Is.Empty);
     }
@@ -35,8 +39,7 @@ public sealed class ArchitectureSharedFrameworkResolverTests
         _fileSystem.AddDirectory("/opt/dotnet/shared/Microsoft.AspNetCore.App/9.0.3");
         _fileSystem.AddDirectory("/opt/dotnet/shared/Microsoft.AspNetCore.App/9.0.10");
 
-        IReadOnlyList<string> result = ArchitectureSharedFrameworkResolver.ResolveProbingPaths(
-            new List<string> { "Microsoft.AspNetCore.App" }, _fileSystem, _environment);
+        IReadOnlyList<string> result = Resolve(_aspNetCoreApp);
 
         Assert.That(result, Is.EqualTo(new[] { "/opt/dotnet/shared/Microsoft.AspNetCore.App/9.0.10" }));
     }
@@ -49,8 +52,7 @@ public sealed class ArchitectureSharedFrameworkResolverTests
         _fileSystem.AddDirectory("/usr/local/share/dotnet/shared/Microsoft.AspNetCore.App");
         _fileSystem.AddDirectory("/usr/local/share/dotnet/shared/Microsoft.AspNetCore.App/10.0.5");
 
-        IReadOnlyList<string> result = ArchitectureSharedFrameworkResolver.ResolveProbingPaths(
-            new List<string> { "Microsoft.AspNetCore.App" }, _fileSystem, _environment);
+        IReadOnlyList<string> result = Resolve(_aspNetCoreApp);
 
         Assert.That(result, Is.EqualTo(new[] { "/usr/local/share/dotnet/shared/Microsoft.AspNetCore.App/10.0.5" }));
     }
@@ -62,13 +64,12 @@ public sealed class ArchitectureSharedFrameworkResolverTests
         _fileSystem.AddDirectory("/opt/dotnet/shared");
         _fileSystem.AddDirectory("/opt/dotnet/shared/Microsoft.AspNetCore.App");
         _fileSystem.AddDirectory("/opt/dotnet/shared/Microsoft.AspNetCore.App/8.0.1");
-        _environment.RuntimeDirectory = "/usr/local/share/dotnet/shared/Microsoft.NETCore.App/10.0.0";
+        _environment.RuntimeDirectory = "/usr/local/share/dotnet/shared/Microsoft.NETCore.App/8.0.0";
         _fileSystem.AddDirectory("/usr/local/share/dotnet/shared");
         _fileSystem.AddDirectory("/usr/local/share/dotnet/shared/Microsoft.AspNetCore.App");
-        _fileSystem.AddDirectory("/usr/local/share/dotnet/shared/Microsoft.AspNetCore.App/10.0.5");
+        _fileSystem.AddDirectory("/usr/local/share/dotnet/shared/Microsoft.AspNetCore.App/8.0.9");
 
-        IReadOnlyList<string> result = ArchitectureSharedFrameworkResolver.ResolveProbingPaths(
-            new List<string> { "Microsoft.AspNetCore.App" }, _fileSystem, _environment);
+        IReadOnlyList<string> result = Resolve(_aspNetCoreApp);
 
         Assert.That(result, Is.EqualTo(new[] { "/opt/dotnet/shared/Microsoft.AspNetCore.App/8.0.1" }));
     }
@@ -83,25 +84,103 @@ public sealed class ArchitectureSharedFrameworkResolverTests
         _fileSystem.AddDirectory("/usr/local/share/dotnet/shared/Microsoft.AspNetCore.App");
         _fileSystem.AddDirectory("/usr/local/share/dotnet/shared/Microsoft.AspNetCore.App/10.0.5");
 
-        IReadOnlyList<string> result = ArchitectureSharedFrameworkResolver.ResolveProbingPaths(
-            new List<string> { "Microsoft.AspNetCore.App" }, _fileSystem, _environment);
+        IReadOnlyList<string> result = Resolve(_aspNetCoreApp);
 
         Assert.That(result, Is.EqualTo(new[] { "/usr/local/share/dotnet/shared/Microsoft.AspNetCore.App/10.0.5" }));
     }
 
     [Test]
-    public void ResolveProbingPaths_PrereleaseVersionSuffix_IsIgnoredForVersionComparison()
+    public void ResolveProbingPaths_StableVersionPreferredOverHigherNumberedPrerelease()
     {
+        // A stable 8.x install must win over a numerically higher 9.0.0 prerelease — the .NET host
+        // never rolls a release build forward into a prerelease build.
         _environment.SetEnvironmentVariable("DOTNET_ROOT", "/opt/dotnet");
         _fileSystem.AddDirectory("/opt/dotnet/shared");
         _fileSystem.AddDirectory("/opt/dotnet/shared/Microsoft.AspNetCore.App");
         _fileSystem.AddDirectory("/opt/dotnet/shared/Microsoft.AspNetCore.App/8.0.11");
         _fileSystem.AddDirectory("/opt/dotnet/shared/Microsoft.AspNetCore.App/9.0.0-preview.1");
 
-        IReadOnlyList<string> result = ArchitectureSharedFrameworkResolver.ResolveProbingPaths(
-            new List<string> { "Microsoft.AspNetCore.App" }, _fileSystem, _environment);
+        IReadOnlyList<string> result = Resolve(_aspNetCoreApp);
 
-        Assert.That(result, Is.EqualTo(new[] { "/opt/dotnet/shared/Microsoft.AspNetCore.App/9.0.0-preview.1" }));
+        Assert.That(result, Is.EqualTo(new[] { "/opt/dotnet/shared/Microsoft.AspNetCore.App/8.0.11" }));
+    }
+
+    [Test]
+    public void ResolveProbingPaths_OnlyPrereleaseInstalled_FallsBackToHighestPrerelease()
+    {
+        _environment.SetEnvironmentVariable("DOTNET_ROOT", "/opt/dotnet");
+        _fileSystem.AddDirectory("/opt/dotnet/shared");
+        _fileSystem.AddDirectory("/opt/dotnet/shared/Microsoft.AspNetCore.App");
+        _fileSystem.AddDirectory("/opt/dotnet/shared/Microsoft.AspNetCore.App/9.0.0-preview.1");
+        _fileSystem.AddDirectory("/opt/dotnet/shared/Microsoft.AspNetCore.App/9.1.0-preview.1");
+
+        IReadOnlyList<string> result = Resolve(_aspNetCoreApp);
+
+        Assert.That(result, Is.EqualTo(new[] { "/opt/dotnet/shared/Microsoft.AspNetCore.App/9.1.0-preview.1" }));
+    }
+
+    [Test]
+    public void ResolveProbingPaths_TargetFrameworkAnchor_ExcludesAHigherPrereleaseMajorEvenThoughItIsInstalled()
+    {
+        // The reviewer's coexistence scenario: a net10 consumer on a machine that also has
+        // Microsoft.AspNetCore.App 11.0.0-preview.* installed must stay on the 10.x stable build.
+        _environment.SetEnvironmentVariable("DOTNET_ROOT", "/opt/dotnet");
+        _fileSystem.AddDirectory("/opt/dotnet/shared");
+        _fileSystem.AddDirectory("/opt/dotnet/shared/Microsoft.AspNetCore.App");
+        _fileSystem.AddDirectory("/opt/dotnet/shared/Microsoft.AspNetCore.App/10.0.5");
+        _fileSystem.AddDirectory("/opt/dotnet/shared/Microsoft.AspNetCore.App/11.0.0-preview.1");
+
+        IReadOnlyList<string> result = Resolve(_aspNetCoreApp, "net10.0");
+
+        Assert.That(result, Is.EqualTo(new[] { "/opt/dotnet/shared/Microsoft.AspNetCore.App/10.0.5" }));
+    }
+
+    [Test]
+    public void ResolveProbingPaths_RuntimeDirectoryAnchor_UsedWhenTargetFrameworkNotSet()
+    {
+        _environment.SetEnvironmentVariable("DOTNET_ROOT", "/opt/dotnet");
+        _fileSystem.AddDirectory("/opt/dotnet/shared");
+        _fileSystem.AddDirectory("/opt/dotnet/shared/Microsoft.AspNetCore.App");
+        _fileSystem.AddDirectory("/opt/dotnet/shared/Microsoft.AspNetCore.App/9.0.9");
+        _fileSystem.AddDirectory("/opt/dotnet/shared/Microsoft.AspNetCore.App/10.0.2");
+        _environment.RuntimeDirectory = "/opt/dotnet/shared/Microsoft.NETCore.App/9.0.0";
+
+        IReadOnlyList<string> result = Resolve(_aspNetCoreApp);
+
+        Assert.That(result, Is.EqualTo(new[] { "/opt/dotnet/shared/Microsoft.AspNetCore.App/9.0.9" }));
+    }
+
+    [Test]
+    public void ResolveProbingPaths_AnchorMajorHasNoCandidate_TreatsFrameworkAsMissingRatherThanCrossingMajor()
+    {
+        _environment.SetEnvironmentVariable("DOTNET_ROOT", "/opt/dotnet");
+        _fileSystem.AddDirectory("/opt/dotnet/shared");
+        _fileSystem.AddDirectory("/opt/dotnet/shared/Microsoft.AspNetCore.App");
+        _fileSystem.AddDirectory("/opt/dotnet/shared/Microsoft.AspNetCore.App/9.0.9");
+
+        InvalidOperationException exception = Assert.Throws<InvalidOperationException>(
+            () => Resolve(_aspNetCoreApp, "net10.0"))!;
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(exception.Message, Does.Contain("Microsoft.AspNetCore.App"));
+            Assert.That(exception.Message, Does.Contain("major version 10"));
+        });
+    }
+
+    [Test]
+    public void ResolveProbingPaths_TargetFrameworkWithoutADot_IsNotUsedAsAnAnchor()
+    {
+        // "net48" (.NET Framework) never carries a dot after "net<digits>" the way "netN.0" TFMs
+        // do; it must not be misparsed into major version 48.
+        _environment.SetEnvironmentVariable("DOTNET_ROOT", "/opt/dotnet");
+        _fileSystem.AddDirectory("/opt/dotnet/shared");
+        _fileSystem.AddDirectory("/opt/dotnet/shared/Microsoft.AspNetCore.App");
+        _fileSystem.AddDirectory("/opt/dotnet/shared/Microsoft.AspNetCore.App/8.0.1");
+
+        IReadOnlyList<string> result = Resolve(_aspNetCoreApp, "net48");
+
+        Assert.That(result, Is.EqualTo(new[] { "/opt/dotnet/shared/Microsoft.AspNetCore.App/8.0.1" }));
     }
 
     [Test]
@@ -113,8 +192,7 @@ public sealed class ArchitectureSharedFrameworkResolverTests
         _fileSystem.AddDirectory("/opt/dotnet/shared/Microsoft.AspNetCore.App/current");
         _fileSystem.AddDirectory("/opt/dotnet/shared/Microsoft.AspNetCore.App/8.0.1");
 
-        IReadOnlyList<string> result = ArchitectureSharedFrameworkResolver.ResolveProbingPaths(
-            new List<string> { "Microsoft.AspNetCore.App" }, _fileSystem, _environment);
+        IReadOnlyList<string> result = Resolve(_aspNetCoreApp);
 
         Assert.That(result, Is.EqualTo(new[] { "/opt/dotnet/shared/Microsoft.AspNetCore.App/8.0.1" }));
     }
@@ -127,8 +205,7 @@ public sealed class ArchitectureSharedFrameworkResolverTests
         _fileSystem.AddDirectory("/opt/dotnet/shared/Microsoft.AspNetCore.App");
         _fileSystem.AddDirectory("/opt/dotnet/shared/Microsoft.AspNetCore.App/8.0.1");
 
-        IReadOnlyList<string> result = ArchitectureSharedFrameworkResolver.ResolveProbingPaths(
-            new List<string> { " Microsoft.AspNetCore.App ", "Microsoft.AspNetCore.App", "" }, _fileSystem, _environment);
+        IReadOnlyList<string> result = Resolve(new List<string> { " Microsoft.AspNetCore.App ", "Microsoft.AspNetCore.App", "" });
 
         Assert.That(result, Is.EqualTo(new[] { "/opt/dotnet/shared/Microsoft.AspNetCore.App/8.0.1" }));
     }
@@ -139,14 +216,15 @@ public sealed class ArchitectureSharedFrameworkResolverTests
         _environment.SetEnvironmentVariable("DOTNET_ROOT", "/opt/dotnet");
         _fileSystem.AddDirectory("/opt/dotnet/shared");
 
-        InvalidOperationException exception = Assert.Throws<InvalidOperationException>(() =>
-            ArchitectureSharedFrameworkResolver.ResolveProbingPaths(
-                new List<string> { "Microsoft.AspNetCore.App" }, _fileSystem, _environment))!;
+        InvalidOperationException exception = Assert.Throws<InvalidOperationException>(
+            () => Resolve(_aspNetCoreApp))!;
 
         Assert.Multiple(() =>
         {
             Assert.That(exception.Message, Does.Contain("Microsoft.AspNetCore.App"));
-            Assert.That(exception.Message, Does.Contain("/opt/dotnet/shared"));
+            // The joined root uses the host's own directory separator (backslash on Windows), so
+            // normalize before asserting on its content.
+            Assert.That(exception.Message.Replace('\\', '/'), Does.Contain("/opt/dotnet/shared"));
             Assert.That(exception.Message, Does.Contain("DOTNET_ROOT"));
         });
     }
@@ -154,9 +232,8 @@ public sealed class ArchitectureSharedFrameworkResolverTests
     [Test]
     public void ResolveProbingPaths_NoSharedRootsResolvable_ThrowsNamingNoneSearched()
     {
-        InvalidOperationException exception = Assert.Throws<InvalidOperationException>(() =>
-            ArchitectureSharedFrameworkResolver.ResolveProbingPaths(
-                new List<string> { "Microsoft.AspNetCore.App" }, _fileSystem, _environment))!;
+        InvalidOperationException exception = Assert.Throws<InvalidOperationException>(
+            () => Resolve(_aspNetCoreApp))!;
 
         Assert.That(exception.Message, Does.Contain("<none>"));
     }

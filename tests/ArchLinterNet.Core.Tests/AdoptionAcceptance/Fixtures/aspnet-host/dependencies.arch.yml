@@ -3,4 +3,5 @@ name: Synthetic ASP.NET host adopter
 analysis:
   target_assemblies: [Synthetic.AspNetHost]
   projects: [Synthetic.AspNetHost.csproj]
+  target_framework: net10.0
   shared_frameworks: [Microsoft.AspNetCore.App]

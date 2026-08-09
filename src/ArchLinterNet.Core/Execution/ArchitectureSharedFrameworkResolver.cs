@@ -14,6 +14,7 @@ internal static class ArchitectureSharedFrameworkResolver
 
     public static IReadOnlyList<string> ResolveProbingPaths(
         IReadOnlyList<string> sharedFrameworkNames,
+        string? targetFrameworkMoniker,
         IArchitectureFileSystem fileSystem,
         IArchitectureEnvironment environment)
     {
@@ -28,12 +29,13 @@ internal static class ArchitectureSharedFrameworkResolver
         }
 
         IReadOnlyList<string> sharedRoots = ResolveSharedRoots(fileSystem, environment);
+        int? anchorMajorVersion = ResolveAnchorMajorVersion(targetFrameworkMoniker, environment);
         List<string> resolvedDirectories = new(names.Length);
         List<string> missingFrameworkNames = new();
 
         foreach (string name in names)
         {
-            string? frameworkDirectory = ResolveFrameworkDirectory(name, sharedRoots, fileSystem);
+            string? frameworkDirectory = ResolveFrameworkDirectory(name, sharedRoots, fileSystem, anchorMajorVersion);
             if (frameworkDirectory is null)
             {
                 missingFrameworkNames.Add(name);
@@ -46,17 +48,20 @@ internal static class ArchitectureSharedFrameworkResolver
         if (missingFrameworkNames.Count > 0)
         {
             string searchedRoots = sharedRoots.Count == 0 ? "<none>" : string.Join(", ", sharedRoots);
+            string majorVersionClause = anchorMajorVersion is int major
+                ? $" compatible with major version {major}"
+                : string.Empty;
             throw new InvalidOperationException(
                 "analysis.shared_frameworks named a shared framework that is not installed on this "
-                + $"machine: {string.Join(", ", missingFrameworkNames)}. Searched shared-framework roots: "
-                + $"{searchedRoots}. Install the corresponding .NET runtime or set {DotNetRootEnvironmentVariable} "
-                + "to a directory whose 'shared' subdirectory contains it.");
+                + $"machine{majorVersionClause}: {string.Join(", ", missingFrameworkNames)}. Searched "
+                + $"shared-framework roots: {searchedRoots}. Install the corresponding .NET runtime or set "
+                + $"{DotNetRootEnvironmentVariable} to a directory whose 'shared' subdirectory contains it.");
         }
 
         return resolvedDirectories;
     }
 
-    private static IReadOnlyList<string> ResolveSharedRoots(
+    private static string[] ResolveSharedRoots(
         IArchitectureFileSystem fileSystem, IArchitectureEnvironment environment)
     {
         List<string> roots = new();
@@ -94,8 +99,57 @@ internal static class ArchitectureSharedFrameworkResolver
         }
     }
 
+    // The .NET host's default roll-forward policy never crosses a major version and prefers a
+    // release build over a prerelease one. Anchoring shared-framework selection the same way stops
+    // a machine that also has e.g. Microsoft.AspNetCore.App 11.0.0-preview.* installed from being
+    // silently selected for a net10 consumer merely because "11" sorts higher than "10".
+    private static int? ResolveAnchorMajorVersion(string? targetFrameworkMoniker, IArchitectureEnvironment environment)
+    {
+        int? fromTargetFramework = TryParseMajorFromTargetFrameworkMoniker(targetFrameworkMoniker);
+        if (fromTargetFramework is not null)
+        {
+            return fromTargetFramework;
+        }
+
+        string runtimeDirectory = environment.RuntimeDirectory;
+        if (string.IsNullOrWhiteSpace(runtimeDirectory))
+        {
+            return null;
+        }
+
+        string versionSegment = Path.GetFileName(runtimeDirectory.TrimEnd('/', '\\'));
+        return TryParseVersionPrefix(versionSegment)?.Major;
+    }
+
+    // Modern TFMs ("net8.0", "net10.0-windows") always carry a dot after the major version; older
+    // monikers without one ("net48", "netcoreapp3.1" has a dot but isn't "netN") are intentionally
+    // left unrecognized rather than misparsed into an unrelated major number.
+    private static int? TryParseMajorFromTargetFrameworkMoniker(string? targetFrameworkMoniker)
+    {
+        if (string.IsNullOrWhiteSpace(targetFrameworkMoniker))
+        {
+            return null;
+        }
+
+        string trimmed = targetFrameworkMoniker.Trim();
+        if (!trimmed.StartsWith("net", StringComparison.OrdinalIgnoreCase))
+        {
+            return null;
+        }
+
+        string remainder = trimmed[3..];
+        int dotIndex = remainder.IndexOf('.');
+        if (dotIndex < 0)
+        {
+            return null;
+        }
+
+        return int.TryParse(remainder[..dotIndex], out int major) ? major : null;
+    }
+
     private static string? ResolveFrameworkDirectory(
-        string frameworkName, IReadOnlyList<string> sharedRoots, IArchitectureFileSystem fileSystem)
+        string frameworkName, IReadOnlyList<string> sharedRoots, IArchitectureFileSystem fileSystem,
+        int? anchorMajorVersion)
     {
         foreach (string sharedRoot in sharedRoots)
         {
@@ -105,24 +159,32 @@ internal static class ArchitectureSharedFrameworkResolver
                 continue;
             }
 
-            string? highestVersionDirectory = null;
-            Version? highestVersion = null;
+            (string Directory, Version Version)? bestStable = null;
+            (string Directory, Version Version)? bestPrerelease = null;
             foreach (string versionDirectory in
                      fileSystem.EnumerateDirectories(frameworkRoot, "*", SearchOption.TopDirectoryOnly))
             {
-                Version? version = TryParseVersionPrefix(Path.GetFileName(versionDirectory.TrimEnd('/', '\\')));
-                if (version is null || (highestVersion is not null && version <= highestVersion))
+                string versionName = Path.GetFileName(versionDirectory.TrimEnd('/', '\\'));
+                Version? version = TryParseVersionPrefix(versionName);
+                if (version is null || (anchorMajorVersion is int major && version.Major != major))
                 {
                     continue;
                 }
 
-                highestVersion = version;
-                highestVersionDirectory = versionDirectory;
+                bool isPrerelease = versionName.Contains('-', StringComparison.Ordinal);
+                ref (string Directory, Version Version)? best = ref isPrerelease ? ref bestPrerelease : ref bestStable;
+                if (best is null || version > best.Value.Version)
+                {
+                    best = (versionDirectory, version);
+                }
             }
 
-            if (highestVersionDirectory is not null)
+            // A release build is always preferred over a prerelease one, even a numerically higher
+            // prerelease; a prerelease is only used when it is the sole candidate for this framework.
+            string? selected = (bestStable ?? bestPrerelease)?.Directory;
+            if (selected is not null)
             {
-                return highestVersionDirectory;
+                return selected;
             }
         }
 

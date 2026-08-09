@@ -181,7 +181,7 @@ public sealed class ArchitectureAssemblyResolutionService : IArchitectureAssembl
         // path is out of scope.
         IEnumerable<string> sharedFrameworkProbingPaths = forceIsolatedLoading
             ? ArchitectureSharedFrameworkResolver.ResolveProbingPaths(
-                document.Analysis.SharedFrameworks, fileSystem, environment)
+                document.Analysis.SharedFrameworks, document.Analysis.TargetFramework, fileSystem, environment)
             : Array.Empty<string>();
         IReadOnlyList<string> probingPaths = ResolveProbingPaths(document, repositoryRoot, fileSystem, environment)
             .Concat(additionalProbingPaths ?? Array.Empty<string>())
