@@ -54,7 +54,8 @@ internal sealed class ArchitectureContractExecutionContext
         string? targetType = null,
         string? sourceMember = null,
         string? targetMember = null,
-        string? configuration = null)
+        string? configuration = null,
+        Action<ArchitectureBaselineCandidate>? observeCandidate = null)
     {
         ArchitectureViolationIdentity? liveIdentity = BuildLiveIdentity(
             sourceType, forbiddenReference, sourceAssembly, targetAssembly, targetType, sourceMember, targetMember, configuration);
@@ -66,7 +67,14 @@ internal sealed class ArchitectureContractExecutionContext
             var candidate = new ArchitectureBaselineCandidate(
                 _contractGroup!, ContractId, sourceType, forbiddenReference, liveIdentity);
             _findingIdentityCandidates.Add(candidate);
-            _baselineCandidates?.Add(candidate);
+            if (observeCandidate == null)
+            {
+                _baselineCandidates?.Add(candidate);
+            }
+            else
+            {
+                observeCandidate(candidate);
+            }
         }
 
         return ignored;
