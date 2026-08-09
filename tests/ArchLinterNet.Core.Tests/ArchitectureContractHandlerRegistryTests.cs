@@ -266,6 +266,95 @@ public sealed class ArchitectureContractHandlerRegistryTests
     }
 
     [Test]
+    public void CheckCycleContract_AcyclicLayers_DoNotProduceBaselineCandidates()
+    {
+        var document = new ArchitectureContractDocument
+        {
+            Version = 1,
+            Name = "Test",
+            Layers = new Dictionary<string, ArchitectureLayer>
+            {
+                ["upper"] = new() { Namespace = "HandlerRegistryLayerFixtures.Upper" },
+                ["lower"] = new() { Namespace = "HandlerRegistryLayerFixtures.Lower" },
+            },
+            Analysis = new ArchitectureAnalysisConfiguration { TargetAssemblies = new List<string>() },
+            Contracts = new ArchitectureContractGroups
+            {
+                StrictCycles =
+                [
+                    new ArchitectureCycleContract
+                    {
+                        Name = "Acyclic cycle check",
+                        Id = "acyclic-cycle-check",
+                        Layers = ["upper", "lower"],
+                    },
+                ],
+            },
+        };
+
+        var runner = new ArchitectureContractRunner(CreateContext(_layerFixtureAssembly), document);
+
+        IReadOnlyCollection<string> cycles = runner.CheckCycleContract(document.Contracts.StrictCycles[0]);
+        ArchitectureBaselineDocument baseline = new ArchitectureBaselineGenerator().Generate(document, runner.BaselineCandidates);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(cycles, Is.Empty);
+            Assert.That(runner.BaselineCandidates, Is.Empty);
+            Assert.That(baseline.Baseline.StrictCycles, Is.Empty);
+        });
+    }
+
+    [Test]
+    public void CheckCycleContract_CyclicLayers_ProduceExactCycleEdgeCandidates()
+    {
+        var document = new ArchitectureContractDocument
+        {
+            Version = 1,
+            Name = "Test",
+            Layers = new Dictionary<string, ArchitectureLayer>
+            {
+                ["layerA"] = new() { Namespace = "HandlerRegistryCycleFixtures.LayerA" },
+                ["layerB"] = new() { Namespace = "HandlerRegistryCycleFixtures.LayerB" },
+            },
+            Analysis = new ArchitectureAnalysisConfiguration { TargetAssemblies = new List<string>() },
+            Contracts = new ArchitectureContractGroups
+            {
+                StrictCycles =
+                [
+                    new ArchitectureCycleContract
+                    {
+                        Name = "Cycle",
+                        Id = "cycle-check",
+                        Layers = ["layerA", "layerB"],
+                    },
+                ],
+            },
+        };
+
+        Assembly fixtureAssembly = typeof(HandlerRegistryCycleFixtures.LayerA.ServiceA).Assembly;
+        var runner = new ArchitectureContractRunner(CreateContext(fixtureAssembly), document);
+
+        IReadOnlyCollection<string> cycles = runner.CheckCycleContract(document.Contracts.StrictCycles[0]);
+        ArchitectureBaselineCandidate[] candidates = runner.BaselineCandidates.ToArray();
+        ArchitectureBaselineDocument baseline = new ArchitectureBaselineGenerator().Generate(document, candidates);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(cycles, Does.Contain("layerA -> layerB -> layerA"));
+            Assert.That(candidates, Has.Length.EqualTo(2));
+            Assert.That(candidates.Select(candidate => candidate.ContractGroup), Is.EqualTo(["strict_cycles", "strict_cycles"]));
+            Assert.That(candidates.Select(candidate => candidate.ContractId), Is.EqualTo(["cycle-check", "cycle-check"]));
+            Assert.That(candidates.Select(candidate => candidate.SourceType), Is.EqualTo(
+                [typeof(HandlerRegistryCycleFixtures.LayerA.ServiceA).FullName, typeof(HandlerRegistryCycleFixtures.LayerB.ServiceB).FullName]));
+            Assert.That(candidates.Select(candidate => candidate.ForbiddenReference), Is.EqualTo(
+                [typeof(HandlerRegistryCycleFixtures.LayerB.ServiceB).FullName, typeof(HandlerRegistryCycleFixtures.LayerA.ServiceA).FullName]));
+            Assert.That(candidates, Has.All.Matches<ArchitectureBaselineCandidate>(candidate => candidate.Identity != null));
+            Assert.That(baseline.Baseline.StrictCycles.Single().IgnoredViolations, Has.Count.EqualTo(2));
+        });
+    }
+
+    [Test]
     public void AllowOnlyHandler_MatchesDirectRunnerCheck()
     {
         var document = CreateLayerFixtureDocument("layerUpper", "layerLower", new List<string> { "layerUpper", "layerLower" });

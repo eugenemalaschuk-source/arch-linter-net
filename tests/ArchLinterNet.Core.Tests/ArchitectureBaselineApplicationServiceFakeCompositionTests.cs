@@ -344,7 +344,7 @@ public sealed partial class ArchitectureBaselineApplicationServiceFakeCompositio
     }
 
     [Test]
-    public void Verify_InSync_WhenOnlyNewDebtPresent()
+    public void Verify_OutOfSync_WhenNewDebtPresent()
     {
         var document = CreateDocumentWith_knownRule();
         var runnerSetupService = new FakeRunnerSetupService { DocumentToReturn = document };
@@ -391,7 +391,7 @@ public sealed partial class ArchitectureBaselineApplicationServiceFakeCompositio
         });
 
         Assert.That(outcome.Succeeded, Is.True);
-        Assert.That(outcome.InSync, Is.True);
+        Assert.That(outcome.InSync, Is.False);
         Assert.That(outcome.New.Single().SourceType, Is.EqualTo("SrcNew"));
     }
 

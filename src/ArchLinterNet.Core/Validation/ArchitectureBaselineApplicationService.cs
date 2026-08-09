@@ -203,7 +203,8 @@ public sealed class ArchitectureBaselineApplicationService(
 
         // Ambiguity is out-of-sync too: one entry standing in for several distinct violations
         // suppresses more than it was reviewed for.
-        bool inSync = comparison.Resolved.Count == 0
+        bool inSync = comparison.New.Count == 0
+            && comparison.Resolved.Count == 0
             && comparison.ConfigurationErrors.Count == 0
             && comparison.Ambiguous.Count == 0;
 
