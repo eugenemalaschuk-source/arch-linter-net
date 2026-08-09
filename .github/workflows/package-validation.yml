@@ -101,7 +101,6 @@ jobs:
             analysis-profile.schema.json \
             api-snapshot.schema.json \
             baseline.schema.json \
-            compatibility-manifest.json \
             normalized-finding.schema.json; do
             required_entry="contentFiles/any/any/schema/0.5.1/$required_schema"
             if ! printf '%s\n' "$core_listing" | grep -qxF "$required_entry"; then
@@ -111,10 +110,14 @@ jobs:
           done
 
           # policy-root/policy-fragment advanced to an independent 0.6.1 schema identity to add
-          # layers.*.overlaps_with; the frozen pre-overlaps_with 0.5.1 bytes are preserved in source
-          # control but are no longer packaged/registry-discoverable (see
-          # schema/0.5.1/compatibility-manifest.json).
+          # layers.*.overlaps_with. The manifest itself is release-qualified (its own $id/bytes are
+          # the immutable contract), so it also advances to a new 0.6.1 generation rather than being
+          # edited in place; that generation still lists every unaffected schema at its existing
+          # 0.5.1 identity. The frozen pre-overlaps_with 0.5.1 policy-root/policy-fragment/manifest
+          # bytes are preserved in source control but are no longer packaged/registry-discoverable
+          # (see schema/0.5.1/compatibility-manifest.json and schema/0.6.1/compatibility-manifest.json).
           for required_schema in \
+            compatibility-manifest.json \
             dependencies.arch.fragment.schema.json \
             dependencies.arch.schema.json; do
             required_entry="contentFiles/any/any/schema/0.6.1/$required_schema"
@@ -188,7 +191,7 @@ jobs:
 
           unzip -p "$GITHUB_WORKSPACE/nupkg/$cli_nupkg" README.md > packaged-readme.md
           grep -qF '0.6.0 is the public adoption package line' packaged-readme.md
-          grep -qF 'immutable 0.5.1 `adoption-stabilization/v1` schema registry' packaged-readme.md
+          grep -qF '`adoption-stabilization/v1` schema registry' packaged-readme.md
           if grep -qF '0.5.1 is the single public adoption-stabilization release target' packaged-readme.md; then
             echo 'Packaged README contains stale 0.5.1 product-release wording.' >&2
             exit 1
