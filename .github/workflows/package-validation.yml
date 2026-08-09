@@ -102,10 +102,22 @@ jobs:
             api-snapshot.schema.json \
             baseline.schema.json \
             compatibility-manifest.json \
-            dependencies.arch.fragment.schema.json \
-            dependencies.arch.schema.json \
             normalized-finding.schema.json; do
             required_entry="contentFiles/any/any/schema/0.5.1/$required_schema"
+            if ! printf '%s\n' "$core_listing" | grep -qxF "$required_entry"; then
+              echo "Core package is missing release-matched schema '$required_entry'." >&2
+              exit 1
+            fi
+          done
+
+          # policy-root/policy-fragment advanced to an independent 0.6.1 schema identity to add
+          # layers.*.overlaps_with; the frozen pre-overlaps_with 0.5.1 bytes are preserved in source
+          # control but are no longer packaged/registry-discoverable (see
+          # schema/0.5.1/compatibility-manifest.json).
+          for required_schema in \
+            dependencies.arch.fragment.schema.json \
+            dependencies.arch.schema.json; do
+            required_entry="contentFiles/any/any/schema/0.6.1/$required_schema"
             if ! printf '%s\n' "$core_listing" | grep -qxF "$required_entry"; then
               echo "Core package is missing release-matched schema '$required_entry'." >&2
               exit 1
@@ -150,7 +162,7 @@ jobs:
           # The CLI's established --version contract uses the three-part assembly version,
           # while NuGet package versions may include a prerelease or build suffix.
           grep -qF "$cli_assembly_version" version.txt
-          grep -qx $'policy-root\tv1\thttps://archlinternet.dev/schema/0.5.1/dependencies.arch.schema.json\tschema/0.5.1/dependencies.arch.schema.json' schemas.txt
+          grep -qx $'policy-root\tv1\thttps://archlinternet.dev/schema/0.6.1/dependencies.arch.schema.json\tschema/0.6.1/dependencies.arch.schema.json' schemas.txt
           grep -qx $'normalized-finding\tv1\thttps://archlinternet.dev/schema/0.5.1/normalized-finding.schema.json\tschema/0.5.1/normalized-finding.schema.json' schemas.txt
           grep -qx $'analysis-cache\tv1\thttps://archlinternet.dev/schema/0.5.1/analysis-cache.schema.json\tschema/0.5.1/analysis-cache.schema.json' schemas.txt
           grep -qx $'analysis-profile\tv1\thttps://archlinternet.dev/schema/0.5.1/analysis-profile.schema.json\tschema/0.5.1/analysis-profile.schema.json' schemas.txt
@@ -160,7 +172,7 @@ jobs:
           ./tool/arch-linter-net schema print analysis-profile > printed-analysis-profile-schema.json
 
           core_nupkg=$(printf '%s\n' "$GITHUB_WORKSPACE"/nupkg/ArchLinterNet.Core.*.nupkg)
-          unzip -p "$core_nupkg" contentFiles/any/any/schema/0.5.1/dependencies.arch.schema.json > packaged-schema.json
+          unzip -p "$core_nupkg" contentFiles/any/any/schema/0.6.1/dependencies.arch.schema.json > packaged-schema.json
           unzip -p "$core_nupkg" contentFiles/any/any/schema/0.5.1/normalized-finding.schema.json > packaged-normalized-finding-schema.json
           unzip -p "$core_nupkg" contentFiles/any/any/schema/0.5.1/analysis-cache.schema.json > packaged-analysis-cache-schema.json
           unzip -p "$core_nupkg" contentFiles/any/any/schema/0.5.1/analysis-profile.schema.json > packaged-analysis-profile-schema.json
