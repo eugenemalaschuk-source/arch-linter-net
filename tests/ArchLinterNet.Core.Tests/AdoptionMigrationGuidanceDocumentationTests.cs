@@ -1,4 +1,6 @@
+using System.Text.RegularExpressions;
 using ArchLinterNet.Core.Resolution;
+using ArchLinterNet.Core.Schema;
 using NUnit.Framework;
 
 namespace ArchLinterNet.Core.Tests;
@@ -85,10 +87,42 @@ public sealed class AdoptionMigrationGuidanceDocumentationTests
             Assert.That(nav, Does.Contain("guides/migration-to-0-5-1.md"));
             Assert.That(nav, Does.Contain("guides/reference-entrypoints.md"));
             Assert.That(nav, Does.Contain("reference/release-notes-0-5-1.md"));
-            Assert.That(readme, Does.Contain("0.5.1 is the single public adoption-stabilization release target"));
+            Assert.That(readme, Does.Contain("0.6.0 is the public adoption package line"));
+            Assert.That(readme, Does.Contain("immutable 0.5.1 `adoption-stabilization/v1` schema registry"));
             Assert.That(readme, Does.Contain("Checkpoint A is internal evidence only"));
             Assert.That(releaseNotes, Does.Contain("0.5.1 is the single public adoption-stabilization release"));
             Assert.That(releaseNotes, Does.Contain("schema list"));
+        });
+    }
+
+    [Test]
+    public void PublicSchemaGuidance_MapsTheProductLineToOnlyShippedSchemaIdentities()
+    {
+        string root = RepositoryRoot();
+        string schemaReference = ReadDocumentation("reference/yaml-schema.md");
+        string cliReference = ReadDocumentation("cli/index.md");
+        string releaseProcess = ReadDocumentation("reference/release-process.md");
+        string readme = File.ReadAllText(Path.Combine(root, "README.md"));
+        string guidance = string.Join(Environment.NewLine, readme, schemaReference, cliReference, releaseProcess);
+        string normalizedGuidance = Regex.Replace(guidance, @"\s+", " ");
+        var registry = new PackagedSchemaRegistry();
+        var supportedIds = registry.List()
+            .Select(static schema => schema.SchemaId)
+            .ToHashSet(StringComparer.Ordinal);
+        string[] documentedIds = Regex.Matches(guidance,
+                @"https://archlinternet\.dev/schema/[^\s]+?\.schema\.json")
+            .Select(static match => match.Value)
+            .Distinct(StringComparer.Ordinal)
+            .ToArray();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(normalizedGuidance, Does.Contain("0.6.0 package line"));
+            Assert.That(normalizedGuidance, Does.Contain("0.5.1"));
+            Assert.That(normalizedGuidance, Does.Contain("independently from package SemVer"));
+            Assert.That(normalizedGuidance, Does.Contain("no `schema/0.6.0` identity is shipped"));
+            Assert.That(documentedIds, Is.Not.Empty);
+            Assert.That(documentedIds, Is.SubsetOf(supportedIds));
         });
     }
 

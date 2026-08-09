@@ -17,9 +17,12 @@ ArchLinterNet turns architectural decisions into executable contracts: layered b
 
 The goal is not just to lint dependencies. ArchLinterNet makes architecture rules explicit, reviewable, enforceable, and safe to evolve as a normal part of development.
 
-> Status: 0.5.1 is the single public adoption-stabilization release target.
+> Status: 0.6.0 is the public adoption package line. It intentionally ships
+> the immutable 0.5.1 `adoption-stabilization/v1` schema registry: schema
+> identities version persisted contracts independently from package SemVer.
 > Checkpoint A is internal evidence only; the packed-artifact Checkpoint B is
-> the release authorization gate. See the [0.5.1 migration guide](docs/guides/migration-to-0-5-1.md).
+> the release authorization gate. Use `arch-linter-net schema list` from the
+> installed package to discover the supported offline `$schema` identities.
 
 ## Why ArchLinterNet?
 
