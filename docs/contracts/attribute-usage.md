@@ -54,6 +54,8 @@ A member decorated with two different matching attributes produces two separate 
 
 A contract must declare at least one allow-list entry or at least one deny-list entry. A contract with neither is rejected at policy load time — it can never produce a violation.
 
+`allowed_only_in_namespaces` and `forbidden_in_namespaces` entries accept the same constrained glob grammar as a layer's `namespace` (a literal namespace, or `*` as one or more complete segments — see [Namespace-allowance contract fields](../policy-format/layers-and-namespaces.md#namespace-allowance-contract-fields-use-the-same-grammar)). An entry using unsupported wildcard syntax is rejected at policy load with an actionable error instead of silently matching nothing.
+
 Location (namespace/assembly) is always derived from the attribute's **enclosing type**, never the member itself — a method or field doesn't have its own namespace or assembly.
 
 If a contract declares both an allow-list and a deny-list and a single matched attribute usage fails both checks, exactly **one** violation is reported, described as `forbidden` (the more specific rule) rather than two.

@@ -95,6 +95,15 @@ Examples:
 - That same pattern does not match
   `MyCompany.Product.Features.Audio.Internal.Contracts`.
 
+`allowed_only_in_namespaces`, `forbidden_in_namespaces`, and
+`must_reside_in_namespaces` (see below) accept this exact same grammar — a
+literal namespace, or `*` as one or more complete segments, e.g.
+`allowed_only_in_namespaces: [MyCompany.Product.Modules.*.Composition]`. Do not
+author `**`, `?`, character classes, a partial-segment wildcard, or a bare/leading
+`*` in these fields either — an entry using unsupported syntax fails policy load
+with an actionable error instead of silently compiling into a pattern that
+matches nothing.
+
 Prefer narrow layers before broad aggregate layers. If a repository has modules
 such as `Sales`, `Billing`, and `Inventory`, model those modules directly before
 adding a broad `application` layer that hides cross-module coupling. Use glob

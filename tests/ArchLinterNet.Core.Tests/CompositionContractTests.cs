@@ -194,6 +194,52 @@ public sealed class CompositionContractTests
     }
 
     [Test]
+    public void CheckCompositionContract_AllowedOnlyInNamespacesGlobPattern_MatchesMiddleSegment()
+    {
+        var contract = new ArchitectureCompositionContract
+        {
+            Name = "glob-namespace-composition-boundary",
+            ForbiddenApis = new List<string> { GetServiceApi },
+            AllowedOnlyInNamespaces = new List<string> { "CompositionContractTestFixtures.Modules.*.Composition" }
+        };
+        var document = CreateDocument(contract);
+        var runner = new ArchitectureContractRunner(CreateContext(), document);
+
+        var violations = runner.Session.CheckCompositionContract(contract);
+
+        Assert.That(violations.Any(v =>
+            v.SourceType == "CompositionContractTestFixtures.Modules.Orders.Composition.OrdersCompositionRoot"), Is.False,
+            "The glob pattern must match the resolved 'Orders' segment and treat the call site as inside the boundary.");
+        Assert.That(violations.Any(v =>
+            v.SourceType == "CompositionContractTestFixtures.Application.ServiceLocatorLeak"), Is.True,
+            "A namespace the glob pattern does not match must still be reported.");
+    }
+
+    [Test]
+    public void Composition_AllowedOnlyInNamespacesPartialSegmentWildcard_ThrowsActionableError()
+    {
+        string policyPath = WritePolicy("""
+            version: 1
+            name: Test
+            analysis:
+              target_assemblies: [ArchLinterNet.Core]
+            contracts:
+              strict_composition:
+                - name: invalid-namespace-glob
+                  forbidden_apis: [System.IServiceProvider.GetService]
+                  allowed_only_in_namespaces: [Example.Modules.*Bad]
+                  reason: Partial segment wildcard is unsupported.
+            """);
+
+        InvalidOperationException ex = Assert.Throws<InvalidOperationException>(() =>
+            new ArchitecturePolicyDocumentLoader().Load(policyPath))!;
+
+        Assert.That(ex.Message, Does.Contain("invalid-namespace-glob"));
+        Assert.That(ex.Message, Does.Contain("allowed_only_in_namespaces"));
+        Assert.That(ex.Message, Does.Contain("Partial segment"));
+    }
+
+    [Test]
     public void CheckCompositionContract_TypeWithNoForbiddenCalls_ProducesNoViolation()
     {
         var contract = new ArchitectureCompositionContract

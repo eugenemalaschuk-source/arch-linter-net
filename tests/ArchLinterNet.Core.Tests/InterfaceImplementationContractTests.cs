@@ -16,6 +16,7 @@ public sealed class InterfaceImplementationContractTests
     private const string PrefixedPortsNamespace = "InterfaceImplementationContractTestFixtures.Ports.Prefixed.";
     private const string AdaptersNamespace = "InterfaceImplementationContractTestFixtures.Adapters";
     private const string DomainNamespace = "InterfaceImplementationContractTestFixtures.Domain";
+    private const string ModulePortName = "InterfaceImplementationContractTestFixtures.ModulePorts.IModulePort";
 
     private string _tempDir = null!;
 
@@ -141,6 +142,71 @@ public sealed class InterfaceImplementationContractTests
         Assert.That(violations.All(v => (v.Payload as InterfaceImplementationPayload)?.ImplementationKind == "forbidden"), Is.True);
         Assert.That(violations.All(v =>
             v.SourceType.StartsWith(DomainNamespace, StringComparison.Ordinal)), Is.True);
+    }
+
+    [Test]
+    public void CheckInterfaceImplementationContract_AllowedOnlyInNamespacesGlobPattern_MatchesMiddleSegment()
+    {
+        var contract = new ArchitectureInterfaceImplementationContract
+        {
+            Name = "port-allowed-namespace-glob",
+            Interfaces = new List<string> { ModulePortName },
+            AllowedOnlyInNamespaces = new List<string> { "InterfaceImplementationContractTestFixtures.Modules.*.Adapters" }
+        };
+        var document = CreateDocument(contract);
+        var runner = new ArchitectureContractRunner(CreateContext(), document);
+
+        var violations = runner.Session.CheckInterfaceImplementationContract(contract);
+
+        Assert.That(violations.Any(v =>
+            v.SourceType == "InterfaceImplementationContractTestFixtures.Modules.Orders.Adapters.OrdersPaymentAdapter"), Is.False);
+        Assert.That(violations.Any(v =>
+            v.SourceType == "InterfaceImplementationContractTestFixtures.Modules.Orders.Other.OrdersOtherImplementation"), Is.True);
+    }
+
+    [Test]
+    public void CheckInterfaceImplementationContract_ForbiddenInNamespacesGlobPattern_MatchesMiddleSegment()
+    {
+        var contract = new ArchitectureInterfaceImplementationContract
+        {
+            Name = "port-forbidden-namespace-glob",
+            Interfaces = new List<string> { ModulePortName },
+            ForbiddenInNamespaces = new List<string> { "InterfaceImplementationContractTestFixtures.Modules.*.Domain" }
+        };
+        var document = CreateDocument(contract);
+        var runner = new ArchitectureContractRunner(CreateContext(), document);
+
+        var violations = runner.Session.CheckInterfaceImplementationContract(contract);
+
+        Assert.That(violations.Any(v =>
+            v.SourceType == "InterfaceImplementationContractTestFixtures.Modules.Orders.Domain.OrdersDomainPaymentImplementation"
+            && (v.Payload as InterfaceImplementationPayload)?.ImplementationKind == "forbidden"), Is.True);
+        Assert.That(violations.Any(v =>
+            v.SourceType == "InterfaceImplementationContractTestFixtures.Modules.Orders.Other.OrdersOtherImplementation"), Is.False);
+    }
+
+    [Test]
+    public void InterfaceImplementation_AllowedOnlyInNamespacesEmptySegment_ThrowsActionableError()
+    {
+        string policyPath = WritePolicy($"""
+            version: 1
+            name: Test
+            analysis:
+              target_assemblies: [{AssemblyName}]
+            contracts:
+              strict_interface_implementation:
+                - name: invalid-namespace-glob
+                  interfaces: [{PaymentPortName}]
+                  allowed_only_in_namespaces: ["Example..Adapters"]
+                  reason: Empty segment is unsupported.
+            """);
+
+        InvalidOperationException ex = Assert.Throws<InvalidOperationException>(() =>
+            new ArchitecturePolicyDocumentLoader().Load(policyPath))!;
+
+        Assert.That(ex.Message, Does.Contain("invalid-namespace-glob"));
+        Assert.That(ex.Message, Does.Contain("allowed_only_in_namespaces"));
+        Assert.That(ex.Message, Does.Contain("Empty segment"));
     }
 
     [Test]

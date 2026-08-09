@@ -15,6 +15,7 @@ public sealed class AttributeUsageContractTests
     private const string TestMarkerAttributeName = "AttributeUsageContractTestFixtures.Markers.TestMarkerAttribute";
     private const string SecondMarkerAttributeName = "AttributeUsageContractTestFixtures.Markers.SecondMarkerAttribute";
     private const string PrefixedNamespace = "AttributeUsageContractTestFixtures.Markers.Prefixed.";
+    private const string ModuleMarkerAttributeName = "AttributeUsageContractTestFixtures.ModuleMarkers.ModuleMarkerAttribute";
 
     private string _tempDir = null!;
 
@@ -144,6 +145,95 @@ public sealed class AttributeUsageContractTests
         Assert.That(violations.All(v => (v.Payload as AttributeUsagePayload)?.AttributeUsageKind == "forbidden"), Is.True);
         Assert.That(violations.All(v =>
             v.SourceType.StartsWith("AttributeUsageContractTestFixtures.Forbidden", StringComparison.Ordinal)), Is.True);
+    }
+
+    [Test]
+    public void CheckAttributeUsageContract_AllowedOnlyInNamespacesGlobPattern_MatchesMiddleSegment()
+    {
+        var contract = new ArchitectureAttributeUsageContract
+        {
+            Name = "marker-allowed-namespace-glob",
+            Attributes = new List<string> { ModuleMarkerAttributeName },
+            AllowedOnlyInNamespaces = new List<string> { "AttributeUsageContractTestFixtures.Modules.*.Allowed" }
+        };
+        var document = CreateDocument(contract);
+        var runner = new ArchitectureContractRunner(CreateContext(), document);
+
+        var violations = runner.Session.CheckAttributeUsageContract(contract);
+
+        Assert.That(violations.Any(v =>
+            v.SourceType == "AttributeUsageContractTestFixtures.Modules.Orders.Allowed.OrdersAllowedHolder"), Is.False);
+        Assert.That(violations.Any(v =>
+            v.SourceType == "AttributeUsageContractTestFixtures.Modules.Orders.Other.OrdersOtherHolder"), Is.True);
+    }
+
+    [Test]
+    public void CheckAttributeUsageContract_ForbiddenInNamespacesGlobPattern_MatchesMiddleSegment()
+    {
+        var contract = new ArchitectureAttributeUsageContract
+        {
+            Name = "marker-forbidden-namespace-glob",
+            Attributes = new List<string> { ModuleMarkerAttributeName },
+            ForbiddenInNamespaces = new List<string> { "AttributeUsageContractTestFixtures.Modules.*.Forbidden" }
+        };
+        var document = CreateDocument(contract);
+        var runner = new ArchitectureContractRunner(CreateContext(), document);
+
+        var violations = runner.Session.CheckAttributeUsageContract(contract);
+
+        Assert.That(violations.Any(v =>
+            v.SourceType == "AttributeUsageContractTestFixtures.Modules.Orders.Forbidden.OrdersForbiddenHolder"
+            && (v.Payload as AttributeUsagePayload)?.AttributeUsageKind == "forbidden"), Is.True);
+        Assert.That(violations.Any(v =>
+            v.SourceType == "AttributeUsageContractTestFixtures.Modules.Orders.Other.OrdersOtherHolder"), Is.False);
+    }
+
+    [Test]
+    public void AttributeUsage_AllowedOnlyInNamespacesLeadingWildcard_ThrowsActionableError()
+    {
+        string policyPath = WritePolicy($"""
+            version: 1
+            name: Test
+            analysis:
+              target_assemblies: [{AssemblyName}]
+            contracts:
+              strict_attribute_usage:
+                - name: invalid-namespace-glob
+                  attributes: [{TestMarkerAttributeName}]
+                  allowed_only_in_namespaces: ["*.Allowed"]
+                  reason: Leading wildcard is unsupported.
+            """);
+
+        InvalidOperationException ex = Assert.Throws<InvalidOperationException>(() =>
+            new ArchitecturePolicyDocumentLoader().Load(policyPath))!;
+
+        Assert.That(ex.Message, Does.Contain("invalid-namespace-glob"));
+        Assert.That(ex.Message, Does.Contain("allowed_only_in_namespaces"));
+        Assert.That(ex.Message, Does.Contain("Leading wildcard"));
+    }
+
+    [Test]
+    public void AttributeUsage_ForbiddenInNamespacesBareWildcard_ThrowsActionableError()
+    {
+        string policyPath = WritePolicy($"""
+            version: 1
+            name: Test
+            analysis:
+              target_assemblies: [{AssemblyName}]
+            contracts:
+              strict_attribute_usage:
+                - name: invalid-forbidden-namespace-glob
+                  attributes: [{TestMarkerAttributeName}]
+                  forbidden_in_namespaces: ["*"]
+                  reason: Bare wildcard is unsupported.
+            """);
+
+        InvalidOperationException ex = Assert.Throws<InvalidOperationException>(() =>
+            new ArchitecturePolicyDocumentLoader().Load(policyPath))!;
+
+        Assert.That(ex.Message, Does.Contain("invalid-forbidden-namespace-glob"));
+        Assert.That(ex.Message, Does.Contain("forbidden_in_namespaces"));
+        Assert.That(ex.Message, Does.Contain("Bare wildcard"));
     }
 
     [Test]

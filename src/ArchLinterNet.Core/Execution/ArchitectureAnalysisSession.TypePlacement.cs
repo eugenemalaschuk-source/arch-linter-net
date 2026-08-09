@@ -160,7 +160,7 @@ public sealed partial class ArchitectureAnalysisSession
         string actualNamespace,
         string actualAssemblyName,
         IReadOnlyList<ArchitectureLayer> allowedLayers,
-        IReadOnlyList<string> allowedNamespacePrefixes,
+        IReadOnlyList<string> allowedNamespacePatterns,
         HashSet<string> allowedAssemblyNames)
     {
         if (allowedLayers.Any(layer => ArchitectureLayerResolver.MatchesNamespace(layer, actualNamespace)))
@@ -168,7 +168,7 @@ public sealed partial class ArchitectureAnalysisSession
             return true;
         }
 
-        if (allowedNamespacePrefixes.Any(prefix => ArchitectureLayerResolver.MatchesPrefix(actualNamespace, prefix)))
+        if (allowedNamespacePatterns.Any(pattern => ArchitectureLayerResolver.MatchesNamespacePattern(actualNamespace, pattern)))
         {
             return true;
         }

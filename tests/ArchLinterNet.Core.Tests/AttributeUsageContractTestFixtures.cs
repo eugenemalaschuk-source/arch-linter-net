@@ -17,6 +17,15 @@ namespace AttributeUsageContractTestFixtures.Markers.Prefixed
     public sealed class PrefixedMarkerAttribute : Attribute;
 }
 
+// Distinct from TestMarkerAttribute so glob-pattern tests over Modules.* fixtures below don't
+// bleed into the closed-world "every TestMarker-tagged type in the assembly" assertions the
+// tests above already make.
+namespace AttributeUsageContractTestFixtures.ModuleMarkers
+{
+    [AttributeUsage(AttributeTargets.All)]
+    public sealed class ModuleMarkerAttribute : Attribute;
+}
+
 namespace AttributeUsageContractTestFixtures.Allowed
 {
     using AttributeUsageContractTestFixtures.Markers;
@@ -99,6 +108,35 @@ namespace AttributeUsageContractTestFixtures.Forbidden
         [TestMarker]
         public int MarkedField;
     }
+}
+
+// Nested under an extra "module" segment so allowed_only_in_namespaces/forbidden_in_namespaces
+// glob patterns such as "...Modules.*.Allowed"/"...Modules.*.Forbidden" (issue #443) have a
+// middle segment to consume.
+namespace AttributeUsageContractTestFixtures.Modules.Orders.Allowed
+{
+    using AttributeUsageContractTestFixtures.ModuleMarkers;
+
+    [ModuleMarker]
+    public sealed class OrdersAllowedHolder;
+}
+
+namespace AttributeUsageContractTestFixtures.Modules.Orders.Forbidden
+{
+    using AttributeUsageContractTestFixtures.ModuleMarkers;
+
+    [ModuleMarker]
+    public sealed class OrdersForbiddenHolder;
+}
+
+// Outside every Modules.*.Allowed/Modules.*.Forbidden glob boundary — the negative control for
+// both glob-pattern tests.
+namespace AttributeUsageContractTestFixtures.Modules.Orders.Other
+{
+    using AttributeUsageContractTestFixtures.ModuleMarkers;
+
+    [ModuleMarker]
+    public sealed class OrdersOtherHolder;
 }
 
 #pragma warning restore CS0649
