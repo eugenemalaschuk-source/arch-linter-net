@@ -144,7 +144,9 @@ jobs:
 
           pushd "$smoke_dir" >/dev/null
           dotnet tool install ArchLinterNet.Cli --tool-path tool --add-source "$GITHUB_WORKSPACE/nupkg" --version "$cli_version" --ignore-failed-sources
+          ./tool/arch-linter-net --version > version.txt
           ./tool/arch-linter-net schema list > schemas.txt
+          grep -qF "$cli_version" version.txt
           grep -qx $'policy-root\tv1\thttps://archlinternet.dev/schema/0.5.1/dependencies.arch.schema.json\tschema/0.5.1/dependencies.arch.schema.json' schemas.txt
           grep -qx $'normalized-finding\tv1\thttps://archlinternet.dev/schema/0.5.1/normalized-finding.schema.json\tschema/0.5.1/normalized-finding.schema.json' schemas.txt
           grep -qx $'analysis-cache\tv1\thttps://archlinternet.dev/schema/0.5.1/analysis-cache.schema.json\tschema/0.5.1/analysis-cache.schema.json' schemas.txt
@@ -168,6 +170,18 @@ jobs:
           sha256sum printed-analysis-cache-schema.json
           sha256sum printed-analysis-profile-schema.json
           popd >/dev/null
+
+          unzip -p "$GITHUB_WORKSPACE/nupkg/$cli_nupkg" README.md > packaged-readme.md
+          grep -qF '0.6.0 is the public adoption package line' packaged-readme.md
+          grep -qF 'immutable 0.5.1 `adoption-stabilization/v1` schema registry' packaged-readme.md
+          if grep -qF '0.5.1 is the single public adoption-stabilization release target' packaged-readme.md; then
+            echo 'Packaged README contains stale 0.5.1 product-release wording.' >&2
+            exit 1
+          fi
+          if grep -qF '/schema/0.6.0/' "$smoke_dir/schemas.txt"; then
+            echo 'Installed schema list advertises an unsupported 0.6.0 schema identity.' >&2
+            exit 1
+          fi
 
       - name: External consumer smoke test
         shell: bash

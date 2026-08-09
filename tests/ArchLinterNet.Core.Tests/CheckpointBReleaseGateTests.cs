@@ -11,7 +11,7 @@ namespace ArchLinterNet.Core.Tests;
 public sealed partial class CheckpointBReleaseGateTests
 {
     private const string CandidateVersionEnvironmentVariable = "CHECKPOINT_B_CANDIDATE_VERSION";
-    private const string DefaultCandidateVersion = "0.5.1";
+    private const string DefaultCandidateVersion = "0.6.0";
     private static readonly string[] _packageIds =
         ["ArchLinterNet.CEL", "ArchLinterNet.Cli", "ArchLinterNet.Core", "ArchLinterNet.Testing"];
 

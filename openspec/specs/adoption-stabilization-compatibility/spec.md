@@ -37,15 +37,19 @@ The system SHALL publish one `adoption-stabilization/v1` registry for 0.5.1 that
 | Analysis profile | `analysis-profile/v1` | writes deterministic counters and optional measurements; the package declares write-only support until a public reader exists |
 | Compatibility registry | `adoption-stabilization/v1` | writes the release-matched registry |
 
-Packaged JSON Schemas and text-format contracts SHALL use immutable release-qualified ids under `https://archlinternet.dev/schema/0.5.1/` and SHALL be shipped in the CLI and applicable NuGet packages. Unversioned web schema URLs MAY remain convenience aliases but SHALL NOT be the compatibility source of truth.
+The 0.6.0 product package line SHALL ship and document this registry as an independently versioned immutable compatibility contract. Packaged JSON Schemas and text-format contracts SHALL use immutable release-qualified ids under `https://archlinternet.dev/schema/0.5.1/` and SHALL be shipped in the CLI and applicable NuGet packages. Unversioned web schema URLs MAY remain convenience aliases but SHALL NOT be the compatibility source of truth.
 
 #### Scenario: Schema is consumed offline
-- **WHEN** an editor, pre-commit hook, or CI job has the 0.5.1 package but no network access
+- **WHEN** an editor, pre-commit hook, or CI job has the 0.6.0 package but no network access
 - **THEN** it can discover and validate every shipped 0.5.1 document format from packaged resources and the registry
 
 #### Scenario: Future format changes equality
 - **WHEN** a future release changes a required field, equality rule, discriminated union, or canonicalization rule
 - **THEN** it introduces a new logical/document version or an explicitly compatible additive extension instead of silently reinterpreting a 0.5.1 version
+
+#### Scenario: Product package retains an unchanged compatibility registry
+- **WHEN** an adopter installs the 0.6.0 CLI package
+- **THEN** its README and release guidance identify the embedded 0.5.1 schema registry as intentionally independent from the package SemVer
 
 ### Requirement: 0.5.0 compatibility and migration are explicit
 The system SHALL preserve supported 0.5.0 policy meaning unless a 0.5.1 feature is explicitly opted into or a documented correctness fix requires requalification. Existing policy YAML without new fields SHALL remain valid. Baseline v1 SHALL retain its legacy exact matching semantics and SHALL never be silently reinterpreted as baseline v2. Changed baseline, API snapshot, and diagnostic formats SHALL have explicit generate, migrate, update, or recapture guidance.
