@@ -198,9 +198,20 @@ public sealed class ArchitectureProjectDiscoveryService : IArchitectureProjectDi
             return;
         }
 
-        if (!TryResolveOutput(projectFile, analysis, _fileSystem, out string outputDirectory, out ArchitectureProjectDiscoveryDiagnostic? diagnostic))
+        if (!TryResolveOutput(projectFile, analysis, _fileSystem, out string outputDirectory,
+                out ArchitectureProjectDiscoveryDiagnostic? diagnostic, out string? staleArtifactPath))
         {
             diagnostics.Add(diagnostic!);
+
+            // A stale build output is not safe to scan, but its physical path is still real evidence
+            // for build-state preflight: without it, preflight cannot tell "stale" from "missing" and
+            // misreports MissingArtifact. Withholding it from targetAssemblyNames/assemblySearchPaths
+            // keeps ordinary scanning from consuming the stale bytes.
+            if (staleArtifactPath != null)
+            {
+                resolvedAssemblyPaths[projectFile.AssemblyName] = staleArtifactPath;
+            }
+
             return;
         }
 
@@ -239,10 +250,12 @@ public sealed class ArchitectureProjectDiscoveryService : IArchitectureProjectDi
         ArchitectureAnalysisConfiguration analysis,
         IArchitectureFileSystem fileSystem,
         out string outputDirectory,
-        out ArchitectureProjectDiscoveryDiagnostic? diagnostic)
+        out ArchitectureProjectDiscoveryDiagnostic? diagnostic,
+        out string? staleArtifactPath)
     {
         outputDirectory = string.Empty;
         diagnostic = null;
+        staleArtifactPath = null;
         string projectDirectory = Path.GetDirectoryName(projectFile.AbsolutePath) ?? string.Empty;
         string configuration = string.IsNullOrWhiteSpace(analysis.Configuration) ? "Debug" : analysis.Configuration;
 
@@ -257,7 +270,8 @@ public sealed class ArchitectureProjectDiscoveryService : IArchitectureProjectDi
                 return false;
             }
 
-            return FinishResolve(projectFile, projectDirectory, candidatePath, fileSystem, out outputDirectory, out diagnostic);
+            return FinishResolve(
+                projectFile, projectDirectory, candidatePath, fileSystem, out outputDirectory, out diagnostic, out staleArtifactPath);
         }
 
         List<(string Framework, string Directory, bool HasOutput)> candidates = projectFile.TargetFrameworks
@@ -274,7 +288,9 @@ public sealed class ArchitectureProjectDiscoveryService : IArchitectureProjectDi
 
         if (withOutput.Count == 1)
         {
-            return FinishResolve(projectFile, projectDirectory, withOutput[0].Directory, fileSystem, out outputDirectory, out diagnostic);
+            return FinishResolve(
+                projectFile, projectDirectory, withOutput[0].Directory, fileSystem, out outputDirectory, out diagnostic,
+                out staleArtifactPath);
         }
 
         string checkedList = string.Join(", ", candidates.Select(candidate =>
@@ -300,10 +316,12 @@ public sealed class ArchitectureProjectDiscoveryService : IArchitectureProjectDi
         string candidateOutputDirectory,
         IArchitectureFileSystem fileSystem,
         out string outputDirectory,
-        out ArchitectureProjectDiscoveryDiagnostic? diagnostic)
+        out ArchitectureProjectDiscoveryDiagnostic? diagnostic,
+        out string? staleArtifactPath)
     {
         outputDirectory = string.Empty;
         diagnostic = null;
+        staleArtifactPath = null;
         string dllPath = Path.Combine(candidateOutputDirectory, $"{projectFile.AssemblyName}.dll");
         DateTime dllWriteTimeUtc = fileSystem.GetLastWriteTimeUtc(dllPath);
         DateTime latestSourceWriteTimeUtc = GetLatestSourceWriteTimeUtc(projectDirectory, projectFile.AbsolutePath, fileSystem);
@@ -313,6 +331,7 @@ public sealed class ArchitectureProjectDiscoveryService : IArchitectureProjectDi
             diagnostic = new ArchitectureProjectDiscoveryDiagnostic(
                 "stale project build output", projectFile.AbsolutePath,
                 $"Project '{projectFile.AbsolutePath}' build output '{dllPath}' (last built {dllWriteTimeUtc:O}) is older than its sources (last changed {latestSourceWriteTimeUtc:O}). Rebuild the project before validating.");
+            staleArtifactPath = dllPath;
             return false;
         }
 
