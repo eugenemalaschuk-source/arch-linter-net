@@ -211,6 +211,71 @@ public sealed class ArchitecturePolicyEffectiveSchemaValidatorTests
         });
     }
 
+    [Test]
+    public void Validate_IndependentParentAndNestedFailures_RetainsBothDiagnostics()
+    {
+        const string Yaml = """
+            version: 1
+            name: Example
+            layers:
+              domain:
+                namespace: App.Domain
+              application:
+                namespace: App.Application
+            analysis:
+              target_assemblies: [App]
+            contracts:
+              strict:
+                - source: [domain]
+                  forbidden: [application]
+            """;
+        ArchitecturePolicyProvenanceIndex provenance = CreateProvenance(
+            ("/contracts/strict/0/source", "contracts.strict[0].source"));
+
+        ArchitecturePolicyImportException exception = Assert.Throws<ArchitecturePolicyImportException>(
+            () => ArchitecturePolicyEffectiveSchemaValidator.Validate(Yaml, provenance))!;
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(exception.Message, Does.Contain("name"));
+            Assert.That(exception.Message, Does.Contain("/contracts/strict/0/source"));
+            Assert.That(exception.Diagnostic!.Location!.YamlPath, Is.EqualTo("contracts.strict[0].source"));
+        });
+    }
+
+    [Test]
+    public void Validate_NamespaceClassificationOverrideMissingReason_SelectsNamespaceVariant()
+    {
+        const string Yaml = """
+            version: 1
+            name: Example
+            layers:
+              domain:
+                namespace: App.Domain
+            analysis:
+              target_assemblies: [App]
+            contracts:
+              strict: []
+            classification:
+              overrides:
+                - namespace: App.Domain
+                  role: domain
+            """;
+        ArchitecturePolicyProvenanceIndex provenance = CreateProvenance(
+            ("/classification/overrides/0", "classification.overrides[0]"));
+
+        ArchitecturePolicyImportException exception = Assert.Throws<ArchitecturePolicyImportException>(
+            () => ArchitecturePolicyEffectiveSchemaValidator.Validate(Yaml, provenance))!;
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(exception.Message, Does.Contain("reason"));
+            Assert.That(exception.Message, Does.Not.Contain("namespace_suffix"));
+            Assert.That(exception.Message, Does.Not.Contain("type"));
+            Assert.That(exception.Diagnostic!.Location!.YamlPath, Is.EqualTo("classification.overrides[0]"));
+        });
+    }
+
     private static ArchitecturePolicyProvenanceIndex CreateProvenance(
         params (string EffectivePath, string YamlPath)[] paths)
     {

@@ -50,12 +50,7 @@ internal static class ArchitecturePolicyEffectiveSchemaValidator
         var failures = new List<SchemaFailure>();
         CollectInvalidLeafFailures(results, failures);
 
-        IReadOnlyList<SchemaFailure> applicableFailures = SuppressInapplicableAlternatives(failures, instance);
-        return applicableFailures
-            .Where(failure => !applicableFailures.Any(other =>
-                other.Order != failure.Order
-                && IsDescendantOf(other.InstanceLocation, failure.InstanceLocation)))
-            .ToArray();
+        return SuppressInapplicableAlternatives(failures, instance);
     }
 
     private static void CollectInvalidLeafFailures(EvaluationResults result, List<SchemaFailure> failures)
@@ -73,6 +68,11 @@ internal static class ArchitecturePolicyEffectiveSchemaValidator
                 CollectInvalidLeafFailures(detail, failures);
             }
 
+            return;
+        }
+
+        if (IsCompositeWrapper(result))
+        {
             return;
         }
 
@@ -97,11 +97,8 @@ internal static class ArchitecturePolicyEffectiveSchemaValidator
             alternatives.AddRange(FindAlternatives(failure, instance));
         }
 
-        HashSet<(string CompositePath, string BranchPath)> applicable = alternatives
-            .Where(alternative => alternative.IsApplicable)
-            .Select(alternative => (alternative.CompositePath, alternative.BranchPath))
-            .ToHashSet();
-        HashSet<string> compositesWithApplicableBranch = applicable
+        HashSet<string> compositesWithApplicableBranch = alternatives
+            .Where(HasApplicableSiblingBranch)
             .Select(alternative => alternative.CompositePath)
             .ToHashSet(StringComparer.Ordinal);
 
@@ -124,30 +121,40 @@ internal static class ArchitecturePolicyEffectiveSchemaValidator
 
             string compositePath = ToPointer(segments.Take(index + 1));
             string branchPath = ToPointer(segments.Take(index + 2));
+            JsonArray? siblingBranches = FindNode(_schemaDocument.Value, compositePath) as JsonArray;
             JsonNode? branch = FindNode(_schemaDocument.Value, branchPath);
             JsonNode? branchInstance = FindNearestObject(instance, failure.InstanceLocation);
             yield return new SchemaAlternative(
                 failure.Order,
                 compositePath,
                 branchPath,
-                IsApplicableBranch(branch, branchInstance));
+                IsApplicableBranch(branch, siblingBranches, branchInstance),
+                branchInstance);
         }
     }
 
-    private static bool IsApplicableBranch(JsonNode? schema, JsonNode? instance)
+    private static bool HasApplicableSiblingBranch(SchemaAlternative alternative)
+    {
+        if (FindNode(_schemaDocument.Value, alternative.CompositePath) is not JsonArray siblingBranches)
+        {
+            return alternative.IsApplicable;
+        }
+
+        return siblingBranches.Any(branch =>
+            IsApplicableBranch(branch, siblingBranches, alternative.Instance));
+    }
+
+    private static bool IsApplicableBranch(JsonNode? schema, JsonArray? siblingBranches, JsonNode? instance)
     {
         if (schema is not JsonObject schemaObject)
         {
             return true;
         }
 
-        if (schemaObject["required"] is JsonArray required)
+        if (instance is JsonObject instanceObject
+            && SelectsDifferentRequiredVariant(schemaObject, siblingBranches, instanceObject))
         {
-            if (instance is not JsonObject instanceObject
-                || required.Any(property => property?.GetValue<string>() is string name && !instanceObject.ContainsKey(name)))
-            {
-                return false;
-            }
+            return false;
         }
 
         if (schemaObject["properties"] is JsonObject properties && instance is JsonObject objectInstance)
@@ -165,8 +172,36 @@ internal static class ArchitecturePolicyEffectiveSchemaValidator
         }
 
         return schemaObject["allOf"] is not JsonArray allOf
-            || allOf.All(child => IsApplicableBranch(child, instance));
+            || allOf.All(child => IsApplicableBranch(child, null, instance));
     }
+
+    private static bool SelectsDifferentRequiredVariant(
+        JsonObject branch,
+        JsonArray? siblingBranches,
+        JsonObject instance)
+    {
+        if (siblingBranches is null)
+        {
+            return false;
+        }
+
+        HashSet<string> branchRequired = GetRequiredProperties(branch).ToHashSet(StringComparer.Ordinal);
+        Dictionary<string, int> requiredCounts = siblingBranches
+            .OfType<JsonObject>()
+            .SelectMany(GetRequiredProperties)
+            .GroupBy(property => property, StringComparer.Ordinal)
+            .ToDictionary(group => group.Key, group => group.Count(), StringComparer.Ordinal);
+
+        return requiredCounts.Any(requirement =>
+            requirement.Value == 1
+            && instance.ContainsKey(requirement.Key)
+            && !branchRequired.Contains(requirement.Key));
+    }
+
+    private static IEnumerable<string> GetRequiredProperties(JsonObject schema) =>
+        schema["required"] is JsonArray required
+            ? required.Select(property => property?.GetValue<string>()).OfType<string>()
+            : Array.Empty<string>();
 
     private static JsonNode? FindNearestObject(JsonNode? instance, string instanceLocation)
     {
@@ -188,14 +223,23 @@ internal static class ArchitecturePolicyEffectiveSchemaValidator
         JsonNode? current = root;
         foreach (string segment in SplitPointer(pointer))
         {
-            current = current switch
+            if (segment == "$ref" && current is JsonObject referenceObject
+                && referenceObject["$ref"] is JsonValue referenceValue
+                && referenceValue.TryGetValue(out string? reference))
             {
-                JsonObject mapping when mapping.TryGetPropertyValue(segment, out JsonNode? child) => child,
-                JsonArray sequence when int.TryParse(segment, out int index)
-                                    && index >= 0
-                                    && index < sequence.Count => sequence[index],
-                _ => null
-            };
+                current = FindNode(root, reference);
+            }
+            else
+            {
+                current = current switch
+                {
+                    JsonObject mapping when mapping.TryGetPropertyValue(segment, out JsonNode? child) => child,
+                    JsonArray sequence when int.TryParse(segment, out int index)
+                                        && index >= 0
+                                        && index < sequence.Count => sequence[index],
+                    _ => null
+                };
+            }
             if (current is null)
             {
                 return null;
@@ -205,16 +249,27 @@ internal static class ArchitecturePolicyEffectiveSchemaValidator
         return current;
     }
 
-    private static bool IsDescendantOf(string candidate, string ancestor) =>
-        candidate.Length > ancestor.Length
-        && candidate.StartsWith(ancestor, StringComparison.Ordinal)
-        && candidate[ancestor.Length] == '/';
+    private static bool IsCompositeWrapper(EvaluationResults result)
+    {
+        string[] segments = SplitPointer(result.EvaluationPath.ToString());
+        return segments.LastOrDefault() is "anyOf" or "oneOf" or "if"
+               || (segments.Contains("not", StringComparer.Ordinal) && segments.LastOrDefault() != "not")
+               || result.Errors?.Values.Any(message => message.StartsWith("Expected 1 matching subschema", StringComparison.Ordinal)) == true;
+    }
 
-    private static string[] SplitPointer(string pointer) =>
-        pointer.Split('/', StringSplitOptions.RemoveEmptyEntries)
+    private static string[] SplitPointer(string pointer)
+    {
+        int fragmentMarker = pointer.IndexOf('#', StringComparison.Ordinal);
+        if (fragmentMarker >= 0)
+        {
+            pointer = pointer[(fragmentMarker + 1)..];
+        }
+
+        return pointer.Split('/', StringSplitOptions.RemoveEmptyEntries)
             .Select(segment => segment.Replace("~1", "/", StringComparison.Ordinal)
                 .Replace("~0", "~", StringComparison.Ordinal))
             .ToArray();
+    }
 
     private static string ToPointer(IEnumerable<string> segments) =>
         "/" + string.Join('/', segments.Select(segment => segment.Replace("~", "~0", StringComparison.Ordinal)
@@ -348,7 +403,12 @@ internal static class ArchitecturePolicyEffectiveSchemaValidator
 
     private sealed record SchemaFailure(string InstanceLocation, string EvaluationPath, string Message, int Order);
 
-    private sealed record SchemaAlternative(int FailureOrder, string CompositePath, string BranchPath, bool IsApplicable);
+    private sealed record SchemaAlternative(
+        int FailureOrder,
+        string CompositePath,
+        string BranchPath,
+        bool IsApplicable,
+        JsonNode? Instance);
 
     private static JsonNode? ConvertNode(YamlNode node)
     {
