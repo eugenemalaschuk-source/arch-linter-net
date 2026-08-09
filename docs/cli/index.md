@@ -219,7 +219,10 @@ All four subcommands take `--policy` (default `architecture/dependencies.arch.ym
 aliased `--config`), a required `--contract <id>` naming a strict or audit public API
 surface contract, an optional `--condition-set`, and `--format`. Build-state preflight runs
 first: a missing, stale, or wrong-target-framework assembly fails the command before anything
-is captured or written.
+is captured or written. A normal `dotnet build` does not create the ArchLinterNet receipt required
+by preflight: use `--ensure-built` on the live-surface command that needs preparation. It builds
+the selected graph, records the receipt, and captures from the re-verified post-build artifacts.
+Use `--no-restore` with it to fail closed when an offline preparation would need restore.
 
 `--format human|json` is supported everywhere; `diff` additionally accepts `sarif`, because it
 is the one subcommand whose output is a pure finding set. `capture`, `update`, and `migrate`
@@ -235,7 +238,8 @@ what actually gets written, even when the command runs from outside the reposito
 arch-linter-net public-api capture \
   --policy architecture/dependencies.arch.yml \
   --contract module-api \
-  --output architecture/api/module-api.txt
+  --output architecture/api/module-api.txt \
+  --ensure-built
 
 # CI gate: exit 1 when the live surface drifted from the snapshot
 arch-linter-net public-api diff \

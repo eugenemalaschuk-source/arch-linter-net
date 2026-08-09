@@ -1,3 +1,5 @@
+using ArchLinterNet.Core.BuildState;
+
 namespace ArchLinterNet.Core.Validation;
 
 // All four public-api operations resolve one named contract from one policy, so they share the same
@@ -17,6 +19,10 @@ public sealed record PublicApiCaptureRequest
 
     public string? ConditionSetName { get; init; }
 
+    public BuildPreparationMode PreparationMode { get; init; } = BuildPreparationMode.Ordinary;
+
+    public bool NoRestore { get; init; }
+
     public CancellationToken CancellationToken { get; init; } = default;
 }
 
@@ -29,6 +35,10 @@ public sealed record PublicApiDiffRequest
     public required string SnapshotPath { get; init; }
 
     public string? ConditionSetName { get; init; }
+
+    public BuildPreparationMode PreparationMode { get; init; } = BuildPreparationMode.Ordinary;
+
+    public bool NoRestore { get; init; }
 
     public CancellationToken CancellationToken { get; init; } = default;
 }
@@ -45,6 +55,10 @@ public sealed record PublicApiUpdateRequest
 
     public string? ConditionSetName { get; init; }
 
+    public BuildPreparationMode PreparationMode { get; init; } = BuildPreparationMode.Ordinary;
+
+    public bool NoRestore { get; init; }
+
     public CancellationToken CancellationToken { get; init; } = default;
 }
 
@@ -59,6 +73,10 @@ public sealed record PublicApiMigrateRequest
     public bool AcceptDrift { get; init; }
 
     public string? ConditionSetName { get; init; }
+
+    public BuildPreparationMode PreparationMode { get; init; } = BuildPreparationMode.Ordinary;
+
+    public bool NoRestore { get; init; }
 
     public CancellationToken CancellationToken { get; init; } = default;
 }

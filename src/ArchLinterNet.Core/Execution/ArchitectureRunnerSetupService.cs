@@ -21,6 +21,11 @@ public sealed class ArchitectureRunnerSetupService(
     IArchitectureProjectDiscoveryService projectDiscoveryService,
     IArchitectureAssemblyResolutionService assemblyResolutionService) : IArchitectureRunnerSetupService
 {
+    // Public-API workflows capture the exact project output that build-state receipts verify.
+    // This internal runner mode lets their ordinary (fresh-process) reads include discovered
+    // project output paths even when analysis.target_assemblies is authored explicitly.
+    internal const string PublicApiResolutionMode = "public-api";
+
     public ArchitectureContractDocument LoadDocument(
         string policyPath,
         string? baselinePath = null,
@@ -198,7 +203,8 @@ public sealed class ArchitectureRunnerSetupService(
         ArchitectureContractRunner runner;
         using (timing?.Measure("assembly_resolution", indent: 1))
         {
-            bool resolveAssemblyOutputs = ShouldResolveAssemblyOutputs(document, mode, selectedContractIds);
+            bool resolveAssemblyOutputs = string.Equals(mode, PublicApiResolutionMode, StringComparison.Ordinal)
+                || ShouldResolveAssemblyOutputs(document, mode, selectedContractIds);
             if (loadPostBuildArtifacts)
             {
                 // Explicit target_assemblies normally keep discovery from probing project output.

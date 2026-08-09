@@ -21,6 +21,8 @@ internal sealed class MigratePublicApiSubcommandModule : IPublicApiSubcommandMod
         Option<bool> forceOption = new("--force");
         Option<bool> dryRunOption = new("--dry-run");
         dryRunOption.Aliases.Add("--check");
+        Option<bool> ensureBuiltOption = PublicApiOptionsFactory.CreateEnsureBuiltOption();
+        Option<bool> noRestoreOption = PublicApiOptionsFactory.CreateNoRestoreOption();
         Option<bool> helpOption = PublicApiOptionsFactory.CreateHelpOption();
 
         command.Options.Add(policyOption);
@@ -31,6 +33,8 @@ internal sealed class MigratePublicApiSubcommandModule : IPublicApiSubcommandMod
         command.Options.Add(acceptDriftOption);
         command.Options.Add(forceOption);
         command.Options.Add(dryRunOption);
+        command.Options.Add(ensureBuiltOption);
+        command.Options.Add(noRestoreOption);
         command.Options.Add(helpOption);
 
         command.SetAction(parseResult => handler.Execute(new PublicApiMigrateCommandOptions(
@@ -42,7 +46,9 @@ internal sealed class MigratePublicApiSubcommandModule : IPublicApiSubcommandMod
             parseResult.GetValue(acceptDriftOption),
             parseResult.GetValue(forceOption),
             parseResult.GetValue(dryRunOption),
-            parseResult.GetValue(helpOption))));
+            parseResult.GetValue(helpOption),
+            parseResult.GetValue(ensureBuiltOption),
+            parseResult.GetValue(noRestoreOption))));
 
         return command;
     }

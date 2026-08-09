@@ -44,7 +44,7 @@ internal sealed class AdoptionAcceptanceFixture : IDisposable
         return new AdoptionAcceptanceFixture(id, destination);
     }
 
-    public void Build()
+    public void Build(string? configuration = null, string? targetFramework = null)
     {
         string buildTarget = Directory.GetFiles(Root, "*.slnx", SearchOption.TopDirectoryOnly).SingleOrDefault()
             ?? ProjectPaths.First();
@@ -61,6 +61,17 @@ internal sealed class AdoptionAcceptanceFixture : IDisposable
         startInfo.ArgumentList.Add("--verbosity");
         startInfo.ArgumentList.Add("quiet");
         startInfo.ArgumentList.Add("--maxcpucount:1");
+        if (!string.IsNullOrWhiteSpace(configuration))
+        {
+            startInfo.ArgumentList.Add("--configuration");
+            startInfo.ArgumentList.Add(configuration);
+        }
+
+        if (!string.IsNullOrWhiteSpace(targetFramework))
+        {
+            startInfo.ArgumentList.Add("--framework");
+            startInfo.ArgumentList.Add(targetFramework);
+        }
 
         using var process = Process.Start(startInfo)!;
         string output = process.StandardOutput.ReadToEnd();

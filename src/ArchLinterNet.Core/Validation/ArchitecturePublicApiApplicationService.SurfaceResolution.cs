@@ -11,7 +11,13 @@ namespace ArchLinterNet.Core.Validation;
 // shares. Split from the operation bodies so neither file grows past the repository's file-size gate.
 public sealed partial class ArchitecturePublicApiApplicationService
 {
-    private SurfaceResolution ResolveSurface(string policyPath, string contractId, string? conditionSetName, CancellationToken cancellationToken)
+    private SurfaceResolution ResolveSurface(
+        string policyPath,
+        string contractId,
+        string? conditionSetName,
+        BuildPreparationMode preparationMode,
+        bool noRestore,
+        CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
         ArchitectureContractDocument document = runnerSetupService.LoadDocument(policyPath, null, null, cancellationToken);
@@ -34,16 +40,49 @@ public sealed partial class ArchitecturePublicApiApplicationService
                 $"Unknown public API surface contract '{contractId}'. Available contract ids: {availableText}.");
         }
 
-        ArchitectureRunnerSetup setup = runnerSetupService.BuildRunner(document, policyPath, conditionSetName, cancellationToken: cancellationToken);
+        ArchitectureRunnerSetup setup = runnerSetupService.BuildRunner(
+            document, policyPath, conditionSetName, mode: ArchitectureRunnerSetupService.PublicApiResolutionMode,
+            cancellationToken: cancellationToken);
+        string requestedConfiguration = string.IsNullOrWhiteSpace(document.Analysis.Configuration)
+            ? "Debug"
+            : document.Analysis.Configuration;
+        string? requestedTargetFramework = string.IsNullOrWhiteSpace(document.Analysis.TargetFramework)
+            ? null
+            : document.Analysis.TargetFramework;
         try
         {
-            BuildStatePreflightResult preflight = RunBuildStatePreflight(setup.Runner, cancellationToken);
+            BuildStatePreflightResult preflight = RunBuildStatePreflight(
+                setup.Runner, preparationMode, noRestore, requestedConfiguration, requestedTargetFramework, cancellationToken);
             if (preflight.Blocked)
             {
                 return SurfaceResolution.Failed(
                     "Build state preflight is blocked; the exported surface cannot be captured from artifacts " +
                     "that are missing, stale, or built for a different target framework.",
                     preflight.Diagnostics);
+            }
+
+            if (preparationMode == BuildPreparationMode.EnsureBuilt
+                && setup.Runner.Session.Context.ProjectDiscovery is { DiscoveredProjects.Count: > 0 })
+            {
+                // The initial runner only identifies the graph to prepare. Recreate it after the
+                // build so the scanner consumes post-build bytes, then prove those bytes against
+                // the receipt in ordinary mode before continuing.
+                ArchitectureRunnerSetup postBuildSetup = runnerSetupService.BuildRunnerForPostBuild(
+                    document, policyPath, conditionSetName, mode: ArchitectureRunnerSetupService.PublicApiResolutionMode,
+                    cancellationToken: cancellationToken);
+                setup.Runner.Session.Context.Dispose();
+                setup = postBuildSetup;
+                preflight = RunBuildStatePreflight(
+                    setup.Runner, BuildPreparationMode.Ordinary, noRestore,
+                    requestedConfiguration, requestedTargetFramework, cancellationToken);
+
+                if (preflight.Blocked)
+                {
+                    return SurfaceResolution.Failed(
+                        "Build state preflight is blocked; the exported surface cannot be captured from artifacts " +
+                        "that are missing, stale, or built for a different target framework.",
+                        preflight.Diagnostics);
+                }
             }
 
             IReadOnlyList<PublicApiSnapshotEntry> entries = setup.Runner.Session.CapturePublicApiSurface(
@@ -73,7 +112,13 @@ public sealed partial class ArchitecturePublicApiApplicationService
     // the fingerprint/receipt inputs it needs when project discovery produced a project graph, and
     // "resolution never ran" (neither resolved nor missing names) must not be read as "artifact
     // missing".
-    private BuildStatePreflightResult RunBuildStatePreflight(IArchitectureContractRunner runner, CancellationToken cancellationToken)
+    private BuildStatePreflightResult RunBuildStatePreflight(
+        IArchitectureContractRunner runner,
+        BuildPreparationMode preparationMode,
+        bool noRestore,
+        string requestedConfiguration,
+        string? requestedTargetFramework,
+        CancellationToken cancellationToken)
     {
         Discovery.ProjectDiscoveryResult? discovery = runner.Session.Context.ProjectDiscovery;
         if (discovery == null || discovery.DiscoveredProjects.Count == 0)
@@ -83,7 +128,13 @@ public sealed partial class ArchitecturePublicApiApplicationService
 
         BuildStateResolvedAssemblies resolution = new(
             runner.Session.Context.TargetAssemblies,
-            runner.Session.Context.MissingAssemblyNames);
+            runner.Session.Context.MissingAssemblyNames)
+        {
+            // Post-build assembly loading is deliberately isolated and stream-backed, so those
+            // Assembly instances have no usable Location. Discovery owns the exact selected
+            // project paths; retain them for receipt verification in both preflight passes.
+            ResolvedAssemblyPaths = discovery.ResolvedAssemblyPaths,
+        };
 
         if (resolution.ResolvedAssemblies.Count == 0 && resolution.MissingAssemblyNames.Count == 0)
         {
@@ -94,7 +145,10 @@ public sealed partial class ArchitecturePublicApiApplicationService
             runner.Session.Context.RepositoryRoot,
             discovery,
             resolution,
-            BuildPreparationMode.Ordinary,
+            preparationMode,
+            noRestore,
+            requestedConfiguration,
+            requestedTargetFramework,
             CancellationToken: cancellationToken));
     }
 

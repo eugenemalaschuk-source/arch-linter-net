@@ -19,6 +19,10 @@ internal static class PublicApiHelpTexts
           --contract <id>          Required. Id of a strict/audit public API surface contract.
           --condition-set <name>   Condition set to resolve preprocessor symbols with.
           --format <fmt>           human (default) or json. `diff` also accepts sarif.
+          --ensure-built           Build the selected project graph, create a receipt, and
+                                   then capture the verified live surface.
+          --no-restore             Fail closed when restore is required; combine with
+                                   --ensure-built for an offline preparation attempt.
           -h, --help               Show help.
 
         Paths are repository-local: relative, non-rooted, and inside the policy boundary (the
@@ -29,6 +33,10 @@ internal static class PublicApiHelpTexts
           0  success / snapshot in sync
           1  a completed gate found drift (diff drift, or unaccepted migrate drift)
           2  invalid arguments, unusable snapshot, blocked build state, or runtime error
+
+        A normal `dotnet build` does not create an ArchLinterNet receipt. To create the first
+        reviewed snapshot, run `public-api capture` with `--ensure-built`; subsequent diff and
+        update commands reuse the verified receipt-backed artifacts until their inputs change.
 
         Run 'arch-linter-net public-api <subcommand> --help' for subcommand details.
         """;
@@ -50,6 +58,9 @@ internal static class PublicApiHelpTexts
 
         Capture refuses to overwrite an existing, differing snapshot without --force: a snapshot is
         a reviewed artifact, and replacing one silently would hide an unreviewed surface change.
+
+        Add --ensure-built to prepare the selected project graph and create the receipt required
+        for capture. Add --no-restore to fail closed instead of restoring during that preparation.
         """;
 
     public const string DiffHelpText = """
@@ -63,6 +74,9 @@ internal static class PublicApiHelpTexts
           --snapshot <path>   Required. Repository-local snapshot path to compare against.
 
         Returns exit code 1 when any drift is detected.
+
+        Add --ensure-built to prepare the selected project graph and create the receipt required
+        for diff. Add --no-restore to fail closed instead of restoring during that preparation.
         """;
 
     public const string UpdateHelpText = """
@@ -78,6 +92,9 @@ internal static class PublicApiHelpTexts
 
         Updating a contract that declares its surface inline via 'declared_api' is refused: a YAML
         round-trip cannot preserve the surrounding policy comments. Use 'public-api migrate' first.
+
+        Add --ensure-built to prepare the selected project graph and create the receipt required
+        for update. Add --no-restore to fail closed instead of restoring during that preparation.
         """;
 
     public const string MigrateHelpText = """
@@ -98,5 +115,8 @@ internal static class PublicApiHelpTexts
         Like capture, migrate never overwrites an existing, differing destination without --force: a
         snapshot is a reviewed artifact, and migrate could otherwise silently destroy another
         contract's reviewed snapshot.
+
+        Add --ensure-built to prepare the selected project graph and create the receipt required
+        for migration. Add --no-restore to fail closed instead of restoring during that preparation.
         """;
 }

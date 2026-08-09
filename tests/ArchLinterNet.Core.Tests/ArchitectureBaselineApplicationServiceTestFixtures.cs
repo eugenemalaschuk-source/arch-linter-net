@@ -14,6 +14,12 @@ internal sealed class FakeRunnerSetupService : IArchitectureRunnerSetupService
 
     public bool BuildRunnerCalled { get; private set; }
 
+    public int BuildRunnerCallCount { get; private set; }
+
+    public int BuildRunnerForPostBuildCallCount { get; private set; }
+
+    public Queue<IArchitectureContractRunner>? RunnersToReturn { get; init; }
+
     public HashSet<string>? SelectedContractIdsReceived { get; private set; }
 
     public string? ModeReceived { get; private set; }
@@ -42,9 +48,10 @@ internal sealed class FakeRunnerSetupService : IArchitectureRunnerSetupService
         int? maxParallelism = null)
     {
         BuildRunnerCalled = true;
+        BuildRunnerCallCount++;
         SelectedContractIdsReceived = selectedContractIds;
         ModeReceived = mode;
-        return new ArchitectureRunnerSetup("/fake/repository/root", RunnerToReturn);
+        return CreateSetup();
     }
 
     public ArchitectureRunnerSetup BuildRunnerForPostBuild(
@@ -53,8 +60,18 @@ internal sealed class FakeRunnerSetupService : IArchitectureRunnerSetupService
         bool enableUnmatchedIgnoreTracking = true, ValidationTiming? timing = null, string? mode = null,
         CancellationToken cancellationToken = default, int? maxParallelism = null)
     {
-        return BuildRunner(document, policyPath, conditionSetName, preprocessorSymbols, selectedContractIds,
-            enableUnmatchedIgnoreTracking, timing, mode, cancellationToken, maxParallelism);
+        BuildRunnerForPostBuildCallCount++;
+        SelectedContractIdsReceived = selectedContractIds;
+        ModeReceived = mode;
+        return CreateSetup();
+    }
+
+    private ArchitectureRunnerSetup CreateSetup()
+    {
+        IArchitectureContractRunner runner = RunnersToReturn is { Count: > 0 }
+            ? RunnersToReturn.Dequeue()
+            : RunnerToReturn;
+        return new ArchitectureRunnerSetup("/fake/repository/root", runner);
     }
 }
 

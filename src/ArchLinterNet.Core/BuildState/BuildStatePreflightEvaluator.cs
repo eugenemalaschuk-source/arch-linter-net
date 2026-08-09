@@ -119,15 +119,20 @@ public static class BuildStatePreflightEvaluator
     {
         assemblyPath = null;
 
-        if (missing.Contains(project.AssemblyName))
-        {
-            return MissingArtifactDiagnostic(project, request);
-        }
-
+        // A physical resolved path — even for an assembly that resolution also reported missing
+        // (e.g. a stale project output that ordinary discovery refused to load) — is stronger
+        // evidence than the missing-name flag: it names a concrete artifact receipt verification
+        // can inspect, letting CheckReceipt classify it as StaleArtifact instead of collapsing it
+        // into MissingArtifact before its actual state is ever examined.
         if (request.Resolution.ResolvedAssemblyPaths.TryGetValue(project.AssemblyName, out string? plannedPath))
         {
             assemblyPath = Path.GetFullPath(plannedPath);
             return File.Exists(assemblyPath) ? null : MissingArtifactDiagnostic(project, request);
+        }
+
+        if (missing.Contains(project.AssemblyName))
+        {
+            return MissingArtifactDiagnostic(project, request);
         }
 
         if (!resolvedByName.TryGetValue(project.AssemblyName, out Assembly? assembly))

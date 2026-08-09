@@ -258,7 +258,7 @@ capture or update command in an unattended CI job.
 # Produce a candidate for review.
 dotnet arch-linter-net public-api capture \
   --policy architecture/arch.yml --contract product-api \
-  --output architecture/api/product-api.txt
+  --output architecture/api/product-api.txt --ensure-built
 
 # Gate an already reviewed snapshot.
 dotnet arch-linter-net public-api diff \

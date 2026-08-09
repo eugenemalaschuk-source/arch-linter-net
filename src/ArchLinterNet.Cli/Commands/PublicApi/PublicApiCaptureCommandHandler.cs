@@ -1,5 +1,6 @@
 using System.Text.Json;
 using ArchLinterNet.Cli.Abstractions;
+using ArchLinterNet.Core.BuildState;
 using ArchLinterNet.Core.Validation;
 
 namespace ArchLinterNet.Cli.Commands.PublicApi;
@@ -40,6 +41,8 @@ internal sealed class PublicApiCaptureCommandHandler(ICliRuntime runtime, ICliCo
                 ContractId = options.ContractId!,
                 OutputPath = options.OutputPath,
                 ConditionSetName = options.ConditionSetName,
+                PreparationMode = options.EnsureBuilt ? BuildPreparationMode.EnsureBuilt : BuildPreparationMode.Ordinary,
+                NoRestore = options.NoRestore,
                 CancellationToken = cancellationToken,
             });
 

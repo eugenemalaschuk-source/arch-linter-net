@@ -72,6 +72,34 @@ public sealed class ArchitectureRunnerSetupServiceDiscoveryTests
     }
 
     [Test]
+    public void BuildRunner_PublicApiMode_UsesDiscoveredOutputForExplicitTargetAssembly()
+    {
+        CreateProjectWithOutput("ArchLinterNet.Core", "net9.0");
+
+        var document = new ArchitectureContractDocument
+        {
+            Version = 1,
+            Name = "Test",
+            Analysis = new ArchitectureAnalysisConfiguration
+            {
+                TargetAssemblies = new List<string> { "ArchLinterNet.Core" },
+                Projects = new List<string> { Path.Combine(_repoRoot, "ArchLinterNet.Core", "ArchLinterNet.Core.csproj") }
+            }
+        };
+
+        ArchitectureRunnerSetup setup = _runnerSetupService.BuildRunner(document, _policyPath, mode: "public-api");
+        string expectedArtifactPath = Path.Combine(_repoRoot, "ArchLinterNet.Core", "bin", "Debug", "net9.0", "ArchLinterNet.Core.dll");
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(setup.Runner.Session.Context.ProjectDiscovery!.ResolvedAssemblyPaths,
+                Does.ContainKey("ArchLinterNet.Core").WithValue(expectedArtifactPath));
+            Assert.That(setup.Runner.Session.Context.AssemblyProbingPaths,
+                Does.Contain(Path.GetDirectoryName(expectedArtifactPath)!));
+        });
+    }
+
+    [Test]
     public void BuildRunner_EmptyTargetAssemblies_SeedsFromDiscoveredProject()
     {
         CreateProjectWithOutput("ArchLinterNet.Core", "net9.0");

@@ -78,6 +78,7 @@ public sealed partial class CheckpointBReleaseGateTests
             });
         }
 
+        scenarios.Add(AssertPublicApiSnapshotWorkflow(candidate));
         AssertCacheLifecycleOracle(candidate);
         scenarios.Add(Passed("sequential-default-parity"));
         scenarios.Add(Passed("profile-generation"));

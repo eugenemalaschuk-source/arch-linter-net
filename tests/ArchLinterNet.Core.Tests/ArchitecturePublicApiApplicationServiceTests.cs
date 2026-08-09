@@ -5,6 +5,7 @@ using ArchLinterNet.Core.Contracts.Abstractions;
 using ArchLinterNet.Core.Contracts.Families;
 using ArchLinterNet.Core.Discovery;
 using ArchLinterNet.Core.Execution;
+using ArchLinterNet.Core.Execution.Abstractions;
 using ArchLinterNet.Core.Model;
 using ArchLinterNet.Core.Validation;
 using NUnit.Framework;
@@ -15,7 +16,7 @@ namespace ArchLinterNet.Core.Tests;
 // Fake-composition tests for the public-api application seam. The session is built over the real
 // test assembly, so capture exercises the actual reflection scanner rather than a stubbed surface.
 [TestFixture]
-public sealed class ArchitecturePublicApiApplicationServiceTests
+public sealed partial class ArchitecturePublicApiApplicationServiceTests
 {
     private const string ContractId = "surface";
     private const string PolicyPath = "architecture/dependencies.arch.yml";
@@ -742,11 +743,19 @@ public sealed class ArchitecturePublicApiApplicationServiceTests
         }
     }
 
-    private sealed class FakeBuildStatePreparationService(BuildStatePreflightResult? result) : IBuildStatePreparationService
+    private sealed class FakeBuildStatePreparationService(params BuildStatePreflightResult?[] results) : IBuildStatePreparationService
     {
+        private readonly Queue<BuildStatePreflightResult> _results = new(
+            results.Where(static result => result is not null).Select(static result => result!));
+
+        public List<BuildStatePreflightRequest> Requests { get; } = new();
+
         public BuildStatePreflightResult Prepare(BuildStatePreflightRequest request)
         {
-            return result ?? new BuildStatePreflightResult(Array.Empty<BuildStatePreflightDiagnostic>());
+            Requests.Add(request);
+            return _results.Count > 0
+                ? _results.Dequeue()
+                : new BuildStatePreflightResult(Array.Empty<BuildStatePreflightDiagnostic>());
         }
     }
 }

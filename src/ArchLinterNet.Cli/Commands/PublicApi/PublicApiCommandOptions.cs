@@ -7,7 +7,9 @@ internal sealed record PublicApiCaptureCommandOptions(
     string? ConditionSetName,
     string Format,
     bool Force,
-    bool ShowHelp);
+    bool ShowHelp,
+    bool EnsureBuilt = false,
+    bool NoRestore = false);
 
 internal sealed record PublicApiDiffCommandOptions(
     string PolicyPath,
@@ -15,7 +17,9 @@ internal sealed record PublicApiDiffCommandOptions(
     string? SnapshotPath,
     string? ConditionSetName,
     string Format,
-    bool ShowHelp);
+    bool ShowHelp,
+    bool EnsureBuilt = false,
+    bool NoRestore = false);
 
 internal sealed record PublicApiUpdateCommandOptions(
     string PolicyPath,
@@ -24,7 +28,9 @@ internal sealed record PublicApiUpdateCommandOptions(
     string? ConditionSetName,
     string Format,
     bool DryRun,
-    bool ShowHelp);
+    bool ShowHelp,
+    bool EnsureBuilt = false,
+    bool NoRestore = false);
 
 internal sealed record PublicApiMigrateCommandOptions(
     string PolicyPath,
@@ -35,4 +41,6 @@ internal sealed record PublicApiMigrateCommandOptions(
     bool AcceptDrift,
     bool Force,
     bool DryRun,
-    bool ShowHelp);
+    bool ShowHelp,
+    bool EnsureBuilt = false,
+    bool NoRestore = false);

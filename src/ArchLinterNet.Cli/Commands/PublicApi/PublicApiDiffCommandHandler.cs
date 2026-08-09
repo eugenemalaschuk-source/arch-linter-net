@@ -1,4 +1,5 @@
 using ArchLinterNet.Cli.Abstractions;
+using ArchLinterNet.Core.BuildState;
 using ArchLinterNet.Core.Validation;
 
 namespace ArchLinterNet.Cli.Commands.PublicApi;
@@ -39,6 +40,8 @@ internal sealed class PublicApiDiffCommandHandler(ICliRuntime runtime, ICliConso
                 ContractId = options.ContractId!,
                 SnapshotPath = options.SnapshotPath,
                 ConditionSetName = options.ConditionSetName,
+                PreparationMode = options.EnsureBuilt ? BuildPreparationMode.EnsureBuilt : BuildPreparationMode.Ordinary,
+                NoRestore = options.NoRestore,
                 CancellationToken = cancellationToken,
             });
 
