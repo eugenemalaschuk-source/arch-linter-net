@@ -85,6 +85,10 @@ public sealed partial class CheckpointBReleaseGateTests
 
             using ZipArchive core = ZipFile.OpenRead(PackagePath("ArchLinterNet.Core"));
             Assert.That(ReadEntry(core, "ArchLinterNet.Core.nuspec"), Does.Contain("ArchLinterNet.CEL"));
+            Assert.That(ReadEntry(core, "README.md"), Does.Contain(
+                "0.6.0 is the public adoption package line"));
+            Assert.That(ReadEntry(core, "README.md"), Does.Contain(
+                "immutable 0.5.1 `adoption-stabilization/v1` schema registry"));
             foreach (string schema in new[]
                      {
                          "analysis-build-state.schema.json", "analysis-cache.schema.json",
@@ -119,12 +123,17 @@ public sealed partial class CheckpointBReleaseGateTests
             string offlineDirectory = Path.Combine(_root, "offline");
             Directory.CreateDirectory(offlineDirectory);
 
+            CommandResult version = RunTool(offlineDirectory, "--version");
             CommandResult list = RunTool(offlineDirectory, "schema", "list");
             CommandResult print = RunTool(offlineDirectory, "schema", "print", "analysis-cache");
 
             Assert.Multiple(() =>
             {
+                Assert.That(version.ExitCode, Is.EqualTo(0), version.CombinedOutput);
+                Assert.That(version.StandardOutput, Does.Contain(_candidateVersion));
                 Assert.That(list.ExitCode, Is.EqualTo(0), list.CombinedOutput);
+                Assert.That(list.StandardOutput, Does.Contain("https://archlinternet.dev/schema/0.5.1/"));
+                Assert.That(list.StandardOutput, Does.Not.Contain("/schema/0.6.0/"));
                 Assert.That(list.StandardOutput, Does.Contain("analysis-cache\tv1"));
                 Assert.That(list.StandardOutput, Does.Contain("analysis-profile\tv1"));
                 Assert.That(print.ExitCode, Is.EqualTo(0), print.CombinedOutput);

@@ -53,6 +53,15 @@ The workflow detects the latest SemVer-compatible git tag and calculates the nex
 
 Tags use the `v` prefix. Package versions are emitted without `v`.
 
+### Schema registry identity
+
+The public 0.6.0 package line ships the immutable 0.5.1
+`adoption-stabilization/v1` registry. Schema identifiers version persisted
+format contracts independently from package SemVer, so release metadata and
+package READMEs must state both values rather than inventing a `schema/0.6.0`
+URL. Before publication, run `arch-linter-net schema list` from the candidate
+package and confirm every documented `$schema` identifier is listed there.
+
 ### Version override
 
 Use `version_override` only when automatic tag-based calculation cannot be used:
