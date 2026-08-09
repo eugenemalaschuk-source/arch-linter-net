@@ -115,11 +115,23 @@ public sealed class ArchitectureProjectRoslynContextResolverTests
         ArchitectureProjectRoslynResolution resolution =
             new ArchitectureProjectRoslynContextResolver().Resolve(_consumerProjectPath);
 
-        Assert.That(resolution.Succeeded, Is.True, resolution.FailureReason);
-        Assert.That(resolution.Context!.SourceFilePaths, Has.Some.Contains("Caller.cs"));
-        Assert.That(resolution.Context!.ReferenceAssemblyPaths,
-            Has.Some.Contains("Fixture.Referenced.dll"),
-            "Expected the referenced project's build output to be among the resolved references.");
+        string? referencedAssemblyPath = resolution.Context?.ReferenceAssemblyPaths
+            .FirstOrDefault(path => path.Contains("Fixture.Referenced.dll", StringComparison.Ordinal));
+        string projectIntermediateDirectory = Path.Combine(Path.GetDirectoryName(_consumerProjectPath)!, "obj");
+        string[] generatedCleanFiles = Directory.GetFiles(
+            projectIntermediateDirectory, "ArchLinterNet.DesignTime.*.FileListAbsolute.txt", SearchOption.AllDirectories);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(resolution.Succeeded, Is.True, resolution.FailureReason);
+            Assert.That(resolution.Context!.SourceFilePaths, Has.Some.Contains("Caller.cs"));
+            Assert.That(referencedAssemblyPath, Is.Not.Null,
+                "Expected the referenced project's build output to be among the resolved references.");
+            Assert.That(File.Exists(referencedAssemblyPath), Is.True,
+                "The referenced project assembly must remain available after Resolve returns.");
+            Assert.That(generatedCleanFiles, Is.Empty,
+                "Design-time clean manifests must be removed after resolution.");
+        });
     }
 
     [Test]

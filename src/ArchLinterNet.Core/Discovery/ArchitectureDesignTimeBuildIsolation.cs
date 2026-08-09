@@ -2,28 +2,35 @@ namespace ArchLinterNet.Core.Discovery;
 
 internal sealed class ArchitectureDesignTimeBuildIsolation : IDisposable
 {
-    private readonly string _directory;
+    private readonly string _projectIntermediateDirectory;
 
-    private ArchitectureDesignTimeBuildIsolation(string directory)
+    private ArchitectureDesignTimeBuildIsolation(string projectIntermediateDirectory, string cleanFileName)
     {
-        _directory = directory;
-        IntermediateOutputPath = Path.Combine(directory, "obj") + Path.DirectorySeparatorChar;
+        _projectIntermediateDirectory = projectIntermediateDirectory;
+        CleanFileName = cleanFileName;
     }
 
-    public string IntermediateOutputPath { get; }
+    public string CleanFileName { get; }
 
-    public static ArchitectureDesignTimeBuildIsolation Create()
+    public static ArchitectureDesignTimeBuildIsolation Create(string projectAbsolutePath)
     {
-        string directory = Path.Combine(Path.GetTempPath(), $"arch-linter-design-time-{Guid.NewGuid():N}");
-        Directory.CreateDirectory(directory);
-        return new ArchitectureDesignTimeBuildIsolation(directory);
+        string projectDirectory = Path.GetDirectoryName(projectAbsolutePath)
+            ?? throw new ArgumentException("The project path must include a directory.", nameof(projectAbsolutePath));
+        string cleanFileName = $"ArchLinterNet.DesignTime.{Guid.NewGuid():N}.FileListAbsolute.txt";
+        return new ArchitectureDesignTimeBuildIsolation(Path.Combine(projectDirectory, "obj"), cleanFileName);
     }
 
     public void Dispose()
     {
-        if (Directory.Exists(_directory))
+        if (!Directory.Exists(_projectIntermediateDirectory))
         {
-            Directory.Delete(_directory, true);
+            return;
+        }
+
+        foreach (string cleanFilePath in Directory.GetFiles(
+                     _projectIntermediateDirectory, CleanFileName, SearchOption.AllDirectories))
+        {
+            File.Delete(cleanFilePath);
         }
     }
 }
