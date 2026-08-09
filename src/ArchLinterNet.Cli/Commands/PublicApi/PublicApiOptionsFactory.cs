@@ -45,6 +45,10 @@ internal static class PublicApiOptionsFactory
         return option;
     }
 
+    public static Option<bool> CreateEnsureBuiltOption() => new("--ensure-built");
+
+    public static Option<bool> CreateNoRestoreOption() => new("--no-restore");
+
     public static string GetPolicyPath(ParseResult parseResult, Option<string> policyOption)
     {
         return parseResult.GetValue(policyOption) ?? DefaultPolicyPath;

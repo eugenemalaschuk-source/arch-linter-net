@@ -14,6 +14,10 @@ internal sealed class FakeRunnerSetupService : IArchitectureRunnerSetupService
 
     public bool BuildRunnerCalled { get; private set; }
 
+    public int BuildRunnerCallCount { get; private set; }
+
+    public Queue<IArchitectureContractRunner>? RunnersToReturn { get; init; }
+
     public HashSet<string>? SelectedContractIdsReceived { get; private set; }
 
     public string? ModeReceived { get; private set; }
@@ -42,9 +46,13 @@ internal sealed class FakeRunnerSetupService : IArchitectureRunnerSetupService
         int? maxParallelism = null)
     {
         BuildRunnerCalled = true;
+        BuildRunnerCallCount++;
         SelectedContractIdsReceived = selectedContractIds;
         ModeReceived = mode;
-        return new ArchitectureRunnerSetup("/fake/repository/root", RunnerToReturn);
+        IArchitectureContractRunner runner = RunnersToReturn is { Count: > 0 }
+            ? RunnersToReturn.Dequeue()
+            : RunnerToReturn;
+        return new ArchitectureRunnerSetup("/fake/repository/root", runner);
     }
 
     public ArchitectureRunnerSetup BuildRunnerForPostBuild(

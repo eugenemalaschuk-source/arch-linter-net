@@ -1,5 +1,6 @@
 using System.Text.Json;
 using ArchLinterNet.Cli.Abstractions;
+using ArchLinterNet.Core.BuildState;
 using ArchLinterNet.Core.Validation;
 
 namespace ArchLinterNet.Cli.Commands.PublicApi;
@@ -41,6 +42,8 @@ internal sealed class PublicApiMigrateCommandHandler(ICliRuntime runtime, ICliCo
                 OutputPath = options.OutputPath,
                 AcceptDrift = options.AcceptDrift,
                 ConditionSetName = options.ConditionSetName,
+                PreparationMode = options.EnsureBuilt ? BuildPreparationMode.EnsureBuilt : BuildPreparationMode.Ordinary,
+                NoRestore = options.NoRestore,
                 CancellationToken = cancellationToken,
             });
 

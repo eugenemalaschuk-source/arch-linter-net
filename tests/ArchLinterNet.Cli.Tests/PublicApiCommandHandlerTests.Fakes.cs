@@ -89,6 +89,14 @@ public sealed partial class PublicApiCommandHandlerTests
 
         public PublicApiMigrateOutcome? MigrateOutcome { get; init; }
 
+        public PublicApiCaptureRequest? LastCaptureRequest { get; private set; }
+
+        public PublicApiDiffRequest? LastDiffRequest { get; private set; }
+
+        public PublicApiUpdateRequest? LastUpdateRequest { get; private set; }
+
+        public PublicApiMigrateRequest? LastMigrateRequest { get; private set; }
+
         /// <summary>Thrown from the matching Public-API entrypoint instead of returning its
         /// outcome — used to simulate Core observing a cancelled token and raising
         /// OperationCanceledException.</summary>
@@ -113,21 +121,27 @@ public sealed partial class PublicApiCommandHandlerTests
 
         public PublicApiCaptureOutcome CapturePublicApi(PublicApiCaptureRequest request)
         {
+            LastCaptureRequest = request;
             OnCapturePublicApi?.Invoke();
             return CaptureException != null ? throw CaptureException : CaptureOutcome ?? throw new NotSupportedException();
         }
 
-        public PublicApiDiffOutcome DiffPublicApi(PublicApiDiffRequest request) =>
-            DiffException != null ? throw DiffException : DiffOutcome ?? throw new NotSupportedException();
+        public PublicApiDiffOutcome DiffPublicApi(PublicApiDiffRequest request)
+        {
+            LastDiffRequest = request;
+            return DiffException != null ? throw DiffException : DiffOutcome ?? throw new NotSupportedException();
+        }
 
         public PublicApiUpdateOutcome UpdatePublicApi(PublicApiUpdateRequest request)
         {
+            LastUpdateRequest = request;
             OnUpdatePublicApi?.Invoke();
             return UpdateException != null ? throw UpdateException : UpdateOutcome ?? throw new NotSupportedException();
         }
 
         public PublicApiMigrateOutcome MigratePublicApi(PublicApiMigrateRequest request)
         {
+            LastMigrateRequest = request;
             OnMigratePublicApi?.Invoke();
             return MigrateException != null ? throw MigrateException : MigrateOutcome ?? throw new NotSupportedException();
         }

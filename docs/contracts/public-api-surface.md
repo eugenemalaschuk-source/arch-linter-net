@@ -43,7 +43,7 @@ contracts:
 ```
 
 ```bash
-arch-linter-net public-api capture --policy architecture/dependencies.arch.yml --contract module-api --output architecture/api/module-api.txt
+arch-linter-net public-api capture --policy architecture/dependencies.arch.yml --contract module-api --output architecture/api/module-api.txt --ensure-built
 ```
 
 ## When to use

@@ -11,7 +11,13 @@ namespace ArchLinterNet.Core.Validation;
 // shares. Split from the operation bodies so neither file grows past the repository's file-size gate.
 public sealed partial class ArchitecturePublicApiApplicationService
 {
-    private SurfaceResolution ResolveSurface(string policyPath, string contractId, string? conditionSetName, CancellationToken cancellationToken)
+    private SurfaceResolution ResolveSurface(
+        string policyPath,
+        string contractId,
+        string? conditionSetName,
+        BuildPreparationMode preparationMode,
+        bool noRestore,
+        CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
         ArchitectureContractDocument document = runnerSetupService.LoadDocument(policyPath, null, null, cancellationToken);
@@ -37,13 +43,36 @@ public sealed partial class ArchitecturePublicApiApplicationService
         ArchitectureRunnerSetup setup = runnerSetupService.BuildRunner(document, policyPath, conditionSetName, cancellationToken: cancellationToken);
         try
         {
-            BuildStatePreflightResult preflight = RunBuildStatePreflight(setup.Runner, cancellationToken);
+            BuildStatePreflightResult preflight = RunBuildStatePreflight(
+                setup.Runner, preparationMode, noRestore, cancellationToken);
             if (preflight.Blocked)
             {
                 return SurfaceResolution.Failed(
                     "Build state preflight is blocked; the exported surface cannot be captured from artifacts " +
                     "that are missing, stale, or built for a different target framework.",
                     preflight.Diagnostics);
+            }
+
+            if (preparationMode == BuildPreparationMode.EnsureBuilt
+                && setup.Runner.Session.Context.ProjectDiscovery is { DiscoveredProjects.Count: > 0 })
+            {
+                // The initial runner only identifies the graph to prepare. Recreate it after the
+                // build so the scanner consumes post-build bytes, then prove those bytes against
+                // the receipt in ordinary mode before continuing.
+                ArchitectureRunnerSetup postBuildSetup = runnerSetupService.BuildRunner(
+                    document, policyPath, conditionSetName, cancellationToken: cancellationToken);
+                setup.Runner.Session.Context.Dispose();
+                setup = postBuildSetup;
+                preflight = RunBuildStatePreflight(
+                    setup.Runner, BuildPreparationMode.Ordinary, noRestore, cancellationToken);
+
+                if (preflight.Blocked)
+                {
+                    return SurfaceResolution.Failed(
+                        "Build state preflight is blocked; the exported surface cannot be captured from artifacts " +
+                        "that are missing, stale, or built for a different target framework.",
+                        preflight.Diagnostics);
+                }
             }
 
             IReadOnlyList<PublicApiSnapshotEntry> entries = setup.Runner.Session.CapturePublicApiSurface(
@@ -73,7 +102,11 @@ public sealed partial class ArchitecturePublicApiApplicationService
     // the fingerprint/receipt inputs it needs when project discovery produced a project graph, and
     // "resolution never ran" (neither resolved nor missing names) must not be read as "artifact
     // missing".
-    private BuildStatePreflightResult RunBuildStatePreflight(IArchitectureContractRunner runner, CancellationToken cancellationToken)
+    private BuildStatePreflightResult RunBuildStatePreflight(
+        IArchitectureContractRunner runner,
+        BuildPreparationMode preparationMode,
+        bool noRestore,
+        CancellationToken cancellationToken)
     {
         Discovery.ProjectDiscoveryResult? discovery = runner.Session.Context.ProjectDiscovery;
         if (discovery == null || discovery.DiscoveredProjects.Count == 0)
@@ -94,7 +127,8 @@ public sealed partial class ArchitecturePublicApiApplicationService
             runner.Session.Context.RepositoryRoot,
             discovery,
             resolution,
-            BuildPreparationMode.Ordinary,
+            preparationMode,
+            noRestore,
             CancellationToken: cancellationToken));
     }
 

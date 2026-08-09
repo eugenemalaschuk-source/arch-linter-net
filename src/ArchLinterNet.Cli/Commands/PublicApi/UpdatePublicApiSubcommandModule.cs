@@ -19,6 +19,8 @@ internal sealed class UpdatePublicApiSubcommandModule : IPublicApiSubcommandModu
         Option<string> formatOption = PublicApiOptionsFactory.CreateFormatOption();
         Option<bool> dryRunOption = new("--dry-run");
         dryRunOption.Aliases.Add("--check");
+        Option<bool> ensureBuiltOption = PublicApiOptionsFactory.CreateEnsureBuiltOption();
+        Option<bool> noRestoreOption = PublicApiOptionsFactory.CreateNoRestoreOption();
         Option<bool> helpOption = PublicApiOptionsFactory.CreateHelpOption();
 
         command.Options.Add(policyOption);
@@ -27,6 +29,8 @@ internal sealed class UpdatePublicApiSubcommandModule : IPublicApiSubcommandModu
         command.Options.Add(conditionSetOption);
         command.Options.Add(formatOption);
         command.Options.Add(dryRunOption);
+        command.Options.Add(ensureBuiltOption);
+        command.Options.Add(noRestoreOption);
         command.Options.Add(helpOption);
 
         command.SetAction(parseResult => handler.Execute(new PublicApiUpdateCommandOptions(
@@ -36,7 +40,9 @@ internal sealed class UpdatePublicApiSubcommandModule : IPublicApiSubcommandModu
             parseResult.GetValue(conditionSetOption),
             PublicApiOptionsFactory.GetFormat(parseResult, formatOption),
             parseResult.GetValue(dryRunOption),
-            parseResult.GetValue(helpOption))));
+            parseResult.GetValue(helpOption),
+            parseResult.GetValue(ensureBuiltOption),
+            parseResult.GetValue(noRestoreOption))));
 
         return command;
     }
