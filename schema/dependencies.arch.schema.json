@@ -728,6 +728,10 @@
           "$ref": "#/$defs/stringList",
           "description": "Additional directories used when resolving target assemblies."
         },
+        "shared_frameworks": {
+          "$ref": "#/$defs/stringList",
+          "description": "Shared framework names (e.g. Microsoft.AspNetCore.App) whose installed directory is added to post-build (--ensure-built) assembly probing paths."
+        },
         "source_roots": {
           "$ref": "#/$defs/stringList",
           "description": "Source roots used by method-body Roslyn scanning."

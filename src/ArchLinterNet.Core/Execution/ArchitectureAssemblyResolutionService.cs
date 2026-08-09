@@ -175,8 +175,17 @@ public sealed class ArchitectureAssemblyResolutionService : IArchitectureAssembl
         List<string> missing = new();
         int assemblyLoads = 0;
 
+        // Shared-framework probing only applies to the isolated post-build (--ensure-built) load
+        // scope — the documented entrypoint for analyzing framework-dependent consumer assemblies.
+        // See the assembly-resolution spec's shared-framework requirement for why the non-isolated
+        // path is out of scope.
+        IEnumerable<string> sharedFrameworkProbingPaths = forceIsolatedLoading
+            ? ArchitectureSharedFrameworkResolver.ResolveProbingPaths(
+                document.Analysis.SharedFrameworks, fileSystem, environment)
+            : Array.Empty<string>();
         IReadOnlyList<string> probingPaths = ResolveProbingPaths(document, repositoryRoot, fileSystem, environment)
             .Concat(additionalProbingPaths ?? Array.Empty<string>())
+            .Concat(sharedFrameworkProbingPaths)
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToArray();
         IReadOnlyDictionary<string, string> exactPaths = exactPostBuildAssemblyPaths

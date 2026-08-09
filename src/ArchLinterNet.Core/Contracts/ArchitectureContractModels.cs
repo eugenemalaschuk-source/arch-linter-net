@@ -72,6 +72,11 @@ public sealed class ArchitectureAnalysisConfiguration
     [YamlMember(Alias = "assembly_search_paths")]
     public List<string> AssemblySearchPaths { get; set; } = new();
 
+    // Opt-in shared-framework names (e.g. "Microsoft.AspNetCore.App") whose installed
+    // directory is added to post-build (--ensure-built) probing paths. See assembly-resolution spec.
+    [YamlMember(Alias = "shared_frameworks")]
+    public List<string> SharedFrameworks { get; set; } = new();
+
     [YamlMember(Alias = "source_roots")]
     public List<string> SourceRoots { get; set; } = new();
 
