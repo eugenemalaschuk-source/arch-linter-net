@@ -131,7 +131,8 @@ jobs:
             /d:sonar.qualitygate.wait=true \
             /d:sonar.qualitygate.timeout=300 \
             /d:sonar.cs.opencover.reportsPaths="test-results/**/coverage.opencover.xml" \
-            /d:sonar.cs.vstest.reportsPaths="test-results/**/*.trx"
+            /d:sonar.cs.vstest.reportsPaths="test-results/**/*.trx" \
+            /d:sonar.exclusions="**/AdoptionAcceptance/Fixtures/**"
 
       - name: Collect test coverage
         run: make test-coverage
@@ -436,7 +437,8 @@ jobs:
             /d:sonar.qualitygate.wait=true \
             /d:sonar.qualitygate.timeout=300 \
             /d:sonar.cs.opencover.reportsPaths="test-results/**/coverage.opencover.xml" \
-            /d:sonar.cs.vstest.reportsPaths="test-results/**/*.trx"
+            /d:sonar.cs.vstest.reportsPaths="test-results/**/*.trx" \
+            /d:sonar.exclusions="**/AdoptionAcceptance/Fixtures/**"
 
       - name: Collect main branch test coverage
         run: make test-coverage-main-ci

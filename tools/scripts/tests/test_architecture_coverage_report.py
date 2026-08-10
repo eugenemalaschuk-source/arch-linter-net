@@ -450,6 +450,46 @@ def test_classify_changed_file_skips_test_project_files(tmp_path: Path) -> None:
     assert units == []
 
 
+def test_classify_changed_file_skips_synthetic_acceptance_fixture_files(tmp_path: Path) -> None:
+    """A synthetic adoption-acceptance fixture carries its own .csproj, so the enclosing-
+    project check alone would classify it as "unknown". Its assemblies are built into
+    throwaway copies by the acceptance and release gates and are never in
+    analysis.target_assemblies, so it is skipped exactly like a test project."""
+    file_rel = ("tests/ArchLinterNet.Core.Tests/AdoptionAcceptance/Fixtures/"
+                "modular-consumer/src/Synthetic.Modules.M01/Module.cs")
+    write_file(tmp_path, file_rel, "namespace Synthetic.Modules.M01;\n\nclass Module {}\n")
+    write_file(
+        tmp_path,
+        ("tests/ArchLinterNet.Core.Tests/AdoptionAcceptance/Fixtures/"
+         "modular-consumer/src/Synthetic.Modules.M01/Synthetic.Modules.M01.csproj"),
+        "<Project Sdk=\"Microsoft.NET.Sdk\"></Project>\n")
+
+    report = make_report(True, [])
+    coverage_index = build_coverage_index(report)
+
+    units = classify_changed_file(file_rel, tmp_path, coverage_index, ALL_SCOPES)
+
+    assert units == []
+
+
+def test_render_new_code_section_omits_synthetic_acceptance_fixture_noise(tmp_path: Path) -> None:
+    file_rel = ("tests/ArchLinterNet.Core.Tests/AdoptionAcceptance/Fixtures/"
+                "modular-consumer/src/Synthetic.Modules.M01/Module.cs")
+    write_file(tmp_path, file_rel, "namespace Synthetic.Modules.M01;\n\nclass Module {}\n")
+    write_file(
+        tmp_path,
+        ("tests/ArchLinterNet.Core.Tests/AdoptionAcceptance/Fixtures/"
+         "modular-consumer/src/Synthetic.Modules.M01/Synthetic.Modules.M01.csproj"),
+        "<Project Sdk=\"Microsoft.NET.Sdk\"></Project>\n")
+
+    report = make_report(True, [])
+
+    markdown = render_report(report, [file_rel], tmp_path)
+
+    assert "Synthetic.Modules.M01" not in markdown
+    assert "| Requiring policy update | none |" in markdown
+
+
 def test_render_new_code_section_omits_test_project_noise(tmp_path: Path) -> None:
     file_rel = "tests/Foo.Tests/BarTests.cs"
     write_file(tmp_path, file_rel, "namespace FooTestFixtures;\n\nclass BarTests {}\n")
