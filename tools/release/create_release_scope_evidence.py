@@ -18,6 +18,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import os
 import re
 import subprocess
 from pathlib import Path
@@ -37,10 +38,17 @@ def _allowed_roots() -> tuple[Path, ...]:
 
 
 def _safe_path(value: Path, description: str) -> Path:
-    resolved = Path(value).resolve()
-    if not any(resolved.is_relative_to(root) for root in _allowed_roots()):
-        raise ValueError(f"The {description} '{value}' resolves outside the release workspace.")
-    return resolved
+    resolved = os.path.realpath(str(value))
+    for root in _allowed_roots():
+        candidate = os.path.realpath(str(root))
+        try:
+            contained = os.path.commonpath([resolved, candidate]) == candidate
+        except ValueError:
+            # Different drives on Windows: no common path, so this root does not contain it.
+            continue
+        if contained:
+            return Path(resolved)
+    raise ValueError(f"The {description} '{value}' resolves outside the release workspace.")
 
 
 def _repository(value: str) -> str:
@@ -86,7 +94,8 @@ def _resolve_states(repository: str, numbers: list[int]) -> dict[int, dict[str, 
     """Read issue state from GitHub. Any failure is fatal: an unverifiable scope must not pass."""
     resolved: dict[int, dict[str, Any]] = {}
     for number in numbers:
-        completed = subprocess.run(  # noqa: S603 - fixed argv, validated repository and issue number
+        # Fixed argv, no shell, and both interpolated values re-validated at the call site.
+        completed = subprocess.run(
             ["gh", "issue", "view", str(_issue_number(number)), "--repo", _repository(repository),
              "--json", "number,state,title"],
             capture_output=True, text=True, check=False, shell=False)

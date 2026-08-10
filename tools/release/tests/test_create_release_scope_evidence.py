@@ -79,17 +79,21 @@ def test_build_evidence_binds_state_to_the_candidate(tmp_path: Path, monkeypatch
 def test_build_evidence_rejects_a_manifest_from_another_commit(tmp_path: Path, monkeypatch) -> None:
     monkeypatch.chdir(tmp_path)
     _stub_gh(monkeypatch, {})
+    declaration = _declaration(tmp_path)
+    manifest = _manifest(tmp_path, "c" * 40)
 
     with pytest.raises(ValueError, match="source commit does not match"):
-        build_evidence(_declaration(tmp_path), _manifest(tmp_path, "c" * 40), _COMMIT, _REPOSITORY)
+        build_evidence(declaration, manifest, _COMMIT, _REPOSITORY)
 
 
 def test_unresolvable_issue_is_fatal(tmp_path: Path, monkeypatch) -> None:
     monkeypatch.chdir(tmp_path)
     _stub_gh(monkeypatch, {}, returncode=1, stderr="not found")
+    declaration = _declaration(tmp_path)
+    manifest = _manifest(tmp_path)
 
     with pytest.raises(ValueError, match="Cannot resolve issue #435"):
-        build_evidence(_declaration(tmp_path), _manifest(tmp_path), _COMMIT, _REPOSITORY)
+        build_evidence(declaration, manifest, _COMMIT, _REPOSITORY)
 
 
 @pytest.mark.parametrize("value", ["owner", "owner/name/extra", "owner/na me", "own;er/name", "", "-"])
@@ -131,6 +135,16 @@ def test_traversal_out_of_the_workspace_is_rejected(tmp_path: Path, monkeypatch)
 
     with pytest.raises(ValueError, match="resolves outside the release workspace"):
         _safe_path(Path("../../escaped.json"), "output")
+
+
+def test_incomparable_root_is_treated_as_not_containing(tmp_path: Path, monkeypatch) -> None:
+    """os.path.commonpath raises for paths on different Windows drives; that is a rejection, not a
+    crash, and must not leak a confusing message."""
+    monkeypatch.setattr(generator.os.path, "commonpath",
+                        lambda paths: (_ for _ in ()).throw(ValueError("different drives")))
+
+    with pytest.raises(ValueError, match="resolves outside the release workspace"):
+        _safe_path(tmp_path / "file.json", "output")
 
 
 def test_path_inside_the_workspace_is_accepted(tmp_path: Path, monkeypatch) -> None:
