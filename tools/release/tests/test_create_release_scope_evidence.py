@@ -172,22 +172,45 @@ def test_malformed_declaration_is_rejected(tmp_path: Path, declaration: dict, me
         _read_declaration(path)
 
 
-def test_main_writes_the_bound_inventory(tmp_path: Path, monkeypatch) -> None:
+def test_main_writes_the_bound_inventory_to_the_fixed_location(tmp_path: Path, monkeypatch) -> None:
+    """`main` takes no path arguments: the declaration, manifest, and output are fixed release-
+    workspace locations, so the only inputs are the repository and the source commit."""
     monkeypatch.chdir(tmp_path)
     _stub_gh(monkeypatch, {435: "CLOSED", 466: "CLOSED"})
-    output = tmp_path / "evidence" / "release-scope.json"
+    output = tmp_path / "artifacts" / "checkpoint-b" / "release-scope.json"
+    monkeypatch.setattr(generator, "_declaration_path", lambda: _declaration(tmp_path))
+    monkeypatch.setattr(generator, "_candidate_manifest_path", lambda: _manifest(tmp_path))
+    monkeypatch.setattr(generator, "_output_path", lambda: output)
     monkeypatch.setattr(sys, "argv", [
         "create_release_scope_evidence.py",
-        "--declaration", str(_declaration(tmp_path)),
-        "--candidate-manifest", str(_manifest(tmp_path)),
         "--source-commit", _COMMIT,
         "--repository", _REPOSITORY,
-        "--output", str(output),
     ])
 
     assert generator.main() == 0
     written = json.loads(output.read_text())
     assert [item["state"] for item in written["required_items"]] == ["closed", "closed"]
+
+
+def test_main_rejects_path_arguments(monkeypatch) -> None:
+    """A release-authorizing script must not be pointable at another manifest or output."""
+    monkeypatch.setattr(sys, "argv", [
+        "create_release_scope_evidence.py",
+        "--source-commit", _COMMIT,
+        "--repository", _REPOSITORY,
+        "--output", "/tmp/elsewhere.json",
+    ])
+
+    with pytest.raises(SystemExit):
+        generator.main()
+
+
+def test_the_fixed_locations_stay_inside_the_release_workspace() -> None:
+    root = generator._repository_root()
+
+    assert generator._declaration_path().is_relative_to(root)
+    assert generator._candidate_manifest_path().is_relative_to(root)
+    assert generator._output_path().is_relative_to(root)
 
 
 def test_the_shipped_declaration_is_valid() -> None:

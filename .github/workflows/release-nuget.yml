@@ -149,7 +149,9 @@ jobs:
       - name: Resolve authoritative release scope
         env:
           GH_TOKEN: ${{ github.token }}
-        run: python3 tools/release/create_release_scope_evidence.py --candidate-manifest artifacts/candidate/package-manifest.json --source-commit "$GITHUB_SHA" --repository "$GITHUB_REPOSITORY" --output artifacts/checkpoint-b/release-scope.json
+        # No path arguments by design: the declaration, candidate manifest, and output are fixed
+        # release-workspace locations inside the tool.
+        run: python3 tools/release/create_release_scope_evidence.py --source-commit "$GITHUB_SHA" --repository "$GITHUB_REPOSITORY"
 
       - name: Download platform evidence
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c

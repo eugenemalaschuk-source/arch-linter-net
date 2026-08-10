@@ -8,9 +8,11 @@ this tool resolves only the *current* state of those issues and binds the result
 manifest digest and source commit, so the aggregator cannot be handed a stale or unrelated
 inventory.
 
-This tool authorizes a publication decision, so every value that reaches the filesystem or an OS
-command is validated first: paths must resolve inside a known root, the repository must match the
-GitHub `owner/name` grammar, and issue numbers must be positive integers.
+This tool authorizes a publication decision, so it takes no path arguments at all: the declaration,
+the candidate manifest, and the output all sit at fixed locations in the release workspace, which
+the release workflow already pins. The only inputs are the repository and the source commit, both
+validated against a strict grammar before they reach an OS command. `build_evidence` keeps explicit
+path parameters as the seam the tests drive.
 """
 
 from __future__ import annotations
@@ -30,11 +32,30 @@ _REPOSITORY_PATTERN = re.compile(r"^[A-Za-z0-9._-]+/[A-Za-z0-9._-]+$")
 _COMMIT_PATTERN = re.compile(r"^[0-9a-fA-F]{7,64}$")
 
 
+def _repository_root() -> Path:
+    return Path(__file__).resolve().parents[2]
+
+
+# Fixed release-workspace locations. The release workflow already pins these paths for every other
+# tool in this directory; keeping them here instead of in argv means a release-authorizing script
+# has no way to be pointed at a different manifest or to write its verdict somewhere else.
+def _declaration_path() -> Path:
+    return Path(__file__).with_name("release-scope.json")
+
+
+def _candidate_manifest_path() -> Path:
+    return _repository_root() / "artifacts" / "candidate" / "package-manifest.json"
+
+
+def _output_path() -> Path:
+    return _repository_root() / "artifacts" / "checkpoint-b" / "release-scope.json"
+
+
 def _allowed_roots() -> tuple[Path, ...]:
     """Paths are accepted only inside the working tree or the repository this script ships in, so a
-    faulty or hostile argument cannot read or write outside the release workspace. Resolved per
-    call rather than at import time, so the answer never depends on when the module was loaded."""
-    return (Path.cwd().resolve(), Path(__file__).resolve().parents[2])
+    faulty caller cannot read or write outside the release workspace. Resolved per call rather than
+    at import time, so the answer never depends on when the module was loaded."""
+    return (Path.cwd().resolve(), _repository_root())
 
 
 def _safe_path(value: Path, description: str) -> Path:
@@ -145,20 +166,16 @@ def build_evidence(
 
 def main() -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--declaration", type=Path,
-                        default=Path(__file__).with_name("release-scope.json"))
-    parser.add_argument("--candidate-manifest", type=Path, required=True)
     parser.add_argument("--source-commit", required=True)
     parser.add_argument("--repository", required=True)
-    parser.add_argument("--output", type=Path, required=True)
     arguments = parser.parse_args()
 
     evidence = build_evidence(
-        arguments.declaration,
-        arguments.candidate_manifest,
+        _declaration_path(),
+        _candidate_manifest_path(),
         arguments.source_commit,
         arguments.repository)
-    output = _safe_path(arguments.output, "output")
+    output = _output_path()
     output.parent.mkdir(parents=True, exist_ok=True)
     output.write_text(json.dumps(evidence, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     return 0
