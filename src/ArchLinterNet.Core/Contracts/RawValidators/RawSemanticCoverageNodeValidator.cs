@@ -10,52 +10,30 @@ internal sealed class RawSemanticCoverageNodeValidator : IArchitecturePolicyRawD
 {
     public void Validate(ArchitecturePolicyRawDocument document)
     {
-        if (!document.TryGetSection(RawYamlNodes.ContractsKey, out YamlMappingNode? contracts))
-        {
-            return;
-        }
-
-        ValidateGroup(contracts, "strict_coverage", document.Provenance);
-        ValidateGroup(contracts, "audit_coverage", document.Provenance);
+        RawYamlNodes.ForEachContract(document, "strict_coverage", (contract, _, _) => ValidateContract(contract));
+        RawYamlNodes.ForEachContract(document, "audit_coverage", (contract, _, _) => ValidateContract(contract));
     }
 
-    private static void ValidateGroup(
-        YamlMappingNode contracts,
-        string groupKey,
-        ArchitecturePolicyProvenanceIndex provenance)
+    private static void ValidateContract(YamlMappingNode contract)
     {
-        if (!RawYamlNodes.TryGetChild(contracts, groupKey, out YamlNode? groupNode) || groupNode is not YamlSequenceNode contractsList)
+        if (!RawYamlNodes.TryGetChild(contract, "scope", out YamlNode? scopeNode)
+            || scopeNode is not YamlScalarNode scope
+            || !string.Equals(scope.Value, "semantic_role", StringComparison.Ordinal)
+            || !RawYamlNodes.TryGetChild(contract, RawYamlNodes.ExcludeKey, out YamlNode? excludeNode)
+            || excludeNode is not YamlSequenceNode exclusions)
         {
             return;
         }
 
-        for (int index = 0; index < contractsList.Children.Count; index++)
+        string contractName = RawYamlNodes.ContractName(contract);
+        foreach (YamlMappingNode exclusion in exclusions.Children.OfType<YamlMappingNode>())
         {
-            if (contractsList.Children[index] is not YamlMappingNode contract)
-            {
-                continue;
-            }
-
-            provenance.SetValidationSubject(RawYamlNodes.ContractPath(groupKey, index));
-            if (!RawYamlNodes.TryGetChild(contract, "scope", out YamlNode? scopeNode)
-                || scopeNode is not YamlScalarNode scope
-                || !string.Equals(scope.Value, "semantic_role", StringComparison.Ordinal)
-                || !RawYamlNodes.TryGetChild(contract, RawYamlNodes.ExcludeKey, out YamlNode? excludeNode)
-                || excludeNode is not YamlSequenceNode exclusions)
-            {
-                continue;
-            }
-
-            string contractName = RawYamlNodes.ContractName(contract);
-            foreach (YamlMappingNode exclusion in exclusions.Children.OfType<YamlMappingNode>())
-            {
-                RawYamlNodes.ValidateKnownKeys(exclusion, contractName, "semantic coverage exclusion",
-                    new[]
-                    {
-                        "namespace", RawYamlNodes.NamespaceSuffixKey, "project", "assembly", "contract_id", "between",
-                        "role", "metadata", "reason"
-                    });
-            }
+            RawYamlNodes.ValidateKnownKeys(exclusion, contractName, "semantic coverage exclusion",
+                new[]
+                {
+                    "namespace", RawYamlNodes.NamespaceSuffixKey, "project", "assembly", "contract_id", "between",
+                    "role", "metadata", "reason"
+                });
         }
     }
 }

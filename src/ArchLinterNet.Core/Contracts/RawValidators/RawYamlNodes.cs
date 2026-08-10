@@ -73,6 +73,35 @@ internal static class RawYamlNodes
             : UnnamedContractName;
     }
 
+    // The one place a raw validator walks a `contracts.<group>` sequence. Pointing the provenance
+    // validation subject at the indexed contract before each callback is load-bearing (it is what
+    // carries the authored/imported location into a raw diagnostic), so it lives here rather than
+    // being repeated - and re-derived - by every contract-family validator. Non-mapping entries are
+    // skipped, matching the behavior each validator had before this loop was shared.
+    public static void ForEachContract(
+        ArchitecturePolicyRawDocument document,
+        string groupKey,
+        Action<YamlMappingNode, string, int> validateContract)
+    {
+        if (!document.TryGetSection(ContractsKey, out YamlMappingNode? contracts)
+            || !TryGetChild(contracts, groupKey, out YamlNode? groupNode)
+            || groupNode is not YamlSequenceNode sequence)
+        {
+            return;
+        }
+
+        for (int index = 0; index < sequence.Children.Count; index++)
+        {
+            if (sequence.Children[index] is not YamlMappingNode contractNode)
+            {
+                continue;
+            }
+
+            document.Provenance.SetValidationSubject(ContractPath(groupKey, index));
+            validateContract(contractNode, groupKey, index);
+        }
+    }
+
     public static string ContractPath(string groupKey, int index)
     {
         return ArchitecturePolicyProvenancePath.AppendIndex(

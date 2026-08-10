@@ -17,33 +17,8 @@ internal sealed class RawLayerTemplateNodeValidator : IArchitecturePolicyRawDocu
 
     public void Validate(ArchitecturePolicyRawDocument document)
     {
-        if (!document.TryGetSection(RawYamlNodes.ContractsKey, out YamlMappingNode? contracts))
-        {
-            return;
-        }
-
-        ValidateGroup(contracts, "strict_layer_templates", document.Provenance);
-        ValidateGroup(contracts, "audit_layer_templates", document.Provenance);
-    }
-
-    private static void ValidateGroup(
-        YamlMappingNode contracts, string groupKey, ArchitecturePolicyProvenanceIndex provenance)
-    {
-        if (!RawYamlNodes.TryGetChild(contracts, groupKey, out YamlNode? groupNode) || groupNode is not YamlSequenceNode sequence)
-        {
-            return;
-        }
-
-        for (int index = 0; index < sequence.Children.Count; index++)
-        {
-            if (sequence.Children[index] is not YamlMappingNode contractNode)
-            {
-                continue;
-            }
-
-            provenance.SetValidationSubject(RawYamlNodes.ContractPath(groupKey, index));
-            ValidateContract(contractNode);
-        }
+        RawYamlNodes.ForEachContract(document, "strict_layer_templates", (contract, _, _) => ValidateContract(contract));
+        RawYamlNodes.ForEachContract(document, "audit_layer_templates", (contract, _, _) => ValidateContract(contract));
     }
 
     private static void ValidateContract(YamlMappingNode contractNode)

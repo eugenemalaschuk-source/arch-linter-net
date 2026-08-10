@@ -27,33 +27,10 @@ internal sealed class RawLayoutConventionNodeValidator : IArchitecturePolicyRawD
 
     public void Validate(ArchitecturePolicyRawDocument document)
     {
-        if (!document.TryGetSection(RawYamlNodes.ContractsKey, out YamlMappingNode? contracts))
-        {
-            return;
-        }
-
-        ValidateGroup(contracts, "strict_layout_conventions", document.Provenance);
-        ValidateGroup(contracts, "audit_layout_conventions", document.Provenance);
-    }
-
-    private static void ValidateGroup(
-        YamlMappingNode contracts, string groupKey, ArchitecturePolicyProvenanceIndex provenance)
-    {
-        if (!RawYamlNodes.TryGetChild(contracts, groupKey, out YamlNode? groupNode) || groupNode is not YamlSequenceNode sequence)
-        {
-            return;
-        }
-
-        for (int index = 0; index < sequence.Children.Count; index++)
-        {
-            if (sequence.Children[index] is not YamlMappingNode contractNode)
-            {
-                continue;
-            }
-
-            provenance.SetValidationSubject(RawYamlNodes.ContractPath(groupKey, index));
-            ValidateContract(contractNode, groupKey, index, provenance);
-        }
+        RawYamlNodes.ForEachContract(document, "strict_layout_conventions",
+            (contract, groupKey, index) => ValidateContract(contract, groupKey, index, document.Provenance));
+        RawYamlNodes.ForEachContract(document, "audit_layout_conventions",
+            (contract, groupKey, index) => ValidateContract(contract, groupKey, index, document.Provenance));
     }
 
     private static void ValidateContract(

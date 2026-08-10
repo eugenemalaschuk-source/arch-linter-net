@@ -99,8 +99,12 @@ The self-architecture policy is namespace-scoped and cannot distinguish the load
 neighbours in `ArchLinterNet.Core.Contracts`. The boundary is instead guarded by focused NUnit
 architecture tests asserting that:
 
-- `ArchitecturePolicyDocumentLoader` declares no member whose signature mentions a
-  `YamlDotNet.RepresentationModel` type (a reintroduced raw-node algorithm must take or return one);
+- `ArchitecturePolicyDocumentLoader` references no `YamlDotNet.RepresentationModel` type at all.
+  Signatures alone are not enough: the extracted checks looked like
+  `ValidateRawLayerYaml(string yaml, ArchitecturePolicyProvenanceIndex provenance)` and built the node
+  tree inside their own bodies, so a signature-only guard would let exactly that shape back in. The
+  guard therefore checks the loader's source *and* its compiled members, method locals and
+  compiler-generated captured state, and is itself verified against a probe reproducing the old shape;
 - every `IArchitecturePolicyRawDocumentValidator` in the Core assembly is registered exactly once in
   the pipeline, so a new raw validator cannot be silently unreachable;
 - the pipeline's order matches the documented pre-refactor call order.

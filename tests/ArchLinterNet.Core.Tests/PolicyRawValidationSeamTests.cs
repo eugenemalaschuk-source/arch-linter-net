@@ -1,4 +1,5 @@
 using System.Reflection;
+using System.Text.RegularExpressions;
 using ArchLinterNet.Core.Contracts;
 using ArchLinterNet.Core.Contracts.RawValidators;
 using ArchLinterNet.Core.Model;
@@ -11,9 +12,18 @@ namespace ArchLinterNet.Core.Tests;
 // belong to their own validator, the loader only orders the stage, and the stage's first-match-wins
 // order and provenance evidence are load-bearing behavior.
 [TestFixture]
-public sealed class PolicyRawValidationSeamTests
+public sealed partial class PolicyRawValidationSeamTests
 {
     private const string RepresentationModelNamespace = "YamlDotNet.RepresentationModel";
+
+    private const BindingFlags Declared = BindingFlags.Public | BindingFlags.NonPublic
+        | BindingFlags.Instance | BindingFlags.Static | BindingFlags.DeclaredOnly;
+
+    // The representation-model surface a raw-node algorithm has to name somewhere in its source, even
+    // when its own signature exposes none of it. Deliberately does not match YamlDotNet.Serialization
+    // types: configuring the deserializer is a loader stage, walking the node tree is not.
+    [GeneratedRegex(@"\b(YamlDotNet\.RepresentationModel|YamlStream|YamlDocument|YamlNode|YamlMappingNode|YamlSequenceNode|YamlScalarNode|YamlAliasNode)\b")]
+    private static partial Regex RepresentationModelReference();
 
     // The order ArchitecturePolicyDocumentLoader.LoadCore invoked its raw checks in before they were
     // extracted. Contextual and port-boundary contracts were a single pass, contextual groups first.
@@ -122,32 +132,84 @@ public sealed class PolicyRawValidationSeamTests
         }
     }
 
-    // A reintroduced capability-specific raw-node algorithm on the loader has to accept or return a
-    // YamlDotNet representation-model node, so this fails the moment the switchboard starts growing
-    // back - the self-architecture policy is namespace-scoped and cannot see inside a single type.
+    // The reintroduced anti-pattern this guards against is a method like the former
+    // `ValidateRawLayerYaml(string yaml, ArchitecturePolicyProvenanceIndex provenance)`: its signature
+    // mentions no node type at all, because it built the YamlStream and walked YamlMappingNode inside
+    // its own body. Checking signatures alone would let exactly that back in, so the source of every
+    // loader partial is checked for any representation-model type name.
     [Test]
-    public void Loader_DeclaresNoRawYamlNodeMembers()
+    public void LoaderSource_DoesNotReferenceRawYamlNodeTypes()
     {
-        const BindingFlags Declared = BindingFlags.Public | BindingFlags.NonPublic
-            | BindingFlags.Instance | BindingFlags.Static | BindingFlags.DeclaredOnly;
-        Type loader = typeof(ArchitecturePolicyDocumentLoader);
+        string[] loaderSources = Directory.GetFiles(
+            Path.Combine(FindRepositoryRoot(), "src", "ArchLinterNet.Core", "Contracts"),
+            "ArchitecturePolicyDocumentLoader*.cs");
+        Assert.That(loaderSources, Is.Not.Empty, "Loader source files were not found - fix the path in this guard.");
 
-        string[] offenders = loader.GetMethods(Declared)
-            .SelectMany(method => method.GetParameters()
-                .Select(parameter => parameter.ParameterType)
-                .Append(method.ReturnType)
-                .Where(MentionsRepresentationModel)
-                .Select(type => $"{method.Name}: {type.Name}"))
-            .Concat(loader.GetFields(Declared)
-                .Where(field => MentionsRepresentationModel(field.FieldType))
-                .Select(field => $"{field.Name}: {field.FieldType.Name}"))
-            .Concat(loader.GetProperties(Declared)
-                .Where(property => MentionsRepresentationModel(property.PropertyType))
-                .Select(property => $"{property.Name}: {property.PropertyType.Name}"))
+        string[] offenders = loaderSources
+            .SelectMany(path => File.ReadAllLines(path)
+                .Select((line, number) => (Line: line, Number: number + 1))
+                .Where(entry => RepresentationModelReference().IsMatch(entry.Line))
+                .Select(entry => $"{Path.GetFileName(path)}:{entry.Number}: {entry.Line.Trim()}"))
             .ToArray();
 
         Assert.That(offenders, Is.Empty,
-            "Raw YAML node validation belongs in Contracts/RawValidators, not on the policy document loader.");
+            "Raw YAML node algorithms belong in Contracts/RawValidators, not on the policy document loader.");
+    }
+
+    // Compiled-form counterpart to the source guard, so the boundary survives a rename or a move of
+    // the loader's files. Locals and nested compiler-generated types are covered too: a raw-node
+    // algorithm hidden inside a method body or a lambda still materializes as a representation-model
+    // local or captured field.
+    [Test]
+    public void LoaderType_DeclaresNoRawYamlNodeMembersOrLocals()
+    {
+        Type loader = typeof(ArchitecturePolicyDocumentLoader);
+        string[] offenders = new[] { loader }
+            .Concat(loader.GetNestedTypes(Declared))
+            .SelectMany(RepresentationModelUsages)
+            .ToArray();
+
+        Assert.That(offenders, Is.Empty,
+            "Raw YAML node algorithms belong in Contracts/RawValidators, not on the policy document loader.");
+    }
+
+    private static IEnumerable<string> RepresentationModelUsages(Type type)
+    {
+        IEnumerable<string> signatures = type.GetMethods(Declared).Cast<MethodBase>()
+            .Concat(type.GetConstructors(Declared))
+            .SelectMany(method => method.GetParameters()
+                .Select(parameter => parameter.ParameterType)
+                .Concat(method is MethodInfo info ? new[] { info.ReturnType } : Array.Empty<Type>())
+                .Where(MentionsRepresentationModel)
+                .Select(used => $"{type.Name}.{method.Name} signature: {used.Name}"));
+
+        IEnumerable<string> locals = type.GetMethods(Declared).Cast<MethodBase>()
+            .Concat(type.GetConstructors(Declared))
+            .SelectMany(method => (method.GetMethodBody()?.LocalVariables ?? (IList<LocalVariableInfo>)Array.Empty<LocalVariableInfo>())
+                .Select(local => local.LocalType)
+                .Where(MentionsRepresentationModel)
+                .Select(used => $"{type.Name}.{method.Name} local: {used.Name}"));
+
+        IEnumerable<string> fields = type.GetFields(Declared)
+            .Where(field => MentionsRepresentationModel(field.FieldType))
+            .Select(field => $"{type.Name}.{field.Name} field: {field.FieldType.Name}");
+
+        IEnumerable<string> properties = type.GetProperties(Declared)
+            .Where(property => MentionsRepresentationModel(property.PropertyType))
+            .Select(property => $"{type.Name}.{property.Name} property: {property.PropertyType.Name}");
+
+        return signatures.Concat(locals).Concat(fields).Concat(properties);
+    }
+
+    private static string FindRepositoryRoot()
+    {
+        var directory = new DirectoryInfo(TestContext.CurrentContext.TestDirectory);
+        while (directory is not null && directory.GetFiles("ArchLinterNet.slnx").Length == 0)
+        {
+            directory = directory.Parent;
+        }
+
+        return directory?.FullName ?? throw new InvalidOperationException("Could not find repo root");
     }
 
     [Test]

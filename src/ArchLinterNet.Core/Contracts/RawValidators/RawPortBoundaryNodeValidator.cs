@@ -14,44 +14,26 @@ internal sealed class RawPortBoundaryNodeValidator : IArchitecturePolicyRawDocum
 
     public void Validate(ArchitecturePolicyRawDocument document)
     {
-        if (!document.TryGetSection(RawYamlNodes.ContractsKey, out YamlMappingNode? contracts))
-        {
-            return;
-        }
-
-        ValidateGroup(contracts, "strict_port_boundaries", document.Provenance);
-        ValidateGroup(contracts, "audit_port_boundaries", document.Provenance);
+        RawYamlNodes.ForEachContract(document, "strict_port_boundaries", (entry, _, _) => ValidateContract(entry));
+        RawYamlNodes.ForEachContract(document, "audit_port_boundaries", (entry, _, _) => ValidateContract(entry));
     }
 
-    private static void ValidateGroup(
-        YamlMappingNode contracts,
-        string groupKey,
-        ArchitecturePolicyProvenanceIndex provenance)
+    private static void ValidateContract(YamlMappingNode entry)
     {
-        if (!RawYamlNodes.TryGetChild(contracts, groupKey, out YamlNode? groupNode) || groupNode is not YamlSequenceNode sequence) return;
-        for (int index = 0; index < sequence.Children.Count; index++)
+        string name = RawYamlNodes.ContractName(entry);
+        ValidateContractNodeKeys(entry, name);
+        if (RawYamlNodes.TryGetChild(entry, RawYamlNodes.SourceKey, out YamlNode? source) && source is YamlMappingNode sourceMapping)
         {
-            if (sequence.Children[index] is not YamlMappingNode entry)
-            {
-                continue;
-            }
-
-            provenance.SetValidationSubject(RawYamlNodes.ContractPath(groupKey, index));
-            string name = RawYamlNodes.ContractName(entry);
-            ValidateContractNodeKeys(entry, name);
-            if (RawYamlNodes.TryGetChild(entry, RawYamlNodes.SourceKey, out YamlNode? source) && source is YamlMappingNode sourceMapping)
-            {
-                RawContextualSelectorKeys.ValidateNodeKeys(sourceMapping, name, RawYamlNodes.SourceKey);
-            }
-            if (RawYamlNodes.TryGetChild(entry, "target_context", out YamlNode? targetContext) && targetContext is YamlMappingNode targetMapping)
-            {
-                ValidateTargetContextNodeKeys(targetMapping, name);
-            }
-            RawContextualSelectorKeys.ValidateListKeys(entry, name, "allowed_seams");
-            RawContextualSelectorKeys.ValidateListKeys(entry, name, "forbidden");
-            RawContextualSelectorKeys.ValidateListKeys(entry, name, RawYamlNodes.ExcludeKey);
-            ValidateAdapterBindings(entry, name);
+            RawContextualSelectorKeys.ValidateNodeKeys(sourceMapping, name, RawYamlNodes.SourceKey);
         }
+        if (RawYamlNodes.TryGetChild(entry, "target_context", out YamlNode? targetContext) && targetContext is YamlMappingNode targetMapping)
+        {
+            ValidateTargetContextNodeKeys(targetMapping, name);
+        }
+        RawContextualSelectorKeys.ValidateListKeys(entry, name, "allowed_seams");
+        RawContextualSelectorKeys.ValidateListKeys(entry, name, "forbidden");
+        RawContextualSelectorKeys.ValidateListKeys(entry, name, RawYamlNodes.ExcludeKey);
+        ValidateAdapterBindings(entry, name);
     }
 
     private static void ValidateContractNodeKeys(YamlMappingNode node, string contractName)

@@ -59,8 +59,9 @@ Validation that inspects the effective policy YAML node tree before deserializat
 implemented by classes implementing an internal raw-document validator interface (a single
 `Validate(ArchitecturePolicyRawDocument document)` method that throws on invalid raw configuration),
 rather than as methods on `ArchitecturePolicyDocumentLoader`. `ArchitecturePolicyDocumentLoader`
-SHALL NOT declare any member whose signature references a YamlDotNet representation-model node type,
-and SHALL NOT contain capability-specific raw YAML node algorithms in its own method bodies.
+SHALL NOT reference any YamlDotNet representation-model type anywhere in its own source - neither in a
+member signature nor inside a method body, lambda, or local declaration - so that a raw-node algorithm
+whose signature exposes no node type cannot be reintroduced onto it.
 
 #### Scenario: Adding a raw node rule to an existing capability does not touch the loader
 - **WHEN** a new raw YAML node rule is added for an existing capability (for example a new
@@ -68,10 +69,12 @@ and SHALL NOT contain capability-specific raw YAML node algorithms in its own me
 - **THEN** the change is made entirely within that capability's raw validator class
 - **AND** `ArchitecturePolicyDocumentLoader` is not modified
 
-#### Scenario: Loader declares no raw node algorithms
-- **WHEN** the members declared by `ArchitecturePolicyDocumentLoader` are inspected
-- **THEN** no field, property, parameter or return type references a YamlDotNet
-  representation-model node type
+#### Scenario: A raw node algorithm hidden in a loader method body is rejected
+- **WHEN** a method that takes only a YAML string and builds the node tree inside its own body is
+  added to `ArchitecturePolicyDocumentLoader` - the shape the extracted raw checks had before this
+  change
+- **THEN** the loader boundary guard fails, on both the loader's source and its compiled members,
+  locals and captured state
 
 #### Scenario: Every raw validator is reachable from the pipeline
 - **WHEN** the Core assembly is inspected for implementations of the raw-document validator interface
@@ -113,12 +116,15 @@ after the whole raw stage, not by individual raw validators.
 - **THEN** the failure is enriched with that fragment's authored location, identical to the location
   produced before this change
 
-### Requirement: The policy document loader orders load stages without owning their algorithms
+### Requirement: The policy document loader orders load stages without owning capability-specific algorithms
 `ArchitecturePolicyDocumentLoader` SHALL sequence root resolution, import resolution and composition,
 effective-schema validation, raw YAML validation, deserialization, fallback-ID assignment, provenance
 binding, deferred classification-path detection, reviewed API snapshot resolution, source-set
-expansion and the document-validator pipeline as explicit, deterministically ordered stages, and
-SHALL delegate each stage's algorithm to a dedicated type. Cancellation checks and exception
+expansion and the document-validator pipeline as explicit, deterministically ordered stages. It SHALL
+NOT implement any stage that is specific to a contract family or other policy capability; each such
+stage SHALL be delegated to a dedicated type. Stages that are not capability-specific - resolving and
+reading the selected root, delegating to the import resolution and composition components, and
+configuring the YAML deserializer - MAY remain on the loader. Cancellation checks and exception
 enrichment SHALL remain deterministic and unchanged.
 
 #### Scenario: Stage order is unchanged
