@@ -1,5 +1,7 @@
 using ArchLinterNet.Core.Contracts.Families;
 using ArchLinterNet.Core.Contracts.PolicyImports;
+using ArchLinterNet.Core.Contracts.Validators;
+using ArchLinterNet.Core.Discovery;
 using ArchLinterNet.Core.Model;
 using ArchLinterNet.Core.Resolution;
 
@@ -48,14 +50,26 @@ internal static partial class ArchitectureSourceSetExpander
             groups.StrictExternalAllowOnly, list => groups.StrictExternalAllowOnly = list);
         ExpandGroup(document, resolver, expansions, "audit_external_allow_only",
             groups.AuditExternalAllowOnly, list => groups.AuditExternalAllowOnly = list);
+        ExpandGroup(document, resolver, expansions, "strict_assembly_dependency",
+            groups.StrictAssemblyDependency, list => groups.StrictAssemblyDependency = list);
+        ExpandGroup(document, resolver, expansions, "audit_assembly_dependency",
+            groups.AuditAssemblyDependency, list => groups.AuditAssemblyDependency = list);
+        ExpandGroup(document, resolver, expansions, "strict_assembly_allow_only",
+            groups.StrictAssemblyAllowOnly, list => groups.StrictAssemblyAllowOnly = list);
+        ExpandGroup(document, resolver, expansions, "audit_assembly_allow_only",
+            groups.AuditAssemblyAllowOnly, list => groups.AuditAssemblyAllowOnly = list);
 
         ExpansionContext inlineContext = new(document, resolver, expansions);
-        ExpandInlineGroup(inlineContext, "strict_project_metadata",
-            groups.StrictProjectMetadata, contract => contract.Projects, (contract, values) => contract.Projects = values,
-            contract => contract.ProjectSets, new SourceSetField("project_sets", ArchitectureSourceSetKind.Project));
-        ExpandInlineGroup(inlineContext, "audit_project_metadata",
-            groups.AuditProjectMetadata, contract => contract.Projects, (contract, values) => contract.Projects = values,
-            contract => contract.ProjectSets, new SourceSetField("project_sets", ArchitectureSourceSetKind.Project));
+        if (!HasDeferredProjectUniverse(document))
+        {
+            ExpandInlineGroup(inlineContext, "strict_project_metadata",
+                groups.StrictProjectMetadata, contract => contract.Projects, (contract, values) => contract.Projects = values,
+                contract => contract.ProjectSets, new SourceSetField("project_sets", ArchitectureSourceSetKind.Project));
+            ExpandInlineGroup(inlineContext, "audit_project_metadata",
+                groups.AuditProjectMetadata, contract => contract.Projects, (contract, values) => contract.Projects = values,
+                contract => contract.ProjectSets, new SourceSetField("project_sets", ArchitectureSourceSetKind.Project));
+            document.ProjectSourceSetsExpanded = true;
+        }
         ExpandInlineGroup(inlineContext, "strict_composition",
             groups.StrictComposition, contract => contract.AllowedOnlyInAssemblies,
             (contract, values) => contract.AllowedOnlyInAssemblies = values,
@@ -76,6 +90,55 @@ internal static partial class ArchitectureSourceSetExpander
             resolver.Resolutions,
             expansions);
     }
+
+    // Solution-derived project paths are unavailable to the policy loader. Bind only project-kind
+    // sets once discovery has applied include/exclude filtering, preserving the eager expansion of
+    // every other kind and its inventory evidence.
+    internal static void BindProjectSets(ArchitectureContractDocument document, ProjectDiscoveryResult discovery)
+    {
+        if (!HasDeferredProjectUniverse(document) || document.ProjectSourceSetsExpanded)
+        {
+            return;
+        }
+
+        try
+        {
+            string[] universe = discovery.DiscoveredProjects
+                .Select(project => project.Path)
+                .OrderBy(path => path, StringComparer.Ordinal)
+                .ToArray();
+            SourceSetResolver resolver = new(document, universe);
+            List<ArchitectureContractExpansion> expansions = new();
+            ExpansionContext context = new(document, resolver, expansions);
+            Families.ArchitectureContractGroups groups = document.Contracts;
+
+            ExpandInlineGroup(context, "strict_project_metadata",
+                groups.StrictProjectMetadata, contract => contract.Projects, (contract, values) => contract.Projects = values,
+                contract => contract.ProjectSets, new SourceSetField("project_sets", ArchitectureSourceSetKind.Project));
+            ExpandInlineGroup(context, "audit_project_metadata",
+                groups.AuditProjectMetadata, contract => contract.Projects, (contract, values) => contract.Projects = values,
+                contract => contract.ProjectSets, new SourceSetField("project_sets", ArchitectureSourceSetKind.Project));
+
+            document.SourceExpansion = new ArchitectureSourceExpansionInventory(
+                document.SourceExpansion.Sets.Concat(resolver.Resolutions.Where(set =>
+                    set.Kind == ArchitectureSourceSetKind.Project)).ToArray(),
+                document.SourceExpansion.Contracts.Concat(expansions).ToArray());
+            new ProjectMetadataValidator().Validate(document);
+            document.ProjectSourceSetsExpanded = true;
+        }
+        catch (InvalidOperationException exception)
+        {
+            Exception enriched = document.Provenance.EnrichValidationException(exception);
+            throw ReferenceEquals(enriched, exception) ? exception : enriched;
+        }
+        finally
+        {
+            document.Provenance.ResetValidationSubject();
+        }
+    }
+
+    private static bool HasDeferredProjectUniverse(ArchitectureContractDocument document) =>
+        !string.IsNullOrWhiteSpace(document.Analysis.Solution);
 
     private static void ExpandGroup<TContract>(
         ArchitectureContractDocument document,
@@ -471,20 +534,27 @@ internal static partial class ArchitectureSourceSetExpander
     private sealed class SourceSetResolver
     {
         private readonly ArchitectureContractDocument _document;
+        private readonly IReadOnlyList<string>? _projectUniverse;
         private readonly Dictionary<string, ArchitectureSourceSetResolution> _resolutions =
             new(StringComparer.Ordinal);
         private readonly Dictionary<(string Set, string Source), string> _selectors = new();
         private readonly Dictionary<(string Set, string Source), ArchitecturePolicySourceLocation?> _itemLocations = new();
         private readonly List<ArchitectureSourceSetResolution> _ordered = new();
 
-        public SourceSetResolver(ArchitectureContractDocument document)
+        public SourceSetResolver(ArchitectureContractDocument document, IReadOnlyList<string>? projectUniverse = null)
         {
             _document = document;
+            _projectUniverse = projectUniverse;
 
             // Every declared set is resolved eagerly, so an unusable or empty declaration is a
             // policy error whether or not a contract happens to reference it.
             foreach ((string name, ArchitectureSourceSet set) in document.SourceSets)
             {
+                if (set.Kind == ArchitectureSourceSetKind.Project &&
+                    HasDeferredProjectUniverse(document) && projectUniverse is null)
+                {
+                    continue;
+                }
                 // Point diagnostics at the authored `source_sets.<name>` node — including its
                 // originating fragment for a composed policy — before it can throw.
                 document.Provenance.SetValidationSubject(set);
@@ -599,13 +669,6 @@ internal static partial class ArchitectureSourceSetExpander
                     "intentionally empty set must record why it is empty.");
             }
 
-            if (set.Kind == ArchitectureSourceSetKind.Project && set.Globs.Count > 0)
-            {
-                throw new InvalidOperationException(
-                    $"Source set '{name}' declares 'globs' with 'kind: project'. Project sets accept " +
-                    "explicit 'members' only, because project identities are paths rather than " +
-                    "dotted names.");
-            }
         }
 
         private void AddMembers(string name, ArchitectureSourceSet set, SortedSet<string> resolved)
@@ -646,15 +709,16 @@ internal static partial class ArchitectureSourceSetExpander
                     continue;
                 }
 
-                if (universe.Count == 0)
+                if (universe.Count == 0 && !(set.Kind == ArchitectureSourceSetKind.Project && _projectUniverse is not null))
                 {
                     throw new InvalidOperationException(
                         $"Source set '{name}' declares glob '{glob}' but {UniverseName(set.Kind)} is " +
                         "empty. Declare the inputs the glob may resolve against.");
                 }
 
-                NamespaceGlobPattern pattern = NamespaceGlobPattern.Parse(glob);
-                string[] matches = universe.Where(candidate => pattern.Match(candidate).Matched).ToArray();
+                string[] matches = set.Kind == ArchitectureSourceSetKind.Project
+                    ? universe.Where(candidate => ProjectPathGlob.IsMatch(candidate, glob)).ToArray()
+                    : universe.Where(candidate => NamespaceGlobPattern.Parse(glob).Match(candidate).Matched).ToArray();
 
                 if (matches.Length == 0 && !set.Optional)
                 {
@@ -698,14 +762,15 @@ internal static partial class ArchitectureSourceSetExpander
 
             // A policy that declares no targets or no projects is a small policy that names its
             // sources directly; there is nothing to check the member against in that case.
-            return universe.Count == 0 || universe.Contains(value, StringComparer.Ordinal);
+            return (universe.Count == 0 && !(kind == ArchitectureSourceSetKind.Project && _projectUniverse is not null))
+                || universe.Contains(value, StringComparer.Ordinal);
         }
 
         private IReadOnlyList<string> Universe(ArchitectureSourceSetKind kind) => kind switch
         {
             ArchitectureSourceSetKind.Assembly => _document.Analysis.TargetAssemblies,
             ArchitectureSourceSetKind.Layer => _document.Layers.Keys.ToArray(),
-            _ => _document.Analysis.Projects
+            _ => _projectUniverse ?? _document.Analysis.Projects
         };
 
         private static string UniverseName(ArchitectureSourceSetKind kind) => kind switch

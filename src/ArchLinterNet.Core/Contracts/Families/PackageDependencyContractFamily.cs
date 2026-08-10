@@ -12,45 +12,21 @@ public sealed partial class ArchitectureContractGroups
     public List<ArchitecturePackageDependencyContract> AuditPackageDependency { get; set; } = new();
 }
 
-public sealed class ArchitecturePackageDependencyContract : IArchitectureSourceExpandableContract
+public sealed class ArchitecturePackageDependencyContract : ArchitectureSourceExpandableContractBase
 {
-    [YamlMember(Alias = "name")] public string Name { get; set; } = string.Empty;
-
-    [YamlMember(Alias = "id")] public string? Id { get; set; }
-
-    [YamlMember(Alias = "source")] public string Source { get; set; } = string.Empty;
-
-    [YamlMember(Alias = "sources")] public List<string> Sources { get; set; } = new();
-
-    [YamlMember(Alias = "source_sets")] public List<string> SourceSets { get; set; } = new();
-
-    [YamlMember(Alias = "exclude_sources")] public List<string> ExcludedSources { get; set; } = new();
-
-    [YamlMember(Alias = "exclude_source_sets")] public List<string> ExcludedSourceSets { get; set; } = new();
-
     [YamlMember(Alias = "forbidden")] public List<string> Forbidden { get; set; } = new();
 
     [YamlMember(Alias = "dependency_depth")]
     public DependencyDepthMode DependencyDepth { get; set; } = DependencyDepthMode.Direct;
 
-    [YamlMember(Alias = "ignored_violations")]
-    public List<ArchitectureIgnoredViolation> IgnoredViolations { get; set; } = new();
+    [YamlIgnore] public override ArchitectureSourceSetKind SourceKind => ArchitectureSourceSetKind.Assembly;
 
-    [YamlMember(Alias = "reason")] public string Reason { get; set; } = string.Empty;
-
-    [YamlIgnore] public ArchitectureSourceExpansionOrigin? ExpansionOrigin { get; set; }
-
-    [YamlIgnore] public ArchitectureSourceSetKind SourceKind => ArchitectureSourceSetKind.Assembly;
-
-    public IArchitectureSourceExpandableContract CloneForSource(string source) =>
-        new ArchitecturePackageDependencyContract
-        {
-            Name = Name,
-            Id = Id,
-            Source = source,
-            Forbidden = new(Forbidden),
-            DependencyDepth = DependencyDepth,
-            IgnoredViolations = new(IgnoredViolations),
-            Reason = Reason
-        };
+    public override IArchitectureSourceExpandableContract CloneForSource(string source)
+    {
+        ArchitecturePackageDependencyContract clone = new();
+        CopyBaseFieldsTo(clone, source);
+        clone.Forbidden = new(Forbidden);
+        clone.DependencyDepth = DependencyDepth;
+        return clone;
+    }
 }

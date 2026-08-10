@@ -36,6 +36,25 @@ contracts:
 
 Every assembly name referenced by these contracts (`source`, `forbidden`, `allowed`) must also be listed in `analysis.target_assemblies`; a name that isn't a declared target assembly fails policy loading with an actionable error instead of silently being skipped.
 
+For a shared directional invariant, replace scalar `source:` with `sources:` or an assembly
+`source_sets:` reference. The contract expands deterministically to one direct-reference rule per
+resolved source, with derived IDs and independent diagnostics/baseline identities. The established
+`exclude_sources:` and `exclude_source_sets:` fields may subtract sources from the expanded set.
+
+```yaml
+source_sets:
+  module_assemblies:
+    kind: assembly
+    globs: ["MyApp.Modules.*"]
+
+contracts:
+  strict_assembly_allow_only:
+    - id: modules-allowed-refs
+      name: modules-may-only-reference-abstractions
+      source_sets: [module_assemblies]
+      allowed: [MyApp.Shared.Abstractions]
+```
+
 ## Semantics
 
 Both families detect **direct assembly references only**, using each assembly's own referenced-assembly metadata (`Assembly.GetReferencedAssemblies()`), matched by assembly simple name. A transitive path (A references B, B references C) is not detected by either family — this is a deliberate MVP scope decision, matching [assembly independence contracts](assembly-independence.md)'s existing direct-only behavior.

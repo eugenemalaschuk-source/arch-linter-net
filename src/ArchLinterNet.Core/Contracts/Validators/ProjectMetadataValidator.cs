@@ -10,7 +10,8 @@ internal sealed class ProjectMetadataValidator : IArchitecturePolicyDocumentVali
         foreach (ArchitectureProjectMetadataContract contract in document.Provenance.Track(
                      document.Contracts.StrictProjectMetadata.Concat(document.Contracts.AuditProjectMetadata)))
         {
-            if (contract.Projects.Count == 0 || contract.Projects.All(string.IsNullOrWhiteSpace))
+            if ((contract.Projects.Count == 0 || contract.Projects.All(string.IsNullOrWhiteSpace)) &&
+                contract.ProjectSets.Count == 0)
             {
                 throw new InvalidOperationException(
                     $"Project metadata contract '{contract.Name}' declares no usable 'projects'. " +
