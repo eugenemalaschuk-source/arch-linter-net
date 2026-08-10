@@ -765,9 +765,9 @@ sealed class ArchLinterNet.Core.Contracts.Families.ArchitectureAssemblyDependenc
   property ArchLinterNet.Core.Model.ArchitectureSourceExpansionOrigin? ExpansionOrigin {get;set;}
   property ArchLinterNet.Core.Model.ArchitectureSourceSetKind SourceKind {get;}
   property System.Collections.Generic.List<ArchLinterNet.Core.Contracts.ArchitectureIgnoredViolation> IgnoredViolations {get;set;}
-  property System.Collections.Generic.List<string> Forbidden {get;set;}
   property System.Collections.Generic.List<string> ExcludedSourceSets {get;set;}
   property System.Collections.Generic.List<string> ExcludedSources {get;set;}
+  property System.Collections.Generic.List<string> Forbidden {get;set;}
   property System.Collections.Generic.List<string> SourceSets {get;set;}
   property System.Collections.Generic.List<string> Sources {get;set;}
   property string Name {get;set;}

@@ -75,6 +75,71 @@ public sealed class DiscoveredProjectSourceSetTests
         });
     }
 
+    [Test]
+    public void ProjectSetMember_IsRejectedWhenSolutionFilteringLeavesNoProjects()
+    {
+        WriteProject("src/Production/Production.csproj");
+        File.WriteAllText(Path.Combine(_repositoryRoot, "Fixture.slnx"), "<Solution><Project Path=\"src/Production/Production.csproj\" /></Solution>");
+        string policyPath = Path.Combine(_repositoryRoot, "dependencies.arch.yml");
+        File.WriteAllText(policyPath, """
+            version: 1
+            name: Empty filtered solution
+            analysis:
+              solution: Fixture.slnx
+              project_exclude: ["src/**"]
+            source_sets:
+              production_projects:
+                kind: project
+                members: [src/Production/Production.csproj]
+            contracts:
+              strict_project_metadata:
+                - name: production nullable
+                  project_sets: [production_projects]
+                  required_properties: { Nullable: enable }
+            """);
+
+        ArchitectureContractDocument document = new ArchitecturePolicyDocumentLoader().Load(policyPath);
+        ProjectDiscoveryResult discovery = new ArchitectureProjectDiscoveryService().ResolveAndApply(document, _repositoryRoot, false);
+
+        InvalidOperationException exception = Assert.Throws<InvalidOperationException>(() =>
+            ArchitectureSourceSetExpander.BindProjectSets(document, discovery))!;
+        Assert.That(exception.Message, Does.Contain("must not introduce sources"));
+    }
+
+    [Test]
+    public void OptionalProjectGlob_IsRecordedEmptyWhenSolutionFilteringLeavesNoProjects()
+    {
+        WriteProject("src/Production/Production.csproj");
+        File.WriteAllText(Path.Combine(_repositoryRoot, "Fixture.slnx"), "<Solution><Project Path=\"src/Production/Production.csproj\" /></Solution>");
+        string policyPath = Path.Combine(_repositoryRoot, "dependencies.arch.yml");
+        File.WriteAllText(policyPath, """
+            version: 1
+            name: Optional empty filtered solution
+            analysis:
+              solution: Fixture.slnx
+              project_exclude: ["src/**"]
+            source_sets:
+              future_projects:
+                kind: project
+                globs: ["src/**/*.csproj"]
+                optional: true
+                reason: Production projects are introduced later.
+            contracts:
+              strict_project_metadata:
+                - name: future projects nullable
+                  project_sets: [future_projects]
+                  required_properties: { Nullable: enable }
+            """);
+
+        ArchitectureContractDocument document = new ArchitecturePolicyDocumentLoader().Load(policyPath);
+        ProjectDiscoveryResult discovery = new ArchitectureProjectDiscoveryService().ResolveAndApply(document, _repositoryRoot, false);
+
+        ArchitectureSourceSetExpander.BindProjectSets(document, discovery);
+
+        Assert.That(document.SourceExpansion.Sets.Single().ResolvedSources, Is.Empty);
+        Assert.That(document.SourceExpansion.Contracts.Single().OptionalEmpty, Is.True);
+    }
+
     private void WriteProject(string relativePath)
     {
         string projectPath = Path.Combine(_repositoryRoot, relativePath);
