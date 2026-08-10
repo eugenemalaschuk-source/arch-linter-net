@@ -367,16 +367,24 @@ public sealed class AnalysisCacheStoreTests
     // entry whose Violations list alone would serialize past MaxEntryBytes must never be published
     // at all — a subsequent TryGet must not need to reject it as SizeExceeded because Put already
     // refused to write it.
+    //
+    // The oversized entry is one violation carrying a single over-limit ASCII payload rather than a
+    // 200,000-element object graph (issue #470). Both cross the same real serialized-byte bound,
+    // but this one is O(1) allocations and needs no serializer throughput, so the correctness
+    // assertion no longer depends on runner speed while `make test` runs suites concurrently.
     [Test]
     public void Put_EntryLargerThanMaxBytes_IsRejectedBeforeWrite()
     {
+        const int OverMaxEntryBytes = (8 * 1024 * 1024) + 1024;
         AnalysisCacheKey key = CreateKey();
         AnalysisCacheProjectManifest[] manifests = { EligibleManifest() };
-        ArchitectureViolation[] oversizedViolations = Enumerable.Range(0, 200_000)
-            .Select(i => new ArchitectureViolation(
-                $"contract-{i}", $"id-{i}", $"Namespace.Type{i}", $"Forbidden.Namespace{i}",
-                new[] { $"Forbidden.Namespace{i}.Reference" }))
-            .ToArray();
+        // Plain ASCII: one UTF-8 byte per character and no JSON escaping, so the serialized entry
+        // is at least this large regardless of serializer settings.
+        ArchitectureViolation[] oversizedViolations =
+        [
+            new("contract", "id", "Namespace.Type", new string('a', OverMaxEntryBytes),
+                ["Forbidden.Namespace.Reference"]),
+        ];
         AnalysisCacheOutcomeV1 oversizedOutcome = SampleOutcome() with { Violations = oversizedViolations };
 
         AnalysisCacheStore.PutResult putResult = AnalysisCacheStore.Put(_location, key, manifests, oversizedOutcome);
