@@ -36,6 +36,12 @@ internal sealed class AttributeUsageValidator : IArchitecturePolicyDocumentValid
                     "or forbidden_in_layers/forbidden_in_namespaces/forbidden_in_projects/forbidden_in_assemblies " +
                     "location expectation. Declare at least one, or the rule can never produce a violation.");
             }
+
+            string contractLabel = $"Attribute usage contract '{contract.Name}'";
+            PolicyDocumentValidatorSupport.ValidateNamespacePatterns(
+                contractLabel, "allowed_only_in_namespaces", contract.AllowedOnlyInNamespaces);
+            PolicyDocumentValidatorSupport.ValidateNamespacePatterns(
+                contractLabel, "forbidden_in_namespaces", contract.ForbiddenInNamespaces);
         }
     }
 }

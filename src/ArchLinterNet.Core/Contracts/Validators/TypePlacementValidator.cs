@@ -31,6 +31,9 @@ internal sealed class TypePlacementValidator : IArchitecturePolicyDocumentValida
             {
                 throw new InvalidOperationException($"Type placement contract '{contract.Name}' declares a selector but no expectation.");
             }
+
+            PolicyDocumentValidatorSupport.ValidateNamespacePatterns(
+                $"Type placement contract '{contract.Name}'", "must_reside_in_namespaces", contract.MustResideInNamespaces);
         }
     }
 

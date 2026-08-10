@@ -43,6 +43,9 @@ internal sealed class CompositionValidator : IArchitecturePolicyDocumentValidato
                     "missing 'assembly' or 'type'. Both are required — a type selector without an assembly " +
                     "or type identity cannot match anything.");
             }
+
+            PolicyDocumentValidatorSupport.ValidateNamespacePatterns(
+                $"Composition contract '{contract.Name}'", "allowed_only_in_namespaces", contract.AllowedOnlyInNamespaces);
         }
     }
 }

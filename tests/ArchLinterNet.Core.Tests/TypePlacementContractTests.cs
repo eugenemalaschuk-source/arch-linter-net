@@ -11,7 +11,7 @@ using RoleFixtures = TypePlacementContractTestFixtures.Roles;
 namespace ArchLinterNet.Core.Tests;
 
 [TestFixture]
-public sealed class TypePlacementContractTests
+public sealed partial class TypePlacementContractTests
 {
     private string _tempDir = null!;
 

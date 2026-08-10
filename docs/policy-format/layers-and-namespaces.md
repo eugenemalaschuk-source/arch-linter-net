@@ -112,6 +112,37 @@ Examples:
 | `MyApp.Features.*` | `MyApp.Features` | no |
 | `MyApp.Features.*` | `MyApp.Other.Audio` | no |
 
+## Namespace-allowance contract fields use the same grammar
+
+`allowed_only_in_namespaces` (composition, attribute-usage, interface-implementation
+contracts), `forbidden_in_namespaces` (attribute-usage, interface-implementation
+contracts), and `must_reside_in_namespaces` (type-placement contracts) accept the
+exact same constrained glob grammar as `namespace` above — a literal namespace, or
+a pattern with `*` as one or more complete segments:
+
+```yaml
+contracts:
+  strict_composition:
+    - name: container-confined-to-module-bootstrap
+      allowed_only_in_namespaces: [Product.Modules.*.Composition]
+      forbidden_apis: [Resolve, Register]
+      reason: Container resolution must happen only in each module's composition root.
+```
+
+This matches `Product.Modules.Orders.Composition`, `Product.Modules.Billing.Composition`,
+and their descendants, but not `Product.Modules.Composition` (zero segments for `*`) or
+`Product.Modules.Orders.Sub.Composition` (an extra segment before `Composition`).
+
+There is no `namespace_suffix` equivalent for these fields — the suffix, if any, is
+just part of the same pattern string (as in the `Composition` example above), not a
+separate field.
+
+An entry using unsupported syntax (`**`, `?`, `[...]`, a partial-segment wildcard
+such as `Foo*`, or a bare/leading `*`) fails policy load with the same actionable
+error `namespace`'s glob grammar produces, naming the contract, the field, the
+pattern, and the violated rule — it never silently compiles into a pattern that
+then matches nothing at scan time.
+
 ## Namespace suffix
 
 Use `namespace_suffix` to model conventions such as `Contracts`, `Models`, or `Api` slices:

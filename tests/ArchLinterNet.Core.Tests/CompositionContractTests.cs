@@ -12,7 +12,7 @@ using ArchitectureContractGroups = ArchLinterNet.Core.Contracts.Families.Archite
 namespace ArchLinterNet.Core.Tests;
 
 [TestFixture]
-public sealed class CompositionContractTests
+public sealed partial class CompositionContractTests
 {
     private const string CompositionNamespace = "CompositionContractTestFixtures.Composition";
     private const string ApplicationNamespace = "CompositionContractTestFixtures.Application";

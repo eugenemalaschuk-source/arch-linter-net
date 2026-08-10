@@ -10,11 +10,12 @@ using ArchitectureContractGroups = ArchLinterNet.Core.Contracts.Families.Archite
 namespace ArchLinterNet.Core.Tests;
 
 [TestFixture]
-public sealed class AttributeUsageContractTests
+public sealed partial class AttributeUsageContractTests
 {
     private const string TestMarkerAttributeName = "AttributeUsageContractTestFixtures.Markers.TestMarkerAttribute";
     private const string SecondMarkerAttributeName = "AttributeUsageContractTestFixtures.Markers.SecondMarkerAttribute";
     private const string PrefixedNamespace = "AttributeUsageContractTestFixtures.Markers.Prefixed.";
+    private const string ModuleMarkerAttributeName = "AttributeUsageContractTestFixtures.ModuleMarkers.ModuleMarkerAttribute";
 
     private string _tempDir = null!;
 

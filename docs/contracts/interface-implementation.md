@@ -53,6 +53,8 @@ If a single matched implementation fails both checks, exactly **one** violation 
 
 `allowed_only_in_projects`/`forbidden_in_projects` resolve each configured project name to its assembly name via project discovery — the same assembly-name-equivalence semantics documented for `type_placement`'s `must_reside_in_projects`.
 
+`allowed_only_in_namespaces` and `forbidden_in_namespaces` entries accept the same constrained glob grammar as a layer's `namespace` (a literal namespace, or `*` as one or more complete segments — see [Namespace-allowance contract fields](../policy-format/layers-and-namespaces.md#namespace-allowance-contract-fields-use-the-same-grammar)). An entry using unsupported wildcard syntax is rejected at policy load with an actionable error instead of silently matching nothing.
+
 ### Violations
 
 Each violation identifies the implementing type, the matched interface's fully-qualified name, whether the violation is `misplaced` or `forbidden`, the actual location, and — for `misplaced` violations only — the expected (allow-list) location description. Violations are emitted deterministically: implementing types ordered by fully-qualified name, matched interfaces within a type ordered by name (both ordinal).

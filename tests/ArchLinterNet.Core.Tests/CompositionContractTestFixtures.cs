@@ -132,6 +132,22 @@ namespace CompositionContractTestFixtures.Application
     }
 }
 
+// A composition root nested under an extra "module" segment, used to exercise
+// allowed_only_in_namespaces glob patterns such as "...Modules.*.Composition" (issue #443):
+// the middle "*" must consume exactly the "Orders" segment.
+namespace CompositionContractTestFixtures.Modules.Orders.Composition
+{
+    using CompositionContractTestFixtures.Fakes;
+
+    public sealed class OrdersCompositionRoot
+    {
+        public static object? ResolveFromLocator(IFakeServiceProvider provider)
+        {
+            return provider.GetService(typeof(object));
+        }
+    }
+}
+
 // A namespace outside every namespace/layer/project/assembly boundary entry, used to exercise
 // allowed_only_in_types: only the specific type named by an assembly+type selector is exempted,
 // its sibling in the same namespace/assembly is not — proving the selector is type-granular, not
