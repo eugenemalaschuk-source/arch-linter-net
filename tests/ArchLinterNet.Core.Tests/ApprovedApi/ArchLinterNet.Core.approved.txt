@@ -742,20 +742,34 @@ sealed class ArchLinterNet.Core.Contracts.Families.ArchitectureAsmdefContract : 
   property string Name {get;set;}
   property string Reason {get;set;}
   property string? Id {get;set;}
-sealed class ArchLinterNet.Core.Contracts.Families.ArchitectureAssemblyAllowOnlyContract : ArchLinterNet.Core.Contracts.IArchitectureContract
+sealed class ArchLinterNet.Core.Contracts.Families.ArchitectureAssemblyAllowOnlyContract : ArchLinterNet.Core.Contracts.IArchitectureContract, ArchLinterNet.Core.Contracts.IArchitectureSourceExpandableContract
   ctor()
+  method ArchLinterNet.Core.Contracts.IArchitectureSourceExpandableContract CloneForSource(string source)
   property ArchLinterNet.Core.Contracts.DependencyDepthMode DependencyDepth {get;set;}
+  property ArchLinterNet.Core.Model.ArchitectureSourceExpansionOrigin? ExpansionOrigin {get;set;}
+  property ArchLinterNet.Core.Model.ArchitectureSourceSetKind SourceKind {get;}
   property System.Collections.Generic.List<ArchLinterNet.Core.Contracts.ArchitectureIgnoredViolation> IgnoredViolations {get;set;}
   property System.Collections.Generic.List<string> Allowed {get;set;}
+  property System.Collections.Generic.List<string> ExcludedSourceSets {get;set;}
+  property System.Collections.Generic.List<string> ExcludedSources {get;set;}
+  property System.Collections.Generic.List<string> SourceSets {get;set;}
+  property System.Collections.Generic.List<string> Sources {get;set;}
   property string Name {get;set;}
   property string Reason {get;set;}
   property string Source {get;set;}
   property string? Id {get;set;}
-sealed class ArchLinterNet.Core.Contracts.Families.ArchitectureAssemblyDependencyContract : ArchLinterNet.Core.Contracts.IArchitectureContract
+sealed class ArchLinterNet.Core.Contracts.Families.ArchitectureAssemblyDependencyContract : ArchLinterNet.Core.Contracts.IArchitectureContract, ArchLinterNet.Core.Contracts.IArchitectureSourceExpandableContract
   ctor()
+  method ArchLinterNet.Core.Contracts.IArchitectureSourceExpandableContract CloneForSource(string source)
   property ArchLinterNet.Core.Contracts.DependencyDepthMode DependencyDepth {get;set;}
+  property ArchLinterNet.Core.Model.ArchitectureSourceExpansionOrigin? ExpansionOrigin {get;set;}
+  property ArchLinterNet.Core.Model.ArchitectureSourceSetKind SourceKind {get;}
   property System.Collections.Generic.List<ArchLinterNet.Core.Contracts.ArchitectureIgnoredViolation> IgnoredViolations {get;set;}
   property System.Collections.Generic.List<string> Forbidden {get;set;}
+  property System.Collections.Generic.List<string> ExcludedSourceSets {get;set;}
+  property System.Collections.Generic.List<string> ExcludedSources {get;set;}
+  property System.Collections.Generic.List<string> SourceSets {get;set;}
+  property System.Collections.Generic.List<string> Sources {get;set;}
   property string Name {get;set;}
   property string Reason {get;set;}
   property string Source {get;set;}
