@@ -393,9 +393,9 @@ public sealed class SourceSetExpansionTests
     }
 
     [Test]
-    public void ProjectSetWithGlobs_IsRejected()
+    public void ProjectSetWithPathGlob_ResolvesExplicitProjectUniverse()
     {
-        InvalidOperationException exception = Assert.Throws<InvalidOperationException>(() => Load($"""
+        ArchitectureContractDocument document = Load($"""
             version: 1
             name: Test
             analysis:
@@ -404,12 +404,13 @@ public sealed class SourceSetExpansionTests
             source_sets:
               host_projects:
                 kind: project
-                globs: ["src.*"]
+                globs: ["src/**/*.csproj"]
             contracts:
               strict: []
-            """))!;
+            """);
 
-        Assert.That(exception.Message, Does.Contain("accept explicit 'members' only"));
+        Assert.That(document.SourceExpansion.Sets.Single().ResolvedSources,
+            Is.EqualTo(new[] { "src/Acme.Host/Acme.Host.csproj" }));
     }
 
     [Test]

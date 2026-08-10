@@ -77,3 +77,14 @@ The system SHALL expose typed inclusion, exclusion, and stale-exclusion evidence
 #### Scenario: Runtime matcher scope is available after execution
 - **WHEN** a type-placement or layout-convention contract evaluates an include matcher and one or more exclusions
 - **THEN** the inventory SHALL expose typed inclusion participation and each exclusion's matched, stale, or evaluation-failed state without re-evaluating the matcher
+
+### Requirement: Coverage exposes solution-derived project set resolution
+The shared coverage inventory SHALL expose deterministic resolved project-set and project-metadata
+union evidence, including authored contract identity and selector provenance, for solution-derived
+project source sets.
+
+#### Scenario: Coverage records every authored source-set expansion identity
+- **WHEN** rule-input coverage selects an authored directional assembly contract ID
+- **THEN** coverage selects every derived instance and retains their authored and resolved-source
+  identities
+

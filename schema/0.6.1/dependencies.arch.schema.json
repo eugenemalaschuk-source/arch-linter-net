@@ -81,10 +81,6 @@
         {
           "if": { "properties": { "optional": { "const": true } }, "required": ["optional"] },
           "then": { "required": ["reason"] }
-        },
-        {
-          "if": { "properties": { "kind": { "const": "project" } }, "required": ["kind"] },
-          "then": { "not": { "required": ["globs"] } }
         }
       ],
       "properties": {
@@ -92,7 +88,7 @@
           "type": "string",
           "enum": ["assembly", "layer", "project"],
           "default": "assembly",
-          "description": "Identity domain of this set's members. It also fixes the declared policy input its globs resolve against: 'analysis.target_assemblies' for assembly, 'layers' keys for layer, and 'analysis.projects' for project."
+          "description": "Identity domain of this set's members. Assembly and layer globs resolve against their declared policy inputs; project members and constrained repository-relative path globs resolve against explicit projects or the filtered solution-discovered project inventory."
         },
         "members": {
           "$ref": "#/$defs/nonBlankStringList",
@@ -100,7 +96,7 @@
         },
         "globs": {
           "$ref": "#/$defs/nonBlankStringList",
-          "description": "Constrained dotted-segment globs ('*' as a complete segment, at least one leading literal segment). Not valid for 'kind: project'."
+          "description": "Constrained dotted-segment globs for assembly/layer sets. Project sets use constrained repository-relative path globs with '*' and '**'."
         },
         "optional": {
           "type": "boolean",
@@ -1382,11 +1378,21 @@
     "assemblyDependencyContract": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["name", "source", "forbidden"],
+      "required": ["name", "forbidden"],
+      "anyOf": [
+        { "required": ["source"] },
+        { "required": ["sources"] },
+        { "required": ["source_sets"] }
+      ],
+      "not": { "$ref": "#/$defs/exactSourceWithExclusions" },
       "properties": {
         "name": { "type": "string", "minLength": 1 },
         "id": { "type": "string", "minLength": 1 },
         "source": { "type": "string", "minLength": 1 },
+        "sources": { "$ref": "#/$defs/stringList" },
+        "source_sets": { "$ref": "#/$defs/stringList" },
+        "exclude_sources": { "$ref": "#/$defs/stringList" },
+        "exclude_source_sets": { "$ref": "#/$defs/stringList" },
         "forbidden": { "$ref": "#/$defs/stringList" },
         "dependency_depth": {
           "type": "string",
@@ -1401,11 +1407,21 @@
     "assemblyAllowOnlyContract": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["name", "source", "allowed"],
+      "required": ["name", "allowed"],
+      "anyOf": [
+        { "required": ["source"] },
+        { "required": ["sources"] },
+        { "required": ["source_sets"] }
+      ],
+      "not": { "$ref": "#/$defs/exactSourceWithExclusions" },
       "properties": {
         "name": { "type": "string", "minLength": 1 },
         "id": { "type": "string", "minLength": 1 },
         "source": { "type": "string", "minLength": 1 },
+        "sources": { "$ref": "#/$defs/stringList" },
+        "source_sets": { "$ref": "#/$defs/stringList" },
+        "exclude_sources": { "$ref": "#/$defs/stringList" },
+        "exclude_source_sets": { "$ref": "#/$defs/stringList" },
         "allowed": { "$ref": "#/$defs/stringList" },
         "dependency_depth": {
           "type": "string",

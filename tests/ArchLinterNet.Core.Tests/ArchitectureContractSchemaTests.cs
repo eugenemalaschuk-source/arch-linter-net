@@ -12,8 +12,8 @@ namespace ArchLinterNet.Core.Tests;
 public sealed class ArchitectureContractSchemaTests
 {
     private static readonly string[] _directOnly = { "direct" };
-    private static readonly string[] _assemblyDependencyRequiredFields = { "name", "source", "forbidden" };
-    private static readonly string[] _assemblyAllowOnlyRequiredFields = { "name", "source", "allowed" };
+    private static readonly string[] _assemblyDependencyRequiredFields = { "name", "forbidden" };
+    private static readonly string[] _assemblyAllowOnlyRequiredFields = { "name", "allowed" };
     private static readonly string[] _scalarValueAcceptedTypes = { "string", "boolean", "number" };
     private static readonly string[] _fixedSixSourceOrder =
         { "yaml_override", "type_attribute", "assembly_attribute", "inheritance", "namespace", "path" };
@@ -67,21 +67,27 @@ public sealed class ArchitectureContractSchemaTests
     }
 
     [Test]
-    public void Schema_AssemblyDependencyContract_RequiresNameSourceAndForbidden()
+    public void Schema_AssemblyDependencyContract_RequiresNameAndForbiddenWithOneSourceSelector()
     {
         JsonElement schema = LoadSchema();
         JsonElement required = schema.GetProperty("$defs").GetProperty("assemblyDependencyContract").GetProperty("required");
 
         Assert.That(required.EnumerateArray().Select(v => v.GetString()), Is.EquivalentTo(_assemblyDependencyRequiredFields));
+        Assert.That(schema.GetProperty("$defs").GetProperty("assemblyDependencyContract").GetProperty("anyOf")
+            .EnumerateArray().Select(option => option.GetProperty("required")[0].GetString()),
+            Is.EquivalentTo(new[] { "source", "sources", "source_sets" }));
     }
 
     [Test]
-    public void Schema_AssemblyAllowOnlyContract_RequiresNameSourceAndAllowed()
+    public void Schema_AssemblyAllowOnlyContract_RequiresNameAndAllowedWithOneSourceSelector()
     {
         JsonElement schema = LoadSchema();
         JsonElement required = schema.GetProperty("$defs").GetProperty("assemblyAllowOnlyContract").GetProperty("required");
 
         Assert.That(required.EnumerateArray().Select(v => v.GetString()), Is.EquivalentTo(_assemblyAllowOnlyRequiredFields));
+        Assert.That(schema.GetProperty("$defs").GetProperty("assemblyAllowOnlyContract").GetProperty("anyOf")
+            .EnumerateArray().Select(option => option.GetProperty("required")[0].GetString()),
+            Is.EquivalentTo(new[] { "source", "sources", "source_sets" }));
     }
 
     [Test]
@@ -150,7 +156,9 @@ public sealed class ArchitectureContractSchemaTests
                      "frameworkDependencyContract",
                      "frameworkAllowOnlyContract",
                      "externalDependencyContract",
-                     "externalAllowOnlyContract"
+                     "externalAllowOnlyContract",
+                     "assemblyDependencyContract",
+                     "assemblyAllowOnlyContract"
                  })
         {
             JsonElement def = defs.GetProperty(defName);

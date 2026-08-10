@@ -11,6 +11,7 @@
     { "required": ["external_dependencies"] },
     { "required": ["packages"] },
     { "required": ["framework_references"] },
+    { "required": ["source_sets"] },
     { "required": ["legacy_runtime_layers"] },
     { "required": ["analysis"] },
     { "required": ["contracts"] },
@@ -42,6 +43,12 @@
       "type": "object",
       "additionalProperties": {
         "$ref": "https://archlinternet.dev/schema/0.6.1/dependencies.arch.schema.json#/$defs/frameworkReferenceGroup"
+      }
+    },
+    "source_sets": {
+      "type": "object",
+      "additionalProperties": {
+        "$ref": "https://archlinternet.dev/schema/0.6.1/dependencies.arch.schema.json#/$defs/sourceSet"
       }
     },
     "legacy_runtime_layers": {

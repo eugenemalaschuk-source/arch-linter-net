@@ -14,7 +14,8 @@ contracts:
   strict_project_metadata:
     - id: <string>                         # Optional — stable identifier
       name: <string>                       # Required
-      projects: [<project-path>]           # Required — repo-relative discovered .csproj paths
+      projects: [<project-path>]           # Required unless project_sets is present
+      project_sets: [<project-set-name>]   # Optional — reusable project-kind source sets
       required_properties:                 # Optional — exact value requirements
         <PropertyName>: <value>
       forbidden_properties:                # Optional — exact forbidden value pairs
@@ -83,6 +84,11 @@ analysis:
 Without discovery, the contract cannot evaluate and `CheckConfiguration` reports `no project metadata discovered`.
 
 Metadata-only policies may omit `analysis.target_assemblies`; project discovery still parses the `.csproj` metadata without requiring a resolvable DLL output.
+
+`project_sets` can reuse the final solution-discovered project inventory. A project-kind set may
+use explicit repository-relative members or `*`/`**` path globs; when `analysis.solution` is set,
+selectors run after `project_include` and `project_exclude`, so excluded projects cannot enter a
+metadata contract and `analysis.projects` does not need to repeat the solution inventory.
 
 ## Current limits
 

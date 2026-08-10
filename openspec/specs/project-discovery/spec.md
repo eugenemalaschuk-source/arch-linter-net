@@ -216,3 +216,16 @@ The system SHALL parse `ProjectReference` items from each discovered or explicit
 #### Scenario: Metadata available even when build output is missing
 - **WHEN** a discovered project has no resolvable build output and discovery reports a build-output diagnostic
 - **THEN** the discovered project SHALL still expose its parsed properties, friend assemblies, and project references
+
+### Requirement: Filtered solution inventory is available to project source sets
+The system SHALL make repository-relative project paths from the final solution discovery result,
+after include/exclude filtering, available as the project-kind source-set universe before project
+metadata contracts are executed. This availability SHALL not require resolving project build
+outputs.
+
+#### Scenario: A newly discovered matching production project joins the set
+- **WHEN** a new production project is added to the solution and matches an existing project-set
+  selector after filtering
+- **THEN** the resolved project-set inventory includes the new project without an authored project
+  list update
+

@@ -107,3 +107,13 @@ The system SHALL reject `dependency_depth: transitive` on an `ArchitectureAssemb
 - **WHEN** an `ArchitectureAssemblyAllowOnlyContract` with `DependencyDepth` set to `Transitive` is passed directly to the session check method (bypassing the policy loader)
 - **THEN** the check throws an actionable error stating that only `direct` is currently supported
 
+### Requirement: Assembly allow-only supports source-set expansion
+The system SHALL apply the source-set expansion model to directional assembly allow-only contracts
+while preserving declared-target filtering and direct-only dependency semantics for every resolved
+source.
+
+#### Scenario: A disallowed direct reference is attributed to its expanded source
+- **WHEN** one expanded assembly allow-only source directly references a declared assembly outside
+  its allowed list
+- **THEN** exactly one finding identifies that resolved source and derived contract instance
+

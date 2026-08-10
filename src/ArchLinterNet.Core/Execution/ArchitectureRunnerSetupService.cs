@@ -108,6 +108,7 @@ public sealed class ArchitectureRunnerSetupService(
         bool resolveAssemblyOutputs = true;
         ProjectDiscoveryResult discovery = projectDiscoveryService.ResolveAndApply(
             document, repositoryRoot, resolveAssemblyOutputs, cancellationToken);
+        ArchitectureSourceSetExpander.BindProjectSets(document, discovery);
 
         IReadOnlyList<string> targetNames = document.Analysis.TargetAssemblies
             .Where(static name => !string.IsNullOrWhiteSpace(name))
@@ -214,6 +215,7 @@ public sealed class ArchitectureRunnerSetupService(
             }
             ProjectDiscoveryResult discovery = projectDiscoveryService.ResolveAndApply(
                 document, repositoryRoot, resolveAssemblyOutputs, cancellationToken);
+            ArchitectureSourceSetExpander.BindProjectSets(document, discovery);
 
             cancellationToken.ThrowIfCancellationRequested();
 

@@ -71,10 +71,12 @@ Installed releases expose their immutable offline `adoption-stabilization/v1` sc
 Declare `source_sets.<name>` at document level with a `kind` (`assembly`, `layer`, or `project`),
 explicit `members`, constrained `globs`, and an optional `optional: true` plus `reason`. A set never
 widens analysis: `assembly` globs resolve only against `analysis.target_assemblies`, `layer` globs
-only against declared `layers` keys, and `project` sets accept explicit `members` only.
+only against declared `layers` keys, and project members/path globs resolve only against explicit
+projects or the filtered `analysis.solution` inventory. Project globs use repository-relative
+`*`/`**` path matching, not dotted assembly/layer matching.
 
 Package dependency, package allow-only, framework dependency, framework allow-only, external
-dependency, and external allow-only contracts may declare `sources`/`source_sets` instead of
+dependency, external allow-only, assembly dependency, and assembly allow-only contracts may declare `sources`/`source_sets` instead of
 `source`. These same families may additionally subtract `exclude_sources`/`exclude_source_sets`
 after expansion, without widening the declared universe. Each authored contract then expands into one
 instance per resolved source, with the derived id `<authored-id>/<normalized-source>` and its own

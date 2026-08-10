@@ -62,6 +62,12 @@ public sealed class ArchitectureContractDocument
     [YamlIgnore]
     public ArchitectureSourceExpansionInventory SourceExpansion { get; internal set; } =
         ArchitectureSourceExpansionInventory.Empty;
+
+    // Project sets may need the post-filter solution inventory, which is only available during
+    // runner setup. This prevents repeated setup paths from appending the same inline-union
+    // evidence or re-mutating project metadata contracts.
+    [YamlIgnore]
+    internal bool ProjectSourceSetsExpanded { get; set; }
 }
 
 public sealed class ArchitectureAnalysisConfiguration
