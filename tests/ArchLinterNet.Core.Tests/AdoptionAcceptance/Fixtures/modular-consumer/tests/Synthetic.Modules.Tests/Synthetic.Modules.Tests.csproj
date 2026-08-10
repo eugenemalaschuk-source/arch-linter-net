@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AssemblyName>Synthetic.Modules.Tests</AssemblyName>
+    <RootNamespace>Synthetic.Modules.Tests</RootNamespace>
+    <SyntheticModuleTier>test</SyntheticModuleTier>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../src/Synthetic.Modules.M01/Synthetic.Modules.M01.csproj" />
+  </ItemGroup>
+</Project>

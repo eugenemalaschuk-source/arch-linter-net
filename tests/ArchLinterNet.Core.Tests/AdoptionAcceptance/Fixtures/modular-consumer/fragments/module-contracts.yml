@@ -1,0 +1,45 @@
+# Directional module invariants. Each of these is ONE authored contract that expands to one
+# instance per resolved module assembly; adding a module enrols it without a new contract block.
+contracts:
+  strict_assembly_allow_only:
+    - id: modules-reference-abstractions-only
+      name: modules-reference-abstractions-only
+      source_sets: [module_assemblies]
+      allowed: [Synthetic.Shared.Abstractions]
+      reason: A module may only take a direct assembly reference on the shared abstractions.
+  strict_assembly_dependency:
+    - id: modules-never-reference-the-host
+      name: modules-never-reference-the-host
+      source_sets: [module_assemblies]
+      forbidden: [Synthetic.Composition]
+      reason: Modules must not depend on the composition host that wires them together.
+    - id: future-modules-never-reference-the-host
+      name: future-modules-never-reference-the-host
+      source_sets: [future_module_assemblies]
+      forbidden: [Synthetic.Composition]
+      reason: The same invariant is pre-authored for not-yet-extracted modules.
+  strict:
+    - id: modules-do-not-depend-on-the-host
+      name: modules-do-not-depend-on-the-host
+      source: modules
+      forbidden: [composition_host]
+      reason: Namespace-level restatement of the module/host direction, addressed by contract id.
+  strict_cycles:
+    - id: modular-graph-is-acyclic
+      name: modular-graph-is-acyclic
+      layers: [shared_abstractions, modules, composition_host]
+      reason: The module graph must stay acyclic; only real cycles may become accepted debt.
+  strict_composition:
+    - id: service-resolution-confined-to-composition
+      name: service-resolution-confined-to-composition
+      allowed_only_in_namespaces:
+        - Synthetic.Modules.*.Composition
+        - Synthetic.Composition
+      forbidden_apis:
+        - System.IServiceProvider.GetService
+      reason: Service resolution belongs in a composition boundary, expressed once as a glob.
+  strict_coverage:
+    - id: every-module-assembly-is-governed
+      name: every-module-assembly-is-governed
+      scope: assembly
+      reason: Every discovered assembly must be classified by the module governance model.

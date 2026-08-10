@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Strictly aggregate Checkpoint B evidence for one immutable candidate."""
+"""Strictly aggregate packed-artifact release evidence for one immutable candidate."""
 
 from __future__ import annotations
 
@@ -13,13 +13,15 @@ from typing import Any
 _EVIDENCE_SCHEMA = "checkpoint-b-platform-evidence/v1"
 _GATES_SCHEMA = "checkpoint-b-repository-gates/v1"
 _MANIFEST_SCHEMA = "checkpoint-b-candidate-manifest/v1"
+_RELEASE_SCOPE_SCHEMA = "checkpoint-b-release-scope/v1"
 _REQUIRED_PLATFORMS = {
     "linux-x64": ("x64", "bash"),
     "macos-arm64": ("arm64", "zsh"),
     "macos-x64": ("x64", "zsh"),
     "windows-x64": ("x64", "pwsh"),
 }
-_REQUIRED_SCENARIOS = {
+# Platform, packaging, and execution-mode scenarios established by the 0.6.0 Checkpoint B gate.
+_PLATFORM_SCENARIOS = {
     "cache-corruption-recompute",
     "cache-miss-population-hit",
     "clean-checkout",
@@ -35,7 +37,43 @@ _REQUIRED_SCENARIOS = {
     "profile-generation",
     "sequential-default-parity",
 }
+# The 0.6.1 consumer-cleanup matrix: F1-F11 plus the #465 source-set authoring model, proven
+# against the installed candidate rather than a source-tree ProjectReference.
+_CONSUMER_CLEANUP_SCENARIOS = {
+    "actionable-schema-diagnostics",
+    "composed-policy-assembly-free-check",
+    "consumer-policy-shape",
+    "dependency-contract-id-parity",
+    "discovered-project-set-authoring",
+    "json-configuration-error-format",
+    "layer-overlap-allowance",
+    "missing-shared-framework-diagnostic",
+    "namespace-allowance-pattern",
+    "non-destructive-ensure-built",
+    "packaged-testing-ensure-built",
+    "public-api-snapshot-workflow",
+    "release-identity-consistency",
+    "source-set-assembly-authoring",
+    "source-set-enrolment",
+    "stale-source-selector-fail-closed",
+    "strict-cycles-baseline-scope",
+}
+_REQUIRED_SCENARIOS = _PLATFORM_SCENARIOS | _CONSUMER_CLEANUP_SCENARIOS
+_SCENARIO_RESULTS = {"passed", "not_applicable", "failed"}
 _REQUIRED_GATES = {"acceptance", "openspec_strict"}
+# Counters the consumer policy must report so the gate can reject a candidate whose canonical
+# consumer path still needs a workaround shape this release exists to remove.
+_POLICY_SHAPE_FIELDS = {
+    "policy_documents",
+    "imported_fragments",
+    "governed_module_assemblies",
+    "authored_directional_assembly_contracts",
+    "expanded_directional_assembly_instances",
+    "governed_projects",
+    "authored_project_metadata_contracts",
+    "declared_project_inventories",
+    "inline_public_api_signatures",
+}
 
 
 def _sha256(path: Path) -> str:
@@ -69,14 +107,23 @@ def _read_manifest(path: Path) -> dict[str, Any]:
     return manifest
 
 
+def _read_policy_shape(path: Path, record: dict[str, Any]) -> dict[str, Any]:
+    shape = record.get("policy_shape")
+    if not isinstance(shape, dict) or set(shape) != _POLICY_SHAPE_FIELDS:
+        raise ValueError(f"{path} does not report the required consumer policy-shape counters.")
+    if any(not isinstance(value, int) for value in shape.values()):
+        raise ValueError(f"{path} reports a non-numeric policy-shape counter.")
+    return shape
+
+
 def _read_records(input_directory: Path, manifest: dict[str, Any], manifest_digest: str) -> list[dict[str, Any]]:
     records: list[dict[str, Any]] = []
     for path in sorted(input_directory.rglob("*.json")):
         record = _load_json(path, "platform evidence")
         if record.get("schema") != _EVIDENCE_SCHEMA:
             raise ValueError(f"{path} does not use the supported evidence schema.")
-        if record.get("checkpoint") != "B" or record.get("result") != "passed":
-            raise ValueError(f"{path} does not report a passed Checkpoint B result.")
+        if record.get("checkpoint") != "B" or record.get("result") not in {"passed", "failed"}:
+            raise ValueError(f"{path} does not report a packed-artifact gate result.")
         if record.get("synthetic_identities_only") is not True:
             raise ValueError(f"{path} does not affirm synthetic identities only.")
         if record.get("candidate_version") != manifest["version"]:
@@ -94,13 +141,17 @@ def _read_records(input_directory: Path, manifest: dict[str, Any], manifest_dige
         if len(scenario_ids) != len(scenarios) or set(scenario_ids) != _REQUIRED_SCENARIOS:
             raise ValueError(f"{path} has missing, unexpected, or duplicate scenario IDs.")
         for scenario in scenarios:
-            if not isinstance(scenario, dict) or scenario.get("result") not in {"passed", "not_applicable"}:
-                raise ValueError(f"{path} contains a failed or malformed scenario result.")
-            if scenario["result"] == "not_applicable" and not isinstance(scenario.get("reason"), str):
-                raise ValueError(f"{path} does not explain a non-applicable scenario.")
+            if not isinstance(scenario, dict) or scenario.get("result") not in _SCENARIO_RESULTS:
+                raise ValueError(f"{path} contains a malformed scenario result.")
+            if scenario["result"] != "passed" and not isinstance(scenario.get("reason"), str):
+                raise ValueError(f"{path} does not explain a non-passing scenario.")
+        declared_failed = any(scenario["result"] == "failed" for scenario in scenarios)
+        if declared_failed != (record["result"] == "failed"):
+            raise ValueError(f"{path} platform result contradicts its own scenario results.")
+        _read_policy_shape(path, record)
         records.append(record)
     if not records:
-        raise ValueError("No Checkpoint B evidence records were found.")
+        raise ValueError("No packed-artifact gate evidence records were found.")
     return records
 
 
@@ -113,7 +164,7 @@ def _validate_platforms(records: list[dict[str, Any]]) -> None:
         by_platform.setdefault(platform, []).append(record)
 
     if set(by_platform) != set(_REQUIRED_PLATFORMS):
-        raise ValueError(f"Checkpoint B platform matrix mismatch: {sorted(by_platform)}.")
+        raise ValueError(f"Release-gate platform matrix mismatch: {sorted(by_platform)}.")
     for platform, (architecture, shell) in _REQUIRED_PLATFORMS.items():
         records_for_platform = by_platform[platform]
         if len(records_for_platform) != 1:
@@ -123,13 +174,55 @@ def _validate_platforms(records: list[dict[str, Any]]) -> None:
             raise ValueError(f"{platform} evidence reports a wrong architecture.")
         if record.get("shell") != shell:
             raise ValueError(f"{platform} evidence reports a wrong shell adapter.")
-    for scenario_id in _REQUIRED_SCENARIOS:
+
+
+def _failed_scenarios(records: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Every scenario that failed anywhere, plus every scenario no platform ever passed."""
+    failures: dict[str, dict[str, Any]] = {}
+    for record in records:
+        for scenario in record["scenarios"]:
+            if scenario["result"] == "failed":
+                failures.setdefault(scenario["id"], {
+                    "id": scenario["id"],
+                    "platform_id": record["platform_id"],
+                    "reason": scenario["reason"],
+                })
+    for scenario_id in sorted(_REQUIRED_SCENARIOS):
+        if scenario_id in failures:
+            continue
         if not any(
-            scenario.get("id") == scenario_id and scenario.get("result") == "passed"
+            scenario["id"] == scenario_id and scenario["result"] == "passed"
             for record in records
             for scenario in record["scenarios"]
         ):
-            raise ValueError(f"No platform passed required scenario '{scenario_id}'.")
+            failures[scenario_id] = {
+                "id": scenario_id,
+                "platform_id": None,
+                "reason": "No platform executed this required scenario to a passing result.",
+            }
+    return [failures[key] for key in sorted(failures)]
+
+
+def _policy_shape_defects(records: list[dict[str, Any]]) -> list[str]:
+    defects: list[str] = []
+    for record in records:
+        shape = record["policy_shape"]
+        platform = record["platform_id"]
+        if shape["imported_fragments"] < 1:
+            defects.append(f"{platform}: the consumer policy is a forced monolith.")
+        if shape["authored_directional_assembly_contracts"] >= shape["governed_module_assemblies"]:
+            defects.append(
+                f"{platform}: directional assembly contracts are still authored per module "
+                f"({shape['authored_directional_assembly_contracts']} contracts for "
+                f"{shape['governed_module_assemblies']} module assemblies)."
+            )
+        if shape["expanded_directional_assembly_instances"] < shape["governed_module_assemblies"]:
+            defects.append(f"{platform}: source-set expansion does not cover every governed module assembly.")
+        if shape["declared_project_inventories"] != 0:
+            defects.append(f"{platform}: a project inventory is still copied instead of discovered.")
+        if shape["inline_public_api_signatures"] != 0:
+            defects.append(f"{platform}: the reviewed public API is still an inline YAML inventory.")
+    return sorted(set(defects))
 
 
 def _read_gates(path: Path, manifest: dict[str, Any], manifest_digest: str) -> dict[str, Any]:
@@ -148,39 +241,144 @@ def _read_gates(path: Path, manifest: dict[str, Any], manifest_digest: str) -> d
     return gates
 
 
-def _summary(records: list[dict[str, Any]], manifest: dict[str, Any], gates: dict[str, Any], manifest_digest: str) -> dict[str, Any]:
+def _read_release_scope(path: Path, manifest: dict[str, Any], manifest_digest: str) -> dict[str, Any]:
+    """The authoritative #434 release-scope inventory, bound to this candidate."""
+    scope = _load_json(path, "release-scope inventory")
+    if scope.get("schema") != _RELEASE_SCOPE_SCHEMA:
+        raise ValueError("Release-scope schema is invalid.")
+    if scope.get("candidate_manifest_sha256") != manifest_digest:
+        raise ValueError("Release scope is not bound to the candidate manifest.")
+    if scope.get("source_commit") != manifest["source_commit"]:
+        raise ValueError("Release scope source commit differs from the candidate manifest.")
+    required = scope.get("required_items")
+    if not isinstance(required, list) or not required:
+        raise ValueError("Release scope declares no required items.")
+    for item in required:
+        if not isinstance(item, dict) or not isinstance(item.get("issue"), int):
+            raise ValueError("Release-scope item is malformed.")
+        if item.get("state") not in {"open", "closed"}:
+            raise ValueError(f"Release-scope item #{item.get('issue')} has no resolved state.")
+    return scope
+
+
+def _release_scope_defects(scope: dict[str, Any]) -> list[str]:
+    """#466: no required release-scope item may be open when publication is authorized."""
+    return [
+        f"#{item['issue']} ({item.get('finding', 'release scope')}) is {item['state']}: "
+        f"{item.get('summary') or item.get('title', '')}".strip()
+        for item in sorted(scope["required_items"], key=lambda item: item["issue"])
+        if item["state"] != "closed"
+    ]
+
+
+def _summary(
+    records: list[dict[str, Any]],
+    manifest: dict[str, Any],
+    gates: dict[str, Any],
+    scope: dict[str, Any],
+    manifest_digest: str,
+) -> dict[str, Any]:
     _validate_platforms(records)
+    failures = _failed_scenarios(records)
+    defects = _policy_shape_defects(records)
+    open_scope = _release_scope_defects(scope)
+    version = manifest["version"]
+    passed = not failures and not defects and not open_scope
     return {
         "schema": "checkpoint-b-release-evidence/v1",
         "checkpoint": "B",
-        "result": "passed",
-        "authorization": "The manifested candidate is authorized for publication.",
-        "candidate_version": manifest["version"],
+        "result": "passed" if passed else "failed",
+        "authorization": (
+            f"PASS: the manifested {version} candidate is authorized for publication."
+            if passed
+            else f"FAIL: the manifested {version} candidate is NOT authorized for publication."
+        ),
+        "candidate_version": version,
         "source_commit": manifest["source_commit"],
         "candidate_manifest_sha256": manifest_digest,
         "synthetic_identities_only": True,
         "packages": manifest["packages"],
         "required_scenarios": sorted(_REQUIRED_SCENARIOS),
+        "consumer_cleanup_scenarios": sorted(_CONSUMER_CLEANUP_SCENARIOS),
+        "failed_scenarios": failures,
+        "policy_shape_defects": defects,
+        "open_release_scope_items": open_scope,
+        "release_scope": scope,
         "platforms": sorted(records, key=lambda record: str(record["platform_id"])),
         "repository_gates": gates["gates"],
     }
 
 
 def _markdown(summary: dict[str, Any]) -> str:
-    rows = ["| {platform_id} | {runtime} | {shell} | passed |".format(**record) for record in summary["platforms"]]
+    platform_rows = ["| {platform_id} | {runtime} | {shell} | {result} |".format(**record) for record in summary["platforms"]]
+    shape = summary["platforms"][0]["policy_shape"]
+    failure_rows = [
+        f"| `{failure['id']}` | {failure['platform_id'] or 'all'} | {failure['reason']} |"
+        for failure in summary["failed_scenarios"]
+    ]
+    failure_section = [
+        "## Failed required scenarios",
+        "",
+        "| Scenario | Platform | Reason |",
+        "| --- | --- | --- |",
+        *failure_rows,
+        "",
+    ] if failure_rows else []
+    defect_section = [
+        "## Consumer policy-shape defects",
+        "",
+        *[f"- {defect}" for defect in summary["policy_shape_defects"]],
+        "",
+    ] if summary["policy_shape_defects"] else []
+    scope = summary["release_scope"]
+    scope_section = [
+        f"## Release scope (story #{scope['story']}, target {scope['release_target']})",
+        "",
+        "| Item | Finding | State | Summary |",
+        "| --- | --- | --- | --- |",
+        *[
+            "| #{issue} | {finding} | {state} | {summary} |".format(
+                issue=item["issue"],
+                finding=item.get("finding", ""),
+                state=item["state"],
+                summary=item.get("summary") or item.get("title", ""))
+            for item in sorted(scope["required_items"], key=lambda item: item["issue"])
+        ],
+        "",
+        *([
+            "Excluded from the release scope:",
+            "",
+            *[f"- #{item['issue']} — {item['reason']}" for item in scope.get("excluded_items", [])],
+            "",
+        ] if scope.get("excluded_items") else []),
+    ]
     return "\n".join([
-        "# Checkpoint B release evidence",
+        "# Packed-artifact release evidence",
         "",
         f"- Candidate version: `{summary['candidate_version']}`",
         f"- Tested commit: `{summary['source_commit']}`",
         f"- Candidate manifest SHA-256: `{summary['candidate_manifest_sha256']}`",
-        "- Checkpoint B: **passed**",
-        "- Release authorization: the manifested candidate is authorized for publication.",
+        f"- Result: **{summary['result']}**",
+        f"- Release authorization: {summary['authorization']}",
         "- Private adopter identity: none; all fixtures and evidence are synthetic.",
         "",
+        "## Consumer policy shape",
+        "",
+        f"- Composed policy documents: {shape['policy_documents']} ({shape['imported_fragments']} imported fragments)",
+        f"- Module assemblies governed by {shape['authored_directional_assembly_contracts']} authored directional "
+        f"assembly contracts: {shape['governed_module_assemblies']} "
+        f"({shape['expanded_directional_assembly_instances']} expanded instances)",
+        f"- Projects governed by {shape['authored_project_metadata_contracts']} project-metadata contracts through "
+        f"solution discovery: {shape['governed_projects']}",
+        f"- Copied project inventories: {shape['declared_project_inventories']}",
+        f"- Inline public API signatures: {shape['inline_public_api_signatures']}",
+        "",
+        *failure_section,
+        *defect_section,
+        *scope_section,
         "| Platform | Runtime | Shell | Result |",
         "| --- | --- | --- | --- |",
-        *rows,
+        *platform_rows,
         "",
     ])
 
@@ -190,6 +388,7 @@ def main() -> int:
     parser.add_argument("--input-dir", type=Path, required=True)
     parser.add_argument("--candidate-manifest", type=Path, required=True)
     parser.add_argument("--repository-gates", type=Path, required=True)
+    parser.add_argument("--release-scope", type=Path, required=True)
     parser.add_argument("--output-dir", type=Path, required=True)
     arguments = parser.parse_args()
 
@@ -197,7 +396,8 @@ def main() -> int:
     manifest_digest = _sha256(arguments.candidate_manifest)
     records = _read_records(arguments.input_dir, manifest, manifest_digest)
     gates = _read_gates(arguments.repository_gates, manifest, manifest_digest)
-    summary = _summary(records, manifest, gates, manifest_digest)
+    scope = _read_release_scope(arguments.release_scope, manifest, manifest_digest)
+    summary = _summary(records, manifest, gates, scope, manifest_digest)
     arguments.output_dir.mkdir(parents=True, exist_ok=True)
     (arguments.output_dir / "checkpoint-b-release-evidence.json").write_text(
         json.dumps(summary, indent=2, sort_keys=True) + "\n", encoding="utf-8"
@@ -205,6 +405,9 @@ def main() -> int:
     (arguments.output_dir / "checkpoint-b-release-evidence.md").write_text(
         _markdown(summary), encoding="utf-8"
     )
+    if summary["result"] != "passed":
+        print(summary["authorization"])
+        return 1
     return 0
 
 

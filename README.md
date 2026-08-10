@@ -17,7 +17,7 @@ ArchLinterNet turns architectural decisions into executable contracts: layered b
 
 The goal is not just to lint dependencies. ArchLinterNet makes architecture rules explicit, reviewable, enforceable, and safe to evolve as a normal part of development.
 
-> Status: 0.6.0 is the public adoption package line. It ships an
+> Status: 0.6.1 is the public adoption package line. It ships an
 > `adoption-stabilization/v1` schema registry whose entries version persisted
 > contracts independently from package SemVer: most stay at their frozen
 > immutable `0.5.1` identity, while policy-root/policy-fragment have advanced

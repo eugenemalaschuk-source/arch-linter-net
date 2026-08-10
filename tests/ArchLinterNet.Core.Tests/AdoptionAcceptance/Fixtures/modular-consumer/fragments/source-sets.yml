@@ -1,0 +1,15 @@
+# Reusable source sets. `module_assemblies` is the single authored inventory every directional
+# module invariant fans out over; `production_projects` is the solution-discovered project
+# inventory every project-metadata contract reuses after analysis.project_exclude filtering.
+source_sets:
+  module_assemblies:
+    kind: assembly
+    globs: [Synthetic.Modules.*]
+  production_projects:
+    kind: project
+    globs: [src/**/*.csproj]
+  future_module_assemblies:
+    kind: assembly
+    globs: [Synthetic.Future.Modules.*]
+    optional: true
+    reason: Reserved for modules that have not been extracted yet; empty is an accepted state.

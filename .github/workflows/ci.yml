@@ -23,7 +23,9 @@ jobs:
     name: Pull Request Validation
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    # Lint, the sequential coverage run, Python tooling coverage, and the SonarCloud begin/end pair.
+    # A cancelled `End SonarCloud analysis` step means this budget was exceeded, not a scanner fault.
+    timeout-minutes: 25
     permissions:
       contents: read
       pull-requests: write
@@ -131,10 +133,16 @@ jobs:
             /d:sonar.qualitygate.wait=true \
             /d:sonar.qualitygate.timeout=300 \
             /d:sonar.cs.opencover.reportsPaths="test-results/**/coverage.opencover.xml" \
-            /d:sonar.cs.vstest.reportsPaths="test-results/**/*.trx"
+            /d:sonar.cs.vstest.reportsPaths="test-results/**/*.trx" \
+            /d:sonar.python.coverage.reportPaths="coverage-python.xml" \
+            /d:sonar.exclusions="**/AdoptionAcceptance/Fixtures/**" \
+            /d:sonar.coverage.exclusions="tools/**/tests/**,**/CheckpointBReleaseGateTests*.cs"
 
       - name: Collect test coverage
         run: make test-coverage
+
+      - name: Collect Python tooling coverage
+        run: make test-tooling-coverage
 
       - name: Resolve coverage report paths
         id: coverage_reports
@@ -189,6 +197,9 @@ jobs:
       - name: Test architecture coverage report generator
         if: github.event_name == 'pull_request'
         run: make test-architecture-coverage-report
+
+      - name: Test packed-artifact release-evidence aggregator
+        run: make test-release-evidence
 
       - name: Collect changed first-party files
         id: changed_files
@@ -272,7 +283,9 @@ jobs:
     name: Intel macOS Test Suite
     if: github.event_name == 'pull_request'
     runs-on: macos-15-intel
-    timeout-minutes: 15
+    # The slowest supported runner, and the suite now also builds the synthetic modular consumer
+    # for the packed-artifact release gate. Windows finishes in ~10m and Apple Silicon in ~5m.
+    timeout-minutes: 25
     permissions:
       contents: read
 
@@ -433,10 +446,16 @@ jobs:
             /d:sonar.qualitygate.wait=true \
             /d:sonar.qualitygate.timeout=300 \
             /d:sonar.cs.opencover.reportsPaths="test-results/**/coverage.opencover.xml" \
-            /d:sonar.cs.vstest.reportsPaths="test-results/**/*.trx"
+            /d:sonar.cs.vstest.reportsPaths="test-results/**/*.trx" \
+            /d:sonar.python.coverage.reportPaths="coverage-python.xml" \
+            /d:sonar.exclusions="**/AdoptionAcceptance/Fixtures/**" \
+            /d:sonar.coverage.exclusions="tools/**/tests/**,**/CheckpointBReleaseGateTests*.cs"
 
       - name: Collect main branch test coverage
         run: make test-coverage-main-ci
+
+      - name: Collect main branch Python tooling coverage
+        run: make test-tooling-coverage
 
       - name: Resolve coverage report paths
         id: coverage_reports

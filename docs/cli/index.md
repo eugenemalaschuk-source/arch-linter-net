@@ -29,7 +29,7 @@ dotnet run --project src/ArchLinterNet.Cli --
 ## Packaged schemas
 
 Installed releases expose an immutable `adoption-stabilization/v1` schema
-registry without a repository checkout or network access. The public 0.6.0
+registry without a repository checkout or network access. The public 0.6.1
 package line ships a registry whose entries version persisted contracts
 independently from package SemVer: most stay at their frozen `0.5.1`
 identity, policy root/fragment advanced to `0.6.1`, and no `schema/0.6.0`

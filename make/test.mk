@@ -9,8 +9,21 @@
 # not surface fixture-level categories as VSTest traits, so `Category=E2E`/`Category!=E2E` match
 # nothing. The fixtures' [Category("E2E")] attributes stay as human-readable documentation.
 # `!~` negation is supported by the VSTest filter syntax.
-TEST_E2E_FILTER := FullyQualifiedName~ExternalDependencyContractAuditE2eTests|FullyQualifiedName~BuildStatePreflightTests|FullyQualifiedName~BuildStatePreflightAssemblyReloadTests|FullyQualifiedName~CheckpointAAdoptionAcceptanceTests|FullyQualifiedName~ArchitectureBaselineIntegrationTests
-TEST_UNIT_FILTER := FullyQualifiedName!~ExternalDependencyContractAuditE2eTests&FullyQualifiedName!~BuildStatePreflightTests&FullyQualifiedName!~BuildStatePreflightAssemblyReloadTests&FullyQualifiedName!~CheckpointAAdoptionAcceptanceTests&FullyQualifiedName!~ArchitectureBaselineIntegrationTests
+#
+# CheckpointBReleaseGateTests belongs in the E2E bucket for exactly the reason above: it packs the
+# whole solution, installs the tool from an isolated feed, and builds the synthetic consumer
+# fixtures. Left in the unit bucket it serializes behind ~2,500 unit tests while the E2E process
+# sits idle, which is what pushed the Intel macOS job past its 15-minute budget.
+TEST_E2E_FIXTURES := FullyQualifiedName~ExternalDependencyContractAuditE2eTests|FullyQualifiedName~BuildStatePreflightTests|FullyQualifiedName~BuildStatePreflightAssemblyReloadTests|FullyQualifiedName~CheckpointAAdoptionAcceptanceTests|FullyQualifiedName~ArchitectureBaselineIntegrationTests
+TEST_E2E_FILTER := $(TEST_E2E_FIXTURES)|FullyQualifiedName~CheckpointBReleaseGateTests
+
+# The coverage runs execute the E2E suite WITHOUT --collect (see the comment on test-coverage), so
+# the packed-artifact release gate contributes no coverage there while costing several minutes of a
+# job whose purpose is coverage and SonarCloud analysis. Its correctness signal already comes from
+# `make test`/`make acceptance` and from every platform test-suite job, so the coverage runs skip
+# it. This is why the gate is also listed in sonar.coverage.exclusions.
+TEST_COVERAGE_E2E_FILTER := $(TEST_E2E_FIXTURES)
+TEST_UNIT_FILTER := FullyQualifiedName!~ExternalDependencyContractAuditE2eTests&FullyQualifiedName!~BuildStatePreflightTests&FullyQualifiedName!~BuildStatePreflightAssemblyReloadTests&FullyQualifiedName!~CheckpointAAdoptionAcceptanceTests&FullyQualifiedName!~ArchitectureBaselineIntegrationTests&FullyQualifiedName!~CheckpointBReleaseGateTests
 
 # Both background processes are waited on regardless of the first one's exit status, then the
 # combined result is checked explicitly — no `set -e`, which would abort the shell at the first
@@ -50,7 +63,7 @@ test-coverage:  ## Run all tests with coverage collection (Cobertura + OpenCover
 	@dotnet test "$(SLNX)" --no-restore --no-build --filter "$(TEST_UNIT_FILTER)" --logger trx --collect:"XPlat Code Coverage" \
 		--results-directory "$(RESULTS_DIR)/units" \
 		-- DataCollectionRunSettings.DataCollectors.DataCollector.Configuration.Format=cobertura,opencover
-	@dotnet test "$(SLNX)" --no-restore --no-build --filter "$(TEST_E2E_FILTER)" --logger trx \
+	@dotnet test "$(SLNX)" --no-restore --no-build --filter "$(TEST_COVERAGE_E2E_FILTER)" --logger trx \
 		--results-directory "$(RESULTS_DIR)/e2e"
 
 test-coverage-main-ci:  ## Run coverage for main-branch badge refresh with hang diagnostics enabled
@@ -59,7 +72,7 @@ test-coverage-main-ci:  ## Run coverage for main-branch badge refresh with hang 
 	@dotnet test "$(SLNX)" --no-restore --no-build --filter "$(TEST_UNIT_FILTER)" --logger trx --blame-hang --blame-hang-timeout 5m \
 		--collect:"XPlat Code Coverage" --results-directory "$(RESULTS_DIR)/units" \
 		-- DataCollectionRunSettings.DataCollectors.DataCollector.Configuration.Format=cobertura,opencover
-	@dotnet test "$(SLNX)" --no-restore --no-build --filter "$(TEST_E2E_FILTER)" --logger trx --blame-hang --blame-hang-timeout 5m \
+	@dotnet test "$(SLNX)" --no-restore --no-build --filter "$(TEST_COVERAGE_E2E_FILTER)" --logger trx --blame-hang --blame-hang-timeout 5m \
 		--results-directory "$(RESULTS_DIR)/e2e"
 
 test-coverage-badge: test-coverage  ## Run tests with coverage and print a test-coverage badge Markdown line

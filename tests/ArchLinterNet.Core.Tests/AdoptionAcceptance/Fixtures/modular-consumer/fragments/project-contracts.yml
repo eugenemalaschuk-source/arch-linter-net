@@ -1,0 +1,21 @@
+# Project governance. Both contracts reuse the same solution-discovered project set instead of
+# repeating the .csproj inventory, and neither declares analysis.projects.
+contracts:
+  strict_project_metadata:
+    - id: production-projects-are-nullable
+      name: production-projects-are-nullable
+      project_sets: [production_projects]
+      required_properties:
+        Nullable: enable
+      reason: Every production project opts into nullable reference types.
+    - id: production-projects-declare-a-tier
+      name: production-projects-declare-a-tier
+      project_sets: [production_projects]
+      forbidden_properties:
+        SyntheticModuleTier: unassigned
+      reason: Every production project declares its governance tier explicitly.
+  strict_coverage:
+    - id: every-production-project-is-governed
+      name: every-production-project-is-governed
+      scope: project
+      reason: Every discovered production project must be classified by project governance.
