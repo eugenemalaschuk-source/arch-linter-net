@@ -183,6 +183,14 @@ The system SHALL validate every entry of `allowed_only_in_namespaces`, `forbidde
 - **WHEN** a namespace-allowance field entry is rejected
 - **THEN** the error message SHALL name the same violated rule that `layers.<name>.namespace` validation would report for the identical pattern (e.g. "Bare wildcard '*' is not allowed", "Partial segment wildcard '...' is not allowed")
 
+#### Scenario: Blank or whitespace-only entries rejected at load time, not left to fail at scan time
+- **WHEN** a contract declares an `allowed_only_in_namespaces`, `forbidden_in_namespaces`, or `must_reside_in_namespaces` entry that is empty or whitespace-only
+- **THEN** policy load SHALL fail with a configuration error identifying the contract and the field, rather than letting an empty entry reach glob parsing unguarded during analysis (which would fail mid-scan instead of at load) or letting a whitespace-only entry silently compile into a pattern that can never match any real namespace
+
+#### Scenario: Validation applies identically through composed (imported) policies
+- **WHEN** a contract declaring a namespace-allowance field is loaded from an imported fragment rather than the root policy file
+- **THEN** a valid glob pattern loads successfully and an unsupported pattern fails with the same actionable error, additionally identifying the source fragment file
+
 ### Requirement: Docs and AI guidance document the shared grammar for namespace-allowance fields
 
 The contract documentation and AI-facing policy-authoring guidance SHALL state that `allowed_only_in_namespaces`, `forbidden_in_namespaces`, and `must_reside_in_namespaces` support the same constrained glob grammar as `layers.<name>.namespace`.

@@ -210,6 +210,30 @@ public sealed class InterfaceImplementationContractTests
     }
 
     [Test]
+    public void InterfaceImplementation_AllowedOnlyInNamespacesBlankEntry_ThrowsActionableErrorInsteadOfSilentNoMatch()
+    {
+        string policyPath = WritePolicy($"""
+            version: 1
+            name: Test
+            analysis:
+              target_assemblies: [{AssemblyName}]
+            contracts:
+              strict_interface_implementation:
+                - name: blank-namespace-entry
+                  interfaces: [{PaymentPortName}]
+                  allowed_only_in_namespaces: ["{AdaptersNamespace}", "  "]
+                  reason: A blank entry must fail load, not silently no-match.
+            """);
+
+        InvalidOperationException ex = Assert.Throws<InvalidOperationException>(() =>
+            new ArchitecturePolicyDocumentLoader().Load(policyPath))!;
+
+        Assert.That(ex.Message, Does.Contain("blank-namespace-entry"));
+        Assert.That(ex.Message, Does.Contain("allowed_only_in_namespaces"));
+        Assert.That(ex.Message, Does.Contain("blank"));
+    }
+
+    [Test]
     public void CheckInterfaceImplementationContract_FailingBothAllowAndDenyLists_ReportsSingleForbiddenViolation()
     {
         var contract = new ArchitectureInterfaceImplementationContract

@@ -237,6 +237,68 @@ public sealed class AttributeUsageContractTests
     }
 
     [Test]
+    public void AttributeUsage_ForbiddenInNamespacesBlankEntry_ThrowsActionableErrorInsteadOfSilentNoMatch()
+    {
+        string policyPath = WritePolicy($"""
+            version: 1
+            name: Test
+            analysis:
+              target_assemblies: [{AssemblyName}]
+            contracts:
+              strict_attribute_usage:
+                - name: blank-forbidden-namespace-entry
+                  attributes: [{TestMarkerAttributeName}]
+                  forbidden_in_namespaces: ["AttributeUsageContractTestFixtures.Forbidden", ""]
+                  reason: A blank entry must fail load, not silently no-match.
+            """);
+
+        InvalidOperationException ex = Assert.Throws<InvalidOperationException>(() =>
+            new ArchitecturePolicyDocumentLoader().Load(policyPath))!;
+
+        Assert.That(ex.Message, Does.Contain("blank-forbidden-namespace-entry"));
+        Assert.That(ex.Message, Does.Contain("forbidden_in_namespaces"));
+        Assert.That(ex.Message, Does.Contain("blank"));
+    }
+
+    [Test]
+    public void AttributeUsage_ComposedPolicy_InvalidNamespaceGlobInImportedFragment_ThrowsActionableErrorIdentifyingFragment()
+    {
+        string root = Path.Combine(_tempDir, "root.yml");
+        File.WriteAllText(root, $$"""
+            version: 1
+            name: Test
+            imports:
+              - fragment.yml
+            layers: {}
+            analysis:
+              target_assemblies: [{{AssemblyName}}]
+            contracts:
+              strict_attribute_usage: []
+            """);
+        File.WriteAllText(Path.Combine(_tempDir, "fragment.yml"), $$"""
+            contracts:
+              strict_attribute_usage:
+                - name: composed-invalid-glob
+                  attributes: [{{TestMarkerAttributeName}}]
+                  allowed_only_in_namespaces: ["*.Allowed"]
+                  reason: Composed (imported) policy path regression for issue #443.
+            """);
+
+        // Composed (imported) policies wrap the InvalidOperationException in
+        // ArchitecturePolicyValidationException - Assert.Catch matches by assignability, unlike
+        // Assert.Throws's exact-type check (see ExpressionCompilationValidatorLocationRegressionTests).
+        InvalidOperationException ex = Assert.Catch<InvalidOperationException>(() =>
+            new ArchitecturePolicyDocumentLoader().Load(root))!;
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(ex.Message, Does.Contain("composed-invalid-glob"));
+            Assert.That(ex.Message, Does.Contain("Leading wildcard"));
+            Assert.That(ex.Message, Does.Contain("fragment.yml"));
+        });
+    }
+
+    [Test]
     public void CheckAttributeUsageContract_BothAllowedAndForbidden_FailingBothReportsSingleForbiddenViolation()
     {
         var contract = new ArchitectureAttributeUsageContract

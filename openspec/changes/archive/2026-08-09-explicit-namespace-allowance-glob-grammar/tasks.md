@@ -28,11 +28,17 @@
 
 ## 5. Spec sync and archive
 
-- [ ] 5.1 Compare implementation against `specs/namespace-glob-patterns/spec.md` delta; adjust wording if implementation diverged.
-- [ ] 5.2 Run `openspec validate --all`.
-- [ ] 5.3 Run `openspec archive explicit-namespace-allowance-glob-grammar`.
+- [x] 5.1 Compare implementation against `specs/namespace-glob-patterns/spec.md` delta; adjust wording if implementation diverged.
+- [x] 5.2 Run `openspec validate --all`.
+- [x] 5.3 Run `openspec archive explicit-namespace-allowance-glob-grammar`.
 
 ## 6. Validation
 
-- [ ] 6.1 `make fmt`.
-- [ ] 6.2 `make acceptance`.
+- [x] 6.1 `make fmt`.
+- [x] 6.2 `make acceptance`.
+
+## 7. PR review round 2 (blocking findings)
+
+- [x] 7.1 `ValidateNamespacePatterns` was skipping blank/whitespace entries instead of validating them: an empty-string entry reached `NamespaceGlobPattern.Parse` unguarded at scan time (crash mid-analysis instead of at load), and a whitespace-only entry parsed as a harmless-looking literal that could never match — reproducing the exact silent-no-match trap this change closes for wildcard patterns. Fixed to reject blank entries explicitly at load time.
+- [x] 7.2 Added blank-entry regression tests for all four validators (composition, attribute-usage allowed/forbidden, interface-implementation, type-placement).
+- [x] 7.3 Added composed (imported-fragment) policy-path regression tests: valid glob pattern loads successfully through `imports:`, and an invalid pattern in an imported fragment still fails with an actionable error naming the fragment file (composition, attribute-usage, type-placement).

@@ -163,6 +163,59 @@ public sealed class TypePlacementContractTests
     }
 
     [Test]
+    public void TypePlacement_MustResideInNamespacesBlankEntry_ThrowsActionableErrorInsteadOfSilentNoMatch()
+    {
+        string policyPath = WritePolicy("""
+            version: 1
+            name: Test
+            analysis:
+              target_assemblies: [ArchLinterNet.Core]
+            contracts:
+              strict_type_placement:
+                - name: blank-namespace-entry
+                  types_matching:
+                    name_suffix: Controller
+                  must_reside_in_namespaces: ["TypePlacementContractTestFixtures.Correct", " "]
+                  reason: A blank entry must fail load, not silently no-match.
+            """);
+
+        InvalidOperationException ex = Assert.Throws<InvalidOperationException>(() =>
+            new ArchitecturePolicyDocumentLoader().Load(policyPath))!;
+
+        Assert.That(ex.Message, Does.Contain("blank-namespace-entry"));
+        Assert.That(ex.Message, Does.Contain("must_reside_in_namespaces"));
+        Assert.That(ex.Message, Does.Contain("blank"));
+    }
+
+    [Test]
+    public void TypePlacement_ComposedPolicy_ValidGlobNamespaceInImportedFragment_LoadsSuccessfully()
+    {
+        string root = Path.Combine(_tempDir, "root.yml");
+        File.WriteAllText(root, """
+            version: 1
+            name: Test
+            imports:
+              - fragment.yml
+            layers: {}
+            analysis:
+              target_assemblies: [ArchLinterNet.Core]
+            contracts:
+              strict_type_placement: []
+            """);
+        File.WriteAllText(Path.Combine(_tempDir, "fragment.yml"), """
+            contracts:
+              strict_type_placement:
+                - name: composed-glob-placement
+                  types_matching:
+                    name_suffix: Controller
+                  must_reside_in_namespaces: [Example.Modules.*.Correct]
+                  reason: Composed (imported) policy path regression for issue #443.
+            """);
+
+        Assert.DoesNotThrow(() => new ArchitecturePolicyDocumentLoader().Load(root));
+    }
+
+    [Test]
     public void CheckTypePlacementContract_ExcludeMatcherSubtractsIncludedTypes()
     {
         var contract = new ArchitectureTypePlacementContract
