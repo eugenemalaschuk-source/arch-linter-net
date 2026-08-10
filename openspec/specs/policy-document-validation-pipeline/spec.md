@@ -3,7 +3,9 @@
 ## Purpose
 Owns how a loaded policy document is validated: an ordered raw-YAML validation pipeline that runs
 before deserialization, an ordered document-validator pipeline that runs after it, and the boundary
-that keeps both out of `ArchitecturePolicyDocumentLoader`, which only orders the load stages.
+that keeps both out of `ArchitecturePolicyDocumentLoader`. The loader sequences the load stages and
+may still implement the ones that are not capability-specific — resolving and reading the selected
+root, delegating to import resolution and composition, and configuring the YAML deserializer.
 ## Requirements
 ### Requirement: Family-specific policy validation is owned by dedicated validator classes
 Each contract family's YAML-configuration validation SHALL be implemented by its own class implementing `IArchitecturePolicyDocumentValidator` (a single `Validate(ArchitectureContractDocument document)` method that throws on invalid configuration), rather than as a private method on `ArchitecturePolicyDocumentLoader`. `ArchitecturePolicyDocumentLoader` SHALL NOT contain family-specific validation logic in its own method bodies.
