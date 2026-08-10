@@ -1,0 +1,37 @@
+{
+  "schema": "checkpoint-b-release-scope-declaration/v1",
+  "release_target": "0.6.1",
+  "story": 434,
+  "_comment": [
+    "The authoritative release scope for the packed-artifact gate. It is declared here, in the",
+    "repository, so the set of blocking work is reviewed like any other release artifact instead of",
+    "being derived from mutable issue text at release time. The generator resolves only the current",
+    "GitHub state of these numbers; the aggregator refuses to authorize publication unless every",
+    "required item is closed.",
+    "Adding release-blocking work under the story means adding it here in the same change."
+  ],
+  "required_items": [
+    { "issue": 435, "finding": "F1", "summary": "Align project and assembly coverage scope semantics" },
+    { "issue": 436, "finding": "F2", "summary": "Make --ensure-built non-destructive" },
+    { "issue": 437, "finding": "F3", "summary": "Make public-api snapshot workflows reachable" },
+    { "issue": 438, "finding": "F4", "summary": "Restrict strict_cycles debt candidates to real findings" },
+    { "issue": 439, "finding": "F5", "summary": "Accept dependency contract id consistently" },
+    { "issue": 440, "finding": "F6", "summary": "Report actionable schema-validation failures" },
+    { "issue": 441, "finding": "F7", "summary": "Support ASP.NET shared-framework analysis" },
+    { "issue": 442, "finding": "F8", "summary": "Resolve layer-overlap allowance mismatch" },
+    { "issue": 443, "finding": "F9", "summary": "Make namespace allowance pattern semantics explicit" },
+    { "issue": 444, "finding": "F10", "summary": "Honor JSON format on configuration-error paths" },
+    { "issue": 445, "finding": "F11", "summary": "Reconcile schema registry and release version identity" },
+    { "issue": 465, "finding": "authoring", "summary": "Complete source-set authoring for assembly and discovered-project governance" },
+    { "issue": 466, "finding": "gate", "summary": "Run the final packed-artifact 0.6.1 consumer-cleanup gate" },
+    { "issue": 470, "finding": "gate-reliability", "summary": "Make the analysis-cache size-bound regression deterministic" },
+    { "issue": 471, "finding": "gate-defect", "summary": "Fix composed-policy schema diagnostic location and branch suppression" }
+  ],
+  "excluded_items": [
+    { "issue": 450, "reason": "Post-release refactoring story; #466 states it is not a 0.6.1 release prerequisite." },
+    { "issue": 451, "reason": "Child of the post-release refactoring story #450." },
+    { "issue": 452, "reason": "Child of the post-release refactoring story #450." },
+    { "issue": 453, "reason": "Child of the post-release refactoring story #450." },
+    { "issue": 464, "reason": "Self-policy hardening under #450; #466 states it is not a 0.6.1 release prerequisite." }
+  ]
+}

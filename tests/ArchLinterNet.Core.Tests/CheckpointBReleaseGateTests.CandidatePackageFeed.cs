@@ -10,7 +10,7 @@ namespace ArchLinterNet.Core.Tests;
 
 public sealed partial class CheckpointBReleaseGateTests
 {
-    private sealed class CandidatePackageFeed : IDisposable
+    private sealed partial class CandidatePackageFeed : IDisposable
     {
         private readonly string _root;
         private readonly string _feed;

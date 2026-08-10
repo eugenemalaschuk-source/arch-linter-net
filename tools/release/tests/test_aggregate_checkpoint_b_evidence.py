@@ -17,6 +17,7 @@ from aggregate_checkpoint_b_evidence import (  # noqa: E402
     _read_gates,
     _read_manifest,
     _read_records,
+    _read_release_scope,
     _summary,
 )
 
@@ -55,11 +56,30 @@ def _scenarios(shell: str, platform: str, failed: dict[str, str] | None = None) 
     return results
 
 
+def _release_scope(digest: str, open_items: set[int] | None = None) -> dict:
+    open_items = open_items or set()
+    return {
+        "schema": "checkpoint-b-release-scope/v1",
+        "release_target": "0.6.1",
+        "story": 434,
+        "repository": "owner/repo",
+        "source_commit": _COMMIT,
+        "candidate_manifest_sha256": digest,
+        "required_items": [
+            {"issue": number, "finding": f"F{index + 1}", "summary": f"Item {number}",
+             "state": "open" if number in open_items else "closed"}
+            for index, number in enumerate((435, 436, 466))
+        ],
+        "excluded_items": [{"issue": 450, "reason": "Post-release refactoring story."}],
+    }
+
+
 def _write_corpus(
     tmp_path: Path,
     failed: dict[str, str] | None = None,
     policy_shape: dict | None = None,
-) -> tuple[Path, Path, Path]:
+    open_scope_items: set[int] | None = None,
+) -> tuple[Path, Path, Path, Path]:
     manifest_path = tmp_path / "package-manifest.json"
     manifest_path.write_text(json.dumps({
         "schema": "checkpoint-b-candidate-manifest/v1",
@@ -98,16 +118,19 @@ def _write_corpus(
         "candidate_manifest_sha256": digest,
         "gates": [{"id": "acceptance", "result": "passed"}, {"id": "openspec_strict", "result": "passed"}],
     }))
-    return manifest_path, platforms, gates_path
+    scope_path = tmp_path / "release-scope.json"
+    scope_path.write_text(json.dumps(_release_scope(digest, open_scope_items)))
+    return manifest_path, platforms, gates_path, scope_path
 
 
 def _aggregate(tmp_path: Path, **kwargs) -> dict:
-    manifest_path, platforms, gates_path = _write_corpus(tmp_path, **kwargs)
+    manifest_path, platforms, gates_path, scope_path = _write_corpus(tmp_path, **kwargs)
     manifest = _read_manifest(manifest_path)
     digest = hashlib.sha256(manifest_path.read_bytes()).hexdigest()
     records = _read_records(platforms, manifest, digest)
     gates = _read_gates(gates_path, manifest, digest)
-    return _summary(records, manifest, gates, digest)
+    scope = _read_release_scope(scope_path, manifest, digest)
+    return _summary(records, manifest, gates, scope, digest)
 
 
 def test_consumer_cleanup_scenarios_are_required() -> None:
@@ -162,7 +185,7 @@ def test_inline_public_api_inventory_blocks_publication(tmp_path: Path) -> None:
 
 
 def test_missing_policy_shape_is_rejected(tmp_path: Path) -> None:
-    manifest_path, platforms, _ = _write_corpus(tmp_path)
+    manifest_path, platforms, _, _ = _write_corpus(tmp_path)
     record_path = platforms / "linux-x64.json"
     record = json.loads(record_path.read_text())
     del record["policy_shape"]
@@ -176,7 +199,7 @@ def test_missing_policy_shape_is_rejected(tmp_path: Path) -> None:
 
 
 def test_platform_result_contradicting_its_scenarios_is_rejected(tmp_path: Path) -> None:
-    manifest_path, platforms, _ = _write_corpus(tmp_path, failed={"source-set-enrolment": "Broken."})
+    manifest_path, platforms, _, _ = _write_corpus(tmp_path, failed={"source-set-enrolment": "Broken."})
     record_path = platforms / "linux-x64.json"
     record = json.loads(record_path.read_text())
     record["result"] = "passed"
@@ -190,13 +213,14 @@ def test_platform_result_contradicting_its_scenarios_is_rejected(tmp_path: Path)
 
 
 def _run_main(tmp_path: Path, **kwargs) -> tuple[int, dict, str]:
-    manifest_path, platforms, gates_path = _write_corpus(tmp_path, **kwargs)
+    manifest_path, platforms, gates_path, scope_path = _write_corpus(tmp_path, **kwargs)
     output = tmp_path / "release-evidence"
     argv = [
         "aggregate_checkpoint_b_evidence.py",
         "--input-dir", str(platforms),
         "--candidate-manifest", str(manifest_path),
         "--repository-gates", str(gates_path),
+        "--release-scope", str(scope_path),
         "--output-dir", str(output),
     ]
     original = sys.argv
@@ -244,7 +268,7 @@ def test_main_reports_policy_shape_defects(tmp_path: Path) -> None:
 
 
 def test_scenario_missing_everywhere_blocks_publication(tmp_path: Path) -> None:
-    manifest_path, platforms, gates_path = _write_corpus(tmp_path)
+    manifest_path, platforms, gates_path, scope_path = _write_corpus(tmp_path)
     for record_path in platforms.iterdir():
         record = json.loads(record_path.read_text())
         for scenario in record["scenarios"]:
@@ -259,6 +283,7 @@ def test_scenario_missing_everywhere_blocks_publication(tmp_path: Path) -> None:
         _read_records(platforms, manifest, digest),
         manifest,
         _read_gates(gates_path, manifest, digest),
+        _read_release_scope(scope_path, manifest, digest),
         digest)
 
     assert summary["result"] == "failed"
@@ -285,7 +310,7 @@ def test_scenario_missing_everywhere_blocks_publication(tmp_path: Path) -> None:
     ],
 )
 def test_malformed_platform_record_is_rejected(tmp_path: Path, mutate, message: str) -> None:
-    manifest_path, platforms, _ = _write_corpus(tmp_path)
+    manifest_path, platforms, _, _ = _write_corpus(tmp_path)
     record_path = platforms / "linux-x64.json"
     record = json.loads(record_path.read_text())
     mutate(record)
@@ -299,20 +324,21 @@ def test_malformed_platform_record_is_rejected(tmp_path: Path, mutate, message: 
 
 
 def test_platform_matrix_must_be_complete(tmp_path: Path) -> None:
-    manifest_path, platforms, gates_path = _write_corpus(tmp_path)
+    manifest_path, platforms, gates_path, scope_path = _write_corpus(tmp_path)
     (platforms / "macos-x64.json").unlink()
     digest = hashlib.sha256(manifest_path.read_bytes()).hexdigest()
     manifest = _read_manifest(manifest_path)
 
     records = _read_records(platforms, manifest, digest)
     gates = _read_gates(gates_path, manifest, digest)
+    scope = _read_release_scope(scope_path, manifest, digest)
 
     with pytest.raises(ValueError, match="platform matrix mismatch"):
-        _summary(records, manifest, gates, digest)
+        _summary(records, manifest, gates, scope, digest)
 
 
 def test_wrong_architecture_or_shell_is_rejected(tmp_path: Path) -> None:
-    manifest_path, platforms, gates_path = _write_corpus(tmp_path)
+    manifest_path, platforms, gates_path, scope_path = _write_corpus(tmp_path)
     record_path = platforms / "macos-arm64.json"
     record = json.loads(record_path.read_text())
     record["architecture"] = "X64"
@@ -322,9 +348,10 @@ def test_wrong_architecture_or_shell_is_rejected(tmp_path: Path) -> None:
 
     records = _read_records(platforms, manifest, digest)
     gates = _read_gates(gates_path, manifest, digest)
+    scope = _read_release_scope(scope_path, manifest, digest)
 
     with pytest.raises(ValueError, match="wrong architecture"):
-        _summary(records, manifest, gates, digest)
+        _summary(records, manifest, gates, scope, digest)
 
 
 @pytest.mark.parametrize(
@@ -338,7 +365,7 @@ def test_wrong_architecture_or_shell_is_rejected(tmp_path: Path) -> None:
     ],
 )
 def test_malformed_repository_gates_are_rejected(tmp_path: Path, mutate, message: str) -> None:
-    manifest_path, _, gates_path = _write_corpus(tmp_path)
+    manifest_path, _, gates_path, _ = _write_corpus(tmp_path)
     gates = json.loads(gates_path.read_text())
     mutate(gates)
     gates_path.write_text(json.dumps(gates))
@@ -359,7 +386,7 @@ def test_malformed_repository_gates_are_rejected(tmp_path: Path, mutate, message
     ],
 )
 def test_malformed_candidate_manifest_is_rejected(tmp_path: Path, mutate, message: str) -> None:
-    manifest_path, _, _ = _write_corpus(tmp_path)
+    manifest_path, _, _, _ = _write_corpus(tmp_path)
     manifest = json.loads(manifest_path.read_text())
     mutate(manifest)
     manifest_path.write_text(json.dumps(manifest))
@@ -377,7 +404,7 @@ def test_unreadable_input_is_reported_with_its_description(tmp_path: Path) -> No
 
 
 def test_empty_evidence_directory_is_rejected(tmp_path: Path) -> None:
-    manifest_path, platforms, _ = _write_corpus(tmp_path)
+    manifest_path, platforms, _, _ = _write_corpus(tmp_path)
     for record_path in platforms.iterdir():
         record_path.unlink()
 
@@ -386,3 +413,52 @@ def test_empty_evidence_directory_is_rejected(tmp_path: Path) -> None:
 
     with pytest.raises(ValueError, match="No packed-artifact gate evidence records"):
         _read_records(platforms, manifest, digest)
+
+
+def test_open_release_scope_item_blocks_publication(tmp_path: Path) -> None:
+    summary = _aggregate(tmp_path, open_scope_items={436})
+
+    assert summary["result"] == "failed"
+    assert summary["open_release_scope_items"] == ["#436 (F2) is open: Item 436"]
+    assert summary["authorization"].startswith("FAIL")
+
+
+def test_release_scope_inventory_is_emitted_in_the_evidence(tmp_path: Path) -> None:
+    exit_code, summary, markdown = _run_main(tmp_path)
+
+    assert exit_code == 0
+    assert summary["release_scope"]["story"] == 434
+    assert [item["issue"] for item in summary["release_scope"]["required_items"]] == [435, 436, 466]
+    assert "## Release scope (story #434, target 0.6.1)" in markdown
+    assert "| #435 | F1 | closed | Item 435 |" in markdown
+    assert "- #450 — Post-release refactoring story." in markdown
+
+
+def test_open_release_scope_item_is_listed_in_the_markdown(tmp_path: Path) -> None:
+    exit_code, _, markdown = _run_main(tmp_path, open_scope_items={466})
+
+    assert exit_code == 1
+    assert "| #466 | F3 | open | Item 466 |" in markdown
+
+
+@pytest.mark.parametrize(
+    ("mutate", "message"),
+    [
+        (lambda scope: scope.update(schema="other/v1"), "Release-scope schema"),
+        (lambda scope: scope.update(candidate_manifest_sha256="e" * 64), "not bound to the candidate"),
+        (lambda scope: scope.update(source_commit="f" * 40), "source commit differs"),
+        (lambda scope: scope.update(required_items=[]), "declares no required items"),
+        (lambda scope: scope["required_items"][0].update(issue="435"), "item is malformed"),
+        (lambda scope: scope["required_items"][0].update(state="unknown"), "no resolved state"),
+    ],
+)
+def test_malformed_release_scope_is_rejected(tmp_path: Path, mutate, message: str) -> None:
+    manifest_path, _, _, scope_path = _write_corpus(tmp_path)
+    scope = json.loads(scope_path.read_text())
+    mutate(scope)
+    scope_path.write_text(json.dumps(scope))
+    manifest = _read_manifest(manifest_path)
+    digest = hashlib.sha256(manifest_path.read_bytes()).hexdigest()
+
+    with pytest.raises(ValueError, match=message):
+        _read_release_scope(scope_path, manifest, digest)

@@ -32,7 +32,8 @@ Its composed policy is authored the way the release intends a consumer to author
 | Scenario | Finding |
 |---|---|
 | `composed-policy-assembly-free-check` | F1 |
-| `non-destructive-ensure-built` | F2 |
+| `non-destructive-ensure-built` | F2 (CLI) |
+| `packaged-testing-ensure-built` | F2 (packaged Testing API) |
 | `public-api-snapshot-workflow` | F3 |
 | `strict-cycles-baseline-scope` | F4 |
 | `dependency-contract-id-parity` | F5 |
@@ -49,6 +50,20 @@ Its composed policy is authored the way the release intends a consumer to author
 | `consumer-policy-shape` | policy-shape acceptance |
 
 Every scenario is required on every platform in the matrix. A scenario that a platform cannot execute is recorded as `not_applicable` with a reason and must pass on at least one platform.
+
+## Release-scope closure
+
+`tools/release/release-scope.json` declares the authoritative #434 release scope: the required
+items, and the items explicitly excluded with their reasons. It lives in the repository so the set
+of blocking work is reviewed like any other release artifact rather than derived from mutable issue
+text at release time.
+
+`create_release_scope_evidence.py` resolves only the *current* state of those issues from the issue
+tracker and binds the result to the candidate manifest digest and source commit. The aggregator
+refuses to authorize publication while any required item is open, and emits the inventory —
+including exclusions — in both the JSON and Markdown evidence.
+
+Adding release-blocking work under the story means adding it to the declaration in the same change.
 
 ## Tracked defects
 

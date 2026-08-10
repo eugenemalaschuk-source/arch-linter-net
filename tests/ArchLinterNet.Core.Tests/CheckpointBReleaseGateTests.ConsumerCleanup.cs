@@ -37,6 +37,7 @@ public sealed partial class CheckpointBReleaseGateTests
         {
             AssertComposedPolicyAssemblyFreeCheck(candidate, consumer),
             AssertNonDestructiveBuildPreparation(candidate, consumer),
+            candidate.AssertRepeatedTestingEnsureBuilt(),
             AssertStrictCyclesBaselineScope(candidate, consumer),
             AssertDependencyContractIdParity(candidate, consumer),
             AssertLayerOverlapAllowance(candidate, consumer),
@@ -105,13 +106,18 @@ public sealed partial class CheckpointBReleaseGateTests
         return Passed("composed-policy-assembly-free-check");
     }
 
-    // F2 — repeated `--ensure-built` validation preserves the verified build outputs byte for
-    // byte, so a consumer needs no post-analysis rebuild shim before packing or testing.
+    // F2, CLI half — repeated build preparation preserves the verified build outputs, so a consumer
+    // needs no post-analysis rebuild shim before packing or testing. The oracle covers every
+    // selected primary output, not just assemblies: a torn PDB breaks a consumer's downstream
+    // `dotnet test --no-build` just as badly. The packaged Testing half of #436 is proven
+    // separately by `packaged-testing-ensure-built`.
     private static CheckpointScenarioResult AssertNonDestructiveBuildPreparation(
         CandidatePackageFeed candidate, AdoptionAcceptanceFixture consumer)
     {
         Dictionary<string, string> before = HashBuildOutputs(consumer.Root);
         Assert.That(before, Is.Not.Empty, "The consumer fixture must have build outputs to preserve.");
+        Assert.That(before.Keys, Has.Some.EndsWith(".pdb"),
+            "The preservation oracle must cover symbols, not only assemblies.");
 
         CommandResult second = candidate.RunTool(consumer.Root,
             "--policy", consumer.PolicyPath, "--strict", "--format", "json", "--ensure-built");
@@ -229,9 +235,16 @@ public sealed partial class CheckpointBReleaseGateTests
         return Passed("layer-overlap-allowance");
     }
 
+    /// <summary>
+    /// Every selected primary build output, by content. Assemblies alone are not the invariant:
+    /// #436 corrupted whatever the post-build evaluation touched, and a consumer continuing with
+    /// `dotnet test --no-build` or packing needs its symbols and deps/runtime config intact too.
+    /// </summary>
     private static Dictionary<string, string> HashBuildOutputs(string root)
     {
-        return Directory.EnumerateFiles(root, "*.dll", SearchOption.AllDirectories)
+        string[] primaryOutputs = ["*.dll", "*.pdb", "*.deps.json", "*.runtimeconfig.json"];
+        return primaryOutputs
+            .SelectMany(pattern => Directory.EnumerateFiles(root, pattern, SearchOption.AllDirectories))
             .Where(path => path.Contains($"{Path.DirectorySeparatorChar}bin{Path.DirectorySeparatorChar}",
                 StringComparison.Ordinal))
             .ToDictionary(

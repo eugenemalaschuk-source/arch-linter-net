@@ -13,6 +13,7 @@ from typing import Any
 _EVIDENCE_SCHEMA = "checkpoint-b-platform-evidence/v1"
 _GATES_SCHEMA = "checkpoint-b-repository-gates/v1"
 _MANIFEST_SCHEMA = "checkpoint-b-candidate-manifest/v1"
+_RELEASE_SCOPE_SCHEMA = "checkpoint-b-release-scope/v1"
 _REQUIRED_PLATFORMS = {
     "linux-x64": ("x64", "bash"),
     "macos-arm64": ("arm64", "zsh"),
@@ -49,6 +50,7 @@ _CONSUMER_CLEANUP_SCENARIOS = {
     "missing-shared-framework-diagnostic",
     "namespace-allowance-pattern",
     "non-destructive-ensure-built",
+    "packaged-testing-ensure-built",
     "public-api-snapshot-workflow",
     "release-identity-consistency",
     "source-set-assembly-authoring",
@@ -239,12 +241,49 @@ def _read_gates(path: Path, manifest: dict[str, Any], manifest_digest: str) -> d
     return gates
 
 
-def _summary(records: list[dict[str, Any]], manifest: dict[str, Any], gates: dict[str, Any], manifest_digest: str) -> dict[str, Any]:
+def _read_release_scope(path: Path, manifest: dict[str, Any], manifest_digest: str) -> dict[str, Any]:
+    """The authoritative #434 release-scope inventory, bound to this candidate."""
+    scope = _load_json(path, "release-scope inventory")
+    if scope.get("schema") != _RELEASE_SCOPE_SCHEMA:
+        raise ValueError("Release-scope schema is invalid.")
+    if scope.get("candidate_manifest_sha256") != manifest_digest:
+        raise ValueError("Release scope is not bound to the candidate manifest.")
+    if scope.get("source_commit") != manifest["source_commit"]:
+        raise ValueError("Release scope source commit differs from the candidate manifest.")
+    required = scope.get("required_items")
+    if not isinstance(required, list) or not required:
+        raise ValueError("Release scope declares no required items.")
+    for item in required:
+        if not isinstance(item, dict) or not isinstance(item.get("issue"), int):
+            raise ValueError("Release-scope item is malformed.")
+        if item.get("state") not in {"open", "closed"}:
+            raise ValueError(f"Release-scope item #{item.get('issue')} has no resolved state.")
+    return scope
+
+
+def _release_scope_defects(scope: dict[str, Any]) -> list[str]:
+    """#466: no required release-scope item may be open when publication is authorized."""
+    return [
+        f"#{item['issue']} ({item.get('finding', 'release scope')}) is {item['state']}: "
+        f"{item.get('summary') or item.get('title', '')}".strip()
+        for item in sorted(scope["required_items"], key=lambda item: item["issue"])
+        if item["state"] != "closed"
+    ]
+
+
+def _summary(
+    records: list[dict[str, Any]],
+    manifest: dict[str, Any],
+    gates: dict[str, Any],
+    scope: dict[str, Any],
+    manifest_digest: str,
+) -> dict[str, Any]:
     _validate_platforms(records)
     failures = _failed_scenarios(records)
     defects = _policy_shape_defects(records)
+    open_scope = _release_scope_defects(scope)
     version = manifest["version"]
-    passed = not failures and not defects
+    passed = not failures and not defects and not open_scope
     return {
         "schema": "checkpoint-b-release-evidence/v1",
         "checkpoint": "B",
@@ -263,6 +302,8 @@ def _summary(records: list[dict[str, Any]], manifest: dict[str, Any], gates: dic
         "consumer_cleanup_scenarios": sorted(_CONSUMER_CLEANUP_SCENARIOS),
         "failed_scenarios": failures,
         "policy_shape_defects": defects,
+        "open_release_scope_items": open_scope,
+        "release_scope": scope,
         "platforms": sorted(records, key=lambda record: str(record["platform_id"])),
         "repository_gates": gates["gates"],
     }
@@ -289,6 +330,28 @@ def _markdown(summary: dict[str, Any]) -> str:
         *[f"- {defect}" for defect in summary["policy_shape_defects"]],
         "",
     ] if summary["policy_shape_defects"] else []
+    scope = summary["release_scope"]
+    scope_section = [
+        f"## Release scope (story #{scope['story']}, target {scope['release_target']})",
+        "",
+        "| Item | Finding | State | Summary |",
+        "| --- | --- | --- | --- |",
+        *[
+            "| #{issue} | {finding} | {state} | {summary} |".format(
+                issue=item["issue"],
+                finding=item.get("finding", ""),
+                state=item["state"],
+                summary=item.get("summary") or item.get("title", ""))
+            for item in sorted(scope["required_items"], key=lambda item: item["issue"])
+        ],
+        "",
+        *([
+            "Excluded from the release scope:",
+            "",
+            *[f"- #{item['issue']} — {item['reason']}" for item in scope.get("excluded_items", [])],
+            "",
+        ] if scope.get("excluded_items") else []),
+    ]
     return "\n".join([
         "# Packed-artifact release evidence",
         "",
@@ -312,6 +375,7 @@ def _markdown(summary: dict[str, Any]) -> str:
         "",
         *failure_section,
         *defect_section,
+        *scope_section,
         "| Platform | Runtime | Shell | Result |",
         "| --- | --- | --- | --- |",
         *platform_rows,
@@ -324,6 +388,7 @@ def main() -> int:
     parser.add_argument("--input-dir", type=Path, required=True)
     parser.add_argument("--candidate-manifest", type=Path, required=True)
     parser.add_argument("--repository-gates", type=Path, required=True)
+    parser.add_argument("--release-scope", type=Path, required=True)
     parser.add_argument("--output-dir", type=Path, required=True)
     arguments = parser.parse_args()
 
@@ -331,7 +396,8 @@ def main() -> int:
     manifest_digest = _sha256(arguments.candidate_manifest)
     records = _read_records(arguments.input_dir, manifest, manifest_digest)
     gates = _read_gates(arguments.repository_gates, manifest, manifest_digest)
-    summary = _summary(records, manifest, gates, manifest_digest)
+    scope = _read_release_scope(arguments.release_scope, manifest, manifest_digest)
+    summary = _summary(records, manifest, gates, scope, manifest_digest)
     arguments.output_dir.mkdir(parents=True, exist_ok=True)
     (arguments.output_dir / "checkpoint-b-release-evidence.json").write_text(
         json.dumps(summary, indent=2, sort_keys=True) + "\n", encoding="utf-8"
