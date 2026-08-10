@@ -709,7 +709,7 @@ internal static partial class ArchitectureSourceSetExpander
                     continue;
                 }
 
-                if (universe.Count == 0)
+                if (universe.Count == 0 && !(set.Kind == ArchitectureSourceSetKind.Project && _projectUniverse is not null))
                 {
                     throw new InvalidOperationException(
                         $"Source set '{name}' declares glob '{glob}' but {UniverseName(set.Kind)} is " +
@@ -762,7 +762,8 @@ internal static partial class ArchitectureSourceSetExpander
 
             // A policy that declares no targets or no projects is a small policy that names its
             // sources directly; there is nothing to check the member against in that case.
-            return universe.Count == 0 || universe.Contains(value, StringComparer.Ordinal);
+            return (universe.Count == 0 && !(kind == ArchitectureSourceSetKind.Project && _projectUniverse is not null))
+                || universe.Contains(value, StringComparer.Ordinal);
         }
 
         private IReadOnlyList<string> Universe(ArchitectureSourceSetKind kind) => kind switch
