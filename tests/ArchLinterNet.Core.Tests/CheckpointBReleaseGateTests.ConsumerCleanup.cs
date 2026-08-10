@@ -16,10 +16,10 @@ public sealed partial class CheckpointBReleaseGateTests
     /// gate honest in both directions: a NEW failure fails this test immediately, and a tracked
     /// defect that has silently been fixed also fails it so the entry gets removed.
     /// </summary>
-    private static readonly IReadOnlyDictionary<string, string> _trackedConsumerCleanupDefects =
-        new Dictionary<string, string>(StringComparer.Ordinal);
+    private static readonly Dictionary<string, string> _trackedConsumerCleanupDefects =
+        new(StringComparer.Ordinal);
 
-    private static IReadOnlyList<CheckpointScenarioResult> AssertConsumerCleanupMatrix(
+    private static List<CheckpointScenarioResult> AssertConsumerCleanupMatrix(
         CandidatePackageFeed candidate,
         out ConsumerPolicyShape policyShape)
     {
@@ -110,12 +110,12 @@ public sealed partial class CheckpointBReleaseGateTests
     private static CheckpointScenarioResult AssertNonDestructiveBuildPreparation(
         CandidatePackageFeed candidate, AdoptionAcceptanceFixture consumer)
     {
-        IReadOnlyDictionary<string, string> before = HashBuildOutputs(consumer.Root);
+        Dictionary<string, string> before = HashBuildOutputs(consumer.Root);
         Assert.That(before, Is.Not.Empty, "The consumer fixture must have build outputs to preserve.");
 
         CommandResult second = candidate.RunTool(consumer.Root,
             "--policy", consumer.PolicyPath, "--strict", "--format", "json", "--ensure-built");
-        IReadOnlyDictionary<string, string> after = HashBuildOutputs(consumer.Root);
+        Dictionary<string, string> after = HashBuildOutputs(consumer.Root);
 
         Assert.Multiple(() =>
         {
@@ -229,7 +229,7 @@ public sealed partial class CheckpointBReleaseGateTests
         return Passed("layer-overlap-allowance");
     }
 
-    private static IReadOnlyDictionary<string, string> HashBuildOutputs(string root)
+    private static Dictionary<string, string> HashBuildOutputs(string root)
     {
         return Directory.EnumerateFiles(root, "*.dll", SearchOption.AllDirectories)
             .Where(path => path.Contains($"{Path.DirectorySeparatorChar}bin{Path.DirectorySeparatorChar}",

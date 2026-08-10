@@ -168,9 +168,11 @@ def test_missing_policy_shape_is_rejected(tmp_path: Path) -> None:
     del record["policy_shape"]
     record_path.write_text(json.dumps(record))
 
+    manifest = _read_manifest(manifest_path)
+    digest = hashlib.sha256(manifest_path.read_bytes()).hexdigest()
+
     with pytest.raises(ValueError, match="policy-shape counters"):
-        _read_records(platforms, _read_manifest(manifest_path),
-                      hashlib.sha256(manifest_path.read_bytes()).hexdigest())
+        _read_records(platforms, manifest, digest)
 
 
 def test_platform_result_contradicting_its_scenarios_is_rejected(tmp_path: Path) -> None:
@@ -180,9 +182,11 @@ def test_platform_result_contradicting_its_scenarios_is_rejected(tmp_path: Path)
     record["result"] = "passed"
     record_path.write_text(json.dumps(record))
 
+    manifest = _read_manifest(manifest_path)
+    digest = hashlib.sha256(manifest_path.read_bytes()).hexdigest()
+
     with pytest.raises(ValueError, match="contradicts its own scenario results"):
-        _read_records(platforms, _read_manifest(manifest_path),
-                      hashlib.sha256(manifest_path.read_bytes()).hexdigest())
+        _read_records(platforms, manifest, digest)
 
 
 def _run_main(tmp_path: Path, **kwargs) -> tuple[int, dict, str]:
@@ -287,9 +291,11 @@ def test_malformed_platform_record_is_rejected(tmp_path: Path, mutate, message: 
     mutate(record)
     record_path.write_text(json.dumps(record))
 
+    manifest = _read_manifest(manifest_path)
+    digest = hashlib.sha256(manifest_path.read_bytes()).hexdigest()
+
     with pytest.raises(ValueError, match=message):
-        _read_records(platforms, _read_manifest(manifest_path),
-                      hashlib.sha256(manifest_path.read_bytes()).hexdigest())
+        _read_records(platforms, manifest, digest)
 
 
 def test_platform_matrix_must_be_complete(tmp_path: Path) -> None:
@@ -298,12 +304,11 @@ def test_platform_matrix_must_be_complete(tmp_path: Path) -> None:
     digest = hashlib.sha256(manifest_path.read_bytes()).hexdigest()
     manifest = _read_manifest(manifest_path)
 
+    records = _read_records(platforms, manifest, digest)
+    gates = _read_gates(gates_path, manifest, digest)
+
     with pytest.raises(ValueError, match="platform matrix mismatch"):
-        _summary(
-            _read_records(platforms, manifest, digest),
-            manifest,
-            _read_gates(gates_path, manifest, digest),
-            digest)
+        _summary(records, manifest, gates, digest)
 
 
 def test_wrong_architecture_or_shell_is_rejected(tmp_path: Path) -> None:
@@ -315,12 +320,11 @@ def test_wrong_architecture_or_shell_is_rejected(tmp_path: Path) -> None:
     digest = hashlib.sha256(manifest_path.read_bytes()).hexdigest()
     manifest = _read_manifest(manifest_path)
 
+    records = _read_records(platforms, manifest, digest)
+    gates = _read_gates(gates_path, manifest, digest)
+
     with pytest.raises(ValueError, match="wrong architecture"):
-        _summary(
-            _read_records(platforms, manifest, digest),
-            manifest,
-            _read_gates(gates_path, manifest, digest),
-            digest)
+        _summary(records, manifest, gates, digest)
 
 
 @pytest.mark.parametrize(
@@ -339,9 +343,11 @@ def test_malformed_repository_gates_are_rejected(tmp_path: Path, mutate, message
     mutate(gates)
     gates_path.write_text(json.dumps(gates))
 
+    manifest = _read_manifest(manifest_path)
+    digest = hashlib.sha256(manifest_path.read_bytes()).hexdigest()
+
     with pytest.raises(ValueError, match=message):
-        _read_gates(gates_path, _read_manifest(manifest_path),
-                    hashlib.sha256(manifest_path.read_bytes()).hexdigest())
+        _read_gates(gates_path, manifest, digest)
 
 
 @pytest.mark.parametrize(
@@ -375,6 +381,8 @@ def test_empty_evidence_directory_is_rejected(tmp_path: Path) -> None:
     for record_path in platforms.iterdir():
         record_path.unlink()
 
+    manifest = _read_manifest(manifest_path)
+    digest = hashlib.sha256(manifest_path.read_bytes()).hexdigest()
+
     with pytest.raises(ValueError, match="No packed-artifact gate evidence records"):
-        _read_records(platforms, _read_manifest(manifest_path),
-                      hashlib.sha256(manifest_path.read_bytes()).hexdigest())
+        _read_records(platforms, manifest, digest)
