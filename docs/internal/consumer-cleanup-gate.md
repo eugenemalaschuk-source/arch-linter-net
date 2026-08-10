@@ -59,6 +59,14 @@ The registry does not suppress anything. A registered scenario is still recorded
 
 Adding an entry is a release decision, not a test-maintenance convenience. Every entry must name the tracking issue.
 
+## Where it runs
+
+The gate is in the `make test` **E2E** bucket (`TEST_E2E_FILTER`), not the unit bucket: it packs the whole solution, installs the tool from an isolated feed, and builds the synthetic consumer fixtures, so leaving it on the unit critical path serialized it behind ~2,500 unit tests.
+
+That bucket runs without coverage instrumentation — `make test-coverage` collects only from the unit process, by design — so `CheckpointBReleaseGateTests*.cs` is listed in `sonar.coverage.exclusions`. The harness is fully executed on every run; only its line coverage is unmeasurable, and reporting it as untested would be wrong.
+
+The release workflow runs the same entrypoint on all four platforms against the real candidate feed; that run, not the PR run, is what authorizes publication.
+
 ## Release evidence
 
 Each platform job writes `checkpoint-b-platform-evidence/v1` including typed `policy_shape` counters. The aggregator validates the platform matrix, the scenario inventory, the policy shape, and the independently produced repository gates, then emits `checkpoint-b-release-evidence.json`/`.md` with an explicit PASS or FAIL publication statement and exits non-zero on FAIL.

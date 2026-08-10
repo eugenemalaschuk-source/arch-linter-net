@@ -9,8 +9,13 @@
 # not surface fixture-level categories as VSTest traits, so `Category=E2E`/`Category!=E2E` match
 # nothing. The fixtures' [Category("E2E")] attributes stay as human-readable documentation.
 # `!~` negation is supported by the VSTest filter syntax.
-TEST_E2E_FILTER := FullyQualifiedName~ExternalDependencyContractAuditE2eTests|FullyQualifiedName~BuildStatePreflightTests|FullyQualifiedName~BuildStatePreflightAssemblyReloadTests|FullyQualifiedName~CheckpointAAdoptionAcceptanceTests|FullyQualifiedName~ArchitectureBaselineIntegrationTests
-TEST_UNIT_FILTER := FullyQualifiedName!~ExternalDependencyContractAuditE2eTests&FullyQualifiedName!~BuildStatePreflightTests&FullyQualifiedName!~BuildStatePreflightAssemblyReloadTests&FullyQualifiedName!~CheckpointAAdoptionAcceptanceTests&FullyQualifiedName!~ArchitectureBaselineIntegrationTests
+#
+# CheckpointBReleaseGateTests belongs in the E2E bucket for exactly the reason above: it packs the
+# whole solution, installs the tool from an isolated feed, and builds the synthetic consumer
+# fixtures. Left in the unit bucket it serializes behind ~2,500 unit tests while the E2E process
+# sits idle, which is what pushed the Intel macOS job past its 15-minute budget.
+TEST_E2E_FILTER := FullyQualifiedName~ExternalDependencyContractAuditE2eTests|FullyQualifiedName~BuildStatePreflightTests|FullyQualifiedName~BuildStatePreflightAssemblyReloadTests|FullyQualifiedName~CheckpointAAdoptionAcceptanceTests|FullyQualifiedName~ArchitectureBaselineIntegrationTests|FullyQualifiedName~CheckpointBReleaseGateTests
+TEST_UNIT_FILTER := FullyQualifiedName!~ExternalDependencyContractAuditE2eTests&FullyQualifiedName!~BuildStatePreflightTests&FullyQualifiedName!~BuildStatePreflightAssemblyReloadTests&FullyQualifiedName!~CheckpointAAdoptionAcceptanceTests&FullyQualifiedName!~ArchitectureBaselineIntegrationTests&FullyQualifiedName!~CheckpointBReleaseGateTests
 
 # Both background processes are waited on regardless of the first one's exit status, then the
 # combined result is checked explicitly — no `set -e`, which would abort the shell at the first

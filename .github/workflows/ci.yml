@@ -134,7 +134,7 @@ jobs:
             /d:sonar.cs.vstest.reportsPaths="test-results/**/*.trx" \
             /d:sonar.python.coverage.reportPaths="coverage-python.xml" \
             /d:sonar.exclusions="**/AdoptionAcceptance/Fixtures/**" \
-            /d:sonar.coverage.exclusions="tools/**/tests/**"
+            /d:sonar.coverage.exclusions="tools/**/tests/**,**/CheckpointBReleaseGateTests*.cs"
 
       - name: Collect test coverage
         run: make test-coverage
@@ -281,7 +281,9 @@ jobs:
     name: Intel macOS Test Suite
     if: github.event_name == 'pull_request'
     runs-on: macos-15-intel
-    timeout-minutes: 15
+    # The slowest supported runner, and the suite now also builds the synthetic modular consumer
+    # for the packed-artifact release gate. Windows finishes in ~10m and Apple Silicon in ~5m.
+    timeout-minutes: 25
     permissions:
       contents: read
 
@@ -445,7 +447,7 @@ jobs:
             /d:sonar.cs.vstest.reportsPaths="test-results/**/*.trx" \
             /d:sonar.python.coverage.reportPaths="coverage-python.xml" \
             /d:sonar.exclusions="**/AdoptionAcceptance/Fixtures/**" \
-            /d:sonar.coverage.exclusions="tools/**/tests/**"
+            /d:sonar.coverage.exclusions="tools/**/tests/**,**/CheckpointBReleaseGateTests*.cs"
 
       - name: Collect main branch test coverage
         run: make test-coverage-main-ci
