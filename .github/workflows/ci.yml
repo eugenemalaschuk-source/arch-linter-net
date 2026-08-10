@@ -367,7 +367,12 @@ jobs:
     name: Main Badge Refresh
     if: github.event_name == 'push'
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    # This job does the most work of any in the workflow: a full build, the sequential
+    # units-then-e2e coverage run, and a SonarCloud analysis whose `end` step waits on the quality
+    # gate for up to `sonar.qualitygate.timeout=300` seconds. At 10 minutes the coverage step alone
+    # (~9 minutes on ubuntu-latest) left the quality-gate wait no room, so the job was cancelled at
+    # the cap rather than failing on a real signal. 25 minutes matches Pull Request Validation.
+    timeout-minutes: 25
     permissions:
       contents: read
 
