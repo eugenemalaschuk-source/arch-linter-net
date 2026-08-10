@@ -54,6 +54,8 @@ A contract must declare at least one entry across these five lists; a contract w
 
 `allowed_only_in_projects` resolves each configured project name to its assembly name via project discovery — the same assembly-name-equivalence semantics documented for `type_placement`'s `must_reside_in_projects`.
 
+`allowed_only_in_namespaces` entries accept the same constrained glob grammar as a layer's `namespace` (a literal namespace, or `*` as one or more complete segments — see [Namespace-allowance contract fields](../policy-format/layers-and-namespaces.md#namespace-allowance-contract-fields-use-the-same-grammar)). An entry using unsupported wildcard syntax is rejected at policy load with an actionable error instead of silently matching nothing.
+
 `allowed_only_in_types` is a direct assembly + type identity selector, narrower than `allowed_only_in_assemblies` (which allows every type in the named assembly) or `allowed_only_in_namespaces` (every type in the namespace). Each entry requires both `assembly` and `type` (the type's fully-qualified name) and is matched by exact string equality — no globbing, no semantic-role classification or attribute-based matching. Use it when a single global/top-level type, such as one host's `Program`, must be the composition boundary without also allowing the rest of its assembly or namespace:
 
 ```yaml

@@ -62,6 +62,8 @@ Validation evidence records the positive `types_matching` selector and every exc
 
 `must_reside_in_projects` resolves each configured project name to its assembly name via project discovery, then checks it identically to `must_reside_in_assemblies`. **There is no true type-to-`.csproj` mapping in this tool** — a project maps 1:1 to a single assembly name, so "must reside in project X" really means "must reside in the assembly that project X produces." For a typical one-project-per-assembly .NET solution this is exactly what you'd expect; it does not track physical file placement within a project. A project name that does not match any discovered project resolves to nothing and therefore never widens what's allowed (fail-closed, like other allow-only-style contracts in this tool).
 
+`must_reside_in_namespaces` entries accept the same constrained glob grammar as a layer's `namespace` (a literal namespace, or `*` as one or more complete segments — see [Namespace-allowance contract fields](../policy-format/layers-and-namespaces.md#namespace-allowance-contract-fields-use-the-same-grammar)). An entry using unsupported wildcard syntax is rejected at policy load with an actionable error instead of silently matching nothing.
+
 ### Naming expectations
 
 `required_name_suffix`, `required_name_prefix`, `forbidden_name_suffix`, and `forbidden_name_prefix` are all optional and check the selected type's simple name.

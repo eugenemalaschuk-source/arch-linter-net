@@ -250,6 +250,18 @@ internal static class ArchitectureLayerResolver
                || name.StartsWith(prefix + ".", StringComparison.Ordinal);
     }
 
+    // Namespace-allowance fields (allowed_only_in_namespaces, forbidden_in_namespaces,
+    // must_reside_in_namespaces) use this instead of MatchesPrefix so they share the exact same
+    // constrained glob grammar as layers.<name>.namespace. A literal pattern (no '*') degrades to
+    // the same segment-prefix semantics MatchesPrefix already provided, so this is backward
+    // compatible for every existing policy. Callers must validate the pattern eagerly at policy
+    // load (see PolicyDocumentValidatorSupport.ValidateNamespacePatterns) - this method still
+    // throws InvalidNamespacePatternException for unsupported syntax, it just doesn't catch it.
+    public static bool MatchesNamespacePattern(string namespaceName, string pattern)
+    {
+        return NamespaceGlobPattern.Parse(pattern).Match(namespaceName).Matched;
+    }
+
     private static ArchitectureNamespaceMatch MatchLiteral(
         string namespacePattern, string namespaceSuffix, string namespaceName)
     {

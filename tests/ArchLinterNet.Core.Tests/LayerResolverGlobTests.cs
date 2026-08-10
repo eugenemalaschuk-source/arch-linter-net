@@ -375,4 +375,72 @@ public sealed class LayerResolverGlobTests
 
         Assert.That(result, Is.False);
     }
+
+    // MatchesNamespacePattern backs allowed_only_in_namespaces/forbidden_in_namespaces/
+    // must_reside_in_namespaces (issue #443): it must share the exact same constrained glob
+    // grammar as layers.<name>.namespace above, not a second, incompatible grammar.
+    [Test]
+    public void MatchesNamespacePattern_Literal_MatchesSelfAndDescendants()
+    {
+        Assert.That(ArchitectureLayerResolver.MatchesNamespacePattern("Test.Core", "Test.Core"), Is.True);
+        Assert.That(ArchitectureLayerResolver.MatchesNamespacePattern("Test.Core.Services", "Test.Core"), Is.True);
+    }
+
+    [Test]
+    public void MatchesNamespacePattern_LiteralSiblingBleed_ReturnsFalse()
+    {
+        bool result = ArchitectureLayerResolver.MatchesNamespacePattern("Test.CoreExtra", "Test.Core");
+
+        Assert.That(result, Is.False);
+    }
+
+    [Test]
+    public void MatchesNamespacePattern_MiddleWildcard_MatchesResolvedSegment()
+    {
+        bool result = ArchitectureLayerResolver.MatchesNamespacePattern(
+            "Example.Modules.Orders.Composition", "Example.Modules.*.Composition");
+
+        Assert.That(result, Is.True);
+    }
+
+    [Test]
+    public void MatchesNamespacePattern_MiddleWildcard_MatchesDescendantOfResolvedSegment()
+    {
+        bool result = ArchitectureLayerResolver.MatchesNamespacePattern(
+            "Example.Modules.Orders.Composition.Startup", "Example.Modules.*.Composition");
+
+        Assert.That(result, Is.True);
+    }
+
+    [Test]
+    public void MatchesNamespacePattern_MiddleWildcard_FewerSegmentsThanPattern_ReturnsFalse()
+    {
+        bool result = ArchitectureLayerResolver.MatchesNamespacePattern(
+            "Example.Modules.Composition", "Example.Modules.*.Composition");
+
+        Assert.That(result, Is.False);
+    }
+
+    [Test]
+    public void MatchesNamespacePattern_MiddleWildcard_ExtraSegmentBeforeSuffix_ReturnsFalse()
+    {
+        bool result = ArchitectureLayerResolver.MatchesNamespacePattern(
+            "Example.Modules.Orders.Sub.Composition", "Example.Modules.*.Composition");
+
+        Assert.That(result, Is.False);
+    }
+
+    [Test]
+    public void MatchesNamespacePattern_BareWildcard_ThrowsInvalidNamespacePatternException()
+    {
+        Assert.Throws<InvalidNamespacePatternException>(() =>
+            ArchitectureLayerResolver.MatchesNamespacePattern("Example.Anything", "*"));
+    }
+
+    [Test]
+    public void MatchesNamespacePattern_PartialSegmentWildcard_ThrowsInvalidNamespacePatternException()
+    {
+        Assert.Throws<InvalidNamespacePatternException>(() =>
+            ArchitectureLayerResolver.MatchesNamespacePattern("Example.Modules.Bad", "Example.Modules.*Bad"));
+    }
 }
