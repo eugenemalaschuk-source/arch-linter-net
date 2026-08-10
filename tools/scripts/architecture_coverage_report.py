@@ -169,6 +169,16 @@ def is_test_project(csproj_path: Path) -> bool:
     return csproj_path.stem.endswith(".Tests")
 
 
+def is_synthetic_acceptance_fixture(file_path: Path) -> bool:
+    """Synthetic adoption-acceptance fixtures are test data, not first-party code. Their
+    projects are built into throwaway copies by the acceptance and release gates and are
+    never part of the linter's own `analysis.target_assemblies`, so — exactly like the
+    test projects in is_test_project — their namespaces/projects/assemblies can never
+    appear in a coverage bucket. They carry their own .csproj, so the enclosing-project
+    check alone would classify every one of them as "unknown"."""
+    return "AdoptionAcceptance/Fixtures" in file_path.as_posix()
+
+
 def classify_changed_file(
     file_path: str,
     repo_root: Path,
@@ -184,6 +194,9 @@ def classify_changed_file(
     repository has no project-coverage contract" on every changed file. A file inside a
     test project is skipped entirely for the same reason (see is_test_project)."""
     path_obj = Path(file_path)
+    if is_synthetic_acceptance_fixture(path_obj):
+        return []
+
     csproj_path = find_enclosing_csproj(path_obj, repo_root)
 
     if csproj_path is not None and is_test_project(csproj_path):

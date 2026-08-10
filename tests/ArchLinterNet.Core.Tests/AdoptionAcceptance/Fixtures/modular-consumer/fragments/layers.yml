@@ -1,0 +1,13 @@
+# Layer fragment. `modules` and `module_composition` deliberately overlap on every
+# Synthetic.Modules.*.Composition type. Neither glob contains the other, so the overlap is
+# reconciled locally with overlaps_with instead of by relaxing analysis.policy_consistency (F8).
+layers:
+  shared_abstractions:
+    namespace: Synthetic.Shared.Abstractions
+  modules:
+    namespace: Synthetic.Modules.*
+  module_composition:
+    namespace: Synthetic.Modules.*.Composition
+    overlaps_with: [modules]
+  composition_host:
+    namespace: Synthetic.Composition

@@ -63,17 +63,25 @@ hit/corruption, and in-flight cancellation/publication interruption.
 ### Requirement: Evidence is schema-backed and cannot self-authorize
 The aggregation job SHALL validate exactly one evidence record for every required
 platform, its observed architecture and shell, required scenario inventory,
-candidate package manifest, and independently produced repository-gate results.
-It SHALL emit an immutable GitHub Actions workflow artifact containing the
-candidate-manifest digest and workflow-run reference; it SHALL NOT hard-code
-successful gates or authorization. This artifact is the authoritative release
+consumer policy-shape counters, candidate package manifest, and independently produced
+repository-gate results. It SHALL reject a platform record whose declared result contradicts its
+own scenario results. It SHALL emit an immutable GitHub Actions workflow artifact containing the
+candidate-manifest digest and workflow-run reference, an explicit PASS or FAIL publication
+statement naming the candidate version, and the inventory of failed scenarios and policy-shape
+defects; it SHALL NOT hard-code successful gates or authorization. It SHALL terminate
+unsuccessfully when the verdict is FAIL. This artifact is the authoritative release
 record and is retained according to the repository artifact-retention policy;
 generated evidence is not checked into the source tree.
 
 #### Scenario: Evidence is incomplete
-- **WHEN** a platform record, required scenario, gate result, or manifest digest
-  is absent, duplicated, mismatched, or invalid
+- **WHEN** a platform record, required scenario, policy-shape counter, gate result, or manifest
+  digest is absent, duplicated, mismatched, or invalid
 - **THEN** aggregation fails and no authorization statement is emitted
+
+#### Scenario: A required scenario failed
+- **WHEN** any required scenario is recorded as failed on any platform
+- **THEN** the emitted evidence states FAIL for the candidate version, lists the failed scenario
+  and its reason, and the aggregation job terminates unsuccessfully
 
 ### Requirement: Checkpoint B evidence has executable, duplicate-free scenario outcomes
 Every Checkpoint B scenario record SHALL be returned by the oracle that executed
@@ -83,4 +91,97 @@ missing, or unexpected scenario ID before authorization.
 #### Scenario: A scenario is duplicated
 - **WHEN** a platform evidence record contains two entries with the same scenario ID
 - **THEN** aggregation fails and no release authorization is emitted
+
+### Requirement: The packed gate executes a release-blocking consumer-cleanup matrix
+The packed-artifact gate SHALL execute, against the candidate tool and packages installed from
+the isolated local feed, one required scenario for every adoption finding the release claims to
+fix and for the reusable source-set authoring model it introduces: composed assembly-free policy
+validation, non-destructive build preparation, the reviewed public-API snapshot workflow,
+strict-cycle baseline scope, dependency contract id parity, actionable schema diagnostics, shared
+-framework analysis, declared layer-overlap allowance, namespace allowance glob semantics,
+JSON-formatted configuration-error termination, candidate release identity, source-set assembly
+authoring, discovered-project-set authoring, source-set enrolment, and fail-closed stale source
+selectors. Each scenario SHALL be proven from the installed candidate and SHALL NOT accept a
+source-tree `ProjectReference` as evidence.
+
+#### Scenario: A fixed finding regresses in the packed candidate
+- **WHEN** a consumer-cleanup scenario cannot be satisfied by the installed candidate
+- **THEN** the platform evidence records that scenario as failed and the aggregated evidence does
+  not authorize publication
+
+#### Scenario: A required scenario is unreachable on a platform
+- **WHEN** a platform cannot execute a required scenario
+- **THEN** its evidence records the scenario as not applicable with a reason and at least one
+  other platform records it as passed
+
+### Requirement: The canonical consumer policy shape is typed release evidence
+Every platform evidence record SHALL carry typed counters describing the synthetic consumer
+policy the matrix validated: composed policy documents and imported fragments, governed module
+assemblies, authored directional assembly contracts and their expanded instances, governed
+projects and the project-metadata contracts reusing them, copied project inventories, and inline
+public-API signatures. The aggregation job SHALL reject a candidate whose counters show a
+workaround shape this release exists to remove — a forced policy monolith, directional assembly
+contracts authored once per module, a copied project inventory where solution discovery can be
+authoritative, or an inline public-API inventory instead of a reviewed snapshot.
+
+#### Scenario: Directional contracts are still copied per module
+- **WHEN** the consumer policy authors at least one directional assembly contract per governed
+  module assembly
+- **THEN** aggregation records a policy-shape defect and does not authorize publication
+
+#### Scenario: Deduplicated authoring is recorded
+- **WHEN** one authored directional assembly contract expands across every governed module
+  assembly and project-metadata contracts reuse one discovered project set
+- **THEN** the evidence records the authored/expanded counts as the release's policy-shape proof
+
+### Requirement: A tracked defect blocks release without hiding itself
+A consumer-cleanup scenario whose failure is a separately tracked product defect MAY be recorded
+in a registry that names its tracking issue. The registry SHALL NOT change the recorded scenario
+result, the platform result, or the authorization outcome. The executable gate SHALL fail when a
+scenario fails without a registry entry, and SHALL also fail when a registered scenario starts
+satisfying its contract, so the entry is removed and the scenario gates the release again.
+
+#### Scenario: A tracked defect is silently fixed
+- **WHEN** a registered scenario satisfies its contract
+- **THEN** the gate fails and names the registry entry that must be removed
+
+### Requirement: Publication authorization proves the release scope is closed
+The aggregation job SHALL consume an authoritative release-scope inventory bound to the candidate
+manifest digest and source commit, listing every required release-scope item and its resolved
+state. The required inventory SHALL be declared in the repository so it is reviewed like any other
+release artifact, and the resolved state SHALL come from the issue tracker rather than the
+declaration. Authorization SHALL be refused while any required item is not closed, and the
+inventory, including the explicitly excluded items and their reasons, SHALL appear in the emitted
+JSON and Markdown evidence.
+
+#### Scenario: A required release-scope item is open
+- **WHEN** any required item of the release scope is open at aggregation time
+- **THEN** the evidence states FAIL, lists that item, and the aggregation job terminates
+  unsuccessfully
+
+#### Scenario: The inventory cannot be trusted
+- **WHEN** the release-scope inventory is missing, unbound from the candidate manifest digest or
+  source commit, empty, or contains an item with no resolved state
+- **THEN** aggregation fails and no authorization statement is emitted
+
+### Requirement: The public-API scenario observes every delta class
+The packed gate SHALL drive the reviewed public-API snapshot lifecycle from the installed
+candidate across an ordinary API evolution that adds one exported signature, removes one, and
+changes one. It SHALL assert that each delta class is reported, and that `update` restores the
+reviewed snapshot to a clean comparison.
+
+#### Scenario: A delta class stops being reported
+- **WHEN** the exact snapshot comparison fails to report an added, removed, or changed signature
+- **THEN** the scenario fails and the candidate is not authorized
+
+### Requirement: Non-destructive build preparation is proven on both entrypoints
+The packed gate SHALL prove non-destructive build preparation through the installed CLI and
+through a packaged `ArchLinterNet.Testing` consumer performing two consecutive `WithEnsureBuilt()`
+validations in one process without an intervening rebuild. The preservation oracle SHALL cover
+every selected primary build output, not assemblies alone.
+
+#### Scenario: Repeated packaged validation disturbs an output
+- **WHEN** a second consecutive packaged `WithEnsureBuilt()` validation fails, or any selected
+  primary output is removed or rewritten
+- **THEN** the scenario fails and the candidate is not authorized
 

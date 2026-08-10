@@ -1,0 +1,27 @@
+<Solution>
+  <Folder Name="/synthetic/">
+    <Project Path="src/Synthetic.Shared.Abstractions/Synthetic.Shared.Abstractions.csproj" />
+    <Project Path="src/Synthetic.Modules.M01/Synthetic.Modules.M01.csproj" />
+    <Project Path="src/Synthetic.Modules.M02/Synthetic.Modules.M02.csproj" />
+    <Project Path="src/Synthetic.Modules.M03/Synthetic.Modules.M03.csproj" />
+    <Project Path="src/Synthetic.Modules.M04/Synthetic.Modules.M04.csproj" />
+    <Project Path="src/Synthetic.Modules.M05/Synthetic.Modules.M05.csproj" />
+    <Project Path="src/Synthetic.Modules.M06/Synthetic.Modules.M06.csproj" />
+    <Project Path="src/Synthetic.Modules.M07/Synthetic.Modules.M07.csproj" />
+    <Project Path="src/Synthetic.Modules.M08/Synthetic.Modules.M08.csproj" />
+    <Project Path="src/Synthetic.Modules.M09/Synthetic.Modules.M09.csproj" />
+    <Project Path="src/Synthetic.Modules.M10/Synthetic.Modules.M10.csproj" />
+    <Project Path="src/Synthetic.Modules.M11/Synthetic.Modules.M11.csproj" />
+    <Project Path="src/Synthetic.Modules.M12/Synthetic.Modules.M12.csproj" />
+    <Project Path="src/Synthetic.Modules.M13/Synthetic.Modules.M13.csproj" />
+    <Project Path="src/Synthetic.Modules.M14/Synthetic.Modules.M14.csproj" />
+    <Project Path="src/Synthetic.Modules.M15/Synthetic.Modules.M15.csproj" />
+    <Project Path="src/Synthetic.Modules.M16/Synthetic.Modules.M16.csproj" />
+    <Project Path="src/Synthetic.Modules.M17/Synthetic.Modules.M17.csproj" />
+    <Project Path="src/Synthetic.Modules.M18/Synthetic.Modules.M18.csproj" />
+    <Project Path="src/Synthetic.Modules.M19/Synthetic.Modules.M19.csproj" />
+    <Project Path="src/Synthetic.Modules.M20/Synthetic.Modules.M20.csproj" />
+    <Project Path="src/Synthetic.Composition/Synthetic.Composition.csproj" />
+    <Project Path="tests/Synthetic.Modules.Tests/Synthetic.Modules.Tests.csproj" />
+  </Folder>
+</Solution>

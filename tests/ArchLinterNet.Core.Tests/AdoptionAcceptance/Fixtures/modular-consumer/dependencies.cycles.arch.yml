@@ -1,0 +1,37 @@
+# Companion probe policy for the strict-cycles baseline scope regression (F4).
+#
+# It declares two cycle contracts over the same scanned assemblies: one over a genuinely cyclic
+# pair of composition namespaces, and one over an ordinary acyclic host -> abstractions edge.
+# Baseline update must persist candidates for the first and nothing for the second.
+#
+# It resolves assemblies from their build output directly instead of through solution discovery,
+# because the baseline subcommands have no --ensure-built build-preparation option.
+version: 1
+name: Synthetic modular consumer cycle probe
+layers:
+  composition_root:
+    namespace: Synthetic.Composition
+    exclude:
+      - namespace: Synthetic.Composition.Wiring
+      - namespace: Synthetic.Composition.Runtime
+  composition_wiring:
+    namespace: Synthetic.Composition.Wiring
+  composition_runtime:
+    namespace: Synthetic.Composition.Runtime
+  shared_abstractions:
+    namespace: Synthetic.Shared.Abstractions
+contracts:
+  strict_cycles:
+    - id: composition-internals-cycle-probe
+      name: composition-internals-cycle-probe
+      layers: [composition_wiring, composition_runtime]
+      reason: A real cycle; its edges are the only acceptable baseline candidates.
+    - id: host-and-abstractions-cycle-probe
+      name: host-and-abstractions-cycle-probe
+      layers: [composition_root, shared_abstractions]
+      reason: An ordinary acyclic inter-layer edge that must never become accepted debt.
+analysis:
+  target_assemblies: [Synthetic.Composition, Synthetic.Shared.Abstractions]
+  assembly_search_paths:
+    - src/Synthetic.Composition/bin/Debug/net10.0
+    - src/Synthetic.Shared.Abstractions/bin/Debug/net10.0

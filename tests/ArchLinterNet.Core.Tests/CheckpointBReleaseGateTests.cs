@@ -11,7 +11,13 @@ namespace ArchLinterNet.Core.Tests;
 public sealed partial class CheckpointBReleaseGateTests
 {
     private const string CandidateVersionEnvironmentVariable = "CHECKPOINT_B_CANDIDATE_VERSION";
-    private const string DefaultCandidateVersion = "0.6.0";
+    private const string DefaultCandidateVersion = "0.6.1";
+
+    // The public adoption package line this candidate belongs to, and the packaged schema
+    // generation carrying its policy-root identity. These are release-line constants; the
+    // candidate's own package version may additionally carry a prerelease or build suffix.
+    private const string ProductReleaseLine = "0.6.1";
+    private const string ProductSchemaGeneration = "0.6.1";
     private static readonly string[] _packageIds =
         ["ArchLinterNet.CEL", "ArchLinterNet.Cli", "ArchLinterNet.Core", "ArchLinterNet.Testing"];
 
@@ -83,7 +89,8 @@ public sealed partial class CheckpointBReleaseGateTests
         scenarios.Add(Passed("cache-corruption-recompute"));
         scenarios.AddRange(candidate.ShellScenarios());
         scenarios.Add(candidate.AssertCliInFlightCancellation());
-        candidate.WriteEvidence(scenarios);
+        scenarios.AddRange(AssertConsumerCleanupMatrix(candidate, out ConsumerPolicyShape policyShape));
+        candidate.WriteEvidence(scenarios, policyShape);
     }
 
     private static CheckpointScenarioResult Passed(string id) => new(id, "passed", null);

@@ -1,0 +1,44 @@
+# Synthetic modular consumer policy for the packed-artifact 0.6.1 consumer-cleanup gate.
+#
+# Shape rules this fixture exists to prove (issue #466):
+#   * one authored directional assembly contract governs every module through a source set;
+#   * project-metadata contracts reuse one solution-discovered project set;
+#   * the policy stays composed from fragments instead of collapsing into a monolith;
+#   * no rule needs a bulk inline `declared_api` inventory (the reviewed public-API snapshot
+#     lifecycle is proven separately by the `public-api-snapshot-workflow` scenario).
+version: 1
+name: Synthetic modular consumer
+imports:
+  - fragments/layers.yml
+  - fragments/source-sets.yml
+  - fragments/module-contracts.yml
+  - fragments/project-contracts.yml
+analysis:
+  solution: Synthetic.Modular.slnx
+  project_exclude:
+    - tests/**
+  target_assemblies:
+    - Synthetic.Shared.Abstractions
+    - Synthetic.Modules.M01
+    - Synthetic.Modules.M02
+    - Synthetic.Modules.M03
+    - Synthetic.Modules.M04
+    - Synthetic.Modules.M05
+    - Synthetic.Modules.M06
+    - Synthetic.Modules.M07
+    - Synthetic.Modules.M08
+    - Synthetic.Modules.M09
+    - Synthetic.Modules.M10
+    - Synthetic.Modules.M11
+    - Synthetic.Modules.M12
+    - Synthetic.Modules.M13
+    - Synthetic.Modules.M14
+    - Synthetic.Modules.M15
+    - Synthetic.Modules.M16
+    - Synthetic.Modules.M17
+    - Synthetic.Modules.M18
+    - Synthetic.Modules.M19
+    - Synthetic.Modules.M20
+    - Synthetic.Composition
+  configuration: Debug
+  target_framework: net10.0

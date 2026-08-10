@@ -31,7 +31,9 @@ jobs:
     name: Checkpoint B (${{ matrix.id }})
     needs: prepare-candidate
     runs-on: ${{ matrix.runner }}
-    timeout-minutes: 30
+    # The 0.6.1 consumer-cleanup matrix builds and analyzes the 23-project synthetic modular
+    # consumer several times on top of the existing packaged-artifact scenarios.
+    timeout-minutes: 45
     strategy:
       fail-fast: false
       matrix:
@@ -107,6 +109,9 @@ jobs:
     needs: [checkpoint-b, prepare-candidate]
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    permissions:
+      contents: read
+      issues: read
 
     steps:
       - name: Checkout
@@ -141,6 +146,13 @@ jobs:
       - name: Record passed repository gates
         run: python3 tools/release/create_repository_gate_evidence.py --candidate-manifest artifacts/candidate/package-manifest.json --source-commit "$GITHUB_SHA" --output artifacts/checkpoint-b/repository-gates.json
 
+      - name: Resolve authoritative release scope
+        env:
+          GH_TOKEN: ${{ github.token }}
+        # No path arguments by design: the declaration, candidate manifest, and output are fixed
+        # release-workspace locations inside the tool.
+        run: python3 tools/release/create_release_scope_evidence.py --source-commit "$GITHUB_SHA" --repository "$GITHUB_REPOSITORY"
+
       - name: Download platform evidence
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
         with:
@@ -148,7 +160,7 @@ jobs:
           path: artifacts/checkpoint-b/platforms
 
       - name: Generate deterministic release evidence
-        run: python3 tools/release/aggregate_checkpoint_b_evidence.py --input-dir artifacts/checkpoint-b/platforms --candidate-manifest artifacts/candidate/package-manifest.json --repository-gates artifacts/checkpoint-b/repository-gates.json --output-dir artifacts/checkpoint-b/release-evidence
+        run: python3 tools/release/aggregate_checkpoint_b_evidence.py --input-dir artifacts/checkpoint-b/platforms --candidate-manifest artifacts/candidate/package-manifest.json --repository-gates artifacts/checkpoint-b/repository-gates.json --release-scope artifacts/checkpoint-b/release-scope.json --output-dir artifacts/checkpoint-b/release-evidence
 
       - name: Upload release evidence
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a

@@ -28,6 +28,8 @@
 ##   make test                 — run all tests
 ##   make test-coverage        — run all tests with coverage collection (cobertura XML)
 ##   make test-coverage-badge  — run tests with coverage and print a test-coverage badge line
+##   make test-release-evidence — run tests for the packed-artifact release-evidence aggregator
+##   make test-tooling-coverage — run all Python tooling tests with coverage
 ##   make benchmark-cel        — run the ArchLinterNet.CEL BenchmarkDotNet suite (optional, not part of acceptance)
 ##
 ## Build:
