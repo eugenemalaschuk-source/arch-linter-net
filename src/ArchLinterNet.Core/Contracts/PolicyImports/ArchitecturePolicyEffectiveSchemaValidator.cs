@@ -29,14 +29,19 @@ internal static class ArchitecturePolicyEffectiveSchemaValidator
         }
 
         IReadOnlyList<SchemaFailure> failures = SelectActionableFailures(results, instance);
-        string details = DescribeInvalidDiscoveryCoverageRoots(instance) ?? string.Join(
+        CoverageRootsDefect? coverageRoots = DescribeInvalidDiscoveryCoverageRoots(instance);
+        string details = coverageRoots?.Message ?? string.Join(
             "; ",
             failures.Take(12).Select(failure => $"{failure.InstanceLocation}: {failure.Message}"));
-        ArchitecturePolicySourceLocation? location = failures
-            .OrderByDescending(failure => InstanceDepth(failure.InstanceLocation))
-            .ThenBy(failure => failure.Order)
-            .Select(failure => FindLocation(provenance, failure.InstanceLocation))
-            .FirstOrDefault(candidate => candidate is not null);
+        // The reported location must describe the reported message. When a specialized message
+        // replaces the schema failures, its own instance pointer owns the provenance too.
+        ArchitecturePolicySourceLocation? location = coverageRoots is null
+            ? failures
+                .OrderByDescending(failure => InstanceDepth(failure.InstanceLocation))
+                .ThenBy(failure => failure.Order)
+                .Select(failure => FindLocation(provenance, failure.InstanceLocation))
+                .FirstOrDefault(candidate => candidate is not null)
+            : FindLocation(provenance, coverageRoots.InstanceLocation);
         throw ArchitecturePolicyDiagnosticFactory.Exception(
             ArchitecturePolicyImportErrorCategory.SourceShape,
             $"Composed policy does not satisfy the effective policy schema: {details}",
@@ -124,12 +129,14 @@ internal static class ArchitecturePolicyEffectiveSchemaValidator
             JsonArray? siblingBranches = FindSchemaNode(_schemaDocument.Value, compositePath) as JsonArray;
             JsonNode? branch = FindSchemaNode(_schemaDocument.Value, branchPath);
             JsonNode? branchInstance = FindNearestObject(instance, failure.InstanceLocation);
+            JsonNode? exactInstance = FindInstanceNode(instance, failure.InstanceLocation);
             yield return new SchemaAlternative(
                 failure.Order,
                 compositePath,
                 branchPath,
-                IsApplicableBranch(branch, siblingBranches, branchInstance),
-                branchInstance);
+                IsApplicableBranch(branch, siblingBranches, branchInstance, exactInstance),
+                branchInstance,
+                exactInstance);
         }
     }
 
@@ -141,14 +148,25 @@ internal static class ArchitecturePolicyEffectiveSchemaValidator
         }
 
         return siblingBranches.Any(branch =>
-            IsApplicableBranch(branch, siblingBranches, alternative.Instance));
+            IsApplicableBranch(branch, siblingBranches, alternative.Instance, alternative.ExactInstance));
     }
 
-    private static bool IsApplicableBranch(JsonNode? schema, JsonArray? siblingBranches, JsonNode? instance)
+    private static bool IsApplicableBranch(
+        JsonNode? schema,
+        JsonArray? siblingBranches,
+        JsonNode? instance,
+        JsonNode? exactInstance)
     {
         if (schema is not JsonObject schemaObject)
         {
             return true;
+        }
+
+        // A type-discriminated alternative that does not accept the failing value's own JSON type
+        // ("this string is not a boolean") never described the authored intent.
+        if (exactInstance is not null && DeclaresIncompatibleType(schemaObject, exactInstance))
+        {
+            return false;
         }
 
         if (instance is JsonObject instanceObject
@@ -172,7 +190,55 @@ internal static class ArchitecturePolicyEffectiveSchemaValidator
         }
 
         return schemaObject["allOf"] is not JsonArray allOf
-            || allOf.All(child => IsApplicableBranch(child, null, instance));
+            || allOf.All(child => IsApplicableBranch(child, null, instance, exactInstance));
+    }
+
+    private static bool DeclaresIncompatibleType(JsonObject schema, JsonNode instance)
+    {
+        string[] declared = schema["type"] switch
+        {
+            JsonValue single when single.TryGetValue(out string? name) => [name],
+            JsonArray many => many.Select(entry => entry?.GetValue<string>()).OfType<string>().ToArray(),
+            _ => [],
+        };
+
+        return declared.Length > 0 && !declared.Intersect(InstanceTypes(instance), StringComparer.Ordinal).Any();
+    }
+
+    private static IEnumerable<string> InstanceTypes(JsonNode instance)
+    {
+        switch (instance)
+        {
+            case JsonObject:
+                yield return "object";
+                yield break;
+            case JsonArray:
+                yield return "array";
+                yield break;
+        }
+
+        if (instance is not JsonValue value)
+        {
+            yield break;
+        }
+
+        if (value.TryGetValue(out bool _))
+        {
+            yield return "boolean";
+        }
+        else if (value.TryGetValue(out string? _))
+        {
+            yield return "string";
+        }
+        else if (value.TryGetValue(out long _) || value.TryGetValue(out int _))
+        {
+            yield return "integer";
+            yield return "number";
+        }
+        else if (value.TryGetValue(out double _))
+        {
+            yield return "number";
+        }
     }
 
     private static bool SelectsDifferentRequiredVariant(
@@ -186,6 +252,15 @@ internal static class ArchitecturePolicyEffectiveSchemaValidator
         }
 
         HashSet<string> branchRequired = GetRequiredProperties(branch).ToHashSet(StringComparer.Ordinal);
+        // A branch the instance already satisfies is applicable by construction. Without this, a
+        // plural `anyOf` ("declare target_assemblies, a solution, or projects") makes every branch
+        // look like it selects another variant, because each sibling requires something the
+        // instance also declares — and then no alternative can ever be suppressed.
+        if (branchRequired.Count > 0 && branchRequired.All(instance.ContainsKey))
+        {
+            return false;
+        }
+
         Dictionary<string, int> requiredCounts = siblingBranches
             .OfType<JsonObject>()
             .SelectMany(GetRequiredProperties)
@@ -274,7 +349,10 @@ internal static class ArchitecturePolicyEffectiveSchemaValidator
     private static bool IsCompositeWrapper(EvaluationResults result)
     {
         string[] segments = SplitSchemaPointer(result.EvaluationPath.ToString());
+        // A failure anywhere beneath `if` is a discriminator that selected another variant, not a
+        // defect: `if` never makes a document invalid, only chooses whether `then`/`else` applies.
         return segments.LastOrDefault() is "anyOf" or "oneOf" or "if"
+               || segments.Contains("if", StringComparer.Ordinal)
                || (segments.Contains("not", StringComparer.Ordinal) && segments.LastOrDefault() != "not")
                || result.Errors?.Values.Any(message => message.StartsWith("Expected 1 matching subschema", StringComparison.Ordinal)) == true;
     }
@@ -304,7 +382,7 @@ internal static class ArchitecturePolicyEffectiveSchemaValidator
         "/" + string.Join('/', segments.Select(segment => segment.Replace("~", "~0", StringComparison.Ordinal)
             .Replace("/", "~1", StringComparison.Ordinal)));
 
-    private static string? DescribeInvalidDiscoveryCoverageRoots(JsonNode? instance)
+    private static CoverageRootsDefect? DescribeInvalidDiscoveryCoverageRoots(JsonNode? instance)
     {
         if (instance is not JsonObject root
             || root["contracts"] is not JsonObject contracts)
@@ -330,13 +408,18 @@ internal static class ArchitecturePolicyEffectiveSchemaValidator
                     continue;
                 }
 
-                return $"/contracts/{groupName}/{index}/roots: 'roots' is not valid for {scope} coverage; " +
-                    "that scope classifies all discovered units.";
+                string instanceLocation = $"/contracts/{groupName}/{index}/roots";
+                return new CoverageRootsDefect(
+                    instanceLocation,
+                    $"{instanceLocation}: 'roots' is not valid for {scope} coverage; " +
+                    "that scope classifies all discovered units.");
             }
         }
 
         return null;
     }
+
+    private sealed record CoverageRootsDefect(string InstanceLocation, string Message);
 
     private static JsonNode LoadSchemaDocument()
     {
@@ -437,7 +520,8 @@ internal static class ArchitecturePolicyEffectiveSchemaValidator
         string CompositePath,
         string BranchPath,
         bool IsApplicable,
-        JsonNode? Instance);
+        JsonNode? Instance,
+        JsonNode? ExactInstance);
 
     private static JsonNode? ConvertNode(YamlNode node)
     {

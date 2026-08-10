@@ -17,13 +17,7 @@ public sealed partial class CheckpointBReleaseGateTests
     /// defect that has silently been fixed also fails it so the entry gets removed.
     /// </summary>
     private static readonly IReadOnlyDictionary<string, string> _trackedConsumerCleanupDefects =
-        new Dictionary<string, string>(StringComparer.Ordinal)
-        {
-            ["actionable-schema-diagnostics"] =
-                "Blocked by #471: on a composed policy the effective-schema failure reports an "
-                + "unrelated imported-fragment location as its primary provenance, and inapplicable "
-                + "constant-discriminator branches resurface when an independent defect exists.",
-        };
+        new Dictionary<string, string>(StringComparer.Ordinal);
 
     private static IReadOnlyList<CheckpointScenarioResult> AssertConsumerCleanupMatrix(
         CandidatePackageFeed candidate,

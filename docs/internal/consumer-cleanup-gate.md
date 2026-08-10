@@ -73,4 +73,8 @@ make test-release-evidence
 
 ## Current verdict
 
-The gate was executed against a locally packed `0.6.1` candidate at the commit that introduced it. Twenty-nine of thirty required scenarios pass; `actionable-schema-diagnostics` fails and is tracked as [#471](https://github.com/eugenemalaschuk-source/arch-linter-net/issues/471). The aggregated verdict is therefore **FAIL**: v0.6.1 is not authorized for publication until #471 is resolved and the gate is re-run on the full platform matrix.
+The gate was executed against a locally packed `0.6.1` candidate at the commit that introduced it. All thirty required scenarios pass and the tracked-defect registry is empty.
+
+Executing the matrix originally found one real defect — on a composed policy the effective-schema failure reported an unrelated imported-fragment location and resurfaced inapplicable discriminator branches ([#471](https://github.com/eugenemalaschuk-source/arch-linter-net/issues/471)). It was fixed in the same branch, so `actionable-schema-diagnostics` gates the release rather than being registered as a known failure.
+
+A PASS from a single local platform is not a release authorization: publication requires the aggregated four-platform evidence produced by the release workflow.
