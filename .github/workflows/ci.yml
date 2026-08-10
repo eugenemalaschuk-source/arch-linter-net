@@ -132,10 +132,15 @@ jobs:
             /d:sonar.qualitygate.timeout=300 \
             /d:sonar.cs.opencover.reportsPaths="test-results/**/coverage.opencover.xml" \
             /d:sonar.cs.vstest.reportsPaths="test-results/**/*.trx" \
-            /d:sonar.exclusions="**/AdoptionAcceptance/Fixtures/**"
+            /d:sonar.python.coverage.reportPaths="coverage-python.xml" \
+            /d:sonar.exclusions="**/AdoptionAcceptance/Fixtures/**" \
+            /d:sonar.coverage.exclusions="tools/**/tests/**"
 
       - name: Collect test coverage
         run: make test-coverage
+
+      - name: Collect Python tooling coverage
+        run: make test-tooling-coverage
 
       - name: Resolve coverage report paths
         id: coverage_reports
@@ -438,10 +443,15 @@ jobs:
             /d:sonar.qualitygate.timeout=300 \
             /d:sonar.cs.opencover.reportsPaths="test-results/**/coverage.opencover.xml" \
             /d:sonar.cs.vstest.reportsPaths="test-results/**/*.trx" \
-            /d:sonar.exclusions="**/AdoptionAcceptance/Fixtures/**"
+            /d:sonar.python.coverage.reportPaths="coverage-python.xml" \
+            /d:sonar.exclusions="**/AdoptionAcceptance/Fixtures/**" \
+            /d:sonar.coverage.exclusions="tools/**/tests/**"
 
       - name: Collect main branch test coverage
         run: make test-coverage-main-ci
+
+      - name: Collect main branch Python tooling coverage
+        run: make test-tooling-coverage
 
       - name: Resolve coverage report paths
         id: coverage_reports

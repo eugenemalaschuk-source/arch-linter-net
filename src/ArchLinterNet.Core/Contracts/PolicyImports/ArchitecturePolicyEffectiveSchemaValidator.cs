@@ -193,7 +193,13 @@ internal static class ArchitecturePolicyEffectiveSchemaValidator
             || allOf.All(child => IsApplicableBranch(child, null, instance, exactInstance));
     }
 
-    private static bool DeclaresIncompatibleType(JsonObject schema, JsonNode instance)
+    /// <summary>
+    /// Whether <paramref name="schema"/> declares a <c>type</c> that cannot accept
+    /// <paramref name="instance"/>. Internal so the JSON type matrix is directly testable: only a
+    /// few of these combinations are reachable through the policy schema's own alternatives, and
+    /// the rest would otherwise be untested defensive code.
+    /// </summary>
+    internal static bool DeclaresIncompatibleType(JsonObject schema, JsonNode instance)
     {
         string[] declared = schema["type"] switch
         {

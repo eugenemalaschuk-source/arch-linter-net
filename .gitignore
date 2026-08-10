@@ -73,3 +73,6 @@ changed-files.txt
 
 # BenchmarkDotNet output (make benchmark-cel)
 BenchmarkDotNet.Artifacts/
+
+# Python tooling coverage report consumed by SonarCloud
+coverage-python.xml

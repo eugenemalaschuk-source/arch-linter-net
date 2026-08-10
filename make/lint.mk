@@ -1,4 +1,4 @@
-.PHONY: lint lint-architecture audit-architecture lint-code-size lint-dotnet-format lint-workflows fmt-workflows test-architecture-coverage-report test-release-evidence architecture-coverage-report architecture-strict-json architecture-audit-json architecture-coverage-markdown architecture-coverage-ci
+.PHONY: lint lint-architecture audit-architecture lint-code-size lint-dotnet-format lint-workflows fmt-workflows test-architecture-coverage-report test-release-evidence test-tooling-coverage architecture-coverage-report architecture-strict-json architecture-audit-json architecture-coverage-markdown architecture-coverage-ci
 
 CHANGED_FILES ?= changed-files.txt
 DIFF_STATUS   ?= ok
@@ -52,6 +52,16 @@ test-architecture-coverage-report:  ## Run tests for the architecture coverage r
 test-release-evidence:  ## Run tests for the packed-artifact release-evidence aggregator
 	@cd "$(PROJECT_ROOT)" && UV_PROJECT_ENVIRONMENT="$(PROJECT_ROOT)/.venv" "$(UV)" run --project tools/pyproject.toml \
 		pytest tools/release/tests/test_aggregate_checkpoint_b_evidence.py
+
+# Both Python suites in one run, emitting the Cobertura report SonarCloud needs. Without it the
+# release-evidence aggregator and the coverage-report generator are measured as 0%-covered new
+# code even though both are tested.
+test-tooling-coverage:  ## Run all Python tooling tests with coverage (coverage-python.xml)
+	@cd "$(PROJECT_ROOT)" && UV_PROJECT_ENVIRONMENT="$(PROJECT_ROOT)/.venv" "$(UV)" run --project tools/pyproject.toml \
+		pytest tools/release/tests/test_aggregate_checkpoint_b_evidence.py \
+		tools/scripts/tests/test_architecture_coverage_report.py \
+		--cov=tools/release --cov=tools/scripts \
+		--cov-report=xml:coverage-python.xml --cov-report=term-missing
 
 architecture-strict-json:  ## Run strict architecture validation, writing architecture-strict.json (target assemblies must already be built)
 	@dotnet run --no-build --project "$(PROJECT_ROOT)/src/ArchLinterNet.Cli" -- \

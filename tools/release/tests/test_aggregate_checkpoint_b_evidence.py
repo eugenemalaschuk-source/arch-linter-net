@@ -9,6 +9,7 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
+import aggregate_checkpoint_b_evidence as aggregator  # noqa: E402
 from aggregate_checkpoint_b_evidence import (  # noqa: E402
     _CONSUMER_CLEANUP_SCENARIOS,
     _REQUIRED_PLATFORMS,
@@ -180,5 +181,200 @@ def test_platform_result_contradicting_its_scenarios_is_rejected(tmp_path: Path)
     record_path.write_text(json.dumps(record))
 
     with pytest.raises(ValueError, match="contradicts its own scenario results"):
+        _read_records(platforms, _read_manifest(manifest_path),
+                      hashlib.sha256(manifest_path.read_bytes()).hexdigest())
+
+
+def _run_main(tmp_path: Path, **kwargs) -> tuple[int, dict, str]:
+    manifest_path, platforms, gates_path = _write_corpus(tmp_path, **kwargs)
+    output = tmp_path / "release-evidence"
+    argv = [
+        "aggregate_checkpoint_b_evidence.py",
+        "--input-dir", str(platforms),
+        "--candidate-manifest", str(manifest_path),
+        "--repository-gates", str(gates_path),
+        "--output-dir", str(output),
+    ]
+    original = sys.argv
+    sys.argv = argv
+    try:
+        exit_code = aggregator.main()
+    finally:
+        sys.argv = original
+    summary = json.loads((output / "checkpoint-b-release-evidence.json").read_text())
+    markdown = (output / "checkpoint-b-release-evidence.md").read_text()
+    return exit_code, summary, markdown
+
+
+def test_main_writes_pass_evidence_and_succeeds(tmp_path: Path) -> None:
+    exit_code, summary, markdown = _run_main(tmp_path)
+
+    assert exit_code == 0
+    assert summary["result"] == "passed"
+    assert "PASS: the manifested 0.6.1 candidate is authorized for publication." in markdown
+    assert "Composed policy documents: 5 (4 imported fragments)" in markdown
+    assert "Copied project inventories: 0" in markdown
+    assert markdown.count("| passed |") == len(_REQUIRED_PLATFORMS)
+    assert "Failed required scenarios" not in markdown
+
+
+def test_main_reports_fail_and_terminates_unsuccessfully(tmp_path: Path) -> None:
+    exit_code, summary, markdown = _run_main(
+        tmp_path, failed={"actionable-schema-diagnostics": "Blocked by #471."})
+
+    assert exit_code == 1
+    assert summary["result"] == "failed"
+    assert "NOT authorized for publication" in markdown
+    assert "## Failed required scenarios" in markdown
+    assert "| `actionable-schema-diagnostics` | linux-x64 | Blocked by #471. |" in markdown
+
+
+def test_main_reports_policy_shape_defects(tmp_path: Path) -> None:
+    exit_code, summary, markdown = _run_main(
+        tmp_path, policy_shape=dict(_POLICY_SHAPE, imported_fragments=0))
+
+    assert exit_code == 1
+    assert summary["policy_shape_defects"]
+    assert "## Consumer policy-shape defects" in markdown
+    assert "forced monolith" in markdown
+
+
+def test_scenario_missing_everywhere_blocks_publication(tmp_path: Path) -> None:
+    manifest_path, platforms, gates_path = _write_corpus(tmp_path)
+    for record_path in platforms.iterdir():
+        record = json.loads(record_path.read_text())
+        for scenario in record["scenarios"]:
+            if scenario["id"] == "source-set-enrolment":
+                scenario["result"] = "not_applicable"
+                scenario["reason"] = "Skipped everywhere."
+        record_path.write_text(json.dumps(record))
+    digest = hashlib.sha256(manifest_path.read_bytes()).hexdigest()
+    manifest = _read_manifest(manifest_path)
+
+    summary = _summary(
+        _read_records(platforms, manifest, digest),
+        manifest,
+        _read_gates(gates_path, manifest, digest),
+        digest)
+
+    assert summary["result"] == "failed"
+    assert [failure["id"] for failure in summary["failed_scenarios"]] == ["source-set-enrolment"]
+    assert summary["failed_scenarios"][0]["platform_id"] is None
+
+
+@pytest.mark.parametrize(
+    ("mutate", "message"),
+    [
+        (lambda record: record.update(schema="other/v1"), "supported evidence schema"),
+        (lambda record: record.update(checkpoint="A"), "packed-artifact gate result"),
+        (lambda record: record.update(synthetic_identities_only=False), "synthetic identities"),
+        (lambda record: record.update(candidate_version="9.9.9"), "candidate version differs"),
+        (lambda record: record.update(source_commit="c" * 40), "source commit differs"),
+        (lambda record: record.update(candidate_manifest_sha256="d" * 64), "candidate manifest digest"),
+        (lambda record: record.update(packages=[]), "package inventory differs"),
+        (lambda record: record["scenarios"].pop(), "incomplete scenario inventory"),
+        (lambda record: record["scenarios"].__setitem__(0, dict(record["scenarios"][1])),
+         "missing, unexpected, or duplicate scenario IDs"),
+        (lambda record: record["scenarios"][0].update(result="unknown"), "malformed scenario result"),
+        (lambda record: record["scenarios"][0].update(result="failed", reason=None), "explain a non-passing"),
+        (lambda record: record["policy_shape"].update(governed_projects="many"), "non-numeric policy-shape"),
+    ],
+)
+def test_malformed_platform_record_is_rejected(tmp_path: Path, mutate, message: str) -> None:
+    manifest_path, platforms, _ = _write_corpus(tmp_path)
+    record_path = platforms / "linux-x64.json"
+    record = json.loads(record_path.read_text())
+    mutate(record)
+    record_path.write_text(json.dumps(record))
+
+    with pytest.raises(ValueError, match=message):
+        _read_records(platforms, _read_manifest(manifest_path),
+                      hashlib.sha256(manifest_path.read_bytes()).hexdigest())
+
+
+def test_platform_matrix_must_be_complete(tmp_path: Path) -> None:
+    manifest_path, platforms, gates_path = _write_corpus(tmp_path)
+    (platforms / "macos-x64.json").unlink()
+    digest = hashlib.sha256(manifest_path.read_bytes()).hexdigest()
+    manifest = _read_manifest(manifest_path)
+
+    with pytest.raises(ValueError, match="platform matrix mismatch"):
+        _summary(
+            _read_records(platforms, manifest, digest),
+            manifest,
+            _read_gates(gates_path, manifest, digest),
+            digest)
+
+
+def test_wrong_architecture_or_shell_is_rejected(tmp_path: Path) -> None:
+    manifest_path, platforms, gates_path = _write_corpus(tmp_path)
+    record_path = platforms / "macos-arm64.json"
+    record = json.loads(record_path.read_text())
+    record["architecture"] = "X64"
+    record_path.write_text(json.dumps(record))
+    digest = hashlib.sha256(manifest_path.read_bytes()).hexdigest()
+    manifest = _read_manifest(manifest_path)
+
+    with pytest.raises(ValueError, match="wrong architecture"):
+        _summary(
+            _read_records(platforms, manifest, digest),
+            manifest,
+            _read_gates(gates_path, manifest, digest),
+            digest)
+
+
+@pytest.mark.parametrize(
+    ("mutate", "message"),
+    [
+        (lambda gates: gates.update(schema="other/v1"), "Repository gates schema"),
+        (lambda gates: gates.update(candidate_manifest_sha256="e" * 64), "not bound to the candidate"),
+        (lambda gates: gates.update(source_commit="f" * 40), "source commit differs"),
+        (lambda gates: gates.update(gates=[{"id": "acceptance", "result": "passed"}]), "inventory is incomplete"),
+        (lambda gates: gates["gates"][0].update(result="failed"), "gate failed or is malformed"),
+    ],
+)
+def test_malformed_repository_gates_are_rejected(tmp_path: Path, mutate, message: str) -> None:
+    manifest_path, _, gates_path = _write_corpus(tmp_path)
+    gates = json.loads(gates_path.read_text())
+    mutate(gates)
+    gates_path.write_text(json.dumps(gates))
+
+    with pytest.raises(ValueError, match=message):
+        _read_gates(gates_path, _read_manifest(manifest_path),
+                    hashlib.sha256(manifest_path.read_bytes()).hexdigest())
+
+
+@pytest.mark.parametrize(
+    ("mutate", "message"),
+    [
+        (lambda manifest: manifest.update(schema="other/v1"), "manifest schema is invalid"),
+        (lambda manifest: manifest.update(packages=[]), "package inventory is invalid"),
+        (lambda manifest: manifest["packages"][0].pop("sha256"), "package record is invalid"),
+    ],
+)
+def test_malformed_candidate_manifest_is_rejected(tmp_path: Path, mutate, message: str) -> None:
+    manifest_path, _, _ = _write_corpus(tmp_path)
+    manifest = json.loads(manifest_path.read_text())
+    mutate(manifest)
+    manifest_path.write_text(json.dumps(manifest))
+
+    with pytest.raises(ValueError, match=message):
+        _read_manifest(manifest_path)
+
+
+def test_unreadable_input_is_reported_with_its_description(tmp_path: Path) -> None:
+    broken = tmp_path / "broken.json"
+    broken.write_text("{ not json")
+
+    with pytest.raises(ValueError, match="Cannot read candidate manifest"):
+        _read_manifest(broken)
+
+
+def test_empty_evidence_directory_is_rejected(tmp_path: Path) -> None:
+    manifest_path, platforms, _ = _write_corpus(tmp_path)
+    for record_path in platforms.iterdir():
+        record_path.unlink()
+
+    with pytest.raises(ValueError, match="No packed-artifact gate evidence records"):
         _read_records(platforms, _read_manifest(manifest_path),
                       hashlib.sha256(manifest_path.read_bytes()).hexdigest())

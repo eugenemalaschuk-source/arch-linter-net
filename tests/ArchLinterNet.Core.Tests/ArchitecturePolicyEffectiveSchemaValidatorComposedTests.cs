@@ -1,3 +1,4 @@
+using System.Text.Json.Nodes;
 using ArchLinterNet.Core.Contracts;
 using ArchLinterNet.Core.Contracts.PolicyImports;
 using ArchLinterNet.Core.Model;
@@ -157,6 +158,48 @@ public sealed class ArchitecturePolicyEffectiveSchemaValidatorComposedTests
         Assert.That(
             () => ArchitecturePolicyEffectiveSchemaValidator.Validate(Yaml, CreateProvenance()),
             Throws.Nothing);
+    }
+
+    // The policy schema only reaches a few of these combinations through its own alternatives
+    // (a scalar map value failing string/boolean/number/integer). The rest guard the same rule for
+    // any future typed alternative, so the matrix is asserted directly.
+    [TestCase("\"string\"", "\"App.Domain\"", false)]
+    [TestCase("\"string\"", "true", true)]
+    [TestCase("\"string\"", "7", true)]
+    [TestCase("\"string\"", "7.5", true)]
+    [TestCase("\"string\"", "{}", true)]
+    [TestCase("\"string\"", "[]", true)]
+    [TestCase("\"boolean\"", "true", false)]
+    [TestCase("\"boolean\"", "\"App.Domain\"", true)]
+    [TestCase("\"integer\"", "7", false)]
+    [TestCase("\"integer\"", "7.5", true)]
+    [TestCase("\"number\"", "7", false)]
+    [TestCase("\"number\"", "7.5", false)]
+    [TestCase("\"object\"", "{}", false)]
+    [TestCase("\"object\"", "[]", true)]
+    [TestCase("\"array\"", "[]", false)]
+    [TestCase("\"array\"", "{}", true)]
+    [TestCase("[\"string\", \"boolean\"]", "true", false)]
+    [TestCase("[\"string\", \"boolean\"]", "7", true)]
+    public void DeclaresIncompatibleType_MatchesTheInstanceJsonType(
+        string declaredType, string instanceJson, bool expectedIncompatible)
+    {
+        var schema = (JsonObject)JsonNode.Parse($$"""{"type": {{declaredType}}}""")!;
+        JsonNode instance = JsonNode.Parse(instanceJson)!;
+
+        bool incompatible = ArchitecturePolicyEffectiveSchemaValidator.DeclaresIncompatibleType(schema, instance);
+
+        Assert.That(incompatible, Is.EqualTo(expectedIncompatible));
+    }
+
+    [Test]
+    public void DeclaresIncompatibleType_SchemaWithoutDeclaredType_NeverSuppressesAnAlternative()
+    {
+        var schema = (JsonObject)JsonNode.Parse("""{"required": ["name"]}""")!;
+
+        Assert.That(
+            ArchitecturePolicyEffectiveSchemaValidator.DeclaresIncompatibleType(schema, JsonNode.Parse("7")!),
+            Is.False);
     }
 
     private static ArchitecturePolicyProvenanceIndex CreateProvenance(
