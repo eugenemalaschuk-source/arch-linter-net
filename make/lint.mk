@@ -1,4 +1,4 @@
-.PHONY: lint lint-architecture audit-architecture lint-code-size lint-dotnet-format lint-workflows fmt-workflows test-architecture-coverage-report architecture-coverage-report architecture-strict-json architecture-audit-json architecture-coverage-markdown architecture-coverage-ci
+.PHONY: lint lint-architecture audit-architecture lint-code-size lint-dotnet-format lint-workflows fmt-workflows test-architecture-coverage-report test-release-evidence architecture-coverage-report architecture-strict-json architecture-audit-json architecture-coverage-markdown architecture-coverage-ci
 
 CHANGED_FILES ?= changed-files.txt
 DIFF_STATUS   ?= ok
@@ -48,6 +48,10 @@ fmt-workflows:  ## Format GitHub Actions workflows with prettier
 test-architecture-coverage-report:  ## Run tests for the architecture coverage report generator
 	@cd "$(PROJECT_ROOT)" && UV_PROJECT_ENVIRONMENT="$(PROJECT_ROOT)/.venv" "$(UV)" run --project tools/pyproject.toml \
 		pytest tools/scripts/tests/test_architecture_coverage_report.py
+
+test-release-evidence:  ## Run tests for the packed-artifact release-evidence aggregator
+	@cd "$(PROJECT_ROOT)" && UV_PROJECT_ENVIRONMENT="$(PROJECT_ROOT)/.venv" "$(UV)" run --project tools/pyproject.toml \
+		pytest tools/release/tests/test_aggregate_checkpoint_b_evidence.py
 
 architecture-strict-json:  ## Run strict architecture validation, writing architecture-strict.json (target assemblies must already be built)
 	@dotnet run --no-build --project "$(PROJECT_ROOT)/src/ArchLinterNet.Cli" -- \

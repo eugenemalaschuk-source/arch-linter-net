@@ -190,6 +190,9 @@ jobs:
         if: github.event_name == 'pull_request'
         run: make test-architecture-coverage-report
 
+      - name: Test packed-artifact release-evidence aggregator
+        run: make test-release-evidence
+
       - name: Collect changed first-party files
         id: changed_files
         continue-on-error: true

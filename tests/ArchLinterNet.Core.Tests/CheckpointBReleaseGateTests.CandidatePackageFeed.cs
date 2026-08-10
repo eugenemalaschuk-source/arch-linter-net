@@ -86,7 +86,7 @@ public sealed partial class CheckpointBReleaseGateTests
             using ZipArchive core = ZipFile.OpenRead(PackagePath("ArchLinterNet.Core"));
             Assert.That(ReadEntry(core, "ArchLinterNet.Core.nuspec"), Does.Contain("ArchLinterNet.CEL"));
             Assert.That(ReadEntry(core, "README.md"), Does.Contain(
-                "0.6.0 is the public adoption package line"));
+                $"{ProductReleaseLine} is the public adoption package line"));
             Assert.That(ReadEntry(core, "README.md"), Does.Contain(
                 "`adoption-stabilization/v1` schema registry"));
             foreach (string schema in new[]
@@ -391,7 +391,41 @@ public sealed partial class CheckpointBReleaseGateTests
             }
         }
 
-        public void WriteEvidence(IReadOnlyList<CheckpointScenarioResult> scenarios)
+        // F11 — the candidate must identify one release everywhere a consumer can observe it: the
+        // installed CLI's version, the packaged README's public adoption package line, and the
+        // packaged schema registry's product version.
+        public CheckpointScenarioResult AssertReleaseIdentityConsistency()
+        {
+            string identityDirectory = Path.Combine(_root, "release-identity");
+            Directory.CreateDirectory(identityDirectory);
+            CommandResult version = RunTool(identityDirectory, "--version");
+            CommandResult schemas = RunTool(identityDirectory, "schema", "list");
+            string assemblyVersion = _candidateVersion.Split('-', '+')[0];
+
+            using ZipArchive core = ZipFile.OpenRead(PackagePath("ArchLinterNet.Core"));
+            string readme = ReadEntry(core, "README.md");
+            string manifest = ReadEntry(core,
+                $"contentFiles/any/any/schema/{ProductSchemaGeneration}/compatibility-manifest.json");
+            using JsonDocument manifestDocument = JsonDocument.Parse(manifest);
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(version.ExitCode, Is.EqualTo(0), version.CombinedOutput);
+                Assert.That(version.StandardOutput, Does.Contain(assemblyVersion));
+                Assert.That(schemas.ExitCode, Is.EqualTo(0), schemas.CombinedOutput);
+                Assert.That(readme, Does.Contain($"{ProductReleaseLine} is the public adoption package line"),
+                    "The packaged README must identify the candidate's own public adoption package line.");
+                Assert.That(manifestDocument.RootElement.GetProperty("productVersion").GetString(),
+                    Is.EqualTo(ProductReleaseLine),
+                    "The packaged compatibility manifest must identify the candidate's product release.");
+                Assert.That(schemas.StandardOutput,
+                    Does.Contain($"https://archlinternet.dev/schema/{ProductSchemaGeneration}/dependencies.arch.schema.json"),
+                    "The installed schema list must advertise the packaged policy-root identity.");
+            });
+            return Passed("release-identity-consistency");
+        }
+
+        public void WriteEvidence(IReadOnlyList<CheckpointScenarioResult> scenarios, ConsumerPolicyShape policyShape)
         {
             string? directory = Environment.GetEnvironmentVariable("CHECKPOINT_B_EVIDENCE_DIRECTORY");
             if (string.IsNullOrWhiteSpace(directory))
@@ -404,7 +438,9 @@ public sealed partial class CheckpointBReleaseGateTests
             {
                 schema = "checkpoint-b-platform-evidence/v1",
                 checkpoint = "B",
-                result = "passed",
+                // Derived, never asserted: a tracked consumer-cleanup defect must still reach the
+                // aggregator as a failed platform result so it blocks release authorization.
+                result = scenarios.Any(static scenario => scenario.Result == "failed") ? "failed" : "passed",
                 candidate_version = _candidateVersion,
                 source_commit = Environment.GetEnvironmentVariable("ARCH_LINTER_SOURCE_SHA") ?? "unknown",
                 platform_id = Environment.GetEnvironmentVariable("CHECKPOINT_B_PLATFORM") ?? "unknown",
@@ -415,6 +451,7 @@ public sealed partial class CheckpointBReleaseGateTests
                 synthetic_identities_only = true,
                 candidate_manifest_sha256 = _manifestSha256,
                 packages = _packages,
+                policy_shape = policyShape,
                 scenarios = scenarios.OrderBy(static scenario => scenario.Id, StringComparer.Ordinal),
             };
             string fileName = "checkpoint-b-platform-evidence.json";

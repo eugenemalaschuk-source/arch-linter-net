@@ -31,7 +31,9 @@ jobs:
     name: Checkpoint B (${{ matrix.id }})
     needs: prepare-candidate
     runs-on: ${{ matrix.runner }}
-    timeout-minutes: 30
+    # The 0.6.1 consumer-cleanup matrix builds and analyzes the 23-project synthetic modular
+    # consumer several times on top of the existing packaged-artifact scenarios.
+    timeout-minutes: 45
     strategy:
       fail-fast: false
       matrix:

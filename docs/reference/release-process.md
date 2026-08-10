@@ -24,9 +24,10 @@ re-verifies the candidate manifest and publishes those exact `.nupkg` files;
 it never repacks after Checkpoint B. The run uploads
 `checkpoint-b-release-evidence-<version>` as the immutable audit record.
 Inspect its JSON and Markdown files for the package digests, candidate-manifest
-digest, commit, matrix, gate status, and explicit authorization statement. A
-missing platform artifact, invalid digest, or failed Checkpoint B test blocks
-publication. A dry-run is evidence for its own immutable artifact only: a
+digest, commit, matrix, gate status, consumer policy shape, and explicit PASS or
+FAIL authorization statement. A missing platform artifact, invalid digest,
+failed required scenario, or workaround-shaped consumer policy blocks
+publication, and the aggregation job then terminates unsuccessfully. A dry-run is evidence for its own immutable artifact only: a
 subsequent publish run creates and validates a new candidate artifact. Before
 publication, verify the
 [0.5.1 release notes](release-notes-0-5-1.md), [migration guide](../guides/migration-to-0-5-1.md),
@@ -55,7 +56,7 @@ Tags use the `v` prefix. Package versions are emitted without `v`.
 
 ### Schema registry identity
 
-The public 0.6.0 package line ships an `adoption-stabilization/v1` registry
+The public 0.6.1 package line ships an `adoption-stabilization/v1` registry
 whose entries version persisted format contracts independently from package
 SemVer: most stay at their frozen immutable `0.5.1` identity, and policy
 root/fragment advanced to `0.6.1`. Release metadata and package READMEs must

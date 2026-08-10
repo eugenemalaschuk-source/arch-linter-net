@@ -190,7 +190,7 @@ jobs:
           popd >/dev/null
 
           unzip -p "$GITHUB_WORKSPACE/nupkg/$cli_nupkg" README.md > packaged-readme.md
-          grep -qF '0.6.0 is the public adoption package line' packaged-readme.md
+          grep -qF '0.6.1 is the public adoption package line' packaged-readme.md
           grep -qF '`adoption-stabilization/v1` schema registry' packaged-readme.md
           if grep -qF '0.5.1 is the single public adoption-stabilization release target' packaged-readme.md; then
             echo 'Packaged README contains stale 0.5.1 product-release wording.' >&2
