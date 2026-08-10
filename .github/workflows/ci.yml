@@ -23,7 +23,9 @@ jobs:
     name: Pull Request Validation
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    # Lint, the sequential coverage run, Python tooling coverage, and the SonarCloud begin/end pair.
+    # A cancelled `End SonarCloud analysis` step means this budget was exceeded, not a scanner fault.
+    timeout-minutes: 25
     permissions:
       contents: read
       pull-requests: write

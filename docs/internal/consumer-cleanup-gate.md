@@ -80,6 +80,8 @@ The gate is in the `make test` **E2E** bucket (`TEST_E2E_FILTER`), not the unit 
 
 That bucket runs without coverage instrumentation — `make test-coverage` collects only from the unit process, by design — so `CheckpointBReleaseGateTests*.cs` is listed in `sonar.coverage.exclusions`. The harness is fully executed on every run; only its line coverage is unmeasurable, and reporting it as untested would be wrong.
 
+For the same reason the coverage runs skip the gate entirely: `TEST_COVERAGE_E2E_FILTER` is the E2E bucket minus the gate, so `make test-coverage` does not spend several minutes on a run that produces no coverage. `make test` and `make acceptance` still run it, as do the per-platform CI test suites, so the correctness signal is unchanged.
+
 The release workflow runs the same entrypoint on all four platforms against the real candidate feed; that run, not the PR run, is what authorizes publication.
 
 ## Release evidence
