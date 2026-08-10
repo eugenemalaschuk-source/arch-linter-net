@@ -51,14 +51,14 @@ test-architecture-coverage-report:  ## Run tests for the architecture coverage r
 
 test-release-evidence:  ## Run tests for the packed-artifact release-evidence aggregator
 	@cd "$(PROJECT_ROOT)" && UV_PROJECT_ENVIRONMENT="$(PROJECT_ROOT)/.venv" "$(UV)" run --project tools/pyproject.toml \
-		pytest tools/release/tests/test_aggregate_checkpoint_b_evidence.py
+		pytest tools/release/tests
 
 # Both Python suites in one run, emitting the Cobertura report SonarCloud needs. Without it the
 # release-evidence aggregator and the coverage-report generator are measured as 0%-covered new
 # code even though both are tested.
 test-tooling-coverage:  ## Run all Python tooling tests with coverage (coverage-python.xml)
 	@cd "$(PROJECT_ROOT)" && UV_PROJECT_ENVIRONMENT="$(PROJECT_ROOT)/.venv" "$(UV)" run --project tools/pyproject.toml \
-		pytest tools/release/tests/test_aggregate_checkpoint_b_evidence.py \
+		pytest tools/release/tests \
 		tools/scripts/tests/test_architecture_coverage_report.py \
 		--cov=tools/release --cov=tools/scripts \
 		--cov-report=xml:coverage-python.xml --cov-report=term-missing

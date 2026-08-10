@@ -33,6 +33,8 @@ public sealed partial class CheckpointBReleaseGateTests
         }
         """;
 
+    private static readonly string[] _expectedDeltaKinds = ["added", "removed", "changed"];
+
     private static CheckpointScenarioResult AssertPublicApiSnapshotWorkflow(CandidatePackageFeed candidate)
     {
         using AdoptionAcceptanceFixture fixture = AdoptionAcceptanceFixture.Create("small");
@@ -128,7 +130,7 @@ contracts:
         Assert.Multiple(() =>
         {
             Assert.That(evolved.ExitCode, Is.EqualTo(1), evolved.CombinedOutput);
-            Assert.That(deltas.Keys, Is.EquivalentTo(new[] { "added", "removed", "changed" }),
+            Assert.That(deltas.Keys, Is.EquivalentTo(_expectedDeltaKinds),
                 $"Every delta class must be observed.{Environment.NewLine}{evolved.CombinedOutput}");
             Assert.That(deltas["added"], Is.EqualTo("method Synthetic.Small.Service.Added(): System.String"));
             Assert.That(deltas["removed"], Is.EqualTo("method Synthetic.Small.Service.Removed(): System.String"));
