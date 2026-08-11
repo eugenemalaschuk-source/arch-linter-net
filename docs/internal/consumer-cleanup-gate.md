@@ -76,11 +76,11 @@ Adding an entry is a release decision, not a test-maintenance convenience. Every
 
 ## Where it runs
 
-The gate is in the `make test` **E2E** bucket (`TEST_E2E_FILTER`), not the unit bucket: it packs the whole solution, installs the tool from an isolated feed, and builds the synthetic consumer fixtures, so leaving it on the unit critical path serialized it behind ~2,500 unit tests.
+The gate is its own **packed-artifact** bucket (`TEST_PACKED_ARTIFACT_FILTER`, run via `make test-packed-artifact`), not the unit bucket and not the ordinary E2E bucket: it packs the whole solution, installs the tool from an isolated feed, and builds the synthetic consumer fixtures across the consumer-cleanup matrix, so leaving it on the unit critical path serialized it behind ~2,500 unit tests, and leaving it in ordinary E2E made that bucket contend with it on the same runner.
 
-That bucket runs without coverage instrumentation — `make test-coverage` collects only from the unit process, by design — so `CheckpointBReleaseGateTests*.cs` is listed in `sonar.coverage.exclusions`. The harness is fully executed on every run; only its line coverage is unmeasurable, and reporting it as untested would be wrong.
+The bucket runs without coverage instrumentation — `make test-coverage` collects only from the unit bucket, by design — so `CheckpointBReleaseGateTests*.cs` is listed in `sonar.coverage.exclusions`. The harness is fully executed on every run; only its line coverage is unmeasurable, and reporting it as untested would be wrong.
 
-For the same reason the coverage runs skip the gate entirely: `TEST_COVERAGE_E2E_FILTER` is the E2E bucket minus the gate, so `make test-coverage` does not spend several minutes on a run that produces no coverage. `make test` and `make acceptance` still run it, as do the per-platform CI test suites, so the correctness signal is unchanged.
+For the same reason the coverage targets no longer invoke it at all: `test-coverage`/`test-coverage-main-ci` run only the unit bucket, so they don't spend time on a run that produces no coverage. `make test`, `make acceptance`, and the independent `test-packed-artifact` CI jobs still run it on every platform, so the correctness signal is unchanged — it just runs on its own runner instead of contending with unit or E2E.
 
 The release workflow runs the same entrypoint on all four platforms against the real candidate feed; that run, not the PR run, is what authorizes publication.
 
