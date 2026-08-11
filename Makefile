@@ -25,8 +25,11 @@
 ##
 ## Testing:
 ##   make acceptance           — lint + all tests
-##   make test                 — run all tests
-##   make test-coverage        — run all tests with coverage collection (cobertura XML)
+##   make test                 — run all tests (unit + E2E + packed-artifact buckets)
+##   make test-unit            — run only the coverage-eligible unit bucket
+##   make test-e2e             — run only the ordinary E2E bucket (excludes CheckpointBReleaseGateTests)
+##   make test-packed-artifact — run only the packed-artifact release gate (CheckpointBReleaseGateTests)
+##   make test-coverage        — run the unit bucket with coverage collection (cobertura XML)
 ##   make test-coverage-badge  — run tests with coverage and print a test-coverage badge line
 ##   make test-release-evidence — run tests for the packed-artifact release-evidence aggregator
 ##   make test-tooling-coverage — run all Python tooling tests with coverage

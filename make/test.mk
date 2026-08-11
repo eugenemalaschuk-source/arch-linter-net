@@ -1,42 +1,58 @@
-.PHONY: test clean-results test-coverage test-coverage-main-ci test-coverage-badge _acceptance-test benchmark-cel
+.PHONY: test test-unit test-e2e test-packed-artifact clean-results test-coverage test-coverage-main-ci test-coverage-badge _acceptance-test benchmark-cel
 
-# Unit tests and E2E tests run in two parallel `dotnet test` processes: the heavy E2E tests
-# (real CLI subprocess builds and full-assembly analyses) no longer extend the critical path of
-# the unit suite. The solution is built once up front; both processes run with --no-build so they
-# never race on shared obj/bin output.
+# Three independently addressable test buckets, single-sourced here as VSTest FullyQualifiedName
+# filters. Each bucket has its own `make test-*` target (below) so unit, ordinary E2E, and the
+# packed-artifact release gate can run on separate CI runners instead of contending for one.
 #
-# The E2E split uses FullyQualifiedName filters, NOT [Category("E2E")]: the NUnit3TestAdapter does
+# Placement rule for new fixtures:
+#   - coverage-eligible unit/in-process correctness            -> unit bucket
+#   - subprocess/build/filesystem/adoption integration          -> E2E bucket
+#   - freshly packed/installed candidate, consumer/release proof -> packed-artifact bucket
+# Adding a slow fixture to the wrong bucket is a topology regression, not a style nit.
+#
+# The split uses FullyQualifiedName filters, NOT [Category("E2E")]: the NUnit3TestAdapter does
 # not surface fixture-level categories as VSTest traits, so `Category=E2E`/`Category!=E2E` match
 # nothing. The fixtures' [Category("E2E")] attributes stay as human-readable documentation.
 # `!~` negation is supported by the VSTest filter syntax.
 #
-# CheckpointBReleaseGateTests belongs in the E2E bucket for exactly the reason above: it packs the
+# CheckpointBReleaseGateTests is its own packed-artifact bucket, not part of E2E: it packs the
 # whole solution, installs the tool from an isolated feed, and builds the synthetic consumer
-# fixtures. Left in the unit bucket it serializes behind ~2,500 unit tests while the E2E process
-# sits idle, which is what pushed the Intel macOS job past its 15-minute budget.
+# fixtures across the release-evidence consumer matrix. Mixing it into ordinary E2E serialized it
+# behind the rest of that bucket on the same runner, which pushed platform jobs past their budget.
 TEST_E2E_FIXTURES := FullyQualifiedName~ExternalDependencyContractAuditE2eTests|FullyQualifiedName~BuildStatePreflightTests|FullyQualifiedName~BuildStatePreflightAssemblyReloadTests|FullyQualifiedName~CheckpointAAdoptionAcceptanceTests|FullyQualifiedName~ArchitectureBaselineIntegrationTests
-TEST_E2E_FILTER := $(TEST_E2E_FIXTURES)|FullyQualifiedName~CheckpointBReleaseGateTests
-
-# The coverage runs execute the E2E suite WITHOUT --collect (see the comment on test-coverage), so
-# the packed-artifact release gate contributes no coverage there while costing several minutes of a
-# job whose purpose is coverage and SonarCloud analysis. Its correctness signal already comes from
-# `make test`/`make acceptance` and from every platform test-suite job, so the coverage runs skip
-# it. This is why the gate is also listed in sonar.coverage.exclusions.
-TEST_COVERAGE_E2E_FILTER := $(TEST_E2E_FIXTURES)
+TEST_E2E_FILTER := $(TEST_E2E_FIXTURES)
+TEST_PACKED_ARTIFACT_FILTER := FullyQualifiedName~CheckpointBReleaseGateTests
 TEST_UNIT_FILTER := FullyQualifiedName!~ExternalDependencyContractAuditE2eTests&FullyQualifiedName!~BuildStatePreflightTests&FullyQualifiedName!~BuildStatePreflightAssemblyReloadTests&FullyQualifiedName!~CheckpointAAdoptionAcceptanceTests&FullyQualifiedName!~ArchitectureBaselineIntegrationTests&FullyQualifiedName!~CheckpointBReleaseGateTests
 
-# Both background processes are waited on regardless of the first one's exit status, then the
-# combined result is checked explicitly — no `set -e`, which would abort the shell at the first
-# failed `wait`, orphaning the second process and losing its result.
-test:  ## Run all tests (unit tests and E2E tests in parallel)
+test-unit:  ## Run only the coverage-eligible unit bucket
+	@dotnet build "$(SLNX)" --no-restore --nologo
+	@dotnet test "$(SLNX)" --no-restore --no-build --filter "$(TEST_UNIT_FILTER)"
+
+test-e2e:  ## Run only the ordinary E2E bucket (excludes CheckpointBReleaseGateTests)
+	@dotnet build "$(SLNX)" --no-restore --nologo
+	@dotnet test "$(SLNX)" --no-restore --no-build --filter "$(TEST_E2E_FILTER)"
+
+test-packed-artifact:  ## Run only the packed-artifact release gate (CheckpointBReleaseGateTests)
+	@dotnet build "$(SLNX)" --no-restore --nologo
+	@dotnet test "$(SLNX)" --no-restore --no-build --filter "$(TEST_PACKED_ARTIFACT_FILTER)"
+
+# `make test` remains "run the complete authoritative test set" — the union of all three buckets,
+# restructured to launch as three parallel `dotnet test` processes off a single build so they never
+# race on shared obj/bin output. All three are waited on regardless of any earlier one's exit
+# status, then the combined result is checked explicitly — no `set -e`, which would abort the shell
+# at the first failed `wait`, orphaning the remaining processes and losing their results.
+test:  ## Run all tests (unit, E2E and packed-artifact buckets in parallel)
 	@dotnet build "$(SLNX)" --no-restore --nologo
 	@dotnet test "$(SLNX)" --no-restore --no-build --filter "$(TEST_UNIT_FILTER)" & \
 	p1=$$!; \
 	dotnet test "$(SLNX)" --no-restore --no-build --filter "$(TEST_E2E_FILTER)" & \
 	p2=$$!; \
+	dotnet test "$(SLNX)" --no-restore --no-build --filter "$(TEST_PACKED_ARTIFACT_FILTER)" & \
+	p3=$$!; \
 	wait $$p1; s1=$$?; \
 	wait $$p2; s2=$$?; \
-	if [ $$s1 -ne 0 ] || [ $$s2 -ne 0 ]; then exit 1; fi
+	wait $$p3; s3=$$?; \
+	if [ $$s1 -ne 0 ] || [ $$s2 -ne 0 ] || [ $$s3 -ne 0 ]; then exit 1; fi
 
 # Used only by `make acceptance` (see Makefile). test and lint-architecture both build/test the
 # Core.Tests project; running them concurrently races on the same obj/bin output, so acceptance
@@ -49,31 +65,25 @@ _acceptance-test: | lint-architecture
 clean-results:  ## Remove test-results folder
 	rm -rf "$(RESULTS_DIR)"
 
-# Coverage targets run the two suites SEQUENTIALLY, not in parallel. Microsoft.CodeCoverage
-# instruments assemblies in-place in the shared bin/ output: while the units process rewrites
-# (instrument at start, restore at end) those files, a concurrently running E2E process loads the
-# same files — the torn reads crash its test host or surface as random BadImageFormatException
-# ("Index not found") in IL-scanning tests. With one process at a time there is no rewrite/load
-# overlap, so coverage is collected by the units process and the E2E process (which runs CLI
-# subprocesses that never contribute to the collector anyway) runs after it without --collect.
-# `make test` itself stays parallel — without coverage collection nothing rewrites bin files.
-test-coverage:  ## Run all tests with coverage collection (Cobertura + OpenCover XML under test-results/)
+# Coverage is coverage-only: it runs exactly the unit bucket with `--collect`. Ordinary E2E and the
+# packed-artifact gate contribute no code coverage (E2E runs CLI subprocesses; the packed-artifact
+# gate installs a packed tool from an isolated feed) and are no longer invoked here at all — their
+# correctness signal comes from the independent `test-e2e`/`test-packed-artifact` CI jobs and from
+# `make test`/`make acceptance` locally, not from the coverage/Sonar critical path. This is also why
+# CheckpointBReleaseGateTests stays listed in sonar.coverage.exclusions.
+test-coverage:  ## Run the unit bucket with coverage collection (Cobertura + OpenCover XML under test-results/)
 	@rm -rf "$(RESULTS_DIR)"
 	@dotnet build "$(SLNX)" --no-restore --nologo
 	@dotnet test "$(SLNX)" --no-restore --no-build --filter "$(TEST_UNIT_FILTER)" --logger trx --collect:"XPlat Code Coverage" \
 		--results-directory "$(RESULTS_DIR)/units" \
 		-- DataCollectionRunSettings.DataCollectors.DataCollector.Configuration.Format=cobertura,opencover
-	@dotnet test "$(SLNX)" --no-restore --no-build --filter "$(TEST_COVERAGE_E2E_FILTER)" --logger trx \
-		--results-directory "$(RESULTS_DIR)/e2e"
 
-test-coverage-main-ci:  ## Run coverage for main-branch badge refresh with hang diagnostics enabled
+test-coverage-main-ci:  ## Run unit-bucket coverage for main-branch badge refresh with hang diagnostics enabled
 	@rm -rf "$(RESULTS_DIR)"
 	@dotnet build "$(SLNX)" --no-restore --nologo
 	@dotnet test "$(SLNX)" --no-restore --no-build --filter "$(TEST_UNIT_FILTER)" --logger trx --blame-hang --blame-hang-timeout 5m \
 		--collect:"XPlat Code Coverage" --results-directory "$(RESULTS_DIR)/units" \
 		-- DataCollectionRunSettings.DataCollectors.DataCollector.Configuration.Format=cobertura,opencover
-	@dotnet test "$(SLNX)" --no-restore --no-build --filter "$(TEST_COVERAGE_E2E_FILTER)" --logger trx --blame-hang --blame-hang-timeout 5m \
-		--results-directory "$(RESULTS_DIR)/e2e"
 
 test-coverage-badge: test-coverage  ## Run tests with coverage and print a test-coverage badge Markdown line
 	@cd "$(PROJECT_ROOT)" && UV_PROJECT_ENVIRONMENT="$(PROJECT_ROOT)/.venv" "$(UV)" run --project tools/pyproject.toml \

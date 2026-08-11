@@ -279,13 +279,27 @@ jobs:
         if: steps.architecture_coverage.outcome == 'failure'
         run: exit 1
 
-  macos_intel_tests:
-    name: Intel macOS Test Suite
+  # Unit, ordinary E2E, and the packed-artifact release gate used to run as two `dotnet test`
+  # processes inside one `make test` per platform, so the heaviest two suites always contended for
+  # the same hosted runner. Each bucket now gets its own matrix job/leg per platform (no artificial
+  # `needs:` between them) so they schedule and run concurrently on independent runners instead.
+  # See `make/test.mk` for the bucket filter definitions and placement rules.
+  unit_tests:
+    name: Unit Test Suite (${{ matrix.name }})
     if: github.event_name == 'pull_request'
-    runs-on: macos-15-intel
-    # The slowest supported runner, and the suite now also builds the synthetic modular consumer
-    # for the packed-artifact release gate. Windows finishes in ~10m and Apple Silicon in ~5m.
-    timeout-minutes: 25
+    runs-on: ${{ matrix.os }}
+    # Coverage-eligible unit/in-process correctness only — no subprocess builds or packing.
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            name: Windows
+          - os: macos-15-intel
+            name: Intel macOS
+          - os: macos-14
+            name: Apple Silicon macOS
     permissions:
       contents: read
 
@@ -296,60 +310,11 @@ jobs:
           persist-credentials: false
 
       - name: Verify Intel macOS runner
+        if: matrix.os == 'macos-15-intel'
         run: test "$(uname -m)" = x86_64
 
-      - name: Setup .NET
-        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68
-        with:
-          dotnet-version: 10.0.x
-
-      - name: Restore
-        run: make restore
-
-      - name: Run test suite
-        run: make test
-
-  windows_tests:
-    name: Windows Test Suite
-    if: github.event_name == 'pull_request'
-    runs-on: windows-latest
-    timeout-minutes: 15
-    permissions:
-      contents: read
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
-        with:
-          persist-credentials: false
-
-      - name: Setup .NET
-        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68
-        with:
-          dotnet-version: 10.0.x
-
-      - name: Restore
-        run: make restore
-
-      - name: Run test suite
-        shell: bash
-        run: make test
-
-  macos_arm64_tests:
-    name: Apple Silicon macOS Test Suite
-    if: github.event_name == 'pull_request'
-    runs-on: macos-14
-    timeout-minutes: 10
-    permissions:
-      contents: read
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
-        with:
-          persist-credentials: false
-
       - name: Verify Apple Silicon macOS runner
+        if: matrix.os == 'macos-14'
         run: test "$(uname -m)" = arm64
 
       - name: Setup .NET
@@ -360,8 +325,102 @@ jobs:
       - name: Restore
         run: make restore
 
-      - name: Run test suite
-        run: make test
+      - name: Run unit test suite
+        shell: bash
+        run: make test-unit
+
+  e2e_tests:
+    name: E2E Test Suite (${{ matrix.name }})
+    if: github.event_name == 'pull_request'
+    runs-on: ${{ matrix.os }}
+    # Ordinary E2E: real CLI subprocess builds and full-assembly analyses, excluding the
+    # packed-artifact release gate (see packed_artifact_tests below).
+    timeout-minutes: 12
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            name: Windows
+          - os: macos-15-intel
+            name: Intel macOS
+          - os: macos-14
+            name: Apple Silicon macOS
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+
+      - name: Verify Intel macOS runner
+        if: matrix.os == 'macos-15-intel'
+        run: test "$(uname -m)" = x86_64
+
+      - name: Verify Apple Silicon macOS runner
+        if: matrix.os == 'macos-14'
+        run: test "$(uname -m)" = arm64
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Restore
+        run: make restore
+
+      - name: Run E2E test suite
+        shell: bash
+        run: make test-e2e
+
+  packed_artifact_tests:
+    name: Packed Artifact Test Suite (${{ matrix.name }})
+    if: github.event_name == 'pull_request'
+    runs-on: ${{ matrix.os }}
+    # CheckpointBReleaseGateTests only: packs the whole solution, installs the candidate tool from
+    # an isolated feed, and runs the consumer-cleanup scenario matrix against it — materially
+    # heavier than ordinary E2E, so it gets a longer budget.
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            name: Windows
+          - os: macos-15-intel
+            name: Intel macOS
+          - os: macos-14
+            name: Apple Silicon macOS
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+
+      - name: Verify Intel macOS runner
+        if: matrix.os == 'macos-15-intel'
+        run: test "$(uname -m)" = x86_64
+
+      - name: Verify Apple Silicon macOS runner
+        if: matrix.os == 'macos-14'
+        run: test "$(uname -m)" = arm64
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Restore
+        run: make restore
+
+      - name: Run packed-artifact test suite
+        shell: bash
+        run: make test-packed-artifact
 
   main_badge_refresh:
     name: Main Badge Refresh
