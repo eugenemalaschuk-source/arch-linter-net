@@ -4,3 +4,13 @@ analysis:
   target_assemblies: [Synthetic.AspNetHost]
   projects: [Synthetic.AspNetHost.csproj]
   shared_frameworks: [Microsoft.AspNetCore.App]
+
+layers:
+  host:
+    namespace: Synthetic.AspNetHost
+
+contracts:
+  strict_method_body:
+    - name: host-method-bodies-are-readable
+      source: host
+      forbidden_calls: [Synthetic.DoesNotExist]
