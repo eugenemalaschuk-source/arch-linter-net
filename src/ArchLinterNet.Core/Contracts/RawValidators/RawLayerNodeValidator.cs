@@ -30,7 +30,7 @@ internal sealed class RawLayerNodeValidator : IArchitecturePolicyRawDocumentVali
             ValidateLayerExcludeEntries(layerNode, layerName);
             ValidateLayerOverlapsWithEntries(layerNode, layerName);
 
-            bool hasNamespace = RawYamlNodes.TryGetNonNullChild(layerNode, "namespace", out _);
+            bool hasNamespace = RawYamlNodes.TryGetNonNullChild(layerNode, RawYamlNodes.NamespaceKey, out _);
             bool hasNamespaceSuffix = RawYamlNodes.TryGetNonNullChild(layerNode, RawYamlNodes.NamespaceSuffixKey, out _);
             bool hasSelectorKey = RawYamlNodes.TryGetChild(layerNode, "selector", out YamlNode? selectorNode);
 
@@ -77,7 +77,7 @@ internal sealed class RawLayerNodeValidator : IArchitecturePolicyRawDocumentVali
         foreach ((YamlNode keyNode, _) in layerNode.Children)
         {
             if (keyNode is YamlScalarNode scalar
-                && !string.Equals(scalar.Value, "namespace", StringComparison.Ordinal)
+                && !string.Equals(scalar.Value, RawYamlNodes.NamespaceKey, StringComparison.Ordinal)
                 && !string.Equals(scalar.Value, RawYamlNodes.NamespaceSuffixKey, StringComparison.Ordinal)
                 && !string.Equals(scalar.Value, "external", StringComparison.Ordinal)
                 && !string.Equals(scalar.Value, "selector", StringComparison.Ordinal)
@@ -151,7 +151,7 @@ internal sealed class RawLayerNodeValidator : IArchitecturePolicyRawDocumentVali
                     continue;
                 }
 
-                if (string.Equals(entryKeyScalar.Value, "namespace", StringComparison.Ordinal))
+                if (string.Equals(entryKeyScalar.Value, RawYamlNodes.NamespaceKey, StringComparison.Ordinal))
                 {
                     hasNamespace = true;
                     continue;
@@ -174,7 +174,7 @@ internal sealed class RawLayerNodeValidator : IArchitecturePolicyRawDocumentVali
 
     private static void ValidateNamespaceValue(YamlMappingNode layerNode, string layerName)
     {
-        if (RawYamlNodes.TryGetChild(layerNode, "namespace", out YamlNode? nsNode)
+        if (RawYamlNodes.TryGetChild(layerNode, RawYamlNodes.NamespaceKey, out YamlNode? nsNode)
             && nsNode is YamlScalarNode nsScalar
             && (RawYamlNodes.IsExplicitNull(nsScalar) || string.IsNullOrWhiteSpace(nsScalar.Value)))
         {

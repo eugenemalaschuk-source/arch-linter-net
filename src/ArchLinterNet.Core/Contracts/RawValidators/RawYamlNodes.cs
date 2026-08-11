@@ -17,6 +17,7 @@ internal static class RawYamlNodes
     public const string WhenKey = "when";
     public const string ContractsKey = "contracts";
     public const string UnnamedContractName = "<unnamed>";
+    public const string NamespaceKey = "namespace";
     public const string NamespaceSuffixKey = "namespace_suffix";
     public const string ExcludeKey = "exclude";
     public const string OverlapsWithKey = "overlaps_with";
@@ -110,12 +111,16 @@ internal static class RawYamlNodes
             index);
     }
 
-    public static void ValidateKnownKeys(YamlMappingNode node, string contractName, string location, IEnumerable<string> allowed)
+    public static void ValidateKnownKeys(
+        YamlMappingNode node, string contractName, string location, IEnumerable<string> allowed)
     {
         foreach ((YamlNode keyNode, _) in node.Children)
         {
             if (keyNode is YamlScalarNode scalar && !allowed.Contains(scalar.Value, StringComparer.Ordinal))
-                throw new InvalidOperationException($"Contextual contract '{contractName}' declares an unknown property '{scalar.Value}' on {location}.");
+            {
+                throw new InvalidOperationException(
+                    $"Contextual contract '{contractName}' declares an unknown property '{scalar.Value}' on {location}.");
+            }
         }
     }
 }
