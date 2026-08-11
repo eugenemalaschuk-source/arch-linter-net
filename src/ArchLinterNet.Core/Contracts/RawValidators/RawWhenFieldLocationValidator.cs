@@ -2,14 +2,13 @@ using System.Globalization;
 using YamlDotNet.Core;
 using YamlDotNet.RepresentationModel;
 
-namespace ArchLinterNet.Core.Contracts;
+namespace ArchLinterNet.Core.Contracts.RawValidators;
 
-// Raw-YAML validation for the `when` CEL expression field (openspec/specs/cel-policy-model/spec.md),
-// split out of ArchitecturePolicyDocumentLoader.cs to keep both files under the repository's file-size
-// lint budget (make/lint.mk CS_SIZE_LINT_ERROR_LINES). See
-// openspec/changes/archive/2026-07-18-core-cel-integration and Contracts/Validators/ExpressionCompilationValidator.cs
-// (the post-deserialization compile step this raw pass gates).
-public sealed partial class ArchitecturePolicyDocumentLoader
+// Raw-YAML validation for the `when` CEL expression field (openspec/specs/cel-policy-model/spec.md).
+// See openspec/changes/archive/2026-07-18-core-cel-integration and
+// Contracts/Validators/ExpressionCompilationValidator.cs (the post-deserialization compile step this
+// raw pass gates).
+internal sealed class RawWhenFieldLocationValidator : IArchitecturePolicyRawDocumentValidator
 {
     // Closed first-wave `when` locations from openspec/specs/cel-policy-model/spec.md. IgnoreUnmatchedProperties()
     // silently drops any YAML key that has no matching C# property, so a `when` field declared anywhere else
@@ -50,17 +49,73 @@ public sealed partial class ArchitecturePolicyDocumentLoader
     private static readonly string[] _arbitraryNameGroupKeys =
         { "layers", "external_dependencies", "packages", "framework_references" };
 
-    private static void ValidateRawWhenFieldLocations(string yaml)
-    {
-        var stream = new YamlStream();
-        stream.Load(new StringReader(yaml));
+    // A key is a recognized, legitimate opaque (arbitrary user-content) value boundary only when the CURRENT
+    // node's exact structural path is one of the fixed positions this schema actually declares that property
+    // at - never by key name alone, and never by a sibling-key heuristic. A sibling-key check (e.g. "opaque if
+    // a 'role' key sits next to it, or if it is the node's only key") is still bypassable anywhere in the tree
+    // by wrapping the payload in a fabricated container that happens to satisfy the heuristic (e.g.
+    // `extensions: { metadata: { when: "..." } }`, or `classification.extensions: { role: x, metadata: { when:
+    // "..." } }`) - IgnoreUnmatchedProperties() silently drops the fabricated container together with the
+    // `when` it shields, exactly like the direct-sibling case this whole raw pass exists to catch. Exact-path
+    // matching closes that off: `extensions`/`classification.extensions` are not on either list below, so the
+    // walk keeps descending into them and still finds the `when` underneath.
+    //
+    // The metadata-bearing selector/classification/coverage-exclusion locations mirror _allowedWhenLocations'
+    // context-selector paths (role+metadata+when are declared together on the same node) plus every
+    // metadata-bearing shape `when` is NOT approved on (port-boundary/adapter-binding selectors, classification
+    // extraction entries, semantic-role coverage exclusions).
+    private static readonly string[][] _recognizedOpaqueMetadataLocations = _allowedWhenLocations
+        .Select(location => location.Append(RawYamlNodes.MetadataKey).ToArray())
+        .Concat(new[]
+        {
+            new[] { "contracts", "strict_port_boundaries", "*", "source", RawYamlNodes.MetadataKey },
+            new[] { "contracts", "strict_port_boundaries", "*", "allowed_seams", "*", RawYamlNodes.MetadataKey },
+            new[] { "contracts", "strict_port_boundaries", "*", "forbidden", "*", RawYamlNodes.MetadataKey },
+            new[] { "contracts", "strict_port_boundaries", "*", "exclude", "*", RawYamlNodes.MetadataKey },
+            new[] { "contracts", "strict_port_boundaries", "*", "target_context", RawYamlNodes.MetadataKey },
+            new[] { "contracts", "strict_port_boundaries", "*", "adapter_bindings", "*", "adapter", RawYamlNodes.MetadataKey },
+            new[] { "contracts", "strict_port_boundaries", "*", "adapter_bindings", "*", "expected_port", RawYamlNodes.MetadataKey },
+            new[] { "contracts", "strict_port_boundaries", "*", "adapter_bindings", "*", "allowed_contexts", "*", RawYamlNodes.MetadataKey },
+            new[] { "contracts", "audit_port_boundaries", "*", "source", RawYamlNodes.MetadataKey },
+            new[] { "contracts", "audit_port_boundaries", "*", "allowed_seams", "*", RawYamlNodes.MetadataKey },
+            new[] { "contracts", "audit_port_boundaries", "*", "forbidden", "*", RawYamlNodes.MetadataKey },
+            new[] { "contracts", "audit_port_boundaries", "*", "exclude", "*", RawYamlNodes.MetadataKey },
+            new[] { "contracts", "audit_port_boundaries", "*", "target_context", RawYamlNodes.MetadataKey },
+            new[] { "contracts", "audit_port_boundaries", "*", "adapter_bindings", "*", "adapter", RawYamlNodes.MetadataKey },
+            new[] { "contracts", "audit_port_boundaries", "*", "adapter_bindings", "*", "expected_port", RawYamlNodes.MetadataKey },
+            new[] { "contracts", "audit_port_boundaries", "*", "adapter_bindings", "*", "allowed_contexts", "*", RawYamlNodes.MetadataKey },
+            new[] { "classification", "attributes", "*", RawYamlNodes.MetadataKey },
+            new[] { "classification", "assembly_attributes", "*", RawYamlNodes.MetadataKey },
+            new[] { "classification", "inheritance", "*", RawYamlNodes.MetadataKey },
+            new[] { "classification", "namespace", "*", RawYamlNodes.MetadataKey },
+            new[] { "classification", "path", "*", RawYamlNodes.MetadataKey },
+            new[] { "classification", "overrides", "*", RawYamlNodes.MetadataKey },
+            new[] { "contracts", "strict_coverage", "*", "exclude", "*", RawYamlNodes.MetadataKey },
+            new[] { "contracts", "audit_coverage", "*", "exclude", "*", RawYamlNodes.MetadataKey },
+        })
+        .ToArray();
 
-        if (stream.Documents.Count == 0 || stream.Documents[0].RootNode is not YamlMappingNode root)
+    private static readonly string[][] _recognizedOpaqueScalarMapLocations =
+    {
+        new[] { "contracts", "strict_project_metadata", "*", "required_properties" },
+        new[] { "contracts", "strict_project_metadata", "*", "forbidden_properties" },
+        new[] { "contracts", "audit_project_metadata", "*", "required_properties" },
+        new[] { "contracts", "audit_project_metadata", "*", "forbidden_properties" },
+    };
+
+    private static readonly string[][] _recognizedOpaqueConditionSetsLocations =
+    {
+        new[] { "analysis", "condition_sets" },
+    };
+
+    public void Validate(ArchitecturePolicyRawDocument document)
+    {
+        if (document.Root is null)
         {
             return;
         }
 
-        WalkForWhenFields(root, new List<string>(), new List<string>(), childKeysAreArbitraryNames: false);
+        WalkForWhenFields(document.Root, new List<string>(), new List<string>(), childKeysAreArbitraryNames: false);
     }
 
     private static void WalkForWhenFields(
@@ -78,7 +133,7 @@ public sealed partial class ArchitecturePolicyDocumentLoader
             // node's own keys are fixed schema properties, not author-chosen names.
             if (!childKeysAreArbitraryNames)
             {
-                if (string.Equals(key, WhenKey, StringComparison.Ordinal))
+                if (string.Equals(key, RawYamlNodes.WhenKey, StringComparison.Ordinal))
                 {
                     ValidateWhenFieldDeclaration(structuralPath, displayPath, valueNode);
                     continue;
@@ -142,71 +197,12 @@ public sealed partial class ArchitecturePolicyDocumentLoader
         structuralPath.RemoveAt(structuralPath.Count - 1);
     }
 
-    // A key is a recognized, legitimate opaque (arbitrary user-content) value boundary only when the CURRENT
-    // node's exact structural path is one of the fixed positions this schema actually declares that property
-    // at - never by key name alone, and never by a sibling-key heuristic. A sibling-key check (e.g. "opaque if
-    // a 'role' key sits next to it, or if it is the node's only key") is still bypassable anywhere in the tree
-    // by wrapping the payload in a fabricated container that happens to satisfy the heuristic (e.g.
-    // `extensions: { metadata: { when: "..." } }`, or `classification.extensions: { role: x, metadata: { when:
-    // "..." } }`) - IgnoreUnmatchedProperties() silently drops the fabricated container together with the
-    // `when` it shields, exactly like the direct-sibling case this whole raw pass exists to catch. Exact-path
-    // matching closes that off: `extensions`/`classification.extensions` are not on either list below, so the
-    // walk keeps descending into them and still finds the `when` underneath.
-    //
-    // The metadata-bearing selector/classification/coverage-exclusion locations mirror _allowedWhenLocations'
-    // context-selector paths (role+metadata+when are declared together on the same node) plus every
-    // metadata-bearing shape `when` is NOT approved on (port-boundary/adapter-binding selectors, classification
-    // extraction entries, semantic-role coverage exclusions).
-    private static readonly string[][] _recognizedOpaqueMetadataLocations = _allowedWhenLocations
-        .Select(location => location.Append(MetadataKey).ToArray())
-        .Concat(new[]
-        {
-            new[] { "contracts", "strict_port_boundaries", "*", "source", MetadataKey },
-            new[] { "contracts", "strict_port_boundaries", "*", "allowed_seams", "*", MetadataKey },
-            new[] { "contracts", "strict_port_boundaries", "*", "forbidden", "*", MetadataKey },
-            new[] { "contracts", "strict_port_boundaries", "*", "exclude", "*", MetadataKey },
-            new[] { "contracts", "strict_port_boundaries", "*", "target_context", MetadataKey },
-            new[] { "contracts", "strict_port_boundaries", "*", "adapter_bindings", "*", "adapter", MetadataKey },
-            new[] { "contracts", "strict_port_boundaries", "*", "adapter_bindings", "*", "expected_port", MetadataKey },
-            new[] { "contracts", "strict_port_boundaries", "*", "adapter_bindings", "*", "allowed_contexts", "*", MetadataKey },
-            new[] { "contracts", "audit_port_boundaries", "*", "source", MetadataKey },
-            new[] { "contracts", "audit_port_boundaries", "*", "allowed_seams", "*", MetadataKey },
-            new[] { "contracts", "audit_port_boundaries", "*", "forbidden", "*", MetadataKey },
-            new[] { "contracts", "audit_port_boundaries", "*", "exclude", "*", MetadataKey },
-            new[] { "contracts", "audit_port_boundaries", "*", "target_context", MetadataKey },
-            new[] { "contracts", "audit_port_boundaries", "*", "adapter_bindings", "*", "adapter", MetadataKey },
-            new[] { "contracts", "audit_port_boundaries", "*", "adapter_bindings", "*", "expected_port", MetadataKey },
-            new[] { "contracts", "audit_port_boundaries", "*", "adapter_bindings", "*", "allowed_contexts", "*", MetadataKey },
-            new[] { "classification", "attributes", "*", MetadataKey },
-            new[] { "classification", "assembly_attributes", "*", MetadataKey },
-            new[] { "classification", "inheritance", "*", MetadataKey },
-            new[] { "classification", "namespace", "*", MetadataKey },
-            new[] { "classification", "path", "*", MetadataKey },
-            new[] { "classification", "overrides", "*", MetadataKey },
-            new[] { "contracts", "strict_coverage", "*", "exclude", "*", MetadataKey },
-            new[] { "contracts", "audit_coverage", "*", "exclude", "*", MetadataKey },
-        })
-        .ToArray();
-
-    private static readonly string[][] _recognizedOpaqueScalarMapLocations =
-    {
-        new[] { "contracts", "strict_project_metadata", "*", "required_properties" },
-        new[] { "contracts", "strict_project_metadata", "*", "forbidden_properties" },
-        new[] { "contracts", "audit_project_metadata", "*", "required_properties" },
-        new[] { "contracts", "audit_project_metadata", "*", "forbidden_properties" },
-    };
-
-    private static readonly string[][] _recognizedOpaqueConditionSetsLocations =
-    {
-        new[] { "analysis", "condition_sets" },
-    };
-
     private static bool IsRecognizedOpaqueValueKey(string key, IReadOnlyList<string> structuralPath)
     {
         string[] ownPath = new List<string>(structuralPath) { key }.ToArray();
         return key switch
         {
-            MetadataKey => MatchesAnyPattern(ownPath, _recognizedOpaqueMetadataLocations),
+            RawYamlNodes.MetadataKey => MatchesAnyPattern(ownPath, _recognizedOpaqueMetadataLocations),
             "required_properties" or "forbidden_properties" => MatchesAnyPattern(ownPath, _recognizedOpaqueScalarMapLocations),
             "condition_sets" => MatchesAnyPattern(ownPath, _recognizedOpaqueConditionSetsLocations),
             _ => false,
@@ -215,7 +211,7 @@ public sealed partial class ArchitecturePolicyDocumentLoader
 
     private static void ValidateWhenFieldDeclaration(List<string> structuralPath, List<string> displayPath, YamlNode valueNode)
     {
-        string location = string.Join(".", displayPath.Append(WhenKey));
+        string location = string.Join(".", displayPath.Append(RawYamlNodes.WhenKey));
         if (!MatchesAnyPattern(structuralPath, _allowedWhenLocations))
         {
             throw new InvalidOperationException(
@@ -223,7 +219,9 @@ public sealed partial class ArchitecturePolicyDocumentLoader
                 "See openspec/specs/cel-policy-model/spec.md for the closed list of locations that may declare 'when'.");
         }
 
-        if (valueNode is not YamlScalarNode whenScalar || IsExplicitNull(whenScalar) || string.IsNullOrEmpty(whenScalar.Value))
+        if (valueNode is not YamlScalarNode whenScalar
+            || RawYamlNodes.IsExplicitNull(whenScalar)
+            || string.IsNullOrEmpty(whenScalar.Value))
         {
             throw new InvalidOperationException(
                 $"'{location}' must be a non-empty string when declared.");
