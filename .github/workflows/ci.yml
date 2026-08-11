@@ -289,7 +289,11 @@ jobs:
     if: github.event_name == 'pull_request'
     runs-on: ${{ matrix.os }}
     # Coverage-eligible unit/in-process correctness only — no subprocess builds or packing.
-    timeout-minutes: 15
+    # Measured on the #475 topology PR: Apple Silicon macOS ~4.8m, Intel macOS ~11.6m, Windows was
+    # still mid-run (past the filesystem/symlink-heavy fixtures) when cancelled at a 15m cap — the
+    # unit bucket alone runs meaningfully slower on Windows than on either macOS runner. 30m gives
+    # headroom until enough Windows runs land to tighten this with real data.
+    timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
