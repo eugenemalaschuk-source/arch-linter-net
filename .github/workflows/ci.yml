@@ -23,8 +23,10 @@ jobs:
     name: Pull Request Validation
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
-    # Lint, the sequential coverage run, Python tooling coverage, and the SonarCloud begin/end pair.
-    # A cancelled `End SonarCloud analysis` step means this budget was exceeded, not a scanner fault.
+    # Lint, the unit-only coverage run (see make/test.mk — E2E/packed-artifact correctness moved to
+    # the independent test-suite jobs below), Python tooling coverage, and the SonarCloud begin/end
+    # pair. A cancelled `End SonarCloud analysis` step means this budget was exceeded, not a scanner
+    # fault.
     timeout-minutes: 25
     permissions:
       contents: read
@@ -430,11 +432,14 @@ jobs:
     name: Main Badge Refresh
     if: github.event_name == 'push'
     runs-on: ubuntu-latest
-    # This job does the most work of any in the workflow: a full build, the sequential
-    # units-then-e2e coverage run, and a SonarCloud analysis whose `end` step waits on the quality
-    # gate for up to `sonar.qualitygate.timeout=300` seconds. At 10 minutes the coverage step alone
-    # (~9 minutes on ubuntu-latest) left the quality-gate wait no room, so the job was cancelled at
-    # the cap rather than failing on a real signal. 25 minutes matches Pull Request Validation.
+    # This job does the most work of any in the workflow: a full build, the unit-only coverage run
+    # (see make/test.mk — E2E/packed-artifact correctness moved to the independent test-suite jobs,
+    # no longer on this critical path), and a SonarCloud analysis whose `end` step waits on the
+    # quality gate for up to `sonar.qualitygate.timeout=300` seconds. At 10 minutes the coverage step
+    # alone (~9 minutes on ubuntu-latest, when it still ran units then E2E sequentially) left the
+    # quality-gate wait no room, so the job was cancelled at the cap rather than failing on a real
+    # signal. 25 minutes matches Pull Request Validation; revisit once a push to `main` produces a
+    # real unit-only timing for this job.
     timeout-minutes: 25
     permissions:
       contents: read
