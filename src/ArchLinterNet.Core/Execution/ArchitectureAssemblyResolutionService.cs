@@ -184,11 +184,13 @@ public sealed class ArchitectureAssemblyResolutionService : IArchitectureAssembl
                 document.Analysis.SharedFrameworks, document.Analysis.TargetFramework,
                 ExtractDiscoveredTargetFrameworks(exactPostBuildAssemblyPaths, names), fileSystem, environment)
             : Array.Empty<string>();
-        IReadOnlyList<string> probingPaths = ResolveProbingPaths(document, repositoryRoot, fileSystem, environment)
-            .Concat(additionalProbingPaths ?? Array.Empty<string>())
-            .Concat(sharedFrameworkProbingPaths)
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .ToArray();
+        IReadOnlyList<string> probingPaths = ResolveProbingPaths(
+            document,
+            repositoryRoot,
+            fileSystem,
+            environment,
+            additionalProbingPaths,
+            sharedFrameworkProbingPaths);
         IReadOnlyDictionary<string, string> exactPaths = exactPostBuildAssemblyPaths
             ?? new Dictionary<string, string>(StringComparer.Ordinal);
         IArchitectureAssemblyLoadScope? isolatedLoadScope = forceIsolatedLoading
@@ -320,12 +322,22 @@ public sealed class ArchitectureAssemblyResolutionService : IArchitectureAssembl
         ArchitectureContractDocument document,
         string? repositoryRoot,
         IArchitectureFileSystem fileSystem,
-        IArchitectureEnvironment environment)
+        IArchitectureEnvironment environment,
+        IReadOnlyCollection<string>? additionalProbingPaths,
+        IEnumerable<string> sharedFrameworkProbingPaths)
     {
         List<string> result = new();
 
         result.AddRange(ResolveEnvProbingPaths(fileSystem, environment));
         result.AddRange(ResolveConfiguredSearchPaths(document, repositoryRoot, fileSystem));
+        result.AddRange(additionalProbingPaths ?? Array.Empty<string>());
+
+        // An opted-in shared framework is one coherent runtime closure. It must win over the
+        // tool's own app base, which can carry older Microsoft.Extensions.* packages; mixing
+        // those with Microsoft.AspNetCore.App creates impossible interface implementations
+        // such as WebApplicationBuilder.get_Logging on .NET 10. Consumer outputs above still
+        // take precedence, so an application keeps its explicit package dependencies.
+        result.AddRange(sharedFrameworkProbingPaths);
 
         string appBaseDirectory = environment.BaseDirectory;
         if (fileSystem.DirectoryExists(appBaseDirectory))
