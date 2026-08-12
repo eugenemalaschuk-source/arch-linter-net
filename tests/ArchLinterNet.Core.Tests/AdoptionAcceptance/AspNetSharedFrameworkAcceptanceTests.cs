@@ -137,6 +137,52 @@ public sealed class AspNetSharedFrameworkAcceptanceTests
         Assert.That(result.RootElement.GetProperty("passed").GetBoolean(), Is.True, stdout);
     }
 
+    [Test]
+    public void BaselineVerifyEnsureBuiltPackagedEntrypoint_AnalyzesAspNetHostFixture()
+    {
+        string cliDllPath = Path.Combine(
+            new ArchitectureRepositoryRootResolver().Resolve(),
+            "src", "ArchLinterNet.Cli", "bin", "Debug", "net10.0", "ArchLinterNet.Cli.dll");
+        Assert.That(File.Exists(cliDllPath), Is.True, cliDllPath);
+
+        string baselinePath = Path.Combine(_fixture.Root, "baseline.arch.yml");
+        File.WriteAllText(baselinePath, "version: 2\nbaseline: {}\n");
+
+        var startInfo = new ProcessStartInfo("dotnet")
+        {
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            UseShellExecute = false,
+            WorkingDirectory = _fixture.Root,
+        };
+        startInfo.Environment["DOTNET_CLI_DISABLE_COLOR"] = "1";
+        startInfo.ArgumentList.Add(cliDllPath);
+        startInfo.ArgumentList.Add("baseline");
+        startInfo.ArgumentList.Add("verify");
+        startInfo.ArgumentList.Add("--policy");
+        startInfo.ArgumentList.Add(_fixture.PolicyPath);
+        startInfo.ArgumentList.Add("--baseline");
+        startInfo.ArgumentList.Add(baselinePath);
+        startInfo.ArgumentList.Add("--mode");
+        startInfo.ArgumentList.Add("strict");
+        startInfo.ArgumentList.Add("--format");
+        startInfo.ArgumentList.Add("json");
+        startInfo.ArgumentList.Add("--ensure-built");
+        startInfo.ArgumentList.Add("--configuration");
+        startInfo.ArgumentList.Add("Debug");
+        startInfo.ArgumentList.Add("--framework");
+        startInfo.ArgumentList.Add("net10.0");
+
+        using var process = Process.Start(startInfo)!;
+        string stdout = process.StandardOutput.ReadToEnd();
+        string stderr = process.StandardError.ReadToEnd();
+        process.WaitForExit();
+
+        Assert.That(process.ExitCode, Is.EqualTo(0), () => $"stdout: {stdout}{Environment.NewLine}stderr: {stderr}");
+        using JsonDocument result = JsonDocument.Parse(stdout);
+        Assert.That(result.RootElement.GetProperty("inSync").GetBoolean(), Is.True, stdout);
+    }
+
     private ArchitectureRunnerSetup MaterializeFixture(List<string> sharedFrameworks)
     {
         var discovery = new FixedDiscoveryService

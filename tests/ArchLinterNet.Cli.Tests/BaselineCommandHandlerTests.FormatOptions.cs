@@ -1,5 +1,6 @@
 using System.Text.Json;
 using ArchLinterNet.Cli.Commands.Baseline;
+using ArchLinterNet.Core.BuildState;
 using NUnit.Framework;
 
 namespace ArchLinterNet.Cli.Tests;
@@ -47,6 +48,33 @@ public sealed partial class BaselineCommandHandlerTests
             AssertJsonError(diffConsole, "--json cannot be combined with --format");
             AssertJsonError(verifyConsole, "--json cannot be combined with --format");
             AssertJsonError(migrateConsole, "--json cannot be combined with --format");
+        });
+    }
+
+    [Test]
+    public void BaselineVerify_ForwardsBuildStateSelectors()
+    {
+        var runtime = new StubRuntime();
+        var console = new RecordingConsole();
+        int result = new VerifyBaselineSubcommandModule()
+            .CreateCommand(runtime, console, new StubFileSystem("policy.yml", "baseline.yml"))
+            .Parse([
+                "--policy", "policy.yml", "--baseline", "baseline.yml",
+                "--ensure-built", "--no-restore", "--configuration", "Release",
+                "--framework", "net10.0", "--platform", "AnyCPU", "--runtime", "linux-x64",
+            ])
+            .Invoke();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(result, Is.EqualTo(CliExitCodes.Success));
+            Assert.That(runtime.VerifyRequest, Is.Not.Null);
+            Assert.That(runtime.VerifyRequest!.PreparationMode, Is.EqualTo(BuildPreparationMode.EnsureBuilt));
+            Assert.That(runtime.VerifyRequest.NoRestore, Is.True);
+            Assert.That(runtime.VerifyRequest.RequestedConfiguration, Is.EqualTo("Release"));
+            Assert.That(runtime.VerifyRequest.RequestedTargetFramework, Is.EqualTo("net10.0"));
+            Assert.That(runtime.VerifyRequest.RequestedPlatform, Is.EqualTo("AnyCPU"));
+            Assert.That(runtime.VerifyRequest.RequestedRuntimeIdentifier, Is.EqualTo("linux-x64"));
         });
     }
 

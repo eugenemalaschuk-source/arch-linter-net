@@ -1,5 +1,6 @@
 using ArchLinterNet.Core.Contracts;
 using ArchLinterNet.Core.Contracts.Abstractions;
+using ArchLinterNet.Core.BuildState;
 using ArchLinterNet.Core.Execution;
 using ArchLinterNet.Core.Execution.Abstractions;
 using ArchLinterNet.Core.Model;
@@ -7,12 +8,13 @@ using ArchLinterNet.Core.Validation.Abstractions;
 
 namespace ArchLinterNet.Core.Validation;
 
-public sealed class ArchitectureBaselineApplicationService(
+public sealed partial class ArchitectureBaselineApplicationService(
     IArchitectureRunnerSetupService runnerSetupService,
     IArchitectureContractHandlerRegistry handlerRegistry,
     IArchitectureContractExecutor contractExecutor,
     IArchitectureBaselineGenerator baselineGenerator,
-    IArchitectureBaselineLoadingService baselineLoadingService)
+    IArchitectureBaselineLoadingService baselineLoadingService,
+    IBuildStatePreparationService? buildStatePreparationService = null)
     : IArchitectureBaselineApplicationService
 {
     private const string ModeStrict = "strict";
@@ -182,10 +184,9 @@ public sealed class ArchitectureBaselineApplicationService(
 
     public BaselineVerifyOutcome Verify(BaselineVerifyRequest request)
     {
-        (ArchitectureContractDocument document, IReadOnlyList<ArchitectureBaselineCandidate>? candidates, List<ArchitectureViolation> configViolations) =
-            CollectCandidates(request.PolicyPath, request.Mode, request.ConditionSetName, request.ContractIds, request.CancellationToken);
+        BaselineCandidateCollection collection = CollectVerifyCandidates(request);
 
-        if (candidates == null)
+        if (collection.Candidates == null)
         {
             return new BaselineVerifyOutcome(
                 Succeeded: false,
@@ -194,12 +195,15 @@ public sealed class ArchitectureBaselineApplicationService(
                 Frozen: Array.Empty<ArchitectureBaselineComparisonEntry>(),
                 Resolved: Array.Empty<ArchitectureBaselineComparisonEntry>(),
                 ConfigurationErrors: Array.Empty<ArchitectureBaselineComparisonEntry>(),
-                ConfigurationViolations: configViolations);
+                ConfigurationViolations: collection.ConfigurationViolations)
+            {
+                PreflightDiagnostics = collection.PreflightDiagnostics,
+            };
         }
 
         ArchitectureBaselineDocument existingBaseline = baselineLoadingService.Load(request.BaselinePath);
         ArchitectureBaselineComparisonResult comparison = ArchitectureBaselineComparer.Compare(
-            document, existingBaseline, candidates, request.Mode, request.ContractIds);
+            collection.Document, existingBaseline, collection.Candidates, request.Mode, request.ContractIds);
 
         // Ambiguity is out-of-sync too: one entry standing in for several distinct violations
         // suppresses more than it was reviewed for.
@@ -352,6 +356,19 @@ public sealed class ArchitectureBaselineApplicationService(
             IReadOnlyCollection<string>? contractIds,
             CancellationToken cancellationToken = default)
     {
+        BaselineCandidateCollection collection = CollectCandidatesCore(
+            policyPath, mode, conditionSetName, contractIds, cancellationToken, buildState: null);
+        return (collection.Document, collection.Candidates, collection.ConfigurationViolations);
+    }
+
+    private BaselineCandidateCollection CollectCandidatesCore(
+            string policyPath,
+            string mode,
+            string? conditionSetName,
+            IReadOnlyCollection<string>? contractIds,
+            CancellationToken cancellationToken,
+            BaselineBuildStateOptions? buildState)
+    {
         cancellationToken.ThrowIfCancellationRequested();
         if (mode is not (ModeStrict or ModeAudit or "all"))
         {
@@ -387,39 +404,82 @@ public sealed class ArchitectureBaselineApplicationService(
             mode: mode == "all" ? null : mode,
             cancellationToken: cancellationToken);
 
-        IArchitectureContractRunner runner = setup.Runner;
-
-        List<ArchitectureViolation> configViolations = mode switch
+        try
         {
-            ModeStrict => runner.CheckConfiguration(strict: true),
-            ModeAudit => runner.CheckConfiguration(strict: false),
-            "all" => runner.CheckConfiguration(),
-            _ => throw new ArgumentOutOfRangeException(nameof(mode), mode, "Unsupported baseline mode."),
-        };
+            if (buildState != null)
+            {
+                BuildStatePreflightResult preflight = RunBuildStatePreflight(setup.Runner, buildState, cancellationToken);
+                if (preflight.Blocked)
+                {
+                    return BaselineCandidateCollection.PreflightBlocked(document, preflight.Diagnostics);
+                }
 
-        if (configViolations.Count > 0)
-        {
-            return (document, null, configViolations);
-        }
+                if (buildState.PreparationMode == BuildPreparationMode.EnsureBuilt
+                    && setup.Runner.Session.Context.ProjectDiscovery is { DiscoveredProjects.Count: > 0 })
+                {
+                    // The initial runner only identifies what must be built. Candidate collection
+                    // must execute against a fresh isolated post-build runner: it is the only
+                    // supported path that supplies an opted-in shared-framework closure.
+                    ArchitectureRunnerSetup postBuildSetup = runnerSetupService.BuildRunnerForPostBuild(
+                        document, policyPath, conditionSetName,
+                        selectedContractIds: selectedContractIds,
+                        enableUnmatchedIgnoreTracking: true,
+                        mode: mode == "all" ? null : mode,
+                        cancellationToken: cancellationToken);
+                    setup.Runner.Session.Context.Dispose();
+                    setup = postBuildSetup;
 
-        bool includeStrict = mode is ModeStrict or "all";
-        bool includeAudit = mode is ModeAudit or "all";
+                    preflight = RunBuildStatePreflight(
+                        setup.Runner,
+                        buildState with { PreparationMode = BuildPreparationMode.Ordinary },
+                        cancellationToken);
+                    if (preflight.Blocked)
+                    {
+                        return BaselineCandidateCollection.PreflightBlocked(document, preflight.Diagnostics);
+                    }
+                }
+            }
 
-        if (includeStrict)
-        {
+            IArchitectureContractRunner runner = setup.Runner;
+            List<ArchitectureViolation> configViolations = mode switch
+            {
+                ModeStrict => runner.CheckConfiguration(strict: true),
+                ModeAudit => runner.CheckConfiguration(strict: false),
+                "all" => runner.CheckConfiguration(),
+                _ => throw new ArgumentOutOfRangeException(nameof(mode), mode, "Unsupported baseline mode."),
+            };
+
+            if (configViolations.Count > 0)
+            {
+                return new BaselineCandidateCollection(document, null, configViolations, Array.Empty<BuildStatePreflightDiagnostic>());
+            }
+
+            bool includeStrict = mode is ModeStrict or "all";
+            bool includeAudit = mode is ModeAudit or "all";
+
+            if (includeStrict)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                contractExecutor.Execute(runner.Session, ModeStrict, handlerRegistry, includeAsmdefContracts: false);
+            }
+
+            if (includeAudit)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                contractExecutor.Execute(runner.Session, ModeAudit, handlerRegistry, includeAsmdefContracts: false);
+            }
+
             cancellationToken.ThrowIfCancellationRequested();
-            contractExecutor.Execute(runner.Session, ModeStrict, handlerRegistry, includeAsmdefContracts: false);
-        }
 
-        if (includeAudit)
+            return new BaselineCandidateCollection(
+                document, runner.BaselineCandidates, new List<ArchitectureViolation>(), Array.Empty<BuildStatePreflightDiagnostic>());
+        }
+        finally
         {
-            cancellationToken.ThrowIfCancellationRequested();
-            contractExecutor.Execute(runner.Session, ModeAudit, handlerRegistry, includeAsmdefContracts: false);
+            // Candidate identities are plain value records, so the runner's ordinary or isolated
+            // load context is no longer needed once collection returns.
+            setup.Runner.Session.Context.Dispose();
         }
-
-        cancellationToken.ThrowIfCancellationRequested();
-
-        return (document, runner.BaselineCandidates, new List<ArchitectureViolation>());
     }
 
     private static HashSet<string> CollectAvailableContractIds(ArchitectureContractDocument document, string mode)
