@@ -40,8 +40,8 @@ When a `--report` file sink fails, the validation result is still reported. The 
 
 Cancellation also exits `2` with typed `cancelled` completion. A cancellation
 observed before full publication wins over a clean result; it must not be
-treated as a passed gate or a reusable partial cache entry. The [0.5.1 migration
-guide](../guides/migration-to-0-5-1.md) describes the corresponding report and
+treated as a passed gate or a reusable partial cache entry. The
+[upgrade guide](../guides/upgrading.md) describes the corresponding report and
 artifact evidence.
 
 CI should fail closed on exit code `2`.
