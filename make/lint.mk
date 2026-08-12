@@ -1,4 +1,4 @@
-.PHONY: lint lint-architecture audit-architecture lint-code-size lint-dotnet-format lint-workflows fmt-workflows test-architecture-coverage-report test-release-evidence test-tooling-coverage architecture-coverage-report architecture-strict-json architecture-audit-json architecture-coverage-markdown architecture-coverage-ci
+.PHONY: lint lint-architecture audit-architecture lint-code-size lint-dotnet-format lint-workflows fmt-workflows test-architecture-coverage-report test-release-evidence test-calculate-version test-coverage-badge-script test-tooling-coverage architecture-coverage-report architecture-strict-json architecture-audit-json architecture-coverage-markdown architecture-coverage-ci
 
 CHANGED_FILES ?= changed-files.txt
 DIFF_STATUS   ?= ok
@@ -53,6 +53,14 @@ test-release-evidence:  ## Run tests for the packed-artifact release-evidence ag
 	@cd "$(PROJECT_ROOT)" && UV_PROJECT_ENVIRONMENT="$(PROJECT_ROOT)/.venv" "$(UV)" run --project tools/pyproject.toml \
 		pytest tools/release/tests
 
+test-calculate-version:  ## Run tests for the release version-calculation script
+	@cd "$(PROJECT_ROOT)" && UV_PROJECT_ENVIRONMENT="$(PROJECT_ROOT)/.venv" "$(UV)" run --project tools/pyproject.toml \
+		pytest tools/scripts/tests/test_calculate_version.py
+
+test-coverage-badge-script:  ## Run tests for the test-coverage badge Markdown generator
+	@cd "$(PROJECT_ROOT)" && UV_PROJECT_ENVIRONMENT="$(PROJECT_ROOT)/.venv" "$(UV)" run --project tools/pyproject.toml \
+		pytest tools/scripts/tests/test_test_coverage_badge.py
+
 # Both Python suites in one run, emitting the Cobertura report SonarCloud needs. Without it the
 # release-evidence aggregator and the coverage-report generator are measured as 0%-covered new
 # code even though both are tested.
@@ -60,6 +68,8 @@ test-tooling-coverage:  ## Run all Python tooling tests with coverage (coverage-
 	@cd "$(PROJECT_ROOT)" && UV_PROJECT_ENVIRONMENT="$(PROJECT_ROOT)/.venv" "$(UV)" run --project tools/pyproject.toml \
 		pytest tools/release/tests \
 		tools/scripts/tests/test_architecture_coverage_report.py \
+		tools/scripts/tests/test_calculate_version.py \
+		tools/scripts/tests/test_test_coverage_badge.py \
 		tools/scripts/tests/test_verify_core_unit_shards.py \
 		--cov=tools/release --cov=tools/scripts \
 		--cov-report=xml:coverage-python.xml --cov-report=term-missing

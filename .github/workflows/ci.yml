@@ -397,6 +397,12 @@ jobs:
       - name: Test packed-artifact release-evidence aggregator
         run: make test-release-evidence
 
+      - name: Test release version-calculation script
+        run: make test-calculate-version
+
+      - name: Test test-coverage badge Markdown generator
+        run: make test-coverage-badge-script
+
   # Unit, ordinary E2E, and the packed-artifact release gate used to run as two `dotnet test`
   # processes inside one `make test` per platform, so the heaviest two suites always contended for
   # the same hosted runner. Each bucket now gets its own matrix job/leg per platform (no artificial
