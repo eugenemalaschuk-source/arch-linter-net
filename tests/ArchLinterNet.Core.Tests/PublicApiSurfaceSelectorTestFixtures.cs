@@ -112,6 +112,41 @@ namespace PublicApiSurfaceSelectorTestFixtures
         {
         }
     }
+
+    // Two distinct unselected first-party types, both referenced by a single selected member, used
+    // to prove multiple escapes are reported deterministically rather than in whatever order a
+    // HashSet-backed collection happened to enumerate them.
+    public sealed class HiddenA
+    {
+        public HiddenA()
+        {
+        }
+
+        public int Value { get; set; }
+    }
+
+    public sealed class HiddenB
+    {
+        public HiddenB()
+        {
+        }
+
+        public int Value { get; set; }
+    }
+
+    [PublicApiContract]
+    public sealed class SelectedWithTwoFirstPartyEscapes
+    {
+        public SelectedWithTwoFirstPartyEscapes()
+        {
+        }
+
+        // Parameters declared HiddenB-before-HiddenA on purpose: the expected reported order is
+        // alphabetical (HiddenA, then HiddenB), not declaration order.
+        public static void Method(HiddenB b, HiddenA a)
+        {
+        }
+    }
 }
 
 namespace PublicApiSurfaceSelectorTestFixtures.PublicSurface

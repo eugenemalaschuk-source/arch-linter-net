@@ -205,8 +205,19 @@ internal static class PublicApiSurfaceChecker
             governedByAssembly.Values.SelectMany(entries => entries)
                 .Select(entry => (entry.AssemblyName, entry.DeclaringTypeName)));
 
-        foreach (ArchitectureExportedApiEntry entry in governedByAssembly.Values.SelectMany(entries => entries))
+        // Ordinal-sorted, not left in dictionary/list enumeration order: two escaping references from
+        // the same member (or across members) must be reported in a stable sequence, since the
+        // execution context's occurrence counter (used by baseline/ignore identity) numbers repeat
+        // identities in the order it encounters them.
+        IEnumerable<ArchitectureExportedApiEntry> orderedEntries = governedByAssembly.Values
+            .SelectMany(entries => entries)
+            .OrderBy(entry => entry.DeclaringTypeName, StringComparer.Ordinal)
+            .ThenBy(entry => entry.Signature, StringComparer.Ordinal);
+
+        foreach (ArchitectureExportedApiEntry entry in orderedEntries)
         {
+            // entry.ReferencedTypes is itself already ordinal-sorted (see ReferencedTypes in
+            // ArchitecturePublicApiSurfaceScanner), so this inner loop needs no further ordering.
             foreach ((string referencedAssembly, string referencedType) in entry.ReferencedTypes)
             {
                 (string, string) referenced = (referencedAssembly, referencedType);
@@ -215,13 +226,20 @@ internal static class PublicApiSurfaceChecker
                     continue;
                 }
 
+                // source* describes the selected member that holds the escaping reference; target*
+                // describes the escaping first-party type itself — mirroring the source/target
+                // convention every other contract family's IsIgnored call uses (for example
+                // InheritanceChecker, where sourceType is the checked type and targetType is the
+                // forbidden base type). Getting this backwards (as an earlier revision did) makes an
+                // ignored_violations entry authored against the escaping type unable to ever match.
                 if (executionContext.IsIgnored(
                         entry.DeclaringTypeName,
-                        entry.Signature,
+                        referencedType,
                         sourceAssembly: entry.AssemblyName,
-                        targetAssembly: entry.AssemblyName,
-                        targetType: entry.DeclaringTypeName,
-                        targetMember: entry.Signature))
+                        targetAssembly: referencedAssembly,
+                        targetType: referencedType,
+                        sourceMember: entry.Signature,
+                        targetMember: referencedType))
                 {
                     continue;
                 }

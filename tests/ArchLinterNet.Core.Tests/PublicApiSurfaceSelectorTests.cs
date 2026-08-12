@@ -391,6 +391,70 @@ public sealed class PublicApiSurfaceSelectorTests
         Assert.That(escape, Is.Not.Null);
     }
 
+    // Regression (PR #529 review): a member referencing two distinct unselected first-party types
+    // must report both, in a stable order — ordinal by (assembly, type name), not the order
+    // ReferencedTypes' backing HashSet<Type> happened to enumerate them, and not parameter
+    // declaration order (the fixture declares HiddenB before HiddenA).
+    [Test]
+    public void SelectedMember_WithTwoFirstPartyEscapes_ReportsBothInDeterministicOrder()
+    {
+        var contract = new ArchitecturePublicApiSurfaceContract
+        {
+            Name = "surface",
+            Assemblies = new List<string> { AssemblyName },
+            SurfaceSelector = new ArchitecturePublicApiSurfaceSelector
+            {
+                HasAttribute = typeof(Fixtures.PublicApiContractAttribute).FullName!,
+            },
+        };
+        var runner = CreateRunner(contract);
+
+        List<string?> escapes = runner.Session.CheckPublicApiSurfaceContract(contract)
+            .Where(v => v.SourceType == typeof(Fixtures.SelectedWithTwoFirstPartyEscapes).FullName)
+            .Select(v => (v.Payload as PublicApiSurfacePayload)?.UnselectedFirstPartyDependency)
+            .Where(dependency => dependency != null)
+            .ToList();
+
+        Assert.That(escapes, Is.EqualTo(new[]
+        {
+            typeof(Fixtures.HiddenA).FullName,
+            typeof(Fixtures.HiddenB).FullName,
+        }));
+    }
+
+    // Regression (PR #529 review): the escape violation's ignore identity must describe the escaping
+    // (target) type, not duplicate the selected (source) member — otherwise an ignored_violations
+    // entry authored against the actual forbidden dependency could never match it.
+    [Test]
+    public void SelectedMember_ReferencingUnselectedFirstPartyType_IgnoredViolationMatchesTheEscapingType()
+    {
+        var contract = new ArchitecturePublicApiSurfaceContract
+        {
+            Name = "surface",
+            Assemblies = new List<string> { AssemblyName },
+            SurfaceSelector = new ArchitecturePublicApiSurfaceSelector
+            {
+                HasAttribute = typeof(Fixtures.PublicApiContractAttribute).FullName!,
+            },
+            IgnoredViolations = new List<ArchitectureIgnoredViolation>
+            {
+                new()
+                {
+                    SourceType = typeof(Fixtures.SelectedWithEscapingDependency).FullName!,
+                    ForbiddenReference = typeof(Fixtures.IncidentalType).FullName!,
+                    Reason = "accepted for this regression test",
+                },
+            },
+        };
+        var runner = CreateRunner(contract);
+
+        List<ArchitectureViolation> violations = runner.Session.CheckPublicApiSurfaceContract(contract);
+
+        Assert.That(violations.Any(v =>
+            v.SourceType == typeof(Fixtures.SelectedWithEscapingDependency).FullName
+            && (v.Payload as PublicApiSurfacePayload)?.UnselectedFirstPartyDependency != null), Is.False);
+    }
+
     // Scenario 10: backward compatibility — no selector governs everything, exactly as before #525.
     [Test]
     public void NoSelector_GovernsEveryExportedType_UnchangedFromPriorBehavior()
@@ -449,7 +513,7 @@ public sealed class PublicApiSurfaceSelectorTests
         Assert.Multiple(() =>
         {
             Assert.That(validatedTypeNames, Is.EqualTo(capturedTypeNames));
-            Assert.That(safety.Select(v => v.SourceType), Is.SubsetOf(capturedTypeNames));
+            Assert.That(safety.Select(v => v.SourceType).Distinct(), Is.SubsetOf(capturedTypeNames));
         });
     }
 

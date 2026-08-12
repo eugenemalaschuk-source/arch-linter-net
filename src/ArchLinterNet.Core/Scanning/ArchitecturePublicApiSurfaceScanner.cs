@@ -334,9 +334,14 @@ internal static class ArchitecturePublicApiSurfaceScanner
             }
         }
 
+        // Ordinal-sorted, not left in HashSet<Type> enumeration order: that order is not guaranteed
+        // stable across runs, and downstream escape-violation reporting depends on encountering
+        // multiple escaping types for the same member in a deterministic sequence.
         return collected
-            .Select(type => (SafeAssemblyName(type), ArchitectureTypeNames.SafeFullName(type)))
+            .Select(type => (AssemblyName: SafeAssemblyName(type), TypeFullName: ArchitectureTypeNames.SafeFullName(type)))
             .Distinct()
+            .OrderBy(reference => reference.AssemblyName, StringComparer.Ordinal)
+            .ThenBy(reference => reference.TypeFullName, StringComparer.Ordinal)
             .ToArray();
     }
 
