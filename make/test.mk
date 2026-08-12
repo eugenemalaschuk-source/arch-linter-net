@@ -1,4 +1,4 @@
-.PHONY: test test-unit test-e2e test-packed-artifact clean-results test-coverage test-coverage-main-ci test-coverage-badge _acceptance-test benchmark-cel
+.PHONY: test test-unit test-unit-core-1 test-unit-core-2 test-unit-other test-e2e test-packed-artifact clean-results test-coverage test-coverage-main-ci test-coverage-badge _acceptance-test benchmark-cel lint-test-shard-membership
 
 # Three independently addressable test buckets, single-sourced here as VSTest FullyQualifiedName
 # filters. Each bucket has its own `make test-*` target (below) so unit, ordinary E2E, and the
@@ -39,9 +39,87 @@ TEST_E2E_FILTER := $(TEST_E2E_FIXTURES)
 TEST_PACKED_ARTIFACT_FILTER := FullyQualifiedName~CheckpointBReleaseGateTests
 TEST_UNIT_FILTER := FullyQualifiedName!~ExternalDependencyContractAuditE2eTests&FullyQualifiedName!~BuildStatePreflightTests&FullyQualifiedName!~BuildStatePreflightAssemblyReloadTests&FullyQualifiedName!~CheckpointAAdoptionAcceptanceTests&FullyQualifiedName!~ArchitectureBaselineIntegrationTests&FullyQualifiedName!~CheckpointBReleaseGateTests
 
-test-unit:  ## Run only the coverage-eligible unit bucket
+# ArchLinterNet.Core.Tests carries no [assembly: Parallelizable] (unlike ArchLinterNet.Cli.Tests),
+# runs strictly serially, and is the dominant cost inside the unit bucket (~2600 of the bucket's
+# ~3600 tests, and effectively all of its wall-clock — see
+# docs/internal/core-unit-shard-inventory.md for the measured baseline). It is split into two
+# deterministic shards so unit_tests can run them as independent CI matrix legs instead of one
+# monolithic per-platform job.
+#
+# Shard 1 is a pure-OR list of ~54 fixture classes. It starts from the classes measured (or, for
+# the defensively-included Checkers.* group, suspected) to be individually heaviest — Roslyn/IL
+# method-body resolution, project/framework-reference resolution, filesystem/build-preservation,
+# and reflection-heavy checkers — then adds enough further classes, picked by test *count* rather
+# than measured per-test duration, to bring shard 1 to roughly half of the bucket's ~2571 tests.
+# This two-step selection matters: an earlier duration-only split (the ~16 heaviest classes alone,
+# ~5% of the bucket by count) measured as balanced by summed per-test TRX duration but was NOT
+# balanced in practice — with ~2400 tests left in the remainder shard, per-test/per-process
+# framework overhead invisible to any single test's recorded duration dominated its real
+# wall-clock. See docs/internal/core-unit-shard-inventory.md for the measured evidence.
+#
+# Shard 2 is the remainder: TEST_UNIT_FILTER with one additional `!~` negation per shard-1 token,
+# so a fixture nobody explicitly assigns is fail-closed into shard 2 rather than silently
+# unassigned. tools/scripts/verify_core_unit_shards.py mechanically checks that no shard-1 token
+# is dead (matches nothing) or leaks into the E2E/packed-artifact buckets — see
+# lint-test-shard-membership below.
+#
+# Both shard filters are scoped to the ArchLinterNet.Core.Tests project specifically (see
+# CORE_TESTS_CSPROJ below), not the .slnx: TEST_UNIT_FILTER's negations are class-name substrings
+# that don't exist in ArchLinterNet.CEL.Tests/ArchLinterNet.Cli.Tests, so those assemblies would
+# pass every negation vacuously and run in BOTH shards if a shard filter were applied against the
+# whole solution. test-unit-other runs those two (already-fast, already internally parallel)
+# assemblies once, on their own.
+TEST_CORE_UNIT_SHARD_1_FIXTURES := FullyQualifiedName~PerTestDurationGuardAttributeTests|FullyQualifiedName~EnsureBuiltNonDestructiveIntegrationTests|FullyQualifiedName~FrameworkReferenceContractTests|FullyQualifiedName~FrameworkReferenceConfigurationTests|FullyQualifiedName~FrameworkReferenceBaselineIdentityTests|FullyQualifiedName~ArchitectureAnalysisSessionMethodBodyProjectAwareTests|FullyQualifiedName~FrameworkReferenceAllowOnlyContractTests|FullyQualifiedName~ArchitectureProjectRoslynContextResolverTests|FullyQualifiedName~AspNetSharedFrameworkAcceptanceTests|FullyQualifiedName~BoundedParallelPartitionRunnerTests|FullyQualifiedName~CompositionContractTests|FullyQualifiedName~CelBoundaryArchitectureTests|FullyQualifiedName~PublicApiSurfaceCheckerTests|FullyQualifiedName~InheritanceCheckerTests|FullyQualifiedName~AssemblyIndependenceCheckerTests|FullyQualifiedName~AcyclicSiblingContractTests|FullyQualifiedName~ArchitectureContractSchemaInstanceValidationTests|FullyQualifiedName~ArchitecturePolicyImportTests|FullyQualifiedName~ArchitectureDiagnosticFormatterTests|FullyQualifiedName~ExpressionCompilationValidatorTests|FullyQualifiedName~LayerResolverGlobTests|FullyQualifiedName~ArchitectureSourceFileFactIndexTests|FullyQualifiedName~ArchitectureSarifFormatterTests|FullyQualifiedName~AnalysisCacheStoreTests|FullyQualifiedName~ArchitectureRoleIndexTests|FullyQualifiedName~LayerResolverTests|FullyQualifiedName~ArchitectureAttributeRoleExtractorTests|FullyQualifiedName~LayoutConventionContractTests|FullyQualifiedName~AttributeUsageContractTests|FullyQualifiedName~ArchitecturePublicApiSignatureDetailsCoverageTests|FullyQualifiedName~TypePlacementContractTests|FullyQualifiedName~ContextualContractSchemaTests|FullyQualifiedName~ArchitectureContractSchemaTests|FullyQualifiedName~ArchitectureBaselineApplicationServiceFakeCompositionTests|FullyQualifiedName~ArchitectureCoverageSummaryTests|FullyQualifiedName~ArchitecturePublicApiApplicationServiceTests|FullyQualifiedName~BaselineSafeAuthoringTests|FullyQualifiedName~ArchitecturePolicyProvenanceTests|FullyQualifiedName~PolicyConsistencyCheckTests|FullyQualifiedName~CelSelectorContextualIntegrationTests|FullyQualifiedName~InterfaceImplementationContractTests|FullyQualifiedName~RuleInputCoverageValidationTests|FullyQualifiedName~ContextualContractValidationTests|FullyQualifiedName~ArchitecturePolicyEffectiveSchemaValidatorComposedTests|FullyQualifiedName~EvaluatedBuildInputManifestTests|FullyQualifiedName~PublicApiSurfaceContractTests|FullyQualifiedName~AnalysisCacheDiagnosticPayloadConverterTests|FullyQualifiedName~ArchitectureContractHandlerRegistryTests|FullyQualifiedName~ArchitectureDeclaredTypeParserTests|FullyQualifiedName~ArchitectureValidatorTests|FullyQualifiedName~TestingAdapterTests|FullyQualifiedName~ExternalDependencyContractTests|FullyQualifiedName~ArchitectureAnalysisSnapshotTests|FullyQualifiedName~SourceSetExpansionTests
+TEST_CORE_UNIT_SHARD_1_FILTER := $(TEST_CORE_UNIT_SHARD_1_FIXTURES)
+TEST_CORE_UNIT_SHARD_2_FILTER := $(TEST_UNIT_FILTER)&FullyQualifiedName!~PerTestDurationGuardAttributeTests&FullyQualifiedName!~EnsureBuiltNonDestructiveIntegrationTests&FullyQualifiedName!~FrameworkReferenceContractTests&FullyQualifiedName!~FrameworkReferenceConfigurationTests&FullyQualifiedName!~FrameworkReferenceBaselineIdentityTests&FullyQualifiedName!~ArchitectureAnalysisSessionMethodBodyProjectAwareTests&FullyQualifiedName!~FrameworkReferenceAllowOnlyContractTests&FullyQualifiedName!~ArchitectureProjectRoslynContextResolverTests&FullyQualifiedName!~AspNetSharedFrameworkAcceptanceTests&FullyQualifiedName!~BoundedParallelPartitionRunnerTests&FullyQualifiedName!~CompositionContractTests&FullyQualifiedName!~CelBoundaryArchitectureTests&FullyQualifiedName!~PublicApiSurfaceCheckerTests&FullyQualifiedName!~InheritanceCheckerTests&FullyQualifiedName!~AssemblyIndependenceCheckerTests&FullyQualifiedName!~AcyclicSiblingContractTests&FullyQualifiedName!~ArchitectureContractSchemaInstanceValidationTests&FullyQualifiedName!~ArchitecturePolicyImportTests&FullyQualifiedName!~ArchitectureDiagnosticFormatterTests&FullyQualifiedName!~ExpressionCompilationValidatorTests&FullyQualifiedName!~LayerResolverGlobTests&FullyQualifiedName!~ArchitectureSourceFileFactIndexTests&FullyQualifiedName!~ArchitectureSarifFormatterTests&FullyQualifiedName!~AnalysisCacheStoreTests&FullyQualifiedName!~ArchitectureRoleIndexTests&FullyQualifiedName!~LayerResolverTests&FullyQualifiedName!~ArchitectureAttributeRoleExtractorTests&FullyQualifiedName!~LayoutConventionContractTests&FullyQualifiedName!~AttributeUsageContractTests&FullyQualifiedName!~ArchitecturePublicApiSignatureDetailsCoverageTests&FullyQualifiedName!~TypePlacementContractTests&FullyQualifiedName!~ContextualContractSchemaTests&FullyQualifiedName!~ArchitectureContractSchemaTests&FullyQualifiedName!~ArchitectureBaselineApplicationServiceFakeCompositionTests&FullyQualifiedName!~ArchitectureCoverageSummaryTests&FullyQualifiedName!~ArchitecturePublicApiApplicationServiceTests&FullyQualifiedName!~BaselineSafeAuthoringTests&FullyQualifiedName!~ArchitecturePolicyProvenanceTests&FullyQualifiedName!~PolicyConsistencyCheckTests&FullyQualifiedName!~CelSelectorContextualIntegrationTests&FullyQualifiedName!~InterfaceImplementationContractTests&FullyQualifiedName!~RuleInputCoverageValidationTests&FullyQualifiedName!~ContextualContractValidationTests&FullyQualifiedName!~ArchitecturePolicyEffectiveSchemaValidatorComposedTests&FullyQualifiedName!~EvaluatedBuildInputManifestTests&FullyQualifiedName!~PublicApiSurfaceContractTests&FullyQualifiedName!~AnalysisCacheDiagnosticPayloadConverterTests&FullyQualifiedName!~ArchitectureContractHandlerRegistryTests&FullyQualifiedName!~ArchitectureDeclaredTypeParserTests&FullyQualifiedName!~ArchitectureValidatorTests&FullyQualifiedName!~TestingAdapterTests&FullyQualifiedName!~ExternalDependencyContractTests&FullyQualifiedName!~ArchitectureAnalysisSnapshotTests&FullyQualifiedName!~SourceSetExpansionTests
+
+CORE_TESTS_CSPROJ := $(TESTS_DIR)/ArchLinterNet.Core.Tests/ArchLinterNet.Core.Tests.csproj
+CEL_TESTS_CSPROJ := $(TESTS_DIR)/ArchLinterNet.CEL.Tests/ArchLinterNet.CEL.Tests.csproj
+CLI_TESTS_CSPROJ := $(TESTS_DIR)/ArchLinterNet.Cli.Tests/ArchLinterNet.Cli.Tests.csproj
+
+test-unit-core-1:  ## Run only Core unit shard 1 (heaviest fixture classes — see docs/internal/core-unit-shard-inventory.md)
 	@dotnet build "$(SLNX)" --no-restore --nologo
-	@dotnet test "$(SLNX)" --no-restore --no-build --filter "$(TEST_UNIT_FILTER)"
+	@dotnet test "$(CORE_TESTS_CSPROJ)" --no-restore --no-build --filter "$(TEST_CORE_UNIT_SHARD_1_FILTER)"
+
+test-unit-core-2:  ## Run only Core unit shard 2 (remainder of the unit bucket, excluding shard 1's fixtures)
+	@dotnet build "$(SLNX)" --no-restore --nologo
+	@dotnet test "$(CORE_TESTS_CSPROJ)" --no-restore --no-build --filter "$(TEST_CORE_UNIT_SHARD_2_FILTER)"
+
+test-unit-other:  ## Run the unit bucket's non-Core assemblies (ArchLinterNet.CEL.Tests, ArchLinterNet.Cli.Tests)
+	@dotnet build "$(SLNX)" --no-restore --nologo
+	@dotnet test "$(CEL_TESTS_CSPROJ)" --no-restore --no-build
+	@dotnet test "$(CLI_TESTS_CSPROJ)" --no-restore --no-build
+
+# The aggregate unit command: single build, then the same three invocations test-unit-core-1/
+# test-unit-core-2/test-unit-other run underneath as parallel processes off that one build (not
+# `$(MAKE) test-unit-core-1` etc., which would each trigger their own redundant/racing build step).
+# Mirrors the wait-all-then-check-exit-codes pattern `test` (below) already uses.
+test-unit:  ## Run the complete coverage-eligible unit bucket (both Core shards plus CEL/Cli)
+	@dotnet build "$(SLNX)" --no-restore --nologo
+	@dotnet test "$(CORE_TESTS_CSPROJ)" --no-restore --no-build --filter "$(TEST_CORE_UNIT_SHARD_1_FILTER)" & \
+	p1=$$!; \
+	dotnet test "$(CORE_TESTS_CSPROJ)" --no-restore --no-build --filter "$(TEST_CORE_UNIT_SHARD_2_FILTER)" & \
+	p2=$$!; \
+	dotnet test "$(CEL_TESTS_CSPROJ)" --no-restore --no-build & \
+	p3=$$!; \
+	dotnet test "$(CLI_TESTS_CSPROJ)" --no-restore --no-build & \
+	p4=$$!; \
+	wait $$p1; s1=$$?; \
+	wait $$p2; s2=$$?; \
+	wait $$p3; s3=$$?; \
+	wait $$p4; s4=$$?; \
+	if [ $$s1 -ne 0 ] || [ $$s2 -ne 0 ] || [ $$s3 -ne 0 ] || [ $$s4 -ne 0 ]; then exit 1; fi
+
+# Discovers every ArchLinterNet.Core.Tests test via `dotnet vstest --ListFullyQualifiedTests`
+# (NOT `dotnet test --list-tests`, which silently ignores --filter and cannot validate anything —
+# see docs/internal/core-unit-shard-inventory.md) and checks the shard-1 tokens above against it:
+# fails on a dead token (matches nothing — a rename/removal silently shrank shard 1) or a leak
+# (a shard-1 token also matches an E2E/packed-artifact fixture). Parses the token lists straight
+# out of this file, so there is exactly one authored list, not two kept in sync by hand.
+lint-test-shard-membership:  ## Verify Core unit shard tokens are live and don't leak into E2E/packed-artifact
+	@dotnet build "$(CORE_TESTS_CSPROJ)" --no-restore --nologo
+	@cd "$(PROJECT_ROOT)" && UV_PROJECT_ENVIRONMENT="$(PROJECT_ROOT)/.venv" "$(UV)" run --project tools/pyproject.toml \
+		python tools/scripts/verify_core_unit_shards.py --test-mk make/test.mk
 
 test-e2e:  ## Run only the ordinary E2E bucket (excludes CheckpointBReleaseGateTests)
 	@dotnet build "$(SLNX)" --no-restore --nologo

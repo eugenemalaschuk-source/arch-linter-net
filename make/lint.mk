@@ -3,7 +3,7 @@
 CHANGED_FILES ?= changed-files.txt
 DIFF_STATUS   ?= ok
 
-lint: lint-code-size lint-dotnet-format lint-architecture lint-docs  ## Run all code quality checks
+lint: lint-code-size lint-dotnet-format lint-architecture lint-docs lint-test-shard-membership  ## Run all code quality checks
 
 lint-architecture:  ## Run strict architecture contracts on self
 	@dotnet build "$(PROJECT_ROOT)/src/ArchLinterNet.Cli/ArchLinterNet.Cli.csproj" --nologo -v minimal
