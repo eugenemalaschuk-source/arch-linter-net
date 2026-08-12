@@ -799,8 +799,8 @@ contract with nothing to scan fails policy loading with an actionable error.
 `forbid_public_constants_unless_declared` adds an independent, stricter check on top of the
 general declaration: an exported `const` field is forbidden unless its fully-qualified
 member name is in `allowed_public_constants`, even if its full signature is already present
-in `declared_api`. See [Public API surface contracts](../contracts/public-api-surface.md)
-for the signature grammar and full semantics.
+in `declared_api`. `surface_selector` restricts governed types to a bounded selector, reusing
+`type_placement.types_matching` plus `role`. See [Public API surface contracts](../contracts/public-api-surface.md).
 
 ### Project metadata contract
 
