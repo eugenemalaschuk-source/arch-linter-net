@@ -19,7 +19,7 @@ DOTTED_OR_DASHED_VERSION = r"v?\d+[.-]\d+[.-]\d+"
 PRODUCT_STYLE_DOC_IDENTITY = r"(?:migration-to|upgrade-to|release-notes?|adopt(?:ion)?-to)"
 PRODUCT_GUIDE_LABEL = r"(?:Adopt(?:ion)?(?:\s+or\s+Upgrade)?|Upgrade|Migration)"
 VERSIONED_DOC_IDENTITY = re.compile(
-    rf"(?i)(?:^|[/(`'\"\s]){PRODUCT_STYLE_DOC_IDENTITY}[-_]{DOTTED_OR_DASHED_VERSION}\b"
+    rf"(?i)(?:^|[/(`'\"]){PRODUCT_STYLE_DOC_IDENTITY}[-_]{DOTTED_OR_DASHED_VERSION}\b"
 )
 EXPLICIT_PRODUCT_VERSION_PATH = re.compile(
     rf"(?i)(?:^|/)(?:"
@@ -168,12 +168,10 @@ def content_violations(root: Path, paths: list[Path]) -> list[str]:
                         f"{relative}: pin ArchLinterNet package versions in repository package/tool metadata, not evergreen docs: '{snippet}'"
                     )
 
-        # Release-process and schema-reference pages may discuss SemVer or exact
-        # immutable machine identifiers because versioning is the subject there.
-        if relative not in {
-            "docs/reference/release-process.md",
-            "docs/reference/yaml-schema.md",
-        }:
+        # Release-process examples may discuss product SemVer because versioning
+        # is the subject there. All other evergreen surfaces still distinguish
+        # product release prose from legitimate machine/schema/standard versions.
+        if relative != "docs/reference/release-process.md":
             for pattern in (
                 ARCHLINTERNET_RELEASE_PROSE,
                 PACKAGE_LINE_PROSE,
