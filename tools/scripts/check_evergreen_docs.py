@@ -45,26 +45,28 @@ HARDCODED_PACKAGE_REFERENCE = re.compile(
     rf"(?i)<PackageReference\b(?=[^>\n]*\bInclude=[\"']ArchLinterNet(?:\.[^\"']+)+[\"'])(?=[^>\n]*\bVersion=[\"']{SEMVER}[\"'])[^>\n]*>"
 )
 ARCHLINTERNET_RELEASE_PROSE = re.compile(
-    rf"(?i)\bArchLinterNet\b[^\n]{{0,40}}\b"
-    rf"(?:package\s+version|version|release|package\s+line|public\s+package\s+line|public\s+adoption\s+package\s+line)\b"
-    rf"[^\n]{{0,80}}\b{SEMVER}\b"
+    rf"(?i)\bArchLinterNet(?:'s)?\s+"
+    rf"(?:package\s+version|package\s+release|version|release|package\s+line|public\s+package\s+line|public\s+adoption\s+package\s+line)\b"
+    rf"[^\n]{{0,60}}\b{SEMVER}\b"
 )
 PACKAGE_LINE_PROSE = re.compile(
     rf"(?i)(?:"
-    rf"\b{SEMVER}\b[^\n]{{0,80}}\b(?:current|public)\b[^\n]{{0,60}}\b(?:adoption\s+)?package\s+line\b"
+    rf"\b{SEMVER}\b[^\n]{{0,80}}\bpublic\s+adoption\s+package\s+line\b"
     rf"|"
-    rf"\b(?:current|public)\b[^\n]{{0,60}}\b(?:adoption\s+)?package\s+line\b[^\n]{{0,80}}\b{SEMVER}\b"
+    rf"\b{SEMVER}\b[^\n]{{0,80}}\b(?:current|public)\s+package\s+line\b[^\n]{{0,60}}\b(?:for\s+)?ArchLinterNet\b"
+    rf"|"
+    rf"\b(?:current|public)\s+package\s+line\b[^\n]{{0,60}}\b(?:for\s+)?ArchLinterNet\b[^\n]{{0,60}}\b{SEMVER}\b"
     rf")"
 )
 ARCHLINTERNET_STATUS_PROSE = re.compile(
     rf"(?i)(?:"
-    rf"\bArchLinterNet\s+{SEMVER}\b[^\n]{{0,80}}\b(?:current|public)\b[^\n]{{0,60}}\b(?:package|release)\b"
+    rf"\bArchLinterNet\s+{SEMVER}\b[^\n]{{0,80}}\b(?:current|public)\b[^\n]{{0,40}}\b(?:package|release)\b"
     rf"|"
-    rf"\b(?:current|public)\b[^\n]{{0,60}}\bArchLinterNet\b[^\n]{{0,60}}\b(?:package|release)\b[^\n]{{0,80}}\b{SEMVER}\b"
+    rf"\b(?:current|public)\b[^\n]{{0,40}}\bArchLinterNet(?:'s)?\s+(?:package|release)\b[^\n]{{0,60}}\b{SEMVER}\b"
     rf"|"
-    rf"\b(?:current|public)\b[^\n]{{0,60}}\b(?:package|release)\b[^\n]{{0,60}}\bArchLinterNet\b[^\n]{{0,80}}\b{SEMVER}\b"
+    rf"\b(?:current|public)\b[^\n]{{0,40}}\b(?:package(?:\s+release)?|release)\s+(?:for|of)\s+ArchLinterNet\b[^\n]{{0,60}}\b{SEMVER}\b"
     rf"|"
-    rf"\b{SEMVER}\b[^\n]{{0,80}}\b(?:current|public)\b[^\n]{{0,60}}\b(?:package|release)\b[^\n]{{0,60}}\bArchLinterNet\b"
+    rf"\b{SEMVER}\b[^\n]{{0,80}}\b(?:current|public)\b[^\n]{{0,40}}\b(?:package(?:\s+release)?|release)\s+(?:for|of)\s+ArchLinterNet\b"
     rf")"
 )
 VERSIONED_HEADING = re.compile(
