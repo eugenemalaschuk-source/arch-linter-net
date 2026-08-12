@@ -14,44 +14,45 @@ import re
 import sys
 from pathlib import Path
 
-SEMVER = r"v?\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?"
-DOTTED_OR_DASHED_VERSION = r"v?\d+[.-]\d+[.-]\d+"
+SEMVER = r"v?\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?"
+PATH_VERSION = r"v?\d+[.-]\d+[.-]\d+(?:[-_][0-9A-Za-z][0-9A-Za-z._-]*?)?"
+CLI_VERSION_ARG = rf"(?:{SEMVER}|[\"']{SEMVER}[\"'])"
 PRODUCT_STYLE_DOC_IDENTITY = r"(?:migration-to|upgrade-to|release-notes?|adopt(?:ion)?-to)"
 PRODUCT_GUIDE_LABEL = r"(?:Adopt(?:ion)?(?:\s+or\s+Upgrade)?|Upgrade|Migration)"
 PRODUCT_RELEASE_PATH_QUALIFIER = (
     r"(?:release(?:-notes?)?|version|migration(?:-to)?|upgrade(?:-to)?|adopt(?:ion)?(?:-to)?)"
 )
 VERSIONED_DOC_IDENTITY = re.compile(
-    rf"(?i)(?:^|[/(`'\"]){PRODUCT_STYLE_DOC_IDENTITY}[-_]{DOTTED_OR_DASHED_VERSION}\b"
+    rf"(?i)(?:^|[/(`'\"]){PRODUCT_STYLE_DOC_IDENTITY}[-_]{PATH_VERSION}\b"
 )
 EXPLICIT_PRODUCT_VERSION_PATH = re.compile(
     rf"(?i)(?:^|/)(?:"
-    rf"archlinternet(?:[-_]{PRODUCT_RELEASE_PATH_QUALIFIER})?[-_]{DOTTED_OR_DASHED_VERSION}"
-    rf"|{DOTTED_OR_DASHED_VERSION}[-_]archlinternet(?:[-_]{PRODUCT_RELEASE_PATH_QUALIFIER})?"
+    rf"archlinternet(?:[-_]{PRODUCT_RELEASE_PATH_QUALIFIER})?[-_]{PATH_VERSION}(?:[-_.][^/]*)?"
+    rf"|{PATH_VERSION}[-_]archlinternet(?:[-_]{PRODUCT_RELEASE_PATH_QUALIFIER})?"
     rf")(?:/|\.md$|$)"
 )
 VERSION_FIRST_PRODUCT_DOC_PATH = re.compile(
-    rf"(?i)(?:^|/){DOTTED_OR_DASHED_VERSION}[-_]"
+    rf"(?i)(?:^|/){PATH_VERSION}[-_]"
     rf"(?:migration|upgrade|release(?:-notes?)?|adopt(?:ion)?)"
     rf"(?:[-_.][^/]*)?(?:/|\.md$)"
 )
 ROOT_README_VERSION = re.compile(
-    rf"(?i)^README[^/]*[-_.]{DOTTED_OR_DASHED_VERSION}(?:[-_.]|$)"
+    rf"(?i)^README[^/]*[-_.]{PATH_VERSION}(?:[-_.]|$)"
 )
 HARDCODED_TOOL_PACKAGE_PIN = re.compile(
     rf"(?i)dotnet\s+tool\s+(?:install|update)\b"
     rf"(?=[^\n]*\bArchLinterNet(?:\.[A-Za-z0-9]+)+\b)"
-    rf"(?=[^\n]*--version(?:\s+|=){SEMVER}\b)[^\n]*"
+    rf"(?=[^\n]*--version(?:\s+|=){CLI_VERSION_ARG})[^\n]*"
 )
 HARDCODED_LIBRARY_PACKAGE_PIN = re.compile(
     rf"(?i)dotnet\s+(?:add\s+package|package\s+add)\b"
     rf"(?=[^\n]*\bArchLinterNet(?:\.[A-Za-z0-9]+)+\b)"
-    rf"(?=[^\n]*(?:--version|-v)(?:\s+|=){SEMVER}\b)[^\n]*"
+    rf"(?=[^\n]*(?:--version|-v)(?:\s+|=){CLI_VERSION_ARG})[^\n]*"
 )
 HARDCODED_MSBUILD_PACKAGE_PIN = re.compile(
-    rf"(?i)<(?:PackageReference|PackageVersion)\b"
-    rf"(?=[^>\n]*\b(?:Include|Update)=[\"']ArchLinterNet(?:\.[^\"']+)+[\"'])"
-    rf"(?=[^>\n]*\b(?:Version|VersionOverride)=[\"']{SEMVER}[\"'])[^>\n]*>"
+    rf"(?is)<(?:PackageReference|PackageVersion)\b"
+    rf"(?=[^>]*\b(?:Include|Update)=[\"']ArchLinterNet(?:\.[^\"']+)+[\"'])"
+    rf"(?=[^>]*\b(?:Version|VersionOverride)=[\"']{SEMVER}[\"'])[^>]*>"
 )
 HARDCODED_NESTED_MSBUILD_PACKAGE_PIN = re.compile(
     rf"(?is)<(?P<package_item>PackageReference|PackageVersion)\b"
@@ -79,15 +80,15 @@ PACKAGE_LINE_PROSE = re.compile(
 )
 ARCHLINTERNET_STATUS_PROSE = re.compile(
     rf"(?i)(?:"
-    rf"\bArchLinterNet\s+{SEMVER}\b[^\n]{{0,80}}\b(?:current|public)\b[^\n]{{0,40}}\b(?:package|release)\b"
+    rf"\bArchLinterNet\s+{SEMVER}\b[^\n]{{0,80}}\b(?:current|public)\b[^\n]{{0,40}}\b(?:package|release|version)\b"
     rf"|"
-    rf"\b(?:current|public)\b[^\n]{{0,40}}\bArchLinterNet(?:'s)?\s+(?:package|release)\b[^\n]{{0,60}}\b{SEMVER}\b"
+    rf"\b(?:current|public)\b[^\n]{{0,40}}\bArchLinterNet(?:'s)?\s+(?:package|release|version)\b[^\n]{{0,60}}\b{SEMVER}\b"
     rf"|"
-    rf"\b(?:current|public)\b[^\n]{{0,40}}\b(?:package(?:\s+release)?|release)\s+(?:for|of)\s+ArchLinterNet\b[^\n]{{0,60}}\b{SEMVER}\b"
+    rf"\b(?:current|public)\b[^\n]{{0,40}}\b(?:package(?:\s+release)?|release|version)\s+(?:for|of)\s+ArchLinterNet\b[^\n]{{0,60}}\b{SEMVER}\b"
     rf"|"
-    rf"\b{SEMVER}\b[^\n]{{0,80}}\b(?:current|public)\b[^\n]{{0,40}}\b(?:package(?:\s+release)?|release)\s+(?:for|of)\s+ArchLinterNet\b"
+    rf"\b{SEMVER}\b[^\n]{{0,80}}\b(?:current|public)\b[^\n]{{0,40}}\b(?:package(?:\s+release)?|release|version)\s+(?:for|of)\s+ArchLinterNet\b"
     rf"|"
-    rf"\b{SEMVER}\b[^\n]{{0,80}}\b(?:current|public)\b[^\n]{{0,40}}\bArchLinterNet(?:'s)?\s+(?:package|release)\b"
+    rf"\b{SEMVER}\b[^\n]{{0,80}}\b(?:current|public)\b[^\n]{{0,40}}\bArchLinterNet(?:'s)?\s+(?:package|release|version)\b"
     rf")"
 )
 VERSIONED_HEADING = re.compile(
@@ -167,9 +168,17 @@ def content_violations(root: Path, paths: list[Path]) -> list[str]:
             )
 
         if relative != "docs/reference/release-process.md":
+            command_text = re.sub(r"(?:\\|`)\r?\n[ \t]*", " ", text)
             for pattern in (
                 HARDCODED_TOOL_PACKAGE_PIN,
                 HARDCODED_LIBRARY_PACKAGE_PIN,
+            ):
+                for match in pattern.finditer(command_text):
+                    snippet = " ".join(match.group(0).split())
+                    violations.append(
+                        f"{relative}: pin ArchLinterNet package versions in repository package/tool metadata, not evergreen docs: '{snippet}'"
+                    )
+            for pattern in (
                 HARDCODED_MSBUILD_PACKAGE_PIN,
                 HARDCODED_NESTED_MSBUILD_PACKAGE_PIN,
                 HARDCODED_TOOL_MANIFEST_PIN,
