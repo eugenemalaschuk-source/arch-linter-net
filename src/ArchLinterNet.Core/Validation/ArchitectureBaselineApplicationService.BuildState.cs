@@ -1,6 +1,7 @@
 using ArchLinterNet.Core.BuildState;
 using ArchLinterNet.Core.Contracts;
 using ArchLinterNet.Core.Contracts.Abstractions;
+using ArchLinterNet.Core.Execution;
 using ArchLinterNet.Core.Execution.Abstractions;
 using ArchLinterNet.Core.Model;
 
@@ -29,39 +30,24 @@ public sealed partial class ArchitectureBaselineApplicationService
         BaselineBuildStateOptions options,
         CancellationToken cancellationToken)
     {
-        Discovery.ProjectDiscoveryResult? discovery = runner.Session.Context.ProjectDiscovery;
-        if (discovery == null || discovery.DiscoveredProjects.Count == 0)
-        {
-            return new BuildStatePreflightResult(Array.Empty<BuildStatePreflightDiagnostic>());
-        }
-
-        BuildStateResolvedAssemblies resolution = new(
-            runner.Session.Context.TargetAssemblies,
-            runner.Session.Context.MissingAssemblyNames)
-        {
-            // Isolated post-build loads are stream-backed, so discovery remains the authoritative
-            // location of their selected project output paths for receipt verification.
-            ResolvedAssemblyPaths = discovery.ResolvedAssemblyPaths,
-        };
-
-        if (resolution.ResolvedAssemblies.Count == 0 && resolution.MissingAssemblyNames.Count == 0)
-        {
-            return new BuildStatePreflightResult(Array.Empty<BuildStatePreflightDiagnostic>());
-        }
-
-        IBuildStatePreparationService preparationService = buildStatePreparationService
-            ?? throw new InvalidOperationException("Build-state preparation is unavailable for baseline verification.");
-        return preparationService.Prepare(new BuildStatePreflightRequest(
+        // Isolated post-build loads are stream-backed, so discovery remains the authoritative
+        // location of their selected project output paths for receipt verification — unlike
+        // ordinary validation, baseline verify must include ResolvedAssemblyPaths from discovery.
+        return BuildStatePreflightRunner.Run(
             runner.Session.Context.RepositoryRoot,
-            discovery,
-            resolution,
+            runner.Session.Context.ProjectDiscovery,
+            runner.Session.Context.TargetAssemblies,
+            runner.Session.Context.MissingAssemblyNames,
+            includeResolvedAssemblyPathsFromDiscovery: true,
+            () => buildStatePreparationService
+                ?? throw new InvalidOperationException("Build-state preparation is unavailable for baseline verification."),
             options.PreparationMode,
             options.NoRestore,
             options.RequestedConfiguration,
             options.RequestedTargetFramework,
             options.RequestedPlatform,
             options.RequestedRuntimeIdentifier,
-            cancellationToken));
+            cancellationToken);
     }
 
     private sealed record BaselineBuildStateOptions(

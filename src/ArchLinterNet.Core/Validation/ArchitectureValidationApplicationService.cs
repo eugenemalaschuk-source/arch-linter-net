@@ -331,41 +331,28 @@ public sealed class ArchitectureValidationApplicationService(
     // receipt model this needs (ArchitectureDiscoveredProject.Path/AssemblyName) has no
     // counterpart when target assemblies are configured directly via analysis.target_assemblies
     // without project discovery.
+    // Assembly resolution is skipped entirely (not merely unsuccessful) when only project-scope
+    // coverage contracts are selected — see ArchitectureRunnerSetupService.ShouldResolveAssemblyOutputs.
+    // That path deliberately lets the coverage engine classify unresolved projects as "unknown"
+    // instead of failing the run, so preflight must not reinterpret "resolution wasn't attempted"
+    // as "artifact missing". Resolution having populated neither resolved nor missing names is the
+    // signal that it never ran — BuildStatePreflightRunner.Run encodes that same short-circuit.
     private BuildStatePreflightResult RunBuildStatePreflight(AnalysisSnapshotRequest request, IArchitectureContractRunner runner)
     {
-        var discovery = runner.Session.Context.ProjectDiscovery;
-        if (discovery == null || discovery.DiscoveredProjects.Count == 0)
-        {
-            return new BuildStatePreflightResult(Array.Empty<BuildStatePreflightDiagnostic>());
-        }
-
-        BuildStateResolvedAssemblies resolution = new(
-            runner.Session.Context.TargetAssemblies,
-            runner.Session.Context.MissingAssemblyNames);
-
-        // Assembly resolution is skipped entirely (not merely unsuccessful) when only
-        // project-scope coverage contracts are selected — see
-        // ArchitectureRunnerSetupService.ShouldResolveAssemblyOutputs. That path deliberately lets
-        // the coverage engine classify unresolved projects as "unknown" instead of failing the
-        // run, so preflight must not reinterpret "resolution wasn't attempted" as "artifact
-        // missing". Resolution having populated neither resolved nor missing names is the signal
-        // that it never ran.
-        if (resolution.ResolvedAssemblies.Count == 0 && resolution.MissingAssemblyNames.Count == 0)
-        {
-            return new BuildStatePreflightResult(Array.Empty<BuildStatePreflightDiagnostic>());
-        }
-
-        return buildStatePreparationService.Prepare(new BuildStatePreflightRequest(
+        return BuildStatePreflightRunner.Run(
             runner.Session.Context.RepositoryRoot,
-            discovery,
-            resolution,
+            runner.Session.Context.ProjectDiscovery,
+            runner.Session.Context.TargetAssemblies,
+            runner.Session.Context.MissingAssemblyNames,
+            includeResolvedAssemblyPathsFromDiscovery: false,
+            () => buildStatePreparationService,
             request.PreparationMode,
             request.NoRestore,
             request.RequestedConfiguration,
             request.RequestedTargetFramework,
             request.RequestedPlatform,
             request.RequestedRuntimeIdentifier,
-            request.CancellationToken));
+            request.CancellationToken);
     }
 
     private BuildStatePreflightResult RunBuildStatePreflight(
