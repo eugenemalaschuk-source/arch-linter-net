@@ -19,30 +19,26 @@ env:
   SONAR_ORGANIZATION: ${{ vars.SONAR_ORGANIZATION || 'eugenemalaschuk-source' }}
 
 jobs:
-  pull_request_validate:
-    name: Pull Request Validation
+  # The former monolithic `pull_request_validate` job packed workflow lint, repository lint,
+  # SonarCloud/coverage, architecture coverage, and Python tooling tests into one serial job, so
+  # unrelated checks waited behind whichever ran first. It is now five independently schedulable
+  # jobs along real dependency boundaries; `needs:` is used only where a job genuinely requires
+  # another's artifact or result (none of the five below do).
+  workflow_quality:
+    name: Workflow Quality
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
-    # Lint, the unit-only coverage run (see make/test.mk — E2E/packed-artifact correctness moved to
-    # the independent test-suite jobs below), Python tooling coverage, and the SonarCloud begin/end
-    # pair. A cancelled `End SonarCloud analysis` step means this budget was exceeded, not a scanner
-    # fault.
-    timeout-minutes: 25
+    # actionlint, zizmor, and the workflow Prettier check only — no .NET restore, so this fails
+    # fast independently of every other pull-request validation job.
+    timeout-minutes: 5
     permissions:
       contents: read
-      pull-requests: write
-    env:
-      TRUSTED_PR: ${{ github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.user.login != 'dependabot[bot]' }}
 
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
-          fetch-depth: 0
           persist-credentials: false
-
-      - name: Setup uv
-        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
 
       - name: Lint workflows with actionlint
         uses: raven-actions/actionlint@3d39aea434753780c3b3d4a1a31c854b4dbf49d7
@@ -62,6 +58,69 @@ jobs:
 
       - name: Check workflow formatting
         run: npx --yes --ignore-scripts prettier@3.9.5 --check ".github/workflows/*.yml"
+
+  repository_lint:
+    name: Repository Lint
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    # `make lint` (code size, dotnet format, self-architecture, docs) — not coupled to Sonar or
+    # coverage collection.
+    timeout-minutes: 15
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+
+      - name: Setup uv
+        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Cache NuGet packages
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
+        with:
+          path: ~/.nuget/packages
+          key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj') }}
+          restore-keys: |
+            ${{ runner.os }}-nuget-
+
+      - name: Restore
+        run: make restore
+
+      - name: Lint
+        run: make lint
+
+  coverage_sonar:
+    name: Coverage + Sonar
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    # SonarScanner for .NET requires begin -> build/test -> end in one job. Keeps only the
+    # unit-only coverage run (see make/test.mk — E2E/packed-artifact correctness runs in the
+    # independent test-suite jobs below), Python tooling coverage feeding the same Sonar analysis,
+    # and the Codecov upload. A cancelled `End SonarCloud analysis` step means this budget was
+    # exceeded, not a scanner fault.
+    timeout-minutes: 25
+    permissions:
+      contents: read
+    env:
+      TRUSTED_PR: ${{ github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.user.login != 'dependabot[bot]' }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Setup uv
+        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
 
       - name: Setup .NET
         uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68
@@ -84,9 +143,6 @@ jobs:
 
       - name: Restore
         run: make restore
-
-      - name: Lint
-        run: make lint
 
       - name: Cache SonarQube packages
         if: env.TRUSTED_PR == 'true'
@@ -193,15 +249,51 @@ jobs:
             echo "### Secret-backed integrations"
             echo
             echo "SonarCloud and Codecov uploads were skipped because GitHub does not expose ordinary repository secrets to fork or Dependabot pull requests."
-            echo "Restore, lint, tests, and architecture coverage continue to run without those secrets."
+            echo "Coverage collection continues to run without those secrets."
           } >> "$GITHUB_STEP_SUMMARY"
 
-      - name: Test architecture coverage report generator
-        if: github.event_name == 'pull_request'
-        run: make test-architecture-coverage-report
+  architecture_coverage:
+    name: Architecture Coverage
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    # Strict/audit architecture coverage analysis, artifacts and PR comment. This job has its own
+    # checkout and does not share a runner with repository_lint, so it builds the CLI and Testing
+    # projects itself before running the CLI in `--no-build` mode below.
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      pull-requests: write
 
-      - name: Test packed-artifact release-evidence aggregator
-        run: make test-release-evidence
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Setup uv
+        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Cache NuGet packages
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
+        with:
+          path: ~/.nuget/packages
+          key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj') }}
+          restore-keys: |
+            ${{ runner.os }}-nuget-
+
+      - name: Restore
+        run: make restore
+
+      - name: Build CLI and Testing projects
+        run: |
+          dotnet build src/ArchLinterNet.Cli/ArchLinterNet.Cli.csproj --nologo -v minimal
+          dotnet build src/ArchLinterNet.Testing/ArchLinterNet.Testing.csproj --nologo -v minimal
 
       - name: Collect changed first-party files
         id: changed_files
@@ -213,7 +305,6 @@ jobs:
             -- '*.cs' ':!*.g.cs' ':!*Designer.cs' > changed-files.txt
 
       - name: Run architecture coverage analysis
-        if: github.event_name == 'pull_request'
         id: architecture_coverage
         continue-on-error: true
         run: |
@@ -224,21 +315,21 @@ jobs:
           make architecture-coverage-ci DIFF_STATUS="$DIFF_STATUS"
 
       - name: Upload strict diagnostics
-        if: always() && github.event_name == 'pull_request' && hashFiles('architecture-strict.json') != ''
+        if: always() && hashFiles('architecture-strict.json') != ''
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: architecture-strict
           path: architecture-strict.json
 
       - name: Upload audit diagnostics
-        if: always() && github.event_name == 'pull_request' && hashFiles('architecture-audit.json') != ''
+        if: always() && hashFiles('architecture-audit.json') != ''
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: architecture-audit
           path: architecture-audit.json
 
       - name: Upload architecture coverage report
-        if: always() && github.event_name == 'pull_request' && hashFiles('architecture-coverage.md') != ''
+        if: always() && hashFiles('architecture-coverage.md') != ''
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: architecture-coverage-report
@@ -281,6 +372,31 @@ jobs:
         if: steps.architecture_coverage.outcome == 'failure'
         run: exit 1
 
+  tooling_support_tests:
+    name: Tooling / Support Tests
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    # Python tooling tests not coupled to Sonar coverage collection — see coverage_sonar for the
+    # coverage-instrumented run of the same suites, which feeds SonarCloud/Codecov.
+    timeout-minutes: 10
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+
+      - name: Setup uv
+        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
+
+      - name: Test architecture coverage report generator
+        run: make test-architecture-coverage-report
+
+      - name: Test packed-artifact release-evidence aggregator
+        run: make test-release-evidence
+
   # Unit, ordinary E2E, and the packed-artifact release gate used to run as two `dotnet test`
   # processes inside one `make test` per platform, so the heaviest two suites always contended for
   # the same hosted runner. Each bucket now gets its own matrix job/leg per platform (no artificial
@@ -291,10 +407,14 @@ jobs:
     if: github.event_name == 'pull_request'
     runs-on: ${{ matrix.os }}
     # Coverage-eligible unit/in-process correctness only — no subprocess builds or packing.
-    # Measured on the #475 topology PR: Apple Silicon macOS ~4.8m, Intel macOS ~11.6m, Windows was
-    # still mid-run (past the filesystem/symlink-heavy fixtures) when cancelled at a 15m cap — the
-    # unit bucket alone runs meaningfully slower on Windows than on either macOS runner. 30m gives
-    # headroom until enough Windows runs land to tighten this with real data.
+    # Measured on the #475 topology PR: Apple Silicon macOS ~4.8m, Windows ~10m — the unit bucket
+    # alone runs meaningfully slower on Windows than on macOS. 30m gives headroom until enough
+    # Windows runs land to tighten this with real data.
+    #
+    # macos-15-intel was dropped from this matrix (and from e2e_tests/packed_artifact_tests below):
+    # GitHub's Intel macOS runners are older hardware than the Apple Silicon (macos-14) runners and
+    # ran the unit bucket roughly 2x slower (~12m vs ~5-7m) for no additional correctness signal on
+    # this .NET/cross-platform-file-handling codebase — Apple Silicon macOS coverage is sufficient.
     timeout-minutes: 30
     strategy:
       fail-fast: false
@@ -302,8 +422,6 @@ jobs:
         include:
           - os: windows-latest
             name: Windows
-          - os: macos-15-intel
-            name: Intel macOS
           - os: macos-14
             name: Apple Silicon macOS
     permissions:
@@ -314,10 +432,6 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           persist-credentials: false
-
-      - name: Verify Intel macOS runner
-        if: matrix.os == 'macos-15-intel'
-        run: test "$(uname -m)" = x86_64
 
       - name: Verify Apple Silicon macOS runner
         if: matrix.os == 'macos-14'
@@ -348,8 +462,6 @@ jobs:
         include:
           - os: windows-latest
             name: Windows
-          - os: macos-15-intel
-            name: Intel macOS
           - os: macos-14
             name: Apple Silicon macOS
     permissions:
@@ -360,10 +472,6 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           persist-credentials: false
-
-      - name: Verify Intel macOS runner
-        if: matrix.os == 'macos-15-intel'
-        run: test "$(uname -m)" = x86_64
 
       - name: Verify Apple Silicon macOS runner
         if: matrix.os == 'macos-14'
@@ -395,8 +503,6 @@ jobs:
         include:
           - os: windows-latest
             name: Windows
-          - os: macos-15-intel
-            name: Intel macOS
           - os: macos-14
             name: Apple Silicon macOS
     permissions:
@@ -407,10 +513,6 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           persist-credentials: false
-
-      - name: Verify Intel macOS runner
-        if: matrix.os == 'macos-15-intel'
-        run: test "$(uname -m)" = x86_64
 
       - name: Verify Apple Silicon macOS runner
         if: matrix.os == 'macos-14'
