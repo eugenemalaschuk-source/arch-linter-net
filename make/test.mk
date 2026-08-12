@@ -19,6 +19,21 @@
 # whole solution, installs the tool from an isolated feed, and builds the synthetic consumer
 # fixtures across the release-evidence consumer matrix. Mixing it into ordinary E2E serialized it
 # behind the rest of that bucket on the same runner, which pushed platform jobs past their budget.
+#
+# Control characters in [TestCase(...)] arguments silently vanish from every bucket above: NUnit
+# renders non-printable argument characters into a display name using backslash-escape sequences
+# (e.g. an ESC byte becomes the six characters backslash-u-0-0-1-b), and that display name
+# becomes the test case's FullyQualifiedName. The NUnit3TestAdapter's fallback filter parser
+# (used whenever a filter mixes `&`/`!~`, as all the filters below do) re-parses
+# FullyQualifiedName through the same backslash-escape grammar used
+# for filter expression text; a backslash not followed by one of that grammar's recognized escape
+# targets (`\(){}&|=!~`) throws there, and the affected case is excluded from every
+# FullyQualifiedName filter bucket with no diagnostic (see issue #480, and
+# ReportCoordinatorTests.TerminatorsC1SequencesAndMalformedInputCases for the fix pattern). Any new
+# parameterized fixture whose arguments embed raw control bytes must give each case an explicit,
+# ASCII, backslash-free name via `TestCaseData(...).SetName(...)` instead of a bare
+# `[TestCase(...)]` — the arguments passed to the test body are unaffected, only the generated
+# identity used for filtering and reporting.
 TEST_E2E_FIXTURES := FullyQualifiedName~ExternalDependencyContractAuditE2eTests|FullyQualifiedName~BuildStatePreflightTests|FullyQualifiedName~BuildStatePreflightAssemblyReloadTests|FullyQualifiedName~CheckpointAAdoptionAcceptanceTests|FullyQualifiedName~ArchitectureBaselineIntegrationTests
 TEST_E2E_FILTER := $(TEST_E2E_FIXTURES)
 TEST_PACKED_ARTIFACT_FILTER := FullyQualifiedName~CheckpointBReleaseGateTests
