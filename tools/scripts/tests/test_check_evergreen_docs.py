@@ -66,6 +66,8 @@ def test_find_violations_accepts_versioned_standard_and_contract_paths_and_navig
             "  - Reference:\n"
             "      - ArchLinterNet SARIF 2.1.0: reference/sarif-2.1.0.md\n"
             "      - Protocol v2.1.0: reference/v2.1.0.md\n"
+            "      - SARIF Migration to 2.1.0: reference/sarif-migration-to-2.1.0.md\n"
+            "      - SARIF Release Notes 2.1.0: reference/sarif-release-notes-2.1.0.md\n"
             "exclude_docs: |\n"
             "  internal/\n"
         ),
@@ -76,6 +78,14 @@ def test_find_violations_accepts_versioned_standard_and_contract_paths_and_navig
     )
     (tmp_path / "docs" / "reference" / "v2.1.0.md").write_text(
         "# Protocol v2.1.0\n\nPersisted contract reference.\n",
+        encoding="utf-8",
+    )
+    (tmp_path / "docs" / "reference" / "sarif-migration-to-2.1.0.md").write_text(
+        "# SARIF Migration to 2.1.0\n\nStandard migration reference.\n",
+        encoding="utf-8",
+    )
+    (tmp_path / "docs" / "reference" / "sarif-release-notes-2.1.0.md").write_text(
+        "# SARIF Release Notes 2.1.0\n\nStandard release reference.\n",
         encoding="utf-8",
     )
 
