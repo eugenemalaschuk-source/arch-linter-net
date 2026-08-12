@@ -30,13 +30,29 @@ public sealed partial class ArchitectureAnalysisSession
     // selection and ignore matching deliberately do not apply to the captured entries themselves,
     // because a snapshot describes what the assemblies actually export, not what the policy
     // currently tolerates. A configured surface_selector still applies — capture must reflect the
-    // same selected surface strict/audit validation governs (issue #525) — and selectorSafetyViolations
-    // surfaces the same zero-match/first-party-escape fail-closed checks strict/audit validation runs
-    // (PR #529 review), so a selector configuration unsafe for `validate` cannot silently produce a
-    // usable snapshot through `capture`/`diff`/`update`/`migrate`. Ignore matching DOES apply to
-    // those checks — the same ignored_violations a reviewer already accepted in `validate` should not
-    // re-block the lifecycle that reuses this method.
+    // same selected surface strict/audit validation governs (issue #525).
+    //
+    // Kept as its own public overload (unchanged since before #525) rather than folded into the
+    // safety-aware one below: ArchitectureAnalysisSession is reviewed public API surface, and adding
+    // an out parameter would replace this method's signature rather than add to it, breaking every
+    // precompiled caller (PR #529 review). Callers needing the selector-safety verdict (currently
+    // only ResolveSurface) use the internal overload directly.
     public IReadOnlyList<PublicApiSnapshotEntry> CapturePublicApiSurface(
+        ArchitecturePublicApiSurfaceContract contract,
+        out IReadOnlyList<string> missingAssemblies)
+    {
+        return CapturePublicApiSurface(contract, out missingAssemblies, out _);
+    }
+
+    // selectorSafetyViolations surfaces the same zero-match/first-party-escape fail-closed checks
+    // strict/audit validation runs (PR #529 review), so a selector configuration unsafe for
+    // `validate` cannot silently produce a usable snapshot through `capture`/`diff`/`update`/
+    // `migrate`. Ignore matching DOES apply to those checks — the same ignored_violations a reviewer
+    // already accepted in `validate` should not re-block the lifecycle that reuses this method.
+    // Internal: only the public-api application service (same assembly) currently needs the verdict;
+    // exposing it publicly is not required by any current caller and would grow the reviewed surface
+    // for no concrete need (this repository's own decision bias — see AGENTS.md).
+    internal IReadOnlyList<PublicApiSnapshotEntry> CapturePublicApiSurface(
         ArchitecturePublicApiSurfaceContract contract,
         out IReadOnlyList<string> missingAssemblies,
         out IReadOnlyList<ArchitectureViolation> selectorSafetyViolations)

@@ -236,8 +236,10 @@ internal static class PublicApiSurfaceChecker
                     Payload = new PublicApiSurfacePayload(
                         UndeclaredApiSignature: entry.Signature,
                         ApiAssemblyName: entry.AssemblyName,
-                        ApiVisibility: entry.Visibility,
-                        UnselectedFirstPartyDependency: referencedType),
+                        ApiVisibility: entry.Visibility)
+                    {
+                        UnselectedFirstPartyDependency = referencedType,
+                    },
                 };
             }
         }

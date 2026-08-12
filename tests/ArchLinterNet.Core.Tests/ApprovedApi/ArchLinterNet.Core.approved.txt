@@ -1422,7 +1422,7 @@ sealed class ArchLinterNet.Core.Execution.ArchitectureAnalysisSession
   method System.Collections.Generic.IReadOnlyCollection<string> CheckAcyclicSiblingContract(ArchLinterNet.Core.Contracts.Families.ArchitectureAcyclicSiblingContract contract)
   method System.Collections.Generic.IReadOnlyCollection<string> CheckCycleContract(ArchLinterNet.Core.Contracts.Families.ArchitectureCycleContract contract)
   method System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Model.ArchitectureClassificationRoleFact> CheckClassificationRoles()
-  method System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Model.PublicApiSnapshotEntry> CapturePublicApiSurface(ArchLinterNet.Core.Contracts.Families.ArchitecturePublicApiSurfaceContract contract, out System.Collections.Generic.IReadOnlyList<string> missingAssemblies, out System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Model.ArchitectureViolation> selectorSafetyViolations)
+  method System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Model.PublicApiSnapshotEntry> CapturePublicApiSurface(ArchLinterNet.Core.Contracts.Families.ArchitecturePublicApiSurfaceContract contract, out System.Collections.Generic.IReadOnlyList<string> missingAssemblies)
   method System.Collections.Generic.List<ArchLinterNet.Core.Model.ArchitectureViolation> CheckAllowOnlyContract(ArchLinterNet.Core.Contracts.Families.ArchitectureAllowOnlyContract contract)
   method System.Collections.Generic.List<ArchLinterNet.Core.Model.ArchitectureViolation> CheckAsmdefContract(ArchLinterNet.Core.Contracts.Families.ArchitectureAsmdefContract contract)
   method System.Collections.Generic.List<ArchLinterNet.Core.Model.ArchitectureViolation> CheckAssemblyAllowOnlyContract(ArchLinterNet.Core.Contracts.Families.ArchitectureAssemblyAllowOnlyContract contract)
@@ -3230,14 +3230,14 @@ sealed class ArchLinterNet.Core.Model.PublicApiSurfaceDiagnostic : ArchLinterNet
   property string? UndeclaredApiSignature {get;init;}
   property string? UnselectedFirstPartyDependency {get;init;}
 sealed class ArchLinterNet.Core.Model.PublicApiSurfacePayload : ArchLinterNet.Core.Model.IArchitectureDiagnosticPayload, System.IEquatable<ArchLinterNet.Core.Model.PublicApiSurfacePayload>
-  ctor(string? UndeclaredApiSignature = null, bool? ForbiddenPublicConstant = null, string? ApiAssemblyName = null, string? ApiVisibility = null, string? ApiDeltaKind = null, string? PreviousApiSignature = null, string? UnselectedFirstPartyDependency = null)
+  ctor(string? UndeclaredApiSignature = null, bool? ForbiddenPublicConstant = null, string? ApiAssemblyName = null, string? ApiVisibility = null, string? ApiDeltaKind = null, string? PreviousApiSignature = null)
   method ArchLinterNet.Core.Model.ArchitectureDiagnostic ToDiagnostic(ArchLinterNet.Core.Model.ArchitectureViolation violation)
   method ArchLinterNet.Core.Model.PublicApiSurfacePayload <Clone>$()
   method bool Equals(ArchLinterNet.Core.Model.PublicApiSurfacePayload? other)
   method bool Equals(object? obj)
   method int GetHashCode()
   method string ToString()
-  method void Deconstruct(out string? UndeclaredApiSignature, out bool? ForbiddenPublicConstant, out string? ApiAssemblyName, out string? ApiVisibility, out string? ApiDeltaKind, out string? PreviousApiSignature, out string? UnselectedFirstPartyDependency)
+  method void Deconstruct(out string? UndeclaredApiSignature, out bool? ForbiddenPublicConstant, out string? ApiAssemblyName, out string? ApiVisibility, out string? ApiDeltaKind, out string? PreviousApiSignature)
   operator !=(ArchLinterNet.Core.Model.PublicApiSurfacePayload? left, ArchLinterNet.Core.Model.PublicApiSurfacePayload? right)
   operator ==(ArchLinterNet.Core.Model.PublicApiSurfacePayload? left, ArchLinterNet.Core.Model.PublicApiSurfacePayload? right)
   property bool? ForbiddenPublicConstant {get;init;}
