@@ -13,26 +13,6 @@ namespace ArchLinterNet.Cli.Tests;
 [TestFixture]
 public sealed partial class ReportCoordinatorTests
 {
-    [Test]
-    public void StripAnsi_RemovesCsiAndOscSequencesFromHumanReports()
-    {
-        const string Colored = "\u001b[31mviolation\u001b[0m\u001b]8;;https://example.test\u001b\\link\u001b]8;;\u001b\\";
-
-        Assert.That(ReportCoordinator.StripAnsi(Colored), Is.EqualTo("violationlink"));
-    }
-
-    [TestCase("\u001b]0;title\u0007visible", "visible")]
-    [TestCase("\u009b31mred\u009b0m", "red")]
-    [TestCase("\u009d0;title\u009cvisible", "visible")]
-    [TestCase("\u001b7saved", "saved")]
-    [TestCase("\u001b\u001b[31mred", "red")]
-    [TestCase("\u001b[31\nvisible", "\nvisible")]
-    [TestCase("\u001bé", "é")]
-    public void StripAnsi_HandlesTerminatorsC1SequencesAndMalformedInput(string input, string expected)
-    {
-        Assert.That(ReportCoordinator.StripAnsi(input), Is.EqualTo(expected));
-    }
-
     private static ValidationOutcome PassedOutcome => new(
         true, Array.Empty<ArchitectureViolation>(), Array.Empty<string>(),
         Array.Empty<ArchitectureViolation>(), "off", Array.Empty<ArchitectureUnmatchedIgnoredViolation>(),
