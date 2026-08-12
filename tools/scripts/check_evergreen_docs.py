@@ -18,14 +18,17 @@ SEMVER = r"v?\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?"
 DOTTED_OR_DASHED_VERSION = r"v?\d+[.-]\d+[.-]\d+"
 PRODUCT_STYLE_DOC_IDENTITY = r"(?:migration-to|upgrade-to|release-notes?|adopt(?:ion)?-to)"
 PRODUCT_GUIDE_LABEL = r"(?:Adopt(?:ion)?(?:\s+or\s+Upgrade)?|Upgrade|Migration)"
+PRODUCT_RELEASE_PATH_QUALIFIER = (
+    r"(?:release(?:-notes?)?|version|migration(?:-to)?|upgrade(?:-to)?|adopt(?:ion)?(?:-to)?)"
+)
 VERSIONED_DOC_IDENTITY = re.compile(
     rf"(?i)(?:^|[/(`'\"]){PRODUCT_STYLE_DOC_IDENTITY}[-_]{DOTTED_OR_DASHED_VERSION}\b"
 )
 EXPLICIT_PRODUCT_VERSION_PATH = re.compile(
     rf"(?i)(?:^|/)(?:"
-    rf"archlinternet[^/]*?[-_]{DOTTED_OR_DASHED_VERSION}"
-    rf"|{DOTTED_OR_DASHED_VERSION}[^/]*?[-_]archlinternet"
-    rf")[^/]*(?:/|\.md$)"
+    rf"archlinternet(?:[-_]{PRODUCT_RELEASE_PATH_QUALIFIER})?[-_]{DOTTED_OR_DASHED_VERSION}"
+    rf"|{DOTTED_OR_DASHED_VERSION}[-_]archlinternet(?:[-_]{PRODUCT_RELEASE_PATH_QUALIFIER})?"
+    rf")(?:/|\.md$|$)"
 )
 VERSION_FIRST_PRODUCT_DOC_PATH = re.compile(
     rf"(?i)(?:^|/){DOTTED_OR_DASHED_VERSION}[-_]"
@@ -38,12 +41,12 @@ ROOT_README_VERSION = re.compile(
 HARDCODED_TOOL_PACKAGE_PIN = re.compile(
     rf"(?i)dotnet\s+tool\s+(?:install|update)\b"
     rf"(?=[^\n]*\bArchLinterNet(?:\.[A-Za-z0-9]+)+\b)"
-    rf"(?=[^\n]*--version\s+{SEMVER}\b)[^\n]*"
+    rf"(?=[^\n]*--version(?:\s+|=){SEMVER}\b)[^\n]*"
 )
 HARDCODED_LIBRARY_PACKAGE_PIN = re.compile(
     rf"(?i)dotnet\s+(?:add\s+package|package\s+add)\b"
     rf"(?=[^\n]*\bArchLinterNet(?:\.[A-Za-z0-9]+)+\b)"
-    rf"(?=[^\n]*(?:--version|-v)\s+{SEMVER}\b)[^\n]*"
+    rf"(?=[^\n]*(?:--version|-v)(?:\s+|=){SEMVER}\b)[^\n]*"
 )
 HARDCODED_MSBUILD_PACKAGE_PIN = re.compile(
     rf"(?i)<(?:PackageReference|PackageVersion)\b"
@@ -114,6 +117,7 @@ def repository_root() -> Path:
 def public_markdown_files(root: Path) -> list[Path]:
     docs_root = root / "docs"
     samples_root = root / "samples"
+    src_root = root / "src"
     files = [path for path in root.glob("README*") if path.is_file()]
     if docs_root.exists():
         files.extend(
@@ -123,6 +127,8 @@ def public_markdown_files(root: Path) -> list[Path]:
         )
     if samples_root.exists():
         files.extend(path for path in samples_root.rglob("*.md") if path.is_file())
+    if src_root.exists():
+        files.extend(path for path in src_root.rglob("README*.md") if path.is_file())
     return sorted(set(files))
 
 
