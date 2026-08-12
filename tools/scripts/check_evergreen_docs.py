@@ -122,8 +122,9 @@ def content_violations(root: Path, paths: list[Path]) -> list[str]:
         text = path.read_text(encoding="utf-8")
 
         for match in VERSIONED_DOC_IDENTITY.finditer(text):
+            snippet = match.group(0)
             violations.append(
-                f"{relative}: version-named evergreen docs reference '{match.group(0).lstrip('/ (`\"\'')}'"
+                f"{relative}: version-named evergreen docs reference '{snippet}'"
             )
 
         for pattern in (
