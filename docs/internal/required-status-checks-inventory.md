@@ -12,6 +12,27 @@ Applying this change to the `Main` ruleset is a **manual step** (repository sett
 file in this repo) — this document exists so that step can be taken from an exact, verified
 list instead of guesswork.
 
+**This is a blocker, not a follow-up.** Issue #479 makes CI enforcement an explicit acceptance
+criterion for relaxing mandatory local `make acceptance`, not an optional next step: *"The
+final stabilized authoritative CI checks are required by the active `Main` ruleset, so relaxing
+local validation does not weaken merge quality."* Until this step is applied, a red or missing
+exhaustive CI check does not technically block a merge — the risk-based local-validation policy
+in this PR should be treated as incomplete/not-yet-safe-to-rely-on until it is. Confirmed on
+review of PR #490 (2026-08-12): the active ruleset still has no `required_status_checks` rule.
+
+A ready-to-apply payload for this exact ruleset is at
+[`main-ruleset-required-status-checks.json`](main-ruleset-required-status-checks.json)
+(preserves every existing `Main` ruleset rule and adds the 15 contexts below). To apply it
+(requires repository admin access):
+
+```bash
+gh api --method PUT repos/eugenemalaschuk-source/arch-linter-net/rulesets/18790669 \
+  --input docs/internal/main-ruleset-required-status-checks.json
+```
+
+After applying, verify enforcement by confirming a PR with a red or missing required check is
+blocked from merging (e.g. via the merge button's state on an open PR, or `gh pr view --json mergeStateStatus`).
+
 ## Source
 
 Check names (`context` values, from the GitHub check-runs API) captured from the head commit of
@@ -99,9 +120,7 @@ Validate NuGet Packages
 
 ## Manual application step (not automated by this change)
 
-Add a `required_status_checks` rule to the `Main` ruleset
-(`repos/eugenemalaschuk-source/arch-linter-net/rulesets/18790669`) with `strict_required_status_checks_policy`
-per current branch-protection preference and the 15 contexts above, each with
-`integration_id` for the GitHub Actions app where applicable. This requires `admin`/ruleset-write
-access and is intentionally left for a maintainer to apply — repository ruleset mutation is not
-something this workflow performs automatically.
+See the blocker note near the top of this document for the exact `gh api` command and the
+`main-ruleset-required-status-checks.json` payload. Applying it requires `admin`/ruleset-write
+access on the repository and is intentionally left for a maintainer to run — mutating a
+repository security setting is not something this workflow performs automatically.
