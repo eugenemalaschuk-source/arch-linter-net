@@ -40,6 +40,21 @@ def test_find_violations_accepts_machine_standard_and_framework_versions(tmp_pat
     assert evergreen.find_violations(tmp_path) == []
 
 
+def test_find_violations_accepts_external_release_and_package_versions(tmp_path: Path) -> None:
+    write_repo(
+        tmp_path,
+        guide=(
+            "# Interoperability\n\n"
+            "SARIF 2.1.0 is the current release of the standard.\n"
+            "The current SARIF release is 2.1.0.\n"
+            "The current Newtonsoft.Json package version is 13.0.4.\n"
+            "ArchLinterNet supports SARIF 2.1.0, the current release of the standard.\n"
+        ),
+    )
+
+    assert evergreen.find_violations(tmp_path) == []
+
+
 def test_find_violations_accepts_versioned_standard_and_contract_paths_and_navigation(tmp_path: Path) -> None:
     write_repo(
         tmp_path,
@@ -147,6 +162,34 @@ def test_find_violations_rejects_hardcoded_archlinternet_library_package_version
     violations = evergreen.find_violations(tmp_path)
 
     assert any("ArchLinterNet.Testing --version 9.8.7" in violation for violation in violations)
+
+
+def test_find_violations_rejects_noun_first_library_package_version(tmp_path: Path) -> None:
+    write_repo(
+        tmp_path,
+        guide=(
+            "# Test integration\n\n"
+            "`dotnet package add ArchLinterNet.Testing --version 9.8.7`\n"
+        ),
+    )
+
+    violations = evergreen.find_violations(tmp_path)
+
+    assert any("dotnet package add ArchLinterNet.Testing --version 9.8.7" in violation for violation in violations)
+
+
+def test_find_violations_rejects_noun_first_short_version_option(tmp_path: Path) -> None:
+    write_repo(
+        tmp_path,
+        guide=(
+            "# Test integration\n\n"
+            "`dotnet package add ArchLinterNet.Testing -v 9.8.7`\n"
+        ),
+    )
+
+    violations = evergreen.find_violations(tmp_path)
+
+    assert any("dotnet package add ArchLinterNet.Testing -v 9.8.7" in violation for violation in violations)
 
 
 def test_find_violations_rejects_hardcoded_archlinternet_package_reference(tmp_path: Path) -> None:
