@@ -113,6 +113,28 @@ def test_find_violations_rejects_hardcoded_archlinternet_cli_install_version(tmp
     assert any("pin ArchLinterNet package versions" in violation for violation in violations)
 
 
+def test_find_violations_rejects_global_tool_install_pin(tmp_path: Path) -> None:
+    write_repo(
+        tmp_path,
+        guide="`dotnet tool install --global ArchLinterNet.Cli --version 9.8.7`\n",
+    )
+
+    violations = evergreen.find_violations(tmp_path)
+
+    assert any("--global ArchLinterNet.Cli --version 9.8.7" in violation for violation in violations)
+
+
+def test_find_violations_rejects_tool_path_install_pin(tmp_path: Path) -> None:
+    write_repo(
+        tmp_path,
+        guide="`dotnet tool install --tool-path .tools ArchLinterNet.Cli --version 9.8.7`\n",
+    )
+
+    violations = evergreen.find_violations(tmp_path)
+
+    assert any("--tool-path .tools ArchLinterNet.Cli --version 9.8.7" in violation for violation in violations)
+
+
 def test_find_violations_rejects_hardcoded_archlinternet_library_package_version(tmp_path: Path) -> None:
     write_repo(
         tmp_path,
