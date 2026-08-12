@@ -22,17 +22,18 @@ PRODUCT_GUIDE_LABEL = r"(?:Adopt(?:ion)?(?:\s+or\s+Upgrade)?|Upgrade|Migration)"
 PRODUCT_RELEASE_PATH_QUALIFIER = (
     r"(?:release(?:-notes?)?|version|migration(?:-to)?|upgrade(?:-to)?|adopt(?:ion)?(?:-to)?)"
 )
+PRODUCT_PATH_SEPARATOR = r"[-_./]"
 VERSIONED_DOC_IDENTITY = re.compile(
     rf"(?i)(?:^|[/(`'\"]){PRODUCT_STYLE_DOC_IDENTITY}[-_]{PATH_VERSION}\b"
 )
 EXPLICIT_PRODUCT_VERSION_PATH = re.compile(
     rf"(?i)(?:^|/)(?:"
-    rf"archlinternet(?:[-_]{PRODUCT_RELEASE_PATH_QUALIFIER})?[-_]{PATH_VERSION}(?:[-_.][^/]*)?"
-    rf"|{PATH_VERSION}[-_]archlinternet(?:[-_]{PRODUCT_RELEASE_PATH_QUALIFIER})?"
+    rf"archlinternet(?:[-_.]{PRODUCT_RELEASE_PATH_QUALIFIER})?{PRODUCT_PATH_SEPARATOR}{PATH_VERSION}(?:[-_.][^/]*)?"
+    rf"|{PATH_VERSION}{PRODUCT_PATH_SEPARATOR}archlinternet(?:[-_.]{PRODUCT_RELEASE_PATH_QUALIFIER})?"
     rf")(?:/|\.md$|$)"
 )
 VERSION_FIRST_PRODUCT_DOC_PATH = re.compile(
-    rf"(?i)(?:^|/){PATH_VERSION}[-_]"
+    rf"(?i)(?:^|/){PATH_VERSION}[-_.]"
     rf"(?:migration|upgrade|release(?:-notes?)?|adopt(?:ion)?)"
     rf"(?:[-_.][^/]*)?(?:/|\.md$)"
 )
@@ -51,12 +52,12 @@ HARDCODED_LIBRARY_PACKAGE_PIN = re.compile(
 )
 HARDCODED_MSBUILD_PACKAGE_PIN = re.compile(
     rf"(?is)<(?:PackageReference|PackageVersion)\b"
-    rf"(?=[^>]*\b(?:Include|Update)=[\"']ArchLinterNet(?:\.[^\"']+)+[\"'])"
-    rf"(?=[^>]*\b(?:Version|VersionOverride)=[\"']{SEMVER}[\"'])[^>]*>"
+    rf"(?=[^>]*\b(?:Include|Update)\s*=\s*[\"']ArchLinterNet(?:\.[^\"']+)+[\"'])"
+    rf"(?=[^>]*\b(?:Version|VersionOverride)\s*=\s*[\"']{SEMVER}[\"'])[^>]*>"
 )
 HARDCODED_NESTED_MSBUILD_PACKAGE_PIN = re.compile(
     rf"(?is)<(?P<package_item>PackageReference|PackageVersion)\b"
-    rf"(?=[^>]*\b(?:Include|Update)=[\"']ArchLinterNet(?:\.[^\"']+)+[\"'])[^>]*>"
+    rf"(?=[^>]*\b(?:Include|Update)\s*=\s*[\"']ArchLinterNet(?:\.[^\"']+)+[\"'])[^>]*>"
     rf"(?:(?!</(?P=package_item)>).){{0,240}}?"
     rf"<(?:Version|VersionOverride)>\s*{SEMVER}\s*</(?:Version|VersionOverride)>"
 )
