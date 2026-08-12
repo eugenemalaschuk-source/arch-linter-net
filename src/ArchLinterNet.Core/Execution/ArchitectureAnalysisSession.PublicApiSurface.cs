@@ -44,14 +44,15 @@ public sealed partial class ArchitectureAnalysisSession
         return CapturePublicApiSurface(contract, out missingAssemblies, out _);
     }
 
-    // selectorSafetyViolations surfaces the same zero-match/first-party-escape fail-closed checks
-    // strict/audit validation runs (PR #529 review), so a selector configuration unsafe for
-    // `validate` cannot silently produce a usable snapshot through `capture`/`diff`/`update`/
-    // `migrate`. Ignore matching DOES apply to those checks — the same ignored_violations a reviewer
-    // already accepted in `validate` should not re-block the lifecycle that reuses this method.
-    // Internal: only the public-api application service (same assembly) currently needs the verdict;
-    // exposing it publicly is not required by any current caller and would grow the reviewed surface
-    // for no concrete need (this repository's own decision bias — see AGENTS.md).
+    // The selectorSafetyViolations output surfaces the same zero-match and first-party-escape
+    // fail-closed checks strict and audit validation already run, so an unsafe selector
+    // configuration cannot silently produce a usable snapshot through the capture, diff, update, or
+    // migrate lifecycle. Ignore matching applies to those checks too, so a violation a reviewer has
+    // already accepted during validation does not re-block this same lifecycle.
+    //
+    // This overload stays internal because only the public-api application service, in the same
+    // assembly, currently needs the verdict; exposing it publicly would grow the reviewed surface
+    // without an actual caller requiring it.
     internal IReadOnlyList<PublicApiSnapshotEntry> CapturePublicApiSurface(
         ArchitecturePublicApiSurfaceContract contract,
         out IReadOnlyList<string> missingAssemblies,
