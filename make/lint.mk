@@ -3,7 +3,7 @@
 CHANGED_FILES ?= changed-files.txt
 DIFF_STATUS   ?= ok
 
-lint: lint-code-size lint-dotnet-format lint-architecture lint-docs  ## Run all code quality checks
+lint: lint-code-size lint-dotnet-format lint-architecture lint-docs lint-test-shard-membership  ## Run all code quality checks
 
 lint-architecture:  ## Run strict architecture contracts on self
 	@dotnet build "$(PROJECT_ROOT)/src/ArchLinterNet.Cli/ArchLinterNet.Cli.csproj" --nologo -v minimal
@@ -60,6 +60,7 @@ test-tooling-coverage:  ## Run all Python tooling tests with coverage (coverage-
 	@cd "$(PROJECT_ROOT)" && UV_PROJECT_ENVIRONMENT="$(PROJECT_ROOT)/.venv" "$(UV)" run --project tools/pyproject.toml \
 		pytest tools/release/tests \
 		tools/scripts/tests/test_architecture_coverage_report.py \
+		tools/scripts/tests/test_verify_core_unit_shards.py \
 		--cov=tools/release --cov=tools/scripts \
 		--cov-report=xml:coverage-python.xml --cov-report=term-missing
 

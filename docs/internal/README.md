@@ -32,6 +32,8 @@ It is intentionally excluded from the public MkDocs/GitHub Pages product site.
 
 - [Policy import design examples](policy-import-examples/README.md) - fixture-ready positive and negative YAML examples.
 
+- [Core unit suite shard inventory](core-unit-shard-inventory.md) - measured fixture-duration baseline and rationale for the `ArchLinterNet.Core.Tests` CI shard partition (#478).
+
 ## Publishing rule
 
 Only public product documentation should appear in `mkdocs.yml` navigation and GitHub Pages output.

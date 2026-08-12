@@ -402,28 +402,48 @@ jobs:
   # the same hosted runner. Each bucket now gets its own matrix job/leg per platform (no artificial
   # `needs:` between them) so they schedule and run concurrently on independent runners instead.
   # See `make/test.mk` for the bucket filter definitions and placement rules.
+  # ArchLinterNet.Core.Tests has no assembly-level NUnit parallelism and is the dominant cost
+  # inside the unit bucket (see docs/internal/core-unit-shard-inventory.md), so it now runs as two
+  # deterministic shards (make/test.mk: TEST_CORE_UNIT_SHARD_1_FILTER/TEST_CORE_UNIT_SHARD_2_FILTER)
+  # instead of one monolithic per-platform job. Each (platform, shard) pair is its own matrix leg —
+  # no artificial `needs:` between shards, matching the unsharded e2e_tests/packed_artifact_tests
+  # jobs below. Shard 1's legs also run the unit bucket's non-Core assemblies (CEL.Tests/Cli.Tests
+  # — both already fast and, for Cli.Tests, already internally parallel) via test-unit-other, so
+  # every unit-eligible assembly still runs exactly once across the full unit_tests matrix.
   unit_tests:
     name: Unit Test Suite (${{ matrix.name }})
     if: github.event_name == 'pull_request'
     runs-on: ${{ matrix.os }}
     # Coverage-eligible unit/in-process correctness only — no subprocess builds or packing.
-    # Measured on the #475 topology PR: Apple Silicon macOS ~4.8m, Windows ~10m — the unit bucket
-    # alone runs meaningfully slower on Windows than on macOS. 30m gives headroom until enough
-    # Windows runs land to tighten this with real data.
+    # Measured on the #475 topology PR (pre-sharding): Apple Silicon macOS ~4.8m, Windows ~10m for
+    # the WHOLE unsharded bucket. Each shard leg here covers roughly half of that by discovered
+    # test count (see docs/internal/core-unit-shard-inventory.md), but local measurements swung
+    # wildly between shard-balance attempts and are not trusted as a predictor of CI timing — 20m
+    # keeps meaningful headroom below the prior 30m unsharded budget without repeating the flaky
+    # early-cancellation mistake #481 already documented from a too-tight cap. Tighten once real
+    # per-leg CI timings land.
     #
     # macos-15-intel was dropped from this matrix (and from e2e_tests/packed_artifact_tests below):
     # GitHub's Intel macOS runners are older hardware than the Apple Silicon (macos-14) runners and
     # ran the unit bucket roughly 2x slower (~12m vs ~5-7m) for no additional correctness signal on
     # this .NET/cross-platform-file-handling codebase — Apple Silicon macOS coverage is sufficient.
-    timeout-minutes: 30
+    timeout-minutes: 20
     strategy:
       fail-fast: false
       matrix:
         include:
           - os: windows-latest
-            name: Windows
+            name: Windows / Core Shard 1
+            shard: 1
+          - os: windows-latest
+            name: Windows / Core Shard 2
+            shard: 2
           - os: macos-14
-            name: Apple Silicon macOS
+            name: Apple Silicon macOS / Core Shard 1
+            shard: 1
+          - os: macos-14
+            name: Apple Silicon macOS / Core Shard 2
+            shard: 2
     permissions:
       contents: read
 
@@ -445,9 +465,14 @@ jobs:
       - name: Restore
         run: make restore
 
-      - name: Run unit test suite
+      - name: Run Core unit shard ${{ matrix.shard }}
         shell: bash
-        run: make test-unit
+        run: make test-unit-core-${{ matrix.shard }}
+
+      - name: Run non-Core unit assemblies (CEL.Tests, Cli.Tests)
+        if: matrix.shard == 1
+        shell: bash
+        run: make test-unit-other
 
   e2e_tests:
     name: E2E Test Suite (${{ matrix.name }})

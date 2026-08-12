@@ -20,13 +20,17 @@
 ##   make lint-dotnet-format                — verify C# formatting without changing files
 ##   make lint-docs                         — verify MkDocs documentation structure
 ##   make lint-workflows                    — lint GitHub Actions workflows
+##   make lint-test-shard-membership        — verify Core unit shard tokens are live and leak-free
 ##   make architecture-coverage-report      — show full-solution coverage report locally (Markdown + JSON)
 ##   make test-architecture-coverage-report — run tests for the coverage report generator
 ##
 ## Testing:
 ##   make acceptance           — lint + all tests
 ##   make test                 — run all tests (unit + E2E + packed-artifact buckets)
-##   make test-unit            — run only the coverage-eligible unit bucket
+##   make test-unit            — run the complete coverage-eligible unit bucket (both Core shards plus CEL/Cli)
+##   make test-unit-core-1     — run only Core unit shard 1 (heaviest fixture classes)
+##   make test-unit-core-2     — run only Core unit shard 2 (remainder)
+##   make test-unit-other      — run the unit bucket's non-Core assemblies (CEL.Tests, Cli.Tests)
 ##   make test-e2e             — run only the ordinary E2E bucket (excludes CheckpointBReleaseGateTests)
 ##   make test-packed-artifact — run only the packed-artifact release gate (CheckpointBReleaseGateTests)
 ##   make test-coverage        — run the unit bucket with coverage collection (cobertura XML)
