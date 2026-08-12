@@ -140,18 +140,22 @@ internal static class PublicApiSurfaceChecker
             yield break;
         }
 
-        HashSet<string> firstPartyTypeNames = new(
-            evaluation.ScannedByAssembly.Values.SelectMany(entries => entries).Select(entry => entry.DeclaringTypeName),
-            StringComparer.Ordinal);
-        HashSet<string> selectedTypeNames = new(
-            evaluation.GovernedByAssembly.Values.SelectMany(entries => entries).Select(entry => entry.DeclaringTypeName),
-            StringComparer.Ordinal);
+        // Keyed by (assembly, type name), not name alone: two distinct assemblies can legitimately
+        // export a type under the identical full name, and a name-only key would let a selected
+        // assembly's type mask an unselected same-named type from a different assembly.
+        HashSet<(string Assembly, string Type)> firstPartyTypes = new(
+            evaluation.ScannedByAssembly.Values.SelectMany(entries => entries)
+                .Select(entry => (entry.AssemblyName, entry.DeclaringTypeName)));
+        HashSet<(string Assembly, string Type)> selectedTypes = new(
+            evaluation.GovernedByAssembly.Values.SelectMany(entries => entries)
+                .Select(entry => (entry.AssemblyName, entry.DeclaringTypeName)));
 
         foreach (ArchitectureExportedApiEntry entry in evaluation.GovernedByAssembly.Values.SelectMany(entries => entries))
         {
-            foreach (string referenced in entry.ReferencedTypeFullNames)
+            foreach ((string referencedAssembly, string referencedType) in entry.ReferencedTypes)
             {
-                if (!firstPartyTypeNames.Contains(referenced) || selectedTypeNames.Contains(referenced))
+                (string, string) referenced = (referencedAssembly, referencedType);
+                if (!firstPartyTypes.Contains(referenced) || selectedTypes.Contains(referenced))
                 {
                     continue;
                 }
@@ -178,7 +182,7 @@ internal static class PublicApiSurfaceChecker
                         UndeclaredApiSignature: entry.Signature,
                         ApiAssemblyName: entry.AssemblyName,
                         ApiVisibility: entry.Visibility,
-                        UnselectedFirstPartyDependency: referenced),
+                        UnselectedFirstPartyDependency: referencedType),
                 };
             }
         }

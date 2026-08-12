@@ -82,9 +82,34 @@ namespace PublicApiSurfaceSelectorTestFixtures
         {
         }
 
-        public IncidentalType GetIncidental()
+        public static IncidentalType GetIncidental()
         {
             return new IncidentalType();
+        }
+    }
+
+    // Unselected first-party type referenced only through a generic method constraint, never through
+    // an ordinary parameter/return/field/property/event type — proves the escape check also walks
+    // generic parameter constraints, not just ordinary signature positions.
+    public class UnselectedConstraintTarget
+    {
+        public UnselectedConstraintTarget()
+        {
+        }
+
+        public int Value { get; set; }
+    }
+
+    [PublicApiContract]
+    public sealed class SelectedWithGenericConstraintEscape
+    {
+        public SelectedWithGenericConstraintEscape()
+        {
+        }
+
+        public static void Method<T>()
+            where T : UnselectedConstraintTarget
+        {
         }
     }
 }

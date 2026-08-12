@@ -10,11 +10,7 @@ public sealed partial class ArchitectureDiagnosticFormatter
 {
     private static string FormatPublicApiSurfaceContextForHumans(PublicApiSurfaceDiagnostic publicApiSurface)
     {
-        string reason = publicApiSurface.ForbiddenPublicConstant == true
-            ? "forbidden_public_constant"
-            : publicApiSurface.UnselectedFirstPartyDependency != null
-                ? "unselected_first_party_dependency"
-                : ReasonForDelta(publicApiSurface.ApiDeltaKind);
+        string reason = ReasonFor(publicApiSurface);
         string context = $" (reason: {reason}, assembly: {publicApiSurface.ApiAssemblyName}, " +
                $"visibility: {publicApiSurface.ApiVisibility}, signature: {publicApiSurface.UndeclaredApiSignature}";
 
@@ -34,6 +30,21 @@ public sealed partial class ArchitectureDiagnosticFormatter
         }
 
         return context + ")";
+    }
+
+    private static string ReasonFor(PublicApiSurfaceDiagnostic publicApiSurface)
+    {
+        if (publicApiSurface.ForbiddenPublicConstant == true)
+        {
+            return "forbidden_public_constant";
+        }
+
+        if (publicApiSurface.UnselectedFirstPartyDependency != null)
+        {
+            return "unselected_first_party_dependency";
+        }
+
+        return ReasonForDelta(publicApiSurface.ApiDeltaKind);
     }
 
     private static string ReasonForDelta(string? apiDeltaKind) => apiDeltaKind switch

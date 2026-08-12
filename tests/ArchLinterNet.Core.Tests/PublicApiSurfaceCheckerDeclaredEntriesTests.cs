@@ -33,7 +33,7 @@ public sealed class PublicApiSurfaceCheckerDeclaredEntriesTests
     {
         return new ArchitectureExportedApiEntry(
             BaseSignature, exactSignature, "Acme.Shared.Thing", assemblyName, "public", false, null,
-            Array.Empty<string>());
+            Array.Empty<(string, string)>());
     }
 
     [Test]

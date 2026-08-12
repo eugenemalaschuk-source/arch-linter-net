@@ -1,3 +1,5 @@
+using System.Reflection;
+using System.Reflection.Emit;
 using ArchLinterNet.Core.Contracts;
 using ArchLinterNet.Core.Contracts.Families;
 using ArchLinterNet.Core.Execution;
@@ -291,6 +293,102 @@ public sealed class PublicApiSurfaceSelectorTests
         Assert.That(violations.Any(v =>
             v.SourceType == typeof(Fixtures.SelectedByAttribute).FullName
             && (v.Payload as PublicApiSurfacePayload)?.UnselectedFirstPartyDependency != null), Is.False);
+    }
+
+    // Regression (PR #529 review): the escape check's first-party/selected sets used to be keyed on
+    // bare type full name. In a multi-assembly contract, a same-named type SELECTED in one assembly
+    // could mask an unselected same-named type in a different assembly, turning a real escape into a
+    // false green. The check must be keyed on (assembly, type name), not name alone.
+    [Test]
+    public void SelectedMember_ReferencingUnselectedFirstPartyType_IsNotMaskedBySameNamedSelectedTypeInAnotherAssembly()
+    {
+        Assembly decoyAssembly = BuildDecoyAssemblyWithSameNamedSelectedType();
+        string decoyAssemblyName = decoyAssembly.GetName().Name!;
+
+        var contract = new ArchitecturePublicApiSurfaceContract
+        {
+            Name = "surface",
+            Assemblies = new List<string> { AssemblyName, decoyAssemblyName },
+            SurfaceSelector = new ArchitecturePublicApiSurfaceSelector
+            {
+                HasAttribute = typeof(Fixtures.PublicApiContractAttribute).FullName!,
+            },
+        };
+        var document = new ArchitectureContractDocument
+        {
+            Version = 1,
+            Name = "Test",
+            Analysis = new ArchitectureAnalysisConfiguration
+            {
+                TargetAssemblies = new List<string> { AssemblyName, decoyAssemblyName },
+            },
+            Classification = new ArchitectureClassificationConfiguration(),
+            Contracts = new ArchitectureContractGroups
+            {
+                StrictPublicApiSurface = new List<ArchitecturePublicApiSurfaceContract> { contract },
+            },
+        };
+        var context = new ArchitectureAnalysisContext(
+            "/tmp",
+            new[] { typeof(PublicApiSurfaceSelectorTests).Assembly, decoyAssembly },
+            Array.Empty<string>(),
+            Array.Empty<string>());
+        var runner = new ArchitectureContractRunner(context, document);
+
+        List<ArchitectureViolation> violations = runner.Session.CheckPublicApiSurfaceContract(contract);
+
+        bool escapeStillReported = violations.Any(v =>
+            v.SourceType == typeof(Fixtures.SelectedWithEscapingDependency).FullName
+            && (v.Payload as PublicApiSurfacePayload)?.UnselectedFirstPartyDependency
+                == typeof(Fixtures.IncidentalType).FullName);
+        Assert.That(escapeStillReported, Is.True,
+            "a same-named selected type in a different assembly must not mask an unselected first-party escape");
+    }
+
+    // Builds a second, independent assembly declaring a public type under the identical full name as
+    // Fixtures.IncidentalType, itself carrying the selector's marker attribute (so it IS selected in
+    // its own assembly) — the exact shape needed to reproduce the name-only masking bug.
+    private static Assembly BuildDecoyAssemblyWithSameNamedSelectedType()
+    {
+        AssemblyName assemblyName = new($"PublicApiSurfaceSelectorDecoy-{Guid.NewGuid():N}");
+        AssemblyBuilder assemblyBuilder = AssemblyBuilder.DefineDynamicAssembly(assemblyName, AssemblyBuilderAccess.Run);
+        ModuleBuilder moduleBuilder = assemblyBuilder.DefineDynamicModule("MainModule");
+        TypeBuilder typeBuilder = moduleBuilder.DefineType(
+            typeof(Fixtures.IncidentalType).FullName!, TypeAttributes.Public | TypeAttributes.Sealed);
+
+        ConstructorInfo attributeCtor = typeof(Fixtures.PublicApiContractAttribute).GetConstructor(Type.EmptyTypes)!;
+        typeBuilder.SetCustomAttribute(new CustomAttributeBuilder(attributeCtor, Array.Empty<object>()));
+
+        typeBuilder.CreateType();
+        return assemblyBuilder;
+    }
+
+    // Regression (PR #529 review): a first-party type referenced only through a generic method
+    // constraint (`where T : HiddenExported`), never through an ordinary parameter/return/field/
+    // property/event type, must still fail closed — the exact public API grammar already treats
+    // generic constraints as part of a member's signature (ArchitecturePublicApiSignatureDetails), so
+    // the escape check must walk them too.
+    [Test]
+    public void SelectedMember_GenericMethodConstraintReferencingUnselectedFirstPartyType_FailsClosed()
+    {
+        var contract = new ArchitecturePublicApiSurfaceContract
+        {
+            Name = "surface",
+            Assemblies = new List<string> { AssemblyName },
+            SurfaceSelector = new ArchitecturePublicApiSurfaceSelector
+            {
+                HasAttribute = typeof(Fixtures.PublicApiContractAttribute).FullName!,
+            },
+        };
+        var runner = CreateRunner(contract);
+
+        List<ArchitectureViolation> violations = runner.Session.CheckPublicApiSurfaceContract(contract);
+
+        ArchitectureViolation? escape = violations.FirstOrDefault(v =>
+            v.SourceType == typeof(Fixtures.SelectedWithGenericConstraintEscape).FullName
+            && (v.Payload as PublicApiSurfacePayload)?.UnselectedFirstPartyDependency
+                == typeof(Fixtures.UnselectedConstraintTarget).FullName);
+        Assert.That(escape, Is.Not.Null);
     }
 
     // Scenario 10: backward compatibility — no selector governs everything, exactly as before #525.

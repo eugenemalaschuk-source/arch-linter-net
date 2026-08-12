@@ -9,7 +9,10 @@ namespace ArchLinterNet.Core.Scanning;
 // ExactSignature adds the deterministic detail suffix that identity deliberately drops — constant
 // values, accessor shape, static/ref/out/in, sealed/abstract, enum underlying type, generic
 // constraints — and is what a reviewed snapshot records. Keeping both is what lets an existing
-// inline allowlist and an exact snapshot coexist on the same contract.
+// inline allowlist and an exact snapshot coexist on the same contract. ReferencedTypes is
+// assembly-qualified, not just full name: two distinct assemblies can legitimately export a type
+// under the identical full name, so a first-party-escape check keyed on name alone could let a
+// selected assembly's type mask an unselected same-named type from a different assembly.
 internal readonly record struct ArchitectureExportedApiEntry(
     string Signature,
     string ExactSignature,
@@ -18,7 +21,7 @@ internal readonly record struct ArchitectureExportedApiEntry(
     string Visibility,
     bool IsConst,
     string? ConstQualifiedName,
-    IReadOnlyList<string> ReferencedTypeFullNames);
+    IReadOnlyList<(string AssemblyName, string TypeFullName)> ReferencedTypes);
 
 // Reflection-based enumeration of a type's exported (public/protected/protected-internal) surface,
 // normalized into deterministic signature strings. Mirrors the defensive-reflection posture used by
@@ -42,11 +45,16 @@ internal static class ArchitecturePublicApiSurfaceScanner
             string typeName = ArchitectureTypeNames.SafeFullName(type);
             string typeSignature = NormalizeType(type);
             string typeVisibility = TypeVisibility(type);
+            // A generic type's own declaration can reference a first-party type purely through a
+            // constraint (`class Foo<T> where T : HiddenExported`), with no member involved at all.
+            (string, string)[] typeReferenced = type.IsGenericTypeDefinition
+                ? ReferencedTypes(Array.Empty<Type>(), type.GetGenericArguments())
+                : Array.Empty<(string, string)>();
             yield return new ArchitectureExportedApiEntry(
                 typeSignature,
                 ArchitecturePublicApiSignatureDetails.Compose(
                     typeSignature, ArchitecturePublicApiSignatureDetails.ForType(type, typeVisibility)),
-                typeName, assemblyName, typeVisibility, false, null, Array.Empty<string>());
+                typeName, assemblyName, typeVisibility, false, null, typeReferenced);
 
             foreach (ArchitectureExportedApiEntry member in GetExportedMembers(type, assemblyName))
             {
@@ -166,8 +174,7 @@ internal static class ArchitecturePublicApiSurfaceScanner
             if (signature != null)
             {
                 string visibility = MemberVisibility(ctor);
-                IReadOnlyList<string> referenced = ReferencedTypeFullNames(
-                    SafeGetParameters(ctor).Select(p => p.ParameterType).ToArray());
+                var referenced = ReferencedTypes(SafeGetParameters(ctor).Select(p => p.ParameterType));
                 yield return new ArchitectureExportedApiEntry(
                     signature,
                     ArchitecturePublicApiSignatureDetails.Compose(
@@ -196,8 +203,9 @@ internal static class ArchitecturePublicApiSurfaceScanner
             if (signature != null)
             {
                 string visibility = MemberVisibility(method);
-                IReadOnlyList<string> referenced = ReferencedTypeFullNames(
-                    SafeGetParameters(method).Select(p => p.ParameterType).Append(method.ReturnType).ToArray());
+                Type[]? genericParameters = method.IsGenericMethodDefinition ? method.GetGenericArguments() : null;
+                var referenced = ReferencedTypes(
+                    SafeGetParameters(method).Select(p => p.ParameterType).Append(method.ReturnType), genericParameters);
                 yield return new ArchitectureExportedApiEntry(
                     signature,
                     ArchitecturePublicApiSignatureDetails.Compose(
@@ -225,9 +233,8 @@ internal static class ArchitecturePublicApiSurfaceScanner
             string? signature = TryNormalizeProperty(type, property);
             if (signature != null)
             {
-                IReadOnlyList<string> referenced = ReferencedTypeFullNames(
-                    new[] { property.PropertyType }.Concat(
-                        SafeGetIndexParameters(property).Select(p => p.ParameterType)).ToArray());
+                var referenced = ReferencedTypes(
+                    new[] { property.PropertyType }.Concat(SafeGetIndexParameters(property).Select(p => p.ParameterType)));
                 yield return new ArchitectureExportedApiEntry(
                     signature,
                     ArchitecturePublicApiSignatureDetails.Compose(
@@ -268,7 +275,7 @@ internal static class ArchitecturePublicApiSurfaceScanner
                 ArchitecturePublicApiSignatureDetails.Compose(
                     signature, ArchitecturePublicApiSignatureDetails.ForField(field, fieldVisibility)),
                 declaringTypeName, assemblyName, fieldVisibility, isConst, constQualifiedName,
-                ReferencedTypeFullNames(field.FieldType));
+                ReferencedTypes(new[] { field.FieldType }));
         }
     }
 
@@ -296,15 +303,19 @@ internal static class ArchitecturePublicApiSurfaceScanner
                 ArchitecturePublicApiSignatureDetails.Compose(
                     eventSignature, ArchitecturePublicApiSignatureDetails.ForEvent(evt, eventVisibility)),
                 declaringTypeName, assemblyName, eventVisibility, false, null,
-                ReferencedTypeFullNames(handlerType!));
+                ReferencedTypes(new[] { handlerType! }));
         }
     }
 
-    // Distinct full names of every type a member's signature references (parameter/return/field/
-    // property/event-handler types), walking through array/pointer/byref wrappers and generic
-    // instantiations. Used to fail closed when a selected member depends on an unselected
-    // first-party exported type (issue #525) — not full C#-syntax rendering, just type identity.
-    private static IReadOnlyList<string> ReferencedTypeFullNames(params Type[] types)
+    // Distinct, assembly-qualified identity of every type a member's signature references
+    // (parameter/return/field/property/event-handler types, plus its own generic parameters'
+    // constraints when genericParameters is supplied), walking through array/pointer/byref wrappers
+    // and generic instantiations. Used to fail closed when a selected member depends on an
+    // unselected first-party exported type (issue #525) — not full C#-syntax rendering, just type
+    // identity. Assembly-qualified because two distinct assemblies can legitimately export a type
+    // under the identical full name.
+    private static (string AssemblyName, string TypeFullName)[] ReferencedTypes(
+        IEnumerable<Type> types, IEnumerable<Type>? genericParameters = null)
     {
         var collected = new HashSet<Type>();
         foreach (Type type in types)
@@ -312,7 +323,21 @@ internal static class ArchitecturePublicApiSurfaceScanner
             CollectReferencedTypes(type, collected);
         }
 
-        return collected.Select(ArchitectureTypeNames.SafeFullName).Distinct(StringComparer.Ordinal).ToArray();
+        if (genericParameters != null)
+        {
+            foreach (Type parameter in genericParameters)
+            {
+                foreach (Type constraint in SafeGetGenericParameterConstraints(parameter))
+                {
+                    CollectReferencedTypes(constraint, collected);
+                }
+            }
+        }
+
+        return collected
+            .Select(type => (SafeAssemblyName(type), ArchitectureTypeNames.SafeFullName(type)))
+            .Distinct()
+            .ToArray();
     }
 
     private static void CollectReferencedTypes(Type type, HashSet<Type> collected)
@@ -345,6 +370,38 @@ internal static class ArchitecturePublicApiSurfaceScanner
         }
 
         collected.Add(type);
+    }
+
+    private static string SafeAssemblyName(Type type)
+    {
+        try
+        {
+            return type.Assembly.GetName().Name ?? string.Empty;
+        }
+        catch (TypeLoadException)
+        {
+            return string.Empty;
+        }
+        catch (FileNotFoundException)
+        {
+            return string.Empty;
+        }
+    }
+
+    private static Type[] SafeGetGenericParameterConstraints(Type parameter)
+    {
+        try
+        {
+            return parameter.GetGenericParameterConstraints();
+        }
+        catch (TypeLoadException)
+        {
+            return Array.Empty<Type>();
+        }
+        catch (FileNotFoundException)
+        {
+            return Array.Empty<Type>();
+        }
     }
 
     private static Type? SafeGetElementType(Type type)
