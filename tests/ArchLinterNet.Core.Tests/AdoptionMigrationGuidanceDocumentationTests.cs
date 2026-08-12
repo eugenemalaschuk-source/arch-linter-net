@@ -9,31 +9,31 @@ namespace ArchLinterNet.Core.Tests;
 public sealed class AdoptionMigrationGuidanceDocumentationTests
 {
     [Test]
-    public void MigrationGuide_SeparatesGreenfieldAndUpgradePathsWithSafeReleaseBoundary()
+    public void UpgradeGuide_SeparatesGreenfieldAndExistingPolicyPathsWithoutReleaseIdentity()
     {
-        string guide = ReadNormalizedDocumentation("guides/migration-to-0-5-1.md");
+        string guide = ReadNormalizedDocumentation("guides/upgrading.md");
 
         Assert.Multiple(() =>
         {
-            Assert.That(guide, Does.Contain("# Adopt or Upgrade to 0.5.1"));
+            Assert.That(guide, Does.Contain("# Adopt or Upgrade ArchLinterNet"));
             Assert.That(guide, Does.Contain("## Greenfield adoption"));
-            Assert.That(guide, Does.Contain("## Upgrade from 0.5.0"));
-            Assert.That(guide, Does.Contain("Checkpoint A is internal integration evidence"));
-            Assert.That(guide, Does.Contain("not a package release or a support promise"));
+            Assert.That(guide, Does.Contain("## Upgrade an existing policy"));
+            Assert.That(guide, Does.Contain("package releases and persisted document/schema versions have separate lifecycles"));
             Assert.That(guide, Does.Contain("dotnet arch-linter-net policy check"));
             Assert.That(guide, Does.Contain("solution: Example.Product.slnx"));
             Assert.That(guide, Does.Contain("dotnet build Example.Product.slnx --no-restore"));
             Assert.That(guide, Does.Contain("--ensure-built --no-restore"));
             Assert.That(guide, Does.Contain("changed`, `stale`, or `ambiguous`"));
             Assert.That(guide, Does.Contain("CI uses read-only `baseline verify`"));
-            Assert.That(guide, Does.Contain("must never regenerate, update, or commit"));
+            Assert.That(guide, Does.Contain("must never regenerate, update, or commit accepted debt"));
+            Assert.That(guide, Does.Not.Match(@"Adopt or Upgrade (?:to )?v?\d+\.\d+\.\d+"));
         });
     }
 
     [Test]
-    public void MigrationGuide_DocumentsInstalledSchemasReportsAndExecutionControls()
+    public void UpgradeGuide_DocumentsInstalledSchemasReportsAndExecutionControls()
     {
-        string guide = ReadNormalizedDocumentation("guides/migration-to-0-5-1.md");
+        string guide = ReadNormalizedDocumentation("guides/upgrading.md");
 
         Assert.Multiple(() =>
         {
@@ -46,16 +46,18 @@ public sealed class AdoptionMigrationGuidanceDocumentationTests
             Assert.That(guide, Does.Contain("--max-parallelism 1"));
             Assert.That(guide, Does.Contain("typed `cancelled` completion"));
             Assert.That(guide, Does.Contain("Human output is complete without color or a TTY"));
+            Assert.That(guide, Does.Contain("`.config/dotnet-tools.json`"));
         });
     }
 
     [Test]
-    public void ReferenceEntrypoints_PreserveArgumentsStreamsAndExitStatus()
+    public void ReferenceEntrypoints_PreserveArgumentsStreamsAndExitStatusWithoutDocsOwnedPackagePin()
     {
         string entrypoints = ReadNormalizedDocumentation("guides/reference-entrypoints.md");
 
         Assert.Multiple(() =>
         {
+            Assert.That(entrypoints, Does.Contain("# Reference Entrypoints"));
             Assert.That(entrypoints, Does.Contain("## Direct pinned .NET tool"));
             Assert.That(entrypoints, Does.Contain("## POSIX shell"));
             Assert.That(entrypoints, Does.Contain("## PowerShell"));
@@ -69,34 +71,36 @@ public sealed class AdoptionMigrationGuidanceDocumentationTests
             Assert.That(entrypoints, Does.Contain("& dotnet @arguments"));
             Assert.That(entrypoints, Does.Contain("$LASTEXITCODE"));
             Assert.That(entrypoints, Does.Contain("Do not use `Invoke-Expression`"));
-            Assert.That(entrypoints, Does.Contain("do not interpolate untrusted values"));
             Assert.That(entrypoints, Does.Contain("task --exit-code architecture"));
             Assert.That(entrypoints, Does.Contain("does not preserve the product exit code"));
+            Assert.That(entrypoints, Does.Contain("`.config/dotnet-tools.json`"));
+            Assert.That(entrypoints, Does.Not.Match(@"ArchLinterNet\.Cli --version v?\d+\.\d+\.\d+"));
         });
     }
 
     [Test]
-    public void NavigationAndPublicReferences_LinkToCanonicalGuidance()
+    public void NavigationAndPublicReferences_UseEvergreenCanonicalGuidance()
     {
-        string nav = File.ReadAllText(Path.Combine(RepositoryRoot(), "mkdocs.yml"));
-        string readme = File.ReadAllText(Path.Combine(RepositoryRoot(), "README.md"));
-        string releaseNotes = ReadDocumentation("reference/release-notes-0-5-1.md");
+        string root = RepositoryRoot();
+        string nav = File.ReadAllText(Path.Combine(root, "mkdocs.yml"));
+        string readme = File.ReadAllText(Path.Combine(root, "README.md"));
 
         Assert.Multiple(() =>
         {
-            Assert.That(nav, Does.Contain("guides/migration-to-0-5-1.md"));
+            Assert.That(nav, Does.Contain("guides/upgrading.md"));
             Assert.That(nav, Does.Contain("guides/reference-entrypoints.md"));
-            Assert.That(nav, Does.Contain("reference/release-notes-0-5-1.md"));
-            Assert.That(readme, Does.Contain("0.6.1 is the public adoption package line"));
-            Assert.That(readme, Does.Contain("`adoption-stabilization/v1` schema registry"));
-            Assert.That(readme, Does.Contain("Checkpoint A is internal evidence only"));
-            Assert.That(releaseNotes, Does.Contain("0.5.1 is the single public adoption-stabilization release"));
-            Assert.That(releaseNotes, Does.Contain("schema list"));
+            Assert.That(nav, Does.Not.Contain("migration-to-0-5-1.md"));
+            Assert.That(nav, Does.Not.Contain("release-notes-0-5-1.md"));
+            Assert.That(readme, Does.Contain("/guides/upgrading/"));
+            Assert.That(readme, Does.Contain("Reference entrypoints"));
+            Assert.That(readme, Does.Not.Contain("public adoption package line"));
+            Assert.That(File.Exists(Path.Combine(root, "docs", "guides", "migration-to-0-5-1.md")), Is.False);
+            Assert.That(File.Exists(Path.Combine(root, "docs", "reference", "release-notes-0-5-1.md")), Is.False);
         });
     }
 
     [Test]
-    public void PublicSchemaGuidance_MapsTheProductLineToOnlyShippedSchemaIdentities()
+    public void PublicSchemaGuidance_UsesInstalledRegistryWithoutTreatingPackageSemVerAsSchemaIdentity()
     {
         string root = RepositoryRoot();
         string schemaReference = ReadDocumentation("reference/yaml-schema.md");
@@ -117,10 +121,10 @@ public sealed class AdoptionMigrationGuidanceDocumentationTests
 
         Assert.Multiple(() =>
         {
-            Assert.That(normalizedGuidance, Does.Contain("0.6.1 package line"));
-            Assert.That(normalizedGuidance, Does.Contain("0.5.1"));
             Assert.That(normalizedGuidance, Does.Contain("independently from package SemVer"));
-            Assert.That(normalizedGuidance, Does.Contain("no `schema/0.6.0` identity is shipped"));
+            Assert.That(normalizedGuidance, Does.Contain("schema list"));
+            Assert.That(normalizedGuidance, Does.Not.Contain("public adoption package line"));
+            Assert.That(normalizedGuidance, Does.Not.Match(@"current public .*package line"));
             Assert.That(documentedIds, Is.Not.Empty);
             Assert.That(documentedIds, Is.SubsetOf(supportedIds));
         });
