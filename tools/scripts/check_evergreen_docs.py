@@ -16,15 +16,20 @@ from pathlib import Path
 
 SEMVER = r"v?\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?"
 DOTTED_OR_DASHED_VERSION = r"v?\d+[.-]\d+[.-]\d+"
-PRODUCT_CONCEPT = r"(?:archlinternet|release(?:-notes?)?|migration|upgrade|adopt(?:ion)?)"
+PRODUCT_STYLE_DOC_IDENTITY = r"(?:migration-to|upgrade-to|release-notes?|adopt(?:ion)?-to)"
 VERSIONED_DOC_IDENTITY = re.compile(
-    r"(?i)(?:migration-to|upgrade-to|release-notes?|adopt(?:ion)?-to)[-_]v?\d+[-.]\d+[-.]\d+"
+    rf"(?i)(?:^|[/(`'\"\s]){PRODUCT_STYLE_DOC_IDENTITY}[-_]{DOTTED_OR_DASHED_VERSION}\b"
 )
-PRODUCT_VERSION_PATH = re.compile(
+EXPLICIT_PRODUCT_VERSION_PATH = re.compile(
     rf"(?i)(?:^|/)(?:"
-    rf"{PRODUCT_CONCEPT}[^/]*?[-_]{DOTTED_OR_DASHED_VERSION}"
-    rf"|{DOTTED_OR_DASHED_VERSION}[^/]*?[-_]{PRODUCT_CONCEPT}"
+    rf"archlinternet[^/]*?[-_]{DOTTED_OR_DASHED_VERSION}"
+    rf"|{DOTTED_OR_DASHED_VERSION}[^/]*?[-_]archlinternet"
     rf")[^/]*(?:/|\.md$)"
+)
+VERSION_FIRST_PRODUCT_DOC_PATH = re.compile(
+    rf"(?i)(?:^|/){DOTTED_OR_DASHED_VERSION}[-_]"
+    rf"(?:migration|upgrade|release(?:-notes?)?|adopt(?:ion)?)"
+    rf"(?:[-_.][^/]*)?(?:/|\.md$)"
 )
 HARDCODED_TOOL_PACKAGE_PIN = re.compile(
     rf"(?i)dotnet\s+tool\s+(?:install|update)\b"
@@ -70,10 +75,11 @@ VERSIONED_HEADING = re.compile(
     rf")"
 )
 VERSIONED_NAV_CONCEPT = re.compile(
-    rf"(?i)(?:Adopt|Upgrade|Migration|Release\s+Notes?|Reference\s+Entrypoints?)[^\n]{{0,60}}\b{SEMVER}\b"
-    rf"|\b{SEMVER}\b[^\n]{{0,60}}(?:Adopt|Upgrade|Migration|Release\s+Notes?|Reference\s+Entrypoints?)"
+    rf"(?i)^\s*-\s+(?:"
+    rf"(?:Adopt|Upgrade|Migration|Release\s+Notes?|Reference\s+Entrypoints?)[^:\n]{{0,60}}\b{SEMVER}\b"
     rf"|ArchLinterNet\s+{SEMVER}\b"
-    rf"|\b{SEMVER}\b\s+ArchLinterNet"
+    rf"|\b{SEMVER}\b[^:\n]{{0,60}}(?:ArchLinterNet|Adopt|Upgrade|Migration|Release\s+Notes?|Reference\s+Entrypoints?)"
+    rf")"
 )
 
 
@@ -98,7 +104,11 @@ def path_violations(root: Path, paths: list[Path]) -> list[str]:
         relative = path.relative_to(root).as_posix()
         if relative == "README.md":
             continue
-        if VERSIONED_DOC_IDENTITY.search(relative) or PRODUCT_VERSION_PATH.search(relative):
+        if (
+            VERSIONED_DOC_IDENTITY.search(relative)
+            or EXPLICIT_PRODUCT_VERSION_PATH.search(relative)
+            or VERSION_FIRST_PRODUCT_DOC_PATH.search(relative)
+        ):
             violations.append(
                 f"{relative}: ArchLinterNet product release must not be a public docs path identity"
             )
@@ -113,7 +123,7 @@ def content_violations(root: Path, paths: list[Path]) -> list[str]:
 
         for match in VERSIONED_DOC_IDENTITY.finditer(text):
             violations.append(
-                f"{relative}: version-named evergreen docs reference '{match.group(0)}'"
+                f"{relative}: version-named evergreen docs reference '{match.group(0).lstrip('/ (`\"\'')}'"
             )
 
         for pattern in (
