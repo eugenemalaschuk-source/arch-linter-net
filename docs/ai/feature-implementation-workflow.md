@@ -91,19 +91,54 @@ Before adding an abstraction, layer, service, interface, manager, facade, or ext
 
 ## 4. Validation lifecycle
 
-Implementation is incomplete until validation succeeds.
+Implementation is incomplete until validation succeeds. Local validation is risk-based: scope it to the change instead of always running the entire repository suite. Exhaustive, cross-platform validation is authoritative in PR CI, not a local ritual — see [Risk-based local validation](#risk-based-local-validation) below.
 
-Execute in order:
+Always required locally, for every change:
 
-1. Add or update relevant tests.
-1. Run focused tests when useful.
-1. Run `make fmt`.
-1. Inspect formatting changes.
-1. Run `make acceptance`.
-1. Fix issue-related failures.
-1. Rerun validation until it passes.
+1. Add or update the tests that prove the issue behavior.
+1. Run the most focused relevant test/filter first.
+1. Run `make fmt` (or the equivalent formatter) on changed files and inspect the formatting diff.
+1. Run relevant OpenSpec validation when OpenSpec applies.
+1. Run any repository lint directly implicated by the change.
 
-Do not open a PR when formatting or acceptance was not executed, related failures remain, or success cannot be established. For an environment blocker, report the exact command, observed failure, unvalidated scope, and required prerequisite.
+Then expand validation according to the change's risk tier, per the table below. Fix issue-related failures and rerun validation until the locally-required checks pass.
+
+Do not open a PR when the locally-required checks for the change's risk tier were not executed, related failures remain, or success cannot be established. For an environment blocker, report the exact command, observed failure, unvalidated scope, and required prerequisite.
+
+### Risk-based local validation
+
+Classify the change into exactly one tier and apply its required local validation. When a change spans tiers, use the higher tier.
+
+**Focused / localized change** — one contract handler or validator, one CLI command path, one CEL parser/evaluator behavior, a documentation-only change, or a workflow-only change:
+
+- focused changed/new tests;
+- the directly affected test project/family, where reasonably bounded;
+- relevant formatter/linter/spec checks.
+- Full `make acceptance` is **not mandatory** before opening a PR.
+
+**Cross-cutting change** — shared Core infrastructure, public API or schema changes, cache/build-state/cancellation/concurrency primitives, broad policy-loading/import behavior, or changes spanning multiple production projects:
+
+- focused tests;
+- all directly affected project/family suites;
+- relevant lint/spec checks;
+- broader validation when impact cannot be bounded confidently.
+- `make acceptance` is recommended when it materially increases confidence, but is not a ritual prerequisite when CI is available and exhaustive CI will run before merge.
+
+**Release / publication / CI-authority change** — release-candidate or packed-artifact authorization, publishing/versioning, changes to CI topology or required checks themselves, or cases where CI cannot exercise the relevant environment:
+
+- the broadest locally available validation appropriate to the task;
+- keep any existing release-specific full gates mandatory.
+
+### Opening the PR without a full local `make acceptance`
+
+A PR may be opened after successful risk-appropriate local validation even when `make acceptance` was not run. When doing so:
+
+- list the exact local commands run and their results in the PR body;
+- state explicitly when exhaustive validation is delegated to CI, e.g.: `Local validation: focused Core tests + make fmt + OpenSpec validation` / `Full acceptance: delegated to PR CI`;
+- never fabricate or imply a full local pass that did not happen;
+- do not wait for CI completion before opening the PR, unless the issue specifically requires CI evidence before the PR can be meaningfully created.
+
+`make acceptance` remains the full local repository gate. It stays available and unchanged, and is expected for maintainer/manual verification, cross-cutting or release work where it materially increases confidence, and any case where CI is unavailable.
 
 ## 5. Spec synchronization and archive
 
@@ -127,7 +162,7 @@ Before opening the PR, verify:
 - the branch is issue-specific and is not `main`;
 - tests were updated where needed;
 - `make fmt` passed;
-- `make acceptance` passed;
+- the [risk-based local validation](#risk-based-local-validation) required for the change's tier passed — `make acceptance` is only required when the tier mandates it;
 - specs match implementation;
 - `opsx-archive` completed when applicable;
 - the diff contains no unrelated files, secrets, temporary files, or local artifacts.
@@ -142,7 +177,7 @@ Open exactly one PR targeting `main` unless repository instructions specify othe
 - `Tests run`
 - `Risks / follow-ups`
 
-List exact validation commands and results. Do not hide unfinished issue scope as a follow-up.
+List exact validation commands and results, and state which validation is delegated to CI (see [Opening the PR without a full local `make acceptance`](#opening-the-pr-without-a-full-local-make-acceptance)). Do not hide unfinished issue scope as a follow-up.
 
 ## Decision bias
 

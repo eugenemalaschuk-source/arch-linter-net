@@ -20,6 +20,8 @@ make architecture-coverage-report  # full-solution coverage report (Markdown + J
 ```
 All `dotnet test`/`dotnet format` targets use `--no-restore` — run `restore` first when adding/changing dependencies.
 
+`make acceptance` is the full local repository gate, not a mandatory step before every PR. Local validation for a feature implementation is risk-based — see [docs/ai/feature-implementation-workflow.md](docs/ai/feature-implementation-workflow.md), the single source of truth for the validation lifecycle. Exhaustive, cross-platform validation is authoritative in PR CI.
+
 Run a single test project:
 ```
 dotnet test tests/ArchLinterNet.Core.Tests --no-restore
