@@ -15,12 +15,20 @@ import sys
 from pathlib import Path
 
 SEMVER = r"v?\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?"
-PATH_SEMVER = re.compile(r"(?i)(?:^|[-_/])v?\d+(?:[.-])\d+(?:[.-])\d+(?:[-_./]|$)")
 VERSIONED_DOC_IDENTITY = re.compile(
     r"(?i)(?:migration-to|upgrade-to|release-notes?|adopt(?:ion)?-to)[-_]v?\d+[-.]\d+[-.]\d+"
 )
-HARDCODED_TOOL_INSTALL = re.compile(
-    rf"(?i)ArchLinterNet\.Cli\s+--version\s+{SEMVER}"
+PRODUCT_VERSION_PATH = re.compile(
+    r"(?i)(?:^|/)(?:archlinternet[-_]?v?\d+[.-]\d+[.-]\d+|v\d+[.-]\d+[.-]\d+)(?:[-_.][^/]*)?(?:/|\.md$)"
+)
+HARDCODED_TOOL_PACKAGE_PIN = re.compile(
+    rf"(?i)dotnet\s+tool\s+(?:install|update)\s+ArchLinterNet(?:\.[A-Za-z0-9]+)+[^\n]{{0,80}}--version\s+{SEMVER}"
+)
+HARDCODED_LIBRARY_PACKAGE_PIN = re.compile(
+    rf"(?i)dotnet\s+add\s+package\s+ArchLinterNet(?:\.[A-Za-z0-9]+)+[^\n]{{0,80}}--version\s+{SEMVER}"
+)
+HARDCODED_PACKAGE_REFERENCE = re.compile(
+    rf"(?i)<PackageReference\b(?=[^>\n]*\bInclude=[\"']ArchLinterNet(?:\.[^\"']+)+[\"'])(?=[^>\n]*\bVersion=[\"']{SEMVER}[\"'])[^>\n]*>"
 )
 PRODUCT_RELEASE_PROSE = re.compile(
     rf"(?i)(?:ArchLinterNet|package)\s+(?:version|release|package\s+line|public\s+package\s+line|public\s+adoption\s+package\s+line)"
@@ -29,8 +37,15 @@ PRODUCT_RELEASE_PROSE = re.compile(
 CURRENT_LINE_PROSE = re.compile(
     rf"(?i)\b(?:current|public)\b[^\n]{{0,60}}\b(?:package|release)\b[^\n]{{0,60}}\b{SEMVER}\b"
 )
+VERSION_FIRST_RELEASE_PROSE = re.compile(
+    rf"(?i)\b{SEMVER}\b[^\n]{{0,60}}\b(?:current|public)\b[^\n]{{0,60}}\b(?:package|release)\b"
+)
 VERSIONED_HEADING = re.compile(
     rf"(?im)^#{{1,6}}\s+[^\n]*(?:ArchLinterNet|Adopt|Upgrade|Migration|Release\s+Notes?)[^\n]*\b{SEMVER}\b"
+)
+VERSIONED_NAV_CONCEPT = re.compile(
+    rf"(?i)(?:ArchLinterNet|Adopt|Upgrade|Migration|Release\s+Notes?|Reference\s+Entrypoints?)[^\n]{{0,60}}\b{SEMVER}\b"
+    rf"|\b{SEMVER}\b[^\n]{{0,60}}(?:ArchLinterNet|Adopt|Upgrade|Migration|Release\s+Notes?|Reference\s+Entrypoints?)"
 )
 
 
@@ -55,9 +70,9 @@ def path_violations(root: Path, paths: list[Path]) -> list[str]:
         relative = path.relative_to(root).as_posix()
         if relative == "README.md":
             continue
-        if VERSIONED_DOC_IDENTITY.search(relative) or PATH_SEMVER.search(relative):
+        if VERSIONED_DOC_IDENTITY.search(relative) or PRODUCT_VERSION_PATH.search(relative):
             violations.append(
-                f"{relative}: product release SemVer must not be a public docs path identity"
+                f"{relative}: ArchLinterNet product release must not be a public docs path identity"
             )
     return violations
 
@@ -73,10 +88,16 @@ def content_violations(root: Path, paths: list[Path]) -> list[str]:
                 f"{relative}: version-named evergreen docs reference '{match.group(0)}'"
             )
 
-        for match in HARDCODED_TOOL_INSTALL.finditer(text):
-            violations.append(
-                f"{relative}: pin package versions in the tool manifest, not evergreen docs: '{match.group(0)}'"
-            )
+        for pattern in (
+            HARDCODED_TOOL_PACKAGE_PIN,
+            HARDCODED_LIBRARY_PACKAGE_PIN,
+            HARDCODED_PACKAGE_REFERENCE,
+        ):
+            for match in pattern.finditer(text):
+                snippet = " ".join(match.group(0).split())
+                violations.append(
+                    f"{relative}: pin ArchLinterNet package versions in repository package/tool metadata, not evergreen docs: '{snippet}'"
+                )
 
         # Release-process and schema-reference pages may discuss SemVer or exact
         # immutable machine identifiers because versioning is the subject there.
@@ -84,7 +105,12 @@ def content_violations(root: Path, paths: list[Path]) -> list[str]:
             "docs/reference/release-process.md",
             "docs/reference/yaml-schema.md",
         }:
-            for pattern in (PRODUCT_RELEASE_PROSE, CURRENT_LINE_PROSE, VERSIONED_HEADING):
+            for pattern in (
+                PRODUCT_RELEASE_PROSE,
+                CURRENT_LINE_PROSE,
+                VERSION_FIRST_RELEASE_PROSE,
+                VERSIONED_HEADING,
+            ):
                 for match in pattern.finditer(text):
                     snippet = " ".join(match.group(0).split())
                     violations.append(
@@ -108,9 +134,9 @@ def navigation_violations(root: Path) -> list[str]:
             in_nav = False
         if not in_nav:
             continue
-        if VERSIONED_DOC_IDENTITY.search(line) or re.search(SEMVER, line):
+        if VERSIONED_DOC_IDENTITY.search(line) or VERSIONED_NAV_CONCEPT.search(line):
             violations.append(
-                f"mkdocs.yml:{line_number}: public navigation must use a version-neutral identity: {line.strip()}"
+                f"mkdocs.yml:{line_number}: public navigation must use a version-neutral ArchLinterNet product identity: {line.strip()}"
             )
 
     return violations
