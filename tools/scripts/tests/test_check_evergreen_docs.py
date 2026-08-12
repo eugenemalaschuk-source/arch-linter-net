@@ -90,7 +90,6 @@ def test_rejects_product_release_paths(tmp_path: Path) -> None:
         (guides / name).write_text("# Versioned product doc\n", encoding="utf-8")
 
     violations = evergreen.find_violations(tmp_path)
-
     for name in names:
         assert any(name in violation for violation in violations)
 
@@ -116,12 +115,18 @@ def test_rejects_product_release_prose_but_not_schema_ids(tmp_path: Path) -> Non
     )
 
 
-def test_rejects_version_first_public_package_line(tmp_path: Path) -> None:
-    write_repo(tmp_path, guide="0.6.4 is the public adoption package line for ArchLinterNet.\n")
-
-    assert any(
-        "product package SemVer is coupled" in item for item in evergreen.find_violations(tmp_path)
+def test_rejects_version_first_product_status(tmp_path: Path) -> None:
+    write_repo(
+        tmp_path,
+        guide=(
+            "0.6.4 is the public adoption package line for ArchLinterNet.\n"
+            "9.8.7 is the current ArchLinterNet release.\n"
+        ),
     )
+
+    violations = evergreen.find_violations(tmp_path)
+    assert any("0.6.4" in item for item in violations)
+    assert any("9.8.7" in item for item in violations)
 
 
 def test_rejects_versioned_product_heading_and_navigation(tmp_path: Path) -> None:
@@ -133,6 +138,7 @@ def test_rejects_versioned_product_heading_and_navigation(tmp_path: Path) -> Non
             "nav:\n"
             "  - Guides:\n"
             "      - Upgrade to 9.8.7: guides/upgrading.md\n"
+            "      - ArchLinterNet release 9.8.7: guides/upgrading.md\n"
             "exclude_docs: |\n"
             "  internal/\n"
         ),
@@ -140,7 +146,8 @@ def test_rejects_versioned_product_heading_and_navigation(tmp_path: Path) -> Non
 
     violations = evergreen.find_violations(tmp_path)
     assert any("product package SemVer is coupled" in item for item in violations)
-    assert any("public navigation" in item for item in violations)
+    assert any("Upgrade to 9.8.7" in item for item in violations)
+    assert any("ArchLinterNet release 9.8.7" in item for item in violations)
 
 
 def test_rejects_tool_package_pins_in_supported_argument_forms(tmp_path: Path) -> None:
@@ -181,6 +188,7 @@ def test_rejects_msbuild_and_tool_manifest_package_pins(tmp_path: Path) -> None:
         '<PackageVersion Include="ArchLinterNet.Testing" Version="9.8.7" />',
         '<PackageReference Include="ArchLinterNet.Testing" VersionOverride="9.8.7" />',
         '<PackageReference Include="ArchLinterNet.Testing">\n  <Version>9.8.7</Version>\n</PackageReference>',
+        '<PackageVersion Include="ArchLinterNet.Testing">\n  <Version>9.8.7</Version>\n</PackageVersion>',
         '"ArchLinterNet.Cli": { "version": "9.8.7", "commands": ["arch-linter-net"] }',
     )
     for index, snippet in enumerate(snippets):
