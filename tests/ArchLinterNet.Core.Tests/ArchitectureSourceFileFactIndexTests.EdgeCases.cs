@@ -247,7 +247,14 @@ public sealed partial class ArchitectureSourceFileFactIndexTests
     // itself is covered by the implementation unit-reading the reflectionFactsByName list count.
 
     private static readonly Assembly _coreAssembly = typeof(ArchitectureDeclaredTypeFact).Assembly;
-    private static readonly Assembly[] _testAndCoreAssemblies = [_testAssembly, _coreAssembly];
+
+    // Self-contained (not [_testAssembly, _coreAssembly]): _testAssembly is declared in the other
+    // partial file (ArchitectureSourceFileFactIndexTests.cs), and C# does not guarantee static
+    // field-initializer order across partial-class files, only within one file. Referencing it here
+    // risked reading a default(Assembly) if the compiler happened to initialize this file's fields
+    // first.
+    private static readonly Assembly[] _testAndCoreAssemblies =
+        [typeof(ArchitectureSourceFileFactIndexTests).Assembly, _coreAssembly];
     private static readonly string[] _featureXSymbols = ["FEATURE_X"];
     private static readonly string[] _singleSourceRoot = ["src"];
     private static readonly string[] _foreignSourceRoot = ["foreign"];
