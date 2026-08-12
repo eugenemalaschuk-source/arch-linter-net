@@ -64,7 +64,13 @@ internal sealed record BaselineVerifyCommandOptions(
     string? ConditionSetName,
     string Format,
     IReadOnlyList<string> ContractIds,
-    bool ShowHelp)
+    bool ShowHelp,
+    bool EnsureBuilt = false,
+    bool NoRestore = false,
+    string? Configuration = null,
+    string? TargetFramework = null,
+    string? Platform = null,
+    string? RuntimeIdentifier = null)
 {
     public bool HasFormatConflict { get; init; }
 }
