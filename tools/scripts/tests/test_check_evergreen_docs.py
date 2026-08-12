@@ -71,6 +71,7 @@ def test_find_violations_accepts_versioned_standard_and_contract_paths_and_navig
             "      - Protocol v2.1.0: reference/v2.1.0.md\n"
             "      - SARIF Migration to 2.1.0: reference/sarif-migration-to-2.1.0.md\n"
             "      - SARIF Release Notes 2.1.0: reference/sarif-release-notes-2.1.0.md\n"
+            "      - Upgrade SARIF to 2.1.0: reference/sarif-upgrade-to-2.1.0.md\n"
             "exclude_docs: |\n"
             "  internal/\n"
         ),
@@ -89,6 +90,10 @@ def test_find_violations_accepts_versioned_standard_and_contract_paths_and_navig
     )
     (tmp_path / "docs" / "reference" / "sarif-release-notes-2.1.0.md").write_text(
         "# SARIF Release Notes 2.1.0\n\nStandard release reference.\n",
+        encoding="utf-8",
+    )
+    (tmp_path / "docs" / "reference" / "sarif-upgrade-to-2.1.0.md").write_text(
+        "# Upgrade SARIF to 2.1.0\n\nStandard upgrade reference.\n",
         encoding="utf-8",
     )
 
@@ -239,6 +244,36 @@ def test_find_violations_rejects_hardcoded_archlinternet_package_reference(tmp_p
     assert any("PackageReference" in violation and "9.8.7" in violation for violation in violations)
 
 
+def test_find_violations_rejects_nested_archlinternet_package_reference(tmp_path: Path) -> None:
+    write_repo(
+        tmp_path,
+        guide=(
+            "<PackageReference Include=\"ArchLinterNet.Testing\">\n"
+            "  <Version>9.8.7</Version>\n"
+            "</PackageReference>\n"
+        ),
+    )
+
+    violations = evergreen.find_violations(tmp_path)
+
+    assert any("PackageReference" in violation and "9.8.7" in violation for violation in violations)
+
+
+def test_nested_package_guard_does_not_cross_into_neighbor(tmp_path: Path) -> None:
+    write_repo(
+        tmp_path,
+        guide=(
+            "<PackageReference Include=\"ArchLinterNet.Testing\">\n"
+            "</PackageReference>\n"
+            "<PackageReference Include=\"Newtonsoft.Json\">\n"
+            "  <Version>13.0.4</Version>\n"
+            "</PackageReference>\n"
+        ),
+    )
+
+    assert evergreen.find_violations(tmp_path) == []
+
+
 def test_find_violations_rejects_central_package_version_pin(tmp_path: Path) -> None:
     write_repo(
         tmp_path,
@@ -299,6 +334,17 @@ def test_sample_markdown_is_part_of_public_guard(tmp_path: Path) -> None:
     violations = evergreen.find_violations(tmp_path)
 
     assert any("samples/Example/README.md" in violation for violation in violations)
+
+
+def test_release_process_may_use_explicit_product_version_examples(tmp_path: Path) -> None:
+    write_repo(tmp_path)
+    (tmp_path / "docs" / "reference" / "release-process.md").write_text(
+        "# Release Process\n\n"
+        "Example candidate check: `dotnet tool install ArchLinterNet.Cli --version 9.8.7`.\n",
+        encoding="utf-8",
+    )
+
+    assert evergreen.find_violations(tmp_path) == []
 
 
 def test_find_violations_rejects_versioned_mkdocs_navigation(tmp_path: Path) -> None:
