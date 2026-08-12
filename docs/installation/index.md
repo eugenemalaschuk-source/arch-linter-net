@@ -27,9 +27,13 @@ dotnet run --project src/ArchLinterNet.Cli -- \
 After the CLI package is available on NuGet.org:
 
 ```bash
-dotnet tool install --global ArchLinterNet.Cli --version 0.5.1
+dotnet tool install --global ArchLinterNet.Cli
 arch-linter-net --help
 ```
+
+For reproducible repository/CI use, prefer a local tool manifest below. A global
+install follows the package source selected by the caller and should not be used
+as an implicit repository version policy.
 
 Run validation:
 
@@ -44,14 +48,20 @@ For repository-pinned usage, create or update a tool manifest:
 ```bash
 dotnet new tool-manifest
 
-dotnet tool install ArchLinterNet.Cli --version 0.5.1
+dotnet tool install ArchLinterNet.Cli
 
 dotnet tool restore
 
 dotnet arch-linter-net --policy architecture/dependencies.arch.yml --mode strict
 ```
 
-Local tools are recommended for CI because the tool version is pinned in the repository.
+The install records the exact resolved package version in
+`.config/dotnet-tools.json`. Review and commit that manifest. When upgrading,
+run `dotnet tool update ArchLinterNet.Cli`, review the manifest diff, and run the
+repository acceptance gate before merging it.
+
+Local tools are recommended for CI because the selected tool version is pinned
+in the repository rather than in evergreen documentation.
 
 ## NuGet packages for test integration
 
@@ -100,8 +110,8 @@ For local tools, prefer:
 ```
 
 See [CI integration](../guides/ci-integration.md) for strict + audit workflows.
-For the 0.5.1 greenfield and upgrade paths, including prepared/offline
-environments, see [Adopt or Upgrade to 0.5.1](../guides/migration-to-0-5-1.md).
+For greenfield adoption, upgrades, and prepared/offline environments, see
+[Adopt or Upgrade ArchLinterNet](../guides/upgrading.md).
 
 ## NuGet.org links
 
