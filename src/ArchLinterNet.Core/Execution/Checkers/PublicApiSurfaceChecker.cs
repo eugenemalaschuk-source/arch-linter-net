@@ -13,12 +13,14 @@ internal static class PublicApiSurfaceChecker
     private const string RemovedDelta = "removed";
     private const string ChangedDelta = "changed";
     private const string UnusableSnapshotDelta = "snapshot-unusable";
+    private const string ZeroMatchDelta = "selector-zero-match";
     private const string ViolationCategory = "public API surface";
 
     public static List<ArchitectureViolation> Check(
         ArchitecturePublicApiSurfaceContract contract,
         IReadOnlyDictionary<string, Assembly> resolvedAssemblies,
-        ArchitectureContractExecutionContext executionContext)
+        ArchitectureContractExecutionContext executionContext,
+        Func<Type, bool>? surfaceSelectorPredicate)
     {
         // A missing, unparsable, or foreign snapshot is deliberately not a policy-load failure (see
         // PublicApiSnapshotResolver), so validation is where it has to become loud. Reporting the
@@ -28,8 +30,21 @@ internal static class PublicApiSurfaceChecker
             return new List<ArchitectureViolation> { UnusableSnapshotViolation(contract) };
         }
 
-        Evaluation evaluation = Evaluate(contract, resolvedAssemblies);
+        Evaluation evaluation = Evaluate(contract, resolvedAssemblies, surfaceSelectorPredicate);
+
+        // Selector resolution needs reflected assemblies, unavailable at policy-load time, so a
+        // required selector matching nothing has to become loud here instead — mirroring the
+        // ApiSnapshotError short-circuit above — or a typo'd selector would silently pass strict
+        // validation with an empty effective surface.
+        if (contract.SurfaceSelector != null
+            && evaluation.ScannedByAssembly.Count > 0
+            && evaluation.GovernedByAssembly.Values.All(entries => entries.Count == 0))
+        {
+            return new List<ArchitectureViolation> { ZeroMatchSelectorViolation(contract) };
+        }
+
         List<ArchitectureViolation> violations = CollectSurfaceViolations(contract, evaluation, executionContext);
+        violations.AddRange(CollectFirstPartyEscapeViolations(contract, evaluation, executionContext));
 
         AddDeltaViolations(contract, evaluation.Delta.Removed, RemovedDelta, executionContext, violations);
         AddDeltaViolations(contract, evaluation.Delta.Changed, ChangedDelta, executionContext, violations);
@@ -39,7 +54,8 @@ internal static class PublicApiSurfaceChecker
 
     private static Evaluation Evaluate(
         ArchitecturePublicApiSurfaceContract contract,
-        IReadOnlyDictionary<string, Assembly> resolvedAssemblies)
+        IReadOnlyDictionary<string, Assembly> resolvedAssemblies,
+        Func<Type, bool>? surfaceSelectorPredicate)
     {
         // The reviewed snapshot records the exact grammar (base signature plus the detail suffix
         // carrying constant values, accessor shape, static/ref/out/in, sealed/abstract, generic
@@ -50,20 +66,29 @@ internal static class PublicApiSurfaceChecker
         Dictionary<string, List<ArchitectureExportedApiEntry>> scannedByAssembly =
             ScanContractAssemblies(contract, resolvedAssemblies);
 
+        // scannedByAssembly stays the full, unfiltered first-party universe (used by the escape
+        // check below); governedByAssembly is what a selector, when configured, actually governs —
+        // every other computation (violations, exact diff) targets the governed set so a type
+        // outside the selected surface is never enumerated or reported at all.
+        Dictionary<string, List<ArchitectureExportedApiEntry>> governedByAssembly = surfaceSelectorPredicate == null
+            ? scannedByAssembly
+            : FilterToSelected(scannedByAssembly, resolvedAssemblies, surfaceSelectorPredicate);
+
         // Exact mode replaces "is this signature declared?" with a correlated delta, so a re-signed
         // member reports once as a change instead of as an unrelated addition plus removal. It only
         // runs when every declared assembly actually resolved: against a partially resolved
         // contract, every entry of the missing assembly would masquerade as a removal.
         bool exact = string.Equals(contract.ApiComparison, PublicApiComparisonModes.Exact, StringComparison.Ordinal)
-            && scannedByAssembly.Count == contract.Assemblies.Distinct(StringComparer.Ordinal).Count();
+            && governedByAssembly.Count == contract.Assemblies.Distinct(StringComparer.Ordinal).Count();
 
         PublicApiDelta delta = exact
             ? PublicApiSnapshotDiffer.Diff(
-                DeclaredEntries(contract, scannedByAssembly, exactGrammar),
-                ActualEntries(scannedByAssembly, exactGrammar))
+                DeclaredEntries(contract, governedByAssembly, exactGrammar),
+                ActualEntries(governedByAssembly, exactGrammar))
             : PublicApiDelta.Empty;
 
         return new Evaluation(
+            governedByAssembly,
             scannedByAssembly,
             exactGrammar,
             exact,
@@ -75,13 +100,110 @@ internal static class PublicApiSurfaceChecker
             new HashSet<string>(contract.AllowedPublicConstants, StringComparer.Ordinal));
     }
 
+    // Per-assembly selected type full names, computed once and applied to that assembly's already-
+    // scanned entries. Assembly keys mirror scannedByAssembly (only resolved assemblies), values
+    // filtered to what the selector actually matched — possibly empty, which is what the zero-match
+    // check above looks for.
+    private static Dictionary<string, List<ArchitectureExportedApiEntry>> FilterToSelected(
+        Dictionary<string, List<ArchitectureExportedApiEntry>> scannedByAssembly,
+        IReadOnlyDictionary<string, Assembly> resolvedAssemblies,
+        Func<Type, bool> surfaceSelectorPredicate)
+    {
+        Dictionary<string, List<ArchitectureExportedApiEntry>> governed = new(StringComparer.Ordinal);
+
+        foreach ((string assemblyName, List<ArchitectureExportedApiEntry> entries) in scannedByAssembly)
+        {
+            if (!resolvedAssemblies.TryGetValue(assemblyName, out Assembly? assembly))
+            {
+                continue;
+            }
+
+            HashSet<string> selectedTypeNames =
+                ArchitecturePublicApiSurfaceScanner.SelectedTypeFullNames(assembly, surfaceSelectorPredicate);
+            governed[assemblyName] = entries.Where(entry => selectedTypeNames.Contains(entry.DeclaringTypeName)).ToList();
+        }
+
+        return governed;
+    }
+
+    // Fails closed when a governed (selected) member's signature depends on a first-party exported
+    // type (declared in one of the contract's own assemblies) that surface_selector did not itself
+    // select — never applicable when no selector is configured, since every first-party type is
+    // governed by construction in that case.
+    private static IEnumerable<ArchitectureViolation> CollectFirstPartyEscapeViolations(
+        ArchitecturePublicApiSurfaceContract contract,
+        Evaluation evaluation,
+        ArchitectureContractExecutionContext executionContext)
+    {
+        if (contract.SurfaceSelector == null)
+        {
+            yield break;
+        }
+
+        HashSet<string> firstPartyTypeNames = new(
+            evaluation.ScannedByAssembly.Values.SelectMany(entries => entries).Select(entry => entry.DeclaringTypeName),
+            StringComparer.Ordinal);
+        HashSet<string> selectedTypeNames = new(
+            evaluation.GovernedByAssembly.Values.SelectMany(entries => entries).Select(entry => entry.DeclaringTypeName),
+            StringComparer.Ordinal);
+
+        foreach (ArchitectureExportedApiEntry entry in evaluation.GovernedByAssembly.Values.SelectMany(entries => entries))
+        {
+            foreach (string referenced in entry.ReferencedTypeFullNames)
+            {
+                if (!firstPartyTypeNames.Contains(referenced) || selectedTypeNames.Contains(referenced))
+                {
+                    continue;
+                }
+
+                if (executionContext.IsIgnored(
+                        entry.DeclaringTypeName,
+                        entry.Signature,
+                        sourceAssembly: entry.AssemblyName,
+                        targetAssembly: entry.AssemblyName,
+                        targetType: entry.DeclaringTypeName,
+                        targetMember: entry.Signature))
+                {
+                    continue;
+                }
+
+                yield return new ArchitectureViolation(
+                    contract.Name,
+                    contract.Id,
+                    entry.DeclaringTypeName,
+                    ViolationCategory,
+                    new[] { entry.Signature })
+                {
+                    Payload = new PublicApiSurfacePayload(
+                        UndeclaredApiSignature: entry.Signature,
+                        ApiAssemblyName: entry.AssemblyName,
+                        ApiVisibility: entry.Visibility,
+                        UnselectedFirstPartyDependency: referenced),
+                };
+            }
+        }
+    }
+
+    private static ArchitectureViolation ZeroMatchSelectorViolation(ArchitecturePublicApiSurfaceContract contract)
+    {
+        const string Message =
+            "surface_selector matched zero exported types across the contract's resolved assemblies.";
+        return new ArchitectureViolation(
+            contract.Name, contract.Id, contract.Name, "public API surface selector", new[] { Message })
+        {
+            Payload = new PublicApiSurfacePayload(
+                UndeclaredApiSignature: Message,
+                ApiDeltaKind: ZeroMatchDelta),
+        };
+    }
+
     private static List<ArchitectureViolation> CollectSurfaceViolations(
         ArchitecturePublicApiSurfaceContract contract,
         Evaluation evaluation,
         ArchitectureContractExecutionContext executionContext)
     {
         return contract.Assemblies
-            .Select(assemblyName => evaluation.ScannedByAssembly.GetValueOrDefault(assemblyName))
+            .Select(assemblyName => evaluation.GovernedByAssembly.GetValueOrDefault(assemblyName))
             .Where(scanned => scanned != null)
             .SelectMany(scanned => OrderedViolations(contract, evaluation, scanned!))
             .Select(verdict => TryBuildViolation(contract, evaluation, verdict, executionContext))
@@ -297,6 +419,7 @@ internal static class PublicApiSurfaceChecker
     }
 
     private sealed record Evaluation(
+        Dictionary<string, List<ArchitectureExportedApiEntry>> GovernedByAssembly,
         Dictionary<string, List<ArchitectureExportedApiEntry>> ScannedByAssembly,
         bool ExactGrammar,
         bool Exact,

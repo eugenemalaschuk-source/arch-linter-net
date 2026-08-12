@@ -39,7 +39,8 @@ public sealed class PublicApiSurfaceCheckerTests
             [assemblyName] = _fixturesAssembly,
         };
 
-        List<ArchitectureViolation> violations = PublicApiSurfaceChecker.Check(contract, resolvedAssemblies, CreateExecutionContext());
+        List<ArchitectureViolation> violations = PublicApiSurfaceChecker.Check(
+            contract, resolvedAssemblies, CreateExecutionContext(), surfaceSelectorPredicate: null);
 
         Assert.That(violations.Any(v => v.SourceType == TypeName && (v.Payload as PublicApiSurfacePayload)?.UndeclaredApiSignature == $"class {TypeName}"), Is.True);
     }
@@ -63,7 +64,8 @@ public sealed class PublicApiSurfaceCheckerTests
         List<ArchitectureViolation> violations = PublicApiSurfaceChecker.Check(
             contract,
             new Dictionary<string, Assembly>(StringComparer.Ordinal) { [assemblyName] = _fixturesAssembly },
-            context);
+            context,
+            surfaceSelectorPredicate: null);
 
         Assert.That(candidates, Has.Count.EqualTo(violations.Count));
         Assert.That(candidates.Select(candidate => candidate.Identity!.Occurrence), Is.All.EqualTo(0));

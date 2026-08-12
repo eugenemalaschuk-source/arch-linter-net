@@ -2,6 +2,8 @@ using System.Reflection;
 using System.Runtime.CompilerServices;
 
 namespace ArchLinterNet.Core.Scanning;
+// Note: relies on System.Linq extension methods (Select/Where/Concat/Distinct/ToArray/ToHashSet)
+// available via ArchLinterNet.Core's global usings.
 
 // Signature is the legacy `declared_api` identity (kind + name + parameter/member types).
 // ExactSignature adds the deterministic detail suffix that identity deliberately drops — constant
@@ -15,7 +17,8 @@ internal readonly record struct ArchitectureExportedApiEntry(
     string AssemblyName,
     string Visibility,
     bool IsConst,
-    string? ConstQualifiedName);
+    string? ConstQualifiedName,
+    IReadOnlyList<string> ReferencedTypeFullNames);
 
 // Reflection-based enumeration of a type's exported (public/protected/protected-internal) surface,
 // normalized into deterministic signature strings. Mirrors the defensive-reflection posture used by
@@ -34,13 +37,8 @@ internal static class ArchitecturePublicApiSurfaceScanner
     {
         string assemblyName = assembly.GetName().Name ?? string.Empty;
 
-        foreach (Type type in ArchitectureTypeScanner.GetLoadableTypes(assembly))
+        foreach (Type type in GetExportedTypes(assembly))
         {
-            if (!IsExportedType(type) || IsCompilerGenerated(type))
-            {
-                continue;
-            }
-
             string typeName = ArchitectureTypeNames.SafeFullName(type);
             string typeSignature = NormalizeType(type);
             string typeVisibility = TypeVisibility(type);
@@ -48,13 +46,40 @@ internal static class ArchitecturePublicApiSurfaceScanner
                 typeSignature,
                 ArchitecturePublicApiSignatureDetails.Compose(
                     typeSignature, ArchitecturePublicApiSignatureDetails.ForType(type, typeVisibility)),
-                typeName, assemblyName, typeVisibility, false, null);
+                typeName, assemblyName, typeVisibility, false, null, Array.Empty<string>());
 
             foreach (ArchitectureExportedApiEntry member in GetExportedMembers(type, assemblyName))
             {
                 yield return member;
             }
         }
+    }
+
+    // The exported type universe GetExportedSurface enumerates, factored out so a surface_selector
+    // predicate (issue #525) can be evaluated against exactly the same candidate types without
+    // duplicating the visibility-chain filter.
+    internal static IEnumerable<Type> GetExportedTypes(Assembly assembly)
+    {
+        foreach (Type type in ArchitectureTypeScanner.GetLoadableTypes(assembly))
+        {
+            if (!IsExportedType(type) || IsCompilerGenerated(type))
+            {
+                continue;
+            }
+
+            yield return type;
+        }
+    }
+
+    // Full names of exported types selected by predicate, for the checker/session to determine
+    // which of an assembly's exported types a surface_selector matched, without exposing Type
+    // objects (or the selector matching engine) outside this scanning layer.
+    public static HashSet<string> SelectedTypeFullNames(Assembly assembly, Func<Type, bool> predicate)
+    {
+        return GetExportedTypes(assembly)
+            .Where(predicate)
+            .Select(ArchitectureTypeNames.SafeFullName)
+            .ToHashSet(StringComparer.Ordinal);
     }
 
     // A type is exported if it (and every enclosing type, for nested types) is itself public, or
@@ -141,11 +166,13 @@ internal static class ArchitecturePublicApiSurfaceScanner
             if (signature != null)
             {
                 string visibility = MemberVisibility(ctor);
+                IReadOnlyList<string> referenced = ReferencedTypeFullNames(
+                    SafeGetParameters(ctor).Select(p => p.ParameterType).ToArray());
                 yield return new ArchitectureExportedApiEntry(
                     signature,
                     ArchitecturePublicApiSignatureDetails.Compose(
                         signature, ArchitecturePublicApiSignatureDetails.ForMethod(ctor, visibility)),
-                    declaringTypeName, assemblyName, visibility, false, null);
+                    declaringTypeName, assemblyName, visibility, false, null, referenced);
             }
         }
     }
@@ -169,11 +196,13 @@ internal static class ArchitecturePublicApiSurfaceScanner
             if (signature != null)
             {
                 string visibility = MemberVisibility(method);
+                IReadOnlyList<string> referenced = ReferencedTypeFullNames(
+                    SafeGetParameters(method).Select(p => p.ParameterType).Append(method.ReturnType).ToArray());
                 yield return new ArchitectureExportedApiEntry(
                     signature,
                     ArchitecturePublicApiSignatureDetails.Compose(
                         signature, ArchitecturePublicApiSignatureDetails.ForMethod(method, visibility)),
-                    declaringTypeName, assemblyName, visibility, false, null);
+                    declaringTypeName, assemblyName, visibility, false, null, referenced);
             }
         }
     }
@@ -196,11 +225,15 @@ internal static class ArchitecturePublicApiSurfaceScanner
             string? signature = TryNormalizeProperty(type, property);
             if (signature != null)
             {
+                IReadOnlyList<string> referenced = ReferencedTypeFullNames(
+                    new[] { property.PropertyType }.Concat(
+                        SafeGetIndexParameters(property).Select(p => p.ParameterType)).ToArray());
                 yield return new ArchitectureExportedApiEntry(
                     signature,
                     ArchitecturePublicApiSignatureDetails.Compose(
                         signature, ArchitecturePublicApiSignatureDetails.ForProperty(property)),
-                    declaringTypeName, assemblyName, AccessorVisibility(property.GetMethod, property.SetMethod), false, null);
+                    declaringTypeName, assemblyName, AccessorVisibility(property.GetMethod, property.SetMethod), false, null,
+                    referenced);
             }
         }
     }
@@ -234,7 +267,8 @@ internal static class ArchitecturePublicApiSurfaceScanner
                 signature,
                 ArchitecturePublicApiSignatureDetails.Compose(
                     signature, ArchitecturePublicApiSignatureDetails.ForField(field, fieldVisibility)),
-                declaringTypeName, assemblyName, fieldVisibility, isConst, constQualifiedName);
+                declaringTypeName, assemblyName, fieldVisibility, isConst, constQualifiedName,
+                ReferencedTypeFullNames(field.FieldType));
         }
     }
 
@@ -261,7 +295,103 @@ internal static class ArchitecturePublicApiSurfaceScanner
                 eventSignature,
                 ArchitecturePublicApiSignatureDetails.Compose(
                     eventSignature, ArchitecturePublicApiSignatureDetails.ForEvent(evt, eventVisibility)),
-                declaringTypeName, assemblyName, eventVisibility, false, null);
+                declaringTypeName, assemblyName, eventVisibility, false, null,
+                ReferencedTypeFullNames(handlerType!));
+        }
+    }
+
+    // Distinct full names of every type a member's signature references (parameter/return/field/
+    // property/event-handler types), walking through array/pointer/byref wrappers and generic
+    // instantiations. Used to fail closed when a selected member depends on an unselected
+    // first-party exported type (issue #525) — not full C#-syntax rendering, just type identity.
+    private static IReadOnlyList<string> ReferencedTypeFullNames(params Type[] types)
+    {
+        var collected = new HashSet<Type>();
+        foreach (Type type in types)
+        {
+            CollectReferencedTypes(type, collected);
+        }
+
+        return collected.Select(ArchitectureTypeNames.SafeFullName).Distinct(StringComparer.Ordinal).ToArray();
+    }
+
+    private static void CollectReferencedTypes(Type type, HashSet<Type> collected)
+    {
+        if (type.IsByRef || type.IsPointer || type.IsArray)
+        {
+            Type? element = SafeGetElementType(type);
+            if (element != null)
+            {
+                CollectReferencedTypes(element, collected);
+            }
+
+            return;
+        }
+
+        if (type.IsGenericParameter)
+        {
+            return;
+        }
+
+        if (type.IsGenericType && !type.IsGenericTypeDefinition)
+        {
+            collected.Add(type.GetGenericTypeDefinition());
+            foreach (Type argument in type.GetGenericArguments())
+            {
+                CollectReferencedTypes(argument, collected);
+            }
+
+            return;
+        }
+
+        collected.Add(type);
+    }
+
+    private static Type? SafeGetElementType(Type type)
+    {
+        try
+        {
+            return type.GetElementType();
+        }
+        catch (TypeLoadException)
+        {
+            return null;
+        }
+        catch (FileNotFoundException)
+        {
+            return null;
+        }
+    }
+
+    private static ParameterInfo[] SafeGetParameters(MethodBase method)
+    {
+        try
+        {
+            return method.GetParameters();
+        }
+        catch (TypeLoadException)
+        {
+            return Array.Empty<ParameterInfo>();
+        }
+        catch (FileNotFoundException)
+        {
+            return Array.Empty<ParameterInfo>();
+        }
+    }
+
+    private static ParameterInfo[] SafeGetIndexParameters(PropertyInfo property)
+    {
+        try
+        {
+            return property.GetIndexParameters();
+        }
+        catch (TypeLoadException)
+        {
+            return Array.Empty<ParameterInfo>();
+        }
+        catch (FileNotFoundException)
+        {
+            return Array.Empty<ParameterInfo>();
         }
     }
 

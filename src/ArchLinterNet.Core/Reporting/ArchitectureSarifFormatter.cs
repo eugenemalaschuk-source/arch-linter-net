@@ -297,7 +297,8 @@ public sealed partial class ArchitectureSarifFormatter : IArchitectureSarifForma
     {
         if (publicApiSurface.ApiDeltaKind == null && publicApiSurface.PreviousApiSignature == null
             && publicApiSurface.ApiAssemblyName == null && publicApiSurface.ApiVisibility == null
-            && publicApiSurface.ForbiddenPublicConstant == null)
+            && publicApiSurface.ForbiddenPublicConstant == null
+            && publicApiSurface.UnselectedFirstPartyDependency == null)
         {
             return null;
         }
@@ -308,6 +309,9 @@ public sealed partial class ArchitectureSarifFormatter : IArchitectureSarifForma
 
         if (publicApiSurface.PreviousApiSignature != null)
             properties["previous_api_signature"] = publicApiSurface.PreviousApiSignature;
+
+        if (publicApiSurface.UnselectedFirstPartyDependency != null)
+            properties["unselected_first_party_dependency"] = publicApiSurface.UnselectedFirstPartyDependency;
 
         if (publicApiSurface.UndeclaredApiSignature != null)
             properties["api_signature"] = publicApiSurface.UndeclaredApiSignature;

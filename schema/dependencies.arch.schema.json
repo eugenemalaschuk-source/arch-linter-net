@@ -1763,6 +1763,21 @@
       ],
       "unevaluatedProperties": false
     },
+    "publicApiSurfaceSelector": {
+      "type": "object",
+      "additionalProperties": false,
+      "minProperties": 1,
+      "properties": {
+        "name_suffix": { "type": "string", "minLength": 1 },
+        "name_prefix": { "type": "string", "minLength": 1 },
+        "namespace": { "type": "string", "minLength": 1 },
+        "layer": { "type": "string", "minLength": 1 },
+        "base_type": { "type": "string", "minLength": 1 },
+        "implements_interface": { "type": "string", "minLength": 1 },
+        "has_attribute": { "type": "string", "minLength": 1 },
+        "role": { "type": "string", "minLength": 1 }
+      }
+    },
     "publicApiSurfaceContract": {
       "allOf": [
         { "$ref": "#/$defs/baseContractFields" },
@@ -1774,6 +1789,10 @@
             "id": { "type": "string", "minLength": 1 },
             "assemblies": { "$ref": "#/$defs/stringList" },
             "declared_api": { "$ref": "#/$defs/stringList" },
+            "surface_selector": {
+              "$ref": "#/$defs/publicApiSurfaceSelector",
+              "description": "Optional bounded type-selection selector restricting the governed surface to matching types, reusing type_placement's structural matcher vocabulary plus role. Absent means every exported type/member in assemblies is governed (unchanged default behavior)."
+            },
             "api_snapshot": {
               "type": "string",
               "minLength": 1,

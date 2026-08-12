@@ -97,6 +97,17 @@ public sealed partial class ArchitecturePublicApiApplicationService
                     preflight.Diagnostics);
             }
 
+            // A configured surface_selector that matched nothing must fail closed here too, not just
+            // in strict/audit validation — otherwise capture/diff/update/migrate could silently
+            // produce an empty snapshot for a typo'd selector (issue #525).
+            if (contract.SurfaceSelector != null && entries.Count == 0)
+            {
+                return SurfaceResolution.Failed(
+                    $"Contract '{contractId}' declares a surface_selector that matched zero exported types " +
+                    "across its resolved assemblies. Fix the selector, or remove it to govern the whole surface.",
+                    preflight.Diagnostics);
+            }
+
             return new SurfaceResolution(contract, entries, preflight.Diagnostics, null);
         }
         finally

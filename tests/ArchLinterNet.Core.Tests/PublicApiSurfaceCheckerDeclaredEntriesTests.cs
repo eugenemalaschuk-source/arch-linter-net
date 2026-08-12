@@ -32,7 +32,8 @@ public sealed class PublicApiSurfaceCheckerDeclaredEntriesTests
     private static ArchitectureExportedApiEntry Entry(string assemblyName, string exactSignature)
     {
         return new ArchitectureExportedApiEntry(
-            BaseSignature, exactSignature, "Acme.Shared.Thing", assemblyName, "public", false, null);
+            BaseSignature, exactSignature, "Acme.Shared.Thing", assemblyName, "public", false, null,
+            Array.Empty<string>());
     }
 
     [Test]

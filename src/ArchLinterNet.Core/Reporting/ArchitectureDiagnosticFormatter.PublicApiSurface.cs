@@ -12,7 +12,9 @@ public sealed partial class ArchitectureDiagnosticFormatter
     {
         string reason = publicApiSurface.ForbiddenPublicConstant == true
             ? "forbidden_public_constant"
-            : ReasonForDelta(publicApiSurface.ApiDeltaKind);
+            : publicApiSurface.UnselectedFirstPartyDependency != null
+                ? "unselected_first_party_dependency"
+                : ReasonForDelta(publicApiSurface.ApiDeltaKind);
         string context = $" (reason: {reason}, assembly: {publicApiSurface.ApiAssemblyName}, " +
                $"visibility: {publicApiSurface.ApiVisibility}, signature: {publicApiSurface.UndeclaredApiSignature}";
 
@@ -26,6 +28,11 @@ public sealed partial class ArchitectureDiagnosticFormatter
             context += $", previous_signature: {publicApiSurface.PreviousApiSignature}";
         }
 
+        if (publicApiSurface.UnselectedFirstPartyDependency != null)
+        {
+            context += $", unselected_dependency: {publicApiSurface.UnselectedFirstPartyDependency}";
+        }
+
         return context + ")";
     }
 
@@ -33,6 +40,7 @@ public sealed partial class ArchitectureDiagnosticFormatter
     {
         "removed" => "removed_api_member",
         "changed" => "changed_api_signature",
+        "selector-zero-match" => "selector_matched_nothing",
         _ => "undeclared_api_member",
     };
 
@@ -55,5 +63,8 @@ public sealed partial class ArchitectureDiagnosticFormatter
 
         if (publicApiSurface.PreviousApiSignature != null)
             obj["previous_api_signature"] = publicApiSurface.PreviousApiSignature;
+
+        if (publicApiSurface.UnselectedFirstPartyDependency != null)
+            obj["unselected_first_party_dependency"] = publicApiSurface.UnselectedFirstPartyDependency;
     }
 }

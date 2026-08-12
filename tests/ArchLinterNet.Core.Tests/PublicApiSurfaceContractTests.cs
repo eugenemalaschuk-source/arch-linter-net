@@ -533,6 +533,27 @@ public sealed class PublicApiSurfaceContractTests
     }
 
     [Test]
+    public void PublicApiSurface_EmptySurfaceSelector_ThrowsActionableError()
+    {
+        string policyPath = WritePolicy($$"""
+            version: 1
+            name: Test
+            analysis:
+              target_assemblies: [{{AssemblyName}}]
+            contracts:
+              strict_public_api_surface:
+                - name: empty-selector
+                  assemblies: [{{AssemblyName}}]
+                  surface_selector: {}
+                  reason: Empty selector must be rejected.
+            """);
+
+        Exception ex = Assert.Catch<Exception>(() => new ArchitecturePolicyDocumentLoader().Load(policyPath))!;
+
+        Assert.That(ex.Message, Does.Contain("empty-selector").Or.Contain("surface_selector"));
+    }
+
+    [Test]
     public void ValidateStrict_PublicApiSurfaceViolation_EndToEndThroughValidationService()
     {
         string policyPath = WritePolicy($"""

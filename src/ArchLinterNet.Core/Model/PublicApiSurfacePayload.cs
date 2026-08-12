@@ -6,7 +6,8 @@ public sealed record PublicApiSurfacePayload(
     string? ApiAssemblyName = null,
     string? ApiVisibility = null,
     string? ApiDeltaKind = null,
-    string? PreviousApiSignature = null)
+    string? PreviousApiSignature = null,
+    string? UnselectedFirstPartyDependency = null)
     : IArchitectureDiagnosticPayload
 {
     public ArchitectureDiagnostic ToDiagnostic(ArchitectureViolation violation) =>
@@ -20,6 +21,7 @@ public sealed record PublicApiSurfacePayload(
             ApiAssemblyName = ApiAssemblyName,
             ApiVisibility = ApiVisibility,
             ApiDeltaKind = ApiDeltaKind,
-            PreviousApiSignature = PreviousApiSignature
+            PreviousApiSignature = PreviousApiSignature,
+            UnselectedFirstPartyDependency = UnselectedFirstPartyDependency
         };
 }
