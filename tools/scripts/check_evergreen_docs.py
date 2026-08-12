@@ -31,6 +31,9 @@ VERSION_FIRST_PRODUCT_DOC_PATH = re.compile(
     rf"(?:migration|upgrade|release(?:-notes?)?|adopt(?:ion)?)"
     rf"(?:[-_.][^/]*)?(?:/|\.md$)"
 )
+ROOT_README_VERSION = re.compile(
+    rf"(?i)^README[^/]*[-_.]{DOTTED_OR_DASHED_VERSION}(?:[-_.]|$)"
+)
 HARDCODED_TOOL_PACKAGE_PIN = re.compile(
     rf"(?i)dotnet\s+tool\s+(?:install|update)\b"
     rf"(?=[^\n]*\bArchLinterNet(?:\.[A-Za-z0-9]+)+\b)"
@@ -41,8 +44,19 @@ HARDCODED_LIBRARY_PACKAGE_PIN = re.compile(
     rf"(?=[^\n]*\bArchLinterNet(?:\.[A-Za-z0-9]+)+\b)"
     rf"(?=[^\n]*(?:--version|-v)\s+{SEMVER}\b)[^\n]*"
 )
-HARDCODED_PACKAGE_REFERENCE = re.compile(
-    rf"(?i)<PackageReference\b(?=[^>\n]*\bInclude=[\"']ArchLinterNet(?:\.[^\"']+)+[\"'])(?=[^>\n]*\bVersion=[\"']{SEMVER}[\"'])[^>\n]*>"
+HARDCODED_MSBUILD_PACKAGE_PIN = re.compile(
+    rf"(?i)<(?:PackageReference|PackageVersion)\b"
+    rf"(?=[^>\n]*\b(?:Include|Update)=[\"']ArchLinterNet(?:\.[^\"']+)+[\"'])"
+    rf"(?=[^>\n]*\b(?:Version|VersionOverride)=[\"']{SEMVER}[\"'])[^>\n]*>"
+)
+HARDCODED_NESTED_MSBUILD_PACKAGE_PIN = re.compile(
+    rf"(?is)<PackageReference\b"
+    rf"(?=[^>]*\b(?:Include|Update)=[\"']ArchLinterNet(?:\.[^\"']+)+[\"'])[^>]*>"
+    rf".{{0,240}}?<(?:Version|VersionOverride)>\s*{SEMVER}\s*</(?:Version|VersionOverride)>"
+)
+HARDCODED_TOOL_MANIFEST_PIN = re.compile(
+    rf"(?is)[\"']ArchLinterNet(?:\.[A-Za-z0-9]+)+[\"']\s*:\s*\{{"
+    rf".{{0,240}}?[\"']version[\"']\s*:\s*[\"']{SEMVER}[\"']"
 )
 ARCHLINTERNET_RELEASE_PROSE = re.compile(
     rf"(?i)\bArchLinterNet(?:'s)?\s+"
@@ -91,23 +105,26 @@ def repository_root() -> Path:
 
 def public_markdown_files(root: Path) -> list[Path]:
     docs_root = root / "docs"
-    files = [root / "README.md"]
-    files.extend(
-        path
-        for path in docs_root.rglob("*.md")
-        if "internal" not in path.relative_to(docs_root).parts
-    )
-    return sorted(files)
+    samples_root = root / "samples"
+    files = [path for path in root.glob("README*") if path.is_file()]
+    if docs_root.exists():
+        files.extend(
+            path
+            for path in docs_root.rglob("*.md")
+            if "internal" not in path.relative_to(docs_root).parts
+        )
+    if samples_root.exists():
+        files.extend(path for path in samples_root.rglob("*.md") if path.is_file())
+    return sorted(set(files))
 
 
 def path_violations(root: Path, paths: list[Path]) -> list[str]:
     violations: list[str] = []
     for path in paths:
         relative = path.relative_to(root).as_posix()
-        if relative == "README.md":
-            continue
         if (
-            VERSIONED_DOC_IDENTITY.search(relative)
+            ROOT_README_VERSION.search(relative)
+            or VERSIONED_DOC_IDENTITY.search(relative)
             or EXPLICIT_PRODUCT_VERSION_PATH.search(relative)
             or VERSION_FIRST_PRODUCT_DOC_PATH.search(relative)
         ):
@@ -132,7 +149,9 @@ def content_violations(root: Path, paths: list[Path]) -> list[str]:
         for pattern in (
             HARDCODED_TOOL_PACKAGE_PIN,
             HARDCODED_LIBRARY_PACKAGE_PIN,
-            HARDCODED_PACKAGE_REFERENCE,
+            HARDCODED_MSBUILD_PACKAGE_PIN,
+            HARDCODED_NESTED_MSBUILD_PACKAGE_PIN,
+            HARDCODED_TOOL_MANIFEST_PIN,
         ):
             for match in pattern.finditer(text):
                 snippet = " ".join(match.group(0).split())
