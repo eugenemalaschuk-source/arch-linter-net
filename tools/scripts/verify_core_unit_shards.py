@@ -29,6 +29,15 @@ from pathlib import Path
 
 TOKEN_PATTERN = re.compile(r"FullyQualifiedName~([A-Za-z0-9_.]+)")
 
+# Deliberately strict allow-list for the --dll argument before it ever reaches subprocess.run():
+# letters, digits, path separators, drive-letter colon, and the handful of punctuation characters
+# a legitimate build-output path can contain. subprocess.run() below is already called with an
+# argv list (never shell=True), so shell metacharacters can't be interpreted by a shell either way
+# - this check exists to give static taint analysis (and any future maintainer) a single, explicit
+# validation point for a value that ultimately comes from CLI input, rather than relying on that
+# argv-list fact alone.
+SAFE_DLL_PATH_PATTERN = re.compile(r"^[A-Za-z]:[\\/][\w\\/.\- ]+\.dll$|^[\w\\/.\- ]+\.dll$")
+
 RED = "\033[31m"
 GREEN = "\033[32m"
 RESET = "\033[0m"
@@ -41,7 +50,19 @@ def extract_tokens(test_mk_text: str, variable: str) -> list[str]:
     return TOKEN_PATTERN.findall(match.group(1))
 
 
+def validate_dll_path(dll: Path) -> Path:
+    """Resolve and allow-list the assembly path before it can reach a subprocess invocation."""
+    resolved = dll.resolve()
+    if not SAFE_DLL_PATH_PATTERN.match(str(resolved)):
+        raise ValueError(
+            f"Refusing to run dotnet vstest against an unexpected path: {resolved} "
+            "(expected a plain filesystem path ending in .dll)"
+        )
+    return resolved
+
+
 def discover_fully_qualified_tests(dll: Path) -> list[str]:
+    dll = validate_dll_path(dll)
     if not dll.exists():
         raise FileNotFoundError(
             f"Core.Tests assembly not found at {dll}. Build ArchLinterNet.Core.Tests before "
