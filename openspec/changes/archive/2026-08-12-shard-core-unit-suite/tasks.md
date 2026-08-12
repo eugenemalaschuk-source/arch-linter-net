@@ -114,8 +114,9 @@
 
 ## 7. Pull request
 
-- [ ] 7.1 Push the feature branch and open a PR referencing #478 (`Closes #478`), noting the
-      already-satisfied dependencies on #475 and #477.
+- [x] 7.1 Push the feature branch and open a PR referencing #478 (`Closes #478`), noting the
+      already-satisfied dependencies on #475 and #477. Opened as
+      https://github.com/eugenemalaschuk-source/arch-linter-net/pull/488.
 - [ ] 7.2 After the PR's own CI run completes, record real per-leg shard timings (per platform)
       as timing evidence, including the pre-sharding baseline comparison the issue's acceptance
       criteria ask for.
