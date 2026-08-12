@@ -32,22 +32,35 @@ HARDCODED_TOOL_PACKAGE_PIN = re.compile(
     rf"(?=[^\n]*--version\s+{SEMVER}\b)[^\n]*"
 )
 HARDCODED_LIBRARY_PACKAGE_PIN = re.compile(
-    rf"(?i)dotnet\s+add\s+package\b"
+    rf"(?i)dotnet\s+(?:add\s+package|package\s+add)\b"
     rf"(?=[^\n]*\bArchLinterNet(?:\.[A-Za-z0-9]+)+\b)"
-    rf"(?=[^\n]*--version\s+{SEMVER}\b)[^\n]*"
+    rf"(?=[^\n]*(?:--version|-v)\s+{SEMVER}\b)[^\n]*"
 )
 HARDCODED_PACKAGE_REFERENCE = re.compile(
     rf"(?i)<PackageReference\b(?=[^>\n]*\bInclude=[\"']ArchLinterNet(?:\.[^\"']+)+[\"'])(?=[^>\n]*\bVersion=[\"']{SEMVER}[\"'])[^>\n]*>"
 )
-PRODUCT_RELEASE_PROSE = re.compile(
-    rf"(?i)(?:ArchLinterNet|package)\s+(?:version|release|package\s+line|public\s+package\s+line|public\s+adoption\s+package\s+line)"
+ARCHLINTERNET_RELEASE_PROSE = re.compile(
+    rf"(?i)\bArchLinterNet\b[^\n]{{0,40}}\b"
+    rf"(?:package\s+version|version|release|package\s+line|public\s+package\s+line|public\s+adoption\s+package\s+line)\b"
     rf"[^\n]{{0,80}}\b{SEMVER}\b"
 )
-CURRENT_LINE_PROSE = re.compile(
-    rf"(?i)\b(?:current|public)\b[^\n]{{0,60}}\b(?:package|release)\b[^\n]{{0,60}}\b{SEMVER}\b"
+PACKAGE_LINE_PROSE = re.compile(
+    rf"(?i)(?:"
+    rf"\b{SEMVER}\b[^\n]{{0,80}}\b(?:current|public)\b[^\n]{{0,60}}\b(?:adoption\s+)?package\s+line\b"
+    rf"|"
+    rf"\b(?:current|public)\b[^\n]{{0,60}}\b(?:adoption\s+)?package\s+line\b[^\n]{{0,80}}\b{SEMVER}\b"
+    rf")"
 )
-VERSION_FIRST_RELEASE_PROSE = re.compile(
-    rf"(?i)\b{SEMVER}\b[^\n]{{0,60}}\b(?:current|public)\b[^\n]{{0,60}}\b(?:package|release)\b"
+ARCHLINTERNET_STATUS_PROSE = re.compile(
+    rf"(?i)(?:"
+    rf"\bArchLinterNet\s+{SEMVER}\b[^\n]{{0,80}}\b(?:current|public)\b[^\n]{{0,60}}\b(?:package|release)\b"
+    rf"|"
+    rf"\b(?:current|public)\b[^\n]{{0,60}}\bArchLinterNet\b[^\n]{{0,60}}\b(?:package|release)\b[^\n]{{0,80}}\b{SEMVER}\b"
+    rf"|"
+    rf"\b(?:current|public)\b[^\n]{{0,60}}\b(?:package|release)\b[^\n]{{0,60}}\bArchLinterNet\b[^\n]{{0,80}}\b{SEMVER}\b"
+    rf"|"
+    rf"\b{SEMVER}\b[^\n]{{0,80}}\b(?:current|public)\b[^\n]{{0,60}}\b(?:package|release)\b[^\n]{{0,60}}\bArchLinterNet\b"
+    rf")"
 )
 VERSIONED_HEADING = re.compile(
     rf"(?im)^#{{1,6}}\s+(?:"
@@ -121,9 +134,9 @@ def content_violations(root: Path, paths: list[Path]) -> list[str]:
             "docs/reference/yaml-schema.md",
         }:
             for pattern in (
-                PRODUCT_RELEASE_PROSE,
-                CURRENT_LINE_PROSE,
-                VERSION_FIRST_RELEASE_PROSE,
+                ARCHLINTERNET_RELEASE_PROSE,
+                PACKAGE_LINE_PROSE,
+                ARCHLINTERNET_STATUS_PROSE,
                 VERSIONED_HEADING,
             ):
                 for match in pattern.finditer(text):
