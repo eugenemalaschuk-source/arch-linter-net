@@ -6,7 +6,9 @@ from unittest.mock import patch
 import tempfile
 from pathlib import Path
 
-from tools.release.calculate_version import (
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "release"))
+
+from calculate_version import (  # noqa: E402
     DetectedTag,
     SemVerVersion,
     detect_latest_tag,
@@ -210,7 +212,7 @@ class TestMainCLI(unittest.TestCase):
         with patch.object(sys, "argv", test_args):
             with (
                 patch(
-                    "tools.release.calculate_version.detect_latest_tag",
+                    "calculate_version.detect_latest_tag",
                     return_value=None,
                 ),
                 patch("sys.stderr", new_callable=StringIO) as err,
@@ -247,7 +249,7 @@ class TestMainCLI(unittest.TestCase):
 class TestDetectLatestTag(unittest.TestCase):
 
     @patch(
-        "tools.release.calculate_version.subprocess.run",
+        "calculate_version.subprocess.run",
     )
     def test_returns_latest_stable(self, mock_run):
         mock_run.return_value.stdout = "v0.0.9\nv0.1.0\n"
@@ -258,7 +260,7 @@ class TestDetectLatestTag(unittest.TestCase):
         self.assertEqual("0.1.0", str(result))
 
     @patch(
-        "tools.release.calculate_version.subprocess.run",
+        "calculate_version.subprocess.run",
     )
     def test_returns_latest_preview(self, mock_run):
         mock_run.return_value.stdout = (
@@ -271,7 +273,7 @@ class TestDetectLatestTag(unittest.TestCase):
         self.assertEqual("0.1.0-preview.2", str(result))
 
     @patch(
-        "tools.release.calculate_version.subprocess.run",
+        "calculate_version.subprocess.run",
     )
     def test_stable_has_higher_precedence_than_preview(self, mock_run):
         mock_run.return_value.stdout = "v0.1.0\nv0.1.0-preview.3\n"
@@ -282,7 +284,7 @@ class TestDetectLatestTag(unittest.TestCase):
         self.assertEqual("0.1.0", str(result))
 
     @patch(
-        "tools.release.calculate_version.subprocess.run",
+        "calculate_version.subprocess.run",
     )
     def test_non_semver_tags_ignored(self, mock_run):
         mock_run.return_value.stdout = (
@@ -295,7 +297,7 @@ class TestDetectLatestTag(unittest.TestCase):
         self.assertEqual("0.1.0", str(result))
 
     @patch(
-        "tools.release.calculate_version.subprocess.run",
+        "calculate_version.subprocess.run",
     )
     def test_no_tags_returns_none(self, mock_run):
         mock_run.return_value.stdout = ""
@@ -305,7 +307,7 @@ class TestDetectLatestTag(unittest.TestCase):
         self.assertIsNone(result)
 
     @patch(
-        "tools.release.calculate_version.subprocess.run",
+        "calculate_version.subprocess.run",
     )
     def test_numeric_preview_compared_as_numbers(self, mock_run):
         mock_run.return_value.stdout = (
@@ -318,7 +320,7 @@ class TestDetectLatestTag(unittest.TestCase):
         self.assertEqual("0.1.0-preview.10", str(result))
 
     @patch(
-        "tools.release.calculate_version.subprocess.run",
+        "calculate_version.subprocess.run",
     )
     def test_detected_tag_preserves_raw_name(self, mock_run):
         mock_run.return_value.stdout = (
@@ -344,7 +346,7 @@ class TestGithubEnv(unittest.TestCase):
             with patch.object(sys, "argv", test_args):
                 with (
                     patch(
-                        "tools.release.calculate_version.detect_latest_detected_tag",
+                        "calculate_version.detect_latest_detected_tag",
                         return_value=detected,
                     ),
                     patch("sys.stdout", new_callable=StringIO) as out,
