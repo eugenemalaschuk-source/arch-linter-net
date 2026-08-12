@@ -1,84 +1,18 @@
 # YAML Schema Reference
 
-The machine-readable root/effective-policy JSON Schema lives at
-`schema/dependencies.arch.schema.json`. Imported partial documents use
-`schema/dependencies.arch.fragment.schema.json`. Use them when authoring
-policies with schema-aware editors or AI agents.
+The machine-readable root/effective-policy JSON Schema lives at `schema/dependencies.arch.schema.json`; imported partial documents use `schema/dependencies.arch.fragment.schema.json`. Use them with schema-aware editors or AI agents.
 
 ## Independently versioned packaged schemas
 
-Each installed release exposes an `adoption-stabilization/v1` schema registry
-whose entries version persisted formats independently from package SemVer. Use
-`arch-linter-net schema list` offline to inspect the exact registry shipped by
-the installed package, or `arch-linter-net schema print <logical-id>` to write
-one exact packaged schema. Do not derive a `$schema` URL mechanically from the
-package version.
+Each installed release exposes an `adoption-stabilization/v1` schema registry whose persisted formats are versioned independently from package SemVer. Use `arch-linter-net schema list` and `arch-linter-net schema print <logical-id>` as the authority for the exact installed contracts; never derive a `$schema` URL mechanically from the package version.
 
-The repository's packaged compatibility set currently includes immutable
-release-qualified schema identities where those identities are themselves the
-machine contract. Policy root/fragment v1 use
-`https://archlinternet.dev/schema/0.6.1/dependencies.arch.schema.json` and
-`https://archlinternet.dev/schema/0.6.1/dependencies.arch.fragment.schema.json`;
-other frozen registry entries retain their immutable `0.5.1` identities. These
-numbers describe persisted schema contracts, not the identity of this evergreen
-documentation page. JSON diagnostics use `schema_version: 1`, a stable `kind`,
-and a typed `details` object; documented legacy fields remain available during
-the compatibility window. `PackagedSchemaRegistry.TryValidateText` parses a
-serialized API snapshot and validates that model against its packaged contract.
-Cache entries reject unsupported envelope versions. Profile is a generated-output
-format: its descriptor reports write support only until a public document reader
-is introduced.
+Immutable release-qualified schema IDs remain valid when the version is itself the machine contract. Policy root/fragment v1 currently use `https://archlinternet.dev/schema/0.6.1/dependencies.arch.schema.json` and `https://archlinternet.dev/schema/0.6.1/dependencies.arch.fragment.schema.json`; other frozen registry entries retain their immutable `0.5.1` identities. These numbers are schema-contract identities, not the identity of this evergreen page. The [upgrade guide](../guides/upgrading.md#offline-schemas) shows the offline discovery workflow.
 
-For an installed release, prefer `schema list` and `schema print` over a
-repository URL. The [upgrade guide](../guides/upgrading.md#offline-schemas) shows
-the complete offline discovery workflow for every shipped format.
+Normalized diagnostic JSON uses `schema_version: 1`, stable `kind`, typed `details`, and canonical identity; SARIF and the Testing API project the same normalized finding semantics. Readers reject unknown schema versions, while non-strict readers may preserve unknown v1 kinds as opaque findings. See [Output formats](../usage/output-formats.md) and [Capabilities](../ai/capabilities.md) for consumer-facing projection details.
 
-### Normalized finding v1 compatibility
-
-Machine consumers should validate each finding against the packaged
-`normalized-finding` schema and use the versioned envelope plus `details`:
-
-- `kind` and `details.detail_kind` are the same lower-snake-case discriminator;
-- `canonical_identity` is the stable serialized `ArchitectureViolationIdentity`,
-  including assembly/member/target/configuration/occurrence evidence when the
-  producer has it;
-- `mode`, `severity`, `message_code`, `policy_origin`, `source_location`, and
-  `baseline_state` are always present in the envelope and are `null` only when
-  that metadata does not apply or is unavailable;
-- `details` has a kind-specific required shape. It is not an open property bag;
-  a payload belonging to another `kind` does not validate;
-- SARIF carries the same object under
-  `result.properties.arch_linter_net`, while physical source paths also remain
-  in standard SARIF `locations`;
-- the Testing API exposes the same normalized `ArchitectureFinding` objects,
-  including cycle, coverage, policy-consistency, unmatched-ignore, preflight,
-  and baseline lifecycle findings.
-
-The existing top-level `contract`, `contract_id`, `source`,
-`forbidden_namespace`, `forbidden_references`, and family-specific fields remain
-as derived compatibility fields. New integrations should read `details`;
-compatibility fields may be deprecated in a later versioned schema. Baseline
-command JSON also retains its existing camel-case lifecycle and `identity`
-fields alongside the normalized snake-case envelope.
-
-Readers reject unknown schema versions. For schema version 1, non-strict readers
-preserve an unknown `kind` and its raw `details` as an opaque finding; strict
-validation rejects that kind deterministically.
-
-> Note: the current runtime YAML loader ignores unmatched properties while
-> deserializing. Validate against the JSON Schema before opening policy PRs if
-> you need unsupported fields to fail fast.
+> Note: the current runtime YAML loader ignores unmatched properties while deserializing. Validate against the JSON Schema before opening policy PRs if unsupported fields must fail fast.
 >
-> CEL-backed policy predicates are live for a closed set of locations: an
-> optional `when` field on `layers.<name>.selector` and on contextual
-> dependency/allow-only `source`/`forbidden`/`allowed`/`exclude` selectors. See
-> [Layers and namespace patterns](../policy-format/layers-and-namespaces.md#selector-when-predicates),
-> [Contextual dependency contracts](../contracts/context-dependency.md#cel-predicates),
-> and [Contextual allow-only contracts](../contracts/context-allow-only.md#cel-predicates).
-> `when` is compiled and evaluated at these locations only — every other
-> string field remains a literal value, never implicitly parsed as an
-> expression. See the [CEL policy expressions guide](../policy-format/cel-expressions.md)
-> for the full authoring reference, supported-syntax matrix, and diagnostics.
+> CEL-backed policy predicates are live only at the documented `when` locations. See [CEL policy expressions](../policy-format/cel-expressions.md) for the supported syntax and diagnostics.
 
 ## Root and fragment schemas
 
