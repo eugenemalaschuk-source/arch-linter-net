@@ -429,9 +429,14 @@ public sealed class PublicApiSurfaceSelectorTests
         };
         var runner = CreateRunner(contract);
 
-        IReadOnlyList<PublicApiSnapshotEntry> captured =
-            runner.Session.CapturePublicApiSurface(contract, out IReadOnlyList<string> missing);
+        IReadOnlyList<PublicApiSnapshotEntry> captured = runner.Session.CapturePublicApiSurface(
+            contract, out IReadOnlyList<string> missing, out IReadOnlyList<ArchitectureViolation> safety);
         Assert.That(missing, Is.Empty);
+
+        // This selector also matches the escape-scenario fixtures elsewhere in this file (they share
+        // this test assembly and the same marker attribute), so capture's own selector-safety check
+        // is expected to surface those same escapes here — every safety violation's SourceType must
+        // still be part of the captured (governed) type set, never a type outside it.
         HashSet<string> capturedTypeNames = captured
             .Select(entry => PublicApiSignatureIdentity.DeclaringTypeName(entry.Signature))
             .ToHashSet(StringComparer.Ordinal);
@@ -441,7 +446,11 @@ public sealed class PublicApiSurfaceSelectorTests
         HashSet<string> validatedTypeNames =
             ViolationSourceTypes(runner.Session.CheckPublicApiSurfaceContract(contract));
 
-        Assert.That(validatedTypeNames, Is.EqualTo(capturedTypeNames));
+        Assert.Multiple(() =>
+        {
+            Assert.That(validatedTypeNames, Is.EqualTo(capturedTypeNames));
+            Assert.That(safety.Select(v => v.SourceType), Is.SubsetOf(capturedTypeNames));
+        });
     }
 
     // Scenario 12: a large modular consumer replaces a whole-assembly snapshot with a materially
@@ -467,9 +476,9 @@ public sealed class PublicApiSurfaceSelectorTests
         };
 
         IReadOnlyList<PublicApiSnapshotEntry> wholeCapture =
-            CreateRunner(wholeAssembly).Session.CapturePublicApiSurface(wholeAssembly, out _);
+            CreateRunner(wholeAssembly).Session.CapturePublicApiSurface(wholeAssembly, out _, out _);
         IReadOnlyList<PublicApiSnapshotEntry> selectedCapture =
-            CreateRunner(selected).Session.CapturePublicApiSurface(selected, out _);
+            CreateRunner(selected).Session.CapturePublicApiSurface(selected, out _, out _);
 
         Assert.That(selectedCapture.Count, Is.LessThan(wholeCapture.Count / 10),
             "the selected snapshot should be an order of magnitude smaller, not merely smaller");

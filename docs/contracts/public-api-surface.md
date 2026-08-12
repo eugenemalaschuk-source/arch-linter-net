@@ -138,7 +138,7 @@ The selected surface is used identically everywhere: strict/audit validation, `p
 Two failure modes are specific to selectors:
 
 - A selector that matches **zero** exported types across the contract's resolved assemblies is a violation (`api_delta_kind: selector-zero-match`), reported at validation/capture time — the same "recorded, not thrown at load" treatment an unusable snapshot already gets, since resolving a selector needs the assemblies loaded. It applies to `public-api capture`/`diff`/`update`/`migrate` too, so a typo'd selector can never silently produce a near-empty snapshot.
-- A selected member whose signature references another exported type declared in the **same contract's assemblies** (a first-party type) that the selector did **not** select fails closed rather than silently including the dependency. Ordinary BCL/external referenced types never trigger this — only types the contract itself governs. The diagnostic carries `unselected_first_party_dependency` naming the escaping type.
+- A selected member whose signature references another exported type declared in the **same contract's assemblies** (a first-party type) that the selector did **not** select fails closed rather than silently including the dependency. Ordinary BCL/external referenced types never trigger this — only types the contract itself governs. The diagnostic carries `unselected_first_party_dependency` naming the escaping type. Like the zero-match check, this also applies to `public-api capture`/`diff`/`update`/`migrate`, not only strict/audit validation — a selector configuration `validate` would reject can never produce a snapshot through the capture lifecycle that `validate` could then never pass against.
 
 ### Reviewed snapshots
 

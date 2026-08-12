@@ -86,7 +86,7 @@ public sealed partial class ArchitecturePublicApiApplicationService
             }
 
             IReadOnlyList<PublicApiSnapshotEntry> entries = setup.Runner.Session.CapturePublicApiSurface(
-                contract, out IReadOnlyList<string> missingAssemblies);
+                contract, out IReadOnlyList<string> missingAssemblies, out IReadOnlyList<ArchitectureViolation> selectorSafetyViolations);
             cancellationToken.ThrowIfCancellationRequested();
 
             if (missingAssemblies.Count > 0)
@@ -97,14 +97,15 @@ public sealed partial class ArchitecturePublicApiApplicationService
                     preflight.Diagnostics);
             }
 
-            // A configured surface_selector that matched nothing must fail closed here too, not just
-            // in strict/audit validation — otherwise capture/diff/update/migrate could silently
-            // produce an empty snapshot for a typo'd selector (issue #525).
-            if (contract.SurfaceSelector != null && entries.Count == 0)
+            // The same zero-match/first-party-escape fail-closed checks strict/audit validation runs
+            // must also block capture/diff/update/migrate (issue #525, PR #529 review) — otherwise a
+            // selector configuration `validate` rejects could still produce a usable snapshot through
+            // this lifecycle, which `validate` would then never be able to pass against.
+            if (selectorSafetyViolations.Count > 0)
             {
                 return SurfaceResolution.Failed(
-                    $"Contract '{contractId}' declares a surface_selector that matched zero exported types " +
-                    "across its resolved assemblies. Fix the selector, or remove it to govern the whole surface.",
+                    $"Contract '{contractId}' failed a selector safety check: " +
+                    string.Join(" ", selectorSafetyViolations.Select(DescribeSelectorSafetyViolation)),
                     preflight.Diagnostics);
             }
 
@@ -117,6 +118,15 @@ public sealed partial class ArchitecturePublicApiApplicationService
             // here costs nothing and avoids holding target assemblies loaded after the CLI returns.
             setup.Runner.Session.Context.Dispose();
         }
+    }
+
+    private static string DescribeSelectorSafetyViolation(ArchitectureViolation violation)
+    {
+        PublicApiSurfacePayload? payload = violation.Payload as PublicApiSurfacePayload;
+        return payload?.UnselectedFirstPartyDependency != null
+            ? $"{violation.SourceType} ({violation.ForbiddenReferences.FirstOrDefault()}) depends on unselected " +
+              $"first-party type '{payload.UnselectedFirstPartyDependency}'."
+            : payload?.UndeclaredApiSignature ?? "surface_selector failed a safety check.";
     }
 
     // Mirrors ArchitectureValidationApplicationService.RunBuildStatePreflight: preflight only has

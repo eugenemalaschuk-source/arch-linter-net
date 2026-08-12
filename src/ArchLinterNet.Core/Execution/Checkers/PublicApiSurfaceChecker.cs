@@ -30,21 +30,24 @@ internal static class PublicApiSurfaceChecker
             return new List<ArchitectureViolation> { UnusableSnapshotViolation(contract) };
         }
 
-        Evaluation evaluation = Evaluate(contract, resolvedAssemblies, surfaceSelectorPredicate);
+        (Dictionary<string, List<ArchitectureExportedApiEntry>> scannedByAssembly,
+                Dictionary<string, List<ArchitectureExportedApiEntry>> governedByAssembly) =
+            ScanAndFilter(contract, resolvedAssemblies, surfaceSelectorPredicate);
 
-        // Selector resolution needs reflected assemblies, unavailable at policy-load time, so a
-        // required selector matching nothing has to become loud here instead — mirroring the
-        // ApiSnapshotError short-circuit above — or a typo'd selector would silently pass strict
-        // validation with an empty effective surface.
-        if (contract.SurfaceSelector != null
-            && evaluation.ScannedByAssembly.Count > 0
-            && evaluation.GovernedByAssembly.Values.All(entries => entries.Count == 0))
+        List<ArchitectureViolation> selectorSafetyViolations =
+            CheckSelectorSafety(contract, scannedByAssembly, governedByAssembly, executionContext);
+
+        // Zero-match is the sole finding when it applies — the selected surface is empty, so there
+        // is nothing else to evaluate against declared_api/exact-diff.
+        if (selectorSafetyViolations.Any(IsZeroMatch))
         {
-            return new List<ArchitectureViolation> { ZeroMatchSelectorViolation(contract) };
+            return selectorSafetyViolations;
         }
 
+        Evaluation evaluation = BuildEvaluation(contract, scannedByAssembly, governedByAssembly);
+
         List<ArchitectureViolation> violations = CollectSurfaceViolations(contract, evaluation, executionContext);
-        violations.AddRange(CollectFirstPartyEscapeViolations(contract, evaluation, executionContext));
+        violations.AddRange(selectorSafetyViolations);
 
         AddDeltaViolations(contract, evaluation.Delta.Removed, RemovedDelta, executionContext, violations);
         AddDeltaViolations(contract, evaluation.Delta.Changed, ChangedDelta, executionContext, violations);
@@ -52,27 +55,83 @@ internal static class PublicApiSurfaceChecker
         return violations;
     }
 
-    private static Evaluation Evaluate(
+    // The selector-safety checks (zero-match, first-party escape) independent of declared_api/exact
+    // diff — the part strict/audit validation and the capture/diff/update/migrate lifecycle must
+    // agree on identically, since a selector unsafe for one is unsafe for the other (issue #525,
+    // PR #529 review: capture/update previously could accept a selector configuration validate would
+    // reject). This overload scans for itself, for callers (the capture/update/diff/migrate seam)
+    // that have not already built scannedByAssembly/governedByAssembly.
+    internal static List<ArchitectureViolation> CheckSelectorSafety(
+        ArchitecturePublicApiSurfaceContract contract,
+        IReadOnlyDictionary<string, Assembly> resolvedAssemblies,
+        ArchitectureContractExecutionContext executionContext,
+        Func<Type, bool>? surfaceSelectorPredicate)
+    {
+        (Dictionary<string, List<ArchitectureExportedApiEntry>> scannedByAssembly,
+                Dictionary<string, List<ArchitectureExportedApiEntry>> governedByAssembly) =
+            ScanAndFilter(contract, resolvedAssemblies, surfaceSelectorPredicate);
+
+        return CheckSelectorSafety(contract, scannedByAssembly, governedByAssembly, executionContext);
+    }
+
+    private static List<ArchitectureViolation> CheckSelectorSafety(
+        ArchitecturePublicApiSurfaceContract contract,
+        Dictionary<string, List<ArchitectureExportedApiEntry>> scannedByAssembly,
+        Dictionary<string, List<ArchitectureExportedApiEntry>> governedByAssembly,
+        ArchitectureContractExecutionContext executionContext)
+    {
+        if (contract.SurfaceSelector == null)
+        {
+            return new List<ArchitectureViolation>();
+        }
+
+        // Selector resolution needs reflected assemblies, unavailable at policy-load time, so a
+        // required selector matching nothing has to become loud here instead — mirroring the
+        // ApiSnapshotError short-circuit in Check() — or a typo'd selector would silently pass
+        // strict validation, or silently capture/update an empty snapshot, with an empty effective
+        // surface.
+        if (scannedByAssembly.Count > 0 && governedByAssembly.Values.All(entries => entries.Count == 0))
+        {
+            return new List<ArchitectureViolation> { ZeroMatchSelectorViolation(contract) };
+        }
+
+        return CollectFirstPartyEscapeViolations(contract, scannedByAssembly, governedByAssembly, executionContext).ToList();
+    }
+
+    private static bool IsZeroMatch(ArchitectureViolation violation) =>
+        (violation.Payload as PublicApiSurfacePayload)?.ApiDeltaKind == ZeroMatchDelta;
+
+    private static (
+        Dictionary<string, List<ArchitectureExportedApiEntry>> ScannedByAssembly,
+        Dictionary<string, List<ArchitectureExportedApiEntry>> GovernedByAssembly) ScanAndFilter(
         ArchitecturePublicApiSurfaceContract contract,
         IReadOnlyDictionary<string, Assembly> resolvedAssemblies,
         Func<Type, bool>? surfaceSelectorPredicate)
+    {
+        Dictionary<string, List<ArchitectureExportedApiEntry>> scannedByAssembly =
+            ScanContractAssemblies(contract, resolvedAssemblies);
+
+        // scannedByAssembly stays the full, unfiltered first-party universe (used by the escape
+        // check); governedByAssembly is what a selector, when configured, actually governs — every
+        // other computation (violations, exact diff) targets the governed set so a type outside the
+        // selected surface is never enumerated or reported at all.
+        Dictionary<string, List<ArchitectureExportedApiEntry>> governedByAssembly = surfaceSelectorPredicate == null
+            ? scannedByAssembly
+            : FilterToSelected(scannedByAssembly, resolvedAssemblies, surfaceSelectorPredicate);
+
+        return (scannedByAssembly, governedByAssembly);
+    }
+
+    private static Evaluation BuildEvaluation(
+        ArchitecturePublicApiSurfaceContract contract,
+        Dictionary<string, List<ArchitectureExportedApiEntry>> scannedByAssembly,
+        Dictionary<string, List<ArchitectureExportedApiEntry>> governedByAssembly)
     {
         // The reviewed snapshot records the exact grammar (base signature plus the detail suffix
         // carrying constant values, accessor shape, static/ref/out/in, sealed/abstract, generic
         // constraints). A contract with only an inline `declared_api` list keeps comparing against
         // the legacy identity grammar, which is what keeps existing policies working unchanged.
         bool exactGrammar = !string.IsNullOrWhiteSpace(contract.ApiSnapshot);
-
-        Dictionary<string, List<ArchitectureExportedApiEntry>> scannedByAssembly =
-            ScanContractAssemblies(contract, resolvedAssemblies);
-
-        // scannedByAssembly stays the full, unfiltered first-party universe (used by the escape
-        // check below); governedByAssembly is what a selector, when configured, actually governs —
-        // every other computation (violations, exact diff) targets the governed set so a type
-        // outside the selected surface is never enumerated or reported at all.
-        Dictionary<string, List<ArchitectureExportedApiEntry>> governedByAssembly = surfaceSelectorPredicate == null
-            ? scannedByAssembly
-            : FilterToSelected(scannedByAssembly, resolvedAssemblies, surfaceSelectorPredicate);
 
         // Exact mode replaces "is this signature declared?" with a correlated delta, so a re-signed
         // member reports once as a change instead of as an unrelated addition plus removal. It only
@@ -128,29 +187,25 @@ internal static class PublicApiSurfaceChecker
 
     // Fails closed when a governed (selected) member's signature depends on a first-party exported
     // type (declared in one of the contract's own assemblies) that surface_selector did not itself
-    // select — never applicable when no selector is configured, since every first-party type is
-    // governed by construction in that case.
+    // select. Caller (CheckSelectorSafety) only invokes this when a selector is configured — with no
+    // selector every first-party type is governed by construction, so escape is impossible.
     private static IEnumerable<ArchitectureViolation> CollectFirstPartyEscapeViolations(
         ArchitecturePublicApiSurfaceContract contract,
-        Evaluation evaluation,
+        Dictionary<string, List<ArchitectureExportedApiEntry>> scannedByAssembly,
+        Dictionary<string, List<ArchitectureExportedApiEntry>> governedByAssembly,
         ArchitectureContractExecutionContext executionContext)
     {
-        if (contract.SurfaceSelector == null)
-        {
-            yield break;
-        }
-
         // Keyed by (assembly, type name), not name alone: two distinct assemblies can legitimately
         // export a type under the identical full name, and a name-only key would let a selected
         // assembly's type mask an unselected same-named type from a different assembly.
         HashSet<(string Assembly, string Type)> firstPartyTypes = new(
-            evaluation.ScannedByAssembly.Values.SelectMany(entries => entries)
+            scannedByAssembly.Values.SelectMany(entries => entries)
                 .Select(entry => (entry.AssemblyName, entry.DeclaringTypeName)));
         HashSet<(string Assembly, string Type)> selectedTypes = new(
-            evaluation.GovernedByAssembly.Values.SelectMany(entries => entries)
+            governedByAssembly.Values.SelectMany(entries => entries)
                 .Select(entry => (entry.AssemblyName, entry.DeclaringTypeName)));
 
-        foreach (ArchitectureExportedApiEntry entry in evaluation.GovernedByAssembly.Values.SelectMany(entries => entries))
+        foreach (ArchitectureExportedApiEntry entry in governedByAssembly.Values.SelectMany(entries => entries))
         {
             foreach ((string referencedAssembly, string referencedType) in entry.ReferencedTypes)
             {

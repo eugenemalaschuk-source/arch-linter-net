@@ -260,3 +260,8 @@ The system SHALL fail closed when a selected member's normalized signature refer
 - **WHEN** a selected type's exported member signature references a type from the base class library or another assembly outside the contract's own `assemblies`
 - **THEN** the system SHALL NOT report a first-party-dependency violation for that reference
 
+#### Scenario: Unselected first-party dependency fails a capture/diff/update/migrate operation
+
+- **WHEN** `public-api capture`, `public-api diff`, `public-api update`, or `public-api migrate` resolves a contract whose selected surface has a member depending on an unselected first-party type
+- **THEN** the operation SHALL fail rather than producing a snapshot the same policy's strict validation could never pass against
+

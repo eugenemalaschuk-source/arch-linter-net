@@ -27,14 +27,19 @@ public sealed partial class ArchitectureAnalysisSession
 
     // Captures a contract's exported surface without evaluating it against any declaration. This is
     // the read side the public-api capture/diff/update/migrate workflow builds on; contract
-    // selection and ignore matching deliberately do not apply, because a snapshot describes what
-    // the assemblies actually export, not what the policy currently tolerates. A configured
-    // surface_selector still applies — capture must reflect the same selected surface strict/audit
-    // validation governs (issue #525) — but zero-match detection is the caller's job: it can be told
-    // from missingAssemblies being empty while the returned entries are also empty.
+    // selection and ignore matching deliberately do not apply to the captured entries themselves,
+    // because a snapshot describes what the assemblies actually export, not what the policy
+    // currently tolerates. A configured surface_selector still applies — capture must reflect the
+    // same selected surface strict/audit validation governs (issue #525) — and selectorSafetyViolations
+    // surfaces the same zero-match/first-party-escape fail-closed checks strict/audit validation runs
+    // (PR #529 review), so a selector configuration unsafe for `validate` cannot silently produce a
+    // usable snapshot through `capture`/`diff`/`update`/`migrate`. Ignore matching DOES apply to
+    // those checks — the same ignored_violations a reviewer already accepted in `validate` should not
+    // re-block the lifecycle that reuses this method.
     public IReadOnlyList<PublicApiSnapshotEntry> CapturePublicApiSurface(
         ArchitecturePublicApiSurfaceContract contract,
-        out IReadOnlyList<string> missingAssemblies)
+        out IReadOnlyList<string> missingAssemblies,
+        out IReadOnlyList<ArchitectureViolation> selectorSafetyViolations)
     {
         Dictionary<string, Assembly> resolvedAssemblies = BuildAssemblyLookup();
         Func<Type, bool>? selectorPredicate = BuildSurfaceSelectorPredicate(contract);
@@ -66,6 +71,15 @@ public sealed partial class ArchitectureAnalysisSession
         }
 
         missingAssemblies = missing;
+
+        // An unresolved assembly already fails the operation on its own (missingAssemblies); running
+        // the safety check against a partial universe would misreport escapes/zero-match against
+        // types that simply never resolved, mirroring how exact-diff mode guards the same condition.
+        selectorSafetyViolations = missing.Count == 0
+            ? PublicApiSurfaceChecker.CheckSelectorSafety(
+                contract, resolvedAssemblies, CreateExecutionContext(contract, contract.IgnoredViolations), selectorPredicate)
+            : Array.Empty<ArchitectureViolation>();
+
         return entries;
     }
 
