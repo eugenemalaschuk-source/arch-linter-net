@@ -116,6 +116,15 @@ def test_find_violations_rejects_version_first_product_concept_path(tmp_path: Pa
     assert any("v9-8-7-upgrade.md" in violation for violation in violations)
 
 
+def test_find_violations_rejects_versioned_root_readme_identity(tmp_path: Path) -> None:
+    write_repo(tmp_path)
+    (tmp_path / "README-v9.8.7.md").write_text("# Historical-looking README\n", encoding="utf-8")
+
+    violations = evergreen.find_violations(tmp_path)
+
+    assert any("README-v9.8.7.md" in violation for violation in violations)
+
+
 def test_find_violations_rejects_version_first_public_package_line(tmp_path: Path) -> None:
     write_repo(
         tmp_path,
@@ -228,6 +237,68 @@ def test_find_violations_rejects_hardcoded_archlinternet_package_reference(tmp_p
     violations = evergreen.find_violations(tmp_path)
 
     assert any("PackageReference" in violation and "9.8.7" in violation for violation in violations)
+
+
+def test_find_violations_rejects_central_package_version_pin(tmp_path: Path) -> None:
+    write_repo(
+        tmp_path,
+        guide=(
+            "# Central package management\n\n"
+            "`<PackageVersion Include=\"ArchLinterNet.Testing\" Version=\"9.8.7\" />`\n"
+        ),
+    )
+
+    violations = evergreen.find_violations(tmp_path)
+
+    assert any("PackageVersion" in violation and "9.8.7" in violation for violation in violations)
+
+
+def test_find_violations_rejects_tool_manifest_json_pin(tmp_path: Path) -> None:
+    write_repo(
+        tmp_path,
+        guide=(
+            "```json\n"
+            "{\n"
+            "  \"tools\": {\n"
+            "    \"ArchLinterNet.Cli\": {\n"
+            "      \"version\": \"9.8.7\",\n"
+            "      \"commands\": [\"arch-linter-net\"]\n"
+            "    }\n"
+            "  }\n"
+            "}\n"
+            "```\n"
+        ),
+    )
+
+    violations = evergreen.find_violations(tmp_path)
+
+    assert any("ArchLinterNet.Cli" in violation and "9.8.7" in violation for violation in violations)
+
+
+def test_root_readme_variants_are_part_of_public_guard(tmp_path: Path) -> None:
+    write_repo(tmp_path)
+    (tmp_path / "README.quickstart.md").write_text(
+        "`dotnet tool install ArchLinterNet.Cli --version 9.8.7`\n",
+        encoding="utf-8",
+    )
+
+    violations = evergreen.find_violations(tmp_path)
+
+    assert any("README.quickstart.md" in violation for violation in violations)
+
+
+def test_sample_markdown_is_part_of_public_guard(tmp_path: Path) -> None:
+    write_repo(tmp_path)
+    sample = tmp_path / "samples" / "Example" / "README.md"
+    sample.parent.mkdir(parents=True)
+    sample.write_text(
+        "`dotnet tool install ArchLinterNet.Cli --version 9.8.7`\n",
+        encoding="utf-8",
+    )
+
+    violations = evergreen.find_violations(tmp_path)
+
+    assert any("samples/Example/README.md" in violation for violation in violations)
 
 
 def test_find_violations_rejects_versioned_mkdocs_navigation(tmp_path: Path) -> None:
