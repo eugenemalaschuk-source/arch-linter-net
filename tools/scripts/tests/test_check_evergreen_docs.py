@@ -40,7 +40,7 @@ def test_find_violations_accepts_machine_standard_and_framework_versions(tmp_pat
     assert evergreen.find_violations(tmp_path) == []
 
 
-def test_find_violations_accepts_versioned_standard_path_and_navigation(tmp_path: Path) -> None:
+def test_find_violations_accepts_versioned_standard_and_contract_paths_and_navigation(tmp_path: Path) -> None:
     write_repo(
         tmp_path,
         nav=(
@@ -49,13 +49,18 @@ def test_find_violations_accepts_versioned_standard_path_and_navigation(tmp_path
             "  - Guides:\n"
             "      - Upgrade: guides/upgrading.md\n"
             "  - Reference:\n"
-            "      - SARIF 2.1.0: reference/sarif-2.1.0.md\n"
+            "      - ArchLinterNet SARIF 2.1.0: reference/sarif-2.1.0.md\n"
+            "      - Protocol v2.1.0: reference/v2.1.0.md\n"
             "exclude_docs: |\n"
             "  internal/\n"
         ),
     )
     (tmp_path / "docs" / "reference" / "sarif-2.1.0.md").write_text(
-        "# SARIF 2.1.0\n\nStandard-format reference.\n",
+        "# ArchLinterNet SARIF 2.1.0\n\nStandard-format reference.\n",
+        encoding="utf-8",
+    )
+    (tmp_path / "docs" / "reference" / "v2.1.0.md").write_text(
+        "# Protocol v2.1.0\n\nPersisted contract reference.\n",
         encoding="utf-8",
     )
 
@@ -71,6 +76,16 @@ def test_find_violations_rejects_version_named_public_docs_path(tmp_path: Path) 
 
     assert any("migration-to-0-5-1.md" in violation for violation in violations)
     assert any("public docs path identity" in violation for violation in violations)
+
+
+def test_find_violations_rejects_version_first_product_concept_path(tmp_path: Path) -> None:
+    write_repo(tmp_path)
+    path = tmp_path / "docs" / "guides" / "v9-8-7-upgrade.md"
+    path.write_text("# Upgrade\n", encoding="utf-8")
+
+    violations = evergreen.find_violations(tmp_path)
+
+    assert any("v9-8-7-upgrade.md" in violation for violation in violations)
 
 
 def test_find_violations_rejects_version_first_public_package_line(tmp_path: Path) -> None:
