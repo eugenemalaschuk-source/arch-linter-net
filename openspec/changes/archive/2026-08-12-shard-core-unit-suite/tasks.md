@@ -117,6 +117,15 @@
 - [x] 7.1 Push the feature branch and open a PR referencing #478 (`Closes #478`), noting the
       already-satisfied dependencies on #475 and #477. Opened as
       https://github.com/eugenemalaschuk-source/arch-linter-net/pull/488.
-- [ ] 7.2 After the PR's own CI run completes, record real per-leg shard timings (per platform)
+- [x] 7.2 After the PR's own CI run completes, record real per-leg shard timings (per platform)
       as timing evidence, including the pre-sharding baseline comparison the issue's acceptance
-      criteria ask for.
+      criteria ask for. Posted as a PR comment
+      (https://github.com/eugenemalaschuk-source/arch-linter-net/pull/488#issuecomment-5266422051).
+      Two runs: Windows shard 1 slowest at 319s/352s, Apple Silicon macOS shard 1 slowest at
+      171s/137s. Against the #475/#481 pre-sharding baseline (Windows ~9-10m, Apple Silicon macOS
+      ~4.5-4.8m), the slowest shard averages 56-62% of baseline on Windows and 53-57% on Apple
+      Silicon macOS - at or just under the issue's 60% target on both platforms, with real
+      run-to-run variance consistent with #481's already-documented hosted-runner noise. All 18
+      PR checks pass, including SonarCloud (a taint-analysis finding on the `--dll` CLI argument
+      and a coverage gap on the new validator script were fixed after the initial push - see the
+      PR's commit history).
