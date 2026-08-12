@@ -76,7 +76,7 @@ def test_accepts_versioned_standard_paths_headings_and_navigation(tmp_path: Path
     assert evergreen.find_violations(tmp_path) == []
 
 
-def test_rejects_product_release_paths(tmp_path: Path) -> None:
+def test_rejects_product_release_paths_including_prereleases(tmp_path: Path) -> None:
     write_repo(tmp_path)
     guides = tmp_path / "docs" / "guides"
     names = (
@@ -85,6 +85,9 @@ def test_rejects_product_release_paths(tmp_path: Path) -> None:
         "archlinternet-9.8.7.md",
         "archlinternet-release-9.8.7.md",
         "9.8.7-archlinternet.md",
+        "archlinternet-release-9.8.7-preview.1.md",
+        "archlinternet-9.8.7-preview.1-guide.md",
+        "v9.8.7-preview.1-upgrade.md",
     )
     for name in names:
         (guides / name).write_text("# Versioned product doc\n", encoding="utf-8")
@@ -96,9 +99,13 @@ def test_rejects_product_release_paths(tmp_path: Path) -> None:
 
 def test_rejects_versioned_root_readme_identity(tmp_path: Path) -> None:
     write_repo(tmp_path)
-    (tmp_path / "README-v9.8.7.md").write_text("# Versioned README\n", encoding="utf-8")
+    (tmp_path / "README-v9.8.7-preview.1.md").write_text(
+        "# Versioned README\n", encoding="utf-8"
+    )
 
-    assert any("README-v9.8.7.md" in item for item in evergreen.find_violations(tmp_path))
+    assert any(
+        "README-v9.8.7-preview.1.md" in item for item in evergreen.find_violations(tmp_path)
+    )
 
 
 def test_rejects_product_release_prose_but_not_schema_ids(tmp_path: Path) -> None:
@@ -115,18 +122,19 @@ def test_rejects_product_release_prose_but_not_schema_ids(tmp_path: Path) -> Non
     )
 
 
-def test_rejects_version_first_product_status(tmp_path: Path) -> None:
+def test_rejects_product_status_wording_and_version_first_forms(tmp_path: Path) -> None:
     write_repo(
         tmp_path,
         guide=(
             "0.6.4 is the public adoption package line for ArchLinterNet.\n"
             "9.8.7 is the current ArchLinterNet release.\n"
+            "The current ArchLinterNet version is 9.8.7.\n"
+            "ArchLinterNet 9.8.7 is the current version.\n"
         ),
     )
 
     violations = evergreen.find_violations(tmp_path)
-    assert any("0.6.4" in item for item in violations)
-    assert any("9.8.7" in item for item in violations)
+    assert sum("product package SemVer is coupled" in item for item in violations) >= 4
 
 
 def test_rejects_versioned_product_heading_and_navigation(tmp_path: Path) -> None:
@@ -157,6 +165,11 @@ def test_rejects_tool_package_pins_in_supported_argument_forms(tmp_path: Path) -
         "dotnet tool install --tool-path .tools ArchLinterNet.Cli --version 9.8.7",
         "dotnet tool install ArchLinterNet.Cli --version=9.8.7",
         "dotnet tool update --global ArchLinterNet.Cli --version=9.8.7",
+        'dotnet tool install ArchLinterNet.Cli --version "9.8.7"',
+        "dotnet tool install ArchLinterNet.Cli --version '9.8.7-preview.1'",
+        "dotnet tool install ArchLinterNet.Cli --version 9.8.7+build.1",
+        "dotnet tool install ArchLinterNet.Cli \\\n  --version 9.8.7",
+        "dotnet tool install ArchLinterNet.Cli `\n  --version 9.8.7",
     )
     for index, command in enumerate(commands):
         root = tmp_path / str(index)
@@ -173,6 +186,9 @@ def test_rejects_library_package_pins_in_supported_command_forms(tmp_path: Path)
         "dotnet package add ArchLinterNet.Testing -v 9.8.7",
         "dotnet package add ArchLinterNet.Testing --version=9.8.7",
         "dotnet package add ArchLinterNet.Testing -v=9.8.7",
+        'dotnet package add ArchLinterNet.Testing --version "9.8.7"',
+        "dotnet package add ArchLinterNet.Testing -v '9.8.7-preview.1'",
+        "dotnet package add ArchLinterNet.Testing \\\n  --version 9.8.7",
     )
     for index, command in enumerate(commands):
         root = tmp_path / str(index)
@@ -187,6 +203,8 @@ def test_rejects_msbuild_and_tool_manifest_package_pins(tmp_path: Path) -> None:
         '<PackageReference Include="ArchLinterNet.Testing" Version="9.8.7" />',
         '<PackageVersion Include="ArchLinterNet.Testing" Version="9.8.7" />',
         '<PackageReference Include="ArchLinterNet.Testing" VersionOverride="9.8.7" />',
+        '<PackageReference\n  Include="ArchLinterNet.Testing"\n  Version="9.8.7-preview.1" />',
+        '<PackageVersion\n  Include="ArchLinterNet.Testing"\n  Version="9.8.7" />',
         '<PackageReference Include="ArchLinterNet.Testing">\n  <Version>9.8.7</Version>\n</PackageReference>',
         '<PackageVersion Include="ArchLinterNet.Testing">\n  <Version>9.8.7</Version>\n</PackageVersion>',
         '"ArchLinterNet.Cli": { "version": "9.8.7", "commands": ["arch-linter-net"] }',
