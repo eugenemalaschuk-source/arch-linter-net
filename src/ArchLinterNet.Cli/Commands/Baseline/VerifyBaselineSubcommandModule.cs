@@ -19,6 +19,12 @@ internal sealed class VerifyBaselineSubcommandModule : IBaselineSubcommandModule
         Option<string[]> contractOption = new("--contract");
         Option<bool> jsonOption = new("--json");
         Option<string> formatOption = new("--format");
+        Option<bool> ensureBuiltOption = new("--ensure-built");
+        Option<bool> noRestoreOption = new("--no-restore");
+        Option<string> configurationOption = new("--configuration");
+        Option<string> targetFrameworkOption = new("--framework");
+        Option<string> platformOption = new("--platform");
+        Option<string> runtimeIdentifierOption = new("--runtime");
         Option<bool> helpOption = new("--help");
         helpOption.Aliases.Add("-h");
 
@@ -29,6 +35,12 @@ internal sealed class VerifyBaselineSubcommandModule : IBaselineSubcommandModule
         command.Options.Add(contractOption);
         command.Options.Add(jsonOption);
         command.Options.Add(formatOption);
+        command.Options.Add(ensureBuiltOption);
+        command.Options.Add(noRestoreOption);
+        command.Options.Add(configurationOption);
+        command.Options.Add(targetFrameworkOption);
+        command.Options.Add(platformOption);
+        command.Options.Add(runtimeIdentifierOption);
         command.Options.Add(helpOption);
 
         command.SetAction(parseResult => handler.Execute(new BaselineVerifyCommandOptions(
@@ -38,7 +50,13 @@ internal sealed class VerifyBaselineSubcommandModule : IBaselineSubcommandModule
             parseResult.GetValue(conditionSetOption),
             parseResult.GetValue(jsonOption) ? "json" : parseResult.GetValue(formatOption) ?? "human",
             parseResult.GetValue(contractOption) ?? Array.Empty<string>(),
-            parseResult.GetValue(helpOption))
+            parseResult.GetValue(helpOption),
+            parseResult.GetValue(ensureBuiltOption),
+            parseResult.GetValue(noRestoreOption),
+            parseResult.GetValue(configurationOption),
+            parseResult.GetValue(targetFrameworkOption),
+            parseResult.GetValue(platformOption),
+            parseResult.GetValue(runtimeIdentifierOption))
         {
             HasFormatConflict = parseResult.GetValue(jsonOption) && parseResult.GetValue(formatOption) is not null,
         }));

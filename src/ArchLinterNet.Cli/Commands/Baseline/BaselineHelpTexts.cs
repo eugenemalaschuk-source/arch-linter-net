@@ -170,6 +170,15 @@ internal static class BaselineHelpTexts
           --contract <id>     Restrict to this contract ID (may be repeated)
           --condition-set <name>
                               Use a named condition set from analysis.condition_sets
+          --ensure-built      Build and verify the selected project graph before collecting
+                              baseline candidates; required for opted-in shared frameworks
+          --no-restore        Fail closed when restore is required instead of restoring
+          --configuration <name>
+                              Requested build configuration for build-state preflight
+          --framework <tfm>   Requested target framework for build-state preflight
+          --platform <platform>
+                              Requested platform for build-state preflight
+          --runtime <rid>     Requested runtime identifier for build-state preflight
           --json               Shorthand for --format json; cannot be combined with --format
           --format <fmt>       Output format: human (default), json, or sarif
           -h, --help          Show this help message

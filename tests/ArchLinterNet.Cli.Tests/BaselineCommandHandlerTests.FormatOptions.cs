@@ -1,5 +1,8 @@
 using System.Text.Json;
 using ArchLinterNet.Cli.Commands.Baseline;
+using ArchLinterNet.Core.BuildState;
+using ArchLinterNet.Core.Model;
+using ArchLinterNet.Core.Validation;
 using NUnit.Framework;
 
 namespace ArchLinterNet.Cli.Tests;
@@ -47,6 +50,71 @@ public sealed partial class BaselineCommandHandlerTests
             AssertJsonError(diffConsole, "--json cannot be combined with --format");
             AssertJsonError(verifyConsole, "--json cannot be combined with --format");
             AssertJsonError(migrateConsole, "--json cannot be combined with --format");
+        });
+    }
+
+    [Test]
+    public void BaselineVerify_ForwardsBuildStateSelectors()
+    {
+        var runtime = new StubRuntime();
+        var console = new RecordingConsole();
+        int result = new VerifyBaselineSubcommandModule()
+            .CreateCommand(runtime, console, new StubFileSystem("policy.yml", "baseline.yml"))
+            .Parse([
+                "--policy", "policy.yml", "--baseline", "baseline.yml",
+                "--ensure-built", "--no-restore", "--configuration", "Release",
+                "--framework", "net10.0", "--platform", "AnyCPU", "--runtime", "linux-x64",
+            ])
+            .Invoke();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(result, Is.EqualTo(CliExitCodes.Success));
+            Assert.That(runtime.VerifyRequest, Is.Not.Null);
+            Assert.That(runtime.VerifyRequest!.PreparationMode, Is.EqualTo(BuildPreparationMode.EnsureBuilt));
+            Assert.That(runtime.VerifyRequest.NoRestore, Is.True);
+            Assert.That(runtime.VerifyRequest.RequestedConfiguration, Is.EqualTo("Release"));
+            Assert.That(runtime.VerifyRequest.RequestedTargetFramework, Is.EqualTo("net10.0"));
+            Assert.That(runtime.VerifyRequest.RequestedPlatform, Is.EqualTo("AnyCPU"));
+            Assert.That(runtime.VerifyRequest.RequestedRuntimeIdentifier, Is.EqualTo("linux-x64"));
+        });
+    }
+
+    [Test]
+    public void BaselineVerify_PreflightBlocked_ReportsPreflightFailureAndSkipsConfigurationViolations()
+    {
+        var runtime = new StubRuntime
+        {
+            VerifyOutcome = new BaselineVerifyOutcome(
+                false,
+                false,
+                Array.Empty<ArchitectureBaselineComparisonEntry>(),
+                Array.Empty<ArchitectureBaselineComparisonEntry>(),
+                Array.Empty<ArchitectureBaselineComparisonEntry>(),
+                Array.Empty<ArchitectureBaselineComparisonEntry>(),
+                [CreateViolation("Source.I", "Forbidden.I")])
+            {
+                PreflightDiagnostics = new[]
+                {
+                    new BuildStatePreflightDiagnostic(
+                        "Acme.Module", null, BuildStatePreflightState.MissingArtifact,
+                        new BuildStatePreflightEvidence("Acme.Module.csproj", "Acme.Module")),
+                },
+            },
+        };
+        var console = new RecordingConsole();
+
+        int result = new BaselineVerifyCommandHandler(runtime, console, new StubFileSystem("policy.yml", "baseline.yml")).Execute(
+            new BaselineVerifyCommandOptions("policy.yml", "baseline.yml", "strict", null, "human", Array.Empty<string>(), false));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(result, Is.EqualTo(CliExitCodes.InvalidArgumentsOrRuntimeError));
+            Assert.That(console.ErrorText, Does.Contain("build-state preflight is blocked"));
+            Assert.That(console.ErrorText, Does.Contain("MissingArtifact"));
+            // The preflight failure short-circuits before configuration violations are written.
+            Assert.That(console.OutputText, Does.Not.Contain("Forbidden.I"));
+            Assert.That(console.ErrorText, Does.Not.Contain("Forbidden.I"));
         });
     }
 

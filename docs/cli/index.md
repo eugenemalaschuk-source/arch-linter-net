@@ -247,8 +247,15 @@ arch-linter-net baseline diff \
 # CI gate: exit 1 if the baseline has drifted out of sync
 arch-linter-net baseline verify \
   --config architecture/dependencies.arch.yml \
-  --baseline architecture/baseline.arch.yml
+  --baseline architecture/baseline.arch.yml \
+  --ensure-built --configuration Debug --framework net10.0
 ```
+
+`baseline verify` supports the same explicit build-state selectors as `validate`:
+`--ensure-built`, `--no-restore`, `--configuration`, `--framework`, `--platform`, and
+`--runtime`. Use `--ensure-built` when the analyzed application opts into a shared framework
+such as `Microsoft.AspNetCore.App`; verification then loads the verified post-build artifact
+closure rather than the CLI host's default runtime closure.
 
 See [Migration baselines](../guides/migration-baselines.md) for the full
 lifecycle walkthrough.
