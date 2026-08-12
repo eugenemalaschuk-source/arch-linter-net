@@ -1,3 +1,4 @@
+using ArchLinterNet.Core.BuildState;
 using ArchLinterNet.Core.Contracts;
 using ArchLinterNet.Core.Model;
 using ArchLinterNet.Core.Reporting;
@@ -24,6 +25,13 @@ public sealed record BaselineVerifyOutcome(
     /// <summary>Every entry in the shared lifecycle vocabulary, for one-shape reporting.</summary>
     public IReadOnlyList<BaselineLifecycleEntry> Entries { get; init; } =
         Array.Empty<BaselineLifecycleEntry>();
+
+    /// <summary>
+    /// Build-state failures are distinct from policy configuration violations: the verify gate
+    /// did not complete, so hosts can report the typed preflight diagnostics and exit accordingly.
+    /// </summary>
+    public IReadOnlyCollection<BuildStatePreflightDiagnostic> PreflightDiagnostics { get; init; } =
+        Array.Empty<BuildStatePreflightDiagnostic>();
 
     public IReadOnlyList<ArchitectureFinding> Findings => ArchitectureFindingMapper.Order(
         Entries.Select(ArchitectureFindingMapper.FromBaseline));
