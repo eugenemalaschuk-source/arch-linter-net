@@ -15,11 +15,16 @@ import sys
 from pathlib import Path
 
 SEMVER = r"v?\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?"
+DOTTED_OR_DASHED_VERSION = r"v?\d+[.-]\d+[.-]\d+"
+PRODUCT_CONCEPT = r"(?:archlinternet|release(?:-notes?)?|migration|upgrade|adopt(?:ion)?)"
 VERSIONED_DOC_IDENTITY = re.compile(
     r"(?i)(?:migration-to|upgrade-to|release-notes?|adopt(?:ion)?-to)[-_]v?\d+[-.]\d+[-.]\d+"
 )
 PRODUCT_VERSION_PATH = re.compile(
-    r"(?i)(?:^|/)(?:archlinternet[-_]?v?\d+[.-]\d+[.-]\d+|v\d+[.-]\d+[.-]\d+)(?:[-_.][^/]*)?(?:/|\.md$)"
+    rf"(?i)(?:^|/)(?:"
+    rf"{PRODUCT_CONCEPT}[^/]*?[-_]{DOTTED_OR_DASHED_VERSION}"
+    rf"|{DOTTED_OR_DASHED_VERSION}[^/]*?[-_]{PRODUCT_CONCEPT}"
+    rf")[^/]*(?:/|\.md$)"
 )
 HARDCODED_TOOL_PACKAGE_PIN = re.compile(
     rf"(?i)dotnet\s+tool\s+(?:install|update)\s+ArchLinterNet(?:\.[A-Za-z0-9]+)+[^\n]{{0,80}}--version\s+{SEMVER}"
@@ -41,11 +46,17 @@ VERSION_FIRST_RELEASE_PROSE = re.compile(
     rf"(?i)\b{SEMVER}\b[^\n]{{0,60}}\b(?:current|public)\b[^\n]{{0,60}}\b(?:package|release)\b"
 )
 VERSIONED_HEADING = re.compile(
-    rf"(?im)^#{{1,6}}\s+[^\n]*(?:ArchLinterNet|Adopt|Upgrade|Migration|Release\s+Notes?)[^\n]*\b{SEMVER}\b"
+    rf"(?im)^#{{1,6}}\s+(?:"
+    rf"(?:Adopt|Upgrade|Migration|Release\s+Notes?)[^\n]{{0,60}}\b{SEMVER}\b"
+    rf"|ArchLinterNet\s+{SEMVER}\b"
+    rf"|\b{SEMVER}\b\s+ArchLinterNet"
+    rf")"
 )
 VERSIONED_NAV_CONCEPT = re.compile(
-    rf"(?i)(?:ArchLinterNet|Adopt|Upgrade|Migration|Release\s+Notes?|Reference\s+Entrypoints?)[^\n]{{0,60}}\b{SEMVER}\b"
-    rf"|\b{SEMVER}\b[^\n]{{0,60}}(?:ArchLinterNet|Adopt|Upgrade|Migration|Release\s+Notes?|Reference\s+Entrypoints?)"
+    rf"(?i)(?:Adopt|Upgrade|Migration|Release\s+Notes?|Reference\s+Entrypoints?)[^\n]{{0,60}}\b{SEMVER}\b"
+    rf"|\b{SEMVER}\b[^\n]{{0,60}}(?:Adopt|Upgrade|Migration|Release\s+Notes?|Reference\s+Entrypoints?)"
+    rf"|ArchLinterNet\s+{SEMVER}\b"
+    rf"|\b{SEMVER}\b\s+ArchLinterNet"
 )
 
 
