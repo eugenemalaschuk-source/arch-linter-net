@@ -49,6 +49,9 @@ def test_find_violations_accepts_external_release_and_package_versions(tmp_path:
             "The current SARIF release is 2.1.0.\n"
             "The current Newtonsoft.Json package version is 13.0.4.\n"
             "ArchLinterNet supports SARIF 2.1.0, the current release of the standard.\n"
+            "ArchLinterNet supports SARIF release 2.1.0.\n"
+            "ArchLinterNet uses Newtonsoft.Json package version 13.0.4.\n"
+            "The current SARIF release in ArchLinterNet is 2.1.0.\n"
         ),
     )
 
@@ -117,6 +120,17 @@ def test_find_violations_rejects_version_first_public_package_line(tmp_path: Pat
     write_repo(
         tmp_path,
         guide="0.6.4 is the public adoption package line for ArchLinterNet.\n",
+    )
+
+    violations = evergreen.find_violations(tmp_path)
+
+    assert any("product package SemVer is coupled to evergreen prose" in violation for violation in violations)
+
+
+def test_find_violations_rejects_explicit_current_archlinternet_release(tmp_path: Path) -> None:
+    write_repo(
+        tmp_path,
+        guide="The current ArchLinterNet release is 9.8.7.\n",
     )
 
     violations = evergreen.find_violations(tmp_path)
