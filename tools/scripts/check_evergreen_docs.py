@@ -17,6 +17,7 @@ from pathlib import Path
 SEMVER = r"v?\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?"
 DOTTED_OR_DASHED_VERSION = r"v?\d+[.-]\d+[.-]\d+"
 PRODUCT_STYLE_DOC_IDENTITY = r"(?:migration-to|upgrade-to|release-notes?|adopt(?:ion)?-to)"
+PRODUCT_GUIDE_LABEL = r"(?:Adopt(?:ion)?(?:\s+or\s+Upgrade)?|Upgrade|Migration)"
 VERSIONED_DOC_IDENTITY = re.compile(
     rf"(?i)(?:^|[/(`'\"\s]){PRODUCT_STYLE_DOC_IDENTITY}[-_]{DOTTED_OR_DASHED_VERSION}\b"
 )
@@ -52,11 +53,12 @@ HARDCODED_MSBUILD_PACKAGE_PIN = re.compile(
 HARDCODED_NESTED_MSBUILD_PACKAGE_PIN = re.compile(
     rf"(?is)<PackageReference\b"
     rf"(?=[^>]*\b(?:Include|Update)=[\"']ArchLinterNet(?:\.[^\"']+)+[\"'])[^>]*>"
-    rf".{{0,240}}?<(?:Version|VersionOverride)>\s*{SEMVER}\s*</(?:Version|VersionOverride)>"
+    rf"(?:(?!</PackageReference>).){{0,240}}?"
+    rf"<(?:Version|VersionOverride)>\s*{SEMVER}\s*</(?:Version|VersionOverride)>"
 )
 HARDCODED_TOOL_MANIFEST_PIN = re.compile(
     rf"(?is)[\"']ArchLinterNet(?:\.[A-Za-z0-9]+)+[\"']\s*:\s*\{{"
-    rf".{{0,240}}?[\"']version[\"']\s*:\s*[\"']{SEMVER}[\"']"
+    rf"(?:(?!\}}).){{0,240}}?[\"']version[\"']\s*:\s*[\"']{SEMVER}[\"']"
 )
 ARCHLINTERNET_RELEASE_PROSE = re.compile(
     rf"(?i)\bArchLinterNet(?:'s)?\s+"
@@ -85,16 +87,22 @@ ARCHLINTERNET_STATUS_PROSE = re.compile(
 )
 VERSIONED_HEADING = re.compile(
     rf"(?im)^#{{1,6}}\s+(?:"
-    rf"(?:Adopt|Upgrade|Migration|Release\s+Notes?)[^\n]{{0,60}}\b{SEMVER}\b"
+    rf"{PRODUCT_GUIDE_LABEL}(?:\s+(?:to|for))?\s+{SEMVER}\b"
+    rf"|Release\s+Notes?\s+{SEMVER}\b"
+    rf"|Reference\s+Entrypoints?\s+{SEMVER}\b"
+    rf"|(?:{PRODUCT_GUIDE_LABEL}|Release\s+Notes?)[^\n]{{0,30}}\bArchLinterNet\b[^\n]{{0,30}}\b{SEMVER}\b"
     rf"|ArchLinterNet\s+{SEMVER}\b"
-    rf"|\b{SEMVER}\b\s+ArchLinterNet"
+    rf"|\b{SEMVER}\b\s+(?:ArchLinterNet|{PRODUCT_GUIDE_LABEL}|Release\s+Notes?|Reference\s+Entrypoints?)\b"
     rf")"
 )
 VERSIONED_NAV_CONCEPT = re.compile(
     rf"(?i)^\s*-\s+(?:"
-    rf"(?:Adopt|Upgrade|Migration|Release\s+Notes?|Reference\s+Entrypoints?)[^:\n]{{0,60}}\b{SEMVER}\b"
+    rf"{PRODUCT_GUIDE_LABEL}(?:\s+(?:to|for))?\s+{SEMVER}\b"
+    rf"|Release\s+Notes?\s+{SEMVER}\b"
+    rf"|Reference\s+Entrypoints?\s+{SEMVER}\b"
+    rf"|(?:{PRODUCT_GUIDE_LABEL}|Release\s+Notes?)[^:\n]{{0,30}}\bArchLinterNet\b[^:\n]{{0,30}}\b{SEMVER}\b"
     rf"|ArchLinterNet\s+{SEMVER}\b"
-    rf"|\b{SEMVER}\b[^:\n]{{0,60}}(?:ArchLinterNet|Adopt|Upgrade|Migration|Release\s+Notes?|Reference\s+Entrypoints?)"
+    rf"|\b{SEMVER}\b\s+(?:ArchLinterNet|{PRODUCT_GUIDE_LABEL}|Release\s+Notes?|Reference\s+Entrypoints?)\b"
     rf")"
 )
 
@@ -146,18 +154,19 @@ def content_violations(root: Path, paths: list[Path]) -> list[str]:
                 f"{relative}: version-named evergreen docs reference '{snippet}'"
             )
 
-        for pattern in (
-            HARDCODED_TOOL_PACKAGE_PIN,
-            HARDCODED_LIBRARY_PACKAGE_PIN,
-            HARDCODED_MSBUILD_PACKAGE_PIN,
-            HARDCODED_NESTED_MSBUILD_PACKAGE_PIN,
-            HARDCODED_TOOL_MANIFEST_PIN,
-        ):
-            for match in pattern.finditer(text):
-                snippet = " ".join(match.group(0).split())
-                violations.append(
-                    f"{relative}: pin ArchLinterNet package versions in repository package/tool metadata, not evergreen docs: '{snippet}'"
-                )
+        if relative != "docs/reference/release-process.md":
+            for pattern in (
+                HARDCODED_TOOL_PACKAGE_PIN,
+                HARDCODED_LIBRARY_PACKAGE_PIN,
+                HARDCODED_MSBUILD_PACKAGE_PIN,
+                HARDCODED_NESTED_MSBUILD_PACKAGE_PIN,
+                HARDCODED_TOOL_MANIFEST_PIN,
+            ):
+                for match in pattern.finditer(text):
+                    snippet = " ".join(match.group(0).split())
+                    violations.append(
+                        f"{relative}: pin ArchLinterNet package versions in repository package/tool metadata, not evergreen docs: '{snippet}'"
+                    )
 
         # Release-process and schema-reference pages may discuss SemVer or exact
         # immutable machine identifiers because versioning is the subject there.
