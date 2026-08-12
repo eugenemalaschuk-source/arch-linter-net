@@ -407,10 +407,14 @@ jobs:
     if: github.event_name == 'pull_request'
     runs-on: ${{ matrix.os }}
     # Coverage-eligible unit/in-process correctness only — no subprocess builds or packing.
-    # Measured on the #475 topology PR: Apple Silicon macOS ~4.8m, Intel macOS ~11.6m, Windows was
-    # still mid-run (past the filesystem/symlink-heavy fixtures) when cancelled at a 15m cap — the
-    # unit bucket alone runs meaningfully slower on Windows than on either macOS runner. 30m gives
-    # headroom until enough Windows runs land to tighten this with real data.
+    # Measured on the #475 topology PR: Apple Silicon macOS ~4.8m, Windows ~10m — the unit bucket
+    # alone runs meaningfully slower on Windows than on macOS. 30m gives headroom until enough
+    # Windows runs land to tighten this with real data.
+    #
+    # macos-15-intel was dropped from this matrix (and from e2e_tests/packed_artifact_tests below):
+    # GitHub's Intel macOS runners are older hardware than the Apple Silicon (macos-14) runners and
+    # ran the unit bucket roughly 2x slower (~12m vs ~5-7m) for no additional correctness signal on
+    # this .NET/cross-platform-file-handling codebase — Apple Silicon macOS coverage is sufficient.
     timeout-minutes: 30
     strategy:
       fail-fast: false
@@ -418,8 +422,6 @@ jobs:
         include:
           - os: windows-latest
             name: Windows
-          - os: macos-15-intel
-            name: Intel macOS
           - os: macos-14
             name: Apple Silicon macOS
     permissions:
@@ -430,10 +432,6 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           persist-credentials: false
-
-      - name: Verify Intel macOS runner
-        if: matrix.os == 'macos-15-intel'
-        run: test "$(uname -m)" = x86_64
 
       - name: Verify Apple Silicon macOS runner
         if: matrix.os == 'macos-14'
@@ -464,8 +462,6 @@ jobs:
         include:
           - os: windows-latest
             name: Windows
-          - os: macos-15-intel
-            name: Intel macOS
           - os: macos-14
             name: Apple Silicon macOS
     permissions:
@@ -476,10 +472,6 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           persist-credentials: false
-
-      - name: Verify Intel macOS runner
-        if: matrix.os == 'macos-15-intel'
-        run: test "$(uname -m)" = x86_64
 
       - name: Verify Apple Silicon macOS runner
         if: matrix.os == 'macos-14'
@@ -511,8 +503,6 @@ jobs:
         include:
           - os: windows-latest
             name: Windows
-          - os: macos-15-intel
-            name: Intel macOS
           - os: macos-14
             name: Apple Silicon macOS
     permissions:
@@ -523,10 +513,6 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           persist-credentials: false
-
-      - name: Verify Intel macOS runner
-        if: matrix.os == 'macos-15-intel'
-        run: test "$(uname -m)" = x86_64
 
       - name: Verify Apple Silicon macOS runner
         if: matrix.os == 'macos-14'
