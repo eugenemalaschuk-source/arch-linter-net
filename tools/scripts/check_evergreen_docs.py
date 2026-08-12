@@ -27,10 +27,14 @@ PRODUCT_VERSION_PATH = re.compile(
     rf")[^/]*(?:/|\.md$)"
 )
 HARDCODED_TOOL_PACKAGE_PIN = re.compile(
-    rf"(?i)dotnet\s+tool\s+(?:install|update)\s+ArchLinterNet(?:\.[A-Za-z0-9]+)+[^\n]{{0,80}}--version\s+{SEMVER}"
+    rf"(?i)dotnet\s+tool\s+(?:install|update)\b"
+    rf"(?=[^\n]*\bArchLinterNet(?:\.[A-Za-z0-9]+)+\b)"
+    rf"(?=[^\n]*--version\s+{SEMVER}\b)[^\n]*"
 )
 HARDCODED_LIBRARY_PACKAGE_PIN = re.compile(
-    rf"(?i)dotnet\s+add\s+package\s+ArchLinterNet(?:\.[A-Za-z0-9]+)+[^\n]{{0,80}}--version\s+{SEMVER}"
+    rf"(?i)dotnet\s+add\s+package\b"
+    rf"(?=[^\n]*\bArchLinterNet(?:\.[A-Za-z0-9]+)+\b)"
+    rf"(?=[^\n]*--version\s+{SEMVER}\b)[^\n]*"
 )
 HARDCODED_PACKAGE_REFERENCE = re.compile(
     rf"(?i)<PackageReference\b(?=[^>\n]*\bInclude=[\"']ArchLinterNet(?:\.[^\"']+)+[\"'])(?=[^>\n]*\bVersion=[\"']{SEMVER}[\"'])[^>\n]*>"
