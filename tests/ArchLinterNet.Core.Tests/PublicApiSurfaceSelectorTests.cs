@@ -348,7 +348,7 @@ public sealed class PublicApiSurfaceSelectorTests
     // Builds a second, independent assembly declaring a public type under the identical full name as
     // Fixtures.IncidentalType, itself carrying the selector's marker attribute (so it IS selected in
     // its own assembly) — the exact shape needed to reproduce the name-only masking bug.
-    private static Assembly BuildDecoyAssemblyWithSameNamedSelectedType()
+    private static AssemblyBuilder BuildDecoyAssemblyWithSameNamedSelectedType()
     {
         AssemblyName assemblyName = new($"PublicApiSurfaceSelectorDecoy-{Guid.NewGuid():N}");
         AssemblyBuilder assemblyBuilder = AssemblyBuilder.DefineDynamicAssembly(assemblyName, AssemblyBuilderAccess.Run);
