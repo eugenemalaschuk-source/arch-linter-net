@@ -7,13 +7,31 @@ policies with schema-aware editors or AI agents.
 
 ## Independently versioned packaged schemas
 
-The public 0.6.1 package line ships an `adoption-stabilization/v1` schema registry whose entries version persisted formats independently from package SemVer, so a 0.6.1 installation does not ship or support a `https://archlinternet.dev/schema/0.6.0/...` identity. Use `arch-linter-net schema list` offline to inspect the shipped registry, or `arch-linter-net schema print <logical-id>` to write one exact packaged schema. Policy root/fragment v1 advanced to the `0.6.1` identity to add `layers.*.overlaps_with`; every other entry keeps its frozen immutable `0.5.1` identity: baseline v2 with identity v1, the API snapshot v1 canonical-model contract, normalized finding v1, analysis build-state receipt v1, analysis-cache v1, and analysis-profile v1. JSON diagnostics use `schema_version: 1`, a stable `kind`, and a typed `details` object; documented legacy fields remain available during the compatibility window. `PackagedSchemaRegistry.TryValidateText` parses a serialized API snapshot and validates that model against its packaged contract. Cache entries reject unsupported envelope versions. Profile is a generated-output format: its descriptor reports write support only until a public document reader is introduced.
+Each installed release exposes an `adoption-stabilization/v1` schema registry
+whose entries version persisted formats independently from package SemVer. Use
+`arch-linter-net schema list` offline to inspect the exact registry shipped by
+the installed package, or `arch-linter-net schema print <logical-id>` to write
+one exact packaged schema. Do not derive a `$schema` URL mechanically from the
+package version.
 
-Release-qualified editor IDs are immutable: `https://archlinternet.dev/schema/0.6.1/dependencies.arch.schema.json` for a root policy and `https://archlinternet.dev/schema/0.6.1/dependencies.arch.fragment.schema.json` for an imported fragment. (The prior `0.5.1` identity is frozen at its pre-`overlaps_with` shape and no longer packaged as the current policy-root/policy-fragment schema — see `analysis.policy_consistency` above and the packaged schema registry reference.)
+The repository's packaged compatibility set currently includes immutable
+release-qualified schema identities where those identities are themselves the
+machine contract. Policy root/fragment v1 use
+`https://archlinternet.dev/schema/0.6.1/dependencies.arch.schema.json` and
+`https://archlinternet.dev/schema/0.6.1/dependencies.arch.fragment.schema.json`;
+other frozen registry entries retain their immutable `0.5.1` identities. These
+numbers describe persisted schema contracts, not the identity of this evergreen
+documentation page. JSON diagnostics use `schema_version: 1`, a stable `kind`,
+and a typed `details` object; documented legacy fields remain available during
+the compatibility window. `PackagedSchemaRegistry.TryValidateText` parses a
+serialized API snapshot and validates that model against its packaged contract.
+Cache entries reject unsupported envelope versions. Profile is a generated-output
+format: its descriptor reports write support only until a public document reader
+is introduced.
 
 For an installed release, prefer `schema list` and `schema print` over a
-repository URL. The [0.5.1 migration guide](../guides/migration-to-0-5-1.md#offline-schemas)
-shows the complete offline discovery workflow for every shipped format.
+repository URL. The [upgrade guide](../guides/upgrading.md#offline-schemas) shows
+the complete offline discovery workflow for every shipped format.
 
 ### Normalized finding v1 compatibility
 
@@ -38,10 +56,10 @@ Machine consumers should validate each finding against the packaged
 
 The existing top-level `contract`, `contract_id`, `source`,
 `forbidden_namespace`, `forbidden_references`, and family-specific fields remain
-as derived compatibility fields for 0.5.1. New integrations should read
-`details`; compatibility fields may be deprecated in a later versioned schema.
-Baseline command JSON also retains its existing camel-case lifecycle and
-`identity` fields alongside the normalized snake-case envelope.
+as derived compatibility fields. New integrations should read `details`;
+compatibility fields may be deprecated in a later versioned schema. Baseline
+command JSON also retains its existing camel-case lifecycle and `identity`
+fields alongside the normalized snake-case envelope.
 
 Readers reject unknown schema versions. For schema version 1, non-strict readers
 preserve an unknown `kind` and its raw `details` as an opaque finding; strict
@@ -240,8 +258,8 @@ Contracts reference sets in two shapes:
   replace `source:` and expand the contract into one instance per resolved source. Each instance
   keeps its own diagnostics and baseline identity under the derived id
   `<authored-id>/<normalized-source>`; `--contract` selection and rule-input coverage `contract_ids`
-  still accept the authored id. These families may also declare `exclude_sources:` and
-  `exclude_source_sets:`; exclusions subtract from the already resolved source universe and are
+  still accept the authored id. These families may also declare `exclude_sources` and
+  `exclude_source_sets`; exclusions subtract from the already resolved source universe and are
   reported as matched/stale source-expansion evidence in JSON, `explain`, and SARIF.
 - **Inline union** — `project_sets:` on project metadata contracts and `allowed_only_in_assembly_sets:`
   on composition contracts union resolved members into the existing list without producing instances.
