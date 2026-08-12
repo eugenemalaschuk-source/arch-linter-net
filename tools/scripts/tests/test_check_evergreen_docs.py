@@ -40,6 +40,21 @@ def test_find_violations_accepts_machine_standard_and_framework_versions(tmp_pat
     assert evergreen.find_violations(tmp_path) == []
 
 
+def test_yaml_schema_page_rejects_product_release_status(tmp_path: Path) -> None:
+    write_repo(tmp_path)
+    (tmp_path / "docs" / "reference" / "yaml-schema.md").write_text(
+        "# YAML Schema Reference\n\n"
+        "Immutable machine contract: "
+        "https://archlinternet.dev/schema/0.6.1/dependencies.arch.schema.json\n\n"
+        "ArchLinterNet release 9.8.7 is current.\n",
+        encoding="utf-8",
+    )
+
+    violations = evergreen.find_violations(tmp_path)
+
+    assert any("product package SemVer is coupled to evergreen prose" in violation for violation in violations)
+
+
 def test_find_violations_accepts_external_release_and_package_versions(tmp_path: Path) -> None:
     write_repo(
         tmp_path,
@@ -52,6 +67,7 @@ def test_find_violations_accepts_external_release_and_package_versions(tmp_path:
             "ArchLinterNet supports SARIF release 2.1.0.\n"
             "ArchLinterNet uses Newtonsoft.Json package version 13.0.4.\n"
             "The current SARIF release in ArchLinterNet is 2.1.0.\n"
+            "Use SARIF migration-to-2.1.0 terminology when discussing the standard.\n"
         ),
     )
 
