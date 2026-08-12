@@ -35,6 +35,15 @@ internal sealed class PublicApiSurfaceValidator : IArchitecturePolicyDocumentVal
                     "'strict_public_api_surface'/'audit_public_api_surface' must be a declared target assembly, " +
                     "otherwise a typo'd assembly name would silently disable the contract instead of failing loudly.");
             }
+
+            if (contract.SurfaceSelector is { HasAnyField: false })
+            {
+                throw new InvalidOperationException(
+                    $"Public API surface contract '{contract.Name}' declares a 'surface_selector' with no " +
+                    "populated field. An unselective selector would govern nothing; declare at least one of " +
+                    "name_suffix, name_prefix, namespace, layer, base_type, implements_interface, has_attribute, " +
+                    "or role.");
+            }
         }
     }
 }

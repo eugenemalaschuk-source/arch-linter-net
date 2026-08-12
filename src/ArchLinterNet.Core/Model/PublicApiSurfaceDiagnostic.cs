@@ -20,4 +20,8 @@ public sealed record PublicApiSurfaceDiagnostic(
     public string? ApiDeltaKind { get; init; }
 
     public string? PreviousApiSignature { get; init; }
+
+    // Set when a selected member's signature depends on a first-party exported type (declared in
+    // one of the contract's own assemblies) that surface_selector did not itself select.
+    public string? UnselectedFirstPartyDependency { get; init; }
 }

@@ -33,6 +33,42 @@ public sealed partial class ArchitectureContractGroups
     public List<ArchitecturePublicApiSurfaceContract> AuditPublicApiSurface { get; set; } = new();
 }
 
+// Restricts the contract's governed surface to types matching bounded, already-delivered
+// evidence: the same structural matcher vocabulary type_placement.types_matching uses
+// (ArchitectureTypeRoleMatcher), plus Role, matched via the existing semantic role index
+// (ArchitectureContextSelectorMatcher.MatchesLiteral). No new matcher/tag engine — see
+// openspec/changes/add-public-api-surface-selector/design.md Decision 1. Absent selector
+// preserves the pre-existing unconditional assembly-wide behavior.
+public sealed class ArchitecturePublicApiSurfaceSelector
+{
+    [YamlMember(Alias = "name_suffix")] public string NameSuffix { get; set; } = string.Empty;
+
+    [YamlMember(Alias = "name_prefix")] public string NamePrefix { get; set; } = string.Empty;
+
+    [YamlMember(Alias = "namespace")] public string Namespace { get; set; } = string.Empty;
+
+    [YamlMember(Alias = "layer")] public string Layer { get; set; } = string.Empty;
+
+    [YamlMember(Alias = "base_type")] public string BaseType { get; set; } = string.Empty;
+
+    [YamlMember(Alias = "implements_interface")]
+    public string ImplementsInterface { get; set; } = string.Empty;
+
+    [YamlMember(Alias = "has_attribute")] public string HasAttribute { get; set; } = string.Empty;
+
+    [YamlMember(Alias = "role")] public string Role { get; set; } = string.Empty;
+
+    public bool HasAnyField =>
+        !string.IsNullOrEmpty(NameSuffix)
+        || !string.IsNullOrEmpty(NamePrefix)
+        || !string.IsNullOrEmpty(Namespace)
+        || !string.IsNullOrEmpty(Layer)
+        || !string.IsNullOrEmpty(BaseType)
+        || !string.IsNullOrEmpty(ImplementsInterface)
+        || !string.IsNullOrEmpty(HasAttribute)
+        || !string.IsNullOrEmpty(Role);
+}
+
 public sealed class ArchitecturePublicApiSurfaceContract : IArchitectureContract
 {
     [YamlMember(Alias = "name")] public string Name { get; set; } = string.Empty;
@@ -42,6 +78,11 @@ public sealed class ArchitecturePublicApiSurfaceContract : IArchitectureContract
     [YamlMember(Alias = "assemblies")] public List<string> Assemblies { get; set; } = new();
 
     [YamlMember(Alias = "declared_api")] public List<string> DeclaredApi { get; set; } = new();
+
+    // Optional intentional-surface selector (issue #525). Null means "no selector" — every
+    // exported type/member in Assemblies remains governed, unchanged from prior behavior.
+    [YamlMember(Alias = "surface_selector")]
+    public ArchitecturePublicApiSurfaceSelector? SurfaceSelector { get; set; }
 
     // Path to a reviewed public API snapshot file, resolved relative to the policy boundary at
     // load time. Its entries are unioned with DeclaredApi to form the declared surface.

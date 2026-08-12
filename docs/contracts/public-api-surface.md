@@ -46,6 +46,33 @@ contracts:
 arch-linter-net public-api capture --policy architecture/dependencies.arch.yml --contract module-api --output architecture/api/module-api.txt --ensure-built
 ```
 
+### Example with an intentional-surface selector
+
+For a modular assembly containing many CLR-`public` implementation/domain/configuration types that are not intended compatibility contracts, restrict the reviewed snapshot to the types you actually mean to support:
+
+```yaml
+contracts:
+  strict_public_api_surface:
+    - id: module-public-api
+      name: module-public-api-declared
+      assemblies: [Acme.Ledger.Module]
+      surface_selector:
+        has_attribute: Acme.Ledger.Module.Architecture.PublicApiContractAttribute
+      api_snapshot: architecture/api/module-public.txt
+      api_comparison: exact
+      reason: Only the types marked as intentional compatibility surface are reviewed.
+```
+
+`PublicApiContractAttribute` is a user-owned marker — nothing ArchLinterNet ships — applied on the type alongside whatever attribute already establishes its architecture role:
+
+```csharp
+[ValueObject]          // however the repository establishes its primary architecture role
+[PublicApiContract]    // user-owned orthogonal marker selecting API membership
+public readonly record struct Money(decimal Amount, string Currency);
+```
+
+See [Selecting an intentional surface](#selecting-an-intentional-surface) below for the full selector vocabulary and the role-vs-membership distinction.
+
 ## When to use
 
 Use public API surface contracts for library assemblies you ship to consumers (NuGet packages, shared internal libraries), where an accidental `public` type or member is a silent breaking-change/compatibility risk:
@@ -83,6 +110,35 @@ Parameter, field, property, and return types are rendered via their CLR full nam
 A type is exported if it is `public`, or if it is `protected`/`protected internal` **and** every enclosing type in its nesting chain is itself exported. A `protected` nested type inside an `internal` outer type is unreachable from outside the assembly, so it is out of scope even though the modifier says "protected."
 
 For an exported type, its own **directly declared** members (constructors, methods, properties, fields including `const`, and events) are in scope if they are `public`, `protected`, or `protected internal`. Compiler-generated members (property/event backing fields, `get_`/`set_`/`add_`/`remove_` accessor methods — represented instead by the property/event itself) are excluded, as is an enum's synthesized `value__` backing field (an enum's real exported surface is its literal members, e.g. `const MyApp.Color.Red: MyApp.Color`, not this CLR implementation detail). Members **inherited** from a base type are not re-reported against the derived type; they belong to the base type's own declared surface.
+
+### Selecting an intentional surface
+
+By default every exported type and member in `assemblies` is governed — this is unchanged and remains the behavior when no `surface_selector` is declared. `surface_selector` is an optional, bounded selector that restricts the governed surface to types the selector matches, letting a modular assembly's reviewed snapshot describe only its intentional compatibility contracts instead of every incidental `public` implementation/domain/configuration type.
+
+**Semantic role is not the same thing as API membership.** ArchLinterNet's semantic classification model gives each type a single winning role (`ValueObject`, `Entity`, `Controller`, `Adapter`, etc.) plus metadata. `surface_selector` does **not** require, and must never be used to force, reclassifying a type to some `ApiContract`-style role merely to shrink a snapshot — a `ValueObject` selected into the reviewed API surface stays a `ValueObject` for every other semantic/contextual rule. Membership in the reviewed surface is an orthogonal, independent decision from the type's architectural role.
+
+`surface_selector` accepts the same structural matcher fields `type_placement.types_matching` already supports, plus `role`:
+
+| Field | Matches |
+| --- | --- |
+| `name_suffix` / `name_prefix` | Simple type name |
+| `namespace` | Namespace, or a child namespace of it |
+| `layer` | A namespace already resolved to a declared layer |
+| `base_type` | Any type whose base-type chain includes the named type |
+| `implements_interface` | Any type implementing the named interface |
+| `has_attribute` | Any type carrying a custom attribute with the named full name |
+| `role` | The type's existing single winning semantic role (read-only — selecting via `role` never assigns or changes it) |
+
+At least one field must be populated — an empty `surface_selector` is rejected at policy load, the same invariant `types_matching` already enforces. Every populated field combines with **AND** semantics, exactly like `types_matching`.
+
+`has_attribute` is the primary adoption path: a user-owned marker attribute (nothing ArchLinterNet ships) selects membership without touching the type's real architectural classification. `implements_interface`/`base_type` fit a repository that already has a stable contract abstraction; `namespace`/`layer`/name matching fit only when they express deliberate API intent, not a naming guess. `role` selects through the existing semantic role index and is meant for the case where a type's genuine primary classification already **is** `ApiContract` (or similar) — it is one more existing-evidence path, not the required mechanism for ordinary orthogonal membership.
+
+The selected surface is used identically everywhere: strict/audit validation, `public-api capture`, `public-api diff`, `public-api update` (including `--dry-run`), `public-api migrate`, the CLI, and `ArchLinterNet.Testing` all resolve the same effective set of governed types — there is exactly one selected surface per contract, not a validation-only view.
+
+Two failure modes are specific to selectors:
+
+- A selector that matches **zero** exported types across the contract's resolved assemblies is a violation (`api_delta_kind: selector-zero-match`), reported at validation/capture time — the same "recorded, not thrown at load" treatment an unusable snapshot already gets, since resolving a selector needs the assemblies loaded. It applies to `public-api capture`/`diff`/`update`/`migrate` too, so a typo'd selector can never silently produce a near-empty snapshot.
+- A selected member whose signature references another exported type declared in the **same contract's assemblies** (a first-party type) that the selector did **not** select fails closed rather than silently including the dependency. Ordinary BCL/external referenced types never trigger this — only types the contract itself governs. The diagnostic carries `unselected_first_party_dependency` naming the escaping type. Like the zero-match check, this also applies to `public-api capture`/`diff`/`update`/`migrate`, not only strict/audit validation — a selector configuration `validate` would reject can never produce a snapshot through the capture lifecycle that `validate` could then never pass against.
 
 ### Reviewed snapshots
 
@@ -150,7 +206,7 @@ Setting `forbid_public_constants_unless_declared: true` adds a stricter, indepen
 
 Each violation identifies the contract, the declaring assembly, the declaring type, the normalized signature of the undeclared member or forbidden constant, the member's visibility (`public`, `protected`, or `protected internal`), and whether the violation reason is an undeclared exported member, a removed member, a changed signature, or a forbidden public constant.
 
-Surface deltas carry a normalized delta record — `api_delta_kind` (`added`, `removed`, `changed`, or `snapshot-unusable` for a missing/unparsable/foreign snapshot) and, for a change, `previous_api_signature`. Human output renders them inline (`delta: changed, previous_signature: ...`), the JSON CI artifact exposes `api_delta_kind`/`previous_api_signature`, and SARIF carries the same keys in each result's `properties`, so all three formats describe the same records. When a `const` field is simultaneously undeclared **and** fails the `forbid_public_constants_unless_declared` check, it is reported once, as a forbidden public constant (the stricter of the two reasons). `ignored_violations` entries use the same `source_type`/`forbidden_reference`/`reason` shape as other contract families, where `forbidden_reference` is the normalized signature string.
+Surface deltas carry a normalized delta record — `api_delta_kind` (`added`, `removed`, `changed`, `snapshot-unusable` for a missing/unparsable/foreign snapshot, or `selector-zero-match` for a `surface_selector` that matched nothing) and, for a change, `previous_api_signature`. A selected member depending on an unselected first-party type instead carries `unselected_first_party_dependency`, naming the escaping type. Human output renders them inline (`delta: changed, previous_signature: ...` / `reason: unselected_first_party_dependency, unselected_dependency: ...`), the JSON CI artifact exposes the same fields, and SARIF carries the same keys in each result's `properties`, so all formats describe the same records. When a `const` field is simultaneously undeclared **and** fails the `forbid_public_constants_unless_declared` check, it is reported once, as a forbidden public constant (the stricter of the two reasons). `ignored_violations` entries use the same `source_type`/`forbidden_reference`/`reason` shape as other contract families. For every other public-api-surface violation reason, `forbidden_reference` is the normalized signature string; for an unselected first-party dependency, it is the escaping type's fully qualified name instead (the signature that depends on it is still available separately, as `undeclared_api_signature`/`UndeclaredApiSignature`) — the same source/target distinction `type_placement`-style families already use for their own `ignored_violations` entries.
 
 ## Scope: what's not covered here
 
@@ -161,3 +217,5 @@ Surface deltas carry a normalized delta record — `api_delta_kind` (`added`, `r
 - No automatic API-review approval or code-ownership enforcement.
 - No automatic rewriting of source visibility.
 - Reflection-based (like `protected` and `type_placement`), not project-aware Roslyn compilation.
+- `surface_selector` is not a new annotation/tag/classification engine and does not ship a built-in marker attribute — it reuses the existing `type_placement` matcher vocabulary and semantic role index, and a selected type keeps its single existing winning role.
+- The first-party-dependency check is one hop (a selected member's own signature), not a general recursive DTO/domain/persistence/framework/version exposure graph.

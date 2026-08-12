@@ -10,9 +10,7 @@ public sealed partial class ArchitectureDiagnosticFormatter
 {
     private static string FormatPublicApiSurfaceContextForHumans(PublicApiSurfaceDiagnostic publicApiSurface)
     {
-        string reason = publicApiSurface.ForbiddenPublicConstant == true
-            ? "forbidden_public_constant"
-            : ReasonForDelta(publicApiSurface.ApiDeltaKind);
+        string reason = ReasonFor(publicApiSurface);
         string context = $" (reason: {reason}, assembly: {publicApiSurface.ApiAssemblyName}, " +
                $"visibility: {publicApiSurface.ApiVisibility}, signature: {publicApiSurface.UndeclaredApiSignature}";
 
@@ -26,13 +24,34 @@ public sealed partial class ArchitectureDiagnosticFormatter
             context += $", previous_signature: {publicApiSurface.PreviousApiSignature}";
         }
 
+        if (publicApiSurface.UnselectedFirstPartyDependency != null)
+        {
+            context += $", unselected_dependency: {publicApiSurface.UnselectedFirstPartyDependency}";
+        }
+
         return context + ")";
+    }
+
+    private static string ReasonFor(PublicApiSurfaceDiagnostic publicApiSurface)
+    {
+        if (publicApiSurface.ForbiddenPublicConstant == true)
+        {
+            return "forbidden_public_constant";
+        }
+
+        if (publicApiSurface.UnselectedFirstPartyDependency != null)
+        {
+            return "unselected_first_party_dependency";
+        }
+
+        return ReasonForDelta(publicApiSurface.ApiDeltaKind);
     }
 
     private static string ReasonForDelta(string? apiDeltaKind) => apiDeltaKind switch
     {
         "removed" => "removed_api_member",
         "changed" => "changed_api_signature",
+        "selector-zero-match" => "selector_matched_nothing",
         _ => "undeclared_api_member",
     };
 
@@ -55,5 +74,8 @@ public sealed partial class ArchitectureDiagnosticFormatter
 
         if (publicApiSurface.PreviousApiSignature != null)
             obj["previous_api_signature"] = publicApiSurface.PreviousApiSignature;
+
+        if (publicApiSurface.UnselectedFirstPartyDependency != null)
+            obj["unselected_first_party_dependency"] = publicApiSurface.UnselectedFirstPartyDependency;
     }
 }
