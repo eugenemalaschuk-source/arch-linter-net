@@ -422,6 +422,52 @@ public sealed class PublicApiSurfaceSelectorTests
         }));
     }
 
+    // Regression (PR #529 review): AttachFindingIdentities matches a violation's ForbiddenReferences
+    // against the recorded candidate's ForbiddenReference/TargetMember — both now the escaping type,
+    // per the identity fix above. If ForbiddenReferences still carried the source member's own
+    // signature instead, no candidate would ever match, every escape violation would carry no
+    // identity, and two distinct escapes from the same member would collapse onto the same fallback
+    // finding identity downstream (JSON/SARIF/Testing). Exercised through the same
+    // FindingIdentityCursor/AttachFindingIdentities path ArchitectureAnalysisSessionFindingIdentityTests
+    // uses for every other contract family, not just the raw Check call.
+    [Test]
+    public void SelectedMember_WithTwoFirstPartyEscapes_AttachesDistinctFindingIdentitiesPerEscapingType()
+    {
+        var contract = new ArchitecturePublicApiSurfaceContract
+        {
+            Id = "surface",
+            Name = "surface",
+            Assemblies = new List<string> { AssemblyName },
+            SurfaceSelector = new ArchitecturePublicApiSurfaceSelector
+            {
+                HasAttribute = typeof(Fixtures.PublicApiContractAttribute).FullName!,
+            },
+        };
+        var runner = CreateRunner(contract);
+
+        int cursor = runner.Session.FindingIdentityCursor;
+        List<ArchitectureViolation> violations = runner.Session.CheckPublicApiSurfaceContract(contract);
+        IReadOnlyList<ArchitectureViolation> attached = runner.Session.AttachFindingIdentities(violations, cursor);
+
+        List<ArchitectureViolation> escapes = attached
+            .Where(v => v.SourceType == typeof(Fixtures.SelectedWithTwoFirstPartyEscapes).FullName
+                && (v.Payload as PublicApiSurfacePayload)?.UnselectedFirstPartyDependency != null)
+            .ToList();
+
+        Assert.That(escapes, Has.Count.EqualTo(2));
+        Assert.Multiple(() =>
+        {
+            foreach (ArchitectureViolation escape in escapes)
+            {
+                Assert.That(escape.Identity, Is.Not.Null,
+                    $"no identity attached for escape to {(escape.Payload as PublicApiSurfacePayload)?.UnselectedFirstPartyDependency}");
+            }
+
+            Assert.That(escapes.Select(v => v.Identity!.TargetType).Distinct().Count(), Is.EqualTo(2),
+                "two distinct escaping types must not collapse onto the same finding identity");
+        });
+    }
+
     // Regression (PR #529 review): the escape violation's ignore identity must describe the escaping
     // (target) type, not duplicate the selected (source) member — otherwise an ignored_violations
     // entry authored against the actual forbidden dependency could never match it.

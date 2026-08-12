@@ -244,12 +244,20 @@ internal static class PublicApiSurfaceChecker
                     continue;
                 }
 
+                // ForbiddenReferences must carry the escaping type, not entry.Signature: identity
+                // attachment (ArchitectureAnalysisSession.AttachFindingIdentities) matches a
+                // violation's ForbiddenReferences against the baseline candidate's ForbiddenReference/
+                // TargetMember — both now referencedType (see the IsIgnored call above) — so a
+                // mismatched ForbiddenReferences here would leave every escape violation with no
+                // attached identity, and two distinct escapes from the same member would collapse
+                // onto the same fallback finding identity downstream (JSON/SARIF/Testing). The source
+                // member's own signature is not lost — it is still reported as UndeclaredApiSignature.
                 yield return new ArchitectureViolation(
                     contract.Name,
                     contract.Id,
                     entry.DeclaringTypeName,
                     ViolationCategory,
-                    new[] { entry.Signature })
+                    new[] { referencedType })
                 {
                     Payload = new PublicApiSurfacePayload(
                         UndeclaredApiSignature: entry.Signature,
