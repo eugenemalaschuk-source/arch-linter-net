@@ -54,9 +54,9 @@ HARDCODED_MSBUILD_PACKAGE_PIN = re.compile(
     rf"(?=[^>\n]*\b(?:Version|VersionOverride)=[\"']{SEMVER}[\"'])[^>\n]*>"
 )
 HARDCODED_NESTED_MSBUILD_PACKAGE_PIN = re.compile(
-    rf"(?is)<PackageReference\b"
+    rf"(?is)<(?P<package_item>PackageReference|PackageVersion)\b"
     rf"(?=[^>]*\b(?:Include|Update)=[\"']ArchLinterNet(?:\.[^\"']+)+[\"'])[^>]*>"
-    rf"(?:(?!</PackageReference>).){{0,240}}?"
+    rf"(?:(?!</(?P=package_item)>).){{0,240}}?"
     rf"<(?:Version|VersionOverride)>\s*{SEMVER}\s*</(?:Version|VersionOverride)>"
 )
 HARDCODED_TOOL_MANIFEST_PIN = re.compile(
@@ -86,6 +86,8 @@ ARCHLINTERNET_STATUS_PROSE = re.compile(
     rf"\b(?:current|public)\b[^\n]{{0,40}}\b(?:package(?:\s+release)?|release)\s+(?:for|of)\s+ArchLinterNet\b[^\n]{{0,60}}\b{SEMVER}\b"
     rf"|"
     rf"\b{SEMVER}\b[^\n]{{0,80}}\b(?:current|public)\b[^\n]{{0,40}}\b(?:package(?:\s+release)?|release)\s+(?:for|of)\s+ArchLinterNet\b"
+    rf"|"
+    rf"\b{SEMVER}\b[^\n]{{0,80}}\b(?:current|public)\b[^\n]{{0,40}}\bArchLinterNet(?:'s)?\s+(?:package|release)\b"
     rf")"
 )
 VERSIONED_HEADING = re.compile(
@@ -107,6 +109,10 @@ VERSIONED_NAV_CONCEPT = re.compile(
     rf"|ArchLinterNet\s+{SEMVER}\b"
     rf"|\b{SEMVER}\b\s+(?:ArchLinterNet|{PRODUCT_GUIDE_LABEL}|Release\s+Notes?|Reference\s+Entrypoints?)\b"
     rf")"
+)
+ARCHLINTERNET_VERSIONED_NAV = re.compile(
+    rf"(?i)^\s*-\s+(?:(?:current|public)\s+)?ArchLinterNet(?:'s)?"
+    rf"(?:\s+(?:release|version|package(?:\s+(?:release|version|line))?))?\s+{SEMVER}\b"
 )
 
 
@@ -207,7 +213,11 @@ def navigation_violations(root: Path) -> list[str]:
             in_nav = False
         if not in_nav:
             continue
-        if VERSIONED_DOC_IDENTITY.search(line) or VERSIONED_NAV_CONCEPT.search(line):
+        if (
+            VERSIONED_DOC_IDENTITY.search(line)
+            or VERSIONED_NAV_CONCEPT.search(line)
+            or ARCHLINTERNET_VERSIONED_NAV.search(line)
+        ):
             violations.append(
                 f"mkdocs.yml:{line_number}: public navigation must use a version-neutral ArchLinterNet product identity: {line.strip()}"
             )
