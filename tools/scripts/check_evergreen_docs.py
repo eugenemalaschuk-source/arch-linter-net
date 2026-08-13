@@ -16,7 +16,11 @@ import sys
 from pathlib import Path
 
 SEMVER = r"v?\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?"
-PATH_VERSION = r"v?\d+[.-]\d+[.-]\d+(?:[-_][0-9A-Za-z][0-9A-Za-z._-]*?)?"
+PATH_VERSION = (
+    r"v?\d+[.-]\d+[.-]\d+"
+    r"(?:[-_][0-9A-Za-z][0-9A-Za-z._-]*?)?"
+    r"(?:\+[0-9A-Za-z][0-9A-Za-z._-]*)?"
+)
 CLI_VERSION_ARG = rf"(?:{SEMVER}|[\"']{SEMVER}[\"'])"
 PRODUCT_DOC_CONCEPT = (
     r"(?:migration(?:-to)?|upgrade(?:-to)?|upgrading|release(?:-notes?)?|"
@@ -24,6 +28,10 @@ PRODUCT_DOC_CONCEPT = (
     r"troubleshooting|reference-entrypoints|cli|capabilities)"
 )
 PRODUCT_GUIDE_LABEL = r"(?:Adopt(?:ion)?(?:\s+or\s+Upgrade)?|Upgrade|Migration)"
+ARCHLINTERNET_GUIDE_IDENTITY = (
+    r"(?:upgrade(?:\s+guide)?|migration(?:\s+guide)?|adoption(?:\s+guide)?|"
+    r"release\s+notes?|reference\s+entrypoints?)"
+)
 PRODUCT_RELEASE_PATH_QUALIFIER = rf"(?:version|{PRODUCT_DOC_CONCEPT})"
 PRODUCT_PATH_SEPARATOR = r"[-_./]"
 VERSIONED_DOC_IDENTITY = re.compile(
@@ -100,6 +108,7 @@ VERSIONED_HEADING = re.compile(
     rf"|Release\s+Notes?\s+{SEMVER}\b"
     rf"|Reference\s+Entrypoints?\s+{SEMVER}\b"
     rf"|(?:{PRODUCT_GUIDE_LABEL}|Release\s+Notes?)[^\n]{{0,30}}\bArchLinterNet\b[^\n]{{0,30}}\b{SEMVER}\b"
+    rf"|ArchLinterNet(?:'s)?\s+{ARCHLINTERNET_GUIDE_IDENTITY}(?:\s+(?:to|for))?\s+{SEMVER}\b"
     rf"|ArchLinterNet\s+{SEMVER}\b"
     rf"|\b{SEMVER}\b\s+(?:ArchLinterNet|{PRODUCT_GUIDE_LABEL}|Release\s+Notes?|Reference\s+Entrypoints?)\b"
     rf")"
@@ -110,6 +119,7 @@ VERSIONED_NAV_CONCEPT = re.compile(
     rf"|Release\s+Notes?\s+{SEMVER}\b"
     rf"|Reference\s+Entrypoints?\s+{SEMVER}\b"
     rf"|(?:{PRODUCT_GUIDE_LABEL}|Release\s+Notes?)[^:\n]{{0,30}}\bArchLinterNet\b[^:\n]{{0,30}}\b{SEMVER}\b"
+    rf"|ArchLinterNet(?:'s)?\s+{ARCHLINTERNET_GUIDE_IDENTITY}(?:\s+(?:to|for))?\s+{SEMVER}\b"
     rf"|ArchLinterNet\s+{SEMVER}\b"
     rf"|\b{SEMVER}\b\s+(?:ArchLinterNet|{PRODUCT_GUIDE_LABEL}|Release\s+Notes?|Reference\s+Entrypoints?)\b"
     rf")"
@@ -214,7 +224,9 @@ def repository_readme_files(root: Path) -> list[Path]:
         candidates = [
             root / relative
             for relative in result.stdout.split("\0")
-            if relative and Path(relative).name.startswith("README")
+            if relative
+            and Path(relative).name.startswith("README")
+            and (root / relative).is_file()
         ]
 
     return sorted(path for path in candidates if not is_excluded_readme(root, path))
