@@ -66,11 +66,15 @@ The system SHALL provide a mapper that converts checker result types (`Architect
 - **THEN** it returns an `UnmatchedIgnoreDiagnostic` preserving `ContractName`, `ContractId`, `IgnoreIndex`, `SourceType`, `ForbiddenReference`, and `Reason`
 
 ### Requirement: Formatters consume the diagnostic model without checker-specific knowledge
-`ArchitectureDiagnosticFormatter` SHALL render human-readable and CI JSON output by pattern-matching on `ArchitectureDiagnostic` kind, and SHALL NOT inspect optional fields of legacy checker result types directly.
+`ArchitectureDiagnosticFormatter` SHALL render human-readable output and shared CI JSON display fields by pattern-matching on `ArchitectureDiagnostic` kind, SHALL render each diagnostic's structured CI/JSON detail fields by dispatching through a per-family projector registered in `DiagnosticDetailProjectionRegistry` (see the `diagnostic-detail-projection-registry` capability) rather than a central switch enumerating every diagnostic kind, and SHALL NOT inspect optional fields of legacy checker result types directly.
 
 #### Scenario: Existing human and JSON output remain unchanged
 - **WHEN** the same set of legacy checker results that previously produced a given human-readable or JSON output is formatted through the new model and adapter
 - **THEN** the formatted output is identical to the output produced before this change
+
+#### Scenario: Structured detail projection does not require a central switch edit
+- **WHEN** a diagnostic family's structured CI/JSON detail fields are produced
+- **THEN** they are produced by that family's own registered projector, and no diagnostic family's structured detail projection requires adding a case to a shared all-kinds switch statement
 
 ### Requirement: Policy consistency diagnostic has its own subtype
 The system SHALL represent each policy-consistency finding as a `PolicyConsistencyDiagnostic` with `Kind == ArchitectureDiagnosticKind.PolicyConsistency`, carrying `CheckKind` (a string discriminant such as `"duplicate-id"`, `"allow-forbid-conflict"`, `"independence-conflict"`, `"protected-importer-conflict"`, `"layer-overlap"`, or `"unreachable-contract"`), `Reason` (human-readable text), `ConflictingContractIds`, `ConflictingContractNames`, `Layers`, and an optional `RepresentativeType`.
@@ -207,3 +211,4 @@ comparison projections SHALL consume that identity without reconstructing it fro
 #### Scenario: Rendering does not affect a finding identity
 - **WHEN** the same validation result is rendered sequentially to human, JSON, SARIF, or Testing output
 - **THEN** every projection SHALL expose the same canonical identity for the finding.
+

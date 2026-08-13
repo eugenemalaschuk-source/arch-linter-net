@@ -44,4 +44,16 @@ public sealed partial class ArchitectureDiagnosticFormatter
             ["configuration"] = e.Configuration,
         }).ToArray();
     }
+
+    private static void ApplyFrameworkReferenceCiFields(FrameworkReferenceDiagnostic framework, Dictionary<string, object?> obj)
+    {
+        obj["forbidden_framework_group"] = framework.ForbiddenFrameworkGroup;
+        ApplyFrameworkReferenceEvidenceCiFields(framework.Evidence, obj);
+    }
+
+    private static void ApplyFrameworkReferenceAllowOnlyCiFields(FrameworkReferenceAllowOnlyDiagnostic framework, Dictionary<string, object?> obj)
+    {
+        obj["allowed_framework_groups"] = framework.AllowedFrameworkGroups.ToArray();
+        ApplyFrameworkReferenceEvidenceCiFields(framework.Evidence, obj);
+    }
 }

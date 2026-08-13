@@ -117,4 +117,14 @@ public sealed partial class ArchitectureDiagnosticFormatter
         BuildStatePreflightState.RestoreFailed => "restore-failed",
         _ => throw new ArgumentOutOfRangeException(nameof(state), state, null)
     };
+
+    private static void ApplyBuildStatePreflightCiFields(BuildStatePreflightDiagnostic preflight, Dictionary<string, object?> obj)
+    {
+        BuildStatePreflightEvidence evidence = preflight.Evidence;
+        obj["state"] = StateToken(preflight.State); obj["project_path"] = evidence.ProjectPath;
+        obj["assembly_name"] = evidence.AssemblyName; obj["requested_configuration"] = evidence.RequestedConfiguration;
+        obj["observed_configuration"] = evidence.ObservedConfiguration; obj["requested_target_framework"] = evidence.RequestedTargetFramework;
+        obj["observed_target_framework"] = evidence.ObservedTargetFramework; obj["expected_output_path"] = evidence.ExpectedOutputPath;
+        obj["build_command"] = evidence.BuildCommand; obj["detail"] = evidence.Detail;
+    }
 }
