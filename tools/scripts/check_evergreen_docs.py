@@ -17,7 +17,9 @@ from pathlib import Path
 SEMVER = r"v?\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?"
 PATH_VERSION = r"v?\d+[.-]\d+[.-]\d+(?:[-_][0-9A-Za-z][0-9A-Za-z._-]*?)?"
 CLI_VERSION_ARG = rf"(?:{SEMVER}|[\"']{SEMVER}[\"'])"
-PRODUCT_STYLE_DOC_IDENTITY = r"(?:migration-to|upgrade-to|release-notes?|adopt(?:ion)?-to)"
+PRODUCT_STYLE_DOC_IDENTITY = (
+    r"(?:migration(?:-to)?|upgrade(?:-to)?|release(?:-notes?)?|adopt(?:ion)?(?:-to)?)"
+)
 PRODUCT_GUIDE_LABEL = r"(?:Adopt(?:ion)?(?:\s+or\s+Upgrade)?|Upgrade|Migration)"
 PRODUCT_RELEASE_PATH_QUALIFIER = (
     r"(?:release(?:-notes?)?|version|migration(?:-to)?|upgrade(?:-to)?|adopt(?:ion)?(?:-to)?)"
@@ -116,6 +118,9 @@ ARCHLINTERNET_VERSIONED_NAV = re.compile(
     rf"(?i)^\s*-\s+(?:(?:current|public)\s+)?ArchLinterNet(?:'s)?"
     rf"(?:\s+(?:release|version|package(?:\s+(?:release|version|line))?))?\s+{SEMVER}\b"
 )
+SOFT_PROSE_WRAP = re.compile(
+    r"(?<!\n)\n(?![ \t]*\n)(?![ \t]*(?:[-*+>#`|]|\d+[.)][ \t]))[ \t]*"
+)
 
 
 def repository_root() -> Path:
@@ -194,17 +199,22 @@ def content_violations(root: Path, paths: list[Path]) -> list[str]:
         # is the subject there. All other evergreen surfaces still distinguish
         # product release prose from legitimate machine/schema/standard versions.
         if relative != "docs/reference/release-process.md":
+            prose_text = SOFT_PROSE_WRAP.sub(" ", text)
             for pattern in (
                 ARCHLINTERNET_RELEASE_PROSE,
                 PACKAGE_LINE_PROSE,
                 ARCHLINTERNET_STATUS_PROSE,
-                VERSIONED_HEADING,
             ):
-                for match in pattern.finditer(text):
+                for match in pattern.finditer(prose_text):
                     snippet = " ".join(match.group(0).split())
                     violations.append(
                         f"{relative}: product package SemVer is coupled to evergreen prose: '{snippet}'"
                     )
+            for match in VERSIONED_HEADING.finditer(text):
+                snippet = " ".join(match.group(0).split())
+                violations.append(
+                    f"{relative}: product package SemVer is coupled to evergreen prose: '{snippet}'"
+                )
 
     return violations
 
