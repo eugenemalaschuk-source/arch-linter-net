@@ -11,6 +11,7 @@ navigation label, or copy-paste install identity.
 from __future__ import annotations
 
 import re
+import subprocess
 import sys
 from pathlib import Path
 
@@ -121,6 +122,20 @@ MARKDOWN_STRUCTURAL_LINE = re.compile(
     r"^[ \t]*(?:#{1,6}(?:[ \t]|$)|[-*+][ \t]+|(?:`{3,}|~{3,})|\||\d+[.)][ \t]+)"
 )
 BLOCKQUOTE_LINE = re.compile(r"^[ \t]*>[ \t]?(.*)$")
+README_EXCLUDED_PREFIXES = (
+    ("docs", "internal"),
+    ("openspec", "changes", "archive"),
+)
+FALLBACK_IGNORED_PARTS = {
+    ".git",
+    ".venv",
+    ".pytest_cache",
+    "TestResults",
+    "artifacts",
+    "bin",
+    "node_modules",
+    "obj",
+}
 
 
 def repository_root() -> Path:
@@ -164,11 +179,41 @@ def normalize_soft_wrapped_prose(text: str) -> str:
     return "\n".join(output)
 
 
+def is_excluded_readme(root: Path, path: Path) -> bool:
+    parts = path.relative_to(root).parts
+    return any(parts[: len(prefix)] == prefix for prefix in README_EXCLUDED_PREFIXES)
+
+
+def repository_readme_files(root: Path) -> list[Path]:
+    """Return tracked contributor README files, with a filesystem fallback for tests."""
+    try:
+        result = subprocess.run(
+            ["git", "-C", str(root), "ls-files", "-z"],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+    except (FileNotFoundError, subprocess.CalledProcessError):
+        candidates = [
+            path
+            for path in root.rglob("README*")
+            if path.is_file()
+            and not any(part in FALLBACK_IGNORED_PARTS for part in path.relative_to(root).parts)
+        ]
+    else:
+        candidates = [
+            root / relative
+            for relative in result.stdout.split("\0")
+            if relative and Path(relative).name.startswith("README")
+        ]
+
+    return sorted(path for path in candidates if not is_excluded_readme(root, path))
+
+
 def public_markdown_files(root: Path) -> list[Path]:
     docs_root = root / "docs"
     samples_root = root / "samples"
-    src_root = root / "src"
-    files = [path for path in root.glob("README*") if path.is_file()]
+    files = repository_readme_files(root)
     if docs_root.exists():
         files.extend(
             path
@@ -177,8 +222,6 @@ def public_markdown_files(root: Path) -> list[Path]:
         )
     if samples_root.exists():
         files.extend(path for path in samples_root.rglob("*.md") if path.is_file())
-    if src_root.exists():
-        files.extend(path for path in src_root.rglob("README*.md") if path.is_file())
     return sorted(set(files))
 
 
