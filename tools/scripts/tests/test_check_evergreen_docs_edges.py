@@ -106,6 +106,24 @@ def test_product_release_prose_rejects_soft_wraps_without_blocking_external_vers
     assert not any("13.0.4" in item for item in product_violations)
 
 
+def test_all_contributor_readmes_are_scanned_but_archives_are_excluded(tmp_path: Path) -> None:
+    write_repo(tmp_path)
+    pin = "dotnet tool install ArchLinterNet.Cli --version 9.8.7\n"
+    benchmark_readme = tmp_path / "benchmarks" / "Example.Benchmarks" / "README.md"
+    benchmark_readme.parent.mkdir(parents=True)
+    benchmark_readme.write_text(pin, encoding="utf-8")
+    archived_readme = (
+        tmp_path / "openspec" / "changes" / "archive" / "old-change" / "README.md"
+    )
+    archived_readme.parent.mkdir(parents=True)
+    archived_readme.write_text("ArchLinterNet release 9.8.7 historical evidence\n", encoding="utf-8")
+
+    violations = evergreen.find_violations(tmp_path)
+
+    assert any("benchmarks/Example.Benchmarks/README.md" in item for item in violations)
+    assert not any("openspec/changes/archive" in item for item in violations)
+
+
 def test_msbuild_pin_detection_accepts_valid_attribute_spacing(tmp_path: Path) -> None:
     write_repo(tmp_path)
     guide = tmp_path / "docs" / "guides" / "upgrading.md"
