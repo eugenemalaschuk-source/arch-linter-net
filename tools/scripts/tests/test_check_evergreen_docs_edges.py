@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import sys
 from pathlib import Path
+from types import SimpleNamespace
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
@@ -19,20 +20,30 @@ def write_repo(root: Path) -> None:
     )
 
 
-def test_product_routes_cover_dotted_and_directory_forms_without_blocking_standard(tmp_path: Path) -> None:
+def test_product_routes_cover_dotted_directory_and_build_metadata_forms_without_blocking_standard(
+    tmp_path: Path,
+) -> None:
     write_repo(tmp_path)
     guides = tmp_path / "docs" / "guides"
     (guides / "archlinternet.9.8.7.md").write_text("# Product release\n", encoding="utf-8")
+    (guides / "archlinternet-9.8.7+build.1.md").write_text(
+        "# Product release\n", encoding="utf-8"
+    )
     directory_route = guides / "archlinternet" / "9.8.7" / "index.md"
     directory_route.parent.mkdir(parents=True)
     directory_route.write_text("# Product release\n", encoding="utf-8")
+    build_directory = guides / "9.8.7+build.1" / "upgrading.md"
+    build_directory.parent.mkdir(parents=True)
+    build_directory.write_text("# Product release\n", encoding="utf-8")
     standard = tmp_path / "docs" / "reference" / "archlinternet-sarif-2.1.0.md"
     standard.write_text("# ArchLinterNet SARIF 2.1.0\n", encoding="utf-8")
 
     violations = evergreen.find_violations(tmp_path)
 
     assert any("archlinternet.9.8.7.md" in item for item in violations)
+    assert any("archlinternet-9.8.7+build.1.md" in item for item in violations)
     assert any("archlinternet/9.8.7/index.md" in item for item in violations)
+    assert any("9.8.7+build.1/upgrading.md" in item for item in violations)
     assert not any("archlinternet-sarif-2.1.0.md" in item for item in violations)
 
 
@@ -73,6 +84,33 @@ def test_product_routes_reject_concept_first_versions_without_to(tmp_path: Path)
     assert any("9.8.7/upgrading.md" in item for item in violations)
     assert not any("sarif-upgrade-2.1.0.md" in item for item in violations)
     assert not any("sarif-upgrade/2.1.0/index.md" in item for item in violations)
+
+
+def test_product_first_heading_and_nav_are_rejected_without_blocking_standard_context(
+    tmp_path: Path,
+) -> None:
+    write_repo(tmp_path)
+    guide = tmp_path / "docs" / "guides" / "upgrading.md"
+    guide.write_text(
+        "# ArchLinterNet upgrade to 9.8.7\n\n"
+        "# ArchLinterNet supports SARIF migration to 2.1.0\n",
+        encoding="utf-8",
+    )
+    (tmp_path / "mkdocs.yml").write_text(
+        "site_name: ArchLinterNet\n"
+        "nav:\n"
+        "  - Guides:\n"
+        "      - ArchLinterNet migration to 9.8.7: guides/upgrading.md\n"
+        "      - ArchLinterNet SARIF migration to 2.1.0: guides/upgrading.md\n",
+        encoding="utf-8",
+    )
+
+    violations = evergreen.find_violations(tmp_path)
+
+    assert any("ArchLinterNet upgrade to 9.8.7" in item for item in violations)
+    assert any("ArchLinterNet migration to 9.8.7" in item for item in violations)
+    assert not any("supports SARIF migration to 2.1.0" in item for item in violations)
+    assert not any("ArchLinterNet SARIF migration to 2.1.0" in item for item in violations)
 
 
 def test_product_release_prose_rejects_soft_wraps_without_blocking_external_versions(
@@ -148,6 +186,21 @@ def test_all_contributor_readmes_are_scanned_but_archives_are_excluded(tmp_path:
 
     assert any("benchmarks/Example.Benchmarks/README.md" in item for item in violations)
     assert not any("openspec/changes/archive" in item for item in violations)
+
+
+def test_tracked_readme_discovery_ignores_missing_worktree_paths(
+    tmp_path: Path, monkeypatch
+) -> None:
+    write_repo(tmp_path)
+    monkeypatch.setattr(
+        evergreen.subprocess,
+        "run",
+        lambda *args, **kwargs: SimpleNamespace(
+            stdout="README.md\0deleted/README.md\0"
+        ),
+    )
+
+    assert evergreen.repository_readme_files(tmp_path) == [tmp_path / "README.md"]
 
 
 def test_msbuild_pin_detection_accepts_valid_attribute_spacing(tmp_path: Path) -> None:
