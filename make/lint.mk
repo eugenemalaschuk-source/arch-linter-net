@@ -1,9 +1,27 @@
-.PHONY: lint lint-architecture audit-architecture lint-code-size lint-dotnet-format lint-workflows fmt-workflows test-architecture-coverage-report test-release-evidence test-calculate-version test-coverage-badge-script test-tooling-coverage architecture-coverage-report architecture-strict-json architecture-audit-json architecture-coverage-markdown architecture-coverage-ci
+.PHONY: lint _lint-dotnet lint-architecture audit-architecture lint-code-size lint-dotnet-format lint-workflows fmt-workflows test-architecture-coverage-report test-release-evidence test-calculate-version test-coverage-badge-script test-tooling-coverage architecture-coverage-report architecture-strict-json architecture-audit-json architecture-coverage-markdown architecture-coverage-ci
 
 CHANGED_FILES ?= changed-files.txt
 DIFF_STATUS   ?= ok
 
-lint: lint-code-size lint-dotnet-format lint-architecture lint-docs lint-test-shard-membership  ## Run all code quality checks
+# dotnet format, architecture self-validation, and shard-membership discovery all touch the normal
+# repository build graph. Running them as independent prerequisites under `make -j` can make two
+# MSBuild processes write the same bin/obj files concurrently (for example ArchLinterNet.CEL.deps.json).
+# Keep only these build-output-mutating checks serialized; code-size and docs lint remain free to run
+# in parallel with this chain.
+_lint-dotnet:
+	@$(MAKE) lint-dotnet-format
+	@$(MAKE) lint-architecture
+	@$(MAKE) lint-test-shard-membership
+
+lint: lint-code-size lint-docs _lint-dotnet  ## Run all code quality checks
+
+# `make acceptance` starts `lint` and `_acceptance-test` in the same parallel make invocation.
+# make/test.mk already makes the test phase wait for lint-architecture, but that is not sufficient:
+# after lint-architecture finishes, shard-membership discovery could still build Core.Tests while
+# `_acceptance-test` starts the full solution build. Sharing this order-only prerequisite makes the
+# test phase wait until every build-output-mutating lint command above has finished, without waiting
+# for independent docs/code-size lint.
+_acceptance-test: | _lint-dotnet
 
 lint-architecture:  ## Run strict architecture contracts on self
 	@dotnet build "$(PROJECT_ROOT)/src/ArchLinterNet.Cli/ArchLinterNet.Cli.csproj" --nologo -v minimal
