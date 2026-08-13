@@ -121,7 +121,7 @@ internal static partial class LayoutConventionChecker
     // ContextDependencyChecker's AddWhenExpression for the same reason. Returns a list (of at most
     // one entry, since layout conventions have exactly one `when` location) for uniformity with the
     // contextual dependency/allow-only payloads' WhenExpressions shape.
-    private static IReadOnlyList<ExpressionParticipation>? BuildLayoutWhenExpressions(
+    private static ExpressionParticipation[]? BuildLayoutWhenExpressions(
         ArchitectureLayoutConventionContract contract) =>
         BuildLayoutWhenExpressions(
             contract.FilesMatching,
@@ -129,7 +129,7 @@ internal static partial class LayoutConventionChecker
             "files_matching",
             ExpressionParticipationResult.Matched);
 
-    private static IReadOnlyList<ExpressionParticipation>? BuildLayoutWhenExpressions(
+    private static ExpressionParticipation[]? BuildLayoutWhenExpressions(
         ArchitectureLayoutFileMatcher matcher,
         string contractName,
         string fieldName,
@@ -151,7 +151,7 @@ internal static partial class LayoutConventionChecker
                 },
             };
 
-    private static IReadOnlyList<ExpressionParticipation>? BuildUnevaluatedLayoutWhenExpressions(
+    private static ExpressionParticipation[]? BuildUnevaluatedLayoutWhenExpressions(
         ArchitectureLayoutConventionContract contract) =>
         BuildLayoutWhenExpressions(
             contract.FilesMatching,
@@ -163,7 +163,7 @@ internal static partial class LayoutConventionChecker
         ArchitectureLayoutConventionContract contract)
     {
         List<ExpressionParticipation> expressions = new();
-        IReadOnlyList<ExpressionParticipation>? include = BuildUnevaluatedLayoutWhenExpressions(contract);
+        ExpressionParticipation[]? include = BuildUnevaluatedLayoutWhenExpressions(contract);
         if (include != null)
         {
             expressions.AddRange(include);
@@ -177,7 +177,7 @@ internal static partial class LayoutConventionChecker
                 continue;
             }
 
-            IReadOnlyList<ExpressionParticipation>? exclusionExpressions = BuildLayoutWhenExpressions(
+            ExpressionParticipation[]? exclusionExpressions = BuildLayoutWhenExpressions(
                 exclusion,
                 contract.Name,
                 $"exclude_files_matching[{index}]",

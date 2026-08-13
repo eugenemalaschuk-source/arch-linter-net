@@ -15,6 +15,8 @@ public sealed class ArchitectureFindingIdentityAttributorTests
 {
     private const string ContractId = "contract-1";
 
+    private static readonly string[] _expectedReportedOrder = { "Serilog.Log", "Newtonsoft.Json.JsonConvert" };
+
     [Test]
     public void Attach_SelectsOneCandidatePerReportedReference_InReportedOrder()
     {
@@ -30,11 +32,12 @@ public sealed class ArchitectureFindingIdentityAttributorTests
         IReadOnlyList<ArchitectureViolation> attached =
             ArchitectureFindingIdentityAttributor.Attach(log, cursor: 0, new[] { violation });
 
+        // Reported-reference order, not candidate-log order: the log records JsonConvert first, so
+        // asserting both the identities and the recorded references against this one expectation is
+        // what pins the pairing rather than a coincidence.
         Assert.That(attached, Has.Count.EqualTo(1));
-        Assert.That(attached[0].Identities.Select(i => i.TargetMember),
-            Is.EqualTo(new[] { "Serilog.Log", "Newtonsoft.Json.JsonConvert" }));
-        Assert.That(attached[0].IdentityReferences,
-            Is.EqualTo(new[] { "Serilog.Log", "Newtonsoft.Json.JsonConvert" }));
+        Assert.That(attached[0].Identities.Select(i => i.TargetMember), Is.EqualTo(_expectedReportedOrder));
+        Assert.That(attached[0].IdentityReferences, Is.EqualTo(_expectedReportedOrder));
         Assert.That(attached[0].Identity, Is.EqualTo(attached[0].Identities.First()));
     }
 

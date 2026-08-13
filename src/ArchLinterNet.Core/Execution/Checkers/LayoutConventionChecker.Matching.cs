@@ -272,7 +272,7 @@ internal static partial class LayoutConventionChecker
             }
 
             string fieldName = $"exclude_files_matching[{index}]";
-            IReadOnlyList<ExpressionParticipation>? whenExpressions = BuildLayoutWhenExpressions(
+            ExpressionParticipation[]? whenExpressions = BuildLayoutWhenExpressions(
                 exclusion,
                 contract.Name,
                 fieldName,
@@ -306,7 +306,7 @@ internal static partial class LayoutConventionChecker
     private readonly record struct MatcherDiagnosticContext(
         ArchitectureLayoutConventionContract Contract,
         string FieldName,
-        IReadOnlyList<ExpressionParticipation>? WhenExpressions);
+        ExpressionParticipation[]? WhenExpressions);
 
     private static bool TryEvaluateUnfiledMatcher(
         ArchitectureCheckerContext context,
@@ -319,7 +319,7 @@ internal static partial class LayoutConventionChecker
     {
         ArchitectureLayoutConventionContract contract = diagnosticContext.Contract;
         string fieldName = diagnosticContext.FieldName;
-        IReadOnlyList<ExpressionParticipation>? whenExpressions = diagnosticContext.WhenExpressions;
+        ExpressionParticipation[]? whenExpressions = diagnosticContext.WhenExpressions;
         matched = false;
         if (matcher.CompiledWhen == null)
         {
