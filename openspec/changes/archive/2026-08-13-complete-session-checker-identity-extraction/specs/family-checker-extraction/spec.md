@@ -1,15 +1,5 @@
-# family-checker-extraction Specification
+## MODIFIED Requirements
 
-## Purpose
-Defines the ownership boundary between `ArchitectureAnalysisSession` and contract-family checking:
-every family's checking algorithm lives in a focused component under
-`ArchLinterNet.Core.Execution.Checkers`, reaching run facts only through the narrow
-`ArchitectureCheckerContext` port (or that family's specific primitives), while the session keeps
-lifecycle, immutable/request-scoped state, fact/index access, cache-facing state and deterministic
-coordination. Registry dispatch, finding order and contract selection are unaffected by where the
-checking is written, and self-policy tests make reintroducing session-owned family checking a test
-failure rather than a review question.
-## Requirements
 ### Requirement: Extracted families check through a standalone checker class
 
 Every contract family's checking algorithm SHALL live in a focused component under `ArchLinterNet.Core.Execution.Checkers`, exposing a `Check` method (or, where one component serves a family and its allow-only counterpart, a `Check` and a `CheckAllowOnly` method) whose parameters are the contract, the read-only inputs that family's algorithm needs, and an `ArchitectureContractExecutionContext`. Those inputs SHALL be either the specific primitives the family needs (e.g. target assemblies, a resolved assembly lookup, or the type index) or the narrow `ArchitectureCheckerContext` fact-access port. No checker component SHALL take an `ArchitectureAnalysisSession` parameter or otherwise reference `ArchitectureAnalysisSession`.
@@ -69,6 +59,8 @@ For every contract family other than `coverage`, `ArchitectureAnalysisSession.Ch
 - **WHEN** `ArchitectureContractHandlerRegistry.Execute` dispatches a contract of any family
 - **THEN** the resolved `ArchitectureContractChecker` delegate SHALL still receive the `ArchitectureAnalysisSession` and the contract, per `contract-handler-execution`, and SHALL NOT receive a checker component directly
 
+## ADDED Requirements
+
 ### Requirement: Checkers reach run facts through a narrow context port
 
 `ArchLinterNet.Core.Execution.ArchitectureCheckerContext` SHALL be the only object through which a contract-family checker reads session-owned run facts or records session-owned participation state. It SHALL expose the contract document, the analysis context, the type/role/source-file-fact indexes, expression facts, the reference graph, preprocessor symbols, the resolved build configuration, layer and containing-layer resolution, assembly and project-assembly lookups, contextual-selector matching, framework-reference resolution, and the subtractive-matcher participation recording port. It SHALL NOT expose contract selection, execution-context creation, unmatched-ignore collection, coverage, policy-consistency or cache-facing state, and it SHALL hold no state of its own beyond the session it forwards to.
@@ -96,4 +88,3 @@ Moving family checking out of `ArchitectureAnalysisSession` SHALL NOT change str
 
 - **WHEN** a `layer` contract declares `exhaustive` with a container namespace, or a `layout_conventions` contract runs against a document with no source-enriched declared-type facts
 - **THEN** exhaustive-sibling findings SHALL still be appended after unmatched-ignore collection, and the data-unavailable path SHALL still report no unmatched ignores for that contract, exactly as before extraction
-

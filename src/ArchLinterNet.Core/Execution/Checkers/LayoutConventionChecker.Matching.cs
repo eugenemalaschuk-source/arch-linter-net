@@ -4,26 +4,31 @@ using ArchLinterNet.Core.Model;
 using ArchLinterNet.Core.Resolution;
 using ArchLinterNet.Core.Scanning;
 
-namespace ArchLinterNet.Core.Execution;
+namespace ArchLinterNet.Core.Execution.Checkers;
 
-public sealed partial class ArchitectureAnalysisSession
+// Candidate/file-group selection for the layout_conventions family. Split from
+// LayoutConventionChecker.cs to keep both files under the repository's file-size lint budget
+// (make/lint.mk CS_SIZE_LINT_ERROR_LINES).
+internal static partial class LayoutConventionChecker
 {
     // A whole-run data-unavailable diagnostic may be caused by an expectation (for example,
     // require_type_name_matches_file_name), while some authored selectors remain evaluable from
     // reflection-only namespace facts. Record every selector in that case: a missing path is
     // explicit EvaluationFailed evidence, and an independent namespace-only result stays useful
     // rather than silently disappearing from coverage/explain.
-    private void RecordUnavailableLayoutSelectorParticipation(ArchitectureLayoutConventionContract contract)
+    private static void RecordUnavailableSelectorParticipation(
+        ArchitectureLayoutConventionContract contract, ArchitectureCheckerContext context)
     {
-        (_, List<(Type Type, ArchitectureDeclaredTypeFact Fact)> unfiled) = BuildCandidateIndex();
+        (_, List<(Type Type, ArchitectureDeclaredTypeFact Fact)> unfiled) = BuildCandidateIndex(context);
         bool inclusionEvaluationFailed = MatcherNeedsSourcePath(contract.FilesMatching);
         List<(Type Type, ArchitectureDeclaredTypeFact Fact)> included = inclusionEvaluationFailed
             ? new List<(Type, ArchitectureDeclaredTypeFact)>()
             : unfiled.Where(entry => MatchesUnfiledFact(contract.FilesMatching, entry.Fact)
-                && (contract.FilesMatching.CompiledWhen == null || EvaluateLayoutWhen(contract.FilesMatching, entry.Type)))
+                && (contract.FilesMatching.CompiledWhen == null
+                    || EvaluateLayoutWhen(contract.FilesMatching, context, entry.Type)))
                 .ToList();
 
-        RecordSubtractiveMatcherParticipation(
+        context.RecordSubtractiveMatcherParticipation(
             contract, "files_matching", null, included.Count > 0,
             evaluationFailed: inclusionEvaluationFailed,
             kind: ArchitectureSelectorParticipationKind.Inclusion);
@@ -36,8 +41,8 @@ public sealed partial class ArchitectureAnalysisSession
             bool evaluationFailed = inclusionEvaluationFailed || MatcherNeedsSourcePath(exclusion);
             bool matched = !evaluationFailed && included.Any(entry =>
                 MatchesUnfiledFact(exclusion, entry.Fact)
-                && (exclusion.CompiledWhen == null || EvaluateLayoutWhen(exclusion, entry.Type)));
-            RecordSubtractiveMatcherParticipation(
+                && (exclusion.CompiledWhen == null || EvaluateLayoutWhen(exclusion, context, entry.Type)));
+            context.RecordSubtractiveMatcherParticipation(
                 contract, "exclude_files_matching", index, matched, evaluationFailed);
         }
     }
@@ -50,35 +55,38 @@ public sealed partial class ArchitectureAnalysisSession
     // declared under a different namespace in the same already-selected file. Facts with no
     // resolvable source file (no source enrichment, or an ambiguous partial-class declaration) can
     // only ever satisfy namespace_segment, evaluated per-type since there is no file to group by.
-    private List<LayoutFileGroup> CollectMatchedFileGroups(
+    private static List<LayoutFileGroup> CollectMatchedFileGroups(
         ArchitectureLayoutConventionContract contract,
+        ArchitectureCheckerContext context,
         ArchitectureContractExecutionContext executionContext,
         List<ArchitectureViolation> violations,
         LayoutExclusionTracker tracker)
     {
         ArchitectureLayoutFileMatcher matcher = contract.FilesMatching;
         (Dictionary<string, List<(Type Type, ArchitectureDeclaredTypeFact Fact)>> byFile,
-            List<(Type Type, ArchitectureDeclaredTypeFact Fact)> unfiled) = BuildCandidateIndex();
+            List<(Type Type, ArchitectureDeclaredTypeFact Fact)> unfiled) = BuildCandidateIndex(context);
 
-        List<LayoutFileGroup> groups = CollectFiledGroups(contract, byFile, tracker, out bool filedInclusionMatched);
-        List<LayoutFileGroup> unfiledGroups = CollectUnfiledGroups(contract, matcher, unfiled, executionContext, violations, tracker);
+        List<LayoutFileGroup> groups = CollectFiledGroups(contract, context, byFile, tracker, out bool filedInclusionMatched);
+        List<LayoutFileGroup> unfiledGroups = CollectUnfiledGroups(
+            contract, context, matcher, unfiled, executionContext, violations, tracker);
         groups.AddRange(unfiledGroups);
         tracker.InclusionMatched = filedInclusionMatched || tracker.InclusionMatched;
         return groups;
     }
 
-    private (Dictionary<string, List<(Type Type, ArchitectureDeclaredTypeFact Fact)>> ByFile,
-        List<(Type Type, ArchitectureDeclaredTypeFact Fact)> Unfiled) BuildCandidateIndex()
+    private static (Dictionary<string, List<(Type Type, ArchitectureDeclaredTypeFact Fact)>> ByFile,
+        List<(Type Type, ArchitectureDeclaredTypeFact Fact)> Unfiled) BuildCandidateIndex(
+            ArchitectureCheckerContext context)
     {
         Dictionary<string, List<(Type Type, ArchitectureDeclaredTypeFact Fact)>> byFile = new(StringComparer.Ordinal);
         List<(Type Type, ArchitectureDeclaredTypeFact Fact)> unfiled = new();
 
-        foreach (Type type in TypeIndex.AllTypes())
+        foreach (Type type in context.TypeIndex.AllTypes())
         {
             string assemblyName = type.Assembly.GetName().Name ?? string.Empty;
             string fullName = ArchitectureTypeNames.SafeFullName(type);
             if (string.IsNullOrEmpty(fullName)
-                || !SourceFileFactIndex.TryGetFact(assemblyName, fullName, out ArchitectureDeclaredTypeFact fact))
+                || !context.SourceFileFactIndex.TryGetFact(assemblyName, fullName, out ArchitectureDeclaredTypeFact fact))
             {
                 continue;
             }
@@ -101,8 +109,9 @@ public sealed partial class ArchitectureAnalysisSession
         return (byFile, unfiled);
     }
 
-    private List<LayoutFileGroup> CollectFiledGroups(
+    private static List<LayoutFileGroup> CollectFiledGroups(
         ArchitectureLayoutConventionContract contract,
+        ArchitectureCheckerContext context,
         Dictionary<string, List<(Type Type, ArchitectureDeclaredTypeFact Fact)>> byFile,
         LayoutExclusionTracker tracker,
         out bool inclusionMatched)
@@ -118,7 +127,7 @@ public sealed partial class ArchitectureAnalysisSession
                 continue;
             }
 
-            List<ArchitectureDeclaredTypeFact> eligibleFacts = FilterByWhen(contract.FilesMatching, entries);
+            List<ArchitectureDeclaredTypeFact> eligibleFacts = FilterByWhen(contract.FilesMatching, context, entries);
             if (eligibleFacts.Count == 0)
             {
                 continue;
@@ -126,7 +135,8 @@ public sealed partial class ArchitectureAnalysisSession
 
             inclusionMatched = true;
 
-            eligibleFacts = ApplyFiledExclusions(entries, eligibleFacts, contract.ExcludeFilesMatching, tracker.Matched);
+            eligibleFacts = ApplyFiledExclusions(
+                context, entries, eligibleFacts, contract.ExcludeFilesMatching, tracker.Matched);
             if (eligibleFacts.Count == 0)
             {
                 continue;
@@ -138,7 +148,8 @@ public sealed partial class ArchitectureAnalysisSession
         return groups;
     }
 
-    private List<ArchitectureDeclaredTypeFact> ApplyFiledExclusions(
+    private static List<ArchitectureDeclaredTypeFact> ApplyFiledExclusions(
+        ArchitectureCheckerContext context,
         List<(Type Type, ArchitectureDeclaredTypeFact Fact)> entries,
         List<ArchitectureDeclaredTypeFact> eligibleFacts,
         List<ArchitectureLayoutFileMatcher> exclusions,
@@ -166,7 +177,7 @@ public sealed partial class ArchitectureAnalysisSession
                 continue;
             }
 
-            foreach (ArchitectureDeclaredTypeFact fact in FilterByWhen(exclusion, entries))
+            foreach (ArchitectureDeclaredTypeFact fact in FilterByWhen(exclusion, context, entries))
             {
                 (string AssemblyName, string FullTypeName) key = (fact.AssemblyName, fact.FullTypeName);
                 if (!eligibleKeys.Contains(key))
@@ -193,8 +204,9 @@ public sealed partial class ArchitectureAnalysisSession
     // An ambiguous partial-class declaration is exempt: its sourcePaths carries every candidate
     // declaration path (see ArchitectureExpressionSubjectFactBuilder.ResolveSourcePaths), so a
     // path-referencing predicate evaluates against real data for it, same as any filed fact.
-    private List<LayoutFileGroup> CollectUnfiledGroups(
+    private static List<LayoutFileGroup> CollectUnfiledGroups(
         ArchitectureLayoutConventionContract contract,
+        ArchitectureCheckerContext context,
         ArchitectureLayoutFileMatcher matcher,
         List<(Type Type, ArchitectureDeclaredTypeFact Fact)> unfiled,
         ArchitectureContractExecutionContext executionContext,
@@ -212,8 +224,9 @@ public sealed partial class ArchitectureAnalysisSession
             }
 
             MatcherDiagnosticContext filesMatchingContext = new(
-                "files_matching", BuildUnevaluatedLayoutWhenExpressions(contract));
-            if (!TryEvaluateUnfiledMatcher(contract, matcher, entry, executionContext, violations, filesMatchingContext, out bool included))
+                contract, "files_matching", BuildUnevaluatedLayoutWhenExpressions(contract));
+            if (!TryEvaluateUnfiledMatcher(
+                    context, matcher, entry, executionContext, violations, filesMatchingContext, out bool included))
             {
                 tracker.InclusionEvaluationFailed = true;
                 continue;
@@ -226,7 +239,7 @@ public sealed partial class ArchitectureAnalysisSession
 
             tracker.InclusionMatched = true;
 
-            if (IsExcludedUnfiledEntry(contract, entry, executionContext, violations, tracker))
+            if (IsExcludedUnfiledEntry(contract, context, entry, executionContext, violations, tracker))
             {
                 continue;
             }
@@ -237,8 +250,9 @@ public sealed partial class ArchitectureAnalysisSession
         return groups;
     }
 
-    private bool IsExcludedUnfiledEntry(
+    private static bool IsExcludedUnfiledEntry(
         ArchitectureLayoutConventionContract contract,
+        ArchitectureCheckerContext context,
         (Type Type, ArchitectureDeclaredTypeFact Fact) entry,
         ArchitectureContractExecutionContext executionContext,
         List<ArchitectureViolation> violations,
@@ -258,13 +272,14 @@ public sealed partial class ArchitectureAnalysisSession
             }
 
             string fieldName = $"exclude_files_matching[{index}]";
-            IReadOnlyList<ExpressionParticipation>? whenExpressions = BuildLayoutWhenExpressions(
+            ExpressionParticipation[]? whenExpressions = BuildLayoutWhenExpressions(
                 exclusion,
                 contract.Name,
                 fieldName,
                 ExpressionParticipationResult.EvaluationFailed);
-            MatcherDiagnosticContext exclusionContext = new(fieldName, whenExpressions);
-            if (!TryEvaluateUnfiledMatcher(contract, exclusion, entry, executionContext, violations, exclusionContext, out bool excluded))
+            MatcherDiagnosticContext exclusionContext = new(contract, fieldName, whenExpressions);
+            if (!TryEvaluateUnfiledMatcher(
+                    context, exclusion, entry, executionContext, violations, exclusionContext, out bool excluded))
             {
                 // The exclusion structurally matched this candidate but its `when` couldn't be
                 // evaluated (no resolved source file) - this is neither "matched" nor "stale"; the
@@ -285,14 +300,16 @@ public sealed partial class ArchitectureAnalysisSession
         return excludedAny;
     }
 
-    // Bundles the diagnostic identity of the matcher being evaluated (which field it came from, and
-    // the pre-built expression-participation payload for its `when`) so TryEvaluateUnfiledMatcher's
-    // signature doesn't have to name each separately.
+    // Bundles the diagnostic identity of the matcher being evaluated — the contract it belongs to,
+    // which field it came from, and the pre-built expression-participation payload for its `when` —
+    // so TryEvaluateUnfiledMatcher's signature doesn't have to name each separately.
     private readonly record struct MatcherDiagnosticContext(
-        string FieldName, IReadOnlyList<ExpressionParticipation>? WhenExpressions);
+        ArchitectureLayoutConventionContract Contract,
+        string FieldName,
+        ExpressionParticipation[]? WhenExpressions);
 
-    private bool TryEvaluateUnfiledMatcher(
-        ArchitectureLayoutConventionContract contract,
+    private static bool TryEvaluateUnfiledMatcher(
+        ArchitectureCheckerContext context,
         ArchitectureLayoutFileMatcher matcher,
         (Type Type, ArchitectureDeclaredTypeFact Fact) entry,
         ArchitectureContractExecutionContext executionContext,
@@ -300,8 +317,9 @@ public sealed partial class ArchitectureAnalysisSession
         MatcherDiagnosticContext diagnosticContext,
         out bool matched)
     {
+        ArchitectureLayoutConventionContract contract = diagnosticContext.Contract;
         string fieldName = diagnosticContext.FieldName;
-        IReadOnlyList<ExpressionParticipation>? whenExpressions = diagnosticContext.WhenExpressions;
+        ExpressionParticipation[]? whenExpressions = diagnosticContext.WhenExpressions;
         matched = false;
         if (matcher.CompiledWhen == null)
         {
@@ -310,7 +328,7 @@ public sealed partial class ArchitectureAnalysisSession
         }
 
         bool whenReferencesSourcePath = ReferencesSourcePathIdentifier(matcher.When);
-        bool isAmbiguous = SourceFileFactIndex.Ambiguities.Any(ambiguity =>
+        bool isAmbiguous = context.SourceFileFactIndex.Ambiguities.Any(ambiguity =>
             ambiguity.AssemblyName == entry.Fact.AssemblyName
             && ambiguity.FullTypeName == entry.Fact.FullTypeName);
         if (whenReferencesSourcePath && !isAmbiguous)
@@ -329,12 +347,13 @@ public sealed partial class ArchitectureAnalysisSession
             return false;
         }
 
-        matched = EvaluateLayoutWhen(matcher, entry.Type);
+        matched = EvaluateLayoutWhen(matcher, context, entry.Type);
         return true;
     }
 
-    private List<ArchitectureDeclaredTypeFact> FilterByWhen(
+    private static List<ArchitectureDeclaredTypeFact> FilterByWhen(
         ArchitectureLayoutFileMatcher matcher,
+        ArchitectureCheckerContext context,
         List<(Type Type, ArchitectureDeclaredTypeFact Fact)> entries)
     {
         if (matcher.CompiledWhen == null)
@@ -342,7 +361,8 @@ public sealed partial class ArchitectureAnalysisSession
             return entries.Select(entry => entry.Fact).ToList();
         }
 
-        return entries.Where(entry => EvaluateLayoutWhen(matcher, entry.Type)).Select(entry => entry.Fact).ToList();
+        return entries.Where(entry => EvaluateLayoutWhen(matcher, context, entry.Type))
+            .Select(entry => entry.Fact).ToList();
     }
 
     private static bool MatchesFileLevelSelector(
@@ -396,12 +416,15 @@ public sealed partial class ArchitectureAnalysisSession
             || fact.NamespaceSegments.Contains(matcher.NamespaceSegment, StringComparer.Ordinal);
     }
 
-    private bool EvaluateLayoutWhen(ArchitectureLayoutFileMatcher matcher, Type type)
+    private static bool EvaluateLayoutWhen(
+        ArchitectureLayoutFileMatcher matcher, ArchitectureCheckerContext context, Type type)
     {
-        var context = ArchitectureExpressionContextFactory.CreateSelectorContext(ExpressionFacts.BuildSubjectFacts(type));
+        var expressionContext = ArchitectureExpressionContextFactory.CreateSelectorContext(
+            context.ExpressionFacts.BuildSubjectFacts(type));
         string description =
             $"Layout convention files_matching at '{matcher.WhenLocation?.YamlPath}' (contract: {matcher.WhenContractName}, " +
             $"when: {matcher.When}) for type '{ArchitectureTypeNames.SafeFullName(type)}'";
-        return ArchitectureExpressionFactService.Evaluate(matcher.CompiledWhen!, context, description, matcher.WhenLocation);
+        return ArchitectureExpressionFactService.Evaluate(
+            matcher.CompiledWhen!, expressionContext, description, matcher.WhenLocation);
     }
 }

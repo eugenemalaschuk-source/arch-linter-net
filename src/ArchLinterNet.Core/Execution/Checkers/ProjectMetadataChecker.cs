@@ -1,0 +1,270 @@
+using ArchLinterNet.Core.Contracts.Families;
+using ArchLinterNet.Core.Discovery;
+using ArchLinterNet.Core.Model;
+using ArchLinterNet.Core.Resolution;
+
+namespace ArchLinterNet.Core.Execution.Checkers;
+
+internal static class ProjectMetadataChecker
+{
+    public static List<ArchitectureViolation> Check(
+        ArchitectureProjectMetadataContract contract,
+        ArchitectureCheckerContext context,
+        ArchitectureContractExecutionContext executionContext)
+    {
+        Dictionary<string, ArchitectureDiscoveredProject> projectsByPath = BuildProjectMetadataLookup(context);
+        List<ArchitectureViolation> violations = new();
+
+        foreach (string configuredProjectPath in contract.Projects
+                     .Select(ProjectPathNormalizer.Normalize)
+                     .Distinct(StringComparer.OrdinalIgnoreCase)
+                     .OrderBy(path => path, StringComparer.OrdinalIgnoreCase))
+        {
+            if (!projectsByPath.TryGetValue(configuredProjectPath, out ArchitectureDiscoveredProject? project))
+            {
+                continue;
+            }
+
+            violations.AddRange(CheckRequiredProperties(executionContext, contract, project));
+            violations.AddRange(CheckForbiddenProperties(executionContext, contract, project));
+            violations.AddRange(CheckFriendAssemblies(executionContext, contract, project));
+            violations.AddRange(CheckForbiddenProjectReferences(executionContext, contract, project));
+        }
+
+        return violations
+            .OrderBy(v => v.SourceType, StringComparer.OrdinalIgnoreCase)
+            .ThenBy(v => (v.Payload as ProjectMetadataPayload)?.ProjectMetadataKey ?? string.Empty, StringComparer.Ordinal)
+            .ThenBy(v => v.ForbiddenNamespace, StringComparer.Ordinal)
+            .ThenBy(v => v.ForbiddenReferences.FirstOrDefault() ?? string.Empty, StringComparer.Ordinal)
+            .ToList();
+    }
+
+    private static IEnumerable<ArchitectureViolation> CheckRequiredProperties(
+        ArchitectureContractExecutionContext executionContext,
+        ArchitectureProjectMetadataContract contract,
+        ArchitectureDiscoveredProject project)
+    {
+        foreach (KeyValuePair<string, string> requirement in contract.RequiredProperties
+                     .OrderBy(pair => pair.Key, StringComparer.OrdinalIgnoreCase))
+        {
+            bool found = project.Properties.TryGetValue(requirement.Key, out ArchitectureDiscoveredProjectProperty? property);
+            string? actualValue = found ? property!.Value : null;
+
+            if (actualValue != null && string.Equals(actualValue, requirement.Value, StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            string forbiddenReference = BuildRequiredPropertyReference(requirement.Key, actualValue);
+            if (executionContext.IsIgnored(
+                    project.Path,
+                    forbiddenReference,
+                    sourceAssembly: project.AssemblyName,
+                    targetType: requirement.Key,
+                    targetMember: forbiddenReference))
+            {
+                continue;
+            }
+
+            yield return new ArchitectureViolation(
+                contract.Name,
+                contract.Id,
+                project.Path,
+                "required project property mismatch",
+                new[]
+                {
+                    $"Property '{requirement.Key}' expected '{requirement.Value}' but actual value was '{actualValue ?? "<missing>"}'."
+                })
+            {
+                Payload = new ProjectMetadataPayload(
+                    ProjectMetadataKind: "required_property",
+                    ProjectMetadataKey: requirement.Key,
+                    ProjectMetadataExpectedValue: requirement.Value,
+                    ProjectMetadataActualValue: actualValue,
+                    ProjectMetadataSourcePath: property?.SourcePath)
+            };
+        }
+    }
+
+    private static IEnumerable<ArchitectureViolation> CheckForbiddenProperties(
+        ArchitectureContractExecutionContext executionContext,
+        ArchitectureProjectMetadataContract contract,
+        ArchitectureDiscoveredProject project)
+    {
+        foreach (KeyValuePair<string, string> rule in contract.ForbiddenProperties
+                     .OrderBy(pair => pair.Key, StringComparer.OrdinalIgnoreCase))
+        {
+            if (!project.Properties.TryGetValue(rule.Key, out ArchitectureDiscoveredProjectProperty? property)
+                || !string.Equals(property.Value, rule.Value, StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            string forbiddenReference = BuildForbiddenPropertyReference(rule.Key, property.Value);
+            if (executionContext.IsIgnored(
+                    project.Path,
+                    forbiddenReference,
+                    sourceAssembly: project.AssemblyName,
+                    targetType: rule.Key,
+                    targetMember: forbiddenReference))
+            {
+                continue;
+            }
+
+            yield return new ArchitectureViolation(
+                contract.Name,
+                contract.Id,
+                project.Path,
+                "forbidden project property value",
+                new[]
+                {
+                    $"Property '{rule.Key}' must not be '{rule.Value}'."
+                })
+            {
+                Payload = new ProjectMetadataPayload(
+                    ProjectMetadataKind: "forbidden_property",
+                    ProjectMetadataKey: rule.Key,
+                    ProjectMetadataExpectedValue: rule.Value,
+                    ProjectMetadataActualValue: property.Value,
+                    ProjectMetadataSourcePath: property.SourcePath)
+            };
+        }
+    }
+
+    private static IEnumerable<ArchitectureViolation> CheckFriendAssemblies(
+        ArchitectureContractExecutionContext executionContext,
+        ArchitectureProjectMetadataContract contract,
+        ArchitectureDiscoveredProject project)
+    {
+        if (contract.AllowedFriendAssemblies is null)
+        {
+            yield break;
+        }
+
+        HashSet<string> allowed = new(
+            contract.AllowedFriendAssemblies.Where(value => !string.IsNullOrWhiteSpace(value)),
+            StringComparer.Ordinal);
+
+        foreach (ArchitectureDiscoveredFriendAssembly friendAssembly in project.FriendAssemblies
+                     .OrderBy(entry => entry.AssemblyName, StringComparer.Ordinal))
+        {
+            if (allowed.Contains(friendAssembly.AssemblyName))
+            {
+                continue;
+            }
+
+            string forbiddenReference = BuildFriendAssemblyReference(friendAssembly.AssemblyName);
+            if (executionContext.IsIgnored(
+                    project.Path,
+                    forbiddenReference,
+                    sourceAssembly: project.AssemblyName,
+                    targetAssembly: friendAssembly.AssemblyName,
+                    targetType: friendAssembly.AssemblyName,
+                    targetMember: forbiddenReference))
+            {
+                continue;
+            }
+
+            string message = allowed.Count > 0
+                ? $"Friend assembly '{friendAssembly.AssemblyName}' is not present in allowed_friend_assemblies."
+                : $"Friend assembly '{friendAssembly.AssemblyName}' is not allowed (allowed_friend_assemblies is empty — deny-all).";
+
+            yield return new ArchitectureViolation(
+                contract.Name,
+                contract.Id,
+                project.Path,
+                "forbidden friend assembly",
+                new[] { message })
+            {
+                Payload = new ProjectMetadataPayload(
+                    ProjectMetadataKind: "friend_assembly",
+                    ProjectMetadataKey: "InternalsVisibleTo",
+                    ProjectMetadataActualValue: friendAssembly.AssemblyName,
+                    ProjectMetadataSourcePath: friendAssembly.SourcePath)
+            };
+        }
+    }
+
+    private static IEnumerable<ArchitectureViolation> CheckForbiddenProjectReferences(
+        ArchitectureContractExecutionContext executionContext,
+        ArchitectureProjectMetadataContract contract,
+        ArchitectureDiscoveredProject project)
+    {
+        foreach (ArchitectureDiscoveredProjectReference projectReference in project.ProjectReferences
+                     .OrderBy(entry => entry.Path, StringComparer.OrdinalIgnoreCase))
+        {
+            string? matchedPattern = contract.ForbiddenProjectReferences
+                .Where(pattern => !string.IsNullOrWhiteSpace(pattern))
+                .OrderBy(pattern => pattern, StringComparer.Ordinal)
+                .FirstOrDefault(pattern => ProjectPathGlob.IsMatch(projectReference.Path, pattern));
+
+            if (matchedPattern == null)
+            {
+                continue;
+            }
+
+            string forbiddenReference = BuildProjectReferenceReference(projectReference.Path);
+            if (executionContext.IsIgnored(
+                    project.Path,
+                    forbiddenReference,
+                    sourceAssembly: project.AssemblyName,
+                    targetType: projectReference.Path,
+                    targetMember: forbiddenReference))
+            {
+                continue;
+            }
+
+            yield return new ArchitectureViolation(
+                contract.Name,
+                contract.Id,
+                project.Path,
+                "forbidden project reference",
+                new[]
+                {
+                    $"Project reference '{projectReference.Path}' matches forbidden pattern '{matchedPattern}'."
+                })
+            {
+                Payload = new ProjectMetadataPayload(
+                    ProjectMetadataKind: "project_reference",
+                    ProjectMetadataKey: "ProjectReference",
+                    ProjectMetadataExpectedValue: matchedPattern,
+                    ProjectMetadataActualValue: projectReference.Path,
+                    ProjectMetadataSourcePath: projectReference.SourcePath)
+            };
+        }
+    }
+
+    private static string BuildRequiredPropertyReference(string key, string? actualValue)
+    {
+        return $"required_property:{key}={actualValue ?? "<missing>"}";
+    }
+
+    private static string BuildForbiddenPropertyReference(string key, string actualValue)
+    {
+        return $"forbidden_property:{key}={actualValue}";
+    }
+
+    private static string BuildFriendAssemblyReference(string assemblyName)
+    {
+        return $"friend_assembly:{assemblyName}";
+    }
+
+    private static string BuildProjectReferenceReference(string projectPath)
+    {
+        return $"project_reference:{projectPath}";
+    }
+
+    private static Dictionary<string, ArchitectureDiscoveredProject> BuildProjectMetadataLookup(
+        ArchitectureCheckerContext context)
+    {
+        IReadOnlyCollection<ArchitectureDiscoveredProject> discoveredProjects =
+            context.AnalysisContext.ProjectDiscovery?.DiscoveredProjects ?? Array.Empty<ArchitectureDiscoveredProject>();
+
+        return discoveredProjects
+            .GroupBy(project => ProjectPathNormalizer.Normalize(project.Path), StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(
+                group => group.Key,
+                group => group.First(),
+                StringComparer.OrdinalIgnoreCase);
+    }
+}
