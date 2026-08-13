@@ -36,6 +36,55 @@ def test_product_routes_cover_dotted_and_directory_forms_without_blocking_standa
     assert not any("archlinternet-sarif-2.1.0.md" in item for item in violations)
 
 
+def test_product_routes_reject_concept_first_versions_without_to(tmp_path: Path) -> None:
+    write_repo(tmp_path)
+    guides = tmp_path / "docs" / "guides"
+    reference = tmp_path / "docs" / "reference"
+    product_paths = (
+        guides / "upgrade-9.8.7.md",
+        guides / "migration-9.8.7.md",
+        reference / "release-9.8.7.md",
+        guides / "adoption-9.8.7.md",
+    )
+    for path in product_paths:
+        path.write_text("# Versioned product guide\n", encoding="utf-8")
+    standard = reference / "sarif-upgrade-2.1.0.md"
+    standard.write_text("# Upgrade SARIF to 2.1.0\n", encoding="utf-8")
+
+    violations = evergreen.find_violations(tmp_path)
+
+    for path in product_paths:
+        assert any(path.name in item for item in violations)
+    assert not any("sarif-upgrade-2.1.0.md" in item for item in violations)
+
+
+def test_product_release_prose_rejects_soft_wraps_without_blocking_external_versions(
+    tmp_path: Path,
+) -> None:
+    write_repo(tmp_path)
+    guide = tmp_path / "docs" / "guides" / "upgrading.md"
+    guide.write_text(
+        "ArchLinterNet release\n"
+        "9.8.7 is current.\n\n"
+        "The current ArchLinterNet release\n"
+        "is 9.8.7.\n\n"
+        "The current SARIF release\n"
+        "is 2.1.0.\n\n"
+        "ArchLinterNet uses Newtonsoft.Json package\n"
+        "version 13.0.4.\n",
+        encoding="utf-8",
+    )
+
+    violations = evergreen.find_violations(tmp_path)
+
+    product_violations = [
+        item for item in violations if "product package SemVer is coupled" in item
+    ]
+    assert sum("9.8.7" in item for item in product_violations) >= 2
+    assert not any("2.1.0" in item for item in product_violations)
+    assert not any("13.0.4" in item for item in product_violations)
+
+
 def test_msbuild_pin_detection_accepts_valid_attribute_spacing(tmp_path: Path) -> None:
     write_repo(tmp_path)
     guide = tmp_path / "docs" / "guides" / "upgrading.md"
