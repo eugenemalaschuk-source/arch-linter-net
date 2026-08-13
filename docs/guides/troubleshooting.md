@@ -2,10 +2,11 @@
 
 Use this page when a validation run fails unexpectedly or produces no useful diagnostics.
 
-For the full 0.5.1 upgrade and prepared/offline execution path, see [Adopt or
-Upgrade to 0.5.1](migration-to-0-5-1.md). Its [reference entrypoints](reference-entrypoints.md)
-preserve stdout, stderr, and the exact exit category in POSIX, PowerShell, Make,
-Task, Tilt, and CI environments.
+For the full upgrade and prepared/offline execution path, see
+[Adopt or Upgrade ArchLinterNet](upgrading.md). Its
+[reference entrypoints](reference-entrypoints.md) preserve stdout, stderr, and
+the exact exit category in POSIX, PowerShell, Make, Task, Tilt, and CI
+environments.
 
 ## Exit code 2
 

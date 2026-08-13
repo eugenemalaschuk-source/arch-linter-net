@@ -85,10 +85,14 @@ public sealed partial class CheckpointBReleaseGateTests
 
             using ZipArchive core = ZipFile.OpenRead(PackagePath("ArchLinterNet.Core"));
             Assert.That(ReadEntry(core, "ArchLinterNet.Core.nuspec"), Does.Contain("ArchLinterNet.CEL"));
-            Assert.That(ReadEntry(core, "README.md"), Does.Contain(
-                $"{ProductReleaseLine} is the public adoption package line"));
-            Assert.That(ReadEntry(core, "README.md"), Does.Contain(
-                "`adoption-stabilization/v1` schema registry"));
+            string readme = ReadEntry(core, "README.md");
+            Assert.Multiple(() =>
+            {
+                Assert.That(readme, Does.Contain("YAML-first architecture governance for .NET repositories."));
+                Assert.That(readme, Does.Contain("/guides/upgrading/"));
+                Assert.That(readme, Does.Not.Contain("public adoption package line"));
+                Assert.That(readme, Does.Not.Contain("migration-to-0-5-1"));
+            });
             foreach (string schema in new[]
                      {
                          "analysis-build-state.schema.json", "analysis-cache.schema.json",
@@ -391,9 +395,9 @@ public sealed partial class CheckpointBReleaseGateTests
             }
         }
 
-        // F11 — the candidate must identify one release everywhere a consumer can observe it: the
-        // installed CLI's version, the packaged README's public adoption package line, and the
-        // packaged schema registry's product version.
+        // F11 — the candidate must identify one release consistently in explicit release contracts:
+        // the installed CLI version, the compatibility manifest product version, and packaged schema
+        // identities. The packaged README intentionally remains an evergreen product document.
         public CheckpointScenarioResult AssertReleaseIdentityConsistency()
         {
             string identityDirectory = Path.Combine(_root, "release-identity");
@@ -413,8 +417,9 @@ public sealed partial class CheckpointBReleaseGateTests
                 Assert.That(version.ExitCode, Is.EqualTo(0), version.CombinedOutput);
                 Assert.That(version.StandardOutput, Does.Contain(assemblyVersion));
                 Assert.That(schemas.ExitCode, Is.EqualTo(0), schemas.CombinedOutput);
-                Assert.That(readme, Does.Contain($"{ProductReleaseLine} is the public adoption package line"),
-                    "The packaged README must identify the candidate's own public adoption package line.");
+                Assert.That(readme, Does.Contain("/guides/upgrading/"));
+                Assert.That(readme, Does.Not.Contain($"{ProductReleaseLine} is the public adoption package line"),
+                    "The packaged README must remain evergreen rather than becoming a release-identity authority.");
                 Assert.That(manifestDocument.RootElement.GetProperty("productVersion").GetString(),
                     Is.EqualTo(ProductReleaseLine),
                     "The packaged compatibility manifest must identify the candidate's product release.");

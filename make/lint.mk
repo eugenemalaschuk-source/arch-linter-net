@@ -69,6 +69,8 @@ test-tooling-coverage:  ## Run all Python tooling tests with coverage (coverage-
 		pytest tools/release/tests \
 		tools/scripts/tests/test_architecture_coverage_report.py \
 		tools/scripts/tests/test_calculate_version.py \
+		tools/scripts/tests/test_check_evergreen_docs.py \
+		tools/scripts/tests/test_check_evergreen_docs_edges.py \
 		tools/scripts/tests/test_test_coverage_badge.py \
 		tools/scripts/tests/test_verify_core_unit_shards.py \
 		--cov=tools/release --cov=tools/scripts \

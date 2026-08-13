@@ -28,7 +28,7 @@ The repository SHALL expose an executable NUnit Checkpoint A entrypoint that exe
 - **THEN** those projections reuse one analysis result and retain their implemented actionable evidence
 
 ### Requirement: Checkpoint A remains non-release evidence
-The repository SHALL store observed Checkpoint A platform and scenario evidence with an explicit statement that it is internal implementation evidence only. The evidence and manifest SHALL NOT authorize package publication, a public checkpoint release, or version 0.5.1 release approval.
+The repository SHALL store observed Checkpoint A platform and scenario evidence with an explicit statement that it is internal implementation evidence only. The evidence and manifest SHALL NOT authorize package publication, a public checkpoint release, or product release approval.
 
 #### Scenario: Checkpoint A succeeds on an observed platform
 - **WHEN** all scoped Checkpoint A scenarios pass on a recorded platform

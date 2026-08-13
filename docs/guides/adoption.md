@@ -2,10 +2,10 @@
 
 Existing repositories often have architecture debt. The goal is to freeze known violations while preventing new ones.
 
-This page is the short existing-repository introduction. For the complete 0.5.1
-upgrade path — imports, structured baseline identity, snapshots, offline
-schemas, cache/profile/concurrency, and status-correct CI entrypoints — use
-[Adopt or Upgrade to 0.5.1](migration-to-0-5-1.md).
+This page is the short existing-repository introduction. For the complete
+adoption and upgrade path — imports, structured baseline identity, snapshots,
+offline schemas, cache/profile/concurrency, and status-correct CI entrypoints —
+use [Adopt or Upgrade ArchLinterNet](upgrading.md).
 
 ## 1. Inspect real code first
 
