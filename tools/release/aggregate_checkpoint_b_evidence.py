@@ -58,7 +58,21 @@ _CONSUMER_CLEANUP_SCENARIOS = {
     "stale-source-selector-fail-closed",
     "strict-cycles-baseline-scope",
 }
-_REQUIRED_SCENARIOS = _PLATFORM_SCENARIOS | _CONSUMER_CLEANUP_SCENARIOS
+# The 0.6.4 public-API surface-selector consumer-exit matrix (#525/#526/#529): proves a modular
+# consumer can replace a whole-assembly reviewed API snapshot with a materially smaller intentional
+# one, selected by bounded evidence, without touching CLR visibility or existing semantic roles.
+_PUBLIC_API_SURFACE_SELECTOR_SCENARIOS = {
+    "public-api-surface-selector-snapshot-reduction",
+    "public-api-surface-selector-role-preservation",
+    "public-api-surface-selector-exact-delta-lifecycle",
+    "public-api-surface-selector-membership-review-visibility",
+    "public-api-surface-selector-escape-fails-closed",
+    "public-api-surface-selector-strict-run-is-green",
+    "public-api-surface-selector-testing-parity",
+}
+_REQUIRED_SCENARIOS = (
+    _PLATFORM_SCENARIOS | _CONSUMER_CLEANUP_SCENARIOS | _PUBLIC_API_SURFACE_SELECTOR_SCENARIOS
+)
 _SCENARIO_RESULTS = {"passed", "not_applicable", "failed"}
 _REQUIRED_GATES = {"acceptance", "openspec_strict"}
 # Counters the consumer policy must report so the gate can reject a candidate whose canonical
