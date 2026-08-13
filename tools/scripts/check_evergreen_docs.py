@@ -20,7 +20,7 @@ CLI_VERSION_ARG = rf"(?:{SEMVER}|[\"']{SEMVER}[\"'])"
 PRODUCT_DOC_CONCEPT = (
     r"(?:migration(?:-to)?|upgrade(?:-to)?|upgrading|release(?:-notes?)?|"
     r"adopt(?:ion)?(?:-to)?|installation|install|quickstart|getting-started|"
-    r"troubleshooting|reference(?:-entrypoints)?|cli|capabilities)"
+    r"troubleshooting|reference-entrypoints|cli|capabilities)"
 )
 PRODUCT_GUIDE_LABEL = r"(?:Adopt(?:ion)?(?:\s+or\s+Upgrade)?|Upgrade|Migration)"
 PRODUCT_RELEASE_PATH_QUALIFIER = rf"(?:version|{PRODUCT_DOC_CONCEPT})"
