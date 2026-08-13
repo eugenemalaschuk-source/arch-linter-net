@@ -14,8 +14,13 @@
 ##
 ## Linting & quality:
 ##   make lint                              — run all code quality checks
-##   make lint-architecture                 — run strict architecture contracts on self
+##   make lint-architecture                 — canonical read-only strict self-policy gate
 ##   make audit-architecture                — run diagnostic architecture audit on self
+##   make policy-check                      — fast policy-only validation (no project/assembly analysis)
+##   make public-api-check                  — read-only reviewed public API drift check
+##   make public-api-update-preview         — preview the reviewed public API snapshot rewrite
+##   make public-api-update                 — rewrite reviewed public API snapshots (explicit action)
+##   make explain-architecture SOURCE=.. TARGET=..  — explain one dependency edge under the self-policy
 ##   make lint-code-size                    — size lint for C# and documentation files
 ##   make lint-dotnet-format                — verify C# formatting without changing files
 ##   make lint-docs                         — verify MkDocs documentation structure

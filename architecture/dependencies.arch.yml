@@ -54,7 +54,85 @@ external_dependencies:
       - Buildalyzer
       - Microsoft.Build
 
+packages:
+  msbuild_project_evaluation_packages:
+    package_prefixes:
+      - Buildalyzer
+      - Microsoft.Build
+  dependency_injection_container_packages:
+    package_prefixes:
+      - Microsoft.Extensions.DependencyInjection
+  test_frameworks:
+    package_prefixes:
+      - NUnit
+      - xunit
+      - MSTest
+      - Microsoft.NET.Test.Sdk
+      - coverlet
+      - Moq
+      - NSubstitute
+      - FluentAssertions
+      - BenchmarkDotNet
+
+framework_references:
+  # The SDK contributes Microsoft.NETCore.App implicitly to every net10.0 project, so it is the
+  # baseline every shipped project legitimately carries, not an authored declaration.
+  base_runtime_framework:
+    framework_names:
+      - Microsoft.NETCore.App
+
+# Reusable source sets replace the per-layer/per-assembly copy-paste that the external, package,
+# framework-reference, and project-metadata rules below would otherwise need. Every set resolves
+# against a declared policy input (layer keys, analysis.target_assemblies, or the solution-discovered
+# project inventory) and fails closed when a selector stops matching.
+source_sets:
+  # Layer-kind selectors resolve against declared `layers` keys using dot-segment globs; because
+  # every layer key here is a single underscore-joined segment, no glob can express "every declared
+  # layer" and the inventory is listed explicitly. Adding a layer above without adding it here is
+  # visible in review as a one-line omission next to the layer declaration.
+  all_declared_layers:
+    kind: layer
+    members:
+      - core
+      - core_model
+      - core_io
+      - core_reporting
+      - core_discovery
+      - core_resolution
+      - core_scanning
+      - core_contracts
+      - core_execution
+      - core_graph
+      - core_validation
+      - core_profiling
+      - core_asmdef
+      - core_composition
+      - core_schema
+      - cli
+      - cli_abstractions
+      - cli_infrastructure
+      - cli_commands
+      - testing
+      - cel
+  shipped_assemblies:
+    kind: assembly
+    globs:
+      - ArchLinterNet.*
+  adapter_assemblies:
+    kind: assembly
+    members:
+      - ArchLinterNet.Cli
+      - ArchLinterNet.Testing
+  production_projects:
+    kind: project
+    globs:
+      - src/**
+
 analysis:
+  solution: ArchLinterNet.slnx
+  project_exclude:
+    - tests/**
+    - benchmarks/**
   target_assemblies:
     - ArchLinterNet.Core
     - ArchLinterNet.Cli
@@ -195,135 +273,124 @@ contracts:
       reason: CEL must not depend on the testing adapter.
 
   strict_external:
-    - name: core-model-must-not-depend-on-di-container
-      source: core_model
+    # One authored rule per external boundary, expanded across every declared layer through the
+    # all_declared_layers source set. Exclusions name the exact layers where the dependency is the
+    # architecture, not a leak: `core` is the umbrella namespace that contains the allowed child
+    # layer, so it is subtracted alongside it.
+    - name: di-container-stays-in-the-composition-boundary
+      id: di-container-stays-in-the-composition-boundary
+      source_sets: [all_declared_layers]
+      exclude_sources: [core, core_composition]
       forbidden: [dependency_injection_container]
-      reason: Container APIs must stay confined to the composition boundary.
+      reason: Container APIs must stay confined to ArchLinterNet.Core.Composition; every other layer consumes the composition root's interfaces and facades.
 
-    - name: core-io-must-not-depend-on-di-container
-      source: core_io
-      forbidden: [dependency_injection_container]
-      reason: Container APIs must stay confined to the composition boundary.
-
-    - name: core-reporting-must-not-depend-on-di-container
-      source: core_reporting
-      forbidden: [dependency_injection_container]
-      reason: Container APIs must stay confined to the composition boundary.
-
-    - name: core-discovery-must-not-depend-on-di-container
-      source: core_discovery
-      forbidden: [dependency_injection_container]
-      reason: Container APIs must stay confined to the composition boundary.
-
-    - name: core-resolution-must-not-depend-on-di-container
-      source: core_resolution
-      forbidden: [dependency_injection_container]
-      reason: Container APIs must stay confined to the composition boundary.
-
-    - name: core-scanning-must-not-depend-on-di-container
-      source: core_scanning
-      forbidden: [dependency_injection_container]
-      reason: Container APIs must stay confined to the composition boundary.
-
-    - name: core-contracts-must-not-depend-on-di-container
-      source: core_contracts
-      forbidden: [dependency_injection_container]
-      reason: Container APIs must stay confined to the composition boundary.
-
-    - name: core-execution-must-not-depend-on-di-container
-      source: core_execution
-      forbidden: [dependency_injection_container]
-      reason: Container APIs must stay confined to the composition boundary.
-
-    - name: core-validation-must-not-depend-on-di-container
-      source: core_validation
-      forbidden: [dependency_injection_container]
-      reason: Application services consume the composition root's interfaces, not container APIs directly.
-
-    - name: core-graph-must-not-depend-on-di-container
-      source: core_graph
-      forbidden: [dependency_injection_container]
-      reason: Application services consume the composition root's interfaces, not container APIs directly.
-
-    - name: core-asmdef-must-not-depend-on-di-container
-      source: core_asmdef
-      forbidden: [dependency_injection_container]
-      reason: The asmdef application service and convenience facade consume the composition root's public engine, not container APIs directly.
-
-    - name: cli-must-not-depend-on-di-container
-      source: cli
-      forbidden: [dependency_injection_container]
-      reason: Adapters must consume the composition root's facade, not container APIs directly.
-
-    - name: testing-must-not-depend-on-di-container
-      source: testing
-      forbidden: [dependency_injection_container]
-      reason: Adapters must consume the composition root's facade, not container APIs directly.
-
-    - name: core-model-must-not-depend-on-msbuild
-      source: core_model
+    - name: msbuild-project-evaluation-stays-in-discovery
+      id: msbuild-project-evaluation-stays-in-discovery
+      source_sets: [all_declared_layers]
+      exclude_sources: [core, core_discovery]
       forbidden: [msbuild_project_evaluation]
-      reason: MSBuild/Buildalyzer project evaluation APIs must stay confined to Core.Discovery.
+      reason: MSBuild/Buildalyzer project-evaluation APIs must stay confined to ArchLinterNet.Core.Discovery; every other layer consumes the resolved project facts.
 
-    - name: core-io-must-not-depend-on-msbuild
-      source: core_io
-      forbidden: [msbuild_project_evaluation]
-      reason: MSBuild/Buildalyzer project evaluation APIs must stay confined to Core.Discovery.
+  strict_assembly_dependency:
+    - name: cel-assembly-must-not-reference-other-shipped-assemblies
+      id: cel-assembly-must-not-reference-other-shipped-assemblies
+      source: ArchLinterNet.CEL
+      forbidden: [ArchLinterNet.Core, ArchLinterNet.Cli, ArchLinterNet.Testing]
+      reason: CEL ships as an independently usable, host-agnostic engine. A namespace rule only fires once code uses a type; this catches the declared assembly reference itself.
 
-    - name: core-reporting-must-not-depend-on-msbuild
-      source: core_reporting
-      forbidden: [msbuild_project_evaluation]
-      reason: MSBuild/Buildalyzer project evaluation APIs must stay confined to Core.Discovery.
+  strict_assembly_allow_only:
+    - name: core-assembly-references-only-cel
+      id: core-assembly-references-only-cel
+      source: ArchLinterNet.Core
+      allowed: [ArchLinterNet.CEL]
+      reason: The shipped engine assembly may take a direct first-party reference on CEL and nothing else, so a host or adapter reference is caught at declaration time.
 
-    - name: core-resolution-must-not-depend-on-msbuild
-      source: core_resolution
-      forbidden: [msbuild_project_evaluation]
-      reason: MSBuild/Buildalyzer project evaluation APIs must stay confined to Core.Discovery.
+    - name: adapter-assemblies-reference-only-core
+      id: adapter-assemblies-reference-only-core
+      source_sets: [adapter_assemblies]
+      allowed: [ArchLinterNet.Core]
+      reason: The CLI and NUnit adapters consume the engine through ArchLinterNet.Core only; a direct CEL or cross-adapter assembly reference is a packaging regression.
 
-    - name: core-scanning-must-not-depend-on-msbuild
-      source: core_scanning
-      forbidden: [msbuild_project_evaluation]
-      reason: MSBuild/Buildalyzer project evaluation APIs must stay confined to Core.Discovery.
+  strict_assembly_independence:
+    - name: adapter-assemblies-are-mutually-independent
+      id: adapter-assemblies-are-mutually-independent
+      assemblies: [ArchLinterNet.Cli, ArchLinterNet.Testing]
+      reason: The CLI tool and the NUnit adapter are separately consumable packages and must not reference each other in either direction.
 
-    - name: core-contracts-must-not-depend-on-msbuild
-      source: core_contracts
-      forbidden: [msbuild_project_evaluation]
-      reason: MSBuild/Buildalyzer project evaluation APIs must stay confined to Core.Discovery.
+  strict_project_metadata:
+    - name: production-projects-must-not-reference-test-or-benchmark-projects
+      id: production-projects-must-not-reference-test-or-benchmark-projects
+      project_sets: [production_projects]
+      forbidden_project_references:
+        - tests/**/*.csproj
+        - benchmarks/**/*.csproj
+      forbidden_properties:
+        IsTestProject: "true"
+      reason: A shipped project must never take a build dependency on a test or benchmark project, or turn itself into a test project.
 
-    - name: core-execution-must-not-depend-on-msbuild
-      source: core_execution
-      forbidden: [msbuild_project_evaluation]
-      reason: MSBuild/Buildalyzer project evaluation APIs must stay confined to Core.Discovery.
+    - name: core-friend-assemblies-are-reviewed
+      id: core-friend-assemblies-are-reviewed
+      projects: [src/ArchLinterNet.Core/ArchLinterNet.Core.csproj]
+      allowed_friend_assemblies:
+        - ArchLinterNet.Core.Tests
+        - ArchLinterNet.Cli
+      reason: Core's internals are deliberately visible to its own test assembly and to the CLI adapter; any further friend assembly widens the effective API surface without review.
 
-    - name: core-validation-must-not-depend-on-msbuild
-      source: core_validation
-      forbidden: [msbuild_project_evaluation]
-      reason: MSBuild/Buildalyzer project evaluation APIs must stay confined to Core.Discovery.
+    - name: cel-friend-assemblies-are-reviewed
+      id: cel-friend-assemblies-are-reviewed
+      projects: [src/ArchLinterNet.CEL/ArchLinterNet.CEL.csproj]
+      allowed_friend_assemblies:
+        - ArchLinterNet.CEL.Tests
+        - ArchLinterNet.CEL.Benchmarks
+      reason: CEL's internal pipeline stages are visible only to its own tests and to the pipeline-stage benchmarks; consumers must stay on the public CelEnvironment surface.
 
-    - name: core-graph-must-not-depend-on-msbuild
-      source: core_graph
-      forbidden: [msbuild_project_evaluation]
-      reason: MSBuild/Buildalyzer project evaluation APIs must stay confined to Core.Discovery.
+    - name: cli-friend-assemblies-are-reviewed
+      id: cli-friend-assemblies-are-reviewed
+      projects: [src/ArchLinterNet.Cli/ArchLinterNet.Cli.csproj]
+      allowed_friend_assemblies:
+        - ArchLinterNet.Cli.Tests
+      reason: The CLI's internals are visible only to its own test assembly.
 
-    - name: core-asmdef-must-not-depend-on-msbuild
-      source: core_asmdef
-      forbidden: [msbuild_project_evaluation]
-      reason: MSBuild/Buildalyzer project evaluation APIs must stay confined to Core.Discovery.
+    - name: testing-adapter-declares-no-friend-assemblies
+      id: testing-adapter-declares-no-friend-assemblies
+      projects: [src/ArchLinterNet.Testing/ArchLinterNet.Testing.csproj]
+      allowed_friend_assemblies: []
+      reason: The NUnit adapter is consumed entirely through its public API; it has no reviewed friend assembly.
 
-    - name: core-composition-must-not-depend-on-msbuild
-      source: core_composition
-      forbidden: [msbuild_project_evaluation]
-      reason: MSBuild/Buildalyzer project evaluation APIs must stay confined to Core.Discovery; the composition root wires the resolver's interface, not Buildalyzer itself.
+  strict_package_dependency:
+    - name: test-frameworks-stay-out-of-shipped-projects
+      id: test-frameworks-stay-out-of-shipped-projects
+      source_sets: [shipped_assemblies]
+      forbidden: [test_frameworks]
+      reason: A shipped package must not declare a test or benchmark framework dependency and push it onto consumers.
 
-    - name: cli-must-not-depend-on-msbuild
-      source: cli
-      forbidden: [msbuild_project_evaluation]
-      reason: Adapters must consume the composition root's facade, not MSBuild/Buildalyzer APIs directly.
+    - name: msbuild-project-evaluation-package-stays-in-core
+      id: msbuild-project-evaluation-package-stays-in-core
+      source_sets: [shipped_assemblies]
+      exclude_sources: [ArchLinterNet.Core]
+      forbidden: [msbuild_project_evaluation_packages]
+      reason: Buildalyzer/MSBuild project evaluation is an ArchLinterNet.Core implementation detail; declaring it elsewhere would move project evaluation out of Core.Discovery.
 
-    - name: testing-must-not-depend-on-msbuild
-      source: testing
-      forbidden: [msbuild_project_evaluation]
-      reason: Adapters must consume the composition root's facade, not MSBuild/Buildalyzer APIs directly.
+    - name: di-container-package-stays-in-core
+      id: di-container-package-stays-in-core
+      source_sets: [shipped_assemblies]
+      exclude_sources: [ArchLinterNet.Core]
+      forbidden: [dependency_injection_container_packages]
+      reason: The container is Core's composition-root implementation detail; an adapter declaring it directly would bypass the composition facade.
+
+  strict_package_allow_only:
+    - name: cel-declares-no-package-dependencies
+      id: cel-declares-no-package-dependencies
+      source: ArchLinterNet.CEL
+      allowed: []
+      reason: CEL is the dependency-light, host-agnostic engine; its value is that it can be referenced with no transitive package graph at all.
+
+  strict_framework_allow_only:
+    - name: shipped-projects-declare-only-the-base-runtime-framework
+      id: shipped-projects-declare-only-the-base-runtime-framework
+      source_sets: [shipped_assemblies]
+      allowed: [base_runtime_framework]
+      reason: Every shipped project carries only the implicit base runtime framework. Adopting a shared framework such as Microsoft.AspNetCore.App or Microsoft.WindowsDesktop.App would silently narrow which hosts can consume the packages.
 
   strict_layers:
     - name: core-layering
@@ -373,11 +440,86 @@ contracts:
       allowed_importers: [core]
       reason: Repository and assembly resolution internals must not be referenced outside Core.
 
+  strict_type_placement:
+    # Post-#452 seam: a new contract-family checker must be a type under the extracted checker
+    # namespace, not a new type grown next to the analysis session. Name-suffix matching is used
+    # deliberately here: checkers are static classes bound through the ArchitectureContractChecker
+    # delegate, so there is no interface or base type to select them by.
+    - name: family-checkers-stay-in-the-extracted-checker-seam
+      id: family-checkers-stay-in-the-extracted-checker-seam
+      types_matching:
+        name_suffix: Checker
+      exclude_types_matching:
+        # ArchitectureContractChecker is the delegate the seam is defined by, not a checker.
+        - base_type: System.MulticastDelegate
+      must_reside_in_namespaces: [ArchLinterNet.Core.Execution.Checkers]
+      reason: Contract-family checking was extracted out of ArchitectureAnalysisSession (#452); a checker type declared anywhere else re-centralizes family logic.
+
+    # Post-#453 seam: the diagnostic model owns every diagnostic type, so the reporting formatter
+    # projects details through the registry instead of switching on host- or execution-owned types.
+    - name: diagnostics-stay-in-the-model-layer
+      id: diagnostics-stay-in-the-model-layer
+      types_matching:
+        base_type: ArchLinterNet.Core.Model.ArchitectureDiagnostic
+      must_reside_in_layers: [core_model]
+      reason: Every diagnostic family is a Core.Model type; declaring one in Reporting or Execution would couple diagnostic shape to a producer or a formatter.
+
+  strict_interface_implementation:
+    - name: diagnostic-detail-payloads-stay-in-the-model-layer
+      id: diagnostic-detail-payloads-stay-in-the-model-layer
+      interfaces: [ArchLinterNet.Core.Model.IArchitectureDiagnosticPayload]
+      allowed_only_in_layers: [core_model]
+      reason: The #453 detail-projection seam depends on every structured payload being a Core.Model type the formatter can project without knowing its producer.
+
+    # Post-#451 seam: policy loading owns raw-YAML validation and document validation in two
+    # dedicated namespaces, keeping the loader itself free of per-family validation branches.
+    - name: raw-policy-document-validators-stay-in-their-loading-seam
+      id: raw-policy-document-validators-stay-in-their-loading-seam
+      interfaces: [ArchLinterNet.Core.Contracts.RawValidators.IArchitecturePolicyRawDocumentValidator]
+      allowed_only_in_namespaces: [ArchLinterNet.Core.Contracts.RawValidators]
+      reason: Raw-node validation is a focused loading-stage contributor set (#451); implementing one elsewhere would reintroduce validation branches into the policy loader.
+
+    - name: policy-document-validators-stay-in-their-loading-seam
+      id: policy-document-validators-stay-in-their-loading-seam
+      interfaces: [ArchLinterNet.Core.Contracts.Validators.IArchitecturePolicyDocumentValidator]
+      allowed_only_in_namespaces: [ArchLinterNet.Core.Contracts.Validators]
+      reason: Typed document validation is a focused loading-stage contributor set (#451); implementing one elsewhere would reintroduce validation branches into the policy loader.
+
+  strict_public_api_surface:
+    # Reviewed compatibility surfaces, captured through `arch-linter-net public-api capture` and
+    # updated only through the explicit `make public-api-update` entrypoint. api_comparison: exact
+    # makes additions, removals, and signature changes all reviewed deltas.
+    - name: cel-public-api-is-reviewed
+      id: cel-public-api-is-reviewed
+      assemblies: [ArchLinterNet.CEL]
+      api_snapshot: architecture/api/ArchLinterNet.CEL.public-api.txt
+      api_comparison: exact
+      reason: CEL ships as a standalone engine package; its whole exported surface is the compatibility contract.
+
+    - name: testing-public-api-is-reviewed
+      id: testing-public-api-is-reviewed
+      assemblies: [ArchLinterNet.Testing]
+      api_snapshot: architecture/api/ArchLinterNet.Testing.public-api.txt
+      api_comparison: exact
+      reason: The NUnit adapter is consumed entirely through its public API, so every exported member is the compatibility contract.
+
+    - name: core-public-api-is-reviewed
+      id: core-public-api-is-reviewed
+      assemblies: [ArchLinterNet.Core]
+      api_snapshot: architecture/api/ArchLinterNet.Core.public-api.txt
+      api_comparison: exact
+      reason: Core is the engine package consumers reference directly; its whole exported surface is the compatibility contract.
+
   strict_coverage:
     - name: assembly-coverage
       id: assembly-coverage
       scope: assembly
       reason: Every first-party assembly must be mapped to a declared layer or explicitly excluded.
+
+    - name: project-coverage
+      id: project-coverage
+      scope: project
+      reason: Every first-party production project discovered from ArchLinterNet.slnx must be mapped to a declared layer, so a newly added src/ project cannot silently escape governance.
 
     - name: namespace-coverage
       id: namespace-coverage
@@ -416,4 +558,6 @@ contracts:
         - cel-must-not-depend-on-core
         - cel-must-not-depend-on-cli
         - cel-must-not-depend-on-testing
+        - di-container-stays-in-the-composition-boundary
+        - msbuild-project-evaluation-stays-in-discovery
       reason: The recovered Core architecture's base package rules, seam, leaf-isolation, and protected-surface rules must keep matching real code so a renamed or deleted layer cannot silently stop being enforced.

@@ -1,0 +1,113 @@
+using NUnit.Framework;
+
+namespace ArchLinterNet.Core.Tests;
+
+/// <summary>
+/// Shared helpers for the self-policy fixtures: locating the repository root, and materializing a
+/// deliberately mutated copy of the real policy next to the original so every repository-relative
+/// input it declares (<c>ArchLinterNet.slnx</c>, <c>architecture/api/*.public-api.txt</c>) still
+/// resolves against the same policy boundary.
+/// </summary>
+internal static class SelfPolicyRepository
+{
+    /// <summary>Prefix for throwaway policy/snapshot copies; also matched by .gitignore.</summary>
+    public const string MutationPrefix = "self-policy-mutation-";
+
+    public static string FindRepositoryRoot()
+    {
+        var dir = new DirectoryInfo(TestContext.CurrentContext.TestDirectory);
+        while (dir != null && dir.GetFiles("ArchLinterNet.slnx").Length == 0)
+            dir = dir.Parent;
+        return dir?.FullName ?? throw new InvalidOperationException("Could not find repo root");
+    }
+
+    public static string PolicyPath(string repositoryRoot) =>
+        Path.Combine(repositoryRoot, "architecture", "dependencies.arch.yml");
+
+    public static string ReadPolicy(string repositoryRoot) => File.ReadAllText(PolicyPath(repositoryRoot));
+
+    /// <summary>
+    /// Writes <paramref name="content"/> to a uniquely named sibling of the real policy and returns
+    /// its path. The caller is responsible for deleting it (see <see cref="DeleteMutations"/>).
+    /// </summary>
+    public static string WriteMutatedPolicy(string repositoryRoot, string content)
+    {
+        string path = Path.Combine(
+            repositoryRoot,
+            "architecture",
+            $"{MutationPrefix}{Guid.NewGuid():N}.arch.yml");
+        File.WriteAllText(path, content);
+        return path;
+    }
+
+    /// <summary>Writes a throwaway snapshot next to the reviewed ones and returns its path.</summary>
+    public static string WriteMutatedSnapshot(string repositoryRoot, string content)
+    {
+        string path = Path.Combine(
+            repositoryRoot,
+            "architecture",
+            "api",
+            $"{MutationPrefix}{Guid.NewGuid():N}.public-api.txt");
+        File.WriteAllText(path, content);
+        return path;
+    }
+
+    /// <summary>Repository-relative path with forward slashes, as the policy declares them.</summary>
+    public static string RelativePolicyPath(string repositoryRoot, string absolutePath) =>
+        Path.GetRelativePath(repositoryRoot, absolutePath).Replace('\\', '/');
+
+    public static void DeleteMutations(string repositoryRoot)
+    {
+        foreach (string directory in new[]
+                 {
+                     Path.Combine(repositoryRoot, "architecture"),
+                     Path.Combine(repositoryRoot, "architecture", "api"),
+                 })
+        {
+            if (!Directory.Exists(directory))
+                continue;
+
+            foreach (string file in Directory.EnumerateFiles(directory, $"{MutationPrefix}*"))
+                TryDelete(file);
+        }
+    }
+
+    private static void TryDelete(string path)
+    {
+        try
+        {
+            File.Delete(path);
+        }
+        catch (IOException)
+        {
+            // A leftover file is a nuisance, not a test failure; the next run's setup retries.
+        }
+    }
+
+    /// <summary>
+    /// Applies an exact, single-occurrence replacement, failing loudly when the anchor text no
+    /// longer exists so a policy edit can never silently turn a negative regression into a no-op.
+    /// </summary>
+    public static string Replace(string policy, string anchor, string replacement)
+    {
+        int occurrences = CountOccurrences(policy, anchor);
+        Assert.That(
+            occurrences,
+            Is.EqualTo(1),
+            $"Expected exactly one occurrence of the mutation anchor in the repository policy:\n{anchor}");
+        return policy.Replace(anchor, replacement);
+    }
+
+    private static int CountOccurrences(string haystack, string needle)
+    {
+        int count = 0;
+        int index = haystack.IndexOf(needle, StringComparison.Ordinal);
+        while (index >= 0)
+        {
+            count++;
+            index = haystack.IndexOf(needle, index + needle.Length, StringComparison.Ordinal);
+        }
+
+        return count;
+    }
+}
