@@ -217,8 +217,8 @@ def test_the_shipped_declaration_is_valid() -> None:
     """The declaration this release actually ships must satisfy its own contract."""
     declaration = _read_declaration(Path(generator.__file__).with_name("release-scope.json"))
 
-    assert declaration["story"] == 434
-    assert declaration["release_target"] == "0.6.1"
+    assert declaration["story"] == 527
+    assert declaration["release_target"] == "0.6.4"
     required = {item["issue"] for item in declaration["required_items"]}
     excluded = {item["issue"] for item in declaration["excluded_items"]}
     assert required.isdisjoint(excluded)

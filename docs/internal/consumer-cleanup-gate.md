@@ -51,12 +51,37 @@ Its composed policy is authored the way the release intends a consumer to author
 
 Every scenario is required on every platform in the matrix. A scenario that a platform cannot execute is recorded as `not_applicable` with a reason and must pass on at least one platform.
 
+## Public-API surface-selector consumer-exit matrix
+
+v0.6.4 (#525/#526/#529, story #527) lets `strict_public_api_surface`/`audit_public_api_surface`
+contracts select an intentional reviewed compatibility surface with `surface_selector`, instead of
+governing every exported type in an assembly. The consumer-exit matrix proves this from the same
+packed candidate, using a dedicated
+`tests/ArchLinterNet.Core.Tests/AdoptionAcceptance/Fixtures/api-surface-selector` fixture rather
+than extending `modular-consumer` — the two fixtures prove unrelated release narratives and keeping
+them separate keeps this addition from risking the already-passing 0.6.1 scenarios.
+
+The fixture governs one assembly with a deliberately large incidental exported surface (implementation/domain/configuration types with no compatibility intent) alongside three sibling `strict_public_api_surface` contracts over the same assembly: `assembly-wide-api` (no selector — the unchanged #94 baseline), `marker-selected-api` (`has_attribute` — the primary user-owned orthogonal-marker adoption path), and `namespace-selected-api` (`namespace` — a second bounded selector source, proving selection is not annotation-specific). A `strict_context_allow_only` contract keyed on `role: ValueObject` proves a selected type's existing semantic role stays governed by ordinary role-based rules, unchanged by selection.
+
+| Scenario | Proves |
+|---|---|
+| `public-api-surface-selector-snapshot-reduction` | Selected snapshots omit incidental types the assembly-wide sibling still governs; selected contracts validate independently of the assembly-wide one; BCL-only members need no evidence; the orthogonal marker is never mapped into classification |
+| `public-api-surface-selector-role-preservation` | A selected `ValueObject`-role type stays governed by an ordinary role-based contract, unchanged by selection |
+| `public-api-surface-selector-exact-delta-lifecycle` | Added/removed/changed signatures on a selected type are all observed exactly, and `update` restores a clean comparison |
+| `public-api-surface-selector-membership-review-visibility` | Adding or removing selector-matching evidence on a type is a review-visible snapshot delta in both directions |
+| `public-api-surface-selector-escape-fails-closed` | A selected member referencing an unselected first-party exported type fails closed instead of silently escaping |
+| `public-api-surface-selector-strict-run-is-green` | The full policy, with every permanent selector contract in place, validates green |
+| `public-api-surface-selector-testing-parity` | The CLI and the packaged `ArchLinterNet.Testing` API resolve the same effective selected surface and normalized findings |
+
+These scenarios are required alongside the existing consumer-cleanup matrix; the same tracked-defect and not-applicable rules apply.
+
 ## Release-scope closure
 
-`tools/release/release-scope.json` declares the authoritative #434 release scope: the required
-items, and the items explicitly excluded with their reasons. It lives in the repository so the set
-of blocking work is reviewed like any other release artifact rather than derived from mutable issue
-text at release time.
+`tools/release/release-scope.json` declares the authoritative release scope for the *current*
+release cycle: the required items, and the items explicitly excluded with their reasons. It lives
+in the repository so the set of blocking work is reviewed like any other release artifact rather
+than derived from mutable issue text at release time. It advanced from the shipped 0.6.1/#434 scope
+to the current 0.6.4/#527 scope when the surface-selector consumer-exit matrix was added.
 
 `create_release_scope_evidence.py` resolves only the *current* state of those issues from the issue
 tracker and binds the result to the candidate manifest digest and source commit. The aggregator
@@ -98,7 +123,16 @@ make test-release-evidence
 
 ## Current verdict
 
-The gate was executed against a locally packed `0.6.1` candidate at the commit that introduced it. All thirty required scenarios pass and the tracked-defect registry is empty.
+The 0.6.1 consumer-cleanup matrix (thirty scenarios) was executed against a locally packed `0.6.1`
+candidate at the commit that introduced it and passed with an empty tracked-defect registry.
+
+The 0.6.4 public-API surface-selector consumer-exit matrix (seven scenarios) was validated locally
+against a packed candidate through a temporary focused harness isolating the new scenarios from the
+rest of the entrypoint, since an unrelated pre-existing platform-line-ending issue in
+`layer-overlap-allowance` (tracked separately) currently prevents the full sequential entrypoint from
+reaching them locally on this environment. All seven new scenarios passed. The full entrypoint,
+including both matrices together, is exercised on every PR and release-workflow platform job; that
+run is authoritative for anything a local, risk-based check cannot fully reproduce.
 
 Executing the matrix originally found one real defect — on a composed policy the effective-schema failure reported an unrelated imported-fragment location and resurfaced inapplicable discriminator branches ([#471](https://github.com/eugenemalaschuk-source/arch-linter-net/issues/471)). It was fixed in the same branch, so `actionable-schema-diagnostics` gates the release rather than being registered as a known failure.
 

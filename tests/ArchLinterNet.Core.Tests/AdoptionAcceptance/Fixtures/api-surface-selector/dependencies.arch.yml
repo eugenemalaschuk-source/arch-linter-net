@@ -1,0 +1,14 @@
+version: 1
+name: Synthetic API surface selector adopter
+analysis:
+  target_assemblies: [Synthetic.ApiSurfaceSelector]
+  projects: [Synthetic.ApiSurfaceSelector.csproj]
+  configuration: Release
+  target_framework: net10.0
+classification:
+  attributes:
+    - attribute: Synthetic.ApiSurfaceSelector.Architecture.ValueObjectRoleAttribute
+      role: ValueObject
+  namespace:
+    - namespace: Synthetic.ApiSurfaceSelector.Domain
+      role: Implementation
