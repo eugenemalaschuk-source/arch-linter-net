@@ -90,6 +90,7 @@ public sealed partial class CheckpointBReleaseGateTests
         scenarios.AddRange(candidate.ShellScenarios());
         scenarios.Add(candidate.AssertCliInFlightCancellation());
         scenarios.AddRange(AssertConsumerCleanupMatrix(candidate, out ConsumerPolicyShape policyShape));
+        scenarios.AddRange(AssertPublicApiSurfaceSelectorMatrix(candidate));
         candidate.WriteEvidence(scenarios, policyShape);
     }
 
