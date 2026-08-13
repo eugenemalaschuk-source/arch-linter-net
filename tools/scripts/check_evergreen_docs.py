@@ -114,7 +114,7 @@ VERSIONED_HEADING = re.compile(
     rf")"
 )
 VERSIONED_NAV_CONCEPT = re.compile(
-    rf"(?i)^\s*-\s+(?:"
+    rf"(?i)^\s*-\s+[\"']?(?:"
     rf"{PRODUCT_GUIDE_LABEL}(?:\s+(?:to|for))?\s+{SEMVER}\b"
     rf"|Release\s+Notes?\s+{SEMVER}\b"
     rf"|Reference\s+Entrypoints?\s+{SEMVER}\b"
@@ -125,7 +125,7 @@ VERSIONED_NAV_CONCEPT = re.compile(
     rf")"
 )
 ARCHLINTERNET_VERSIONED_NAV = re.compile(
-    rf"(?i)^\s*-\s+(?:(?:current|public)\s+)?ArchLinterNet(?:'s)?"
+    rf"(?i)^\s*-\s+[\"']?(?:(?:current|public)\s+)?ArchLinterNet(?:'s)?"
     rf"(?:\s+(?:release|version|package(?:\s+(?:release|version|line))?))?\s+{SEMVER}\b"
 )
 MARKDOWN_STRUCTURAL_LINE = re.compile(
