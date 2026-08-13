@@ -68,6 +68,10 @@ def test_product_release_prose_rejects_soft_wraps_without_blocking_external_vers
         "9.8.7 is current.\n\n"
         "The current ArchLinterNet release\n"
         "is 9.8.7.\n\n"
+        "> ArchLinterNet release\n"
+        "> 9.8.7 is current.\n\n"
+        "# ArchLinterNet release output\n"
+        "SARIF 2.1.0 is the supported standard format.\n\n"
         "The current SARIF release\n"
         "is 2.1.0.\n\n"
         "ArchLinterNet uses Newtonsoft.Json package\n"
@@ -80,7 +84,7 @@ def test_product_release_prose_rejects_soft_wraps_without_blocking_external_vers
     product_violations = [
         item for item in violations if "product package SemVer is coupled" in item
     ]
-    assert sum("9.8.7" in item for item in product_violations) >= 2
+    assert sum("9.8.7" in item for item in product_violations) >= 3
     assert not any("2.1.0" in item for item in product_violations)
     assert not any("13.0.4" in item for item in product_violations)
 
