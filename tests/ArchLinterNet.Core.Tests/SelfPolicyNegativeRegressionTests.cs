@@ -258,6 +258,36 @@ public sealed class SelfPolicyNegativeRegressionTests
         Assert.That(rejected, Is.True, "A malformed policy must fail the fast policy-only gate.");
     }
 
+    // ── Mutation-harness determinism ────────────────────────────────────────
+    // `.gitattributes` pins only `schema/*.json` to LF, so the policy is checked out CRLF on
+    // Windows. Every multi-line anchor above is a C# literal with \n, so without normalization the
+    // whole fixture fails on Windows before reaching a single contract.
+    [Test]
+    public void MutationAnchors_MatchRegardlessOfCheckoutLineEndings()
+    {
+        const string Anchor = "  project_exclude:\n    - tests/**\n    - benchmarks/**\n";
+
+        const string Replacement = "  project_exclude:\n    - tests/**\n";
+
+        string crlfPolicy = _policy.ReplaceLineEndings("\r\n");
+        Assert.That(crlfPolicy, Does.Not.Contain(Anchor),
+            "This case is only meaningful while the anchor is genuinely multi-line.");
+
+        string mutated = SelfPolicyRepository.Replace(crlfPolicy, Anchor, Replacement);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(mutated, Does.Not.Contain(Anchor), "The anchored block must be gone.");
+            Assert.That(mutated, Does.Contain(Replacement), "The replacement must be present.");
+        });
+    }
+
+    [Test]
+    public void ReadPolicy_NormalizesLineEndings()
+    {
+        Assert.That(SelfPolicyRepository.ReadPolicy(_repositoryRoot), Does.Not.Contain("\r"));
+    }
+
     // ── Helpers ─────────────────────────────────────────────────────────────
     private ArchitectureValidationResult ValidateMutated(string mutatedPolicy, params string[] contractIds)
     {

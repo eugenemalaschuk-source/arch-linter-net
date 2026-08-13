@@ -24,7 +24,14 @@ internal static class SelfPolicyRepository
     public static string PolicyPath(string repositoryRoot) =>
         Path.Combine(repositoryRoot, "architecture", "dependencies.arch.yml");
 
-    public static string ReadPolicy(string repositoryRoot) => File.ReadAllText(PolicyPath(repositoryRoot));
+    /// <summary>
+    /// Reads the real policy with line endings normalized to <c>\n</c>. `.gitattributes` pins only
+    /// `schema/*.json` to LF, so this file is checked out CRLF on Windows; without normalizing here,
+    /// every multi-line mutation anchor in <see cref="Replace"/> would match zero times and the
+    /// negative regressions would fail before reaching the contract they exercise.
+    /// </summary>
+    public static string ReadPolicy(string repositoryRoot) =>
+        File.ReadAllText(PolicyPath(repositoryRoot)).ReplaceLineEndings("\n");
 
     /// <summary>
     /// Writes <paramref name="content"/> to a uniquely named sibling of the real policy and returns
@@ -87,9 +94,15 @@ internal static class SelfPolicyRepository
     /// <summary>
     /// Applies an exact, single-occurrence replacement, failing loudly when the anchor text no
     /// longer exists so a policy edit can never silently turn a negative regression into a no-op.
+    /// Both operands are normalized to <c>\n</c> so an anchor written as a C# literal matches the
+    /// same policy text on every platform, whatever line endings the checkout produced.
     /// </summary>
     public static string Replace(string policy, string anchor, string replacement)
     {
+        policy = policy.ReplaceLineEndings("\n");
+        anchor = anchor.ReplaceLineEndings("\n");
+        replacement = replacement.ReplaceLineEndings("\n");
+
         int occurrences = CountOccurrences(policy, anchor);
         Assert.That(
             occurrences,
