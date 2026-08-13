@@ -245,7 +245,7 @@ internal static class PublicApiSurfaceChecker
                 }
 
                 // ForbiddenReferences must carry the escaping type, not entry.Signature: identity
-                // attachment (ArchitectureAnalysisSession.AttachFindingIdentities) matches a
+                // attachment (ArchitectureFindingIdentityAttributor.Attach) matches a
                 // violation's ForbiddenReferences against the baseline candidate's ForbiddenReference/
                 // TargetMember — both now referencedType (see the IsIgnored call above) — so a
                 // mismatched ForbiddenReferences here would leave every escape violation with no
