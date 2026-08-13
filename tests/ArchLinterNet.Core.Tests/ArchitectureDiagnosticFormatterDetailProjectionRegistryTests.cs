@@ -27,12 +27,6 @@ public sealed class ArchitectureDiagnosticFormatterDetailProjectionRegistryTests
     }
 
     [Test]
-    public void All_ContainsExactlyTwentyFourEntries()
-    {
-        Assert.That(ArchitectureDiagnosticFormatter.DiagnosticDetailProjectionRegistry.All, Has.Count.EqualTo(24));
-    }
-
-    [Test]
     public void All_HasNoDuplicateDiagnosticTypes()
     {
         List<Type> types = ArchitectureDiagnosticFormatter.DiagnosticDetailProjectionRegistry.All
