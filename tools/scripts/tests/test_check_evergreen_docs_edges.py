@@ -86,7 +86,7 @@ def test_product_routes_reject_concept_first_versions_without_to(tmp_path: Path)
     assert not any("sarif-upgrade/2.1.0/index.md" in item for item in violations)
 
 
-def test_product_first_heading_and_nav_are_rejected_without_blocking_standard_context(
+def test_product_first_heading_and_quoted_nav_are_rejected_without_blocking_standard_context(
     tmp_path: Path,
 ) -> None:
     write_repo(tmp_path)
@@ -101,7 +101,10 @@ def test_product_first_heading_and_nav_are_rejected_without_blocking_standard_co
         "nav:\n"
         "  - Guides:\n"
         "      - ArchLinterNet migration to 9.8.7: guides/upgrading.md\n"
-        "      - ArchLinterNet SARIF migration to 2.1.0: guides/upgrading.md\n",
+        '      - "Upgrade to 9.8.7": guides/upgrading.md\n'
+        "      - 'ArchLinterNet migration to 9.8.7': guides/upgrading.md\n"
+        '      - "SARIF Migration to 2.1.0": guides/upgrading.md\n'
+        "      - 'ArchLinterNet SARIF migration to 2.1.0': guides/upgrading.md\n",
         encoding="utf-8",
     )
 
@@ -109,7 +112,9 @@ def test_product_first_heading_and_nav_are_rejected_without_blocking_standard_co
 
     assert any("ArchLinterNet upgrade to 9.8.7" in item for item in violations)
     assert any("ArchLinterNet migration to 9.8.7" in item for item in violations)
+    assert any("Upgrade to 9.8.7" in item for item in violations)
     assert not any("supports SARIF migration to 2.1.0" in item for item in violations)
+    assert not any("SARIF Migration to 2.1.0" in item for item in violations)
     assert not any("ArchLinterNet SARIF migration to 2.1.0" in item for item in violations)
 
 
