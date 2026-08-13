@@ -45,17 +45,34 @@ def test_product_routes_reject_concept_first_versions_without_to(tmp_path: Path)
         guides / "migration-9.8.7.md",
         reference / "release-9.8.7.md",
         guides / "adoption-9.8.7.md",
+        guides / "upgrading-9.8.7.md",
+        guides / "installation-9.8.7.md",
+        guides / "troubleshooting-9.8.7.md",
     )
     for path in product_paths:
         path.write_text("# Versioned product guide\n", encoding="utf-8")
+
+    concept_directory = guides / "upgrade" / "9.8.7" / "index.md"
+    concept_directory.parent.mkdir(parents=True)
+    concept_directory.write_text("# Versioned product guide\n", encoding="utf-8")
+    version_directory = guides / "9.8.7" / "upgrading.md"
+    version_directory.parent.mkdir(parents=True)
+    version_directory.write_text("# Versioned product guide\n", encoding="utf-8")
+
     standard = reference / "sarif-upgrade-2.1.0.md"
     standard.write_text("# Upgrade SARIF to 2.1.0\n", encoding="utf-8")
+    standard_directory = reference / "sarif-upgrade" / "2.1.0" / "index.md"
+    standard_directory.parent.mkdir(parents=True)
+    standard_directory.write_text("# Upgrade SARIF to 2.1.0\n", encoding="utf-8")
 
     violations = evergreen.find_violations(tmp_path)
 
     for path in product_paths:
         assert any(path.name in item for item in violations)
+    assert any("upgrade/9.8.7/index.md" in item for item in violations)
+    assert any("9.8.7/upgrading.md" in item for item in violations)
     assert not any("sarif-upgrade-2.1.0.md" in item for item in violations)
+    assert not any("sarif-upgrade/2.1.0/index.md" in item for item in violations)
 
 
 def test_product_release_prose_rejects_soft_wraps_without_blocking_external_versions(
