@@ -53,4 +53,5 @@ The CLI is the primary execution surface for user workflows such as baseline gen
 
 Use `WithBaseline(path).VerifyBaseline()` for a read-only CI gate. Keep
 baseline/API capture and update actions in a reviewed local workflow; test code
-must not automatically approve or rewrite them. See [Adopt or Upgrade to 0.5.1](../guides/migration-to-0-5-1.md#solution-shapes).
+must not automatically approve or rewrite them. See
+[Adopt or Upgrade ArchLinterNet](../guides/upgrading.md#solution-shapes).

@@ -1,7 +1,7 @@
-# 0.5.1 Reference Entrypoints
+# Reference Entrypoints
 
-These are thin consumer-owned templates for ArchLinterNet 0.5.1. They pin or
-restore the tool, pass structured arguments, invoke one validation command per
+These are thin consumer-owned templates for ArchLinterNet. They pin or restore
+the tool, pass structured arguments, invoke one validation command per
 requested session, and preserve stdout/stderr. POSIX, PowerShell, Task with
 `--exit-code`, and direct CI invocations propagate the exact product exit code.
 GNU Make cannot do so for a failing recipe, so its template writes that exact
@@ -15,14 +15,19 @@ strings or use `eval`.
 
 ## Direct pinned .NET tool
 
-Commit `.config/dotnet-tools.json` after pinning the package. CI restores it,
-then invokes the tool exactly once:
+Commit `.config/dotnet-tools.json` after selecting the package. The manifest
+records the exact resolved version; CI restores that reviewed pin rather than a
+version copied from documentation:
 
 ```bash
-dotnet tool install ArchLinterNet.Cli --version 0.5.1
+dotnet new tool-manifest
+dotnet tool install ArchLinterNet.Cli
 dotnet tool restore
 dotnet arch-linter-net --policy architecture/arch.yml --mode strict --ensure-built
 ```
+
+When upgrading, use `dotnet tool update ArchLinterNet.Cli`, review the manifest
+diff, and run the repository acceptance gate before merging the new pin.
 
 For JSON and SARIF artifacts, use product report routing rather than shell
 redirection where multiple files are needed:
@@ -268,4 +273,4 @@ public sealed class ArchitectureTests
 
 Use `.WithBaseline(path).VerifyBaseline()` for a read-only baseline gate and
 keep capture/update/migrate ownership in a reviewed local workflow. See
-[Test Adapter](../usage/test-adapter.md) and the [migration guide](migration-to-0-5-1.md).
+[Test Adapter](../usage/test-adapter.md) and the [upgrade guide](upgrading.md).

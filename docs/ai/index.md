@@ -13,8 +13,8 @@ Internal repository-maintenance instructions, backlog governance, issue-writing 
 - [Semantic-role governance](semantic-role-governance.md) — AI-first workflow, diagnostics, examples, and safe exceptions for semantic roles.
 - [Semantic role catalog](../policy-format/semantic-role-catalog.md) — reviewed role and metadata vocabulary for future semantic policies.
 - [Capabilities](capabilities.md) — supported contract families and limits.
-- [Adopt or Upgrade to 0.5.1](../guides/migration-to-0-5-1.md) — release-qualified
-  upgrade, output, and offline-schema guidance; Checkpoint A is not a release.
+- [Adopt or Upgrade ArchLinterNet](../guides/upgrading.md) — canonical adoption,
+  upgrade, output, and offline-schema guidance.
 - [Policy Review Checklist](policy-review-checklist.md) — review checks before opening a PR.
 
 ## Machine-readable references

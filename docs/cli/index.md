@@ -29,12 +29,11 @@ dotnet run --project src/ArchLinterNet.Cli --
 ## Packaged schemas
 
 Installed releases expose an immutable `adoption-stabilization/v1` schema
-registry without a repository checkout or network access. The public 0.6.1
-package line ships a registry whose entries version persisted contracts
-independently from package SemVer: most stay at their frozen `0.5.1`
-identity, policy root/fragment advanced to `0.6.1`, and no `schema/0.6.0`
-identity is shipped. Use the installed command as the authority for the exact
-supported `$schema` URLs.
+registry without a repository checkout or network access. Registry entries
+version persisted contracts independently from package SemVer. Do not infer a
+schema URL from the package version or copy the currently observed URL into an
+evergreen quick start; use the installed command as the authority for the exact
+supported `$schema` identities.
 
 ```bash
 arch-linter-net schema list
@@ -328,8 +327,8 @@ Safety rules worth knowing before wiring this into a pipeline:
 
 ## Related pages
 
-- [Adopt or upgrade to 0.5.1](../guides/migration-to-0-5-1.md)
-- [0.5.1 reference entrypoints](../guides/reference-entrypoints.md)
+- [Adopt or upgrade ArchLinterNet](../guides/upgrading.md)
+- [Reference entrypoints](../guides/reference-entrypoints.md)
 - [Output formats](../usage/output-formats.md)
 - [Exit codes](../usage/exit-codes.md)
 - [Timings](../usage/timings.md)

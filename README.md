@@ -17,15 +17,6 @@ ArchLinterNet turns architectural decisions into executable contracts: layered b
 
 The goal is not just to lint dependencies. ArchLinterNet makes architecture rules explicit, reviewable, enforceable, and safe to evolve as a normal part of development.
 
-> Status: 0.6.1 is the public adoption package line. It ships an
-> `adoption-stabilization/v1` schema registry whose entries version persisted
-> contracts independently from package SemVer: most stay at their frozen
-> immutable `0.5.1` identity, while policy-root/policy-fragment have advanced
-> to `0.6.1` to support newer policy syntax.
-> Checkpoint A is internal evidence only; the packed-artifact Checkpoint B is
-> the release authorization gate. Use `arch-linter-net schema list` from the
-> installed package to discover the current offline `$schema` identities.
-
 ## Why ArchLinterNet?
 
 Architecture rules often start as diagrams, ADRs, review comments, handwritten test helpers, or tribal knowledge. That works for a while, but the rules quickly become hard to discover, hard to reuse across repositories, and hard for humans or AI agents to review consistently.
@@ -130,8 +121,8 @@ Public product documentation is published through MkDocs and GitHub Pages:
 - [Contract families](https://eugenemalaschuk-source.github.io/arch-linter-net/contracts/)
 - [Coverage contracts](https://eugenemalaschuk-source.github.io/arch-linter-net/contracts/coverage/)
 - [CI integration](https://eugenemalaschuk-source.github.io/arch-linter-net/guides/ci-integration/)
-- [Adopt or upgrade to 0.5.1](https://eugenemalaschuk-source.github.io/arch-linter-net/guides/migration-to-0-5-1/)
-- [0.5.1 reference entrypoints](https://eugenemalaschuk-source.github.io/arch-linter-net/guides/reference-entrypoints/)
+- [Adopt or upgrade ArchLinterNet](https://eugenemalaschuk-source.github.io/arch-linter-net/guides/upgrading/)
+- [Reference entrypoints](https://eugenemalaschuk-source.github.io/arch-linter-net/guides/reference-entrypoints/)
 - [AI policy authoring](https://eugenemalaschuk-source.github.io/arch-linter-net/ai/)
 - [Supported capabilities and non-goals](https://eugenemalaschuk-source.github.io/arch-linter-net/policy-format/supported-capabilities/)
 

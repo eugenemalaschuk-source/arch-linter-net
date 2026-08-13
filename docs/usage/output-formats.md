@@ -2,8 +2,8 @@
 
 ArchLinterNet supports human-readable output for local development, JSON output for CI artifacts and downstream automation, and SARIF output for code-scanning viewers.
 
-For the 0.5.1 report-routing, partial-output, profile, and cancellation workflow,
-see [Adopt or Upgrade to 0.5.1](../guides/migration-to-0-5-1.md#reports-artifacts-and-completion-status).
+For report routing, partial-output, profile, and cancellation workflows, see
+[Adopt or Upgrade ArchLinterNet](../guides/upgrading.md#reports-artifacts-and-completion-status).
 
 ## Human output
 

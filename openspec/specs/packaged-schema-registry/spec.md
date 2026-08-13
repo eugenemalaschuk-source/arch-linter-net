@@ -23,8 +23,8 @@ The schema registry's baseline `0.5.1` identity is an independently versioned co
 - **THEN** package/schema validation fails with the affected logical schema id and expected version
 
 #### Scenario: Product and baseline schema identities differ intentionally
-- **WHEN** an adopter inspects a `0.6.0` package's version, packaged README, and offline schema list for a baseline-identity entry that has not advanced
-- **THEN** the surfaces identify `0.6.0` as the product package line and `0.5.1` as that entry's immutable shipped schema contract, without implying an unsupported `schema/0.6.0` URL
+- **WHEN** an adopter inspects a package's version, compatibility manifest, and offline schema list for a baseline-identity entry that has not advanced
+- **THEN** the package/machine surfaces identify the product release independently while the schema list retains that entry's immutable shipped schema contract, without implying a package-version-derived schema URL
 
 #### Scenario: One entry advances independently
 - **WHEN** a schema's public shape changes (e.g. policy-root gaining a new optional field) while other entries are unaffected
@@ -42,7 +42,7 @@ The CLI SHALL provide documented commands to list the packaged registry and prin
 - **THEN** the CLI writes the exact matching packaged schema bytes to standard output
 
 ### Requirement: Source, package, documentation, and capability consistency
-The repository SHALL validate that every registry entry agrees with its source schema, embedded/package resource, public schema documentation, capability manifest, and release notes. Public editor examples SHALL use immutable release-qualified schema identifiers rather than mutable default-branch URLs as their release contract.
+The repository SHALL validate that every registry entry agrees with its source schema, embedded/package resource, public schema documentation, capability manifest, and explicit release records where applicable. Public editor examples SHALL use immutable release-qualified schema identifiers rather than mutable default-branch URLs as their schema contract, while evergreen product documentation SHALL discover the installed identifier instead of inferring it from product SemVer.
 
 #### Scenario: Documentation omits a supported schema version
 - **WHEN** a documented schema list or capability manifest does not identify a supported registry format and version
@@ -71,13 +71,12 @@ The immutable packaged schema registry SHALL publish the implemented `finding/v1
 - **THEN** schema discovery and printed-resource byte equivalence for finding, cache, and profile formats succeed without a repository checkout or network access
 
 ### Requirement: Packaged release identity regression coverage
-The repository SHALL validate freshly packed artifacts so that the installed CLI version, its offline schema list, the packed README, and release-facing schema guidance use a consistent product-to-registry mapping. Validation SHALL reject stale public release-target wording and every documented immutable schema URL that is absent from the package registry.
+The repository SHALL validate freshly packed artifacts so that the installed CLI version, compatibility manifest, offline schema list, and public schema guidance use a consistent product-to-registry mapping. The packed README SHALL be validated separately as an evergreen product document: it SHALL contain durable product/documentation entrypoints and SHALL NOT claim that a specific product SemVer is the current/public adoption package line. Validation SHALL reject every documented immutable schema URL that is absent from the package registry.
 
-#### Scenario: Stale release target is packaged
-- **WHEN** the packed README presents `0.5.1` as the `0.6.0` product release target
-- **THEN** packaged-artifact validation fails before publication
+#### Scenario: Release-specific wording leaks into the packaged README
+- **WHEN** the packed README presents a product SemVer as its current/public adoption or package-line identity
+- **THEN** packaged-artifact/documentation validation fails before publication
 
 #### Scenario: Documentation names an unsupported schema identifier
-- **WHEN** release-facing guidance names an immutable `$schema` URL not listed by the packed registry
+- **WHEN** schema guidance names an immutable `$schema` URL not listed by the packed registry
 - **THEN** consistency validation fails with the unsupported URL
-

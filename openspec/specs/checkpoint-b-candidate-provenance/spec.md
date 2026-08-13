@@ -43,18 +43,25 @@ reusable as success.
 
 ### Requirement: The candidate agrees with itself about its release identity
 The packed-artifact gate SHALL verify, from the installed candidate rather than the source tree,
-that the candidate identifies one release everywhere a consumer can observe it: the installed
-CLI's reported version, the packaged README's public adoption package line, the packaged
-compatibility manifest's product version, and the schema identities the installed `schema list`
-advertises. A mismatch SHALL fail the gate before publication.
+that explicit release/machine surfaces identify one coherent release: the installed CLI's
+reported version, the packaged compatibility manifest's product version, and the schema identities
+the installed `schema list` advertises. A mismatch SHALL fail the gate before publication.
 
-#### Scenario: Packaged README names a stale package line
-- **WHEN** the packaged README still identifies a previous release as the public adoption package
-  line
-- **THEN** the release-identity scenario fails and the candidate is not authorized
+The packaged README SHALL remain an evergreen product document. It SHALL expose durable product and
+documentation entrypoints and SHALL NOT be treated as a release-identity authority or name the
+candidate as the current/public package line.
+
+#### Scenario: Packaged README is evergreen
+- **WHEN** Checkpoint B inspects the packaged README
+- **THEN** it contains the durable product positioning and canonical adoption/upgrade route without a
+  current/public product-release-line assertion
 
 #### Scenario: Registry product version differs from the candidate
-- **WHEN** the packaged compatibility manifest's product version differs from the candidate's
-  public adoption package line
+- **WHEN** the packaged compatibility manifest's product version differs from the release line
+  expected by the release gate
 - **THEN** the release-identity scenario fails and the candidate is not authorized
 
+#### Scenario: README reintroduces release identity
+- **WHEN** the packaged README embeds the candidate or another product SemVer as its evergreen
+  adoption/status identity
+- **THEN** package/documentation validation fails even when the machine release identity is otherwise coherent
