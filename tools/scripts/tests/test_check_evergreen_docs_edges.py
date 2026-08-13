@@ -106,6 +106,32 @@ def test_product_release_prose_rejects_soft_wraps_without_blocking_external_vers
     assert not any("13.0.4" in item for item in product_violations)
 
 
+def test_product_release_prose_rejects_wrapped_list_items_without_crossing_items(
+    tmp_path: Path,
+) -> None:
+    write_repo(tmp_path)
+    guide = tmp_path / "docs" / "guides" / "upgrading.md"
+    guide.write_text(
+        "- The current ArchLinterNet release\n"
+        "  is 9.8.7.\n\n"
+        "1. ArchLinterNet release\n"
+        "   9.8.7 is current.\n\n"
+        "> - The current ArchLinterNet release\n"
+        ">   is 9.8.7.\n\n"
+        "- ArchLinterNet release\n"
+        "- SARIF 2.1.0 is the supported standard format.\n",
+        encoding="utf-8",
+    )
+
+    violations = evergreen.find_violations(tmp_path)
+    product_violations = [
+        item for item in violations if "product package SemVer is coupled" in item
+    ]
+
+    assert sum("9.8.7" in item for item in product_violations) >= 3
+    assert not any("2.1.0" in item for item in product_violations)
+
+
 def test_all_contributor_readmes_are_scanned_but_archives_are_excluded(tmp_path: Path) -> None:
     write_repo(tmp_path)
     pin = "dotnet tool install ArchLinterNet.Cli --version 9.8.7\n"
