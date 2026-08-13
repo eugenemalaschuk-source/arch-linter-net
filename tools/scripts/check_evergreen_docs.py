@@ -119,8 +119,9 @@ ARCHLINTERNET_VERSIONED_NAV = re.compile(
     rf"(?:\s+(?:release|version|package(?:\s+(?:release|version|line))?))?\s+{SEMVER}\b"
 )
 MARKDOWN_STRUCTURAL_LINE = re.compile(
-    r"^[ \t]*(?:#{1,6}(?:[ \t]|$)|[-*+][ \t]+|(?:`{3,}|~{3,})|\||\d+[.)][ \t]+)"
+    r"^[ \t]*(?:#{1,6}(?:[ \t]|$)|(?:`{3,}|~{3,})|\|)"
 )
+LIST_ITEM_LINE = re.compile(r"^[ \t]*(?:[-*+]|\d+[.)])[ \t]+(.*)$")
 BLOCKQUOTE_LINE = re.compile(r"^[ \t]*>[ \t]?(.*)$")
 README_EXCLUDED_PREFIXES = (
     ("docs", "internal"),
@@ -143,7 +144,7 @@ def repository_root() -> Path:
 
 
 def normalize_soft_wrapped_prose(text: str) -> str:
-    """Join Markdown soft wraps without crossing structural or quote boundaries."""
+    """Join Markdown soft wraps inside paragraphs/list items without crossing structure."""
     output: list[str] = []
     pending: list[str] = []
     pending_kind: str | None = None
@@ -164,12 +165,21 @@ def normalize_soft_wrapped_prose(text: str) -> str:
             content = line
             kind = "plain"
 
+        list_match = LIST_ITEM_LINE.match(content)
+        if list_match:
+            flush_pending()
+            item = list_match.group(1).strip()
+            if item:
+                pending = [item]
+                pending_kind = f"{kind}:list"
+            continue
+
         if not content.strip() or MARKDOWN_STRUCTURAL_LINE.match(content):
             flush_pending()
             output.append(content)
             continue
 
-        if pending and kind != pending_kind:
+        if pending and pending_kind not in {kind, f"{kind}:list"}:
             flush_pending()
         if not pending:
             pending_kind = kind
