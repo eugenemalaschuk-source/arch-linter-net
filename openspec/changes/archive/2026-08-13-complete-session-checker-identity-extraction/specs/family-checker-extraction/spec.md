@@ -23,7 +23,7 @@ The `coverage` family is the single exception: it reports a policy inventory ove
 
 ### Requirement: Session wrapper for extracted families retains only shared run-state concerns
 
-For every contract family other than `coverage`, `ArchitectureAnalysisSession.Check*Contract` SHALL perform only: the `IsContractSelected` gate, the `IsDanglingButCoveredByRuleInputCoverage` deferral check where the family already had one, any pre-existing precondition guard the family already enforced (such as the assembly families' direct-dependency-depth guard), `ArchitectureContractExecutionContext` creation via `CreateExecutionContext`, delegation to the family's checker component, collection of unmatched ignores into the session's `_unmatchedIgnoredViolations` list, and publication of session-owned run state the checker deliberately does not publish itself (baseline candidates for `cycle`). It SHALL NOT contain the family's violation-detection algorithm inline.
+For every contract family other than `coverage`, `ArchitectureAnalysisSession.Check*Contract` SHALL perform only: the `IsContractSelected` gate, the `IsDanglingButCoveredByRuleInputCoverage` deferral check where the family already had one, any pre-existing precondition guard the family already enforced (such as the assembly families' direct-dependency-depth guard), `ArchitectureContractExecutionContext` creation via `CreateExecutionContext`, delegation to the family's checker component, collection of unmatched ignores into the session's `_unmatchedIgnoredViolations` list, and publication of session-owned run state the checker deliberately does not publish itself (baseline candidates for `cycle`). It SHALL NOT contain the family's violation-detection algorithm inline, at any nesting depth, and SHALL NOT reach that algorithm indirectly: the only session-declared methods it may call are the lifecycle and fact-access members named above.
 
 #### Scenario: Session method output is unchanged for a selected contract
 
@@ -38,7 +38,17 @@ For every contract family other than `coverage`, `ArchitectureAnalysisSession.Ch
 #### Scenario: Self-policy rejects reintroduced session-owned checking
 
 - **WHEN** the self-policy suite parses each public `Check*Contract` method declared in an `ArchitectureAnalysisSession` partial
-- **THEN** every method other than `CheckCoverageContract` SHALL consist of at most ten statements and SHALL delegate to a `*Checker` component, so a new family that writes its checking into the session fails the suite
+- **THEN** every method other than `CheckCoverageContract` SHALL contain at most ten statements counting every nested statement, and SHALL delegate to a `*Checker` component, so family logic written inline — including inside a nested block, loop or lambda — fails the suite
+
+#### Scenario: Self-policy rejects family logic hidden behind a session helper
+
+- **WHEN** a family's algorithm is moved into a new private `ArchitectureAnalysisSession` method that the family's entry point calls, leaving the entry point small and still delegating to a `*Checker`
+- **THEN** the self-policy suite SHALL fail, because an entry point may call no session-declared method outside the named lifecycle and fact-access allowlist
+
+#### Scenario: Self-policy rejects dispatch that bypasses the governed entry points
+
+- **WHEN** a contract family's `ArchitectureContractFamilyDescriptor` dispatches into a session method that is not named `Check*Contract`
+- **THEN** the self-policy suite SHALL fail, so no family can be routed to a session method the ownership rules never inspect
 
 ### Requirement: Registry dispatch for extracted families is unchanged
 

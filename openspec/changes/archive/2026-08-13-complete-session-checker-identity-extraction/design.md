@@ -64,13 +64,17 @@ The cursor stays on the session (`FindingIdentityCursor`) because it is a read o
 
 ## Decision 6: Self-policy as source-level tests
 
-The boundary is about *where code is written*, which compiled metadata cannot express: a fat session method and a thin one have identical signatures. `ArchitectureAnalysisSessionCheckerOwnershipTests` therefore parses the session partials and the checker sources with Roslyn (already a Core dependency) and asserts:
+The boundary is about *where code is written*, which compiled metadata cannot express: a fat session method and a thin one have identical signatures. `ArchitectureAnalysisSessionCheckerOwnershipTests` therefore parses the session partials, the checker sources and the family registry with Roslyn (already a Core dependency) and asserts:
 
-1. every public `Check*Contract` entry point is at most ten statements and delegates to a `*Checker` component;
-2. no file under `Execution/Checkers` names `ArchitectureAnalysisSession`;
-3. finding-identity attribution stays in `ArchitectureFindingIdentityAttributor`, with the session method a delegation.
+1. every public `Check*Contract` entry point contains at most ten statements, counting **every nested statement**, and delegates to a `*Checker` component;
+2. an entry point calls no session-declared method outside a named lifecycle/fact-access allowlist;
+3. the family registry dispatches only into methods matching the `Check*Contract` entry-point shape;
+4. no file under `Execution/Checkers` names `ArchitectureAnalysisSession`;
+5. finding-identity attribution stays in `ArchitectureFindingIdentityAttributor`, with the session method a delegation.
 
-Rule 2 forced one small move: `NormalizeProjectPath` became `ProjectPathNormalizer.Normalize` under `Discovery`, since the `project_metadata` checker and the configuration-reference collector both need it and neither should reach into the session for a pure string helper.
+Rules 1–3 are three distinct locks, and the PR #580 review is why: a top-level-only statement count passes a method whose whole algorithm sits inside one `if` (rule 1's nested counting closes that); a size bound of any kind passes an entry point that stays small by calling a new session-private helper holding the algorithm (rule 2 closes that by making such a helper unreachable from the family's execution path); and both are moot for a family whose descriptor dispatches into a session method these rules never inspect (rule 3 closes that). Each was verified by injecting the bypass and observing the corresponding rule fail.
+
+Rules 2 and 4 forced two small moves: `NormalizeProjectPath` became `ProjectPathNormalizer.Normalize` under `Discovery`, and `BuildSurfaceSelectorPredicate` — public-api-surface selector construction that had been sitting on the session since #529 — moved onto `PublicApiSurfaceChecker`, with the session's capture path calling into the checker for it. Neither should have been reachable from the session for a family's own behavior.
 
 ## Risks / Trade-offs
 

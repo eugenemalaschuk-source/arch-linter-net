@@ -20,7 +20,8 @@ public sealed partial class ArchitectureAnalysisSession
         ArchitectureContractExecutionContext executionContext = CreateExecutionContext(contract, contract.IgnoredViolations);
         Dictionary<string, Assembly> resolvedAssemblies = BuildAssemblyLookup();
         List<ArchitectureViolation> violations = PublicApiSurfaceChecker.Check(
-            contract, resolvedAssemblies, executionContext, BuildSurfaceSelectorPredicate(contract));
+            contract, resolvedAssemblies, executionContext,
+            PublicApiSurfaceChecker.BuildSurfaceSelectorPredicate(contract, Document, RoleIndex));
         executionContext.CollectUnmatchedIgnores(_unmatchedIgnoredViolations);
         return violations;
     }
@@ -59,7 +60,8 @@ public sealed partial class ArchitectureAnalysisSession
         out IReadOnlyList<ArchitectureViolation> selectorSafetyViolations)
     {
         Dictionary<string, Assembly> resolvedAssemblies = BuildAssemblyLookup();
-        Func<Type, bool>? selectorPredicate = BuildSurfaceSelectorPredicate(contract);
+        Func<Type, bool>? selectorPredicate =
+            PublicApiSurfaceChecker.BuildSurfaceSelectorPredicate(contract, Document, RoleIndex);
         List<PublicApiSnapshotEntry> entries = new();
         List<string> missing = new();
 
@@ -98,20 +100,5 @@ public sealed partial class ArchitectureAnalysisSession
             : Array.Empty<ArchitectureViolation>();
 
         return entries;
-    }
-
-    // Reuses ArchitectureTypeRoleMatcher (structural fields) and the semantic role index (Role)
-    // through ArchitecturePublicApiSurfaceSelectorMatcher — no new matcher engine. Null selector
-    // means "no surface_selector authored", which every existing call site treats as "everything is
-    // governed", preserving pre-existing assembly-wide behavior exactly.
-    private Func<Type, bool>? BuildSurfaceSelectorPredicate(ArchitecturePublicApiSurfaceContract contract)
-    {
-        if (contract.SurfaceSelector == null)
-        {
-            return null;
-        }
-
-        ArchitecturePublicApiSurfaceSelector selector = contract.SurfaceSelector;
-        return type => ArchitecturePublicApiSurfaceSelectorMatcher.Matches(type, selector, Document, contract.Name, RoleIndex);
     }
 }
