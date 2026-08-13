@@ -1,4 +1,4 @@
-using ArchLinterNet.Core.Contracts;
+using ArchLinterNet.Core.Execution.Checkers;
 
 namespace ArchLinterNet.Core.Execution;
 
@@ -52,9 +52,4 @@ public sealed partial class ArchitectureAnalysisSession
 
         return false;
     }
-
-    private sealed record CycleCandidateEvidence(
-        string SourceLayerName,
-        string TargetLayerName,
-        ArchitectureBaselineCandidate Candidate);
 }

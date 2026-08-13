@@ -2,11 +2,16 @@ using ArchLinterNet.Core.Contracts;
 using ArchLinterNet.Core.Contracts.Families;
 using ArchLinterNet.Core.Discovery;
 using ArchLinterNet.Core.Execution.Abstractions;
+using ArchLinterNet.Core.Execution.Checkers;
 using ArchLinterNet.Core.Model;
 using ArchLinterNet.Core.Resolution;
 
 namespace ArchLinterNet.Core.Execution;
 
+// Session-side entry points for the framework-reference families, plus the MSBuild framework
+// evaluation this session caches. The evaluation stays here rather than moving into
+// FrameworkReferenceChecker because it is run-scoped fact resolution shared with
+// CheckConfiguration's fail-closed evaluation-failure surfacing, not family checking.
 public sealed partial class ArchitectureAnalysisSession
 {
     private readonly Dictionary<string, ArchitectureFrameworkReferenceEvaluationResult> _frameworkEvaluationCache =
@@ -19,51 +24,8 @@ public sealed partial class ArchitectureAnalysisSession
             return new List<ArchitectureViolation>();
         }
 
-        List<ArchitectureViolation> violations = new();
         ArchitectureContractExecutionContext executionContext = CreateExecutionContext(contract, contract.IgnoredViolations);
-
-        IReadOnlyList<ArchitectureDiscoveredFrameworkReference> references = ResolveFrameworkReferences(contract.Source);
-
-        foreach (string frameworkGroupName in contract.Forbidden)
-        {
-            if (!Document.FrameworkReferences.TryGetValue(
-                    frameworkGroupName, out ArchitectureFrameworkReferenceGroup? frameworkGroup))
-            {
-                continue;
-            }
-
-            ArchitectureDiscoveredFrameworkReference[] matched = references
-                .Where(reference => ArchitectureFrameworkReferenceResolver.MatchesGroup(frameworkGroup, reference.FrameworkName))
-                .Where(reference => !executionContext.IsIgnored(
-                    contract.Source, reference.FrameworkName,
-                    sourceAssembly: contract.Source,
-                    targetType: reference.FrameworkName,
-                    targetMember: FormatFrameworkReference(reference),
-                    configuration: ResolvedBuildConfiguration))
-                .ToArray();
-
-            string[] forbiddenReferences = matched
-                .Select(FormatFrameworkReference)
-                .Distinct(StringComparer.Ordinal)
-                .OrderBy(reference => reference, StringComparer.Ordinal)
-                .ToArray();
-
-            if (forbiddenReferences.Length == 0)
-            {
-                continue;
-            }
-
-            violations.Add(new ArchitectureViolation(
-                contract.Name,
-                contract.Id,
-                contract.Source,
-                $"framework group '{frameworkGroupName}'",
-                forbiddenReferences)
-            {
-                Payload = new FrameworkReferencePayload(frameworkGroupName, BuildEvidence(matched))
-            });
-        }
-
+        List<ArchitectureViolation> violations = FrameworkReferenceChecker.Check(contract, CheckerContext, executionContext);
         executionContext.CollectUnmatchedIgnores(_unmatchedIgnoredViolations);
         return violations;
     }
@@ -75,48 +37,9 @@ public sealed partial class ArchitectureAnalysisSession
             return new List<ArchitectureViolation>();
         }
 
-        List<ArchitectureViolation> violations = new();
         ArchitectureContractExecutionContext executionContext = CreateExecutionContext(contract, contract.IgnoredViolations);
-
-        IReadOnlyList<ArchitectureDiscoveredFrameworkReference> references = ResolveFrameworkReferences(contract.Source);
-
-        List<ArchitectureFrameworkReferenceGroup> allowedGroups = contract.Allowed
-            .Select(groupName => Document.FrameworkReferences.TryGetValue(
-                groupName, out ArchitectureFrameworkReferenceGroup? group) ? group : null)
-            .Where(group => group != null)
-            .Select(group => group!)
-            .ToList();
-
-        ArchitectureDiscoveredFrameworkReference[] disallowed = references
-            .Where(reference => !allowedGroups.Any(group =>
-                ArchitectureFrameworkReferenceResolver.MatchesGroup(group, reference.FrameworkName)))
-                .Where(reference => !executionContext.IsIgnored(
-                    contract.Source, reference.FrameworkName,
-                    sourceAssembly: contract.Source,
-                    targetType: reference.FrameworkName,
-                    targetMember: FormatFrameworkReference(reference),
-                    configuration: ResolvedBuildConfiguration))
-            .ToArray();
-
-        string[] disallowedReferences = disallowed
-            .Select(FormatFrameworkReference)
-            .Distinct(StringComparer.Ordinal)
-            .OrderBy(reference => reference, StringComparer.Ordinal)
-            .ToArray();
-
-        if (disallowedReferences.Length > 0)
-        {
-            violations.Add(new ArchitectureViolation(
-                contract.Name,
-                contract.Id,
-                contract.Source,
-                "outside allowed framework groups",
-                disallowedReferences)
-            {
-                Payload = new FrameworkReferenceAllowOnlyPayload(contract.Allowed.ToArray(), BuildEvidence(disallowed))
-            });
-        }
-
+        List<ArchitectureViolation> violations =
+            FrameworkReferenceChecker.CheckAllowOnly(contract, CheckerContext, executionContext);
         executionContext.CollectUnmatchedIgnores(_unmatchedIgnoredViolations);
         return violations;
     }
@@ -128,7 +51,7 @@ public sealed partial class ArchitectureAnalysisSession
     // CheckConfiguration to surface as fail-closed configuration violations; the contract check itself
     // simply sees no references for a project it could not evaluate, never a crash or a silent pass
     // that fabricates data.
-    private ArchitectureDiscoveredFrameworkReference[] ResolveFrameworkReferences(string sourceAssemblyName)
+    internal ArchitectureDiscoveredFrameworkReference[] ResolveFrameworkReferences(string sourceAssemblyName)
     {
         ArchitectureDiscoveredProject? owningProject = FindDiscoveredProject(sourceAssemblyName);
 
@@ -160,7 +83,7 @@ public sealed partial class ArchitectureAnalysisSession
     // targeting Release evaluates Release-conditioned FrameworkReference declarations, and a Debug
     // baseline entry does not silently freeze a distinct Release occurrence of the same
     // FrameworkName+TargetFramework, or vice versa.
-    private string ResolvedBuildConfiguration =>
+    internal string ResolvedBuildConfiguration =>
         string.IsNullOrWhiteSpace(Document.Analysis.Configuration) ? "Debug" : Document.Analysis.Configuration;
 
     private ArchitectureFrameworkReferenceEvaluationResult EvaluateFrameworkReferences(ArchitectureDiscoveredProject owningProject)
@@ -210,21 +133,6 @@ public sealed partial class ArchitectureAnalysisSession
             raw.Condition != null && raw.Condition.Contains(reference.TargetFramework, StringComparison.OrdinalIgnoreCase));
 
         return (tfmMatch ?? candidates[0]).Condition;
-    }
-
-    private FrameworkReferenceEvidence[] BuildEvidence(
-        IEnumerable<ArchitectureDiscoveredFrameworkReference> references)
-    {
-        string configuration = ResolvedBuildConfiguration;
-        return references
-            .Select(reference => new FrameworkReferenceEvidence(
-                reference.FrameworkName, reference.TargetFramework, reference.Explicit, reference.SourcePath, configuration))
-            .ToArray();
-    }
-
-    private static string FormatFrameworkReference(ArchitectureDiscoveredFrameworkReference reference)
-    {
-        return $"{reference.FrameworkName} ({reference.TargetFramework})";
     }
 
     // Fail-closed surfacing: for every distinct (contract, source project) pair that a framework

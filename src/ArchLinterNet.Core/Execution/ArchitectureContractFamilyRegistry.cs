@@ -1,5 +1,6 @@
 using ArchLinterNet.Core.Contracts;
 using ArchLinterNet.Core.Contracts.Families;
+using ArchLinterNet.Core.Discovery;
 using ArchLinterNet.Core.Execution.Abstractions;
 
 namespace ArchLinterNet.Core.Execution;
@@ -236,7 +237,7 @@ internal static class ArchitectureContractFamilyRegistry
 
                 foreach (string project in c.Projects)
                 {
-                    collector.AddProjectMetadataProject(c, ArchitectureAnalysisSession.NormalizeProjectPath(project));
+                    collector.AddProjectMetadataProject(c, ProjectPathNormalizer.Normalize(project));
                 }
             },
         },

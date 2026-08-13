@@ -103,56 +103,6 @@ public sealed partial class ArchitectureAnalysisSession
 
     internal ArchitectureExpressionFactService ExpressionFacts { get; }
 
-    private Type[] FindTypesInLayer(ArchitectureLayer layer)
-    {
-        return TypeIndex.FindTypesInLayer(layer, RoleIndex, ExpressionFacts);
-    }
-
-    private bool MatchesLayer(ArchitectureLayer layer, Type type)
-    {
-        return ArchitectureLayerTypeMatcher.Matches(layer, type, RoleIndex, ExpressionFacts);
-    }
-
-    private bool IsInAnyDeclaredLayer(Type type)
-    {
-        return Document.Layers.Values.Any(layer => MatchesLayer(layer, type));
-    }
-
-    private string? ResolveContainingLayer(Type type, IReadOnlySet<string> candidateLayerNames)
-    {
-        return candidateLayerNames
-            .Select(layerName => new
-            {
-                LayerName = layerName,
-                Layer = ArchitectureLayerResolver.ResolveLayer(Document, "type-resolution", layerName)
-            })
-            .Where(entry => MatchesLayer(entry.Layer, type))
-            .Select(entry =>
-            {
-                bool hasNamespace = !string.IsNullOrWhiteSpace(entry.Layer.Namespace);
-                NamespaceGlobPattern? pattern = hasNamespace ? entry.Layer.GlobPattern : null;
-                return new
-                {
-                    entry.LayerName,
-                    HasSelector = entry.Layer.Selector != null,
-                    HasNamespace = hasNamespace,
-                    IsGlob = pattern?.IsGlob ?? false,
-                    LiteralCount = pattern?.LiteralCount ?? -1,
-                    HasSuffix = !string.IsNullOrEmpty(entry.Layer.NamespaceSuffix),
-                    WildcardCount = pattern?.WildcardCount ?? int.MaxValue
-                };
-            })
-            .OrderByDescending(entry => entry.HasSelector)
-            .ThenByDescending(entry => entry.HasNamespace)
-            .ThenByDescending(entry => entry.HasNamespace && !entry.IsGlob)
-            .ThenByDescending(entry => entry.LiteralCount)
-            .ThenByDescending(entry => entry.HasSuffix)
-            .ThenBy(entry => entry.WildcardCount)
-            .ThenBy(entry => entry.LayerName, StringComparer.Ordinal)
-            .Select(entry => entry.LayerName)
-            .FirstOrDefault();
-    }
-
     public ArchitectureReferenceGraph ReferenceGraph { get; } = new();
 
     public IReadOnlyList<ArchitectureUnmatchedIgnoredViolation> UnmatchedIgnoredViolations
@@ -729,7 +679,7 @@ public sealed partial class ArchitectureAnalysisSession
         }
 
         HashSet<string> discoveredProjectPaths = new(
-            Context.ProjectDiscovery?.DiscoveredProjects.Select(project => NormalizeProjectPath(project.Path))
+            Context.ProjectDiscovery?.DiscoveredProjects.Select(project => ProjectPathNormalizer.Normalize(project.Path))
             ?? Enumerable.Empty<string>(),
             StringComparer.OrdinalIgnoreCase);
 
@@ -756,11 +706,6 @@ public sealed partial class ArchitectureAnalysisSession
             };
             violations.Add(Document.Provenance.Enrich(violation, contract));
         }
-    }
-
-    internal static string NormalizeProjectPath(string path)
-    {
-        return path.Replace('\\', '/').Trim();
     }
 
     // Only contracts that ArchitectureContractExecutor will actually run for this request can

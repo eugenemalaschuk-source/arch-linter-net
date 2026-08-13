@@ -9,6 +9,29 @@ namespace ArchLinterNet.Core.Execution.Checkers;
 
 internal static class PublicApiSurfaceChecker
 {
+    // Reuses ArchitectureTypeRoleMatcher (structural fields) and the semantic role index (Role)
+    // through ArchitecturePublicApiSurfaceSelectorMatcher — no new matcher engine. Null selector
+    // means "no surface_selector authored", which every call site treats as "everything is
+    // governed", preserving pre-#525 assembly-wide behavior exactly.
+    //
+    // Lives here rather than on the session (where it sat until #452) because building the
+    // predicate is public-api-surface family behavior: the session's capture path calls into this
+    // checker for it, instead of the family's selector logic living in the shared state object.
+    public static Func<Type, bool>? BuildSurfaceSelectorPredicate(
+        ArchitecturePublicApiSurfaceContract contract,
+        ArchitectureContractDocument document,
+        ArchitectureRoleIndex roleIndex)
+    {
+        if (contract.SurfaceSelector == null)
+        {
+            return null;
+        }
+
+        ArchitecturePublicApiSurfaceSelector selector = contract.SurfaceSelector;
+        return type => ArchitecturePublicApiSurfaceSelectorMatcher.Matches(
+            type, selector, document, contract.Name, roleIndex);
+    }
+
     private const string AddedDelta = "added";
     private const string RemovedDelta = "removed";
     private const string ChangedDelta = "changed";
@@ -245,7 +268,7 @@ internal static class PublicApiSurfaceChecker
                 }
 
                 // ForbiddenReferences must carry the escaping type, not entry.Signature: identity
-                // attachment (ArchitectureAnalysisSession.AttachFindingIdentities) matches a
+                // attachment (ArchitectureFindingIdentityAttributor.Attach) matches a
                 // violation's ForbiddenReferences against the baseline candidate's ForbiddenReference/
                 // TargetMember — both now referencedType (see the IsIgnored call above) — so a
                 // mismatched ForbiddenReferences here would leave every escape violation with no
