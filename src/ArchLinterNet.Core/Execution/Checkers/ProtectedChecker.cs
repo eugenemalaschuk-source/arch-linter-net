@@ -96,8 +96,8 @@ internal static class ProtectedChecker
         List<string> matchingRefs = new();
         HashSet<string> matchedNamespacePrefixes = new(StringComparer.Ordinal);
 
-        CollectProtectedLayerReferences(context, sourceType, sourceTypeFullName, scope.ProtectedLayer,
-            scope.AllowedTypes, executionContext, matchingRefs, matchedNamespacePrefixes);
+        CollectProtectedLayerReferences(
+            context, sourceType, sourceTypeFullName, scope, executionContext, matchingRefs, matchedNamespacePrefixes);
 
         if (matchingRefs.Count == 0)
         {
@@ -129,8 +129,7 @@ internal static class ProtectedChecker
         ArchitectureCheckerContext context,
         Type sourceType,
         string sourceTypeFullName,
-        ArchitectureLayer protectedLayer,
-        HashSet<string> allowedTypes,
+        ProtectedScope scope,
         ArchitectureContractExecutionContext executionContext,
         List<string> matchingRefs,
         HashSet<string> matchedNamespacePrefixes)
@@ -143,12 +142,12 @@ internal static class ProtectedChecker
                 continue;
             }
 
-            if (!context.MatchesLayer(protectedLayer, refType))
+            if (!context.MatchesLayer(scope.ProtectedLayer, refType))
             {
                 continue;
             }
 
-            if (allowedTypes.Contains(sourceTypeFullName))
+            if (scope.AllowedTypes.Contains(sourceTypeFullName))
             {
                 continue;
             }
@@ -166,7 +165,7 @@ internal static class ProtectedChecker
 
             matchingRefs.Add(refFullName);
             ArchitectureNamespaceMatch protectedMatch = ArchitectureLayerResolver.MatchNamespace(
-                protectedLayer, ArchitectureTypeNames.SafeNamespace(refType));
+                scope.ProtectedLayer, ArchitectureTypeNames.SafeNamespace(refType));
             if (!string.IsNullOrEmpty(protectedMatch.MatchedNamespacePrefix))
             {
                 matchedNamespacePrefixes.Add(protectedMatch.MatchedNamespacePrefix);
