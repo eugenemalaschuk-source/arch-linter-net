@@ -38,7 +38,7 @@ internal static class AllowOnlyChecker
                     .Where(r => !contract.AllowedTypes.Contains(r.FullName))
                     .Where(r => r.Type != null && context.IsInAnyDeclaredLayer(r.Type))
                     .Where(r => !ArchitectureNamespaceViolationFinder.IsInAnyAllowedLayer(
-                        r.Type!, allowedLayers, context.RoleIndex, context.ExpressionFacts))
+                        r.Type, allowedLayers, context.RoleIndex, context.ExpressionFacts))
                     .Where(r => !executionContext.IsIgnored(
                         sourceFullName,
                         r.FullName,

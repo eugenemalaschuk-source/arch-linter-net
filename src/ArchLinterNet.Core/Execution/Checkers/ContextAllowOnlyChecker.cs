@@ -81,17 +81,8 @@ internal static class ContextAllowOnlyChecker
                         s, referencedType, context.RoleIndex, sourceDescriptor))
                 .ToList();
 
-            List<ExpressionParticipation> whenExpressions = new();
-            ContextualCheckerSupport.AddWhenExpression(
-                whenExpressions, contract.Name, contract.Source, "source", ExpressionParticipationResult.Matched);
-            foreach (ArchitectureContextSelector nearMiss in nearMissSelectors)
-            {
-                ContextualCheckerSupport.AddWhenExpression(
-                    whenExpressions, contract.Name, nearMiss, "allowed", ExpressionParticipationResult.NotMatched);
-            }
-            foreach (ArchitectureContextSelector s in notMatchedExclude)
-                ContextualCheckerSupport.AddWhenExpression(
-                    whenExpressions, contract.Name, s, "exclude", ExpressionParticipationResult.NotMatched);
+            List<ExpressionParticipation> whenExpressions = BuildWhenExpressions(
+                contract, nearMissSelectors, notMatchedExclude);
 
             violations.Add(new ArchitectureViolation(
                 contract.Name, contract.Id, sourceFullName, "outside allowed context selectors", evidence)
@@ -150,5 +141,31 @@ internal static class ContextAllowOnlyChecker
         // cannot match any selector and reporting it would be unrelated noise, mirroring how
         // AllowOnlyChecker only considers references already inside a declared layer.
         return context.RoleIndex.TryGetRole(referencedType, out targetDescriptor);
+    }
+
+    // contract.Source.When already evaluated true for this source type - FindContextSelectorMatchingTypes
+    // filtered by it before the caller ever reached this candidate.
+    private static List<ExpressionParticipation> BuildWhenExpressions(
+        ArchitectureContextAllowOnlyContract contract,
+        IReadOnlyList<ArchitectureContextSelector> nearMissSelectors,
+        IReadOnlyList<ArchitectureContextSelector> notMatchedExclude)
+    {
+        List<ExpressionParticipation> whenExpressions = new();
+
+        ContextualCheckerSupport.AddWhenExpression(
+            whenExpressions, contract.Name, contract.Source, "source", ExpressionParticipationResult.Matched);
+        foreach (ArchitectureContextSelector nearMiss in nearMissSelectors)
+        {
+            ContextualCheckerSupport.AddWhenExpression(
+                whenExpressions, contract.Name, nearMiss, "allowed", ExpressionParticipationResult.NotMatched);
+        }
+
+        foreach (ArchitectureContextSelector selector in notMatchedExclude)
+        {
+            ContextualCheckerSupport.AddWhenExpression(
+                whenExpressions, contract.Name, selector, "exclude", ExpressionParticipationResult.NotMatched);
+        }
+
+        return whenExpressions;
     }
 }

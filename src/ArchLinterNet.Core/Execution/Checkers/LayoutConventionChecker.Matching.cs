@@ -224,9 +224,9 @@ internal static partial class LayoutConventionChecker
             }
 
             MatcherDiagnosticContext filesMatchingContext = new(
-                "files_matching", BuildUnevaluatedLayoutWhenExpressions(contract));
+                contract, "files_matching", BuildUnevaluatedLayoutWhenExpressions(contract));
             if (!TryEvaluateUnfiledMatcher(
-                    contract, context, matcher, entry, executionContext, violations, filesMatchingContext, out bool included))
+                    context, matcher, entry, executionContext, violations, filesMatchingContext, out bool included))
             {
                 tracker.InclusionEvaluationFailed = true;
                 continue;
@@ -277,9 +277,9 @@ internal static partial class LayoutConventionChecker
                 contract.Name,
                 fieldName,
                 ExpressionParticipationResult.EvaluationFailed);
-            MatcherDiagnosticContext exclusionContext = new(fieldName, whenExpressions);
+            MatcherDiagnosticContext exclusionContext = new(contract, fieldName, whenExpressions);
             if (!TryEvaluateUnfiledMatcher(
-                    contract, context, exclusion, entry, executionContext, violations, exclusionContext, out bool excluded))
+                    context, exclusion, entry, executionContext, violations, exclusionContext, out bool excluded))
             {
                 // The exclusion structurally matched this candidate but its `when` couldn't be
                 // evaluated (no resolved source file) - this is neither "matched" nor "stale"; the
@@ -300,14 +300,15 @@ internal static partial class LayoutConventionChecker
         return excludedAny;
     }
 
-    // Bundles the diagnostic identity of the matcher being evaluated (which field it came from, and
-    // the pre-built expression-participation payload for its `when`) so TryEvaluateUnfiledMatcher's
-    // signature doesn't have to name each separately.
+    // Bundles the diagnostic identity of the matcher being evaluated — the contract it belongs to,
+    // which field it came from, and the pre-built expression-participation payload for its `when` —
+    // so TryEvaluateUnfiledMatcher's signature doesn't have to name each separately.
     private readonly record struct MatcherDiagnosticContext(
-        string FieldName, IReadOnlyList<ExpressionParticipation>? WhenExpressions);
+        ArchitectureLayoutConventionContract Contract,
+        string FieldName,
+        IReadOnlyList<ExpressionParticipation>? WhenExpressions);
 
     private static bool TryEvaluateUnfiledMatcher(
-        ArchitectureLayoutConventionContract contract,
         ArchitectureCheckerContext context,
         ArchitectureLayoutFileMatcher matcher,
         (Type Type, ArchitectureDeclaredTypeFact Fact) entry,
@@ -316,6 +317,7 @@ internal static partial class LayoutConventionChecker
         MatcherDiagnosticContext diagnosticContext,
         out bool matched)
     {
+        ArchitectureLayoutConventionContract contract = diagnosticContext.Contract;
         string fieldName = diagnosticContext.FieldName;
         IReadOnlyList<ExpressionParticipation>? whenExpressions = diagnosticContext.WhenExpressions;
         matched = false;

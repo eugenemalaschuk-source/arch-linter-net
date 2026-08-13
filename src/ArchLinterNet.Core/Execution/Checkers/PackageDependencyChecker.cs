@@ -121,7 +121,7 @@ internal static class PackageDependencyChecker
             .GroupBy(project => project.AssemblyName, StringComparer.Ordinal)
             .ToDictionary(
                 group => group.Key,
-                group => (IReadOnlyList<ArchitectureDiscoveredPackageReference>)group.First().PackageReferences,
+                group => group.First().PackageReferences,
                 StringComparer.Ordinal);
 
         return packagesByProject.TryGetValue(source, out references!);

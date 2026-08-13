@@ -594,7 +594,7 @@ internal static partial class LayoutConventionChecker
     {
         string namePrefix = string.IsNullOrEmpty(contract.RequireMatchingInterface!.NamePrefix)
             ? "I"
-            : contract.RequireMatchingInterface.NamePrefix!;
+            : contract.RequireMatchingInterface.NamePrefix;
 
         // A matching-interface counterpart is only meaningful for a concrete class: an abstract
         // class is itself an extension point (a base for concrete implementations to satisfy),

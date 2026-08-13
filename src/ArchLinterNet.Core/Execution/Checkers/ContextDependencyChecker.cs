@@ -53,26 +53,8 @@ internal static class ContextDependencyChecker
                 continue;
             }
 
-            // Iterate in order and stop at the first full match, so only selectors that were
-            // actually evaluated before the winner can be marked NotMatched. Selectors after the
-            // winning one are never reached by Matches() and must not appear as NotMatched.
-            ArchitectureContextSelector? matchedSelector = null;
-            List<ArchitectureContextSelector> notMatchedForbidden = new();
-            foreach (ArchitectureContextSelector candidate in contract.Forbidden)
-            {
-                if (ArchitectureContextSelectorMatcher.Matches(
-                        candidate, referencedType, context.RoleIndex, sourceDescriptor, context.ExpressionFacts, sourceType))
-                {
-                    matchedSelector = candidate;
-                    break;
-                }
-                if (!string.IsNullOrEmpty(candidate.When)
-                    && ArchitectureContextSelectorMatcher.MatchesLiteral(
-                        candidate, referencedType, context.RoleIndex, sourceDescriptor))
-                {
-                    notMatchedForbidden.Add(candidate);
-                }
-            }
+            (ArchitectureContextSelector? matchedSelector, List<ArchitectureContextSelector> notMatchedForbidden) =
+                MatchForbiddenSelector(contract, referencedType, context, sourceDescriptor, sourceType);
 
             if (matchedSelector == null)
             {
@@ -103,19 +85,8 @@ internal static class ContextDependencyChecker
                         s, referencedType, context.RoleIndex, sourceDescriptor))
                 .ToList();
 
-            List<ExpressionParticipation> whenExpressions = new();
-            // contract.Source.When already evaluated true for this sourceType - FindContextSelectorMatchingTypes
-            // filtered by it before this method was ever called for this candidate.
-            ContextualCheckerSupport.AddWhenExpression(
-                whenExpressions, contract.Name, contract.Source, "source", ExpressionParticipationResult.Matched);
-            foreach (ArchitectureContextSelector s in notMatchedForbidden)
-                ContextualCheckerSupport.AddWhenExpression(
-                    whenExpressions, contract.Name, s, "forbidden", ExpressionParticipationResult.NotMatched);
-            ContextualCheckerSupport.AddWhenExpression(
-                whenExpressions, contract.Name, matchedSelector, "forbidden", ExpressionParticipationResult.Matched);
-            foreach (ArchitectureContextSelector s in notMatchedExclude)
-                ContextualCheckerSupport.AddWhenExpression(
-                    whenExpressions, contract.Name, s, "exclude", ExpressionParticipationResult.NotMatched);
+            List<ExpressionParticipation> whenExpressions = BuildWhenExpressions(
+                contract, matchedSelector, notMatchedForbidden, notMatchedExclude);
 
             violations.Add(new ArchitectureViolation(
                 contract.Name, contract.Id, sourceFullName,
@@ -133,5 +104,66 @@ internal static class ContextDependencyChecker
                 }
             });
         }
+    }
+
+    // Iterate in order and stop at the first full match, so only selectors that were actually
+    // evaluated before the winner can be marked NotMatched. Selectors after the winning one are
+    // never reached by Matches() and must not appear as NotMatched.
+    private static (ArchitectureContextSelector? Matched, List<ArchitectureContextSelector> NotMatched)
+        MatchForbiddenSelector(
+            ArchitectureContextDependencyContract contract,
+            Type referencedType,
+            ArchitectureCheckerContext context,
+            ArchitectureTypeClassificationResult sourceDescriptor,
+            Type sourceType)
+    {
+        List<ArchitectureContextSelector> notMatched = new();
+
+        foreach (ArchitectureContextSelector candidate in contract.Forbidden)
+        {
+            if (ArchitectureContextSelectorMatcher.Matches(
+                    candidate, referencedType, context.RoleIndex, sourceDescriptor, context.ExpressionFacts, sourceType))
+            {
+                return (candidate, notMatched);
+            }
+
+            if (!string.IsNullOrEmpty(candidate.When)
+                && ArchitectureContextSelectorMatcher.MatchesLiteral(
+                    candidate, referencedType, context.RoleIndex, sourceDescriptor))
+            {
+                notMatched.Add(candidate);
+            }
+        }
+
+        return (null, notMatched);
+    }
+
+    // contract.Source.When already evaluated true for this source type - FindContextSelectorMatchingTypes
+    // filtered by it before the caller ever reached this candidate.
+    private static List<ExpressionParticipation> BuildWhenExpressions(
+        ArchitectureContextDependencyContract contract,
+        ArchitectureContextSelector matchedSelector,
+        IReadOnlyList<ArchitectureContextSelector> notMatchedForbidden,
+        IReadOnlyList<ArchitectureContextSelector> notMatchedExclude)
+    {
+        List<ExpressionParticipation> whenExpressions = new();
+
+        ContextualCheckerSupport.AddWhenExpression(
+            whenExpressions, contract.Name, contract.Source, "source", ExpressionParticipationResult.Matched);
+        foreach (ArchitectureContextSelector selector in notMatchedForbidden)
+        {
+            ContextualCheckerSupport.AddWhenExpression(
+                whenExpressions, contract.Name, selector, "forbidden", ExpressionParticipationResult.NotMatched);
+        }
+
+        ContextualCheckerSupport.AddWhenExpression(
+            whenExpressions, contract.Name, matchedSelector, "forbidden", ExpressionParticipationResult.Matched);
+        foreach (ArchitectureContextSelector selector in notMatchedExclude)
+        {
+            ContextualCheckerSupport.AddWhenExpression(
+                whenExpressions, contract.Name, selector, "exclude", ExpressionParticipationResult.NotMatched);
+        }
+
+        return whenExpressions;
     }
 }

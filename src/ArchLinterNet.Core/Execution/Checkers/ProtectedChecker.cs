@@ -28,21 +28,28 @@ internal static class ProtectedChecker
             ArchitectureLayer protectedLayer =
                 ArchitectureLayerResolver.ResolveLayer(context.Document, contract.Name, protectedLayerName);
 
-            CollectProtectedLayerViolations(contract, context, protectedLayerName, protectedLayer,
-                allowedImporterLayers, allowedTypes, allLayerNames, executionContext, violations);
+            var scope = new ProtectedScope(
+                protectedLayerName, protectedLayer, allowedImporterLayers, allowedTypes, allLayerNames);
+
+            CollectProtectedLayerViolations(contract, context, scope, executionContext, violations);
         }
 
         return violations;
     }
 
-    private static void CollectProtectedLayerViolations( // NOSONAR: contract resolution inputs intentionally stay explicit.
+    // The resolved inputs for one `protected:` entry of the contract, bundled so the per-type
+    // methods below take one scope instead of five separately-threaded resolution results.
+    private sealed record ProtectedScope(
+        string ProtectedLayerName,
+        ArchitectureLayer ProtectedLayer,
+        List<ArchitectureLayer> AllowedImporterLayers,
+        HashSet<string> AllowedTypes,
+        HashSet<string> AllLayerNames);
+
+    private static void CollectProtectedLayerViolations(
         ArchitectureProtectedContract contract,
         ArchitectureCheckerContext context,
-        string protectedLayerName,
-        ArchitectureLayer protectedLayer,
-        List<ArchitectureLayer> allowedImporterLayers,
-        HashSet<string> allowedTypes,
-        HashSet<string> allLayerNames,
+        ProtectedScope scope,
         ArchitectureContractExecutionContext executionContext,
         List<ArchitectureViolation> violations)
     {
@@ -51,8 +58,7 @@ internal static class ProtectedChecker
             foreach (Type sourceType in ArchitectureTypeScanner.GetLoadableTypes(assembly))
             {
                 ArchitectureViolation? violation = BuildViolation(
-                    contract, context, sourceType, protectedLayer, protectedLayerName, allowedImporterLayers,
-                    allowedTypes, allLayerNames, executionContext);
+                    contract, context, sourceType, scope, executionContext);
 
                 if (violation != null)
                 {
@@ -62,15 +68,11 @@ internal static class ProtectedChecker
         }
     }
 
-    private static ArchitectureViolation? BuildViolation( // NOSONAR: explicit contract context aids diagnostic construction.
+    private static ArchitectureViolation? BuildViolation(
         ArchitectureProtectedContract contract,
         ArchitectureCheckerContext context,
         Type sourceType,
-        ArchitectureLayer protectedLayer,
-        string protectedLayerName,
-        List<ArchitectureLayer> allowedImporterLayers,
-        HashSet<string> allowedTypes,
-        HashSet<string> allLayerNames,
+        ProtectedScope scope,
         ArchitectureContractExecutionContext executionContext)
     {
         string sourceTypeFullName = ArchitectureTypeNames.SafeFullName(sourceType);
@@ -79,23 +81,23 @@ internal static class ProtectedChecker
             return null;
         }
 
-        if (context.MatchesLayer(protectedLayer, sourceType))
+        if (context.MatchesLayer(scope.ProtectedLayer, sourceType))
         {
             return null;
         }
 
-        if (allowedImporterLayers.Any(layer => context.MatchesLayer(layer, sourceType)))
+        if (scope.AllowedImporterLayers.Any(layer => context.MatchesLayer(layer, sourceType)))
         {
             return null;
         }
 
-        string? sourceLayerName = context.ResolveContainingLayer(sourceType, allLayerNames);
+        string? sourceLayerName = context.ResolveContainingLayer(sourceType, scope.AllLayerNames);
 
         List<string> matchingRefs = new();
         HashSet<string> matchedNamespacePrefixes = new(StringComparer.Ordinal);
 
-        CollectProtectedLayerReferences(context, sourceType, sourceTypeFullName, protectedLayer, allowedTypes,
-            executionContext, matchingRefs, matchedNamespacePrefixes);
+        CollectProtectedLayerReferences(context, sourceType, sourceTypeFullName, scope.ProtectedLayer,
+            scope.AllowedTypes, executionContext, matchingRefs, matchedNamespacePrefixes);
 
         if (matchingRefs.Count == 0)
         {
@@ -110,7 +112,7 @@ internal static class ProtectedChecker
         return new ArchitectureViolation(
             contract.Name, contract.Id,
             sourceTypeFullName,
-            $"protected layer '{protectedLayerName}' (allowed importers: [{string.Join(", ", contract.AllowedImporters)}])",
+            $"protected layer '{scope.ProtectedLayerName}' (allowed importers: [{string.Join(", ", contract.AllowedImporters)}])",
             normalizedRefs)
         {
             MatchedNamespacePrefixes = matchedNamespacePrefixes.Count > 0
@@ -118,7 +120,7 @@ internal static class ProtectedChecker
                 : null,
             Payload = new DependencyPayload(
                 SourceLayer: sourceLayerName,
-                TargetLayer: protectedLayerName,
+                TargetLayer: scope.ProtectedLayerName,
                 AllowedImporters: contract.AllowedImporters)
         };
     }
