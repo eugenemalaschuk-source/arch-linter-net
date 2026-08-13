@@ -118,13 +118,51 @@ ARCHLINTERNET_VERSIONED_NAV = re.compile(
     rf"(?i)^\s*-\s+(?:(?:current|public)\s+)?ArchLinterNet(?:'s)?"
     rf"(?:\s+(?:release|version|package(?:\s+(?:release|version|line))?))?\s+{SEMVER}\b"
 )
-SOFT_PROSE_WRAP = re.compile(
-    r"(?<!\n)\n(?![ \t]*\n)(?![ \t]*(?:[-*+>#`|]|\d+[.)][ \t]))[ \t]*"
+MARKDOWN_STRUCTURAL_LINE = re.compile(
+    r"^[ \t]*(?:#{1,6}(?:[ \t]|$)|[-*+][ \t]+|(?:`{3,}|~{3,})|\||\d+[.)][ \t]+)"
 )
+BLOCKQUOTE_LINE = re.compile(r"^[ \t]*>[ \t]?(.*)$")
 
 
 def repository_root() -> Path:
     return Path(__file__).resolve().parents[2]
+
+
+def normalize_soft_wrapped_prose(text: str) -> str:
+    """Join Markdown soft wraps without crossing structural or quote boundaries."""
+    output: list[str] = []
+    pending: list[str] = []
+    pending_kind: str | None = None
+
+    def flush_pending() -> None:
+        nonlocal pending, pending_kind
+        if pending:
+            output.append(" ".join(pending))
+            pending = []
+            pending_kind = None
+
+    for line in text.splitlines():
+        quote_match = BLOCKQUOTE_LINE.match(line)
+        if quote_match:
+            content = quote_match.group(1)
+            kind = "quote"
+        else:
+            content = line
+            kind = "plain"
+
+        if not content.strip() or MARKDOWN_STRUCTURAL_LINE.match(content):
+            flush_pending()
+            output.append(content)
+            continue
+
+        if pending and kind != pending_kind:
+            flush_pending()
+        if not pending:
+            pending_kind = kind
+        pending.append(content.strip())
+
+    flush_pending()
+    return "\n".join(output)
 
 
 def public_markdown_files(root: Path) -> list[Path]:
@@ -199,7 +237,7 @@ def content_violations(root: Path, paths: list[Path]) -> list[str]:
         # is the subject there. All other evergreen surfaces still distinguish
         # product release prose from legitimate machine/schema/standard versions.
         if relative != "docs/reference/release-process.md":
-            prose_text = SOFT_PROSE_WRAP.sub(" ", text)
+            prose_text = normalize_soft_wrapped_prose(text)
             for pattern in (
                 ARCHLINTERNET_RELEASE_PROSE,
                 PACKAGE_LINE_PROSE,
