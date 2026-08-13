@@ -17,16 +17,16 @@ from pathlib import Path
 SEMVER = r"v?\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?"
 PATH_VERSION = r"v?\d+[.-]\d+[.-]\d+(?:[-_][0-9A-Za-z][0-9A-Za-z._-]*?)?"
 CLI_VERSION_ARG = rf"(?:{SEMVER}|[\"']{SEMVER}[\"'])"
-PRODUCT_STYLE_DOC_IDENTITY = (
-    r"(?:migration(?:-to)?|upgrade(?:-to)?|release(?:-notes?)?|adopt(?:ion)?(?:-to)?)"
+PRODUCT_DOC_CONCEPT = (
+    r"(?:migration(?:-to)?|upgrade(?:-to)?|upgrading|release(?:-notes?)?|"
+    r"adopt(?:ion)?(?:-to)?|installation|install|quickstart|getting-started|"
+    r"troubleshooting|reference(?:-entrypoints)?|cli|capabilities)"
 )
 PRODUCT_GUIDE_LABEL = r"(?:Adopt(?:ion)?(?:\s+or\s+Upgrade)?|Upgrade|Migration)"
-PRODUCT_RELEASE_PATH_QUALIFIER = (
-    r"(?:release(?:-notes?)?|version|migration(?:-to)?|upgrade(?:-to)?|adopt(?:ion)?(?:-to)?)"
-)
+PRODUCT_RELEASE_PATH_QUALIFIER = rf"(?:version|{PRODUCT_DOC_CONCEPT})"
 PRODUCT_PATH_SEPARATOR = r"[-_./]"
 VERSIONED_DOC_IDENTITY = re.compile(
-    rf"(?i)(?:^|[/(`'\"]){PRODUCT_STYLE_DOC_IDENTITY}[-_]{PATH_VERSION}\b"
+    rf"(?i)(?:^|[/(`'\"]){PRODUCT_DOC_CONCEPT}{PRODUCT_PATH_SEPARATOR}{PATH_VERSION}\b"
 )
 EXPLICIT_PRODUCT_VERSION_PATH = re.compile(
     rf"(?i)(?:^|/)(?:"
@@ -35,9 +35,8 @@ EXPLICIT_PRODUCT_VERSION_PATH = re.compile(
     rf")(?:/|\.md$|$)"
 )
 VERSION_FIRST_PRODUCT_DOC_PATH = re.compile(
-    rf"(?i)(?:^|/){PATH_VERSION}[-_.]"
-    rf"(?:migration|upgrade|release(?:-notes?)?|adopt(?:ion)?)"
-    rf"(?:[-_.][^/]*)?(?:/|\.md$)"
+    rf"(?i)(?:^|/){PATH_VERSION}{PRODUCT_PATH_SEPARATOR}"
+    rf"{PRODUCT_DOC_CONCEPT}(?:[-_.][^/]*)?(?:/|\.md$|$)"
 )
 ROOT_README_VERSION = re.compile(
     rf"(?i)^README[^/]*[-_.]{PATH_VERSION}(?:[-_.]|$)"
