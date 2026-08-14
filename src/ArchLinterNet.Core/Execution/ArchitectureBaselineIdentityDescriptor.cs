@@ -27,7 +27,7 @@ internal sealed record ArchitectureBaselineIdentityDescriptor(
         return new(true, DimensionsFor(familyId));
     }
 
-    private static IReadOnlyList<string> DimensionsFor(string familyId)
+    private static string[] DimensionsFor(string familyId)
     {
         // Every baseline-capable family starts with these semantic dimensions. Family-specific
         // dimensions below are intentionally named as data, never inferred from diagnostic prose.

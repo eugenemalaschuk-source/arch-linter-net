@@ -96,7 +96,7 @@ public sealed class PackagedSchemaRegistry
         }
     }
 
-    private IReadOnlyDictionary<string, Entry> ReadManifest()
+    private Dictionary<string, Entry> ReadManifest()
     {
         using Stream stream = _assembly.GetManifestResourceStream(ManifestResourceName)
             ?? throw new InvalidOperationException("The packaged schema manifest is missing.");

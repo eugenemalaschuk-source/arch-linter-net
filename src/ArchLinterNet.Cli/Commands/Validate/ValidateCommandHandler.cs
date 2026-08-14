@@ -237,7 +237,7 @@ internal sealed partial class ValidateCommandHandler
     private void WriteErrorContent(
         ValidateCommandOptions options,
         string errorFormat,
-        IReadOnlyDictionary<string, string> contentByFormat,
+        Dictionary<string, string> contentByFormat,
         bool allowFileSinks,
         RouteResult? priorOutputResult = null)
     {

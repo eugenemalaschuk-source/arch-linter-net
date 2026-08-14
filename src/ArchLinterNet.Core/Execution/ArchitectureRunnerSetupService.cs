@@ -257,7 +257,7 @@ public sealed class ArchitectureRunnerSetupService(
     }
 
     private static (IReadOnlyList<string> Paths, bool Complete) BuildMetadataReferenceClosure(
-        IReadOnlyCollection<string> roots, ProjectDiscoveryResult discovery, CancellationToken cancellationToken)
+        List<string> roots, ProjectDiscoveryResult discovery, CancellationToken cancellationToken)
     {
         Dictionary<string, string> candidates = new(StringComparer.OrdinalIgnoreCase);
         foreach (string path in roots.Concat(discovery.ResolvedAssemblyPaths.Values))
@@ -325,7 +325,7 @@ public sealed class ArchitectureRunnerSetupService(
         return (closure.OrderBy(path => path, StringComparer.OrdinalIgnoreCase).ToArray(), complete);
     }
 
-    private static IReadOnlyDictionary<string, string> CaptureArtifactDigests(
+    private static Dictionary<string, string> CaptureArtifactDigests(
         IReadOnlyList<string> artifactPaths,
         CancellationToken cancellationToken)
     {

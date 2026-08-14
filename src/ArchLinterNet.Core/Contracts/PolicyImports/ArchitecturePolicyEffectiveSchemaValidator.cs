@@ -92,7 +92,7 @@ internal static class ArchitecturePolicyEffectiveSchemaValidator
         }
     }
 
-    private static IReadOnlyList<SchemaFailure> SuppressInapplicableAlternatives(
+    private static SchemaFailure[] SuppressInapplicableAlternatives(
         IReadOnlyList<SchemaFailure> failures,
         JsonNode? instance)
     {

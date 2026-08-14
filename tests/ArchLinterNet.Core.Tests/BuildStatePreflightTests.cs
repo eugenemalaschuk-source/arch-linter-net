@@ -741,7 +741,7 @@ public sealed class BuildStatePreflightTests
     // real PE files, so instead we reflect against this test assembly itself and override
     // nothing — callers only need GetName().Name and Location, both of which the currently
     // executing test assembly provides after being copied to the fixture path.
-    private static Assembly LoadFakeAssembly(string assemblyPath)
+    private static FakeAssembly LoadFakeAssembly(string assemblyPath)
     {
         return new FakeAssembly(assemblyPath);
     }

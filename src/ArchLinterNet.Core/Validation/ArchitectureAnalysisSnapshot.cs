@@ -531,7 +531,7 @@ public sealed partial class ArchitectureAnalysisSnapshot : IDisposable
             GetDiscoveredProjectPaths(), _document.SourceExpansion);
     }
 
-    private IReadOnlyList<string> GetPolicyImportPaths()
+    private List<string> GetPolicyImportPaths()
     {
         return _document.Provenance.Sources
             .Select(source => Path.GetFullPath(Path.Combine(_repositoryRoot, source.SourcePath)))
@@ -644,7 +644,7 @@ public sealed partial class ArchitectureAnalysisSnapshot : IDisposable
     private bool HasExplicitSourceRoots() => _document.Provenance.TryGetLocation(
         "/analysis/source_roots", out _);
 
-    private IReadOnlyList<string> GetResolvedAssemblyPaths()
+    private List<string> GetResolvedAssemblyPaths()
     {
         return GetSelectedAssemblyArtifactPaths()
             .Concat(_setup?.Runner.Session.Context.TargetAssemblies

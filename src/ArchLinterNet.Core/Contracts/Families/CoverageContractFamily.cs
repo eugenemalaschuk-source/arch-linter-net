@@ -90,7 +90,7 @@ internal static class ArchitectureRuleInputReferences
         };
     }
 
-    private static IEnumerable<ArchitectureRuleInputReference> One(string input, string layer) =>
+    private static ArchitectureRuleInputReference[] One(string input, string layer) =>
         string.IsNullOrWhiteSpace(layer)
             ? Array.Empty<ArchitectureRuleInputReference>()
             : new[] { new ArchitectureRuleInputReference(input, layer) };

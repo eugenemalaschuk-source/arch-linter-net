@@ -15,7 +15,7 @@ public sealed class PublicApiSnapshotStoreTests
     private static readonly string[] _value = { "class Acme.Module.Thing" };
     private string _repositoryRoot = null!;
     private string _policyPath = null!;
-    private IPublicApiSnapshotStore _store = null!;
+    private PublicApiSnapshotStore _store = null!;
 
     [SetUp]
     public void SetUp()
