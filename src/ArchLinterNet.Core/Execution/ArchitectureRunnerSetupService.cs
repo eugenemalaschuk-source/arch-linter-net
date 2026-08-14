@@ -260,22 +260,16 @@ public sealed class ArchitectureRunnerSetupService(
         List<string> roots, ProjectDiscoveryResult discovery, CancellationToken cancellationToken)
     {
         Dictionary<string, string> candidates = new(StringComparer.OrdinalIgnoreCase);
-        foreach (string path in roots.Concat(discovery.ResolvedAssemblyPaths.Values))
+        foreach (string path in roots.Concat(discovery.ResolvedAssemblyPaths.Values).Where(File.Exists))
         {
-            if (File.Exists(path))
-            {
-                candidates[Path.GetFileNameWithoutExtension(path)] = Path.GetFullPath(path);
-            }
+            candidates[Path.GetFileNameWithoutExtension(path)] = Path.GetFullPath(path);
         }
 
         if (AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES") is string trustedPlatformAssemblies)
         {
-            foreach (string path in trustedPlatformAssemblies.Split(Path.PathSeparator, StringSplitOptions.RemoveEmptyEntries))
+            foreach (string path in trustedPlatformAssemblies.Split(Path.PathSeparator, StringSplitOptions.RemoveEmptyEntries).Where(File.Exists))
             {
-                if (File.Exists(path))
-                {
-                    candidates.TryAdd(Path.GetFileNameWithoutExtension(path), Path.GetFullPath(path));
-                }
+                candidates.TryAdd(Path.GetFileNameWithoutExtension(path), Path.GetFullPath(path));
             }
         }
 

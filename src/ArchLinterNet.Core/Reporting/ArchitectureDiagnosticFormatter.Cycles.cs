@@ -69,11 +69,6 @@ public sealed partial class ArchitectureDiagnosticFormatter
         return JsonSerializer.Serialize(payload);
     }
 
-    private static Dictionary<string, object?> ToCycleJsonObject(ArchitectureCycleFinding cycle)
-    {
-        return ToCycleJsonObject(ArchitectureDiagnosticMapper.FromCycle(cycle), mode: null);
-    }
-
     private static Dictionary<string, object?> ToCycleJsonObject(ArchitectureCycleFinding cycle, string? mode) =>
         ToCycleJsonObject(ArchitectureDiagnosticMapper.FromCycle(cycle), mode);
 

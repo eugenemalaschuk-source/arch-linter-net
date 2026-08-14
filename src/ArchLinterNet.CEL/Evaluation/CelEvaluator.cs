@@ -229,7 +229,7 @@ internal static class CelEvaluator
                 return EvaluationStep.Succeeded(CelValue.Bool(false));
             }
 
-            var comparison = left.Value!.Kind switch
+            var comparison = left.Value.Kind switch
             {
                 CelValueKind.Int => left.Value.AsInt().CompareTo(right.Value!.AsInt()),
                 CelValueKind.Float => left.Value.AsFloat().CompareTo(right.Value!.AsFloat()),

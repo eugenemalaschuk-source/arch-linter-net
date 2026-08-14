@@ -142,18 +142,6 @@ internal sealed class ArchitectureIlMethodBodyScanner : IArchitectureIlMethodBod
         }
     }
 
-    private static IEnumerable<string> FindMethodMatches(
-        MethodBase method,
-        IReadOnlyList<ForbiddenCallPattern> patterns,
-        Dictionary<string, bool> matchCache)
-    {
-        foreach (IlForbiddenCallMatch match in FindMethodMatchDetails(method, patterns, matchCache))
-        {
-            yield return
-                $"il {match.InstructionOffset:X4} ({match.MethodName}): {match.MatchedPattern} -> {match.MatchedMember}";
-        }
-    }
-
     private readonly record struct IlForbiddenCallMatch(
         int InstructionOffset,
         string MethodName,

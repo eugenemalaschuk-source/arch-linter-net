@@ -99,7 +99,7 @@ internal static class ArchitectureForbiddenCallMatcher
         string name = memberInfo.Name;
         string fullyQualifiedMember = string.IsNullOrWhiteSpace(containingType?.FullName)
             ? name
-            : $"{containingType!.FullName}.{name}";
+            : $"{containingType.FullName}.{name}";
         string? extensionReceiverType = memberInfo is MethodInfo methodInfo
             ? GetReflectionExtensionReceiverType(methodInfo)
             : null;

@@ -99,7 +99,6 @@ internal sealed partial class ValidateCommandHandler
     // persisted from an unproven build-input manifest.
     private void TryPopulateCache(
         ValidateCommandOptions options,
-        string mode,
         ValidationOutcome outcome,
         ArchitectureAnalysisSnapshotCounters counters,
         CacheExecutionState state)

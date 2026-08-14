@@ -175,10 +175,10 @@ public sealed partial class ArchitectureAnalysisSession
                 items.Add(new ArchitectureCoverageSummaryEvidenceItem(ArchitectureLayerResolver.DescribeLayer(layer), "semantic selector matched no classified type"));
         }
         foreach (ArchitectureContextualConsumerReference consumer in RegisteredContextualConsumers
-                     .OrderBy(consumer => consumer.Description, StringComparer.Ordinal))
+                     .OrderBy(consumer => consumer.Description, StringComparer.Ordinal)
+                     .Where(consumer => !types.Any(type => MatchesContextualConsumer(consumer, type))))
         {
-            if (!types.Any(type => MatchesContextualConsumer(consumer, type)))
-                items.Add(new ArchitectureCoverageSummaryEvidenceItem(DescribeConsumer(consumer), "contextual semantic selector matched no classified type"));
+            items.Add(new ArchitectureCoverageSummaryEvidenceItem(DescribeConsumer(consumer), "contextual semantic selector matched no classified type"));
         }
         return items;
     }

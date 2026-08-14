@@ -25,7 +25,7 @@ internal sealed class ArchitectureClassificationMetadataScalarNodeDeserializer :
         }
 
         reader.MoveNext();
-        value = scalar!.Style == ScalarStyle.Plain ? InferPlainScalarValue(scalar.Value) : scalar.Value;
+        value = scalar.Style == ScalarStyle.Plain ? InferPlainScalarValue(scalar.Value) : scalar.Value;
         return true;
     }
 
