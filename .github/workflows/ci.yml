@@ -19,11 +19,10 @@ env:
   SONAR_ORGANIZATION: ${{ vars.SONAR_ORGANIZATION || 'eugenemalaschuk-source' }}
 
 jobs:
-  # The former monolithic `pull_request_validate` job packed workflow lint, repository lint,
-  # SonarCloud/coverage, architecture coverage, and Python tooling tests into one serial job, so
-  # unrelated checks waited behind whichever ran first. It is now five independently schedulable
-  # jobs along real dependency boundaries; `needs:` is used only where a job genuinely requires
-  # another's artifact or result (none of the five below do).
+  # Pull-request validation is decomposed along real dependency boundaries. Workflow quality,
+  # repository lint, architecture coverage, tooling/support tests, cross-platform correctness and
+  # the .NET coverage shards all start independently. Coverage + Sonar is the one intentional
+  # fan-in: it waits for the isolated coverage shards because it consumes their report artifacts.
   workflow_quality:
     name: Workflow Quality
     if: github.event_name == 'pull_request'
@@ -97,27 +96,98 @@ jobs:
       - name: Lint
         run: make lint
 
+  dotnet_coverage:
+    name: .NET Coverage (${{ matrix.name }})
+    runs-on: ubuntu-latest
+    # Coverlet rewrites instrumented assemblies on disk and restores them after each run. Core
+    # coverage shards therefore run on separate runners/checkouts instead of concurrently against
+    # one shared bin/obj tree. Their artifacts are merged downstream by Coverage + Sonar (PRs) or
+    # Main Badge Refresh (main pushes). This spends runner-minutes to shorten wall-clock feedback.
+    timeout-minutes: 18
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - id: core-1
+            name: Core Shard 1
+            target: test-coverage-core-1
+          - id: core-2
+            name: Core Shard 2
+            target: test-coverage-core-2
+          - id: other
+            name: CEL + CLI
+            target: test-coverage-other
+    permissions:
+      contents: read
+    env:
+      TEST_COVERAGE_DIAGNOSTICS: ${{ github.event_name == 'push' && '--blame-hang --blame-hang-timeout 5m' || '' }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Cache NuGet packages
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
+        with:
+          path: ~/.nuget/packages
+          key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj') }}
+          restore-keys: |
+            ${{ runner.os }}-nuget-
+
+      - name: Restore
+        run: make restore
+
+      - name: Collect ${{ matrix.name }} coverage
+        shell: bash
+        run: make ${{ matrix.target }}
+
+      - name: Upload .NET coverage shard
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: dotnet-coverage-${{ matrix.id }}
+          path: test-results/coverage
+          if-no-files-found: error
+
   coverage_sonar:
     name: Coverage + Sonar
-    if: github.event_name == 'pull_request'
+    needs: dotnet_coverage
+    if: always() && github.event_name == 'pull_request'
     runs-on: ubuntu-latest
-    # SonarScanner for .NET requires begin -> build/test -> end in one job. Keeps only the
-    # unit-only coverage run (see make/test.mk — E2E/packed-artifact correctness runs in the
-    # independent test-suite jobs below), Python tooling coverage feeding the same Sonar analysis,
-    # and the Codecov upload. A cancelled `End SonarCloud analysis` step means this budget was
-    # exceeded, not a scanner fault.
-    timeout-minutes: 25
+    # The expensive .NET coverage execution already ran in isolated shard jobs. This aggregation
+    # job downloads their reports, runs the Sonar-required build inside begin/end, collects Python
+    # tooling coverage, uploads the same report union to Codecov, and waits for the quality gate.
+    timeout-minutes: 15
     permissions:
       contents: read
     env:
       TRUSTED_PR: ${{ github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.user.login != 'dependabot[bot]' }}
 
     steps:
+      - name: Require successful .NET coverage shards
+        if: needs.dotnet_coverage.result != 'success'
+        run: |
+          echo ".NET coverage shard matrix result: ${{ needs.dotnet_coverage.result }}" >&2
+          echo "Coverage + Sonar requires every coverage shard to succeed; refusing a partial aggregate." >&2
+          exit 1
+
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           fetch-depth: 0
           persist-credentials: false
+
+      - name: Download .NET coverage shards
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+        with:
+          pattern: dotnet-coverage-*
+          path: test-results/coverage-shards
 
       - name: Setup uv
         uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
@@ -196,8 +266,9 @@ jobs:
             /d:sonar.exclusions="**/AdoptionAcceptance/Fixtures/**" \
             /d:sonar.coverage.exclusions="tools/**/tests/**,**/CheckpointBReleaseGateTests*.cs"
 
-      - name: Collect test coverage
-        run: make test-coverage
+      - name: Build for SonarCloud analysis
+        if: env.TRUSTED_PR == 'true'
+        run: dotnet build ArchLinterNet.slnx --no-restore --nologo
 
       - name: Collect Python tooling coverage
         run: make test-tooling-coverage
@@ -208,6 +279,10 @@ jobs:
         run: |
           files="$(find test-results -name 'coverage.cobertura.xml' -print | sed 's#^#./#' | paste -sd, -)"
           echo "files=$files" >> "$GITHUB_OUTPUT"
+          if [ -z "$files" ]; then
+            echo "No .NET Cobertura coverage reports were downloaded." >&2
+            exit 1
+          fi
 
       - name: Upload test coverage to Codecov
         if: steps.coverage_reports.outputs.files != '' && env.TRUSTED_PR == 'true'
@@ -249,7 +324,7 @@ jobs:
             echo "### Secret-backed integrations"
             echo
             echo "SonarCloud and Codecov uploads were skipped because GitHub does not expose ordinary repository secrets to fork or Dependabot pull requests."
-            echo "Coverage collection continues to run without those secrets."
+            echo ".NET coverage shards still ran and their reports were aggregated without those secrets."
           } >> "$GITHUB_STEP_SUMMARY"
 
   architecture_coverage:
@@ -563,26 +638,35 @@ jobs:
 
   main_badge_refresh:
     name: Main Badge Refresh
-    if: github.event_name == 'push'
+    needs: dotnet_coverage
+    if: always() && github.event_name == 'push'
     runs-on: ubuntu-latest
-    # This job does the most work of any in the workflow: a full build, the unit-only coverage run
-    # (see make/test.mk — E2E/packed-artifact correctness moved to the independent test-suite jobs,
-    # no longer on this critical path), and a SonarCloud analysis whose `end` step waits on the
-    # quality gate for up to `sonar.qualitygate.timeout=300` seconds. At 10 minutes the coverage step
-    # alone (~9 minutes on ubuntu-latest, when it still ran units then E2E sequentially) left the
-    # quality-gate wait no room, so the job was cancelled at the cap rather than failing on a real
-    # signal. 25 minutes matches Pull Request Validation; revisit once a push to `main` produces a
-    # real unit-only timing for this job.
-    timeout-minutes: 25
+    # Main push coverage is produced by the same isolated coverage-shard matrix as PR coverage.
+    # This job only aggregates those reports, performs the Sonar-required build inside begin/end,
+    # collects Python tooling coverage, uploads Codecov, and waits for the quality gate.
+    timeout-minutes: 15
     permissions:
       contents: read
 
     steps:
+      - name: Require successful .NET coverage shards
+        if: needs.dotnet_coverage.result != 'success'
+        run: |
+          echo ".NET coverage shard matrix result: ${{ needs.dotnet_coverage.result }}" >&2
+          echo "Main Badge Refresh requires every coverage shard to succeed; refusing a partial aggregate." >&2
+          exit 1
+
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           fetch-depth: 0
           persist-credentials: false
+
+      - name: Download .NET coverage shards
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+        with:
+          pattern: dotnet-coverage-*
+          path: test-results/coverage-shards
 
       - name: Setup .NET
         uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68
@@ -657,8 +741,8 @@ jobs:
             /d:sonar.exclusions="**/AdoptionAcceptance/Fixtures/**" \
             /d:sonar.coverage.exclusions="tools/**/tests/**,**/CheckpointBReleaseGateTests*.cs"
 
-      - name: Collect main branch test coverage
-        run: make test-coverage-main-ci
+      - name: Build for SonarCloud analysis
+        run: dotnet build ArchLinterNet.slnx --no-restore --nologo
 
       - name: Collect main branch Python tooling coverage
         run: make test-tooling-coverage
@@ -669,6 +753,10 @@ jobs:
         run: |
           files="$(find test-results -name 'coverage.cobertura.xml' -print | sed 's#^#./#' | paste -sd, -)"
           echo "files=$files" >> "$GITHUB_OUTPUT"
+          if [ -z "$files" ]; then
+            echo "No .NET Cobertura coverage reports were downloaded." >&2
+            exit 1
+          fi
 
       - name: Upload test coverage to Codecov
         if: steps.coverage_reports.outputs.files != ''

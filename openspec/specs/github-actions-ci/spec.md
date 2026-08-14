@@ -70,17 +70,21 @@ separate job or workflow.
 - **AND** that job's `permissions` include `pull-requests: write` so the comment step can run
   without a second job
 
-### Requirement: SonarCloud analysis runs in the existing CI workflow
+### Requirement: SonarCloud analysis consumes isolated coverage artifacts
 
-SonarCloud analysis SHALL run inside `ci.yml`'s coverage/Sonar job so the repository reuses the
-same checkout metadata, restore, build, and test execution that powers the coverage-only unit test
-run, without introducing a second standalone restore/build/test pipeline only for SonarCloud.
+SonarCloud analysis SHALL run inside `ci.yml`'s coverage/Sonar job. The coverage/Sonar job SHALL
+consume the complete set of .NET coverage/TRX artifacts produced by the isolated coverage shard
+jobs, rather than re-running the .NET unit suite serially. For trusted analyses, it SHALL still run
+a build between `dotnet-sonarscanner begin` and `end` so Scanner for .NET receives the MSBuild and
+Roslyn analysis data it requires.
 
-#### Scenario: SonarCloud reuses the existing validation path
+#### Scenario: SonarCloud reuses coverage results without re-running .NET tests
 
-- **WHEN** the coverage/Sonar job runs on a trusted push or pull request
-- **THEN** it performs SonarCloud analysis inside the same job as the coverage-only unit test run
-- **AND** it does not introduce a second standalone restore/build/test pipeline only for SonarCloud
+- **WHEN** the coverage/Sonar job runs after all .NET coverage shards succeed
+- **THEN** it downloads their Cobertura/OpenCover/TRX artifacts
+- **AND** it does not execute the coverage-eligible .NET unit suite again
+- **AND** a trusted run builds the solution inside the SonarCloud begin/end lifecycle before the
+  reports are imported
 
 #### Scenario: Pull request analysis has enough Git metadata
 
@@ -125,13 +129,14 @@ Trusted pull requests SHALL expose SonarCloud results to reviewers through GitHu
 `ci.yml` SHALL decompose pull request validation into independently schedulable jobs along real
 dependency boundaries instead of one monolithic job, so unrelated checks can start concurrently
 and fail independently. At minimum the workflow SHALL provide: a workflow-quality job (actionlint,
-zizmor, workflow Prettier check), a repository-lint job (`make lint`), a coverage/Sonar job (the
-SonarCloud begin/build/end lifecycle, coverage-only unit tests, Python tooling coverage, Codecov
-upload), an architecture-coverage job (strict/audit architecture coverage analysis, artifact
-uploads, PR comment), and a tooling/support-tests job (the architecture-coverage-report-generator
-and release-evidence-aggregator Python test suites). `needs:` SHALL be used between these jobs
-only where one genuinely requires another's artifact or result; by default all of them are
-schedulable at PR start alongside the `unit_tests`/`e2e_tests`/`packed_artifact_tests` jobs.
+zizmor, workflow Prettier check), a repository-lint job (`make lint`), independently schedulable
+.NET coverage shard jobs, a coverage/Sonar aggregation job (SonarCloud begin/build/end lifecycle,
+Python tooling coverage, coverage artifact import, Codecov upload), an architecture-coverage job
+(strict/audit architecture coverage analysis, artifact uploads, PR comment), and a
+tooling/support-tests job (the architecture-coverage-report-generator and release-evidence-
+aggregator Python test suites). `needs:` SHALL be used only along genuine artifact/result
+boundaries; specifically the coverage/Sonar aggregation job MAY depend on the .NET coverage shard
+jobs whose reports it consumes, while unrelated validation jobs remain schedulable at PR start.
 
 #### Scenario: Workflow quality fails without waiting for .NET restore
 
@@ -149,9 +154,10 @@ schedulable at PR start alongside the `unit_tests`/`e2e_tests`/`packed_artifact_
 #### Scenario: Coverage/Sonar job excludes E2E and packed-artifact work
 
 - **WHEN** the coverage/Sonar job runs
-- **THEN** it runs only the coverage-only unit test target, Python tooling coverage, SonarCloud
-  begin/end for trusted pull requests, and the Codecov upload
+- **THEN** it consumes only coverage-eligible .NET test reports, runs Python tooling coverage,
+  performs SonarCloud begin/build/end for trusted pull requests, and performs the Codecov upload
 - **AND** it does not invoke the E2E or packed-artifact test buckets
+- **AND** it does not re-run the .NET coverage shards whose reports it consumes
 
 #### Scenario: Architecture coverage job builds what it needs independently
 
@@ -161,12 +167,13 @@ schedulable at PR start alongside the `unit_tests`/`e2e_tests`/`packed_artifact_
 - **AND** it preserves fail-closed strict-mode failure semantics even though artifact upload and
   PR comment steps use `always()`/`continue-on-error` for report publication
 
-#### Scenario: No artificial ordering between the new validation jobs
+#### Scenario: No artificial ordering between unrelated validation jobs
 
-- **WHEN** the set of workflow-quality, repository-lint, coverage/Sonar, architecture-coverage, and
-  tooling/support-tests jobs is inspected
-- **THEN** none of them declares a `needs:` edge on another unless that job genuinely consumes an
-  artifact or result the other produces
+- **WHEN** workflow-quality, repository-lint, .NET coverage shards, coverage/Sonar aggregation,
+  architecture-coverage, and tooling/support-tests jobs are inspected
+- **THEN** only the coverage/Sonar aggregation job depends on .NET coverage shards because it
+  genuinely consumes their artifacts
+- **AND** unrelated jobs declare no artificial `needs:` edges between each other
 
 ### Requirement: Core unit suite runs as a deterministic, duration-based shard matrix
 
@@ -216,14 +223,38 @@ The check SHALL fail when a shard filter token matches zero discovered tests, an
 - **THEN** the shard-membership check fails with a diagnostic naming the colliding token and the
   bucket it leaked into
 
-### Requirement: Coverage collection remains a single unsharded run
+### Requirement: Coverage collection reuses deterministic Core shard boundaries on isolated runners
 
-The coverage-collecting unit test execution (`make test-coverage` and `make test-coverage-main-ci`) SHALL continue to run the complete unsharded `ArchLinterNet.Core.Tests` unit set in a single process, independent of how many shards the non-coverage `unit_tests` CI job uses.
+The authoritative CI coverage path SHALL split `ArchLinterNet.Core.Tests` using the same committed
+`TEST_CORE_UNIT_SHARD_1_FILTER` / `TEST_CORE_UNIT_SHARD_2_FILTER` boundaries used by correctness
+sharding, and SHALL collect the non-Core CEL/CLI unit assemblies separately. Each coverage shard
+SHALL run in its own CI job/workspace so Coverlet never instruments and restores the same built
+assembly concurrently from multiple processes. The downstream coverage/Sonar or main-branch
+aggregation job SHALL consume the union of all produced coverage artifacts and SHALL fail closed
+when any required coverage shard fails or produces no coverage artifact.
 
-#### Scenario: Coverage is unaffected by the shard count
+The local aggregate `make test-coverage` command MAY remain a single unsharded run because it runs
+inside one checkout and is not the PR feedback critical path.
 
-- **WHEN** `make test-coverage` or `make test-coverage-main-ci` runs
-- **THEN** it collects coverage for the complete unit test set in one `dotnet test --collect`
-  invocation
-- **AND** its behavior does not depend on the `unit_tests` job's shard matrix
+#### Scenario: Core coverage shards are independently schedulable and race-free
+
+- **WHEN** pull-request or main-branch .NET coverage executes in CI
+- **THEN** Core shard 1 and Core shard 2 run as independent Ubuntu jobs using their existing
+  deterministic filters
+- **AND** CEL/CLI coverage runs in a separately schedulable coverage job
+- **AND** no two coverage shards instrument the same checkout's built assemblies concurrently
+
+#### Scenario: Aggregated reports preserve complete coverage
+
+- **WHEN** all .NET coverage shard jobs succeed
+- **THEN** their Cobertura, OpenCover, and TRX artifacts are downloaded by the downstream
+  aggregation job
+- **AND** SonarCloud and Codecov receive the complete union of those reports
+- **AND** the aggregation job does not execute the .NET unit tests again
+
+#### Scenario: A failed coverage shard fails the authoritative aggregate signal
+
+- **WHEN** any required .NET coverage shard fails or its artifact is unavailable
+- **THEN** the downstream Coverage + Sonar or Main Badge Refresh job fails
+- **AND** it does not report a successful aggregate coverage/Sonar result from a partial test set
 
