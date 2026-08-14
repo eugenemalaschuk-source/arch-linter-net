@@ -111,6 +111,58 @@ public sealed class SourceExpansionPipelineIdentityTests
               forbidden: [forbidden_vendor]
         """);
 
+    // Assembly dependency/allow-only also support source-set expansion, and — unlike the external
+    // family above — their checks used the id-only IsContractSelected overload, so selecting the
+    // authored id silently ran nothing at all. A pass-only assertion cannot see that: this policy is
+    // authored to produce a real violation (Core does reference CEL), so "selected" and "silently
+    // skipped" are distinguishable outcomes.
+    private string ViolatingExpandedAssemblyAllowOnlyPolicy() => WritePolicy($"""
+        version: 1
+        name: Test
+
+        layers:
+          core:
+            namespace: ArchLinterNet.Core
+          cel:
+            namespace: ArchLinterNet.CEL
+
+        analysis:
+          target_assemblies: [{CoreAssembly}, {CelAssembly}]
+          policy_consistency: off
+
+        source_sets:
+          engine_assemblies:
+            kind: assembly
+            members: [{CoreAssembly}]
+
+        contracts:
+          strict_assembly_allow_only:
+            - name: engine references nothing first-party
+              id: engine-references-nothing
+              source_sets: [engine_assemblies]
+              allowed: []
+        """);
+
+    [Test]
+    public void Validate_SelectingAuthoredId_RunsExpandedAssemblyAllowOnlyInstances()
+    {
+        ValidationOutcome outcome = ArchitectureValidationService.Validate(new ValidationRequest
+        {
+            PolicyPath = ViolatingExpandedAssemblyAllowOnlyPolicy(),
+            Mode = "strict",
+            ContractIds = new List<string> { "engine-references-nothing" }
+        });
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(outcome.Passed, Is.False, Describe(outcome));
+            Assert.That(
+                outcome.Violations.Select(violation => violation.ContractId),
+                Does.Contain("engine-references-nothing/archlinternet-core"),
+                Describe(outcome));
+        });
+    }
+
     [Test]
     public void Validate_SelectingAuthoredId_IsAcceptedByThePipeline()
     {

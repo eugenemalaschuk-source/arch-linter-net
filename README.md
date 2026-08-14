@@ -164,7 +164,7 @@ The CI badge tracks one workflow that runs all quality signals in the same `vali
 | SonarCloud PR quality gate | trusted `pull_request` runs analyze new code, publish a SonarCloud PR result link, and fail CI when the Sonar quality gate fails |
 | SonarCloud main quality signals | the Sonar badges track the `main` branch project status for quality gate, maintainability, reliability, and security |
 | OpenSSF Scorecard | trusted pull requests produce reviewable SARIF; default-branch and scheduled runs publish the supply-chain score to the public Scorecard API and GitHub code scanning |
-| Architecture validation | strict ArchLinterNet self-policy check (`architecture/dependencies.arch.yml`) |
+| Architecture validation | strict ArchLinterNet self-policy check (`architecture/dependencies.arch.yml`), including the reviewed public API snapshots under `architecture/api/`; read-only, never rewrites either |
 | Architecture coverage | strict/audit coverage JSON artifacts + Markdown report + sticky PR comment |
 
 See [CI integration](docs/guides/ci-integration.md#test-coverage-with-codecov-and-sonarcloud) for how test coverage upload, SonarCloud PR analysis, the dynamic badge, and the architecture coverage gate fit together.

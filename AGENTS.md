@@ -12,11 +12,27 @@ make setup                # full bootstrap: bundle + restore + venv (run once)
 make restore              # NuGet restore (required before any --no-restore target)
 make fmt                  # dotnet format — auto-format all C# code
 make lint                 # lint-code-size + lint-dotnet-format + lint-architecture
-make lint-architecture    # strict self-architecture validation (via Core.Tests)
+make lint-architecture    # canonical read-only strict self-policy gate (CLI + --ensure-built)
+make policy-check         # fast policy-only validation (no project/assembly analysis)
+make public-api-check     # read-only reviewed public API drift check
 make lint-code-size       # file size lint (warn ≥500, error ≥800 lines)
 make test                 # run all tests
 make acceptance           # lint + all tests
 make architecture-coverage-report  # full-solution coverage report (Markdown + JSON) on demand
+```
+
+`make lint-architecture` is the single authoritative definition of "the repository satisfies its own
+architecture policy". It is read-only: `--ensure-built` prepares and verifies the analysed project
+graph, but nothing under `architecture/` is ever rewritten. Rewriting a reviewed public API snapshot
+is an explicit, separate action (`make public-api-update`); lint, acceptance, and CI never do it.
+`SelfArchitecturePolicyTests` runs the same policy through the `ArchLinterNet.Testing` adapter inside
+`make test` as parity evidence, not as a second definition of success.
+
+Reviewed public API lifecycle:
+```
+make public-api-check           # read-only diff (what lint/CI rely on)
+make public-api-update-preview  # dry run of the rewrite
+make public-api-update          # explicit snapshot rewrite — the only writing command
 ```
 All `dotnet test`/`dotnet format` targets use `--no-restore` — run `restore` first when adding/changing dependencies.
 
@@ -65,12 +81,21 @@ Do not create isolated implementation tasks without an existing story or a newly
 
 ## Architecture governance
 File: `architecture/dependencies.arch.yml`. Enforced via `lint-architecture`.
+Reviewed public API snapshots: `architecture/api/*.public-api.txt`.
+Family-by-family adopt/already-covered/N-A/defer rationale:
+[docs/internal/self-policy-capability-matrix.md](docs/internal/self-policy-capability-matrix.md).
 
 Direction rules:
-- CLI and Testing depend **only** on Core.
+- CLI and Testing depend **only** on Core, at namespace *and* assembly-reference level.
+- Core depends only on CEL; CEL depends on nothing first-party.
 - Unity `.asmdef` validation is a Core capability, not a separate adapter assembly.
 - No circular dependencies between packages.
 - `Core.Scanning` internals are protected — only Core itself may import them.
+
+Also self-governed: solution-driven project discovery and project coverage, reviewed
+`InternalsVisibleTo` sets, forbidden production→test/benchmark project references, package and
+FrameworkReference boundaries, the reviewed Core/Testing/CEL public API surfaces, and the
+post-#451/#452/#453 checker / diagnostic-payload / policy-validator seams.
 
 ## Package layout
 ```

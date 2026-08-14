@@ -76,3 +76,8 @@ BenchmarkDotNet.Artifacts/
 
 # Python tooling coverage report consumed by SonarCloud
 coverage-python.xml
+
+# Throwaway mutated policy/snapshot copies written by SelfPolicyNegativeRegressionTests. They are
+# deleted in setup/teardown; this entry keeps a crashed run from polluting a commit.
+architecture/self-policy-mutation-*
+architecture/api/self-policy-mutation-*

@@ -5,6 +5,16 @@ RESULTS_DIR  := $(PROJECT_ROOT)/test-results
 TOOLS_DIR    := $(PROJECT_ROOT)/tools
 
 SLNX         := $(PROJECT_ROOT)/ArchLinterNet.slnx
+CLI_PROJECT  := $(PROJECT_ROOT)/src/ArchLinterNet.Cli
+POLICY       := $(PROJECT_ROOT)/architecture/dependencies.arch.yml
+
+# Reviewed public API surfaces governed by architecture/dependencies.arch.yml, as
+# "<contract-id>=<snapshot path>" pairs. The public-api-* targets iterate this list, so adding a
+# governed assembly means adding its contract here and in the policy — nothing else.
+PUBLIC_API_SURFACES := \
+	core-public-api-is-reviewed=architecture/api/ArchLinterNet.Core.public-api.txt \
+	testing-public-api-is-reviewed=architecture/api/ArchLinterNet.Testing.public-api.txt \
+	cel-public-api-is-reviewed=architecture/api/ArchLinterNet.CEL.public-api.txt
 CS_SIZE_LINT_ROOTS      ?= src tests docs
 CS_SIZE_LINT_WARN_LINES  ?= 500
 CS_SIZE_LINT_ERROR_LINES ?= 800

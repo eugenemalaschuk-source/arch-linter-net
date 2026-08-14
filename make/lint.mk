@@ -1,4 +1,4 @@
-.PHONY: lint _lint-dotnet lint-architecture audit-architecture lint-code-size lint-dotnet-format lint-workflows fmt-workflows test-architecture-coverage-report test-release-evidence test-calculate-version test-coverage-badge-script test-tooling-coverage architecture-coverage-report architecture-strict-json architecture-audit-json architecture-coverage-markdown architecture-coverage-ci
+.PHONY: lint _lint-dotnet lint-architecture audit-architecture policy-check explain-architecture public-api-check public-api-update-preview public-api-update lint-code-size lint-dotnet-format lint-workflows fmt-workflows test-architecture-coverage-report test-release-evidence test-calculate-version test-coverage-badge-script test-tooling-coverage architecture-coverage-report architecture-strict-json architecture-audit-json architecture-coverage-markdown architecture-coverage-ci
 
 CHANGED_FILES ?= changed-files.txt
 DIFF_STATUS   ?= ok
@@ -23,15 +23,57 @@ lint: lint-code-size lint-docs _lint-dotnet  ## Run all code quality checks
 # for independent docs/code-size lint.
 _acceptance-test: | _lint-dotnet
 
-lint-architecture:  ## Run strict architecture contracts on self
-	@dotnet build "$(PROJECT_ROOT)/src/ArchLinterNet.Cli/ArchLinterNet.Cli.csproj" --nologo -v minimal
-	@dotnet build "$(PROJECT_ROOT)/src/ArchLinterNet.Testing/ArchLinterNet.Testing.csproj" --nologo -v minimal
-	@dotnet test "$(TESTS_DIR)/ArchLinterNet.Core.Tests/ArchLinterNet.Core.Tests.csproj" --no-restore \
-		--filter "FullyQualifiedName=ArchLinterNet.Core.Tests.SelfArchitecturePolicyTests.RepositoryPolicy_ValidatesOwnInternalBoundaries"
+# The single authoritative definition of "the repository satisfies its own architecture policy".
+# It is read-only with respect to the policy and the reviewed API snapshots: --ensure-built prepares
+# and verifies the project graph (replacing the explicit `dotnet build` calls this target used to
+# make), but nothing under architecture/ is ever rewritten. `SelfArchitecturePolicyTests` runs the
+# same policy through the ArchLinterNet.Testing adapter as parity evidence inside `make test`; it is
+# not a second definition of success.
+lint-architecture:  ## Canonical read-only strict self-policy gate (builds and verifies the project graph)
+	@dotnet run --project "$(CLI_PROJECT)" -- \
+		--policy "$(POLICY)" --mode strict --ensure-built
 
 audit-architecture:  ## Run diagnostic architecture audit contracts
-	@dotnet build "$(PROJECT_ROOT)/src/ArchLinterNet.Testing/ArchLinterNet.Testing.csproj" --nologo -q 2>/dev/null
-	@dotnet run --project "$(PROJECT_ROOT)/src/ArchLinterNet.Cli" -- --policy "$(PROJECT_ROOT)/architecture/dependencies.arch.yml" --mode audit
+	@dotnet run --project "$(CLI_PROJECT)" -- \
+		--policy "$(POLICY)" --mode audit --ensure-built
+
+policy-check:  ## Fast policy-only validation: schema, imports, composition (no project or assembly analysis)
+	@dotnet run --project "$(CLI_PROJECT)" -- policy check --policy "$(POLICY)"
+
+explain-architecture:  ## Explain why SOURCE reaches TARGET under the self-policy (SOURCE=<id> TARGET=<id>)
+	@if [ -z "$(SOURCE)" ] || [ -z "$(TARGET)" ]; then \
+		echo "usage: make explain-architecture SOURCE=<layer-or-type> TARGET=<layer-or-type>"; \
+		exit 2; \
+	fi
+	@dotnet run --project "$(CLI_PROJECT)" -- explain \
+		--policy "$(POLICY)" --source "$(SOURCE)" --target "$(TARGET)"
+
+# ── Reviewed public API lifecycle ───────────────────────────────────────────
+# check → read-only drift detection (what lint/CI use), update-preview → dry-run of the rewrite,
+# update → the explicit, human-initiated snapshot rewrite. Only the last one writes.
+public-api-check:  ## Read-only diff of every reviewed public API snapshot against the live surface
+	@for surface in $(PUBLIC_API_SURFACES); do \
+		contract="$${surface%%=*}"; snapshot="$${surface#*=}"; \
+		echo "public-api diff: $$contract"; \
+		dotnet run --project "$(CLI_PROJECT)" -- public-api diff \
+			--policy "$(POLICY)" --contract "$$contract" --snapshot "$$snapshot" --ensure-built || exit $$?; \
+	done
+
+public-api-update-preview:  ## Preview the snapshot rewrite for every reviewed public API surface (writes nothing)
+	@for surface in $(PUBLIC_API_SURFACES); do \
+		contract="$${surface%%=*}"; snapshot="$${surface#*=}"; \
+		echo "public-api update --dry-run: $$contract"; \
+		dotnet run --project "$(CLI_PROJECT)" -- public-api update \
+			--policy "$(POLICY)" --contract "$$contract" --snapshot "$$snapshot" --dry-run --ensure-built || exit $$?; \
+	done
+
+public-api-update:  ## Rewrite every reviewed public API snapshot from the live surface (explicit review action)
+	@for surface in $(PUBLIC_API_SURFACES); do \
+		contract="$${surface%%=*}"; snapshot="$${surface#*=}"; \
+		echo "public-api update: $$contract"; \
+		dotnet run --project "$(CLI_PROJECT)" -- public-api update \
+			--policy "$(POLICY)" --contract "$$contract" --snapshot "$$snapshot" --ensure-built || exit $$?; \
+	done
 
 lint-code-size:  ## Size lint for C# and documentation files
 	@cd "$(PROJECT_ROOT)" && UV_PROJECT_ENVIRONMENT="$(PROJECT_ROOT)/.venv" "$(UV)" run --project tools/pyproject.toml \
@@ -94,14 +136,17 @@ test-tooling-coverage:  ## Run all Python tooling tests with coverage (coverage-
 		--cov=tools/release --cov=tools/scripts \
 		--cov-report=xml:coverage-python.xml --cov-report=term-missing
 
-architecture-strict-json:  ## Run strict architecture validation, writing architecture-strict.json (target assemblies must already be built)
-	@dotnet run --no-build --project "$(PROJECT_ROOT)/src/ArchLinterNet.Cli" -- \
-		--policy "$(PROJECT_ROOT)/architecture/dependencies.arch.yml" --mode strict --format json \
+# --ensure-built prepares and verifies the analysed project graph; the policy declares
+# analysis.solution, so a run without a build receipt is blocked by build-state preflight. It never
+# writes to architecture/. --no-build applies to the CLI host itself, which the caller builds.
+architecture-strict-json:  ## Run strict architecture validation, writing architecture-strict.json (CLI must already be built)
+	@dotnet run --no-build --project "$(CLI_PROJECT)" -- \
+		--policy "$(POLICY)" --mode strict --ensure-built --format json \
 		> "$(PROJECT_ROOT)/architecture-strict.json"
 
-architecture-audit-json:  ## Run audit architecture validation, writing architecture-audit.json (target assemblies must already be built)
-	@dotnet run --no-build --project "$(PROJECT_ROOT)/src/ArchLinterNet.Cli" -- \
-		--policy "$(PROJECT_ROOT)/architecture/dependencies.arch.yml" --mode audit --format json \
+architecture-audit-json:  ## Run audit architecture validation, writing architecture-audit.json (CLI must already be built)
+	@dotnet run --no-build --project "$(CLI_PROJECT)" -- \
+		--policy "$(POLICY)" --mode audit --ensure-built --format json \
 		> "$(PROJECT_ROOT)/architecture-audit.json"
 
 architecture-coverage-markdown:  ## Generate architecture-coverage.md from architecture-strict.json (CHANGED_FILES/DIFF_STATUS env optional)

@@ -9,7 +9,11 @@ public sealed partial class ArchitectureAnalysisSession
 {
     public List<ArchitectureViolation> CheckAssemblyDependencyContract(ArchitectureAssemblyDependencyContract contract)
     {
-        if (!IsContractSelected(contract.Id))
+        // Contract overload, not the id-only one: these families support source-set expansion, so
+        // selecting the authored id must reach every expanded instance it produced (see
+        // openspec/specs/source-set-expansion, "The authored id selects every instance"), exactly
+        // as the package, framework-reference, and external families already do.
+        if (!IsContractSelected(contract))
         {
             return new List<ArchitectureViolation>();
         }
@@ -24,7 +28,7 @@ public sealed partial class ArchitectureAnalysisSession
 
     public List<ArchitectureViolation> CheckAssemblyAllowOnlyContract(ArchitectureAssemblyAllowOnlyContract contract)
     {
-        if (!IsContractSelected(contract.Id))
+        if (!IsContractSelected(contract))
         {
             return new List<ArchitectureViolation>();
         }

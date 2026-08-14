@@ -34,6 +34,8 @@ It is intentionally excluded from the public MkDocs/GitHub Pages product site.
 
 - [Core unit suite shard inventory](core-unit-shard-inventory.md) - measured fixture-duration baseline and rationale for the `ArchLinterNet.Core.Tests` CI shard partition (#478).
 
+- [Self-policy capability matrix](self-policy-capability-matrix.md) — per-family adopt / already-covered / not-applicable / defer decisions for the repository's own architecture policy, recorded engine limitations, and the read-only vs writing developer commands (#464).
+
 ## Publishing rule
 
 Only public product documentation should appear in `mkdocs.yml` navigation and GitHub Pages output.

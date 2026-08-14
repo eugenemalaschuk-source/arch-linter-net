@@ -15,6 +15,14 @@
 # nothing. The fixtures' [Category("E2E")] attributes stay as human-readable documentation.
 # `!~` negation is supported by the VSTest filter syntax.
 #
+# SelfArchitecturePolicyTests and SelfPolicyNegativeRegressionTests are E2E, not unit: the
+# repository policy declares analysis.solution, so every self-policy run is subject to build-state
+# preflight and must prepare/verify the real project graph (`WithEnsureBuilt`). They are the only
+# fixtures in any bucket that invoke MSBuild against this repository's own projects while `test`'s
+# buckets run in parallel; that is safe because ensure-built preserves compiled primary outputs
+# byte-for-byte on an already-current graph — the guarantee EnsureBuiltNonDestructiveIntegrationTests
+# pins — so the concurrently-reading buckets never observe a rewritten assembly.
+#
 # CheckpointBReleaseGateTests is its own packed-artifact bucket, not part of E2E: it packs the
 # whole solution, installs the tool from an isolated feed, and builds the synthetic consumer
 # fixtures across the release-evidence consumer matrix. Mixing it into ordinary E2E serialized it
@@ -34,10 +42,10 @@
 # ASCII, backslash-free name via `TestCaseData(...).SetName(...)` instead of a bare
 # `[TestCase(...)]` — the arguments passed to the test body are unaffected, only the generated
 # identity used for filtering and reporting.
-TEST_E2E_FIXTURES := FullyQualifiedName~ExternalDependencyContractAuditE2eTests|FullyQualifiedName~BuildStatePreflightTests|FullyQualifiedName~BuildStatePreflightAssemblyReloadTests|FullyQualifiedName~CheckpointAAdoptionAcceptanceTests|FullyQualifiedName~ArchitectureBaselineIntegrationTests
+TEST_E2E_FIXTURES := FullyQualifiedName~ExternalDependencyContractAuditE2eTests|FullyQualifiedName~BuildStatePreflightTests|FullyQualifiedName~BuildStatePreflightAssemblyReloadTests|FullyQualifiedName~CheckpointAAdoptionAcceptanceTests|FullyQualifiedName~ArchitectureBaselineIntegrationTests|FullyQualifiedName~SelfArchitecturePolicyTests|FullyQualifiedName~SelfPolicyNegativeRegressionTests
 TEST_E2E_FILTER := $(TEST_E2E_FIXTURES)
 TEST_PACKED_ARTIFACT_FILTER := FullyQualifiedName~CheckpointBReleaseGateTests
-TEST_UNIT_FILTER := FullyQualifiedName!~ExternalDependencyContractAuditE2eTests&FullyQualifiedName!~BuildStatePreflightTests&FullyQualifiedName!~BuildStatePreflightAssemblyReloadTests&FullyQualifiedName!~CheckpointAAdoptionAcceptanceTests&FullyQualifiedName!~ArchitectureBaselineIntegrationTests&FullyQualifiedName!~CheckpointBReleaseGateTests
+TEST_UNIT_FILTER := FullyQualifiedName!~ExternalDependencyContractAuditE2eTests&FullyQualifiedName!~BuildStatePreflightTests&FullyQualifiedName!~BuildStatePreflightAssemblyReloadTests&FullyQualifiedName!~CheckpointAAdoptionAcceptanceTests&FullyQualifiedName!~ArchitectureBaselineIntegrationTests&FullyQualifiedName!~SelfArchitecturePolicyTests&FullyQualifiedName!~SelfPolicyNegativeRegressionTests&FullyQualifiedName!~CheckpointBReleaseGateTests
 
 # ArchLinterNet.Core.Tests carries no [assembly: Parallelizable] (unlike ArchLinterNet.Cli.Tests),
 # runs strictly serially, and is the dominant cost inside the unit bucket (~2600 of the bucket's
