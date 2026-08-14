@@ -381,7 +381,7 @@ public sealed partial class ArchitectureAnalysisSession
 
         foreach (System.Reflection.Assembly assembly in Context.TargetAssemblies.Distinct().OrderBy(a => a.FullName, StringComparer.Ordinal))
         {
-            foreach (Type type in ArchitectureTypeScanner.GetLoadableTypes(assembly)
+            foreach (Type type in ArchitectureTypeScanner.GetLoadableTypes(assembly, Context.CancellationToken)
                 .OrderBy(t => ArchitectureTypeNames.SafeFullName(t), StringComparer.Ordinal))
             {
                 findings.AddRange(FindLayerOverlapsForType(type, internalLayers, reportedPairs));
@@ -593,7 +593,7 @@ public sealed partial class ArchitectureAnalysisSession
         foreach (System.Reflection.Assembly assembly in Context.TargetAssemblies.Distinct()
                      .OrderBy(a => a.FullName, StringComparer.Ordinal))
         {
-            foreach (Type type in Scanning.ArchitectureTypeScanner.GetLoadableTypes(assembly))
+            foreach (Type type in Scanning.ArchitectureTypeScanner.GetLoadableTypes(assembly, Context.CancellationToken))
             {
                 MarkMatchedLayerExclusions(ArchitectureTypeNames.SafeNamespace(type), layersWithExclusions, matched);
             }
