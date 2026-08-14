@@ -48,7 +48,7 @@ internal sealed class ArchitecturePolicyImportGraphResolver
         string rootYaml,
         CancellationToken cancellationToken = default)
     {
-        ArchitecturePolicySource rootSource = _parser.Parse(
+        ArchitecturePolicySource rootSource = ArchitecturePolicySourceParser.Parse(
             rootDescriptor,
             root.FullPath,
             root.PhysicalPath,
@@ -206,7 +206,7 @@ internal sealed class ArchitecturePolicyImportGraphResolver
             source.PortableIdentity,
             importPath,
             importChain);
-        ArchitecturePolicySource child = _parser.Parse(
+        ArchitecturePolicySource child = ArchitecturePolicySourceParser.Parse(
             descriptor,
             resolved.FullPath,
             resolved.PhysicalPath,

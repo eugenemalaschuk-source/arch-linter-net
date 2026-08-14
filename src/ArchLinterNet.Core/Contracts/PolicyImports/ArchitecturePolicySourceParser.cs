@@ -53,7 +53,7 @@ internal sealed partial class ArchitecturePolicySourceParser
         return TryGetChild(root, ImportsField, out _);
     }
 
-    public ArchitecturePolicySource Parse(
+    public static ArchitecturePolicySource Parse(
         ArchitecturePolicySourceDescriptor descriptor,
         string fullPath,
         string physicalPath,

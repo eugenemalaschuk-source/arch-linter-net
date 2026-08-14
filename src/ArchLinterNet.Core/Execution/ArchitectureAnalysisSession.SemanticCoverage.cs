@@ -127,13 +127,13 @@ public sealed partial class ArchitectureAnalysisSession
         return findings;
     }
 
-    private bool IsSemanticCoverageTypeInScope(ArchitectureCoverageContract contract, Type type)
+    private static bool IsSemanticCoverageTypeInScope(ArchitectureCoverageContract contract, Type type)
     {
         return contract.Roots.Count == 0 || contract.Roots.Any(root =>
             MatchesNamespaceRoot(root, ArchitectureTypeNames.SafeNamespace(type)));
     }
 
-    private void AddSemanticDiagnosticFinding(
+    private static void AddSemanticDiagnosticFinding(
         List<ArchitectureViolation> findings,
         ArchitectureContractExecutionContext executionContext,
         ArchitectureCoverageContract contract,
