@@ -44,7 +44,7 @@
     "globUniverse": {
       "assembly": "analysis.target_assemblies",
       "layer": "declared layers keys",
-      "project": "not supported — project sets accept explicit members only"
+      "project": "explicit analysis.projects plus the filtered analysis.solution project inventory; project globs use repository-relative '*'/'**' path matching"
     },
     "expansion": "Contracts referencing sets through sources/source_sets expand into one instance per resolved source, deduplicated and ordinally ordered, with instance id '<authored-id>/<normalized-source>' and a retained expansion origin (authored contract id, set name, exact selector). Compatible source-scoped families may additionally subtract exclude_sources/exclude_source_sets from that already-resolved universe, preserving matched/stale exclusion evidence in explain/JSON/SARIF. List-shaped fields use project_sets and allowed_only_in_assembly_sets, which union resolved members into the existing list instead of fanning out.",
     "failClosed": [
@@ -56,7 +56,7 @@
       "expansion above 500 instances for one authored contract",
       "declaring both source and sources/source_sets on the same contract"
     ],
-    "unsupported": ["regular expressions", "partial-segment wildcards", "recursive '**' wildcards", "globs for kind: project"]
+    "unsupported": ["regular expressions", "partial-segment wildcards for assembly/layer kinds", "recursive '**' wildcards for assembly/layer kinds"]
   },
   "contractFamilies": [
     {
@@ -88,6 +88,13 @@
       "validates": "Directed dependency cycles among selected layers."
     },
     {
+      "kind": "acyclic-sibling",
+      "strictGroup": "strict_acyclic_siblings",
+      "auditGroup": "audit_acyclic_siblings",
+      "fields": ["name", "id", "ancestors", "ignored_violations", "reason"],
+      "validates": "Direct sibling namespaces under each configured ancestor do not form directed dependency cycles."
+    },
+    {
       "kind": "method-body",
       "strictGroup": "strict_method_body",
       "auditGroup": "audit_method_body",
@@ -107,6 +114,27 @@
       "auditGroup": "audit_independence",
       "fields": ["name", "layers", "ignored_violations", "reason"],
       "validates": "Mutual independence among a set of layers; no selected layer references another selected layer."
+    },
+    {
+      "kind": "assembly-independence",
+      "strictGroup": "strict_assembly_independence",
+      "auditGroup": "audit_assembly_independence",
+      "fields": ["name", "id", "assemblies", "ignored_violations", "reason"],
+      "validates": "Mutual independence among selected first-party .NET assemblies; no selected assembly directly references another selected assembly."
+    },
+    {
+      "kind": "assembly-dependency",
+      "strictGroup": "strict_assembly_dependency",
+      "auditGroup": "audit_assembly_dependency",
+      "fields": ["name", "id", "source", "sources", "source_sets", "exclude_sources", "exclude_source_sets", "forbidden", "dependency_depth", "ignored_violations", "reason"],
+      "validates": "A source assembly does not directly reference forbidden first-party assemblies. sources/source_sets expand one authored contract into one instance per resolved assembly source; exclude_sources/exclude_source_sets subtract from that bounded resolved universe. Only direct dependency depth is supported."
+    },
+    {
+      "kind": "assembly-allow-only",
+      "strictGroup": "strict_assembly_allow_only",
+      "auditGroup": "audit_assembly_allow_only",
+      "fields": ["name", "id", "source", "sources", "source_sets", "exclude_sources", "exclude_source_sets", "allowed", "dependency_depth", "ignored_violations", "reason"],
+      "validates": "A source assembly directly references only itself and explicitly allowed declared first-party assemblies. sources/source_sets expand one authored contract into one instance per resolved assembly source; exclude_sources/exclude_source_sets subtract from that bounded resolved universe. Only direct dependency depth is supported."
     },
     {
       "kind": "protected-surface",
@@ -147,8 +175,8 @@
       "kind": "public-api-surface",
       "strictGroup": "strict_public_api_surface",
       "auditGroup": "audit_public_api_surface",
-      "fields": ["name", "id", "assemblies", "declared_api", "api_snapshot", "api_comparison", "forbid_public_constants_unless_declared", "allowed_public_constants", "ignored_violations", "reason"],
-      "validates": "An assembly's exported (public/protected/protected-internal) types and directly-declared members match a normalized signature allowlist, declared inline via declared_api (legacy identity grammar) and/or through a reviewed snapshot file via api_snapshot (repository-local, resolved at policy load time, recording the exact grammar: identity plus constant/enum values, accessor shape, static/ref/out/in/params, sealed/abstract, enum underlying type and generic constraints). A snapshot must carry an @contract directive matching the contract id and may only describe the contract's declared assemblies; a missing, unparsable, or foreign snapshot is a validation violation rather than a load failure so the first capture can create it. assemblies must be non-empty. Undeclared exported types/members are violations. api_comparison: exact additionally reports declared signatures that no longer exist (removals) and declared members whose normalized signature changed, correlated by assembly plus declaration kind, qualified name, and parameter count so a re-signed member reports once as a change and a same-named export in another assembly never masks one; the default additions_only reports undeclared additions only. forbid_public_constants_unless_declared adds an independent, stricter check: an exported const field is forbidden unless its fully-qualified name is in allowed_public_constants, even if its full signature is already declared. Not a substitute for binary/package compatibility validation."
+      "fields": ["name", "id", "assemblies", "declared_api", "surface_selector.name_suffix", "surface_selector.name_prefix", "surface_selector.namespace", "surface_selector.layer", "surface_selector.base_type", "surface_selector.implements_interface", "surface_selector.has_attribute", "surface_selector.role", "api_snapshot", "api_comparison", "forbid_public_constants_unless_declared", "allowed_public_constants", "ignored_violations", "reason"],
+      "validates": "An assembly's exported (public/protected/protected-internal) types and directly-declared members match a normalized signature allowlist, either assembly-wide or restricted by optional surface_selector structural/semantic evidence to an intentional reviewed subset. Selected types retain their existing semantic role; zero-match selectors and first-party signature escapes fail closed. The allowlist may be declared inline via declared_api (legacy identity grammar) and/or through a reviewed snapshot file via api_snapshot (repository-local, resolved at policy load time, recording the exact grammar: identity plus constant/enum values, accessor shape, static/ref/out/in/params, sealed/abstract, enum underlying type and generic constraints). A snapshot must carry an @contract directive matching the contract id and may only describe the contract's declared assemblies; a missing, unparsable, or foreign snapshot is a validation violation rather than a load failure so the first capture can create it. assemblies must be non-empty. Undeclared exported types/members are violations. api_comparison: exact additionally reports declared signatures that no longer exist (removals) and declared members whose normalized signature changed, correlated by assembly plus declaration kind, qualified name, and parameter count so a re-signed member reports once as a change and a same-named export in another assembly never masks one; the default additions_only reports undeclared additions only. forbid_public_constants_unless_declared adds an independent, stricter check: an exported const field is forbidden unless its fully-qualified name is in allowed_public_constants, even if its full signature is already declared. Not a substitute for binary/package compatibility validation."
     },
     {
       "kind": "attribute-usage",
@@ -207,6 +235,13 @@
       "validates": "A source project/assembly declares only FrameworkReferences matching allowed framework_references groups. sources/source_sets expand one authored contract into one instance per resolved source; exclude_sources/exclude_source_sets subtract from that bounded resolved universe before allow-only evaluation."
     },
     {
+      "kind": "project-metadata",
+      "strictGroup": "strict_project_metadata",
+      "auditGroup": "audit_project_metadata",
+      "fields": ["name", "id", "projects", "project_sets", "required_properties", "forbidden_properties", "allowed_friend_assemblies", "forbidden_project_references", "ignored_violations", "reason"],
+      "validates": "Selected discovered projects preserve required scalar project properties, reject forbidden property values, restrict InternalsVisibleTo friend assemblies to the reviewed allow-list, and reject ProjectReference targets matching forbidden repository-relative project-path globs. project_sets unions reusable solution/explicit-project source-set members into projects."
+    },
+    {
       "kind": "external-allow-only",
       "strictGroup": "strict_external_allow_only",
       "auditGroup": "audit_external_allow_only",
@@ -233,6 +268,13 @@
       "auditGroup": "audit_context_allow_only",
       "fields": ["name", "id", "source", "allowed", "exclude", "ignored_violations", "reason"],
       "validates": "A type matching the source contextual selector may reference only types matching an allowed contextual selector; any other role-classified reference (after exclude selectors are applied) is a violation. Same selector shape and metadata operator vocabulary (exact/in/any/not-equal-to-source) as context-dependency. Requires a source selector and a non-empty allowed list."
+    },
+    {
+      "kind": "port-boundary",
+      "strictGroup": "strict_port_boundaries",
+      "auditGroup": "audit_port_boundaries",
+      "fields": ["name", "id", "source", "target_context", "allowed_seams", "forbidden", "adapter_bindings[].adapter", "adapter_bindings[].expected_port", "adapter_bindings[].allowed_contexts", "exclude", "ignored_violations", "reason"],
+      "validates": "A selected source may reach a target context only through an explicitly allowed semantic port or ACL seam; optional adapter_bindings constrain adapter-to-port interface bindings and allowed contexts. Context selectors reuse canonical role/metadata evidence and exclusions apply before boundary evaluation."
     }
   ],
   "exceptionMechanisms": {
