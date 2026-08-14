@@ -10,6 +10,8 @@ internal sealed record ArchitectureBaselineIdentityDescriptor(
     IReadOnlyList<string> SemanticDimensions,
     string? NonBaselineReason = null)
 {
+    private const string SourceAssembly = "source-assembly";
+
     public static ArchitectureBaselineIdentityDescriptor For(string familyId, bool isBaselineCapable)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(familyId);
@@ -34,18 +36,18 @@ internal sealed record ArchitectureBaselineIdentityDescriptor(
         string[] common = ["contract-family", "contract-id", "source", "target", "occurrence"];
         return familyId switch
         {
-            "method_body" or "composition" => common.Concat(["source-assembly", "source-member", "target-member"]).ToArray(),
+            "method_body" or "composition" => common.Concat([SourceAssembly, "source-member", "target-member"]).ToArray(),
             "package_dependency" or "package_allow_only" => common.Concat(["source-project", "package-id"]).ToArray(),
             "framework_dependency" or "framework_allow_only" => common.Concat(["source-project", "framework-reference", "target-framework", "condition"]).ToArray(),
-            "public_api_surface" => common.Concat(["source-assembly", "api-symbol"]).ToArray(),
+            "public_api_surface" => common.Concat([SourceAssembly, "api-symbol"]).ToArray(),
             "coverage" => common.Concat(["coverage-subject", "coverage-kind"]).ToArray(),
             "project_metadata" => common.Concat(["source-project", "metadata-key", "configuration", "target-framework"]).ToArray(),
-            "assembly_independence" or "assembly_dependency" or "assembly_allow_only" => common.Concat(["source-assembly", "target-assembly"]).ToArray(),
-            "external" or "external_allow_only" => common.Concat(["source-assembly", "target-assembly", "target-type"]).ToArray(),
+            "assembly_independence" or "assembly_dependency" or "assembly_allow_only" => common.Concat([SourceAssembly, "target-assembly"]).ToArray(),
+            "external" or "external_allow_only" => common.Concat([SourceAssembly, "target-assembly", "target-type"]).ToArray(),
             "dependency" or "layer" or "allow_only" or "cycle" or "acyclic_sibling"
                 or "independence" or "protected" or "context_dependency" or "context_allow_only"
                 or "port_boundary" or "type_placement" or "layout_conventions" or "attribute_usage"
-                or "inheritance" or "interface_implementation" => common.Concat(["source-assembly", "source-type", "target-assembly", "target-type"]).ToArray(),
+                or "inheritance" or "interface_implementation" => common.Concat([SourceAssembly, "source-type", "target-assembly", "target-type"]).ToArray(),
             _ => throw new InvalidOperationException($"Baseline-capable family '{familyId}' requires an identity-dimension classification."),
         };
     }

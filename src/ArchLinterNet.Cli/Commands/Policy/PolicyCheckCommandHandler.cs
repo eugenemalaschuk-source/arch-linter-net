@@ -10,6 +10,8 @@ namespace ArchLinterNet.Cli.Commands.Policy;
 
 internal sealed class PolicyCheckCommandHandler(ICliConsole console)
 {
+    private const string UnexpectedToolFailure = "unexpected-tool-failure";
+
     public int Execute(PolicyCheckCommandOptions options)
     {
         if (options.ShowHelp)
@@ -45,7 +47,7 @@ internal sealed class PolicyCheckCommandHandler(ICliConsole console)
         {
             if (options.Format == "json")
             {
-                WriteFailure("json", new PolicyCheckFailure(ex.Message, "unexpected-tool-failure", null));
+                WriteFailure("json", new PolicyCheckFailure(ex.Message, UnexpectedToolFailure, null));
                 return CliExitCodes.InvalidArgumentsOrRuntimeError;
             }
 
@@ -53,7 +55,7 @@ internal sealed class PolicyCheckCommandHandler(ICliConsole console)
             {
                 console.Out.WriteLine(FormatSarif(
                     new PolicyCheckOutcome(Array.Empty<string>(), Array.Empty<PolicyCheckDeferredCheck>()),
-                    new PolicyCheckFailure(ex.Message, "unexpected-tool-failure", null)));
+                    new PolicyCheckFailure(ex.Message, UnexpectedToolFailure, null)));
                 return CliExitCodes.InvalidArgumentsOrRuntimeError;
             }
 
@@ -198,7 +200,7 @@ internal sealed class PolicyCheckCommandHandler(ICliConsole console)
 
     private static string FailureStatus(PolicyCheckFailure failure)
     {
-        return failure.Category == "unexpected-tool-failure" ? "unexpected-tool-failure" : "invalid-policy";
+        return failure.Category == UnexpectedToolFailure ? UnexpectedToolFailure : "invalid-policy";
     }
 
     private static object[] FormatPrimarySarifLocations(ArchitecturePolicySourceLocation? location)

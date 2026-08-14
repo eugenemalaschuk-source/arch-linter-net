@@ -9,6 +9,8 @@ namespace ArchLinterNet.Core.Execution;
 
 public sealed partial class ArchitectureAnalysisSession
 {
+    private const string UnclassifiedSemanticFact = "unclassified semantic fact";
+
     private ArchitectureCoverageSummary BuildSemanticRoleCoverageSummary(ArchitectureCoverageContract contract)
     {
         List<ArchitectureCoverageSummaryExcludedItem> excludedItems = new();
@@ -30,7 +32,7 @@ public sealed partial class ArchitectureAnalysisSession
             if (!RoleIndex.TryGetRole(type, out ArchitectureTypeClassificationResult descriptor))
             {
                 uncoveredItems.Add(new ArchitectureCoverageSummaryEvidenceItem(
-                    ArchitectureTypeNames.SafeFullName(type), "unclassified semantic fact"));
+                    ArchitectureTypeNames.SafeFullName(type), UnclassifiedSemanticFact));
                 continue;
             }
 
@@ -81,13 +83,13 @@ public sealed partial class ArchitectureAnalysisSession
             {
                 if (!executionContext.IsIgnored(
                         subject,
-                        "unclassified semantic fact",
+                        UnclassifiedSemanticFact,
                         sourceAssembly: sourceAssembly,
                         targetType: subject,
-                        targetMember: "unclassified semantic fact"))
+                        targetMember: UnclassifiedSemanticFact))
                 {
                     findings.Add(new ArchitectureViolation(contract.Name, contract.Id, subject,
-                        "unclassified semantic fact", new[] { subject }));
+                        UnclassifiedSemanticFact, new[] { subject }));
                 }
                 continue;
             }

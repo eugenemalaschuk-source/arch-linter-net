@@ -14,6 +14,8 @@ namespace ArchLinterNet.CEL.Benchmarks.Fixtures;
 /// </summary>
 internal static class BenchmarkFixtures
 {
+    private const string AssemblySchemaName = "assembly";
+
     /// <summary>A short predicate exercising member access, equality, and a built-in call.</summary>
     public const string RepresentativePredicateSource =
         "source.role == 'service' && target.namespace.startsWith('Example.')";
@@ -29,7 +31,7 @@ internal static class BenchmarkFixtures
 
     public static CelObjectSchema BuildAssemblyObjectSchema()
     {
-        var builder = CelObjectSchema.CreateBuilder("assembly");
+        var builder = CelObjectSchema.CreateBuilder(AssemblySchemaName);
         builder.AddMember("role", CelType.String);
         builder.AddMember("namespace", CelType.String);
         builder.AddMember("name", CelType.String);
@@ -43,8 +45,8 @@ internal static class BenchmarkFixtures
         out CelVariable target)
     {
         var builder = CelContextSchema.CreateBuilder("assembly-predicate-v1");
-        source = builder.AddVariable("source", CelType.ObjectOf("assembly"));
-        target = builder.AddVariable("target", CelType.ObjectOf("assembly"));
+        source = builder.AddVariable("source", CelType.ObjectOf(AssemblySchemaName));
+        target = builder.AddVariable("target", CelType.ObjectOf(AssemblySchemaName));
         return builder.Build();
     }
 
@@ -72,7 +74,7 @@ internal static class BenchmarkFixtures
                 ? new Dictionary<string, CelValue> { ["owner"] = CelValue.String("platform-team") }
                 : new Dictionary<string, CelValue>()),
         };
-        return new CelObjectValue("assembly", members);
+        return new CelObjectValue(AssemblySchemaName, members);
     }
 
     /// <summary>The matching "source" object value used throughout the source/target scenario.</summary>
@@ -125,7 +127,7 @@ internal static class BenchmarkFixtures
     public static (CelEnvironment Environment, CelEvaluationContext Context) BuildMismatchedSchemaContext()
     {
         var otherSchemaBuilder = CelContextSchema.CreateBuilder("other-schema-v1");
-        var onlySource = otherSchemaBuilder.AddVariable("source", CelType.ObjectOf("assembly"));
+        var onlySource = otherSchemaBuilder.AddVariable("source", CelType.ObjectOf(AssemblySchemaName));
         var otherSchema = otherSchemaBuilder.Build();
         var otherEnvironment = CelEnvironment.CreateBuilder(CelProfile.V1)
             .WithContextSchema(otherSchema)
