@@ -625,8 +625,10 @@ internal sealed partial class ArchitecturePolicyPathResolver : IArchitecturePoli
     private const uint CommonFileIdAttribute = 0x02000000;
     private const uint DarwinRegularFile = 1;
 
-    [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
-    private static extern SafeFileHandle CreateFile(
+    // DllImport auto-probes the "W"/"A" suffix for CharSet.Unicode/Ansi; LibraryImport does not, so
+    // the real Unicode entry point must be named explicitly.
+    [LibraryImport("kernel32.dll", EntryPoint = "CreateFileW", StringMarshalling = StringMarshalling.Utf16, SetLastError = true)]
+    private static partial SafeFileHandle CreateFile(
         string fileName,
         uint desiredAccess,
         uint shareMode,
@@ -635,18 +637,27 @@ internal sealed partial class ArchitecturePolicyPathResolver : IArchitecturePoli
         uint flagsAndAttributes,
         IntPtr templateFile);
 
+    // ByHandleFileInformation embeds System.Runtime.InteropServices.ComTypes.FILETIME, which the
+    // LibraryImport source generator cannot marshal without disabling runtime marshalling for the
+    // whole assembly (SYSLIB1051) — too invasive a change to make solely for this call.
+    [SuppressMessage("Interoperability", "SYSLIB1054:Use LibraryImportAttribute instead of DllImportAttribute", Justification = "ByHandleFileInformation embeds ComTypes.FILETIME, unsupported by LibraryImport without assembly-wide DisableRuntimeMarshalling.")]
     [DllImport("kernel32.dll", SetLastError = true)]
     private static extern bool GetFileInformationByHandle(
         SafeFileHandle file,
         out ByHandleFileInformation fileInformation);
 
-    [DllImport("kernel32.dll", SetLastError = true)]
-    private static extern uint GetFileType(SafeFileHandle file);
+    [LibraryImport("kernel32.dll", SetLastError = true)]
+    private static partial uint GetFileType(SafeFileHandle file);
 
-    [DllImport("libc", SetLastError = true, EntryPoint = "stat")]
+    // The stat buffer here is the same ABI-specific fixed-size byte layout as FStatLinuxX64/Arm64
+    // above: LibraryImport's source-generated marshaller does not support a MarshalAs(ByValArray)
+    // struct field passed through an `out` parameter, so this stays on the legacy marshaler.
+    [SuppressMessage("Interoperability", "SYSLIB1054:Use LibraryImportAttribute instead of DllImportAttribute", Justification = "stat uses an ABI-specific stat buffer unsupported by LibraryImport.")]
+    [DllImport("libc", CharSet = CharSet.Ansi, SetLastError = true, EntryPoint = "stat")]
     private static extern int StatLinuxX64(string path, out LinuxX64Stat stat);
 
-    [DllImport("libc", SetLastError = true, EntryPoint = "stat")]
+    [SuppressMessage("Interoperability", "SYSLIB1054:Use LibraryImportAttribute instead of DllImportAttribute", Justification = "stat uses an ABI-specific stat buffer unsupported by LibraryImport.")]
+    [DllImport("libc", CharSet = CharSet.Ansi, SetLastError = true, EntryPoint = "stat")]
     private static extern int StatLinuxArm64(string path, out LinuxArm64Stat stat);
 
     [SuppressMessage("Interoperability", "SYSLIB1054:Use LibraryImportAttribute instead of DllImportAttribute", Justification = "fstat uses an ABI-specific stat buffer unsupported by LibraryImport.")]

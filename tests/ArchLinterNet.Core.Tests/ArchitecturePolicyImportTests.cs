@@ -779,11 +779,12 @@ public sealed partial class ArchitecturePolicyImportTests
         return $"{imports}contracts:\n  strict:\n    - name: {name}\n      source: application\n      forbidden: [domain]\n";
     }
 
-    [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true, EntryPoint = "CreateHardLinkW")]
-    private static extern bool CreateHardLinkWindows(string fileName, string existingFileName, IntPtr securityAttributes);
+    [LibraryImport("kernel32.dll", StringMarshalling = StringMarshalling.Utf16, SetLastError = true, EntryPoint = "CreateHardLinkW")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static partial bool CreateHardLinkWindows(string fileName, string existingFileName, IntPtr securityAttributes);
 
-    [DllImport("libc", SetLastError = true, EntryPoint = "link")]
-    private static extern int CreateHardLinkUnix(string existingFileName, string fileName);
+    [LibraryImport("libc", EntryPoint = "link", SetLastError = true, StringMarshalling = StringMarshalling.Utf8)]
+    private static partial int CreateHardLinkUnix(string existingFileName, string fileName);
 
     [LibraryImport("libc", EntryPoint = "mkfifo", SetLastError = true, StringMarshalling = StringMarshalling.Utf8)]
     private static partial int CreateNamedPipeUnix(string pathName, uint mode);
