@@ -18,6 +18,8 @@ public sealed class PackagedSchemaRegistryTests
     private static readonly string[] _value = {
                 "analysis-build-state", "analysis-cache", "analysis-profile", "api-snapshot", "baseline", "normalized-finding", "policy-fragment", "policy-root",
             };
+    private static readonly string[] _value1 = { "policy-root", "policy-fragment" };
+
     [Test]
     public void List_ReturnsEveryReleaseMatchedSchemaInOrdinalOrder()
     {
@@ -33,21 +35,20 @@ public sealed class PackagedSchemaRegistryTests
             // layers.*.overlaps_with while every other schema, and the frozen pre-overlaps_with
             // 0.5.1 policy-root/policy-fragment bytes, remain untouched (see
             // openspec/specs/packaged-schema-registry and schema/0.5.1/compatibility-manifest.json).
-            string[] advancedLogicalIds = { "policy-root", "policy-fragment" };
             Assert.That(
-                schemas.Where(schema => !advancedLogicalIds.Contains(schema.LogicalId))
+                schemas.Where(schema => !_value1.Contains(schema.LogicalId))
                     .All(static schema => schema.SchemaId.Contains("/schema/0.5.1/", StringComparison.Ordinal)),
                 Is.True);
             Assert.That(
-                schemas.Where(schema => advancedLogicalIds.Contains(schema.LogicalId))
+                schemas.Where(schema => _value1.Contains(schema.LogicalId))
                     .All(static schema => schema.SchemaId.Contains("/schema/0.6.1/", StringComparison.Ordinal)),
                 Is.True);
             Assert.That(
-                schemas.Where(schema => !advancedLogicalIds.Contains(schema.LogicalId))
+                schemas.Where(schema => !_value1.Contains(schema.LogicalId))
                     .All(static schema => schema.ResourcePath.StartsWith("schema/0.5.1/", StringComparison.Ordinal)),
                 Is.True);
             Assert.That(
-                schemas.Where(schema => advancedLogicalIds.Contains(schema.LogicalId))
+                schemas.Where(schema => _value1.Contains(schema.LogicalId))
                     .All(static schema => schema.ResourcePath.StartsWith("schema/0.6.1/", StringComparison.Ordinal)),
                 Is.True);
             Assert.That(schemas.All(static schema => schema.Sha256.Length == 64), Is.True);
