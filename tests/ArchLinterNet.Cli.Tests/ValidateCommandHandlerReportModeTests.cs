@@ -146,7 +146,7 @@ public sealed partial class ValidateCommandHandlerReportModeTests
             Assert.That(exitCode, Is.EqualTo(CliExitCodes.InvalidArgumentsOrRuntimeError));
             Assert.That(console.StdErr, Does.Contain("Architecture validation passed."));
             Assert.That(console.StdErr, Does.Contain("Report output failed"));
-            Assert.That(System.Text.RegularExpressions.Regex.Matches(console.StdErr, "Architecture validation passed.").Count,
+            Assert.That(ArchitectureValidationPassedRegex().Matches(console.StdErr).Count,
                 Is.EqualTo(1));
             Assert.That(fileSystem.CommittedPaths, Is.Empty);
         });
@@ -788,4 +788,7 @@ public sealed partial class ValidateCommandHandlerReportModeTests
 
         public bool CanWriteToDirectory(string path) => true;
     }
+
+    [System.Text.RegularExpressions.GeneratedRegex("Architecture validation passed.")]
+    private static partial System.Text.RegularExpressions.Regex ArchitectureValidationPassedRegex();
 }

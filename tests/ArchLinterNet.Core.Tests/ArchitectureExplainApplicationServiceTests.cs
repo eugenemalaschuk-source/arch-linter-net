@@ -97,8 +97,8 @@ public sealed class ArchitectureExplainApplicationServiceTests
             });
 
             Assert.That(outcome.Path, Is.Not.Null);
-            Assert.That(outcome.Path!.First(), Is.EqualTo(ExecutionNamespace));
-            Assert.That(outcome.Path!.Last(), Is.EqualTo(ModelNamespace));
+            Assert.That(outcome.Path![0], Is.EqualTo(ExecutionNamespace));
+            Assert.That(outcome.Path![^1], Is.EqualTo(ModelNamespace));
         }
         finally
         {

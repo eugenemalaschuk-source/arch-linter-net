@@ -47,7 +47,7 @@ internal sealed class AdoptionAcceptanceFixture : IDisposable
     public void Build(string? configuration = null, string? targetFramework = null)
     {
         string buildTarget = Directory.GetFiles(Root, "*.slnx", SearchOption.TopDirectoryOnly).SingleOrDefault()
-            ?? ProjectPaths.First();
+            ?? ProjectPaths[0];
         var startInfo = new ProcessStartInfo("dotnet")
         {
             RedirectStandardOutput = true,

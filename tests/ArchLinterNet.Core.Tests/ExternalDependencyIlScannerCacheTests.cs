@@ -116,12 +116,12 @@ public sealed class ExternalDependencyIlScannerCacheTests
     public void FindMethodBodyViolations_TokenRequestedAgain_IsResolvedOnce()
     {
         var single = new ResolveRecorder();
-        new ArchitectureExternalDependencyIlScanner(single.Resolve).FindMethodBodyViolations(
+        _ = new ArchitectureExternalDependencyIlScanner(single.Resolve).FindMethodBodyViolations(
             _mixedSourceTypes, "vendor_sdk", VendorSdkGroup(), NewExecutionContext()).ToList();
 
         // Scanning the same types twice in one call re-requests every token the first copy walked.
         var doubled = new ResolveRecorder();
-        new ArchitectureExternalDependencyIlScanner(doubled.Resolve).FindMethodBodyViolations(
+        _ = new ArchitectureExternalDependencyIlScanner(doubled.Resolve).FindMethodBodyViolations(
             _mixedSourceTypes.Concat(_mixedSourceTypes).ToArray(),
             "vendor_sdk", VendorSdkGroup(), NewExecutionContext()).ToList();
 
@@ -138,11 +138,11 @@ public sealed class ExternalDependencyIlScannerCacheTests
         var recorder = new ResolveRecorder();
         var scanner = new ArchitectureExternalDependencyIlScanner(recorder.Resolve);
 
-        scanner.FindMethodBodyViolations(
+        _ = scanner.FindMethodBodyViolations(
             _mixedSourceTypes, "vendor_sdk", VendorSdkGroup(), NewExecutionContext()).ToList();
         int afterFirstGroup = recorder.Calls.Count;
 
-        scanner.FindMethodBodyViolations(
+        _ = scanner.FindMethodBodyViolations(
             _mixedSourceTypes, "unity_runtime", UnityGroup(), NewExecutionContext()).ToList();
 
         Assert.That(afterFirstGroup, Is.GreaterThan(0));
@@ -157,7 +157,7 @@ public sealed class ExternalDependencyIlScannerCacheTests
     public void FindMethodBodyViolations_SameTokenInDifferentGenericContexts_IsResolvedPerContext()
     {
         var recorder = new ResolveRecorder();
-        new ArchitectureExternalDependencyIlScanner(recorder.Resolve).FindMethodBodyViolations(
+        _ = new ArchitectureExternalDependencyIlScanner(recorder.Resolve).FindMethodBodyViolations(
             _mixedSourceTypes, "vendor_sdk", VendorSdkGroup(), NewExecutionContext()).ToList();
 
         int tokensSeenUnderSeveralContexts = recorder.Calls
