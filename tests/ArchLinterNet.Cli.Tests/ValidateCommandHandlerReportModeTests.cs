@@ -146,7 +146,7 @@ public sealed partial class ValidateCommandHandlerReportModeTests
             Assert.That(exitCode, Is.EqualTo(CliExitCodes.InvalidArgumentsOrRuntimeError));
             Assert.That(console.StdErr, Does.Contain("Architecture validation passed."));
             Assert.That(console.StdErr, Does.Contain("Report output failed"));
-            Assert.That(ArchitectureValidationPassedRegex().Matches(console.StdErr).Count,
+            Assert.That(ArchitectureValidationPassedRegex().Count(console.StdErr),
                 Is.EqualTo(1));
             Assert.That(fileSystem.CommittedPaths, Is.Empty);
         });

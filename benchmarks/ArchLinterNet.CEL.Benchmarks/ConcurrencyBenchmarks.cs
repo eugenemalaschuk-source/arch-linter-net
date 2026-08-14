@@ -19,27 +19,26 @@ public class ConcurrencyBenchmarks
 {
     private const int TaskCount = 8;
 
-    private CelEnvironment _environment = null!;
     private CelCompiledPredicate _predicate = null!;
     private CelEvaluationContext[] _perTaskContexts = null!;
 
     [GlobalSetup]
     public void Setup()
     {
-        _environment = BenchmarkFixtures.BuildEnvironment();
-        var compilation = _environment.CompilePredicate(BenchmarkFixtures.RepresentativePredicateSource);
+        CelEnvironment environment = BenchmarkFixtures.BuildEnvironment();
+        var compilation = environment.CompilePredicate(BenchmarkFixtures.RepresentativePredicateSource);
         _predicate = compilation.Program!;
 
         // BuildEnvironment() and BuildSourceTargetSchema() each construct a fresh schema, so the
         // predicate's own environment's variable handles are recovered from its Schema.Variables
         // rather than rebuilding a second, structurally-identical-but-distinct schema.
-        var source = _environment.Schema.Variables[0];
-        var target = _environment.Schema.Variables[1];
+        var source = environment.Schema.Variables[0];
+        var target = environment.Schema.Variables[1];
 
         // Independent contexts, one per simulated worker — no cross-thread sharing.
         _perTaskContexts = new CelEvaluationContext[TaskCount];
         for (var i = 0; i < TaskCount; i++)
-            _perTaskContexts[i] = BenchmarkFixtures.BuildMatchingContext(_environment, source, target);
+            _perTaskContexts[i] = BenchmarkFixtures.BuildMatchingContext(environment, source, target);
     }
 
     [Benchmark(Baseline = true, Description = "Sequential evaluation of one compiled predicate across N independent contexts")]

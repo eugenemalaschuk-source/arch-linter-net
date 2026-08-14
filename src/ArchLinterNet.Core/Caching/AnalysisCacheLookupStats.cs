@@ -33,7 +33,6 @@ public sealed class AnalysisCacheLookupStats
             case AnalysisCacheLookupOutcome.Miss:
                 _misses++;
                 break;
-            case AnalysisCacheLookupOutcome.Reject:
             default:
                 _rejects++;
                 RecordReason(result.Reason);

@@ -592,7 +592,7 @@ internal static class ArchitecturePolicyEffectiveSchemaValidator
             return true;
         }
 
-        bool negative = value.StartsWith("-", StringComparison.Ordinal);
+        bool negative = value.StartsWith('-');
         string unsignedValue = negative ? value[1..] : value;
         int radix;
         if (unsignedValue.StartsWith("0x", StringComparison.OrdinalIgnoreCase))

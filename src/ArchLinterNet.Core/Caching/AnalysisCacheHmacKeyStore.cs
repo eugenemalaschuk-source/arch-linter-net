@@ -170,6 +170,7 @@ internal static class AnalysisCacheHmacKeyStore
         }
         catch (IOException)
         {
+            // Best-effort cleanup: a locked or already-removed key file is not this call's problem.
         }
     }
 }

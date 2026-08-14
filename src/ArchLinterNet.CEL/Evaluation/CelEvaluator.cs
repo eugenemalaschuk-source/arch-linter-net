@@ -31,11 +31,8 @@ internal static class CelEvaluator
         }
 
         var session = new EvaluationSession(boundExpression, profileId, context, limits);
-        return session.Evaluate();
+        return session.Run();
     }
-
-    private static CelEvaluationResult Success(CelValue value) =>
-        new(isSuccess: true, value, diagnostics: []);
 
     private static CelEvaluationResult Failure(CelDiagnostic diagnostic) =>
         new(isSuccess: false, value: null, diagnostics: [diagnostic]);
@@ -72,13 +69,16 @@ internal static class CelEvaluator
             _valuesByName = context.ValuesByName;
         }
 
-        public CelEvaluationResult Evaluate()
+        public CelEvaluationResult Run()
         {
             var step = EvaluateNode(_boundExpression.Root);
             return step.IsSuccess
                 ? Success(step.Value!)
                 : Failure(step.Diagnostic!);
         }
+
+        private static CelEvaluationResult Success(CelValue value) =>
+            new(isSuccess: true, value, diagnostics: []);
 
         private EvaluationStep EvaluateNode(CelBoundNode node)
         {

@@ -86,10 +86,7 @@ internal sealed class AdoptionAcceptanceFixture : IDisposable
 
     public long AddLargeEmbeddedResource(string fileName, long byteCount)
     {
-        if (byteCount <= 0)
-        {
-            throw new ArgumentOutOfRangeException(nameof(byteCount));
-        }
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(byteCount);
 
         string resourcePath = Path.Combine(Root, fileName);
         using (FileStream stream = File.Create(resourcePath))
