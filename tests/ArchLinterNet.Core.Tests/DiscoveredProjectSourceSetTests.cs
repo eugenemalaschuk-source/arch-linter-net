@@ -8,6 +8,8 @@ namespace ArchLinterNet.Core.Tests;
 [TestFixture]
 public sealed class DiscoveredProjectSourceSetTests
 {
+    private static readonly string[] _value = { "src/Production/Production.csproj" };
+    private static readonly string[] _value1 = { "src/Production/Production.csproj" };
     private string _repositoryRoot = null!;
 
     [SetUp]
@@ -67,9 +69,9 @@ public sealed class DiscoveredProjectSourceSetTests
         ArchitectureProjectMetadataContract contract = document.Contracts.StrictProjectMetadata.Single();
         Assert.Multiple(() =>
         {
-            Assert.That(contract.Projects, Is.EqualTo(new[] { "src/Production/Production.csproj" }));
+            Assert.That(contract.Projects, Is.EqualTo(_value));
             Assert.That(document.SourceExpansion.Sets.Single(set => set.Name == "production_projects").ResolvedSources,
-                Is.EqualTo(new[] { "src/Production/Production.csproj" }));
+                Is.EqualTo(_value1));
             Assert.That(document.SourceExpansion.Contracts.Single().Instances.Single().Selector,
                 Is.EqualTo("src/**/*.csproj"));
         });

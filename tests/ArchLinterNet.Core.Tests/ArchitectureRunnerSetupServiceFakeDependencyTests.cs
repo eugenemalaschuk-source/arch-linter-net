@@ -13,6 +13,8 @@ namespace ArchLinterNet.Core.Tests;
 [TestFixture]
 public sealed class ArchitectureRunnerSetupServiceFakeDependencyTests
 {
+    private static readonly string[] _value = { "fake-missing-assembly-marker" };
+    private static readonly string[] _value1 = { "fake-probing-path-marker" };
     private sealed class FakeRepositoryRootResolver : IArchitectureRepositoryRootResolver
     {
         public bool WasCalled { get; private set; }
@@ -65,8 +67,8 @@ public sealed class ArchitectureRunnerSetupServiceFakeDependencyTests
             WasCalled = true;
             return new ResolutionResult(
                 new[] { typeof(FakeAssemblyResolutionService).Assembly },
-                new[] { "fake-missing-assembly-marker" },
-                new[] { "fake-probing-path-marker" });
+                _value,
+                _value1);
         }
 
         public ResolutionResult ResolvePostBuild(

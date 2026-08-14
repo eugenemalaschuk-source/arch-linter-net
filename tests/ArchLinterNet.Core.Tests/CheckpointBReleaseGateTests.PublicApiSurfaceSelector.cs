@@ -5,6 +5,7 @@ namespace ArchLinterNet.Core.Tests;
 
 public sealed partial class CheckpointBReleaseGateTests
 {
+    private static readonly string[] _value = { "added", "removed", "changed" };
     private const string ApiSurfaceSelectorFixtureId = "api-surface-selector";
 
     // Appended once for the whole matrix: three sibling strict_public_api_surface contracts over
@@ -272,7 +273,7 @@ contracts:
         Assert.Multiple(() =>
         {
             Assert.That(evolved.ExitCode, Is.EqualTo(1), evolved.CombinedOutput);
-            Assert.That(deltas.Keys, Is.EquivalentTo(new[] { "added", "removed", "changed" }),
+            Assert.That(deltas.Keys, Is.EquivalentTo(_value),
                 $"Every delta class must be observed on a selected type.{Environment.NewLine}{evolved.CombinedOutput}");
             Assert.That(deltas["added"],
                 Is.EqualTo("method Synthetic.ApiSurfaceSelector.Domain.Receipt.Added(): System.String"));

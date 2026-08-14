@@ -13,6 +13,9 @@ namespace ArchLinterNet.Core.Tests;
 [TestFixture]
 public sealed class AnalysisCacheDiagnosticPayloadConverterTests
 {
+    private static readonly string[] _value = { "group-a" };
+    private static readonly string[] _value1 = { "MyApp.Application" };
+    private static readonly string[] _value2 = { "group-a", "group-b" };
     private static T RoundTrip<T>(T payload) where T : IArchitectureDiagnosticPayload
     {
         string json = JsonSerializer.Serialize<IArchitectureDiagnosticPayload>(payload, AnalysisCacheJson.Options);
@@ -24,7 +27,7 @@ public sealed class AnalysisCacheDiagnosticPayloadConverterTests
     [Test]
     public void RoundTrips_FrameworkReferenceAllowOnlyPayload()
     {
-        FrameworkReferenceAllowOnlyPayload original = new(new[] { "group-a" });
+        FrameworkReferenceAllowOnlyPayload original = new(_value);
         FrameworkReferenceAllowOnlyPayload result = RoundTrip(original);
         Assert.That(result.AllowedFrameworkGroups, Is.EqualTo(original.AllowedFrameworkGroups));
     }
@@ -92,7 +95,7 @@ public sealed class AnalysisCacheDiagnosticPayloadConverterTests
     [Test]
     public void RoundTrips_DependencyPayload()
     {
-        DependencyPayload original = new("Domain", "Infrastructure", new[] { "MyApp.Application" });
+        DependencyPayload original = new("Domain", "Infrastructure", _value1);
         DependencyPayload result = RoundTrip(original);
         Assert.That(result.SourceLayer, Is.EqualTo(original.SourceLayer));
         Assert.That(result.AllowedImporters, Is.EqualTo(original.AllowedImporters));
@@ -167,7 +170,7 @@ public sealed class AnalysisCacheDiagnosticPayloadConverterTests
     [Test]
     public void RoundTrips_PackageAllowOnlyPayload()
     {
-        PackageAllowOnlyPayload original = new(new[] { "group-a", "group-b" });
+        PackageAllowOnlyPayload original = new(_value2);
         PackageAllowOnlyPayload result = RoundTrip(original);
         Assert.That(result.AllowedPackageGroups, Is.EqualTo(original.AllowedPackageGroups));
     }

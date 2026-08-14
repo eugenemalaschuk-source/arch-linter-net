@@ -11,6 +11,8 @@ namespace ArchLinterNet.Core.Tests;
 [TestFixture]
 public sealed class ArchitectureExpressionContextFactoryTests
 {
+    private static readonly string[] _value = { "Assets/Game/Client/Presentation/SalesOrder.cs" };
+    private static readonly string[] _value1 = { "Assets", "Assets/Game", "Assets/Game/Client", "Assets/Game/Client/Presentation" };
     private static ArchitectureExpressionSubjectFacts SalesSubject => new(
         FullName: "Acme.Sales.Domain.SalesOrder",
         SimpleName: "SalesOrder",
@@ -26,8 +28,8 @@ public sealed class ArchitectureExpressionContextFactoryTests
         BaseTypeNames: Array.Empty<string>(),
         InterfaceTypeNames: Array.Empty<string>(),
         AttributeTypeNames: Array.Empty<string>(),
-        SourcePaths: new[] { "Assets/Game/Client/Presentation/SalesOrder.cs" },
-        SourceDirectoryPrefixes: new[] { "Assets", "Assets/Game", "Assets/Game/Client", "Assets/Game/Client/Presentation" });
+        SourcePaths: _value,
+        SourceDirectoryPrefixes: _value1);
 
     private static ArchitectureExpressionSubjectFacts InventorySubject => SalesSubject with
     {

@@ -15,6 +15,9 @@ namespace ArchLinterNet.Core.Tests;
 [TestFixture]
 public sealed class PackagedSchemaRegistryTests
 {
+    private static readonly string[] _value = {
+                "analysis-build-state", "analysis-cache", "analysis-profile", "api-snapshot", "baseline", "normalized-finding", "policy-fragment", "policy-root",
+            };
     [Test]
     public void List_ReturnsEveryReleaseMatchedSchemaInOrdinalOrder()
     {
@@ -24,10 +27,7 @@ public sealed class PackagedSchemaRegistryTests
 
         Assert.Multiple(() =>
         {
-            Assert.That(schemas.Select(static schema => schema.LogicalId), Is.EqualTo(new[]
-            {
-                "analysis-build-state", "analysis-cache", "analysis-profile", "api-snapshot", "baseline", "normalized-finding", "policy-fragment", "policy-root",
-            }));
+            Assert.That(schemas.Select(static schema => schema.LogicalId), Is.EqualTo(_value));
             Assert.That(schemas.Single(static schema => schema.LogicalId == "baseline").DocumentVersion, Is.EqualTo("v2"));
             // policy-root/policy-fragment advanced to an independent 0.6.1 schema identity to add
             // layers.*.overlaps_with while every other schema, and the frozen pre-overlaps_with

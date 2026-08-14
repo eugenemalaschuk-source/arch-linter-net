@@ -11,6 +11,15 @@ namespace ArchLinterNet.Core.Tests;
 [TestFixture]
 public sealed class PolicyConsistencyCheckTests
 {
+    private static readonly string[] _value = { "first", "second" };
+    private static readonly string[] _value1 = { "shared-id" };
+    private static readonly string[] _value2 = { "domain-allows-application", "domain-forbids-application" };
+    private static readonly string[] _value3 = { "domain-app-independent", "domain-allows-application" };
+    private static readonly string[] _value4 = { "feature_domain", "feature_application" };
+    private static readonly string[] _value5 = { "domain-protected-allows-application", "domain-protected-no-application" };
+    private static readonly string[] _value6 = { "core", "core-sibling" };
+    private static readonly string[] _value7 = { "core", "core-sibling" };
+    private static readonly string[] _value8 = { "impossible" };
     private static readonly string[] _domainApplication = { "domain", "application" };
     private static readonly string[] _semanticLayers = { "semantic_a", "semantic_b" };
     private static readonly string[] _coreLayer = { "core" };
@@ -77,8 +86,8 @@ public sealed class PolicyConsistencyCheckTests
 
         var finding = findings.FirstOrDefault(f => f.CheckKind == "duplicate-id");
         Assert.That(finding, Is.Not.Null);
-        Assert.That(finding!.ConflictingContractNames, Is.EquivalentTo(new[] { "first", "second" }));
-        Assert.That(finding.ConflictingContractIds, Is.EquivalentTo(new[] { "shared-id" }));
+        Assert.That(finding!.ConflictingContractNames, Is.EquivalentTo(_value));
+        Assert.That(finding.ConflictingContractIds, Is.EquivalentTo(_value1));
     }
 
     [Test]
@@ -136,7 +145,7 @@ public sealed class PolicyConsistencyCheckTests
         Assert.That(finding, Is.Not.Null);
         Assert.That(finding!.Layers, Is.EquivalentTo(_domainApplication));
         Assert.That(finding.ConflictingContractNames,
-            Is.EquivalentTo(new[] { "domain-allows-application", "domain-forbids-application" }));
+            Is.EquivalentTo(_value2));
     }
 
     [Test]
@@ -158,7 +167,7 @@ public sealed class PolicyConsistencyCheckTests
         var finding = findings.FirstOrDefault(f => f.CheckKind == "independence-conflict");
         Assert.That(finding, Is.Not.Null);
         Assert.That(finding!.ConflictingContractNames,
-            Is.EquivalentTo(new[] { "domain-app-independent", "domain-allows-application" }));
+            Is.EquivalentTo(_value3));
     }
 
     [Test]
@@ -195,7 +204,7 @@ public sealed class PolicyConsistencyCheckTests
         var finding = findings.FirstOrDefault(f => f.CheckKind == "independence-conflict");
         Assert.That(finding, Is.Not.Null);
         Assert.That(finding!.ConflictingContractNames, Contains.Item("feature-domain-app-independent"));
-        Assert.That(finding.Layers, Is.EquivalentTo(new[] { "feature_domain", "feature_application" }));
+        Assert.That(finding.Layers, Is.EquivalentTo(_value4));
     }
 
     [Test]
@@ -252,7 +261,7 @@ public sealed class PolicyConsistencyCheckTests
         Assert.That(finding, Is.Not.Null);
         Assert.That(finding!.Layers, Is.EquivalentTo(_domainApplication));
         Assert.That(finding.ConflictingContractNames,
-            Is.EquivalentTo(new[] { "domain-protected-allows-application", "domain-protected-no-application" }));
+            Is.EquivalentTo(_value5));
     }
 
     [Test]
@@ -297,7 +306,7 @@ public sealed class PolicyConsistencyCheckTests
 
         var finding = findings.FirstOrDefault(f => f.CheckKind == "layer-overlap");
         Assert.That(finding, Is.Not.Null);
-        Assert.That(finding!.Layers, Is.EquivalentTo(new[] { "core", "core-sibling" }));
+        Assert.That(finding!.Layers, Is.EquivalentTo(_value6));
         Assert.That(finding.RepresentativeType, Is.Not.Null.And.Not.Empty);
     }
 
@@ -499,7 +508,7 @@ public sealed class PolicyConsistencyCheckTests
 
         var finding = findings.FirstOrDefault(f => f.CheckKind == "layer-overlap");
         Assert.That(finding, Is.Not.Null);
-        Assert.That(finding!.Layers, Is.EquivalentTo(new[] { "core", "core-sibling" }));
+        Assert.That(finding!.Layers, Is.EquivalentTo(_value7));
     }
 
     [Test]
@@ -517,7 +526,7 @@ public sealed class PolicyConsistencyCheckTests
 
         var finding = findings.FirstOrDefault(f => f.CheckKind == "unreachable-contract");
         Assert.That(finding, Is.Not.Null);
-        Assert.That(finding!.Layers, Is.EquivalentTo(new[] { "impossible" }));
+        Assert.That(finding!.Layers, Is.EquivalentTo(_value8));
     }
 
     [Test]

@@ -25,6 +25,10 @@ namespace ArchLinterNet.Core.Tests;
 [TestFixture]
 public sealed class ArchitectureValidationApplicationServiceCacheLocationTests
 {
+    private static readonly string[] _value = { "SomethingMissing" };
+    private static readonly string[] _value1 = { "Fixture" };
+    private static readonly string[] _value2 = { "net10.0" };
+    private static readonly string[] _value3 = { "/fake/repository/root/bin/Fixture.dll" };
     private sealed class FakeRunnerSetupService : IArchitectureRunnerSetupService
     {
         public int BuildRunnerCallCount { get; private set; }
@@ -277,7 +281,7 @@ public sealed class ArchitectureValidationApplicationServiceCacheLocationTests
         var runnerSetupService = new FakeRunnerSetupService
         {
             DocumentToReturn = document,
-            PreparationProvider = _ => CreatePreparation(missingAssemblyNames: new[] { "SomethingMissing" }),
+            PreparationProvider = _ => CreatePreparation(missingAssemblyNames: _value),
             RunnerToReturn = new FakeContractRunner(CreateEmptySession(document)),
         };
         var applicationService = new ArchitectureValidationApplicationService(
@@ -333,17 +337,17 @@ public sealed class ArchitectureValidationApplicationServiceCacheLocationTests
     {
         var document = CreateDocument();
         var discovery = new ProjectDiscoveryResult(
-            new[] { "Fixture" }, Array.Empty<string>(), Array.Empty<string>(),
+            _value1, Array.Empty<string>(), Array.Empty<string>(),
             Array.Empty<ArchitectureProjectDiscoveryDiagnostic>())
         {
-            DiscoveredProjects = new[] { new ArchitectureDiscoveredProject("Fixture.csproj", "Fixture", new[] { "net10.0" }) },
+            DiscoveredProjects = new[] { new ArchitectureDiscoveredProject("Fixture.csproj", "Fixture", _value2) },
             ResolvedAssemblyPaths = new Dictionary<string, string>(StringComparer.Ordinal)
             {
                 ["Fixture"] = "/fake/repository/root/bin/Fixture.dll",
             },
         };
         ArchitectureRunnerPreparation preparation = CreatePreparation(
-            discovery: discovery, selectedPaths: new[] { "/fake/repository/root/bin/Fixture.dll" });
+            discovery: discovery, selectedPaths: _value3);
         var runnerSetupService = new FakeRunnerSetupService
         {
             DocumentToReturn = document,

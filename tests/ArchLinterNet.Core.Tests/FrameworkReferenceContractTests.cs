@@ -15,6 +15,7 @@ namespace ArchLinterNet.Core.Tests;
 [TestFixture]
 public sealed class FrameworkReferenceContractTests
 {
+    private static readonly string[] _value = { "Microsoft.AspNetCore.App (net10.0)" };
     private const string SourceAssemblyName = "MyApp.Domain";
 
     private string _repoRoot = null!;
@@ -142,7 +143,7 @@ public sealed class FrameworkReferenceContractTests
         Assert.That(violations[0].ContractId, Is.EqualTo("domain-no-aspnet"));
         Assert.That(violations[0].SourceType, Is.EqualTo(SourceAssemblyName));
         Assert.That((violations[0].Payload as FrameworkReferencePayload)?.ForbiddenFrameworkGroup, Is.EqualTo("forbidden_web"));
-        Assert.That(violations[0].ForbiddenReferences, Is.EqualTo(new[] { "Microsoft.AspNetCore.App (net10.0)" }));
+        Assert.That(violations[0].ForbiddenReferences, Is.EqualTo(_value));
 
         FrameworkReferenceEvidence evidence = (violations[0].Payload as FrameworkReferencePayload)!.Evidence!.Single();
         Assert.That(evidence.FrameworkName, Is.EqualTo("Microsoft.AspNetCore.App"));

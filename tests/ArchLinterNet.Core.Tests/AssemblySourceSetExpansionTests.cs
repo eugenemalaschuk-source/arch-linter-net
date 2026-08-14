@@ -6,6 +6,7 @@ namespace ArchLinterNet.Core.Tests;
 [TestFixture]
 public sealed class AssemblySourceSetExpansionTests
 {
+    private static readonly string[] _value = { "modules-no-forbidden", "modules-allow-only" };
     private string _temporaryDirectory = null!;
 
     [SetUp]
@@ -58,7 +59,7 @@ public sealed class AssemblySourceSetExpansionTests
             Assert.That(document.Contracts.AuditAssemblyAllowOnly.Select(contract => contract.Id),
                 Is.EqualTo(modules.Select(module => $"modules-allow-only/{module.ToLowerInvariant().Replace('.', '-')}")));
             Assert.That(document.SourceExpansion.Contracts.Select(expansion => expansion.AuthoredContractId),
-                Is.EqualTo(new[] { "modules-no-forbidden", "modules-allow-only" }));
+                Is.EqualTo(_value));
         });
     }
 

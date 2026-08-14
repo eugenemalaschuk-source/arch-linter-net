@@ -7,6 +7,7 @@ namespace ArchLinterNet.Core.Tests;
 [TestFixture]
 public sealed class AsmdefValidatorDelegationTests
 {
+    private static readonly string[] _value = { "Game.Editor" };
     private string _tempDir = null!;
     private string _policyPath = null!;
 
@@ -73,7 +74,7 @@ public sealed class AsmdefValidatorDelegationTests
         Assert.That(violation.ContractId, Is.EqualTo("runtime-editor-ref"));
         Assert.That(violation.SourceType, Is.EqualTo("Game.Runtime"));
         Assert.That(violation.ForbiddenNamespace, Is.EqualTo("asmdef-references"));
-        Assert.That(violation.ForbiddenReferences, Is.EquivalentTo(new[] { "Game.Editor" }));
+        Assert.That(violation.ForbiddenReferences, Is.EquivalentTo(_value));
     }
 
     [Test]

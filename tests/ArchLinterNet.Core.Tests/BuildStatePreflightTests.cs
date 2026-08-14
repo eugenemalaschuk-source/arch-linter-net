@@ -10,6 +10,19 @@ namespace ArchLinterNet.Core.Tests;
 [Category("E2E")]
 public sealed class BuildStatePreflightTests
 {
+    private static readonly string[] _value = { "Fixture" };
+    private static readonly string[] _value1 = { "Fixture" };
+    private static readonly string[] _value2 = { "Fixture" };
+    private static readonly string[] _value3 = { "net10.0" };
+    private static readonly string[] _value4 = { "net10.0" };
+    private static readonly string[] _value5 = { "Downstream", "Upstream" };
+    private static readonly string[] _value6 = { "Upstream" };
+    private static readonly string[] _value7 = { "Fixture" };
+    private static readonly string[] _value8 = { "Fixture" };
+    private static readonly string[] _value9 = { "Fixture" };
+    private static readonly string[] _value10 = { "net10.0" };
+    private static readonly string[] _value11 = { "net10.0" };
+    private static readonly string[] _value12 = { "GraphApp", "GraphLib" };
     private static readonly string[] _staleManifestReasons = { "evaluated-msbuild-evidence-incomplete" };
 
     private string _repoRoot = null!;
@@ -87,7 +100,7 @@ public sealed class BuildStatePreflightTests
     {
         string projectPath = CreateProjectFixture("Fixture", "class C {}");
         ProjectDiscoveryResult discovery = SingleProjectDiscovery(projectPath, "Fixture");
-        BuildStateResolvedAssemblies resolution = new(Array.Empty<Assembly>(), new[] { "Fixture" });
+        BuildStateResolvedAssemblies resolution = new(Array.Empty<Assembly>(), _value);
 
         BuildStatePreflightResult result = BuildStatePreflightEvaluator.Evaluate(new BuildStatePreflightRequest(
             _repoRoot, discovery, resolution, BuildPreparationMode.Ordinary));
@@ -286,7 +299,7 @@ public sealed class BuildStatePreflightTests
         ProjectDiscoveryResult discovery = SingleProjectDiscovery(projectPath, "Fixture", targetFramework: "net10.0");
 
         BuildStatePreflightResult result = BuildStatePreflightEvaluator.Evaluate(new BuildStatePreflightRequest(
-            _repoRoot, discovery, new BuildStateResolvedAssemblies(Array.Empty<Assembly>(), new[] { "Fixture" }),
+            _repoRoot, discovery, new BuildStateResolvedAssemblies(Array.Empty<Assembly>(), _value1),
             BuildPreparationMode.Ordinary, RequestedTargetFramework: "net8.0"));
 
         Assert.That(result.Blocked, Is.True);
@@ -378,7 +391,7 @@ public sealed class BuildStatePreflightTests
         cts.Cancel();
 
         BuildStatePreflightResult result = BuildStatePreflightEvaluator.Evaluate(new BuildStatePreflightRequest(
-            _repoRoot, discovery, new BuildStateResolvedAssemblies(Array.Empty<Assembly>(), new[] { "Fixture" }),
+            _repoRoot, discovery, new BuildStateResolvedAssemblies(Array.Empty<Assembly>(), _value2),
             BuildPreparationMode.Ordinary, CancellationToken: cts.Token));
 
         Assert.That(result.Blocked, Is.True);
@@ -402,14 +415,14 @@ public sealed class BuildStatePreflightTests
         // the repository root) — a reference is looked up by comparing it directly against
         // another project's .Path, not by combining it with a filesystem directory.
         ArchitectureDiscoveredProject downstreamProject = new(
-            downstreamPath, "Downstream", new[] { "net10.0" })
+            downstreamPath, "Downstream", _value3)
         {
             ProjectReferences = new[] { new ArchitectureDiscoveredProjectReference(upstreamPath, downstreamPath) }
         };
-        ArchitectureDiscoveredProject upstreamProject = new(upstreamPath, "Upstream", new[] { "net10.0" });
+        ArchitectureDiscoveredProject upstreamProject = new(upstreamPath, "Upstream", _value4);
 
         ProjectDiscoveryResult discovery = new(
-            new[] { "Downstream", "Upstream" }, Array.Empty<string>(), Array.Empty<string>(),
+            _value5, Array.Empty<string>(), Array.Empty<string>(),
             Array.Empty<ArchitectureProjectDiscoveryDiagnostic>())
         {
             DiscoveredProjects = new[] { downstreamProject, upstreamProject }
@@ -417,7 +430,7 @@ public sealed class BuildStatePreflightTests
 
         // Upstream is missing (never resolved) — Downstream's own artifact is otherwise current.
         BuildStateResolvedAssemblies resolution = new(
-            new[] { LoadFakeAssembly(downstreamAssembly) }, new[] { "Upstream" });
+            new[] { LoadFakeAssembly(downstreamAssembly) }, _value6);
 
         BuildStatePreflightResult result = BuildStatePreflightEvaluator.Evaluate(new BuildStatePreflightRequest(
             _repoRoot, discovery, resolution, BuildPreparationMode.Ordinary));
@@ -435,7 +448,7 @@ public sealed class BuildStatePreflightTests
 
         var service = new BuildStatePreparationService();
         BuildStatePreflightResult result = service.Prepare(new BuildStatePreflightRequest(
-            _repoRoot, discovery, new BuildStateResolvedAssemblies(Array.Empty<Assembly>(), new[] { "Fixture" }),
+            _repoRoot, discovery, new BuildStateResolvedAssemblies(Array.Empty<Assembly>(), _value7),
             BuildPreparationMode.Ordinary, NoRestore: true));
 
         Assert.That(result.Blocked, Is.True);
@@ -451,7 +464,7 @@ public sealed class BuildStatePreflightTests
         File.WriteAllText(Path.Combine(objDirectory, "project.assets.json"), """{"targets":{"net10.0":{}}}""");
 
         ProjectDiscoveryResult discovery = SingleProjectDiscovery(projectPath, "Fixture");
-        BuildStateResolvedAssemblies resolution = new(Array.Empty<Assembly>(), new[] { "Fixture" });
+        BuildStateResolvedAssemblies resolution = new(Array.Empty<Assembly>(), _value8);
 
         var service = new BuildStatePreparationService();
         BuildStatePreflightResult result = service.Prepare(new BuildStatePreflightRequest(
@@ -473,7 +486,7 @@ public sealed class BuildStatePreflightTests
         File.WriteAllText(Path.Combine(objDirectory, "project.assets.json"), "{}");
 
         ProjectDiscoveryResult discovery = SingleProjectDiscovery(projectPath, "Fixture");
-        BuildStateResolvedAssemblies resolution = new(Array.Empty<Assembly>(), new[] { "Fixture" });
+        BuildStateResolvedAssemblies resolution = new(Array.Empty<Assembly>(), _value9);
 
         var service = new BuildStatePreparationService();
         BuildStatePreflightResult result = service.Prepare(new BuildStatePreflightRequest(
@@ -609,9 +622,9 @@ public sealed class BuildStatePreflightTests
         File.WriteAllText(Path.Combine(appDir, "Program.cs"), "System.Console.WriteLine(typeof(EnsureBuiltFixture.C));");
 
         ArchitectureDiscoveredProject libProject = new(
-            Path.GetRelativePath(_repoRoot, libPath).Replace('\\', '/'), "GraphLib", new[] { "net10.0" });
+            Path.GetRelativePath(_repoRoot, libPath).Replace('\\', '/'), "GraphLib", _value10);
         ArchitectureDiscoveredProject appProject = new(
-            Path.GetRelativePath(_repoRoot, appPath).Replace('\\', '/'), "GraphApp", new[] { "net10.0" })
+            Path.GetRelativePath(_repoRoot, appPath).Replace('\\', '/'), "GraphApp", _value11)
         {
             ProjectReferences = new[]
             {
@@ -620,7 +633,7 @@ public sealed class BuildStatePreflightTests
         };
 
         ProjectDiscoveryResult discovery = new(
-            new[] { "GraphApp", "GraphLib" }, Array.Empty<string>(), Array.Empty<string>(),
+            _value12, Array.Empty<string>(), Array.Empty<string>(),
             Array.Empty<ArchitectureProjectDiscoveryDiagnostic>())
         {
             DiscoveredProjects = new[] { appProject, libProject }

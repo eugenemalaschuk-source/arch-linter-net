@@ -10,6 +10,9 @@ namespace ArchLinterNet.Core.Tests;
 [TestFixture]
 public sealed class SourceExpansionProjectionTests
 {
+    private static readonly string[] _value = { "Acme.Modules.Billing", "Acme.Modules.Orders" };
+    private static readonly string[] _value1 = { "modules" };
+    private static readonly string[] _value2 = { "modules-no-infrastructure/acme-modules-billing" };
     private static readonly ArchitectureSarifFormatter _sarifFormatter = new();
 
     private static ArchitecturePolicySourceLocation FragmentLocation()
@@ -121,14 +124,14 @@ public sealed class SourceExpansionProjectionTests
             Assert.That(set.GetProperty("name").GetString(), Is.EqualTo("modules"));
             Assert.That(set.GetProperty("kind").GetString(), Is.EqualTo("assembly"));
             Assert.That(set.GetProperty("resolved_sources").EnumerateArray().Select(v => v.GetString()),
-                Is.EqualTo(new[] { "Acme.Modules.Billing", "Acme.Modules.Orders" }));
+                Is.EqualTo(_value));
             Assert.That(set.GetProperty("policy_location").GetProperty("source_path").GetString(),
                 Is.EqualTo("architecture/parts/modules.yml"));
             Assert.That(contract.GetProperty("group").GetString(), Is.EqualTo("strict_package_dependency"));
             Assert.That(contract.GetProperty("authored_contract_id").GetString(), Is.EqualTo("modules-no-infrastructure"));
             Assert.That(contract.GetProperty("authored_contract_name").GetString(), Is.EqualTo("modules avoid infrastructure"));
             Assert.That(contract.GetProperty("source_sets").EnumerateArray().Select(v => v.GetString()),
-                Is.EqualTo(new[] { "modules" }));
+                Is.EqualTo(_value1));
             Assert.That(exclusion.GetProperty("source_set").GetString(), Is.EqualTo("modules"));
             Assert.That(exclusion.GetProperty("matched").GetBoolean(), Is.True);
             Assert.That(instance.GetProperty("contract_id").GetString(),
@@ -309,7 +312,7 @@ public sealed class SourceExpansionProjectionTests
         {
             Assert.That(Inventory().InstanceIdsFor("not-an-authored-id"), Is.Empty);
             Assert.That(Inventory().InstanceIdsFor("MODULES-NO-INFRASTRUCTURE"),
-                Is.EqualTo(new[] { "modules-no-infrastructure/acme-modules-billing" }));
+                Is.EqualTo(_value2));
             Assert.That(ArchitectureSourceExpansionInventory.Empty.IsEmpty, Is.True);
             Assert.That(Inventory().IsEmpty, Is.False);
         });

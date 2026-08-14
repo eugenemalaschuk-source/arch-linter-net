@@ -14,6 +14,14 @@ namespace ArchLinterNet.Core.Tests;
 [TestFixture]
 public sealed class NamespaceViolationFinderGlobTests
 {
+    private static readonly string[] _value = {
+                "ReviewTest.Modules.Sales.Internal.SalesService",
+                "ReviewTest.Modules.Billing.Internal.BillingService"
+            };
+    private static readonly string[] _value1 = {
+                "ReviewTest.Modules.Billing.Internal",
+                "ReviewTest.Modules.Sales.Internal"
+            };
     private static readonly ArchitectureDiagnosticFormatter _formatter = new();
     private static readonly string[] _matchedInternalPrefixes =
         { "ReviewTest.Modules.Billing.Internal", "ReviewTest.Modules.Sales.Internal" };
@@ -46,11 +54,7 @@ public sealed class NamespaceViolationFinderGlobTests
             "glob-rule",
             "ReviewTest.SharedKernel.SharedKernelType",
             "ReviewTest.Modules.*.Internal",
-            new[]
-            {
-                "ReviewTest.Modules.Sales.Internal.SalesService",
-                "ReviewTest.Modules.Billing.Internal.BillingService"
-            })
+            _value)
         {
             MatchedNamespacePrefixes = new[]
             {
@@ -142,11 +146,7 @@ public sealed class NamespaceViolationFinderGlobTests
         Assert.That(violations, Has.Length.EqualTo(1));
         Assert.That(
             violations[0].MatchedNamespacePrefixes,
-            Is.EquivalentTo(new[]
-            {
-                "ReviewTest.Modules.Billing.Internal",
-                "ReviewTest.Modules.Sales.Internal"
-            }));
+            Is.EquivalentTo(_value1));
     }
 
     [Test]

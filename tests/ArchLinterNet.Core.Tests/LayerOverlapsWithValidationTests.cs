@@ -7,6 +7,7 @@ namespace ArchLinterNet.Core.Tests;
 [TestFixture]
 public sealed class LayerOverlapsWithValidationTests
 {
+    private static readonly string[] _value = { "audit_aspect" };
     [Test]
     public void LayerValidation_OverlapsWithUndeclaredLayer_IsRejected()
     {
@@ -118,7 +119,7 @@ public sealed class LayerOverlapsWithValidationTests
 
             ArchitectureContractDocument document = new ArchitecturePolicyDocumentLoader().Load(policyPath);
 
-            Assert.That(document.Layers["sales_domain"].OverlapsWith, Is.EquivalentTo(new[] { "audit_aspect" }));
+            Assert.That(document.Layers["sales_domain"].OverlapsWith, Is.EquivalentTo(_value));
         }
         finally
         {

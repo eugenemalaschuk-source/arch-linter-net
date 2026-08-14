@@ -8,6 +8,7 @@ namespace ArchLinterNet.Core.Tests;
 [TestFixture]
 public sealed class ArchitectureExplainApplicationServiceTests
 {
+    private static readonly string[] _value = { "ArchLinterNet.Core.Reporting", "json" };
     private const string ExecutionNamespace = "ArchLinterNet.Core.Execution";
     private const string ContractsNamespace = "ArchLinterNet.Core.Contracts";
     private const string ModelNamespace = "ArchLinterNet.Core.Model";
@@ -175,7 +176,7 @@ public sealed class ArchitectureExplainApplicationServiceTests
                 Target = "json",
             });
 
-            Assert.That(outcome.Path, Is.EqualTo(new[] { "ArchLinterNet.Core.Reporting", "json" }));
+            Assert.That(outcome.Path, Is.EqualTo(_value));
             Assert.That(outcome.ContractIds, Does.Contain("reporting-no-json"));
         }
         finally

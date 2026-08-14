@@ -14,6 +14,13 @@ namespace ArchLinterNet.Core.Tests;
 [TestFixture]
 public sealed class PackageDependencyContractTests
 {
+    private static readonly string[] _value = { "net10.0" };
+    private static readonly string[] _value1 = { "Microsoft.EntityFrameworkCore@8.0.0" };
+    private static readonly string[] _value2 = {
+                    "Microsoft.EntityFrameworkCore",
+                    "Microsoft.EntityFrameworkCore.SqlServer",
+                };
+    private static readonly string[] _value3 = { "Microsoft.EntityFrameworkCore" };
     private const string SourceAssemblyName = "MyApp.Domain";
 
     private static ArchitectureAnalysisContext CreateContext(
@@ -57,7 +64,7 @@ public sealed class PackageDependencyContractTests
         return new ArchitectureDiscoveredProject(
             $"src/{assemblyName}/{assemblyName}.csproj",
             assemblyName,
-            new[] { "net10.0" },
+            _value,
             packages.Select(p => new ArchitectureDiscoveredPackageReference(p.Id, p.Version)).ToList());
     }
 
@@ -107,7 +114,7 @@ public sealed class PackageDependencyContractTests
         Assert.That(violations[0].ContractId, Is.EqualTo("domain-no-ef"));
         Assert.That(violations[0].SourceType, Is.EqualTo(SourceAssemblyName));
         Assert.That((violations[0].Payload as PackageDependencyPayload)?.ForbiddenPackageGroup, Is.EqualTo("forbidden_infra"));
-        Assert.That(violations[0].ForbiddenReferences, Is.EqualTo(new[] { "Microsoft.EntityFrameworkCore@8.0.0" }));
+        Assert.That(violations[0].ForbiddenReferences, Is.EqualTo(_value1));
     }
 
     [Test]
@@ -144,11 +151,7 @@ public sealed class PackageDependencyContractTests
             Assert.That(violation.Identities, Has.Count.EqualTo(2));
             Assert.That(
                 violation.Identities.Select(identity => identity.TargetMember),
-                Is.EquivalentTo(new[]
-                {
-                    "Microsoft.EntityFrameworkCore",
-                    "Microsoft.EntityFrameworkCore.SqlServer",
-                }));
+                Is.EquivalentTo(_value2));
             Assert.That(findings, Has.Count.EqualTo(2));
             Assert.That(
                 findings.Select(finding => finding.CanonicalIdentity).Distinct(StringComparer.Ordinal).Count(),
@@ -175,7 +178,7 @@ public sealed class PackageDependencyContractTests
 
         List<ArchitectureViolation> violations = runner.Session.CheckPackageDependencyContract(contract);
 
-        Assert.That(violations[0].ForbiddenReferences, Is.EqualTo(new[] { "Microsoft.EntityFrameworkCore" }));
+        Assert.That(violations[0].ForbiddenReferences, Is.EqualTo(_value3));
     }
 
     [Test]

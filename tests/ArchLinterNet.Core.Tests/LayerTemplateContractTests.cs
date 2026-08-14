@@ -11,6 +11,9 @@ namespace ArchLinterNet.Core.Tests;
 [TestFixture]
 public sealed class LayerTemplateContractTests
 {
+    private static readonly string[] _value = { "Feature.Orders" };
+    private static readonly string[] _value1 = { "Feature.Billing", "Feature.Orders" };
+    private static readonly bool[] _value2 = { true, true };
     private static Assembly CoreAssembly => typeof(ArchitectureContractDocument).Assembly;
 
     private static string CoreAssemblyName => CoreAssembly.GetName().Name!;
@@ -399,8 +402,8 @@ contracts:
             Assert.Multiple(() =>
             {
                 Assert.That(expansion.Kind, Is.EqualTo(ArchitectureContractExpansionKind.ContainerSet));
-                Assert.That(expansion.Instances.Select(i => i.Source), Is.EqualTo(new[] { "Feature.Orders" }));
-                Assert.That(expansion.Inclusions.Select(i => i.Source), Is.EqualTo(new[] { "Feature.Billing", "Feature.Orders" }));
+                Assert.That(expansion.Instances.Select(i => i.Source), Is.EqualTo(_value));
+                Assert.That(expansion.Inclusions.Select(i => i.Source), Is.EqualTo(_value1));
                 Assert.That(expansion.Inclusions.First(i => i.Source == "Feature.Billing").PolicyLocation?.YamlPath,
                     Does.EndWith("/containers/0"));
                 Assert.That(
@@ -449,7 +452,7 @@ contracts:
                 // Both exclude_containers entries target the same container; both must report
                 // matched, since removing it via the first entry must not starve the second of a
                 // stable snapshot to judge itself against.
-                Assert.That(expansion.Exclusions.Select(e => e.Matched), Is.EqualTo(new[] { true, true }));
+                Assert.That(expansion.Exclusions.Select(e => e.Matched), Is.EqualTo(_value2));
                 Assert.That(expansion.Instances.Single().Source, Is.EqualTo("Feature.Orders"));
                 Assert.That(expansion.Instances.Single().PolicyLocation, Is.Not.Null,
                     "The surviving included instance must carry the authored 'containers[i]' location " +

@@ -13,6 +13,7 @@ namespace ArchLinterNet.Core.Tests;
 [TestFixture]
 public sealed class LayerResolverTests
 {
+    private static readonly string[] _value = { "Test.Core" };
     private static ArchitectureExpressionFactService CreateExpressionFacts(
         ArchitectureRoleIndex roleIndex, IReadOnlyCollection<Assembly> assemblies)
     {
@@ -177,7 +178,7 @@ public sealed class LayerResolverTests
     {
         bool result = ArchitectureLayerResolver.IsInAnyNamespace(
             "Test.CoreExtra.Foo",
-            new[] { "Test.Core" });
+            _value);
 
         Assert.That(result, Is.False);
     }

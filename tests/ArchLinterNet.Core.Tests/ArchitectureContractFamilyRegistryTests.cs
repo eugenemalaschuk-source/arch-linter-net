@@ -13,6 +13,7 @@ namespace ArchLinterNet.Core.Tests;
 [TestFixture]
 public sealed class ArchitectureContractFamilyRegistryTests
 {
+    private static readonly string[] _value = { "layer_template", "asmdef" };
     // Pinned to the same order ArchitectureContractCatalogTests.FamiliesInOrder_MatchesHistoricalExecutorDispatchOrder
     // asserts for ArchitectureContractCatalog.FamiliesInOrder, since the catalog derives that order
     // from this registry.
@@ -56,7 +57,7 @@ public sealed class ArchitectureContractFamilyRegistryTests
             .Select(d => d.FamilyId)
             .ToList();
 
-        Assert.That(nonBaselineCapable, Is.EquivalentTo(new[] { "layer_template", "asmdef" }));
+        Assert.That(nonBaselineCapable, Is.EquivalentTo(_value));
     }
 
     [Test]

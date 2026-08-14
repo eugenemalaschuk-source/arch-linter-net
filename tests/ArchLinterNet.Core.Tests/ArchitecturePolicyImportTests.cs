@@ -12,6 +12,8 @@ namespace ArchLinterNet.Core.Tests;
 [TestFixture]
 public sealed partial class ArchitecturePolicyImportTests
 {
+    private static readonly string[] _value = { "root", "a", "c" };
+    private static readonly string[] _value1 = { "A", "C", "B" };
     private string _temporaryDirectory = null!;
 
     [SetUp]
@@ -40,7 +42,7 @@ public sealed partial class ArchitecturePolicyImportTests
 
         ArchitectureContractDocument document = new ArchitecturePolicyDocumentLoader().Load(root);
 
-        Assert.That(document.Contracts.Strict.Select(contract => contract.Name), Is.EqualTo(new[] { "root", "a", "c" }));
+        Assert.That(document.Contracts.Strict.Select(contract => contract.Name), Is.EqualTo(_value));
     }
 
     [Test]
@@ -134,7 +136,7 @@ public sealed partial class ArchitecturePolicyImportTests
 
         ArchitectureContractDocument document = new ArchitecturePolicyDocumentLoader().Load(root);
 
-        Assert.That(document.Contracts.Strict.Select(contract => contract.Name), Is.EqualTo(new[] { "A", "C", "B" }));
+        Assert.That(document.Contracts.Strict.Select(contract => contract.Name), Is.EqualTo(_value1));
     }
 
     [Test]

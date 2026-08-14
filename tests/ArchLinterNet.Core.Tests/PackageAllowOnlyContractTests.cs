@@ -11,6 +11,9 @@ namespace ArchLinterNet.Core.Tests;
 [TestFixture]
 public sealed class PackageAllowOnlyContractTests
 {
+    private static readonly string[] _value = { "net10.0" };
+    private static readonly string[] _value1 = { "Microsoft.EntityFrameworkCore@8.0.0" };
+    private static readonly string[] _value2 = { "Acme.Sdk@1.0.0", "Zebra.Sdk@1.0.0" };
     private const string SourceAssemblyName = "MyApp.Domain";
 
     private static ArchitectureAnalysisContext CreateContext(
@@ -54,7 +57,7 @@ public sealed class PackageAllowOnlyContractTests
         return new ArchitectureDiscoveredProject(
             $"src/{assemblyName}/{assemblyName}.csproj",
             assemblyName,
-            new[] { "net10.0" },
+            _value,
             packages.Select(p => new ArchitectureDiscoveredPackageReference(p.Id, p.Version)).ToList());
     }
 
@@ -103,7 +106,7 @@ public sealed class PackageAllowOnlyContractTests
         Assert.That(violations[0].ContractId, Is.EqualTo("domain-allowed-packages"));
         Assert.That(violations[0].SourceType, Is.EqualTo(SourceAssemblyName));
         Assert.That(violations[0].ForbiddenNamespace, Is.EqualTo("outside allowed package groups"));
-        Assert.That(violations[0].ForbiddenReferences, Is.EqualTo(new[] { "Microsoft.EntityFrameworkCore@8.0.0" }));
+        Assert.That(violations[0].ForbiddenReferences, Is.EqualTo(_value1));
     }
 
     [Test]
@@ -126,7 +129,7 @@ public sealed class PackageAllowOnlyContractTests
         List<ArchitectureViolation> violations = runner.Session.CheckPackageAllowOnlyContract(contract);
 
         Assert.That(violations, Has.Count.EqualTo(1));
-        Assert.That(violations[0].ForbiddenReferences, Is.EqualTo(new[] { "Acme.Sdk@1.0.0", "Zebra.Sdk@1.0.0" }));
+        Assert.That(violations[0].ForbiddenReferences, Is.EqualTo(_value2));
     }
 
     [Test]

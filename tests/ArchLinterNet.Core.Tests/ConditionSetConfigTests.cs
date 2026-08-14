@@ -10,6 +10,7 @@ namespace ArchLinterNet.Core.Tests;
 [TestFixture]
 public sealed class ConditionSetConfigTests
 {
+    private static readonly string[] _value = { "UNITY_EDITOR", "DEBUG" };
     private static readonly string[] _dot = { "." };
     private static readonly string[] _consoleWriteLine = { "System.Console.WriteLine" };
     private static readonly string[] _debugWriteLine = { "System.Diagnostics.Debug.WriteLine" };
@@ -274,7 +275,7 @@ public class _debugClass
                 new ArchitectureContractExecutionContext(
                     "test-debug", null, Array.Empty<ArchitectureIgnoredViolation>(), false, null, null),
                 sourceRoots: _dot,
-                preprocessorSymbols: new[] { "UNITY_EDITOR", "DEBUG" })
+                preprocessorSymbols: _value)
             .ToList();
 
         Assert.That(violationsWith_debug, Is.Not.Empty,
