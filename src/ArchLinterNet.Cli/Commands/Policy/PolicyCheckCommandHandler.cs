@@ -90,13 +90,21 @@ internal sealed class PolicyCheckCommandHandler(ICliConsole console)
     {
         return JsonSerializer.Serialize(new
         {
-            status = outcome.IsValid
-                ? outcome.DeferredChecks.Count == 0 ? "valid" : "valid-with-deferred-checks"
-                : FailureStatus(outcome.Failure!),
+            status = StatusFor(outcome),
             completed_checks = outcome.CompletedChecks,
             deferred_checks = outcome.DeferredChecks.Select(FormatDeferred),
             failure = outcome.Failure is null ? null : FormatFailure(outcome.Failure),
         });
+    }
+
+    private static string StatusFor(PolicyCheckOutcome outcome)
+    {
+        if (!outcome.IsValid)
+        {
+            return FailureStatus(outcome.Failure!);
+        }
+
+        return outcome.DeferredChecks.Count == 0 ? "valid" : "valid-with-deferred-checks";
     }
 
     private static string FormatSarif(PolicyCheckOutcome outcome, PolicyCheckFailure? failure)
@@ -141,15 +149,23 @@ internal sealed class PolicyCheckCommandHandler(ICliConsole console)
                     results,
                     properties = new
                     {
-                        status = failure is null
-                            ? outcome.DeferredChecks.Count == 0 ? "valid" : "valid-with-deferred-checks"
-                            : FailureStatus(failure),
+                        status = SarifStatusFor(outcome, failure),
                         completedChecks = outcome.CompletedChecks,
                         deferredChecks = outcome.DeferredChecks.Select(FormatDeferred),
                     },
                 },
             },
         });
+    }
+
+    private static string SarifStatusFor(PolicyCheckOutcome outcome, PolicyCheckFailure? failure)
+    {
+        if (failure is not null)
+        {
+            return FailureStatus(failure);
+        }
+
+        return outcome.DeferredChecks.Count == 0 ? "valid" : "valid-with-deferred-checks";
     }
 
     private static object FormatDeferred(PolicyCheckDeferredCheck check)

@@ -508,12 +508,15 @@ internal static class CelEvaluator
         private static long MapLookupCost(string key, int entryCount) =>
             1 + SaturatingMultiply(key.Length, entryCount + 1L);
 
-        private static long SaturatingMultiply(long left, long right) =>
-            left == 0 || right == 0
-                ? 0
-                : long.MaxValue / left < right
-                    ? long.MaxValue
-                    : left * right;
+        private static long SaturatingMultiply(long left, long right)
+        {
+            if (left == 0 || right == 0)
+            {
+                return 0;
+            }
+
+            return long.MaxValue / left < right ? long.MaxValue : left * right;
+        }
 
         private const long FixedComparisonCost = 1;
     }

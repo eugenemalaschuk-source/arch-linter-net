@@ -594,10 +594,23 @@ internal static class ArchitecturePolicyEffectiveSchemaValidator
 
         bool negative = value.StartsWith("-", StringComparison.Ordinal);
         string unsignedValue = negative ? value[1..] : value;
-        int radix = unsignedValue.StartsWith("0x", StringComparison.OrdinalIgnoreCase) ? 16
-            : unsignedValue.StartsWith("0o", StringComparison.OrdinalIgnoreCase) ? 8
-            : unsignedValue.StartsWith("0b", StringComparison.OrdinalIgnoreCase) ? 2
-            : 0;
+        int radix;
+        if (unsignedValue.StartsWith("0x", StringComparison.OrdinalIgnoreCase))
+        {
+            radix = 16;
+        }
+        else if (unsignedValue.StartsWith("0o", StringComparison.OrdinalIgnoreCase))
+        {
+            radix = 8;
+        }
+        else if (unsignedValue.StartsWith("0b", StringComparison.OrdinalIgnoreCase))
+        {
+            radix = 2;
+        }
+        else
+        {
+            radix = 0;
+        }
         if (radix == 0)
         {
             result = default;
