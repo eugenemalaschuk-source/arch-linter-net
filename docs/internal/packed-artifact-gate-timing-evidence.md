@@ -60,3 +60,14 @@ candidate-to-required-context critical path of **3:59** — under the issue targ
 Apple Silicon macOS completed its independent eleven-shard evidence and stable fan-in successfully
 at **20:07:01 UTC**. The two platform fan-ins each merged exactly one canonical record from all
 eleven named shard records, confirming that scenario evidence remains complete and fail-closed.
+
+## Final release rehearsal
+
+The non-publishing release rehearsal [31905879344](https://github.com/eugenemalaschuk-source/arch-linter-net/actions/runs/31905879344)
+completed successfully with `publish=false`. Repository acceptance ran from **20:09:02** to
+**20:20:23 UTC** (11:21), after which strict OpenSpec validation, the release-version build, and
+immutable candidate packaging completed before any Checkpoint B job started. The single release
+matrix then ran all **44** platform/shard jobs (eleven shards on each of Linux x64, Windows x64,
+Apple Silicon macOS, and Intel macOS) successfully. Every canonical platform fan-in and the final
+evidence aggregation passed. Package publication, GitHub release creation, and documentation
+publication were skipped, so the rehearsal made no release-side writes.
