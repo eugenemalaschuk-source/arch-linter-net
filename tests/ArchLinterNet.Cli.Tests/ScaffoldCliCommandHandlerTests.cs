@@ -20,7 +20,7 @@ public sealed class ScaffoldCliCommandHandlerTests
     public void Execute_DryRun_ListsOnlyTheMinimalFeatureOwnedFiles()
     {
         var console = new RecordingConsole();
-        var fileSystem = new RecordingFileSystem();
+        var fileSystem = new ScaffoldTestFileSystem();
 
         int exitCode = new ScaffoldCliCommandHandler(console, fileSystem).Execute(Options(dryRun: true));
 
@@ -43,7 +43,7 @@ public sealed class ScaffoldCliCommandHandlerTests
     public void Execute_RequestedConventionTypes_WritesOnlyTheirDeclaredFolders()
     {
         var console = new RecordingConsole();
-        var fileSystem = new RecordingFileSystem();
+        var fileSystem = new ScaffoldTestFileSystem();
         ScaffoldCliCommandOptions options = Options(
             modelName: "Inspection",
             abstractionName: "IInspectionReader",
@@ -72,7 +72,7 @@ public sealed class ScaffoldCliCommandHandlerTests
     {
         const string EntryPointPath = "src/ArchLinterNet.Cli/Commands/Inspect/EntryPoint/InspectCommandModule.cs";
         var console = new RecordingConsole();
-        var fileSystem = new RecordingFileSystem(EntryPointPath);
+        var fileSystem = new ScaffoldTestFileSystem(EntryPointPath);
         var handler = new ScaffoldCliCommandHandler(console, fileSystem);
 
         int rejectedExitCode = handler.Execute(Options());
@@ -90,9 +90,9 @@ public sealed class ScaffoldCliCommandHandlerTests
     [Test]
     public void Execute_CollisionAppearingAfterPreflight_DoesNotOverwriteTheTarget()
     {
-        const string lockPath = "src/ArchLinterNet.Cli/Commands/.scaffold.lock";
+        const string LockPath = "src/ArchLinterNet.Cli/Commands/.scaffold.lock";
         var console = new RecordingConsole();
-        var fileSystem = new RecordingFileSystem
+        var fileSystem = new ScaffoldTestFileSystem
         {
             RejectNextNoClobberMove = true,
         };
@@ -103,7 +103,7 @@ public sealed class ScaffoldCliCommandHandlerTests
         {
             Assert.That(exitCode, Is.EqualTo(CliExitCodes.InvalidArgumentsOrRuntimeError));
             Assert.That(fileSystem.CommittedPaths, Is.Empty);
-            Assert.That(fileSystem.FileExists(lockPath), Is.False);
+            Assert.That(fileSystem.FileExists(LockPath), Is.False);
             Assert.That(console.StdErr, Does.Contain("Scaffold target already exists"));
         });
     }
@@ -111,9 +111,9 @@ public sealed class ScaffoldCliCommandHandlerTests
     [Test]
     public void Execute_ScaffoldLockHeldByAnotherInvocation_FailsBeforePreflightOrWrite()
     {
-        const string lockPath = "src/ArchLinterNet.Cli/Commands/.scaffold.lock";
+        const string LockPath = "src/ArchLinterNet.Cli/Commands/.scaffold.lock";
         var console = new RecordingConsole();
-        var fileSystem = new RecordingFileSystem(lockPath);
+        var fileSystem = new ScaffoldTestFileSystem(LockPath);
 
         int exitCode = new ScaffoldCliCommandHandler(console, fileSystem).Execute(Options());
 
@@ -126,11 +126,52 @@ public sealed class ScaffoldCliCommandHandlerTests
     }
 
     [Test]
+    public void Execute_LockCannotBeReleasedAfterSuccess_ReturnsAnError()
+    {
+        const string LockPath = "src/ArchLinterNet.Cli/Commands/.scaffold.lock";
+        var console = new RecordingConsole();
+        var fileSystem = new ScaffoldTestFileSystem
+        {
+            FailDeletePath = LockPath,
+        };
+
+        int exitCode = new ScaffoldCliCommandHandler(console, fileSystem).Execute(Options());
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(exitCode, Is.EqualTo(CliExitCodes.InvalidArgumentsOrRuntimeError));
+            Assert.That(fileSystem.FileExists(LockPath), Is.True);
+            Assert.That(console.StdErr, Does.Contain("Scaffold lock").And.Contain("could not be removed"));
+        });
+    }
+
+    [Test]
+    public void Execute_LockCannotBeReleasedAfterFailure_ReportsBothErrors()
+    {
+        const string LockPath = "src/ArchLinterNet.Cli/Commands/.scaffold.lock";
+        var console = new RecordingConsole();
+        var fileSystem = new ScaffoldTestFileSystem
+        {
+            RejectNextNoClobberMove = true,
+            FailDeletePath = LockPath,
+        };
+
+        int exitCode = new ScaffoldCliCommandHandler(console, fileSystem).Execute(Options());
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(exitCode, Is.EqualTo(CliExitCodes.InvalidArgumentsOrRuntimeError));
+            Assert.That(console.StdErr, Does.Contain("Scaffold target already exists"));
+            Assert.That(console.StdErr, Does.Contain("Scaffold lock").And.Contain("could not be removed"));
+        });
+    }
+
+    [Test]
     public void Execute_CollisionOnLaterTarget_RollsBackFilesCreatedByTheInvocation()
     {
-        const string abstractionPath = "src/ArchLinterNet.Cli/Commands/Inspect/Abstractions/IInspectionReader.cs";
+        const string AbstractionPath = "src/ArchLinterNet.Cli/Commands/Inspect/Abstractions/IInspectionReader.cs";
         var console = new RecordingConsole();
-        var fileSystem = new RecordingFileSystem
+        var fileSystem = new ScaffoldTestFileSystem
         {
             RejectNoClobberMoveAt = 2,
         };
@@ -141,7 +182,7 @@ public sealed class ScaffoldCliCommandHandlerTests
         Assert.Multiple(() =>
         {
             Assert.That(exitCode, Is.EqualTo(CliExitCodes.InvalidArgumentsOrRuntimeError));
-            Assert.That(fileSystem.CommittedPaths, Is.EqualTo(new[] { abstractionPath }));
+            Assert.That(fileSystem.CommittedPaths, Is.EqualTo(new[] { AbstractionPath }));
             Assert.That(fileSystem.Contents, Is.Empty);
             Assert.That(console.StdOut, Does.Not.Contain("Created "));
             Assert.That(console.StdErr, Does.Contain("InspectCommandHandler.cs"));
@@ -151,14 +192,14 @@ public sealed class ScaffoldCliCommandHandlerTests
     [Test]
     public void Execute_CollisionOnLaterTarget_DoesNotDeleteCreatedFileChangedByAnotherProcess()
     {
-        const string abstractionPath = "src/ArchLinterNet.Cli/Commands/Inspect/Abstractions/IInspectionReader.cs";
-        const string externalContents = "// changed by another process\n";
+        const string AbstractionPath = "src/ArchLinterNet.Cli/Commands/Inspect/Abstractions/IInspectionReader.cs";
+        const string ExternalContents = "// changed by another process\n";
         var console = new RecordingConsole();
-        var fileSystem = new RecordingFileSystem
+        var fileSystem = new ScaffoldTestFileSystem
         {
             RejectNoClobberMoveAt = 2,
         };
-        fileSystem.OnNoClobberMoveRejected = _ => fileSystem.Contents[abstractionPath] = externalContents;
+        fileSystem.OnNoClobberMoveRejected = _ => fileSystem.Contents[AbstractionPath] = ExternalContents;
 
         int exitCode = new ScaffoldCliCommandHandler(console, fileSystem).Execute(
             Options(abstractionName: "IInspectionReader"));
@@ -167,7 +208,7 @@ public sealed class ScaffoldCliCommandHandlerTests
         {
             Assert.That(exitCode, Is.EqualTo(CliExitCodes.InvalidArgumentsOrRuntimeError));
             Assert.That(fileSystem.Contents, Has.Count.EqualTo(1));
-            Assert.That(fileSystem.Contents[abstractionPath], Is.EqualTo(externalContents));
+            Assert.That(fileSystem.Contents[AbstractionPath], Is.EqualTo(ExternalContents));
         });
     }
 
@@ -175,7 +216,7 @@ public sealed class ScaffoldCliCommandHandlerTests
     public void Execute_ConcurrentScaffoldAttemptDuringRollback_IsRejectedBeforeMutation()
     {
         var console = new RecordingConsole();
-        var fileSystem = new RecordingFileSystem
+        var fileSystem = new ScaffoldTestFileSystem
         {
             RejectNoClobberMoveAt = 2,
         };
@@ -206,7 +247,7 @@ public sealed class ScaffoldCliCommandHandlerTests
         try
         {
             var console = new RecordingConsole();
-            var fileSystem = new LateCollisionFileSystem(collisionAttempt: 2);
+            var fileSystem = new ScaffoldLateCollisionFileSystem(collisionAttempt: 2);
 
             int exitCode = new ScaffoldCliCommandHandler(console, fileSystem).Execute(
                 Options(abstractionName: "IInspectionReader"));
@@ -242,7 +283,7 @@ public sealed class ScaffoldCliCommandHandlerTests
     public void Execute_InvalidNamesFailBeforeAnyWrite()
     {
         var console = new RecordingConsole();
-        var fileSystem = new RecordingFileSystem();
+        var fileSystem = new ScaffoldTestFileSystem();
 
         int exitCode = new ScaffoldCliCommandHandler(console, fileSystem).Execute(
             Options(moduleName: "inspect", commandToken: "Inspect"));
@@ -259,7 +300,7 @@ public sealed class ScaffoldCliCommandHandlerTests
     public void Execute_TwoGeneratedModules_CompilePassPolicyAndComposeWithoutCentralRegistration()
     {
         var console = new RecordingConsole();
-        var fileSystem = new RecordingFileSystem();
+        var fileSystem = new ScaffoldTestFileSystem();
         var handler = new ScaffoldCliCommandHandler(console, fileSystem);
 
         Assert.Multiple(() =>
@@ -315,7 +356,7 @@ public sealed class ScaffoldCliCommandHandlerTests
     public void CreatePlan_GeneratedFixtureChecksTheEntryPointCommandName()
     {
         IReadOnlyList<ScaffoldCliCommandHandler.ScaffoldFile> files = new ScaffoldCliCommandHandler(
-            new RecordingConsole(), new RecordingFileSystem()).CreatePlan(Options());
+            new RecordingConsole(), new ScaffoldTestFileSystem()).CreatePlan(Options());
 
         string fixture = files.Single(file => file.Path.EndsWith("InspectCommandScaffoldTests.cs", StringComparison.Ordinal)).Contents;
 
@@ -337,7 +378,7 @@ public sealed class ScaffoldCliCommandHandlerTests
         string? exceptionName = null) =>
         new("cli-command", moduleName, commandToken, dryRun, force, modelName, abstractionName, exceptionName);
 
-    private static Assembly CompileGeneratedModules(RecordingFileSystem fileSystem)
+    private static Assembly CompileGeneratedModules(ScaffoldTestFileSystem fileSystem)
     {
         SyntaxTree[] syntaxTrees = fileSystem.Contents
             .OrderBy(entry => entry.Key, StringComparer.Ordinal)
@@ -382,137 +423,4 @@ public sealed class ScaffoldCliCommandHandlerTests
         public string StdErr => _standardError.ToString();
     }
 
-    private sealed class RecordingFileSystem(params string[] existingPaths) : IFileSystem
-    {
-        private readonly HashSet<string> _existingPaths = new(existingPaths, StringComparer.Ordinal);
-        private readonly Dictionary<string, string> _temporaryContents = new(StringComparer.Ordinal);
-        private int _noClobberMoveAttemptCount;
-
-        public List<string> CommittedPaths { get; } = new();
-
-        public bool RejectNextNoClobberMove { get; set; }
-
-        public int? RejectNoClobberMoveAt { get; set; }
-
-        public Action<string>? OnNoClobberMoveRejected { get; set; }
-
-        public Dictionary<string, string> Contents { get; } = new(StringComparer.Ordinal);
-
-        public bool FileExists(string path) => _existingPaths.Contains(path);
-
-        public Action? OnReadAllText { get; set; }
-
-        public string ReadAllText(string path)
-        {
-            string contents = Contents[path];
-            OnReadAllText?.Invoke();
-            return contents;
-        }
-
-        public void WriteAllText(string path, string contents)
-        {
-            Contents[path] = contents;
-            _existingPaths.Add(path);
-        }
-
-        public string WriteAllTextToTemp(string targetPath, string contents)
-        {
-            string temporaryPath = targetPath + ".tmp";
-            _temporaryContents[temporaryPath] = contents;
-            return temporaryPath;
-        }
-
-        public void RenameTempToTarget(string tempPath, string targetPath)
-        {
-            Contents[targetPath] = _temporaryContents[tempPath];
-            _temporaryContents.Remove(tempPath);
-            _existingPaths.Add(targetPath);
-            CommittedPaths.Add(targetPath);
-        }
-
-        public bool TryRenameTempToNewTarget(string tempPath, string targetPath)
-        {
-            _noClobberMoveAttemptCount++;
-            if (RejectNextNoClobberMove || RejectNoClobberMoveAt == _noClobberMoveAttemptCount)
-            {
-                RejectNextNoClobberMove = false;
-                _existingPaths.Add(targetPath);
-                OnNoClobberMoveRejected?.Invoke(targetPath);
-                return false;
-            }
-
-            if (_existingPaths.Contains(targetPath))
-            {
-                return false;
-            }
-
-            RenameTempToTarget(tempPath, targetPath);
-            return true;
-        }
-
-        public void DeleteFile(string path)
-        {
-            Contents.Remove(path);
-            _temporaryContents.Remove(path);
-            _existingPaths.Remove(path);
-        }
-
-        public bool TryCreateNewFile(string path)
-        {
-            if (_existingPaths.Contains(path))
-            {
-                return false;
-            }
-
-            Contents[path] = string.Empty;
-            _existingPaths.Add(path);
-            return true;
-        }
-
-        public bool DirectoryExists(string path) => true;
-
-        public void DeleteDirectoryIfEmpty(string path) { }
-
-        public bool CanWriteToDirectory(string path) => true;
-    }
-
-    private sealed class LateCollisionFileSystem(int collisionAttempt) : IFileSystem
-    {
-        private readonly FileSystem _inner = new();
-        private int _noClobberMoveAttempts;
-
-        public bool FileExists(string path) => _inner.FileExists(path);
-
-        public string ReadAllText(string path) => _inner.ReadAllText(path);
-
-        public void WriteAllText(string path, string contents) => _inner.WriteAllText(path, contents);
-
-        public string WriteAllTextToTemp(string targetPath, string contents) => _inner.WriteAllTextToTemp(targetPath, contents);
-
-        public string CopyFileToTemp(string sourcePath, string targetPath) => _inner.CopyFileToTemp(sourcePath, targetPath);
-
-        public void RenameTempToTarget(string tempPath, string targetPath) => _inner.RenameTempToTarget(tempPath, targetPath);
-
-        public bool TryRenameTempToNewTarget(string tempPath, string targetPath)
-        {
-            _noClobberMoveAttempts++;
-            if (_noClobberMoveAttempts == collisionAttempt)
-            {
-                _inner.WriteAllText(targetPath, "created by another process");
-                return false;
-            }
-
-            return _inner.TryRenameTempToNewTarget(tempPath, targetPath);
-        }
-
-        public void DeleteFile(string path) => _inner.DeleteFile(path);
-
-        public bool TryCreateNewFile(string path) => _inner.TryCreateNewFile(path);
-
-        public bool DirectoryExists(string path) => _inner.DirectoryExists(path);
-
-        public void DeleteDirectoryIfEmpty(string path) => _inner.DeleteDirectoryIfEmpty(path);
-
-        public bool CanWriteToDirectory(string path) => _inner.CanWriteToDirectory(path);
-    }
 }

@@ -36,7 +36,7 @@ For the reflection-composed CLI, scaffolding a command SHALL not edit `Program.c
 
 ### Requirement: Scaffold is safe and validation-oriented
 
-The scaffold SHALL reject an invalid or colliding module name before writing files, support a dry-run that lists canonical `/`-separated repository paths and namespaces, and never overwrite an existing source file without an explicit force option. An ordinary scaffold invocation SHALL hold one repository-scoped, atomically acquired scaffold lock from collision preflight until creation succeeds or rollback completes; dry-run SHALL not acquire the lock. In ordinary mode, finalising each planned target SHALL use an atomic no-clobber operation so a collision introduced after preflight cannot overwrite another contributor's file. If that late collision aborts the plan, the scaffold SHALL roll back every target and empty directory created by that invocation whose contents still exactly match the generated contents; it SHALL retain any target changed by another process for manual review. Its completion output SHALL identify the architecture policy check required before committing.
+The scaffold SHALL reject an invalid or colliding module name before writing files, support a dry-run that lists canonical `/`-separated repository paths and namespaces, and never overwrite an existing source file without an explicit force option. An ordinary scaffold invocation SHALL hold one repository-scoped, atomically acquired scaffold lock from collision preflight until creation succeeds or rollback completes; dry-run SHALL not acquire the lock. A successful invocation SHALL return an error if it cannot release its lock; an already failing invocation SHALL preserve its original error and additionally report an unsuccessful lock release. In ordinary mode, finalising each planned target SHALL use an atomic no-clobber operation so a collision introduced after preflight cannot overwrite another contributor's file. If that late collision aborts the plan, the scaffold SHALL roll back every target and empty directory created by that invocation whose contents still exactly match the generated contents; it SHALL retain any target changed by another process for manual review. Its completion output SHALL identify the architecture policy check required before committing.
 
 #### Scenario: Existing module is not overwritten
 - **WHEN** a contributor scaffolds `inspect` and the target `Inspect` module already exists
@@ -66,3 +66,9 @@ The scaffold SHALL reject an invalid or colliding module name before writing fil
 - **AND** another ordinary scaffold invocation starts for any module
 - **THEN** the later invocation fails before checking collisions or writing files
 - **AND** the lock is released after the first invocation completes or rolls back
+
+#### Scenario: Lock release failure remains actionable
+- **WHEN** a successful ordinary scaffold invocation cannot remove its scaffold lock
+- **THEN** the command returns an error identifying the lock path and manual recovery action
+- **AND WHEN** another scaffold failure is already being reported
+- **THEN** the original error and unsuccessful lock release are both reported

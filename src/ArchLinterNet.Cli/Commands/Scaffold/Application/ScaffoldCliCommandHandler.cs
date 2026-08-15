@@ -28,15 +28,17 @@ internal sealed class ScaffoldCliCommandHandler(ICliConsole console, IFileSystem
                     $"Scaffold is already running for this repository. Wait for it to finish before creating module '{options.ModuleName}'.");
             }
 
+            bool operationCompleted = false;
             try
             {
                 EnsureNoCollisions(files, options.Force);
                 WritePlan(files, dryRun: false, force: options.Force);
+                operationCompleted = true;
                 return CliExitCodes.Success;
             }
             finally
             {
-                DeleteFileBestEffort(lockPath);
+                ReleaseScaffoldLock(lockPath, operationCompleted);
             }
         }
         catch (ArgumentException exception)
@@ -156,7 +158,7 @@ internal sealed class ScaffoldCliCommandHandler(ICliConsole console, IFileSystem
                 string temporaryPath = fileSystem.WriteAllTextToTemp(file.Path, file.Contents);
                 if (!fileSystem.TryRenameTempToNewTarget(temporaryPath, file.Path))
                 {
-                    DeleteFileBestEffort(temporaryPath);
+                    DeleteTemporaryFileBestEffort(temporaryPath);
                     throw new InvalidOperationException(
                         $"Scaffold target already exists: '{file.Path}'. Re-run with --force only after reviewing the existing file.");
                 }
@@ -225,7 +227,26 @@ internal sealed class ScaffoldCliCommandHandler(ICliConsole console, IFileSystem
         }
     }
 
-    private void DeleteFileBestEffort(string path)
+    private void ReleaseScaffoldLock(string lockPath, bool operationCompleted)
+    {
+        try
+        {
+            fileSystem.DeleteFile(lockPath);
+        }
+        catch (Exception exception)
+        {
+            string message =
+                $"Scaffold lock '{lockPath}' could not be removed. Remove it manually after confirming no scaffold is running.";
+            if (operationCompleted)
+            {
+                throw new InvalidOperationException(message, exception);
+            }
+
+            console.Error.WriteLine($"Additionally, {message}");
+        }
+    }
+
+    private void DeleteTemporaryFileBestEffort(string path)
     {
         try
         {
@@ -233,8 +254,8 @@ internal sealed class ScaffoldCliCommandHandler(ICliConsole console, IFileSystem
         }
         catch
         {
-            // The target collision remains the actionable error; a leftover temp file can be
-            // removed manually if the filesystem rejected cleanup.
+            // The target collision remains the actionable error; a leftover temporary file can
+            // be removed manually if the filesystem rejected cleanup.
         }
     }
 

@@ -58,3 +58,7 @@
 ## 9. Third review follow-up hardening
 
 - [x] 9.1 Serialize ordinary scaffold invocations with an atomically acquired repository-scoped lock held from preflight through rollback, preventing rollback ownership races and concurrent directory cleanup.
+
+## 10. Fourth review follow-up hardening
+
+- [x] 10.1 Surface an unsuccessful scaffold-lock release, preserving the original scaffold failure when one exists.
