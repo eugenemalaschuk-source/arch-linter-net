@@ -41,25 +41,25 @@ public sealed class ModuleContainerContractTests
     [Test]
     public void ModuleNamespaceMembershipResolver_MapsContainerModuleAndNestedSegmentDeterministically()
     {
-        const string container = "Example.Cli.Commands";
+        const string Container = "Example.Cli.Commands";
 
         bool rootResolved = ArchitectureModuleNamespaceMembershipResolver.TryResolve(
-            container, container, out ArchitectureModuleNamespaceMembership? root);
+            Container, Container, out ArchitectureModuleNamespaceMembership? root);
         bool moduleResolved = ArchitectureModuleNamespaceMembershipResolver.TryResolve(
-            container, "Example.Cli.Commands.Validate", out ArchitectureModuleNamespaceMembership? moduleRoot);
+            Container, "Example.Cli.Commands.Validate", out ArchitectureModuleNamespaceMembership? moduleRoot);
         bool nestedResolved = ArchitectureModuleNamespaceMembershipResolver.TryResolve(
-            container, "Example.Cli.Commands.Validate.EntryPoint.Generated", out ArchitectureModuleNamespaceMembership? nested);
+            Container, "Example.Cli.Commands.Validate.EntryPoint.Generated", out ArchitectureModuleNamespaceMembership? nested);
         bool outsideResolved = ArchitectureModuleNamespaceMembershipResolver.TryResolve(
-            container, "Example.Cli.Other.Validate.EntryPoint", out ArchitectureModuleNamespaceMembership? outside);
+            Container, "Example.Cli.Other.Validate.EntryPoint", out ArchitectureModuleNamespaceMembership? outside);
 
         Assert.Multiple(() =>
         {
             Assert.That(rootResolved, Is.True);
-            Assert.That(root, Is.EqualTo(new ArchitectureModuleNamespaceMembership(container, null, null, IsContainerRoot: true)));
+            Assert.That(root, Is.EqualTo(new ArchitectureModuleNamespaceMembership(Container, null, null, IsContainerRoot: true)));
             Assert.That(moduleResolved, Is.True);
-            Assert.That(moduleRoot, Is.EqualTo(new ArchitectureModuleNamespaceMembership(container, "Validate", null, IsContainerRoot: false)));
+            Assert.That(moduleRoot, Is.EqualTo(new ArchitectureModuleNamespaceMembership(Container, "Validate", null, IsContainerRoot: false)));
             Assert.That(nestedResolved, Is.True);
-            Assert.That(nested, Is.EqualTo(new ArchitectureModuleNamespaceMembership(container, "Validate", "EntryPoint", IsContainerRoot: false)));
+            Assert.That(nested, Is.EqualTo(new ArchitectureModuleNamespaceMembership(Container, "Validate", "EntryPoint", IsContainerRoot: false)));
             Assert.That(outsideResolved, Is.False);
             Assert.That(outside, Is.Null);
         });

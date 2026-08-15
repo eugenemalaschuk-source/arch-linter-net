@@ -69,9 +69,9 @@ public sealed class ScaffoldCliCommandHandlerTests
     [Test]
     public void Execute_CollisionFailsBeforeAnyWriteUnlessForceIsExplicit()
     {
-        const string entryPointPath = "src/ArchLinterNet.Cli/Commands/Inspect/EntryPoint/InspectCommandModule.cs";
+        const string EntryPointPath = "src/ArchLinterNet.Cli/Commands/Inspect/EntryPoint/InspectCommandModule.cs";
         var console = new RecordingConsole();
-        var fileSystem = new RecordingFileSystem(entryPointPath);
+        var fileSystem = new RecordingFileSystem(EntryPointPath);
         var handler = new ScaffoldCliCommandHandler(console, fileSystem);
 
         int rejectedExitCode = handler.Execute(Options());
@@ -80,7 +80,7 @@ public sealed class ScaffoldCliCommandHandlerTests
         Assert.Multiple(() =>
         {
             Assert.That(rejectedExitCode, Is.EqualTo(CliExitCodes.InvalidArgumentsOrRuntimeError));
-            Assert.That(console.StdErr, Does.Contain(entryPointPath));
+            Assert.That(console.StdErr, Does.Contain(EntryPointPath));
             Assert.That(forcedExitCode, Is.EqualTo(CliExitCodes.Success));
             Assert.That(fileSystem.CommittedPaths, Has.Count.EqualTo(3));
         });

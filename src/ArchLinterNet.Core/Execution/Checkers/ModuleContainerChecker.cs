@@ -9,12 +9,12 @@ namespace ArchLinterNet.Core.Execution.Checkers;
 
 internal static class ModuleContainerChecker
 {
-    private static readonly IReadOnlySet<string> CliCommandSegments = new HashSet<string>(StringComparer.Ordinal)
+    private static readonly IReadOnlySet<string> _cliCommandSegments = new HashSet<string>(StringComparer.Ordinal)
     {
         "EntryPoint", "Application", "Abstractions", "Models", "Exceptions",
     };
 
-    private static readonly IReadOnlySet<string> GenericModuleNames = new HashSet<string>(StringComparer.Ordinal)
+    private static readonly IReadOnlySet<string> _genericModuleNames = new HashSet<string>(StringComparer.Ordinal)
     {
         "Common", "Shared", "Utils",
     };
@@ -55,7 +55,7 @@ internal static class ModuleContainerChecker
                 continue;
             }
 
-            if (GenericModuleNames.Contains(location.ModuleName))
+            if (_genericModuleNames.Contains(location.ModuleName))
             {
                 AddStructuralViolation(contract, type, $"<generic-module:{location.ModuleName}>", context, executionContext, violations);
                 continue;
@@ -67,7 +67,7 @@ internal static class ModuleContainerChecker
                 continue;
             }
 
-            if (location.Segment != null && !CliCommandSegments.Contains(location.Segment))
+            if (location.Segment != null && !_cliCommandSegments.Contains(location.Segment))
             {
                 AddStructuralViolation(contract, type, $"<undeclared-segment:{location.Segment}>", context, executionContext, violations);
             }

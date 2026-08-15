@@ -1,3 +1,4 @@
+using System.Text.Encodings.Web;
 using System.Text.Json;
 using ArchLinterNet.Core.Reporting;
 using ArchLinterNet.Core.Validation;
@@ -169,7 +170,7 @@ public sealed class SelfPolicyNegativeRegressionTests
 
         ArchitectureValidationResult result = ValidateMutated(mutated, "cli-command-modules-follow-the-feature-profile");
 
-        AssertFailedMentioning(result, "<undeclared-segment:Validate>");
+        AssertFailedMentioning(result, "<module-root:Abstractions>");
     }
 
     // ── Recursive folder-purity and leaf conventions ────────────────────────
@@ -406,7 +407,8 @@ public sealed class SelfPolicyNegativeRegressionTests
         string rendered = string.Join(
             "\n",
             result.Findings.Select(finding => JsonSerializer.Serialize(
-                ArchitectureDiagnosticFormatter.FormatNormalizedFindingForJson(finding))));
+                ArchitectureDiagnosticFormatter.FormatNormalizedFindingForJson(finding),
+                new JsonSerializerOptions { Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping })));
         Assert.That(rendered, Does.Contain(expectedEvidence));
     }
 }
