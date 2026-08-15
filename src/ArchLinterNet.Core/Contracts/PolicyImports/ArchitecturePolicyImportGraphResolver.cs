@@ -10,16 +10,13 @@ internal sealed class ArchitecturePolicyImportGraphResolver
 
     private readonly IArchitectureFileSystem _fileSystem;
     private readonly IArchitecturePolicyPathResolver _pathResolver;
-    private readonly ArchitecturePolicySourceParser _parser;
 
     public ArchitecturePolicyImportGraphResolver(
         IArchitectureFileSystem fileSystem,
-        IArchitecturePolicyPathResolver pathResolver,
-        ArchitecturePolicySourceParser parser)
+        IArchitecturePolicyPathResolver pathResolver)
     {
         _fileSystem = fileSystem;
         _pathResolver = pathResolver;
-        _parser = parser;
     }
 
     public IReadOnlyList<ArchitecturePolicySource> Resolve(

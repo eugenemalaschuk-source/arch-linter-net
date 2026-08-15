@@ -48,7 +48,7 @@ internal static class ArchitecturePolicyEffectiveSchemaValidator
             location);
     }
 
-    private static IReadOnlyList<SchemaFailure> SelectActionableFailures(
+    private static SchemaFailure[] SelectActionableFailures(
         EvaluationResults results,
         JsonNode? instance)
     {

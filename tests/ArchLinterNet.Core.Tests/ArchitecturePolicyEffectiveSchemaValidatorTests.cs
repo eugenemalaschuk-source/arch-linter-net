@@ -204,6 +204,30 @@ public sealed class ArchitecturePolicyEffectiveSchemaValidatorTests
             ArchitecturePolicyEffectiveSchemaValidator.Validate(Yaml, CreateProvenance()));
     }
 
+    [TestCase("0x1", TestName = "Validate_HexadecimalVersionLiteral_ParsesToTheSameIntegerAsDecimal")]
+    [TestCase("0o1", TestName = "Validate_OctalVersionLiteral_ParsesToTheSameIntegerAsDecimal")]
+    [TestCase("0b1", TestName = "Validate_BinaryVersionLiteral_ParsesToTheSameIntegerAsDecimal")]
+    public void Validate_NonDecimalIntegerLiteral_ParsesToTheSameIntegerAsDecimal(string versionLiteral)
+    {
+        // schema/dependencies.arch.schema.json pins `version` to `const: 1` — these only validate if
+        // ArchitecturePolicyEffectiveSchemaValidator.TryParseInteger's 0x/0o/0b radix branches
+        // (pre-existing but previously untested) actually parse each literal to 1.
+        string yaml = $"""
+            version: {versionLiteral}
+            name: Example
+            layers:
+              domain:
+                namespace: App.Domain
+            analysis:
+              target_assemblies: [App]
+            contracts:
+              strict: []
+            """;
+
+        Assert.DoesNotThrow(() =>
+            ArchitecturePolicyEffectiveSchemaValidator.Validate(yaml, CreateProvenance()));
+    }
+
     [Test]
     public void Validate_NestedScalarMapFailure_ReportsTheMapValueInsteadOfAnyOfAlternatives()
     {

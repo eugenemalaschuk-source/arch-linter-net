@@ -21,7 +21,6 @@ public sealed partial class ArchitecturePolicyDocumentLoader : IArchitecturePoli
     private readonly IArchitectureFileSystem _fileSystem;
     private readonly IArchitecturePolicyPathResolver _pathResolver;
     private readonly ArchitecturePolicyImportGraphResolver _importResolver;
-    private readonly ArchitecturePolicySourceParser _sourceParser;
 
     public ArchitecturePolicyDocumentLoader()
         : this(ArchitectureFileSystem.Real)
@@ -39,8 +38,7 @@ public sealed partial class ArchitecturePolicyDocumentLoader : IArchitecturePoli
     {
         _fileSystem = fileSystem;
         _pathResolver = pathResolver;
-        _sourceParser = new ArchitecturePolicySourceParser();
-        _importResolver = new ArchitecturePolicyImportGraphResolver(fileSystem, pathResolver, _sourceParser);
+        _importResolver = new ArchitecturePolicyImportGraphResolver(fileSystem, pathResolver);
     }
 
     public ArchitectureContractDocument Load(string policyPath)

@@ -287,7 +287,7 @@ internal sealed partial class ValidateCommandHandler
     private static string ResolveStderrFallbackFormat(
         ValidateCommandOptions options,
         string defaultFormat,
-        IReadOnlyDictionary<string, string> contentByFormat)
+        Dictionary<string, string> contentByFormat)
     {
         return options.AdditionalSinks
             .FirstOrDefault(sink => sink.DestinationType == ReportDestinationType.Stderr

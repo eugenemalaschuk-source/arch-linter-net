@@ -20,7 +20,7 @@ internal sealed record ArchitecturePolicySource(
     public string PortableIdentity => Descriptor.SourcePath;
 }
 
-internal sealed partial class ArchitecturePolicySourceParser
+internal static partial class ArchitecturePolicySourceParser
 {
     private const string ImportsField = "imports";
 

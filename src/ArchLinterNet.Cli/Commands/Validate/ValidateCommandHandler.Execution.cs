@@ -265,7 +265,7 @@ internal sealed partial class ValidateCommandHandler
         // populated independently.
         if (!result.Cancelled)
         {
-            foreach ((string mode, ValidationOutcome modeOutcome) in outcomesByMode)
+            foreach ((_, ValidationOutcome modeOutcome) in outcomesByMode)
             {
                 TryPopulateCache(options, modeOutcome, snapshot.Counters, profileState.Cache);
             }

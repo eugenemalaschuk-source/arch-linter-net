@@ -654,11 +654,11 @@ internal sealed partial class ArchitecturePolicyPathResolver : IArchitecturePoli
     // struct field passed through an `out` parameter, so this stays on the legacy marshaler.
     [SuppressMessage("Interoperability", "SYSLIB1054:Use LibraryImportAttribute instead of DllImportAttribute", Justification = "stat uses an ABI-specific stat buffer unsupported by LibraryImport.")]
     [DllImport("libc", CharSet = CharSet.Ansi, SetLastError = true, EntryPoint = "stat")]
-    private static extern int StatLinuxX64(string path, out LinuxX64Stat stat);
+    private static extern int StatLinuxX64([MarshalAs(UnmanagedType.LPStr)] string path, out LinuxX64Stat stat);
 
     [SuppressMessage("Interoperability", "SYSLIB1054:Use LibraryImportAttribute instead of DllImportAttribute", Justification = "stat uses an ABI-specific stat buffer unsupported by LibraryImport.")]
     [DllImport("libc", CharSet = CharSet.Ansi, SetLastError = true, EntryPoint = "stat")]
-    private static extern int StatLinuxArm64(string path, out LinuxArm64Stat stat);
+    private static extern int StatLinuxArm64([MarshalAs(UnmanagedType.LPStr)] string path, out LinuxArm64Stat stat);
 
     [SuppressMessage("Interoperability", "SYSLIB1054:Use LibraryImportAttribute instead of DllImportAttribute", Justification = "fstat uses an ABI-specific stat buffer unsupported by LibraryImport.")]
     [DllImport("libc", SetLastError = true, EntryPoint = "fstat")]
