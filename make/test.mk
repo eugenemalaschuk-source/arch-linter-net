@@ -1,4 +1,4 @@
-.PHONY: test test-unit test-unit-core-1 test-unit-core-2 test-unit-other test-e2e test-packed-artifact clean-results test-coverage test-coverage-main-ci test-coverage-badge _acceptance-test benchmark-cel lint-test-shard-membership
+.PHONY: test test-unit test-unit-core-1 test-unit-core-2 test-unit-other test-e2e test-packed-artifact clean-results test-coverage test-coverage-core-1 test-coverage-core-2 test-coverage-other test-coverage-main-ci test-coverage-badge _acceptance-test benchmark-cel lint-test-shard-membership
 
 # Three independently addressable test buckets, single-sourced here as VSTest FullyQualifiedName
 # filters. Each bucket has its own `make test-*` target (below) so unit, ordinary E2E, and the
@@ -84,6 +84,7 @@ TEST_CORE_UNIT_SHARD_2_FILTER := $(TEST_UNIT_FILTER)&FullyQualifiedName!~PerTest
 CORE_TESTS_CSPROJ := $(TESTS_DIR)/ArchLinterNet.Core.Tests/ArchLinterNet.Core.Tests.csproj
 CEL_TESTS_CSPROJ := $(TESTS_DIR)/ArchLinterNet.CEL.Tests/ArchLinterNet.CEL.Tests.csproj
 CLI_TESTS_CSPROJ := $(TESTS_DIR)/ArchLinterNet.Cli.Tests/ArchLinterNet.Cli.Tests.csproj
+TEST_COVERAGE_DIAGNOSTICS ?=
 
 test-unit-core-1:  ## Run only Core unit shard 1 (heaviest fixture classes — see docs/internal/core-unit-shard-inventory.md)
 	@dotnet build "$(SLNX)" --no-restore --nologo
@@ -172,6 +173,12 @@ clean-results:  ## Remove test-results folder
 # correctness signal comes from the independent `test-e2e`/`test-packed-artifact` CI jobs and from
 # `make test`/`make acceptance` locally, not from the coverage/Sonar critical path. This is also why
 # CheckpointBReleaseGateTests stays listed in sonar.coverage.exclusions.
+#
+# `test-coverage` remains the safe aggregate command for one local checkout. Coverlet's VSTest
+# collector instruments referenced assemblies on disk and restores them after a run, so the two
+# Core coverage shards MUST NOT execute concurrently against the same bin/obj tree. CI avoids that
+# race by running the three `test-coverage-*` targets below in isolated jobs/checkouts and merging
+# their Cobertura/OpenCover artifacts in the downstream Sonar/Codecov job.
 test-coverage:  ## Run the unit bucket with coverage collection (Cobertura + OpenCover XML under test-results/)
 	@rm -rf "$(RESULTS_DIR)"
 	@dotnet build "$(SLNX)" --no-restore --nologo
@@ -179,7 +186,31 @@ test-coverage:  ## Run the unit bucket with coverage collection (Cobertura + Ope
 		--results-directory "$(RESULTS_DIR)/units" \
 		-- DataCollectionRunSettings.DataCollectors.DataCollector.Configuration.Format=cobertura,opencover
 
-test-coverage-main-ci:  ## Run unit-bucket coverage for main-branch badge refresh with hang diagnostics enabled
+test-coverage-core-1:  ## CI: collect coverage for Core unit shard 1 in an isolated checkout
+	@rm -rf "$(RESULTS_DIR)/coverage/core-1"
+	@dotnet build "$(SLNX)" --no-restore --nologo
+	@dotnet test "$(CORE_TESTS_CSPROJ)" --no-restore --no-build --filter "$(TEST_CORE_UNIT_SHARD_1_FILTER)" --logger trx $(TEST_COVERAGE_DIAGNOSTICS) --collect:"XPlat Code Coverage" \
+		--results-directory "$(RESULTS_DIR)/coverage/core-1" \
+		-- DataCollectionRunSettings.DataCollectors.DataCollector.Configuration.Format=cobertura,opencover
+
+test-coverage-core-2:  ## CI: collect coverage for Core unit shard 2 in an isolated checkout
+	@rm -rf "$(RESULTS_DIR)/coverage/core-2"
+	@dotnet build "$(SLNX)" --no-restore --nologo
+	@dotnet test "$(CORE_TESTS_CSPROJ)" --no-restore --no-build --filter "$(TEST_CORE_UNIT_SHARD_2_FILTER)" --logger trx $(TEST_COVERAGE_DIAGNOSTICS) --collect:"XPlat Code Coverage" \
+		--results-directory "$(RESULTS_DIR)/coverage/core-2" \
+		-- DataCollectionRunSettings.DataCollectors.DataCollector.Configuration.Format=cobertura,opencover
+
+test-coverage-other:  ## CI: collect coverage for CEL/Cli unit assemblies in an isolated checkout
+	@rm -rf "$(RESULTS_DIR)/coverage/other"
+	@dotnet build "$(SLNX)" --no-restore --nologo
+	@dotnet test "$(CEL_TESTS_CSPROJ)" --no-restore --no-build --logger trx $(TEST_COVERAGE_DIAGNOSTICS) --collect:"XPlat Code Coverage" \
+		--results-directory "$(RESULTS_DIR)/coverage/other/cel" \
+		-- DataCollectionRunSettings.DataCollectors.DataCollector.Configuration.Format=cobertura,opencover
+	@dotnet test "$(CLI_TESTS_CSPROJ)" --no-restore --no-build --logger trx $(TEST_COVERAGE_DIAGNOSTICS) --collect:"XPlat Code Coverage" \
+		--results-directory "$(RESULTS_DIR)/coverage/other/cli" \
+		-- DataCollectionRunSettings.DataCollectors.DataCollector.Configuration.Format=cobertura,opencover
+
+test-coverage-main-ci:  ## Run unit-bucket coverage for local/main diagnostics with hang detection enabled
 	@rm -rf "$(RESULTS_DIR)"
 	@dotnet build "$(SLNX)" --no-restore --nologo
 	@dotnet test "$(SLNX)" --no-restore --no-build --filter "$(TEST_UNIT_FILTER)" --logger trx --blame-hang --blame-hang-timeout 5m \
