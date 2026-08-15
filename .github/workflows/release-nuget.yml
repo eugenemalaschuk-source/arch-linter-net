@@ -51,15 +51,36 @@ jobs:
           - id: package-and-entrypoints
             name: Package + entrypoints
             target: test-packed-artifact-package-and-entrypoints
-          - id: adopter-runtime
-            name: Adopter runtime
-            target: test-packed-artifact-adopter-runtime
-          - id: consumer-cleanup
-            name: Consumer cleanup
-            target: test-packed-artifact-consumer-cleanup
-          - id: public-api-surface-selector
-            name: Public API selector
-            target: test-packed-artifact-public-api-surface-selector
+          - id: adopter-runtime-core
+            name: Adopter runtime core
+            target: test-packed-artifact-adopter-runtime-core
+          - id: adopter-runtime-extended
+            name: Adopter runtime extended
+            target: test-packed-artifact-adopter-runtime-extended
+          - id: consumer-cleanup-policy-execution
+            name: Consumer cleanup policy execution
+            target: test-packed-artifact-consumer-cleanup-policy-execution
+          - id: consumer-cleanup-dependency-contract-id-parity
+            name: Consumer cleanup dependency-contract id parity
+            target: test-packed-artifact-consumer-cleanup-dependency-contract-id-parity
+          - id: consumer-cleanup-layer-overlap-and-policy-shape
+            name: Consumer cleanup layer overlap + policy shape
+            target: test-packed-artifact-consumer-cleanup-layer-overlap-and-policy-shape
+          - id: consumer-cleanup-configuration-and-identity
+            name: Consumer cleanup configuration + identity
+            target: test-packed-artifact-consumer-cleanup-configuration-and-identity
+          - id: consumer-cleanup-source-set-authoring
+            name: Consumer cleanup source-set authoring
+            target: test-packed-artifact-consumer-cleanup-source-set-authoring
+          - id: public-api-surface-selector-snapshot-and-role
+            name: Public API selector snapshot + role
+            target: test-packed-artifact-public-api-surface-selector-snapshot-and-role
+          - id: public-api-surface-selector-delta-and-membership
+            name: Public API selector delta + membership
+            target: test-packed-artifact-public-api-surface-selector-delta-and-membership
+          - id: public-api-surface-selector-enforcement
+            name: Public API selector enforcement
+            target: test-packed-artifact-public-api-surface-selector-enforcement
     env:
       ARCH_LINTER_SOURCE_SHA: ${{ github.sha }}
       CHECKPOINT_B_CANDIDATE_VERSION: ${{ needs.prepare-candidate.outputs.package_version }}
@@ -278,9 +299,6 @@ jobs:
       - name: Restore
         run: make restore
 
-      - name: Build
-        run: dotnet build ArchLinterNet.slnx --configuration Release --no-restore -p:Version="$PACKAGE_VERSION"
-
       - name: Repository acceptance
         run: make acceptance-repository
 
@@ -288,6 +306,12 @@ jobs:
         run: |
           npm ci --ignore-scripts --prefix tools/openspec
           npm exec --prefix tools/openspec --no-install -- openspec validate --all --strict
+
+      # Repository acceptance recompiles source projects at their ordinary development version.
+      # Build the candidate immediately before `--no-build` packing so the assemblies embedded in
+      # each package report the manifest-bound release version rather than those test outputs.
+      - name: Build release candidate
+        run: dotnet build ArchLinterNet.slnx --configuration Release --no-restore -p:Version="$PACKAGE_VERSION"
 
       - name: Prepare NuGet package release notes
         shell: bash

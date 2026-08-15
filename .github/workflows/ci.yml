@@ -605,7 +605,7 @@ jobs:
           if-no-files-found: error
           retention-days: 1
 
-  packed_artifact_shards:
+  packed_artifact_windows_shards:
     name: Packed Artifact Shard (${{ matrix.name }} / ${{ matrix.shard_name }})
     needs: packed_artifact_candidate
     if: github.event_name == 'pull_request'
@@ -626,51 +626,72 @@ jobs:
             name: Windows
             platform: windows-x64
             shell_adapter: pwsh
-            shard: adopter-runtime
-            shard_name: Adopter runtime
-            target: test-packed-artifact-adopter-runtime
+            shard: adopter-runtime-core
+            shard_name: Adopter runtime core
+            target: test-packed-artifact-adopter-runtime-core
           - os: windows-latest
             name: Windows
             platform: windows-x64
             shell_adapter: pwsh
-            shard: consumer-cleanup
-            shard_name: Consumer cleanup
-            target: test-packed-artifact-consumer-cleanup
+            shard: adopter-runtime-extended
+            shard_name: Adopter runtime extended
+            target: test-packed-artifact-adopter-runtime-extended
           - os: windows-latest
             name: Windows
             platform: windows-x64
             shell_adapter: pwsh
-            shard: public-api-surface-selector
-            shard_name: Public API selector
-            target: test-packed-artifact-public-api-surface-selector
-          - os: macos-14
-            name: Apple Silicon macOS
-            platform: macos-arm64
-            shell_adapter: bash
-            shard: package-and-entrypoints
-            shard_name: Package + entrypoints
-            target: test-packed-artifact-package-and-entrypoints
-          - os: macos-14
-            name: Apple Silicon macOS
-            platform: macos-arm64
-            shell_adapter: bash
-            shard: adopter-runtime
-            shard_name: Adopter runtime
-            target: test-packed-artifact-adopter-runtime
-          - os: macos-14
-            name: Apple Silicon macOS
-            platform: macos-arm64
-            shell_adapter: bash
-            shard: consumer-cleanup
-            shard_name: Consumer cleanup
-            target: test-packed-artifact-consumer-cleanup
-          - os: macos-14
-            name: Apple Silicon macOS
-            platform: macos-arm64
-            shell_adapter: bash
-            shard: public-api-surface-selector
-            shard_name: Public API selector
-            target: test-packed-artifact-public-api-surface-selector
+            shard: consumer-cleanup-policy-execution
+            shard_name: Consumer cleanup policy execution
+            target: test-packed-artifact-consumer-cleanup-policy-execution
+          - os: windows-latest
+            name: Windows
+            platform: windows-x64
+            shell_adapter: pwsh
+            shard: consumer-cleanup-dependency-contract-id-parity
+            shard_name: Consumer cleanup dependency-contract id parity
+            target: test-packed-artifact-consumer-cleanup-dependency-contract-id-parity
+          - os: windows-latest
+            name: Windows
+            platform: windows-x64
+            shell_adapter: pwsh
+            shard: consumer-cleanup-layer-overlap-and-policy-shape
+            shard_name: Consumer cleanup layer overlap + policy shape
+            target: test-packed-artifact-consumer-cleanup-layer-overlap-and-policy-shape
+          - os: windows-latest
+            name: Windows
+            platform: windows-x64
+            shell_adapter: pwsh
+            shard: consumer-cleanup-configuration-and-identity
+            shard_name: Consumer cleanup configuration + identity
+            target: test-packed-artifact-consumer-cleanup-configuration-and-identity
+          - os: windows-latest
+            name: Windows
+            platform: windows-x64
+            shell_adapter: pwsh
+            shard: consumer-cleanup-source-set-authoring
+            shard_name: Consumer cleanup source-set authoring
+            target: test-packed-artifact-consumer-cleanup-source-set-authoring
+          - os: windows-latest
+            name: Windows
+            platform: windows-x64
+            shell_adapter: pwsh
+            shard: public-api-surface-selector-snapshot-and-role
+            shard_name: Public API selector snapshot + role
+            target: test-packed-artifact-public-api-surface-selector-snapshot-and-role
+          - os: windows-latest
+            name: Windows
+            platform: windows-x64
+            shell_adapter: pwsh
+            shard: public-api-surface-selector-delta-and-membership
+            shard_name: Public API selector delta + membership
+            target: test-packed-artifact-public-api-surface-selector-delta-and-membership
+          - os: windows-latest
+            name: Windows
+            platform: windows-x64
+            shell_adapter: pwsh
+            shard: public-api-surface-selector-enforcement
+            shard_name: Public API selector enforcement
+            target: test-packed-artifact-public-api-surface-selector-enforcement
     permissions:
       contents: read
     env:
@@ -729,29 +750,121 @@ jobs:
           if-no-files-found: error
           retention-days: 1
 
-  packed_artifact_tests:
-    name: Packed Artifact Test Suite (${{ matrix.name }})
-    needs: [packed_artifact_candidate, packed_artifact_shards]
-    if: always() && github.event_name == 'pull_request'
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
+  packed_artifact_macos_shards:
+    name: Packed Artifact Shard (Apple Silicon macOS / ${{ matrix.shard_name }})
+    needs: packed_artifact_candidate
+    if: github.event_name == 'pull_request'
+    runs-on: macos-14
+    timeout-minutes: 12
     strategy:
       fail-fast: false
       matrix:
         include:
-          - name: Windows
-            platform: windows-x64
-          - name: Apple Silicon macOS
-            platform: macos-arm64
+          - shard: package-and-entrypoints
+            shard_name: Package + entrypoints
+            target: test-packed-artifact-package-and-entrypoints
+          - shard: adopter-runtime-core
+            shard_name: Adopter runtime core
+            target: test-packed-artifact-adopter-runtime-core
+          - shard: adopter-runtime-extended
+            shard_name: Adopter runtime extended
+            target: test-packed-artifact-adopter-runtime-extended
+          - shard: consumer-cleanup-policy-execution
+            shard_name: Consumer cleanup policy execution
+            target: test-packed-artifact-consumer-cleanup-policy-execution
+          - shard: consumer-cleanup-dependency-contract-id-parity
+            shard_name: Consumer cleanup dependency-contract id parity
+            target: test-packed-artifact-consumer-cleanup-dependency-contract-id-parity
+          - shard: consumer-cleanup-layer-overlap-and-policy-shape
+            shard_name: Consumer cleanup layer overlap + policy shape
+            target: test-packed-artifact-consumer-cleanup-layer-overlap-and-policy-shape
+          - shard: consumer-cleanup-configuration-and-identity
+            shard_name: Consumer cleanup configuration + identity
+            target: test-packed-artifact-consumer-cleanup-configuration-and-identity
+          - shard: consumer-cleanup-source-set-authoring
+            shard_name: Consumer cleanup source-set authoring
+            target: test-packed-artifact-consumer-cleanup-source-set-authoring
+          - shard: public-api-surface-selector-snapshot-and-role
+            shard_name: Public API selector snapshot + role
+            target: test-packed-artifact-public-api-surface-selector-snapshot-and-role
+          - shard: public-api-surface-selector-delta-and-membership
+            shard_name: Public API selector delta + membership
+            target: test-packed-artifact-public-api-surface-selector-delta-and-membership
+          - shard: public-api-surface-selector-enforcement
+            shard_name: Public API selector enforcement
+            target: test-packed-artifact-public-api-surface-selector-enforcement
+    permissions:
+      contents: read
+    env:
+      ARCH_LINTER_SOURCE_SHA: ${{ github.sha }}
+      CHECKPOINT_B_CANDIDATE_VERSION: 0.6.1-ci.${{ github.run_id }}
+      CHECKPOINT_B_PACKAGE_FEED: ${{ github.workspace }}/artifacts/candidate
+      CHECKPOINT_B_PACKAGE_MANIFEST: ${{ github.workspace }}/artifacts/candidate/package-manifest.json
+      CHECKPOINT_B_EVIDENCE_DIRECTORY: ${{ github.workspace }}/artifacts/checkpoint-b-shard
+      CHECKPOINT_B_PLATFORM: macos-arm64
+      CHECKPOINT_B_SHELL: bash
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+
+      - name: Verify Apple Silicon macOS runner
+        run: test "$(uname -m)" = arm64
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Cache NuGet packages
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
+        with:
+          path: ~/.nuget/packages
+          key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj') }}
+          restore-keys: |
+            ${{ runner.os }}-nuget-
+
+      - name: Restore packed-artifact test project
+        run: dotnet restore tests/ArchLinterNet.Core.Tests/ArchLinterNet.Core.Tests.csproj --nologo
+
+      - name: Download immutable candidate
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+        with:
+          name: checkpoint-b-pr-candidate
+          path: artifacts/candidate
+
+      - name: Verify immutable candidate
+        run: python3 tools/release/package_manifest.py verify --packages-dir artifacts/candidate --manifest artifacts/candidate/package-manifest.json
+
+      - name: Run ${{ matrix.shard_name }} shard
+        shell: bash
+        run: make ${{ matrix.target }}
+
+      - name: Upload shard evidence
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: checkpoint-b-pr-macos-arm64-${{ matrix.shard }}
+          path: artifacts/checkpoint-b-shard
+          if-no-files-found: error
+          retention-days: 1
+
+  packed_artifact_windows_tests:
+    name: Packed Artifact Test Suite (Windows)
+    needs: [packed_artifact_candidate, packed_artifact_windows_shards]
+    if: always() && github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
     permissions:
       contents: read
 
     steps:
-      - name: Require successful candidate and scenario shards
-        if: needs.packed_artifact_candidate.result != 'success' || needs.packed_artifact_shards.result != 'success'
+      - name: Require successful candidate and Windows scenario shards
+        if: needs.packed_artifact_candidate.result != 'success' || needs.packed_artifact_windows_shards.result != 'success'
         run: |
           echo "candidate: ${{ needs.packed_artifact_candidate.result }}" >&2
-          echo "packed-artifact shards: ${{ needs.packed_artifact_shards.result }}" >&2
+          echo "Windows packed-artifact shards: ${{ needs.packed_artifact_windows_shards.result }}" >&2
           exit 1
 
       - name: Checkout
@@ -765,10 +878,10 @@ jobs:
           name: checkpoint-b-pr-candidate
           path: artifacts/candidate
 
-      - name: Download ${{ matrix.name }} shard evidence
+      - name: Download Windows shard evidence
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
         with:
-          pattern: checkpoint-b-pr-${{ matrix.platform }}-*
+          pattern: checkpoint-b-pr-windows-x64-*
           path: artifacts/checkpoint-b-shards
 
       - name: Merge and validate complete platform evidence
@@ -778,10 +891,59 @@ jobs:
             --candidate-manifest artifacts/candidate/package-manifest.json \
             --output artifacts/checkpoint-b-platform/checkpoint-b-platform-evidence.json
 
-      - name: Upload canonical ${{ matrix.name }} platform evidence
+      - name: Upload canonical Windows platform evidence
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: checkpoint-b-pr-platform-${{ matrix.platform }}
+          name: checkpoint-b-pr-platform-windows-x64
+          path: artifacts/checkpoint-b-platform
+          if-no-files-found: error
+          retention-days: 1
+
+  packed_artifact_macos_tests:
+    name: Packed Artifact Test Suite (Apple Silicon macOS)
+    needs: [packed_artifact_candidate, packed_artifact_macos_shards]
+    if: always() && github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+
+    steps:
+      - name: Require successful candidate and Apple Silicon macOS scenario shards
+        if: needs.packed_artifact_candidate.result != 'success' || needs.packed_artifact_macos_shards.result != 'success'
+        run: |
+          echo "candidate: ${{ needs.packed_artifact_candidate.result }}" >&2
+          echo "Apple Silicon macOS packed-artifact shards: ${{ needs.packed_artifact_macos_shards.result }}" >&2
+          exit 1
+
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+
+      - name: Download immutable candidate
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+        with:
+          name: checkpoint-b-pr-candidate
+          path: artifacts/candidate
+
+      - name: Download Apple Silicon macOS shard evidence
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+        with:
+          pattern: checkpoint-b-pr-macos-arm64-*
+          path: artifacts/checkpoint-b-shards
+
+      - name: Merge and validate complete platform evidence
+        run: |
+          python3 tools/release/merge_checkpoint_b_platform_evidence.py \
+            --input-dir artifacts/checkpoint-b-shards \
+            --candidate-manifest artifacts/candidate/package-manifest.json \
+            --output artifacts/checkpoint-b-platform/checkpoint-b-platform-evidence.json
+
+      - name: Upload canonical Apple Silicon macOS platform evidence
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: checkpoint-b-pr-platform-macos-arm64
           path: artifacts/checkpoint-b-platform
           if-no-files-found: error
           retention-days: 1
