@@ -7,6 +7,7 @@ namespace ArchLinterNet.Core.Tests;
 [TestFixture]
 public sealed class ArchitectureFindingMapperTests
 {
+    private static readonly string[] _value = { "Framework.A", "Framework.B" };
     [Test]
     public void KindToken_MapsEverySupportedDiagnosticKindToStableDistinctWireValue()
     {
@@ -212,7 +213,7 @@ public sealed class ArchitectureFindingMapperTests
             Assert.That(
                 frameworkFindings.Select(finding =>
                     ((FrameworkReferenceDiagnostic)finding.Details).Evidence.Single().FrameworkName),
-                Is.EqualTo(new[] { "Framework.A", "Framework.B" }));
+                Is.EqualTo(_value));
         });
     }
 

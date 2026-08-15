@@ -11,6 +11,10 @@ namespace ArchLinterNet.Cli.Tests;
 [TestFixture]
 public sealed partial class PublicApiCommandHandlerTests
 {
+    private static readonly string[] _value = { "class Acme.Gone" };
+    private static readonly string[] _value1 = { "class Acme.New" };
+    private static readonly string[] _value2 = { "class Acme.Gone" };
+    private static readonly string[] _value3 = { "class Acme.Gone" };
     private const string PolicyPath = "architecture/dependencies.arch.yml";
     private const string SnapshotPath = "architecture/api/module-api.txt";
     private const string ContractId = "module-api";
@@ -384,8 +388,8 @@ public sealed partial class PublicApiCommandHandlerTests
         {
             MigrateOutcome = new PublicApiMigrateOutcome(
                 false, null,
-                new[] { "class Acme.Gone" },
-                new[] { "class Acme.New" },
+                _value,
+                _value1,
                 SnapshotPath,
                 Array.Empty<BuildStatePreflightDiagnostic>(),
                 "has 1 stale inline declaration(s)", PublicApiFailureKind.Drift),
@@ -412,7 +416,7 @@ public sealed partial class PublicApiCommandHandlerTests
         {
             MigrateOutcome = new PublicApiMigrateOutcome(
                 true, CapturedSnapshot,
-                new[] { "class Acme.Gone" },
+                _value2,
                 Array.Empty<string>(),
                 SnapshotPath,
                 Array.Empty<BuildStatePreflightDiagnostic>()),
@@ -621,7 +625,7 @@ public sealed partial class PublicApiCommandHandlerTests
         StubRuntime runtime = new()
         {
             MigrateOutcome = new PublicApiMigrateOutcome(
-                true, CapturedSnapshot, new[] { "class Acme.Gone" }, Array.Empty<string>(), SnapshotPath,
+                true, CapturedSnapshot, _value3, Array.Empty<string>(), SnapshotPath,
                 Array.Empty<BuildStatePreflightDiagnostic>()),
         };
 

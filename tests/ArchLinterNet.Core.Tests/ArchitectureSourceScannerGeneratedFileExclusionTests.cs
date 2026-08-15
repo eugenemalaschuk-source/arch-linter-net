@@ -12,6 +12,8 @@ namespace ArchLinterNet.Core.Tests;
 [TestFixture]
 public sealed class ArchitectureSourceScannerGeneratedFileExclusionTests
 {
+    private static readonly string[] _value = { "System.Console.WriteLine" };
+    private static readonly string[] _value1 = { "src" };
     private string _repoRoot = null!;
 
     [SetUp]
@@ -62,9 +64,9 @@ public sealed class ArchitectureSourceScannerGeneratedFileExclusionTests
         _ = new ArchitectureSourceScanner().FindMethodBodyViolations(
             _repoRoot,
             "Fake.Namespace",
-            new[] { "System.Console.WriteLine" },
+            _value,
             ExecutionContext(),
-            sourceRoots: new[] { "src" },
+            sourceRoots: _value1,
             compilationFactory: compilationFactory).ToList();
 
         return compilationFactory.SeenSourceFilePaths?.ToList() ?? new List<string>();

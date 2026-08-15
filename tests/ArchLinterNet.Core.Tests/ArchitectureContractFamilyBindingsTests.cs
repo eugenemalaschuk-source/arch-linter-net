@@ -14,6 +14,7 @@ namespace ArchLinterNet.Core.Tests;
 [TestFixture]
 public sealed class ArchitectureContractFamilyBindingsTests
 {
+    private static readonly string[] _value = { "layer_template" };
     [Test]
     public void All_HasTwentyNineUniqueFamilyIds()
     {
@@ -31,7 +32,7 @@ public sealed class ArchitectureContractFamilyBindingsTests
             .Select(b => b.FamilyId)
             .ToList();
 
-        Assert.That(excluded, Is.EqualTo(new[] { "layer_template" }));
+        Assert.That(excluded, Is.EqualTo(_value));
     }
 
     private static ArchitectureContractGroups BuildGroupsWithOneStrictContractPerFamily() => new()

@@ -12,6 +12,7 @@ namespace ArchLinterNet.Core.Tests;
 [TestFixture]
 public sealed class ArchitectureViolationSurfaceTests
 {
+    private static readonly string[] _value = { "Ns.Type.Alpha: System.String" };
     [Test]
     public void IdentityReferences_IsNotPublicApi()
     {
@@ -33,7 +34,7 @@ public sealed class ArchitectureViolationSurfaceTests
     public void SerializedViolation_DoesNotExposeThePairing()
     {
         ArchitectureViolation violation = new(
-            "contract", "contract-id", "Ns.Type", "namespace", new[] { "Ns.Type.Alpha: System.String" })
+            "contract", "contract-id", "Ns.Type", "namespace", _value)
         {
             IdentityReferences = new[] { "Ns.Type.Alpha: System.String" },
         };

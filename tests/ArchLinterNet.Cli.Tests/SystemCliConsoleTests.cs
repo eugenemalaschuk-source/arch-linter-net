@@ -6,6 +6,8 @@ namespace ArchLinterNet.Cli.Tests;
 [TestFixture]
 public sealed class SystemCliConsoleTests
 {
+    private static readonly char[] _value = { 'x', '?' };
+    private static readonly char[] _value1 = { '\u001b', '[', '3', '3', 'm' };
     [Test]
     public void WritesToCurrentConsoleStreams()
     {
@@ -54,9 +56,9 @@ public sealed class SystemCliConsoleTests
         console.Out.Write("\u001b]8;;\u001b");
         console.Out.Write("\\");
         console.Out.Write('!');
-        console.Out.Write(new[] { 'x', '?' }, 1, 1);
+        console.Out.Write(_value, 1, 1);
         console.Out.Write(".".AsSpan());
-        console.Error.Write(new[] { '\u001b', '[', '3', '3', 'm' });
+        console.Error.Write(_value1);
         console.Error.Write("warning\u001b[0m");
         _ = console.Out.Encoding;
         _ = console.Out.FormatProvider;

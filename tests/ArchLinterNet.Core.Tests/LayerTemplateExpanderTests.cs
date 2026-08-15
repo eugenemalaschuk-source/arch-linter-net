@@ -8,6 +8,8 @@ namespace ArchLinterNet.Core.Tests;
 [TestFixture]
 public sealed class LayerTemplateExpanderTests
 {
+    private static readonly string[] _value = { "App.Features.One" };
+    private static readonly string[] _value1 = { "MyApp.Features.Fishing.Presentation", "MyApp.Features.Fishing.Domain" };
     [Test]
     public void Expand_ExcludeContainers_SubtractsBeforeExpansion()
     {
@@ -20,7 +22,7 @@ public sealed class LayerTemplateExpanderTests
         };
 
         Assert.That(LayerTemplateExpander.Expand(new[] { template }).Select(contract => contract.ContainerNamespace),
-            Is.EqualTo(new[] { "App.Features.One" }));
+            Is.EqualTo(_value));
     }
     [Test]
     public void Expand_SingleContainer_ProducesOneContract()
@@ -64,7 +66,7 @@ public sealed class LayerTemplateExpanderTests
         List<ArchitectureLayerContract> result = LayerTemplateExpander.Expand(templates);
 
         Assert.That(result[0].Layers,
-            Is.EqualTo(new[] { "MyApp.Features.Fishing.Presentation", "MyApp.Features.Fishing.Domain" }));
+            Is.EqualTo(_value1));
     }
 
     [Test]

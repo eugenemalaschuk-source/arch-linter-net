@@ -15,6 +15,8 @@ namespace ArchLinterNet.Core.Tests;
 [TestFixture]
 public sealed class AnalysisCacheSchemaValidationTests
 {
+    private static readonly string[] _value = { "MyApp.Infrastructure.Db" };
+    private static readonly string[] _value1 = { "MyApp.Application" };
     private static JsonSchema LoadSchema()
     {
         PackagedSchemaRegistry registry = new();
@@ -26,9 +28,9 @@ public sealed class AnalysisCacheSchemaValidationTests
     {
         ArchitectureViolation violationWithPayload = new(
             "no_infra_from_domain", "R001", "MyApp.Domain.Order", "MyApp.Infrastructure",
-            new[] { "MyApp.Infrastructure.Db" })
+            _value)
         {
-            Payload = new DependencyPayload("Domain", "Infrastructure", new[] { "MyApp.Application" }),
+            Payload = new DependencyPayload("Domain", "Infrastructure", _value1),
         };
 
         AnalysisCacheOutcomeV1 outcome = new(

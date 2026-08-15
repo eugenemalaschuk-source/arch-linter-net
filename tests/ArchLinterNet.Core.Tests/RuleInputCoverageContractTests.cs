@@ -10,6 +10,14 @@ namespace ArchLinterNet.Core.Tests;
 [TestFixture]
 public sealed class RuleInputCoverageContractTests
 {
+    private static readonly string[] _value = { "audio-rule" };
+    private static readonly string[] _value1 = { "video-to-ghost-rule" };
+    private static readonly string[] _value2 = { "ghost" };
+    private static readonly string[] _value3 = { "typo-rule" };
+    private static readonly string[] _value4 = { "does_not_exist_layer" };
+    private static readonly string[] _value5 = { "video-to-ghost-rule", "typo-rule" };
+    private static readonly string[] _value6 = { "video-to-ghost-rule", "typo-rule" };
+    private static readonly string[] _value7 = { "audio-rule", "video-to-ghost-rule", "typo-rule" };
     private const string FixtureRoot = "ArchLinterNet.Core.Tests.RuleInputCoverageFixtures";
 
     private static readonly Assembly[] _targetAssemblies = { typeof(RuleInputCoverageContractTests).Assembly };
@@ -89,7 +97,7 @@ public sealed class RuleInputCoverageContractTests
         ArchitectureContractRunner runner = new(CreateContext(), document);
 
         List<ArchitectureViolation> findings = runner.CheckCoverageContract(
-            CreateRuleInputContract(new[] { "audio-rule" }));
+            CreateRuleInputContract(_value));
 
         Assert.That(findings, Is.Empty);
     }
@@ -101,12 +109,12 @@ public sealed class RuleInputCoverageContractTests
         ArchitectureContractRunner runner = new(CreateContext(), document);
 
         List<ArchitectureViolation> findings = runner.CheckCoverageContract(
-            CreateRuleInputContract(new[] { "video-to-ghost-rule" }));
+            CreateRuleInputContract(_value1));
 
         Assert.That(findings, Has.Count.EqualTo(1));
         Assert.That(findings[0].SourceType, Is.EqualTo("video-to-ghost-rule"));
         Assert.That(findings[0].ForbiddenNamespace, Is.EqualTo("empty-input"));
-        Assert.That(findings[0].ForbiddenReferences, Is.EqualTo(new[] { "ghost" }));
+        Assert.That(findings[0].ForbiddenReferences, Is.EqualTo(_value2));
     }
 
     [Test]
@@ -116,12 +124,12 @@ public sealed class RuleInputCoverageContractTests
         ArchitectureContractRunner runner = new(CreateContext(), document);
 
         List<ArchitectureViolation> findings = runner.CheckCoverageContract(
-            CreateRuleInputContract(new[] { "typo-rule" }));
+            CreateRuleInputContract(_value3));
 
         Assert.That(findings, Has.Count.EqualTo(1));
         Assert.That(findings[0].SourceType, Is.EqualTo("typo-rule"));
         Assert.That(findings[0].ForbiddenNamespace, Is.EqualTo("unresolved"));
-        Assert.That(findings[0].ForbiddenReferences, Is.EqualTo(new[] { "does_not_exist_layer" }));
+        Assert.That(findings[0].ForbiddenReferences, Is.EqualTo(_value4));
     }
 
     [Test]
@@ -132,7 +140,7 @@ public sealed class RuleInputCoverageContractTests
 
         List<ArchitectureViolation> findings = runner.CheckCoverageContract(
             CreateRuleInputContract(
-                new[] { "video-to-ghost-rule", "typo-rule" },
+                _value5,
                 new[]
                 {
                     new ArchitectureCoverageExclusion
@@ -155,7 +163,7 @@ public sealed class RuleInputCoverageContractTests
     {
         ArchitectureContractDocument document = CreateDocument();
         ArchitectureCoverageContract contract = CreateRuleInputContract(
-            new[] { "video-to-ghost-rule", "typo-rule" });
+            _value6);
         contract.OptionalInputs.Add(new ArchitectureOptionalRuleInput
         {
             ContractId = "video-to-ghost-rule",
@@ -178,7 +186,7 @@ public sealed class RuleInputCoverageContractTests
     {
         ArchitectureContractDocument document = CreateDocument();
         ArchitectureCoverageContract contract = CreateRuleInputContract(
-            new[] { "audio-rule", "video-to-ghost-rule", "typo-rule" });
+            _value7);
 
         ArchitectureContractRunner firstRunner = new(CreateContext(), document);
         ArchitectureContractRunner secondRunner = new(CreateContext(), document);

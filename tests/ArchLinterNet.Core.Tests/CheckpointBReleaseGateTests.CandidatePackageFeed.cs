@@ -21,6 +21,12 @@ public sealed partial class CheckpointBReleaseGateTests
         private readonly IReadOnlyList<PackageEvidence> _packages;
         private readonly string _manifestSha256;
 
+        private static readonly JsonSerializerOptions _evidenceSerializerOptions = new()
+        {
+            WriteIndented = true,
+            PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower,
+        };
+
         private CandidatePackageFeed(string root, string candidateVersion, string repositoryRoot, string feed,
             string shell, IReadOnlyList<PackageEvidence> packages, string manifestSha256)
         {
@@ -460,11 +466,7 @@ public sealed partial class CheckpointBReleaseGateTests
                 scenarios = scenarios.OrderBy(static scenario => scenario.Id, StringComparer.Ordinal),
             };
             string fileName = "checkpoint-b-platform-evidence.json";
-            File.WriteAllText(Path.Combine(directory, fileName), JsonSerializer.Serialize(evidence, new JsonSerializerOptions
-            {
-                WriteIndented = true,
-                PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower,
-            }));
+            File.WriteAllText(Path.Combine(directory, fileName), JsonSerializer.Serialize(evidence, _evidenceSerializerOptions));
         }
 
         private CommandResult RunIsolatedDotnet(string workingDirectory, params string[] arguments)

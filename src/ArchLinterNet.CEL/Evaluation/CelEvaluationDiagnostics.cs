@@ -9,6 +9,8 @@ namespace ArchLinterNet.CEL.Evaluation;
 /// </summary>
 internal static class CelEvaluationDiagnostics
 {
+    private const string EvaluatorSource = "evaluator";
+
     public static CelDiagnostic BudgetExceeded(
         CelSourceSpan span,
         string limitName,
@@ -16,7 +18,7 @@ internal static class CelEvaluationDiagnostics
         CelProfileId profileId) =>
         new(
             CelDiagnosticCode.BudgetExceeded,
-            "evaluator",
+            EvaluatorSource,
             CelDiagnosticSeverity.Error,
             span,
             $"Evaluation exceeded the {limitName} limit.",
@@ -35,7 +37,7 @@ internal static class CelEvaluationDiagnostics
         CelProfileId profileId) =>
         new(
             CelDiagnosticCode.SchemaMismatch,
-            "evaluator",
+            EvaluatorSource,
             CelDiagnosticSeverity.Error,
             span: null,
             $"Evaluation context schema '{schemaId}' does not match the compiled program schema '{expectedSchemaId}'.",
@@ -54,7 +56,7 @@ internal static class CelEvaluationDiagnostics
         CelProfileId profileId) =>
         new(
             CelDiagnosticCode.EvaluationFailure,
-            "evaluator",
+            EvaluatorSource,
             CelDiagnosticSeverity.Error,
             span,
             $"Map key '{key}' was not present in the receiver value.",
@@ -72,7 +74,7 @@ internal static class CelEvaluationDiagnostics
         CelProfileId profileId) =>
         new(
             CelDiagnosticCode.EvaluationFailure,
-            "evaluator",
+            EvaluatorSource,
             CelDiagnosticSeverity.Error,
             span,
             $"List index {index} is outside the valid range 0..{Math.Max(length - 1, 0)}.",
@@ -90,7 +92,7 @@ internal static class CelEvaluationDiagnostics
         CelProfileId profileId) =>
         new(
             CelDiagnosticCode.EvaluationFailure,
-            "evaluator",
+            EvaluatorSource,
             CelDiagnosticSeverity.Error,
             span,
             $"Object member '{identifier}' was not present in the receiver value.",
@@ -107,7 +109,7 @@ internal static class CelEvaluationDiagnostics
         CelProfileId profileId) =>
         new(
             CelDiagnosticCode.SchemaMismatch,
-            "evaluator",
+            EvaluatorSource,
             CelDiagnosticSeverity.Error,
             span,
             $"Evaluation context did not provide a value for variable '{identifier}'.",

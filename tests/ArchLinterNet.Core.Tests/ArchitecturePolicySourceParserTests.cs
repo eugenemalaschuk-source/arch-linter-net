@@ -15,8 +15,7 @@ public sealed class ArchitecturePolicySourceParserTests
     [Test]
     public void Parse_FragmentWithNestedImport_PreservesDescriptorAndImports()
     {
-        var parser = new ArchitecturePolicySourceParser();
-        ArchitecturePolicySource source = parser.Parse(
+        ArchitecturePolicySource source = ArchitecturePolicySourceParser.Parse(
             Descriptor(ArchitecturePolicyDocumentRole.Fragment), "full", "physical", "identity", "imports: [nested.yml]\n");
 
         Assert.Multiple(() =>
@@ -36,11 +35,10 @@ public sealed class ArchitecturePolicySourceParserTests
         string yaml,
         string expectedYamlPath)
     {
-        var parser = new ArchitecturePolicySourceParser();
         ArchitecturePolicySourceDescriptor descriptor = Descriptor(role);
 
         ArchitecturePolicyImportException exception = Assert.Throws<ArchitecturePolicyImportException>(
-            () => parser.Parse(descriptor, "full", "physical", "identity", yaml))!;
+            () => ArchitecturePolicySourceParser.Parse(descriptor, "full", "physical", "identity", yaml))!;
         ArchitecturePolicySourceLocation location = exception.Diagnostic!.Location!;
 
         Assert.Multiple(() =>
@@ -54,11 +52,10 @@ public sealed class ArchitecturePolicySourceParserTests
     [Test]
     public void Parse_MalformedFragment_EnrichesParserExceptionWithSourceLocation()
     {
-        var parser = new ArchitecturePolicySourceParser();
         ArchitecturePolicySourceDescriptor descriptor = Descriptor(ArchitecturePolicyDocumentRole.Fragment);
 
         ArchitecturePolicyImportException exception = Assert.Throws<ArchitecturePolicyImportException>(
-            () => parser.Parse(descriptor, "full", "physical", "identity", "layers: [unterminated"))!;
+            () => ArchitecturePolicySourceParser.Parse(descriptor, "full", "physical", "identity", "layers: [unterminated"))!;
         ArchitecturePolicySourceLocation location = exception.Diagnostic!.Location!;
 
         Assert.Multiple(() =>
@@ -72,11 +69,10 @@ public sealed class ArchitecturePolicySourceParserTests
     [Test]
     public void Parse_NonScalarImportEntry_UsesIndexedLocation()
     {
-        var parser = new ArchitecturePolicySourceParser();
         ArchitecturePolicySourceDescriptor descriptor = Descriptor(ArchitecturePolicyDocumentRole.Fragment);
 
         ArchitecturePolicyImportException exception = Assert.Throws<ArchitecturePolicyImportException>(
-            () => parser.Parse(
+            () => ArchitecturePolicySourceParser.Parse(
                 descriptor, "full", "physical", "identity", "imports: [nested.yml, { path: nested.yml }]\n"))!;
 
         Assert.That(exception.Diagnostic!.Location!.YamlPath, Is.EqualTo("imports[1]"));
@@ -85,8 +81,7 @@ public sealed class ArchitecturePolicySourceParserTests
     [Test]
     public void ValidatePortableImport_UsesIndexedImportLocationAndChain()
     {
-        var parser = new ArchitecturePolicySourceParser();
-        ArchitecturePolicySource source = parser.Parse(
+        ArchitecturePolicySource source = ArchitecturePolicySourceParser.Parse(
             Descriptor(ArchitecturePolicyDocumentRole.Fragment), "full", "physical", "identity",
             "imports: [one.yml, two.yml, nested\\policy.yml]\n");
 

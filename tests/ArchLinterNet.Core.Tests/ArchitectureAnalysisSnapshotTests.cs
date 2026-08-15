@@ -18,6 +18,12 @@ namespace ArchLinterNet.Core.Tests;
 [TestFixture]
 public sealed partial class ArchitectureAnalysisSnapshotTests
 {
+    private static readonly string[] _value = { "Fixture" };
+    private static readonly string[] _value1 = { "net10.0" };
+    private static readonly string[] _value2 = { "Fixture" };
+    private static readonly string[] _value3 = { "Fixture" };
+    private static readonly string[] _value4 = { "net10.0" };
+    private static readonly string[] _value5 = { "Fixture" };
     private sealed class CountingRunnerSetupService : IArchitectureRunnerSetupService
     {
         public int BuildRunnerCallCount { get; private set; }
@@ -434,18 +440,18 @@ public sealed partial class ArchitectureAnalysisSnapshotTests
         // Preflight only runs when project discovery produced a project graph — reuse the
         // discovered-project session shape from ArchitectureValidationApplicationServiceFakeCompositionTests.
         var discovery = new Discovery.ProjectDiscoveryResult(
-            new[] { "Fixture" }, Array.Empty<string>(), Array.Empty<string>(),
+            _value, Array.Empty<string>(), Array.Empty<string>(),
             Array.Empty<Discovery.ArchitectureProjectDiscoveryDiagnostic>())
         {
             DiscoveredProjects = new[]
             {
-                new Discovery.ArchitectureDiscoveredProject("Fixture.csproj", "Fixture", new[] { "net10.0" })
+                new Discovery.ArchitectureDiscoveredProject("Fixture.csproj", "Fixture", _value1)
             }
         };
         var context = new ArchitectureAnalysisContext(
             "/fake/repository/root",
             Array.Empty<Assembly>(),
-            new[] { "Fixture" },
+            _value2,
             Array.Empty<string>(),
             projectDiscovery: discovery);
         ArchitectureContractDocument document = fixture.RunnerSetupService.DocumentToReturn;
@@ -517,16 +523,16 @@ public sealed partial class ArchitectureAnalysisSnapshotTests
         var runnerSetupService = new CountingRunnerSetupService { DocumentToReturn = document };
 
         var discovery = new Discovery.ProjectDiscoveryResult(
-            new[] { "Fixture" }, Array.Empty<string>(), Array.Empty<string>(),
+            _value3, Array.Empty<string>(), Array.Empty<string>(),
             Array.Empty<Discovery.ArchitectureProjectDiscoveryDiagnostic>())
         {
             DiscoveredProjects = new[]
             {
-                new Discovery.ArchitectureDiscoveredProject("Fixture.csproj", "Fixture", new[] { "net10.0" })
+                new Discovery.ArchitectureDiscoveredProject("Fixture.csproj", "Fixture", _value4)
             }
         };
         var context = new ArchitectureAnalysisContext(
-            "/fake/repository/root", Array.Empty<Assembly>(), new[] { "Fixture" }, Array.Empty<string>(),
+            "/fake/repository/root", Array.Empty<Assembly>(), _value5, Array.Empty<string>(),
             projectDiscovery: discovery);
         var session = new ArchitectureAnalysisSession(
             context, document, selectedContractIds: null, enableUnmatchedIgnoreTracking: true,

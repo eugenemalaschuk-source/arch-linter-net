@@ -275,15 +275,7 @@ public static class AnalysisCacheStore
     private static bool HasDuplicateProjectPath(IReadOnlyList<AnalysisCacheProjectManifest> manifests)
     {
         HashSet<string> seen = new(StringComparer.Ordinal);
-        foreach (AnalysisCacheProjectManifest manifest in manifests)
-        {
-            if (!seen.Add(manifest.ProjectPath))
-            {
-                return true;
-            }
-        }
-
-        return false;
+        return manifests.Any(manifest => !seen.Add(manifest.ProjectPath));
     }
 
     private static bool ArtifactManifestsMatch(

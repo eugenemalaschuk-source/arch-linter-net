@@ -14,6 +14,7 @@ namespace ArchLinterNet.CEL.Tests;
 [TestFixture]
 public sealed class CelEvaluatorTests
 {
+    private static readonly bool[] _value = { true, false, false, true };
     [Test]
     public void Predicate_Evaluate_ReturnsExpectedBooleanResult()
     {
@@ -630,7 +631,7 @@ public sealed class CelEvaluatorTests
 
         var results = await Task.WhenAll(contexts.Select(context => Task.Run(() => compilation.Program!.Evaluate(context))));
 
-        Assert.That(results.Select(result => result.AsBool()).ToArray(), Is.EqualTo(new[] { true, false, false, true }));
+        Assert.That(results.Select(result => result.AsBool()).ToArray(), Is.EqualTo(_value));
     }
 
     private static CelEnvironment BuildEnvironment(CelEvaluationLimits? evaluationLimits = null)

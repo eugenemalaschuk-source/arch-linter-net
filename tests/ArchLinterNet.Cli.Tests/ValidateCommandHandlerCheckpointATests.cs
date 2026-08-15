@@ -5,6 +5,7 @@ namespace ArchLinterNet.Cli.Tests;
 
 public sealed partial class ValidateCommandHandlerReportModeTests
 {
+    private static readonly string[] _value = { "result.json", "result.sarif" };
     [Test]
     public void CheckpointA_HumanJsonAndSarifSinks_ExecuteOneAnalysis()
     {
@@ -30,7 +31,7 @@ public sealed partial class ValidateCommandHandlerReportModeTests
             Assert.That(exitCode, Is.EqualTo(CliExitCodes.Success));
             Assert.That(runtime.ValidationCallCount, Is.EqualTo(1));
             Assert.That(console.StdOut, Does.Contain("Architecture validation passed."));
-            Assert.That(fileSystem.CommittedPaths, Is.EquivalentTo(new[] { "result.json", "result.sarif" }));
+            Assert.That(fileSystem.CommittedPaths, Is.EquivalentTo(_value));
         });
     }
 }

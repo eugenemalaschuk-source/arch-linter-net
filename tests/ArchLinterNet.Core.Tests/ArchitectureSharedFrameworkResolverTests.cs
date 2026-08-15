@@ -6,6 +6,22 @@ namespace ArchLinterNet.Core.Tests;
 [TestFixture]
 public sealed class ArchitectureSharedFrameworkResolverTests
 {
+    private static readonly string[] _value = { "/opt/dotnet/shared/Microsoft.AspNetCore.App/9.0.10" };
+    private static readonly string[] _value1 = { "/usr/local/share/dotnet/shared/Microsoft.AspNetCore.App/10.0.5" };
+    private static readonly string[] _value2 = { "/opt/dotnet/shared/Microsoft.AspNetCore.App/8.0.1" };
+    private static readonly string[] _value3 = { "/usr/local/share/dotnet/shared/Microsoft.AspNetCore.App/10.0.5" };
+    private static readonly string[] _value4 = { "/opt/dotnet/shared/Microsoft.AspNetCore.App/8.0.11" };
+    private static readonly string[] _value5 = { "/opt/dotnet/shared/Microsoft.AspNetCore.App/9.1.0-preview.1" };
+    private static readonly string[] _value6 = { "/opt/dotnet/shared/Microsoft.AspNetCore.App/10.0.5" };
+    private static readonly string[] _value7 = { "net8.0" };
+    private static readonly string[] _value8 = { "/opt/dotnet/shared/Microsoft.AspNetCore.App/8.0.11" };
+    private static readonly string[] _value9 = { "net8.0" };
+    private static readonly string[] _value10 = { "/opt/dotnet/shared/Microsoft.AspNetCore.App/10.0.2" };
+    private static readonly string[] _value11 = { "net8.0", "net10.0" };
+    private static readonly string[] _value12 = { "/opt/dotnet/shared/Microsoft.AspNetCore.App/9.0.9" };
+    private static readonly string[] _value13 = { "/opt/dotnet/shared/Microsoft.AspNetCore.App/8.0.1" };
+    private static readonly string[] _value14 = { "/opt/dotnet/shared/Microsoft.AspNetCore.App/8.0.1" };
+    private static readonly string[] _value15 = { "/opt/dotnet/shared/Microsoft.AspNetCore.App/8.0.1" };
     private static readonly List<string> _aspNetCoreApp = new() { "Microsoft.AspNetCore.App" };
 
     private FakeArchitectureFileSystem _fileSystem = null!;
@@ -46,7 +62,7 @@ public sealed class ArchitectureSharedFrameworkResolverTests
 
         IReadOnlyList<string> result = Resolve(_aspNetCoreApp);
 
-        Assert.That(result, Is.EqualTo(new[] { "/opt/dotnet/shared/Microsoft.AspNetCore.App/9.0.10" }));
+        Assert.That(result, Is.EqualTo(_value));
     }
 
     [Test]
@@ -59,7 +75,7 @@ public sealed class ArchitectureSharedFrameworkResolverTests
 
         IReadOnlyList<string> result = Resolve(_aspNetCoreApp);
 
-        Assert.That(result, Is.EqualTo(new[] { "/usr/local/share/dotnet/shared/Microsoft.AspNetCore.App/10.0.5" }));
+        Assert.That(result, Is.EqualTo(_value1));
     }
 
     [Test]
@@ -76,7 +92,7 @@ public sealed class ArchitectureSharedFrameworkResolverTests
 
         IReadOnlyList<string> result = Resolve(_aspNetCoreApp);
 
-        Assert.That(result, Is.EqualTo(new[] { "/opt/dotnet/shared/Microsoft.AspNetCore.App/8.0.1" }));
+        Assert.That(result, Is.EqualTo(_value2));
     }
 
     [Test]
@@ -91,7 +107,7 @@ public sealed class ArchitectureSharedFrameworkResolverTests
 
         IReadOnlyList<string> result = Resolve(_aspNetCoreApp);
 
-        Assert.That(result, Is.EqualTo(new[] { "/usr/local/share/dotnet/shared/Microsoft.AspNetCore.App/10.0.5" }));
+        Assert.That(result, Is.EqualTo(_value3));
     }
 
     [Test]
@@ -107,7 +123,7 @@ public sealed class ArchitectureSharedFrameworkResolverTests
 
         IReadOnlyList<string> result = Resolve(_aspNetCoreApp);
 
-        Assert.That(result, Is.EqualTo(new[] { "/opt/dotnet/shared/Microsoft.AspNetCore.App/8.0.11" }));
+        Assert.That(result, Is.EqualTo(_value4));
     }
 
     [Test]
@@ -121,7 +137,7 @@ public sealed class ArchitectureSharedFrameworkResolverTests
 
         IReadOnlyList<string> result = Resolve(_aspNetCoreApp);
 
-        Assert.That(result, Is.EqualTo(new[] { "/opt/dotnet/shared/Microsoft.AspNetCore.App/9.1.0-preview.1" }));
+        Assert.That(result, Is.EqualTo(_value5));
     }
 
     [Test]
@@ -137,7 +153,7 @@ public sealed class ArchitectureSharedFrameworkResolverTests
 
         IReadOnlyList<string> result = Resolve(_aspNetCoreApp, "net10.0");
 
-        Assert.That(result, Is.EqualTo(new[] { "/opt/dotnet/shared/Microsoft.AspNetCore.App/10.0.5" }));
+        Assert.That(result, Is.EqualTo(_value6));
     }
 
     [Test]
@@ -153,9 +169,9 @@ public sealed class ArchitectureSharedFrameworkResolverTests
         _fileSystem.AddDirectory("/opt/dotnet/shared/Microsoft.AspNetCore.App/10.0.2");
         _environment.RuntimeDirectory = "/opt/dotnet/shared/Microsoft.NETCore.App/10.0.0";
 
-        IReadOnlyList<string> result = Resolve(_aspNetCoreApp, discoveredTargetFrameworkMonikers: new[] { "net8.0" });
+        IReadOnlyList<string> result = Resolve(_aspNetCoreApp, discoveredTargetFrameworkMonikers: _value7);
 
-        Assert.That(result, Is.EqualTo(new[] { "/opt/dotnet/shared/Microsoft.AspNetCore.App/8.0.11" }));
+        Assert.That(result, Is.EqualTo(_value8));
     }
 
     [Test]
@@ -168,16 +184,16 @@ public sealed class ArchitectureSharedFrameworkResolverTests
         _fileSystem.AddDirectory("/opt/dotnet/shared/Microsoft.AspNetCore.App/10.0.2");
 
         IReadOnlyList<string> result = Resolve(
-            _aspNetCoreApp, "net10.0", discoveredTargetFrameworkMonikers: new[] { "net8.0" });
+            _aspNetCoreApp, "net10.0", discoveredTargetFrameworkMonikers: _value9);
 
-        Assert.That(result, Is.EqualTo(new[] { "/opt/dotnet/shared/Microsoft.AspNetCore.App/10.0.2" }));
+        Assert.That(result, Is.EqualTo(_value10));
     }
 
     [Test]
     public void ResolveProbingPaths_AmbiguousDiscoveredMajors_ThrowsFailClosedInsteadOfPickingOne()
     {
         InvalidOperationException exception = Assert.Throws<InvalidOperationException>(() => Resolve(
-            _aspNetCoreApp, discoveredTargetFrameworkMonikers: new[] { "net8.0", "net10.0" }))!;
+            _aspNetCoreApp, discoveredTargetFrameworkMonikers: _value11))!;
 
         Assert.Multiple(() =>
         {
@@ -198,7 +214,7 @@ public sealed class ArchitectureSharedFrameworkResolverTests
 
         IReadOnlyList<string> result = Resolve(_aspNetCoreApp);
 
-        Assert.That(result, Is.EqualTo(new[] { "/opt/dotnet/shared/Microsoft.AspNetCore.App/9.0.9" }));
+        Assert.That(result, Is.EqualTo(_value12));
     }
 
     [Test]
@@ -231,7 +247,7 @@ public sealed class ArchitectureSharedFrameworkResolverTests
 
         IReadOnlyList<string> result = Resolve(_aspNetCoreApp, "net48");
 
-        Assert.That(result, Is.EqualTo(new[] { "/opt/dotnet/shared/Microsoft.AspNetCore.App/8.0.1" }));
+        Assert.That(result, Is.EqualTo(_value13));
     }
 
     [Test]
@@ -245,7 +261,7 @@ public sealed class ArchitectureSharedFrameworkResolverTests
 
         IReadOnlyList<string> result = Resolve(_aspNetCoreApp);
 
-        Assert.That(result, Is.EqualTo(new[] { "/opt/dotnet/shared/Microsoft.AspNetCore.App/8.0.1" }));
+        Assert.That(result, Is.EqualTo(_value14));
     }
 
     [Test]
@@ -258,7 +274,7 @@ public sealed class ArchitectureSharedFrameworkResolverTests
 
         IReadOnlyList<string> result = Resolve(new List<string> { " Microsoft.AspNetCore.App ", "Microsoft.AspNetCore.App", "" });
 
-        Assert.That(result, Is.EqualTo(new[] { "/opt/dotnet/shared/Microsoft.AspNetCore.App/8.0.1" }));
+        Assert.That(result, Is.EqualTo(_value15));
     }
 
     [Test]

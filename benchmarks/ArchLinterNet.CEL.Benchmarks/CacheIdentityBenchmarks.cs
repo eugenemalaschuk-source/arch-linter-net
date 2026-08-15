@@ -129,8 +129,6 @@ public class CacheIdentityBenchmarks
     public CelCompiledPredicate SourceKeyedCacheMissAndPopulate()
     {
         var cache = new Dictionary<string, CelCompiledPredicate>(StringComparer.Ordinal);
-        if (cache.TryGetValue(BenchmarkFixtures.RepresentativePredicateSource, out var cached))
-            return cached;
         var compiled = _environment.CompilePredicate(BenchmarkFixtures.RepresentativePredicateSource).Program!;
         cache[BenchmarkFixtures.RepresentativePredicateSource] = compiled;
         return compiled;

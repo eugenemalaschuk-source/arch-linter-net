@@ -13,12 +13,10 @@ public sealed partial class ArchitectureAnalysisSession
             return;
         }
 
-        foreach (CycleCandidateEvidence evidence in candidateEvidence)
+        foreach (CycleCandidateEvidence evidence in candidateEvidence.Where(
+            evidence => EdgeParticipatesInCycle(graph, evidence.SourceLayerName, evidence.TargetLayerName)))
         {
-            if (EdgeParticipatesInCycle(graph, evidence.SourceLayerName, evidence.TargetLayerName))
-            {
-                _baselineCandidates.Add(evidence.Candidate);
-            }
+            _baselineCandidates.Add(evidence.Candidate);
         }
     }
 

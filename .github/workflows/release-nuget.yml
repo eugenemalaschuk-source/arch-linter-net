@@ -23,14 +23,13 @@ on:
         required: false
         type: string
 
-permissions:
-  contents: read
-
 jobs:
   checkpoint-b:
     name: Checkpoint B (${{ matrix.id }})
     needs: prepare-candidate
     runs-on: ${{ matrix.runner }}
+    permissions:
+      contents: read
     # The 0.6.1 consumer-cleanup matrix builds and analyzes the 23-project synthetic modular
     # consumer several times on top of the existing packaged-artifact scenarios.
     timeout-minutes: 45
@@ -132,7 +131,7 @@ jobs:
           make restore
           make acceptance
           npm ci --ignore-scripts --prefix tools/openspec
-          npm exec --prefix tools/openspec -- openspec validate --all --strict
+          npm exec --no-install --prefix tools/openspec -- openspec validate --all --strict
 
       - name: Download immutable candidate manifest
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c

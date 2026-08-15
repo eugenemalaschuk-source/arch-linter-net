@@ -10,6 +10,7 @@ namespace ArchLinterNet.Core.Tests;
 [TestFixture]
 public sealed class UnifiedJsonOutputTests
 {
+    private static readonly string[] _value = { "ref1", "ref2" };
     private static readonly ArchitectureDiagnosticFormatter _formatter = new();
     private static readonly string[] _ref = { "ref" };
     private static readonly string[] _ref1 = { "ref1" };
@@ -34,7 +35,7 @@ public sealed class UnifiedJsonOutputTests
     {
         var violations = new List<ArchitectureViolation>
         {
-            new("test-contract", null, "MyApp.Web.Foo", "MyApp.Core", new[] { "ref1", "ref2" })
+            new("test-contract", null, "MyApp.Web.Foo", "MyApp.Core", _value)
         };
         var cycles = new[] { "A -> B -> A" };
 

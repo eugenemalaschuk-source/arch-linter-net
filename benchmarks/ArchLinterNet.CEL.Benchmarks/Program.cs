@@ -2,4 +2,4 @@ using BenchmarkDotNet.Running;
 
 BenchmarkSwitcher.FromAssembly(typeof(Program).Assembly).Run(args);
 
-internal partial class Program;
+internal static partial class Program;

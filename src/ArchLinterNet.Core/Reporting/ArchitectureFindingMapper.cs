@@ -79,11 +79,19 @@ public static class ArchitectureFindingMapper
         {
             cancellationToken.ThrowIfCancellationRequested();
             ArchitectureDiagnostic diagnostic = ArchitectureDiagnosticMapper.FromViolation(violation);
-            IReadOnlyCollection<ArchitectureViolationIdentity> identities = violation.Identities.Count > 0
-                ? violation.Identities
-                : violation.Identity is { } identity
-                    ? new[] { identity }
-                    : new[] { BuildIdentity(diagnostic) };
+            IReadOnlyCollection<ArchitectureViolationIdentity> identities;
+            if (violation.Identities.Count > 0)
+            {
+                identities = violation.Identities;
+            }
+            else if (violation.Identity is { } identity)
+            {
+                identities = new[] { identity };
+            }
+            else
+            {
+                identities = new[] { BuildIdentity(diagnostic) };
+            }
             bool isAggregated = identities.Count > 1;
             int identityIndex = 0;
             foreach (ArchitectureViolationIdentity expandedIdentity in identities)
@@ -207,12 +215,22 @@ public static class ArchitectureFindingMapper
         {
             Identity = identity,
             Mode = mode,
-            Severity = mode is null ? null : mode == "strict" ? "error" : "warning",
+            Severity = SeverityFor(mode),
             MessageCode = KindToken(diagnostic.Kind),
             PolicyOrigin = diagnostic.PolicyLocation,
             RelatedPolicyOrigins = diagnostic.RelatedPolicyLocations,
             SourceLocation = SourceLocationOf(diagnostic),
         };
+
+    private static string? SeverityFor(string? mode)
+    {
+        if (mode is null)
+        {
+            return null;
+        }
+
+        return mode == "strict" ? "error" : "warning";
+    }
 
     private static ArchitectureFindingSourceLocation? SourceLocationOf(ArchitectureDiagnostic diagnostic) => diagnostic switch
     {

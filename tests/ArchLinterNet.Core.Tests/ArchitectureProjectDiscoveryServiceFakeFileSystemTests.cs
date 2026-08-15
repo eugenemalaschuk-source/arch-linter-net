@@ -7,6 +7,8 @@ namespace ArchLinterNet.Core.Tests;
 [TestFixture]
 public sealed class ArchitectureProjectDiscoveryServiceFakeFileSystemTests
 {
+    private static readonly string[] _value = { "ProjA" };
+    private static readonly string[] _value1 = { "ProjA" };
     // ArchitectureProjectDiscoveryService is the most integration-heavy setup dependency: it parses
     // project files, probes build-output directories, and compares source/output timestamps for
     // staleness. Driving it end to end through a fake IArchitectureFileSystem (rather than faking the
@@ -47,9 +49,9 @@ public sealed class ArchitectureProjectDiscoveryServiceFakeFileSystemTests
         ProjectDiscoveryResult result = service.ResolveAndApply(document, repositoryRoot, resolveAssemblyOutputs: true);
 
         Assert.That(result.Diagnostics, Is.Empty);
-        Assert.That(result.TargetAssemblyNames, Is.EquivalentTo(new[] { "ProjA" }));
+        Assert.That(result.TargetAssemblyNames, Is.EquivalentTo(_value));
         Assert.That(result.AssemblySearchPaths.Select(p => p.Replace('\\', '/')), Is.EquivalentTo(new[] { outputDirectory }));
-        Assert.That(document.Analysis.TargetAssemblies, Is.EquivalentTo(new[] { "ProjA" }));
+        Assert.That(document.Analysis.TargetAssemblies, Is.EquivalentTo(_value1));
     }
 
     [Test]

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import sys
 from pathlib import Path
 
@@ -223,12 +224,18 @@ def _run_main(tmp_path: Path, **kwargs) -> tuple[int, dict, str]:
         "--release-scope", str(scope_path),
         "--output-dir", str(output),
     ]
-    original = sys.argv
+    # main() confines every path argument to the working directory or the repository (the same
+    # release-workspace guard create_release_scope_evidence.py established), so the CLI matches CI's
+    # own invocation shape: paths given relative to the runner's checkout-root working directory.
+    original_argv = sys.argv
+    original_cwd = Path.cwd()
     sys.argv = argv
+    os.chdir(tmp_path)
     try:
         exit_code = aggregator.main()
     finally:
-        sys.argv = original
+        sys.argv = original_argv
+        os.chdir(original_cwd)
     summary = json.loads((output / "checkpoint-b-release-evidence.json").read_text())
     markdown = (output / "checkpoint-b-release-evidence.md").read_text()
     return exit_code, summary, markdown

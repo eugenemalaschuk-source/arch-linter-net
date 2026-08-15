@@ -11,6 +11,7 @@ namespace ArchLinterNet.Core.Tests;
 [TestFixture]
 public sealed class FrameworkReferenceBaselineIdentityTests
 {
+    private static readonly string[] _value = { "Microsoft.AspNetCore.App (net10.0)" };
     [Test]
     public void ResolveKind_FrameworkDependency_ResolvesToPackageBucket()
     {
@@ -125,7 +126,7 @@ public sealed class FrameworkReferenceBaselineIdentityTests
             List<ArchitectureViolation> violations = runner.Session.CheckFrameworkDependencyContract(contract);
 
             Assert.That(violations, Has.Count.EqualTo(1));
-            Assert.That(violations[0].ForbiddenReferences, Is.EqualTo(new[] { "Microsoft.AspNetCore.App (net10.0)" }));
+            Assert.That(violations[0].ForbiddenReferences, Is.EqualTo(_value));
             Assert.That(runner.BaselineCandidates, Has.Count.EqualTo(1));
 
             // Regression coverage: identity now keys on the real evaluated TargetFramework, so an

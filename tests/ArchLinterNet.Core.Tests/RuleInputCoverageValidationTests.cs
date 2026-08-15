@@ -7,6 +7,8 @@ namespace ArchLinterNet.Core.Tests;
 [TestFixture]
 public sealed class RuleInputCoverageValidationTests
 {
+    private static readonly string[] _value = { "does_not_exist_layer" };
+    private static readonly string[] _value1 = { "video-to-ghost-rule" };
     private string _tempDir = null!;
 
     [SetUp]
@@ -314,7 +316,7 @@ public sealed class RuleInputCoverageValidationTests
         Assert.That(outcome.Violations, Is.Empty);
         Assert.That(outcome.CoverageFindings, Has.Count.EqualTo(1));
         Assert.That(outcome.CoverageFindings.Single().ForbiddenNamespace, Is.EqualTo("unresolved"));
-        Assert.That(outcome.CoverageFindings.Single().ForbiddenReferences, Is.EqualTo(new[] { "does_not_exist_layer" }));
+        Assert.That(outcome.CoverageFindings.Single().ForbiddenReferences, Is.EqualTo(_value));
     }
 
     [Test]
@@ -402,7 +404,7 @@ public sealed class RuleInputCoverageValidationTests
         {
             PolicyPath = policyPath,
             Mode = "strict",
-            ContractIds = new[] { "video-to-ghost-rule" }
+            ContractIds = _value1
         });
 
         Assert.That(outcome.Passed, Is.False);

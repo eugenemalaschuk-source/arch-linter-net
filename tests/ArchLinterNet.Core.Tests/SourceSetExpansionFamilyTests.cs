@@ -8,6 +8,26 @@ namespace ArchLinterNet.Core.Tests;
 [TestFixture]
 public sealed class SourceSetExpansionFamilyTests
 {
+    private static readonly string[] _value = { "Acme.Modules.Billing", "Acme.Modules.Orders" };
+    private static readonly string[] _value1 = { "approved" };
+    private static readonly string[] _value2 = { "Acme.Modules.Billing", "Acme.Modules.Orders" };
+    private static readonly string[] _value3 = { "web" };
+    private static readonly string[] _value4 = {
+                "modules-approved-frameworks/acme-modules-billing",
+                "modules-approved-frameworks/acme-modules-orders"
+            };
+    private static readonly string[] _value5 = { "approved" };
+    private static readonly string[] _value6 = { "application", "domain" };
+    private static readonly string[] _value7 = { "Approved.Marker" };
+    private static readonly string[] _value8 = { "Acme.Host" };
+    private static readonly string[] _value9 = {
+            "modules-no-infrastructure/acme-modules-billing",
+            "modules-no-infrastructure/acme-modules-orders",
+            "modules-no-legacy-infrastructure/acme-modules-billing",
+            "modules-no-legacy-infrastructure/acme-modules-orders"
+        };
+    private static readonly string[] _value10 = { "src/Acme.Modules.Orders/Acme.Modules.Orders.csproj" };
+    private static readonly string[] _value11 = { "Acme.Host.Api", "Acme.Host.Worker" };
     private string _temporaryDirectory = null!;
 
     [SetUp]
@@ -53,8 +73,8 @@ public sealed class SourceSetExpansionFamilyTests
         Assert.Multiple(() =>
         {
             Assert.That(contracts.Select(c => c.Source),
-                Is.EqualTo(new[] { "Acme.Modules.Billing", "Acme.Modules.Orders" }));
-            Assert.That(contracts[0].Allowed, Is.EqualTo(new[] { "approved" }));
+                Is.EqualTo(_value));
+            Assert.That(contracts[0].Allowed, Is.EqualTo(_value1));
             Assert.That(contracts[0].Id, Is.EqualTo("modules-approved-packages/acme-modules-billing"));
         });
     }
@@ -91,14 +111,10 @@ public sealed class SourceSetExpansionFamilyTests
         Assert.Multiple(() =>
         {
             Assert.That(document.Contracts.StrictFrameworkDependency.Select(c => c.Source),
-                Is.EqualTo(new[] { "Acme.Modules.Billing", "Acme.Modules.Orders" }));
-            Assert.That(document.Contracts.StrictFrameworkDependency[0].Forbidden, Is.EqualTo(new[] { "web" }));
-            Assert.That(document.Contracts.AuditFrameworkAllowOnly.Select(c => c.Id), Is.EqualTo(new[]
-            {
-                "modules-approved-frameworks/acme-modules-billing",
-                "modules-approved-frameworks/acme-modules-orders"
-            }));
-            Assert.That(document.Contracts.AuditFrameworkAllowOnly[0].Allowed, Is.EqualTo(new[] { "approved" }));
+                Is.EqualTo(_value2));
+            Assert.That(document.Contracts.StrictFrameworkDependency[0].Forbidden, Is.EqualTo(_value3));
+            Assert.That(document.Contracts.AuditFrameworkAllowOnly.Select(c => c.Id), Is.EqualTo(_value4));
+            Assert.That(document.Contracts.AuditFrameworkAllowOnly[0].Allowed, Is.EqualTo(_value5));
         });
     }
 
@@ -135,8 +151,8 @@ public sealed class SourceSetExpansionFamilyTests
 
         Assert.Multiple(() =>
         {
-            Assert.That(contracts.Select(c => c.Source), Is.EqualTo(new[] { "application", "domain" }));
-            Assert.That(contracts[0].AllowedTypes, Is.EqualTo(new[] { "Approved.Marker" }));
+            Assert.That(contracts.Select(c => c.Source), Is.EqualTo(_value6));
+            Assert.That(contracts[0].AllowedTypes, Is.EqualTo(_value7));
             Assert.That(contracts[0].Id, Is.EqualTo("inner-approved-vendors/application"));
         });
     }
@@ -232,7 +248,7 @@ public sealed class SourceSetExpansionFamilyTests
             """);
 
         Assert.That(document.Contracts.StrictComposition.Single().AllowedOnlyInAssemblies,
-            Is.EqualTo(new[] { "Acme.Host" }));
+            Is.EqualTo(_value8));
     }
 
     [Test]
@@ -337,13 +353,7 @@ public sealed class SourceSetExpansionFamilyTests
                   forbidden: [infrastructure]
             """);
 
-        Assert.That(document.Contracts.StrictPackageDependency.Select(c => c.Id), Is.EqualTo(new[]
-        {
-            "modules-no-infrastructure/acme-modules-billing",
-            "modules-no-infrastructure/acme-modules-orders",
-            "modules-no-legacy-infrastructure/acme-modules-billing",
-            "modules-no-legacy-infrastructure/acme-modules-orders"
-        }));
+        Assert.That(document.Contracts.StrictPackageDependency.Select(c => c.Id), Is.EqualTo(_value9));
     }
 
     [Test]
@@ -380,7 +390,7 @@ public sealed class SourceSetExpansionFamilyTests
         ArchitectureContractDocument document = new ArchitecturePolicyDocumentLoader().Load(root);
 
         Assert.That(document.Contracts.StrictProjectMetadata.Single().Projects,
-            Is.EqualTo(new[] { "src/Acme.Modules.Orders/Acme.Modules.Orders.csproj" }));
+            Is.EqualTo(_value10));
     }
 
     [Test]
@@ -540,7 +550,7 @@ public sealed class SourceSetExpansionFamilyTests
             Assert.That(composition.Group, Is.EqualTo("audit_composition"));
             Assert.That(composition.SelectorField, Is.EqualTo("allowed_only_in_assembly_sets"));
             Assert.That(composition.Instances.Select(instance => instance.Source),
-                Is.EqualTo(new[] { "Acme.Host.Api", "Acme.Host.Worker" }));
+                Is.EqualTo(_value11));
             Assert.That(composition.Instances.Select(instance => instance.Selector), Is.All.EqualTo("Acme.Host.*"));
         });
     }

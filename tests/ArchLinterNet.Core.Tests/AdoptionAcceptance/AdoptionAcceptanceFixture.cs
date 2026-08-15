@@ -47,7 +47,7 @@ internal sealed class AdoptionAcceptanceFixture : IDisposable
     public void Build(string? configuration = null, string? targetFramework = null)
     {
         string buildTarget = Directory.GetFiles(Root, "*.slnx", SearchOption.TopDirectoryOnly).SingleOrDefault()
-            ?? ProjectPaths.First();
+            ?? ProjectPaths[0];
         var startInfo = new ProcessStartInfo("dotnet")
         {
             RedirectStandardOutput = true,
@@ -86,10 +86,7 @@ internal sealed class AdoptionAcceptanceFixture : IDisposable
 
     public long AddLargeEmbeddedResource(string fileName, long byteCount)
     {
-        if (byteCount <= 0)
-        {
-            throw new ArgumentOutOfRangeException(nameof(byteCount));
-        }
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(byteCount);
 
         string resourcePath = Path.Combine(Root, fileName);
         using (FileStream stream = File.Create(resourcePath))

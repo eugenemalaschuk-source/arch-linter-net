@@ -42,7 +42,7 @@ public class PipelineStageBenchmarks
         {
             ["assembly"] = BenchmarkFixtures.BuildAssemblyObjectSchema(),
         };
-        _tokens = CelTokenizer.Tokenize(BenchmarkFixtures.RepresentativePredicateSource, _limits, _profileId).Tokens!;
+        _tokens = CelTokenizer.Tokenize(BenchmarkFixtures.RepresentativePredicateSource, _limits, _profileId).Tokens;
         _root = CelParser.Parse(_tokens, _limits, _profileId).Root!;
     }
 
@@ -62,7 +62,7 @@ public class PipelineStageBenchmarks
     public bool TokenizeParseBindStaged()
     {
         var tokenizeResult = CelTokenizer.Tokenize(BenchmarkFixtures.RepresentativePredicateSource, _limits, _profileId);
-        var parseResult = CelParser.Parse(tokenizeResult.Tokens!, _limits, _profileId);
+        var parseResult = CelParser.Parse(tokenizeResult.Tokens, _limits, _profileId);
         return _lastResultSucceeded = CelBinder.Bind(parseResult.Root!, _schema, _objectSchemas, CelRequiredResultType.Predicate, _profileId).IsSuccess;
     }
 }

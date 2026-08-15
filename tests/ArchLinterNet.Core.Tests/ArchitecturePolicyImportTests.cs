@@ -12,6 +12,8 @@ namespace ArchLinterNet.Core.Tests;
 [TestFixture]
 public sealed partial class ArchitecturePolicyImportTests
 {
+    private static readonly string[] _value = { "root", "a", "c" };
+    private static readonly string[] _value1 = { "A", "C", "B" };
     private string _temporaryDirectory = null!;
 
     [SetUp]
@@ -40,7 +42,7 @@ public sealed partial class ArchitecturePolicyImportTests
 
         ArchitectureContractDocument document = new ArchitecturePolicyDocumentLoader().Load(root);
 
-        Assert.That(document.Contracts.Strict.Select(contract => contract.Name), Is.EqualTo(new[] { "root", "a", "c" }));
+        Assert.That(document.Contracts.Strict.Select(contract => contract.Name), Is.EqualTo(_value));
     }
 
     [Test]
@@ -134,7 +136,7 @@ public sealed partial class ArchitecturePolicyImportTests
 
         ArchitectureContractDocument document = new ArchitecturePolicyDocumentLoader().Load(root);
 
-        Assert.That(document.Contracts.Strict.Select(contract => contract.Name), Is.EqualTo(new[] { "A", "C", "B" }));
+        Assert.That(document.Contracts.Strict.Select(contract => contract.Name), Is.EqualTo(_value1));
     }
 
     [Test]
@@ -777,11 +779,12 @@ public sealed partial class ArchitecturePolicyImportTests
         return $"{imports}contracts:\n  strict:\n    - name: {name}\n      source: application\n      forbidden: [domain]\n";
     }
 
-    [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true, EntryPoint = "CreateHardLinkW")]
-    private static extern bool CreateHardLinkWindows(string fileName, string existingFileName, IntPtr securityAttributes);
+    [LibraryImport("kernel32.dll", StringMarshalling = StringMarshalling.Utf16, SetLastError = true, EntryPoint = "CreateHardLinkW")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static partial bool CreateHardLinkWindows(string fileName, string existingFileName, IntPtr securityAttributes);
 
-    [DllImport("libc", SetLastError = true, EntryPoint = "link")]
-    private static extern int CreateHardLinkUnix(string existingFileName, string fileName);
+    [LibraryImport("libc", EntryPoint = "link", SetLastError = true, StringMarshalling = StringMarshalling.Utf8)]
+    private static partial int CreateHardLinkUnix(string existingFileName, string fileName);
 
     [LibraryImport("libc", EntryPoint = "mkfifo", SetLastError = true, StringMarshalling = StringMarshalling.Utf8)]
     private static partial int CreateNamedPipeUnix(string pathName, uint mode);

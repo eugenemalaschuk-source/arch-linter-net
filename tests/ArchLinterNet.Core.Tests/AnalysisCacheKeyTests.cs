@@ -6,6 +6,13 @@ namespace ArchLinterNet.Core.Tests;
 [TestFixture]
 public sealed class AnalysisCacheKeyTests
 {
+    private static readonly string[] _value = { "b", "a" };
+    private static readonly string[] _value1 = { "a", "b" };
+    private static readonly string[] _value2 = { "DEBUG" };
+    private static readonly string[] _value3 = { "RELEASE" };
+    private static readonly string[] _value4 = { "B", "A" };
+    private static readonly string[] _value5 = { "A", "B" };
+    private static readonly string[] _value6 = { "A" };
     private static AnalysisCacheKey CreateKey(string configuration = "Debug") => new(
         "policy", "strict", null, "contracts", "workspace", configuration, "net10.0", null, null);
 
@@ -96,8 +103,8 @@ public sealed class AnalysisCacheKeyTests
     [Test]
     public void ComputeContractIdsDigest_IsOrderIndependent()
     {
-        string a = AnalysisCacheKey.ComputeContractIdsDigest(new[] { "b", "a" });
-        string b = AnalysisCacheKey.ComputeContractIdsDigest(new[] { "a", "b" });
+        string a = AnalysisCacheKey.ComputeContractIdsDigest(_value);
+        string b = AnalysisCacheKey.ComputeContractIdsDigest(_value1);
         Assert.That(a, Is.EqualTo(b));
     }
 
@@ -113,17 +120,17 @@ public sealed class AnalysisCacheKeyTests
     [Test]
     public void Digest_ChangesWhenPreprocessorSymbolsDigestChanges()
     {
-        AnalysisCacheKey a = CreateKey() with { PreprocessorSymbolsDigest = AnalysisCacheKey.ComputePreprocessorSymbolsDigest(new[] { "DEBUG" }) };
-        AnalysisCacheKey b = CreateKey() with { PreprocessorSymbolsDigest = AnalysisCacheKey.ComputePreprocessorSymbolsDigest(new[] { "RELEASE" }) };
+        AnalysisCacheKey a = CreateKey() with { PreprocessorSymbolsDigest = AnalysisCacheKey.ComputePreprocessorSymbolsDigest(_value2) };
+        AnalysisCacheKey b = CreateKey() with { PreprocessorSymbolsDigest = AnalysisCacheKey.ComputePreprocessorSymbolsDigest(_value3) };
         Assert.That(a.Digest, Is.Not.EqualTo(b.Digest));
     }
 
     [Test]
     public void ComputePreprocessorSymbolsDigest_IsOrderIndependentButSetSensitive()
     {
-        string a = AnalysisCacheKey.ComputePreprocessorSymbolsDigest(new[] { "B", "A" });
-        string b = AnalysisCacheKey.ComputePreprocessorSymbolsDigest(new[] { "A", "B" });
-        string c = AnalysisCacheKey.ComputePreprocessorSymbolsDigest(new[] { "A" });
+        string a = AnalysisCacheKey.ComputePreprocessorSymbolsDigest(_value4);
+        string b = AnalysisCacheKey.ComputePreprocessorSymbolsDigest(_value5);
+        string c = AnalysisCacheKey.ComputePreprocessorSymbolsDigest(_value6);
 
         Assert.That(a, Is.EqualTo(b));
         Assert.That(a, Is.Not.EqualTo(c));

@@ -49,6 +49,6 @@ public sealed class PerTestDurationGuardAttributeTests
         // Smoke probe for the assembly-level ITestAction wiring: this test exceeds the default
         // limit, so it proves the guard observes per-test duration, and the [CancelAfter]
         // exemption proves the opt-out path (the guard writes a WARNING to test output).
-        Thread.Sleep(PerTestDurationGuardAttribute.DefaultLimitMs + 1_000);
+        Assert.DoesNotThrow(() => Thread.Sleep(PerTestDurationGuardAttribute.DefaultLimitMs + 1_000));
     }
 }

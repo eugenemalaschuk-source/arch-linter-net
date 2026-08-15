@@ -11,6 +11,8 @@ namespace ArchLinterNet.Core.Tests;
 [TestFixture]
 public sealed class FrameworkReferenceAllowOnlyContractTests
 {
+    private static readonly string[] _value = { "Microsoft.AspNetCore.App (net10.0)" };
+    private static readonly string[] _value1 = { "Microsoft.AspNetCore.App (net10.0)", "Microsoft.NETCore.App (net10.0)" };
     private const string SourceAssemblyName = "MyApp.Domain";
 
     private string _repoRoot = null!;
@@ -137,7 +139,7 @@ public sealed class FrameworkReferenceAllowOnlyContractTests
         Assert.That(violations[0].ContractId, Is.EqualTo("domain-allowed-frameworks"));
         Assert.That(violations[0].SourceType, Is.EqualTo(SourceAssemblyName));
         Assert.That(violations[0].ForbiddenNamespace, Is.EqualTo("outside allowed framework groups"));
-        Assert.That(violations[0].ForbiddenReferences, Is.EqualTo(new[] { "Microsoft.AspNetCore.App (net10.0)" }));
+        Assert.That(violations[0].ForbiddenReferences, Is.EqualTo(_value));
     }
 
     [Test]
@@ -166,7 +168,7 @@ public sealed class FrameworkReferenceAllowOnlyContractTests
 
         Assert.That(violations, Has.Count.EqualTo(1));
         Assert.That(violations[0].ForbiddenReferences,
-            Is.EqualTo(new[] { "Microsoft.AspNetCore.App (net10.0)", "Microsoft.NETCore.App (net10.0)" }));
+            Is.EqualTo(_value1));
     }
 
     [Test]

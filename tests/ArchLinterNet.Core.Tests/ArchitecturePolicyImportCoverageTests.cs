@@ -33,8 +33,7 @@ public sealed partial class ArchitecturePolicyImportCoverageTests
         var resolver = new ThrowingPolicyPathResolver();
         var graphResolver = new ArchitecturePolicyImportGraphResolver(
             new FakeArchitectureFileSystem(),
-            resolver,
-            new ArchitecturePolicySourceParser());
+            resolver);
 
         ArchitecturePolicyImportException exception = Assert.Throws<ArchitecturePolicyImportException>(
             () => graphResolver.Resolve("/virtual/architecture/root.yml", "imports: []\n"))!;

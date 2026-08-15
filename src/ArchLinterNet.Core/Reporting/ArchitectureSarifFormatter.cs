@@ -27,6 +27,8 @@ public sealed partial class ArchitectureSarifFormatter : IArchitectureSarifForma
     private const string MethodBodyCategory = "method-body";
     private const string MethodBodyIlCategory = "method-body-il";
     private const string CycleRuleFallback = "dependency-cycle";
+    private const string PhysicalLocationKey = "physicalLocation";
+    private const string ArtifactLocationKey = "artifactLocation";
 
     [GeneratedRegex(@"^line (?<line>\d+):", RegexOptions.CultureInvariant)]
     private static partial Regex MethodBodyLinePattern();
@@ -404,9 +406,9 @@ public sealed partial class ArchitectureSarifFormatter : IArchitectureSarifForma
             };
             if (whenExpression.PolicySourcePath != null)
             {
-                entry["physicalLocation"] = new Dictionary<string, object?>
+                entry[PhysicalLocationKey] = new Dictionary<string, object?>
                 {
-                    ["artifactLocation"] = new Dictionary<string, object?> { ["uri"] = whenExpression.PolicySourcePath },
+                    [ArtifactLocationKey] = new Dictionary<string, object?> { ["uri"] = whenExpression.PolicySourcePath },
                     ["region"] = new Dictionary<string, object?>
                     {
                         ["startLine"] = whenExpression.PolicySourceLine,
@@ -440,9 +442,9 @@ public sealed partial class ArchitectureSarifFormatter : IArchitectureSarifForma
                 {
                     ["text"] = $"Policy {location.Role.ToString().ToLowerInvariant()} definition at {location.YamlPath}"
                 },
-                ["physicalLocation"] = new Dictionary<string, object?>
+                [PhysicalLocationKey] = new Dictionary<string, object?>
                 {
-                    ["artifactLocation"] = new Dictionary<string, object?> { ["uri"] = location.SourcePath },
+                    [ArtifactLocationKey] = new Dictionary<string, object?> { ["uri"] = location.SourcePath },
                     ["region"] = new Dictionary<string, object?>
                     {
                         ["startLine"] = location.Line,
@@ -515,9 +517,9 @@ public sealed partial class ArchitectureSarifFormatter : IArchitectureSarifForma
             {
                 new Dictionary<string, object?>
                 {
-                    ["physicalLocation"] = new Dictionary<string, object?>
+                    [PhysicalLocationKey] = new Dictionary<string, object?>
                     {
-                        ["artifactLocation"] = new Dictionary<string, object?> { ["uri"] = filePath },
+                        [ArtifactLocationKey] = new Dictionary<string, object?> { ["uri"] = filePath },
                     },
                 },
             };
@@ -527,7 +529,7 @@ public sealed partial class ArchitectureSarifFormatter : IArchitectureSarifForma
         {
             var physicalLocation = new Dictionary<string, object?>
             {
-                ["artifactLocation"] = new Dictionary<string, object?> { ["uri"] = filePath },
+                [ArtifactLocationKey] = new Dictionary<string, object?> { ["uri"] = filePath },
             };
 
             Match match = MethodBodyLinePattern().Match(reference);
@@ -536,7 +538,7 @@ public sealed partial class ArchitectureSarifFormatter : IArchitectureSarifForma
                 physicalLocation["region"] = new Dictionary<string, object?> { ["startLine"] = line };
             }
 
-            return (object)new Dictionary<string, object?> { ["physicalLocation"] = physicalLocation };
+            return (object)new Dictionary<string, object?> { [PhysicalLocationKey] = physicalLocation };
         }).ToArray();
     }
 

@@ -9,6 +9,7 @@ namespace ArchLinterNet.Core.Tests;
 [TestFixture]
 public sealed class AnalysisCacheStoreTests
 {
+    private static readonly string[] _value = { "MyApp.Infrastructure.Db.OrderRepository" };
     private string _root = null!;
     private AnalysisCacheLocation _location = null!;
 
@@ -523,7 +524,7 @@ public sealed class AnalysisCacheStoreTests
             {
                 new ArchitectureViolation(
                     "no_infra_from_domain", "R001", "MyApp.Domain.Order", "MyApp.Infrastructure",
-                    new[] { "MyApp.Infrastructure.Db.OrderRepository" }),
+                    _value),
             },
         };
         AnalysisCacheStore.Put(_location, key, manifests, failingOutcome);

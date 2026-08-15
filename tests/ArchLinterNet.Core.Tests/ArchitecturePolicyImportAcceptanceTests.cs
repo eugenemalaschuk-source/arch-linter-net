@@ -9,6 +9,11 @@ namespace ArchLinterNet.Core.Tests;
 [TestFixture]
 public sealed class ArchitecturePolicyImportAcceptanceTests
 {
+    private static readonly string[] _value = { "sales-to-catalog-through-port", "legacy-crm-through-acl" };
+    private static readonly string[] _value1 = { "application-services-have-matching-interfaces" };
+    private static readonly string[] _value2 = { "sales_domain", "inventory_domain", "catalog_domain", "legacy_crm_domain" };
+    private static readonly string[] _value3 = { "sales_domain", "inventory_domain", "catalog_domain", "legacy_crm_domain" };
+    private static readonly string[] _value4 = { "runtime-folder-forbids-editor-types" };
     [TestCase("modular-monolith")]
     [TestCase("unity-client")]
     public void Load_PublicMonolithicAndImportedSamples_ProduceEquivalentModels(string sample)
@@ -27,9 +32,9 @@ public sealed class ArchitecturePolicyImportAcceptanceTests
         Assert.Multiple(() =>
         {
             Assert.That(document.Contracts.StrictPortBoundaries.Select(c => c.Id),
-                Is.EquivalentTo(new[] { "sales-to-catalog-through-port", "legacy-crm-through-acl" }));
+                Is.EquivalentTo(_value));
             Assert.That(document.Contracts.StrictLayoutConventions.Select(c => c.Id),
-                Is.EquivalentTo(new[] { "application-services-have-matching-interfaces" }));
+                Is.EquivalentTo(_value1));
         });
     }
 
@@ -46,11 +51,11 @@ public sealed class ArchitecturePolicyImportAcceptanceTests
             Assert.That(
                 document.Contracts.StrictIndependence
                     .Single(c => c.Id == "bounded-context-domains-independent").Layers,
-                Is.EquivalentTo(new[] { "sales_domain", "inventory_domain", "catalog_domain", "legacy_crm_domain" }));
+                Is.EquivalentTo(_value2));
             Assert.That(
                 document.Contracts.Strict
                     .Single(c => c.Id == "shared-kernel-does-not-depend-on-modules").Forbidden,
-                Is.EquivalentTo(new[] { "sales_domain", "inventory_domain", "catalog_domain", "legacy_crm_domain" }));
+                Is.EquivalentTo(_value3));
         });
     }
 
@@ -60,7 +65,7 @@ public sealed class ArchitecturePolicyImportAcceptanceTests
         ArchitectureContractDocument document = Load("samples/policies/imports/unity-client/architecture/arch.yml");
 
         Assert.That(document.Contracts.StrictLayoutConventions.Select(c => c.Id),
-            Is.EquivalentTo(new[] { "runtime-folder-forbids-editor-types" }));
+            Is.EquivalentTo(_value4));
     }
 
     [Test]

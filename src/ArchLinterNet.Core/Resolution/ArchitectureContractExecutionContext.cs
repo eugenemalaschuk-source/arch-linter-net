@@ -58,7 +58,7 @@ internal sealed class ArchitectureContractExecutionContext
         Action<ArchitectureBaselineCandidate>? observeCandidate = null)
     {
         ArchitectureViolationIdentity? liveIdentity = BuildLiveIdentity(
-            sourceType, forbiddenReference, sourceAssembly, targetAssembly, targetType, sourceMember, targetMember, configuration);
+            sourceType, sourceAssembly, targetAssembly, targetType, sourceMember, targetMember, configuration);
 
         bool ignored = ArchitectureIgnoreMatcher.IsIgnored(sourceType, forbiddenReference, _ignoredViolations, _tracker, liveIdentity);
 
@@ -94,7 +94,7 @@ internal sealed class ArchitectureContractExecutionContext
         ArgumentNullException.ThrowIfNull(forbiddenReferenceAliases);
 
         ArchitectureViolationIdentity? liveIdentity = BuildLiveIdentity(
-            sourceType, canonicalForbiddenReference, sourceAssembly, targetAssembly, targetType, sourceMember, targetMember, configuration);
+            sourceType, sourceAssembly, targetAssembly, targetType, sourceMember, targetMember, configuration);
 
         bool ignored = forbiddenReferenceAliases.Any(alias =>
             ArchitectureIgnoreMatcher.IsIgnored(sourceType, alias, _ignoredViolations, _tracker, liveIdentity));
@@ -111,7 +111,7 @@ internal sealed class ArchitectureContractExecutionContext
     }
 
     private ArchitectureViolationIdentity? BuildLiveIdentity(
-        string sourceType, string forbiddenReference, string? sourceAssembly, string? targetAssembly, string? targetType, string? sourceMember,
+        string sourceType, string? sourceAssembly, string? targetAssembly, string? targetType, string? sourceMember,
         string? targetMember, string? configuration = null)
     {
         if (ContractId == null || _contractGroup == null)

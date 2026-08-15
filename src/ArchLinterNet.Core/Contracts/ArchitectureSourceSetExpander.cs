@@ -19,6 +19,8 @@ internal static partial class ArchitectureSourceSetExpander
     // silently multiply every downstream check.
     internal const int MaxInstancesPerContract = 500;
 
+    private const string ProjectSetsFieldName = "project_sets";
+
     public static void Expand(ArchitectureContractDocument document)
     {
         SourceSetResolver resolver = new(document);
@@ -64,10 +66,10 @@ internal static partial class ArchitectureSourceSetExpander
         {
             ExpandInlineGroup(inlineContext, "strict_project_metadata",
                 groups.StrictProjectMetadata, contract => contract.Projects, (contract, values) => contract.Projects = values,
-                contract => contract.ProjectSets, new SourceSetField("project_sets", ArchitectureSourceSetKind.Project));
+                contract => contract.ProjectSets, new SourceSetField(ProjectSetsFieldName, ArchitectureSourceSetKind.Project));
             ExpandInlineGroup(inlineContext, "audit_project_metadata",
                 groups.AuditProjectMetadata, contract => contract.Projects, (contract, values) => contract.Projects = values,
-                contract => contract.ProjectSets, new SourceSetField("project_sets", ArchitectureSourceSetKind.Project));
+                contract => contract.ProjectSets, new SourceSetField(ProjectSetsFieldName, ArchitectureSourceSetKind.Project));
             document.ProjectSourceSetsExpanded = true;
         }
         ExpandInlineGroup(inlineContext, "strict_composition",
@@ -114,10 +116,10 @@ internal static partial class ArchitectureSourceSetExpander
 
             ExpandInlineGroup(context, "strict_project_metadata",
                 groups.StrictProjectMetadata, contract => contract.Projects, (contract, values) => contract.Projects = values,
-                contract => contract.ProjectSets, new SourceSetField("project_sets", ArchitectureSourceSetKind.Project));
+                contract => contract.ProjectSets, new SourceSetField(ProjectSetsFieldName, ArchitectureSourceSetKind.Project));
             ExpandInlineGroup(context, "audit_project_metadata",
                 groups.AuditProjectMetadata, contract => contract.Projects, (contract, values) => contract.Projects = values,
-                contract => contract.ProjectSets, new SourceSetField("project_sets", ArchitectureSourceSetKind.Project));
+                contract => contract.ProjectSets, new SourceSetField(ProjectSetsFieldName, ArchitectureSourceSetKind.Project));
 
             document.SourceExpansion = new ArchitectureSourceExpansionInventory(
                 document.SourceExpansion.Sets.Concat(resolver.Resolutions.Where(set =>

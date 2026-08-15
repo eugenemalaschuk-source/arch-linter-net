@@ -20,20 +20,17 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
-import os
 import re
 import subprocess
 from pathlib import Path
 from typing import Any
 
+from _release_workspace import _allowed_roots, _repository_root, _safe_path  # noqa: F401
+
 _DECLARATION_SCHEMA = "checkpoint-b-release-scope-declaration/v1"
 _EVIDENCE_SCHEMA = "checkpoint-b-release-scope/v1"
 _REPOSITORY_PATTERN = re.compile(r"^[A-Za-z0-9._-]+/[A-Za-z0-9._-]+$")
 _COMMIT_PATTERN = re.compile(r"^[0-9a-fA-F]{7,64}$")
-
-
-def _repository_root() -> Path:
-    return Path(__file__).resolve().parents[2]
 
 
 # Fixed release-workspace locations. The release workflow already pins these paths for every other
@@ -49,27 +46,6 @@ def _candidate_manifest_path() -> Path:
 
 def _output_path() -> Path:
     return _repository_root() / "artifacts" / "checkpoint-b" / "release-scope.json"
-
-
-def _allowed_roots() -> tuple[Path, ...]:
-    """Paths are accepted only inside the working tree or the repository this script ships in, so a
-    faulty caller cannot read or write outside the release workspace. Resolved per call rather than
-    at import time, so the answer never depends on when the module was loaded."""
-    return (Path.cwd().resolve(), _repository_root())
-
-
-def _safe_path(value: Path, description: str) -> Path:
-    resolved = os.path.realpath(str(value))
-    for root in _allowed_roots():
-        candidate = os.path.realpath(str(root))
-        try:
-            contained = os.path.commonpath([resolved, candidate]) == candidate
-        except ValueError:
-            # Different drives on Windows: no common path, so this root does not contain it.
-            continue
-        if contained:
-            return Path(resolved)
-    raise ValueError(f"The {description} '{value}' resolves outside the release workspace.")
 
 
 def _repository(value: str) -> str:

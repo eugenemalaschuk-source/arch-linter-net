@@ -154,7 +154,7 @@ public sealed class PostOptimizationAnalysisProfileBenchmarkHarness
         return new SampleSeries(samples, priming);
     }
 
-    private static IReadOnlyList<string> ReplaceCachePath(IReadOnlyList<string> arguments, string cachePath)
+    private static List<string> ReplaceCachePath(IReadOnlyList<string> arguments, string cachePath)
     {
         List<string> replaced = arguments.ToList();
         int index = replaced.IndexOf("--cache");
@@ -453,13 +453,13 @@ public sealed class PostOptimizationAnalysisProfileBenchmarkHarness
         public static PackageIdentity Create(string repositoryRoot)
         {
             string packagesDirectory = Path.Combine(repositoryRoot, "nupkg");
-            IReadOnlyList<string> packages = Directory.EnumerateFiles(packagesDirectory, $"{PackageId}.*{PackageExtension}")
+            string[] packages = Directory.EnumerateFiles(packagesDirectory, $"{PackageId}.*{PackageExtension}")
                 .OrderBy(static path => path, StringComparer.Ordinal)
                 .ToArray();
-            if (packages.Count != 1)
+            if (packages.Length != 1)
             {
                 throw new InvalidOperationException(
-                    $"Expected exactly one {PackageId} package in {packagesDirectory}, but found {packages.Count}. Run `rtk make pack` before recording evidence.");
+                    $"Expected exactly one {PackageId} package in {packagesDirectory}, but found {packages.Length}. Run `rtk make pack` before recording evidence.");
             }
 
             string packagePath = packages[0];

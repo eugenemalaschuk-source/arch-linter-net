@@ -15,6 +15,12 @@ namespace ArchLinterNet.Core.Tests;
 [TestFixture]
 public sealed partial class ArchitectureBaselineApplicationServiceFakeCompositionTests
 {
+    private static readonly string[] _value = { "strict", "audit" };
+    private static readonly bool[] _value1 = { true };
+    private static readonly string[] _value2 = { "fake" };
+    private static readonly bool[] _value3 = { true };
+    private static readonly string[] _value4 = { "missing-rule" };
+    private static readonly bool[] _value5 = { false };
     private static readonly string[] _knownRule = { "known-rule" };
 
     [Test]
@@ -43,8 +49,8 @@ public sealed partial class ArchitectureBaselineApplicationServiceFakeCompositio
         Assert.That(outcome.Yaml, Is.EqualTo("fake-baseline-yaml"));
         Assert.That(baselineGenerator.BuildFromEntriesWasCalled, Is.True);
         Assert.That(baselineGenerator.EntriesReceived!.Select(e => e.Reason), Is.All.EqualTo("fake reason"));
-        Assert.That(contractExecutor.ModesReceived, Is.EquivalentTo(new[] { "strict", "audit" }));
-        Assert.That(runner.StrictArgumentsReceived, Is.EqualTo(new[] { true }));
+        Assert.That(contractExecutor.ModesReceived, Is.EquivalentTo(_value));
+        Assert.That(runner.StrictArgumentsReceived, Is.EqualTo(_value1));
         Assert.That(runnerSetupService.ModeReceived, Is.Null);
     }
 
@@ -57,7 +63,7 @@ public sealed partial class ArchitectureBaselineApplicationServiceFakeCompositio
         {
             ConfigurationViolationsToReturn = new List<ArchitectureViolation>
             {
-                new("<configuration>", null, "fake-subject", "fake-configuration-violation", new[] { "fake" }),
+                new("<configuration>", null, "fake-subject", "fake-configuration-violation", _value2),
             },
         };
         runnerSetupService.RunnerToReturn = runner;
@@ -75,7 +81,7 @@ public sealed partial class ArchitectureBaselineApplicationServiceFakeCompositio
         Assert.That(outcome.ConfigurationViolations, Has.Count.EqualTo(1));
         Assert.That(contractExecutor.ModesReceived, Is.Empty);
         Assert.That(baselineGenerator.WasCalled, Is.False);
-        Assert.That(runner.StrictArgumentsReceived, Is.EqualTo(new[] { true }));
+        Assert.That(runner.StrictArgumentsReceived, Is.EqualTo(_value3));
     }
 
     [Test]
@@ -117,7 +123,7 @@ public sealed partial class ArchitectureBaselineApplicationServiceFakeCompositio
             {
                 PolicyPath = "unused-by-fakes.arch.yml",
                 Mode = "all",
-                ContractIds = new[] { "missing-rule" },
+                ContractIds = _value4,
             }));
 
         Assert.That(ex!.Message, Does.Contain("Unknown contract IDs"));
@@ -172,7 +178,7 @@ public sealed partial class ArchitectureBaselineApplicationServiceFakeCompositio
 
         Assert.That(outcome.Succeeded, Is.True);
         Assert.That(outcome.InSync, Is.True);
-        Assert.That(runner.StrictArgumentsReceived, Is.EqualTo(new[] { false }));
+        Assert.That(runner.StrictArgumentsReceived, Is.EqualTo(_value5));
         Assert.That(runnerSetupService.ModeReceived, Is.EqualTo("audit"));
     }
 

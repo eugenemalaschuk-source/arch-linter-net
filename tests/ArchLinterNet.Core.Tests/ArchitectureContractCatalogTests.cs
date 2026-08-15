@@ -9,6 +9,15 @@ namespace ArchLinterNet.Core.Tests;
 [TestFixture]
 public sealed class ArchitectureContractCatalogTests
 {
+    private static readonly string[] _value = {
+            "dependency", "layer", "layer_template", "allow_only", "cycle", "method_body",
+            "asmdef", "independence", "assembly_independence", "assembly_dependency", "assembly_allow_only",
+            "package_dependency", "package_allow_only", "framework_dependency", "framework_allow_only", "project_metadata",
+            "protected", "external", "external_allow_only", "acyclic_sibling", "type_placement", "layout_conventions",
+            "public_api_surface", "attribute_usage", "inheritance", "interface_implementation", "composition", "coverage",
+            "context_dependency", "context_allow_only", "port_boundary",
+        };
+    private static readonly string[] _value1 = { "layer-audit" };
     private static ArchitectureContractDocument BuildDocument()
     {
         return new ArchitectureContractDocument
@@ -142,15 +151,7 @@ public sealed class ArchitectureContractCatalogTests
         // a future reordering of the AddGroup calls in Build is caught as a behavior change.
         ArchitectureContractCatalog catalog = ArchitectureContractCatalog.Build(BuildDocument());
 
-        Assert.That(catalog.FamiliesInOrder, Is.EqualTo(new[]
-        {
-            "dependency", "layer", "layer_template", "allow_only", "cycle", "method_body",
-            "asmdef", "independence", "assembly_independence", "assembly_dependency", "assembly_allow_only",
-            "package_dependency", "package_allow_only", "framework_dependency", "framework_allow_only", "project_metadata",
-            "protected", "external", "external_allow_only", "acyclic_sibling", "type_placement", "layout_conventions",
-            "public_api_surface", "attribute_usage", "inheritance", "interface_implementation", "composition", "coverage",
-            "context_dependency", "context_allow_only", "port_boundary",
-        }));
+        Assert.That(catalog.FamiliesInOrder, Is.EqualTo(_value));
     }
 
     [Test]
@@ -183,7 +184,7 @@ public sealed class ArchitectureContractCatalogTests
 
         ArchitectureContractCatalog catalog = ArchitectureContractCatalog.Build(document);
 
-        Assert.That(catalog.ContractsFor("audit", "layer").Select(c => c.Id), Is.EqualTo(new[] { "layer-audit" }));
+        Assert.That(catalog.ContractsFor("audit", "layer").Select(c => c.Id), Is.EqualTo(_value1));
         Assert.That(catalog.ContractsFor("strict", "layer"), Is.Empty);
         Assert.That(catalog.AvailableContractIds("audit"), Does.Contain("layer-audit"));
         Assert.That(catalog.AvailableContractIds("strict"), Does.Not.Contain("layer-audit"));

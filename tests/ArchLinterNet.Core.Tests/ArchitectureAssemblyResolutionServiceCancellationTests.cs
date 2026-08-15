@@ -18,6 +18,8 @@ namespace ArchLinterNet.Core.Tests;
 [TestFixture]
 public sealed class ArchitectureAssemblyResolutionServiceCancellationTests
 {
+    private static readonly string[] _value = { "AssemblyA" };
+    private static readonly string[] _value1 = { "ArchLinterNet.Core" };
     private static readonly string[] _assemblyNames = { "AssemblyA", "AssemblyB" };
     private static readonly string[] _net10 = { "net10.0" };
 
@@ -126,7 +128,7 @@ public sealed class ArchitectureAssemblyResolutionServiceCancellationTests
         };
         const string ArtifactPath = "/fake/repo/bin/AssemblyA.dll";
         ProjectDiscoveryResult discovery = new(
-            new[] { "AssemblyA" }, Array.Empty<string>(), Array.Empty<string>(),
+            _value, Array.Empty<string>(), Array.Empty<string>(),
             Array.Empty<ArchitectureProjectDiscoveryDiagnostic>())
         {
             ResolvedAssemblyPaths = new Dictionary<string, string>(StringComparer.Ordinal)
@@ -176,7 +178,7 @@ public sealed class ArchitectureAssemblyResolutionServiceCancellationTests
                 },
             };
             ProjectDiscoveryResult discovery = new(
-                new[] { "ArchLinterNet.Core" }, Array.Empty<string>(), Array.Empty<string>(),
+                _value1, Array.Empty<string>(), Array.Empty<string>(),
                 Array.Empty<ArchitectureProjectDiscoveryDiagnostic>())
             {
                 ResolvedAssemblyPaths = new Dictionary<string, string>(StringComparer.Ordinal)

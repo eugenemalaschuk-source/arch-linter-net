@@ -11,6 +11,7 @@ namespace ArchLinterNet.Core.Tests;
 [TestFixture]
 public sealed class ContractSelectiveExecutionTests
 {
+    private static readonly string[] _value = { "NonExistentAssembly" };
     private string _tempDir = null!;
 
     [SetUp]
@@ -170,7 +171,7 @@ public sealed class ContractSelectiveExecutionTests
         };
 
         var runner = new ArchitectureContractRunner(
-            new ArchitectureAnalysisContext(_tempDir, Array.Empty<Assembly>(), new[] { "NonExistentAssembly" }, Array.Empty<string>()),
+            new ArchitectureAnalysisContext(_tempDir, Array.Empty<Assembly>(), _value, Array.Empty<string>()),
             doc,
             new HashSet<string> { "test" });
 

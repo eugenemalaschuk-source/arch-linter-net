@@ -15,6 +15,7 @@ namespace ArchLinterNet.Cli.Tests;
 [TestFixture]
 public sealed partial class ExplainCommandHandlerTests
 {
+    private static readonly string[] _value = { "A", "B" };
     private static ArchitecturePolicyLoadException PolicyException()
     {
         ArchitecturePolicySourceDescriptor source = new(
@@ -481,7 +482,7 @@ public sealed partial class ExplainCommandHandlerTests
         Assert.Multiple(() =>
         {
             Assert.That(doc.RootElement.GetProperty("path").EnumerateArray().Select(e => e.GetString()).ToArray(),
-                Is.EqualTo(new[] { "A", "B" }));
+                Is.EqualTo(_value));
             Assert.That(doc.RootElement.GetProperty("contractIds")[0].GetString(), Is.EqualTo("rule-1"));
             Assert.That(doc.RootElement.TryGetProperty("expressionParticipation", out _), Is.False,
                 "expressionParticipation must be absent when ExpressionParticipation is empty");

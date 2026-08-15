@@ -12,22 +12,22 @@ namespace ArchLinterNet.CEL.Benchmarks;
 /// separately from parsing, binding, and evaluation.
 /// </summary>
 [MemoryDiagnoser]
-public class EnvironmentConstructionBenchmarks
+public static class EnvironmentConstructionBenchmarks
 {
     [Benchmark(Description = "Build source/target context schema (2 object-typed variables)")]
-    public CelContextSchema BuildContextSchema() =>
+    public static CelContextSchema BuildContextSchema() =>
         BenchmarkFixtures.BuildSourceTargetSchema(out _, out _);
 
     [Benchmark(Description = "Build the 'assembly' object schema (5 members)")]
-    public CelObjectSchema BuildObjectSchema() =>
+    public static CelObjectSchema BuildObjectSchema() =>
         BenchmarkFixtures.BuildAssemblyObjectSchema();
 
     [Benchmark(Description = "Build full CelEnvironment (schema + object schema + Build())")]
-    public CelEnvironment BuildFullEnvironment() =>
+    public static CelEnvironment BuildFullEnvironment() =>
         BenchmarkFixtures.BuildEnvironment();
 
     [Benchmark(Description = "CelEnvironmentBuilder with SafeDefaults limits only, no object schemas")]
-    public CelEnvironment BuildMinimalEnvironment()
+    public static CelEnvironment BuildMinimalEnvironment()
     {
         var schema = CelContextSchema.CreateBuilder("minimal").Build();
         return CelEnvironment.CreateBuilder(CelProfile.V1)

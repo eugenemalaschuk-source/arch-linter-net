@@ -14,6 +14,10 @@ namespace ArchLinterNet.Core.Tests;
 [TestFixture]
 public sealed class ArchitectureCoverageInventoryTests
 {
+    private static readonly string[] _value = { "Acme.Modules.Billing", "Acme.Modules.Orders" };
+    private static readonly string[] _value1 = { "Fixture.Assembly" };
+    private static readonly string[] _value2 = { "bin/Debug/net10.0" };
+    private static readonly string[] _value3 = { "src/Fixture" };
     private static readonly Assembly[] _targetAssemblies = { typeof(ArchitectureCoverageInventoryTests).Assembly };
 
     private static ArchitectureRunnerSetupService CreateRunnerSetupService()
@@ -144,7 +148,7 @@ public sealed class ArchitectureCoverageInventoryTests
         Assert.Multiple(() =>
         {
             Assert.That(inventory.SourceExpansion.Sets.Single().ResolvedSources,
-                Is.EqualTo(new[] { "Acme.Modules.Billing", "Acme.Modules.Orders" }));
+                Is.EqualTo(_value));
             Assert.That(inventory.SourceExpansion.Contracts.Single().AuthoredContractId,
                 Is.EqualTo("modules-no-infrastructure"));
         });
@@ -154,9 +158,9 @@ public sealed class ArchitectureCoverageInventoryTests
     public void Build_WithProjectDiscoveryResult_ExposesItVerbatim()
     {
         var discoveryResult = new ProjectDiscoveryResult(
-            new[] { "Fixture.Assembly" },
-            new[] { "bin/Debug/net10.0" },
-            new[] { "src/Fixture" },
+            _value1,
+            _value2,
+            _value3,
             Array.Empty<ArchitectureProjectDiscoveryDiagnostic>());
 
         ArchitectureCoverageInventory inventory = ArchitectureCoverageInventory.Build(

@@ -12,6 +12,11 @@ namespace ArchLinterNet.Core.Tests;
 [TestFixture]
 public sealed class ArchitectureAnalysisSessionMethodBodyProjectAwareTests
 {
+    private static readonly string[] _value = { "net10.0" };
+    private static readonly string[] _value1 = { "FIXTURE_SYMBOL" };
+    private static readonly string[] _value2 = { "net10.0" };
+    private static readonly string[] _value3 = { "net10.0" };
+    private static readonly string[] _value4 = { "net10.0" };
     private string _fixtureRoot = null!;
     private string _consumerRelativePath = null!;
 
@@ -159,7 +164,7 @@ public sealed class ArchitectureAnalysisSessionMethodBodyProjectAwareTests
             DiscoveredProjects = new[]
             {
                 new ArchitectureDiscoveredProject(
-                    _consumerRelativePath.Replace('\\', '/'), "Fixture.Consumer", new[] { "net10.0" }),
+                    _consumerRelativePath.Replace('\\', '/'), "Fixture.Consumer", _value),
             },
         };
     }
@@ -215,7 +220,7 @@ public sealed class ArchitectureAnalysisSessionMethodBodyProjectAwareTests
         };
 
         ArchitectureAnalysisSession session = CreateSession(
-            contract, DiscoveryPointingAtConsumer(), preprocessorSymbols: new[] { "FIXTURE_SYMBOL" });
+            contract, DiscoveryPointingAtConsumer(), preprocessorSymbols: _value1);
 
         List<ArchitectureViolation> violations = session.CheckMethodBodyContract(contract);
 
@@ -313,7 +318,7 @@ public sealed class ArchitectureAnalysisSessionMethodBodyProjectAwareTests
             DiscoveredProjects = new[]
             {
                 new ArchitectureDiscoveredProject(
-                    "Fixture.NotRestored/Fixture.NotRestored.csproj", "Fixture.NotRestored", new[] { "net10.0" }),
+                    "Fixture.NotRestored/Fixture.NotRestored.csproj", "Fixture.NotRestored", _value2),
             },
         };
 
@@ -364,9 +369,9 @@ public sealed class ArchitectureAnalysisSessionMethodBodyProjectAwareTests
         var projects = new CancelOnFetchCountCollection<ArchitectureDiscoveredProject>(
         [
             new ArchitectureDiscoveredProject(
-                _consumerRelativePath.Replace('\\', '/'), "Fixture.Consumer", new[] { "net10.0" }),
+                _consumerRelativePath.Replace('\\', '/'), "Fixture.Consumer", _value3),
             new ArchitectureDiscoveredProject(
-                "Fixture.Referenced/Fixture.Referenced.csproj", "Fixture.Referenced", new[] { "net10.0" }),
+                "Fixture.Referenced/Fixture.Referenced.csproj", "Fixture.Referenced", _value4),
         ], cts, cancelBeforeTotalFetch: 6);
 
         var document = new ArchitectureContractDocument

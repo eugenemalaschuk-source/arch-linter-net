@@ -11,6 +11,7 @@ namespace ArchLinterNet.Core.Tests;
 [TestFixture]
 public sealed class PackageDependencyConfigurationTests
 {
+    private static readonly string[] _value = { "net10.0" };
     private const string SourceAssemblyName = "MyApp.Domain";
 
     private static ArchitectureAnalysisContext CreateContext(ProjectDiscoveryResult? projectDiscovery = null)
@@ -29,7 +30,7 @@ public sealed class PackageDependencyConfigurationTests
         var project = new ArchitectureDiscoveredProject(
             $"src/{assemblyName}/{assemblyName}.csproj",
             assemblyName,
-            new[] { "net10.0" },
+            _value,
             packages.Select(p => new ArchitectureDiscoveredPackageReference(p.Id, p.Version)).ToList());
 
         return new ProjectDiscoveryResult(

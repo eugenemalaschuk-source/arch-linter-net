@@ -7,6 +7,15 @@ namespace ArchLinterNet.Core.Tests;
 [TestFixture]
 public sealed class ArchitectureProjectDiscoveryTests
 {
+    private static readonly string[] _value = { "Sample" };
+    private static readonly string[] _value1 = { "net9.0" };
+    private static readonly string[] _value2 = { "net8.0", "net9.0" };
+    private static readonly string[] _value3 = { "Foo" };
+    private static readonly string[] _value4 = { "Bar" };
+    private static readonly string[] _value5 = { "Baz" };
+    private static readonly string[] _value6 = { "MultiTarget" };
+    private static readonly string[] _value7 = { "Fresh" };
+    private static readonly string[] _value8 = { "Included" };
     private static readonly string[] _fixtureAssembly = { "Fixture.Assembly" };
     private static readonly string[] _binDebugNet10 = { "bin/Debug/net10.0" };
     private static readonly string[] _srcFixture = { "src/Fixture" };
@@ -84,7 +93,7 @@ public sealed class ArchitectureProjectDiscoveryTests
         ProjectDiscoveryResult result = new ArchitectureProjectDiscoveryService().ResolveFromDocument(document, _repoRoot);
 
         // Discovery itself always reports what it found; the factory layer (not this method) decides precedence.
-        Assert.That(result.TargetAssemblyNames, Is.EquivalentTo(new[] { "Sample" }));
+        Assert.That(result.TargetAssemblyNames, Is.EquivalentTo(_value));
     }
 
     [Test]
@@ -105,7 +114,7 @@ public sealed class ArchitectureProjectDiscoveryTests
         ArchitectureDiscoveredProject discoveredProject = result.DiscoveredProjects.Single();
         Assert.That(discoveredProject.AssemblyName, Is.EqualTo("Sample"));
         Assert.That(discoveredProject.Path, Does.EndWith("Sample.csproj"));
-        Assert.That(discoveredProject.TargetFrameworks, Is.EquivalentTo(new[] { "net9.0" }));
+        Assert.That(discoveredProject.TargetFrameworks, Is.EquivalentTo(_value1));
     }
 
     [Test]
@@ -124,7 +133,7 @@ public sealed class ArchitectureProjectDiscoveryTests
         ProjectDiscoveryResult result = new ArchitectureProjectDiscoveryService().ResolveFromDocument(document, _repoRoot);
 
         ArchitectureDiscoveredProject discoveredProject = result.DiscoveredProjects.Single();
-        Assert.That(discoveredProject.TargetFrameworks, Is.EquivalentTo(new[] { "net8.0", "net9.0" }));
+        Assert.That(discoveredProject.TargetFrameworks, Is.EquivalentTo(_value2));
     }
 
     [Test]
@@ -146,7 +155,7 @@ public sealed class ArchitectureProjectDiscoveryTests
         ProjectDiscoveryResult result = new ArchitectureProjectDiscoveryService().ResolveFromDocument(document, _repoRoot);
 
         Assert.That(result.Diagnostics, Is.Empty);
-        Assert.That(result.TargetAssemblyNames, Is.EquivalentTo(new[] { "Foo" }));
+        Assert.That(result.TargetAssemblyNames, Is.EquivalentTo(_value3));
         Assert.That(result.AssemblySearchPaths.Single(), Does.Contain(Path.Combine("bin", "Debug", "net9.0")));
     }
 
@@ -171,7 +180,7 @@ public sealed class ArchitectureProjectDiscoveryTests
         ProjectDiscoveryResult result = new ArchitectureProjectDiscoveryService().ResolveFromDocument(document, _repoRoot);
 
         Assert.That(result.Diagnostics, Is.Empty);
-        Assert.That(result.TargetAssemblyNames, Is.EquivalentTo(new[] { "Bar" }));
+        Assert.That(result.TargetAssemblyNames, Is.EquivalentTo(_value4));
     }
 
     [Test]
@@ -189,7 +198,7 @@ public sealed class ArchitectureProjectDiscoveryTests
 
         ProjectDiscoveryResult result = new ArchitectureProjectDiscoveryService().ResolveFromDocument(document, _repoRoot);
 
-        Assert.That(result.TargetAssemblyNames, Is.EquivalentTo(new[] { "Baz" }));
+        Assert.That(result.TargetAssemblyNames, Is.EquivalentTo(_value5));
         Assert.That(result.SourceRoots.Single(), Is.EqualTo(Path.GetRelativePath(_repoRoot, projectDir).Replace('\\', '/')));
     }
 
@@ -247,7 +256,7 @@ public sealed class ArchitectureProjectDiscoveryTests
         ProjectDiscoveryResult result = new ArchitectureProjectDiscoveryService().ResolveFromDocument(document, _repoRoot);
 
         Assert.That(result.Diagnostics, Is.Empty);
-        Assert.That(result.TargetAssemblyNames, Is.EquivalentTo(new[] { "MultiTarget" }));
+        Assert.That(result.TargetAssemblyNames, Is.EquivalentTo(_value6));
         Assert.That(result.AssemblySearchPaths.Single(), Does.Contain(Path.Combine("bin", "Debug", "net9.0")));
     }
 
@@ -328,7 +337,7 @@ public sealed class ArchitectureProjectDiscoveryTests
         ProjectDiscoveryResult result = new ArchitectureProjectDiscoveryService().ResolveFromDocument(document, _repoRoot);
 
         Assert.That(result.Diagnostics, Is.Empty);
-        Assert.That(result.TargetAssemblyNames, Is.EquivalentTo(new[] { "Fresh" }));
+        Assert.That(result.TargetAssemblyNames, Is.EquivalentTo(_value7));
     }
 
     [Test]
@@ -390,7 +399,7 @@ public sealed class ArchitectureProjectDiscoveryTests
 
         ProjectDiscoveryResult result = new ArchitectureProjectDiscoveryService().ResolveFromDocument(document, _repoRoot);
 
-        Assert.That(result.TargetAssemblyNames, Is.EquivalentTo(new[] { "Included" }));
+        Assert.That(result.TargetAssemblyNames, Is.EquivalentTo(_value8));
     }
 
     private string CreateProject(

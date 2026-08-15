@@ -13,6 +13,17 @@ namespace ArchLinterNet.Core.Tests;
 [TestFixture]
 public sealed class ProjectMetadataContractTests
 {
+    private static readonly string[] _value = { "net10.0" };
+    private static readonly string[] _value1 = {
+            "required_property",
+            "forbidden_property",
+            "friend_assembly",
+            "project_reference"
+        };
+    private static readonly string[] _value2 = {
+            "required_property"
+        };
+    private static readonly string[] _value3 = { "MyApp.Tests", "MyApp.Tools" };
     private static ArchitectureAnalysisContext CreateContext(params ArchitectureDiscoveredProject[] discoveredProjects)
     {
         ProjectDiscoveryResult discovery = new(
@@ -36,7 +47,7 @@ public sealed class ProjectMetadataContractTests
         return new ArchitectureDiscoveredProject(
             path,
             Path.GetFileNameWithoutExtension(path),
-            new[] { "net10.0" },
+            _value,
             Array.Empty<ArchitectureDiscoveredPackageReference>(),
             Array.Empty<ArchitectureDiscoveredFrameworkReference>(),
             properties.ToDictionary(
@@ -101,13 +112,7 @@ public sealed class ProjectMetadataContractTests
 
         List<ArchitectureViolation> violations = runner.Session.CheckProjectMetadataContract(contract);
 
-        Assert.That(violations.Select(v => (v.Payload as ProjectMetadataPayload)?.ProjectMetadataKind), Is.EquivalentTo(new[]
-        {
-            "required_property",
-            "forbidden_property",
-            "friend_assembly",
-            "project_reference"
-        }));
+        Assert.That(violations.Select(v => (v.Payload as ProjectMetadataPayload)?.ProjectMetadataKind), Is.EquivalentTo(_value1));
         Assert.That(violations.Any(v => (v.Payload as ProjectMetadataPayload)?.ProjectMetadataKey == "IsPackable" && (v.Payload as ProjectMetadataPayload)?.ProjectMetadataExpectedValue == "true" && (v.Payload as ProjectMetadataPayload)?.ProjectMetadataActualValue == "false"), Is.True);
         Assert.That(violations.Any(v => (v.Payload as ProjectMetadataPayload)?.ProjectMetadataActualValue == "MyApp.Tools"), Is.True);
         Assert.That(violations.Any(v => (v.Payload as ProjectMetadataPayload)?.ProjectMetadataActualValue == "tests/MyApp.Tests/MyApp.Tests.csproj"), Is.True);
@@ -185,10 +190,7 @@ public sealed class ProjectMetadataContractTests
 
         List<ArchitectureViolation> violations = runner.Session.CheckProjectMetadataContract(contract);
 
-        Assert.That(violations.Select(v => (v.Payload as ProjectMetadataPayload)?.ProjectMetadataKind), Is.EquivalentTo(new[]
-        {
-            "required_property"
-        }));
+        Assert.That(violations.Select(v => (v.Payload as ProjectMetadataPayload)?.ProjectMetadataKind), Is.EquivalentTo(_value2));
         Assert.That(violations.Any(v => (v.Payload as ProjectMetadataPayload)?.ProjectMetadataActualValue == "MyApp.Tools"), Is.False);
         Assert.That(runner.BaselineCandidates.Any(candidate =>
             candidate.ContractGroup == "strict_project_metadata"
@@ -219,7 +221,7 @@ public sealed class ProjectMetadataContractTests
         Assert.That(violations.Count, Is.EqualTo(2));
         Assert.That(violations.All(v => (v.Payload as ProjectMetadataPayload)?.ProjectMetadataKind == "friend_assembly"), Is.True);
         Assert.That(violations.Select(v => (v.Payload as ProjectMetadataPayload)?.ProjectMetadataActualValue),
-            Is.EquivalentTo(new[] { "MyApp.Tests", "MyApp.Tools" }));
+            Is.EquivalentTo(_value3));
         Assert.That(violations.Any(v => v.ForbiddenReferences.First().Contains("deny-all")), Is.True);
     }
 

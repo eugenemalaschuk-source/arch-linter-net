@@ -10,6 +10,15 @@ namespace ArchLinterNet.Core.Contracts.RawValidators;
 // raw pass gates).
 internal sealed class RawWhenFieldLocationValidator : IArchitecturePolicyRawDocumentValidator
 {
+    private const string ContractsKey = "contracts";
+    private const string SourceKey = "source";
+    private const string ForbiddenKey = "forbidden";
+    private const string ExcludeKey = "exclude";
+    private const string StrictPortBoundariesKey = "strict_port_boundaries";
+    private const string AdapterBindingsKey = "adapter_bindings";
+    private const string AuditPortBoundariesKey = "audit_port_boundaries";
+    private const string ClassificationKey = "classification";
+
     // Closed first-wave `when` locations from openspec/specs/cel-policy-model/spec.md. IgnoreUnmatchedProperties()
     // silently drops any YAML key that has no matching C# property, so a `when` field declared anywhere else
     // (e.g. `analysis.when`, a bare contract-level `contracts.strict[0].when`) would otherwise vanish during
@@ -20,22 +29,22 @@ internal sealed class RawWhenFieldLocationValidator : IArchitecturePolicyRawDocu
     private static readonly string[][] _allowedWhenLocations =
     {
         new[] { "layers", "*", "selector" },
-        new[] { "contracts", "strict_context_dependencies", "*", "source" },
-        new[] { "contracts", "strict_context_dependencies", "*", "forbidden", "*" },
-        new[] { "contracts", "strict_context_dependencies", "*", "exclude", "*" },
-        new[] { "contracts", "audit_context_dependencies", "*", "source" },
-        new[] { "contracts", "audit_context_dependencies", "*", "forbidden", "*" },
-        new[] { "contracts", "audit_context_dependencies", "*", "exclude", "*" },
-        new[] { "contracts", "strict_context_allow_only", "*", "source" },
-        new[] { "contracts", "strict_context_allow_only", "*", "allowed", "*" },
-        new[] { "contracts", "strict_context_allow_only", "*", "exclude", "*" },
-        new[] { "contracts", "audit_context_allow_only", "*", "source" },
-        new[] { "contracts", "audit_context_allow_only", "*", "allowed", "*" },
-        new[] { "contracts", "audit_context_allow_only", "*", "exclude", "*" },
-        new[] { "contracts", "strict_layout_conventions", "*", "files_matching" },
-        new[] { "contracts", "audit_layout_conventions", "*", "files_matching" },
-        new[] { "contracts", "strict_layout_conventions", "*", "exclude_files_matching", "*" },
-        new[] { "contracts", "audit_layout_conventions", "*", "exclude_files_matching", "*" },
+        new[] { ContractsKey, "strict_context_dependencies", "*", SourceKey },
+        new[] { ContractsKey, "strict_context_dependencies", "*", ForbiddenKey, "*" },
+        new[] { ContractsKey, "strict_context_dependencies", "*", ExcludeKey, "*" },
+        new[] { ContractsKey, "audit_context_dependencies", "*", SourceKey },
+        new[] { ContractsKey, "audit_context_dependencies", "*", ForbiddenKey, "*" },
+        new[] { ContractsKey, "audit_context_dependencies", "*", ExcludeKey, "*" },
+        new[] { ContractsKey, "strict_context_allow_only", "*", SourceKey },
+        new[] { ContractsKey, "strict_context_allow_only", "*", "allowed", "*" },
+        new[] { ContractsKey, "strict_context_allow_only", "*", ExcludeKey, "*" },
+        new[] { ContractsKey, "audit_context_allow_only", "*", SourceKey },
+        new[] { ContractsKey, "audit_context_allow_only", "*", "allowed", "*" },
+        new[] { ContractsKey, "audit_context_allow_only", "*", ExcludeKey, "*" },
+        new[] { ContractsKey, "strict_layout_conventions", "*", "files_matching" },
+        new[] { ContractsKey, "audit_layout_conventions", "*", "files_matching" },
+        new[] { ContractsKey, "strict_layout_conventions", "*", "exclude_files_matching", "*" },
+        new[] { ContractsKey, "audit_layout_conventions", "*", "exclude_files_matching", "*" },
     };
 
     // Top-level dictionaries keyed by an author-chosen, arbitrary name (layer name, external-dependency-group
@@ -68,39 +77,39 @@ internal sealed class RawWhenFieldLocationValidator : IArchitecturePolicyRawDocu
         .Select(location => location.Append(RawYamlNodes.MetadataKey).ToArray())
         .Concat(new[]
         {
-            new[] { "contracts", "strict_port_boundaries", "*", "source", RawYamlNodes.MetadataKey },
-            new[] { "contracts", "strict_port_boundaries", "*", "allowed_seams", "*", RawYamlNodes.MetadataKey },
-            new[] { "contracts", "strict_port_boundaries", "*", "forbidden", "*", RawYamlNodes.MetadataKey },
-            new[] { "contracts", "strict_port_boundaries", "*", "exclude", "*", RawYamlNodes.MetadataKey },
-            new[] { "contracts", "strict_port_boundaries", "*", "target_context", RawYamlNodes.MetadataKey },
-            new[] { "contracts", "strict_port_boundaries", "*", "adapter_bindings", "*", "adapter", RawYamlNodes.MetadataKey },
-            new[] { "contracts", "strict_port_boundaries", "*", "adapter_bindings", "*", "expected_port", RawYamlNodes.MetadataKey },
-            new[] { "contracts", "strict_port_boundaries", "*", "adapter_bindings", "*", "allowed_contexts", "*", RawYamlNodes.MetadataKey },
-            new[] { "contracts", "audit_port_boundaries", "*", "source", RawYamlNodes.MetadataKey },
-            new[] { "contracts", "audit_port_boundaries", "*", "allowed_seams", "*", RawYamlNodes.MetadataKey },
-            new[] { "contracts", "audit_port_boundaries", "*", "forbidden", "*", RawYamlNodes.MetadataKey },
-            new[] { "contracts", "audit_port_boundaries", "*", "exclude", "*", RawYamlNodes.MetadataKey },
-            new[] { "contracts", "audit_port_boundaries", "*", "target_context", RawYamlNodes.MetadataKey },
-            new[] { "contracts", "audit_port_boundaries", "*", "adapter_bindings", "*", "adapter", RawYamlNodes.MetadataKey },
-            new[] { "contracts", "audit_port_boundaries", "*", "adapter_bindings", "*", "expected_port", RawYamlNodes.MetadataKey },
-            new[] { "contracts", "audit_port_boundaries", "*", "adapter_bindings", "*", "allowed_contexts", "*", RawYamlNodes.MetadataKey },
-            new[] { "classification", "attributes", "*", RawYamlNodes.MetadataKey },
-            new[] { "classification", "assembly_attributes", "*", RawYamlNodes.MetadataKey },
-            new[] { "classification", "inheritance", "*", RawYamlNodes.MetadataKey },
-            new[] { "classification", "namespace", "*", RawYamlNodes.MetadataKey },
-            new[] { "classification", "path", "*", RawYamlNodes.MetadataKey },
-            new[] { "classification", "overrides", "*", RawYamlNodes.MetadataKey },
-            new[] { "contracts", "strict_coverage", "*", "exclude", "*", RawYamlNodes.MetadataKey },
-            new[] { "contracts", "audit_coverage", "*", "exclude", "*", RawYamlNodes.MetadataKey },
+            new[] { ContractsKey, StrictPortBoundariesKey, "*", SourceKey, RawYamlNodes.MetadataKey },
+            new[] { ContractsKey, StrictPortBoundariesKey, "*", "allowed_seams", "*", RawYamlNodes.MetadataKey },
+            new[] { ContractsKey, StrictPortBoundariesKey, "*", ForbiddenKey, "*", RawYamlNodes.MetadataKey },
+            new[] { ContractsKey, StrictPortBoundariesKey, "*", ExcludeKey, "*", RawYamlNodes.MetadataKey },
+            new[] { ContractsKey, StrictPortBoundariesKey, "*", "target_context", RawYamlNodes.MetadataKey },
+            new[] { ContractsKey, StrictPortBoundariesKey, "*", AdapterBindingsKey, "*", "adapter", RawYamlNodes.MetadataKey },
+            new[] { ContractsKey, StrictPortBoundariesKey, "*", AdapterBindingsKey, "*", "expected_port", RawYamlNodes.MetadataKey },
+            new[] { ContractsKey, StrictPortBoundariesKey, "*", AdapterBindingsKey, "*", "allowed_contexts", "*", RawYamlNodes.MetadataKey },
+            new[] { ContractsKey, AuditPortBoundariesKey, "*", SourceKey, RawYamlNodes.MetadataKey },
+            new[] { ContractsKey, AuditPortBoundariesKey, "*", "allowed_seams", "*", RawYamlNodes.MetadataKey },
+            new[] { ContractsKey, AuditPortBoundariesKey, "*", ForbiddenKey, "*", RawYamlNodes.MetadataKey },
+            new[] { ContractsKey, AuditPortBoundariesKey, "*", ExcludeKey, "*", RawYamlNodes.MetadataKey },
+            new[] { ContractsKey, AuditPortBoundariesKey, "*", "target_context", RawYamlNodes.MetadataKey },
+            new[] { ContractsKey, AuditPortBoundariesKey, "*", AdapterBindingsKey, "*", "adapter", RawYamlNodes.MetadataKey },
+            new[] { ContractsKey, AuditPortBoundariesKey, "*", AdapterBindingsKey, "*", "expected_port", RawYamlNodes.MetadataKey },
+            new[] { ContractsKey, AuditPortBoundariesKey, "*", AdapterBindingsKey, "*", "allowed_contexts", "*", RawYamlNodes.MetadataKey },
+            new[] { ClassificationKey, "attributes", "*", RawYamlNodes.MetadataKey },
+            new[] { ClassificationKey, "assembly_attributes", "*", RawYamlNodes.MetadataKey },
+            new[] { ClassificationKey, "inheritance", "*", RawYamlNodes.MetadataKey },
+            new[] { ClassificationKey, "namespace", "*", RawYamlNodes.MetadataKey },
+            new[] { ClassificationKey, "path", "*", RawYamlNodes.MetadataKey },
+            new[] { ClassificationKey, "overrides", "*", RawYamlNodes.MetadataKey },
+            new[] { ContractsKey, "strict_coverage", "*", ExcludeKey, "*", RawYamlNodes.MetadataKey },
+            new[] { ContractsKey, "audit_coverage", "*", ExcludeKey, "*", RawYamlNodes.MetadataKey },
         })
         .ToArray();
 
     private static readonly string[][] _recognizedOpaqueScalarMapLocations =
     {
-        new[] { "contracts", "strict_project_metadata", "*", "required_properties" },
-        new[] { "contracts", "strict_project_metadata", "*", "forbidden_properties" },
-        new[] { "contracts", "audit_project_metadata", "*", "required_properties" },
-        new[] { "contracts", "audit_project_metadata", "*", "forbidden_properties" },
+        new[] { ContractsKey, "strict_project_metadata", "*", "required_properties" },
+        new[] { ContractsKey, "strict_project_metadata", "*", "forbidden_properties" },
+        new[] { ContractsKey, "audit_project_metadata", "*", "required_properties" },
+        new[] { ContractsKey, "audit_project_metadata", "*", "forbidden_properties" },
     };
 
     private static readonly string[][] _recognizedOpaqueConditionSetsLocations =

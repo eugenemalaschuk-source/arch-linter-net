@@ -31,11 +31,8 @@ internal static class CelEvaluator
         }
 
         var session = new EvaluationSession(boundExpression, profileId, context, limits);
-        return session.Evaluate();
+        return session.Run();
     }
-
-    private static CelEvaluationResult Success(CelValue value) =>
-        new(isSuccess: true, value, diagnostics: []);
 
     private static CelEvaluationResult Failure(CelDiagnostic diagnostic) =>
         new(isSuccess: false, value: null, diagnostics: [diagnostic]);
@@ -72,13 +69,16 @@ internal static class CelEvaluator
             _valuesByName = context.ValuesByName;
         }
 
-        public CelEvaluationResult Evaluate()
+        public CelEvaluationResult Run()
         {
             var step = EvaluateNode(_boundExpression.Root);
             return step.IsSuccess
                 ? Success(step.Value!)
                 : Failure(step.Diagnostic!);
         }
+
+        private static CelEvaluationResult Success(CelValue value) =>
+            new(isSuccess: true, value, diagnostics: []);
 
         private EvaluationStep EvaluateNode(CelBoundNode node)
         {
@@ -229,7 +229,7 @@ internal static class CelEvaluator
                 return EvaluationStep.Succeeded(CelValue.Bool(false));
             }
 
-            var comparison = left.Value!.Kind switch
+            var comparison = left.Value.Kind switch
             {
                 CelValueKind.Int => left.Value.AsInt().CompareTo(right.Value!.AsInt()),
                 CelValueKind.Float => left.Value.AsFloat().CompareTo(right.Value!.AsFloat()),
@@ -508,12 +508,15 @@ internal static class CelEvaluator
         private static long MapLookupCost(string key, int entryCount) =>
             1 + SaturatingMultiply(key.Length, entryCount + 1L);
 
-        private static long SaturatingMultiply(long left, long right) =>
-            left == 0 || right == 0
-                ? 0
-                : long.MaxValue / left < right
-                    ? long.MaxValue
-                    : left * right;
+        private static long SaturatingMultiply(long left, long right)
+        {
+            if (left == 0 || right == 0)
+            {
+                return 0;
+            }
+
+            return long.MaxValue / left < right ? long.MaxValue : left * right;
+        }
 
         private const long FixedComparisonCost = 1;
     }

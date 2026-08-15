@@ -10,6 +10,9 @@ namespace ArchLinterNet.Core.Tests;
 
 public sealed partial class ArchitecturePublicApiApplicationServiceTests
 {
+    private static readonly string[] _value = { "net10.0" };
+    private static readonly string[] _value1 = { "Release", "Release" };
+    private static readonly string[] _value2 = { "net10.0", "net10.0" };
     [Test]
     public void Capture_EnsureBuilt_RecreatesRunnerAndReverifiesPostBuildArtifacts()
     {
@@ -20,7 +23,7 @@ public sealed partial class ArchitecturePublicApiApplicationServiceTests
         {
             DiscoveredProjects = new[]
             {
-                new ArchitectureDiscoveredProject("Test.csproj", AssemblyName, new[] { "net10.0" }),
+                new ArchitectureDiscoveredProject("Test.csproj", AssemblyName, _value),
             },
             ResolvedAssemblyPaths = new Dictionary<string, string>(StringComparer.Ordinal)
             {
@@ -64,9 +67,9 @@ public sealed partial class ArchitecturePublicApiApplicationServiceTests
             }));
             Assert.That(preparation.Requests, Is.All.Property(nameof(BuildStatePreflightRequest.NoRestore)).True);
             Assert.That(preparation.Requests.Select(request => request.RequestedConfiguration),
-                Is.EqualTo(new[] { "Release", "Release" }));
+                Is.EqualTo(_value1));
             Assert.That(preparation.Requests.Select(request => request.RequestedTargetFramework),
-                Is.EqualTo(new[] { "net10.0", "net10.0" }));
+                Is.EqualTo(_value2));
             Assert.That(preparation.Requests.Select(request => request.Resolution.ResolvedAssemblyPaths[AssemblyName]),
                 Is.EqualTo(new[] { ArtifactPath, ArtifactPath }));
         });

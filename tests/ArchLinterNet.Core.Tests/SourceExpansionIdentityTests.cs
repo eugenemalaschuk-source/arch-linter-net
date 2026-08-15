@@ -12,6 +12,20 @@ namespace ArchLinterNet.Core.Tests;
 [TestFixture]
 public sealed class SourceExpansionIdentityTests
 {
+    private static readonly string[] _value = {
+                "inner-no-vendor/audio:audio",
+                "inner-no-vendor/video:video"
+            };
+    private static readonly string[] _value1 = {
+                "inner-no-vendor/audio",
+                "inner-no-vendor/video"
+            };
+    private static readonly string[] _value2 = { "inner-no-vendor/audio:audio" };
+    private static readonly string[] _value3 = { "inner-no-vendor" };
+    private static readonly string[] _value4 = { "application" };
+    private static readonly string[] _value5 = { "application", "domain" };
+    private static readonly string[] _value6 = { "application", "domain" };
+    private static readonly string[] _value7 = { "application", "domain" };
     private const string FixtureRoot = "ArchLinterNet.Core.Tests.RuleInputCoverageFixtures";
 
     private static ArchitectureAnalysisContext CreateContext()
@@ -150,11 +164,7 @@ public sealed class SourceExpansionIdentityTests
         Assert.Multiple(() =>
         {
             Assert.That(summary, Is.Not.Null);
-            Assert.That(summary.CoveredItems.Select(item => item.Item), Is.EqualTo(new[]
-            {
-                "inner-no-vendor/audio:audio",
-                "inner-no-vendor/video:video"
-            }));
+            Assert.That(summary.CoveredItems.Select(item => item.Item), Is.EqualTo(_value));
             Assert.That(summary.Counts.Covered, Is.EqualTo(2));
             Assert.That(summary.Counts.Excluded, Is.Zero);
         });
@@ -180,11 +190,7 @@ public sealed class SourceExpansionIdentityTests
         {
             Assert.That(summary.Counts.Excluded, Is.EqualTo(2));
             Assert.That(summary.Counts.Covered, Is.Zero);
-            Assert.That(summary.ExcludedItems.Select(item => item.Item), Is.EqualTo(new[]
-            {
-                "inner-no-vendor/audio",
-                "inner-no-vendor/video"
-            }));
+            Assert.That(summary.ExcludedItems.Select(item => item.Item), Is.EqualTo(_value1));
         });
     }
 
@@ -198,7 +204,7 @@ public sealed class SourceExpansionIdentityTests
             runner.BuildCoverageSummary(CreateRuleInputContract("inner-no-vendor/audio"))!;
 
         Assert.That(summary.CoveredItems.Select(item => item.Item),
-            Is.EqualTo(new[] { "inner-no-vendor/audio:audio" }));
+            Is.EqualTo(_value2));
     }
 
     [Test]
@@ -244,7 +250,7 @@ public sealed class SourceExpansionIdentityTests
             ArchitectureContractDocument document = new ArchitecturePolicyDocumentLoader().Load(path);
 
             Assert.That(document.Contracts.StrictCoverage.Single().ContractIds,
-                Is.EqualTo(new[] { "inner-no-vendor" }));
+                Is.EqualTo(_value3));
         }
         finally
         {
@@ -294,7 +300,7 @@ public sealed class SourceExpansionIdentityTests
             ArchitectureContractDocument document = new ArchitecturePolicyDocumentLoader().Load(path);
 
             Assert.That(document.Contracts.StrictExternal.Select(contract => contract.Source),
-                Is.EqualTo(new[] { "application" }));
+                Is.EqualTo(_value4));
             Assert.That(document.SourceExpansion.Contracts.Single().Exclusions.Select(exclusion => (exclusion.Source, exclusion.Matched)),
                 Is.EqualTo(new[] { ("infrastructure", false), ("domain", true) }));
         }
@@ -345,7 +351,7 @@ public sealed class SourceExpansionIdentityTests
                 Assert.That(document.Contracts.StrictExternal, Is.Empty);
                 Assert.That(expansion.Instances, Is.Empty);
                 Assert.That(expansion.Inclusions.Select(instance => instance.Source),
-                    Is.EqualTo(new[] { "application", "domain" }));
+                    Is.EqualTo(_value5));
                 Assert.That(expansion.OptionalEmpty, Is.False);
                 Assert.That(expansion.Exclusions.All(exclusion => exclusion.Matched), Is.True);
             });
@@ -463,7 +469,7 @@ public sealed class SourceExpansionIdentityTests
                 Assert.That(exclusion.OptionalEmpty, Is.True);
                 Assert.That(exclusion.OptionalReason, Does.Contain("not extracted yet"));
                 Assert.That(document.Contracts.StrictExternal.Select(contract => contract.Source),
-                    Is.EqualTo(new[] { "application", "domain" }));
+                    Is.EqualTo(_value6));
             });
         }
         finally
@@ -511,7 +517,7 @@ public sealed class SourceExpansionIdentityTests
             Assert.Multiple(() =>
             {
                 Assert.That(expansion.Instances.Select(instance => instance.Source),
-                    Is.EqualTo(new[] { "application", "domain" }));
+                    Is.EqualTo(_value7));
                 Assert.That(expansion.Instances.All(instance => instance.PolicyLocation != null), Is.True,
                     "Every included instance must carry the authored location it came from: the " +
                     "matching 'sources[i]' entry for an explicit source, or the referenced source " +

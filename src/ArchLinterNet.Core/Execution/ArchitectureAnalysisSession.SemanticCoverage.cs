@@ -9,6 +9,8 @@ namespace ArchLinterNet.Core.Execution;
 
 public sealed partial class ArchitectureAnalysisSession
 {
+    private const string UnclassifiedSemanticFact = "unclassified semantic fact";
+
     private ArchitectureCoverageSummary BuildSemanticRoleCoverageSummary(ArchitectureCoverageContract contract)
     {
         List<ArchitectureCoverageSummaryExcludedItem> excludedItems = new();
@@ -30,7 +32,7 @@ public sealed partial class ArchitectureAnalysisSession
             if (!RoleIndex.TryGetRole(type, out ArchitectureTypeClassificationResult descriptor))
             {
                 uncoveredItems.Add(new ArchitectureCoverageSummaryEvidenceItem(
-                    ArchitectureTypeNames.SafeFullName(type), "unclassified semantic fact"));
+                    ArchitectureTypeNames.SafeFullName(type), UnclassifiedSemanticFact));
                 continue;
             }
 
@@ -81,13 +83,13 @@ public sealed partial class ArchitectureAnalysisSession
             {
                 if (!executionContext.IsIgnored(
                         subject,
-                        "unclassified semantic fact",
+                        UnclassifiedSemanticFact,
                         sourceAssembly: sourceAssembly,
                         targetType: subject,
-                        targetMember: "unclassified semantic fact"))
+                        targetMember: UnclassifiedSemanticFact))
                 {
                     findings.Add(new ArchitectureViolation(contract.Name, contract.Id, subject,
-                        "unclassified semantic fact", new[] { subject }));
+                        UnclassifiedSemanticFact, new[] { subject }));
                 }
                 continue;
             }
@@ -127,13 +129,13 @@ public sealed partial class ArchitectureAnalysisSession
         return findings;
     }
 
-    private bool IsSemanticCoverageTypeInScope(ArchitectureCoverageContract contract, Type type)
+    private static bool IsSemanticCoverageTypeInScope(ArchitectureCoverageContract contract, Type type)
     {
         return contract.Roots.Count == 0 || contract.Roots.Any(root =>
             MatchesNamespaceRoot(root, ArchitectureTypeNames.SafeNamespace(type)));
     }
 
-    private void AddSemanticDiagnosticFinding(
+    private static void AddSemanticDiagnosticFinding(
         List<ArchitectureViolation> findings,
         ArchitectureContractExecutionContext executionContext,
         ArchitectureCoverageContract contract,
@@ -175,10 +177,10 @@ public sealed partial class ArchitectureAnalysisSession
                 items.Add(new ArchitectureCoverageSummaryEvidenceItem(ArchitectureLayerResolver.DescribeLayer(layer), "semantic selector matched no classified type"));
         }
         foreach (ArchitectureContextualConsumerReference consumer in RegisteredContextualConsumers
+                     .Where(consumer => !types.Any(type => MatchesContextualConsumer(consumer, type)))
                      .OrderBy(consumer => consumer.Description, StringComparer.Ordinal))
         {
-            if (!types.Any(type => MatchesContextualConsumer(consumer, type)))
-                items.Add(new ArchitectureCoverageSummaryEvidenceItem(DescribeConsumer(consumer), "contextual semantic selector matched no classified type"));
+            items.Add(new ArchitectureCoverageSummaryEvidenceItem(DescribeConsumer(consumer), "contextual semantic selector matched no classified type"));
         }
         return items;
     }

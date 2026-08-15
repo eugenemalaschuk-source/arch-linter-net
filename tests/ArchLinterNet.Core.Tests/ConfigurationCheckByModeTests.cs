@@ -9,6 +9,7 @@ namespace ArchLinterNet.Core.Tests;
 [TestFixture]
 public sealed class ConfigurationCheckByModeTests
 {
+    private static readonly string[] _value = { "Missing.Assembly" };
     [Test]
     public void CheckConfiguration_StrictMode_ChecksOnlyStrictLayers()
     {
@@ -118,7 +119,7 @@ public sealed class ConfigurationCheckByModeTests
         var context = new ArchitectureAnalysisContext(
             "/tmp",
             Array.Empty<System.Reflection.Assembly>(),
-            new[] { "Missing.Assembly" },
+            _value,
             Array.Empty<string>());
 
         var runner = new ArchitectureContractRunner(context, document);

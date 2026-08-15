@@ -12,6 +12,8 @@ namespace ArchLinterNet.Core.Tests;
 [TestFixture]
 public sealed class SourceExpansionPipelineIdentityTests
 {
+    private static readonly string[] _value = { "inner-no-vendor" };
+    private static readonly string[] _value1 = { "some-other-contract" };
     private const string CoreAssembly = "ArchLinterNet.Core";
     private const string CelAssembly = "ArchLinterNet.CEL";
 
@@ -434,10 +436,10 @@ public sealed class SourceExpansionPipelineIdentityTests
 
         ArchitectureBaselineComparisonResult selectedByAuthoredId = ArchitectureBaselineComparer.Compare(
             document, baseline, Array.Empty<ArchitectureBaselineCandidate>(), "strict",
-            new[] { "inner-no-vendor" });
+            _value);
         ArchitectureBaselineComparisonResult selectedByUnrelatedId = ArchitectureBaselineComparer.Compare(
             document, baseline, Array.Empty<ArchitectureBaselineCandidate>(), "strict",
-            new[] { "some-other-contract" });
+            _value1);
 
         Assert.Multiple(() =>
         {

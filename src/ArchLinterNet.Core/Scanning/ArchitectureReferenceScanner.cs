@@ -298,8 +298,8 @@ internal static class ArchitectureReferenceScanner
     {
         try
         {
-            return type.GetConstructors(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic |
-                                         BindingFlags.DeclaredOnly); // NOSONAR: intentional — deep type graph traversal needs full member visibility
+            return type.GetConstructors(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic | // NOSONAR: intentional — deep type graph traversal needs full member visibility
+                                         BindingFlags.DeclaredOnly);
         }
         catch (FileNotFoundException)
         {

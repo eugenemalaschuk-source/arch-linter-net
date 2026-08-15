@@ -174,7 +174,7 @@ internal sealed class BaselineMigrateCommandHandler(ICliRuntime runtime, ICliCon
         });
     }
 
-    private static IReadOnlyList<BaselineLifecycleEntry> ToLifecycleEntries(
+    private static BaselineLifecycleEntry[] ToLifecycleEntries(
         IReadOnlyList<BaselineMigrateEntryReport> report)
     {
         return report.Select(entry => new BaselineLifecycleEntry(

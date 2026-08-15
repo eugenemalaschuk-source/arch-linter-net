@@ -11,6 +11,13 @@ namespace ArchLinterNet.Core.Tests;
 [TestFixture]
 public sealed class ArchitectureContractSchemaTests
 {
+    private static readonly string[] _value = { "source", "sources", "source_sets" };
+    private static readonly string[] _value1 = { "source", "sources", "source_sets" };
+    private static readonly string[] _value2 = { "name" };
+    private static readonly string[] _value3 = {
+                         "solution", "projects", "project_include", "project_exclude",
+                         "configuration", "target_framework"
+                     };
     private static readonly string[] _directOnly = { "direct" };
     private static readonly string[] _assemblyDependencyRequiredFields = { "name", "forbidden" };
     private static readonly string[] _assemblyAllowOnlyRequiredFields = { "name", "allowed" };
@@ -75,7 +82,7 @@ public sealed class ArchitectureContractSchemaTests
         Assert.That(required.EnumerateArray().Select(v => v.GetString()), Is.EquivalentTo(_assemblyDependencyRequiredFields));
         Assert.That(schema.GetProperty("$defs").GetProperty("assemblyDependencyContract").GetProperty("anyOf")
             .EnumerateArray().Select(option => option.GetProperty("required")[0].GetString()),
-            Is.EquivalentTo(new[] { "source", "sources", "source_sets" }));
+            Is.EquivalentTo(_value));
     }
 
     [Test]
@@ -87,7 +94,7 @@ public sealed class ArchitectureContractSchemaTests
         Assert.That(required.EnumerateArray().Select(v => v.GetString()), Is.EquivalentTo(_assemblyAllowOnlyRequiredFields));
         Assert.That(schema.GetProperty("$defs").GetProperty("assemblyAllowOnlyContract").GetProperty("anyOf")
             .EnumerateArray().Select(option => option.GetProperty("required")[0].GetString()),
-            Is.EquivalentTo(new[] { "source", "sources", "source_sets" }));
+            Is.EquivalentTo(_value1));
     }
 
     [Test]
@@ -140,7 +147,7 @@ public sealed class ArchitectureContractSchemaTests
             Assert.That(selector[1].GetProperty("required")[0].GetString(), Is.EqualTo("project_sets"));
             Assert.That(
                 allOf[1].GetProperty("required").EnumerateArray().Select(entry => entry.GetString()),
-                Is.EqualTo(new[] { "name" }));
+                Is.EqualTo(_value2));
         });
     }
 
@@ -198,11 +205,7 @@ public sealed class ArchitectureContractSchemaTests
         // resolves its members against analysis.projects.
         Assert.Multiple(() =>
         {
-            foreach (string key in new[]
-                     {
-                         "solution", "projects", "project_include", "project_exclude",
-                         "configuration", "target_framework"
-                     })
+            foreach (string key in _value3)
             {
                 Assert.That(properties.TryGetProperty(key, out _), Is.True, $"analysis.{key} must be declared");
             }

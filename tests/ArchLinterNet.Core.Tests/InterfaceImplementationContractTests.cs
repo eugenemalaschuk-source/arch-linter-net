@@ -11,6 +11,7 @@ namespace ArchLinterNet.Core.Tests;
 [TestFixture]
 public sealed class InterfaceImplementationContractTests
 {
+    private static readonly string[] _value = { "does_not_exist_layer" };
     private const string PaymentPortName = "InterfaceImplementationContractTestFixtures.Ports.IPaymentPort";
     private const string GenericPortName = "InterfaceImplementationContractTestFixtures.Ports.IGenericPort`1";
     private const string PrefixedPortsNamespace = "InterfaceImplementationContractTestFixtures.Ports.Prefixed.";
@@ -647,6 +648,6 @@ public sealed class InterfaceImplementationContractTests
         Assert.That(outcome.Violations, Is.Empty);
         Assert.That(outcome.CoverageFindings, Has.Count.EqualTo(1));
         Assert.That(outcome.CoverageFindings.Single().ForbiddenNamespace, Is.EqualTo("unresolved"));
-        Assert.That(outcome.CoverageFindings.Single().ForbiddenReferences, Is.EqualTo(new[] { "does_not_exist_layer" }));
+        Assert.That(outcome.CoverageFindings.Single().ForbiddenReferences, Is.EqualTo(_value));
     }
 }

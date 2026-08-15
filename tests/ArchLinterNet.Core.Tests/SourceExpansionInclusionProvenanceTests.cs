@@ -7,6 +7,9 @@ namespace ArchLinterNet.Core.Tests;
 [TestFixture]
 public sealed class SourceExpansionInclusionProvenanceTests
 {
+    private static readonly string[] _value = { "application" };
+    private static readonly string[] _value1 = { "first_application", "repeated_application" };
+    private static readonly string[] _value2 = { "contracts.strict_external[0]/source_sets/0", "contracts.strict_external[0]/source_sets/1" };
     [Test]
     public void SourceExpansion_InclusionsPreserveEveryAuthoredSetReferenceIncludingOptionalEmpty()
     {
@@ -50,12 +53,12 @@ public sealed class SourceExpansionInclusionProvenanceTests
 
             Assert.Multiple(() =>
             {
-                Assert.That(expansion.Instances.Select(instance => instance.Source), Is.EqualTo(new[] { "application" }));
+                Assert.That(expansion.Instances.Select(instance => instance.Source), Is.EqualTo(_value));
                 Assert.That(expansion.Inclusions.Where(instance => instance.Source == "application").Select(instance => instance.SetName),
-                    Is.EqualTo(new[] { "first_application", "repeated_application" }));
+                    Is.EqualTo(_value1));
                 Assert.That(expansion.Inclusions.Where(instance => instance.Source == "application")
                         .Select(instance => instance.SourceSetReferencePolicyLocation!.YamlPath),
-                    Is.EqualTo(new[] { "contracts.strict_external[0]/source_sets/0", "contracts.strict_external[0]/source_sets/1" }));
+                    Is.EqualTo(_value2));
 
                 ArchitectureExpandedContractInstance optional = expansion.Inclusions.Single(instance => instance.OptionalEmpty);
                 Assert.That(optional.SetName, Is.EqualTo("future_layers"));

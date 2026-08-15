@@ -5,10 +5,10 @@ namespace ArchLinterNet.Cli.Tests;
 
 public partial class CliIntegrationTests
 {
-    private string CoveragePolicy => Path.Combine(
+    private static string CoveragePolicy => Path.Combine(
         _repoRoot, "tests", "ArchLinterNet.Cli.Tests", "TestPolicies", "coverage-policy.yml");
 
-    private string RuleInputCoveragePolicy => Path.Combine(
+    private static string RuleInputCoveragePolicy => Path.Combine(
         _repoRoot, "tests", "ArchLinterNet.Cli.Tests", "TestPolicies", "rule-input-coverage-policy.yml");
 
     private static readonly string[] _overlappingExclusionSourceFiles =

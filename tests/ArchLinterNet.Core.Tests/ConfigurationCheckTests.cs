@@ -9,6 +9,7 @@ namespace ArchLinterNet.Core.Tests;
 [TestFixture]
 public sealed class ConfigurationCheckTests
 {
+    private static readonly string[] _value = { "Nonexistent.Assembly.That.Does.Not.Exist" };
     private string _tempDir = null!;
 
     [SetUp]
@@ -54,7 +55,7 @@ public sealed class ConfigurationCheckTests
         var context = new ArchitectureAnalysisContext(
             _tempDir,
             Array.Empty<System.Reflection.Assembly>(),
-            new[] { "Nonexistent.Assembly.That.Does.Not.Exist" },
+            _value,
             Array.Empty<string>());
 
         var runner = new ArchitectureContractRunner(context, document);

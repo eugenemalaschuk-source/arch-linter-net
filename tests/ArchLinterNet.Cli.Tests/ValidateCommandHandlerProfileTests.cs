@@ -28,7 +28,7 @@ public sealed class ValidateCommandHandlerProfileTests
         // Empty by default (every pre-existing test keeps its original "no discovered projects"
         // behavior). Set to a non-empty list to exercise real (non-zero) cache population counters
         // — see Execute_CacheAuto_WithDiscoveredProjects_ReportsNonZeroIneligibleUnitCount below.
-        public IReadOnlyList<string> DiscoveredProjectPaths { get; init; } = Array.Empty<string>();
+        public string[] DiscoveredProjectPaths { get; init; } = Array.Empty<string>();
 
         // Must point at a real, readable file whenever DiscoveredProjectPaths is non-empty — the
         // cache key's policy digest reads this file's content, and a nonexistent policy path would
@@ -52,7 +52,7 @@ public sealed class ValidateCommandHandlerProfileTests
                 lookupStats.RecordLookup(
                     ArchLinterNet.Core.Caching.AnalysisCacheLookupResult.Reject(
                         ArchLinterNet.Core.Caching.AnalysisCacheRejectReason.IneligibleBuildInput),
-                    DiscoveredProjectPaths.Count);
+                    DiscoveredProjectPaths.Length);
             }
 
             ArchitectureAnalysisSnapshotCounters counters = new() { CacheLookups = lookupStats };

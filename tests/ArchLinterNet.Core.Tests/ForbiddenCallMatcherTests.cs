@@ -7,6 +7,10 @@ namespace ArchLinterNet.Core.Tests;
 [TestFixture]
 public sealed class ForbiddenCallMatcherTests
 {
+    private static readonly string[] _value = { "MyApp.Services.MyService." };
+    private static readonly string[] _value1 = { "Microsoft.Extensions.DependencyInjection.IServiceCollection." };
+    private static readonly string[] _value2 = { "MyApp.Services.MyService.MyMethod" };
+    private static readonly string[] _value3 = { "SomethingElse" };
     private static readonly string[] _foo = { "_foo" };
     private static readonly string[] _fooWithParen = { "_foo(" };
     private static readonly string[] _myAppServices = { "MyApp.Services." };
@@ -64,7 +68,7 @@ public sealed class ForbiddenCallMatcherTests
     public void TryMatch_TrailingDotPattern_MatchesFullyQualifiedTypePrefix()
     {
         IReadOnlyList<ForbiddenCallPattern> patterns = ArchitectureForbiddenCallMatcher.NormalizePatterns(
-            new[] { "MyApp.Services.MyService." });
+            _value);
         var descriptor = new SymbolDescriptor(
             "MyMethod",
             "MyService",
@@ -82,7 +86,7 @@ public sealed class ForbiddenCallMatcherTests
     public void TryMatch_TrailingDotPattern_MatchesExtensionReceiverType()
     {
         IReadOnlyList<ForbiddenCallPattern> patterns = ArchitectureForbiddenCallMatcher.NormalizePatterns(
-            new[] { "Microsoft.Extensions.DependencyInjection.IServiceCollection." });
+            _value1);
         var descriptor = new SymbolDescriptor(
             "AddSingleton",
             "ServiceCollectionServiceExtensions",
@@ -101,7 +105,7 @@ public sealed class ForbiddenCallMatcherTests
     public void TryMatch_FullyQualifiedMatch_ReturnsTrue()
     {
         IReadOnlyList<ForbiddenCallPattern> patterns = ArchitectureForbiddenCallMatcher.NormalizePatterns(
-            new[] { "MyApp.Services.MyService.MyMethod" });
+            _value2);
         var descriptor = new SymbolDescriptor("MyMethod", "MyService", "MyApp.Services", "MyApp.Services.MyService.MyMethod");
         var cache = new Dictionary<string, bool>();
 
@@ -115,7 +119,7 @@ public sealed class ForbiddenCallMatcherTests
     public void TryMatch_NoMatch_ReturnsFalse()
     {
         IReadOnlyList<ForbiddenCallPattern> patterns = ArchitectureForbiddenCallMatcher.NormalizePatterns(
-            new[] { "SomethingElse" });
+            _value3);
         var descriptor = new SymbolDescriptor("_foo", "Bar", "Baz", "Baz.Bar._foo");
         var cache = new Dictionary<string, bool>();
 

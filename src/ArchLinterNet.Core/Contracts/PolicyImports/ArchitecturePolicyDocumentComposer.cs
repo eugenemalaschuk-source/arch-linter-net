@@ -5,6 +5,10 @@ namespace ArchLinterNet.Core.Contracts.PolicyImports;
 
 internal sealed class ArchitecturePolicyDocumentComposer
 {
+    private const string AnalysisSection = "analysis";
+    private const string ContractsSection = "contracts";
+    private const string ClassificationSection = "classification";
+
     private static readonly HashSet<string> _keyedSections = new(StringComparer.Ordinal)
     {
         "layers", "external_dependencies", "packages", "framework_references", "source_sets"
@@ -26,7 +30,7 @@ internal sealed class ArchitecturePolicyDocumentComposer
             ComposeSource(effective, source);
         }
 
-        foreach (string required in new[] { "version", "name", "layers", "analysis", "contracts" })
+        foreach (string required in new[] { "version", "name", "layers", AnalysisSection, ContractsSection })
         {
             if (!ArchitecturePolicySourceParser.TryGetChild(effective, required, out _))
             {
@@ -67,15 +71,15 @@ internal sealed class ArchitecturePolicyDocumentComposer
             {
                 AppendSequence(effective, key, value, source, key, ArchitecturePolicyProvenancePath.Property(key));
             }
-            else if (key == "analysis")
+            else if (key == AnalysisSection)
             {
                 MergeAnalysis(effective, value, source);
             }
-            else if (key == "contracts")
+            else if (key == ContractsSection)
             {
                 MergeContracts(effective, value, source);
             }
-            else if (key == "classification")
+            else if (key == ClassificationSection)
             {
                 MergeClassification(effective, value, source);
             }
@@ -104,14 +108,14 @@ internal sealed class ArchitecturePolicyDocumentComposer
 
     private void MergeAnalysis(YamlMappingNode effective, YamlNode value, ArchitecturePolicySource source)
     {
-        YamlMappingNode sourceMap = RequireMapping(value, source, "analysis");
-        YamlMappingNode target = GetOrAddMapping(effective, "analysis", source, "analysis");
+        YamlMappingNode sourceMap = RequireMapping(value, source, AnalysisSection);
+        YamlMappingNode target = GetOrAddMapping(effective, AnalysisSection, source, AnalysisSection);
         foreach ((YamlNode keyNode, YamlNode child) in sourceMap.Children)
         {
-            string key = ScalarKey(keyNode, source, "analysis", "analysis field");
+            string key = ScalarKey(keyNode, source, AnalysisSection, "analysis field");
             string yamlPath = $"analysis.{key}";
             string effectivePath = ArchitecturePolicyProvenancePath.AppendProperty(
-                ArchitecturePolicyProvenancePath.Property("analysis"), key);
+                ArchitecturePolicyProvenancePath.Property(AnalysisSection), key);
             if (key == "condition_sets")
             {
                 MergeNestedMap(target, key, child, source, yamlPath, effectivePath);
@@ -129,14 +133,14 @@ internal sealed class ArchitecturePolicyDocumentComposer
 
     private void MergeContracts(YamlMappingNode effective, YamlNode value, ArchitecturePolicySource source)
     {
-        YamlMappingNode sourceMap = RequireMapping(value, source, "contracts");
-        YamlMappingNode target = GetOrAddMapping(effective, "contracts", source, "contracts");
+        YamlMappingNode sourceMap = RequireMapping(value, source, ContractsSection);
+        YamlMappingNode target = GetOrAddMapping(effective, ContractsSection, source, ContractsSection);
         foreach ((YamlNode keyNode, YamlNode child) in sourceMap.Children)
         {
-            string group = ScalarKey(keyNode, source, "contracts", "contract group");
+            string group = ScalarKey(keyNode, source, ContractsSection, "contract group");
             string yamlPath = $"contracts.{group}";
             string effectivePath = ArchitecturePolicyProvenancePath.AppendProperty(
-                ArchitecturePolicyProvenancePath.Property("contracts"), group);
+                ArchitecturePolicyProvenancePath.Property(ContractsSection), group);
             YamlSequenceNode sourceSequence = RequireSequence(child, source, yamlPath);
             YamlSequenceNode targetSequence = GetOrAddSequence(target, group, source, yamlPath);
             int firstIndex = targetSequence.Children.Count;
@@ -159,14 +163,14 @@ internal sealed class ArchitecturePolicyDocumentComposer
 
     private void MergeClassification(YamlMappingNode effective, YamlNode value, ArchitecturePolicySource source)
     {
-        YamlMappingNode sourceMap = RequireMapping(value, source, "classification");
-        YamlMappingNode target = GetOrAddMapping(effective, "classification", source, "classification");
+        YamlMappingNode sourceMap = RequireMapping(value, source, ClassificationSection);
+        YamlMappingNode target = GetOrAddMapping(effective, ClassificationSection, source, ClassificationSection);
         foreach ((YamlNode keyNode, YamlNode child) in sourceMap.Children)
         {
-            string key = ScalarKey(keyNode, source, "classification", "classification field");
+            string key = ScalarKey(keyNode, source, ClassificationSection, "classification field");
             string yamlPath = $"classification.{key}";
             string effectivePath = ArchitecturePolicyProvenancePath.AppendProperty(
-                ArchitecturePolicyProvenancePath.Property("classification"), key);
+                ArchitecturePolicyProvenancePath.Property(ClassificationSection), key);
             if (key == "precedence")
             {
                 AddSingleton(target, key, child, source, yamlPath, effectivePath);

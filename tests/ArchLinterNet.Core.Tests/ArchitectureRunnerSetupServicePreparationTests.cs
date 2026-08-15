@@ -21,6 +21,7 @@ namespace ArchLinterNet.Core.Tests;
 [TestFixture]
 public sealed class ArchitectureRunnerSetupServicePreparationTests
 {
+    private static readonly string[] _value = { "Missing" };
     private sealed class FixedDiscoveryService : IArchitectureProjectDiscoveryService
     {
         public ProjectDiscoveryResult Result { get; set; } = ProjectDiscoveryResult.Empty;
@@ -298,7 +299,7 @@ public sealed class ArchitectureRunnerSetupServicePreparationTests
         var document = new ArchitectureContractDocument { Version = 1, Name = "Test" };
         var preparation = new ArchitectureRunnerPreparation(
             _repoRoot, null, ProjectDiscoveryResult.Empty, ResolveAssemblyOutputs: false,
-            Array.Empty<string>(), new Dictionary<string, string>(), new[] { "Missing" },
+            Array.Empty<string>(), new Dictionary<string, string>(), _value,
             IsMetadataReferenceClosureComplete: true);
 
         InvalidOperationException? exception = Assert.Throws<InvalidOperationException>(
