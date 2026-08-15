@@ -52,10 +52,10 @@ internal static class SelfPolicyRepository
         var importPaths = new List<string>();
         for (int index = importsStart + 1; index < importsEnd; index++)
         {
-            const string importPrefix = "  - ";
-            if (rootLines[index].StartsWith(importPrefix, StringComparison.Ordinal))
+            const string ImportPrefix = "  - ";
+            if (rootLines[index].StartsWith(ImportPrefix, StringComparison.Ordinal))
             {
-                importPaths.Add(rootLines[index][importPrefix.Length..].Trim());
+                importPaths.Add(rootLines[index][ImportPrefix.Length..].Trim());
             }
         }
 
