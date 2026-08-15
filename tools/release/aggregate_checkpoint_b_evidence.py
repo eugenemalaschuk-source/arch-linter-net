@@ -9,6 +9,7 @@ import json
 from pathlib import Path
 from typing import Any
 
+from _release_workspace import _safe_path
 
 _EVIDENCE_SCHEMA = "checkpoint-b-platform-evidence/v1"
 _GATES_SCHEMA = "checkpoint-b-repository-gates/v1"
@@ -406,17 +407,23 @@ def main() -> int:
     parser.add_argument("--output-dir", type=Path, required=True)
     arguments = parser.parse_args()
 
-    manifest = _read_manifest(arguments.candidate_manifest)
-    manifest_digest = _sha256(arguments.candidate_manifest)
-    records = _read_records(arguments.input_dir, manifest, manifest_digest)
-    gates = _read_gates(arguments.repository_gates, manifest, manifest_digest)
-    scope = _read_release_scope(arguments.release_scope, manifest, manifest_digest)
+    candidate_manifest = _safe_path(arguments.candidate_manifest, "candidate manifest")
+    input_dir = _safe_path(arguments.input_dir, "input directory")
+    repository_gates = _safe_path(arguments.repository_gates, "repository-gates result")
+    release_scope = _safe_path(arguments.release_scope, "release-scope inventory")
+    output_dir = _safe_path(arguments.output_dir, "output directory")
+
+    manifest = _read_manifest(candidate_manifest)
+    manifest_digest = _sha256(candidate_manifest)
+    records = _read_records(input_dir, manifest, manifest_digest)
+    gates = _read_gates(repository_gates, manifest, manifest_digest)
+    scope = _read_release_scope(release_scope, manifest, manifest_digest)
     summary = _summary(records, manifest, gates, scope, manifest_digest)
-    arguments.output_dir.mkdir(parents=True, exist_ok=True)
-    (arguments.output_dir / "checkpoint-b-release-evidence.json").write_text(
+    output_dir.mkdir(parents=True, exist_ok=True)
+    (output_dir / "checkpoint-b-release-evidence.json").write_text(
         json.dumps(summary, indent=2, sort_keys=True) + "\n", encoding="utf-8"
     )
-    (arguments.output_dir / "checkpoint-b-release-evidence.md").write_text(
+    (output_dir / "checkpoint-b-release-evidence.md").write_text(
         _markdown(summary), encoding="utf-8"
     )
     if summary["result"] != "passed":

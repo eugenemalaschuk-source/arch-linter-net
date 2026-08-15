@@ -29,7 +29,7 @@ internal static class ArchitectureSharedFrameworkResolver
             return Array.Empty<string>();
         }
 
-        IReadOnlyList<string> sharedRoots = ResolveSharedRoots(fileSystem, environment);
+        string[] sharedRoots = ResolveSharedRoots(fileSystem, environment);
         int? anchorMajorVersion = ResolveAnchorMajorVersion(
             targetFrameworkMoniker, discoveredTargetFrameworkMonikers, environment);
         List<string> resolvedDirectories = new(names.Length);
@@ -49,7 +49,7 @@ internal static class ArchitectureSharedFrameworkResolver
 
         if (missingFrameworkNames.Count > 0)
         {
-            string searchedRoots = sharedRoots.Count == 0 ? "<none>" : string.Join(", ", sharedRoots);
+            string searchedRoots = sharedRoots.Length == 0 ? "<none>" : string.Join(", ", sharedRoots);
             string majorVersionClause = anchorMajorVersion is int major
                 ? $" compatible with major version {major}"
                 : string.Empty;

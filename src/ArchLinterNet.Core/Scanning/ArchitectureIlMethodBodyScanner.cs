@@ -128,8 +128,8 @@ internal sealed class ArchitectureIlMethodBodyScanner : IArchitectureIlMethodBod
     private static IEnumerable<MethodBase> EnumerateMethods(Type sourceType)
     {
         const BindingFlags Flags =
-            BindingFlags.Instance | BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic |
-            BindingFlags.DeclaredOnly; // NOSONAR: intentional — IL scanning needs reflection access to all members
+            BindingFlags.Instance | BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic | // NOSONAR: intentional — IL scanning needs reflection access to all members
+            BindingFlags.DeclaredOnly;
 
         foreach (MethodInfo method in sourceType.GetMethods(Flags))
         {
@@ -139,18 +139,6 @@ internal sealed class ArchitectureIlMethodBodyScanner : IArchitectureIlMethodBod
         foreach (ConstructorInfo constructor in sourceType.GetConstructors(Flags))
         {
             yield return constructor;
-        }
-    }
-
-    private static IEnumerable<string> FindMethodMatches(
-        MethodBase method,
-        IReadOnlyList<ForbiddenCallPattern> patterns,
-        Dictionary<string, bool> matchCache)
-    {
-        foreach (IlForbiddenCallMatch match in FindMethodMatchDetails(method, patterns, matchCache))
-        {
-            yield return
-                $"il {match.InstructionOffset:X4} ({match.MethodName}): {match.MatchedPattern} -> {match.MatchedMember}";
         }
     }
 

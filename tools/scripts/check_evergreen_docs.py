@@ -131,7 +131,7 @@ ARCHLINTERNET_VERSIONED_NAV = re.compile(
 MARKDOWN_STRUCTURAL_LINE = re.compile(
     r"^[ \t]*(?:#{1,6}(?:[ \t]|$)|(?:`{3,}|~{3,})|\|)"
 )
-LIST_ITEM_LINE = re.compile(r"^[ \t]*(?:[-*+]|\d+[.)])[ \t]+(.*)$")
+LIST_ITEM_LINE = re.compile(r"^[ \t]*(?:[-*+]|\d+[.)])[ \t](.*)$")
 BLOCKQUOTE_LINE = re.compile(r"^[ \t]*>[ \t]?(.*)$")
 README_EXCLUDED_PREFIXES = (
     ("docs", "internal"),
@@ -276,7 +276,7 @@ def content_violations(root: Path, paths: list[Path]) -> list[str]:
             )
 
         if relative != "docs/reference/release-process.md":
-            command_text = re.sub(r"(?:\\|`)\r?\n[ \t]*", " ", text)
+            command_text = re.sub(r"[\\`]\r?\n[ \t]*", " ", text)
             for pattern in (
                 HARDCODED_TOOL_PACKAGE_PIN,
                 HARDCODED_LIBRARY_PACKAGE_PIN,

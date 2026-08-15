@@ -102,7 +102,17 @@ public static class ArchitectureBaselineSarifFormatter
 
         private static int CompareNullableStrings(string? left, string? right)
         {
-            return left is null ? right is null ? 0 : -1 : right is null ? 1 : StringComparer.Ordinal.Compare(left, right);
+            if (left is null)
+            {
+                return right is null ? 0 : -1;
+            }
+
+            if (right is null)
+            {
+                return 1;
+            }
+
+            return StringComparer.Ordinal.Compare(left, right);
         }
     }
 

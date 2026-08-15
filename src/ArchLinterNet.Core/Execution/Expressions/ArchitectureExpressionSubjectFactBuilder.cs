@@ -121,7 +121,7 @@ internal static class ArchitectureExpressionSubjectFactBuilder
         catch (TypeLoadException) { return false; }
     }
 
-    private static IReadOnlyList<string> BuildBaseTypeNames(Type type)
+    private static List<string> BuildBaseTypeNames(Type type)
     {
         List<string> names = new();
         Type? current = SafeBaseType(type);
@@ -141,7 +141,7 @@ internal static class ArchitectureExpressionSubjectFactBuilder
         catch (TypeLoadException) { return null; }
     }
 
-    private static IReadOnlyList<string> BuildInterfaceTypeNames(Type type)
+    private static List<string> BuildInterfaceTypeNames(Type type)
     {
         return ArchitectureReferenceScanner.SafeGetInterfaces(type)
             .Select(ArchitectureTypeNames.SafeFullName)
@@ -193,7 +193,7 @@ internal static class ArchitectureExpressionSubjectFactBuilder
         return ambiguity?.SourceFilePaths ?? Array.Empty<string>();
     }
 
-    private static IReadOnlyList<string> BuildSourceDirectoryPrefixes(IReadOnlyList<string> sourcePaths)
+    private static List<string> BuildSourceDirectoryPrefixes(IReadOnlyList<string> sourcePaths)
     {
         HashSet<string> prefixes = new(StringComparer.Ordinal);
         foreach (string path in sourcePaths)

@@ -24,6 +24,9 @@ namespace ArchLinterNet.Cli.Tests;
 [TestFixture]
 public sealed class CliArchitectureTests
 {
+    private static readonly string[] _value = { "baseline", "cache", "graph", "explain", "policy", "public-api", "schema" };
+    private static readonly string[] _value1 = { "generate", "update", "prune", "diff", "verify", "migrate" };
+    private static readonly string[] _value2 = { "rule-1" };
     [Test]
     public void Composition_ResolvesCliHostAndHandlersWithoutStaticGlobals()
     {
@@ -47,7 +50,7 @@ public sealed class CliArchitectureTests
             }));
             Assert.That(
                 composition.RootCommandFactory.Create().Subcommands.Select(static command => command.Name),
-                Is.EquivalentTo(new[] { "baseline", "cache", "graph", "explain", "policy", "public-api", "schema" }));
+                Is.EquivalentTo(_value));
         });
     }
 
@@ -129,7 +132,7 @@ public sealed class CliArchitectureTests
 
         var commandNames = module.CreateCommand(runtime, console, fileSystem).Subcommands.Select(static command => command.Name).ToArray();
 
-        Assert.That(commandNames, Is.EquivalentTo(new[] { "generate", "update", "prune", "diff", "verify", "migrate" }));
+        Assert.That(commandNames, Is.EquivalentTo(_value1));
     }
 
     [Test]
@@ -157,7 +160,7 @@ public sealed class CliArchitectureTests
             Assert.That(runtime.LastValidationRequest!.PolicyPath, Is.EqualTo("policy.yml"));
             Assert.That(runtime.LastValidationRequest.ConditionSetName, Is.EqualTo("dev"));
             Assert.That(runtime.LastValidationRequest.BaselinePath, Is.EqualTo("baseline.yml"));
-            Assert.That(runtime.LastValidationRequest.ContractIds, Is.EqualTo(new[] { "rule-1" }));
+            Assert.That(runtime.LastValidationRequest.ContractIds, Is.EqualTo(_value2));
             Assert.That(console.StdOut, Does.Contain("Architecture validation passed."));
             Assert.That(console.StdErr, Is.Empty);
         });

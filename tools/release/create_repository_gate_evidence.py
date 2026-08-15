@@ -9,6 +9,8 @@ import json
 import os
 from pathlib import Path
 
+from _release_workspace import _safe_path
+
 
 def _sha256(path: Path) -> str:
     digest = hashlib.sha256()
@@ -25,7 +27,10 @@ def main() -> int:
     parser.add_argument("--output", type=Path, required=True)
     arguments = parser.parse_args()
 
-    manifest = json.loads(arguments.candidate_manifest.read_text(encoding="utf-8"))
+    candidate_manifest = _safe_path(arguments.candidate_manifest, "candidate manifest")
+    output = _safe_path(arguments.output, "output path")
+
+    manifest = json.loads(candidate_manifest.read_text(encoding="utf-8"))
     if manifest.get("source_commit") != arguments.source_commit:
         raise ValueError("Candidate manifest source commit does not match the checked commit.")
 
@@ -37,15 +42,15 @@ def main() -> int:
     evidence = {
         "schema": "checkpoint-b-repository-gates/v1",
         "source_commit": arguments.source_commit,
-        "candidate_manifest_sha256": _sha256(arguments.candidate_manifest),
+        "candidate_manifest_sha256": _sha256(candidate_manifest),
         "workflow_run_url": run_url or None,
         "gates": [
             {"id": "acceptance", "result": "passed", "command": "make acceptance"},
             {"id": "openspec_strict", "result": "passed", "command": "openspec validate --all --strict"},
         ],
     }
-    arguments.output.parent.mkdir(parents=True, exist_ok=True)
-    arguments.output.write_text(json.dumps(evidence, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    output.parent.mkdir(parents=True, exist_ok=True)
+    output.write_text(json.dumps(evidence, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     return 0
 
 

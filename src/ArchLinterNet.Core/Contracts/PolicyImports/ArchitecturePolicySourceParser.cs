@@ -20,7 +20,7 @@ internal sealed record ArchitecturePolicySource(
     public string PortableIdentity => Descriptor.SourcePath;
 }
 
-internal sealed partial class ArchitecturePolicySourceParser
+internal static partial class ArchitecturePolicySourceParser
 {
     private const string ImportsField = "imports";
 
@@ -53,7 +53,7 @@ internal sealed partial class ArchitecturePolicySourceParser
         return TryGetChild(root, ImportsField, out _);
     }
 
-    public ArchitecturePolicySource Parse(
+    public static ArchitecturePolicySource Parse(
         ArchitecturePolicySourceDescriptor descriptor,
         string fullPath,
         string physicalPath,

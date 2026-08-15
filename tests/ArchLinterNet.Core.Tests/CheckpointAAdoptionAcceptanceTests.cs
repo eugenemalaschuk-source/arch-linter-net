@@ -14,6 +14,9 @@ namespace ArchLinterNet.Core.Tests;
 [CancelAfter(120_000)]
 public sealed class CheckpointAAdoptionAcceptanceTests
 {
+    private static readonly string[] _value = { "#374", "#411", "#366" };
+    private static readonly string[] _value1 = { "#356", "#357", "#358", "#359", "#360", "#361", "#362", "#363", "#364" };
+    private static readonly string[] _value2 = { "Synthetic.Legacy" };
     private static readonly string[] _fixtureShapes =
         { "clean-checkout", "large-multi-host", "migration", "multi-host", "multi-project", "small" };
 
@@ -37,10 +40,10 @@ public sealed class CheckpointAAdoptionAcceptanceTests
             Assert.That(root.GetProperty("release_gate").GetBoolean(), Is.False);
             Assert.That(root.GetProperty("synthetic_identities_only").GetBoolean(), Is.True);
             Assert.That(shapes, Is.EqualTo(_fixtureShapes));
-            Assert.That(reusers, Is.EqualTo(new[] { "#374", "#411", "#366" }));
+            Assert.That(reusers, Is.EqualTo(_value));
             Assert.That(root.GetProperty("scenarios").EnumerateArray()
                 .Select(scenario => scenario.GetProperty("owner").GetString()),
-                Is.EquivalentTo(new[] { "#356", "#357", "#358", "#359", "#360", "#361", "#362", "#363", "#364" }));
+                Is.EquivalentTo(_value1));
             Assert.That(root.GetProperty("scenarios").EnumerateArray()
                 .All(scenario => !string.IsNullOrWhiteSpace(scenario.GetProperty("entrypoint").GetString())), Is.True);
             Assert.That(root.GetProperty("scenarios").EnumerateArray()
@@ -133,7 +136,7 @@ public sealed class CheckpointAAdoptionAcceptanceTests
 
         Assert.Multiple(() =>
         {
-            Assert.That(document.Analysis.TargetAssemblies, Is.EqualTo(new[] { "Synthetic.Legacy" }));
+            Assert.That(document.Analysis.TargetAssemblies, Is.EqualTo(_value2));
             Assert.That(document.Layers, Contains.Key("legacy"));
             Assert.That(File.ReadAllText(Path.Combine(fixture.Root, "baseline.yml")), Does.StartWith("version: 1"));
         });

@@ -13,6 +13,8 @@ namespace ArchLinterNet.Core.Tests;
 [TestFixture]
 public sealed class ExternalDependencyContractTests
 {
+    private static readonly string[] _value = { "UnityEngine" };
+    private static readonly string[] _value1 = { "Stripe.StripeClient" };
     private string _tempDir = null!;
 
     [SetUp]
@@ -77,9 +79,9 @@ contracts:
 
         Assert.That(document.ExternalDependencies.ContainsKey("unity_runtime"), Is.True);
         Assert.That(document.ExternalDependencies["unity_runtime"].NamespacePrefixes,
-            Is.EqualTo(new[] { "UnityEngine" }));
+            Is.EqualTo(_value));
         Assert.That(document.ExternalDependencies["unity_runtime"].TypePrefixes,
-            Is.EqualTo(new[] { "Stripe.StripeClient" }));
+            Is.EqualTo(_value1));
         Assert.That(document.Contracts.StrictExternal, Has.Count.EqualTo(1));
         Assert.That(document.Contracts.AuditExternal, Has.Count.EqualTo(1));
         Assert.That(document.Contracts.StrictExternal[0].Id, Is.EqualTo("core-no-unity"));

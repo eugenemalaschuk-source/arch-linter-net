@@ -13,6 +13,9 @@ namespace ArchLinterNet.Cli.Tests;
 [TestFixture]
 public sealed partial class ReportCoordinatorTests
 {
+    private static readonly string[] _value = { "one.json", "two.sarif" };
+    private static readonly string[] _value1 = { "bad.json" };
+    private static readonly string[] _value2 = { "first.json", "second.sarif" };
     private static ValidationOutcome PassedOutcome => new(
         true, Array.Empty<ArchitectureViolation>(), Array.Empty<string>(),
         Array.Empty<ArchitectureViolation>(), "off", Array.Empty<ArchitectureUnmatchedIgnoredViolation>(),
@@ -241,7 +244,7 @@ public sealed partial class ReportCoordinatorTests
         RouteResult result = coordinator.RouteSingleOutcome("human", "strict", PassedOutcome, sinks);
 
         Assert.That(result.Status, Is.EqualTo(ReportRouteStatus.OutputFailed));
-        Assert.That(result.FailedPaths, Is.EquivalentTo(new[] { "one.json", "two.sarif" }));
+        Assert.That(result.FailedPaths, Is.EquivalentTo(_value));
     }
 
     [Test]
@@ -265,7 +268,7 @@ public sealed partial class ReportCoordinatorTests
         // Phase 2: skipped entirely.
         // No file was renamed → no output published → OutputFailed, not PartialOutput.
         Assert.That(result.Status, Is.EqualTo(ReportRouteStatus.OutputFailed));
-        Assert.That(result.FailedPaths, Is.EquivalentTo(new[] { "bad.json" }));
+        Assert.That(result.FailedPaths, Is.EquivalentTo(_value1));
     }
 
 
@@ -325,7 +328,7 @@ public sealed partial class ReportCoordinatorTests
         Assert.That(result.Status, Is.EqualTo(ReportRouteStatus.PartialOutput));
         Assert.That(result.CommittedPaths, Does.Contain("first.json"));
         Assert.That(result.FailedPaths, Does.Contain("second.sarif"));
-        Assert.That(result.StagedPaths, Is.EquivalentTo(new[] { "first.json", "second.sarif" }));
+        Assert.That(result.StagedPaths, Is.EquivalentTo(_value2));
     }
 
     [Test]

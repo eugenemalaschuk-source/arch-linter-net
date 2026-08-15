@@ -6,7 +6,7 @@ using NUnit.Framework;
 namespace ArchLinterNet.Core.Tests;
 
 [TestFixture]
-public sealed class AdoptionMigrationGuidanceDocumentationTests
+public sealed partial class AdoptionMigrationGuidanceDocumentationTests
 {
     [Test]
     public void UpgradeGuide_SeparatesGreenfieldAndExistingPolicyPathsWithoutReleaseIdentity()
@@ -108,13 +108,12 @@ public sealed class AdoptionMigrationGuidanceDocumentationTests
         string releaseProcess = ReadDocumentation("reference/release-process.md");
         string readme = File.ReadAllText(Path.Combine(root, "README.md"));
         string guidance = string.Join(Environment.NewLine, readme, schemaReference, cliReference, releaseProcess);
-        string normalizedGuidance = Regex.Replace(guidance, @"\s+", " ");
+        string normalizedGuidance = WhitespaceRunRegex().Replace(guidance, " ");
         var registry = new PackagedSchemaRegistry();
         var supportedIds = registry.List()
             .Select(static schema => schema.SchemaId)
             .ToHashSet(StringComparer.Ordinal);
-        string[] documentedIds = Regex.Matches(guidance,
-                @"https://archlinternet\.dev/schema/[^\s]+?\.schema\.json")
+        string[] documentedIds = SchemaUrlRegex().Matches(guidance)
             .Select(static match => match.Value)
             .Distinct(StringComparer.Ordinal)
             .ToArray();
@@ -146,4 +145,10 @@ public sealed class AdoptionMigrationGuidanceDocumentationTests
     {
         return new ArchitectureRepositoryRootResolver().Resolve();
     }
+
+    [GeneratedRegex(@"\s+")]
+    private static partial Regex WhitespaceRunRegex();
+
+    [GeneratedRegex(@"https://archlinternet\.dev/schema/[^\s]+?\.schema\.json")]
+    private static partial Regex SchemaUrlRegex();
 }

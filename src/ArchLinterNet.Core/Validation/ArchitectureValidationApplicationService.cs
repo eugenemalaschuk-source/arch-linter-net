@@ -416,7 +416,7 @@ public sealed class ArchitectureValidationApplicationService(
     // later (see CreateSnapshot) and the specific mode for the single-mode Validate path, so
     // contract-ID selection validates against exactly the same catalog it did before this change
     // for single-mode callers.
-    private ComposedPolicy ComposeDocument(
+    private static ComposedPolicy ComposeDocument(
         ArchitectureContractDocument document, AnalysisSnapshotRequest request, string? modeHint)
     {
         string unmatchedConfig = document.Analysis.UnmatchedIgnoredViolations;

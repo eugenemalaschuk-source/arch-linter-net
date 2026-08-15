@@ -330,8 +330,8 @@ class TestDetectLatestTag(unittest.TestCase):
 
         result = detect_latest_detected_tag()
         self.assertIsNotNone(result)
-        self.assertEqual(result.name, "v0.2.0-preview.2")
-        self.assertEqual(result.version, SemVerVersion(0, 2, 0, 2))
+        self.assertEqual("v0.2.0-preview.2", result.name)
+        self.assertEqual(SemVerVersion(0, 2, 0, 2), result.version)
 
 
 class TestGithubEnv(unittest.TestCase):
@@ -375,9 +375,9 @@ class TestGithubEnv(unittest.TestCase):
             ["--release-type", "preview"], detected
         )
         env = self._parse_env(content)
-        self.assertEqual(env["PACKAGE_VERSION"], "0.2.0-preview.3")
-        self.assertEqual(env["TARGET_TAG"], "v0.2.0-preview.3")
-        self.assertEqual(env["PREVIOUS_TAG"], "v0.2.0-preview.2")
+        self.assertEqual("0.2.0-preview.3", env["PACKAGE_VERSION"])
+        self.assertEqual("v0.2.0-preview.3", env["TARGET_TAG"])
+        self.assertEqual("v0.2.0-preview.2", env["PREVIOUS_TAG"])
         self.assertIn("Calculated PACKAGE_VERSION=0.2.0-preview.3", stdout)
         self.assertIn("Target tag: v0.2.0-preview.3", stdout)
         self.assertIn("Previous tag: v0.2.0-preview.2", stdout)
@@ -388,9 +388,9 @@ class TestGithubEnv(unittest.TestCase):
             ["--release-type", "patch"], detected
         )
         env = self._parse_env(content)
-        self.assertEqual(env["PACKAGE_VERSION"], "0.1.1")
-        self.assertEqual(env["TARGET_TAG"], "v0.1.1")
-        self.assertEqual(env["PREVIOUS_TAG"], "v0.1.0")
+        self.assertEqual("0.1.1", env["PACKAGE_VERSION"])
+        self.assertEqual("v0.1.1", env["TARGET_TAG"])
+        self.assertEqual("v0.1.0", env["PREVIOUS_TAG"])
         self.assertIn("Target tag: v0.1.1", stdout)
 
     def test_github_env_override_detects_previous_tag(self):
@@ -399,9 +399,9 @@ class TestGithubEnv(unittest.TestCase):
             ["--version-override", "0.3.0"], detected
         )
         env = self._parse_env(content)
-        self.assertEqual(env["PACKAGE_VERSION"], "0.3.0")
-        self.assertEqual(env["TARGET_TAG"], "v0.3.0")
-        self.assertEqual(env["PREVIOUS_TAG"], "v0.2.0")
+        self.assertEqual("0.3.0", env["PACKAGE_VERSION"])
+        self.assertEqual("v0.3.0", env["TARGET_TAG"])
+        self.assertEqual("v0.2.0", env["PREVIOUS_TAG"])
         self.assertIn("Target tag: v0.3.0", stdout)
 
     def test_github_env_override_no_tags_previous_empty(self):
@@ -409,9 +409,9 @@ class TestGithubEnv(unittest.TestCase):
             ["--version-override", "0.1.0"], None
         )
         env = self._parse_env(content)
-        self.assertEqual(env["PACKAGE_VERSION"], "0.1.0")
-        self.assertEqual(env["TARGET_TAG"], "v0.1.0")
-        self.assertEqual(env["PREVIOUS_TAG"], "")
+        self.assertEqual("0.1.0", env["PACKAGE_VERSION"])
+        self.assertEqual("v0.1.0", env["TARGET_TAG"])
+        self.assertEqual("", env["PREVIOUS_TAG"])
         self.assertIn("Previous tag: <none>", stdout)
 
     def test_github_env_writes_to_file(self):

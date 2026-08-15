@@ -237,7 +237,7 @@ internal sealed partial class ValidateCommandHandler
     private void WriteErrorContent(
         ValidateCommandOptions options,
         string errorFormat,
-        IReadOnlyDictionary<string, string> contentByFormat,
+        Dictionary<string, string> contentByFormat,
         bool allowFileSinks,
         RouteResult? priorOutputResult = null)
     {
@@ -274,14 +274,10 @@ internal sealed partial class ValidateCommandHandler
         // document to a stream that successfully received it. A configured stderr sink that
         // itself failed is different: no document reached that channel, so it remains a valid
         // fallback target for the routing diagnostic.
-        if (priorOutputResult is null)
-        {
-            // A collision prevented error routing before any configured stream was written, so
-            // stderr is idle even when a --report file sink was requested.
-            string fallbackFormat = ResolveStderrFallbackFormat(options, errorFormat, contentByFormat);
-            TryWriteToStderr(contentByFormat[fallbackFormat]);
-        }
-        else if (CanUseStderrFallback(priorOutputResult.Value))
+        // A collision prevented error routing before any configured stream was written (stderr is
+        // idle even when a --report file sink was requested), or a configured stderr sink is a
+        // still-valid fallback target because it never itself received a document.
+        if (priorOutputResult is null || CanUseStderrFallback(priorOutputResult.Value))
         {
             string fallbackFormat = ResolveStderrFallbackFormat(options, errorFormat, contentByFormat);
             TryWriteToStderr(contentByFormat[fallbackFormat]);
@@ -291,7 +287,7 @@ internal sealed partial class ValidateCommandHandler
     private static string ResolveStderrFallbackFormat(
         ValidateCommandOptions options,
         string defaultFormat,
-        IReadOnlyDictionary<string, string> contentByFormat)
+        Dictionary<string, string> contentByFormat)
     {
         return options.AdditionalSinks
             .FirstOrDefault(sink => sink.DestinationType == ReportDestinationType.Stderr

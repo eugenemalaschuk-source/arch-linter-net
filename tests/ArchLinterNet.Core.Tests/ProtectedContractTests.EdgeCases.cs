@@ -13,6 +13,9 @@ namespace ArchLinterNet.Core.Tests;
 
 public sealed partial class ProtectedContractTests
 {
+    private static readonly string[] _value = { "ArchLinterNet.Core.Execution.ArchitectureContractRunner" };
+    private static readonly string[] _value1 = { "core" };
+    private static readonly string[] _value2 = { "Infrastructure.DbContext" };
     private static readonly Assembly[] _testAssemblyArray = { TestAssembly };
     private static readonly Assembly[] _coreAssemblyTestAssembly = { CoreAssembly, TestAssembly };
 
@@ -24,12 +27,12 @@ public sealed partial class ProtectedContractTests
             "exec-protected",
             "ArchLinterNet.Core.Tests.SomeUser",
             "protected layer 'execution' (allowed importers: [core])",
-            new[] { "ArchLinterNet.Core.Execution.ArchitectureContractRunner" })
+            _value)
         {
             Payload = new DependencyPayload(
                 SourceLayer: "test_area",
                 TargetLayer: "execution",
-                AllowedImporters: new[] { "core" })
+                AllowedImporters: _value1)
         };
 
         string json = _formatter.FormatResultForCiArtifacts(
@@ -149,7 +152,7 @@ public sealed partial class ProtectedContractTests
             null,
             "App.Web.Controller",
             "Infrastructure",
-            new[] { "Infrastructure.DbContext" });
+            _value2);
 
         string json = _formatter.FormatResultForCiArtifacts(
             "strict", false,

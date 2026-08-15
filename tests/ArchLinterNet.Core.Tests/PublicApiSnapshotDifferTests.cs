@@ -7,6 +7,10 @@ namespace ArchLinterNet.Core.Tests;
 [TestFixture]
 public sealed class PublicApiSnapshotDifferTests
 {
+    private static readonly string[] _value = { "class Acme.Module.Other" };
+    private static readonly string[] _value1 = { "class Acme.Module.Gone" };
+    private static readonly string[] _value2 = { "const Acme.Module.Color.Blue: Acme.Module.Color" };
+    private static readonly string[] _value3 = { "const Acme.Module.Thing.Version: System.Int32" };
     private const string Assembly = "Acme.Module";
 
     private static PublicApiSnapshotEntry[] Entries(params string[] signatures)
@@ -32,7 +36,7 @@ public sealed class PublicApiSnapshotDifferTests
 
         Assert.Multiple(() =>
         {
-            Assert.That(delta.Added.Select(e => e.Signature), Is.EqualTo(new[] { "class Acme.Module.Other" }));
+            Assert.That(delta.Added.Select(e => e.Signature), Is.EqualTo(_value));
             Assert.That(delta.Removed, Is.Empty);
             Assert.That(delta.Changed, Is.Empty);
         });
@@ -47,7 +51,7 @@ public sealed class PublicApiSnapshotDifferTests
 
         Assert.Multiple(() =>
         {
-            Assert.That(delta.Removed.Select(e => e.Signature), Is.EqualTo(new[] { "class Acme.Module.Gone" }));
+            Assert.That(delta.Removed.Select(e => e.Signature), Is.EqualTo(_value1));
             Assert.That(delta.Removed[0].PreviousSignature, Is.EqualTo("class Acme.Module.Gone"));
             Assert.That(delta.Added, Is.Empty);
         });
@@ -158,8 +162,8 @@ public sealed class PublicApiSnapshotDifferTests
 
         Assert.Multiple(() =>
         {
-            Assert.That(delta.Added.Select(e => e.Signature), Is.EqualTo(new[] { "const Acme.Module.Color.Blue: Acme.Module.Color" }));
-            Assert.That(delta.Changed.Select(e => e.Signature), Is.EqualTo(new[] { "const Acme.Module.Thing.Version: System.Int32" }));
+            Assert.That(delta.Added.Select(e => e.Signature), Is.EqualTo(_value2));
+            Assert.That(delta.Changed.Select(e => e.Signature), Is.EqualTo(_value3));
             Assert.That(delta.Removed, Is.Empty);
         });
     }

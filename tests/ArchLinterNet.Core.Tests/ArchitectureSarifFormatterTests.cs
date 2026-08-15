@@ -9,6 +9,16 @@ namespace ArchLinterNet.Core.Tests;
 [TestFixture]
 public sealed partial class ArchitectureSarifFormatterTests
 {
+    private static readonly string[] _value = { "line 42: Forbidden.Call -> Forbidden.Type.Call" };
+    private static readonly string[] _value1 = { "not a line reference" };
+    private static readonly string[] _value2 = { "Newtonsoft.Json" };
+    private static readonly string[] _value3 = { "Microsoft.AspNetCore.App" };
+    private static readonly string[] _value4 = { "Microsoft.AspNetCore.App" };
+    private static readonly string[] _value5 = { "approved_core" };
+    private static readonly string[] _value6 = { "il 0012 (MyApp.Infrastructure.LegacyService.Run): Forbidden.Call -> Forbidden.Type.Call" };
+    private static readonly string[] _value7 = { "ref-a" };
+    private static readonly string[] _value8 = { "ref-b" };
+    private static readonly string[] _value9 = { "a-rule", "b-rule", "m-rule" };
     private static readonly ArchitectureSarifFormatter _formatter = new();
     private static readonly string[] _ref1 = { "ref1" };
     private static readonly string[] _ref2 = { "ref2" };
@@ -452,7 +462,7 @@ public sealed partial class ArchitectureSarifFormatterTests
         var violations = new List<ArchitectureViolation>
         {
             new("method-body-rule", "method-body-rule", "src/Foo.cs", "method-body",
-                new[] { "line 42: Forbidden.Call -> Forbidden.Type.Call" })
+                _value)
         };
 
         JsonElement root = Run("strict", violations);
@@ -472,7 +482,7 @@ public sealed partial class ArchitectureSarifFormatterTests
         var violations = new List<ArchitectureViolation>
         {
             new("method-body-rule", "method-body-rule", "src/Foo.cs", "method-body",
-                new[] { "not a line reference" })
+                _value1)
         };
 
         JsonElement root = Run("strict", violations);
@@ -511,7 +521,7 @@ public sealed partial class ArchitectureSarifFormatterTests
     {
         var violations = new List<ArchitectureViolation>
         {
-            new("package-rule", "package-rule", "MyApp.Csproj", "forbidden-packages", new[] { "Newtonsoft.Json" })
+            new("package-rule", "package-rule", "MyApp.Csproj", "forbidden-packages", _value2)
             {
                 Payload = new PackageDependencyPayload("legacy-json")
             }
@@ -548,7 +558,7 @@ public sealed partial class ArchitectureSarifFormatterTests
     {
         var violations = new List<ArchitectureViolation>
         {
-            new("framework-rule", "framework-rule", "MyApp.Csproj", "forbidden-frameworks", new[] { "Microsoft.AspNetCore.App" })
+            new("framework-rule", "framework-rule", "MyApp.Csproj", "forbidden-frameworks", _value3)
             {
                 Payload = new FrameworkReferencePayload("forbidden_web")
             }
@@ -567,9 +577,9 @@ public sealed partial class ArchitectureSarifFormatterTests
         var violations = new List<ArchitectureViolation>
         {
             new("framework-allow-only-rule", "framework-allow-only-rule", "MyApp.Csproj", "outside allowed framework groups",
-                new[] { "Microsoft.AspNetCore.App" })
+                _value4)
             {
-                Payload = new FrameworkReferenceAllowOnlyPayload(new[] { "approved_core" })
+                Payload = new FrameworkReferenceAllowOnlyPayload(_value5)
             }
         };
 
@@ -640,7 +650,7 @@ public sealed partial class ArchitectureSarifFormatterTests
         var violations = new List<ArchitectureViolation>
         {
             new("method-body-il-rule", "method-body-il-rule", "MyApp.Infrastructure.LegacyService", "method-body-il",
-                new[] { "il 0012 (MyApp.Infrastructure.LegacyService.Run): Forbidden.Call -> Forbidden.Type.Call" })
+                _value6)
         };
 
         JsonElement root = Run("strict", violations);
@@ -708,11 +718,11 @@ public sealed partial class ArchitectureSarifFormatterTests
     [Test]
     public void FormatResultAsSarif_MixedViolationKindsAndCycles_OutputIsIndependentOfInputOrder()
     {
-        var violationA = new ArchitectureViolation("a-contract", "a-rule", "Source.A", "Forbidden.A", new[] { "ref-a" })
+        var violationA = new ArchitectureViolation("a-contract", "a-rule", "Source.A", "Forbidden.A", _value7)
         {
             Payload = new ExternalDependencyPayload("external-group")
         };
-        var violationB = new ArchitectureViolation("b-contract", "b-rule", "Source.B", "Forbidden.B", new[] { "ref-b" });
+        var violationB = new ArchitectureViolation("b-contract", "b-rule", "Source.B", "Forbidden.B", _value8);
         var cycle = "[m-rule] X -> Y -> X";
 
         string inOriginalOrder = _formatter.FormatResultAsSarif(
@@ -725,6 +735,6 @@ public sealed partial class ArchitectureSarifFormatterTests
         using var doc = JsonDocument.Parse(inOriginalOrder);
         JsonElement results = doc.RootElement.GetProperty("runs")[0].GetProperty("results");
         var ruleIds = results.EnumerateArray().Select(r => r.GetProperty("ruleId").GetString()).ToArray();
-        Assert.That(ruleIds, Is.EqualTo(new[] { "a-rule", "b-rule", "m-rule" }));
+        Assert.That(ruleIds, Is.EqualTo(_value9));
     }
 }

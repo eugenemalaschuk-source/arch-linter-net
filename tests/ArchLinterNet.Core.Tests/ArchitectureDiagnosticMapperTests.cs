@@ -7,6 +7,10 @@ namespace ArchLinterNet.Core.Tests;
 [TestFixture]
 public sealed class ArchitectureDiagnosticMapperTests
 {
+    private static readonly string[] _value = { "UnityEngine.Vector3" };
+    private static readonly string[] _value1 = { "MyApp.Public.Thing.Method()" };
+    private static readonly string[] _value2 = { "System.Object" };
+    private static readonly string[] _value3 = { "Container.Resolve" };
     private static readonly string[] _ref1 = { "ref1" };
     private static readonly string[] _coreInternal = { "Core.Internal" };
     private static readonly string[] _api = { "_api" };
@@ -71,7 +75,7 @@ public sealed class ArchitectureDiagnosticMapperTests
     {
         var violation = new ArchitectureViolation(
             "contract", "core-no-unity", "MyApp.Core.PlayerModel", "external dependency group 'unity_runtime'",
-            new[] { "UnityEngine.Vector3" })
+            _value)
         {
             Payload = new ExternalDependencyPayload("unity_runtime")
         };
@@ -171,7 +175,7 @@ public sealed class ArchitectureDiagnosticMapperTests
     public void FromViolation_PublicApiSurfacePayload_ReturnsPublicApiSurfaceDiagnostic()
     {
         var violation = new ArchitectureViolation(
-            "contract", null, "MyApp.Public.Thing", "public API surface", new[] { "MyApp.Public.Thing.Method()" })
+            "contract", null, "MyApp.Public.Thing", "public API surface", _value1)
         {
             Payload = new PublicApiSurfacePayload(
                 UndeclaredApiSignature: "MyApp.Public.Thing.Method()",
@@ -195,7 +199,7 @@ public sealed class ArchitectureDiagnosticMapperTests
     public void FromViolation_InheritancePayload_ReturnsInheritanceDiagnostic()
     {
         var violation = new ArchitectureViolation(
-            "contract", null, "MyApp.Domain.Thing", "System.Object", new[] { "System.Object" })
+            "contract", null, "MyApp.Domain.Thing", "System.Object", _value2)
         {
             Payload = new InheritancePayload(
                 ForbiddenBaseType: "System.Object",
@@ -215,7 +219,7 @@ public sealed class ArchitectureDiagnosticMapperTests
     public void FromViolation_CompositionPayload_ReturnsCompositionDiagnostic()
     {
         var violation = new ArchitectureViolation(
-            "contract", null, "MyApp.Domain.Thing", "Container.Resolve", new[] { "Container.Resolve" })
+            "contract", null, "MyApp.Domain.Thing", "Container.Resolve", _value3)
         {
             Payload = new CompositionPayload(
                 SourceMember: "MyApp.Domain.Thing.DoWork()",

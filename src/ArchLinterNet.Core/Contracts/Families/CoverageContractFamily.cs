@@ -65,19 +65,21 @@ internal sealed record ArchitectureRuleInputReference(string Input, string Layer
 
 internal static class ArchitectureRuleInputReferences
 {
+    private const string SourceInput = "source";
+
     public static IEnumerable<ArchitectureRuleInputReference> For(IArchitectureContract contract)
     {
         return contract switch
         {
-            ArchitectureDependencyContract c => One("source", c.Source).Concat(Many("forbidden", c.Forbidden)),
-            ArchitectureAllowOnlyContract c => One("source", c.Source).Concat(Many("allowed", c.Allowed)),
+            ArchitectureDependencyContract c => One(SourceInput, c.Source).Concat(Many("forbidden", c.Forbidden)),
+            ArchitectureAllowOnlyContract c => One(SourceInput, c.Source).Concat(Many("allowed", c.Allowed)),
             ArchitectureCycleContract c => Many("layers", c.Layers),
-            ArchitectureMethodBodyContract c => One("source", c.Source),
+            ArchitectureMethodBodyContract c => One(SourceInput, c.Source),
             ArchitectureIndependenceContract c => Many("layers", c.Layers),
             ArchitectureLayerContract c => Many("layers", c.Layers),
             ArchitectureProtectedContract c => Many("protected", c.Protected).Concat(Many("allowed_importers", c.AllowedImporters)),
-            ArchitectureExternalDependencyContract c => One("source", c.Source),
-            ArchitectureExternalAllowOnlyContract c => One("source", c.Source),
+            ArchitectureExternalDependencyContract c => One(SourceInput, c.Source),
+            ArchitectureExternalAllowOnlyContract c => One(SourceInput, c.Source),
             ArchitectureTypePlacementContract c => One("types_matching.layer", c.TypesMatching.Layer)
                 .Concat(Many("must_reside_in_layers", c.MustResideInLayers)),
             ArchitectureAttributeUsageContract c => Many("allowed_only_in_layers", c.AllowedOnlyInLayers)
@@ -90,7 +92,7 @@ internal static class ArchitectureRuleInputReferences
         };
     }
 
-    private static IEnumerable<ArchitectureRuleInputReference> One(string input, string layer) =>
+    private static ArchitectureRuleInputReference[] One(string input, string layer) =>
         string.IsNullOrWhiteSpace(layer)
             ? Array.Empty<ArchitectureRuleInputReference>()
             : new[] { new ArchitectureRuleInputReference(input, layer) };

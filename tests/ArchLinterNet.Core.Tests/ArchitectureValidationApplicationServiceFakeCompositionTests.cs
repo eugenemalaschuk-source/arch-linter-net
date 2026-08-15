@@ -20,6 +20,11 @@ namespace ArchLinterNet.Core.Tests;
 [TestFixture]
 public sealed class ArchitectureValidationApplicationServiceFakeCompositionTests
 {
+    private static readonly string[] _value = { "Fixture" };
+    private static readonly string[] _value1 = { "net10.0" };
+    private static readonly string[] _value2 = { "Fixture" };
+    private static readonly string[] _value3 = { "fake" };
+    private static readonly string[] _value4 = { "fake" };
     private sealed class FakeRunnerSetupService : IArchitectureRunnerSetupService
     {
         public bool LoadDocumentCalled { get; private set; }
@@ -168,19 +173,19 @@ public sealed class ArchitectureValidationApplicationServiceFakeCompositionTests
     private static ArchitectureAnalysisSession CreateSessionWithDiscoveredProject(ArchitectureContractDocument document)
     {
         var discovery = new ProjectDiscoveryResult(
-            new[] { "Fixture" }, Array.Empty<string>(), Array.Empty<string>(),
+            _value, Array.Empty<string>(), Array.Empty<string>(),
             Array.Empty<ArchitectureProjectDiscoveryDiagnostic>())
         {
             DiscoveredProjects = new[]
             {
-                new ArchitectureDiscoveredProject("Fixture.csproj", "Fixture", new[] { "net10.0" })
+                new ArchitectureDiscoveredProject("Fixture.csproj", "Fixture", _value1)
             }
         };
 
         var context = new ArchitectureAnalysisContext(
             "/fake/repository/root",
             Array.Empty<System.Reflection.Assembly>(),
-            new[] { "Fixture" },
+            _value2,
             Array.Empty<string>(),
             projectDiscovery: discovery);
 
@@ -348,7 +353,7 @@ public sealed class ArchitectureValidationApplicationServiceFakeCompositionTests
         {
             ConfigurationViolationsToReturn = new List<ArchitectureViolation>
             {
-                new("<configuration>", null, "fake-subject", "fake-configuration-violation", new[] { "fake" }),
+                new("<configuration>", null, "fake-subject", "fake-configuration-violation", _value3),
             },
         };
         runnerSetupService.RunnerToReturn = runner;
@@ -356,7 +361,7 @@ public sealed class ArchitectureValidationApplicationServiceFakeCompositionTests
         var contractExecutor = new FakeContractExecutor
         {
             ResultToReturn = new ArchitectureContractExecutionResult(
-                new[] { new ArchitectureViolation("core", null, "contracts", "forbidden dependency", new[] { "fake" }) },
+                new[] { new ArchitectureViolation("core", null, "contracts", "forbidden dependency", _value4) },
                 Array.Empty<string>(),
                 Array.Empty<ArchitectureViolation>(),
                 Array.Empty<ArchitectureCoverageSummary>()),

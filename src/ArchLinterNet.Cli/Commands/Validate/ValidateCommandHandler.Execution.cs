@@ -120,7 +120,7 @@ internal sealed partial class ValidateCommandHandler
         // still gates on every discovered project being #406 VerifiedCacheEligible.
         if (!result.Cancelled)
         {
-            TryPopulateCache(options, mode, outcome, counters, profileState.Cache);
+            TryPopulateCache(options, outcome, counters, profileState.Cache);
         }
 
         WriteProfile(
@@ -265,9 +265,9 @@ internal sealed partial class ValidateCommandHandler
         // populated independently.
         if (!result.Cancelled)
         {
-            foreach ((string mode, ValidationOutcome modeOutcome) in outcomesByMode)
+            foreach ((_, ValidationOutcome modeOutcome) in outcomesByMode)
             {
-                TryPopulateCache(options, mode, modeOutcome, snapshot.Counters, profileState.Cache);
+                TryPopulateCache(options, modeOutcome, snapshot.Counters, profileState.Cache);
             }
         }
 

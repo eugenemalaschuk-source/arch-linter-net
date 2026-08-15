@@ -74,7 +74,7 @@ internal static class ArchitectureExpressionContextFactory
             .Build();
     }
 
-    private static IReadOnlyDictionary<string, CelValue> ToValueMap<T>(
+    private static Dictionary<string, CelValue> ToValueMap<T>(
         IReadOnlyDictionary<string, T> source, Func<T, CelValue> convert)
     {
         var result = new Dictionary<string, CelValue>(source.Count, StringComparer.Ordinal);
@@ -86,7 +86,7 @@ internal static class ArchitectureExpressionContextFactory
         return result;
     }
 
-    private static IReadOnlyList<CelValue> ToValueList(IReadOnlyList<string> source)
+    private static List<CelValue> ToValueList(IReadOnlyList<string> source)
     {
         var result = new List<CelValue>(source.Count);
         foreach (string value in source)

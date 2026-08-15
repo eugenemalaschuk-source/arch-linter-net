@@ -149,7 +149,7 @@ def validate_package_version(version: str) -> None:
 
 
 def _strip_v(text: str) -> str:
-    if text.startswith("v") or text.startswith("V"):
+    if text.startswith(("v", "V")):
         return text[1:]
     return text
 

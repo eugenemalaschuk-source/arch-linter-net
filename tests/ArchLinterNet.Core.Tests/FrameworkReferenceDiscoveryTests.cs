@@ -7,6 +7,7 @@ namespace ArchLinterNet.Core.Tests;
 [TestFixture]
 public sealed class FrameworkReferenceDiscoveryTests
 {
+    private static readonly string[] _value = { "'$(TargetFramework)'=='net10.0'", "'$(TargetFramework)'=='net472'" };
     private string _repoRoot = null!;
 
     [SetUp]
@@ -140,6 +141,6 @@ public sealed class FrameworkReferenceDiscoveryTests
 
         Assert.That(project.FrameworkReferences, Has.Count.EqualTo(2));
         Assert.That(project.FrameworkReferences.Select(f => f.Condition),
-            Is.EquivalentTo(new[] { "'$(TargetFramework)'=='net10.0'", "'$(TargetFramework)'=='net472'" }));
+            Is.EquivalentTo(_value));
     }
 }

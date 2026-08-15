@@ -12,9 +12,10 @@ namespace ArchLinterNet.Core.Tests;
 [TestFixture]
 public sealed class PublicApiSnapshotStoreTests
 {
+    private static readonly string[] _value = { "class Acme.Module.Thing" };
     private string _repositoryRoot = null!;
     private string _policyPath = null!;
-    private IPublicApiSnapshotStore _store = null!;
+    private PublicApiSnapshotStore _store = null!;
 
     [SetUp]
     public void SetUp()
@@ -98,7 +99,7 @@ public sealed class PublicApiSnapshotStoreTests
         Assert.Multiple(() =>
         {
             Assert.That(document.ContractId, Is.EqualTo("surface"));
-            Assert.That(document.Entries.Select(entry => entry.Signature), Is.EqualTo(new[] { "class Acme.Module.Thing" }));
+            Assert.That(document.Entries.Select(entry => entry.Signature), Is.EqualTo(_value));
         });
     }
 

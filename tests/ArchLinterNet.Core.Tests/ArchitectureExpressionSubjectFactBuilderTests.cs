@@ -11,6 +11,7 @@ namespace ArchLinterNet.Core.Tests;
 [TestFixture]
 public sealed class ArchitectureExpressionSubjectFactBuilderTests
 {
+    private static readonly string[] _value = { "net10.0" };
     private static ArchitectureRoleIndex EmptyRoleIndex(Type[] types) =>
         new(new ArchitectureClassificationConfiguration(), new ArchitectureTypeIndex(new[] { typeof(ArchitectureExpressionSubjectFactBuilderTests).Assembly }));
 
@@ -27,7 +28,7 @@ public sealed class ArchitectureExpressionSubjectFactBuilderTests
             DiscoveredProjects = new[]
             {
                 new ArchitectureDiscoveredProject(
-                    $"tests/{assemblyName}/{assemblyName}.Custom.csproj", assemblyName, new[] { "net10.0" })
+                    $"tests/{assemblyName}/{assemblyName}.Custom.csproj", assemblyName, _value)
             }
         };
 

@@ -16,6 +16,14 @@ namespace ArchLinterNet.Core.Tests;
 [TestFixture]
 public sealed class ArchitectureBaselineApplicationServiceBuildStateTests
 {
+    private static readonly string[] _value = { "net10.0" };
+    private static readonly string[] _value1 = { "Fixture" };
+    private static readonly string[] _value2 = { "Fixture" };
+    private static readonly string[] _value3 = { "Fixture" };
+    private static readonly string[] _value4 = { "Fixture" };
+    private static readonly string[] _value5 = { "Fixture" };
+    private static readonly string[] _value6 = { "Fixture" };
+    private static readonly string[] _value7 = { "Fixture" };
     private sealed class FakeBuildStatePreparationService : IBuildStatePreparationService
     {
         public int PrepareCallCount { get; private set; }
@@ -38,7 +46,7 @@ public sealed class ArchitectureBaselineApplicationServiceBuildStateTests
     private static ArchitectureContractDocument CreateDocument() => new() { Version = 1, Name = "Fake" };
 
     private static ArchitectureDiscoveredProject FixtureProject() =>
-        new("Fixture.csproj", "Fixture", new[] { "net10.0" });
+        new("Fixture.csproj", "Fixture", _value);
 
     private static ArchitectureAnalysisSession CreateSession(
         ArchitectureContractDocument document,
@@ -155,7 +163,7 @@ public sealed class ArchitectureBaselineApplicationServiceBuildStateTests
         var document = CreateDocument();
         var discovery = ProjectDiscoveryResult.Empty with { DiscoveredProjects = new[] { FixtureProject() } };
         var runnerSetupService = new FakeRunnerSetupService { DocumentToReturn = document };
-        var runner = new FakeContractRunner(CreateSession(document, discovery, missingAssemblyNames: new[] { "Fixture" }));
+        var runner = new FakeContractRunner(CreateSession(document, discovery, missingAssemblyNames: _value1));
         runnerSetupService.RunnerToReturn = runner;
 
         var applicationService = new ArchitectureBaselineApplicationService(
@@ -180,7 +188,7 @@ public sealed class ArchitectureBaselineApplicationServiceBuildStateTests
         var document = CreateDocument();
         var discovery = ProjectDiscoveryResult.Empty with { DiscoveredProjects = new[] { FixtureProject() } };
         var runnerSetupService = new FakeRunnerSetupService { DocumentToReturn = document };
-        var runner = new FakeContractRunner(CreateSession(document, discovery, missingAssemblyNames: new[] { "Fixture" }));
+        var runner = new FakeContractRunner(CreateSession(document, discovery, missingAssemblyNames: _value2));
         runnerSetupService.RunnerToReturn = runner;
         var blockingDiagnostic = BlockingDiagnostic();
         var preparationService = new FakeBuildStatePreparationService
@@ -217,7 +225,7 @@ public sealed class ArchitectureBaselineApplicationServiceBuildStateTests
         var document = CreateDocument();
         var discovery = ProjectDiscoveryResult.Empty with { DiscoveredProjects = new[] { FixtureProject() } };
         var runnerSetupService = new FakeRunnerSetupService { DocumentToReturn = document };
-        var runner = new FakeContractRunner(CreateSession(document, discovery, missingAssemblyNames: new[] { "Fixture" }));
+        var runner = new FakeContractRunner(CreateSession(document, discovery, missingAssemblyNames: _value3));
         runnerSetupService.RunnerToReturn = runner;
         var preparationService = new FakeBuildStatePreparationService();
 
@@ -250,8 +258,8 @@ public sealed class ArchitectureBaselineApplicationServiceBuildStateTests
         var document = CreateDocument();
         var discovery = ProjectDiscoveryResult.Empty with { DiscoveredProjects = new[] { FixtureProject() } };
 
-        var firstRunner = new FakeContractRunner(CreateSession(document, discovery, missingAssemblyNames: new[] { "Fixture" }));
-        var secondRunner = new FakeContractRunner(CreateSession(document, discovery, missingAssemblyNames: new[] { "Fixture" }))
+        var firstRunner = new FakeContractRunner(CreateSession(document, discovery, missingAssemblyNames: _value4));
+        var secondRunner = new FakeContractRunner(CreateSession(document, discovery, missingAssemblyNames: _value5))
         {
             BaselineCandidates = new List<ArchitectureBaselineCandidate>
             {
@@ -300,8 +308,8 @@ public sealed class ArchitectureBaselineApplicationServiceBuildStateTests
         var document = CreateDocument();
         var discovery = ProjectDiscoveryResult.Empty with { DiscoveredProjects = new[] { FixtureProject() } };
 
-        var firstRunner = new FakeContractRunner(CreateSession(document, discovery, missingAssemblyNames: new[] { "Fixture" }));
-        var secondRunner = new FakeContractRunner(CreateSession(document, discovery, missingAssemblyNames: new[] { "Fixture" }));
+        var firstRunner = new FakeContractRunner(CreateSession(document, discovery, missingAssemblyNames: _value6));
+        var secondRunner = new FakeContractRunner(CreateSession(document, discovery, missingAssemblyNames: _value7));
 
         var runnerSetupService = new FakeRunnerSetupService
         {

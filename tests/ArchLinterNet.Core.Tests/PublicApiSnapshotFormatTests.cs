@@ -7,6 +7,9 @@ namespace ArchLinterNet.Core.Tests;
 [TestFixture]
 public sealed class PublicApiSnapshotFormatTests
 {
+    private static readonly string[] _value = {
+            "@assembly A", "class A.Alpha", "class A.Beta", "@assembly B",
+        };
     private static PublicApiSnapshotDocument Document(params PublicApiSnapshotEntry[] entries)
     {
         return new PublicApiSnapshotDocument(PublicApiSnapshotFormat.CurrentVersion, "module-api", entries);
@@ -34,10 +37,7 @@ public sealed class PublicApiSnapshotFormatTests
         string[] lines = serialized.Split('\n');
         int firstEntry = Array.IndexOf(lines, "@assembly A");
 
-        Assert.That(lines[firstEntry..(firstEntry + 4)], Is.EqualTo(new[]
-        {
-            "@assembly A", "class A.Alpha", "class A.Beta", "@assembly B",
-        }));
+        Assert.That(lines[firstEntry..(firstEntry + 4)], Is.EqualTo(_value));
     }
 
     [Test]

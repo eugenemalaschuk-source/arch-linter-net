@@ -25,15 +25,22 @@ namespace ArchLinterNet.Core.Tests;
 [TestFixture]
 public sealed class AnalysisCacheHitReconstructionTests
 {
+    private static readonly string[] _value = { "MyApp.Infrastructure.Db.OrderRepository" };
+    private static readonly string[] _value1 = { "MyApp.Application" };
+    private static readonly string[] _value2 = { "MyApp.Infrastructure.Db.CustomerRepository" };
+    private static readonly string[] _value3 = { "A -> B -> A" };
+    private static readonly string[] _value4 = { "R001" };
+    private static readonly string[] _value5 = { "no_infra_from_domain" };
+    private static readonly string[] _value6 = { "Domain" };
     private static ArchitectureViolation[] BuildOriginalViolationsInDeterministicOrder()
     {
         return new[]
         {
             new ArchitectureViolation(
                 "no_infra_from_domain", "R001", "MyApp.Domain.Order", "MyApp.Infrastructure",
-                new[] { "MyApp.Infrastructure.Db.OrderRepository" })
+                _value)
             {
-                Payload = new DependencyPayload("Domain", "Infrastructure", new[] { "MyApp.Application" }),
+                Payload = new DependencyPayload("Domain", "Infrastructure", _value1),
                 Identity = new ArchitectureViolationIdentity(
                     ArchitectureViolationIdentity.CurrentVersion, "layers", "dependency", "R001",
                     "MyApp.Domain", "MyApp.Domain.Order", null, "MyApp.Infrastructure",
@@ -41,7 +48,7 @@ public sealed class AnalysisCacheHitReconstructionTests
             },
             new ArchitectureViolation(
                 "no_infra_from_domain", "R001", "MyApp.Domain.Customer", "MyApp.Infrastructure",
-                new[] { "MyApp.Infrastructure.Db.CustomerRepository" })
+                _value2)
             {
                 Payload = new DependencyPayload("Domain", "Infrastructure", null),
                 Identity = new ArchitectureViolationIdentity(
@@ -58,7 +65,7 @@ public sealed class AnalysisCacheHitReconstructionTests
         return new ValidationOutcome(
             Passed: false,
             Violations: violations,
-            Cycles: new[] { "A -> B -> A" },
+            Cycles: _value3,
             CoverageFindings: Array.Empty<ArchitectureViolation>(),
             CoverageConfig: "off",
             UnmatchedIgnoredViolations: new[]
@@ -71,7 +78,7 @@ public sealed class AnalysisCacheHitReconstructionTests
             {
                 new PolicyConsistencyDiagnostic(
                     "no_infra_from_domain", "R001", "duplicate-contract-id", "duplicate id detected",
-                    new[] { "R001" }, new[] { "no_infra_from_domain" }, new[] { "Domain" }),
+                    _value4, _value5, _value6),
             },
             PolicyConsistencyConfig: "warn",
             CoverageSummaries: new[]

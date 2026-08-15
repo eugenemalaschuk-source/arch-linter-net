@@ -150,7 +150,12 @@ public static class BuildStateCanonicalHasher
     private static bool IsUnderBuildOutputDirectory(string file, string projectDirectory)
     {
         string relative = Path.GetRelativePath(projectDirectory, file);
-        string[] segments = relative.Split(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+        // Array-form Split (not the two-char params overload) to avoid Sonar S3220: the params
+        // overload partially matches `Split(char separator, int count, StringSplitOptions)`,
+        // which is ambiguous-looking at a glance even though it resolves correctly today. Trades
+        // one small array allocation (S3878) for that clarity, matching
+        // BuildStatePreparationService.MatchesRequestedOutputPath's identical call shape.
+        string[] segments = relative.Split(new[] { Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar });
         return segments.Length > 0
             && (string.Equals(segments[0], "bin", StringComparison.OrdinalIgnoreCase)
                 || string.Equals(segments[0], "obj", StringComparison.OrdinalIgnoreCase));

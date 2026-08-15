@@ -74,7 +74,7 @@ internal sealed partial class ValidateCommandHandler
     // this command builds, so ArchitectureAnalysisSnapshot.Evaluate can attempt the real cache-hit
     // short-circuit for each requested mode. Null whenever --cache was not passed, or whenever the
     // configured location is unsafe (already reported as a runtime error before execution started).
-    private AnalysisCacheLocation? ResolveCacheLocationForExecution(ValidateCommandOptions options)
+    private static AnalysisCacheLocation? ResolveCacheLocationForExecution(ValidateCommandOptions options)
     {
         if (options.CacheDestination is null)
         {
@@ -99,7 +99,6 @@ internal sealed partial class ValidateCommandHandler
     // persisted from an unproven build-input manifest.
     private void TryPopulateCache(
         ValidateCommandOptions options,
-        string mode,
         ValidationOutcome outcome,
         ArchitectureAnalysisSnapshotCounters counters,
         CacheExecutionState state)

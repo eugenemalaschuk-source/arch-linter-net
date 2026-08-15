@@ -11,6 +11,7 @@ import pytest
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import create_release_scope_evidence as generator  # noqa: E402
+import _release_workspace  # noqa: E402
 from create_release_scope_evidence import (  # noqa: E402
     _issue_number,
     _read_declaration,
@@ -140,7 +141,7 @@ def test_traversal_out_of_the_workspace_is_rejected(tmp_path: Path, monkeypatch)
 def test_incomparable_root_is_treated_as_not_containing(tmp_path: Path, monkeypatch) -> None:
     """os.path.commonpath raises for paths on different Windows drives; that is a rejection, not a
     crash, and must not leak a confusing message."""
-    monkeypatch.setattr(generator.os.path, "commonpath",
+    monkeypatch.setattr(_release_workspace.os.path, "commonpath",
                         lambda paths: (_ for _ in ()).throw(ValueError("different drives")))
 
     with pytest.raises(ValueError, match="resolves outside the release workspace"):

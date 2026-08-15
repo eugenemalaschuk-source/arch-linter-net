@@ -66,7 +66,7 @@ internal sealed class ArchitecturePolicyCheckApplicationService(
         return new PolicyCheckFailure(contract.ApiSnapshotError!, contract.ApiSnapshotErrorKind.ToString(), diagnostic);
     }
 
-    private static IReadOnlyCollection<PolicyCheckDeferredCheck> BuildDeferredChecks(
+    private static List<PolicyCheckDeferredCheck> BuildDeferredChecks(
         ArchitectureContractDocument document)
     {
         var checks = new List<PolicyCheckDeferredCheck>();

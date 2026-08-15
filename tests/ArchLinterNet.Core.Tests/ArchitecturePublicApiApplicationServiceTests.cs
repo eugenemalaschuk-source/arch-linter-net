@@ -176,7 +176,7 @@ public sealed partial class ArchitecturePublicApiApplicationServiceTests
         {
             DiscoveredProjects = new[]
             {
-                new ArchitectureDiscoveredProject("Test.csproj", AssemblyName, new[] { "net10.0" }),
+                new ArchitectureDiscoveredProject("Test.csproj", AssemblyName, _value),
             },
         };
 

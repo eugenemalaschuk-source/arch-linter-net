@@ -113,8 +113,8 @@ internal sealed class ArchitectureExternalDependencyIlScanner : IArchitectureExt
     private static IEnumerable<MethodBase> EnumerateMethods(Type sourceType)
     {
         const BindingFlags Flags =
-            BindingFlags.Instance | BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic |
-            BindingFlags.DeclaredOnly; // NOSONAR: intentional — IL scanning needs reflection access to all members
+            BindingFlags.Instance | BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic | // NOSONAR: intentional — IL scanning needs reflection access to all members
+            BindingFlags.DeclaredOnly;
 
         foreach (MethodInfo method in sourceType.GetMethods(Flags))
         {
