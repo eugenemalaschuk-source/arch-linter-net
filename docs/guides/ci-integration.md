@@ -72,6 +72,19 @@ Use `dotnet tool restore` with a local tool manifest when the repository should 
 
 See [Exit codes](../usage/exit-codes.md) for details.
 
+## Architecture-policy badge payload
+
+`arch-linter-net badge architecture-policy --policy architecture/dependencies.arch.yml --ensure-built`
+performs the same strict validation and writes a Shields endpoint JSON payload to standard output.
+It returns `0` with `passing`/`brightgreen`, `1` with `failing`/`red`, and `2` with
+`unavailable`/`red`. A workflow can use its exit status as the blocking gate while a
+badge service consumes the JSON endpoint.
+
+For a pull-request coverage comment, render the strict JSON with
+`arch-linter-net coverage report --input architecture-strict.json --output architecture-coverage.md`.
+Use `--max-failure-diagnostics 3` for the compact comment and pass `--changed-files`,
+`--repo-root`, and `--diff-status failed` when applicable.
+
 ## Strict vs audit jobs
 
 Strict validation is the no-new-debt gate. It should fail a pull request when an enforced architecture boundary is violated.
@@ -130,6 +143,31 @@ When architecture coverage is wired into CI as a quality gate (see the `architec
 To inspect the same full-solution coverage report locally before pushing, run `make architecture-coverage-report`, which prints both the Markdown report (the same one posted to pull requests) and the raw JSON view.
 
 **All-zero counts can mean two different things.** If `coverage_summary` is an empty list, the policy defines no coverage contracts at all (`strict_coverage`/`audit_coverage` are absent) — the report's note line calls this out explicitly. That is different from a policy that *does* define coverage contracts and reports zero uncovered/stale/unknown items, which means real coverage contracts exist and nothing is currently failing them. This repository's own `architecture/dependencies.arch.yml` defines `assembly`-, `project`-, `namespace`-, and `rule_input`-scope `strict_coverage` contracts covering all four first-party assemblies, every discovered production project, their root namespaces, and the rule inputs of its source-sensitive strict rules, so the gate reflects real coverage rather than an empty, trivially-passing policy.
+
+## Architecture policy badge
+
+The README's **Architecture policy** badge is a dynamic GitHub Actions status
+badge for the latest `main` run of
+[Architecture Policy](https://github.com/eugenemalaschuk-source/arch-linter-net/actions/workflows/architecture-policy.yml).
+That workflow runs the repository's authoritative read-only strict self-policy
+gate:
+
+```bash
+make restore
+make lint-architecture
+```
+
+It is intentionally a status signal, not an architecture-coverage percentage or
+a unit-test coverage metric. Architecture coverage remains the strict/audit
+JSON and Markdown report described above; test coverage remains the separate
+Codecov signal below. The workflow has read-only contents permission, writes no
+badge files or README commits, and does not publish packages, releases, or
+GitHub Pages content.
+
+After a merge, GitHub refreshes the badge from the next `main` workflow run. If
+the badge is failing or stale, inspect that run's **Strict Self-Policy** job:
+the `make lint-architecture` output names the violated policy rule. Run the two
+commands above locally after restoring dependencies to reproduce the result.
 
 ## Test coverage with Codecov and SonarCloud
 

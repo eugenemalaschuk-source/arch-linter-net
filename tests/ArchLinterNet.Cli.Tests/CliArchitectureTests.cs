@@ -3,7 +3,9 @@ using System.Text.Json;
 using ArchLinterNet.Cli;
 using ArchLinterNet.Cli.Abstractions;
 using ArchLinterNet.Cli.Commands.Baseline;
+using ArchLinterNet.Cli.Commands.Badge.EntryPoint;
 using ArchLinterNet.Cli.Commands.Cache;
+using ArchLinterNet.Cli.Commands.Coverage.EntryPoint;
 using ArchLinterNet.Cli.Commands.Explain;
 using ArchLinterNet.Cli.Commands.Graph;
 using ArchLinterNet.Cli.Commands.Policy;
@@ -25,7 +27,7 @@ namespace ArchLinterNet.Cli.Tests;
 [TestFixture]
 public sealed class CliArchitectureTests
 {
-    private static readonly string[] _value = { "baseline", "cache", "graph", "explain", "policy", "public-api", "scaffold", "schema" };
+    private static readonly string[] _value = { "badge", "baseline", "cache", "coverage", "graph", "explain", "policy", "public-api", "scaffold", "schema" };
     private static readonly string[] _value1 = { "generate", "update", "prune", "diff", "verify", "migrate" };
     private static readonly string[] _value2 = { "rule-1" };
     [Test]
@@ -41,8 +43,10 @@ public sealed class CliArchitectureTests
             Assert.That(composition.RootCommandModule, Is.InstanceOf<ValidateCommandModule>());
             Assert.That(composition.SubcommandModules.Select(static module => module.GetType()), Is.EquivalentTo(new[]
             {
+                typeof(BadgeCommandModule),
                 typeof(BaselineCommandModule),
                 typeof(CacheCommandModule),
+                typeof(CoverageCommandModule),
                 typeof(GraphCommandModule),
                 typeof(ExplainCommandModule),
                 typeof(PolicyCommandModule),

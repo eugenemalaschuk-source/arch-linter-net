@@ -2,7 +2,6 @@
 
 ## Purpose
 Operationalize architecture coverage as a CI quality signal: publish strict/audit JSON artifacts, generate a Markdown coverage report (including new-code coverage), and post it as a pull request comment with minimal write-permission exposure.
-
 ## Requirements
 ### Requirement: Strict and audit coverage artifacts are published
 The `validate` job in `.github/workflows/ci.yml` SHALL run ArchLinterNet against the repository's own policy in both `strict` and `audit` JSON modes and upload the resulting JSON as build artifacts on every pull request and `main` push.
@@ -27,11 +26,15 @@ The `validate` job SHALL report an overall failed conclusion when the strict run
 - **THEN** the `validate` job's conclusion is not `failure` due to those findings
 
 ### Requirement: Markdown coverage report generation
-A report generator (`tools/scripts/architecture_coverage_report.py`) SHALL convert the strict JSON's `coverage_summary` and `coverage_findings` into a Markdown report containing overall status (pass/fail) and covered/excluded/uncovered/stale/unknown counts.
+A native `coverage report` CLI command SHALL convert strict JSON's
+`coverage_summary` and coverage findings into a Markdown report containing
+overall status (pass/fail) and covered/excluded/uncovered/stale/unknown counts.
 
 #### Scenario: Zero findings produces a clean pass report
-- **WHEN** the strict JSON has empty `coverage_findings` and all `coverage_summary` counts at zero
-- **THEN** the generated Markdown reports a passing status and all counts as `0`
+- **WHEN** the CLI report command receives strict JSON with empty
+  `coverage_findings` and all `coverage_summary` counts at zero
+- **THEN** the generated Markdown reports a passing status and all counts as
+  `0`
 
 #### Scenario: Failed gate is reflected in the report
 - **WHEN** the strict JSON has `passed: false`
@@ -101,8 +104,10 @@ A step in the `validate` job in `.github/workflows/ci.yml` SHALL post the genera
 - **THEN** it updates that existing comment instead of creating a new one
 
 ### Requirement: Report generator is tested
-The report generator SHALL have script-level tests covering JSON parsing, Markdown generation, zero-findings output, failed-gate output, unknown-mapping behavior, and deriving `covered` from real `covered_items` evidence.
+The native CLI report renderer SHALL have NUnit tests covering JSON parsing,
+Markdown generation, zero-findings output, failed-gate output, unknown-mapping
+behavior, and deriving `covered` from real `covered_items` evidence.
 
 #### Scenario: Test suite covers required cases
-- **WHEN** the report generator's test suite is run
+- **WHEN** the CLI test suite is run
 - **THEN** it includes passing tests for JSON parsing, Markdown generation, the zero-findings case, the failed-gate case, the unknown-mapping case, and the covered-from-evidence case

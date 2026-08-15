@@ -1,4 +1,4 @@
-.PHONY: lint _lint-dotnet lint-architecture audit-architecture policy-check explain-architecture public-api-check public-api-update-preview public-api-update lint-code-size lint-dotnet-format lint-workflows fmt-workflows test-architecture-coverage-report test-release-evidence test-calculate-version test-coverage-badge-script test-tooling-coverage architecture-coverage-report architecture-strict-json architecture-audit-json architecture-coverage-markdown architecture-coverage-comment-markdown architecture-coverage-ci
+.PHONY: lint _lint-dotnet lint-architecture audit-architecture policy-check explain-architecture public-api-check public-api-update-preview public-api-update lint-code-size lint-dotnet-format lint-workflows fmt-workflows test-release-evidence test-calculate-version test-coverage-badge-script test-tooling-coverage architecture-coverage-report architecture-strict-json architecture-audit-json architecture-coverage-markdown architecture-coverage-comment-markdown architecture-coverage-ci
 
 CHANGED_FILES ?= changed-files.txt
 DIFF_STATUS   ?= ok
@@ -105,10 +105,6 @@ fmt-workflows:  ## Format GitHub Actions workflows with prettier
 	@printf '\033[1;36m══════════════════════════════════════════\n  🎨  prettier --write: .github/workflows/\n══════════════════════════════════════════\033[0m\n'
 	@npx --yes prettier --write ".github/workflows/*.yml"
 
-test-architecture-coverage-report:  ## Run tests for the architecture coverage report generator
-	@cd "$(PROJECT_ROOT)" && UV_PROJECT_ENVIRONMENT="$(PROJECT_ROOT)/.venv" "$(UV)" run --project tools/pyproject.toml \
-		pytest tools/scripts/tests/test_architecture_coverage_report.py
-
 test-release-evidence:  ## Run tests for the packed-artifact release-evidence aggregator
 	@cd "$(PROJECT_ROOT)" && UV_PROJECT_ENVIRONMENT="$(PROJECT_ROOT)/.venv" "$(UV)" run --project tools/pyproject.toml \
 		pytest tools/release/tests
@@ -127,7 +123,6 @@ test-coverage-badge-script:  ## Run tests for the test-coverage badge Markdown g
 test-tooling-coverage:  ## Run all Python tooling tests with coverage (coverage-python.xml)
 	@cd "$(PROJECT_ROOT)" && UV_PROJECT_ENVIRONMENT="$(PROJECT_ROOT)/.venv" "$(UV)" run --project tools/pyproject.toml \
 		pytest tools/release/tests \
-		tools/scripts/tests/test_architecture_coverage_report.py \
 		tools/scripts/tests/test_calculate_version.py \
 		tools/scripts/tests/test_check_evergreen_docs.py \
 		tools/scripts/tests/test_check_evergreen_docs_edges.py \
@@ -150,21 +145,14 @@ architecture-audit-json:  ## Run audit architecture validation, writing architec
 		> "$(PROJECT_ROOT)/architecture-audit.json"
 
 architecture-coverage-markdown:  ## Generate architecture-coverage.md from architecture-strict.json (CHANGED_FILES/DIFF_STATUS env optional)
-	@cd "$(PROJECT_ROOT)" && UV_PROJECT_ENVIRONMENT="$(PROJECT_ROOT)/.venv" "$(UV)" run --project tools/pyproject.toml \
-		python tools/scripts/architecture_coverage_report.py architecture-strict.json \
-		--changed-files "$(CHANGED_FILES)" \
-		--diff-status "$(DIFF_STATUS)" \
-		--repo-root "$(PROJECT_ROOT)" \
-		--output architecture-coverage.md
+	@dotnet run --no-build --project "$(CLI_PROJECT)" -- coverage report \
+		--input architecture-strict.json --changed-files "$(CHANGED_FILES)" --diff-status "$(DIFF_STATUS)" \
+		--repo-root "$(PROJECT_ROOT)" --output architecture-coverage.md
 
 architecture-coverage-comment-markdown:  ## Generate compact architecture-coverage-comment.md for a PR comment
-	@cd "$(PROJECT_ROOT)" && UV_PROJECT_ENVIRONMENT="$(PROJECT_ROOT)/.venv" "$(UV)" run --project tools/pyproject.toml \
-		python tools/scripts/architecture_coverage_report.py architecture-strict.json \
-		--changed-files "$(CHANGED_FILES)" \
-		--diff-status "$(DIFF_STATUS)" \
-		--repo-root "$(PROJECT_ROOT)" \
-		--max-failure-diagnostics 3 \
-		--output architecture-coverage-comment.md
+	@dotnet run --no-build --project "$(CLI_PROJECT)" -- coverage report \
+		--input architecture-strict.json --changed-files "$(CHANGED_FILES)" --diff-status "$(DIFF_STATUS)" \
+		--repo-root "$(PROJECT_ROOT)" --max-failure-diagnostics 3 --output architecture-coverage-comment.md
 
 architecture-coverage-ci:  ## CI entrypoint: strict+audit JSON + Markdown report in one call (CHANGED_FILES/DIFF_STATUS env optional)
 	@$(MAKE) architecture-strict-json; STRICT_EXIT=$$?; \

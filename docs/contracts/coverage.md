@@ -192,7 +192,7 @@ human, JSON, and CI consumers.
 
 Test assemblies (typically named `*.Tests`) are usually never listed in `analysis.target_assemblies`, so their namespaces/projects/assemblies never enter the coverage inventory and can never appear in any contract's `covered_items`/`uncovered_items`/`stale_items`/`unknown_items`. Downstream tooling that maps a pull request's changed files onto coverage buckets to build a "new-code coverage" report should treat a file inside a `*.Tests` project as out of scope entirely, rather than reporting it as `unknown`/"requiring policy update" — there is no coverage evidence to check it against by construction, so flagging it would be tooling noise, not a real policy gap.
 
-This repository's own CI report generator (`tools/scripts/architecture_coverage_report.py`) implements exactly this: any changed file whose enclosing `.csproj` stem ends in `.Tests` is skipped before classification, so new test files never surface as "requiring policy update" in the PR coverage comment, regardless of which contract family the surrounding feature belongs to.
+This repository's own CLI report command (`arch-linter-net coverage report`) implements exactly this: any changed file whose enclosing `.csproj` stem ends in `.Tests` is skipped before classification, so new test files never surface as "requiring policy update" in the PR coverage comment, regardless of which contract family the surrounding feature belongs to.
 
 ## Baselining coverage debt
 

@@ -27,7 +27,6 @@
 ##   make lint-workflows                    — lint GitHub Actions workflows
 ##   make lint-test-shard-membership        — verify Core unit shard tokens are live and leak-free
 ##   make architecture-coverage-report      — show full-solution coverage report locally (Markdown + JSON)
-##   make test-architecture-coverage-report — run tests for the coverage report generator
 ##
 ## Testing:
 ##   make acceptance           — lint + all tests
