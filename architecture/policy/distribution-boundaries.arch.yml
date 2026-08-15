@@ -1,0 +1,125 @@
+# yaml-language-server: $schema=../schema/dependencies.arch.fragment.schema.json
+#
+# Assembly, package, framework, project-metadata, and external-dependency
+# boundaries that define how the shipped artifacts may be composed.
+contracts:
+  strict_external:
+    # One authored rule per external boundary, expanded across every declared layer through the
+    # all_declared_layers source set. Exclusions name the exact layers where the dependency is the
+    # architecture, not a leak: `core` is the umbrella namespace that contains the allowed child
+    # layer, so it is subtracted alongside it.
+    - name: di-container-stays-in-the-composition-boundary
+      id: di-container-stays-in-the-composition-boundary
+      source_sets: [all_declared_layers]
+      exclude_sources: [core, core_composition]
+      forbidden: [dependency_injection_container]
+      reason: Container APIs must stay confined to ArchLinterNet.Core.Composition; every other layer consumes the composition root's interfaces and facades.
+
+    - name: msbuild-project-evaluation-stays-in-discovery
+      id: msbuild-project-evaluation-stays-in-discovery
+      source_sets: [all_declared_layers]
+      exclude_sources: [core, core_discovery]
+      forbidden: [msbuild_project_evaluation]
+      reason: MSBuild/Buildalyzer project-evaluation APIs must stay confined to ArchLinterNet.Core.Discovery; every other layer consumes the resolved project facts.
+
+  strict_assembly_dependency:
+    - name: cel-assembly-must-not-reference-other-shipped-assemblies
+      id: cel-assembly-must-not-reference-other-shipped-assemblies
+      source: ArchLinterNet.CEL
+      forbidden: [ArchLinterNet.Core, ArchLinterNet.Cli, ArchLinterNet.Testing]
+      reason: CEL ships as an independently usable, host-agnostic engine. A namespace rule only fires once code uses a type; this catches the declared assembly reference itself.
+
+  strict_assembly_allow_only:
+    - name: core-assembly-references-only-cel
+      id: core-assembly-references-only-cel
+      source: ArchLinterNet.Core
+      allowed: [ArchLinterNet.CEL]
+      reason: The shipped engine assembly may take a direct first-party reference on CEL and nothing else, so a host or adapter reference is caught at declaration time.
+
+    - name: adapter-assemblies-reference-only-core
+      id: adapter-assemblies-reference-only-core
+      source_sets: [adapter_assemblies]
+      allowed: [ArchLinterNet.Core]
+      reason: The CLI and NUnit adapters consume the engine through ArchLinterNet.Core only; a direct CEL or cross-adapter assembly reference is a packaging regression.
+
+  strict_assembly_independence:
+    - name: adapter-assemblies-are-mutually-independent
+      id: adapter-assemblies-are-mutually-independent
+      assemblies: [ArchLinterNet.Cli, ArchLinterNet.Testing]
+      reason: The CLI tool and the NUnit adapter are separately consumable packages and must not reference each other in either direction.
+
+  strict_project_metadata:
+    - name: production-projects-must-not-reference-test-or-benchmark-projects
+      id: production-projects-must-not-reference-test-or-benchmark-projects
+      project_sets: [production_projects]
+      forbidden_project_references:
+        - tests/**/*.csproj
+        - benchmarks/**/*.csproj
+      forbidden_properties:
+        IsTestProject: "true"
+      reason: A shipped project must never take a build dependency on a test or benchmark project, or turn itself into a test project.
+
+    - name: core-friend-assemblies-are-reviewed
+      id: core-friend-assemblies-are-reviewed
+      projects: [src/ArchLinterNet.Core/ArchLinterNet.Core.csproj]
+      allowed_friend_assemblies:
+        - ArchLinterNet.Core.Tests
+        - ArchLinterNet.Cli
+      reason: Core's internals are deliberately visible to its own test assembly and to the CLI adapter; any further friend assembly widens the effective API surface without review.
+
+    - name: cel-friend-assemblies-are-reviewed
+      id: cel-friend-assemblies-are-reviewed
+      projects: [src/ArchLinterNet.CEL/ArchLinterNet.CEL.csproj]
+      allowed_friend_assemblies:
+        - ArchLinterNet.CEL.Tests
+        - ArchLinterNet.CEL.Benchmarks
+      reason: CEL's internal pipeline stages are visible only to its own tests and to the pipeline-stage benchmarks; consumers must stay on the public CelEnvironment surface.
+
+    - name: cli-friend-assemblies-are-reviewed
+      id: cli-friend-assemblies-are-reviewed
+      projects: [src/ArchLinterNet.Cli/ArchLinterNet.Cli.csproj]
+      allowed_friend_assemblies:
+        - ArchLinterNet.Cli.Tests
+      reason: The CLI's internals are visible only to its own test assembly.
+
+    - name: testing-adapter-declares-no-friend-assemblies
+      id: testing-adapter-declares-no-friend-assemblies
+      projects: [src/ArchLinterNet.Testing/ArchLinterNet.Testing.csproj]
+      allowed_friend_assemblies: []
+      reason: The NUnit adapter is consumed entirely through its public API; it has no reviewed friend assembly.
+
+  strict_package_dependency:
+    - name: test-frameworks-stay-out-of-shipped-projects
+      id: test-frameworks-stay-out-of-shipped-projects
+      source_sets: [shipped_assemblies]
+      forbidden: [test_frameworks]
+      reason: A shipped package must not declare a test or benchmark framework dependency and push it onto consumers.
+
+    - name: msbuild-project-evaluation-package-stays-in-core
+      id: msbuild-project-evaluation-package-stays-in-core
+      source_sets: [shipped_assemblies]
+      exclude_sources: [ArchLinterNet.Core]
+      forbidden: [msbuild_project_evaluation_packages]
+      reason: Buildalyzer/MSBuild project evaluation is an ArchLinterNet.Core implementation detail; declaring it elsewhere would move project evaluation out of Core.Discovery.
+
+    - name: di-container-package-stays-in-core
+      id: di-container-package-stays-in-core
+      source_sets: [shipped_assemblies]
+      exclude_sources: [ArchLinterNet.Core]
+      forbidden: [dependency_injection_container_packages]
+      reason: The container is Core's composition-root implementation detail; an adapter declaring it directly would bypass the composition facade.
+
+  strict_package_allow_only:
+    - name: cel-declares-no-package-dependencies
+      id: cel-declares-no-package-dependencies
+      source: ArchLinterNet.CEL
+      allowed: []
+      reason: CEL is the dependency-light, host-agnostic engine; its value is that it can be referenced with no transitive package graph at all.
+
+  strict_framework_allow_only:
+    - name: shipped-projects-declare-only-the-base-runtime-framework
+      id: shipped-projects-declare-only-the-base-runtime-framework
+      source_sets: [shipped_assemblies]
+      allowed: [base_runtime_framework]
+      reason: Every shipped project carries only the implicit base runtime framework. Adopting a shared framework such as Microsoft.AspNetCore.App or Microsoft.WindowsDesktop.App would silently narrow which hosts can consume the packages.
+

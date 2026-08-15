@@ -1,0 +1,112 @@
+# yaml-language-server: $schema=../schema/dependencies.arch.fragment.schema.json
+#
+# This is intentionally an audit, not a strict gate. It measures the gap between
+# the current package-oriented layout and the domain convention we want to adopt
+# before production code is moved.
+contracts:
+  audit_allow_only:
+    - name: abstractions-may-reference-only-models
+      id: abstractions-may-reference-only-models
+      source: abstraction_types
+      allowed: [model_types]
+      reason: An abstraction is a contract over domain data; it must not reach into domain services, infrastructure, commands, or other concrete implementation namespaces.
+
+    - name: models-have-no-first-party-dependencies
+      id: models-have-no-first-party-dependencies
+      source: model_types
+      allowed: []
+      reason: Models are the innermost domain representation and must not depend on another first-party namespace.
+
+    - name: exceptions-have-no-first-party-dependencies
+      id: exceptions-have-no-first-party-dependencies
+      source: exception_types
+      allowed: []
+      reason: Exception types must be self-contained; System.Exception is a BCL base type and is intentionally outside first-party dependency checking.
+
+  audit_layout_conventions:
+    - name: production-interfaces-live-in-abstractions
+      id: production-interfaces-live-in-abstractions
+      files_matching:
+        folder_segment: src
+      exclude_files_matching:
+        - folder_segment: Abstractions
+      forbid_type_kind: interface
+      reason: Every production interface is an abstraction and must be declared in an Abstractions directory.
+
+    - name: models-live-in-models-directories-class
+      id: models-live-in-models-directories-class
+      files_matching:
+        folder_segment: src
+        when: subject.role == 'Model'
+      exclude_files_matching:
+        - folder_segment: Models
+      forbid_type_kind: class
+      reason: Model classes must be declared under a Models directory.
+
+    - name: models-live-in-models-directories-record
+      id: models-live-in-models-directories-record
+      files_matching:
+        folder_segment: src
+        when: subject.role == 'Model'
+      exclude_files_matching:
+        - folder_segment: Models
+      forbid_type_kind: record
+      reason: Model records must be declared under a Models directory.
+
+    - name: models-live-in-models-directories-struct
+      id: models-live-in-models-directories-struct
+      files_matching:
+        folder_segment: src
+        when: subject.role == 'Model'
+      exclude_files_matching:
+        - folder_segment: Models
+      forbid_type_kind: struct
+      reason: Model structs must be declared under a Models directory.
+
+    - name: models-live-in-models-directories-enum
+      id: models-live-in-models-directories-enum
+      files_matching:
+        folder_segment: src
+        when: subject.role == 'Model'
+      exclude_files_matching:
+        - folder_segment: Models
+      forbid_type_kind: enum
+      reason: Model enums must be declared under a Models directory.
+
+    - name: models-live-in-models-directories-interface
+      id: models-live-in-models-directories-interface
+      files_matching:
+        folder_segment: src
+        when: subject.role == 'Model'
+      exclude_files_matching:
+        - folder_segment: Models
+      forbid_type_kind: interface
+      reason: Model interfaces must be declared under a Models directory.
+
+    - name: models-live-in-models-directories-delegate
+      id: models-live-in-models-directories-delegate
+      files_matching:
+        folder_segment: src
+        when: subject.role == 'Model'
+      exclude_files_matching:
+        - folder_segment: Models
+      forbid_type_kind: delegate
+      reason: Model delegates must be declared under a Models directory.
+
+    - name: exceptions-live-in-exceptions-directories
+      id: exceptions-live-in-exceptions-directories
+      files_matching:
+        folder_segment: src
+        when: subject.role == 'Exception'
+      exclude_files_matching:
+        - folder_segment: Exceptions
+      forbid_type_kind: class
+      reason: A class derived from System.Exception must be declared under an Exceptions directory.
+
+    - name: exceptions-directories-contain-only-exception-classes
+      id: exceptions-directories-contain-only-exception-classes
+      files_matching:
+        folder_segment: Exceptions
+        when: subject.role != 'Exception'
+      forbid_type_kind: class
+      reason: An Exceptions directory may contain exception classes only, not ordinary concrete classes.
