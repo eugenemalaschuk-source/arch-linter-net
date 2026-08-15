@@ -14,3 +14,8 @@
 - [x] 3.1 Repair self-policy classification overlap and stale rule-input coverage references.
 - [x] 3.2 Run strict validation and remediate the resulting C# source-layout and purity violations.
 - [x] 3.3 Remediate resulting linter and CI policy violations, then run focused validation.
+
+## 4. CEL convention parity
+
+- [x] 4.1 Classify CEL's data-only modules as Models and confirm that the package-wide abstraction and exception conventions cover CEL.
+- [x] 4.2 Move CEL model declarations into local Models directories and validate strict/audit, linter, and test gates.

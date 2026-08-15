@@ -16,13 +16,24 @@ classification:
     - base_type: System.Exception
       role: Exception
   namespace:
-    # Core currently uses the singular Model namespace. Keep it classified so
-    # the audit makes the existing plural-folder convention violation visible.
+  # Core currently uses the singular Model namespace. Keep it classified so
+  # the audit makes the existing plural-folder convention violation visible.
     - namespace: ArchLinterNet.Core.Model
       role: Model
     - namespace: ArchLinterNet.Core.*.Models
       role: Model
     - namespace: ArchLinterNet.Cli.*.Models
+      role: Model
+    # CEL's diagnostics, runtime values, and profile identity are immutable data modules.
+    # Its parser, binder, evaluator, and builders are deliberately not Models: they are
+    # behavioural components whose cross-module dependencies are part of the engine pipeline.
+    - namespace: ArchLinterNet.CEL.Diagnostics
+      role: Model
+    - namespace: ArchLinterNet.CEL.Values
+      role: Model
+    - namespace: ArchLinterNet.CEL.Profile
+      role: Model
+    - namespace: ArchLinterNet.CEL.*.Models
       role: Model
 
 layers:
@@ -59,7 +70,7 @@ layers:
   model_types:
     selector:
       role: Model
-    overlaps_with: [core, core_model]
+    overlaps_with: [cel, core, core_model]
   exception_types:
     selector:
       role: Exception

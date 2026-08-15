@@ -34,7 +34,9 @@ only `coverage_summary`, so a failing comment hides the direct evidence that tri
    run artifacts when posting the compact output.
 5. Repair policy-integrity failures before treating resulting audit diagnostics as source
    violations. Then remediate violations in governed C# code, linter tooling, and CI inputs, while
-   preserving the declared policy semantics.
+   preserving the declared policy semantics. Apply the conventions consistently to CEL: exception
+   and interface rules remain package-wide, while its immutable diagnostics, values, and profile
+   identity are explicitly classified as Models; parser/binder/evaluator/builder components are not.
 
 ## Risks / Trade-offs
 
