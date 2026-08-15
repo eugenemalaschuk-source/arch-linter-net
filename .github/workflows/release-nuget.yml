@@ -284,9 +284,6 @@ jobs:
       - name: Restore
         run: make restore
 
-      - name: Build
-        run: dotnet build ArchLinterNet.slnx --configuration Release --no-restore -p:Version="$PACKAGE_VERSION"
-
       - name: Repository acceptance
         run: make acceptance-repository
 
@@ -294,6 +291,12 @@ jobs:
         run: |
           npm ci --ignore-scripts --prefix tools/openspec
           npm exec --prefix tools/openspec --no-install -- openspec validate --all --strict
+
+      # Repository acceptance recompiles source projects at their ordinary development version.
+      # Build the candidate immediately before `--no-build` packing so the assemblies embedded in
+      # each package report the manifest-bound release version rather than those test outputs.
+      - name: Build release candidate
+        run: dotnet build ArchLinterNet.slnx --configuration Release --no-restore -p:Version="$PACKAGE_VERSION"
 
       - name: Prepare NuGet package release notes
         shell: bash

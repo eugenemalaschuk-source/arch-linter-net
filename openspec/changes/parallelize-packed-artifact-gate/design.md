@@ -31,7 +31,7 @@ The active `Main` ruleset requires `Packed Artifact Test Suite (Windows)` and `P
 
 ## Decision 5: repository gates and packed-candidate gates are separate proofs
 
-`make acceptance` remains the full local convenience gate. A new `make acceptance-repository` runs lint + unit + ordinary E2E only. Release candidate preparation executes that repository gate plus strict OpenSpec once, records their evidence after the candidate manifest exists, and does not rerun Checkpoint B through generic acceptance. The final evidence job consumes the recorded repository-gate artifact instead of repeating acceptance.
+`make acceptance` remains the full local convenience gate. A new `make acceptance-repository` runs lint + unit + ordinary E2E only. Release candidate preparation executes that repository gate plus strict OpenSpec once, then builds the release-version binaries immediately before `--no-build` packing; this matters because repository acceptance recompiles the ordinary development-version outputs. It records the passed gates after the candidate manifest exists and does not rerun Checkpoint B through generic acceptance. The final evidence job consumes the recorded repository-gate artifact instead of repeating acceptance.
 
 ## Decision 6: timeout must bound descendants
 

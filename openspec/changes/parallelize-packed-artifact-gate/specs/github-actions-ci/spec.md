@@ -27,7 +27,7 @@ The existing authoritative check contexts `Packed Artifact Test Suite (Windows)`
 
 ### Requirement: Release workflow separates repository correctness from immutable packed-candidate proof
 
-The release workflow SHALL execute repository lint/unit/ordinary-E2E correctness and strict OpenSpec validation once, bind those passed results to the immutable candidate manifest, and SHALL validate the packed candidate separately through the Checkpoint B platform/shard matrix. Generic repository-acceptance stages SHALL NOT rerun the packed-artifact scenario matrix before or after the authoritative immutable-candidate Checkpoint B execution.
+The release workflow SHALL execute repository lint/unit/ordinary-E2E correctness and strict OpenSpec validation once, build version-bound candidate binaries after any repository gate that recompiles ordinary development-version outputs, bind those passed results to the immutable candidate manifest, and SHALL validate the packed candidate separately through the Checkpoint B platform/shard matrix. Generic repository-acceptance stages SHALL NOT rerun the packed-artifact scenario matrix before or after the authoritative immutable-candidate Checkpoint B execution.
 
 Local `make acceptance` SHALL remain the complete lint + unit + ordinary E2E + packed-artifact convenience gate.
 
@@ -36,6 +36,12 @@ Local `make acceptance` SHALL remain the complete lint + unit + ordinary E2E + p
 - **WHEN** `prepare-candidate` validates repository correctness before publication authorization
 - **THEN** it runs the repository acceptance surface without packed-artifact proof
 - **AND** it later creates one immutable candidate that the Checkpoint B shards consume
+
+#### Scenario: Repository acceptance recompiles ordinary development-version outputs
+
+- **WHEN** repository acceptance has rebuilt source projects before release packaging
+- **THEN** `prepare-candidate` rebuilds the release-version binaries before its `--no-build` package steps
+- **AND** the installed CLI reports the manifest-bound candidate version
 
 #### Scenario: Evidence aggregation does not rerun acceptance
 
