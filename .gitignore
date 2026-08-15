@@ -54,8 +54,11 @@ opencode.json
 # graphify generated knowledge graph
 graphify-out/
 
-# Local NuGet packages (built by make pack)
-nupkg/
+# Local NuGet packages (built by make pack). Keep the feed directory itself in clean checkouts
+# because nuget.config always declares ./nupkg as a source; package payloads stay ignored by the
+# global *.nupkg/*.snupkg rules above.
+nupkg/*
+!nupkg/.gitkeep
 
 # Python
 .venv/

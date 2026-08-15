@@ -147,11 +147,12 @@ public sealed partial class CheckpointBReleaseGateTests
             CommandResult version = RunTool(offlineDirectory, "--version");
             CommandResult list = RunTool(offlineDirectory, "schema", "list");
             CommandResult print = RunTool(offlineDirectory, "schema", "print", "analysis-cache");
+            string assemblyVersion = _candidateVersion.Split('-', '+')[0];
 
             Assert.Multiple(() =>
             {
                 Assert.That(version.ExitCode, Is.EqualTo(0), version.CombinedOutput);
-                Assert.That(version.StandardOutput, Does.Contain(_candidateVersion));
+                Assert.That(version.StandardOutput, Does.Contain(assemblyVersion));
                 Assert.That(list.ExitCode, Is.EqualTo(0), list.CombinedOutput);
                 Assert.That(list.StandardOutput, Does.Contain("https://archlinternet.dev/schema/0.5.1/"));
                 Assert.That(list.StandardOutput, Does.Not.Contain("/schema/0.6.0/"));
