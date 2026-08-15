@@ -1,5 +1,3 @@
-using ArchLinterNet.CEL.Compilation;
-
 namespace ArchLinterNet.Core.Model;
 
 // A plain data marker recording that a contextual dependency/allow-only contract's selector
@@ -30,10 +28,10 @@ public sealed record ArchitectureContextualConsumerReference(
     string? WhenContractName = null,
     string? SourceWhenContractName = null)
 {
-    // Kept internal (unlike the positional properties above) so the compiled CEL predicate — an
-    // ArchLinterNet.CEL engine type — never appears on this Core model's public surface, matching
-    // ArchitectureContextSelector.CompiledWhen's own internal visibility.
-    internal CelCompiledPredicate? CompiledWhen { get; init; }
+    // Kept internal (unlike the positional properties above) so the compiled CEL predicate never
+    // appears on this Core model's public surface or dependency graph. The Execution seam restores
+    // its concrete type before evaluating the selector.
+    internal object? CompiledWhen { get; init; }
 
-    internal CelCompiledPredicate? SourceCompiledWhen { get; init; }
+    internal object? SourceCompiledWhen { get; init; }
 }

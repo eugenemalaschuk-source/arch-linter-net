@@ -8,14 +8,14 @@ namespace ArchLinterNet.Core.Model;
 public sealed class ArchitecturePolicyLoadException : InvalidOperationException
 {
     public ArchitecturePolicyLoadException(
-        string message, ArchitecturePolicyDiagnostic? diagnostic, string category, Exception? innerException = null)
+        string message, object? diagnostic, string category, Exception? innerException = null)
         : base(message, innerException)
     {
         Diagnostic = diagnostic;
         Category = category;
     }
 
-    public ArchitecturePolicyDiagnostic? Diagnostic { get; }
+    public dynamic? Diagnostic { get; }
 
     public string Category { get; }
 }

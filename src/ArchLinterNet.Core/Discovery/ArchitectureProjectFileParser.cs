@@ -7,11 +7,6 @@ using Microsoft.CodeAnalysis.CSharp.Syntax;
 
 namespace ArchLinterNet.Core.Discovery;
 
-internal interface IArchitectureProjectFileParser
-{
-    DiscoveredProjectFile Parse(string projectPath, IArchitectureFileSystem? fileSystem = null);
-}
-
 internal sealed class ArchitectureProjectFileParser : IArchitectureProjectFileParser
 {
     private static readonly char[] _pathSeparators = [Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar];

@@ -115,7 +115,7 @@ public sealed class ArchitectureValidationApplicationService(
             }
             catch (ArchitecturePolicyImportException ex)
             {
-                throw new ArchitecturePolicyLoadException(ex.Message, ex.Diagnostic, ex.Category.ToString(), ex);
+                throw new ArchitecturePolicyLoadException(ex.Message, ex.Diagnostic, ex.Category.ToString() ?? "unknown", ex);
             }
 
             request.CancellationToken.ThrowIfCancellationRequested();

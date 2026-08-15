@@ -7,29 +7,6 @@ using ArchLinterNet.Core.IO.Abstractions;
 
 namespace ArchLinterNet.Core.Execution;
 
-public interface IArchitectureAssemblyResolutionService
-{
-    ResolutionResult Resolve(
-        ArchitectureContractDocument document,
-        string repositoryRoot,
-        ProjectDiscoveryResult discovery,
-        bool resolveAssemblyOutputs,
-        string? mode,
-        HashSet<string>? selectedContractIds,
-        CancellationToken cancellationToken = default);
-
-    // The post-ensure-built pass must not reuse a same-simple-name assembly from the process.
-    ResolutionResult ResolvePostBuild(
-        ArchitectureContractDocument document,
-        string repositoryRoot,
-        ProjectDiscoveryResult discovery,
-        bool resolveAssemblyOutputs,
-        string? mode,
-        HashSet<string>? selectedContractIds,
-        CancellationToken cancellationToken = default,
-        IReadOnlyDictionary<string, string>? expectedArtifactContentDigests = null);
-}
-
 public sealed class ArchitectureAssemblyResolutionService : IArchitectureAssemblyResolutionService
 {
     private const string AssemblySearchPathsEnvVar = "ARCHITECTURE_ASSEMBLY_SEARCH_PATHS";

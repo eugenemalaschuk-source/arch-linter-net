@@ -233,7 +233,7 @@ internal static partial class LayoutConventionChecker
         foreach (ArchitectureDeclaredTypeSourceAmbiguity ambiguity in context.SourceFileFactIndex.Ambiguities
                      .OrderBy(a => a.FullTypeName, StringComparer.Ordinal))
         {
-            if (!IsUnresolvableAmbiguousMatch(matcher, context, ambiguity, typesByIdentity))
+            if (!IsUnresolvableAmbiguousMatch(contract, matcher, context, ambiguity, typesByIdentity))
             {
                 continue;
             }
@@ -261,6 +261,7 @@ internal static partial class LayoutConventionChecker
     }
 
     private static bool IsUnresolvableAmbiguousMatch(
+        ArchitectureLayoutConventionContract contract,
         ArchitectureLayoutFileMatcher matcher,
         ArchitectureCheckerContext context,
         ArchitectureDeclaredTypeSourceAmbiguity ambiguity,
@@ -277,6 +278,11 @@ internal static partial class LayoutConventionChecker
             return false;
         }
 
+        if (!CanProduceViolationForAmbiguousFact(contract, fact))
+        {
+            return false;
+        }
+
         if (!string.IsNullOrEmpty(matcher.NamespaceSegment)
             && !fact.NamespaceSegments.Contains(matcher.NamespaceSegment, StringComparer.Ordinal))
         {
@@ -284,6 +290,30 @@ internal static partial class LayoutConventionChecker
         }
 
         return MatchesWhenForAmbiguity(matcher, context, ambiguity, typesByIdentity);
+    }
+
+    // A source-path ambiguity is only actionable when this fact could violate at least one
+    // expectation. For a forbid-only rule, reporting an ambiguous partial class under
+    // `forbid_type_kind: interface` is noise: its CLR/Roslyn type kind already proves it cannot
+    // fail the rule, regardless of which candidate file supplied its path facts.
+    private static bool CanProduceViolationForAmbiguousFact(
+        ArchitectureLayoutConventionContract contract,
+        ArchitectureDeclaredTypeFact fact)
+    {
+        bool hasExpectationOtherThanForbiddenKind = !string.IsNullOrEmpty(contract.RequireTypeKind)
+            || !string.IsNullOrEmpty(contract.RequiredNameSuffix)
+            || !string.IsNullOrEmpty(contract.RequiredNamePrefix)
+            || !string.IsNullOrEmpty(contract.ForbiddenNameSuffix)
+            || !string.IsNullOrEmpty(contract.ForbiddenNamePrefix)
+            || contract.RequireTypeNameMatchesFileName
+            || contract.RequireMatchingInterface is not null;
+        if (hasExpectationOtherThanForbiddenKind || string.IsNullOrEmpty(contract.ForbidTypeKind))
+        {
+            return true;
+        }
+
+        ArchitectureTypeKind forbiddenKind = ParseTypeKind(contract.ForbidTypeKind);
+        return forbiddenKind == ArchitectureTypeKind.Record || fact.TypeKind == forbiddenKind;
     }
 
     private static bool MatchesWhenForAmbiguity(

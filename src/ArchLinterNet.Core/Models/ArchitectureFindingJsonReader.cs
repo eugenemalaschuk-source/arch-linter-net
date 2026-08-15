@@ -27,8 +27,6 @@ public sealed record ArchitectureFindingReadEnvelope(
     public string ToJson() => RawEnvelope.GetRawText();
 }
 
-public sealed class ArchitectureFindingFormatException(string message) : InvalidOperationException(message);
-
 /// <summary>
 /// Reads the stable envelope without binding details to CLR subtype names. Supported kinds remain
 /// available to higher-level typed consumers; unknown v1 kinds are retained as opaque payloads in

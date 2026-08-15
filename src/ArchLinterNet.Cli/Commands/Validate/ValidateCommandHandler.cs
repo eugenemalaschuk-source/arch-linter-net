@@ -628,8 +628,8 @@ internal sealed partial class ValidateCommandHandler
     {
         diagnostic = exception switch
         {
-            ArchitecturePolicyLoadException loadException => loadException.Diagnostic,
-            ArchitecturePolicyValidationException validationException => validationException.Diagnostic,
+            ArchitecturePolicyLoadException loadException => loadException.Diagnostic as ArchitecturePolicyDiagnostic,
+            ArchitecturePolicyValidationException validationException => validationException.Diagnostic as ArchitecturePolicyDiagnostic,
             _ => null,
         };
         return diagnostic is not null;

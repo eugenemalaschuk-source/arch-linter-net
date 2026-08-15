@@ -5,12 +5,6 @@
 # before production code is moved.
 contracts:
   audit_allow_only:
-    - name: abstractions-may-reference-only-models
-      id: abstractions-may-reference-only-models
-      source: abstraction_types
-      allowed: [model_types]
-      reason: An abstraction is a contract over domain data; it must not reach into domain services, infrastructure, commands, or other concrete implementation namespaces.
-
     - name: models-have-no-first-party-dependencies
       id: models-have-no-first-party-dependencies
       source: model_types

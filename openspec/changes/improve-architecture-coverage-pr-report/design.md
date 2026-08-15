@@ -32,6 +32,9 @@ only `coverage_summary`, so a failing comment hides the direct evidence that tri
 4. The status header and Failed rules section precede the existing aggregate and new-code tables;
    the existing tables remain secondary operational context. The workflow appends a link to its
    run artifacts when posting the compact output.
+5. Repair policy-integrity failures before treating resulting audit diagnostics as source
+   violations. Then remediate violations in governed C# code, linter tooling, and CI inputs, while
+   preserving the declared policy semantics.
 
 ## Risks / Trade-offs
 
@@ -41,6 +44,8 @@ only `coverage_summary`, so a failing comment hides the direct evidence that tri
   sort all groups, show omitted counts, and link to the full artifact.
 - [Coverage fallback could duplicate structured diagnostics] -> use it only when the structured
   `coverage_findings` array is absent or empty.
+- [A policy repair masks a real violation] -> keep role classification and coverage input sets
+  explicit, then run strict validation to expose and fix the resulting diagnostics.
 
 ## Migration Plan
 

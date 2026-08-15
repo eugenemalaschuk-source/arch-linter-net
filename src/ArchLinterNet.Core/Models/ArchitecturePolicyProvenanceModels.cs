@@ -46,17 +46,3 @@ public sealed record ArchitecturePolicyDiagnostic(
     ArchitecturePolicySourceLocation? Location,
     IReadOnlyList<ArchitecturePolicySourceLocation> RelatedLocations,
     IReadOnlyList<string> ImportChain);
-
-public sealed class ArchitecturePolicyValidationException : InvalidOperationException
-{
-    public ArchitecturePolicyValidationException(
-        string message,
-        ArchitecturePolicyDiagnostic diagnostic,
-        Exception innerException)
-        : base(message, innerException)
-    {
-        Diagnostic = diagnostic;
-    }
-
-    public ArchitecturePolicyDiagnostic Diagnostic { get; }
-}

@@ -534,6 +534,22 @@ public sealed partial class LayoutConventionContractTests
         Assert.That(violations.Any(v => v.SourceType.Contains("PartialOffender", StringComparison.Ordinal)), Is.False);
     }
 
+    [Test]
+    public void CheckLayoutConventionsContract_AmbiguousPartialClass_CannotViolateForbiddenInterface_IsNotReported()
+    {
+        var contract = new ArchitectureLayoutConventionContract
+        {
+            Name = "services-must-not-contain-interfaces",
+            FilesMatching = new ArchitectureLayoutFileMatcher { FolderSegment = "Services" },
+            ForbidTypeKind = "interface"
+        };
+        var runner = new ArchitectureContractRunner(CreateContext(), CreateDocument(contract));
+
+        var violations = runner.Session.CheckLayoutConventionsContract(contract);
+
+        Assert.That(violations.Any(v => v.SourceType.Contains("PartialOffender", StringComparison.Ordinal)), Is.False);
+    }
+
     // Regression: reflection alone classifies records as Class/Struct (see source-file-fact-index) -
     // a record type with no resolvable source file must not silently pass forbid_type_kind: record.
     [Test]

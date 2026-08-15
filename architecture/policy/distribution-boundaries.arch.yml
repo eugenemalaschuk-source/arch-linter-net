@@ -4,8 +4,8 @@
 # boundaries that define how the shipped artifacts may be composed.
 contracts:
   strict_external:
-    # One authored rule per external boundary, expanded across every declared layer through the
-    # all_declared_layers source set. Exclusions name the exact layers where the dependency is the
+    # One authored rule per external boundary, expanded across every declared namespace layer through
+    # the all_declared_layers source set. Exclusions name the exact layers where the dependency is the
     # architecture, not a leak: `core` is the umbrella namespace that contains the allowed child
     # layer, so it is subtracted alongside it.
     - name: di-container-stays-in-the-composition-boundary
@@ -122,4 +122,3 @@ contracts:
       source_sets: [shipped_assemblies]
       allowed: [base_runtime_framework]
       reason: Every shipped project carries only the implicit base runtime framework. Adopting a shared framework such as Microsoft.AspNetCore.App or Microsoft.WindowsDesktop.App would silently narrow which hosts can consume the packages.
-

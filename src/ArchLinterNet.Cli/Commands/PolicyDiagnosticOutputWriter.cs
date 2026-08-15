@@ -11,8 +11,8 @@ internal static class PolicyDiagnosticOutputWriter
     {
         (ArchitecturePolicyDiagnostic? Diagnostic, string? Category) policyError = exception switch
         {
-            ArchitecturePolicyLoadException loadException => (loadException.Diagnostic, loadException.Category),
-            ArchitecturePolicyValidationException validationException => (validationException.Diagnostic, null),
+            ArchitecturePolicyLoadException loadException => (loadException.Diagnostic as ArchitecturePolicyDiagnostic, loadException.Category),
+            ArchitecturePolicyValidationException validationException => (validationException.Diagnostic as ArchitecturePolicyDiagnostic, null),
             _ => (null, null),
         };
         if (policyError.Diagnostic is null)
@@ -55,8 +55,8 @@ internal static class PolicyDiagnosticOutputWriter
     {
         ArchitecturePolicyDiagnostic? diagnostic = exception switch
         {
-            ArchitecturePolicyLoadException loadException => loadException.Diagnostic,
-            ArchitecturePolicyValidationException validationException => validationException.Diagnostic,
+            ArchitecturePolicyLoadException loadException => loadException.Diagnostic as ArchitecturePolicyDiagnostic,
+            ArchitecturePolicyValidationException validationException => validationException.Diagnostic as ArchitecturePolicyDiagnostic,
             _ => null,
         };
         if (diagnostic is null)

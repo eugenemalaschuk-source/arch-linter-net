@@ -115,10 +115,12 @@ outputs are not part of the analysed assembly set. `samples/` contains no projec
 These are behaviours confirmed against the current engine, recorded so future self-policy work does
 not re-derive them or author policy that looks plausible but is not executable.
 
-1. **Layer-kind source-set globs cannot express "every declared layer."** Layer globs use the
-   dot-segment grammar (`Bare wildcard '*' is not allowed`, `Partial segment wildcard 'core*' is not allowed`). Because every layer key here is a single underscore-joined segment, `all_declared_layers`
-   lists its members explicitly. A newly declared layer must be added to that list; the omission is a
-   one-line review signal next to the layer declaration, not an automatic escape.
+1. **Layer-kind source-set globs cannot express every declared namespace layer.** Layer globs use
+   the dot-segment grammar (`Bare wildcard '*' is not allowed`, `Partial segment wildcard 'core*' is not allowed`). Because every namespace-layer key here is a single underscore-joined segment,
+   `all_declared_layers` lists its members explicitly. Semantic role selectors do not provide a
+   namespace coverage input, so they are governed through their enclosing namespace layers. A newly
+   declared namespace layer must be added to that list; the omission is a one-line review signal next
+   to the layer declaration, not an automatic escape.
 1. **`scope: rule_input` coverage accepts only dependency, layer, allow-only, cycle, method-body,
    independence, protected-surface, and external contract IDs.** Assembly, package, framework,
    project-metadata, type-placement, interface-implementation, public-api, and coverage contracts are

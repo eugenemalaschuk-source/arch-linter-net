@@ -534,8 +534,8 @@ ctor ArchLinterNet.Core.Contracts.ArchitectureNamespaceClassificationMapping()
 ctor ArchLinterNet.Core.Contracts.ArchitecturePackageGroup()
 ctor ArchLinterNet.Core.Contracts.ArchitecturePolicyDocumentLoader()
 ctor ArchLinterNet.Core.Contracts.ArchitecturePolicyDocumentLoader(ArchLinterNet.Core.IO.Abstractions.IArchitectureFileSystem)
-ctor ArchLinterNet.Core.Contracts.ArchitecturePolicyImportException(ArchLinterNet.Core.Contracts.ArchitecturePolicyImportErrorCategory, System.String)
-ctor ArchLinterNet.Core.Contracts.ArchitecturePolicyImportException(ArchLinterNet.Core.Contracts.ArchitecturePolicyImportErrorCategory, System.String, ArchLinterNet.Core.Model.ArchitecturePolicyDiagnostic)
+ctor ArchLinterNet.Core.Contracts.ArchitecturePolicyImportException(System.Object, System.String)
+ctor ArchLinterNet.Core.Contracts.ArchitecturePolicyImportException(System.Object, System.String, System.Object)
 ctor ArchLinterNet.Core.Contracts.ArchitectureSourceExpandableContractBase() [visibility:protected]
 ctor ArchLinterNet.Core.Contracts.ArchitectureSourceSet()
 ctor ArchLinterNet.Core.Contracts.ConditionSetResolutionService()
@@ -650,10 +650,10 @@ ctor ArchLinterNet.Core.Model.ArchitectureGraphEdge(System.String, System.String
 ctor ArchLinterNet.Core.Model.ArchitectureGraphNode(System.String, ArchLinterNet.Core.Model.ArchitectureGraphNodeKind)
 ctor ArchLinterNet.Core.Model.ArchitecturePolicyDiagnostic(ArchLinterNet.Core.Model.ArchitecturePolicyDiagnosticKind, ArchLinterNet.Core.Model.ArchitecturePolicySourceLocation, System.Collections.Generic.IReadOnlyList`1[ArchLinterNet.Core.Model.ArchitecturePolicySourceLocation], System.Collections.Generic.IReadOnlyList`1[System.String])
 ctor ArchLinterNet.Core.Model.ArchitecturePolicyErrorDiagnostic(System.String, ArchLinterNet.Core.Model.ArchitecturePolicyDiagnosticKind, System.String, System.Collections.Generic.IReadOnlyList`1[System.String])
-ctor ArchLinterNet.Core.Model.ArchitecturePolicyLoadException(System.String, ArchLinterNet.Core.Model.ArchitecturePolicyDiagnostic, System.String, System.Exception)
+ctor ArchLinterNet.Core.Model.ArchitecturePolicyLoadException(System.String, System.Object, System.String, System.Exception)
 ctor ArchLinterNet.Core.Model.ArchitecturePolicySourceDescriptor(System.String, System.String, ArchLinterNet.Core.Model.ArchitecturePolicyDocumentRole, System.Int32, System.String, System.String, System.Collections.Generic.IReadOnlyList`1[System.String])
 ctor ArchLinterNet.Core.Model.ArchitecturePolicySourceLocation(ArchLinterNet.Core.Model.ArchitecturePolicySourceDescriptor, System.String, System.Int32, System.Int32, System.String, System.String, System.Int32)
-ctor ArchLinterNet.Core.Model.ArchitecturePolicyValidationException(System.String, ArchLinterNet.Core.Model.ArchitecturePolicyDiagnostic, System.Exception)
+ctor ArchLinterNet.Core.Model.ArchitecturePolicyValidationException(System.String, System.Object, System.Exception)
 ctor ArchLinterNet.Core.Model.ArchitectureSourceExpansionInventory(System.Collections.Generic.IReadOnlyList`1[ArchLinterNet.Core.Model.ArchitectureSourceSetResolution], System.Collections.Generic.IReadOnlyList`1[ArchLinterNet.Core.Model.ArchitectureContractExpansion])
 ctor ArchLinterNet.Core.Model.ArchitectureSourceExpansionOrigin(System.String, System.String, System.String, System.String, System.String)
 ctor ArchLinterNet.Core.Model.ArchitectureSourceSetResolution(System.String, ArchLinterNet.Core.Model.ArchitectureSourceSetKind, System.Collections.Generic.IReadOnlyList`1[System.String], System.Boolean, System.String)
@@ -1595,8 +1595,8 @@ property ArchLinterNet.Core.Contracts.ArchitectureNamespaceClassificationMapping
 property ArchLinterNet.Core.Contracts.ArchitectureNamespaceClassificationMapping.Role: System.String [get, set]
 property ArchLinterNet.Core.Contracts.ArchitecturePackageGroup.PackageIds: System.Collections.Generic.List`1[System.String] [get, set]
 property ArchLinterNet.Core.Contracts.ArchitecturePackageGroup.PackagePrefixes: System.Collections.Generic.List`1[System.String] [get, set]
-property ArchLinterNet.Core.Contracts.ArchitecturePolicyImportException.Category: ArchLinterNet.Core.Contracts.ArchitecturePolicyImportErrorCategory [get]
-property ArchLinterNet.Core.Contracts.ArchitecturePolicyImportException.Diagnostic: ArchLinterNet.Core.Model.ArchitecturePolicyDiagnostic [get]
+property ArchLinterNet.Core.Contracts.ArchitecturePolicyImportException.Category: System.Object [get]
+property ArchLinterNet.Core.Contracts.ArchitecturePolicyImportException.Diagnostic: System.Object [get]
 property ArchLinterNet.Core.Contracts.ArchitecturePolicyProvenanceIndex.Empty: ArchLinterNet.Core.Contracts.ArchitecturePolicyProvenanceIndex [static, get]
 property ArchLinterNet.Core.Contracts.ArchitecturePolicyProvenanceIndex.HasImports: System.Boolean [get]
 property ArchLinterNet.Core.Contracts.ArchitecturePolicyProvenanceIndex.Nodes: System.Collections.Generic.IReadOnlyDictionary`2[System.String,ArchLinterNet.Core.Model.ArchitecturePolicySourceLocation] [get]
@@ -2260,7 +2260,7 @@ property ArchLinterNet.Core.Model.ArchitecturePolicyErrorDiagnostic.ImportChain:
 property ArchLinterNet.Core.Model.ArchitecturePolicyErrorDiagnostic.Kind: ArchLinterNet.Core.Model.ArchitectureDiagnosticKind [override, get]
 property ArchLinterNet.Core.Model.ArchitecturePolicyErrorDiagnostic.Message: System.String [get, init]
 property ArchLinterNet.Core.Model.ArchitecturePolicyLoadException.Category: System.String [get]
-property ArchLinterNet.Core.Model.ArchitecturePolicyLoadException.Diagnostic: ArchLinterNet.Core.Model.ArchitecturePolicyDiagnostic [get]
+property ArchLinterNet.Core.Model.ArchitecturePolicyLoadException.Diagnostic: System.Object [get]
 property ArchLinterNet.Core.Model.ArchitecturePolicySourceDescriptor.AuthoredImportPath: System.String [get, init]
 property ArchLinterNet.Core.Model.ArchitecturePolicySourceDescriptor.DeclaringSourcePath: System.String [get, init]
 property ArchLinterNet.Core.Model.ArchitecturePolicySourceDescriptor.ImportChain: System.Collections.Generic.IReadOnlyList`1[System.String] [get, init]
@@ -2279,7 +2279,7 @@ property ArchLinterNet.Core.Model.ArchitecturePolicySourceLocation.Source: ArchL
 property ArchLinterNet.Core.Model.ArchitecturePolicySourceLocation.SourceOrdinal: System.Int32 [get]
 property ArchLinterNet.Core.Model.ArchitecturePolicySourceLocation.SourcePath: System.String [get]
 property ArchLinterNet.Core.Model.ArchitecturePolicySourceLocation.YamlPath: System.String [get, init]
-property ArchLinterNet.Core.Model.ArchitecturePolicyValidationException.Diagnostic: ArchLinterNet.Core.Model.ArchitecturePolicyDiagnostic [get]
+property ArchLinterNet.Core.Model.ArchitecturePolicyValidationException.Diagnostic: System.Object [get]
 property ArchLinterNet.Core.Model.ArchitectureSourceExpansionInventory.Contracts: System.Collections.Generic.IReadOnlyList`1[ArchLinterNet.Core.Model.ArchitectureContractExpansion] [get]
 property ArchLinterNet.Core.Model.ArchitectureSourceExpansionInventory.Empty: ArchLinterNet.Core.Model.ArchitectureSourceExpansionInventory [static, get]
 property ArchLinterNet.Core.Model.ArchitectureSourceExpansionInventory.IsEmpty: System.Boolean [get]

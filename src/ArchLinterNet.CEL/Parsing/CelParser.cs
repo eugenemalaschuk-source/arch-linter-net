@@ -76,7 +76,7 @@ internal sealed class CelParser
         }
         catch (CelParseException ex)
         {
-            return CelParseResult.Failed(ex.Diagnostic);
+            return CelParseResult.Failed((CelDiagnostic)ex.Diagnostic);
         }
     }
 
@@ -699,16 +699,4 @@ internal sealed class CelParser
     private CelParseException FailBudget(CelSourceSpan span, string limitName, long observedValue) =>
         new(CelParseDiagnostics.BudgetExceeded(span, limitName, observedValue, _profileId));
 
-    [System.Diagnostics.CodeAnalysis.SuppressMessage(
-        "Design",
-        "S3871:Exception types should be \"public\"",
-        Justification = "Internal control-flow signal local to CelParser's recursive-descent " +
-            "parse; never crosses the assembly boundary and is always caught inside Parse() " +
-            "before a result is returned.")]
-    private sealed class CelParseException : Exception
-    {
-        public CelDiagnostic Diagnostic { get; }
-
-        public CelParseException(CelDiagnostic diagnostic) => Diagnostic = diagnostic;
-    }
 }

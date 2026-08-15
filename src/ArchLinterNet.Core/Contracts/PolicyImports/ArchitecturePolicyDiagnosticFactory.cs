@@ -76,7 +76,7 @@ internal static class ArchitecturePolicyDiagnosticFactory
             return exception;
         }
 
-        return Exception(exception.Category, exception.Message, location, importChain: importChain);
+        return Exception(CategoryOf(exception), exception.Message, location, importChain: importChain);
     }
 
     public static ArchitecturePolicyImportException EnrichRoot(
@@ -84,14 +84,14 @@ internal static class ArchitecturePolicyDiagnosticFactory
         ArchitecturePolicySourceDescriptor root)
     {
         return Exception(
-            exception.Category,
+            CategoryOf(exception),
             RootMessage(exception, root.SourcePath),
             Location(root));
     }
 
     private static string RootMessage(ArchitecturePolicyImportException exception, string sourcePath)
     {
-        return exception.Category switch
+        return CategoryOf(exception) switch
         {
             ArchitecturePolicyImportErrorCategory.MissingFile => $"Root policy file not found: {sourcePath}",
             ArchitecturePolicyImportErrorCategory.SourceShape =>
@@ -115,6 +115,13 @@ internal static class ArchitecturePolicyDiagnosticFactory
         return start >= 0 && trimmed.EndsWith(')')
             ? trimmed[(start + 1)..^1]
             : "native error";
+    }
+
+    private static ArchitecturePolicyImportErrorCategory CategoryOf(ArchitecturePolicyImportException exception)
+    {
+        return (object)exception.Category is ArchitecturePolicyImportErrorCategory category
+            ? category
+            : throw new InvalidOperationException("Architecture policy import exception has an invalid category.");
     }
 
     private static ArchitecturePolicyDiagnosticKind KindFor(ArchitecturePolicyImportErrorCategory category)

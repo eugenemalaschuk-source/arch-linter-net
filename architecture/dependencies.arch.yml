@@ -24,12 +24,6 @@ classification:
       role: Model
     - namespace: ArchLinterNet.Cli.*.Models
       role: Model
-    - namespace: ArchLinterNet.Core.*.Abstractions
-      role: Abstraction
-    - namespace: ArchLinterNet.Cli.Abstractions
-      role: Abstraction
-    - namespace: ArchLinterNet.Cli.Commands.*.Abstractions
-      role: Abstraction
 
 layers:
   core:
@@ -66,27 +60,10 @@ layers:
     selector:
       role: Model
     overlaps_with: [core, core_model]
-  abstraction_types:
-    selector:
-      role: Abstraction
-    overlaps_with:
-      - core
-      - core_asmdef
-      - core_contracts
-      - core_discovery
-      - core_execution
-      - core_graph
-      - core_io
-      - core_resolution
-      - core_scanning
-      - core_validation
-      - cli
-      - cli_abstractions
-      - cli_commands
   exception_types:
     selector:
       role: Exception
-    overlaps_with: [core, core_contracts, core_model, core_resolution]
+    overlaps_with: [cel, core, core_contracts, core_model, core_resolution]
   cli:
     namespace: ArchLinterNet.Cli
   cli_abstractions:
@@ -141,10 +118,11 @@ framework_references:
 # against a declared policy input (layer keys, analysis.target_assemblies, or the solution-discovered
 # project inventory) and fails closed when a selector stops matching.
 source_sets:
-  # Layer-kind selectors resolve against declared `layers` keys using dot-segment globs; because
-  # every layer key here is a single underscore-joined segment, no glob can express "every declared
-  # layer" and the inventory is listed explicitly. Adding a layer above without adding it here is
-  # visible in review as a one-line omission next to the layer declaration.
+  # Layer-kind selectors resolve against declared `layers` keys using dot-segment globs. This
+  # namespace-boundary inventory is explicit because its underscore-joined keys cannot be selected
+  # with one glob. Semantic role selectors have no namespace coverage input and remain governed by
+  # their enclosing namespace layer; adding a namespace layer above without adding it here remains
+  # visible in review as a one-line omission.
   all_declared_layers:
     kind: layer
     members:
@@ -163,9 +141,6 @@ source_sets:
       - core_asmdef
       - core_composition
       - core_schema
-      - model_types
-      - abstraction_types
-      - exception_types
       - cli
       - cli_abstractions
       - cli_infrastructure

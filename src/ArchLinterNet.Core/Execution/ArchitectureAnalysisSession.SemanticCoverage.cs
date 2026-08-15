@@ -219,7 +219,8 @@ public sealed partial class ArchitectureAnalysisSession
     private bool MatchesContextualConsumer(ArchitectureContextualConsumerReference consumer, Type type)
     {
         ArchitectureContextSelector selector = CreateContextualSelector(
-            consumer.Role, consumer.Metadata, consumer.When, consumer.CompiledWhen,
+            consumer.Role, consumer.Metadata, consumer.When,
+            consumer.CompiledWhen as ArchLinterNet.CEL.Compilation.CelCompiledPredicate,
             consumer.WhenLocation, consumer.WhenContractName);
         if (consumer.SourceRole == null)
         {
@@ -228,7 +229,8 @@ public sealed partial class ArchitectureAnalysisSession
         }
 
         ArchitectureContextSelector sourceSelector = CreateContextualSelector(
-            consumer.SourceRole, consumer.SourceMetadata!, consumer.SourceWhen, consumer.SourceCompiledWhen,
+            consumer.SourceRole, consumer.SourceMetadata!, consumer.SourceWhen,
+            consumer.SourceCompiledWhen as ArchLinterNet.CEL.Compilation.CelCompiledPredicate,
             consumer.SourceWhenLocation, consumer.SourceWhenContractName);
         return RoleIndex.ClassifiedTypes().Any(sourceType =>
             RoleIndex.TryGetRole(sourceType, out ArchitectureTypeClassificationResult sourceDescriptor)

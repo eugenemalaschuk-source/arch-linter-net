@@ -8,3 +8,9 @@
 
 - [x] 2.1 Add script-level tests for grouping, full-detail rendering, compact truncation, fallback, and passing output.
 - [x] 2.2 Run the focused report-generator tests and OpenSpec validation.
+
+## 3. Self-policy remediation
+
+- [x] 3.1 Repair self-policy classification overlap and stale rule-input coverage references.
+- [x] 3.2 Run strict validation and remediate the resulting C# source-layout and purity violations.
+- [x] 3.3 Remediate resulting linter and CI policy violations, then run focused validation.
