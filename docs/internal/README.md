@@ -14,6 +14,8 @@ It is intentionally excluded from the public MkDocs/GitHub Pages product site.
 
 - [Analysis and build-state blueprint](analysis-build-state-blueprint.md) — portable fingerprint identity, artifact verification, explicit preparation, immutable snapshot ownership, and downstream constraints for #362/#363/#365/#374/#375 (#355/#387).
 
+- [Release Architecture Forensics theory](release-forensics.md) — deterministic Git-range evidence, scoring, report semantics, and interpretation limits for the planned #234 workstream.
+
 - [0.5.1 adoption-stabilization compatibility blueprint](adoption-stabilization-compatibility.md) — release-level identity, schemas, findings, output, cache, profiling, cancellation, support evidence, and final consistency contract for #354/#355.
 
 - [0.5.1 adoption-stabilization consistency audit](adoption-stabilization-consistency-audit.md) — final reconciliation, archived child-owned OpenSpec correction, and the Checkpoint B handoff for #411.
