@@ -1,4 +1,5 @@
 using ArchLinterNet.Core.Contracts.Families;
+using Microsoft.CodeAnalysis.CSharp;
 
 namespace ArchLinterNet.Core.Contracts.Validators;
 
@@ -11,7 +12,7 @@ internal sealed class ModuleContainerValidator : IArchitecturePolicyDocumentVali
         foreach (ArchitectureModuleContainerContract contract in document.Provenance.Track(
                      document.Contracts.StrictModuleContainers.Concat(document.Contracts.AuditModuleContainers)))
         {
-            if (string.IsNullOrWhiteSpace(contract.Container) || contract.Container.EndsWith(".", StringComparison.Ordinal))
+            if (!IsValidContainerNamespace(contract.Container))
             {
                 throw new InvalidOperationException(
                     $"Module container contract '{contract.Name}' requires a non-empty dot-separated container namespace.");
@@ -26,6 +27,12 @@ internal sealed class ModuleContainerValidator : IArchitecturePolicyDocumentVali
             ValidateTypeNames(contract, contract.AllowedContainerRootTypes, "allowed_container_root_types");
             ValidateTypeNames(contract, contract.AllowedModuleRootTypes, "allowed_module_root_types");
         }
+    }
+
+    private static bool IsValidContainerNamespace(string container)
+    {
+        return !string.IsNullOrWhiteSpace(container)
+            && container.Split('.').All(SyntaxFacts.IsValidIdentifier);
     }
 
     private static void ValidateTypeNames(

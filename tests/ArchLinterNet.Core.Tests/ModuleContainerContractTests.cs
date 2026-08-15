@@ -104,6 +104,7 @@ public sealed class ModuleContainerContractTests
         {
             "<module-root:Orders>",
             "<generic-module:Common>",
+            "<generic-module:common>",
             "<undeclared-segment:Infrastructure>",
         }));
     }
@@ -139,6 +140,9 @@ contracts:
     }
 
     [TestCase("", "cli_command", "non-empty dot-separated container namespace")]
+    [TestCase("ArchLinterNet..Cli.Commands", "cli_command", "non-empty dot-separated container namespace")]
+    [TestCase("ArchLinterNet.Cli. Commands", "cli_command", "non-empty dot-separated container namespace")]
+    [TestCase("ArchLinterNet.Cli.*", "cli_command", "non-empty dot-separated container namespace")]
     [TestCase("ArchLinterNet.Cli.Commands", "unsupported", "unsupported profile")]
     public void ContractLoader_InvalidModuleContainerConfiguration_Throws(string container, string profile, string expectedMessage)
     {

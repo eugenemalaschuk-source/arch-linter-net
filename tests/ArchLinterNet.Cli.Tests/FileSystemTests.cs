@@ -143,6 +143,44 @@ public sealed class FileSystemTests
     }
 
     [Test]
+    public void TryRenameTempToNewTarget_DoesNotOverwriteAnExistingTarget()
+    {
+        var fs = new FileSystem();
+        string tempPath = Path.Combine(_tempRoot, "source.tmp");
+        string targetPath = Path.Combine(_tempRoot, "target.json");
+        File.WriteAllText(tempPath, "new");
+        File.WriteAllText(targetPath, "existing");
+
+        bool moved = fs.TryRenameTempToNewTarget(tempPath, targetPath);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(moved, Is.False);
+            Assert.That(File.ReadAllText(targetPath), Is.EqualTo("existing"));
+            Assert.That(File.Exists(tempPath), Is.True);
+        });
+    }
+
+    [Test]
+    public void TryCreateNewFile_CreatesOnlyTheFirstLockMarker()
+    {
+        var fs = new FileSystem();
+        string lockDirectory = Path.Combine(_tempRoot, "nested");
+        string lockPath = Path.Combine(lockDirectory, ".scaffold.lock");
+        Directory.CreateDirectory(lockDirectory);
+
+        bool firstCreated = fs.TryCreateNewFile(lockPath);
+        bool secondCreated = fs.TryCreateNewFile(lockPath);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(firstCreated, Is.True);
+            Assert.That(secondCreated, Is.False);
+            Assert.That(File.Exists(lockPath), Is.True);
+        });
+    }
+
+    [Test]
     public void DeleteFile_DelegatesToFileSystem()
     {
         var fs = new FileSystem();

@@ -19,6 +19,8 @@ namespace ArchLinterNet.Cli.Tests
                 Assert.That(CliCommandModuleCatalog.IsGovernedModuleCandidate(
                     typeof(ArchLinterNet.Cli.Commands.Common.EntryPoint.GenericBucketCandidate)), Is.False);
                 Assert.That(CliCommandModuleCatalog.IsGovernedModuleCandidate(
+                    typeof(ArchLinterNet.Cli.Commands.common.EntryPoint.LowercaseGenericBucketCandidate)), Is.False);
+                Assert.That(CliCommandModuleCatalog.IsGovernedModuleCandidate(
                     typeof(ArchLinterNet.Cli.Commands.ContainerRootCandidate)), Is.False);
             });
         }
@@ -38,6 +40,11 @@ namespace ArchLinterNet.Cli.Commands.CatalogFixture.Application
 namespace ArchLinterNet.Cli.Commands.Common.EntryPoint
 {
     internal sealed class GenericBucketCandidate;
+}
+
+namespace ArchLinterNet.Cli.Commands.common.EntryPoint
+{
+    internal sealed class LowercaseGenericBucketCandidate;
 }
 
 namespace ArchLinterNet.Cli.Commands

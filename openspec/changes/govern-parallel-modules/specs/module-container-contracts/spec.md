@@ -2,7 +2,7 @@
 
 ### Requirement: Discover direct-child modules from one declared container
 
-The system SHALL support strict and audit module-container contracts that select one declared namespace container and deterministically discover every immediate child namespace containing first-party production types as a module. The contract SHALL govern discovered modules without requiring a hand-maintained layer entry or peer list for each module.
+The system SHALL support strict and audit module-container contracts that select one declared namespace container and deterministically discover every immediate child namespace containing first-party production types as a module. The container value SHALL be a non-empty dot-separated C# namespace identifier without glob or whitespace segments. The contract SHALL govern discovered modules without requiring a hand-maintained layer entry or peer list for each module.
 
 #### Scenario: A new direct child is governed without policy inventory edits
 - **WHEN** production code introduces `ArchLinterNet.Cli.Commands.Inspect` beneath a governed `ArchLinterNet.Cli.Commands` container
@@ -68,7 +68,7 @@ The CLI-command profile SHALL enforce these first-party dependency directions fo
 
 ### Requirement: Generic shared implementation buckets are prohibited
 
-The module-container contract SHALL reject a production namespace segment named `Common`, `Shared`, or `Utils` within a governed module container. Reuse across modules SHALL be introduced only through a reviewed, narrowly named published-contract or shared-kernel namespace outside the container with an owner and a reason in policy.
+The module-container contract SHALL reject a production namespace segment named `Common`, `Shared`, or `Utils`, case-insensitively, within a governed module container. Reuse across modules SHALL be introduced only through a reviewed, narrowly named published-contract or shared-kernel namespace outside the container with an owner and a reason in policy.
 
 #### Scenario: A generic shared bucket is introduced
 - **WHEN** a type is declared in `ArchLinterNet.Cli.Commands.Shared`

@@ -74,6 +74,11 @@ namespace ModuleContainerFixtures.Structure.Common.Models
     public sealed class CommonModel;
 }
 
+namespace ModuleContainerFixtures.Structure.common.Models
+{
+    public sealed class LowercaseCommonModel;
+}
+
 namespace ModuleContainerFixtures.Structure.Payments.Infrastructure
 {
     public sealed class PaymentInfrastructure;

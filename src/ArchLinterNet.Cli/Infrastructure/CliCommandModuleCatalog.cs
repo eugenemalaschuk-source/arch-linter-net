@@ -8,7 +8,7 @@ internal static class CliCommandModuleCatalog
 {
     private const string CommandContainer = "ArchLinterNet.Cli.Commands";
 
-    private static readonly IReadOnlySet<string> _genericModuleNames = new HashSet<string>(StringComparer.Ordinal)
+    private static readonly IReadOnlySet<string> _genericModuleNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
     {
         "Common", "Shared", "Utils",
     };

@@ -37,3 +37,24 @@
 - [x] 5.2 Retire the redundant hand-maintained command layer inventory and sibling-independence contract only after parity tests prove the discovered contract is authoritative; retain source-set and rule-input coverage for the new contract.
 - [x] 5.3 Document the contributor workflow: local module ownership, published-contract/shared-kernel admission criteria, prohibited generic buckets, scaffold usage, and the required policy checks.
 - [x] 5.4 Verify reviewed public API is unchanged, run formatter, policy check, architecture lint, full lint, focused and full tests, and `openspec validate govern-parallel-modules --strict`.
+
+## 6. Self-review hardening
+
+- [x] 6.1 Make ordinary scaffold creation atomic at each target so a race cannot overwrite a newly created source file without `--force`.
+- [x] 6.2 Reject generic module buckets case-insensitively in policy checking and reflection composition.
+- [x] 6.3 Reject malformed module-container namespace values during policy loading.
+- [x] 6.4 Generate a focused scaffold fixture that validates the actual entry-point command module.
+
+## 7. Review follow-up hardening
+
+- [x] 7.1 Make the atomic no-clobber move an explicit requirement of every `IFileSystem` implementation, including test doubles.
+- [x] 7.2 Roll back unchanged files created by an ordinary scaffold invocation when a later target collides, and add regressions for rollback and externally modified-file preservation.
+
+## 8. Second review follow-up hardening
+
+- [x] 8.1 Preserve canonical `/`-separated repository paths in scaffold plans and output on every supported operating system.
+- [x] 8.2 Roll back empty directories created by an aborted ordinary scaffold plan, with a regression using the production filesystem implementation.
+
+## 9. Third review follow-up hardening
+
+- [x] 9.1 Serialize ordinary scaffold invocations with an atomically acquired repository-scoped lock held from preflight through rollback, preventing rollback ownership races and concurrent directory cleanup.

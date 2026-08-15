@@ -14,9 +14,30 @@ internal sealed class ScaffoldCliCommandHandler(ICliConsole console, IFileSystem
         try
         {
             IReadOnlyList<ScaffoldFile> files = CreatePlan(options);
-            EnsureNoCollisions(files, options.Force);
-            WritePlan(files, options.DryRun);
-            return CliExitCodes.Success;
+            if (options.DryRun)
+            {
+                EnsureNoCollisions(files, options.Force);
+                WritePlan(files, dryRun: true, force: options.Force);
+                return CliExitCodes.Success;
+            }
+
+            string lockPath = GetScaffoldLockPath();
+            if (!fileSystem.TryCreateNewFile(lockPath))
+            {
+                throw new InvalidOperationException(
+                    $"Scaffold is already running for this repository. Wait for it to finish before creating module '{options.ModuleName}'.");
+            }
+
+            try
+            {
+                EnsureNoCollisions(files, options.Force);
+                WritePlan(files, dryRun: false, force: options.Force);
+                return CliExitCodes.Success;
+            }
+            finally
+            {
+                DeleteFileBestEffort(lockPath);
+            }
         }
         catch (ArgumentException exception)
         {
@@ -54,7 +75,7 @@ internal sealed class ScaffoldCliCommandHandler(ICliConsole console, IFileSystem
             new(
                 CombineRepositoryPath(TestPath, $"{moduleName}CommandScaffoldTests.cs"),
                 "ArchLinterNet.Cli.Tests.Scaffolded",
-                TestTemplate(moduleName, commandToken)),
+                TestTemplate(moduleName, commandToken, moduleNamespace)),
         };
 
         AddOptionalModel(files, options.ModelName, modulePath, moduleNamespace);
@@ -78,24 +99,143 @@ internal sealed class ScaffoldCliCommandHandler(ICliConsole console, IFileSystem
         }
     }
 
-    private void WritePlan(IReadOnlyList<ScaffoldFile> files, bool dryRun)
+    private static string GetScaffoldLockPath() =>
+        CombineRepositoryPath(CommandContainerPath, ".scaffold.lock");
+
+    private void WritePlan(IReadOnlyList<ScaffoldFile> files, bool dryRun, bool force)
     {
         if (dryRun)
         {
             console.Out.WriteLine("Dry run — no files written.");
+
+            foreach (ScaffoldFile file in files.OrderBy(static file => file.Path, StringComparer.Ordinal))
+            {
+                console.Out.WriteLine($"Would create {file.Path} ({file.Namespace})");
+            }
+
+            console.Out.WriteLine("Run 'make lint-architecture' before committing the generated module.");
+            return;
+        }
+
+        if (force)
+        {
+            WritePlanWithForce(files);
+        }
+        else
+        {
+            WritePlanWithoutForce(files);
+        }
+
+        console.Out.WriteLine("Run 'make lint-architecture' before committing the generated module.");
+    }
+
+    private void WritePlanWithForce(IReadOnlyList<ScaffoldFile> files)
+    {
+        foreach (ScaffoldFile file in files.OrderBy(static file => file.Path, StringComparer.Ordinal))
+        {
+            string temporaryPath = fileSystem.WriteAllTextToTemp(file.Path, file.Contents);
+            fileSystem.RenameTempToTarget(temporaryPath, file.Path);
         }
 
         foreach (ScaffoldFile file in files.OrderBy(static file => file.Path, StringComparer.Ordinal))
         {
-            console.Out.WriteLine($"{(dryRun ? "Would create" : "Created")} {file.Path} ({file.Namespace})");
-            if (!dryRun)
+            console.Out.WriteLine($"Created {file.Path} ({file.Namespace})");
+        }
+    }
+
+    private void WritePlanWithoutForce(IReadOnlyList<ScaffoldFile> files)
+    {
+        var createdFiles = new List<ScaffoldFile>();
+        var createdDirectories = new HashSet<string>(StringComparer.Ordinal);
+
+        try
+        {
+            foreach (ScaffoldFile file in files.OrderBy(static file => file.Path, StringComparer.Ordinal))
             {
+                RecordMissingParentDirectories(file.Path, createdDirectories);
                 string temporaryPath = fileSystem.WriteAllTextToTemp(file.Path, file.Contents);
-                fileSystem.RenameTempToTarget(temporaryPath, file.Path);
+                if (!fileSystem.TryRenameTempToNewTarget(temporaryPath, file.Path))
+                {
+                    DeleteFileBestEffort(temporaryPath);
+                    throw new InvalidOperationException(
+                        $"Scaffold target already exists: '{file.Path}'. Re-run with --force only after reviewing the existing file.");
+                }
+
+                createdFiles.Add(file);
             }
         }
+        catch
+        {
+            RollBackCreatedFilesBestEffort(createdFiles);
+            RollBackCreatedDirectoriesBestEffort(createdDirectories);
+            throw;
+        }
 
-        console.Out.WriteLine("Run 'make lint-architecture' before committing the generated module.");
+        foreach (ScaffoldFile file in createdFiles)
+        {
+            console.Out.WriteLine($"Created {file.Path} ({file.Namespace})");
+        }
+    }
+
+    private void RecordMissingParentDirectories(string path, ISet<string> createdDirectories)
+    {
+        for (string? directory = Path.GetDirectoryName(path);
+             !string.IsNullOrEmpty(directory) && !fileSystem.DirectoryExists(directory);
+             directory = Path.GetDirectoryName(directory))
+        {
+            createdDirectories.Add(directory);
+        }
+    }
+
+    // The repository-scoped scaffold lock serializes ordinary scaffold plans from preflight
+    // through rollback. Together with atomic create-if-absent finalization, this prevents one
+    // scaffold invocation from observing or deleting another invocation's output.
+    private void RollBackCreatedFilesBestEffort(IEnumerable<ScaffoldFile> createdFiles)
+    {
+        foreach (ScaffoldFile file in createdFiles.Reverse())
+        {
+            try
+            {
+                if (string.Equals(fileSystem.ReadAllText(file.Path), file.Contents, StringComparison.Ordinal))
+                {
+                    fileSystem.DeleteFile(file.Path);
+                }
+            }
+            catch
+            {
+                // Preserve the original scaffold failure. A file whose ownership cannot be
+                // verified is intentionally retained for manual review rather than deleted.
+            }
+        }
+    }
+
+    private void RollBackCreatedDirectoriesBestEffort(IEnumerable<string> createdDirectories)
+    {
+        foreach (string directory in createdDirectories.OrderByDescending(static directory => directory.Length))
+        {
+            try
+            {
+                fileSystem.DeleteDirectoryIfEmpty(directory);
+            }
+            catch
+            {
+                // A non-empty or externally changed directory is deliberately retained rather
+                // than removed during best-effort rollback.
+            }
+        }
+    }
+
+    private void DeleteFileBestEffort(string path)
+    {
+        try
+        {
+            fileSystem.DeleteFile(path);
+        }
+        catch
+        {
+            // The target collision remains the actionable error; a leftover temp file can be
+            // removed manually if the filesystem rejected cleanup.
+        }
     }
 
     private static void AddOptionalModel(
@@ -213,9 +353,10 @@ internal sealed class ScaffoldCliCommandHandler(ICliConsole console, IFileSystem
           }
           """;
 
-    private static string TestTemplate(string moduleName, string commandToken) =>
+    private static string TestTemplate(string moduleName, string commandToken, string moduleNamespace) =>
         $$"""
           using NUnit.Framework;
+          using {{moduleNamespace}}.EntryPoint;
 
           namespace ArchLinterNet.Cli.Tests.Scaffolded;
 
@@ -225,7 +366,7 @@ internal sealed class ScaffoldCliCommandHandler(ICliConsole console, IFileSystem
               [Test]
               public void Module_UsesTheExpectedCommandToken()
               {
-                  Assert.That("{{commandToken}}", Is.EqualTo("{{commandToken}}"));
+                  Assert.That(new {{moduleName}}CommandModule().CommandName, Is.EqualTo("{{commandToken}}"));
               }
           }
           """;

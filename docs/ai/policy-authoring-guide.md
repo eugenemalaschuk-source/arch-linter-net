@@ -873,8 +873,10 @@ tests/ArchLinterNet.Cli.Tests/Scaffolded/InspectCommandScaffoldTests.cs
 
 Optional `--model`, `--abstraction`, and `--exception` create a single type in `Models`,
 `Abstractions`, or `Exceptions`; they never create empty folders. The scaffold validates names,
-fails before writing if a target file already exists, and requires explicit `--force` to replace
-one. It does not edit `Program.cs`, the reflection catalog, or a peer-module policy inventory.
+uses an atomic no-clobber write in ordinary mode, and requires explicit `--force` to replace a
+target. Ordinary runs hold a short-lived repository-scoped scaffold lock through preflight,
+creation, and any rollback; dry-run creates no lock. It does not edit `Program.cs`, the reflection
+catalog, or a peer-module policy inventory.
 
 Each direct child of `ArchLinterNet.Cli.Commands` is independently owned. Keep command behavior
 inside its `EntryPoint` and `Application` namespaces; use `Models`, `Abstractions`, and

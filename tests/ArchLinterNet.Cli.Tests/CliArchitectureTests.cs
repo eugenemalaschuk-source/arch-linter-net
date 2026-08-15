@@ -601,10 +601,27 @@ public sealed class CliArchitectureTests
             CommittedPaths.Add(targetPath);
         }
 
+        public bool TryRenameTempToNewTarget(string tempPath, string targetPath)
+        {
+            if (FileExists(targetPath))
+            {
+                return false;
+            }
+
+            RenameTempToTarget(tempPath, targetPath);
+            return true;
+        }
+
         public void DeleteFile(string path)
         {
             _tempContents.Remove(path);
         }
+
+        public bool TryCreateNewFile(string path) => true;
+
+        public bool DirectoryExists(string path) => true;
+
+        public void DeleteDirectoryIfEmpty(string path) { }
 
         public bool CanWriteToDirectory(string path) => true;
     }

@@ -14,7 +14,7 @@ internal static class ModuleContainerChecker
         "EntryPoint", "Application", "Abstractions", "Models", "Exceptions",
     };
 
-    private static readonly IReadOnlySet<string> _genericModuleNames = new HashSet<string>(StringComparer.Ordinal)
+    private static readonly IReadOnlySet<string> _genericModuleNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
     {
         "Common", "Shared", "Utils",
     };
