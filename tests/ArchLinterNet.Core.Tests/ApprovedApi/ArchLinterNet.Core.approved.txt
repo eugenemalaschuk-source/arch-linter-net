@@ -687,10 +687,10 @@ enum ArchLinterNet.Core.Contracts.ArchitecturePolicyImportErrorCategory : int
   enum-member SourceShape = 7
   enum-member UnreadableFile = 9
 sealed class ArchLinterNet.Core.Contracts.ArchitecturePolicyImportException : System.InvalidOperationException
-  ctor(ArchLinterNet.Core.Contracts.ArchitecturePolicyImportErrorCategory category, string message)
-  ctor(ArchLinterNet.Core.Contracts.ArchitecturePolicyImportErrorCategory category, string message, ArchLinterNet.Core.Model.ArchitecturePolicyDiagnostic? diagnostic)
-  property ArchLinterNet.Core.Contracts.ArchitecturePolicyImportErrorCategory Category {get;}
-  property ArchLinterNet.Core.Model.ArchitecturePolicyDiagnostic? Diagnostic {get;}
+  ctor(object category, string message)
+  ctor(object category, string message, object? diagnostic)
+  property object Category {get;}
+  property object? Diagnostic {get;}
 sealed class ArchLinterNet.Core.Contracts.ArchitecturePolicyProvenanceIndex
   method bool TryGetLocation(string effectiveYamlPath, out ArchLinterNet.Core.Model.ArchitecturePolicySourceLocation? location)
   property ArchLinterNet.Core.Model.ArchitecturePolicySourceDescriptor? RootSource {get;}
@@ -2241,8 +2241,8 @@ sealed class ArchLinterNet.Core.Model.ArchitecturePolicyErrorDiagnostic : ArchLi
   property string Message {get;init;}
   property string? ErrorCategory {get;init;}
 sealed class ArchLinterNet.Core.Model.ArchitecturePolicyLoadException : System.InvalidOperationException
-  ctor(string message, ArchLinterNet.Core.Model.ArchitecturePolicyDiagnostic? diagnostic, string category, System.Exception? innerException = null)
-  property ArchLinterNet.Core.Model.ArchitecturePolicyDiagnostic? Diagnostic {get;}
+  ctor(string message, object? diagnostic, string category, System.Exception? innerException = null)
+  property object? Diagnostic {get;}
   property string Category {get;}
 sealed class ArchLinterNet.Core.Model.ArchitecturePolicySourceDescriptor : System.IEquatable<ArchLinterNet.Core.Model.ArchitecturePolicySourceDescriptor>
   ctor(string RootPath, string SourcePath, ArchLinterNet.Core.Model.ArchitecturePolicyDocumentRole Role, int SourceOrdinal, string? DeclaringSourcePath, string? AuthoredImportPath, System.Collections.Generic.IReadOnlyList<string> ImportChain)
@@ -2283,8 +2283,8 @@ sealed class ArchLinterNet.Core.Model.ArchitecturePolicySourceLocation : System.
   property string? ContractFamily {get;init;}
   property string? ContractId {get;init;}
 sealed class ArchLinterNet.Core.Model.ArchitecturePolicyValidationException : System.InvalidOperationException
-  ctor(string message, ArchLinterNet.Core.Model.ArchitecturePolicyDiagnostic diagnostic, System.Exception innerException)
-  property ArchLinterNet.Core.Model.ArchitecturePolicyDiagnostic Diagnostic {get;}
+  ctor(string message, object diagnostic, System.Exception innerException)
+  property object Diagnostic {get;}
 enum ArchLinterNet.Core.Model.ArchitectureSelectorParticipationKind : int
   enum-member Exclusion = 1
   enum-member Inclusion = 0
