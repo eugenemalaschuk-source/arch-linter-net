@@ -5,7 +5,8 @@
 	test-packed-artifact-consumer-cleanup-configuration-and-identity \
 	test-packed-artifact-consumer-cleanup-source-set-authoring \
 	test-packed-artifact-public-api-surface-selector-snapshot-and-role \
-	test-packed-artifact-public-api-surface-selector-lifecycle
+	test-packed-artifact-public-api-surface-selector-delta-and-membership \
+	test-packed-artifact-public-api-surface-selector-enforcement
 
 # Checkpoint B CI/release sharding. The ordinary `test-packed-artifact` target remains the complete
 # local gate and discovers all CheckpointBReleaseGateTests methods in one NUnit process. These
@@ -18,7 +19,8 @@ TEST_PACKED_ARTIFACT_CONSUMER_CLEANUP_POLICY_FOUNDATION_FILTER := FullyQualified
 TEST_PACKED_ARTIFACT_CONSUMER_CLEANUP_CONFIGURATION_AND_IDENTITY_FILTER := FullyQualifiedName~CheckpointBReleaseGateTests.PackedCandidate_ConsumerCleanupConfigurationAndIdentity
 TEST_PACKED_ARTIFACT_CONSUMER_CLEANUP_SOURCE_SET_AUTHORING_FILTER := FullyQualifiedName~CheckpointBReleaseGateTests.PackedCandidate_ConsumerCleanupSourceSetAuthoring
 TEST_PACKED_ARTIFACT_PUBLIC_API_SURFACE_SELECTOR_SNAPSHOT_AND_ROLE_FILTER := FullyQualifiedName~CheckpointBReleaseGateTests.PackedCandidate_PublicApiSurfaceSelectorSnapshotAndRole
-TEST_PACKED_ARTIFACT_PUBLIC_API_SURFACE_SELECTOR_LIFECYCLE_FILTER := FullyQualifiedName~CheckpointBReleaseGateTests.PackedCandidate_PublicApiSurfaceSelectorLifecycle
+TEST_PACKED_ARTIFACT_PUBLIC_API_SURFACE_SELECTOR_DELTA_AND_MEMBERSHIP_FILTER := FullyQualifiedName~CheckpointBReleaseGateTests.PackedCandidate_PublicApiSurfaceSelectorDeltaAndMembership
+TEST_PACKED_ARTIFACT_PUBLIC_API_SURFACE_SELECTOR_ENFORCEMENT_FILTER := FullyQualifiedName~CheckpointBReleaseGateTests.PackedCandidate_PublicApiSurfaceSelectorEnforcement
 
 CHECKPOINT_B_CANDIDATE_VERSION ?= 0.6.1
 CHECKPOINT_B_CANDIDATE_DIR ?= $(PROJECT_ROOT)/artifacts/checkpoint-b-candidate
@@ -70,9 +72,13 @@ test-packed-artifact-public-api-surface-selector-snapshot-and-role:  ## Run Chec
 	@dotnet build "$(CORE_TESTS_CSPROJ)" --no-restore --nologo
 	@dotnet test "$(CORE_TESTS_CSPROJ)" --no-restore --no-build --filter "$(TEST_PACKED_ARTIFACT_PUBLIC_API_SURFACE_SELECTOR_SNAPSHOT_AND_ROLE_FILTER)"
 
-test-packed-artifact-public-api-surface-selector-lifecycle:  ## Run Checkpoint B public-API selector lifecycle shard
+test-packed-artifact-public-api-surface-selector-delta-and-membership:  ## Run Checkpoint B public-API selector delta/membership shard
 	@dotnet build "$(CORE_TESTS_CSPROJ)" --no-restore --nologo
-	@dotnet test "$(CORE_TESTS_CSPROJ)" --no-restore --no-build --filter "$(TEST_PACKED_ARTIFACT_PUBLIC_API_SURFACE_SELECTOR_LIFECYCLE_FILTER)"
+	@dotnet test "$(CORE_TESTS_CSPROJ)" --no-restore --no-build --filter "$(TEST_PACKED_ARTIFACT_PUBLIC_API_SURFACE_SELECTOR_DELTA_AND_MEMBERSHIP_FILTER)"
+
+test-packed-artifact-public-api-surface-selector-enforcement:  ## Run Checkpoint B public-API selector enforcement shard
+	@dotnet build "$(CORE_TESTS_CSPROJ)" --no-restore --nologo
+	@dotnet test "$(CORE_TESTS_CSPROJ)" --no-restore --no-build --filter "$(TEST_PACKED_ARTIFACT_PUBLIC_API_SURFACE_SELECTOR_ENFORCEMENT_FILTER)"
 
 # Repository correctness without the packed candidate gate. Release workflows use this once to
 # prove source-tree lint/unit/E2E correctness, then prove the immutable packed candidate separately.

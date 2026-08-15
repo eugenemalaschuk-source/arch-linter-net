@@ -2,7 +2,7 @@
 
 ## Decision 1: shard by scenario ownership, not by random test selection
 
-Checkpoint B is decomposed into eight explicit NUnit methods:
+Checkpoint B is decomposed into nine explicit NUnit methods:
 
 1. package and entrypoints;
 2. core adopter runtime/parity;
@@ -11,7 +11,8 @@ Checkpoint B is decomposed into eight explicit NUnit methods:
 5. consumer-cleanup configuration and identity;
 6. consumer-cleanup source-set authoring;
 7. public-API surface-selector snapshot and role preservation;
-8. public-API surface-selector lifecycle and fail-closed checks.
+8. public-API surface-selector delta and membership lifecycle;
+9. public-API surface-selector fail-closed enforcement and Testing-adapter parity.
 
 The complete fixture remains non-parallel locally and uses one `OneTimeSetUp` candidate. CI filters one method per isolated runner. This keeps the scenario partition reviewable and deterministic.
 
@@ -23,7 +24,7 @@ Each shard still gets its own temporary NuGet caches, tool install path, fixture
 
 ## Decision 3: partial execution evidence is not release evidence
 
-A shard writes `checkpoint-b-platform-shard-evidence/v1`. The merge tool requires exactly the eight named shards, validates common candidate/platform metadata, rejects duplicate/overlapping/missing/unexpected scenario IDs, requires policy-shape evidence from the consumer-cleanup policy-foundation shard, and emits the existing `checkpoint-b-platform-evidence/v1` record.
+A shard writes `checkpoint-b-platform-shard-evidence/v1`. The merge tool requires exactly the nine named shards, validates common candidate/platform metadata, rejects duplicate/overlapping/missing/unexpected scenario IDs, requires policy-shape evidence from the consumer-cleanup policy-foundation shard, and emits the existing `checkpoint-b-platform-evidence/v1` record.
 
 The existing final release aggregator remains the authority over required platforms, complete scenario inventory, policy shape, repository gates, release scope, and publication authorization.
 

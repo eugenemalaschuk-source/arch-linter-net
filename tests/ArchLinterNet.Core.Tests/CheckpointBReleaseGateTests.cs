@@ -120,7 +120,7 @@ public sealed partial class CheckpointBReleaseGateTests
     }
 
     [Test]
-    public void PackedCandidate_PublicApiSurfaceSelectorLifecycle()
+    public void PackedCandidate_PublicApiSurfaceSelectorDeltaAndMembership()
     {
         CandidatePackageFeed candidate = Candidate;
         using AdoptionAcceptanceFixture fixture = CreatePublicApiSurfaceSelectorFixture();
@@ -128,10 +128,24 @@ public sealed partial class CheckpointBReleaseGateTests
         // The lifecycle scenarios consume the initial reviewed snapshots. They re-establish that
         // fixture-local precondition without emitting the snapshot-reduction scenario a second time.
         _ = AssertSurfaceSelectorSnapshotReduction(candidate, fixture);
-        candidate.WriteShardEvidence("public-api-surface-selector-lifecycle",
+        candidate.WriteShardEvidence("public-api-surface-selector-delta-and-membership",
         [
             AssertSurfaceSelectorExactDeltaLifecycle(candidate, fixture),
             AssertSurfaceSelectorMembershipReviewVisibility(candidate, fixture),
+        ]);
+    }
+
+    [Test]
+    public void PackedCandidate_PublicApiSurfaceSelectorEnforcement()
+    {
+        CandidatePackageFeed candidate = Candidate;
+        using AdoptionAcceptanceFixture fixture = CreatePublicApiSurfaceSelectorFixture();
+
+        // Strict validation and Testing-adapter parity require fresh reviewed snapshots but do
+        // not independently claim the snapshot-reduction evidence scenario.
+        _ = AssertSurfaceSelectorSnapshotReduction(candidate, fixture);
+        candidate.WriteShardEvidence("public-api-surface-selector-enforcement",
+        [
             AssertSurfaceSelectorEscapeFailsClosed(candidate, fixture),
             AssertSurfaceSelectorStrictRunIsGreen(candidate, fixture),
             candidate.AssertPublicApiSurfaceSelectorTestingParity(fixture),

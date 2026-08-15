@@ -69,9 +69,12 @@ jobs:
           - id: public-api-surface-selector-snapshot-and-role
             name: Public API selector snapshot + role
             target: test-packed-artifact-public-api-surface-selector-snapshot-and-role
-          - id: public-api-surface-selector-lifecycle
-            name: Public API selector lifecycle
-            target: test-packed-artifact-public-api-surface-selector-lifecycle
+          - id: public-api-surface-selector-delta-and-membership
+            name: Public API selector delta + membership
+            target: test-packed-artifact-public-api-surface-selector-delta-and-membership
+          - id: public-api-surface-selector-enforcement
+            name: Public API selector enforcement
+            target: test-packed-artifact-public-api-surface-selector-enforcement
     env:
       ARCH_LINTER_SOURCE_SHA: ${{ github.sha }}
       CHECKPOINT_B_CANDIDATE_VERSION: ${{ needs.prepare-candidate.outputs.package_version }}

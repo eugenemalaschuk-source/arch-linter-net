@@ -668,9 +668,16 @@ jobs:
             name: Windows
             platform: windows-x64
             shell_adapter: pwsh
-            shard: public-api-surface-selector-lifecycle
-            shard_name: Public API selector lifecycle
-            target: test-packed-artifact-public-api-surface-selector-lifecycle
+            shard: public-api-surface-selector-delta-and-membership
+            shard_name: Public API selector delta + membership
+            target: test-packed-artifact-public-api-surface-selector-delta-and-membership
+          - os: windows-latest
+            name: Windows
+            platform: windows-x64
+            shell_adapter: pwsh
+            shard: public-api-surface-selector-enforcement
+            shard_name: Public API selector enforcement
+            target: test-packed-artifact-public-api-surface-selector-enforcement
           - os: macos-14
             name: Apple Silicon macOS
             platform: macos-arm64
@@ -724,9 +731,16 @@ jobs:
             name: Apple Silicon macOS
             platform: macos-arm64
             shell_adapter: bash
-            shard: public-api-surface-selector-lifecycle
-            shard_name: Public API selector lifecycle
-            target: test-packed-artifact-public-api-surface-selector-lifecycle
+            shard: public-api-surface-selector-delta-and-membership
+            shard_name: Public API selector delta + membership
+            target: test-packed-artifact-public-api-surface-selector-delta-and-membership
+          - os: macos-14
+            name: Apple Silicon macOS
+            platform: macos-arm64
+            shell_adapter: bash
+            shard: public-api-surface-selector-enforcement
+            shard_name: Public API selector enforcement
+            target: test-packed-artifact-public-api-surface-selector-enforcement
     permissions:
       contents: read
     env:

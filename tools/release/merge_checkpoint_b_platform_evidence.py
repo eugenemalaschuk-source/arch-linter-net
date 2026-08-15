@@ -27,7 +27,8 @@ _REQUIRED_SHARDS = {
     "consumer-cleanup-configuration-and-identity",
     "consumer-cleanup-source-set-authoring",
     "public-api-surface-selector-snapshot-and-role",
-    "public-api-surface-selector-lifecycle",
+    "public-api-surface-selector-delta-and-membership",
+    "public-api-surface-selector-enforcement",
 }
 _COMMON_FIELDS = (
     "checkpoint",
