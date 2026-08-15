@@ -27,3 +27,4 @@
 - [ ] 4.1 Switch the production declaration-count self-policy from audit to strict with a maximum of one source declaration and add a negative regression.
 - [ ] 4.2 Update architecture capability documentation and OpenSpec specifications with the final convention and any reviewed exceptions.
 - [ ] 4.3 Run public API review, policy/lint gates, full tests, and OpenSpec validation; verify that no handwritten production partial aggregate remains.
+- [x] 4.4 Model direct CLI command folders as independent feature modules, retain recursive convention rules for their nested folders, and add a negative self-policy regression.

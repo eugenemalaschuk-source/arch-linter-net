@@ -5,6 +5,7 @@ imports:
   - policy/dependency-boundaries.arch.yml
   - policy/distribution-boundaries.arch.yml
   - policy/seam-governance.arch.yml
+  - policy/command-boundaries.arch.yml
   - policy/public-api-and-coverage.arch.yml
   - policy/audit-conventions.arch.yml
 
@@ -83,6 +84,22 @@ layers:
     namespace: ArchLinterNet.Cli.Infrastructure
   cli_commands:
     namespace: ArchLinterNet.Cli.Commands
+  cli_command_baseline:
+    namespace: ArchLinterNet.Cli.Commands.Baseline
+  cli_command_cache:
+    namespace: ArchLinterNet.Cli.Commands.Cache
+  cli_command_explain:
+    namespace: ArchLinterNet.Cli.Commands.Explain
+  cli_command_graph:
+    namespace: ArchLinterNet.Cli.Commands.Graph
+  cli_command_policy:
+    namespace: ArchLinterNet.Cli.Commands.Policy
+  cli_command_public_api:
+    namespace: ArchLinterNet.Cli.Commands.PublicApi
+  cli_command_schema:
+    namespace: ArchLinterNet.Cli.Commands.Schema
+  cli_command_validate:
+    namespace: ArchLinterNet.Cli.Commands.Validate
   testing:
     namespace: ArchLinterNet.Testing
   cel:
@@ -156,6 +173,14 @@ source_sets:
       - cli_abstractions
       - cli_infrastructure
       - cli_commands
+      - cli_command_baseline
+      - cli_command_cache
+      - cli_command_explain
+      - cli_command_graph
+      - cli_command_policy
+      - cli_command_public_api
+      - cli_command_schema
+      - cli_command_validate
       - testing
       - cel
   shipped_assemblies:

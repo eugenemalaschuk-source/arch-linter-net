@@ -59,6 +59,19 @@ declaration per type. Test source remains outside this production rule because a
 fixtures must model C# partial declarations; test aggregate cleanup is proven by targeted fixture
 splits rather than a blanket rule that would prohibit the language test cases.
 
+### Treat direct CLI commands as independent feature modules
+
+`ArchLinterNet.Cli.Commands` is a host-level feature container rather than a domain hierarchy.
+Its direct children (`Baseline`, `Cache`, `Explain`, `Graph`, `Policy`, `PublicApi`, `Schema`, and
+`Validate`) are command modules. They may use the CLI's top-level abstractions, Core's public
+application seams, and narrowly named shared support outside a command module, but no command may
+reference another command's namespace.
+
+The generic convention rules remain recursive: a command's interfaces belong in `Abstractions`,
+its models belong in `Models` and have no first-party dependencies, and its exception classes are
+self-contained and belong in `Exceptions`. Those rules are not duplicated per command. The
+command-specific policy only supplies the missing sibling-boundary invariant.
+
 ### Audit baseline (2026-08-15)
 
 `production-types-have-one-source-declaration` reports these fifteen production aggregates. The
@@ -98,7 +111,7 @@ source/source-set inclusion resolution and layer-template container expansion ar
 by `ArchitectureSourceSetInclusionResolver` and
 `ArchitectureLayerTemplateContainerExpansionRecorder`.
 
-The post-tranche audit has ten handwritten source aggregates remaining:
+The post-tranche audit has nine handwritten source aggregates remaining:
 
 | Type | Declarations |
 | --- | ---: |

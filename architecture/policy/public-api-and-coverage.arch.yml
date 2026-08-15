@@ -56,6 +56,7 @@ contracts:
         - cli-must-not-depend-on-testing
         - testing-must-not-depend-on-cli
         - cli-must-use-validation-application-seam
+        - cli-command-modules-are-independent
         - testing-must-use-validation-application-seam
         - core-execution-must-not-depend-on-hosts
         - core-reporting-stays-a-diagnostics-leaf

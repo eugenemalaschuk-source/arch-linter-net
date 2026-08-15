@@ -50,7 +50,7 @@ outputs are not part of the analysed assembly set. `samples/` contains no projec
 | `allow-only` (namespace) | — | — | **N/A** | The internal layer graph is expressed as targeted forbidden edges plus ordered layers; an allow-only restatement would duplicate them with weaker locality. |
 | `layer-order` | `cli`/`testing` → `core` → `cel`, and `cli` → `core_validation` → `core_execution` → `core_model` | Declared `layers` | **already covered** | `core-layering`, `core-application-seam-layering`. |
 | `cycle` | Packages must not form dependency cycles | Declared `layers` | **already covered** | `package-cycles`. |
-| `independence` (layer) | — | — | **N/A** | Mutual independence between layers is already implied by the directional rules above; the meaningful independence statement here is at assembly level (below). |
+| `independence` (layer) | Direct `Cli.Commands` feature modules do not reference one another | Eight declared `cli_command_*` layers | **adopt** | `cli-command-modules-are-independent` permits only explicit shared seams outside the command module. Adding a command requires adding its reviewed layer to this inventory. |
 | `protected-surface` | `Core.Scanning` / `Core.Discovery` / `Core.Resolution` internals are Core-only | Declared `layers` | **already covered** | Three pre-existing rules. |
 | `layer-template` | — | — | **N/A** | Layer templates repeat one ordered-layer shape across sibling containers. Core's internal layers are not sibling instances of one shape; they are a single ordered stack. |
 | `acyclic-sibling` | — | — | **N/A** | Same reason: there is no set of sibling module namespaces to keep mutually acyclic. |

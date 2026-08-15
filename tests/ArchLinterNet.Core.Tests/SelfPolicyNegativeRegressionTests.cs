@@ -158,6 +158,21 @@ public sealed class SelfPolicyNegativeRegressionTests
         AssertFailedMentioning(result, "Payload");
     }
 
+    // ── CLI command module boundaries ───────────────────────────────────────
+    [Test]
+    public void CliCommandIndependence_RejectsASiblingCommandReference()
+    {
+        string mutated = SelfPolicyRepository.Replace(
+            _policy,
+            "  cli_command_public_api:\n    namespace: ArchLinterNet.Cli.Commands.PublicApi\n",
+            "  cli_command_public_api:\n    namespace: ArchLinterNet.Cli.Abstractions\n"
+            + "    overlaps_with: [cli_abstractions]\n");
+
+        ArchitectureValidationResult result = ValidateMutated(mutated, "cli-command-modules-are-independent");
+
+        AssertFailedMentioning(result, "ArchLinterNet.Cli.Abstractions");
+    }
+
     // ── Reviewed public API lifecycle ───────────────────────────────────────
     [Test]
     public void PublicApiSurface_RejectsAnUnreviewedAdditionWithoutRewritingTheSnapshot()

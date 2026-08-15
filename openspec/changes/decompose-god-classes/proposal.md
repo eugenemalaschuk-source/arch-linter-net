@@ -13,6 +13,8 @@ compiled types remain high-coupling god classes that are difficult to understand
   the default decomposition mechanism.
 - Replace the largest production partial aggregates with collaborating, purpose-named types while
   preserving public API and diagnostic output.
+- Treat direct `Cli.Commands` children as independent command modules, while retaining the common
+  `Abstractions`/`Models`/`Exceptions` conventions at every nesting level.
 - Reduce test-suite partial aggregates where they hide unrelated scenarios behind one fixture;
   keep only narrowly scoped test fixtures and generated-code scenarios that require `partial`.
 - Retain the existing file-size lint as a complementary per-file signal; it is not a measure of

@@ -1,0 +1,19 @@
+# yaml-language-server: $schema=../schema/dependencies.arch.fragment.schema.json
+#
+# Each direct child of Cli.Commands is a user-facing feature module. Commands may share the
+# Cli abstractions and Core application seams, but command behaviour must not be reused by another
+# command through a direct namespace dependency.
+contracts:
+  strict_independence:
+    - name: cli-command-modules-are-independent
+      id: cli-command-modules-are-independent
+      layers:
+        - cli_command_baseline
+        - cli_command_cache
+        - cli_command_explain
+        - cli_command_graph
+        - cli_command_policy
+        - cli_command_public_api
+        - cli_command_schema
+        - cli_command_validate
+      reason: User-facing CLI commands are independent feature modules; move genuinely shared behaviour to an explicit shared seam instead of importing a sibling command.
