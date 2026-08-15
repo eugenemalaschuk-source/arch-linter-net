@@ -164,8 +164,8 @@ public sealed class ArchitectureRunnerSetupService(
         {
             resolution = assemblyResolutionService.ResolvePostBuild(
                 document, preparation.RepositoryRoot, preparation.ProjectDiscovery,
-                preparation.ResolveAssemblyOutputs, mode, selectedContractIds, cancellationToken,
-                preparation.CapturedArtifactContentDigests);
+                preparation.ResolveAssemblyOutputs, mode, selectedContractIds,
+                preparation.CapturedArtifactContentDigests, cancellationToken);
         }
 
         ArchitectureAnalysisContext context = CreateAnalysisContext(
@@ -223,7 +223,7 @@ public sealed class ArchitectureRunnerSetupService(
             ResolutionResult resolution = loadPostBuildArtifacts
                 ? assemblyResolutionService.ResolvePostBuild(
                     document, repositoryRoot, discovery, resolveAssemblyOutputs, mode, selectedContractIds,
-                    cancellationToken)
+                    cancellationToken: cancellationToken)
                 : assemblyResolutionService.Resolve(
                     document, repositoryRoot, discovery, resolveAssemblyOutputs, mode, selectedContractIds,
                     cancellationToken);

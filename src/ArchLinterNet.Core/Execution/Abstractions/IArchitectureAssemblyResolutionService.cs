@@ -16,13 +16,13 @@ public interface IArchitectureAssemblyResolutionService
         CancellationToken cancellationToken = default);
 
     // The post-ensure-built pass must not reuse a same-simple-name assembly from the process.
-    ResolutionResult ResolvePostBuild( // NOSONAR: public compatibility contract keeps the two post-build verification inputs explicit.
+    ResolutionResult ResolvePostBuild(
         ArchitectureContractDocument document,
         string repositoryRoot,
         ProjectDiscoveryResult discovery,
         bool resolveAssemblyOutputs,
         string? mode,
         HashSet<string>? selectedContractIds,
-        CancellationToken cancellationToken = default,
-        IReadOnlyDictionary<string, string>? expectedArtifactContentDigests = null);
+        IReadOnlyDictionary<string, string>? expectedArtifactContentDigests = null,
+        CancellationToken cancellationToken = default);
 }
