@@ -10,6 +10,12 @@ namespace ArchLinterNet.Core.Tests;
 [TestFixture]
 public sealed class LayoutConventionDeclarationCountTests
 {
+    private static readonly string[] _partialOffenderDeclarationPaths =
+    [
+        "Elsewhere/PartialOffender.Part2.cs",
+        "Services/PartialOffender.Part1.cs",
+    ];
+
     private string _tempDir = null!;
 
     [SetUp]
@@ -65,11 +71,7 @@ public sealed class LayoutConventionDeclarationCountTests
             Assert.That(payload.DataUnavailable, Is.False);
             Assert.That(payload.ExpectedDeclarationCount, Is.EqualTo(1));
             Assert.That(payload.ActualDeclarationCount, Is.EqualTo(2));
-            Assert.That(payload.DeclarationPaths, Is.EqualTo(new[]
-            {
-                "Services/PartialOffender.Part1.cs",
-                "Elsewhere/PartialOffender.Part2.cs",
-            }.OrderBy(path => path, StringComparer.Ordinal)));
+            Assert.That(payload.DeclarationPaths, Is.EqualTo(_partialOffenderDeclarationPaths));
             Assert.That(violation.ForbiddenNamespace, Does.Contain("expected at most 1 source declaration"));
         });
     }

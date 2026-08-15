@@ -13,7 +13,7 @@ public interface IArchitectureDiagnosticFormatter
     string FormatViolationsForHumans(IReadOnlyCollection<ArchitectureViolation> violations, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        return FormatViolationsForHumans(violations);
+        return FormatViolationsForHumans(violations); // NOSONAR: retained compatibility member has no cancellation-aware overload.
     }
 
     string FormatCyclesForHumans(IReadOnlyCollection<string> cycles);
@@ -31,7 +31,7 @@ public interface IArchitectureDiagnosticFormatter
     string FormatCoverageForHumans(IReadOnlyCollection<ArchitectureViolation> findings, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        return FormatCoverageForHumans(findings);
+        return FormatCoverageForHumans(findings); // NOSONAR: retained compatibility member has no cancellation-aware overload.
     }
 
     string FormatCoverageSummaryForHumans(IReadOnlyCollection<ArchitectureCoverageSummary> summaries);
@@ -118,7 +118,8 @@ public interface IArchitectureDiagnosticFormatter
         CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        return FormatViolationsForCiArtifacts(contractName, contractId, violations);
+        return FormatViolationsForCiArtifacts( // NOSONAR: retained compatibility member has no cancellation-aware overload.
+            contractName, contractId, violations);
     }
 
     string FormatCyclesForCiArtifacts(

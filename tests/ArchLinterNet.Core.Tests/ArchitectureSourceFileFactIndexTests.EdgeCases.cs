@@ -12,6 +12,12 @@ namespace ArchLinterNet.Core.Tests;
 [TestFixture]
 public sealed partial class ArchitectureSourceFileFactIndexTests
 {
+    private static readonly string[] _partialFixtureDeclarationPaths =
+    [
+        "src/PartialFixture.Part1.cs",
+        "src/PartialFixture.Part2.cs",
+    ];
+
     // ── Unique-file ambiguity (4.1) ────────────────────────────────────────────────────
 
     [Test]
@@ -92,11 +98,9 @@ public sealed partial class ArchitectureSourceFileFactIndexTests
 
         Assert.That(declarations, Has.Count.EqualTo(2));
         Assert.That(declarations.All(declaration => declaration.IsPartial), Is.True);
-        Assert.That(declarations.Select(declaration => declaration.SourceFilePath), Is.EqualTo(new[]
-        {
-            "src/PartialFixture.Part1.cs",
-            "src/PartialFixture.Part2.cs",
-        }));
+        Assert.That(
+            declarations.Select(declaration => declaration.SourceFilePath),
+            Is.EqualTo(_partialFixtureDeclarationPaths));
     }
 
     // ── Deterministic ordering (4.2) ───────────────────────────────────────────────────

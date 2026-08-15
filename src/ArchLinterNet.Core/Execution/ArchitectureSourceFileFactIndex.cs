@@ -347,7 +347,7 @@ public sealed partial class ArchitectureSourceFileFactIndex
         return sourceMap;
     }
 
-    private static IReadOnlyList<ArchitectureTypeSourceDeclaration> BuildSourceDeclarations(
+    private static ArchitectureTypeSourceDeclaration[] BuildSourceDeclarations(
         Dictionary<SourceFactKey, List<SourceDeclaration>> sourceMap)
     {
         return sourceMap

@@ -51,6 +51,29 @@ def _code(value: object) -> str:
     return f"`{cleaned}`"
 
 
+def _append_text_part(parts: list[str], label: str, value: str | None) -> None:
+    if value:
+        parts.append(f"{label} {_code(value)}")
+
+
+def _append_subject_part(parts: list[str], subject: str | None, source: str | None) -> None:
+    if subject and subject != source:
+        parts.append(f"subject {_code(subject)}")
+
+
+def _append_item_part(parts: list[str], finding: dict) -> None:
+    item = _as_text(finding.get("item"))
+    if item:
+        scope = _as_text(finding.get("scope"))
+        parts.append(f"{f'{scope} item' if scope else 'item'} {_code(item)}")
+
+
+def _append_references_part(parts: list[str], finding: dict) -> None:
+    references = _format_references(finding.get("forbidden_references"))
+    if references:
+        parts.append(f"forbidden references {references}")
+
+
 def _format_location(value: object) -> str | None:
     if not isinstance(value, dict):
         return _as_text(value)
@@ -78,43 +101,7 @@ def _format_references(value: object) -> str | None:
     return ", ".join(present) if present else None
 
 
-def _diagnostic_summary(finding: dict) -> str:
-    parts: list[str] = []
-    message_code = _as_text(finding.get("message_code"))
-    if message_code:
-        parts.append(f"code {_code(message_code)}")
-
-    source = _as_text(finding.get("source"))
-    if source:
-        parts.append(f"source {_code(source)}")
-
-    subject = _as_text(finding.get("subject"))
-    if subject and subject != source:
-        parts.append(f"subject {_code(subject)}")
-
-    state = _as_text(finding.get("state"))
-    if state:
-        parts.append(f"state {_code(state)}")
-
-    scope = _as_text(finding.get("scope"))
-    item = _as_text(finding.get("item"))
-    if item:
-        label = f"{scope} item" if scope else "item"
-        parts.append(f"{label} {_code(item)}")
-
-    forbidden_namespace = _as_text(finding.get("forbidden_namespace"))
-    if forbidden_namespace:
-        parts.append(f"forbidden namespace {_code(forbidden_namespace)}")
-
-    references = _format_references(finding.get("forbidden_references"))
-    if references:
-        parts.append(f"forbidden references {references}")
-
-    for field, label in (("evidence", "evidence"), ("reason", "reason"), ("detail", "detail")):
-        value = _as_text(finding.get(field))
-        if value:
-            parts.append(f"{label} {_code(value)}")
-
+def _append_location_parts(parts: list[str], finding: dict) -> None:
     seen_locations: set[str] = set()
     for field, label in (
         ("source_location", "source"),
@@ -125,6 +112,23 @@ def _diagnostic_summary(finding: dict) -> str:
         if location and location not in seen_locations:
             parts.append(f"{label} {_code(location)}")
             seen_locations.add(location)
+
+
+def _diagnostic_summary(finding: dict) -> str:
+    parts: list[str] = []
+    source = _as_text(finding.get("source"))
+    _append_text_part(parts, "code", _as_text(finding.get("message_code")))
+    _append_text_part(parts, "source", source)
+    _append_subject_part(parts, _as_text(finding.get("subject")), source)
+    _append_text_part(parts, "state", _as_text(finding.get("state")))
+    _append_item_part(parts, finding)
+    _append_text_part(parts, "forbidden namespace", _as_text(finding.get("forbidden_namespace")))
+    _append_references_part(parts, finding)
+
+    for field, label in (("evidence", "evidence"), ("reason", "reason"), ("detail", "detail")):
+        _append_text_part(parts, label, _as_text(finding.get(field)))
+
+    _append_location_parts(parts, finding)
 
     return "; ".join(parts) if parts else "structured diagnostic emitted without detail fields"
 
@@ -139,46 +143,75 @@ def _rule_identity(finding: dict, category: str) -> tuple[str, str]:
     return category.lower().replace(" ", "-"), category
 
 
+def _coverage_bucket_fallback(entry: dict, bucket: str, state: str) -> list[dict]:
+    items = entry.get(bucket, []) or []
+    if not isinstance(items, list):
+        return []
+
+    return [
+        {
+            "contract_id": entry.get("contract_id"),
+            "contract": entry.get("contract"),
+            "scope": entry.get("scope"),
+            "state": state,
+            "item": item.get("item"),
+            "evidence": item.get("evidence") or item.get("reason"),
+        }
+        for item in items
+        if isinstance(item, dict)
+    ]
+
+
+def _coverage_entry_fallback(entry: dict) -> list[dict]:
+    findings: list[dict] = []
+    for bucket, state in COVERAGE_FALLBACK_BUCKETS:
+        findings.extend(_coverage_bucket_fallback(entry, bucket, state))
+    return findings
+
+
 def _coverage_summary_fallback(report: dict) -> list[dict]:
     if report.get("coverage_findings"):
         return []
 
-    findings: list[dict] = []
-    for entry in report.get("coverage_summary", []) or []:
-        if not isinstance(entry, dict):
+    return [
+        finding
+        for entry in report.get("coverage_summary", []) or []
+        if isinstance(entry, dict)
+        for finding in _coverage_entry_fallback(entry)
+    ]
+
+
+def _collection_findings(report: dict, collection: str) -> list[object]:
+    if collection == "coverage_summary_fallback":
+        return _coverage_summary_fallback(report)
+    return report.get(collection, []) or []
+
+
+def _add_collection_findings(
+    grouped: dict[str, tuple[str, set[tuple[str, str]]]],
+    findings: list[object],
+    collection: str,
+    category: str,
+) -> None:
+    for finding in findings:
+        if not isinstance(finding, dict):
             continue
-        for bucket, state in COVERAGE_FALLBACK_BUCKETS:
-            for item in entry.get(bucket, []) or []:
-                if not isinstance(item, dict):
-                    continue
-                findings.append(
-                    {
-                        "contract_id": entry.get("contract_id"),
-                        "contract": entry.get("contract"),
-                        "scope": entry.get("scope"),
-                        "state": state,
-                        "item": item.get("item"),
-                        "evidence": item.get("evidence") or item.get("reason"),
-                    }
-                )
-    return findings
+        if collection == "preflight_diagnostics" and finding.get("state") == "current":
+            continue
+        identifier, name = _rule_identity(finding, category)
+        existing_name, diagnostics = grouped.setdefault(identifier, (name, set()))
+        if existing_name == identifier and name != identifier:
+            grouped[identifier] = (name, diagnostics)
+        diagnostics.add((category, _diagnostic_summary(finding)))
 
 
 def collect_failed_rules(report: dict) -> list[FailedRule]:
     grouped: dict[str, tuple[str, set[tuple[str, str]]]] = {}
     collections = (*FAILURE_COLLECTIONS, ("coverage_summary_fallback", "Coverage summary"))
     for collection, category in collections:
-        findings = _coverage_summary_fallback(report) if collection == "coverage_summary_fallback" else report.get(collection, []) or []
-        for finding in findings:
-            if not isinstance(finding, dict):
-                continue
-            if collection == "preflight_diagnostics" and finding.get("state") == "current":
-                continue
-            identifier, name = _rule_identity(finding, category)
-            existing_name, diagnostics = grouped.setdefault(identifier, (name, set()))
-            if existing_name == identifier and name != identifier:
-                grouped[identifier] = (name, diagnostics)
-            diagnostics.add((category, _diagnostic_summary(finding)))
+        _add_collection_findings(
+            grouped, _collection_findings(report, collection), collection, category
+        )
 
     rules = [
         FailedRule(

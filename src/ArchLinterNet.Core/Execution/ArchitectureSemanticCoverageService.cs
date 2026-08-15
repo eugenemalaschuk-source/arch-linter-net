@@ -92,44 +92,7 @@ internal sealed class ArchitectureSemanticCoverageService
 
         foreach (Type type in types)
         {
-            if (!IsSemanticCoverageTypeInScope(contract, type))
-            {
-                continue;
-            }
-
-            string subject = ArchitectureTypeNames.SafeFullName(type);
-            string sourceAssembly = ArchitectureTypeNames.SafeAssemblyName(type) ?? string.Empty;
-            if (!RoleIndex.TryGetRole(type, out ArchitectureTypeClassificationResult descriptor))
-            {
-                if (!executionContext.IsIgnored(
-                        subject,
-                        UnclassifiedSemanticFact,
-                        sourceAssembly: sourceAssembly,
-                        targetType: subject,
-                        targetMember: UnclassifiedSemanticFact))
-                {
-                    findings.Add(new ArchitectureViolation(contract.Name, contract.Id, subject,
-                        UnclassifiedSemanticFact, new[] { subject }));
-                }
-                continue;
-            }
-
-            if (contract.Exclude.Any(exclusion => MatchesSemanticExclusion(exclusion, descriptor))
-                || DescribeSemanticGovernance(type) != null)
-            {
-                continue;
-            }
-
-            if (!executionContext.IsIgnored(
-                    subject,
-                    "uncovered semantic role",
-                    sourceAssembly: sourceAssembly,
-                    targetType: subject,
-                    targetMember: "uncovered semantic role"))
-            {
-                findings.Add(new ArchitectureViolation(contract.Name, contract.Id, subject,
-                    "uncovered semantic role", new[] { DescribeSemanticFact(descriptor) }));
-            }
+            CheckType(contract, executionContext, type, findings);
         }
 
         foreach (ArchitectureCoverageSummaryEvidenceItem stale in GetSemanticStaleItems(types))
@@ -147,6 +110,78 @@ internal sealed class ArchitectureSemanticCoverageService
 
         _session.CollectUnmatchedIgnores(executionContext);
         return findings;
+    }
+
+    private void CheckType(
+        ArchitectureCoverageContract contract,
+        ArchitectureContractExecutionContext executionContext,
+        Type type,
+        List<ArchitectureViolation> findings)
+    {
+        if (!IsSemanticCoverageTypeInScope(contract, type))
+        {
+            return;
+        }
+
+        string subject = ArchitectureTypeNames.SafeFullName(type);
+        string sourceAssembly = ArchitectureTypeNames.SafeAssemblyName(type) ?? string.Empty;
+        if (!RoleIndex.TryGetRole(type, out ArchitectureTypeClassificationResult descriptor))
+        {
+            AddUnclassifiedTypeFinding(contract, executionContext, subject, sourceAssembly, findings);
+            return;
+        }
+
+        if (contract.Exclude.Any(exclusion => MatchesSemanticExclusion(exclusion, descriptor))
+            || DescribeSemanticGovernance(type) != null)
+        {
+            return;
+        }
+
+        AddUncoveredRoleFinding(contract, executionContext, subject, sourceAssembly, descriptor, findings);
+    }
+
+    private static void AddUnclassifiedTypeFinding(
+        ArchitectureCoverageContract contract,
+        ArchitectureContractExecutionContext executionContext,
+        string subject,
+        string sourceAssembly,
+        List<ArchitectureViolation> findings)
+    {
+        if (executionContext.IsIgnored(
+                subject,
+                UnclassifiedSemanticFact,
+                sourceAssembly: sourceAssembly,
+                targetType: subject,
+                targetMember: UnclassifiedSemanticFact))
+        {
+            return;
+        }
+
+        findings.Add(new ArchitectureViolation(contract.Name, contract.Id, subject,
+            UnclassifiedSemanticFact, new[] { subject }));
+    }
+
+    private static void AddUncoveredRoleFinding(
+        ArchitectureCoverageContract contract,
+        ArchitectureContractExecutionContext executionContext,
+        string subject,
+        string sourceAssembly,
+        ArchitectureTypeClassificationResult descriptor,
+        List<ArchitectureViolation> findings)
+    {
+        const string UncoveredSemanticRole = "uncovered semantic role";
+        if (executionContext.IsIgnored(
+                subject,
+                UncoveredSemanticRole,
+                sourceAssembly: sourceAssembly,
+                targetType: subject,
+                targetMember: UncoveredSemanticRole))
+        {
+            return;
+        }
+
+        findings.Add(new ArchitectureViolation(contract.Name, contract.Id, subject,
+            UncoveredSemanticRole, new[] { DescribeSemanticFact(descriptor) }));
     }
 
     private static bool IsSemanticCoverageTypeInScope(ArchitectureCoverageContract contract, Type type)
