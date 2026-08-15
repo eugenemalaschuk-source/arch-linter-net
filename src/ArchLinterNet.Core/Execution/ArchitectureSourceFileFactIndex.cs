@@ -110,6 +110,10 @@ public sealed partial class ArchitectureSourceFileFactIndex
 
     public IReadOnlyList<ArchitectureDeclaredTypeSourceAmbiguity> Ambiguities => _data.Value.Ambiguities;
 
+    // Unlike AllFacts, this preserves every source declaration of a type, including every part
+    // of a partial type. Consumers that need one unambiguous source path must keep using AllFacts.
+    internal IReadOnlyList<ArchitectureTypeSourceDeclaration> SourceDeclarations => _data.Value.SourceDeclarations;
+
     public bool TryGetFact(string fullTypeName, out ArchitectureDeclaredTypeFact fact)
     {
         ArgumentNullException.ThrowIfNull(fullTypeName);
@@ -160,7 +164,7 @@ public sealed partial class ArchitectureSourceFileFactIndex
 
         _cancellationToken.ThrowIfCancellationRequested();
 
-        Dictionary<SourceFactKey, List<(string FilePath, ArchitectureTypeKind Kind)>> sourceMap =
+        Dictionary<SourceFactKey, List<SourceDeclaration>> sourceMap =
             _sourceRoots.Count > 0 ? RunSourceScan() : [];
 
         (Dictionary<SourceFactKey, SourceInfo> resolvedSourceInfo,
@@ -169,7 +173,7 @@ public sealed partial class ArchitectureSourceFileFactIndex
 
         List<ArchitectureDeclaredTypeFact> allFacts = BuildFacts(reflectionFacts, resolvedSourceInfo);
         SortFactsAndAmbiguities(allFacts, ambiguities);
-        return BuildFactIndexData(allFacts, ambiguities);
+        return BuildFactIndexData(allFacts, ambiguities, BuildSourceDeclarations(sourceMap));
     }
 
     private static void SortFactsAndAmbiguities(
@@ -190,7 +194,8 @@ public sealed partial class ArchitectureSourceFileFactIndex
 
     private static FactIndexData BuildFactIndexData(
         List<ArchitectureDeclaredTypeFact> allFacts,
-        List<ArchitectureDeclaredTypeSourceAmbiguity> ambiguities)
+        List<ArchitectureDeclaredTypeSourceAmbiguity> ambiguities,
+        IReadOnlyList<ArchitectureTypeSourceDeclaration> sourceDeclarations)
     {
         Dictionary<string, ArchitectureDeclaredTypeFact> uniqueFactsByName = new(_ordinal);
         Dictionary<SourceFactKey, ArchitectureDeclaredTypeFact> factsByAssemblyAndName = new();
@@ -220,6 +225,7 @@ public sealed partial class ArchitectureSourceFileFactIndex
             factsByAssemblyAndName,
             allFacts,
             ambiguities,
+            sourceDeclarations,
             byFile,
             byNamespace);
     }
@@ -307,14 +313,14 @@ public sealed partial class ArchitectureSourceFileFactIndex
     // owning assembly can be determined from the most specific known project subtree.
     // Bounded-parallel across source roots (issue #408): each root's own file enumeration/parse is
     // independent, merged strictly in source-root declaration order — never completion order.
-    private Dictionary<SourceFactKey, List<(string FilePath, ArchitectureTypeKind Kind)>> RunSourceScan()
+    private Dictionary<SourceFactKey, List<SourceDeclaration>> RunSourceScan()
     {
         _profilingCounters?.RecordSourceScanPass();
         IReadOnlyList<(string SourceRoot, string AssemblyName)> ownershipEntries = _sourcePathAssemblyOwnership
             .Select(static entry => (entry.SourcePath, entry.AssemblyName))
             .ToList();
 
-        Dictionary<SourceFactKey, List<(string FilePath, ArchitectureTypeKind Kind)>>[] perRootMaps =
+        Dictionary<SourceFactKey, List<SourceDeclaration>>[] perRootMaps =
             _partitionRunner.Run(
                 _sourceRoots,
                 _maxParallelism,
@@ -323,12 +329,12 @@ public sealed partial class ArchitectureSourceFileFactIndex
                 _profilingCounters,
                 _parallelEligibilityThreshold);
 
-        Dictionary<SourceFactKey, List<(string FilePath, ArchitectureTypeKind Kind)>> sourceMap = [];
-        foreach (Dictionary<SourceFactKey, List<(string FilePath, ArchitectureTypeKind Kind)>> rootMap in perRootMaps)
+        Dictionary<SourceFactKey, List<SourceDeclaration>> sourceMap = [];
+        foreach (Dictionary<SourceFactKey, List<SourceDeclaration>> rootMap in perRootMaps)
         {
-            foreach (KeyValuePair<SourceFactKey, List<(string FilePath, ArchitectureTypeKind Kind)>> entry in rootMap)
+            foreach (KeyValuePair<SourceFactKey, List<SourceDeclaration>> entry in rootMap)
             {
-                if (!sourceMap.TryGetValue(entry.Key, out List<(string FilePath, ArchitectureTypeKind Kind)>? entries))
+                if (!sourceMap.TryGetValue(entry.Key, out List<SourceDeclaration>? entries))
                 {
                     entries = [];
                     sourceMap[entry.Key] = entries;
@@ -341,18 +347,39 @@ public sealed partial class ArchitectureSourceFileFactIndex
         return sourceMap;
     }
 
+    private static IReadOnlyList<ArchitectureTypeSourceDeclaration> BuildSourceDeclarations(
+        Dictionary<SourceFactKey, List<SourceDeclaration>> sourceMap)
+    {
+        return sourceMap
+            .SelectMany(entry => entry.Value.Select(declaration => new ArchitectureTypeSourceDeclaration(
+                entry.Key.AssemblyName,
+                entry.Key.FullTypeName,
+                declaration.Kind,
+                declaration.IsPartial,
+                declaration.FilePath,
+                declaration.SourceLine)))
+            // Overlapping source roots may scan the same declaration more than once; that is not a
+            // second C# declaration and must not consume a type's declaration budget twice.
+            .Distinct()
+            .OrderBy(declaration => declaration.FullTypeName, _ordinal)
+            .ThenBy(declaration => declaration.AssemblyName, _ordinal)
+            .ThenBy(declaration => declaration.SourceFilePath, _ordinal)
+            .ThenBy(declaration => declaration.SourceLine)
+            .ToArray();
+    }
+
     // Step 3: for each owned (assemblyName, CLR name), resolve it to either one source file
     // (enriched) or an ambiguity (partial class across multiple files).
     private static (
         Dictionary<SourceFactKey, SourceInfo> Resolved,
         List<ArchitectureDeclaredTypeSourceAmbiguity> Ambiguities)
         ResolveSourceInfo(
-            Dictionary<SourceFactKey, List<(string FilePath, ArchitectureTypeKind Kind)>> sourceMap)
+            Dictionary<SourceFactKey, List<SourceDeclaration>> sourceMap)
     {
         Dictionary<SourceFactKey, SourceInfo> resolved = [];
         List<ArchitectureDeclaredTypeSourceAmbiguity> ambiguities = [];
 
-        foreach (KeyValuePair<SourceFactKey, List<(string FilePath, ArchitectureTypeKind Kind)>> entry in sourceMap)
+        foreach (KeyValuePair<SourceFactKey, List<SourceDeclaration>> entry in sourceMap)
         {
             SourceFactKey key = entry.Key;
 
@@ -408,7 +435,7 @@ public sealed partial class ArchitectureSourceFileFactIndex
     }
 
     private void ProcessSourceFile(
-        Dictionary<SourceFactKey, List<(string FilePath, ArchitectureTypeKind Kind)>> sourceMap,
+        Dictionary<SourceFactKey, List<SourceDeclaration>> sourceMap,
         string assemblyName,
         string absoluteRoot,
         string absoluteFile)
@@ -444,7 +471,7 @@ public sealed partial class ArchitectureSourceFileFactIndex
     }
 
     private void AddParsedTypes(
-        Dictionary<SourceFactKey, List<(string FilePath, ArchitectureTypeKind Kind)>> sourceMap,
+        Dictionary<SourceFactKey, List<SourceDeclaration>> sourceMap,
         string assemblyName,
         string normalizedFilePath,
         string sourceText)
@@ -453,13 +480,17 @@ public sealed partial class ArchitectureSourceFileFactIndex
             ArchitectureDeclaredTypeParser.ParseSourceText(sourceText, _preprocessorSymbols))
         {
             SourceFactKey key = new(assemblyName, parsed.FullTypeName);
-            if (!sourceMap.TryGetValue(key, out List<(string, ArchitectureTypeKind)>? entries))
+            if (!sourceMap.TryGetValue(key, out List<SourceDeclaration>? entries))
             {
                 entries = [];
                 sourceMap[key] = entries;
             }
 
-            entries.Add((normalizedFilePath, parsed.TypeKind));
+            entries.Add(new SourceDeclaration(
+                normalizedFilePath,
+                parsed.TypeKind,
+                parsed.IsPartial,
+                parsed.SourceLine));
         }
     }
 
@@ -732,11 +763,18 @@ public sealed partial class ArchitectureSourceFileFactIndex
         ArchitectureTypeKind KindFromSource,
         bool IsAmbiguous);
 
+    private sealed record SourceDeclaration(
+        string FilePath,
+        ArchitectureTypeKind Kind,
+        bool IsPartial,
+        int SourceLine);
+
     private sealed record FactIndexData(
         Dictionary<string, ArchitectureDeclaredTypeFact> UniqueFactsByName,
         Dictionary<SourceFactKey, ArchitectureDeclaredTypeFact> FactsByAssemblyAndName,
         IReadOnlyList<ArchitectureDeclaredTypeFact> AllFacts,
         IReadOnlyList<ArchitectureDeclaredTypeSourceAmbiguity> Ambiguities,
+        IReadOnlyList<ArchitectureTypeSourceDeclaration> SourceDeclarations,
         Dictionary<string, IReadOnlyList<ArchitectureDeclaredTypeFact>> ByFile,
         Dictionary<string, IReadOnlyList<ArchitectureDeclaredTypeFact>> ByNamespace);
 }

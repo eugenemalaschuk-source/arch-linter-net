@@ -3,8 +3,13 @@ using ArchLinterNet.Core.Model;
 
 namespace ArchLinterNet.Core.Execution;
 
-public sealed partial class ArchitectureAnalysisSession
+internal sealed class ArchitectureContextualConsumerRegistry
 {
+    private readonly Dictionary<string, ArchitectureContextualConsumerReference> _registeredContextualConsumers =
+        new(StringComparer.Ordinal);
+
+    public IReadOnlyCollection<ArchitectureContextualConsumerReference> Consumers => _registeredContextualConsumers.Values;
+
     internal void RegisterContextualConsumer(ArchitectureContextSelector selector)
     {
         RegisterContextualConsumerCore(source: null, selector);

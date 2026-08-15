@@ -2,17 +2,24 @@ using ArchLinterNet.Core.Contracts;
 
 namespace ArchLinterNet.Core.Execution;
 
-public sealed partial class ArchitectureAnalysisSession
+internal sealed class ArchitectureContractSelectionService
 {
+    private readonly ArchitectureAnalysisSession _session;
+
+    public ArchitectureContractSelectionService(ArchitectureAnalysisSession session)
+    {
+        _session = session ?? throw new ArgumentNullException(nameof(session));
+    }
+
     // Source-set expansion derives per-instance ids ("<authored-id>/<source>"), so selecting the
     // authored id a policy author actually wrote must still select every instance it produced.
     // Contracts that were never expanded fall through to the ordinary id-only check.
     public bool IsContractSelected(IArchitectureContract contract)
     {
-        return IsContractSelected(contract.Id)
-            || (SelectedContractIds is { Count: > 0 }
+        return _session.IsContractSelected(contract.Id)
+            || (_session.SelectedContractIds is { Count: > 0 }
                 && contract is IArchitectureSourceExpandableContract { ExpansionOrigin: { } origin }
-                && SelectedContractIds.Contains(origin.AuthoredContractId));
+                && _session.SelectedContractIds.Contains(origin.AuthoredContractId));
     }
 
     // Every id a request or a coverage contract may legitimately use to name this contract: its own
@@ -33,18 +40,19 @@ public sealed partial class ArchitectureAnalysisSession
     // coverage contract that will actually execute this request already tracks this contract — by
     // its own id or by its authored id — defer entirely to that coverage contract's "unresolved"
     // finding instead of crashing, mirroring CheckConfiguration's "empty layer namespace" deferral.
-    private bool IsDanglingButCoveredByRuleInputCoverage(IArchitectureContract contract)
+    public bool IsDanglingButCoveredByRuleInputCoverage(IArchitectureContract contract)
     {
-        if (contract.Id == null || _ruleInputCoveredContractIdsForMode == null)
+        if (contract.Id == null || _session.RuleInputCoveredContractIdsForMode == null)
         {
             return false;
         }
 
-        if (!ContractIdAliases(contract).Any(_ruleInputCoveredContractIdsForMode.Contains))
+        if (!ContractIdAliases(contract).Any(_session.RuleInputCoveredContractIdsForMode.Contains))
         {
             return false;
         }
 
-        return GetReferencedLayerNames(contract).Any(layerName => !Document.Layers.ContainsKey(layerName));
+        return ArchitectureAnalysisSession.GetReferencedLayerNames(contract)
+            .Any(layerName => !_session.Document.Layers.ContainsKey(layerName));
     }
 }

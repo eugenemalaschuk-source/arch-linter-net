@@ -22,7 +22,8 @@ internal sealed class RawLayoutConventionNodeValidator : IArchitecturePolicyRawD
     {
         "name", "id", "files_matching", ExcludeFilesMatchingKey, "require_type_kind", "forbid_type_kind",
         "required_name_suffix", "required_name_prefix", "forbidden_name_suffix", "forbidden_name_prefix",
-        "require_type_name_matches_file_name", "require_matching_interface", "ignored_violations", "reason"
+        "require_type_name_matches_file_name", "max_declarations_per_type", "require_matching_interface",
+        "ignored_violations", "reason"
     };
 
     public void Validate(ArchitecturePolicyRawDocument document)

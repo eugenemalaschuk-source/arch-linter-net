@@ -151,7 +151,7 @@ public sealed partial class ArchitectureAnalysisSession
     private string? DescribeSemanticGovernance(Type type)
     {
         ArchitectureLayer? layer = Document.Layers.Values
-            .Where(candidate => candidate.Selector != null && MatchesLayer(candidate, type))
+            .Where(candidate => candidate.Selector != null && Facts.MatchesLayer(candidate, type))
             .OrderBy(ArchitectureLayerResolver.DescribeLayer, StringComparer.Ordinal)
             .FirstOrDefault();
         if (layer != null)
@@ -173,7 +173,7 @@ public sealed partial class ArchitectureAnalysisSession
                      .Where(layer => layer.Selector != null && !layer.External)
                      .OrderBy(ArchitectureLayerResolver.DescribeLayer, StringComparer.Ordinal))
         {
-            if (!types.Any(type => RoleIndex.TryGetRole(type, out _) && MatchesLayer(layer, type)))
+            if (!types.Any(type => RoleIndex.TryGetRole(type, out _) && Facts.MatchesLayer(layer, type)))
                 items.Add(new ArchitectureCoverageSummaryEvidenceItem(ArchitectureLayerResolver.DescribeLayer(layer), "semantic selector matched no classified type"));
         }
         foreach (ArchitectureContextualConsumerReference consumer in RegisteredContextualConsumers

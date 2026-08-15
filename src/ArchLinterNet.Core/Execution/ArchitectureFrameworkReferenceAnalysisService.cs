@@ -12,35 +12,42 @@ namespace ArchLinterNet.Core.Execution;
 // evaluation this session caches. The evaluation stays here rather than moving into
 // FrameworkReferenceChecker because it is run-scoped fact resolution shared with
 // CheckConfiguration's fail-closed evaluation-failure surfacing, not family checking.
-public sealed partial class ArchitectureAnalysisSession
+internal sealed class ArchitectureFrameworkReferenceAnalysisService
 {
+    private readonly ArchitectureAnalysisSession _session;
+
     private readonly Dictionary<string, ArchitectureFrameworkReferenceEvaluationResult> _frameworkEvaluationCache =
         new(StringComparer.Ordinal);
 
+    public ArchitectureFrameworkReferenceAnalysisService(ArchitectureAnalysisSession session)
+    {
+        _session = session ?? throw new ArgumentNullException(nameof(session));
+    }
+
     public List<ArchitectureViolation> CheckFrameworkDependencyContract(ArchitectureFrameworkReferenceContract contract)
     {
-        if (!IsContractSelected(contract))
+        if (!_session.IsContractSelected(contract))
         {
             return new List<ArchitectureViolation>();
         }
 
-        ArchitectureContractExecutionContext executionContext = CreateExecutionContext(contract, contract.IgnoredViolations);
-        List<ArchitectureViolation> violations = FrameworkReferenceChecker.Check(contract, CheckerContext, executionContext);
-        executionContext.CollectUnmatchedIgnores(_unmatchedIgnoredViolations);
+        ArchitectureContractExecutionContext executionContext = _session.CreateExecutionContext(contract, contract.IgnoredViolations);
+        List<ArchitectureViolation> violations = FrameworkReferenceChecker.Check(contract, _session.CheckerContext, executionContext);
+        _session.CollectUnmatchedIgnores(executionContext);
         return violations;
     }
 
     public List<ArchitectureViolation> CheckFrameworkAllowOnlyContract(ArchitectureFrameworkReferenceAllowOnlyContract contract)
     {
-        if (!IsContractSelected(contract))
+        if (!_session.IsContractSelected(contract))
         {
             return new List<ArchitectureViolation>();
         }
 
-        ArchitectureContractExecutionContext executionContext = CreateExecutionContext(contract, contract.IgnoredViolations);
+        ArchitectureContractExecutionContext executionContext = _session.CreateExecutionContext(contract, contract.IgnoredViolations);
         List<ArchitectureViolation> violations =
-            FrameworkReferenceChecker.CheckAllowOnly(contract, CheckerContext, executionContext);
-        executionContext.CollectUnmatchedIgnores(_unmatchedIgnoredViolations);
+            FrameworkReferenceChecker.CheckAllowOnly(contract, _session.CheckerContext, executionContext);
+        _session.CollectUnmatchedIgnores(executionContext);
         return violations;
     }
 
@@ -74,7 +81,7 @@ public sealed partial class ArchitectureAnalysisSession
 
     private ArchitectureDiscoveredProject? FindDiscoveredProject(string assemblyName)
     {
-        return Context.ProjectDiscovery?.DiscoveredProjects
+        return _session.Context.ProjectDiscovery?.DiscoveredProjects
             .FirstOrDefault(project => string.Equals(project.AssemblyName, assemblyName, StringComparison.Ordinal));
     }
 
@@ -84,11 +91,11 @@ public sealed partial class ArchitectureAnalysisSession
     // baseline entry does not silently freeze a distinct Release occurrence of the same
     // FrameworkName+TargetFramework, or vice versa.
     internal string ResolvedBuildConfiguration =>
-        string.IsNullOrWhiteSpace(Document.Analysis.Configuration) ? "Debug" : Document.Analysis.Configuration;
+        string.IsNullOrWhiteSpace(_session.Document.Analysis.Configuration) ? "Debug" : _session.Document.Analysis.Configuration;
 
     private ArchitectureFrameworkReferenceEvaluationResult EvaluateFrameworkReferences(ArchitectureDiscoveredProject owningProject)
     {
-        string projectAbsolutePath = Path.GetFullPath(Path.Combine(Context.RepositoryRoot, owningProject.Path));
+        string projectAbsolutePath = Path.GetFullPath(Path.Combine(_session.Context.RepositoryRoot, owningProject.Path));
         string configuration = ResolvedBuildConfiguration;
         string cacheKey = $"{projectAbsolutePath}|{configuration}";
 
@@ -140,7 +147,7 @@ public sealed partial class ArchitectureAnalysisSession
     // used by the contract checks) and reports one configuration violation per project/TFM that
     // MSBuild could not evaluate. A project with no discovered project metadata at all is already
     // reported by AddFrameworkMetadataViolations and is skipped here to avoid duplicate noise.
-    private void AddFrameworkEvaluationFailureViolations(
+    internal void AddFrameworkEvaluationFailureViolations(
         List<ArchitectureViolation> violations, ArchitectureConfigurationReferenceCollector collector)
     {
         foreach ((IArchitectureContract contract, string source) in collector.FrameworkContractSources
@@ -178,7 +185,7 @@ public sealed partial class ArchitectureAnalysisSession
                         "Framework dependency/allow-only contracts require a project that can be evaluated by MSBuild " +
                         "for every configured target framework; without it, this contract cannot be trusted to report violations."
                     });
-                violations.Add(Document.Provenance.Enrich(violation, contract));
+                violations.Add(_session.Document.Provenance.Enrich(violation, contract));
             }
         }
     }

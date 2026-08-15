@@ -38,11 +38,11 @@ public sealed partial class ArchitectureSourceFileFactIndex
         return factsByName;
     }
 
-    private Dictionary<SourceFactKey, List<(string FilePath, ArchitectureTypeKind Kind)>> ScanSourceRoot(
+    private Dictionary<SourceFactKey, List<SourceDeclaration>> ScanSourceRoot(
         string sourceRoot,
         IReadOnlyList<(string SourceRoot, string AssemblyName)> ownershipEntries)
     {
-        Dictionary<SourceFactKey, List<(string FilePath, ArchitectureTypeKind Kind)>> localMap = [];
+        Dictionary<SourceFactKey, List<SourceDeclaration>> localMap = [];
         _cancellationToken.ThrowIfCancellationRequested();
         string normalizedSourceRoot = NormalizeRelativePath(sourceRoot);
         string absoluteRoot = Path.Combine(_repositoryRoot, normalizedSourceRoot);

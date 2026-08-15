@@ -399,7 +399,7 @@ public sealed partial class ArchitectureAnalysisSession
         HashSet<(string, string)> reportedPairs)
     {
         List<string> matchedLayers = internalLayers
-            .Where(kvp => MatchesLayer(kvp.Value, type))
+            .Where(kvp => Facts.MatchesLayer(kvp.Value, type))
             .Select(kvp => kvp.Key)
             .ToList();
 
@@ -685,7 +685,7 @@ public sealed partial class ArchitectureAnalysisSession
         return false;
     }
 
-    private static IEnumerable<string> GetReferencedLayerNames(IArchitectureContract contract)
+    internal static IEnumerable<string> GetReferencedLayerNames(IArchitectureContract contract)
         => ArchitectureRuleInputReferences.For(contract).Select(reference => reference.Layer);
 
     // Shared by GetReferencedLayerNames (dangling-layer deferral, policy-consistency) and

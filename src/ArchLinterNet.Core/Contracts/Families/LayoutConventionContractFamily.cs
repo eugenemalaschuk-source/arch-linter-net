@@ -79,6 +79,9 @@ public sealed class ArchitectureLayoutConventionContract : IArchitectureContract
     [YamlMember(Alias = "require_type_name_matches_file_name")]
     public bool RequireTypeNameMatchesFileName { get; set; }
 
+    [YamlMember(Alias = "max_declarations_per_type")]
+    public int? MaxDeclarationsPerType { get; set; }
+
     [YamlMember(Alias = "require_matching_interface")]
     public ArchitectureRequireMatchingInterface? RequireMatchingInterface { get; set; }
 

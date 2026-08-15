@@ -5,6 +5,8 @@ using ArchLinterNet.Core;
 using ArchLinterNet.Core.Model;
 using ArchLinterNet.Core.Reporting;
 using ArchLinterNet.Core.Validation;
+using ArchitectureDiagnosticFormatter = ArchLinterNet.Core.Reporting.ArchitectureDiagnosticFormatter;
+using ArchitectureSarifFormatter = ArchLinterNet.Core.Reporting.ArchitectureSarifFormatter;
 
 namespace ArchLinterNet.Cli.Commands.Policy;
 

@@ -2,20 +2,6 @@ using ArchLinterNet.Core.Model;
 
 namespace ArchLinterNet.Core.Reporting;
 
-public partial interface IArchitectureSarifFormatter
-{
-    /// <summary>
-    /// Additive overload — see the classificationPathDeferred-style pattern used elsewhere in this
-    /// codebase for why this exists alongside the original overload instead of extending it.
-    /// </summary>
-    string FormatResultAsSarif(
-        string mode,
-        IReadOnlyCollection<ArchitectureViolation> violations,
-        IReadOnlyCollection<string> cycles,
-        IReadOnlyCollection<BuildStatePreflightDiagnostic> preflightDiagnostics,
-        string toolVersion);
-}
-
 public sealed partial class ArchitectureSarifFormatter
 {
     public string FormatResultAsSarif(

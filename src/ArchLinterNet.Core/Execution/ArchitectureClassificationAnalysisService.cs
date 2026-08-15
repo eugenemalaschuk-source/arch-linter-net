@@ -3,10 +3,17 @@ using ArchLinterNet.Core.Scanning;
 
 namespace ArchLinterNet.Core.Execution;
 
-public sealed partial class ArchitectureAnalysisSession
+internal sealed class ArchitectureClassificationAnalysisService
 {
+    private readonly ArchitectureAnalysisSession _session;
+
     private (IReadOnlyList<ArchitectureClassificationConflict> Conflicts, IReadOnlyList<ArchitectureClassificationMetadataFailure> MetadataFailures)?
         _cachedClassificationFacts;
+
+    public ArchitectureClassificationAnalysisService(ArchitectureAnalysisSession session)
+    {
+        _session = session ?? throw new ArgumentNullException(nameof(session));
+    }
 
     // Reads the deduplicated conflict/evidence-extraction-failure facts from RoleIndex's single
     // cached extraction pass, for CLI/CI surfacing. RoleIndex computes these lazily on first access
@@ -20,8 +27,8 @@ public sealed partial class ArchitectureAnalysisSession
         }
 
         cached = (
-            RoleIndex.Conflicts.Select(Document.Provenance.Enrich).ToList(),
-            RoleIndex.MetadataFailures.Select(Document.Provenance.Enrich).ToList());
+            _session.RoleIndex.Conflicts.Select(_session.Document.Provenance.Enrich).ToList(),
+            _session.RoleIndex.MetadataFailures.Select(_session.Document.Provenance.Enrich).ToList());
         _cachedClassificationFacts = cached;
         return cached;
     }
@@ -31,9 +38,9 @@ public sealed partial class ArchitectureAnalysisSession
     {
         List<ArchitectureClassificationRoleFact> roles = new();
 
-        foreach (Type type in RoleIndex.ClassifiedTypes())
+        foreach (Type type in _session.RoleIndex.ClassifiedTypes())
         {
-            if (!RoleIndex.TryGetRole(type, out ArchitectureTypeClassificationResult descriptor))
+            if (!_session.RoleIndex.TryGetRole(type, out ArchitectureTypeClassificationResult descriptor))
             {
                 continue;
             }
@@ -50,6 +57,6 @@ public sealed partial class ArchitectureAnalysisSession
     // classification is deferred pending issue #171, see ArchitecturePolicyDocumentLoader.
     public ArchitectureClassificationPathDeferredNotice? CheckClassificationPathDeferred()
     {
-        return Document.ClassificationPathDeferred;
+        return _session.Document.ClassificationPathDeferred;
     }
 }

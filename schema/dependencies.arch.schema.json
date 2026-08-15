@@ -1755,6 +1755,7 @@
             "forbidden_name_suffix": { "type": "string", "minLength": 1 },
             "forbidden_name_prefix": { "type": "string", "minLength": 1 },
             "require_type_name_matches_file_name": { "type": "boolean", "default": false },
+            "max_declarations_per_type": { "type": "integer", "minimum": 1 },
             "require_matching_interface": { "$ref": "#/$defs/requireMatchingInterface" },
             "ignored_violations": { "$ref": "#/$defs/ignoredViolations" },
             "reason": { "type": "string" }

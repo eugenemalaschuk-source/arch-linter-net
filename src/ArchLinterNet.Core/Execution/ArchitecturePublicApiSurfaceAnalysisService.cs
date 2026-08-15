@@ -8,21 +8,28 @@ using ArchLinterNet.Core.Scanning;
 
 namespace ArchLinterNet.Core.Execution;
 
-public sealed partial class ArchitectureAnalysisSession
+internal sealed class ArchitecturePublicApiSurfaceAnalysisService
 {
+    private readonly ArchitectureAnalysisSession _session;
+
+    public ArchitecturePublicApiSurfaceAnalysisService(ArchitectureAnalysisSession session)
+    {
+        _session = session ?? throw new ArgumentNullException(nameof(session));
+    }
+
     public List<ArchitectureViolation> CheckPublicApiSurfaceContract(ArchitecturePublicApiSurfaceContract contract)
     {
-        if (!IsContractSelected(contract.Id) || IsDanglingButCoveredByRuleInputCoverage(contract))
+        if (!_session.IsContractSelected(contract.Id) || _session.IsDanglingButCoveredByRuleInputCoverage(contract))
         {
             return new List<ArchitectureViolation>();
         }
 
-        ArchitectureContractExecutionContext executionContext = CreateExecutionContext(contract, contract.IgnoredViolations);
-        Dictionary<string, Assembly> resolvedAssemblies = BuildAssemblyLookup();
+        ArchitectureContractExecutionContext executionContext = _session.CreateExecutionContext(contract, contract.IgnoredViolations);
+        Dictionary<string, Assembly> resolvedAssemblies = _session.Facts.BuildAssemblyLookup();
         List<ArchitectureViolation> violations = PublicApiSurfaceChecker.Check(
             contract, resolvedAssemblies, executionContext,
-            PublicApiSurfaceChecker.BuildSurfaceSelectorPredicate(contract, Document, RoleIndex));
-        executionContext.CollectUnmatchedIgnores(_unmatchedIgnoredViolations);
+            PublicApiSurfaceChecker.BuildSurfaceSelectorPredicate(contract, _session.Document, _session.RoleIndex));
+        _session.CollectUnmatchedIgnores(executionContext);
         return violations;
     }
 
@@ -59,9 +66,9 @@ public sealed partial class ArchitectureAnalysisSession
         out IReadOnlyList<string> missingAssemblies,
         out IReadOnlyList<ArchitectureViolation> selectorSafetyViolations)
     {
-        Dictionary<string, Assembly> resolvedAssemblies = BuildAssemblyLookup();
+        Dictionary<string, Assembly> resolvedAssemblies = _session.Facts.BuildAssemblyLookup();
         Func<Type, bool>? selectorPredicate =
-            PublicApiSurfaceChecker.BuildSurfaceSelectorPredicate(contract, Document, RoleIndex);
+            PublicApiSurfaceChecker.BuildSurfaceSelectorPredicate(contract, _session.Document, _session.RoleIndex);
         List<PublicApiSnapshotEntry> entries = new();
         List<string> missing = new();
 
@@ -96,7 +103,7 @@ public sealed partial class ArchitectureAnalysisSession
         // types that simply never resolved, mirroring how exact-diff mode guards the same condition.
         selectorSafetyViolations = missing.Count == 0
             ? PublicApiSurfaceChecker.CheckSelectorSafety(
-                contract, resolvedAssemblies, CreateExecutionContext(contract, contract.IgnoredViolations), selectorPredicate)
+                contract, resolvedAssemblies, _session.CreateExecutionContext(contract, contract.IgnoredViolations), selectorPredicate)
             : Array.Empty<ArchitectureViolation>();
 
         return entries;

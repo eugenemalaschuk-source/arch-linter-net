@@ -3,6 +3,7 @@ using ArchLinterNet.Core.Contracts.Families;
 using ArchLinterNet.Core.Contracts.PolicyImports;
 using ArchLinterNet.Core.Discovery;
 using ArchLinterNet.Core.Execution.Abstractions;
+using ArchLinterNet.Core.Execution.Checkers;
 using ArchLinterNet.Core.Execution.Expressions;
 using ArchLinterNet.Core.Model;
 using ArchLinterNet.Core.Resolution;
@@ -17,20 +18,39 @@ namespace ArchLinterNet.Core.Execution;
 // this session kept for public API stability; handlers receive this session, not the runner.
 public sealed partial class ArchitectureAnalysisSession
 {
-    private const string ConfigurationSource = "<configuration>";
 
     private ArchitectureCoverageInventory? _cachedCoverageInventory;
     private ArchitectureContractDocument? _cachedCoverageInventoryDocument;
 
     private readonly List<ArchitectureUnmatchedIgnoredViolation> _unmatchedIgnoredViolations = new();
 
-    private readonly List<ArchitectureBaselineCandidate> _baselineCandidates = new();
-    private readonly List<ArchitectureBaselineCandidate> _findingIdentityCandidates = new();
-
-    private readonly Dictionary<string, ArchitectureContextualConsumerReference> _registeredContextualConsumers =
-        new(StringComparer.Ordinal);
-
     private HashSet<string>? _ruleInputCoveredContractIdsForMode;
+
+    private readonly ArchitectureConfigurationValidationService _configurationValidationService;
+
+    private readonly ArchitectureCoreContractCheckingService _coreContractCheckingService;
+
+    private readonly ArchitectureSupplementalContractCheckingService _supplementalContractCheckingService;
+
+    private readonly ArchitectureFrameworkReferenceAnalysisService _frameworkReferenceAnalysisService;
+
+    private readonly ArchitectureClassificationAnalysisService _classificationAnalysisService;
+
+    private readonly ArchitectureContextualConsumerRegistry _contextualConsumerRegistry;
+
+    private readonly ArchitecturePublicApiSurfaceAnalysisService _publicApiSurfaceAnalysisService;
+
+    private readonly ArchitectureCycleBaselineCandidateRecorder _cycleBaselineCandidateRecorder = new();
+
+    private readonly ArchitectureFindingIdentityService _findingIdentityService = new();
+
+    private readonly ArchitectureSubtractiveMatcherParticipationRecorder _subtractiveMatcherParticipationRecorder;
+
+    private readonly ArchitectureContractSelectionService _contractSelectionService;
+
+    internal ArchitectureAnalysisFactService Facts { get; }
+
+    private ArchitectureCheckerContext? _checkerContext;
 
     public ArchitectureAnalysisSession(
         ArchitectureAnalysisContext context,
@@ -58,7 +78,17 @@ public sealed partial class ArchitectureAnalysisSession
             new ArchitectureSourceFileFactIndex.ConstructionOptions(
                 context.ProfilingCounters, context.CancellationToken, context.MaxParallelism));
         ExpressionFacts = new ArchitectureExpressionFactService(RoleIndex, SourceFileFactIndex, context.ProjectDiscovery);
+        Facts = new ArchitectureAnalysisFactService(context, document, TypeIndex, RoleIndex, ExpressionFacts);
+        _contextualConsumerRegistry = new ArchitectureContextualConsumerRegistry();
         RegisterAllContextualConsumersFromDocument();
+        _configurationValidationService = new ArchitectureConfigurationValidationService(this);
+        _coreContractCheckingService = new ArchitectureCoreContractCheckingService(this);
+        _supplementalContractCheckingService = new ArchitectureSupplementalContractCheckingService(this);
+        _frameworkReferenceAnalysisService = new ArchitectureFrameworkReferenceAnalysisService(this);
+        _classificationAnalysisService = new ArchitectureClassificationAnalysisService(this);
+        _publicApiSurfaceAnalysisService = new ArchitecturePublicApiSurfaceAnalysisService(this);
+        _subtractiveMatcherParticipationRecorder = new ArchitectureSubtractiveMatcherParticipationRecorder(this);
+        _contractSelectionService = new ArchitectureContractSelectionService(this);
     }
 
     // Registered eagerly at construction, before any contract-family checker (including a future
@@ -103,19 +133,21 @@ public sealed partial class ArchitectureAnalysisSession
 
     internal ArchitectureExpressionFactService ExpressionFacts { get; }
 
+    internal ArchitectureCheckerContext CheckerContext => _checkerContext ??= new ArchitectureCheckerContext(this);
+
     public ArchitectureReferenceGraph ReferenceGraph { get; } = new();
 
     public IReadOnlyList<ArchitectureUnmatchedIgnoredViolation> UnmatchedIgnoredViolations
         => _unmatchedIgnoredViolations;
 
     public IReadOnlyList<ArchitectureBaselineCandidate> BaselineCandidates
-        => _baselineCandidates;
+        => _cycleBaselineCandidateRecorder.Candidates;
 
     // Coverage-participating consumption recorded by contextual dependency/allow-only contracts.
     // See ArchitectureContextualConsumerReference and design.md Decision 7. Nothing consumes this
     // collection yet — it exists so a future coverage change can query it.
     public IReadOnlyCollection<ArchitectureContextualConsumerReference> RegisteredContextualConsumers
-        => _registeredContextualConsumers.Values;
+        => _contextualConsumerRegistry.Consumers;
 
     // Cached per session so multiple future coverage contract handlers share one inventory instead of
     // each rebuilding it; an explicit projectDiscovery override bypasses the cache (test-only substitution).
@@ -139,7 +171,7 @@ public sealed partial class ArchitectureAnalysisSession
         return inventory;
     }
 
-    private ArchitectureContractExecutionContext CreateExecutionContext(
+    internal ArchitectureContractExecutionContext CreateExecutionContext(
         IArchitectureContract contract,
         IReadOnlyList<ArchitectureIgnoredViolation> ignoredViolations)
     {
@@ -150,11 +182,16 @@ public sealed partial class ArchitectureAnalysisSession
             ignoredViolations,
             EnableUnmatchedIgnoreTracking,
             contractGroup,
-            _baselineCandidates,
-            _findingIdentityCandidates);
+            _cycleBaselineCandidateRecorder.CandidateStore,
+            _findingIdentityService.Candidates);
     }
 
-    private string? ResolveContractGroup(IArchitectureContract contract)
+    internal void CollectUnmatchedIgnores(ArchitectureContractExecutionContext executionContext)
+    {
+        executionContext.CollectUnmatchedIgnores(_unmatchedIgnoredViolations);
+    }
+
+    internal string? ResolveContractGroup(IArchitectureContract contract)
     {
         return Catalog.ResolveGroup(contract);
     }
@@ -165,114 +202,61 @@ public sealed partial class ArchitectureAnalysisSession
             || (contractId != null && SelectedContractIds.Contains(contractId));
     }
 
+    public bool IsContractSelected(IArchitectureContract contract) => _contractSelectionService.IsContractSelected(contract);
+
+    internal bool IsDanglingButCoveredByRuleInputCoverage(IArchitectureContract contract) =>
+        _contractSelectionService.IsDanglingButCoveredByRuleInputCoverage(contract);
+
+    internal HashSet<string>? RuleInputCoveredContractIdsForMode => _ruleInputCoveredContractIdsForMode;
+
     // Called once by ArchitectureContractExecutor.Execute before any family loop runs, so every
     // Check*Contract call below can defer a dangling layer reference to rule-input coverage using
     // the exact mode/selection-aware set CheckConfiguration already computes — without each method
     // needing to know "mode" itself.
     public void PrepareRuleInputCoverageDeferral(string mode)
     {
-        _ruleInputCoveredContractIdsForMode = CollectRuleInputCoveredContractIds(mode == "strict");
+        _ruleInputCoveredContractIdsForMode = _configurationValidationService.CollectRuleInputCoveredContractIds(mode == "strict");
     }
 
-    public IEnumerable<ArchitectureDependencyContract> StrictContracts()
-    {
-        return Document.Contracts.Strict;
-    }
+    public IEnumerable<ArchitectureDependencyContract> StrictContracts() => Document.Contracts.Strict;
 
-    public IEnumerable<ArchitectureDependencyContract> AuditContracts()
-    {
-        return Document.Contracts.Audit;
-    }
+    public IEnumerable<ArchitectureDependencyContract> AuditContracts() => Document.Contracts.Audit;
 
-    public IEnumerable<ArchitectureLayerContract> StrictLayerContracts()
-    {
-        return Document.Contracts.StrictLayers;
-    }
+    public IEnumerable<ArchitectureLayerContract> StrictLayerContracts() => Document.Contracts.StrictLayers;
 
-    public IEnumerable<ArchitectureLayerContract> AuditLayerContracts()
-    {
-        return Document.Contracts.AuditLayers;
-    }
+    public IEnumerable<ArchitectureLayerContract> AuditLayerContracts() => Document.Contracts.AuditLayers;
 
-    public IEnumerable<ArchitectureAllowOnlyContract> StrictAllowOnlyContracts()
-    {
-        return Document.Contracts.StrictAllowOnly;
-    }
+    public IEnumerable<ArchitectureAllowOnlyContract> StrictAllowOnlyContracts() => Document.Contracts.StrictAllowOnly;
 
-    public IEnumerable<ArchitectureAllowOnlyContract> AuditAllowOnlyContracts()
-    {
-        return Document.Contracts.AuditAllowOnly;
-    }
+    public IEnumerable<ArchitectureAllowOnlyContract> AuditAllowOnlyContracts() => Document.Contracts.AuditAllowOnly;
 
-    public IEnumerable<ArchitectureCycleContract> StrictCycleContracts()
-    {
-        return Document.Contracts.StrictCycles;
-    }
+    public IEnumerable<ArchitectureCycleContract> StrictCycleContracts() => Document.Contracts.StrictCycles;
 
-    public IEnumerable<ArchitectureCycleContract> AuditCycleContracts()
-    {
-        return Document.Contracts.AuditCycles;
-    }
+    public IEnumerable<ArchitectureCycleContract> AuditCycleContracts() => Document.Contracts.AuditCycles;
 
-    public IEnumerable<ArchitectureMethodBodyContract> StrictMethodBodyContracts()
-    {
-        return Document.Contracts.StrictMethodBody;
-    }
+    public IEnumerable<ArchitectureMethodBodyContract> StrictMethodBodyContracts() => Document.Contracts.StrictMethodBody;
 
-    public IEnumerable<ArchitectureMethodBodyContract> AuditMethodBodyContracts()
-    {
-        return Document.Contracts.AuditMethodBody;
-    }
+    public IEnumerable<ArchitectureMethodBodyContract> AuditMethodBodyContracts() => Document.Contracts.AuditMethodBody;
 
-    public IEnumerable<ArchitectureAsmdefContract> StrictAsmdefContracts()
-    {
-        return Document.Contracts.StrictAsmdef;
-    }
+    public IEnumerable<ArchitectureAsmdefContract> StrictAsmdefContracts() => Document.Contracts.StrictAsmdef;
 
-    public IEnumerable<ArchitectureAsmdefContract> AuditAsmdefContracts()
-    {
-        return Document.Contracts.AuditAsmdef;
-    }
+    public IEnumerable<ArchitectureAsmdefContract> AuditAsmdefContracts() => Document.Contracts.AuditAsmdef;
 
-    public IEnumerable<ArchitectureIndependenceContract> StrictIndependenceContracts()
-    {
-        return Document.Contracts.StrictIndependence;
-    }
+    public IEnumerable<ArchitectureIndependenceContract> StrictIndependenceContracts() => Document.Contracts.StrictIndependence;
 
-    public IEnumerable<ArchitectureIndependenceContract> AuditIndependenceContracts()
-    {
-        return Document.Contracts.AuditIndependence;
-    }
+    public IEnumerable<ArchitectureIndependenceContract> AuditIndependenceContracts() => Document.Contracts.AuditIndependence;
 
-    public IEnumerable<ArchitectureProtectedContract> StrictProtectedContracts()
-    {
-        return Document.Contracts.StrictProtected;
-    }
+    public IEnumerable<ArchitectureProtectedContract> StrictProtectedContracts() => Document.Contracts.StrictProtected;
 
-    public IEnumerable<ArchitectureProtectedContract> AuditProtectedContracts()
-    {
-        return Document.Contracts.AuditProtected;
-    }
+    public IEnumerable<ArchitectureProtectedContract> AuditProtectedContracts() => Document.Contracts.AuditProtected;
 
-    public IEnumerable<ArchitectureExternalDependencyContract> StrictExternalContracts()
-    {
-        return Document.Contracts.StrictExternal;
-    }
+    public IEnumerable<ArchitectureExternalDependencyContract> StrictExternalContracts() => Document.Contracts.StrictExternal;
 
-    public IEnumerable<ArchitectureExternalDependencyContract> AuditExternalContracts()
-    {
-        return Document.Contracts.AuditExternal;
-    }
+    public IEnumerable<ArchitectureExternalDependencyContract> AuditExternalContracts() => Document.Contracts.AuditExternal;
 
-    public IEnumerable<ArchitectureAcyclicSiblingContract> StrictAcyclicSiblingContracts()
-    {
-        return Document.Contracts.StrictAcyclicSiblings;
-    }
+    public IEnumerable<ArchitectureAcyclicSiblingContract> StrictAcyclicSiblingContracts() => Document.Contracts.StrictAcyclicSiblings;
 
-    public IEnumerable<ArchitectureAcyclicSiblingContract> AuditAcyclicSiblingContracts()
-    {
-        return Document.Contracts.AuditAcyclicSiblings;
-    }
+    public IEnumerable<ArchitectureAcyclicSiblingContract> AuditAcyclicSiblingContracts() => Document.Contracts.AuditAcyclicSiblings;
 
     public List<ArchitectureViolation> CheckConfiguration()
     {
@@ -281,451 +265,172 @@ public sealed partial class ArchitectureAnalysisSession
 
     public List<ArchitectureViolation> CheckConfiguration(bool strict)
     {
-        List<ArchitectureViolation> violations = new();
-
-        AddMissingAssemblyViolations(violations);
-        AddDiscoveryDiagnosticViolations(violations);
-
-        ArchitectureConfigurationReferenceCollector collector = BuildConfigurationReferenceCollector(strict);
-        HashSet<string> ruleInputCoveredContractIds = CollectRuleInputCoveredContractIds(strict);
-
-        AddLayerReferenceViolations(violations, collector, ruleInputCoveredContractIds);
-        AddExternalDependencyGroupViolations(violations, collector);
-        AddPackageGroupViolations(violations, collector);
-        AddPackageMetadataViolations(violations, collector);
-        AddFrameworkGroupViolations(violations, collector);
-        AddFrameworkMetadataViolations(violations, collector);
-        AddFrameworkEvaluationFailureViolations(violations, collector);
-        AddProjectMetadataViolations(violations, collector);
-
-        return violations;
+        return _configurationValidationService.Check(strict);
     }
 
-    private void AddMissingAssemblyViolations(List<ArchitectureViolation> violations)
-    {
-        foreach (string missingAssembly in Context.MissingAssemblyNames)
-        {
-            string probeInfo = Context.AssemblyProbingPaths.Count > 0
-                ? $" Probing paths: {string.Join("; ", Context.AssemblyProbingPaths)}"
-                : string.Empty;
+    public List<ArchitectureViolation> CheckContract(ArchitectureDependencyContract contract) =>
+        _coreContractCheckingService.CheckContract(contract);
 
-            var violation = new ArchitectureViolation(
-                ConfigurationSource,
-                null,
-                missingAssembly,
-                "missing target assembly",
-                new[] { $"Assembly '{missingAssembly}' is declared in analysis.target_assemblies but could not be resolved.{probeInfo}" });
-            int index = Document.Analysis.TargetAssemblies.IndexOf(missingAssembly);
-            violations.Add(index < 0
-                ? violation
-                : Document.Provenance.EnrichAtPath(
-                    violation,
-                    ArchitecturePolicyProvenancePath.AppendIndex(
-                        ArchitecturePolicyProvenancePath.AppendProperty(
-                            ArchitecturePolicyProvenancePath.Property("analysis"), "target_assemblies"),
-                        index)));
-        }
-    }
+    public List<ArchitectureViolation> CheckLayerContract(ArchitectureLayerContract contract) =>
+        _coreContractCheckingService.CheckLayerContract(contract);
 
-    private void AddDiscoveryDiagnosticViolations(List<ArchitectureViolation> violations)
-    {
-        foreach (ArchitectureProjectDiscoveryDiagnostic discoveryDiagnostic in Context.DiscoveryDiagnostics)
-        {
-            violations.Add(new ArchitectureViolation(
-                ConfigurationSource,
-                null,
-                discoveryDiagnostic.Subject,
-                discoveryDiagnostic.Kind,
-                new[] { discoveryDiagnostic.Message }));
-        }
-    }
+    public List<ArchitectureViolation> CheckAllowOnlyContract(ArchitectureAllowOnlyContract contract) =>
+        _coreContractCheckingService.CheckAllowOnlyContract(contract);
 
-    private ArchitectureConfigurationReferenceCollector BuildConfigurationReferenceCollector(bool strict)
-    {
-        ArchitectureConfigurationReferenceCollector collector = new();
+    public IReadOnlyCollection<string> CheckCycleContract(ArchitectureCycleContract contract) =>
+        _coreContractCheckingService.CheckCycleContract(contract);
 
-        foreach (ArchitectureContractFamilyDescriptor descriptor in ArchitectureContractFamilyRegistry.All)
-        {
-            if (descriptor.ConfigurationContributor is null)
-            {
-                continue;
-            }
+    public IReadOnlyCollection<string> CheckAcyclicSiblingContract(ArchitectureAcyclicSiblingContract contract) =>
+        _coreContractCheckingService.CheckAcyclicSiblingContract(contract);
 
-            IEnumerable<IArchitectureContract> contracts = strict
-                ? descriptor.StrictContracts(Document.Contracts)
-                : descriptor.AuditContracts(Document.Contracts);
+    public List<ArchitectureViolation> CheckMethodBodyContract(ArchitectureMethodBodyContract contract) =>
+        _coreContractCheckingService.CheckMethodBodyContract(contract);
 
-            foreach (IArchitectureContract contract in contracts)
-            {
-                descriptor.ConfigurationContributor(this, collector, contract);
-            }
-        }
+    public List<ArchitectureViolation> CheckAsmdefContract(ArchitectureAsmdefContract contract) =>
+        _coreContractCheckingService.CheckAsmdefContract(contract);
 
-        return collector;
-    }
+    public List<ArchitectureViolation> CheckIndependenceContract(ArchitectureIndependenceContract contract) =>
+        _coreContractCheckingService.CheckIndependenceContract(contract);
 
-    private void AddLayerReferenceViolations(
+    public List<ArchitectureViolation> CheckExternalContract(ArchitectureExternalDependencyContract contract) =>
+        _coreContractCheckingService.CheckExternalContract(contract);
+
+    public List<ArchitectureViolation> CheckExternalAllowOnlyContract(ArchitectureExternalAllowOnlyContract contract) =>
+        _coreContractCheckingService.CheckExternalAllowOnlyContract(contract);
+
+    public List<ArchitectureViolation> CheckAssemblyIndependenceContract(ArchitectureAssemblyIndependenceContract contract) =>
+        _supplementalContractCheckingService.CheckAssemblyIndependenceContract(contract);
+
+    public List<ArchitectureViolation> CheckPortBoundaryContract(ArchitecturePortBoundaryContract contract) =>
+        _supplementalContractCheckingService.CheckPortBoundaryContract(contract);
+
+    public List<ArchitectureViolation> CheckAttributeUsageContract(ArchitectureAttributeUsageContract contract) =>
+        _supplementalContractCheckingService.CheckAttributeUsageContract(contract);
+
+    public List<ArchitectureViolation> CheckAssemblyDependencyContract(ArchitectureAssemblyDependencyContract contract) =>
+        _supplementalContractCheckingService.CheckAssemblyDependencyContract(contract);
+
+    public List<ArchitectureViolation> CheckAssemblyAllowOnlyContract(ArchitectureAssemblyAllowOnlyContract contract) =>
+        _supplementalContractCheckingService.CheckAssemblyAllowOnlyContract(contract);
+
+    public List<ArchitectureViolation> CheckCompositionContract(ArchitectureCompositionContract contract) =>
+        _supplementalContractCheckingService.CheckCompositionContract(contract);
+
+    public List<ArchitectureViolation> CheckInheritanceContract(ArchitectureInheritanceContract contract) =>
+        _supplementalContractCheckingService.CheckInheritanceContract(contract);
+
+    public List<ArchitectureViolation> CheckInterfaceImplementationContract(ArchitectureInterfaceImplementationContract contract) =>
+        _supplementalContractCheckingService.CheckInterfaceImplementationContract(contract);
+
+    public List<ArchitectureViolation> CheckLayoutConventionsContract(ArchitectureLayoutConventionContract contract) =>
+        _supplementalContractCheckingService.CheckLayoutConventionsContract(contract);
+
+    public List<ArchitectureViolation> CheckPackageDependencyContract(ArchitecturePackageDependencyContract contract) =>
+        _supplementalContractCheckingService.CheckPackageDependencyContract(contract);
+
+    public List<ArchitectureViolation> CheckPackageAllowOnlyContract(ArchitecturePackageAllowOnlyContract contract) =>
+        _supplementalContractCheckingService.CheckPackageAllowOnlyContract(contract);
+
+    public List<ArchitectureViolation> CheckProjectMetadataContract(ArchitectureProjectMetadataContract contract) =>
+        _supplementalContractCheckingService.CheckProjectMetadataContract(contract);
+
+    public List<ArchitectureViolation> CheckProtectedContract(ArchitectureProtectedContract contract) =>
+        _supplementalContractCheckingService.CheckProtectedContract(contract);
+
+    public List<ArchitectureViolation> CheckTypePlacementContract(ArchitectureTypePlacementContract contract) =>
+        _supplementalContractCheckingService.CheckTypePlacementContract(contract);
+
+    public List<ArchitectureViolation> CheckContextDependencyContract(ArchitectureContextDependencyContract contract) =>
+        _supplementalContractCheckingService.CheckContextDependencyContract(contract);
+
+    public List<ArchitectureViolation> CheckContextAllowOnlyContract(ArchitectureContextAllowOnlyContract contract) =>
+        _supplementalContractCheckingService.CheckContextAllowOnlyContract(contract);
+
+    public (IReadOnlyList<ArchitectureClassificationConflict> Conflicts, IReadOnlyList<ArchitectureClassificationMetadataFailure> MetadataFailures)
+        CheckClassificationFacts() => _classificationAnalysisService.CheckClassificationFacts();
+
+    public IReadOnlyList<ArchitectureClassificationRoleFact> CheckClassificationRoles() =>
+        _classificationAnalysisService.CheckClassificationRoles();
+
+    public ArchitectureClassificationPathDeferredNotice? CheckClassificationPathDeferred() =>
+        _classificationAnalysisService.CheckClassificationPathDeferred();
+
+    public List<ArchitectureViolation> CheckPublicApiSurfaceContract(ArchitecturePublicApiSurfaceContract contract) =>
+        _publicApiSurfaceAnalysisService.CheckPublicApiSurfaceContract(contract);
+
+    public IReadOnlyList<PublicApiSnapshotEntry> CapturePublicApiSurface(
+        ArchitecturePublicApiSurfaceContract contract,
+        out IReadOnlyList<string> missingAssemblies) =>
+        _publicApiSurfaceAnalysisService.CapturePublicApiSurface(contract, out missingAssemblies);
+
+    internal IReadOnlyList<PublicApiSnapshotEntry> CapturePublicApiSurface(
+        ArchitecturePublicApiSurfaceContract contract,
+        out IReadOnlyList<string> missingAssemblies,
+        out IReadOnlyList<ArchitectureViolation> selectorSafetyViolations) =>
+        _publicApiSurfaceAnalysisService.CapturePublicApiSurface(
+            contract, out missingAssemblies, out selectorSafetyViolations);
+
+    public List<ArchitectureViolation> CheckFrameworkDependencyContract(ArchitectureFrameworkReferenceContract contract) =>
+        _frameworkReferenceAnalysisService.CheckFrameworkDependencyContract(contract);
+
+    public List<ArchitectureViolation> CheckFrameworkAllowOnlyContract(ArchitectureFrameworkReferenceAllowOnlyContract contract) =>
+        _frameworkReferenceAnalysisService.CheckFrameworkAllowOnlyContract(contract);
+
+    internal ArchitectureDiscoveredFrameworkReference[] ResolveFrameworkReferences(string sourceAssemblyName) =>
+        _frameworkReferenceAnalysisService.ResolveFrameworkReferences(sourceAssemblyName);
+
+    internal string ResolvedBuildConfiguration => _frameworkReferenceAnalysisService.ResolvedBuildConfiguration;
+
+    internal void AddFrameworkEvaluationFailureViolations(
         List<ArchitectureViolation> violations,
-        ArchitectureConfigurationReferenceCollector collector,
-        HashSet<string> ruleInputCoveredContractIds)
+        ArchitectureConfigurationReferenceCollector collector) =>
+        _frameworkReferenceAnalysisService.AddFrameworkEvaluationFailureViolations(violations, collector);
+
+    internal void AddCycleBaselineCandidates(
+        IReadOnlyDictionary<string, HashSet<string>> graph,
+        IReadOnlyCollection<CycleCandidateEvidence> candidateEvidence) =>
+        _cycleBaselineCandidateRecorder.Record(EnableUnmatchedIgnoreTracking, graph, candidateEvidence);
+
+    internal int FindingIdentityCursor => _findingIdentityService.Cursor;
+
+    internal IReadOnlyList<ArchitectureViolation> AttachFindingIdentities(
+        IReadOnlyCollection<ArchitectureViolation> violations,
+        int cursor) => _findingIdentityService.Attach(violations, cursor);
+
+    public IReadOnlyList<ArchitectureSubtractiveMatcherParticipation> SubtractiveMatcherParticipation =>
+        _subtractiveMatcherParticipationRecorder.Participations;
+
+    internal void RecordSubtractiveMatcherParticipation(
+        IArchitectureContract contract,
+        string field,
+        int? index,
+        bool matched,
+        bool evaluationFailed = false,
+        ArchitectureSelectorParticipationKind kind = ArchitectureSelectorParticipationKind.Exclusion) =>
+        _subtractiveMatcherParticipationRecorder.Record(contract, field, index, matched, evaluationFailed, kind);
+
+    internal void RegisterContextualConsumer(ArchitectureContextSelector selector) =>
+        _contextualConsumerRegistry.RegisterContextualConsumer(selector);
+
+    internal void RegisterContextualConsumer(ArchitectureContextSelector source, ArchitectureContextSelector selector) =>
+        _contextualConsumerRegistry.RegisterContextualConsumer(source, selector);
+
+    private void RegisterContextualConsumers(
+        ArchitectureContextSelector source,
+        IEnumerable<ArchitectureContextSelector> targetSelectors,
+        IEnumerable<ArchitectureContextSelector> excludeSelectors)
     {
-        foreach ((string layerName, List<IArchitectureContract> referencingContracts) in
-                 collector.LayerReferencingContracts)
+        RegisterContextualConsumer(source);
+
+        foreach (ArchitectureContextSelector selector in targetSelectors)
         {
-            List<string[]> referencingContractIdAliases = referencingContracts
-                .Select(ContractIdAliases)
-                .Where(aliases => aliases.Length > 0)
-                .ToList();
-            bool isFullyOwnedByRuleInputCoverage = referencingContractIdAliases.Count > 0
-                && referencingContractIdAliases.All(aliases => aliases.Any(ruleInputCoveredContractIds.Contains));
+            RegisterContextualConsumer(source, selector);
+        }
 
-            // A dangling layer name referenced exclusively by contracts a rule_input coverage
-            // contract tracks defers to that coverage contract's own "unresolved" finding
-            // instead of throwing here — otherwise scope: rule_input's unresolved diagnostic
-            // would be unreachable through the real validation pipeline, since this resolution
-            // happens before any contract or coverage check runs.
-            if (!Document.Layers.ContainsKey(layerName) && isFullyOwnedByRuleInputCoverage)
-            {
-                continue;
-            }
-
-            ArchitectureLayer layer;
-            try
-            {
-                layer = ArchitectureLayerResolver.ResolveLayer(Document, ConfigurationSource, layerName);
-            }
-            catch (InvalidOperationException exception)
-            {
-                Exception enriched = Document.Provenance.EnrichValidationException(
-                    exception,
-                    referencingContracts.Cast<object>());
-                if (ReferenceEquals(enriched, exception))
-                {
-                    throw;
-                }
-
-                throw enriched;
-            }
-
-            if (layer.External)
-            {
-                continue;
-            }
-
-            Type[] types = FindTypesInLayer(layer);
-
-            if (types.Length == 0)
-            {
-                // A layer referenced exclusively by contracts that a rule_input coverage contract
-                // explicitly tracks (via contract_ids) defers to that coverage contract's own
-                // empty-input classification and severity instead of also failing here as a hard,
-                // unconditional configuration error — otherwise analysis.coverage and exclude
-                // entries could never actually govern the outcome for these contracts.
-                if (isFullyOwnedByRuleInputCoverage)
-                {
-                    continue;
-                }
-
-                string matchDescription = layer.Selector == null
-                    ? $"namespace '{layer.Namespace}'"
-                    : $"semantic selector '{ArchitectureLayerResolver.DescribeLayer(layer)}'";
-
-                var violation = new ArchitectureViolation(
-                    ConfigurationSource,
-                    null,
-                    ArchitectureLayerResolver.DescribeLayer(layer),
-                    layer.Selector == null ? "empty layer namespace" : "empty layer selector",
-                    new[] { $"Layer '{layerName}' {matchDescription} contains no matching types in loaded assemblies." });
-                violations.Add(Document.Provenance.EnrichAtPath(
-                    violation,
-                    ArchitecturePolicyProvenancePath.AppendProperty(
-                        ArchitecturePolicyProvenancePath.Property("layers"), layerName)));
-            }
+        foreach (ArchitectureContextSelector selector in excludeSelectors)
+        {
+            RegisterContextualConsumer(source, selector);
         }
     }
 
-    private void AddExternalDependencyGroupViolations(
-        List<ArchitectureViolation> violations, ArchitectureConfigurationReferenceCollector collector)
-    {
-        foreach ((string groupName, List<IArchitectureContract> referencingContracts) in
-                 collector.ReferencedExternalGroups)
-        {
-            if (!Document.ExternalDependencies.TryGetValue(groupName, out ArchitectureExternalDependencyGroup? group))
-            {
-                var violation = new ArchitectureViolation(
-                    ConfigurationSource,
-                    null,
-                    groupName,
-                    "unknown external dependency group",
-                    new[]
-                    {
-                        $"External dependency group '{groupName}' is referenced by a contract but is not declared in external_dependencies."
-                    })
-                {
-                    Payload = new ExternalDependencyPayload(groupName)
-                };
-                violations.Add(Document.Provenance.Enrich(
-                    violation,
-                    referencingContracts.FirstOrDefault(),
-                    referencingContracts.Skip(1).Cast<object>()));
-
-                continue;
-            }
-
-            if (ArchitectureExternalDependencyResolver.HasUsableMatchers(group))
-            {
-                continue;
-            }
-
-            var invalidGroup = new ArchitectureViolation(
-                ConfigurationSource,
-                null,
-                groupName,
-                "invalid external dependency group",
-                new[]
-                {
-                    $"External dependency group '{groupName}' must declare at least one non-empty namespace_prefixes or type_prefixes matcher."
-                })
-            {
-                Payload = new ExternalDependencyPayload(groupName)
-            };
-            violations.Add(Document.Provenance.EnrichAtPath(
-                invalidGroup,
-                ArchitecturePolicyProvenancePath.AppendProperty(
-                    ArchitecturePolicyProvenancePath.Property("external_dependencies"), groupName)));
-        }
-    }
-
-    private void AddPackageGroupViolations(
-        List<ArchitectureViolation> violations, ArchitectureConfigurationReferenceCollector collector)
-    {
-        foreach ((string groupName, List<IArchitectureContract> referencingContracts) in
-                 collector.ReferencedPackageGroups)
-        {
-            if (!Document.Packages.TryGetValue(groupName, out ArchitecturePackageGroup? group))
-            {
-                var violation = new ArchitectureViolation(
-                    ConfigurationSource,
-                    null,
-                    groupName,
-                    "unknown package group",
-                    new[]
-                    {
-                        $"Package group '{groupName}' is referenced by a contract but is not declared in packages."
-                    })
-                {
-                    Payload = new PackageDependencyPayload(groupName)
-                };
-                violations.Add(Document.Provenance.Enrich(
-                    violation,
-                    referencingContracts.FirstOrDefault(),
-                    referencingContracts.Skip(1).Cast<object>()));
-
-                continue;
-            }
-
-            if (ArchitecturePackageDependencyResolver.HasUsableMatchers(group))
-            {
-                continue;
-            }
-
-            var invalidGroup = new ArchitectureViolation(
-                ConfigurationSource,
-                null,
-                groupName,
-                "invalid package group",
-                new[]
-                {
-                    $"Package group '{groupName}' must declare at least one non-empty package_ids or package_prefixes matcher."
-                })
-            {
-                Payload = new PackageDependencyPayload(groupName)
-            };
-            violations.Add(Document.Provenance.EnrichAtPath(
-                invalidGroup,
-                ArchitecturePolicyProvenancePath.AppendProperty(
-                    ArchitecturePolicyProvenancePath.Property("packages"), groupName)));
-        }
-    }
-
-    private void AddPackageMetadataViolations(
-        List<ArchitectureViolation> violations, ArchitectureConfigurationReferenceCollector collector)
-    {
-        if (collector.PackageContractSources.Count == 0)
-        {
-            return;
-        }
-
-        HashSet<string> projectsWithPackageData = new(
-            Context.ProjectDiscovery?.DiscoveredProjects.Select(project => project.AssemblyName) ?? Enumerable.Empty<string>(),
-            StringComparer.Ordinal);
-
-        foreach ((IArchitectureContract contract, string source) in collector.PackageContractSources
-                     .DistinctBy(entry => (entry.Contract, entry.Source)))
-        {
-            if (projectsWithPackageData.Contains(source))
-            {
-                continue;
-            }
-
-            var violation = new ArchitectureViolation(
-                contract.Name,
-                contract.Id,
-                source,
-                "no package metadata discovered",
-                new[]
-                {
-                    $"Contract '{contract.Name}' declares source '{source}', but no discovered project with that assembly name has package reference metadata available. " +
-                    "Package dependency/allow-only contracts require analysis.solution or analysis.projects to be configured so project discovery can parse PackageReference items; " +
-                    "without it, this contract will never report a violation."
-                });
-            violations.Add(Document.Provenance.Enrich(violation, contract));
-        }
-    }
-
-    private void AddFrameworkGroupViolations(
-        List<ArchitectureViolation> violations, ArchitectureConfigurationReferenceCollector collector)
-    {
-        foreach ((string groupName, List<IArchitectureContract> referencingContracts) in
-                 collector.ReferencedFrameworkGroups)
-        {
-            if (!Document.FrameworkReferences.TryGetValue(groupName, out ArchitectureFrameworkReferenceGroup? group))
-            {
-                var violation = new ArchitectureViolation(
-                    ConfigurationSource,
-                    null,
-                    groupName,
-                    "unknown framework group",
-                    new[]
-                    {
-                        $"Framework group '{groupName}' is referenced by a contract but is not declared in framework_references."
-                    })
-                {
-                    Payload = new FrameworkReferencePayload(groupName)
-                };
-                violations.Add(Document.Provenance.Enrich(
-                    violation,
-                    referencingContracts.FirstOrDefault(),
-                    referencingContracts.Skip(1).Cast<object>()));
-
-                continue;
-            }
-
-            if (ArchitectureFrameworkReferenceResolver.HasUsableMatchers(group))
-            {
-                continue;
-            }
-
-            var invalidGroup = new ArchitectureViolation(
-                ConfigurationSource,
-                null,
-                groupName,
-                "invalid framework group",
-                new[]
-                {
-                    $"Framework group '{groupName}' must declare at least one non-empty framework_names or framework_name_prefixes matcher."
-                })
-            {
-                Payload = new FrameworkReferencePayload(groupName)
-            };
-            violations.Add(Document.Provenance.EnrichAtPath(
-                invalidGroup,
-                ArchitecturePolicyProvenancePath.AppendProperty(
-                    ArchitecturePolicyProvenancePath.Property("framework_references"), groupName)));
-        }
-    }
-
-    private void AddFrameworkMetadataViolations(
-        List<ArchitectureViolation> violations, ArchitectureConfigurationReferenceCollector collector)
-    {
-        if (collector.FrameworkContractSources.Count == 0)
-        {
-            return;
-        }
-
-        HashSet<string> projectsWithFrameworkData = new(
-            Context.ProjectDiscovery?.DiscoveredProjects.Select(project => project.AssemblyName) ?? Enumerable.Empty<string>(),
-            StringComparer.Ordinal);
-
-        foreach ((IArchitectureContract contract, string source) in collector.FrameworkContractSources
-                     .DistinctBy(entry => (entry.Contract, entry.Source)))
-        {
-            if (projectsWithFrameworkData.Contains(source))
-            {
-                continue;
-            }
-
-            var violation = new ArchitectureViolation(
-                contract.Name,
-                contract.Id,
-                source,
-                "no project metadata discovered",
-                new[]
-                {
-                    $"Contract '{contract.Name}' declares source '{source}', but no discovered project with that assembly name has project metadata available. " +
-                    "Framework dependency/allow-only contracts require analysis.solution or analysis.projects to be configured so project discovery can parse FrameworkReference items; " +
-                    "without it, this contract will never report a violation."
-                });
-            violations.Add(Document.Provenance.Enrich(violation, contract));
-        }
-    }
-
-    private void AddProjectMetadataViolations(
-        List<ArchitectureViolation> violations, ArchitectureConfigurationReferenceCollector collector)
-    {
-        if (collector.ProjectMetadataContractProjects.Count == 0)
-        {
-            return;
-        }
-
-        HashSet<string> discoveredProjectPaths = new(
-            Context.ProjectDiscovery?.DiscoveredProjects.Select(project => ProjectPathNormalizer.Normalize(project.Path))
-            ?? Enumerable.Empty<string>(),
-            StringComparer.OrdinalIgnoreCase);
-
-        foreach ((IArchitectureContract contract, string projectPath) in collector.ProjectMetadataContractProjects
-                     .DistinctBy(entry => (entry.Contract, entry.ProjectPath)))
-        {
-            if (discoveredProjectPaths.Contains(projectPath))
-            {
-                continue;
-            }
-
-            var violation = new ArchitectureViolation(
-                contract.Name,
-                contract.Id,
-                projectPath,
-                "no project metadata discovered",
-                new[]
-                {
-                    $"Contract '{contract.Name}' targets project '{projectPath}', but project discovery did not expose metadata for that path. " +
-                    "Project metadata contracts require analysis.solution or analysis.projects to discover and parse the matching .csproj file."
-                })
-            {
-                Payload = new ProjectMetadataPayload(ProjectMetadataKind: "missing_project")
-            };
-            violations.Add(Document.Provenance.Enrich(violation, contract));
-        }
-    }
-
-    // Only contracts that ArchitectureContractExecutor will actually run for this request can
-    // defer CheckConfiguration's hard failure: ContractsFor(mode, "coverage") only executes the
-    // group matching the current mode (strict_coverage for strict, audit_coverage for audit), and
-    // CheckCoverageContract itself no-ops when the coverage contract isn't selected. Deferring
-    // for a coverage contract that won't run this request would silently drop the finding
-    // entirely instead of handing it off — the same false-green risk this deferral exists to
-    // avoid in the first place.
-    private HashSet<string> CollectRuleInputCoveredContractIds(bool strict)
-    {
-        IEnumerable<ArchitectureCoverageContract> coverageContractsForMode = strict
-            ? Document.Contracts.StrictCoverage
-            : Document.Contracts.AuditCoverage;
-
-        return new HashSet<string>(
-            coverageContractsForMode
-                .Where(c => string.Equals(c.Scope, "rule_input", StringComparison.Ordinal))
-                .Where(c => IsContractSelected(c.Id))
-                .SelectMany(c => c.ContractIds),
-            StringComparer.OrdinalIgnoreCase);
-    }
 }

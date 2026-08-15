@@ -382,6 +382,36 @@ public sealed partial class ArchitectureSarifFormatterTests
         Assert.That(message, Does.Contain("ref1"));
     }
 
+    [Test]
+    public void FormatResultAsSarif_LayoutConventionDeclarationCount_ExposesStructuredDetails()
+    {
+        var violations = new List<ArchitectureViolation>
+        {
+            new("layout-rule", "layout-id", "Layout.Source", "expected at most 1 source declaration(s), found 2", _ref1)
+            {
+                Payload = new LayoutConventionPayload(MatchedFilePath: "src/App/Services/OrderService.Part1.cs")
+                {
+                    ExpectedDeclarationCount = 1,
+                    ActualDeclarationCount = 2,
+                    DeclarationPaths = ["src/App/Services/OrderService.Part1.cs", "src/App/Services/OrderService.Part2.cs"],
+                },
+            },
+        };
+
+        JsonElement root = Run("strict", violations);
+
+        JsonElement properties = root.GetProperty("runs")[0].GetProperty("results")[0].GetProperty("properties");
+        Assert.Multiple(() =>
+        {
+            Assert.That(properties.GetProperty("expected_declaration_count").GetInt32(), Is.EqualTo(1));
+            Assert.That(properties.GetProperty("actual_declaration_count").GetInt32(), Is.EqualTo(2));
+            Assert.That(properties.GetProperty("declaration_paths")[1].GetString(),
+                Is.EqualTo("src/App/Services/OrderService.Part2.cs"));
+            Assert.That(properties.GetProperty("arch_linter_net").GetProperty("expected_declaration_count").GetInt32(),
+                Is.EqualTo(1));
+        });
+    }
+
     // Regression: MatchedFilePath is a real repository-relative .cs path, unlike every other
     // family's SourceType (a fully-qualified type name) - it must produce a SARIF physicalLocation
     // so GitHub Code Scanning can anchor the finding to that file, not fall back to logicalLocations.

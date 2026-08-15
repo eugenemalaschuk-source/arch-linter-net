@@ -18,6 +18,13 @@ contracts:
       reason: Exception types must be self-contained; System.Exception is a BCL base type and is intentionally outside first-party dependency checking.
 
   audit_layout_conventions:
+    - name: production-types-have-one-source-declaration
+      id: production-types-have-one-source-declaration
+      files_matching:
+        folder_segment: src
+      max_declarations_per_type: 1
+      reason: A production type must have one source declaration; extract collaborators instead of extending a type through partial files.
+
     - name: production-interfaces-live-in-abstractions
       id: production-interfaces-live-in-abstractions
       files_matching:

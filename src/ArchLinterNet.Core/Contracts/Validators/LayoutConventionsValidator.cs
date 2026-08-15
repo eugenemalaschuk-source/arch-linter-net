@@ -23,6 +23,7 @@ internal sealed class LayoutConventionsValidator : IArchitecturePolicyDocumentVa
                 || !string.IsNullOrEmpty(contract.ForbiddenNameSuffix)
                 || !string.IsNullOrEmpty(contract.ForbiddenNamePrefix)
                 || contract.RequireTypeNameMatchesFileName
+                || contract.MaxDeclarationsPerType is not null
                 || contract.RequireMatchingInterface != null;
 
             if (!hasExpectation)
@@ -31,11 +32,12 @@ internal sealed class LayoutConventionsValidator : IArchitecturePolicyDocumentVa
                     $"Layout convention contract '{contract.Name}' declares a files_matching selector but no " +
                     "expectation (require_type_kind/forbid_type_kind/required_name_suffix/required_name_prefix/" +
                     "forbidden_name_suffix/forbidden_name_prefix/require_type_name_matches_file_name/" +
-                    "require_matching_interface). Declare at least one, or the rule can never produce a violation.");
+                    "max_declarations_per_type/require_matching_interface). Declare at least one, or the rule can never produce a violation.");
             }
 
             ValidateTypeKind(contract.Name, "require_type_kind", contract.RequireTypeKind);
             ValidateTypeKind(contract.Name, "forbid_type_kind", contract.ForbidTypeKind);
+            ValidateMaxDeclarationsPerType(contract.Name, contract.MaxDeclarationsPerType);
         }
     }
 
@@ -69,5 +71,17 @@ internal sealed class LayoutConventionsValidator : IArchitecturePolicyDocumentVa
                 $"Layout convention contract '{contractName}' declares '{fieldName}: {value}', which is not a " +
                 "recognized type kind. Expected one of: class, interface, struct, enum, record, delegate.");
         }
+    }
+
+    private static void ValidateMaxDeclarationsPerType(string contractName, int? value)
+    {
+        if (value is not <= 0)
+        {
+            return;
+        }
+
+        throw new InvalidOperationException(
+            $"Layout convention contract '{contractName}' declares 'max_declarations_per_type: {value}', " +
+            "which must be a positive integer.");
     }
 }

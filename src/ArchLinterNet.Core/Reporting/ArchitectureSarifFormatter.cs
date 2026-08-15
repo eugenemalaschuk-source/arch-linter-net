@@ -2,17 +2,9 @@ using System.Text.Json;
 using System.Text.RegularExpressions;
 using ArchLinterNet.Core.Contracts;
 using ArchLinterNet.Core.Model;
+using ArchLinterNet.Core.Reporting.Abstractions;
 
 namespace ArchLinterNet.Core.Reporting;
-
-public partial interface IArchitectureSarifFormatter
-{
-    string FormatResultAsSarif(
-        string mode,
-        IReadOnlyCollection<ArchitectureViolation> violations,
-        IReadOnlyCollection<string> cycles,
-        string toolVersion);
-}
 
 public sealed partial class ArchitectureSarifFormatter : IArchitectureSarifFormatter
 {
@@ -71,8 +63,8 @@ public sealed partial class ArchitectureSarifFormatter : IArchitectureSarifForma
         string toolVersion,
         IReadOnlyCollection<BuildStatePreflightDiagnostic> preflightDiagnostics,
         IReadOnlyCollection<ArchitectureCoverageSummary>? coverageSummaries = null,
-        Model.ArchitectureSourceExpansionInventory? sourceExpansion = null,
-        IReadOnlyCollection<Model.ArchitectureSubtractiveMatcherParticipation>? subtractiveMatcherParticipation = null,
+        ArchitectureSourceExpansionInventory? sourceExpansion = null,
+        IReadOnlyCollection<ArchitectureSubtractiveMatcherParticipation>? subtractiveMatcherParticipation = null,
         CancellationToken cancellationToken = default)
     {
         string level = mode == "strict" ? "error" : "warning";
@@ -135,10 +127,10 @@ public sealed partial class ArchitectureSarifFormatter : IArchitectureSarifForma
                     [PropertiesKey] = new Dictionary<string, object?>
                     {
                         ["coverage_summary"] = FormatCoverageSummaries(coverageSummaries ?? Array.Empty<ArchitectureCoverageSummary>()),
-                        ["source_set_expansion"] = FormatSourceExpansion(
-                            sourceExpansion ?? Model.ArchitectureSourceExpansionInventory.Empty),
-                        ["subtractive_matcher_participation"] = FormatSubtractiveMatcherParticipation(
-                            subtractiveMatcherParticipation ?? Array.Empty<Model.ArchitectureSubtractiveMatcherParticipation>())
+                        ["source_set_expansion"] = Reporting.ArchitectureSarifFormatter.FormatSourceExpansion(
+                            sourceExpansion ?? ArchitectureSourceExpansionInventory.Empty),
+                        ["subtractive_matcher_participation"] = Reporting.ArchitectureSarifFormatter.FormatSubtractiveMatcherParticipation(
+                            subtractiveMatcherParticipation ?? Array.Empty<ArchitectureSubtractiveMatcherParticipation>())
                     },
                 },
             },
@@ -262,6 +254,11 @@ public sealed partial class ArchitectureSarifFormatter : IArchitectureSarifForma
             return BuildPublicApiSurfaceProperties(publicApiSurface);
         }
 
+        if (diagnostic is LayoutConventionDiagnostic layoutConvention)
+        {
+            return BuildLayoutConventionProperties(layoutConvention);
+        }
+
         IReadOnlyCollection<FrameworkReferenceEvidence>? evidence = diagnostic switch
         {
             FrameworkReferenceDiagnostic d => d.Evidence,
@@ -326,6 +323,28 @@ public sealed partial class ArchitectureSarifFormatter : IArchitectureSarifForma
 
         if (publicApiSurface.ForbiddenPublicConstant != null)
             properties["forbidden_public_constant"] = publicApiSurface.ForbiddenPublicConstant;
+
+        return properties;
+    }
+
+    private static Dictionary<string, object?>? BuildLayoutConventionProperties(LayoutConventionDiagnostic layoutConvention)
+    {
+        if (layoutConvention.ExpectedDeclarationCount == null
+            && layoutConvention.ActualDeclarationCount == null
+            && layoutConvention.DeclarationPaths == null)
+        {
+            return null;
+        }
+
+        var properties = new Dictionary<string, object?>();
+        if (layoutConvention.ExpectedDeclarationCount != null)
+            properties["expected_declaration_count"] = layoutConvention.ExpectedDeclarationCount;
+
+        if (layoutConvention.ActualDeclarationCount != null)
+            properties["actual_declaration_count"] = layoutConvention.ActualDeclarationCount;
+
+        if (layoutConvention.DeclarationPaths != null)
+            properties["declaration_paths"] = layoutConvention.DeclarationPaths.ToArray();
 
         return properties;
     }

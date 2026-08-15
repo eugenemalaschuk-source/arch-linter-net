@@ -8,14 +8,21 @@ namespace ArchLinterNet.Core.Execution;
 // session-owned run state; TypePlacementChecker and LayoutConventionChecker append to it through
 // ArchitectureCheckerContext's recording port as each contract that declares these matchers
 // executes, so record order stays purely a function of contract-family execution order.
-public sealed partial class ArchitectureAnalysisSession
+internal sealed class ArchitectureSubtractiveMatcherParticipationRecorder
 {
+    private readonly ArchitectureAnalysisSession _session;
+
     private readonly List<ArchitectureSubtractiveMatcherParticipation> _subtractiveMatcherParticipation = new();
 
-    public IReadOnlyList<ArchitectureSubtractiveMatcherParticipation> SubtractiveMatcherParticipation
+    public ArchitectureSubtractiveMatcherParticipationRecorder(ArchitectureAnalysisSession session)
+    {
+        _session = session ?? throw new ArgumentNullException(nameof(session));
+    }
+
+    public IReadOnlyList<ArchitectureSubtractiveMatcherParticipation> Participations
         => _subtractiveMatcherParticipation;
 
-    internal void RecordSubtractiveMatcherParticipation(
+    public void Record(
         IArchitectureContract contract,
         string field,
         int? index,
@@ -35,7 +42,7 @@ public sealed partial class ArchitectureAnalysisSession
 
     private ArchitecturePolicySourceLocation? ItemLocation(IArchitectureContract contract, string field, int? index)
     {
-        ArchitecturePolicySourceLocation? contractLocation = Document.Provenance.LocationFor(contract);
+        ArchitecturePolicySourceLocation? contractLocation = _session.Document.Provenance.LocationFor(contract);
         if (contractLocation is null)
         {
             return null;
@@ -46,14 +53,14 @@ public sealed partial class ArchitectureAnalysisSession
         {
             path = ArchitecturePolicyProvenancePath.AppendIndex(path, itemIndex);
         }
-        return Document.Provenance.TryGetLocation(path, out ArchitecturePolicySourceLocation? location)
+        return _session.Document.Provenance.TryGetLocation(path, out ArchitecturePolicySourceLocation? location)
             ? location
             : contractLocation with { YamlPath = path };
     }
 
     private ArchitectureSelectorParticipationMode ResolveSelectorParticipationMode(IArchitectureContract contract)
     {
-        string? group = ResolveContractGroup(contract);
+        string? group = _session.ResolveContractGroup(contract);
         if (group is null)
         {
             return ArchitectureSelectorParticipationMode.Unknown;

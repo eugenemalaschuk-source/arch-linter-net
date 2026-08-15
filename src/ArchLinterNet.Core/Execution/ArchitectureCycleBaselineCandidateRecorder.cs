@@ -1,14 +1,23 @@
+using ArchLinterNet.Core.Contracts;
 using ArchLinterNet.Core.Execution.Checkers;
+using ArchLinterNet.Core.Model;
 
 namespace ArchLinterNet.Core.Execution;
 
-public sealed partial class ArchitectureAnalysisSession
+internal sealed class ArchitectureCycleBaselineCandidateRecorder
 {
-    private void AddCycleBaselineCandidates(
+    private readonly List<ArchitectureBaselineCandidate> _candidates = new();
+
+    public IReadOnlyList<ArchitectureBaselineCandidate> Candidates => _candidates;
+
+    internal List<ArchitectureBaselineCandidate> CandidateStore => _candidates;
+
+    public void Record(
+        bool enabled,
         IReadOnlyDictionary<string, HashSet<string>> graph,
         IReadOnlyCollection<CycleCandidateEvidence> candidateEvidence)
     {
-        if (!EnableUnmatchedIgnoreTracking)
+        if (!enabled)
         {
             return;
         }
@@ -16,7 +25,7 @@ public sealed partial class ArchitectureAnalysisSession
         foreach (CycleCandidateEvidence evidence in candidateEvidence.Where(
             evidence => EdgeParticipatesInCycle(graph, evidence.SourceLayerName, evidence.TargetLayerName)))
         {
-            _baselineCandidates.Add(evidence.Candidate);
+            _candidates.Add(evidence.Candidate);
         }
     }
 

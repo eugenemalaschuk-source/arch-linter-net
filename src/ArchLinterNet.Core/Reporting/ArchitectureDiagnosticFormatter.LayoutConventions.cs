@@ -35,6 +35,14 @@ public sealed partial class ArchitectureDiagnosticFormatter
             parts.Add($"expected_counterpart: {layoutConvention.ExpectedCounterpartName}");
         }
 
+        if (layoutConvention.ExpectedDeclarationCount != null)
+        {
+            parts.Add(
+                $"expected_declaration_count: <= {layoutConvention.ExpectedDeclarationCount}, " +
+                $"actual_declaration_count: {layoutConvention.ActualDeclarationCount}, " +
+                $"declaration_paths: {string.Join(", ", layoutConvention.DeclarationPaths ?? Array.Empty<string>())}");
+        }
+
         if (layoutConvention.WhenExpressions is { Count: > 0 })
         {
             string whenSuffix = FormatWhenExpressionsForHumans(layoutConvention.WhenExpressions);
@@ -63,6 +71,15 @@ public sealed partial class ArchitectureDiagnosticFormatter
 
         if (layoutConvention.ExpectedCounterpartName != null)
             obj["expected_counterpart_name"] = layoutConvention.ExpectedCounterpartName;
+
+        if (layoutConvention.ExpectedDeclarationCount != null)
+            obj["expected_declaration_count"] = layoutConvention.ExpectedDeclarationCount;
+
+        if (layoutConvention.ActualDeclarationCount != null)
+            obj["actual_declaration_count"] = layoutConvention.ActualDeclarationCount;
+
+        if (layoutConvention.DeclarationPaths != null)
+            obj["declaration_paths"] = layoutConvention.DeclarationPaths.ToArray();
 
         if (layoutConvention.DataUnavailable)
             obj["data_unavailable"] = layoutConvention.DataUnavailable;

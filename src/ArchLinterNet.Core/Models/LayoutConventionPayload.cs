@@ -10,6 +10,9 @@ public sealed record LayoutConventionPayload(
     bool DataUnavailable = false)
     : IArchitectureDiagnosticPayload
 {
+    public int? ExpectedDeclarationCount { get; init; }
+    public int? ActualDeclarationCount { get; init; }
+    public IReadOnlyList<string>? DeclarationPaths { get; init; }
     public IReadOnlyList<ExpressionParticipation>? WhenExpressions { get; init; }
     public ArchitectureDiagnostic ToDiagnostic(ArchitectureViolation violation) =>
         new LayoutConventionDiagnostic(
@@ -23,6 +26,9 @@ public sealed record LayoutConventionPayload(
             ExpectedTypeName = ExpectedTypeName,
             ActualTypeName = ActualTypeName,
             ExpectedCounterpartName = ExpectedCounterpartName,
+            ExpectedDeclarationCount = ExpectedDeclarationCount,
+            ActualDeclarationCount = ActualDeclarationCount,
+            DeclarationPaths = DeclarationPaths,
             DataUnavailable = DataUnavailable,
             WhenExpressions = WhenExpressions
         };

@@ -27,6 +27,24 @@ public sealed class ArchitectureDeclaredTypeParserTests
         Assert.That(types[0].SimpleTypeName, Is.EqualTo("Order"));
         Assert.That(types[0].Namespace, Is.EqualTo("MyApp.Domain"));
         Assert.That(types[0].TypeKind, Is.EqualTo(ArchitectureTypeKind.Class));
+        Assert.That(types[0].IsPartial, Is.False);
+        Assert.That(types[0].SourceLine, Is.EqualTo(1));
+    }
+
+    [Test]
+    public void ParseSourceText_PartialClass_RecordsModifierAndSourceLine()
+    {
+        IReadOnlyList<ArchitectureDeclaredTypeParser.ParsedTypeInfo> types =
+            ArchitectureDeclaredTypeParser.ParseSourceText("""
+                namespace MyApp;
+
+                public partial class Order
+                {
+                }
+                """);
+
+        Assert.That(types.Single().IsPartial, Is.True);
+        Assert.That(types.Single().SourceLine, Is.EqualTo(3));
     }
 
     [Test]
