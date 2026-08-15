@@ -6,11 +6,12 @@ Checkpoint B has grown into a release acceptance pipeline hidden behind one NUni
 
 ## What Changes
 
-- Split the Checkpoint B scenario oracle into four deterministic scenario shards while keeping the complete local `make test-packed-artifact` gate.
+- Split the Checkpoint B scenario oracle into eleven deterministic scenario shards while keeping the complete local `make test-packed-artifact` gate.
 - Prepare one immutable, manifest-bound candidate per PR/release workflow and distribute it to isolated shard runners.
 - Merge shard evidence fail-closed into the existing canonical one-record-per-platform evidence contract.
 - Preserve the existing required PR check names as fan-in checks so the active `Main` ruleset remains authoritative.
 - Add a repository-acceptance target that excludes packed-artifact proof for release workflow stages where the immutable candidate is validated separately.
+- Build the release-version candidate after repository acceptance, so the `--no-build` package step embeds assemblies whose CLI version agrees with the manifest-bound package version.
 - Make subprocess waits cancellation-aware and kill descendant process trees on timeout/cancellation.
 
 ## Scope

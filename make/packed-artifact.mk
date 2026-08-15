@@ -1,15 +1,30 @@
 .PHONY: test-repository _repository-acceptance-test prepare-packed-artifact-candidate \
-	test-packed-artifact-package-and-entrypoints test-packed-artifact-adopter-runtime \
-	test-packed-artifact-consumer-cleanup test-packed-artifact-public-api-surface-selector
+	test-packed-artifact-package-and-entrypoints test-packed-artifact-adopter-runtime-core \
+	test-packed-artifact-adopter-runtime-extended \
+	test-packed-artifact-consumer-cleanup-policy-execution \
+	test-packed-artifact-consumer-cleanup-dependency-contract-id-parity \
+	test-packed-artifact-consumer-cleanup-layer-overlap-and-policy-shape \
+	test-packed-artifact-consumer-cleanup-configuration-and-identity \
+	test-packed-artifact-consumer-cleanup-source-set-authoring \
+	test-packed-artifact-public-api-surface-selector-snapshot-and-role \
+	test-packed-artifact-public-api-surface-selector-delta-and-membership \
+	test-packed-artifact-public-api-surface-selector-enforcement
 
 # Checkpoint B CI/release sharding. The ordinary `test-packed-artifact` target remains the complete
 # local gate and discovers all CheckpointBReleaseGateTests methods in one NUnit process. These
 # method-specific targets exist so isolated CI workspaces can spend runner-minutes to reduce the
 # packed-artifact wall-clock while preserving the exact scenario union.
 TEST_PACKED_ARTIFACT_PACKAGE_AND_ENTRYPOINTS_FILTER := FullyQualifiedName~CheckpointBReleaseGateTests.PackedCandidate_PackageAndEntrypoints
-TEST_PACKED_ARTIFACT_ADOPTER_RUNTIME_FILTER := FullyQualifiedName~CheckpointBReleaseGateTests.PackedCandidate_AdopterRuntimeMatrix
-TEST_PACKED_ARTIFACT_CONSUMER_CLEANUP_FILTER := FullyQualifiedName~CheckpointBReleaseGateTests.PackedCandidate_ConsumerCleanupMatrix
-TEST_PACKED_ARTIFACT_PUBLIC_API_SURFACE_SELECTOR_FILTER := FullyQualifiedName~CheckpointBReleaseGateTests.PackedCandidate_PublicApiSurfaceSelectorMatrix
+TEST_PACKED_ARTIFACT_ADOPTER_RUNTIME_CORE_FILTER := FullyQualifiedName~CheckpointBReleaseGateTests.PackedCandidate_AdopterRuntimeCore
+TEST_PACKED_ARTIFACT_ADOPTER_RUNTIME_EXTENDED_FILTER := FullyQualifiedName~CheckpointBReleaseGateTests.PackedCandidate_AdopterRuntimeExtended
+TEST_PACKED_ARTIFACT_CONSUMER_CLEANUP_POLICY_EXECUTION_FILTER := FullyQualifiedName~CheckpointBReleaseGateTests.PackedCandidate_ConsumerCleanupPolicyExecution
+TEST_PACKED_ARTIFACT_CONSUMER_CLEANUP_DEPENDENCY_CONTRACT_ID_PARITY_FILTER := FullyQualifiedName~CheckpointBReleaseGateTests.PackedCandidate_ConsumerCleanupDependencyContractIdParity
+TEST_PACKED_ARTIFACT_CONSUMER_CLEANUP_LAYER_OVERLAP_AND_POLICY_SHAPE_FILTER := FullyQualifiedName~CheckpointBReleaseGateTests.PackedCandidate_ConsumerCleanupLayerOverlapAndPolicyShape
+TEST_PACKED_ARTIFACT_CONSUMER_CLEANUP_CONFIGURATION_AND_IDENTITY_FILTER := FullyQualifiedName~CheckpointBReleaseGateTests.PackedCandidate_ConsumerCleanupConfigurationAndIdentity
+TEST_PACKED_ARTIFACT_CONSUMER_CLEANUP_SOURCE_SET_AUTHORING_FILTER := FullyQualifiedName~CheckpointBReleaseGateTests.PackedCandidate_ConsumerCleanupSourceSetAuthoring
+TEST_PACKED_ARTIFACT_PUBLIC_API_SURFACE_SELECTOR_SNAPSHOT_AND_ROLE_FILTER := FullyQualifiedName~CheckpointBReleaseGateTests.PackedCandidate_PublicApiSurfaceSelectorSnapshotAndRole
+TEST_PACKED_ARTIFACT_PUBLIC_API_SURFACE_SELECTOR_DELTA_AND_MEMBERSHIP_FILTER := FullyQualifiedName~CheckpointBReleaseGateTests.PackedCandidate_PublicApiSurfaceSelectorDeltaAndMembership
+TEST_PACKED_ARTIFACT_PUBLIC_API_SURFACE_SELECTOR_ENFORCEMENT_FILTER := FullyQualifiedName~CheckpointBReleaseGateTests.PackedCandidate_PublicApiSurfaceSelectorEnforcement
 
 CHECKPOINT_B_CANDIDATE_VERSION ?= 0.6.1
 CHECKPOINT_B_CANDIDATE_DIR ?= $(PROJECT_ROOT)/artifacts/checkpoint-b-candidate
@@ -37,17 +52,45 @@ test-packed-artifact-package-and-entrypoints:  ## Run Checkpoint B package/entry
 	@dotnet build "$(CORE_TESTS_CSPROJ)" --no-restore --nologo
 	@dotnet test "$(CORE_TESTS_CSPROJ)" --no-restore --no-build --filter "$(TEST_PACKED_ARTIFACT_PACKAGE_AND_ENTRYPOINTS_FILTER)"
 
-test-packed-artifact-adopter-runtime:  ## Run Checkpoint B synthetic adopter/runtime shard
+test-packed-artifact-adopter-runtime-core:  ## Run Checkpoint B core adopter/runtime shard
 	@dotnet build "$(CORE_TESTS_CSPROJ)" --no-restore --nologo
-	@dotnet test "$(CORE_TESTS_CSPROJ)" --no-restore --no-build --filter "$(TEST_PACKED_ARTIFACT_ADOPTER_RUNTIME_FILTER)"
+	@dotnet test "$(CORE_TESTS_CSPROJ)" --no-restore --no-build --filter "$(TEST_PACKED_ARTIFACT_ADOPTER_RUNTIME_CORE_FILTER)"
 
-test-packed-artifact-consumer-cleanup:  ## Run Checkpoint B consumer-cleanup shard
+test-packed-artifact-adopter-runtime-extended:  ## Run Checkpoint B extended adopter/runtime shard
 	@dotnet build "$(CORE_TESTS_CSPROJ)" --no-restore --nologo
-	@dotnet test "$(CORE_TESTS_CSPROJ)" --no-restore --no-build --filter "$(TEST_PACKED_ARTIFACT_CONSUMER_CLEANUP_FILTER)"
+	@dotnet test "$(CORE_TESTS_CSPROJ)" --no-restore --no-build --filter "$(TEST_PACKED_ARTIFACT_ADOPTER_RUNTIME_EXTENDED_FILTER)"
 
-test-packed-artifact-public-api-surface-selector:  ## Run Checkpoint B public-API selector shard
+test-packed-artifact-consumer-cleanup-policy-execution:  ## Run Checkpoint B consumer-cleanup policy execution shard
 	@dotnet build "$(CORE_TESTS_CSPROJ)" --no-restore --nologo
-	@dotnet test "$(CORE_TESTS_CSPROJ)" --no-restore --no-build --filter "$(TEST_PACKED_ARTIFACT_PUBLIC_API_SURFACE_SELECTOR_FILTER)"
+	@dotnet test "$(CORE_TESTS_CSPROJ)" --no-restore --no-build --filter "$(TEST_PACKED_ARTIFACT_CONSUMER_CLEANUP_POLICY_EXECUTION_FILTER)"
+
+test-packed-artifact-consumer-cleanup-dependency-contract-id-parity:  ## Run Checkpoint B consumer-cleanup dependency-contract id shard
+	@dotnet build "$(CORE_TESTS_CSPROJ)" --no-restore --nologo
+	@dotnet test "$(CORE_TESTS_CSPROJ)" --no-restore --no-build --filter "$(TEST_PACKED_ARTIFACT_CONSUMER_CLEANUP_DEPENDENCY_CONTRACT_ID_PARITY_FILTER)"
+
+test-packed-artifact-consumer-cleanup-layer-overlap-and-policy-shape:  ## Run Checkpoint B consumer-cleanup layer-overlap and policy-shape shard
+	@dotnet build "$(CORE_TESTS_CSPROJ)" --no-restore --nologo
+	@dotnet test "$(CORE_TESTS_CSPROJ)" --no-restore --no-build --filter "$(TEST_PACKED_ARTIFACT_CONSUMER_CLEANUP_LAYER_OVERLAP_AND_POLICY_SHAPE_FILTER)"
+
+test-packed-artifact-consumer-cleanup-configuration-and-identity:  ## Run Checkpoint B consumer-cleanup configuration shard
+	@dotnet build "$(CORE_TESTS_CSPROJ)" --no-restore --nologo
+	@dotnet test "$(CORE_TESTS_CSPROJ)" --no-restore --no-build --filter "$(TEST_PACKED_ARTIFACT_CONSUMER_CLEANUP_CONFIGURATION_AND_IDENTITY_FILTER)"
+
+test-packed-artifact-consumer-cleanup-source-set-authoring:  ## Run Checkpoint B consumer-cleanup source-set shard
+	@dotnet build "$(CORE_TESTS_CSPROJ)" --no-restore --nologo
+	@dotnet test "$(CORE_TESTS_CSPROJ)" --no-restore --no-build --filter "$(TEST_PACKED_ARTIFACT_CONSUMER_CLEANUP_SOURCE_SET_AUTHORING_FILTER)"
+
+test-packed-artifact-public-api-surface-selector-snapshot-and-role:  ## Run Checkpoint B public-API selector snapshot/role shard
+	@dotnet build "$(CORE_TESTS_CSPROJ)" --no-restore --nologo
+	@dotnet test "$(CORE_TESTS_CSPROJ)" --no-restore --no-build --filter "$(TEST_PACKED_ARTIFACT_PUBLIC_API_SURFACE_SELECTOR_SNAPSHOT_AND_ROLE_FILTER)"
+
+test-packed-artifact-public-api-surface-selector-delta-and-membership:  ## Run Checkpoint B public-API selector delta/membership shard
+	@dotnet build "$(CORE_TESTS_CSPROJ)" --no-restore --nologo
+	@dotnet test "$(CORE_TESTS_CSPROJ)" --no-restore --no-build --filter "$(TEST_PACKED_ARTIFACT_PUBLIC_API_SURFACE_SELECTOR_DELTA_AND_MEMBERSHIP_FILTER)"
+
+test-packed-artifact-public-api-surface-selector-enforcement:  ## Run Checkpoint B public-API selector enforcement shard
+	@dotnet build "$(CORE_TESTS_CSPROJ)" --no-restore --nologo
+	@dotnet test "$(CORE_TESTS_CSPROJ)" --no-restore --no-build --filter "$(TEST_PACKED_ARTIFACT_PUBLIC_API_SURFACE_SELECTOR_ENFORCEMENT_FILTER)"
 
 # Repository correctness without the packed candidate gate. Release workflows use this once to
 # prove source-tree lint/unit/E2E correctness, then prove the immutable packed candidate separately.

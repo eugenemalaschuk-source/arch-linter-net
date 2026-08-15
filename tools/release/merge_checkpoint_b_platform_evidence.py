@@ -21,9 +21,16 @@ _SHARD_SCHEMA = "checkpoint-b-platform-shard-evidence/v1"
 _PLATFORM_SCHEMA = "checkpoint-b-platform-evidence/v1"
 _REQUIRED_SHARDS = {
     "package-and-entrypoints",
-    "adopter-runtime",
-    "consumer-cleanup",
-    "public-api-surface-selector",
+    "adopter-runtime-core",
+    "adopter-runtime-extended",
+    "consumer-cleanup-policy-execution",
+    "consumer-cleanup-dependency-contract-id-parity",
+    "consumer-cleanup-layer-overlap-and-policy-shape",
+    "consumer-cleanup-configuration-and-identity",
+    "consumer-cleanup-source-set-authoring",
+    "public-api-surface-selector-snapshot-and-role",
+    "public-api-surface-selector-delta-and-membership",
+    "public-api-surface-selector-enforcement",
 }
 _COMMON_FIELDS = (
     "checkpoint",
@@ -120,8 +127,8 @@ def merge_platform_shards(input_directory: Path, candidate_manifest: Path) -> di
         for _, record in records
         if record.get("policy_shape") is not None
     ]
-    if len(shapes) != 1 or shapes[0][0] != "consumer-cleanup":
-        raise ValueError("Exactly the consumer-cleanup shard must report policy_shape.")
+    if len(shapes) != 1 or shapes[0][0] != "consumer-cleanup-layer-overlap-and-policy-shape":
+        raise ValueError("Exactly the consumer-cleanup layer-overlap-and-policy-shape shard must report policy_shape.")
     policy_shape = shapes[0][1]
     if not isinstance(policy_shape, dict) or set(policy_shape) != _POLICY_SHAPE_FIELDS:
         raise ValueError("Checkpoint B consumer-cleanup shard reports an invalid policy_shape.")

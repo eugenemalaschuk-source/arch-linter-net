@@ -58,11 +58,127 @@ public sealed partial class CheckpointBReleaseGateTests
     }
 
     [Test]
-    public void PackedCandidate_AdopterRuntimeMatrix()
+    public void PackedCandidate_AdopterRuntimeCore()
     {
         CandidatePackageFeed candidate = Candidate;
-        var scenarios = new List<CheckpointScenarioResult>();
-        foreach (string fixtureId in new[] { "small", "multi-project", "multi-host", "migration", "aspnet-host" })
+        AssertAdopterRuntimeFixtures(candidate, ["small", "multi-project", "multi-host"]);
+        candidate.WriteShardEvidence("adopter-runtime-core",
+            [Passed("sequential-default-parity"), Passed("profile-generation")]);
+    }
+
+    [Test]
+    public void PackedCandidate_AdopterRuntimeExtended()
+    {
+        CandidatePackageFeed candidate = Candidate;
+        AssertAdopterRuntimeFixtures(candidate, ["migration", "aspnet-host"]);
+
+        var scenarios = new List<CheckpointScenarioResult>
+        {
+            AssertPublicApiSnapshotWorkflow(candidate),
+        };
+        AssertCacheLifecycleOracle(candidate);
+        scenarios.Add(candidate.AssertMissingSharedFrameworkDiagnostic());
+        scenarios.Add(Passed("cache-miss-population-hit"));
+        scenarios.Add(Passed("cache-corruption-recompute"));
+        candidate.WriteShardEvidence("adopter-runtime-extended", scenarios);
+    }
+
+    [Test]
+    public void PackedCandidate_ConsumerCleanupPolicyExecution()
+    {
+        CandidatePackageFeed candidate = Candidate;
+        IReadOnlyList<CheckpointScenarioResult> scenarios =
+            AssertConsumerCleanupPolicyExecution(candidate);
+        candidate.WriteShardEvidence("consumer-cleanup-policy-execution", scenarios);
+    }
+
+    [Test]
+    public void PackedCandidate_ConsumerCleanupDependencyContractIdParity()
+    {
+        CandidatePackageFeed candidate = Candidate;
+        IReadOnlyList<CheckpointScenarioResult> scenarios =
+            AssertConsumerCleanupDependencyContractIdParity(candidate);
+        candidate.WriteShardEvidence("consumer-cleanup-dependency-contract-id-parity", scenarios);
+    }
+
+    [Test]
+    public void PackedCandidate_ConsumerCleanupLayerOverlapAndPolicyShape()
+    {
+        CandidatePackageFeed candidate = Candidate;
+        IReadOnlyList<CheckpointScenarioResult> scenarios =
+            AssertConsumerCleanupLayerOverlapAndPolicyShape(candidate, out ConsumerPolicyShape policyShape);
+        candidate.WriteShardEvidence("consumer-cleanup-layer-overlap-and-policy-shape", scenarios, policyShape);
+    }
+
+    [Test]
+    public void PackedCandidate_ConsumerCleanupConfigurationAndIdentity()
+    {
+        CandidatePackageFeed candidate = Candidate;
+        IReadOnlyList<CheckpointScenarioResult> scenarios =
+            AssertConsumerCleanupConfigurationAndIdentity(candidate);
+        candidate.WriteShardEvidence("consumer-cleanup-configuration-and-identity", scenarios);
+    }
+
+    [Test]
+    public void PackedCandidate_ConsumerCleanupSourceSetAuthoring()
+    {
+        CandidatePackageFeed candidate = Candidate;
+        IReadOnlyList<CheckpointScenarioResult> scenarios =
+            AssertConsumerCleanupSourceSetAuthoring(candidate);
+        candidate.WriteShardEvidence("consumer-cleanup-source-set-authoring", scenarios);
+    }
+
+    [Test]
+    public void PackedCandidate_PublicApiSurfaceSelectorSnapshotAndRole()
+    {
+        CandidatePackageFeed candidate = Candidate;
+        using AdoptionAcceptanceFixture fixture = CreatePublicApiSurfaceSelectorFixture();
+        candidate.WriteShardEvidence("public-api-surface-selector-snapshot-and-role",
+            [AssertSurfaceSelectorSnapshotReduction(candidate, fixture), AssertSurfaceSelectorRolePreservation(candidate, fixture)]);
+    }
+
+    [Test]
+    public void PackedCandidate_PublicApiSurfaceSelectorDeltaAndMembership()
+    {
+        CandidatePackageFeed candidate = Candidate;
+        using AdoptionAcceptanceFixture fixture = CreatePublicApiSurfaceSelectorFixture();
+
+        // The lifecycle scenarios consume the initial reviewed snapshots. They re-establish that
+        // fixture-local precondition without emitting the snapshot-reduction scenario a second time.
+        _ = AssertSurfaceSelectorSnapshotReduction(candidate, fixture);
+        candidate.WriteShardEvidence("public-api-surface-selector-delta-and-membership",
+        [
+            AssertSurfaceSelectorExactDeltaLifecycle(candidate, fixture),
+            AssertSurfaceSelectorMembershipReviewVisibility(candidate, fixture),
+        ]);
+    }
+
+    [Test]
+    public void PackedCandidate_PublicApiSurfaceSelectorEnforcement()
+    {
+        CandidatePackageFeed candidate = Candidate;
+        using AdoptionAcceptanceFixture fixture = CreatePublicApiSurfaceSelectorFixture();
+
+        // Strict validation and Testing-adapter parity require fresh reviewed snapshots but do
+        // not independently claim the snapshot-reduction evidence scenario.
+        _ = AssertSurfaceSelectorSnapshotReduction(candidate, fixture);
+        _ = AssertSurfaceSelectorExactDeltaLifecycle(candidate, fixture);
+        candidate.WriteShardEvidence("public-api-surface-selector-enforcement",
+        [
+            AssertSurfaceSelectorEscapeFailsClosed(candidate, fixture),
+            AssertSurfaceSelectorStrictRunIsGreen(candidate, fixture),
+            candidate.AssertPublicApiSurfaceSelectorTestingParity(fixture),
+        ]);
+    }
+
+    private CandidatePackageFeed Candidate => _candidate
+        ?? throw new InvalidOperationException("Checkpoint B candidate was not prepared.");
+
+    private static CheckpointScenarioResult Passed(string id) => new(id, "passed", null);
+
+    private static void AssertAdopterRuntimeFixtures(CandidatePackageFeed candidate, IEnumerable<string> fixtureIds)
+    {
+        foreach (string fixtureId in fixtureIds)
         {
             using AdoptionAcceptanceFixture fixture = AdoptionAcceptanceFixture.Create(fixtureId);
             fixture.Build();
@@ -91,38 +207,7 @@ public sealed partial class CheckpointBReleaseGateTests
                 Assert.That(sequential.StandardError, Does.Not.Contain("\u001b["), fixtureId);
             });
         }
-
-        scenarios.Add(AssertPublicApiSnapshotWorkflow(candidate));
-        AssertCacheLifecycleOracle(candidate);
-        scenarios.Add(candidate.AssertMissingSharedFrameworkDiagnostic());
-        scenarios.Add(Passed("sequential-default-parity"));
-        scenarios.Add(Passed("profile-generation"));
-        scenarios.Add(Passed("cache-miss-population-hit"));
-        scenarios.Add(Passed("cache-corruption-recompute"));
-        candidate.WriteShardEvidence("adopter-runtime", scenarios);
     }
-
-    [Test]
-    public void PackedCandidate_ConsumerCleanupMatrix()
-    {
-        CandidatePackageFeed candidate = Candidate;
-        IReadOnlyList<CheckpointScenarioResult> scenarios =
-            AssertConsumerCleanupMatrix(candidate, out ConsumerPolicyShape policyShape);
-        candidate.WriteShardEvidence("consumer-cleanup", scenarios, policyShape);
-    }
-
-    [Test]
-    public void PackedCandidate_PublicApiSurfaceSelectorMatrix()
-    {
-        CandidatePackageFeed candidate = Candidate;
-        IReadOnlyList<CheckpointScenarioResult> scenarios = AssertPublicApiSurfaceSelectorMatrix(candidate);
-        candidate.WriteShardEvidence("public-api-surface-selector", scenarios);
-    }
-
-    private CandidatePackageFeed Candidate => _candidate
-        ?? throw new InvalidOperationException("Checkpoint B candidate was not prepared.");
-
-    private static CheckpointScenarioResult Passed(string id) => new(id, "passed", null);
 
     private static void AssertFixtureOracle(string fixtureId, CommandResult result)
     {
