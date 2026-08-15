@@ -48,3 +48,15 @@ evidence; only the layer-overlap-and-policy-shape shard may report the typed pol
 The final timing is recorded after the corresponding PR and non-publishing release workflows
 complete. Platform-specific fan-ins depend only on their own producer matrix, so a constrained
 Apple Silicon queue cannot inflate the Windows branch-protection critical path.
+
+## Final PR measurement
+
+The clean eleven-shard PR run [31905571593](https://github.com/eugenemalaschuk-source/arch-linter-net/actions/runs/31905571593)
+completed successfully. Its immutable candidate ran from **20:01:55** to **20:02:38 UTC** (43 s).
+All eleven Windows shards passed; the slowest was adopter-runtime extended at **3:02**. The stable
+`Packed Artifact Test Suite (Windows)` fan-in completed at **20:05:54 UTC**, for an end-to-end
+candidate-to-required-context critical path of **3:59** — under the issue target of four minutes.
+
+Apple Silicon macOS completed its independent eleven-shard evidence and stable fan-in successfully
+at **20:07:01 UTC**. The two platform fan-ins each merged exactly one canonical record from all
+eleven named shard records, confirming that scenario evidence remains complete and fail-closed.
