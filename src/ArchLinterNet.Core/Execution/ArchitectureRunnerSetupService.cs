@@ -7,6 +7,7 @@ using ArchLinterNet.Core.Contracts.Families;
 using ArchLinterNet.Core.Discovery;
 using ArchLinterNet.Core.Discovery.Abstractions;
 using ArchLinterNet.Core.Execution.Abstractions;
+using ArchLinterNet.Core.Execution.Results;
 using ArchLinterNet.Core.Reporting;
 using ArchLinterNet.Core.Resolution;
 using ArchLinterNet.Core.Resolution.Abstractions;

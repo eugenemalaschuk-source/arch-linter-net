@@ -4,6 +4,7 @@ using ArchLinterNet.Core.Contracts.PolicyImports;
 using ArchLinterNet.Core.Discovery;
 using ArchLinterNet.Core.Execution.Abstractions;
 using ArchLinterNet.Core.Execution.Checkers;
+using ArchLinterNet.Core.Execution.Configuration;
 using ArchLinterNet.Core.Execution.Expressions;
 using ArchLinterNet.Core.Model;
 using ArchLinterNet.Core.Reporting;
@@ -268,6 +269,10 @@ public sealed class ArchitectureAnalysisSession
 
     public IEnumerable<ArchitectureAcyclicSiblingContract> AuditAcyclicSiblingContracts() => Document.Contracts.AuditAcyclicSiblings;
 
+    public IEnumerable<ArchitectureModuleContainerContract> StrictModuleContainerContracts() => Document.Contracts.StrictModuleContainers;
+
+    public IEnumerable<ArchitectureModuleContainerContract> AuditModuleContainerContracts() => Document.Contracts.AuditModuleContainers;
+
     public List<ArchitectureViolation> CheckConfiguration()
     {
         return CheckConfiguration(strict: true);
@@ -304,6 +309,9 @@ public sealed class ArchitectureAnalysisSession
 
     public IReadOnlyCollection<string> CheckAcyclicSiblingContract(ArchitectureAcyclicSiblingContract contract) =>
         _coreContractCheckingService.CheckAcyclicSiblingContract(contract);
+
+    public List<ArchitectureViolation> CheckModuleContainerContract(ArchitectureModuleContainerContract contract) =>
+        _coreContractCheckingService.CheckModuleContainerContract(contract);
 
     public List<ArchitectureViolation> CheckMethodBodyContract(ArchitectureMethodBodyContract contract) =>
         _coreContractCheckingService.CheckMethodBodyContract(contract);

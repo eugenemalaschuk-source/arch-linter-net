@@ -8,5 +8,6 @@ internal sealed record ArchitectureTypeSourceDeclaration(
     string FullTypeName,
     ArchitectureTypeKind TypeKind,
     bool IsPartial,
+    bool IsAbstract,
     string SourceFilePath,
     int SourceLine);

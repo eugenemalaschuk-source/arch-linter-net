@@ -10,6 +10,10 @@ public sealed record LayoutConventionPayload(
     bool DataUnavailable = false)
     : IArchitectureDiagnosticPayload
 {
+    public IReadOnlyList<string>? ExpectedRoles { get; init; }
+    public string? ActualRole { get; init; }
+    public bool? ExpectedAbstractClass { get; init; }
+    public bool? ActualIsAbstract { get; init; }
     public int? ExpectedDeclarationCount { get; init; }
     public int? ActualDeclarationCount { get; init; }
     public IReadOnlyList<string>? DeclarationPaths { get; init; }
@@ -26,6 +30,10 @@ public sealed record LayoutConventionPayload(
             ExpectedTypeName = ExpectedTypeName,
             ActualTypeName = ActualTypeName,
             ExpectedCounterpartName = ExpectedCounterpartName,
+            ExpectedRoles = ExpectedRoles,
+            ActualRole = ActualRole,
+            ExpectedAbstractClass = ExpectedAbstractClass,
+            ActualIsAbstract = ActualIsAbstract,
             ExpectedDeclarationCount = ExpectedDeclarationCount,
             ActualDeclarationCount = ActualDeclarationCount,
             DeclarationPaths = DeclarationPaths,

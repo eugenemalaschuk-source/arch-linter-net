@@ -1,12 +1,8 @@
 using ArchLinterNet.Core.Contracts;
+using ArchLinterNet.Core.Execution.Results;
 using ArchLinterNet.Core.Reporting;
 
 namespace ArchLinterNet.Core.Execution.Abstractions;
-
-public sealed record ArchitectureRunnerSetup(string RepositoryRoot, IArchitectureContractRunner Runner)
-{
-    public int AssemblyLoads { get; init; }
-}
 
 public interface IArchitectureRunnerSetupService
 {

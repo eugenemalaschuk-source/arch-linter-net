@@ -356,6 +356,7 @@ public sealed partial class ArchitectureSourceFileFactIndex
                 entry.Key.FullTypeName,
                 declaration.Kind,
                 declaration.IsPartial,
+                declaration.IsAbstract,
                 declaration.FilePath,
                 declaration.SourceLine)))
             // Overlapping source roots may scan the same declaration more than once; that is not a
@@ -393,8 +394,12 @@ public sealed partial class ArchitectureSourceFileFactIndex
             if (uniquePaths.Count == 1)
             {
                 string relPath = uniquePaths[0];
-                ArchitectureTypeKind kind = entry.Value.First(e => e.FilePath == relPath).Kind;
-                resolved[key] = new SourceInfo(relPath, kind, IsAmbiguous: false);
+                SourceDeclaration declaration = entry.Value.First(e => e.FilePath == relPath);
+                resolved[key] = new SourceInfo(
+                    relPath,
+                    declaration.Kind,
+                    declaration.IsAbstract,
+                    IsAmbiguous: false);
             }
             else if (uniquePaths.Count > 1)
             {
@@ -402,7 +407,7 @@ public sealed partial class ArchitectureSourceFileFactIndex
                     key.AssemblyName,
                     key.FullTypeName,
                     uniquePaths));
-                resolved[key] = new SourceInfo(null, ArchitectureTypeKind.Unknown, IsAmbiguous: true);
+                resolved[key] = new SourceInfo(null, ArchitectureTypeKind.Unknown, IsAbstract: false, IsAmbiguous: true);
             }
         }
 
@@ -490,6 +495,7 @@ public sealed partial class ArchitectureSourceFileFactIndex
                 normalizedFilePath,
                 parsed.TypeKind,
                 parsed.IsPartial,
+                parsed.IsAbstract,
                 parsed.SourceLine));
         }
     }
@@ -633,6 +639,7 @@ public sealed partial class ArchitectureSourceFileFactIndex
                 fullName,
                 baseFact.SimpleTypeName,
                 baseFact.TypeKind,
+                baseFact.IsAbstract,
                 null,
                 null,
                 [],
@@ -647,6 +654,7 @@ public sealed partial class ArchitectureSourceFileFactIndex
                 fullName,
                 baseFact.SimpleTypeName,
                 sourceInfo.KindFromSource,
+                sourceInfo.IsAbstract,
                 sourceInfo.FilePath,
                 GetFileNameWithoutExtension(sourceInfo.FilePath),
                 GetFolderSegments(sourceInfo.FilePath),
@@ -659,6 +667,7 @@ public sealed partial class ArchitectureSourceFileFactIndex
             fullName,
             baseFact.SimpleTypeName,
             baseFact.TypeKind,
+            baseFact.IsAbstract,
             null,
             null,
             [],
@@ -756,17 +765,20 @@ public sealed partial class ArchitectureSourceFileFactIndex
         string Namespace,
         string FullTypeName,
         string SimpleTypeName,
-        ArchitectureTypeKind TypeKind);
+        ArchitectureTypeKind TypeKind,
+        bool IsAbstract);
 
     private sealed record SourceInfo(
         string? FilePath,
         ArchitectureTypeKind KindFromSource,
+        bool IsAbstract,
         bool IsAmbiguous);
 
     private sealed record SourceDeclaration(
         string FilePath,
         ArchitectureTypeKind Kind,
         bool IsPartial,
+        bool IsAbstract,
         int SourceLine);
 
     private sealed record FactIndexData(

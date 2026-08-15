@@ -36,7 +36,7 @@ public sealed record ArchitectureViolationIdentity(
         {
             "strict" or "audit"
                 or "layers" or "allow_only"
-                or "cycles" or "acyclic_siblings"
+                or "cycles" or "acyclic_siblings" or "module_containers"
                 or "assembly_independence" or "assembly_dependency" or "assembly_allow_only" => "dependency",
             "method_body" or "composition" => "call",
             "package_dependency" or "package_allow_only" => "package",

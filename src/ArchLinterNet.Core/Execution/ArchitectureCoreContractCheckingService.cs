@@ -91,6 +91,19 @@ internal sealed class ArchitectureCoreContractCheckingService
         return cycles;
     }
 
+    public List<ArchitectureViolation> CheckModuleContainerContract(ArchitectureModuleContainerContract contract)
+    {
+        if (!_session.IsContractSelected(contract.Id))
+        {
+            return new List<ArchitectureViolation>();
+        }
+
+        ArchitectureContractExecutionContext executionContext = _session.CreateExecutionContext(contract, contract.IgnoredViolations);
+        List<ArchitectureViolation> violations = ModuleContainerChecker.Check(contract, _session.CheckerContext, executionContext);
+        _session.CollectUnmatchedIgnores(executionContext);
+        return violations;
+    }
+
     public List<ArchitectureViolation> CheckMethodBodyContract(ArchitectureMethodBodyContract contract)
     {
         if (!_session.IsContractSelected(contract.Id) || _session.IsDanglingButCoveredByRuleInputCoverage(contract))

@@ -2,6 +2,7 @@ using ArchLinterNet.Core.Contracts;
 using ArchLinterNet.Core.Contracts.Families;
 using ArchLinterNet.Core.Discovery;
 using ArchLinterNet.Core.Execution.Abstractions;
+using ArchLinterNet.Core.Execution.Results;
 
 namespace ArchLinterNet.Core.Execution;
 
@@ -296,6 +297,14 @@ internal static class ArchitectureContractFamilyRegistry
             })
         {
             OwnedContractTypes = new[] { typeof(ArchitectureAcyclicSiblingContract) },
+        },
+        new(
+            "module_container", "strict_module_containers", "audit_module_containers", true,
+            g => g.StrictModuleContainers, g => g.AuditModuleContainers,
+            (session, contract) => ArchitectureHandlerResult.FromViolations(
+                session.CheckModuleContainerContract((ArchitectureModuleContainerContract)contract)))
+        {
+            OwnedContractTypes = new[] { typeof(ArchitectureModuleContainerContract) },
         },
         new(
             "type_placement", "strict_type_placement", "audit_type_placement", true,

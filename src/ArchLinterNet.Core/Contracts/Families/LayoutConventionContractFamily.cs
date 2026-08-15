@@ -39,6 +39,24 @@ public sealed class ArchitectureRequireMatchingInterface
     [YamlMember(Alias = "name_prefix")] public string? NamePrefix { get; set; }
 }
 
+/// <summary>
+/// An opt-in file-purity expectation evaluated for every declared type in a matched source file.
+/// Kind and role lists narrow the permitted shape independently; an empty list leaves that axis
+/// unconstrained. <see cref="RequireAbstractClasses"/> applies only to class declarations, so
+/// interfaces remain valid abstraction declarations without pretending they carry the C# modifier.
+/// </summary>
+public sealed class ArchitectureLayoutDeclarationShape
+{
+    [YamlMember(Alias = "allowed_type_kinds")]
+    public List<string> AllowedTypeKinds { get; set; } = new();
+
+    [YamlMember(Alias = "allowed_roles")]
+    public List<string> AllowedRoles { get; set; } = new();
+
+    [YamlMember(Alias = "require_abstract_classes")]
+    public bool RequireAbstractClasses { get; set; }
+}
+
 public sealed class ArchitectureLayoutConventionContract : IArchitectureContract
 {
     [YamlMember(Alias = "name")] public string Name { get; set; } = string.Empty;
@@ -75,6 +93,9 @@ public sealed class ArchitectureLayoutConventionContract : IArchitectureContract
 
     [YamlMember(Alias = "require_matching_interface")]
     public ArchitectureRequireMatchingInterface? RequireMatchingInterface { get; set; }
+
+    [YamlMember(Alias = "all_declarations")]
+    public ArchitectureLayoutDeclarationShape? AllDeclarations { get; set; }
 
     [YamlMember(Alias = "ignored_violations")]
     public List<ArchitectureIgnoredViolation> IgnoredViolations { get; set; } = new();

@@ -1,5 +1,6 @@
 using System.Diagnostics.CodeAnalysis;
 using System.Runtime.InteropServices;
+using ArchLinterNet.Core.Contracts.PolicyImports.Models;
 using Microsoft.Win32.SafeHandles;
 
 namespace ArchLinterNet.Core.Contracts.PolicyImports;

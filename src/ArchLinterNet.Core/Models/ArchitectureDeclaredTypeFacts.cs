@@ -22,10 +22,36 @@ public sealed record ArchitectureDeclaredTypeFact(
     string FullTypeName,
     string SimpleTypeName,
     ArchitectureTypeKind TypeKind,
+    bool IsAbstract,
     string? SourceFilePath,
     string? FileNameWithoutExtension,
     IReadOnlyList<string> FolderSegments,
-    IReadOnlyList<string> NamespaceSegments);
+    IReadOnlyList<string> NamespaceSegments)
+{
+    public ArchitectureDeclaredTypeFact(
+        string assemblyName,
+        string @namespace,
+        string fullTypeName,
+        string simpleTypeName,
+        ArchitectureTypeKind typeKind,
+        string? sourceFilePath,
+        string? fileNameWithoutExtension,
+        IReadOnlyList<string> folderSegments,
+        IReadOnlyList<string> namespaceSegments)
+        : this(
+            assemblyName,
+            @namespace,
+            fullTypeName,
+            simpleTypeName,
+            typeKind,
+            IsAbstract: false,
+            sourceFilePath,
+            fileNameWithoutExtension,
+            folderSegments,
+            namespaceSegments)
+    {
+    }
+}
 
 // Recorded when a type is declared in more than one source file (partial class across files),
 // making a deterministic primary source path unavailable. The corresponding ArchitectureDeclaredTypeFact

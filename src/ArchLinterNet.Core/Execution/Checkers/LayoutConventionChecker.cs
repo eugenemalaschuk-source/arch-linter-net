@@ -55,6 +55,7 @@ internal static partial class LayoutConventionChecker
             || contract.RequireTypeNameMatchesFileName
             || IsRecordKind(contract.RequireTypeKind)
             || IsRecordKind(contract.ForbidTypeKind)
+            || contract.AllDeclarations?.AllowedTypeKinds.Any(IsRecordKind) == true
             || contract.MaxDeclarationsPerType is not null;
 
         bool hasSourceDeclarationInventory = context.SourceFileFactIndex.SourceDeclarations.Count > 0;
@@ -92,6 +93,7 @@ internal static partial class LayoutConventionChecker
             contract.FilesMatching.CompiledWhen != null
             || contract.ExcludeFilesMatching.Any(matcher => matcher.CompiledWhen != null)
             || contract.RequireMatchingInterface != null
+            || contract.AllDeclarations != null
                 ? BuildTypeIdentityLookup(context)
                 : null;
 
@@ -307,6 +309,7 @@ internal static partial class LayoutConventionChecker
     {
         EvaluateRequireTypeKind(contract, group, executionContext, violations);
         EvaluateForbidTypeKind(contract, group, executionContext, violations);
+        EvaluateAllDeclarationShape(contract, context, group, executionContext, violations, typesByIdentity);
         EvaluateNamingExpectations(contract, group, executionContext, violations);
         EvaluateRequireTypeNameMatchesFileName(contract, group, executionContext, violations);
 
@@ -357,6 +360,76 @@ internal static partial class LayoutConventionChecker
             {
                 WhenExpressions = BuildLayoutWhenExpressions(contract),
             });
+    }
+
+    private static void EvaluateAllDeclarationShape(
+        ArchitectureLayoutConventionContract contract,
+        ArchitectureCheckerContext context,
+        LayoutFileGroup group,
+        ArchitectureContractExecutionContext executionContext,
+        List<ArchitectureViolation> violations,
+        Dictionary<(string AssemblyName, string FullTypeName), Type>? typesByIdentity)
+    {
+        ArchitectureLayoutDeclarationShape? shape = contract.AllDeclarations;
+        if (shape == null)
+        {
+            return;
+        }
+
+        IReadOnlySet<ArchitectureTypeKind> allowedKinds = shape.AllowedTypeKinds
+            .Select(ParseTypeKind)
+            .ToHashSet();
+        IReadOnlySet<string> allowedRoles = shape.AllowedRoles.ToHashSet(StringComparer.Ordinal);
+
+        foreach (ArchitectureDeclaredTypeFact fact in group.Facts
+                     .OrderBy(candidate => candidate.FullTypeName, StringComparer.Ordinal)
+                     .ThenBy(candidate => candidate.AssemblyName, StringComparer.Ordinal))
+        {
+            typesByIdentity!.TryGetValue((fact.AssemblyName, fact.FullTypeName), out Type? type);
+            string? actualRole = type != null && context.RoleIndex.TryGetRole(type, out ArchitectureTypeClassificationResult descriptor)
+                ? descriptor.Role
+                : null;
+            bool isAllowedKind = allowedKinds.Count == 0 || allowedKinds.Contains(fact.TypeKind);
+            bool isAllowedRole = allowedRoles.Count == 0 || (actualRole != null && allowedRoles.Contains(actualRole));
+            bool isAllowedAbstractness = !shape.RequireAbstractClasses
+                || fact.TypeKind != ArchitectureTypeKind.Class
+                || fact.IsAbstract;
+
+            if (isAllowedKind && isAllowedRole && isAllowedAbstractness)
+            {
+                continue;
+            }
+
+            string expectedKinds = shape.AllowedTypeKinds.Count == 0
+                ? "any"
+                : string.Join(", ", shape.AllowedTypeKinds);
+            string expectedRoles = shape.AllowedRoles.Count == 0
+                ? "any"
+                : string.Join(", ", shape.AllowedRoles);
+            string actualRoleDisplay = actualRole ?? "unclassified";
+            string abstractnessRequirement = shape.RequireAbstractClasses ? ", abstract classes required" : string.Empty;
+
+            AddViolation(
+                contract,
+                executionContext,
+                violations,
+                sourceType: fact.FullTypeName,
+                identitySourceType: fact.FullTypeName,
+                forbiddenReference:
+                $"all declarations must use kinds [{expectedKinds}] and roles [{expectedRoles}]{abstractnessRequirement}; " +
+                $"actual kind '{fact.TypeKind}', role '{actualRoleDisplay}', abstract '{fact.IsAbstract}'",
+                payload: new LayoutConventionPayload(
+                    MatchedFilePath: group.SourceFilePath,
+                    ExpectedTypeKind: shape.AllowedTypeKinds.Count == 0 ? null : string.Join(", ", shape.AllowedTypeKinds),
+                    ActualTypeKind: fact.TypeKind.ToString())
+                {
+                    ExpectedRoles = shape.AllowedRoles,
+                    ActualRole = actualRoleDisplay,
+                    ExpectedAbstractClass = shape.RequireAbstractClasses ? true : null,
+                    ActualIsAbstract = fact.IsAbstract,
+                    WhenExpressions = BuildLayoutWhenExpressions(contract),
+                });
+        }
     }
 
     private static void EvaluateForbidTypeKind(

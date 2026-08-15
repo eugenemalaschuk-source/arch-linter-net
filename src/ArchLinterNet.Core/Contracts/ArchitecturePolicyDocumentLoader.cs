@@ -1,6 +1,7 @@
 using System.Text.RegularExpressions;
 using ArchLinterNet.Core.Contracts.Abstractions;
 using ArchLinterNet.Core.Contracts.PolicyImports;
+using ArchLinterNet.Core.Contracts.PolicyImports.Models;
 using ArchLinterNet.Core.Contracts.RawValidators;
 using ArchLinterNet.Core.Contracts.Validators;
 using ArchLinterNet.Core.IO;

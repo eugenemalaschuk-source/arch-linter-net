@@ -1,4 +1,5 @@
 using ArchLinterNet.Core.Contracts;
+using ArchLinterNet.Core.Contracts.Families;
 using NUnit.Framework;
 
 namespace ArchLinterNet.Core.Tests;
@@ -9,7 +10,7 @@ public sealed class CliCommandBoundaryPolicyTests
     private const string CommandNamespacePrefix = "ArchLinterNet.Cli.Commands.";
 
     [Test]
-    public void DirectCommandFolders_AreExactlyTheReviewedIndependenceModules()
+    public void DirectCommandFolders_AreGovernedWithoutAPeerInventory()
     {
         string repositoryRoot = SelfPolicyRepository.FindRepositoryRoot();
         string commandsDirectory = Path.Combine(repositoryRoot, "src", "ArchLinterNet.Cli", "Commands");
@@ -18,29 +19,28 @@ public sealed class CliCommandBoundaryPolicyTests
             .Select(directory => new DirectoryInfo(directory).Name)
             .Order(StringComparer.Ordinal)
             .ToArray();
-
-        ArchitectureContractDocument policy = new ArchitecturePolicyDocumentLoader().Load(
-            SelfPolicyRepository.PolicyPath(repositoryRoot));
-        var contract = policy.Contracts.StrictIndependence.Single(
-            candidate => candidate.Id == "cli-command-modules-are-independent");
-        string[] commandNamespaces = contract.Layers
-            .Select(layer => policy.Layers[layer].Namespace)
+        string[] commandRootSourceFiles = Directory
+            .EnumerateFiles(commandsDirectory, "*.cs", SearchOption.TopDirectoryOnly)
+            .Select(path => Path.GetFileName(path))
             .Order(StringComparer.Ordinal)
             .ToArray();
 
+        ArchitectureContractDocument policy = new ArchitecturePolicyDocumentLoader().Load(
+            SelfPolicyRepository.PolicyPath(repositoryRoot));
+        ArchitectureModuleContainerContract discoveredContract = policy.Contracts.StrictModuleContainers.Single(
+            candidate => candidate.Id == "cli-command-modules-follow-the-feature-profile");
+
         Assert.Multiple(() =>
         {
-            Assert.That(contract.Layers, Is.All.StartsWith("cli_command_"));
-            Assert.That(commandNamespaces, Is.All.StartsWith(CommandNamespacePrefix));
-            Assert.That(commandNamespaces.Select(GetDirectCommandName), Is.EqualTo(commandFolders));
+            Assert.That(commandFolders, Is.Not.Empty);
+            Assert.That(policy.Layers.Keys, Is.All.Not.StartsWith("cli_command_"));
+            Assert.That(policy.Contracts.StrictIndependence,
+                Has.None.Matches<ArchitectureIndependenceContract>(candidate => candidate.Id == "cli-command-modules-are-independent"));
+            Assert.That(discoveredContract.Container, Is.EqualTo(CommandNamespacePrefix.TrimEnd('.')));
+            Assert.That(discoveredContract.Profile, Is.EqualTo("cli_command"));
+            Assert.That(commandRootSourceFiles, Is.Empty,
+                "Cli.Commands is a module container, not a shared behaviour bucket. Shared output belongs to the named Integration.OutputFormatting boundary.");
         });
     }
 
-    private static string GetDirectCommandName(string commandNamespace)
-    {
-        string commandName = commandNamespace[CommandNamespacePrefix.Length..];
-        Assert.That(commandName, Does.Not.Contain('.'),
-            "A command boundary must target an immediate Cli.Commands child namespace.");
-        return commandName;
-    }
 }

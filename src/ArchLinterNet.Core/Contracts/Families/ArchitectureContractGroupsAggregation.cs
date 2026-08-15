@@ -44,6 +44,12 @@ public sealed class ArchitectureContractGroups
     [YamlMember(Alias = "audit_acyclic_siblings")]
     public List<ArchitectureAcyclicSiblingContract> AuditAcyclicSiblings { get; set; } = new();
 
+    [YamlMember(Alias = "strict_module_containers")]
+    public List<ArchitectureModuleContainerContract> StrictModuleContainers { get; set; } = new();
+
+    [YamlMember(Alias = "audit_module_containers")]
+    public List<ArchitectureModuleContainerContract> AuditModuleContainers { get; set; } = new();
+
     [YamlMember(Alias = "strict_method_body")]
     public List<ArchitectureMethodBodyContract> StrictMethodBody { get; set; } = new();
 

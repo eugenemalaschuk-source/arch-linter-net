@@ -3,6 +3,7 @@ using ArchLinterNet.Core.Contracts.Families;
 using ArchLinterNet.Core.Discovery;
 using ArchLinterNet.Core.Execution.Abstractions;
 using ArchLinterNet.Core.Execution.Checkers;
+using ArchLinterNet.Core.Execution.Configuration;
 using ArchLinterNet.Core.Model;
 using ArchLinterNet.Core.Resolution;
 

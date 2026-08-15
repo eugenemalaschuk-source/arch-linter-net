@@ -331,7 +331,9 @@ public sealed partial class ArchitectureSarifFormatter : IArchitectureSarifForma
     {
         if (layoutConvention.ExpectedDeclarationCount == null
             && layoutConvention.ActualDeclarationCount == null
-            && layoutConvention.DeclarationPaths == null)
+            && layoutConvention.DeclarationPaths == null
+            && layoutConvention.ExpectedRoles == null
+            && layoutConvention.ExpectedAbstractClass == null)
         {
             return null;
         }
@@ -345,6 +347,18 @@ public sealed partial class ArchitectureSarifFormatter : IArchitectureSarifForma
 
         if (layoutConvention.DeclarationPaths != null)
             properties["declaration_paths"] = layoutConvention.DeclarationPaths.ToArray();
+
+        if (layoutConvention.ExpectedRoles != null)
+            properties["expected_roles"] = layoutConvention.ExpectedRoles.ToArray();
+
+        if (layoutConvention.ActualRole != null)
+            properties["actual_role"] = layoutConvention.ActualRole;
+
+        if (layoutConvention.ExpectedAbstractClass != null)
+            properties["expected_abstract_class"] = layoutConvention.ExpectedAbstractClass;
+
+        if (layoutConvention.ActualIsAbstract != null)
+            properties["actual_abstract"] = layoutConvention.ActualIsAbstract;
 
         return properties;
     }

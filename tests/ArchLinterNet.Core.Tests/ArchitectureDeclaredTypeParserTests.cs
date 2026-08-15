@@ -28,6 +28,7 @@ public sealed class ArchitectureDeclaredTypeParserTests
         Assert.That(types[0].Namespace, Is.EqualTo("MyApp.Domain"));
         Assert.That(types[0].TypeKind, Is.EqualTo(ArchitectureTypeKind.Class));
         Assert.That(types[0].IsPartial, Is.False);
+        Assert.That(types[0].IsAbstract, Is.False);
         Assert.That(types[0].SourceLine, Is.EqualTo(1));
     }
 
@@ -44,7 +45,19 @@ public sealed class ArchitectureDeclaredTypeParserTests
                 """);
 
         Assert.That(types.Single().IsPartial, Is.True);
+        Assert.That(types.Single().IsAbstract, Is.False);
         Assert.That(types.Single().SourceLine, Is.EqualTo(3));
+    }
+
+    [Test]
+    public void ParseSourceText_AbstractClass_RecordsAbstractModifier()
+    {
+        IReadOnlyList<ArchitectureDeclaredTypeParser.ParsedTypeInfo> types =
+            ArchitectureDeclaredTypeParser.ParseSourceText("""
+                namespace MyApp { public abstract class OrderPolicy { } }
+                """);
+
+        Assert.That(types.Single().IsAbstract, Is.True);
     }
 
     [Test]

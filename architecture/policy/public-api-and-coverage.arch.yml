@@ -56,7 +56,6 @@ contracts:
         - cli-must-not-depend-on-testing
         - testing-must-not-depend-on-cli
         - cli-must-use-validation-application-seam
-        - cli-command-modules-are-independent
         - testing-must-use-validation-application-seam
         - core-execution-must-not-depend-on-hosts
         - core-reporting-stays-a-diagnostics-leaf
@@ -79,4 +78,5 @@ contracts:
         - cel-must-not-depend-on-testing
         - di-container-stays-in-the-composition-boundary
         - msbuild-project-evaluation-stays-in-discovery
+        - cli-command-modules-follow-the-feature-profile
       reason: The recovered Core architecture's base package rules, seam, leaf-isolation, and protected-surface rules must keep matching real code so a renamed or deleted layer cannot silently stop being enforced.

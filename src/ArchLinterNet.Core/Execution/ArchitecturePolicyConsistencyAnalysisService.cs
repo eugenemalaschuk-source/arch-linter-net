@@ -76,6 +76,8 @@ internal sealed class ArchitecturePolicyConsistencyAnalysisService
         AddGroup("audit_cycles", AuditMode, "cycle", groups.AuditCycles);
         AddGroup("strict_acyclic_siblings", StrictMode, "acyclic_sibling", groups.StrictAcyclicSiblings);
         AddGroup("audit_acyclic_siblings", AuditMode, "acyclic_sibling", groups.AuditAcyclicSiblings);
+        AddGroup("strict_module_containers", StrictMode, "module_container", groups.StrictModuleContainers);
+        AddGroup("audit_module_containers", AuditMode, "module_container", groups.AuditModuleContainers);
         AddGroup("strict_method_body", StrictMode, "method_body", groups.StrictMethodBody);
         AddGroup("audit_method_body", AuditMode, "method_body", groups.AuditMethodBody);
         AddGroup("strict_independence", StrictMode, "independence", groups.StrictIndependence);
@@ -701,7 +703,9 @@ internal sealed class ArchitecturePolicyConsistencyAnalysisService
     }
 
     internal static IEnumerable<string> GetReferencedLayerNames(IArchitectureContract contract)
-        => ArchitectureRuleInputReferences.For(contract).Select(reference => reference.Layer);
+        => ArchitectureRuleInputReferences.For(contract)
+            .Where(reference => reference.IsLayerReference)
+            .Select(reference => reference.Layer);
 
     // Shared by GetReferencedLayerNames (dangling-layer deferral, policy-consistency) and
     // CheckConfiguration's own layer collection, so a typo'd layer name in either

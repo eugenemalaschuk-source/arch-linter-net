@@ -95,6 +95,13 @@
       "validates": "Direct sibling namespaces under each configured ancestor do not form directed dependency cycles."
     },
     {
+      "kind": "module-container",
+      "strictGroup": "strict_module_containers",
+      "auditGroup": "audit_module_containers",
+      "fields": ["name", "id", "container", "profile", "allowed_container_root_types", "allowed_module_root_types", "ignored_violations", "reason"],
+      "validates": "Direct feature modules discovered below a namespace container remain sibling-isolated and follow the selected profile's root-purity, segment, and dependency-direction rules."
+    },
+    {
       "kind": "method-body",
       "strictGroup": "strict_method_body",
       "auditGroup": "audit_method_body",
@@ -168,8 +175,8 @@
       "kind": "layout-conventions",
       "strictGroup": "strict_layout_conventions",
       "auditGroup": "audit_layout_conventions",
-      "fields": ["name", "id", "files_matching.folder_segment", "files_matching.namespace_segment", "files_matching.file_name_suffix", "files_matching.file_name_prefix", "files_matching.when", "exclude_files_matching", "require_type_kind", "forbid_type_kind", "required_name_suffix", "required_name_prefix", "forbidden_name_suffix", "forbidden_name_prefix", "require_type_name_matches_file_name", "require_matching_interface.name_prefix", "ignored_violations", "reason"],
-      "validates": "Source files selected by folder segment, namespace segment, and/or file-name prefix/suffix (files_matching, AND-combined, no regex) have their declared types checked against a required/forbidden type kind, required/forbidden naming suffix/prefix, file-name-matches-primary-type-name, and/or a matching-interface counterpart for every concrete (non-abstract) class. exclude_files_matching reuses the same matcher shape and subtracts matched candidates before expectations, including its own when predicates. files_matching.when is an optional ArchLinter CEL Profile v1 predicate compiled against the same closed subject context shape as layers.<name>.selector.when, narrowing which declared types in an already-selected file are evaluated. Requires at least one files_matching selector field and at least one expectation. Record vs. class/struct classification and file/folder facts require analysis.source_roots to be configured; a contract needing that data reports a deterministic 'unavailable' diagnostic instead of silently passing when it is missing for the whole run or for an individual declared type."
+      "fields": ["name", "id", "files_matching.folder_segment", "files_matching.namespace_segment", "files_matching.file_name_suffix", "files_matching.file_name_prefix", "files_matching.when", "exclude_files_matching", "require_type_kind", "forbid_type_kind", "required_name_suffix", "required_name_prefix", "forbidden_name_suffix", "forbidden_name_prefix", "require_type_name_matches_file_name", "max_declarations_per_type", "require_matching_interface.name_prefix", "all_declarations.allowed_type_kinds", "all_declarations.allowed_roles", "all_declarations.require_abstract_classes", "ignored_violations", "reason"],
+      "validates": "Source files selected by folder segment, namespace segment, and/or file-name prefix/suffix (files_matching, AND-combined, no regex) have their declared types checked against a required/forbidden type kind, declaration count, all-declaration kind/semantic-role/abstract-class purity, required/forbidden naming suffix/prefix, file-name-matches-primary-type-name, and/or a matching-interface counterpart for every concrete (non-abstract) class. all_declarations requires at least one permitted kind or role and applies both axes when both are given. exclude_files_matching reuses the same matcher shape and subtracts matched candidates before expectations, including its own when predicates. files_matching.when is an optional ArchLinter CEL Profile v1 predicate compiled against the same closed subject context shape as layers.<name>.selector.when, narrowing which declared types in an already-selected file are evaluated. Requires at least one files_matching selector field and at least one expectation. Record vs. class/struct classification and file/folder facts require analysis.source_roots to be configured; a contract needing that data reports a deterministic 'unavailable' diagnostic instead of silently passing when it is missing for the whole run or for an individual declared type."
     },
     {
       "kind": "public-api-surface",

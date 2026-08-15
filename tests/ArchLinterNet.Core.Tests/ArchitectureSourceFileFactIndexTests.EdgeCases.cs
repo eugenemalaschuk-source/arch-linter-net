@@ -98,9 +98,29 @@ public sealed partial class ArchitectureSourceFileFactIndexTests
 
         Assert.That(declarations, Has.Count.EqualTo(2));
         Assert.That(declarations.All(declaration => declaration.IsPartial), Is.True);
+        Assert.That(declarations.All(declaration => !declaration.IsAbstract), Is.True);
         Assert.That(
             declarations.Select(declaration => declaration.SourceFilePath),
             Is.EqualTo(_partialFixtureDeclarationPaths));
+    }
+
+    [Test]
+    public void SourceDeclarations_AbstractClassRetainsAbstractModifier()
+    {
+        const string Source = """
+            namespace ArchLinterNet.Core.Tests.SourceFactFixtures {
+                public abstract class AbstractFixture { }
+            }
+            """;
+
+        ArchitectureSourceFileFactIndex index = BuildIndex(
+            "/fake/repo", "src",
+            new Dictionary<string, string> { ["AbstractFixture.cs"] = Source });
+
+        ArchitectureTypeSourceDeclaration declaration = index.SourceDeclarations.Single(
+            candidate => candidate.FullTypeName.EndsWith(".AbstractFixture", StringComparison.Ordinal));
+
+        Assert.That(declaration.IsAbstract, Is.True);
     }
 
     // ── Deterministic ordering (4.2) ───────────────────────────────────────────────────

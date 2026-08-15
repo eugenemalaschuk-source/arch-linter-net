@@ -40,6 +40,7 @@ Installed releases expose their immutable offline `adoption-stabilization/v1` sc
 | Allow-only | `strict_allow_only` | `audit_allow_only` | Source layer references only itself and allowed first-party layers. |
 | Cycle | `strict_cycles` | `audit_cycles` | Selected layers do not form directed cycles. |
 | Acyclic sibling | `strict_acyclic_siblings` | `audit_acyclic_siblings` | Direct sibling namespaces under ancestor namespaces do not form dependency cycles. |
+| Module container | `strict_module_containers` | `audit_module_containers` | Discovers direct feature modules below a namespace container and enforces the selected profile's sibling-isolation, root-purity, segment, and dependency-direction rules. |
 | Method body | `strict_method_body` | `audit_method_body` | Source layer does not call forbidden APIs. |
 | asmdef | `strict_asmdef` | `audit_asmdef` | Unity `.asmdef` references avoid editor refs or forbidden prefixes. |
 | Independence | `strict_independence` | `audit_independence` | Selected layers do not reference each other. |
@@ -52,7 +53,7 @@ Installed releases expose their immutable offline `adoption-stabilization/v1` sc
 | External allow-only | `strict_external_allow_only` | `audit_external_allow_only` | Source layer references only explicitly allowed vendor/framework dependency groups. Supports `sources`/`source_sets` plus bounded `exclude_sources`/`exclude_source_sets` subtraction. |
 | Layer template | `strict_layer_templates` | `audit_layer_templates` | Reusable layer order applied to multiple containers, with optional `exclude_containers` subtraction before expansion. |
 | Type placement | `strict_type_placement` | `audit_type_placement` | A selected architectural role resides in a declared layer/namespace/project/assembly and/or carries a declared naming suffix/prefix, with optional subtractive `exclude_types_matching` filters. |
-| Layout conventions | `strict_layout_conventions` | `audit_layout_conventions` | Declared types in source files selected by folder/namespace segment and/or file-name prefix/suffix satisfy a required/forbidden type kind, required/forbidden naming, file-name-matches-primary-type, and/or matching-interface counterpart expectation, with optional subtractive `exclude_files_matching` filters. |
+| Layout conventions | `strict_layout_conventions` | `audit_layout_conventions` | Declarations in source files selected by folder/namespace segment and/or file-name prefix/suffix satisfy kind, role, abstract-class, naming, file-name, declaration-count, and/or matching-interface expectations, with optional subtractive `exclude_files_matching` filters. |
 | Public API surface | `strict_public_api_surface` | `audit_public_api_surface` | An assembly's exported public/protected/protected-internal types and members match a declared signature allowlist. |
 | Attribute usage | `strict_attribute_usage` | `audit_attribute_usage` | A declared attribute/marker type appears only in (or never in) a declared layer/namespace/project/assembly. |
 | Inheritance | `strict_inheritance` | `audit_inheritance` | Types in a declared source layer/namespace do not inherit (directly or transitively) from declared forbidden base types. |

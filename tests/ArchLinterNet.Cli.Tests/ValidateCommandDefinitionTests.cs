@@ -3,6 +3,7 @@ using System.Text;
 using System.Text.Json;
 using ArchLinterNet.Cli.Abstractions;
 using ArchLinterNet.Cli.Commands.Validate;
+using ArchLinterNet.Cli.Commands.Validate.EntryPoint;
 using ArchLinterNet.Core.BuildState;
 using ArchLinterNet.Core.Graph;
 using ArchLinterNet.Core.Model;

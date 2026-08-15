@@ -4,16 +4,9 @@
 # Cli abstractions and Core application seams, but command behaviour must not be reused by another
 # command through a direct namespace dependency.
 contracts:
-  strict_independence:
-    - name: cli-command-modules-are-independent
-      id: cli-command-modules-are-independent
-      layers:
-        - cli_command_baseline
-        - cli_command_cache
-        - cli_command_explain
-        - cli_command_graph
-        - cli_command_policy
-        - cli_command_public_api
-        - cli_command_schema
-        - cli_command_validate
-      reason: User-facing CLI commands are independent feature modules; move genuinely shared behaviour to an explicit shared seam instead of importing a sibling command.
+  strict_module_containers:
+    - name: cli-command-modules-follow-the-feature-profile
+      id: cli-command-modules-follow-the-feature-profile
+      container: ArchLinterNet.Cli.Commands
+      profile: cli_command
+      reason: Discover every direct command module without adding it to a central peer list. A direct sibling reference, root type, generic bucket, undeclared segment, or forbidden profile direction is a strict violation.

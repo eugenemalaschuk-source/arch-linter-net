@@ -850,6 +850,45 @@ contracts:
       reason: New feature siblings should not introduce cycles.
 ```
 
+## Create A Parallel-Safe CLI Command Module
+
+For this repository's feature-first CLI profile, create a command from the repository root with
+the scaffold instead of adding a registry entry or a `cli_command_*` policy layer:
+
+```bash
+arch-linter-net scaffold cli-command \
+  --module Inspect \
+  --command inspect \
+  --dry-run
+```
+
+`--module` is a PascalCase namespace/module name and `--command` is the lower-case CLI token.
+Review the dry-run plan first, then rerun without `--dry-run` to create only these owned paths:
+
+```text
+src/ArchLinterNet.Cli/Commands/Inspect/EntryPoint/InspectCommandModule.cs
+src/ArchLinterNet.Cli/Commands/Inspect/Application/InspectCommandHandler.cs
+tests/ArchLinterNet.Cli.Tests/Scaffolded/InspectCommandScaffoldTests.cs
+```
+
+Optional `--model`, `--abstraction`, and `--exception` create a single type in `Models`,
+`Abstractions`, or `Exceptions`; they never create empty folders. The scaffold validates names,
+fails before writing if a target file already exists, and requires explicit `--force` to replace
+one. It does not edit `Program.cs`, the reflection catalog, or a peer-module policy inventory.
+
+Each direct child of `ArchLinterNet.Cli.Commands` is independently owned. Keep command behavior
+inside its `EntryPoint` and `Application` namespaces; use `Models`, `Abstractions`, and
+`Exceptions` only for their focused roles. Do not add `Common`, `Shared`, or `Utils` under the
+container. A capability used by multiple commands needs a narrowly named, owner-reviewed boundary
+outside it (for example `ArchLinterNet.Cli.Integration.OutputFormatting`), not a sibling import.
+
+Before committing a new module, run:
+
+```bash
+make lint-architecture
+dotnet test tests/ArchLinterNet.Cli.Tests --no-restore
+```
+
 ## Keep Ignores Narrow
 
 `ignored_violations` is a frozen-debt baseline. Each entry should identify a

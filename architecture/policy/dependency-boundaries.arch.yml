@@ -40,6 +40,12 @@ contracts:
       forbidden: [cli_commands]
       reason: CLI infrastructure should compose command modules through abstractions and discovery, not by coupling back to command implementation namespaces.
 
+    - name: cli-output-formatting-must-not-depend-on-cli-command-implementations
+      id: cli-output-formatting-must-not-depend-on-cli-command-implementations
+      source: cli_integration_output_formatting
+      forbidden: [cli_commands]
+      reason: Shared output formatting is a named integration boundary owned outside Commands; it must not absorb command behaviour or reintroduce a shared command root.
+
     - name: testing-must-use-validation-application-seam
       id: testing-must-use-validation-application-seam
       source: testing

@@ -17,6 +17,7 @@ internal static class ArchitectureDeclaredTypeParser
         string Namespace,
         ArchitectureTypeKind TypeKind,
         bool IsPartial,
+        bool IsAbstract,
         int SourceLine);
 
     public static IReadOnlyList<ParsedTypeInfo> ParseSourceText(
@@ -67,6 +68,7 @@ internal static class ArchitectureDeclaredTypeParser
                         ns,
                         GetKind(typeDecl),
                         typeDecl.Modifiers.Any(SyntaxKind.PartialKeyword),
+                        typeDecl.Modifiers.Any(SyntaxKind.AbstractKeyword),
                         GetSourceLine(typeDecl)));
 
                     // Recurse for nested type declarations (members of any TypeDeclaration may contain
@@ -78,7 +80,7 @@ internal static class ArchitectureDeclaredTypeParser
                     string enumName = enumDecl.Identifier.ValueText;
                     string enumFull = BuildClrFull(ns, outerClrPrefix, enumName);
                     results.Add(new ParsedTypeInfo(
-                        enumFull, enumName, ns, ArchitectureTypeKind.Enum, IsPartial: false, SourceLine: GetSourceLine(enumDecl)));
+                        enumFull, enumName, ns, ArchitectureTypeKind.Enum, IsPartial: false, IsAbstract: false, SourceLine: GetSourceLine(enumDecl)));
                     break;
 
                 case DelegateDeclarationSyntax delegateDecl:
@@ -87,7 +89,7 @@ internal static class ArchitectureDeclaredTypeParser
                     string delClrSimple = delArity > 0 ? $"{delName}`{delArity}" : delName;
                     string delFull = BuildClrFull(ns, outerClrPrefix, delClrSimple);
                     results.Add(new ParsedTypeInfo(
-                        delFull, delName, ns, ArchitectureTypeKind.Delegate, IsPartial: false, SourceLine: GetSourceLine(delegateDecl)));
+                        delFull, delName, ns, ArchitectureTypeKind.Delegate, IsPartial: false, IsAbstract: false, SourceLine: GetSourceLine(delegateDecl)));
                     break;
             }
         }

@@ -99,8 +99,10 @@ class ArchLinterNet.Core.Contracts.Families.ArchitectureInterfaceImplementationC
 class ArchLinterNet.Core.Contracts.Families.ArchitectureLayerContract [sealed]
 class ArchLinterNet.Core.Contracts.Families.ArchitectureLayerTemplateContract [sealed]
 class ArchLinterNet.Core.Contracts.Families.ArchitectureLayoutConventionContract [sealed]
+class ArchLinterNet.Core.Contracts.Families.ArchitectureLayoutDeclarationShape [sealed]
 class ArchLinterNet.Core.Contracts.Families.ArchitectureLayoutFileMatcher [sealed]
 class ArchLinterNet.Core.Contracts.Families.ArchitectureMethodBodyContract [sealed]
+class ArchLinterNet.Core.Contracts.Families.ArchitectureModuleContainerContract [sealed]
 class ArchLinterNet.Core.Contracts.Families.ArchitectureOptionalRuleInput [sealed]
 class ArchLinterNet.Core.Contracts.Families.ArchitecturePackageAllowOnlyContract [sealed]
 class ArchLinterNet.Core.Contracts.Families.ArchitecturePackageDependencyContract [sealed]
@@ -126,9 +128,6 @@ class ArchLinterNet.Core.Discovery.ArchitectureDiscoveredProjectReference [seale
 class ArchLinterNet.Core.Discovery.ArchitectureProjectDiscoveryDiagnostic [sealed]
 class ArchLinterNet.Core.Discovery.ArchitectureProjectDiscoveryService [sealed]
 class ArchLinterNet.Core.Discovery.ProjectDiscoveryResult [sealed]
-class ArchLinterNet.Core.Execution.Abstractions.ArchitectureContractExecutionResult [sealed]
-class ArchLinterNet.Core.Execution.Abstractions.ArchitectureHandlerResult [sealed]
-class ArchLinterNet.Core.Execution.Abstractions.ArchitectureRunnerSetup [sealed]
 class ArchLinterNet.Core.Execution.ArchitectureAnalysisContext [sealed]
 class ArchLinterNet.Core.Execution.ArchitectureAnalysisSession [sealed]
 class ArchLinterNet.Core.Execution.ArchitectureAssemblyResolutionService [sealed]
@@ -149,6 +148,9 @@ class ArchLinterNet.Core.Execution.ArchitectureTypeIndex [sealed]
 class ArchLinterNet.Core.Execution.LayerTemplateExpander [static]
 class ArchLinterNet.Core.Execution.MaxParallelismResolver [static]
 class ArchLinterNet.Core.Execution.ResolutionResult [sealed]
+class ArchLinterNet.Core.Execution.Results.ArchitectureContractExecutionResult [sealed]
+class ArchLinterNet.Core.Execution.Results.ArchitectureHandlerResult [sealed]
+class ArchLinterNet.Core.Execution.Results.ArchitectureRunnerSetup [sealed]
 class ArchLinterNet.Core.Graph.ArchitectureExplainApplicationService [sealed]
 class ArchLinterNet.Core.Graph.ArchitectureExplainOutcome [sealed]
 class ArchLinterNet.Core.Graph.ArchitectureExplainRequest [sealed]
@@ -184,6 +186,8 @@ class ArchLinterNet.Core.Model.ArchitectureFindingReadEnvelope [sealed]
 class ArchLinterNet.Core.Model.ArchitectureFindingSourceLocation [sealed]
 class ArchLinterNet.Core.Model.ArchitectureGraphEdge [sealed]
 class ArchLinterNet.Core.Model.ArchitectureGraphNode [sealed]
+class ArchLinterNet.Core.Model.ArchitectureModuleNamespaceMembership [sealed]
+class ArchLinterNet.Core.Model.ArchitectureModuleNamespaceMembershipResolver [static]
 class ArchLinterNet.Core.Model.ArchitecturePolicyDiagnostic [sealed]
 class ArchLinterNet.Core.Model.ArchitecturePolicyErrorDiagnostic [sealed]
 class ArchLinterNet.Core.Model.ArchitecturePolicyLoadException [sealed]
@@ -568,8 +572,10 @@ ctor ArchLinterNet.Core.Contracts.Families.ArchitectureInterfaceImplementationCo
 ctor ArchLinterNet.Core.Contracts.Families.ArchitectureLayerContract()
 ctor ArchLinterNet.Core.Contracts.Families.ArchitectureLayerTemplateContract()
 ctor ArchLinterNet.Core.Contracts.Families.ArchitectureLayoutConventionContract()
+ctor ArchLinterNet.Core.Contracts.Families.ArchitectureLayoutDeclarationShape()
 ctor ArchLinterNet.Core.Contracts.Families.ArchitectureLayoutFileMatcher()
 ctor ArchLinterNet.Core.Contracts.Families.ArchitectureMethodBodyContract()
+ctor ArchLinterNet.Core.Contracts.Families.ArchitectureModuleContainerContract()
 ctor ArchLinterNet.Core.Contracts.Families.ArchitectureOptionalRuleInput()
 ctor ArchLinterNet.Core.Contracts.Families.ArchitecturePackageAllowOnlyContract()
 ctor ArchLinterNet.Core.Contracts.Families.ArchitecturePackageDependencyContract()
@@ -593,10 +599,6 @@ ctor ArchLinterNet.Core.Discovery.ArchitectureProjectDiscoveryDiagnostic(System.
 ctor ArchLinterNet.Core.Discovery.ArchitectureProjectDiscoveryService()
 ctor ArchLinterNet.Core.Discovery.ArchitectureProjectDiscoveryService(ArchLinterNet.Core.IO.Abstractions.IArchitectureFileSystem)
 ctor ArchLinterNet.Core.Discovery.ProjectDiscoveryResult(System.Collections.Generic.IReadOnlyCollection`1[System.String], System.Collections.Generic.IReadOnlyCollection`1[System.String], System.Collections.Generic.IReadOnlyCollection`1[System.String], System.Collections.Generic.IReadOnlyCollection`1[ArchLinterNet.Core.Discovery.ArchitectureProjectDiscoveryDiagnostic])
-ctor ArchLinterNet.Core.Execution.Abstractions.ArchitectureContractChecker(System.Object, System.IntPtr)
-ctor ArchLinterNet.Core.Execution.Abstractions.ArchitectureContractExecutionResult(System.Collections.Generic.IReadOnlyCollection`1[ArchLinterNet.Core.Model.ArchitectureViolation], System.Collections.Generic.IReadOnlyCollection`1[System.String], System.Collections.Generic.IReadOnlyCollection`1[ArchLinterNet.Core.Model.ArchitectureViolation], System.Collections.Generic.IReadOnlyCollection`1[ArchLinterNet.Core.Reporting.ArchitectureCoverageSummary])
-ctor ArchLinterNet.Core.Execution.Abstractions.ArchitectureHandlerResult(System.Collections.Generic.IReadOnlyCollection`1[ArchLinterNet.Core.Model.ArchitectureViolation], System.Collections.Generic.IReadOnlyCollection`1[System.String])
-ctor ArchLinterNet.Core.Execution.Abstractions.ArchitectureRunnerSetup(System.String, ArchLinterNet.Core.Execution.Abstractions.IArchitectureContractRunner)
 ctor ArchLinterNet.Core.Execution.ArchitectureAnalysisContext(System.String, System.Collections.Generic.IReadOnlyCollection`1[System.Reflection.Assembly], System.Collections.Generic.IReadOnlyCollection`1[System.String], System.Collections.Generic.IReadOnlyCollection`1[System.String], System.Collections.Generic.IReadOnlyCollection`1[ArchLinterNet.Core.Discovery.ArchitectureProjectDiscoveryDiagnostic], ArchLinterNet.Core.Discovery.ProjectDiscoveryResult, ArchLinterNet.Core.IO.Abstractions.IArchitectureAssemblyLoadScope, System.Collections.Generic.IReadOnlyCollection`1[System.String])
 ctor ArchLinterNet.Core.Execution.ArchitectureAnalysisSession(ArchLinterNet.Core.Execution.ArchitectureAnalysisContext, ArchLinterNet.Core.Contracts.ArchitectureContractDocument, System.Collections.Generic.HashSet`1[System.String], System.Boolean, System.Collections.Generic.IReadOnlyList`1[System.String])
 ctor ArchLinterNet.Core.Execution.ArchitectureAssemblyResolutionService()
@@ -613,7 +615,11 @@ ctor ArchLinterNet.Core.Execution.ArchitectureRunnerPreparation(System.String, S
 ctor ArchLinterNet.Core.Execution.ArchitectureRunnerSetupService(ArchLinterNet.Core.Contracts.Abstractions.IArchitecturePolicyDocumentLoader, ArchLinterNet.Core.Contracts.Abstractions.IArchitectureBaselineLoadingService, ArchLinterNet.Core.Resolution.Abstractions.IArchitectureRepositoryRootResolver, ArchLinterNet.Core.Contracts.Abstractions.IConditionSetResolutionService, ArchLinterNet.Core.Discovery.Abstractions.IArchitectureProjectDiscoveryService, ArchLinterNet.Core.Execution.IArchitectureAssemblyResolutionService)
 ctor ArchLinterNet.Core.Execution.ArchitectureSourceFileFactIndex(System.Collections.Generic.IReadOnlyCollection`1[System.Reflection.Assembly], System.String, System.Collections.Generic.IReadOnlyList`1[System.String], System.Collections.Generic.IReadOnlyList`1[System.String], ArchLinterNet.Core.IO.Abstractions.IArchitectureFileSystem, System.Threading.CancellationToken)
 ctor ArchLinterNet.Core.Execution.ArchitectureTypeIndex(System.Collections.Generic.IReadOnlyCollection`1[System.Reflection.Assembly], System.Threading.CancellationToken)
+ctor ArchLinterNet.Core.Execution.Contracts.ArchitectureContractChecker(System.Object, System.IntPtr)
 ctor ArchLinterNet.Core.Execution.ResolutionResult(System.Collections.Generic.IReadOnlyCollection`1[System.Reflection.Assembly], System.Collections.Generic.IReadOnlyCollection`1[System.String], System.Collections.Generic.IReadOnlyCollection`1[System.String], System.Int32, ArchLinterNet.Core.IO.Abstractions.IArchitectureAssemblyLoadScope)
+ctor ArchLinterNet.Core.Execution.Results.ArchitectureContractExecutionResult(System.Collections.Generic.IReadOnlyCollection`1[ArchLinterNet.Core.Model.ArchitectureViolation], System.Collections.Generic.IReadOnlyCollection`1[System.String], System.Collections.Generic.IReadOnlyCollection`1[ArchLinterNet.Core.Model.ArchitectureViolation], System.Collections.Generic.IReadOnlyCollection`1[ArchLinterNet.Core.Reporting.ArchitectureCoverageSummary])
+ctor ArchLinterNet.Core.Execution.Results.ArchitectureHandlerResult(System.Collections.Generic.IReadOnlyCollection`1[ArchLinterNet.Core.Model.ArchitectureViolation], System.Collections.Generic.IReadOnlyCollection`1[System.String])
+ctor ArchLinterNet.Core.Execution.Results.ArchitectureRunnerSetup(System.String, ArchLinterNet.Core.Execution.Abstractions.IArchitectureContractRunner)
 ctor ArchLinterNet.Core.Graph.ArchitectureExplainApplicationService(ArchLinterNet.Core.Graph.Abstractions.IArchitectureGraphApplicationService)
 ctor ArchLinterNet.Core.Graph.ArchitectureExplainOutcome(System.String, System.String, System.Collections.Generic.IReadOnlyList`1[System.String], System.Collections.Generic.IReadOnlyList`1[System.String])
 ctor ArchLinterNet.Core.Graph.ArchitectureExplainRequest()
@@ -636,6 +642,7 @@ ctor ArchLinterNet.Core.Model.ArchitectureClassificationRoleFact(System.String, 
 ctor ArchLinterNet.Core.Model.ArchitectureContextualConsumerReference(System.String, System.Collections.Generic.IReadOnlyDictionary`2[System.String,System.Object], System.String, System.String, System.Collections.Generic.IReadOnlyDictionary`2[System.String,System.Object], System.String, System.String, ArchLinterNet.Core.Model.ArchitecturePolicySourceLocation, ArchLinterNet.Core.Model.ArchitecturePolicySourceLocation, System.String, System.String)
 ctor ArchLinterNet.Core.Model.ArchitectureContractExpansion(System.String, System.String, System.String, System.Collections.Generic.IReadOnlyList`1[System.String], System.Collections.Generic.IReadOnlyList`1[ArchLinterNet.Core.Model.ArchitectureExpandedContractInstance])
 ctor ArchLinterNet.Core.Model.ArchitectureCycleFinding(System.String, System.String, System.String)
+ctor ArchLinterNet.Core.Model.ArchitectureDeclaredTypeFact(System.String, System.String, System.String, System.String, ArchLinterNet.Core.Model.ArchitectureTypeKind, System.Boolean, System.String, System.String, System.Collections.Generic.IReadOnlyList`1[System.String], System.Collections.Generic.IReadOnlyList`1[System.String])
 ctor ArchLinterNet.Core.Model.ArchitectureDeclaredTypeFact(System.String, System.String, System.String, System.String, ArchLinterNet.Core.Model.ArchitectureTypeKind, System.String, System.String, System.Collections.Generic.IReadOnlyList`1[System.String], System.Collections.Generic.IReadOnlyList`1[System.String])
 ctor ArchLinterNet.Core.Model.ArchitectureDeclaredTypeSourceAmbiguity(System.String, System.String, System.Collections.Generic.IReadOnlyList`1[System.String])
 ctor ArchLinterNet.Core.Model.ArchitectureDependencyGraph(System.Collections.Generic.IReadOnlyList`1[ArchLinterNet.Core.Model.ArchitectureGraphNode], System.Collections.Generic.IReadOnlyList`1[ArchLinterNet.Core.Model.ArchitectureGraphEdge])
@@ -648,6 +655,7 @@ ctor ArchLinterNet.Core.Model.ArchitectureFindingReadEnvelope(System.Int32, Syst
 ctor ArchLinterNet.Core.Model.ArchitectureFindingSourceLocation(System.String, System.Nullable`1[System.Int32], System.Nullable`1[System.Int32])
 ctor ArchLinterNet.Core.Model.ArchitectureGraphEdge(System.String, System.String, ArchLinterNet.Core.Model.ArchitectureGraphNodeKind, ArchLinterNet.Core.Model.ArchitectureGraphNodeKind, System.Collections.Generic.IReadOnlyList`1[System.String])
 ctor ArchLinterNet.Core.Model.ArchitectureGraphNode(System.String, ArchLinterNet.Core.Model.ArchitectureGraphNodeKind)
+ctor ArchLinterNet.Core.Model.ArchitectureModuleNamespaceMembership(System.String, System.String, System.String, System.Boolean)
 ctor ArchLinterNet.Core.Model.ArchitecturePolicyDiagnostic(ArchLinterNet.Core.Model.ArchitecturePolicyDiagnosticKind, ArchLinterNet.Core.Model.ArchitecturePolicySourceLocation, System.Collections.Generic.IReadOnlyList`1[ArchLinterNet.Core.Model.ArchitecturePolicySourceLocation], System.Collections.Generic.IReadOnlyList`1[System.String])
 ctor ArchLinterNet.Core.Model.ArchitecturePolicyErrorDiagnostic(System.String, ArchLinterNet.Core.Model.ArchitecturePolicyDiagnosticKind, System.String, System.Collections.Generic.IReadOnlyList`1[System.String])
 ctor ArchLinterNet.Core.Model.ArchitecturePolicyLoadException(System.String, System.Object, System.String, System.Exception)
@@ -771,7 +779,7 @@ ctor ArchLinterNet.Core.Validation.PublicApiUpdateOutcome(System.Boolean, System
 ctor ArchLinterNet.Core.Validation.PublicApiUpdateRequest()
 ctor ArchLinterNet.Core.Validation.ValidationOutcome(System.Boolean, System.Collections.Generic.IReadOnlyCollection`1[ArchLinterNet.Core.Model.ArchitectureViolation], System.Collections.Generic.IReadOnlyCollection`1[System.String], System.Collections.Generic.IReadOnlyCollection`1[ArchLinterNet.Core.Model.ArchitectureViolation], System.String, System.Collections.Generic.IReadOnlyList`1[ArchLinterNet.Core.Model.ArchitectureUnmatchedIgnoredViolation], System.String, System.Collections.Generic.IReadOnlyCollection`1[ArchLinterNet.Core.Model.PolicyConsistencyDiagnostic], System.String, System.Collections.Generic.IReadOnlyCollection`1[ArchLinterNet.Core.Reporting.ArchitectureCoverageSummary], System.Collections.Generic.IReadOnlyCollection`1[ArchLinterNet.Core.Model.ArchitectureClassificationConflict], System.Collections.Generic.IReadOnlyCollection`1[ArchLinterNet.Core.Model.ArchitectureClassificationMetadataFailure])
 ctor ArchLinterNet.Core.Validation.ValidationRequest()
-delegate ArchLinterNet.Core.Execution.Abstractions.ArchitectureContractChecker [sealed]
+delegate ArchLinterNet.Core.Execution.Contracts.ArchitectureContractChecker [sealed]
 enum ArchLinterNet.Core.BuildState.BuildPreparationMode [underlying:System.Int32]
 enum ArchLinterNet.Core.BuildState.CacheEligibility [underlying:System.Int32]
 enum ArchLinterNet.Core.Caching.AnalysisCacheEntryCompletionStatus [underlying:System.Int32]
@@ -965,22 +973,17 @@ method ArchLinterNet.Core.Contracts.PublicApiSnapshotStore.ResolvePath(System.St
 method ArchLinterNet.Core.Discovery.Abstractions.IArchitectureProjectDiscoveryService.ResolveAndApply(ArchLinterNet.Core.Contracts.ArchitectureContractDocument, System.String, System.Boolean, System.Threading.CancellationToken): ArchLinterNet.Core.Discovery.ProjectDiscoveryResult [abstract]
 method ArchLinterNet.Core.Discovery.ArchitectureProjectDiscoveryService.ResolveAndApply(ArchLinterNet.Core.Contracts.ArchitectureContractDocument, System.String, System.Boolean, System.Threading.CancellationToken): ArchLinterNet.Core.Discovery.ProjectDiscoveryResult [virtual]
 method ArchLinterNet.Core.Discovery.ArchitectureProjectDiscoveryService.ResolveFromDocument(ArchLinterNet.Core.Contracts.ArchitectureContractDocument, System.String, System.Boolean, System.Threading.CancellationToken): ArchLinterNet.Core.Discovery.ProjectDiscoveryResult
-method ArchLinterNet.Core.Execution.Abstractions.ArchitectureContractChecker.BeginInvoke(ArchLinterNet.Core.Execution.ArchitectureAnalysisSession, ArchLinterNet.Core.Contracts.IArchitectureContract, System.AsyncCallback, System.Object): System.IAsyncResult [virtual]
-method ArchLinterNet.Core.Execution.Abstractions.ArchitectureContractChecker.EndInvoke(System.IAsyncResult): ArchLinterNet.Core.Execution.Abstractions.ArchitectureHandlerResult [virtual]
-method ArchLinterNet.Core.Execution.Abstractions.ArchitectureContractChecker.Invoke(ArchLinterNet.Core.Execution.ArchitectureAnalysisSession, ArchLinterNet.Core.Contracts.IArchitectureContract): ArchLinterNet.Core.Execution.Abstractions.ArchitectureHandlerResult [virtual]
-method ArchLinterNet.Core.Execution.Abstractions.ArchitectureHandlerResult.FromCycles(System.Collections.Generic.IReadOnlyCollection`1[System.String]): ArchLinterNet.Core.Execution.Abstractions.ArchitectureHandlerResult [static]
-method ArchLinterNet.Core.Execution.Abstractions.ArchitectureHandlerResult.FromViolations(System.Collections.Generic.IReadOnlyCollection`1[ArchLinterNet.Core.Model.ArchitectureViolation]): ArchLinterNet.Core.Execution.Abstractions.ArchitectureHandlerResult [static]
-method ArchLinterNet.Core.Execution.Abstractions.IArchitectureContractExecutor.Execute(ArchLinterNet.Core.Execution.ArchitectureAnalysisSession, System.String, ArchLinterNet.Core.Execution.Abstractions.IArchitectureContractHandlerRegistry, System.Boolean, ArchLinterNet.Core.Reporting.ValidationTiming): ArchLinterNet.Core.Execution.Abstractions.ArchitectureContractExecutionResult [abstract]
-method ArchLinterNet.Core.Execution.Abstractions.IArchitectureContractHandlerRegistry.Execute(System.String, ArchLinterNet.Core.Execution.ArchitectureAnalysisSession, ArchLinterNet.Core.Contracts.IArchitectureContract): ArchLinterNet.Core.Execution.Abstractions.ArchitectureHandlerResult [abstract]
-method ArchLinterNet.Core.Execution.Abstractions.IArchitectureContractHandlerRegistry.TryGetHandler(System.String, ArchLinterNet.Core.Execution.Abstractions.ArchitectureContractChecker&): System.Boolean [abstract, param1:out]
+method ArchLinterNet.Core.Execution.Abstractions.IArchitectureContractExecutor.Execute(ArchLinterNet.Core.Execution.ArchitectureAnalysisSession, System.String, ArchLinterNet.Core.Execution.Abstractions.IArchitectureContractHandlerRegistry, System.Boolean, ArchLinterNet.Core.Reporting.ValidationTiming): ArchLinterNet.Core.Execution.Results.ArchitectureContractExecutionResult [abstract]
+method ArchLinterNet.Core.Execution.Abstractions.IArchitectureContractHandlerRegistry.Execute(System.String, ArchLinterNet.Core.Execution.ArchitectureAnalysisSession, ArchLinterNet.Core.Contracts.IArchitectureContract): ArchLinterNet.Core.Execution.Results.ArchitectureHandlerResult [abstract]
+method ArchLinterNet.Core.Execution.Abstractions.IArchitectureContractHandlerRegistry.TryGetHandler(System.String, ArchLinterNet.Core.Execution.Contracts.ArchitectureContractChecker&): System.Boolean [abstract, param1:out]
 method ArchLinterNet.Core.Execution.Abstractions.IArchitectureContractRunner.CheckConfiguration(): System.Collections.Generic.List`1[ArchLinterNet.Core.Model.ArchitectureViolation] [abstract]
 method ArchLinterNet.Core.Execution.Abstractions.IArchitectureContractRunner.CheckConfiguration(System.Boolean): System.Collections.Generic.List`1[ArchLinterNet.Core.Model.ArchitectureViolation] [abstract]
 method ArchLinterNet.Core.Execution.Abstractions.IArchitectureContractRunner.CheckPolicyConsistency(): System.Collections.Generic.List`1[ArchLinterNet.Core.Model.PolicyConsistencyDiagnostic] [abstract]
-method ArchLinterNet.Core.Execution.Abstractions.IArchitectureRunnerSetupService.BuildRunner(ArchLinterNet.Core.Contracts.ArchitectureContractDocument, System.String, System.String, System.Collections.Generic.IReadOnlyList`1[System.String], System.Collections.Generic.HashSet`1[System.String], System.Boolean, ArchLinterNet.Core.Reporting.ValidationTiming, System.String, System.Threading.CancellationToken, System.Nullable`1[System.Int32]): ArchLinterNet.Core.Execution.Abstractions.ArchitectureRunnerSetup [abstract]
-method ArchLinterNet.Core.Execution.Abstractions.IArchitectureRunnerSetupService.BuildRunnerForPostBuild(ArchLinterNet.Core.Contracts.ArchitectureContractDocument, System.String, System.String, System.Collections.Generic.IReadOnlyList`1[System.String], System.Collections.Generic.HashSet`1[System.String], System.Boolean, ArchLinterNet.Core.Reporting.ValidationTiming, System.String, System.Threading.CancellationToken, System.Nullable`1[System.Int32]): ArchLinterNet.Core.Execution.Abstractions.ArchitectureRunnerSetup [abstract]
+method ArchLinterNet.Core.Execution.Abstractions.IArchitectureRunnerSetupService.BuildRunner(ArchLinterNet.Core.Contracts.ArchitectureContractDocument, System.String, System.String, System.Collections.Generic.IReadOnlyList`1[System.String], System.Collections.Generic.HashSet`1[System.String], System.Boolean, ArchLinterNet.Core.Reporting.ValidationTiming, System.String, System.Threading.CancellationToken, System.Nullable`1[System.Int32]): ArchLinterNet.Core.Execution.Results.ArchitectureRunnerSetup [abstract]
+method ArchLinterNet.Core.Execution.Abstractions.IArchitectureRunnerSetupService.BuildRunnerForPostBuild(ArchLinterNet.Core.Contracts.ArchitectureContractDocument, System.String, System.String, System.Collections.Generic.IReadOnlyList`1[System.String], System.Collections.Generic.HashSet`1[System.String], System.Boolean, ArchLinterNet.Core.Reporting.ValidationTiming, System.String, System.Threading.CancellationToken, System.Nullable`1[System.Int32]): ArchLinterNet.Core.Execution.Results.ArchitectureRunnerSetup [abstract]
 method ArchLinterNet.Core.Execution.Abstractions.IArchitectureRunnerSetupService.LoadDocument(System.String, System.String, ArchLinterNet.Core.Reporting.ValidationTiming): ArchLinterNet.Core.Contracts.ArchitectureContractDocument [abstract]
 method ArchLinterNet.Core.Execution.Abstractions.IArchitectureRunnerSetupService.LoadDocument(System.String, System.String, ArchLinterNet.Core.Reporting.ValidationTiming, System.Threading.CancellationToken): ArchLinterNet.Core.Contracts.ArchitectureContractDocument [virtual]
-method ArchLinterNet.Core.Execution.Abstractions.IArchitectureRunnerSetupService.MaterializePreparedRunner(ArchLinterNet.Core.Contracts.ArchitectureContractDocument, ArchLinterNet.Core.Execution.ArchitectureRunnerPreparation, System.Collections.Generic.HashSet`1[System.String], System.Boolean, ArchLinterNet.Core.Reporting.ValidationTiming, System.String, System.Threading.CancellationToken, System.Nullable`1[System.Int32]): ArchLinterNet.Core.Execution.Abstractions.ArchitectureRunnerSetup [virtual]
+method ArchLinterNet.Core.Execution.Abstractions.IArchitectureRunnerSetupService.MaterializePreparedRunner(ArchLinterNet.Core.Contracts.ArchitectureContractDocument, ArchLinterNet.Core.Execution.ArchitectureRunnerPreparation, System.Collections.Generic.HashSet`1[System.String], System.Boolean, ArchLinterNet.Core.Reporting.ValidationTiming, System.String, System.Threading.CancellationToken, System.Nullable`1[System.Int32]): ArchLinterNet.Core.Execution.Results.ArchitectureRunnerSetup [virtual]
 method ArchLinterNet.Core.Execution.Abstractions.IArchitectureRunnerSetupService.PrepareRunner(ArchLinterNet.Core.Contracts.ArchitectureContractDocument, System.String, System.String, System.Collections.Generic.IReadOnlyList`1[System.String], System.Collections.Generic.HashSet`1[System.String], System.String, System.Threading.CancellationToken): ArchLinterNet.Core.Execution.ArchitectureRunnerPreparation [virtual]
 method ArchLinterNet.Core.Execution.ArchitectureAnalysisContext.Dispose(): System.Void [virtual]
 method ArchLinterNet.Core.Execution.ArchitectureAnalysisSession.AuditAcyclicSiblingContracts(): System.Collections.Generic.IEnumerable`1[ArchLinterNet.Core.Contracts.Families.ArchitectureAcyclicSiblingContract]
@@ -992,6 +995,7 @@ method ArchLinterNet.Core.Execution.ArchitectureAnalysisSession.AuditExternalCon
 method ArchLinterNet.Core.Execution.ArchitectureAnalysisSession.AuditIndependenceContracts(): System.Collections.Generic.IEnumerable`1[ArchLinterNet.Core.Contracts.Families.ArchitectureIndependenceContract]
 method ArchLinterNet.Core.Execution.ArchitectureAnalysisSession.AuditLayerContracts(): System.Collections.Generic.IEnumerable`1[ArchLinterNet.Core.Contracts.Families.ArchitectureLayerContract]
 method ArchLinterNet.Core.Execution.ArchitectureAnalysisSession.AuditMethodBodyContracts(): System.Collections.Generic.IEnumerable`1[ArchLinterNet.Core.Contracts.Families.ArchitectureMethodBodyContract]
+method ArchLinterNet.Core.Execution.ArchitectureAnalysisSession.AuditModuleContainerContracts(): System.Collections.Generic.IEnumerable`1[ArchLinterNet.Core.Contracts.Families.ArchitectureModuleContainerContract]
 method ArchLinterNet.Core.Execution.ArchitectureAnalysisSession.AuditProtectedContracts(): System.Collections.Generic.IEnumerable`1[ArchLinterNet.Core.Contracts.Families.ArchitectureProtectedContract]
 method ArchLinterNet.Core.Execution.ArchitectureAnalysisSession.BuildCoverageInventory(ArchLinterNet.Core.Contracts.ArchitectureContractDocument, ArchLinterNet.Core.Discovery.ProjectDiscoveryResult): ArchLinterNet.Core.Execution.ArchitectureCoverageInventory
 method ArchLinterNet.Core.Execution.ArchitectureAnalysisSession.BuildCoverageSummary(ArchLinterNet.Core.Contracts.Families.ArchitectureCoverageContract): ArchLinterNet.Core.Reporting.ArchitectureCoverageSummary
@@ -1024,6 +1028,7 @@ method ArchLinterNet.Core.Execution.ArchitectureAnalysisSession.CheckInterfaceIm
 method ArchLinterNet.Core.Execution.ArchitectureAnalysisSession.CheckLayerContract(ArchLinterNet.Core.Contracts.Families.ArchitectureLayerContract): System.Collections.Generic.List`1[ArchLinterNet.Core.Model.ArchitectureViolation]
 method ArchLinterNet.Core.Execution.ArchitectureAnalysisSession.CheckLayoutConventionsContract(ArchLinterNet.Core.Contracts.Families.ArchitectureLayoutConventionContract): System.Collections.Generic.List`1[ArchLinterNet.Core.Model.ArchitectureViolation]
 method ArchLinterNet.Core.Execution.ArchitectureAnalysisSession.CheckMethodBodyContract(ArchLinterNet.Core.Contracts.Families.ArchitectureMethodBodyContract): System.Collections.Generic.List`1[ArchLinterNet.Core.Model.ArchitectureViolation]
+method ArchLinterNet.Core.Execution.ArchitectureAnalysisSession.CheckModuleContainerContract(ArchLinterNet.Core.Contracts.Families.ArchitectureModuleContainerContract): System.Collections.Generic.List`1[ArchLinterNet.Core.Model.ArchitectureViolation]
 method ArchLinterNet.Core.Execution.ArchitectureAnalysisSession.CheckPackageAllowOnlyContract(ArchLinterNet.Core.Contracts.Families.ArchitecturePackageAllowOnlyContract): System.Collections.Generic.List`1[ArchLinterNet.Core.Model.ArchitectureViolation]
 method ArchLinterNet.Core.Execution.ArchitectureAnalysisSession.CheckPackageDependencyContract(ArchLinterNet.Core.Contracts.Families.ArchitecturePackageDependencyContract): System.Collections.Generic.List`1[ArchLinterNet.Core.Model.ArchitectureViolation]
 method ArchLinterNet.Core.Execution.ArchitectureAnalysisSession.CheckPolicyConsistency(): System.Collections.Generic.List`1[ArchLinterNet.Core.Model.PolicyConsistencyDiagnostic]
@@ -1044,6 +1049,7 @@ method ArchLinterNet.Core.Execution.ArchitectureAnalysisSession.StrictExternalCo
 method ArchLinterNet.Core.Execution.ArchitectureAnalysisSession.StrictIndependenceContracts(): System.Collections.Generic.IEnumerable`1[ArchLinterNet.Core.Contracts.Families.ArchitectureIndependenceContract]
 method ArchLinterNet.Core.Execution.ArchitectureAnalysisSession.StrictLayerContracts(): System.Collections.Generic.IEnumerable`1[ArchLinterNet.Core.Contracts.Families.ArchitectureLayerContract]
 method ArchLinterNet.Core.Execution.ArchitectureAnalysisSession.StrictMethodBodyContracts(): System.Collections.Generic.IEnumerable`1[ArchLinterNet.Core.Contracts.Families.ArchitectureMethodBodyContract]
+method ArchLinterNet.Core.Execution.ArchitectureAnalysisSession.StrictModuleContainerContracts(): System.Collections.Generic.IEnumerable`1[ArchLinterNet.Core.Contracts.Families.ArchitectureModuleContainerContract]
 method ArchLinterNet.Core.Execution.ArchitectureAnalysisSession.StrictProtectedContracts(): System.Collections.Generic.IEnumerable`1[ArchLinterNet.Core.Contracts.Families.ArchitectureProtectedContract]
 method ArchLinterNet.Core.Execution.ArchitectureAssemblyResolutionService.Resolve(ArchLinterNet.Core.Contracts.ArchitectureContractDocument, System.String, ArchLinterNet.Core.Discovery.ProjectDiscoveryResult, System.Boolean, System.String, System.Collections.Generic.HashSet`1[System.String], System.Threading.CancellationToken): ArchLinterNet.Core.Execution.ResolutionResult [virtual]
 method ArchLinterNet.Core.Execution.ArchitectureAssemblyResolutionService.ResolveFromDocument(ArchLinterNet.Core.Contracts.ArchitectureContractDocument, System.String, System.Threading.CancellationToken): ArchLinterNet.Core.Execution.ResolutionResult
@@ -1055,8 +1061,8 @@ method ArchLinterNet.Core.Execution.ArchitectureContractCatalog.ContractIdsInGro
 method ArchLinterNet.Core.Execution.ArchitectureContractCatalog.ContractsFor(System.String): System.Collections.Generic.IEnumerable`1[ArchLinterNet.Core.Contracts.IArchitectureContract]
 method ArchLinterNet.Core.Execution.ArchitectureContractCatalog.ContractsFor(System.String, System.String): System.Collections.Generic.IEnumerable`1[ArchLinterNet.Core.Contracts.IArchitectureContract]
 method ArchLinterNet.Core.Execution.ArchitectureContractCatalog.ResolveGroup(ArchLinterNet.Core.Contracts.IArchitectureContract): System.String
-method ArchLinterNet.Core.Execution.ArchitectureContractHandlerRegistry.Execute(System.String, ArchLinterNet.Core.Execution.ArchitectureAnalysisSession, ArchLinterNet.Core.Contracts.IArchitectureContract): ArchLinterNet.Core.Execution.Abstractions.ArchitectureHandlerResult [virtual]
-method ArchLinterNet.Core.Execution.ArchitectureContractHandlerRegistry.TryGetHandler(System.String, ArchLinterNet.Core.Execution.Abstractions.ArchitectureContractChecker&): System.Boolean [virtual, param1:out]
+method ArchLinterNet.Core.Execution.ArchitectureContractHandlerRegistry.Execute(System.String, ArchLinterNet.Core.Execution.ArchitectureAnalysisSession, ArchLinterNet.Core.Contracts.IArchitectureContract): ArchLinterNet.Core.Execution.Results.ArchitectureHandlerResult [virtual]
+method ArchLinterNet.Core.Execution.ArchitectureContractHandlerRegistry.TryGetHandler(System.String, ArchLinterNet.Core.Execution.Contracts.ArchitectureContractChecker&): System.Boolean [virtual, param1:out]
 method ArchLinterNet.Core.Execution.ArchitectureContractRunner.AuditAcyclicSiblingContracts(): System.Collections.Generic.IEnumerable`1[ArchLinterNet.Core.Contracts.Families.ArchitectureAcyclicSiblingContract]
 method ArchLinterNet.Core.Execution.ArchitectureContractRunner.AuditAllowOnlyContracts(): System.Collections.Generic.IEnumerable`1[ArchLinterNet.Core.Contracts.Families.ArchitectureAllowOnlyContract]
 method ArchLinterNet.Core.Execution.ArchitectureContractRunner.AuditAsmdefContracts(): System.Collections.Generic.IEnumerable`1[ArchLinterNet.Core.Contracts.Families.ArchitectureAsmdefContract]
@@ -1066,6 +1072,7 @@ method ArchLinterNet.Core.Execution.ArchitectureContractRunner.AuditExternalCont
 method ArchLinterNet.Core.Execution.ArchitectureContractRunner.AuditIndependenceContracts(): System.Collections.Generic.IEnumerable`1[ArchLinterNet.Core.Contracts.Families.ArchitectureIndependenceContract]
 method ArchLinterNet.Core.Execution.ArchitectureContractRunner.AuditLayerContracts(): System.Collections.Generic.IEnumerable`1[ArchLinterNet.Core.Contracts.Families.ArchitectureLayerContract]
 method ArchLinterNet.Core.Execution.ArchitectureContractRunner.AuditMethodBodyContracts(): System.Collections.Generic.IEnumerable`1[ArchLinterNet.Core.Contracts.Families.ArchitectureMethodBodyContract]
+method ArchLinterNet.Core.Execution.ArchitectureContractRunner.AuditModuleContainerContracts(): System.Collections.Generic.IEnumerable`1[ArchLinterNet.Core.Contracts.Families.ArchitectureModuleContainerContract]
 method ArchLinterNet.Core.Execution.ArchitectureContractRunner.AuditProtectedContracts(): System.Collections.Generic.IEnumerable`1[ArchLinterNet.Core.Contracts.Families.ArchitectureProtectedContract]
 method ArchLinterNet.Core.Execution.ArchitectureContractRunner.BuildCoverageSummary(ArchLinterNet.Core.Contracts.Families.ArchitectureCoverageContract): ArchLinterNet.Core.Reporting.ArchitectureCoverageSummary
 method ArchLinterNet.Core.Execution.ArchitectureContractRunner.CheckAcyclicSiblingContract(ArchLinterNet.Core.Contracts.Families.ArchitectureAcyclicSiblingContract): System.Collections.Generic.IReadOnlyCollection`1[System.String]
@@ -1080,6 +1087,7 @@ method ArchLinterNet.Core.Execution.ArchitectureContractRunner.CheckExternalCont
 method ArchLinterNet.Core.Execution.ArchitectureContractRunner.CheckIndependenceContract(ArchLinterNet.Core.Contracts.Families.ArchitectureIndependenceContract): System.Collections.Generic.List`1[ArchLinterNet.Core.Model.ArchitectureViolation]
 method ArchLinterNet.Core.Execution.ArchitectureContractRunner.CheckLayerContract(ArchLinterNet.Core.Contracts.Families.ArchitectureLayerContract): System.Collections.Generic.List`1[ArchLinterNet.Core.Model.ArchitectureViolation]
 method ArchLinterNet.Core.Execution.ArchitectureContractRunner.CheckMethodBodyContract(ArchLinterNet.Core.Contracts.Families.ArchitectureMethodBodyContract): System.Collections.Generic.List`1[ArchLinterNet.Core.Model.ArchitectureViolation]
+method ArchLinterNet.Core.Execution.ArchitectureContractRunner.CheckModuleContainerContract(ArchLinterNet.Core.Contracts.Families.ArchitectureModuleContainerContract): System.Collections.Generic.List`1[ArchLinterNet.Core.Model.ArchitectureViolation]
 method ArchLinterNet.Core.Execution.ArchitectureContractRunner.CheckPolicyConsistency(): System.Collections.Generic.List`1[ArchLinterNet.Core.Model.PolicyConsistencyDiagnostic] [virtual]
 method ArchLinterNet.Core.Execution.ArchitectureContractRunner.CheckProtectedContract(ArchLinterNet.Core.Contracts.Families.ArchitectureProtectedContract): System.Collections.Generic.List`1[ArchLinterNet.Core.Model.ArchitectureViolation]
 method ArchLinterNet.Core.Execution.ArchitectureContractRunner.StrictAcyclicSiblingContracts(): System.Collections.Generic.IEnumerable`1[ArchLinterNet.Core.Contracts.Families.ArchitectureAcyclicSiblingContract]
@@ -1091,16 +1099,17 @@ method ArchLinterNet.Core.Execution.ArchitectureContractRunner.StrictExternalCon
 method ArchLinterNet.Core.Execution.ArchitectureContractRunner.StrictIndependenceContracts(): System.Collections.Generic.IEnumerable`1[ArchLinterNet.Core.Contracts.Families.ArchitectureIndependenceContract]
 method ArchLinterNet.Core.Execution.ArchitectureContractRunner.StrictLayerContracts(): System.Collections.Generic.IEnumerable`1[ArchLinterNet.Core.Contracts.Families.ArchitectureLayerContract]
 method ArchLinterNet.Core.Execution.ArchitectureContractRunner.StrictMethodBodyContracts(): System.Collections.Generic.IEnumerable`1[ArchLinterNet.Core.Contracts.Families.ArchitectureMethodBodyContract]
+method ArchLinterNet.Core.Execution.ArchitectureContractRunner.StrictModuleContainerContracts(): System.Collections.Generic.IEnumerable`1[ArchLinterNet.Core.Contracts.Families.ArchitectureModuleContainerContract]
 method ArchLinterNet.Core.Execution.ArchitectureContractRunner.StrictProtectedContracts(): System.Collections.Generic.IEnumerable`1[ArchLinterNet.Core.Contracts.Families.ArchitectureProtectedContract]
 method ArchLinterNet.Core.Execution.ArchitectureReferenceGraph.GetReferencedTypes(System.Type): System.Collections.Generic.IReadOnlyList`1[System.Type]
 method ArchLinterNet.Core.Execution.ArchitectureReferenceGraph.GetTransitiveReferencedTypes(System.Type, System.Func`2[System.Type,System.Boolean]): System.Collections.Generic.IEnumerable`1[System.ValueTuple`2[System.Type,System.Collections.Generic.List`1[System.Type]]]
 method ArchLinterNet.Core.Execution.ArchitectureRoleIndex.ClassifiedTypes(): System.Collections.Generic.IReadOnlyCollection`1[System.Type]
 method ArchLinterNet.Core.Execution.ArchitectureRoleIndex.TryGetRole(System.Type, ArchLinterNet.Core.Scanning.ArchitectureTypeClassificationResult&): System.Boolean [param1:out]
-method ArchLinterNet.Core.Execution.ArchitectureRunnerSetupService.BuildRunner(ArchLinterNet.Core.Contracts.ArchitectureContractDocument, System.String, System.String, System.Collections.Generic.IReadOnlyList`1[System.String], System.Collections.Generic.HashSet`1[System.String], System.Boolean, ArchLinterNet.Core.Reporting.ValidationTiming, System.String, System.Threading.CancellationToken, System.Nullable`1[System.Int32]): ArchLinterNet.Core.Execution.Abstractions.ArchitectureRunnerSetup [virtual]
-method ArchLinterNet.Core.Execution.ArchitectureRunnerSetupService.BuildRunnerForPostBuild(ArchLinterNet.Core.Contracts.ArchitectureContractDocument, System.String, System.String, System.Collections.Generic.IReadOnlyList`1[System.String], System.Collections.Generic.HashSet`1[System.String], System.Boolean, ArchLinterNet.Core.Reporting.ValidationTiming, System.String, System.Threading.CancellationToken, System.Nullable`1[System.Int32]): ArchLinterNet.Core.Execution.Abstractions.ArchitectureRunnerSetup [virtual]
+method ArchLinterNet.Core.Execution.ArchitectureRunnerSetupService.BuildRunner(ArchLinterNet.Core.Contracts.ArchitectureContractDocument, System.String, System.String, System.Collections.Generic.IReadOnlyList`1[System.String], System.Collections.Generic.HashSet`1[System.String], System.Boolean, ArchLinterNet.Core.Reporting.ValidationTiming, System.String, System.Threading.CancellationToken, System.Nullable`1[System.Int32]): ArchLinterNet.Core.Execution.Results.ArchitectureRunnerSetup [virtual]
+method ArchLinterNet.Core.Execution.ArchitectureRunnerSetupService.BuildRunnerForPostBuild(ArchLinterNet.Core.Contracts.ArchitectureContractDocument, System.String, System.String, System.Collections.Generic.IReadOnlyList`1[System.String], System.Collections.Generic.HashSet`1[System.String], System.Boolean, ArchLinterNet.Core.Reporting.ValidationTiming, System.String, System.Threading.CancellationToken, System.Nullable`1[System.Int32]): ArchLinterNet.Core.Execution.Results.ArchitectureRunnerSetup [virtual]
 method ArchLinterNet.Core.Execution.ArchitectureRunnerSetupService.LoadDocument(System.String, System.String, ArchLinterNet.Core.Reporting.ValidationTiming): ArchLinterNet.Core.Contracts.ArchitectureContractDocument [virtual]
 method ArchLinterNet.Core.Execution.ArchitectureRunnerSetupService.LoadDocument(System.String, System.String, ArchLinterNet.Core.Reporting.ValidationTiming, System.Threading.CancellationToken): ArchLinterNet.Core.Contracts.ArchitectureContractDocument [virtual]
-method ArchLinterNet.Core.Execution.ArchitectureRunnerSetupService.MaterializePreparedRunner(ArchLinterNet.Core.Contracts.ArchitectureContractDocument, ArchLinterNet.Core.Execution.ArchitectureRunnerPreparation, System.Collections.Generic.HashSet`1[System.String], System.Boolean, ArchLinterNet.Core.Reporting.ValidationTiming, System.String, System.Threading.CancellationToken, System.Nullable`1[System.Int32]): ArchLinterNet.Core.Execution.Abstractions.ArchitectureRunnerSetup [virtual]
+method ArchLinterNet.Core.Execution.ArchitectureRunnerSetupService.MaterializePreparedRunner(ArchLinterNet.Core.Contracts.ArchitectureContractDocument, ArchLinterNet.Core.Execution.ArchitectureRunnerPreparation, System.Collections.Generic.HashSet`1[System.String], System.Boolean, ArchLinterNet.Core.Reporting.ValidationTiming, System.String, System.Threading.CancellationToken, System.Nullable`1[System.Int32]): ArchLinterNet.Core.Execution.Results.ArchitectureRunnerSetup [virtual]
 method ArchLinterNet.Core.Execution.ArchitectureRunnerSetupService.PrepareRunner(ArchLinterNet.Core.Contracts.ArchitectureContractDocument, System.String, System.String, System.Collections.Generic.IReadOnlyList`1[System.String], System.Collections.Generic.HashSet`1[System.String], System.String, System.Threading.CancellationToken): ArchLinterNet.Core.Execution.ArchitectureRunnerPreparation [virtual]
 method ArchLinterNet.Core.Execution.ArchitectureSourceFileFactIndex.GetFactsForFile(System.String): System.Collections.Generic.IReadOnlyList`1[ArchLinterNet.Core.Model.ArchitectureDeclaredTypeFact]
 method ArchLinterNet.Core.Execution.ArchitectureSourceFileFactIndex.GetFactsForNamespace(System.String): System.Collections.Generic.IReadOnlyList`1[ArchLinterNet.Core.Model.ArchitectureDeclaredTypeFact]
@@ -1110,10 +1119,15 @@ method ArchLinterNet.Core.Execution.ArchitectureTypeIndex.AllTypes(): System.Typ
 method ArchLinterNet.Core.Execution.ArchitectureTypeIndex.FindDirectChildNamespaces(System.String): System.Collections.Generic.HashSet`1[System.String]
 method ArchLinterNet.Core.Execution.ArchitectureTypeIndex.FindTypesInLayer(ArchLinterNet.Core.Contracts.ArchitectureLayer): System.Type[]
 method ArchLinterNet.Core.Execution.ArchitectureTypeIndex.FindTypesInNamespace(System.String): System.Type[]
+method ArchLinterNet.Core.Execution.Contracts.ArchitectureContractChecker.BeginInvoke(ArchLinterNet.Core.Execution.ArchitectureAnalysisSession, ArchLinterNet.Core.Contracts.IArchitectureContract, System.AsyncCallback, System.Object): System.IAsyncResult [virtual]
+method ArchLinterNet.Core.Execution.Contracts.ArchitectureContractChecker.EndInvoke(System.IAsyncResult): ArchLinterNet.Core.Execution.Results.ArchitectureHandlerResult [virtual]
+method ArchLinterNet.Core.Execution.Contracts.ArchitectureContractChecker.Invoke(ArchLinterNet.Core.Execution.ArchitectureAnalysisSession, ArchLinterNet.Core.Contracts.IArchitectureContract): ArchLinterNet.Core.Execution.Results.ArchitectureHandlerResult [virtual]
 method ArchLinterNet.Core.Execution.IArchitectureAssemblyResolutionService.Resolve(ArchLinterNet.Core.Contracts.ArchitectureContractDocument, System.String, ArchLinterNet.Core.Discovery.ProjectDiscoveryResult, System.Boolean, System.String, System.Collections.Generic.HashSet`1[System.String], System.Threading.CancellationToken): ArchLinterNet.Core.Execution.ResolutionResult [abstract]
 method ArchLinterNet.Core.Execution.IArchitectureAssemblyResolutionService.ResolvePostBuild(ArchLinterNet.Core.Contracts.ArchitectureContractDocument, System.String, ArchLinterNet.Core.Discovery.ProjectDiscoveryResult, System.Boolean, System.String, System.Collections.Generic.HashSet`1[System.String], System.Threading.CancellationToken, System.Collections.Generic.IReadOnlyDictionary`2[System.String,System.String]): ArchLinterNet.Core.Execution.ResolutionResult [abstract]
 method ArchLinterNet.Core.Execution.LayerTemplateExpander.Expand(System.Collections.Generic.IEnumerable`1[ArchLinterNet.Core.Contracts.Families.ArchitectureLayerTemplateContract]): System.Collections.Generic.List`1[ArchLinterNet.Core.Contracts.Families.ArchitectureLayerContract] [static]
 method ArchLinterNet.Core.Execution.MaxParallelismResolver.Resolve(System.Nullable`1[System.Int32]): System.Int32 [static]
+method ArchLinterNet.Core.Execution.Results.ArchitectureHandlerResult.FromCycles(System.Collections.Generic.IReadOnlyCollection`1[System.String]): ArchLinterNet.Core.Execution.Results.ArchitectureHandlerResult [static]
+method ArchLinterNet.Core.Execution.Results.ArchitectureHandlerResult.FromViolations(System.Collections.Generic.IReadOnlyCollection`1[ArchLinterNet.Core.Model.ArchitectureViolation]): ArchLinterNet.Core.Execution.Results.ArchitectureHandlerResult [static]
 method ArchLinterNet.Core.Graph.Abstractions.IArchitectureExplainApplicationService.Explain(ArchLinterNet.Core.Graph.ArchitectureExplainRequest): ArchLinterNet.Core.Graph.ArchitectureExplainOutcome [abstract]
 method ArchLinterNet.Core.Graph.Abstractions.IArchitectureGraphApplicationService.BuildGraph(ArchLinterNet.Core.Graph.ArchitectureGraphRequest): ArchLinterNet.Core.Graph.ArchitectureGraphOutcome [abstract]
 method ArchLinterNet.Core.Graph.ArchitectureExplainApplicationService.Explain(ArchLinterNet.Core.Graph.ArchitectureExplainRequest): ArchLinterNet.Core.Graph.ArchitectureExplainOutcome [virtual]
@@ -1155,6 +1169,7 @@ method ArchLinterNet.Core.IO.ArchitectureFileSystem.ReadLines(System.String): Sy
 method ArchLinterNet.Core.IO.RoslynCompilationFactory.Create(System.String, System.Collections.Generic.IReadOnlyList`1[System.String], System.Collections.Generic.IReadOnlyList`1[System.String], ArchLinterNet.Core.IO.Abstractions.IArchitectureFileSystem, ArchLinterNet.Core.IO.Abstractions.IArchitectureAssemblyLoader, System.Collections.Generic.IReadOnlyList`1[System.String]): Microsoft.CodeAnalysis.CSharp.CSharpCompilation [virtual]
 method ArchLinterNet.Core.Model.ArchitectureFindingJsonReader.Read(System.String, System.Boolean): ArchLinterNet.Core.Model.ArchitectureFindingReadEnvelope [static]
 method ArchLinterNet.Core.Model.ArchitectureFindingReadEnvelope.ToJson(): System.String
+method ArchLinterNet.Core.Model.ArchitectureModuleNamespaceMembershipResolver.TryResolve(System.String, System.String, ArchLinterNet.Core.Model.ArchitectureModuleNamespaceMembership&): System.Boolean [static, param2:out]
 method ArchLinterNet.Core.Model.ArchitectureSourceExpansionInventory.AuthoredContractIds(): System.Collections.Generic.IReadOnlyList`1[System.String]
 method ArchLinterNet.Core.Model.ArchitectureSourceExpansionInventory.InstanceIdsFor(System.String): System.Collections.Generic.IReadOnlyList`1[System.String]
 method ArchLinterNet.Core.Model.ArchitectureViolationIdentity.ResolveContractFamily(System.String): System.String [static]
@@ -1484,6 +1499,7 @@ property ArchLinterNet.Core.Contracts.ArchitectureBaselineContractGroups.AuditIn
 property ArchLinterNet.Core.Contracts.ArchitectureBaselineContractGroups.AuditLayers: System.Collections.Generic.List`1[ArchLinterNet.Core.Contracts.ArchitectureBaselineContractEntry] [get, set]
 property ArchLinterNet.Core.Contracts.ArchitectureBaselineContractGroups.AuditLayoutConventions: System.Collections.Generic.List`1[ArchLinterNet.Core.Contracts.ArchitectureBaselineContractEntry] [get, set]
 property ArchLinterNet.Core.Contracts.ArchitectureBaselineContractGroups.AuditMethodBody: System.Collections.Generic.List`1[ArchLinterNet.Core.Contracts.ArchitectureBaselineContractEntry] [get, set]
+property ArchLinterNet.Core.Contracts.ArchitectureBaselineContractGroups.AuditModuleContainers: System.Collections.Generic.List`1[ArchLinterNet.Core.Contracts.ArchitectureBaselineContractEntry] [get, set]
 property ArchLinterNet.Core.Contracts.ArchitectureBaselineContractGroups.AuditPackageAllowOnly: System.Collections.Generic.List`1[ArchLinterNet.Core.Contracts.ArchitectureBaselineContractEntry] [get, set]
 property ArchLinterNet.Core.Contracts.ArchitectureBaselineContractGroups.AuditPackageDependency: System.Collections.Generic.List`1[ArchLinterNet.Core.Contracts.ArchitectureBaselineContractEntry] [get, set]
 property ArchLinterNet.Core.Contracts.ArchitectureBaselineContractGroups.AuditPortBoundaries: System.Collections.Generic.List`1[ArchLinterNet.Core.Contracts.ArchitectureBaselineContractEntry] [get, set]
@@ -1513,6 +1529,7 @@ property ArchLinterNet.Core.Contracts.ArchitectureBaselineContractGroups.StrictI
 property ArchLinterNet.Core.Contracts.ArchitectureBaselineContractGroups.StrictLayers: System.Collections.Generic.List`1[ArchLinterNet.Core.Contracts.ArchitectureBaselineContractEntry] [get, set]
 property ArchLinterNet.Core.Contracts.ArchitectureBaselineContractGroups.StrictLayoutConventions: System.Collections.Generic.List`1[ArchLinterNet.Core.Contracts.ArchitectureBaselineContractEntry] [get, set]
 property ArchLinterNet.Core.Contracts.ArchitectureBaselineContractGroups.StrictMethodBody: System.Collections.Generic.List`1[ArchLinterNet.Core.Contracts.ArchitectureBaselineContractEntry] [get, set]
+property ArchLinterNet.Core.Contracts.ArchitectureBaselineContractGroups.StrictModuleContainers: System.Collections.Generic.List`1[ArchLinterNet.Core.Contracts.ArchitectureBaselineContractEntry] [get, set]
 property ArchLinterNet.Core.Contracts.ArchitectureBaselineContractGroups.StrictPackageAllowOnly: System.Collections.Generic.List`1[ArchLinterNet.Core.Contracts.ArchitectureBaselineContractEntry] [get, set]
 property ArchLinterNet.Core.Contracts.ArchitectureBaselineContractGroups.StrictPackageDependency: System.Collections.Generic.List`1[ArchLinterNet.Core.Contracts.ArchitectureBaselineContractEntry] [get, set]
 property ArchLinterNet.Core.Contracts.ArchitectureBaselineContractGroups.StrictPortBoundaries: System.Collections.Generic.List`1[ArchLinterNet.Core.Contracts.ArchitectureBaselineContractEntry] [get, set]
@@ -1718,6 +1735,7 @@ property ArchLinterNet.Core.Contracts.Families.ArchitectureContractGroups.AuditL
 property ArchLinterNet.Core.Contracts.Families.ArchitectureContractGroups.AuditLayers: System.Collections.Generic.List`1[ArchLinterNet.Core.Contracts.Families.ArchitectureLayerContract] [get, set]
 property ArchLinterNet.Core.Contracts.Families.ArchitectureContractGroups.AuditLayoutConventions: System.Collections.Generic.List`1[ArchLinterNet.Core.Contracts.Families.ArchitectureLayoutConventionContract] [get, set]
 property ArchLinterNet.Core.Contracts.Families.ArchitectureContractGroups.AuditMethodBody: System.Collections.Generic.List`1[ArchLinterNet.Core.Contracts.Families.ArchitectureMethodBodyContract] [get, set]
+property ArchLinterNet.Core.Contracts.Families.ArchitectureContractGroups.AuditModuleContainers: System.Collections.Generic.List`1[ArchLinterNet.Core.Contracts.Families.ArchitectureModuleContainerContract] [get, set]
 property ArchLinterNet.Core.Contracts.Families.ArchitectureContractGroups.AuditPackageAllowOnly: System.Collections.Generic.List`1[ArchLinterNet.Core.Contracts.Families.ArchitecturePackageAllowOnlyContract] [get, set]
 property ArchLinterNet.Core.Contracts.Families.ArchitectureContractGroups.AuditPackageDependency: System.Collections.Generic.List`1[ArchLinterNet.Core.Contracts.Families.ArchitecturePackageDependencyContract] [get, set]
 property ArchLinterNet.Core.Contracts.Families.ArchitectureContractGroups.AuditPortBoundaries: System.Collections.Generic.List`1[ArchLinterNet.Core.Contracts.Families.ArchitecturePortBoundaryContract] [get, set]
@@ -1749,6 +1767,7 @@ property ArchLinterNet.Core.Contracts.Families.ArchitectureContractGroups.Strict
 property ArchLinterNet.Core.Contracts.Families.ArchitectureContractGroups.StrictLayers: System.Collections.Generic.List`1[ArchLinterNet.Core.Contracts.Families.ArchitectureLayerContract] [get, set]
 property ArchLinterNet.Core.Contracts.Families.ArchitectureContractGroups.StrictLayoutConventions: System.Collections.Generic.List`1[ArchLinterNet.Core.Contracts.Families.ArchitectureLayoutConventionContract] [get, set]
 property ArchLinterNet.Core.Contracts.Families.ArchitectureContractGroups.StrictMethodBody: System.Collections.Generic.List`1[ArchLinterNet.Core.Contracts.Families.ArchitectureMethodBodyContract] [get, set]
+property ArchLinterNet.Core.Contracts.Families.ArchitectureContractGroups.StrictModuleContainers: System.Collections.Generic.List`1[ArchLinterNet.Core.Contracts.Families.ArchitectureModuleContainerContract] [get, set]
 property ArchLinterNet.Core.Contracts.Families.ArchitectureContractGroups.StrictPackageAllowOnly: System.Collections.Generic.List`1[ArchLinterNet.Core.Contracts.Families.ArchitecturePackageAllowOnlyContract] [get, set]
 property ArchLinterNet.Core.Contracts.Families.ArchitectureContractGroups.StrictPackageDependency: System.Collections.Generic.List`1[ArchLinterNet.Core.Contracts.Families.ArchitecturePackageDependencyContract] [get, set]
 property ArchLinterNet.Core.Contracts.Families.ArchitectureContractGroups.StrictPortBoundaries: System.Collections.Generic.List`1[ArchLinterNet.Core.Contracts.Families.ArchitecturePortBoundaryContract] [get, set]
@@ -1846,6 +1865,7 @@ property ArchLinterNet.Core.Contracts.Families.ArchitectureLayerTemplateContract
 property ArchLinterNet.Core.Contracts.Families.ArchitectureLayerTemplateContract.Layers: System.Collections.Generic.List`1[ArchLinterNet.Core.Contracts.Families.ArchitectureTemplateLayer] [get, set]
 property ArchLinterNet.Core.Contracts.Families.ArchitectureLayerTemplateContract.Name: System.String [virtual, get, set]
 property ArchLinterNet.Core.Contracts.Families.ArchitectureLayerTemplateContract.Reason: System.String [get, set]
+property ArchLinterNet.Core.Contracts.Families.ArchitectureLayoutConventionContract.AllDeclarations: ArchLinterNet.Core.Contracts.Families.ArchitectureLayoutDeclarationShape [get, set]
 property ArchLinterNet.Core.Contracts.Families.ArchitectureLayoutConventionContract.ExcludeFilesMatching: System.Collections.Generic.List`1[ArchLinterNet.Core.Contracts.Families.ArchitectureLayoutFileMatcher] [get, set]
 property ArchLinterNet.Core.Contracts.Families.ArchitectureLayoutConventionContract.FilesMatching: ArchLinterNet.Core.Contracts.Families.ArchitectureLayoutFileMatcher [get, set]
 property ArchLinterNet.Core.Contracts.Families.ArchitectureLayoutConventionContract.ForbidTypeKind: System.String [get, set]
@@ -1861,6 +1881,9 @@ property ArchLinterNet.Core.Contracts.Families.ArchitectureLayoutConventionContr
 property ArchLinterNet.Core.Contracts.Families.ArchitectureLayoutConventionContract.RequireTypeNameMatchesFileName: System.Boolean [get, set]
 property ArchLinterNet.Core.Contracts.Families.ArchitectureLayoutConventionContract.RequiredNamePrefix: System.String [get, set]
 property ArchLinterNet.Core.Contracts.Families.ArchitectureLayoutConventionContract.RequiredNameSuffix: System.String [get, set]
+property ArchLinterNet.Core.Contracts.Families.ArchitectureLayoutDeclarationShape.AllowedRoles: System.Collections.Generic.List`1[System.String] [get, set]
+property ArchLinterNet.Core.Contracts.Families.ArchitectureLayoutDeclarationShape.AllowedTypeKinds: System.Collections.Generic.List`1[System.String] [get, set]
+property ArchLinterNet.Core.Contracts.Families.ArchitectureLayoutDeclarationShape.RequireAbstractClasses: System.Boolean [get, set]
 property ArchLinterNet.Core.Contracts.Families.ArchitectureLayoutFileMatcher.FileNamePrefix: System.String [get, set]
 property ArchLinterNet.Core.Contracts.Families.ArchitectureLayoutFileMatcher.FileNameSuffix: System.String [get, set]
 property ArchLinterNet.Core.Contracts.Families.ArchitectureLayoutFileMatcher.FolderSegment: System.String [get, set]
@@ -1872,6 +1895,14 @@ property ArchLinterNet.Core.Contracts.Families.ArchitectureMethodBodyContract.Ig
 property ArchLinterNet.Core.Contracts.Families.ArchitectureMethodBodyContract.Name: System.String [virtual, get, set]
 property ArchLinterNet.Core.Contracts.Families.ArchitectureMethodBodyContract.Reason: System.String [get, set]
 property ArchLinterNet.Core.Contracts.Families.ArchitectureMethodBodyContract.Source: System.String [get, set]
+property ArchLinterNet.Core.Contracts.Families.ArchitectureModuleContainerContract.AllowedContainerRootTypes: System.Collections.Generic.List`1[System.String] [get, set]
+property ArchLinterNet.Core.Contracts.Families.ArchitectureModuleContainerContract.AllowedModuleRootTypes: System.Collections.Generic.List`1[System.String] [get, set]
+property ArchLinterNet.Core.Contracts.Families.ArchitectureModuleContainerContract.Container: System.String [get, set]
+property ArchLinterNet.Core.Contracts.Families.ArchitectureModuleContainerContract.Id: System.String [virtual, get, set]
+property ArchLinterNet.Core.Contracts.Families.ArchitectureModuleContainerContract.IgnoredViolations: System.Collections.Generic.List`1[ArchLinterNet.Core.Contracts.ArchitectureIgnoredViolation] [get, set]
+property ArchLinterNet.Core.Contracts.Families.ArchitectureModuleContainerContract.Name: System.String [virtual, get, set]
+property ArchLinterNet.Core.Contracts.Families.ArchitectureModuleContainerContract.Profile: System.String [get, set]
+property ArchLinterNet.Core.Contracts.Families.ArchitectureModuleContainerContract.Reason: System.String [get, set]
 property ArchLinterNet.Core.Contracts.Families.ArchitectureOptionalRuleInput.ContractId: System.String [get, set]
 property ArchLinterNet.Core.Contracts.Families.ArchitectureOptionalRuleInput.Input: System.String [get, set]
 property ArchLinterNet.Core.Contracts.Families.ArchitectureOptionalRuleInput.Layer: System.String [get, set]
@@ -1997,17 +2028,6 @@ property ArchLinterNet.Core.Discovery.ProjectDiscoveryResult.DiscoveredProjects:
 property ArchLinterNet.Core.Discovery.ProjectDiscoveryResult.ResolvedAssemblyPaths: System.Collections.Generic.IReadOnlyDictionary`2[System.String,System.String] [get, init]
 property ArchLinterNet.Core.Discovery.ProjectDiscoveryResult.SourceRoots: System.Collections.Generic.IReadOnlyCollection`1[System.String] [get, init]
 property ArchLinterNet.Core.Discovery.ProjectDiscoveryResult.TargetAssemblyNames: System.Collections.Generic.IReadOnlyCollection`1[System.String] [get, init]
-property ArchLinterNet.Core.Execution.Abstractions.ArchitectureContractExecutionResult.ContractFamilyResultCounts: System.Collections.Generic.IReadOnlyDictionary`2[System.String,System.Int32] [get, init]
-property ArchLinterNet.Core.Execution.Abstractions.ArchitectureContractExecutionResult.CoverageSummaries: System.Collections.Generic.IReadOnlyCollection`1[ArchLinterNet.Core.Reporting.ArchitectureCoverageSummary] [get, init]
-property ArchLinterNet.Core.Execution.Abstractions.ArchitectureContractExecutionResult.CoverageViolations: System.Collections.Generic.IReadOnlyCollection`1[ArchLinterNet.Core.Model.ArchitectureViolation] [get, init]
-property ArchLinterNet.Core.Execution.Abstractions.ArchitectureContractExecutionResult.CycleFindings: System.Collections.Generic.IReadOnlyCollection`1[ArchLinterNet.Core.Model.ArchitectureCycleFinding] [get, init]
-property ArchLinterNet.Core.Execution.Abstractions.ArchitectureContractExecutionResult.Cycles: System.Collections.Generic.IReadOnlyCollection`1[System.String] [get, init]
-property ArchLinterNet.Core.Execution.Abstractions.ArchitectureContractExecutionResult.Violations: System.Collections.Generic.IReadOnlyCollection`1[ArchLinterNet.Core.Model.ArchitectureViolation] [get, init]
-property ArchLinterNet.Core.Execution.Abstractions.ArchitectureHandlerResult.Cycles: System.Collections.Generic.IReadOnlyCollection`1[System.String] [get, init]
-property ArchLinterNet.Core.Execution.Abstractions.ArchitectureHandlerResult.Violations: System.Collections.Generic.IReadOnlyCollection`1[ArchLinterNet.Core.Model.ArchitectureViolation] [get, init]
-property ArchLinterNet.Core.Execution.Abstractions.ArchitectureRunnerSetup.AssemblyLoads: System.Int32 [get, init]
-property ArchLinterNet.Core.Execution.Abstractions.ArchitectureRunnerSetup.RepositoryRoot: System.String [get, init]
-property ArchLinterNet.Core.Execution.Abstractions.ArchitectureRunnerSetup.Runner: ArchLinterNet.Core.Execution.Abstractions.IArchitectureContractRunner [get, init]
 property ArchLinterNet.Core.Execution.Abstractions.IArchitectureContractRunner.BaselineCandidates: System.Collections.Generic.IReadOnlyList`1[ArchLinterNet.Core.Contracts.ArchitectureBaselineCandidate] [abstract, get]
 property ArchLinterNet.Core.Execution.Abstractions.IArchitectureContractRunner.Session: ArchLinterNet.Core.Execution.ArchitectureAnalysisSession [abstract, get]
 property ArchLinterNet.Core.Execution.Abstractions.IArchitectureContractRunner.UnmatchedIgnoredViolations: System.Collections.Generic.IReadOnlyList`1[ArchLinterNet.Core.Model.ArchitectureUnmatchedIgnoredViolation] [abstract, get]
@@ -2081,6 +2101,17 @@ property ArchLinterNet.Core.Execution.ResolutionResult.AssemblyProbingPaths: Sys
 property ArchLinterNet.Core.Execution.ResolutionResult.IsolatedLoadScope: ArchLinterNet.Core.IO.Abstractions.IArchitectureAssemblyLoadScope [get, init]
 property ArchLinterNet.Core.Execution.ResolutionResult.MissingAssemblyNames: System.Collections.Generic.IReadOnlyCollection`1[System.String] [get, init]
 property ArchLinterNet.Core.Execution.ResolutionResult.ResolvedAssemblies: System.Collections.Generic.IReadOnlyCollection`1[System.Reflection.Assembly] [get, init]
+property ArchLinterNet.Core.Execution.Results.ArchitectureContractExecutionResult.ContractFamilyResultCounts: System.Collections.Generic.IReadOnlyDictionary`2[System.String,System.Int32] [get, init]
+property ArchLinterNet.Core.Execution.Results.ArchitectureContractExecutionResult.CoverageSummaries: System.Collections.Generic.IReadOnlyCollection`1[ArchLinterNet.Core.Reporting.ArchitectureCoverageSummary] [get, init]
+property ArchLinterNet.Core.Execution.Results.ArchitectureContractExecutionResult.CoverageViolations: System.Collections.Generic.IReadOnlyCollection`1[ArchLinterNet.Core.Model.ArchitectureViolation] [get, init]
+property ArchLinterNet.Core.Execution.Results.ArchitectureContractExecutionResult.CycleFindings: System.Collections.Generic.IReadOnlyCollection`1[ArchLinterNet.Core.Model.ArchitectureCycleFinding] [get, init]
+property ArchLinterNet.Core.Execution.Results.ArchitectureContractExecutionResult.Cycles: System.Collections.Generic.IReadOnlyCollection`1[System.String] [get, init]
+property ArchLinterNet.Core.Execution.Results.ArchitectureContractExecutionResult.Violations: System.Collections.Generic.IReadOnlyCollection`1[ArchLinterNet.Core.Model.ArchitectureViolation] [get, init]
+property ArchLinterNet.Core.Execution.Results.ArchitectureHandlerResult.Cycles: System.Collections.Generic.IReadOnlyCollection`1[System.String] [get, init]
+property ArchLinterNet.Core.Execution.Results.ArchitectureHandlerResult.Violations: System.Collections.Generic.IReadOnlyCollection`1[ArchLinterNet.Core.Model.ArchitectureViolation] [get, init]
+property ArchLinterNet.Core.Execution.Results.ArchitectureRunnerSetup.AssemblyLoads: System.Int32 [get, init]
+property ArchLinterNet.Core.Execution.Results.ArchitectureRunnerSetup.RepositoryRoot: System.String [get, init]
+property ArchLinterNet.Core.Execution.Results.ArchitectureRunnerSetup.Runner: ArchLinterNet.Core.Execution.Abstractions.IArchitectureContractRunner [get, init]
 property ArchLinterNet.Core.Graph.ArchitectureExplainOutcome.ContractIds: System.Collections.Generic.IReadOnlyList`1[System.String] [get, init]
 property ArchLinterNet.Core.Graph.ArchitectureExplainOutcome.CoverageSummaries: System.Collections.Generic.IReadOnlyCollection`1[ArchLinterNet.Core.Reporting.ArchitectureCoverageSummary] [get, init]
 property ArchLinterNet.Core.Graph.ArchitectureExplainOutcome.ExpressionParticipation: System.Collections.Generic.IReadOnlyList`1[ArchLinterNet.Core.Graph.ExplainExpressionParticipation] [get, init]
@@ -2179,6 +2210,7 @@ property ArchLinterNet.Core.Model.ArchitectureDeclaredTypeFact.AssemblyName: Sys
 property ArchLinterNet.Core.Model.ArchitectureDeclaredTypeFact.FileNameWithoutExtension: System.String [get, init]
 property ArchLinterNet.Core.Model.ArchitectureDeclaredTypeFact.FolderSegments: System.Collections.Generic.IReadOnlyList`1[System.String] [get, init]
 property ArchLinterNet.Core.Model.ArchitectureDeclaredTypeFact.FullTypeName: System.String [get, init]
+property ArchLinterNet.Core.Model.ArchitectureDeclaredTypeFact.IsAbstract: System.Boolean [get, init]
 property ArchLinterNet.Core.Model.ArchitectureDeclaredTypeFact.Namespace: System.String [get, init]
 property ArchLinterNet.Core.Model.ArchitectureDeclaredTypeFact.NamespaceSegments: System.Collections.Generic.IReadOnlyList`1[System.String] [get, init]
 property ArchLinterNet.Core.Model.ArchitectureDeclaredTypeFact.SimpleTypeName: System.String [get, init]
@@ -2251,6 +2283,10 @@ property ArchLinterNet.Core.Model.ArchitectureGraphEdge.TargetId: System.String 
 property ArchLinterNet.Core.Model.ArchitectureGraphEdge.TargetKind: ArchLinterNet.Core.Model.ArchitectureGraphNodeKind [get, init]
 property ArchLinterNet.Core.Model.ArchitectureGraphNode.Id: System.String [get, init]
 property ArchLinterNet.Core.Model.ArchitectureGraphNode.Kind: ArchLinterNet.Core.Model.ArchitectureGraphNodeKind [get, init]
+property ArchLinterNet.Core.Model.ArchitectureModuleNamespaceMembership.Container: System.String [get, init]
+property ArchLinterNet.Core.Model.ArchitectureModuleNamespaceMembership.IsContainerRoot: System.Boolean [get, init]
+property ArchLinterNet.Core.Model.ArchitectureModuleNamespaceMembership.ModuleName: System.String [get, init]
+property ArchLinterNet.Core.Model.ArchitectureModuleNamespaceMembership.Segment: System.String [get, init]
 property ArchLinterNet.Core.Model.ArchitecturePolicyDiagnostic.ImportChain: System.Collections.Generic.IReadOnlyList`1[System.String] [get, init]
 property ArchLinterNet.Core.Model.ArchitecturePolicyDiagnostic.Kind: ArchLinterNet.Core.Model.ArchitecturePolicyDiagnosticKind [get, init]
 property ArchLinterNet.Core.Model.ArchitecturePolicyDiagnostic.Location: ArchLinterNet.Core.Model.ArchitecturePolicySourceLocation [get, init]
@@ -2499,12 +2535,16 @@ property ArchLinterNet.Core.Model.InterfaceImplementationPayload.ExpectedImpleme
 property ArchLinterNet.Core.Model.InterfaceImplementationPayload.ImplementationKind: System.String [get, init]
 property ArchLinterNet.Core.Model.InterfaceImplementationPayload.MatchedInterface: System.String [get, init]
 property ArchLinterNet.Core.Model.LayoutConventionDiagnostic.ActualDeclarationCount: System.Nullable`1[System.Int32] [get, init]
+property ArchLinterNet.Core.Model.LayoutConventionDiagnostic.ActualIsAbstract: System.Nullable`1[System.Boolean] [get, init]
+property ArchLinterNet.Core.Model.LayoutConventionDiagnostic.ActualRole: System.String [get, init]
 property ArchLinterNet.Core.Model.LayoutConventionDiagnostic.ActualTypeKind: System.String [get, init]
 property ArchLinterNet.Core.Model.LayoutConventionDiagnostic.ActualTypeName: System.String [get, init]
 property ArchLinterNet.Core.Model.LayoutConventionDiagnostic.DataUnavailable: System.Boolean [get, init]
 property ArchLinterNet.Core.Model.LayoutConventionDiagnostic.DeclarationPaths: System.Collections.Generic.IReadOnlyList`1[System.String] [get, init]
+property ArchLinterNet.Core.Model.LayoutConventionDiagnostic.ExpectedAbstractClass: System.Nullable`1[System.Boolean] [get, init]
 property ArchLinterNet.Core.Model.LayoutConventionDiagnostic.ExpectedCounterpartName: System.String [get, init]
 property ArchLinterNet.Core.Model.LayoutConventionDiagnostic.ExpectedDeclarationCount: System.Nullable`1[System.Int32] [get, init]
+property ArchLinterNet.Core.Model.LayoutConventionDiagnostic.ExpectedRoles: System.Collections.Generic.IReadOnlyList`1[System.String] [get, init]
 property ArchLinterNet.Core.Model.LayoutConventionDiagnostic.ExpectedTypeKind: System.String [get, init]
 property ArchLinterNet.Core.Model.LayoutConventionDiagnostic.ExpectedTypeName: System.String [get, init]
 property ArchLinterNet.Core.Model.LayoutConventionDiagnostic.ForbiddenNamespace: System.String [get, init]
@@ -2514,12 +2554,16 @@ property ArchLinterNet.Core.Model.LayoutConventionDiagnostic.MatchedFilePath: Sy
 property ArchLinterNet.Core.Model.LayoutConventionDiagnostic.SourceType: System.String [get, init]
 property ArchLinterNet.Core.Model.LayoutConventionDiagnostic.WhenExpressions: System.Collections.Generic.IReadOnlyList`1[ArchLinterNet.Core.Model.ExpressionParticipation] [get, init]
 property ArchLinterNet.Core.Model.LayoutConventionPayload.ActualDeclarationCount: System.Nullable`1[System.Int32] [get, init]
+property ArchLinterNet.Core.Model.LayoutConventionPayload.ActualIsAbstract: System.Nullable`1[System.Boolean] [get, init]
+property ArchLinterNet.Core.Model.LayoutConventionPayload.ActualRole: System.String [get, init]
 property ArchLinterNet.Core.Model.LayoutConventionPayload.ActualTypeKind: System.String [get, init]
 property ArchLinterNet.Core.Model.LayoutConventionPayload.ActualTypeName: System.String [get, init]
 property ArchLinterNet.Core.Model.LayoutConventionPayload.DataUnavailable: System.Boolean [get, init]
 property ArchLinterNet.Core.Model.LayoutConventionPayload.DeclarationPaths: System.Collections.Generic.IReadOnlyList`1[System.String] [get, init]
+property ArchLinterNet.Core.Model.LayoutConventionPayload.ExpectedAbstractClass: System.Nullable`1[System.Boolean] [get, init]
 property ArchLinterNet.Core.Model.LayoutConventionPayload.ExpectedCounterpartName: System.String [get, init]
 property ArchLinterNet.Core.Model.LayoutConventionPayload.ExpectedDeclarationCount: System.Nullable`1[System.Int32] [get, init]
+property ArchLinterNet.Core.Model.LayoutConventionPayload.ExpectedRoles: System.Collections.Generic.IReadOnlyList`1[System.String] [get, init]
 property ArchLinterNet.Core.Model.LayoutConventionPayload.ExpectedTypeKind: System.String [get, init]
 property ArchLinterNet.Core.Model.LayoutConventionPayload.ExpectedTypeName: System.String [get, init]
 property ArchLinterNet.Core.Model.LayoutConventionPayload.MatchedFilePath: System.String [get, init]

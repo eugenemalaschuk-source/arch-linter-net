@@ -1,6 +1,7 @@
 using System.Text.Json;
 using ArchLinterNet.Cli.Commands;
 using ArchLinterNet.Cli.Commands.Baseline;
+using ArchLinterNet.Cli.Integration.OutputFormatting;
 using ArchLinterNet.Core.Model;
 using ArchLinterNet.Core.Schema;
 using Json.Schema;

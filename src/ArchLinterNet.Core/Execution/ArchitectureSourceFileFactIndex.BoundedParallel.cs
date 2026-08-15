@@ -32,7 +32,8 @@ public sealed partial class ArchitectureSourceFileFactIndex
                 ns,
                 fullName,
                 GetSimpleTypeName(type),
-                GetTypeKindFromReflection(type)));
+                GetTypeKindFromReflection(type),
+                type.IsAbstract));
         }
 
         return factsByName;

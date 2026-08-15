@@ -34,6 +34,7 @@ public sealed partial class PolicyRawValidationSeamTests
         nameof(RawPortBoundaryNodeValidator),
         nameof(RawSemanticCoverageNodeValidator),
         nameof(RawLayoutConventionNodeValidator),
+        nameof(RawModuleContainerNodeValidator),
         nameof(RawLayerTemplateNodeValidator),
         nameof(RawWhenFieldLocationValidator),
     };
@@ -94,6 +95,18 @@ public sealed partial class PolicyRawValidationSeamTests
             AnalysisExtra: string.Empty,
             ExpectedMessage:
                 "Contextual contract 'layout' declares an unknown property 'required_name_sufix' on layout convention contract."),
+        new(
+            nameof(RawModuleContainerNodeValidator),
+            LayerExtra: string.Empty,
+            ContractsExtra:
+                "  strict_module_containers:\n" +
+                "    - name: modules\n" +
+                "      container: App.Commands\n" +
+                "      profile: cli_command\n" +
+                "      profile_typo: cli_command\n",
+            AnalysisExtra: string.Empty,
+            ExpectedMessage:
+                "Contextual contract 'modules' declares an unknown property 'profile_typo' on module container contract."),
         new(
             nameof(RawLayerTemplateNodeValidator),
             LayerExtra: string.Empty,

@@ -1,10 +1,9 @@
 # yaml-language-server: $schema=../schema/dependencies.arch.fragment.schema.json
 #
-# This is intentionally an audit, not a strict gate. It measures the gap between
-# the current package-oriented layout and the domain convention we want to adopt
-# before production code is moved.
+# This fragment keeps remaining convention debt in audit mode while strict leaf and folder-purity
+# rules protect the conventions whose production migration has completed.
 contracts:
-  audit_allow_only:
+  strict_allow_only:
     - name: models-have-no-first-party-dependencies
       id: models-have-no-first-party-dependencies
       source: model_types
@@ -16,6 +15,24 @@ contracts:
       source: exception_types
       allowed: []
       reason: Exception types must be self-contained; System.Exception is a BCL base type and is intentionally outside first-party dependency checking.
+
+  strict_layout_conventions:
+    - name: abstractions-directories-contain-only-interfaces-or-abstract-classes
+      id: abstractions-directories-contain-only-interfaces-or-abstract-classes
+      files_matching:
+        folder_segment: Abstractions
+      all_declarations:
+        allowed_type_kinds: [interface, class]
+        require_abstract_classes: true
+      reason: "An Abstractions directory is a published contract surface: interfaces are allowed, and classes must be explicitly abstract extension points."
+
+    - name: exceptions-directories-contain-only-exceptions
+      id: exceptions-directories-contain-only-exception-classes
+      files_matching:
+        folder_segment: Exceptions
+      all_declarations:
+        allowed_roles: [Exception]
+      reason: Exceptions directories contain only types classified by inheritance as Exception.
 
   audit_layout_conventions:
     - name: production-types-have-one-source-declaration
@@ -103,11 +120,3 @@ contracts:
         - folder_segment: Exceptions
       forbid_type_kind: class
       reason: A class derived from System.Exception must be declared under an Exceptions directory.
-
-    - name: exceptions-directories-contain-only-exception-classes
-      id: exceptions-directories-contain-only-exception-classes
-      files_matching:
-        folder_segment: Exceptions
-        when: subject.role != 'Exception'
-      forbid_type_kind: class
-      reason: An Exceptions directory may contain exception classes only, not ordinary concrete classes.
