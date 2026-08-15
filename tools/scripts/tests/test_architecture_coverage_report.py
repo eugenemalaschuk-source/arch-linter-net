@@ -160,6 +160,28 @@ def test_render_summary_markdown_sorts_rules_by_contract_id() -> None:
     assert markdown.index("`a-abstractions`") < markdown.index("`z-models`")
 
 
+def test_render_summary_markdown_ignores_current_build_state_preflight_entries() -> None:
+    report = make_report(
+        False,
+        [],
+        violations=[{"contract_id": "broken-rule", "contract": "Broken rule", "source": "Example.Type"}],
+        preflight_diagnostics=[
+            {
+                "contract": "build-state-preflight",
+                "source": "src/Example/Example.csproj",
+                "state": "current",
+            }
+        ],
+    )
+
+    markdown = render_summary_markdown(report)
+
+    assert "`broken-rule`" in markdown
+    assert "src/Example/Example.csproj" not in markdown
+    assert "| Failed rules | 1 |" in markdown
+    assert "| Failed diagnostics | 1 |" in markdown
+
+
 def test_render_summary_markdown_falls_back_to_coverage_summary_when_findings_absent() -> None:
     report = make_report(
         False,

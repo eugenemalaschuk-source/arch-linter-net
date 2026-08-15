@@ -172,6 +172,8 @@ def collect_failed_rules(report: dict) -> list[FailedRule]:
         for finding in findings:
             if not isinstance(finding, dict):
                 continue
+            if collection == "preflight_diagnostics" and finding.get("state") == "current":
+                continue
             identifier, name = _rule_identity(finding, category)
             existing_name, diagnostics = grouped.setdefault(identifier, (name, set()))
             if existing_name == identifier and name != identifier:
