@@ -19,7 +19,22 @@ public sealed partial class CheckpointBReleaseGateTests
     private static readonly Dictionary<string, string> _trackedConsumerCleanupDefects =
         new(StringComparer.Ordinal);
 
-    private static List<CheckpointScenarioResult> AssertConsumerCleanupPolicyFoundation(
+    private static List<CheckpointScenarioResult> AssertConsumerCleanupPolicyExecution(
+        CandidatePackageFeed candidate)
+    {
+        using PreparedConsumerCleanup prepared = PrepareConsumerCleanup(candidate);
+        AdoptionAcceptanceFixture consumer = prepared.Consumer;
+
+        return
+        [
+            AssertComposedPolicyAssemblyFreeCheck(candidate, consumer),
+            AssertNonDestructiveBuildPreparation(candidate, consumer),
+            candidate.AssertRepeatedTestingEnsureBuilt(),
+            AssertStrictCyclesBaselineScope(candidate, consumer),
+        ];
+    }
+
+    private static List<CheckpointScenarioResult> AssertConsumerCleanupPolicyContractsAndShape(
         CandidatePackageFeed candidate,
         out ConsumerPolicyShape policyShape)
     {
@@ -28,10 +43,6 @@ public sealed partial class CheckpointBReleaseGateTests
 
         var scenarios = new List<CheckpointScenarioResult>
         {
-            AssertComposedPolicyAssemblyFreeCheck(candidate, consumer),
-            AssertNonDestructiveBuildPreparation(candidate, consumer),
-            candidate.AssertRepeatedTestingEnsureBuilt(),
-            AssertStrictCyclesBaselineScope(candidate, consumer),
             AssertDependencyContractIdParity(candidate, consumer),
             AssertLayerOverlapAllowance(candidate, consumer),
         };

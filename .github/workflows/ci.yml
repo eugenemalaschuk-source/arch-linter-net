@@ -640,9 +640,16 @@ jobs:
             name: Windows
             platform: windows-x64
             shell_adapter: pwsh
-            shard: consumer-cleanup-policy-foundation
-            shard_name: Consumer cleanup policy foundation
-            target: test-packed-artifact-consumer-cleanup-policy-foundation
+            shard: consumer-cleanup-policy-execution
+            shard_name: Consumer cleanup policy execution
+            target: test-packed-artifact-consumer-cleanup-policy-execution
+          - os: windows-latest
+            name: Windows
+            platform: windows-x64
+            shell_adapter: pwsh
+            shard: consumer-cleanup-policy-contracts-and-shape
+            shard_name: Consumer cleanup policy contracts + shape
+            target: test-packed-artifact-consumer-cleanup-policy-contracts-and-shape
           - os: windows-latest
             name: Windows
             platform: windows-x64
@@ -703,9 +710,16 @@ jobs:
             name: Apple Silicon macOS
             platform: macos-arm64
             shell_adapter: bash
-            shard: consumer-cleanup-policy-foundation
-            shard_name: Consumer cleanup policy foundation
-            target: test-packed-artifact-consumer-cleanup-policy-foundation
+            shard: consumer-cleanup-policy-execution
+            shard_name: Consumer cleanup policy execution
+            target: test-packed-artifact-consumer-cleanup-policy-execution
+          - os: macos-14
+            name: Apple Silicon macOS
+            platform: macos-arm64
+            shell_adapter: bash
+            shard: consumer-cleanup-policy-contracts-and-shape
+            shard_name: Consumer cleanup policy contracts + shape
+            target: test-packed-artifact-consumer-cleanup-policy-contracts-and-shape
           - os: macos-14
             name: Apple Silicon macOS
             platform: macos-arm64

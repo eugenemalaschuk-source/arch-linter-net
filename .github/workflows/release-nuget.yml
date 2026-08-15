@@ -57,9 +57,12 @@ jobs:
           - id: adopter-runtime-extended
             name: Adopter runtime extended
             target: test-packed-artifact-adopter-runtime-extended
-          - id: consumer-cleanup-policy-foundation
-            name: Consumer cleanup policy foundation
-            target: test-packed-artifact-consumer-cleanup-policy-foundation
+          - id: consumer-cleanup-policy-execution
+            name: Consumer cleanup policy execution
+            target: test-packed-artifact-consumer-cleanup-policy-execution
+          - id: consumer-cleanup-policy-contracts-and-shape
+            name: Consumer cleanup policy contracts + shape
+            target: test-packed-artifact-consumer-cleanup-policy-contracts-and-shape
           - id: consumer-cleanup-configuration-and-identity
             name: Consumer cleanup configuration + identity
             target: test-packed-artifact-consumer-cleanup-configuration-and-identity

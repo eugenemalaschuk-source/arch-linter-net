@@ -84,12 +84,21 @@ public sealed partial class CheckpointBReleaseGateTests
     }
 
     [Test]
-    public void PackedCandidate_ConsumerCleanupPolicyFoundation()
+    public void PackedCandidate_ConsumerCleanupPolicyExecution()
     {
         CandidatePackageFeed candidate = Candidate;
         IReadOnlyList<CheckpointScenarioResult> scenarios =
-            AssertConsumerCleanupPolicyFoundation(candidate, out ConsumerPolicyShape policyShape);
-        candidate.WriteShardEvidence("consumer-cleanup-policy-foundation", scenarios, policyShape);
+            AssertConsumerCleanupPolicyExecution(candidate);
+        candidate.WriteShardEvidence("consumer-cleanup-policy-execution", scenarios);
+    }
+
+    [Test]
+    public void PackedCandidate_ConsumerCleanupPolicyContractsAndShape()
+    {
+        CandidatePackageFeed candidate = Candidate;
+        IReadOnlyList<CheckpointScenarioResult> scenarios =
+            AssertConsumerCleanupPolicyContractsAndShape(candidate, out ConsumerPolicyShape policyShape);
+        candidate.WriteShardEvidence("consumer-cleanup-policy-contracts-and-shape", scenarios, policyShape);
     }
 
     [Test]

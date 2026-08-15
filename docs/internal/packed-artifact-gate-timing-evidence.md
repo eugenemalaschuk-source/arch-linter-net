@@ -30,12 +30,18 @@ generic acceptance stage reran packed-artifact proof.
 
 ## Follow-up split
 
-The nine-shard topology separates the two remaining independent Windows hot paths:
+The prior nine-shard topology separated the two independent Windows hot paths:
 
 - adopter runtime: core fixtures versus extended/cache evidence;
 - public-API selector: snapshot/role, delta/membership, and enforcement/Testing-adapter parity.
 
-Every producer emits exactly one named shard record. The merger requires all nine records and
+Its release rehearsal showed that consumer-cleanup policy foundation (3:03) still threatened the
+four-minute PR critical path once candidate preparation and fan-in were included. The final
+ten-shard topology separates that work into policy execution and policy contracts plus typed
+policy shape, while preserving every scenario ID exactly once.
+
+Every producer emits exactly one named shard record. The merger requires all ten records and
 rejects duplicate, missing, or overlapping scenario IDs before it emits canonical platform
-evidence. The final timing is recorded after the corresponding PR and non-publishing release
-workflows complete.
+evidence; only the policy contracts-and-shape shard may report the typed policy-shape counters.
+The final timing is recorded after the corresponding PR and non-publishing release workflows
+complete.
