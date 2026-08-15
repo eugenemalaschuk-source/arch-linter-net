@@ -53,7 +53,7 @@ internal sealed class CelBinder
         }
         catch (CelBindException ex)
         {
-            return CelBindResult.Failed(ex.Diagnostic);
+            return CelBindResult.Failed((CelDiagnostic)ex.Diagnostic);
         }
     }
 
@@ -373,16 +373,4 @@ internal sealed class CelBinder
 
     private static CelBindException Fail(CelDiagnostic diagnostic) => new(diagnostic);
 
-    [System.Diagnostics.CodeAnalysis.SuppressMessage(
-        "Design",
-        "S3871:Exception types should be \"public\"",
-        Justification = "Internal control-flow signal local to CelBinder's recursive bind pass; " +
-            "never crosses the assembly boundary and is always caught inside Bind() before a " +
-            "result is returned.")]
-    private sealed class CelBindException : Exception
-    {
-        public CelDiagnostic Diagnostic { get; }
-
-        public CelBindException(CelDiagnostic diagnostic) => Diagnostic = diagnostic;
-    }
 }

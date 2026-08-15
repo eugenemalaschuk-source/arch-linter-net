@@ -10,6 +10,7 @@ using ArchLinterNet.Cli.Commands.Policy;
 using ArchLinterNet.Cli.Commands.PublicApi;
 using ArchLinterNet.Cli.Commands.Schema;
 using ArchLinterNet.Cli.Commands.Validate;
+using ArchLinterNet.Cli.Commands.Validate.EntryPoint;
 using ArchLinterNet.Cli.Infrastructure;
 using ArchLinterNet.Core.BuildState;
 using ArchLinterNet.Core.Contracts;
@@ -24,7 +25,7 @@ namespace ArchLinterNet.Cli.Tests;
 [TestFixture]
 public sealed class CliArchitectureTests
 {
-    private static readonly string[] _value = { "baseline", "cache", "graph", "explain", "policy", "public-api", "schema" };
+    private static readonly string[] _value = { "baseline", "cache", "graph", "explain", "policy", "public-api", "scaffold", "schema" };
     private static readonly string[] _value1 = { "generate", "update", "prune", "diff", "verify", "migrate" };
     private static readonly string[] _value2 = { "rule-1" };
     [Test]
@@ -46,6 +47,7 @@ public sealed class CliArchitectureTests
                 typeof(ExplainCommandModule),
                 typeof(PolicyCommandModule),
                 typeof(PublicApiCommandModule),
+                typeof(ScaffoldCommandModule),
                 typeof(SchemaCommandModule),
             }));
             Assert.That(
@@ -599,10 +601,27 @@ public sealed class CliArchitectureTests
             CommittedPaths.Add(targetPath);
         }
 
+        public bool TryRenameTempToNewTarget(string tempPath, string targetPath)
+        {
+            if (FileExists(targetPath))
+            {
+                return false;
+            }
+
+            RenameTempToTarget(tempPath, targetPath);
+            return true;
+        }
+
         public void DeleteFile(string path)
         {
             _tempContents.Remove(path);
         }
+
+        public bool TryCreateNewFile(string path) => true;
+
+        public bool DirectoryExists(string path) => true;
+
+        public void DeleteDirectoryIfEmpty(string path) { }
 
         public bool CanWriteToDirectory(string path) => true;
     }

@@ -6,17 +6,6 @@ using ArchLinterNet.Core.Resolution;
 
 namespace ArchLinterNet.Core.Scanning;
 
-internal interface IArchitectureIlMethodBodyScanner
-{
-    IEnumerable<ArchitectureViolation> FindMethodBodyViolations(
-        IReadOnlyCollection<Assembly> targetAssemblies,
-        string sourceNamespacePrefix,
-        IReadOnlyList<string> forbiddenCallPatterns,
-        ArchitectureContractExecutionContext executionContext,
-        ArchitectureLayer? sourceLayer = null,
-        CancellationToken cancellationToken = default);
-}
-
 internal readonly record struct ArchitectureIlForbiddenCallMatch(
     int InstructionOffset,
     string SourceMember,

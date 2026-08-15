@@ -44,7 +44,7 @@ internal sealed record ArchitectureBaselineIdentityDescriptor(
             "project_metadata" => common.Concat(["source-project", "metadata-key", "configuration", "target-framework"]).ToArray(),
             "assembly_independence" or "assembly_dependency" or "assembly_allow_only" => common.Concat([SourceAssembly, "target-assembly"]).ToArray(),
             "external" or "external_allow_only" => common.Concat([SourceAssembly, "target-assembly", "target-type"]).ToArray(),
-            "dependency" or "layer" or "allow_only" or "cycle" or "acyclic_sibling"
+            "dependency" or "layer" or "allow_only" or "cycle" or "acyclic_sibling" or "module_container"
                 or "independence" or "protected" or "context_dependency" or "context_allow_only"
                 or "port_boundary" or "type_placement" or "layout_conventions" or "attribute_usage"
                 or "inheritance" or "interface_implementation" => common.Concat([SourceAssembly, "source-type", "target-assembly", "target-type"]).ToArray(),

@@ -24,6 +24,10 @@ public sealed partial class ArchitectureDiagnosticFormatter
         {
             parts.Add($"expected_kind: {layoutConvention.ExpectedTypeKind}, actual_kind: {layoutConvention.ActualTypeKind}");
         }
+        else if (layoutConvention.ActualTypeKind != null)
+        {
+            parts.Add($"actual_kind: {layoutConvention.ActualTypeKind}");
+        }
 
         if (layoutConvention.ExpectedTypeName != null)
         {
@@ -33,6 +37,32 @@ public sealed partial class ArchitectureDiagnosticFormatter
         if (layoutConvention.ExpectedCounterpartName != null)
         {
             parts.Add($"expected_counterpart: {layoutConvention.ExpectedCounterpartName}");
+        }
+
+        if (layoutConvention.ExpectedRoles != null)
+        {
+            parts.Add(
+                $"expected_roles: [{string.Join(", ", layoutConvention.ExpectedRoles)}], " +
+                $"actual_role: {layoutConvention.ActualRole ?? "unclassified"}");
+        }
+
+        if (layoutConvention.ExpectedAbstractClass != null)
+        {
+            parts.Add(
+                $"expected_abstract_class: {layoutConvention.ExpectedAbstractClass}, " +
+                $"actual_abstract: {layoutConvention.ActualIsAbstract}");
+        }
+        else if (layoutConvention.ActualIsAbstract != null)
+        {
+            parts.Add($"actual_abstract: {layoutConvention.ActualIsAbstract}");
+        }
+
+        if (layoutConvention.ExpectedDeclarationCount != null)
+        {
+            parts.Add(
+                $"expected_declaration_count: <= {layoutConvention.ExpectedDeclarationCount}, " +
+                $"actual_declaration_count: {layoutConvention.ActualDeclarationCount}, " +
+                $"declaration_paths: {string.Join(", ", layoutConvention.DeclarationPaths ?? Array.Empty<string>())}");
         }
 
         if (layoutConvention.WhenExpressions is { Count: > 0 })
@@ -63,6 +93,27 @@ public sealed partial class ArchitectureDiagnosticFormatter
 
         if (layoutConvention.ExpectedCounterpartName != null)
             obj["expected_counterpart_name"] = layoutConvention.ExpectedCounterpartName;
+
+        if (layoutConvention.ExpectedRoles != null)
+            obj["expected_roles"] = layoutConvention.ExpectedRoles.ToArray();
+
+        if (layoutConvention.ActualRole != null)
+            obj["actual_role"] = layoutConvention.ActualRole;
+
+        if (layoutConvention.ExpectedAbstractClass != null)
+            obj["expected_abstract_class"] = layoutConvention.ExpectedAbstractClass;
+
+        if (layoutConvention.ActualIsAbstract != null)
+            obj["actual_abstract"] = layoutConvention.ActualIsAbstract;
+
+        if (layoutConvention.ExpectedDeclarationCount != null)
+            obj["expected_declaration_count"] = layoutConvention.ExpectedDeclarationCount;
+
+        if (layoutConvention.ActualDeclarationCount != null)
+            obj["actual_declaration_count"] = layoutConvention.ActualDeclarationCount;
+
+        if (layoutConvention.DeclarationPaths != null)
+            obj["declaration_paths"] = layoutConvention.DeclarationPaths.ToArray();
 
         if (layoutConvention.DataUnavailable)
             obj["data_unavailable"] = layoutConvention.DataUnavailable;

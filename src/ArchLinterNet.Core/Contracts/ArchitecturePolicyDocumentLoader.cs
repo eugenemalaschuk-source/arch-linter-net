@@ -1,6 +1,7 @@
 using System.Text.RegularExpressions;
 using ArchLinterNet.Core.Contracts.Abstractions;
 using ArchLinterNet.Core.Contracts.PolicyImports;
+using ArchLinterNet.Core.Contracts.PolicyImports.Models;
 using ArchLinterNet.Core.Contracts.RawValidators;
 using ArchLinterNet.Core.Contracts.Validators;
 using ArchLinterNet.Core.IO;
@@ -16,7 +17,7 @@ namespace ArchLinterNet.Core.Contracts;
 // algorithm lives in its own type - raw YAML node checks in RawValidators/, post-deserialization
 // family checks in Validators/, composition in PolicyImports/ - so adding a rule to a capability
 // does not mean extending a central method here.
-public sealed partial class ArchitecturePolicyDocumentLoader : IArchitecturePolicyDocumentLoader
+public sealed partial class ArchitecturePolicyDocumentLoader : IArchitecturePolicyDocumentLoader, IArchitecturePolicyCheckDocumentLoader
 {
     private readonly IArchitectureFileSystem _fileSystem;
     private readonly IArchitecturePolicyPathResolver _pathResolver;
@@ -49,6 +50,11 @@ public sealed partial class ArchitecturePolicyDocumentLoader : IArchitecturePoli
     public ArchitectureContractDocument Load(string policyPath, CancellationToken cancellationToken)
     {
         return LoadCore(policyPath, validateEffectiveSchema: false, cancellationToken);
+    }
+
+    ArchitectureContractDocument IArchitecturePolicyCheckDocumentLoader.LoadForPolicyCheck(string policyPath)
+    {
+        return LoadCore(policyPath, validateEffectiveSchema: true, CancellationToken.None);
     }
 
     private ArchitectureContractDocument LoadCore(

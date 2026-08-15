@@ -7,6 +7,7 @@ using ArchLinterNet.Core.Contracts.Families;
 using ArchLinterNet.Core.Discovery;
 using ArchLinterNet.Core.Discovery.Abstractions;
 using ArchLinterNet.Core.Execution.Abstractions;
+using ArchLinterNet.Core.Execution.Results;
 using ArchLinterNet.Core.Reporting;
 using ArchLinterNet.Core.Resolution;
 using ArchLinterNet.Core.Resolution.Abstractions;
@@ -163,8 +164,8 @@ public sealed class ArchitectureRunnerSetupService(
         {
             resolution = assemblyResolutionService.ResolvePostBuild(
                 document, preparation.RepositoryRoot, preparation.ProjectDiscovery,
-                preparation.ResolveAssemblyOutputs, mode, selectedContractIds, cancellationToken,
-                preparation.CapturedArtifactContentDigests);
+                preparation.ResolveAssemblyOutputs, mode, selectedContractIds,
+                preparation.CapturedArtifactContentDigests, cancellationToken);
         }
 
         ArchitectureAnalysisContext context = CreateAnalysisContext(
@@ -222,7 +223,7 @@ public sealed class ArchitectureRunnerSetupService(
             ResolutionResult resolution = loadPostBuildArtifacts
                 ? assemblyResolutionService.ResolvePostBuild(
                     document, repositoryRoot, discovery, resolveAssemblyOutputs, mode, selectedContractIds,
-                    cancellationToken)
+                    cancellationToken: cancellationToken)
                 : assemblyResolutionService.Resolve(
                     document, repositoryRoot, discovery, resolveAssemblyOutputs, mode, selectedContractIds,
                     cancellationToken);

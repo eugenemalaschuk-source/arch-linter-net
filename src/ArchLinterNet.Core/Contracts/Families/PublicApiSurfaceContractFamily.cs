@@ -24,15 +24,6 @@ public enum PublicApiSnapshotErrorKind
     OwnershipError,
 }
 
-public sealed partial class ArchitectureContractGroups
-{
-    [YamlMember(Alias = "strict_public_api_surface")]
-    public List<ArchitecturePublicApiSurfaceContract> StrictPublicApiSurface { get; set; } = new();
-
-    [YamlMember(Alias = "audit_public_api_surface")]
-    public List<ArchitecturePublicApiSurfaceContract> AuditPublicApiSurface { get; set; } = new();
-}
-
 // Restricts the contract's governed surface to types matching bounded, already-delivered
 // evidence: the same structural matcher vocabulary type_placement.types_matching uses
 // (ArchitectureTypeRoleMatcher), plus Role, matched via the existing semantic role index

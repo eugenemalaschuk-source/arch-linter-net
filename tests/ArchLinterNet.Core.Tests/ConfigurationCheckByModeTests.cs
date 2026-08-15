@@ -1,6 +1,7 @@
 using ArchLinterNet.Core.Contracts;
 using ArchLinterNet.Core.Contracts.Families;
 using ArchLinterNet.Core.Execution;
+using ArchLinterNet.Core.Model;
 using NUnit.Framework;
 using ArchitectureContractGroups = ArchLinterNet.Core.Contracts.Families.ArchitectureContractGroups;
 
@@ -128,5 +129,49 @@ public sealed class ConfigurationCheckByModeTests
 
         Assert.That(strictViolations.Any(v => v.ForbiddenNamespace == "missing target assembly"), Is.True);
         Assert.That(auditViolations.Any(v => v.ForbiddenNamespace == "missing target assembly"), Is.True);
+    }
+
+    [Test]
+    public void CheckConfiguration_FacadePreservesConfigurationValidationServiceOutput()
+    {
+        var document = new ArchitectureContractDocument
+        {
+            Version = 1,
+            Name = "Test",
+            Analysis = new ArchitectureAnalysisConfiguration
+            {
+                TargetAssemblies = new List<string> { "Missing.Assembly" }
+            }
+        };
+
+        var context = new ArchitectureAnalysisContext(
+            "/tmp",
+            Array.Empty<System.Reflection.Assembly>(),
+            _value,
+            Array.Empty<string>());
+        var session = new ArchitectureAnalysisSession(context, document, null, false, null);
+
+        IReadOnlyList<(string ContractName, string? ContractId, string SourceType, string Kind, string References)> direct =
+            new ArchitectureConfigurationValidationService(session)
+                .Check(strict: true)
+                .Select(ToComparableDiagnostic)
+                .ToList();
+        IReadOnlyList<(string ContractName, string? ContractId, string SourceType, string Kind, string References)> facade =
+            session.CheckConfiguration(strict: true)
+                .Select(ToComparableDiagnostic)
+                .ToList();
+
+        Assert.That(facade, Is.EqualTo(direct));
+    }
+
+    private static (string ContractName, string? ContractId, string SourceType, string Kind, string References)
+        ToComparableDiagnostic(ArchitectureViolation violation)
+    {
+        return (
+            violation.ContractName,
+            violation.ContractId,
+            violation.SourceType,
+            violation.ForbiddenNamespace,
+            string.Join("|", violation.ForbiddenReferences));
     }
 }

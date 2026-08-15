@@ -2,41 +2,6 @@ using ArchLinterNet.Core.Model;
 
 namespace ArchLinterNet.Core.Reporting;
 
-public partial interface IArchitectureDiagnosticFormatter
-{
-    /// <summary>
-    /// Additive overload — see the classificationPathDeferred overload in
-    /// <see cref="ArchitectureDiagnosticFormatter"/> for why this exists alongside it instead of
-    /// extending it. <c>preflightDiagnostics</c> is required (no default) so this overload stays
-    /// unambiguous by arity against every prior one.
-    /// </summary>
-    string FormatResultForCiArtifacts( // NOSONAR: each parameter represents a semantically distinct section of the CI artifact payload; grouping would obscure the data contract
-        string mode,
-        bool passed,
-        IReadOnlyCollection<ArchitectureViolation> violations,
-        IReadOnlyCollection<string> cycles,
-        IReadOnlyCollection<ArchitectureClassificationRoleFact> classificationRoles,
-        ArchitectureClassificationPathDeferredNotice? classificationPathDeferred,
-        IReadOnlyCollection<BuildStatePreflightDiagnostic> preflightDiagnostics,
-        IReadOnlyCollection<ArchitectureViolation>? coverageFindings = null,
-        IReadOnlyCollection<ArchitectureUnmatchedIgnoredViolation>? unmatched = null,
-        IReadOnlyCollection<PolicyConsistencyDiagnostic>? policyConsistencyFindings = null,
-        IReadOnlyCollection<ArchitectureCoverageSummary>? coverageSummaries = null,
-        IReadOnlyCollection<ArchitectureClassificationConflict>? classificationConflicts = null,
-        IReadOnlyCollection<ArchitectureClassificationMetadataFailure>? classificationMetadataFailures = null)
-        => FormatResultForCiArtifacts(
-            mode, passed, violations, cycles, classificationRoles, classificationPathDeferred, coverageFindings,
-            unmatched, policyConsistencyFindings, coverageSummaries, classificationConflicts, classificationMetadataFailures);
-
-    /// <summary>
-    /// Default implementation returns an empty string so a pre-existing third-party
-    /// <see cref="IArchitectureDiagnosticFormatter"/> implementer that predates build-state
-    /// preflight still compiles without adding this member. Only
-    /// <see cref="ArchitectureDiagnosticFormatter"/> itself overrides it with real rendering.
-    /// </summary>
-    string FormatBuildStatePreflightForHumans(IReadOnlyCollection<BuildStatePreflightDiagnostic> diagnostics) => string.Empty;
-}
-
 public sealed partial class ArchitectureDiagnosticFormatter
 {
     public string FormatBuildStatePreflightForHumans(IReadOnlyCollection<BuildStatePreflightDiagnostic> diagnostics)

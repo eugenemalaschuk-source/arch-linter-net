@@ -296,6 +296,8 @@ public static class ArchitectureBaselineComparer
             "audit_external_allow_only" => groups.AuditExternalAllowOnly.Select(c => c.Id),
             "strict_acyclic_siblings" => groups.StrictAcyclicSiblings.Select(c => c.Id),
             "audit_acyclic_siblings" => groups.AuditAcyclicSiblings.Select(c => c.Id),
+            "strict_module_containers" => groups.StrictModuleContainers.Select(c => c.Id),
+            "audit_module_containers" => groups.AuditModuleContainers.Select(c => c.Id),
             "strict_type_placement" => groups.StrictTypePlacement.Select(c => c.Id),
             "audit_type_placement" => groups.AuditTypePlacement.Select(c => c.Id),
             "strict_layout_conventions" => groups.StrictLayoutConventions.Select(c => c.Id),

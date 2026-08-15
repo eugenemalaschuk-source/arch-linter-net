@@ -566,9 +566,17 @@ public sealed class ValidateCommandHandlerProfileTests
         {
         }
 
+        public bool TryRenameTempToNewTarget(string tempPath, string targetPath) => !FileExists(targetPath);
+
         public void DeleteFile(string path)
         {
         }
+
+        public bool TryCreateNewFile(string path) => true;
+
+        public bool DirectoryExists(string path) => true;
+
+        public void DeleteDirectoryIfEmpty(string path) { }
 
         public bool CanWriteToDirectory(string path) => writable;
     }

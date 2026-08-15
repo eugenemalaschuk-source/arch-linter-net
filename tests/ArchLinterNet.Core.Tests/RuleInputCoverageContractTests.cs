@@ -18,6 +18,7 @@ public sealed class RuleInputCoverageContractTests
     private static readonly string[] _value5 = { "video-to-ghost-rule", "typo-rule" };
     private static readonly string[] _value6 = { "video-to-ghost-rule", "typo-rule" };
     private static readonly string[] _value7 = { "audio-rule", "video-to-ghost-rule", "typo-rule" };
+    private static readonly string[] _value8 = { "module-container-rule" };
     private const string FixtureRoot = "ArchLinterNet.Core.Tests.RuleInputCoverageFixtures";
 
     private static readonly Assembly[] _targetAssemblies = { typeof(RuleInputCoverageContractTests).Assembly };
@@ -64,6 +65,15 @@ public sealed class RuleInputCoverageContractTests
             Source = "does_not_exist_layer",
             Forbidden = { "audio" },
             Reason = "Placeholder rule with a dangling source layer."
+        });
+
+        document.Contracts.StrictModuleContainers.Add(new ArchitectureModuleContainerContract
+        {
+            Name = "module-container-rule",
+            Id = "module-container-rule",
+            Container = FixtureRoot,
+            Profile = "cli_command",
+            Reason = "Fixture modules must remain independently owned."
         });
 
         return document;
@@ -200,6 +210,17 @@ public sealed class RuleInputCoverageContractTests
     }
 
     [Test]
+    public void CheckRuleInputCoverage_ModuleContainerWithDiscoveredModules_ProducesNoFindings()
+    {
+        ArchitectureContractDocument document = CreateDocument();
+        ArchitectureContractRunner runner = new(CreateContext(), document);
+
+        List<ArchitectureViolation> findings = runner.CheckCoverageContract(CreateRuleInputContract(_value8));
+
+        Assert.That(findings, Is.Empty);
+    }
+
+    [Test]
     public void RuleInputReferences_FieldAwareFamilies_PreserveActualInputNames()
     {
         var typePlacement = new ArchitectureTypePlacementContract
@@ -216,6 +237,11 @@ public sealed class RuleInputCoverageContractTests
         {
             AllowedOnlyInLayers = { "interface-allowed" },
             ForbiddenInLayers = { "interface-forbidden" }
+        };
+        var moduleContainer = new ArchitectureModuleContainerContract
+        {
+            Container = "Example.Cli.Commands",
+            Profile = "cli_command"
         };
 
         Assert.Multiple(() =>
@@ -241,6 +267,10 @@ public sealed class RuleInputCoverageContractTests
                     ("allowed_only_in_layers", "interface-allowed"),
                     ("forbidden_in_layers", "interface-forbidden")
                 }));
+            Assert.That(
+                ArchitectureRuleInputReferences.For(moduleContainer)
+                    .Select(reference => (reference.Input, reference.Layer, reference.IsLayerReference)),
+                Is.EqualTo(new[] { ("container", "Example.Cli.Commands", false) }));
         });
     }
 }

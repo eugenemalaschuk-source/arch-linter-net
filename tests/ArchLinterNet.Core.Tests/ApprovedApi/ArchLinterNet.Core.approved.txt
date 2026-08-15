@@ -520,6 +520,7 @@ sealed class ArchLinterNet.Core.Contracts.ArchitectureBaselineContractGroups
   property System.Collections.Generic.List<ArchLinterNet.Core.Contracts.ArchitectureBaselineContractEntry> AuditLayers {get;set;}
   property System.Collections.Generic.List<ArchLinterNet.Core.Contracts.ArchitectureBaselineContractEntry> AuditLayoutConventions {get;set;}
   property System.Collections.Generic.List<ArchLinterNet.Core.Contracts.ArchitectureBaselineContractEntry> AuditMethodBody {get;set;}
+  property System.Collections.Generic.List<ArchLinterNet.Core.Contracts.ArchitectureBaselineContractEntry> AuditModuleContainers {get;set;}
   property System.Collections.Generic.List<ArchLinterNet.Core.Contracts.ArchitectureBaselineContractEntry> AuditPackageAllowOnly {get;set;}
   property System.Collections.Generic.List<ArchLinterNet.Core.Contracts.ArchitectureBaselineContractEntry> AuditPackageDependency {get;set;}
   property System.Collections.Generic.List<ArchLinterNet.Core.Contracts.ArchitectureBaselineContractEntry> AuditPortBoundaries {get;set;}
@@ -549,6 +550,7 @@ sealed class ArchLinterNet.Core.Contracts.ArchitectureBaselineContractGroups
   property System.Collections.Generic.List<ArchLinterNet.Core.Contracts.ArchitectureBaselineContractEntry> StrictLayers {get;set;}
   property System.Collections.Generic.List<ArchLinterNet.Core.Contracts.ArchitectureBaselineContractEntry> StrictLayoutConventions {get;set;}
   property System.Collections.Generic.List<ArchLinterNet.Core.Contracts.ArchitectureBaselineContractEntry> StrictMethodBody {get;set;}
+  property System.Collections.Generic.List<ArchLinterNet.Core.Contracts.ArchitectureBaselineContractEntry> StrictModuleContainers {get;set;}
   property System.Collections.Generic.List<ArchLinterNet.Core.Contracts.ArchitectureBaselineContractEntry> StrictPackageAllowOnly {get;set;}
   property System.Collections.Generic.List<ArchLinterNet.Core.Contracts.ArchitectureBaselineContractEntry> StrictPackageDependency {get;set;}
   property System.Collections.Generic.List<ArchLinterNet.Core.Contracts.ArchitectureBaselineContractEntry> StrictPortBoundaries {get;set;}
@@ -687,10 +689,10 @@ enum ArchLinterNet.Core.Contracts.ArchitecturePolicyImportErrorCategory : int
   enum-member SourceShape = 7
   enum-member UnreadableFile = 9
 sealed class ArchLinterNet.Core.Contracts.ArchitecturePolicyImportException : System.InvalidOperationException
-  ctor(ArchLinterNet.Core.Contracts.ArchitecturePolicyImportErrorCategory category, string message)
-  ctor(ArchLinterNet.Core.Contracts.ArchitecturePolicyImportErrorCategory category, string message, ArchLinterNet.Core.Model.ArchitecturePolicyDiagnostic? diagnostic)
-  property ArchLinterNet.Core.Contracts.ArchitecturePolicyImportErrorCategory Category {get;}
-  property ArchLinterNet.Core.Model.ArchitecturePolicyDiagnostic? Diagnostic {get;}
+  ctor(object category, string message)
+  ctor(object category, string message, object? diagnostic)
+  property object Category {get;}
+  property object? Diagnostic {get;}
 sealed class ArchLinterNet.Core.Contracts.ArchitecturePolicyProvenanceIndex
   method bool TryGetLocation(string effectiveYamlPath, out ArchLinterNet.Core.Model.ArchitecturePolicySourceLocation? location)
   property ArchLinterNet.Core.Model.ArchitecturePolicySourceDescriptor? RootSource {get;}
@@ -880,6 +882,8 @@ sealed class ArchLinterNet.Core.Contracts.Families.ArchitectureContractGroups
   property System.Collections.Generic.List<ArchLinterNet.Core.Contracts.Families.ArchitectureLayoutConventionContract> StrictLayoutConventions {get;set;}
   property System.Collections.Generic.List<ArchLinterNet.Core.Contracts.Families.ArchitectureMethodBodyContract> AuditMethodBody {get;set;}
   property System.Collections.Generic.List<ArchLinterNet.Core.Contracts.Families.ArchitectureMethodBodyContract> StrictMethodBody {get;set;}
+  property System.Collections.Generic.List<ArchLinterNet.Core.Contracts.Families.ArchitectureModuleContainerContract> AuditModuleContainers {get;set;}
+  property System.Collections.Generic.List<ArchLinterNet.Core.Contracts.Families.ArchitectureModuleContainerContract> StrictModuleContainers {get;set;}
   property System.Collections.Generic.List<ArchLinterNet.Core.Contracts.Families.ArchitecturePackageAllowOnlyContract> AuditPackageAllowOnly {get;set;}
   property System.Collections.Generic.List<ArchLinterNet.Core.Contracts.Families.ArchitecturePackageAllowOnlyContract> StrictPackageAllowOnly {get;set;}
   property System.Collections.Generic.List<ArchLinterNet.Core.Contracts.Families.ArchitecturePackageDependencyContract> AuditPackageDependency {get;set;}
@@ -1018,11 +1022,13 @@ sealed class ArchLinterNet.Core.Contracts.Families.ArchitectureLayerTemplateCont
   property string? Id {get;set;}
 sealed class ArchLinterNet.Core.Contracts.Families.ArchitectureLayoutConventionContract : ArchLinterNet.Core.Contracts.IArchitectureContract
   ctor()
+  property ArchLinterNet.Core.Contracts.Families.ArchitectureLayoutDeclarationShape? AllDeclarations {get;set;}
   property ArchLinterNet.Core.Contracts.Families.ArchitectureLayoutFileMatcher FilesMatching {get;set;}
   property ArchLinterNet.Core.Contracts.Families.ArchitectureRequireMatchingInterface? RequireMatchingInterface {get;set;}
   property System.Collections.Generic.List<ArchLinterNet.Core.Contracts.ArchitectureIgnoredViolation> IgnoredViolations {get;set;}
   property System.Collections.Generic.List<ArchLinterNet.Core.Contracts.Families.ArchitectureLayoutFileMatcher> ExcludeFilesMatching {get;set;}
   property bool RequireTypeNameMatchesFileName {get;set;}
+  property int? MaxDeclarationsPerType {get;set;}
   property string ForbidTypeKind {get;set;}
   property string ForbiddenNamePrefix {get;set;}
   property string ForbiddenNameSuffix {get;set;}
@@ -1032,6 +1038,11 @@ sealed class ArchLinterNet.Core.Contracts.Families.ArchitectureLayoutConventionC
   property string RequiredNamePrefix {get;set;}
   property string RequiredNameSuffix {get;set;}
   property string? Id {get;set;}
+sealed class ArchLinterNet.Core.Contracts.Families.ArchitectureLayoutDeclarationShape
+  ctor()
+  property System.Collections.Generic.List<string> AllowedRoles {get;set;}
+  property System.Collections.Generic.List<string> AllowedTypeKinds {get;set;}
+  property bool RequireAbstractClasses {get;set;}
 sealed class ArchLinterNet.Core.Contracts.Families.ArchitectureLayoutFileMatcher
   ctor()
   property string FileNamePrefix {get;set;}
@@ -1046,6 +1057,16 @@ sealed class ArchLinterNet.Core.Contracts.Families.ArchitectureMethodBodyContrac
   property string Name {get;set;}
   property string Reason {get;set;}
   property string Source {get;set;}
+  property string? Id {get;set;}
+sealed class ArchLinterNet.Core.Contracts.Families.ArchitectureModuleContainerContract : ArchLinterNet.Core.Contracts.IArchitectureContract
+  ctor()
+  property System.Collections.Generic.List<ArchLinterNet.Core.Contracts.ArchitectureIgnoredViolation> IgnoredViolations {get;set;}
+  property System.Collections.Generic.List<string> AllowedContainerRootTypes {get;set;}
+  property System.Collections.Generic.List<string> AllowedModuleRootTypes {get;set;}
+  property string Container {get;set;}
+  property string Name {get;set;}
+  property string Profile {get;set;}
+  property string Reason {get;set;}
   property string? Id {get;set;}
 sealed class ArchLinterNet.Core.Contracts.Families.ArchitectureOptionalRuleInput
   ctor()
@@ -1314,59 +1335,11 @@ sealed class ArchLinterNet.Core.Discovery.ProjectDiscoveryResult : System.IEquat
   property System.Collections.Generic.IReadOnlyCollection<string> SourceRoots {get;init;}
   property System.Collections.Generic.IReadOnlyCollection<string> TargetAssemblyNames {get;init;}
   property System.Collections.Generic.IReadOnlyDictionary<string,string> ResolvedAssemblyPaths {get;init;}
-delegate ArchLinterNet.Core.Execution.Abstractions.ArchitectureContractChecker : System.MulticastDelegate
-  ctor(object object, System.IntPtr method)
-  method ArchLinterNet.Core.Execution.Abstractions.ArchitectureHandlerResult EndInvoke(System.IAsyncResult result)
-  method ArchLinterNet.Core.Execution.Abstractions.ArchitectureHandlerResult Invoke(ArchLinterNet.Core.Execution.ArchitectureAnalysisSession session, ArchLinterNet.Core.Contracts.IArchitectureContract contract)
-  method System.IAsyncResult BeginInvoke(ArchLinterNet.Core.Execution.ArchitectureAnalysisSession session, ArchLinterNet.Core.Contracts.IArchitectureContract contract, System.AsyncCallback callback, object object)
-sealed class ArchLinterNet.Core.Execution.Abstractions.ArchitectureContractExecutionResult : System.IEquatable<ArchLinterNet.Core.Execution.Abstractions.ArchitectureContractExecutionResult>
-  ctor(System.Collections.Generic.IReadOnlyCollection<ArchLinterNet.Core.Model.ArchitectureViolation> Violations, System.Collections.Generic.IReadOnlyCollection<string> Cycles, System.Collections.Generic.IReadOnlyCollection<ArchLinterNet.Core.Model.ArchitectureViolation> CoverageViolations, System.Collections.Generic.IReadOnlyCollection<ArchLinterNet.Core.Reporting.ArchitectureCoverageSummary> CoverageSummaries)
-  method ArchLinterNet.Core.Execution.Abstractions.ArchitectureContractExecutionResult <Clone>$()
-  method bool Equals(ArchLinterNet.Core.Execution.Abstractions.ArchitectureContractExecutionResult? other)
-  method bool Equals(object? obj)
-  method int GetHashCode()
-  method string ToString()
-  method void Deconstruct(out System.Collections.Generic.IReadOnlyCollection<ArchLinterNet.Core.Model.ArchitectureViolation> Violations, out System.Collections.Generic.IReadOnlyCollection<string> Cycles, out System.Collections.Generic.IReadOnlyCollection<ArchLinterNet.Core.Model.ArchitectureViolation> CoverageViolations, out System.Collections.Generic.IReadOnlyCollection<ArchLinterNet.Core.Reporting.ArchitectureCoverageSummary> CoverageSummaries)
-  operator !=(ArchLinterNet.Core.Execution.Abstractions.ArchitectureContractExecutionResult? left, ArchLinterNet.Core.Execution.Abstractions.ArchitectureContractExecutionResult? right)
-  operator ==(ArchLinterNet.Core.Execution.Abstractions.ArchitectureContractExecutionResult? left, ArchLinterNet.Core.Execution.Abstractions.ArchitectureContractExecutionResult? right)
-  property System.Collections.Generic.IReadOnlyCollection<ArchLinterNet.Core.Model.ArchitectureCycleFinding> CycleFindings {get;init;}
-  property System.Collections.Generic.IReadOnlyCollection<ArchLinterNet.Core.Model.ArchitectureViolation> CoverageViolations {get;init;}
-  property System.Collections.Generic.IReadOnlyCollection<ArchLinterNet.Core.Model.ArchitectureViolation> Violations {get;init;}
-  property System.Collections.Generic.IReadOnlyCollection<ArchLinterNet.Core.Reporting.ArchitectureCoverageSummary> CoverageSummaries {get;init;}
-  property System.Collections.Generic.IReadOnlyCollection<string> Cycles {get;init;}
-  property System.Collections.Generic.IReadOnlyDictionary<string,int> ContractFamilyResultCounts {get;init;}
-sealed class ArchLinterNet.Core.Execution.Abstractions.ArchitectureHandlerResult : System.IEquatable<ArchLinterNet.Core.Execution.Abstractions.ArchitectureHandlerResult>
-  ctor(System.Collections.Generic.IReadOnlyCollection<ArchLinterNet.Core.Model.ArchitectureViolation> Violations, System.Collections.Generic.IReadOnlyCollection<string> Cycles)
-  method ArchLinterNet.Core.Execution.Abstractions.ArchitectureHandlerResult <Clone>$()
-  method bool Equals(ArchLinterNet.Core.Execution.Abstractions.ArchitectureHandlerResult? other)
-  method bool Equals(object? obj)
-  method int GetHashCode()
-  method static ArchLinterNet.Core.Execution.Abstractions.ArchitectureHandlerResult FromCycles(System.Collections.Generic.IReadOnlyCollection<string> cycles)
-  method static ArchLinterNet.Core.Execution.Abstractions.ArchitectureHandlerResult FromViolations(System.Collections.Generic.IReadOnlyCollection<ArchLinterNet.Core.Model.ArchitectureViolation> violations)
-  method string ToString()
-  method void Deconstruct(out System.Collections.Generic.IReadOnlyCollection<ArchLinterNet.Core.Model.ArchitectureViolation> Violations, out System.Collections.Generic.IReadOnlyCollection<string> Cycles)
-  operator !=(ArchLinterNet.Core.Execution.Abstractions.ArchitectureHandlerResult? left, ArchLinterNet.Core.Execution.Abstractions.ArchitectureHandlerResult? right)
-  operator ==(ArchLinterNet.Core.Execution.Abstractions.ArchitectureHandlerResult? left, ArchLinterNet.Core.Execution.Abstractions.ArchitectureHandlerResult? right)
-  property System.Collections.Generic.IReadOnlyCollection<ArchLinterNet.Core.Model.ArchitectureViolation> Violations {get;init;}
-  property System.Collections.Generic.IReadOnlyCollection<string> Cycles {get;init;}
-sealed class ArchLinterNet.Core.Execution.Abstractions.ArchitectureRunnerSetup : System.IEquatable<ArchLinterNet.Core.Execution.Abstractions.ArchitectureRunnerSetup>
-  ctor(string RepositoryRoot, ArchLinterNet.Core.Execution.Abstractions.IArchitectureContractRunner Runner)
-  method ArchLinterNet.Core.Execution.Abstractions.ArchitectureRunnerSetup <Clone>$()
-  method bool Equals(ArchLinterNet.Core.Execution.Abstractions.ArchitectureRunnerSetup? other)
-  method bool Equals(object? obj)
-  method int GetHashCode()
-  method string ToString()
-  method void Deconstruct(out string RepositoryRoot, out ArchLinterNet.Core.Execution.Abstractions.IArchitectureContractRunner Runner)
-  operator !=(ArchLinterNet.Core.Execution.Abstractions.ArchitectureRunnerSetup? left, ArchLinterNet.Core.Execution.Abstractions.ArchitectureRunnerSetup? right)
-  operator ==(ArchLinterNet.Core.Execution.Abstractions.ArchitectureRunnerSetup? left, ArchLinterNet.Core.Execution.Abstractions.ArchitectureRunnerSetup? right)
-  property ArchLinterNet.Core.Execution.Abstractions.IArchitectureContractRunner Runner {get;init;}
-  property int AssemblyLoads {get;init;}
-  property string RepositoryRoot {get;init;}
 interface ArchLinterNet.Core.Execution.Abstractions.IArchitectureContractExecutor
-  method ArchLinterNet.Core.Execution.Abstractions.ArchitectureContractExecutionResult Execute(ArchLinterNet.Core.Execution.ArchitectureAnalysisSession session, string mode, ArchLinterNet.Core.Execution.Abstractions.IArchitectureContractHandlerRegistry handlerRegistry, bool includeAsmdefContracts = true, ArchLinterNet.Core.Reporting.ValidationTiming? timing = null)
+  method ArchLinterNet.Core.Execution.Results.ArchitectureContractExecutionResult Execute(ArchLinterNet.Core.Execution.ArchitectureAnalysisSession session, string mode, ArchLinterNet.Core.Execution.Abstractions.IArchitectureContractHandlerRegistry handlerRegistry, bool includeAsmdefContracts = true, ArchLinterNet.Core.Reporting.ValidationTiming? timing = null)
 interface ArchLinterNet.Core.Execution.Abstractions.IArchitectureContractHandlerRegistry
-  method ArchLinterNet.Core.Execution.Abstractions.ArchitectureHandlerResult Execute(string family, ArchLinterNet.Core.Execution.ArchitectureAnalysisSession session, ArchLinterNet.Core.Contracts.IArchitectureContract contract)
-  method bool TryGetHandler(string family, out ArchLinterNet.Core.Execution.Abstractions.ArchitectureContractChecker? checker)
+  method ArchLinterNet.Core.Execution.Results.ArchitectureHandlerResult Execute(string family, ArchLinterNet.Core.Execution.ArchitectureAnalysisSession session, ArchLinterNet.Core.Contracts.IArchitectureContract contract)
+  method bool TryGetHandler(string family, out ArchLinterNet.Core.Execution.Contracts.ArchitectureContractChecker? checker)
 interface ArchLinterNet.Core.Execution.Abstractions.IArchitectureContractRunner
   method System.Collections.Generic.List<ArchLinterNet.Core.Model.ArchitectureViolation> CheckConfiguration()
   method System.Collections.Generic.List<ArchLinterNet.Core.Model.ArchitectureViolation> CheckConfiguration(bool strict)
@@ -1377,10 +1350,10 @@ interface ArchLinterNet.Core.Execution.Abstractions.IArchitectureContractRunner
 interface ArchLinterNet.Core.Execution.Abstractions.IArchitectureRunnerSetupService
   method ArchLinterNet.Core.Contracts.ArchitectureContractDocument LoadDocument(string policyPath, string? baselinePath = null, ArchLinterNet.Core.Reporting.ValidationTiming? timing = null)
   method ArchLinterNet.Core.Contracts.ArchitectureContractDocument LoadDocument(string policyPath, string? baselinePath, ArchLinterNet.Core.Reporting.ValidationTiming? timing, System.Threading.CancellationToken cancellationToken)
-  method ArchLinterNet.Core.Execution.Abstractions.ArchitectureRunnerSetup BuildRunner(ArchLinterNet.Core.Contracts.ArchitectureContractDocument document, string policyPath, string? conditionSetName = null, System.Collections.Generic.IReadOnlyList<string>? preprocessorSymbols = null, System.Collections.Generic.HashSet<string>? selectedContractIds = null, bool enableUnmatchedIgnoreTracking = true, ArchLinterNet.Core.Reporting.ValidationTiming? timing = null, string? mode = null, System.Threading.CancellationToken cancellationToken = null, int? maxParallelism = null)
-  method ArchLinterNet.Core.Execution.Abstractions.ArchitectureRunnerSetup BuildRunnerForPostBuild(ArchLinterNet.Core.Contracts.ArchitectureContractDocument document, string policyPath, string? conditionSetName = null, System.Collections.Generic.IReadOnlyList<string>? preprocessorSymbols = null, System.Collections.Generic.HashSet<string>? selectedContractIds = null, bool enableUnmatchedIgnoreTracking = true, ArchLinterNet.Core.Reporting.ValidationTiming? timing = null, string? mode = null, System.Threading.CancellationToken cancellationToken = null, int? maxParallelism = null)
-  method ArchLinterNet.Core.Execution.Abstractions.ArchitectureRunnerSetup MaterializePreparedRunner(ArchLinterNet.Core.Contracts.ArchitectureContractDocument document, ArchLinterNet.Core.Execution.ArchitectureRunnerPreparation preparation, System.Collections.Generic.HashSet<string>? selectedContractIds = null, bool enableUnmatchedIgnoreTracking = true, ArchLinterNet.Core.Reporting.ValidationTiming? timing = null, string? mode = null, System.Threading.CancellationToken cancellationToken = null, int? maxParallelism = null)
   method ArchLinterNet.Core.Execution.ArchitectureRunnerPreparation PrepareRunner(ArchLinterNet.Core.Contracts.ArchitectureContractDocument document, string policyPath, string? conditionSetName = null, System.Collections.Generic.IReadOnlyList<string>? preprocessorSymbols = null, System.Collections.Generic.HashSet<string>? selectedContractIds = null, string? mode = null, System.Threading.CancellationToken cancellationToken = null)
+  method ArchLinterNet.Core.Execution.Results.ArchitectureRunnerSetup BuildRunner(ArchLinterNet.Core.Contracts.ArchitectureContractDocument document, string policyPath, string? conditionSetName = null, System.Collections.Generic.IReadOnlyList<string>? preprocessorSymbols = null, System.Collections.Generic.HashSet<string>? selectedContractIds = null, bool enableUnmatchedIgnoreTracking = true, ArchLinterNet.Core.Reporting.ValidationTiming? timing = null, string? mode = null, System.Threading.CancellationToken cancellationToken = null, int? maxParallelism = null)
+  method ArchLinterNet.Core.Execution.Results.ArchitectureRunnerSetup BuildRunnerForPostBuild(ArchLinterNet.Core.Contracts.ArchitectureContractDocument document, string policyPath, string? conditionSetName = null, System.Collections.Generic.IReadOnlyList<string>? preprocessorSymbols = null, System.Collections.Generic.HashSet<string>? selectedContractIds = null, bool enableUnmatchedIgnoreTracking = true, ArchLinterNet.Core.Reporting.ValidationTiming? timing = null, string? mode = null, System.Threading.CancellationToken cancellationToken = null, int? maxParallelism = null)
+  method ArchLinterNet.Core.Execution.Results.ArchitectureRunnerSetup MaterializePreparedRunner(ArchLinterNet.Core.Contracts.ArchitectureContractDocument document, ArchLinterNet.Core.Execution.ArchitectureRunnerPreparation preparation, System.Collections.Generic.HashSet<string>? selectedContractIds = null, bool enableUnmatchedIgnoreTracking = true, ArchLinterNet.Core.Reporting.ValidationTiming? timing = null, string? mode = null, System.Threading.CancellationToken cancellationToken = null, int? maxParallelism = null)
 sealed class ArchLinterNet.Core.Execution.ArchitectureAnalysisContext : System.IDisposable
   ctor(string repositoryRoot, System.Collections.Generic.IReadOnlyCollection<System.Reflection.Assembly> targetAssemblies, System.Collections.Generic.IReadOnlyCollection<string> missingAssemblyNames, System.Collections.Generic.IReadOnlyCollection<string> assemblyProbingPaths, System.Collections.Generic.IReadOnlyCollection<ArchLinterNet.Core.Discovery.ArchitectureProjectDiscoveryDiagnostic>? discoveryDiagnostics = null, ArchLinterNet.Core.Discovery.ProjectDiscoveryResult? projectDiscovery = null, ArchLinterNet.Core.IO.Abstractions.IArchitectureAssemblyLoadScope? isolatedLoadScope = null, System.Collections.Generic.IReadOnlyCollection<string>? selectedAssemblyArtifactPaths = null)
   method void Dispose()
@@ -1417,6 +1390,8 @@ sealed class ArchLinterNet.Core.Execution.ArchitectureAnalysisSession
   method System.Collections.Generic.IEnumerable<ArchLinterNet.Core.Contracts.Families.ArchitectureLayerContract> StrictLayerContracts()
   method System.Collections.Generic.IEnumerable<ArchLinterNet.Core.Contracts.Families.ArchitectureMethodBodyContract> AuditMethodBodyContracts()
   method System.Collections.Generic.IEnumerable<ArchLinterNet.Core.Contracts.Families.ArchitectureMethodBodyContract> StrictMethodBodyContracts()
+  method System.Collections.Generic.IEnumerable<ArchLinterNet.Core.Contracts.Families.ArchitectureModuleContainerContract> AuditModuleContainerContracts()
+  method System.Collections.Generic.IEnumerable<ArchLinterNet.Core.Contracts.Families.ArchitectureModuleContainerContract> StrictModuleContainerContracts()
   method System.Collections.Generic.IEnumerable<ArchLinterNet.Core.Contracts.Families.ArchitectureProtectedContract> AuditProtectedContracts()
   method System.Collections.Generic.IEnumerable<ArchLinterNet.Core.Contracts.Families.ArchitectureProtectedContract> StrictProtectedContracts()
   method System.Collections.Generic.IReadOnlyCollection<string> CheckAcyclicSiblingContract(ArchLinterNet.Core.Contracts.Families.ArchitectureAcyclicSiblingContract contract)
@@ -1446,6 +1421,7 @@ sealed class ArchLinterNet.Core.Execution.ArchitectureAnalysisSession
   method System.Collections.Generic.List<ArchLinterNet.Core.Model.ArchitectureViolation> CheckLayerContract(ArchLinterNet.Core.Contracts.Families.ArchitectureLayerContract contract)
   method System.Collections.Generic.List<ArchLinterNet.Core.Model.ArchitectureViolation> CheckLayoutConventionsContract(ArchLinterNet.Core.Contracts.Families.ArchitectureLayoutConventionContract contract)
   method System.Collections.Generic.List<ArchLinterNet.Core.Model.ArchitectureViolation> CheckMethodBodyContract(ArchLinterNet.Core.Contracts.Families.ArchitectureMethodBodyContract contract)
+  method System.Collections.Generic.List<ArchLinterNet.Core.Model.ArchitectureViolation> CheckModuleContainerContract(ArchLinterNet.Core.Contracts.Families.ArchitectureModuleContainerContract contract)
   method System.Collections.Generic.List<ArchLinterNet.Core.Model.ArchitectureViolation> CheckPackageAllowOnlyContract(ArchLinterNet.Core.Contracts.Families.ArchitecturePackageAllowOnlyContract contract)
   method System.Collections.Generic.List<ArchLinterNet.Core.Model.ArchitectureViolation> CheckPackageDependencyContract(ArchLinterNet.Core.Contracts.Families.ArchitecturePackageDependencyContract contract)
   method System.Collections.Generic.List<ArchLinterNet.Core.Model.ArchitectureViolation> CheckPortBoundaryContract(ArchLinterNet.Core.Contracts.Families.ArchitecturePortBoundaryContract contract)
@@ -1476,7 +1452,7 @@ sealed class ArchLinterNet.Core.Execution.ArchitectureAssemblyResolutionService 
   ctor(ArchLinterNet.Core.IO.Abstractions.IArchitectureFileSystem fileSystem, ArchLinterNet.Core.IO.Abstractions.IArchitectureEnvironment environment, ArchLinterNet.Core.IO.Abstractions.IArchitectureAssemblyLoader assemblyLoader)
   method ArchLinterNet.Core.Execution.ResolutionResult Resolve(ArchLinterNet.Core.Contracts.ArchitectureContractDocument document, string repositoryRoot, ArchLinterNet.Core.Discovery.ProjectDiscoveryResult discovery, bool resolveAssemblyOutputs, string? mode, System.Collections.Generic.HashSet<string>? selectedContractIds, System.Threading.CancellationToken cancellationToken = null)
   method ArchLinterNet.Core.Execution.ResolutionResult ResolveFromDocument(ArchLinterNet.Core.Contracts.ArchitectureContractDocument document, string? repositoryRoot = null, System.Threading.CancellationToken cancellationToken = null)
-  method ArchLinterNet.Core.Execution.ResolutionResult ResolvePostBuild(ArchLinterNet.Core.Contracts.ArchitectureContractDocument document, string repositoryRoot, ArchLinterNet.Core.Discovery.ProjectDiscoveryResult discovery, bool resolveAssemblyOutputs, string? mode, System.Collections.Generic.HashSet<string>? selectedContractIds, System.Threading.CancellationToken cancellationToken = null, System.Collections.Generic.IReadOnlyDictionary<string,string>? expectedArtifactContentDigests = null)
+  method ArchLinterNet.Core.Execution.ResolutionResult ResolvePostBuild(ArchLinterNet.Core.Contracts.ArchitectureContractDocument document, string repositoryRoot, ArchLinterNet.Core.Discovery.ProjectDiscoveryResult discovery, bool resolveAssemblyOutputs, string? mode, System.Collections.Generic.HashSet<string>? selectedContractIds, System.Collections.Generic.IReadOnlyDictionary<string,string>? expectedArtifactContentDigests = null, System.Threading.CancellationToken cancellationToken = null)
 sealed class ArchLinterNet.Core.Execution.ArchitectureContractCatalog
   method System.Collections.Generic.HashSet<string> AvailableContractIds(string mode)
   method System.Collections.Generic.HashSet<string> ContractIdsInGroup(string group)
@@ -1505,8 +1481,8 @@ sealed class ArchLinterNet.Core.Execution.ArchitectureContractDescriptor : Syste
   property string? Id {get;init;}
 sealed class ArchLinterNet.Core.Execution.ArchitectureContractHandlerRegistry : ArchLinterNet.Core.Execution.Abstractions.IArchitectureContractHandlerRegistry
   ctor()
-  method ArchLinterNet.Core.Execution.Abstractions.ArchitectureHandlerResult Execute(string family, ArchLinterNet.Core.Execution.ArchitectureAnalysisSession session, ArchLinterNet.Core.Contracts.IArchitectureContract contract)
-  method bool TryGetHandler(string family, out ArchLinterNet.Core.Execution.Abstractions.ArchitectureContractChecker? checker)
+  method ArchLinterNet.Core.Execution.Results.ArchitectureHandlerResult Execute(string family, ArchLinterNet.Core.Execution.ArchitectureAnalysisSession session, ArchLinterNet.Core.Contracts.IArchitectureContract contract)
+  method bool TryGetHandler(string family, out ArchLinterNet.Core.Execution.Contracts.ArchitectureContractChecker? checker)
 sealed class ArchLinterNet.Core.Execution.ArchitectureContractRunner : ArchLinterNet.Core.Execution.Abstractions.IArchitectureContractRunner
   ctor(ArchLinterNet.Core.Execution.ArchitectureAnalysisContext context, ArchLinterNet.Core.Contracts.ArchitectureContractDocument document, System.Collections.Generic.HashSet<string>? selectedContractIds = null, bool enableUnmatchedIgnoreTracking = true, System.Collections.Generic.IReadOnlyList<string>? preprocessorSymbols = null)
   method ArchLinterNet.Core.Reporting.ArchitectureCoverageSummary? BuildCoverageSummary(ArchLinterNet.Core.Contracts.Families.ArchitectureCoverageContract contract)
@@ -1528,6 +1504,8 @@ sealed class ArchLinterNet.Core.Execution.ArchitectureContractRunner : ArchLinte
   method System.Collections.Generic.IEnumerable<ArchLinterNet.Core.Contracts.Families.ArchitectureLayerContract> StrictLayerContracts()
   method System.Collections.Generic.IEnumerable<ArchLinterNet.Core.Contracts.Families.ArchitectureMethodBodyContract> AuditMethodBodyContracts()
   method System.Collections.Generic.IEnumerable<ArchLinterNet.Core.Contracts.Families.ArchitectureMethodBodyContract> StrictMethodBodyContracts()
+  method System.Collections.Generic.IEnumerable<ArchLinterNet.Core.Contracts.Families.ArchitectureModuleContainerContract> AuditModuleContainerContracts()
+  method System.Collections.Generic.IEnumerable<ArchLinterNet.Core.Contracts.Families.ArchitectureModuleContainerContract> StrictModuleContainerContracts()
   method System.Collections.Generic.IEnumerable<ArchLinterNet.Core.Contracts.Families.ArchitectureProtectedContract> AuditProtectedContracts()
   method System.Collections.Generic.IEnumerable<ArchLinterNet.Core.Contracts.Families.ArchitectureProtectedContract> StrictProtectedContracts()
   method System.Collections.Generic.IReadOnlyCollection<string> CheckAcyclicSiblingContract(ArchLinterNet.Core.Contracts.Families.ArchitectureAcyclicSiblingContract contract)
@@ -1542,6 +1520,7 @@ sealed class ArchLinterNet.Core.Execution.ArchitectureContractRunner : ArchLinte
   method System.Collections.Generic.List<ArchLinterNet.Core.Model.ArchitectureViolation> CheckIndependenceContract(ArchLinterNet.Core.Contracts.Families.ArchitectureIndependenceContract contract)
   method System.Collections.Generic.List<ArchLinterNet.Core.Model.ArchitectureViolation> CheckLayerContract(ArchLinterNet.Core.Contracts.Families.ArchitectureLayerContract contract)
   method System.Collections.Generic.List<ArchLinterNet.Core.Model.ArchitectureViolation> CheckMethodBodyContract(ArchLinterNet.Core.Contracts.Families.ArchitectureMethodBodyContract contract)
+  method System.Collections.Generic.List<ArchLinterNet.Core.Model.ArchitectureViolation> CheckModuleContainerContract(ArchLinterNet.Core.Contracts.Families.ArchitectureModuleContainerContract contract)
   method System.Collections.Generic.List<ArchLinterNet.Core.Model.ArchitectureViolation> CheckProtectedContract(ArchLinterNet.Core.Contracts.Families.ArchitectureProtectedContract contract)
   method System.Collections.Generic.List<ArchLinterNet.Core.Model.PolicyConsistencyDiagnostic> CheckPolicyConsistency()
   property ArchLinterNet.Core.Execution.ArchitectureAnalysisSession Session {get;}
@@ -1629,10 +1608,10 @@ sealed class ArchLinterNet.Core.Execution.ArchitectureRunnerSetupService : ArchL
   ctor(ArchLinterNet.Core.Contracts.Abstractions.IArchitecturePolicyDocumentLoader policyDocumentLoader, ArchLinterNet.Core.Contracts.Abstractions.IArchitectureBaselineLoadingService baselineLoadingService, ArchLinterNet.Core.Resolution.Abstractions.IArchitectureRepositoryRootResolver repositoryRootResolver, ArchLinterNet.Core.Contracts.Abstractions.IConditionSetResolutionService conditionSetResolutionService, ArchLinterNet.Core.Discovery.Abstractions.IArchitectureProjectDiscoveryService projectDiscoveryService, ArchLinterNet.Core.Execution.IArchitectureAssemblyResolutionService assemblyResolutionService)
   method ArchLinterNet.Core.Contracts.ArchitectureContractDocument LoadDocument(string policyPath, string? baselinePath = null, ArchLinterNet.Core.Reporting.ValidationTiming? timing = null)
   method ArchLinterNet.Core.Contracts.ArchitectureContractDocument LoadDocument(string policyPath, string? baselinePath, ArchLinterNet.Core.Reporting.ValidationTiming? timing, System.Threading.CancellationToken cancellationToken)
-  method ArchLinterNet.Core.Execution.Abstractions.ArchitectureRunnerSetup BuildRunner(ArchLinterNet.Core.Contracts.ArchitectureContractDocument document, string policyPath, string? conditionSetName = null, System.Collections.Generic.IReadOnlyList<string>? preprocessorSymbols = null, System.Collections.Generic.HashSet<string>? selectedContractIds = null, bool enableUnmatchedIgnoreTracking = true, ArchLinterNet.Core.Reporting.ValidationTiming? timing = null, string? mode = null, System.Threading.CancellationToken cancellationToken = null, int? maxParallelism = null)
-  method ArchLinterNet.Core.Execution.Abstractions.ArchitectureRunnerSetup BuildRunnerForPostBuild(ArchLinterNet.Core.Contracts.ArchitectureContractDocument document, string policyPath, string? conditionSetName = null, System.Collections.Generic.IReadOnlyList<string>? preprocessorSymbols = null, System.Collections.Generic.HashSet<string>? selectedContractIds = null, bool enableUnmatchedIgnoreTracking = true, ArchLinterNet.Core.Reporting.ValidationTiming? timing = null, string? mode = null, System.Threading.CancellationToken cancellationToken = null, int? maxParallelism = null)
-  method ArchLinterNet.Core.Execution.Abstractions.ArchitectureRunnerSetup MaterializePreparedRunner(ArchLinterNet.Core.Contracts.ArchitectureContractDocument document, ArchLinterNet.Core.Execution.ArchitectureRunnerPreparation preparation, System.Collections.Generic.HashSet<string>? selectedContractIds = null, bool enableUnmatchedIgnoreTracking = true, ArchLinterNet.Core.Reporting.ValidationTiming? timing = null, string? mode = null, System.Threading.CancellationToken cancellationToken = null, int? maxParallelism = null)
   method ArchLinterNet.Core.Execution.ArchitectureRunnerPreparation PrepareRunner(ArchLinterNet.Core.Contracts.ArchitectureContractDocument document, string policyPath, string? conditionSetName = null, System.Collections.Generic.IReadOnlyList<string>? preprocessorSymbols = null, System.Collections.Generic.HashSet<string>? selectedContractIds = null, string? mode = null, System.Threading.CancellationToken cancellationToken = null)
+  method ArchLinterNet.Core.Execution.Results.ArchitectureRunnerSetup BuildRunner(ArchLinterNet.Core.Contracts.ArchitectureContractDocument document, string policyPath, string? conditionSetName = null, System.Collections.Generic.IReadOnlyList<string>? preprocessorSymbols = null, System.Collections.Generic.HashSet<string>? selectedContractIds = null, bool enableUnmatchedIgnoreTracking = true, ArchLinterNet.Core.Reporting.ValidationTiming? timing = null, string? mode = null, System.Threading.CancellationToken cancellationToken = null, int? maxParallelism = null)
+  method ArchLinterNet.Core.Execution.Results.ArchitectureRunnerSetup BuildRunnerForPostBuild(ArchLinterNet.Core.Contracts.ArchitectureContractDocument document, string policyPath, string? conditionSetName = null, System.Collections.Generic.IReadOnlyList<string>? preprocessorSymbols = null, System.Collections.Generic.HashSet<string>? selectedContractIds = null, bool enableUnmatchedIgnoreTracking = true, ArchLinterNet.Core.Reporting.ValidationTiming? timing = null, string? mode = null, System.Threading.CancellationToken cancellationToken = null, int? maxParallelism = null)
+  method ArchLinterNet.Core.Execution.Results.ArchitectureRunnerSetup MaterializePreparedRunner(ArchLinterNet.Core.Contracts.ArchitectureContractDocument document, ArchLinterNet.Core.Execution.ArchitectureRunnerPreparation preparation, System.Collections.Generic.HashSet<string>? selectedContractIds = null, bool enableUnmatchedIgnoreTracking = true, ArchLinterNet.Core.Reporting.ValidationTiming? timing = null, string? mode = null, System.Threading.CancellationToken cancellationToken = null, int? maxParallelism = null)
 sealed class ArchLinterNet.Core.Execution.ArchitectureSourceFileFactIndex
   ctor(System.Collections.Generic.IReadOnlyCollection<System.Reflection.Assembly> targetAssemblies, string repositoryRoot, System.Collections.Generic.IReadOnlyList<string> sourceRoots, System.Collections.Generic.IReadOnlyList<string>? preprocessorSymbols = null, ArchLinterNet.Core.IO.Abstractions.IArchitectureFileSystem? fileSystem = null, System.Threading.CancellationToken cancellationToken = null)
   method System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Model.ArchitectureDeclaredTypeFact> GetFactsForFile(string relativeFilePath)
@@ -1647,9 +1626,14 @@ sealed class ArchLinterNet.Core.Execution.ArchitectureTypeIndex
   method System.Type[] AllTypes()
   method System.Type[] FindTypesInLayer(ArchLinterNet.Core.Contracts.ArchitectureLayer layer)
   method System.Type[] FindTypesInNamespace(string namespacePrefix)
+delegate ArchLinterNet.Core.Execution.Contracts.ArchitectureContractChecker : System.MulticastDelegate
+  ctor(object object, System.IntPtr method)
+  method ArchLinterNet.Core.Execution.Results.ArchitectureHandlerResult EndInvoke(System.IAsyncResult result)
+  method ArchLinterNet.Core.Execution.Results.ArchitectureHandlerResult Invoke(ArchLinterNet.Core.Execution.ArchitectureAnalysisSession session, ArchLinterNet.Core.Contracts.IArchitectureContract contract)
+  method System.IAsyncResult BeginInvoke(ArchLinterNet.Core.Execution.ArchitectureAnalysisSession session, ArchLinterNet.Core.Contracts.IArchitectureContract contract, System.AsyncCallback callback, object object)
 interface ArchLinterNet.Core.Execution.IArchitectureAssemblyResolutionService
   method ArchLinterNet.Core.Execution.ResolutionResult Resolve(ArchLinterNet.Core.Contracts.ArchitectureContractDocument document, string repositoryRoot, ArchLinterNet.Core.Discovery.ProjectDiscoveryResult discovery, bool resolveAssemblyOutputs, string? mode, System.Collections.Generic.HashSet<string>? selectedContractIds, System.Threading.CancellationToken cancellationToken = null)
-  method ArchLinterNet.Core.Execution.ResolutionResult ResolvePostBuild(ArchLinterNet.Core.Contracts.ArchitectureContractDocument document, string repositoryRoot, ArchLinterNet.Core.Discovery.ProjectDiscoveryResult discovery, bool resolveAssemblyOutputs, string? mode, System.Collections.Generic.HashSet<string>? selectedContractIds, System.Threading.CancellationToken cancellationToken = null, System.Collections.Generic.IReadOnlyDictionary<string,string>? expectedArtifactContentDigests = null)
+  method ArchLinterNet.Core.Execution.ResolutionResult ResolvePostBuild(ArchLinterNet.Core.Contracts.ArchitectureContractDocument document, string repositoryRoot, ArchLinterNet.Core.Discovery.ProjectDiscoveryResult discovery, bool resolveAssemblyOutputs, string? mode, System.Collections.Generic.HashSet<string>? selectedContractIds, System.Collections.Generic.IReadOnlyDictionary<string,string>? expectedArtifactContentDigests = null, System.Threading.CancellationToken cancellationToken = null)
 static class ArchLinterNet.Core.Execution.LayerTemplateExpander
   method static System.Collections.Generic.List<ArchLinterNet.Core.Contracts.Families.ArchitectureLayerContract> Expand(System.Collections.Generic.IEnumerable<ArchLinterNet.Core.Contracts.Families.ArchitectureLayerTemplateContract> templates)
 static class ArchLinterNet.Core.Execution.MaxParallelismResolver
@@ -1669,6 +1653,49 @@ sealed class ArchLinterNet.Core.Execution.ResolutionResult : System.IEquatable<A
   property System.Collections.Generic.IReadOnlyCollection<string> AssemblyProbingPaths {get;init;}
   property System.Collections.Generic.IReadOnlyCollection<string> MissingAssemblyNames {get;init;}
   property int AssemblyLoads {get;init;}
+sealed class ArchLinterNet.Core.Execution.Results.ArchitectureContractExecutionResult : System.IEquatable<ArchLinterNet.Core.Execution.Results.ArchitectureContractExecutionResult>
+  ctor(System.Collections.Generic.IReadOnlyCollection<ArchLinterNet.Core.Model.ArchitectureViolation> Violations, System.Collections.Generic.IReadOnlyCollection<string> Cycles, System.Collections.Generic.IReadOnlyCollection<ArchLinterNet.Core.Model.ArchitectureViolation> CoverageViolations, System.Collections.Generic.IReadOnlyCollection<ArchLinterNet.Core.Reporting.ArchitectureCoverageSummary> CoverageSummaries)
+  method ArchLinterNet.Core.Execution.Results.ArchitectureContractExecutionResult <Clone>$()
+  method bool Equals(ArchLinterNet.Core.Execution.Results.ArchitectureContractExecutionResult? other)
+  method bool Equals(object? obj)
+  method int GetHashCode()
+  method string ToString()
+  method void Deconstruct(out System.Collections.Generic.IReadOnlyCollection<ArchLinterNet.Core.Model.ArchitectureViolation> Violations, out System.Collections.Generic.IReadOnlyCollection<string> Cycles, out System.Collections.Generic.IReadOnlyCollection<ArchLinterNet.Core.Model.ArchitectureViolation> CoverageViolations, out System.Collections.Generic.IReadOnlyCollection<ArchLinterNet.Core.Reporting.ArchitectureCoverageSummary> CoverageSummaries)
+  operator !=(ArchLinterNet.Core.Execution.Results.ArchitectureContractExecutionResult? left, ArchLinterNet.Core.Execution.Results.ArchitectureContractExecutionResult? right)
+  operator ==(ArchLinterNet.Core.Execution.Results.ArchitectureContractExecutionResult? left, ArchLinterNet.Core.Execution.Results.ArchitectureContractExecutionResult? right)
+  property System.Collections.Generic.IReadOnlyCollection<ArchLinterNet.Core.Model.ArchitectureCycleFinding> CycleFindings {get;init;}
+  property System.Collections.Generic.IReadOnlyCollection<ArchLinterNet.Core.Model.ArchitectureViolation> CoverageViolations {get;init;}
+  property System.Collections.Generic.IReadOnlyCollection<ArchLinterNet.Core.Model.ArchitectureViolation> Violations {get;init;}
+  property System.Collections.Generic.IReadOnlyCollection<ArchLinterNet.Core.Reporting.ArchitectureCoverageSummary> CoverageSummaries {get;init;}
+  property System.Collections.Generic.IReadOnlyCollection<string> Cycles {get;init;}
+  property System.Collections.Generic.IReadOnlyDictionary<string,int> ContractFamilyResultCounts {get;init;}
+sealed class ArchLinterNet.Core.Execution.Results.ArchitectureHandlerResult : System.IEquatable<ArchLinterNet.Core.Execution.Results.ArchitectureHandlerResult>
+  ctor(System.Collections.Generic.IReadOnlyCollection<ArchLinterNet.Core.Model.ArchitectureViolation> Violations, System.Collections.Generic.IReadOnlyCollection<string> Cycles)
+  method ArchLinterNet.Core.Execution.Results.ArchitectureHandlerResult <Clone>$()
+  method bool Equals(ArchLinterNet.Core.Execution.Results.ArchitectureHandlerResult? other)
+  method bool Equals(object? obj)
+  method int GetHashCode()
+  method static ArchLinterNet.Core.Execution.Results.ArchitectureHandlerResult FromCycles(System.Collections.Generic.IReadOnlyCollection<string> cycles)
+  method static ArchLinterNet.Core.Execution.Results.ArchitectureHandlerResult FromViolations(System.Collections.Generic.IReadOnlyCollection<ArchLinterNet.Core.Model.ArchitectureViolation> violations)
+  method string ToString()
+  method void Deconstruct(out System.Collections.Generic.IReadOnlyCollection<ArchLinterNet.Core.Model.ArchitectureViolation> Violations, out System.Collections.Generic.IReadOnlyCollection<string> Cycles)
+  operator !=(ArchLinterNet.Core.Execution.Results.ArchitectureHandlerResult? left, ArchLinterNet.Core.Execution.Results.ArchitectureHandlerResult? right)
+  operator ==(ArchLinterNet.Core.Execution.Results.ArchitectureHandlerResult? left, ArchLinterNet.Core.Execution.Results.ArchitectureHandlerResult? right)
+  property System.Collections.Generic.IReadOnlyCollection<ArchLinterNet.Core.Model.ArchitectureViolation> Violations {get;init;}
+  property System.Collections.Generic.IReadOnlyCollection<string> Cycles {get;init;}
+sealed class ArchLinterNet.Core.Execution.Results.ArchitectureRunnerSetup : System.IEquatable<ArchLinterNet.Core.Execution.Results.ArchitectureRunnerSetup>
+  ctor(string RepositoryRoot, ArchLinterNet.Core.Execution.Abstractions.IArchitectureContractRunner Runner)
+  method ArchLinterNet.Core.Execution.Results.ArchitectureRunnerSetup <Clone>$()
+  method bool Equals(ArchLinterNet.Core.Execution.Results.ArchitectureRunnerSetup? other)
+  method bool Equals(object? obj)
+  method int GetHashCode()
+  method string ToString()
+  method void Deconstruct(out string RepositoryRoot, out ArchLinterNet.Core.Execution.Abstractions.IArchitectureContractRunner Runner)
+  operator !=(ArchLinterNet.Core.Execution.Results.ArchitectureRunnerSetup? left, ArchLinterNet.Core.Execution.Results.ArchitectureRunnerSetup? right)
+  operator ==(ArchLinterNet.Core.Execution.Results.ArchitectureRunnerSetup? left, ArchLinterNet.Core.Execution.Results.ArchitectureRunnerSetup? right)
+  property ArchLinterNet.Core.Execution.Abstractions.IArchitectureContractRunner Runner {get;init;}
+  property int AssemblyLoads {get;init;}
+  property string RepositoryRoot {get;init;}
 interface ArchLinterNet.Core.Graph.Abstractions.IArchitectureExplainApplicationService
   method ArchLinterNet.Core.Graph.ArchitectureExplainOutcome Explain(ArchLinterNet.Core.Graph.ArchitectureExplainRequest request)
 interface ArchLinterNet.Core.Graph.Abstractions.IArchitectureGraphApplicationService
@@ -1978,18 +2005,20 @@ sealed class ArchLinterNet.Core.Model.ArchitectureCycleFinding : System.IEquatab
   property string Path {get;init;}
   property string? ContractId {get;init;}
 sealed class ArchLinterNet.Core.Model.ArchitectureDeclaredTypeFact : System.IEquatable<ArchLinterNet.Core.Model.ArchitectureDeclaredTypeFact>
-  ctor(string AssemblyName, string Namespace, string FullTypeName, string SimpleTypeName, ArchLinterNet.Core.Model.ArchitectureTypeKind TypeKind, string? SourceFilePath, string? FileNameWithoutExtension, System.Collections.Generic.IReadOnlyList<string> FolderSegments, System.Collections.Generic.IReadOnlyList<string> NamespaceSegments)
+  ctor(string AssemblyName, string Namespace, string FullTypeName, string SimpleTypeName, ArchLinterNet.Core.Model.ArchitectureTypeKind TypeKind, bool IsAbstract, string? SourceFilePath, string? FileNameWithoutExtension, System.Collections.Generic.IReadOnlyList<string> FolderSegments, System.Collections.Generic.IReadOnlyList<string> NamespaceSegments)
+  ctor(string assemblyName, string namespace, string fullTypeName, string simpleTypeName, ArchLinterNet.Core.Model.ArchitectureTypeKind typeKind, string? sourceFilePath, string? fileNameWithoutExtension, System.Collections.Generic.IReadOnlyList<string> folderSegments, System.Collections.Generic.IReadOnlyList<string> namespaceSegments)
   method ArchLinterNet.Core.Model.ArchitectureDeclaredTypeFact <Clone>$()
   method bool Equals(ArchLinterNet.Core.Model.ArchitectureDeclaredTypeFact? other)
   method bool Equals(object? obj)
   method int GetHashCode()
   method string ToString()
-  method void Deconstruct(out string AssemblyName, out string Namespace, out string FullTypeName, out string SimpleTypeName, out ArchLinterNet.Core.Model.ArchitectureTypeKind TypeKind, out string? SourceFilePath, out string? FileNameWithoutExtension, out System.Collections.Generic.IReadOnlyList<string> FolderSegments, out System.Collections.Generic.IReadOnlyList<string> NamespaceSegments)
+  method void Deconstruct(out string AssemblyName, out string Namespace, out string FullTypeName, out string SimpleTypeName, out ArchLinterNet.Core.Model.ArchitectureTypeKind TypeKind, out bool IsAbstract, out string? SourceFilePath, out string? FileNameWithoutExtension, out System.Collections.Generic.IReadOnlyList<string> FolderSegments, out System.Collections.Generic.IReadOnlyList<string> NamespaceSegments)
   operator !=(ArchLinterNet.Core.Model.ArchitectureDeclaredTypeFact? left, ArchLinterNet.Core.Model.ArchitectureDeclaredTypeFact? right)
   operator ==(ArchLinterNet.Core.Model.ArchitectureDeclaredTypeFact? left, ArchLinterNet.Core.Model.ArchitectureDeclaredTypeFact? right)
   property ArchLinterNet.Core.Model.ArchitectureTypeKind TypeKind {get;init;}
   property System.Collections.Generic.IReadOnlyList<string> FolderSegments {get;init;}
   property System.Collections.Generic.IReadOnlyList<string> NamespaceSegments {get;init;}
+  property bool IsAbstract {get;init;}
   property string AssemblyName {get;init;}
   property string FullTypeName {get;init;}
   property string Namespace {get;init;}
@@ -2202,6 +2231,22 @@ enum ArchLinterNet.Core.Model.ArchitectureGraphNodeKind : int
   enum-member External = 3
   enum-member Namespace = 1
   enum-member Type = 0
+sealed class ArchLinterNet.Core.Model.ArchitectureModuleNamespaceMembership : System.IEquatable<ArchLinterNet.Core.Model.ArchitectureModuleNamespaceMembership>
+  ctor(string Container, string? ModuleName, string? Segment, bool IsContainerRoot)
+  method ArchLinterNet.Core.Model.ArchitectureModuleNamespaceMembership <Clone>$()
+  method bool Equals(ArchLinterNet.Core.Model.ArchitectureModuleNamespaceMembership? other)
+  method bool Equals(object? obj)
+  method int GetHashCode()
+  method string ToString()
+  method void Deconstruct(out string Container, out string? ModuleName, out string? Segment, out bool IsContainerRoot)
+  operator !=(ArchLinterNet.Core.Model.ArchitectureModuleNamespaceMembership? left, ArchLinterNet.Core.Model.ArchitectureModuleNamespaceMembership? right)
+  operator ==(ArchLinterNet.Core.Model.ArchitectureModuleNamespaceMembership? left, ArchLinterNet.Core.Model.ArchitectureModuleNamespaceMembership? right)
+  property bool IsContainerRoot {get;init;}
+  property string Container {get;init;}
+  property string? ModuleName {get;init;}
+  property string? Segment {get;init;}
+static class ArchLinterNet.Core.Model.ArchitectureModuleNamespaceMembershipResolver
+  method static bool TryResolve(string container, string candidateNamespace, out ArchLinterNet.Core.Model.ArchitectureModuleNamespaceMembership? membership)
 sealed class ArchLinterNet.Core.Model.ArchitecturePolicyDiagnostic : System.IEquatable<ArchLinterNet.Core.Model.ArchitecturePolicyDiagnostic>
   ctor(ArchLinterNet.Core.Model.ArchitecturePolicyDiagnosticKind Kind, ArchLinterNet.Core.Model.ArchitecturePolicySourceLocation? Location, System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Model.ArchitecturePolicySourceLocation> RelatedLocations, System.Collections.Generic.IReadOnlyList<string> ImportChain)
   method ArchLinterNet.Core.Model.ArchitecturePolicyDiagnostic <Clone>$()
@@ -2241,8 +2286,8 @@ sealed class ArchLinterNet.Core.Model.ArchitecturePolicyErrorDiagnostic : ArchLi
   property string Message {get;init;}
   property string? ErrorCategory {get;init;}
 sealed class ArchLinterNet.Core.Model.ArchitecturePolicyLoadException : System.InvalidOperationException
-  ctor(string message, ArchLinterNet.Core.Model.ArchitecturePolicyDiagnostic? diagnostic, string category, System.Exception? innerException = null)
-  property ArchLinterNet.Core.Model.ArchitecturePolicyDiagnostic? Diagnostic {get;}
+  ctor(string message, object? diagnostic, string category, System.Exception? innerException = null)
+  property object? Diagnostic {get;}
   property string Category {get;}
 sealed class ArchLinterNet.Core.Model.ArchitecturePolicySourceDescriptor : System.IEquatable<ArchLinterNet.Core.Model.ArchitecturePolicySourceDescriptor>
   ctor(string RootPath, string SourcePath, ArchLinterNet.Core.Model.ArchitecturePolicyDocumentRole Role, int SourceOrdinal, string? DeclaringSourcePath, string? AuthoredImportPath, System.Collections.Generic.IReadOnlyList<string> ImportChain)
@@ -2283,8 +2328,8 @@ sealed class ArchLinterNet.Core.Model.ArchitecturePolicySourceLocation : System.
   property string? ContractFamily {get;init;}
   property string? ContractId {get;init;}
 sealed class ArchLinterNet.Core.Model.ArchitecturePolicyValidationException : System.InvalidOperationException
-  ctor(string message, ArchLinterNet.Core.Model.ArchitecturePolicyDiagnostic diagnostic, System.Exception innerException)
-  property ArchLinterNet.Core.Model.ArchitecturePolicyDiagnostic Diagnostic {get;}
+  ctor(string message, object diagnostic, System.Exception innerException)
+  property object Diagnostic {get;}
 enum ArchLinterNet.Core.Model.ArchitectureSelectorParticipationKind : int
   enum-member Exclusion = 1
   enum-member Inclusion = 0
@@ -2970,9 +3015,16 @@ sealed class ArchLinterNet.Core.Model.LayoutConventionDiagnostic : ArchLinterNet
   property ArchLinterNet.Core.Model.ArchitectureDiagnosticKind Kind {get;}
   property System.Collections.Generic.IReadOnlyCollection<string> ForbiddenReferences {get;init;}
   property System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Model.ExpressionParticipation>? WhenExpressions {get;init;}
+  property System.Collections.Generic.IReadOnlyList<string>? DeclarationPaths {get;init;}
+  property System.Collections.Generic.IReadOnlyList<string>? ExpectedRoles {get;init;}
   property bool DataUnavailable {get;init;}
+  property bool? ActualIsAbstract {get;init;}
+  property bool? ExpectedAbstractClass {get;init;}
+  property int? ActualDeclarationCount {get;init;}
+  property int? ExpectedDeclarationCount {get;init;}
   property string ForbiddenNamespace {get;init;}
   property string SourceType {get;init;}
+  property string? ActualRole {get;init;}
   property string? ActualTypeKind {get;init;}
   property string? ActualTypeName {get;init;}
   property string? ExpectedCounterpartName {get;init;}
@@ -2991,7 +3043,14 @@ sealed class ArchLinterNet.Core.Model.LayoutConventionPayload : ArchLinterNet.Co
   operator !=(ArchLinterNet.Core.Model.LayoutConventionPayload? left, ArchLinterNet.Core.Model.LayoutConventionPayload? right)
   operator ==(ArchLinterNet.Core.Model.LayoutConventionPayload? left, ArchLinterNet.Core.Model.LayoutConventionPayload? right)
   property System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Model.ExpressionParticipation>? WhenExpressions {get;init;}
+  property System.Collections.Generic.IReadOnlyList<string>? DeclarationPaths {get;init;}
+  property System.Collections.Generic.IReadOnlyList<string>? ExpectedRoles {get;init;}
   property bool DataUnavailable {get;init;}
+  property bool? ActualIsAbstract {get;init;}
+  property bool? ExpectedAbstractClass {get;init;}
+  property int? ActualDeclarationCount {get;init;}
+  property int? ExpectedDeclarationCount {get;init;}
+  property string? ActualRole {get;init;}
   property string? ActualTypeKind {get;init;}
   property string? ActualTypeName {get;init;}
   property string? ExpectedCounterpartName {get;init;}
@@ -3449,6 +3508,28 @@ sealed class ArchLinterNet.Core.Profiling.AnalysisProfilePhaseMeasurement : Syst
 enum ArchLinterNet.Core.Profiling.AnalysisProfileReservedFieldStatus : int
   enum-member Active = 1
   enum-member NotApplicable = 0
+interface ArchLinterNet.Core.Reporting.Abstractions.IArchitectureDiagnosticFormatter
+  method string FormatBuildStatePreflightForHumans(System.Collections.Generic.IReadOnlyCollection<ArchLinterNet.Core.Model.BuildStatePreflightDiagnostic> diagnostics)
+  method string FormatClassificationFactsForHumans(System.Collections.Generic.IReadOnlyCollection<ArchLinterNet.Core.Model.ArchitectureClassificationConflict> conflicts, System.Collections.Generic.IReadOnlyCollection<ArchLinterNet.Core.Model.ArchitectureClassificationMetadataFailure> metadataFailures)
+  method string FormatClassificationFactsForHumans(System.Collections.Generic.IReadOnlyCollection<ArchLinterNet.Core.Model.ArchitectureClassificationConflict> conflicts, System.Collections.Generic.IReadOnlyCollection<ArchLinterNet.Core.Model.ArchitectureClassificationMetadataFailure> metadataFailures, ArchLinterNet.Core.Model.ArchitectureClassificationPathDeferredNotice? classificationPathDeferred)
+  method string FormatCoverageForHumans(System.Collections.Generic.IReadOnlyCollection<ArchLinterNet.Core.Model.ArchitectureViolation> findings)
+  method string FormatCoverageForHumans(System.Collections.Generic.IReadOnlyCollection<ArchLinterNet.Core.Model.ArchitectureViolation> findings, System.Threading.CancellationToken cancellationToken)
+  method string FormatCoverageSummaryForHumans(System.Collections.Generic.IReadOnlyCollection<ArchLinterNet.Core.Reporting.ArchitectureCoverageSummary> summaries)
+  method string FormatCyclesForCiArtifacts(string contractName, string? contractId, System.Collections.Generic.IReadOnlyCollection<string> cycles)
+  method string FormatCyclesForHumans(System.Collections.Generic.IReadOnlyCollection<string> cycles)
+  method string FormatPolicyConsistencyForHumans(System.Collections.Generic.IReadOnlyCollection<ArchLinterNet.Core.Model.PolicyConsistencyDiagnostic> findings)
+  method string FormatResultForCiArtifacts(string mode, bool passed, System.Collections.Generic.IReadOnlyCollection<ArchLinterNet.Core.Model.ArchitectureViolation> violations, System.Collections.Generic.IReadOnlyCollection<string> cycles, System.Collections.Generic.IReadOnlyCollection<ArchLinterNet.Core.Model.ArchitectureClassificationRoleFact> classificationRoles, ArchLinterNet.Core.Model.ArchitectureClassificationPathDeferredNotice? classificationPathDeferred, System.Collections.Generic.IReadOnlyCollection<ArchLinterNet.Core.Model.ArchitectureViolation>? coverageFindings = null, System.Collections.Generic.IReadOnlyCollection<ArchLinterNet.Core.Model.ArchitectureUnmatchedIgnoredViolation>? unmatched = null, System.Collections.Generic.IReadOnlyCollection<ArchLinterNet.Core.Model.PolicyConsistencyDiagnostic>? policyConsistencyFindings = null, System.Collections.Generic.IReadOnlyCollection<ArchLinterNet.Core.Reporting.ArchitectureCoverageSummary>? coverageSummaries = null, System.Collections.Generic.IReadOnlyCollection<ArchLinterNet.Core.Model.ArchitectureClassificationConflict>? classificationConflicts = null, System.Collections.Generic.IReadOnlyCollection<ArchLinterNet.Core.Model.ArchitectureClassificationMetadataFailure>? classificationMetadataFailures = null)
+  method string FormatResultForCiArtifacts(string mode, bool passed, System.Collections.Generic.IReadOnlyCollection<ArchLinterNet.Core.Model.ArchitectureViolation> violations, System.Collections.Generic.IReadOnlyCollection<string> cycles, System.Collections.Generic.IReadOnlyCollection<ArchLinterNet.Core.Model.ArchitectureClassificationRoleFact> classificationRoles, ArchLinterNet.Core.Model.ArchitectureClassificationPathDeferredNotice? classificationPathDeferred, System.Collections.Generic.IReadOnlyCollection<ArchLinterNet.Core.Model.BuildStatePreflightDiagnostic> preflightDiagnostics, System.Collections.Generic.IReadOnlyCollection<ArchLinterNet.Core.Model.ArchitectureViolation>? coverageFindings = null, System.Collections.Generic.IReadOnlyCollection<ArchLinterNet.Core.Model.ArchitectureUnmatchedIgnoredViolation>? unmatched = null, System.Collections.Generic.IReadOnlyCollection<ArchLinterNet.Core.Model.PolicyConsistencyDiagnostic>? policyConsistencyFindings = null, System.Collections.Generic.IReadOnlyCollection<ArchLinterNet.Core.Reporting.ArchitectureCoverageSummary>? coverageSummaries = null, System.Collections.Generic.IReadOnlyCollection<ArchLinterNet.Core.Model.ArchitectureClassificationConflict>? classificationConflicts = null, System.Collections.Generic.IReadOnlyCollection<ArchLinterNet.Core.Model.ArchitectureClassificationMetadataFailure>? classificationMetadataFailures = null)
+  method string FormatResultForCiArtifacts(string mode, bool passed, System.Collections.Generic.IReadOnlyCollection<ArchLinterNet.Core.Model.ArchitectureViolation> violations, System.Collections.Generic.IReadOnlyCollection<string> cycles, System.Collections.Generic.IReadOnlyCollection<ArchLinterNet.Core.Model.ArchitectureClassificationRoleFact> classificationRoles, System.Collections.Generic.IReadOnlyCollection<ArchLinterNet.Core.Model.ArchitectureViolation>? coverageFindings = null, System.Collections.Generic.IReadOnlyCollection<ArchLinterNet.Core.Model.ArchitectureUnmatchedIgnoredViolation>? unmatched = null, System.Collections.Generic.IReadOnlyCollection<ArchLinterNet.Core.Model.PolicyConsistencyDiagnostic>? policyConsistencyFindings = null, System.Collections.Generic.IReadOnlyCollection<ArchLinterNet.Core.Reporting.ArchitectureCoverageSummary>? coverageSummaries = null, System.Collections.Generic.IReadOnlyCollection<ArchLinterNet.Core.Model.ArchitectureClassificationConflict>? classificationConflicts = null, System.Collections.Generic.IReadOnlyCollection<ArchLinterNet.Core.Model.ArchitectureClassificationMetadataFailure>? classificationMetadataFailures = null)
+  method string FormatResultForCiArtifacts(string mode, bool passed, System.Collections.Generic.IReadOnlyCollection<ArchLinterNet.Core.Model.ArchitectureViolation> violations, System.Collections.Generic.IReadOnlyCollection<string> cycles, System.Collections.Generic.IReadOnlyCollection<ArchLinterNet.Core.Model.ArchitectureViolation>? coverageFindings = null, System.Collections.Generic.IReadOnlyCollection<ArchLinterNet.Core.Model.ArchitectureUnmatchedIgnoredViolation>? unmatched = null, System.Collections.Generic.IReadOnlyCollection<ArchLinterNet.Core.Model.PolicyConsistencyDiagnostic>? policyConsistencyFindings = null, System.Collections.Generic.IReadOnlyCollection<ArchLinterNet.Core.Reporting.ArchitectureCoverageSummary>? coverageSummaries = null, System.Collections.Generic.IReadOnlyCollection<ArchLinterNet.Core.Model.ArchitectureClassificationConflict>? classificationConflicts = null, System.Collections.Generic.IReadOnlyCollection<ArchLinterNet.Core.Model.ArchitectureClassificationMetadataFailure>? classificationMetadataFailures = null)
+  method string FormatUnmatchedForHumans(System.Collections.Generic.IReadOnlyCollection<ArchLinterNet.Core.Model.ArchitectureUnmatchedIgnoredViolation> unmatched)
+  method string FormatViolationsForCiArtifacts(string contractName, string? contractId, System.Collections.Generic.IReadOnlyCollection<ArchLinterNet.Core.Model.ArchitectureViolation> violations)
+  method string FormatViolationsForCiArtifacts(string contractName, string? contractId, System.Collections.Generic.IReadOnlyCollection<ArchLinterNet.Core.Model.ArchitectureViolation> violations, System.Threading.CancellationToken cancellationToken)
+  method string FormatViolationsForHumans(System.Collections.Generic.IReadOnlyCollection<ArchLinterNet.Core.Model.ArchitectureViolation> violations)
+  method string FormatViolationsForHumans(System.Collections.Generic.IReadOnlyCollection<ArchLinterNet.Core.Model.ArchitectureViolation> violations, System.Threading.CancellationToken cancellationToken)
+interface ArchLinterNet.Core.Reporting.Abstractions.IArchitectureSarifFormatter
+  method string FormatResultAsSarif(string mode, System.Collections.Generic.IReadOnlyCollection<ArchLinterNet.Core.Model.ArchitectureViolation> violations, System.Collections.Generic.IReadOnlyCollection<string> cycles, System.Collections.Generic.IReadOnlyCollection<ArchLinterNet.Core.Model.BuildStatePreflightDiagnostic> preflightDiagnostics, string toolVersion)
+  method string FormatResultAsSarif(string mode, System.Collections.Generic.IReadOnlyCollection<ArchLinterNet.Core.Model.ArchitectureViolation> violations, System.Collections.Generic.IReadOnlyCollection<string> cycles, string toolVersion)
 static class ArchLinterNet.Core.Reporting.ArchitectureBaselineSarifFormatter
   method static string Format(System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Model.BaselineLifecycleEntry> entries, string toolVersion)
 sealed class ArchLinterNet.Core.Reporting.ArchitectureCoverageSummary : System.IEquatable<ArchLinterNet.Core.Reporting.ArchitectureCoverageSummary>
@@ -3532,7 +3613,7 @@ sealed class ArchLinterNet.Core.Reporting.ArchitectureCoverageSummaryOptionalEmp
   property string Item {get;init;}
   property string Layer {get;init;}
   property string Reason {get;init;}
-sealed class ArchLinterNet.Core.Reporting.ArchitectureDiagnosticFormatter : ArchLinterNet.Core.Reporting.IArchitectureDiagnosticFormatter
+sealed class ArchLinterNet.Core.Reporting.ArchitectureDiagnosticFormatter : ArchLinterNet.Core.Reporting.Abstractions.IArchitectureDiagnosticFormatter
   ctor()
   method static System.Collections.Generic.Dictionary<string,object?> FormatNormalizedFindingForJson(ArchLinterNet.Core.Model.ArchitectureFinding finding)
   method static System.Collections.Generic.Dictionary<string,object?> FormatPolicyLocationForJson(ArchLinterNet.Core.Model.ArchitecturePolicySourceLocation location)
@@ -3578,7 +3659,7 @@ static class ArchLinterNet.Core.Reporting.ArchitectureFindingMapper
   method static System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Model.ArchitectureFinding> Order(System.Collections.Generic.IEnumerable<ArchLinterNet.Core.Model.ArchitectureFinding> findings)
   method static System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Model.ArchitectureFinding> Order(System.Collections.Generic.IEnumerable<ArchLinterNet.Core.Model.ArchitectureFinding> findings, System.Threading.CancellationToken cancellationToken)
   method static string KindToken(ArchLinterNet.Core.Model.ArchitectureDiagnosticKind kind)
-sealed class ArchLinterNet.Core.Reporting.ArchitectureSarifFormatter : ArchLinterNet.Core.Reporting.IArchitectureSarifFormatter
+sealed class ArchLinterNet.Core.Reporting.ArchitectureSarifFormatter : ArchLinterNet.Core.Reporting.Abstractions.IArchitectureSarifFormatter
   ctor()
   method static object[] FormatPolicyLocationsForSarif(ArchLinterNet.Core.Model.ArchitecturePolicySourceLocation? primaryLocation, System.Collections.Generic.IEnumerable<ArchLinterNet.Core.Model.ArchitecturePolicySourceLocation> relatedLocations)
   method static string FormatResultAsSarif(string mode, System.Collections.Generic.IReadOnlyCollection<ArchLinterNet.Core.Model.ArchitectureViolation> violations, System.Collections.Generic.IReadOnlyCollection<ArchLinterNet.Core.Model.ArchitectureCycleFinding> cycles, System.Collections.Generic.IReadOnlyCollection<ArchLinterNet.Core.Model.BuildStatePreflightDiagnostic> preflightDiagnostics, System.Collections.Generic.IReadOnlyCollection<ArchLinterNet.Core.Reporting.ArchitectureCoverageSummary> coverageSummaries, ArchLinterNet.Core.Model.ArchitectureSourceExpansionInventory sourceExpansion, string toolVersion, System.Collections.Generic.IReadOnlyCollection<ArchLinterNet.Core.Model.ArchitectureSubtractiveMatcherParticipation>? subtractiveMatcherParticipation = null)
@@ -3589,28 +3670,6 @@ sealed class ArchLinterNet.Core.Reporting.ArchitectureSarifFormatter : ArchLinte
   method string FormatResultAsSarif(string mode, System.Collections.Generic.IReadOnlyCollection<ArchLinterNet.Core.Model.ArchitectureViolation> violations, System.Collections.Generic.IReadOnlyCollection<string> cycles, System.Collections.Generic.IReadOnlyCollection<ArchLinterNet.Core.Model.BuildStatePreflightDiagnostic> preflightDiagnostics, System.Collections.Generic.IReadOnlyCollection<ArchLinterNet.Core.Reporting.ArchitectureCoverageSummary> coverageSummaries, ArchLinterNet.Core.Model.ArchitectureSourceExpansionInventory sourceExpansion, string toolVersion, System.Collections.Generic.IReadOnlyCollection<ArchLinterNet.Core.Model.ArchitectureSubtractiveMatcherParticipation>? subtractiveMatcherParticipation = null)
   method string FormatResultAsSarif(string mode, System.Collections.Generic.IReadOnlyCollection<ArchLinterNet.Core.Model.ArchitectureViolation> violations, System.Collections.Generic.IReadOnlyCollection<string> cycles, System.Collections.Generic.IReadOnlyCollection<ArchLinterNet.Core.Model.BuildStatePreflightDiagnostic> preflightDiagnostics, System.Collections.Generic.IReadOnlyCollection<ArchLinterNet.Core.Reporting.ArchitectureCoverageSummary> coverageSummaries, ArchLinterNet.Core.Model.ArchitectureSourceExpansionInventory sourceExpansion, string toolVersion, System.Collections.Generic.IReadOnlyCollection<ArchLinterNet.Core.Model.ArchitectureSubtractiveMatcherParticipation>? subtractiveMatcherParticipation, System.Threading.CancellationToken cancellationToken)
   method string FormatResultAsSarif(string mode, System.Collections.Generic.IReadOnlyCollection<ArchLinterNet.Core.Model.ArchitectureViolation> violations, System.Collections.Generic.IReadOnlyCollection<string> cycles, System.Collections.Generic.IReadOnlyCollection<ArchLinterNet.Core.Model.BuildStatePreflightDiagnostic> preflightDiagnostics, System.Collections.Generic.IReadOnlyCollection<ArchLinterNet.Core.Reporting.ArchitectureCoverageSummary> coverageSummaries, string toolVersion)
-  method string FormatResultAsSarif(string mode, System.Collections.Generic.IReadOnlyCollection<ArchLinterNet.Core.Model.ArchitectureViolation> violations, System.Collections.Generic.IReadOnlyCollection<string> cycles, System.Collections.Generic.IReadOnlyCollection<ArchLinterNet.Core.Model.BuildStatePreflightDiagnostic> preflightDiagnostics, string toolVersion)
-  method string FormatResultAsSarif(string mode, System.Collections.Generic.IReadOnlyCollection<ArchLinterNet.Core.Model.ArchitectureViolation> violations, System.Collections.Generic.IReadOnlyCollection<string> cycles, string toolVersion)
-interface ArchLinterNet.Core.Reporting.IArchitectureDiagnosticFormatter
-  method string FormatBuildStatePreflightForHumans(System.Collections.Generic.IReadOnlyCollection<ArchLinterNet.Core.Model.BuildStatePreflightDiagnostic> diagnostics)
-  method string FormatClassificationFactsForHumans(System.Collections.Generic.IReadOnlyCollection<ArchLinterNet.Core.Model.ArchitectureClassificationConflict> conflicts, System.Collections.Generic.IReadOnlyCollection<ArchLinterNet.Core.Model.ArchitectureClassificationMetadataFailure> metadataFailures)
-  method string FormatClassificationFactsForHumans(System.Collections.Generic.IReadOnlyCollection<ArchLinterNet.Core.Model.ArchitectureClassificationConflict> conflicts, System.Collections.Generic.IReadOnlyCollection<ArchLinterNet.Core.Model.ArchitectureClassificationMetadataFailure> metadataFailures, ArchLinterNet.Core.Model.ArchitectureClassificationPathDeferredNotice? classificationPathDeferred)
-  method string FormatCoverageForHumans(System.Collections.Generic.IReadOnlyCollection<ArchLinterNet.Core.Model.ArchitectureViolation> findings)
-  method string FormatCoverageForHumans(System.Collections.Generic.IReadOnlyCollection<ArchLinterNet.Core.Model.ArchitectureViolation> findings, System.Threading.CancellationToken cancellationToken)
-  method string FormatCoverageSummaryForHumans(System.Collections.Generic.IReadOnlyCollection<ArchLinterNet.Core.Reporting.ArchitectureCoverageSummary> summaries)
-  method string FormatCyclesForCiArtifacts(string contractName, string? contractId, System.Collections.Generic.IReadOnlyCollection<string> cycles)
-  method string FormatCyclesForHumans(System.Collections.Generic.IReadOnlyCollection<string> cycles)
-  method string FormatPolicyConsistencyForHumans(System.Collections.Generic.IReadOnlyCollection<ArchLinterNet.Core.Model.PolicyConsistencyDiagnostic> findings)
-  method string FormatResultForCiArtifacts(string mode, bool passed, System.Collections.Generic.IReadOnlyCollection<ArchLinterNet.Core.Model.ArchitectureViolation> violations, System.Collections.Generic.IReadOnlyCollection<string> cycles, System.Collections.Generic.IReadOnlyCollection<ArchLinterNet.Core.Model.ArchitectureClassificationRoleFact> classificationRoles, ArchLinterNet.Core.Model.ArchitectureClassificationPathDeferredNotice? classificationPathDeferred, System.Collections.Generic.IReadOnlyCollection<ArchLinterNet.Core.Model.ArchitectureViolation>? coverageFindings = null, System.Collections.Generic.IReadOnlyCollection<ArchLinterNet.Core.Model.ArchitectureUnmatchedIgnoredViolation>? unmatched = null, System.Collections.Generic.IReadOnlyCollection<ArchLinterNet.Core.Model.PolicyConsistencyDiagnostic>? policyConsistencyFindings = null, System.Collections.Generic.IReadOnlyCollection<ArchLinterNet.Core.Reporting.ArchitectureCoverageSummary>? coverageSummaries = null, System.Collections.Generic.IReadOnlyCollection<ArchLinterNet.Core.Model.ArchitectureClassificationConflict>? classificationConflicts = null, System.Collections.Generic.IReadOnlyCollection<ArchLinterNet.Core.Model.ArchitectureClassificationMetadataFailure>? classificationMetadataFailures = null)
-  method string FormatResultForCiArtifacts(string mode, bool passed, System.Collections.Generic.IReadOnlyCollection<ArchLinterNet.Core.Model.ArchitectureViolation> violations, System.Collections.Generic.IReadOnlyCollection<string> cycles, System.Collections.Generic.IReadOnlyCollection<ArchLinterNet.Core.Model.ArchitectureClassificationRoleFact> classificationRoles, ArchLinterNet.Core.Model.ArchitectureClassificationPathDeferredNotice? classificationPathDeferred, System.Collections.Generic.IReadOnlyCollection<ArchLinterNet.Core.Model.BuildStatePreflightDiagnostic> preflightDiagnostics, System.Collections.Generic.IReadOnlyCollection<ArchLinterNet.Core.Model.ArchitectureViolation>? coverageFindings = null, System.Collections.Generic.IReadOnlyCollection<ArchLinterNet.Core.Model.ArchitectureUnmatchedIgnoredViolation>? unmatched = null, System.Collections.Generic.IReadOnlyCollection<ArchLinterNet.Core.Model.PolicyConsistencyDiagnostic>? policyConsistencyFindings = null, System.Collections.Generic.IReadOnlyCollection<ArchLinterNet.Core.Reporting.ArchitectureCoverageSummary>? coverageSummaries = null, System.Collections.Generic.IReadOnlyCollection<ArchLinterNet.Core.Model.ArchitectureClassificationConflict>? classificationConflicts = null, System.Collections.Generic.IReadOnlyCollection<ArchLinterNet.Core.Model.ArchitectureClassificationMetadataFailure>? classificationMetadataFailures = null)
-  method string FormatResultForCiArtifacts(string mode, bool passed, System.Collections.Generic.IReadOnlyCollection<ArchLinterNet.Core.Model.ArchitectureViolation> violations, System.Collections.Generic.IReadOnlyCollection<string> cycles, System.Collections.Generic.IReadOnlyCollection<ArchLinterNet.Core.Model.ArchitectureClassificationRoleFact> classificationRoles, System.Collections.Generic.IReadOnlyCollection<ArchLinterNet.Core.Model.ArchitectureViolation>? coverageFindings = null, System.Collections.Generic.IReadOnlyCollection<ArchLinterNet.Core.Model.ArchitectureUnmatchedIgnoredViolation>? unmatched = null, System.Collections.Generic.IReadOnlyCollection<ArchLinterNet.Core.Model.PolicyConsistencyDiagnostic>? policyConsistencyFindings = null, System.Collections.Generic.IReadOnlyCollection<ArchLinterNet.Core.Reporting.ArchitectureCoverageSummary>? coverageSummaries = null, System.Collections.Generic.IReadOnlyCollection<ArchLinterNet.Core.Model.ArchitectureClassificationConflict>? classificationConflicts = null, System.Collections.Generic.IReadOnlyCollection<ArchLinterNet.Core.Model.ArchitectureClassificationMetadataFailure>? classificationMetadataFailures = null)
-  method string FormatResultForCiArtifacts(string mode, bool passed, System.Collections.Generic.IReadOnlyCollection<ArchLinterNet.Core.Model.ArchitectureViolation> violations, System.Collections.Generic.IReadOnlyCollection<string> cycles, System.Collections.Generic.IReadOnlyCollection<ArchLinterNet.Core.Model.ArchitectureViolation>? coverageFindings = null, System.Collections.Generic.IReadOnlyCollection<ArchLinterNet.Core.Model.ArchitectureUnmatchedIgnoredViolation>? unmatched = null, System.Collections.Generic.IReadOnlyCollection<ArchLinterNet.Core.Model.PolicyConsistencyDiagnostic>? policyConsistencyFindings = null, System.Collections.Generic.IReadOnlyCollection<ArchLinterNet.Core.Reporting.ArchitectureCoverageSummary>? coverageSummaries = null, System.Collections.Generic.IReadOnlyCollection<ArchLinterNet.Core.Model.ArchitectureClassificationConflict>? classificationConflicts = null, System.Collections.Generic.IReadOnlyCollection<ArchLinterNet.Core.Model.ArchitectureClassificationMetadataFailure>? classificationMetadataFailures = null)
-  method string FormatUnmatchedForHumans(System.Collections.Generic.IReadOnlyCollection<ArchLinterNet.Core.Model.ArchitectureUnmatchedIgnoredViolation> unmatched)
-  method string FormatViolationsForCiArtifacts(string contractName, string? contractId, System.Collections.Generic.IReadOnlyCollection<ArchLinterNet.Core.Model.ArchitectureViolation> violations)
-  method string FormatViolationsForCiArtifacts(string contractName, string? contractId, System.Collections.Generic.IReadOnlyCollection<ArchLinterNet.Core.Model.ArchitectureViolation> violations, System.Threading.CancellationToken cancellationToken)
-  method string FormatViolationsForHumans(System.Collections.Generic.IReadOnlyCollection<ArchLinterNet.Core.Model.ArchitectureViolation> violations)
-  method string FormatViolationsForHumans(System.Collections.Generic.IReadOnlyCollection<ArchLinterNet.Core.Model.ArchitectureViolation> violations, System.Threading.CancellationToken cancellationToken)
-interface ArchLinterNet.Core.Reporting.IArchitectureSarifFormatter
   method string FormatResultAsSarif(string mode, System.Collections.Generic.IReadOnlyCollection<ArchLinterNet.Core.Model.ArchitectureViolation> violations, System.Collections.Generic.IReadOnlyCollection<string> cycles, System.Collections.Generic.IReadOnlyCollection<ArchLinterNet.Core.Model.BuildStatePreflightDiagnostic> preflightDiagnostics, string toolVersion)
   method string FormatResultAsSarif(string mode, System.Collections.Generic.IReadOnlyCollection<ArchLinterNet.Core.Model.ArchitectureViolation> violations, System.Collections.Generic.IReadOnlyCollection<string> cycles, string toolVersion)
 sealed class ArchLinterNet.Core.Reporting.ValidationTiming

@@ -52,6 +52,20 @@ public sealed partial class LayoutConventionContractTests
             "namespace LayoutConventionContractTestFixtures.AmbiguousFolder { public sealed class PartialOffender { } }");
         WriteFixtureFile("AbstractServices/AbstractBaseService.cs",
             "namespace LayoutConventionContractTestFixtures.AbstractServices { public abstract class AbstractBaseService { } }");
+        WriteFixtureFile("FolderPurity/Abstractions/IOrderPort.cs",
+            "namespace LayoutConventionContractTestFixtures.FolderPurity.Abstractions { public interface IOrderPort { } }");
+        WriteFixtureFile("FolderPurity/Abstractions/AbstractOrderPort.cs",
+            "namespace LayoutConventionContractTestFixtures.FolderPurity.Abstractions { public abstract class AbstractOrderPort { } }");
+        WriteFixtureFile("FolderPurity/Abstractions/ConcreteOrderPort.cs",
+            "namespace LayoutConventionContractTestFixtures.FolderPurity.Abstractions { public sealed class ConcreteOrderPort { } }");
+        WriteFixtureFile("FolderPurity/Abstractions/ValueOrderPort.cs",
+            "namespace LayoutConventionContractTestFixtures.FolderPurity.Abstractions { public readonly struct ValueOrderPort { } }");
+        WriteFixtureFile("FolderPurity/Exceptions/OrderRejectedException.cs",
+            "namespace LayoutConventionContractTestFixtures.FolderPurity.Exceptions { public sealed class OrderRejectedException : System.Exception { } }");
+        WriteFixtureFile("FolderPurity/Exceptions/IncorrectExceptionRecord.cs",
+            "namespace LayoutConventionContractTestFixtures.FolderPurity.Exceptions { public sealed record IncorrectExceptionRecord; }");
+        WriteFixtureFile("FolderPurity/Exceptions/IIncorrectException.cs",
+            "namespace LayoutConventionContractTestFixtures.FolderPurity.Exceptions { public interface IIncorrectException { } }");
     }
 
     [TearDown]
@@ -111,6 +125,13 @@ public sealed partial class LayoutConventionContractTests
             {
                 TargetAssemblies = new List<string> { typeof(LayoutConventionContractTests).Assembly.GetName().Name! },
                 SourceRoots = withSourceRoots ? new List<string> { "." } : new List<string>()
+            },
+            Classification = new ArchitectureClassificationConfiguration
+            {
+                Inheritance = new List<ArchitectureInheritanceClassificationMapping>
+                {
+                    new() { BaseType = "System.Exception", Role = "Exception" },
+                },
             },
             Contracts = groups
         };
@@ -526,6 +547,22 @@ public sealed partial class LayoutConventionContractTests
             Name = "interfaces-must-not-contain-offenders",
             FilesMatching = new ArchitectureLayoutFileMatcher { FolderSegment = "Interfaces" },
             ForbidTypeKind = "class"
+        };
+        var runner = new ArchitectureContractRunner(CreateContext(), CreateDocument(contract));
+
+        var violations = runner.Session.CheckLayoutConventionsContract(contract);
+
+        Assert.That(violations.Any(v => v.SourceType.Contains("PartialOffender", StringComparison.Ordinal)), Is.False);
+    }
+
+    [Test]
+    public void CheckLayoutConventionsContract_AmbiguousPartialClass_CannotViolateForbiddenInterface_IsNotReported()
+    {
+        var contract = new ArchitectureLayoutConventionContract
+        {
+            Name = "services-must-not-contain-interfaces",
+            FilesMatching = new ArchitectureLayoutFileMatcher { FolderSegment = "Services" },
+            ForbidTypeKind = "interface"
         };
         var runner = new ArchitectureContractRunner(CreateContext(), CreateDocument(contract));
 

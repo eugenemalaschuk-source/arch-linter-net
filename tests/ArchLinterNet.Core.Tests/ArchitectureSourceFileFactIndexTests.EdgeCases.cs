@@ -12,6 +12,12 @@ namespace ArchLinterNet.Core.Tests;
 [TestFixture]
 public sealed partial class ArchitectureSourceFileFactIndexTests
 {
+    private static readonly string[] _partialFixtureDeclarationPaths =
+    [
+        "src/PartialFixture.Part1.cs",
+        "src/PartialFixture.Part2.cs",
+    ];
+
     // ── Unique-file ambiguity (4.1) ────────────────────────────────────────────────────
 
     [Test]
@@ -67,6 +73,54 @@ public sealed partial class ArchitectureSourceFileFactIndexTests
         Assert.That(index.Ambiguities, Has.Count.EqualTo(1));
         Assert.That(index.Ambiguities[0].AssemblyName, Is.EqualTo(TestAssemblyName));
         Assert.That(index.Ambiguities[0].SourceFilePaths, Has.Count.EqualTo(2));
+    }
+
+    [Test]
+    public void SourceDeclarations_PartialTypeRetainsEveryPathAndModifier()
+    {
+        const string Part = """
+            namespace ArchLinterNet.Core.Tests.SourceFactFixtures {
+                public partial class PartialFixture { }
+            }
+            """;
+
+        ArchitectureSourceFileFactIndex index = BuildIndex(
+            "/fake/repo", "src",
+            new Dictionary<string, string>
+            {
+                ["PartialFixture.Part1.cs"] = Part,
+                ["PartialFixture.Part2.cs"] = Part,
+            });
+
+        IReadOnlyList<ArchitectureTypeSourceDeclaration> declarations = index.SourceDeclarations
+            .Where(declaration => declaration.FullTypeName.EndsWith(".PartialFixture", StringComparison.Ordinal))
+            .ToArray();
+
+        Assert.That(declarations, Has.Count.EqualTo(2));
+        Assert.That(declarations.All(declaration => declaration.IsPartial), Is.True);
+        Assert.That(declarations.All(declaration => !declaration.IsAbstract), Is.True);
+        Assert.That(
+            declarations.Select(declaration => declaration.SourceFilePath),
+            Is.EqualTo(_partialFixtureDeclarationPaths));
+    }
+
+    [Test]
+    public void SourceDeclarations_AbstractClassRetainsAbstractModifier()
+    {
+        const string Source = """
+            namespace ArchLinterNet.Core.Tests.SourceFactFixtures {
+                public abstract class AbstractFixture { }
+            }
+            """;
+
+        ArchitectureSourceFileFactIndex index = BuildIndex(
+            "/fake/repo", "src",
+            new Dictionary<string, string> { ["AbstractFixture.cs"] = Source });
+
+        ArchitectureTypeSourceDeclaration declaration = index.SourceDeclarations.Single(
+            candidate => candidate.FullTypeName.EndsWith(".AbstractFixture", StringComparison.Ordinal));
+
+        Assert.That(declaration.IsAbstract, Is.True);
     }
 
     // ── Deterministic ordering (4.2) ───────────────────────────────────────────────────

@@ -1,3 +1,4 @@
+using ArchLinterNet.Core.Contracts.PolicyImports.Models;
 using ArchLinterNet.Core.IO.Abstractions;
 using ArchLinterNet.Core.Model;
 

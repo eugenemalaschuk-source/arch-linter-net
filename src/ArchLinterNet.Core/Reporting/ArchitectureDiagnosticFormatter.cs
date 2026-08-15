@@ -1,156 +1,8 @@
 using System.Text.Json;
 using ArchLinterNet.Core.Model;
+using ArchLinterNet.Core.Reporting.Abstractions;
 
 namespace ArchLinterNet.Core.Reporting;
-
-public partial interface IArchitectureDiagnosticFormatter
-{
-    string FormatViolationsForHumans(IReadOnlyCollection<ArchitectureViolation> violations);
-
-    /// <summary>
-    /// Additive overload, not a modification of the member above: any caller already compiled
-    /// against the original one-parameter overload keeps resolving to it, unaffected. Declared
-    /// with a default interface implementation that ignores the token and delegates to the
-    /// original overload, so a third-party implementer that predates this member is not forced to
-    /// add it just to keep compiling — only <see cref="ArchitectureDiagnosticFormatter"/> itself
-    /// overrides it with a genuinely per-finding cancellation-aware implementation.
-    /// </summary>
-    string FormatViolationsForHumans(IReadOnlyCollection<ArchitectureViolation> violations, CancellationToken cancellationToken)
-    {
-        cancellationToken.ThrowIfCancellationRequested();
-        // This method IS the cancellation-aware overload; the token is already observed via
-        // ThrowIfCancellationRequested, not by forwarding it further.
-        return FormatViolationsForHumans(violations); // NOSONAR: see comment above
-    }
-
-    string FormatCyclesForHumans(IReadOnlyCollection<string> cycles);
-
-    string FormatUnmatchedForHumans(IReadOnlyCollection<ArchitectureUnmatchedIgnoredViolation> unmatched);
-
-    string FormatPolicyConsistencyForHumans(IReadOnlyCollection<PolicyConsistencyDiagnostic> findings);
-
-    string FormatCoverageForHumans(IReadOnlyCollection<ArchitectureViolation> findings);
-
-    /// <summary>
-    /// Cancellation-aware overload — coverage findings share the same shape (and can be equally
-    /// large) as violations. Default interface implementation ignores the token and delegates to
-    /// the overload above, so every existing test fake keeps compiling unaffected — only
-    /// <see cref="ArchitectureDiagnosticFormatter"/> overrides it with a genuinely per-finding
-    /// cancellation-aware implementation.
-    /// </summary>
-    string FormatCoverageForHumans(IReadOnlyCollection<ArchitectureViolation> findings, CancellationToken cancellationToken)
-    {
-        cancellationToken.ThrowIfCancellationRequested();
-        // This method IS the cancellation-aware overload; the token is already observed via
-        // ThrowIfCancellationRequested, not by forwarding it further.
-        return FormatCoverageForHumans(findings); // NOSONAR: see comment above
-    }
-
-    string FormatCoverageSummaryForHumans(IReadOnlyCollection<ArchitectureCoverageSummary> summaries);
-
-    string FormatClassificationFactsForHumans(
-        IReadOnlyCollection<ArchitectureClassificationConflict> conflicts,
-        IReadOnlyCollection<ArchitectureClassificationMetadataFailure> metadataFailures);
-
-    /// <summary>
-    /// Additive overload, not a modification of the member above: any caller already compiled
-    /// against the original two-parameter overload keeps resolving to it, unaffected.
-    /// <c>classificationPathDeferred</c> is required here, with no default value, so this overload
-    /// stays unambiguous against the original for every call site, named or positional. Declared
-    /// with a default interface implementation that delegates to the original overload and omits
-    /// the path-deferred notice, so a third-party implementer that predates this member is not
-    /// forced to add it just to keep compiling — only <see cref="ArchitectureDiagnosticFormatter"/>
-    /// itself overrides it with real path-deferred formatting.
-    /// </summary>
-    string FormatClassificationFactsForHumans(
-        IReadOnlyCollection<ArchitectureClassificationConflict> conflicts,
-        IReadOnlyCollection<ArchitectureClassificationMetadataFailure> metadataFailures,
-        ArchitectureClassificationPathDeferredNotice? classificationPathDeferred)
-        => FormatClassificationFactsForHumans(conflicts, metadataFailures);
-
-    string FormatResultForCiArtifacts( // NOSONAR: each parameter represents a semantically distinct section of the CI artifact payload; grouping would obscure the data contract
-        string mode,
-        bool passed,
-        IReadOnlyCollection<ArchitectureViolation> violations,
-        IReadOnlyCollection<string> cycles,
-        IReadOnlyCollection<ArchitectureViolation>? coverageFindings = null,
-        IReadOnlyCollection<ArchitectureUnmatchedIgnoredViolation>? unmatched = null,
-        IReadOnlyCollection<PolicyConsistencyDiagnostic>? policyConsistencyFindings = null,
-        IReadOnlyCollection<ArchitectureCoverageSummary>? coverageSummaries = null,
-        IReadOnlyCollection<ArchitectureClassificationConflict>? classificationConflicts = null,
-        IReadOnlyCollection<ArchitectureClassificationMetadataFailure>? classificationMetadataFailures = null);
-
-    /// <summary>
-    /// Additive overload, not a modification of the member above: any caller already compiled
-    /// against the original ten-parameter overload keeps resolving to it, unaffected.
-    /// <c>classificationRoles</c> is required here, with no default value, specifically so this
-    /// overload stays unambiguous against the original for every call site, named or positional.
-    /// Declared with a default interface implementation that delegates to the original overload
-    /// and omits classification roles, so a third-party implementer that predates this member is
-    /// not forced to add it just to keep compiling — only <see cref="ArchitectureDiagnosticFormatter"/>
-    /// itself overrides it with real role serialization.
-    /// </summary>
-    string FormatResultForCiArtifacts( // NOSONAR: each parameter represents a semantically distinct section of the CI artifact payload; grouping would obscure the data contract
-        string mode,
-        bool passed,
-        IReadOnlyCollection<ArchitectureViolation> violations,
-        IReadOnlyCollection<string> cycles,
-        IReadOnlyCollection<ArchitectureClassificationRoleFact> classificationRoles,
-        IReadOnlyCollection<ArchitectureViolation>? coverageFindings = null,
-        IReadOnlyCollection<ArchitectureUnmatchedIgnoredViolation>? unmatched = null,
-        IReadOnlyCollection<PolicyConsistencyDiagnostic>? policyConsistencyFindings = null,
-        IReadOnlyCollection<ArchitectureCoverageSummary>? coverageSummaries = null,
-        IReadOnlyCollection<ArchitectureClassificationConflict>? classificationConflicts = null,
-        IReadOnlyCollection<ArchitectureClassificationMetadataFailure>? classificationMetadataFailures = null)
-        => FormatResultForCiArtifacts(
-            mode, passed, violations, cycles, coverageFindings, unmatched,
-            policyConsistencyFindings, coverageSummaries, classificationConflicts, classificationMetadataFailures);
-
-    /// <summary>
-    /// Additive overload, not a modification of the member above: any caller already compiled
-    /// against the eleven-parameter roles overload keeps resolving to it, unaffected.
-    /// <c>classificationPathDeferred</c> is required here, with no default value, for the same
-    /// unambiguous-arity reason as <c>classificationRoles</c> above. Declared with a default
-    /// interface implementation that delegates to the roles overload and omits the path-deferred
-    /// notice, so a third-party implementer that predates this member is not forced to add it —
-    /// only <see cref="ArchitectureDiagnosticFormatter"/> itself overrides it with real serialization.
-    /// </summary>
-    string FormatResultForCiArtifacts( // NOSONAR: each parameter represents a semantically distinct section of the CI artifact payload; grouping would obscure the data contract
-        string mode,
-        bool passed,
-        IReadOnlyCollection<ArchitectureViolation> violations,
-        IReadOnlyCollection<string> cycles,
-        IReadOnlyCollection<ArchitectureClassificationRoleFact> classificationRoles,
-        ArchitectureClassificationPathDeferredNotice? classificationPathDeferred,
-        IReadOnlyCollection<ArchitectureViolation>? coverageFindings = null,
-        IReadOnlyCollection<ArchitectureUnmatchedIgnoredViolation>? unmatched = null,
-        IReadOnlyCollection<PolicyConsistencyDiagnostic>? policyConsistencyFindings = null,
-        IReadOnlyCollection<ArchitectureCoverageSummary>? coverageSummaries = null,
-        IReadOnlyCollection<ArchitectureClassificationConflict>? classificationConflicts = null,
-        IReadOnlyCollection<ArchitectureClassificationMetadataFailure>? classificationMetadataFailures = null)
-        => FormatResultForCiArtifacts(
-            mode, passed, violations, cycles, classificationRoles, coverageFindings, unmatched,
-            policyConsistencyFindings, coverageSummaries, classificationConflicts, classificationMetadataFailures);
-
-    string FormatViolationsForCiArtifacts(string contractName, string? contractId,
-        IReadOnlyCollection<ArchitectureViolation> violations);
-
-    string FormatViolationsForCiArtifacts(
-        string contractName,
-        string? contractId,
-        IReadOnlyCollection<ArchitectureViolation> violations,
-        CancellationToken cancellationToken)
-    {
-        cancellationToken.ThrowIfCancellationRequested();
-        // Existing external implementations can only provide the legacy member, which has no
-        // cancellation parameter. The guard above still prevents entering that compatibility
-        // path after cancellation; the concrete formatter overrides this overload and observes
-        // the token throughout mapping, sorting, and serialization.
-        return FormatViolationsForCiArtifacts(contractName, contractId, violations); // NOSONAR: preserve source compatibility for pre-cancellation interface implementers
-    }
-
-    string FormatCyclesForCiArtifacts(string contractName, string? contractId, IReadOnlyCollection<string> cycles);
-}
 
 public sealed partial class ArchitectureDiagnosticFormatter : IArchitectureDiagnosticFormatter
 {
@@ -202,7 +54,7 @@ public sealed partial class ArchitectureDiagnosticFormatter : IArchitectureDiagn
                         return $"  {idPrefix}[{u.ContractName}] ignored_violations[{u.IgnoreIndex}] no longer matches any current violation:{Environment.NewLine}" +
                                $"    source_type: {u.SourceType}{Environment.NewLine}" +
                                $"    forbidden_reference: {u.ForbiddenReference}{Environment.NewLine}" +
-                               $"    reason: {u.Reason}" + FormatPolicyLocationSuffix(u);
+                               $"    reason: {u.Reason}" + Reporting.ArchitectureDiagnosticFormatter.FormatPolicyLocationSuffix(u);
                     }));
     }
 
@@ -230,7 +82,7 @@ public sealed partial class ArchitectureDiagnosticFormatter : IArchitectureDiagn
                         string names = string.Join(", ", f.ConflictingContractNames);
                         return $"  {idPrefix}[{f.CheckKind}] {f.Reason}" +
                                (names.Length > 0 ? $" (contracts: {names})" : string.Empty) +
-                               FormatPolicyLocationSuffix(f);
+                               Reporting.ArchitectureDiagnosticFormatter.FormatPolicyLocationSuffix(f);
                     }));
     }
 
@@ -385,7 +237,7 @@ public sealed partial class ArchitectureDiagnosticFormatter : IArchitectureDiagn
         string pathSuffix = FormatConfigurationPathSuffixForHumans(diagnostic);
 
         return $"- {idPrefix}[{diagnostic.ContractName}] {SourceTypeOf(diagnostic)} -> {nsDisplay}{context}: " +
-               $"{refs}{pathSuffix}{FormatPolicyLocationSuffix(diagnostic)}";
+               $"{refs}{pathSuffix}{Reporting.ArchitectureDiagnosticFormatter.FormatPolicyLocationSuffix(diagnostic)}";
     }
 
     private static string FormatFindingForHumans(ArchitectureFinding finding)
@@ -417,12 +269,12 @@ public sealed partial class ArchitectureDiagnosticFormatter : IArchitectureDiagn
 
         if (diagnostic is LayoutConventionDiagnostic layoutConvention)
         {
-            context += FormatLayoutConventionContextForHumans(layoutConvention);
+            context += Reporting.ArchitectureDiagnosticFormatter.FormatLayoutConventionContextForHumans(layoutConvention);
         }
 
         if (diagnostic is PublicApiSurfaceDiagnostic publicApiSurface)
         {
-            context += FormatPublicApiSurfaceContextForHumans(publicApiSurface);
+            context += Reporting.ArchitectureDiagnosticFormatter.FormatPublicApiSurfaceContextForHumans(publicApiSurface);
         }
 
         if (diagnostic is AttributeUsageDiagnostic attributeUsage)
@@ -452,27 +304,27 @@ public sealed partial class ArchitectureDiagnosticFormatter : IArchitectureDiagn
 
         if (diagnostic is ContextDependencyDiagnostic contextDependency)
         {
-            context += FormatContextDependencyContextForHumans(contextDependency);
+            context += Reporting.ArchitectureDiagnosticFormatter.FormatContextDependencyContextForHumans(contextDependency);
         }
 
         if (diagnostic is ContextAllowOnlyDiagnostic contextAllowOnly)
         {
-            context += FormatContextAllowOnlyContextForHumans(contextAllowOnly);
+            context += Reporting.ArchitectureDiagnosticFormatter.FormatContextAllowOnlyContextForHumans(contextAllowOnly);
         }
 
         if (diagnostic is PortBoundaryDiagnostic portBoundary)
         {
-            context += FormatPortBoundaryContextForHumans(portBoundary);
+            context += Reporting.ArchitectureDiagnosticFormatter.FormatPortBoundaryContextForHumans(portBoundary);
         }
 
         if (diagnostic is FrameworkReferenceDiagnostic { Evidence.Count: > 0 } frameworkDependency)
         {
-            context += FormatFrameworkReferenceContextForHumans(frameworkDependency.Evidence);
+            context += Reporting.ArchitectureDiagnosticFormatter.FormatFrameworkReferenceContextForHumans(frameworkDependency.Evidence);
         }
 
         if (diagnostic is FrameworkReferenceAllowOnlyDiagnostic { Evidence.Count: > 0 } frameworkAllowOnly)
         {
-            context += FormatFrameworkReferenceContextForHumans(frameworkAllowOnly.Evidence);
+            context += Reporting.ArchitectureDiagnosticFormatter.FormatFrameworkReferenceContextForHumans(frameworkAllowOnly.Evidence);
         }
 
         return context;
@@ -608,7 +460,7 @@ public sealed partial class ArchitectureDiagnosticFormatter : IArchitectureDiagn
         obj["mode"] = finding.Mode;
         obj["severity"] = finding.Severity;
         obj["message_code"] = finding.MessageCode;
-        obj["policy_origin"] = finding.PolicyOrigin is null ? null : FormatPolicyLocationForJson(finding.PolicyOrigin);
+        obj["policy_origin"] = finding.PolicyOrigin is null ? null : Reporting.ArchitectureDiagnosticFormatter.FormatPolicyLocationForJson(finding.PolicyOrigin);
         obj["source_location"] = finding.SourceLocation is null
             ? null
             : new Dictionary<string, object?>
@@ -629,7 +481,7 @@ public sealed partial class ArchitectureDiagnosticFormatter : IArchitectureDiagn
         obj["forbidden_namespace"] = ForbiddenNamespaceOf(diagnostic);
         obj["forbidden_references"] = ForbiddenReferencesOf(diagnostic).ToArray();
 
-        ApplyDiagnosticSpecificCiFields(diagnostic, obj);
+        Reporting.ArchitectureDiagnosticFormatter.ApplyDiagnosticSpecificCiFields(diagnostic, obj);
 
         obj["details"] = BuildDetailsJsonObject(diagnostic);
 
@@ -640,7 +492,7 @@ public sealed partial class ArchitectureDiagnosticFormatter : IArchitectureDiagn
                 obj["matched_namespace_prefix"] = diagnostic.MatchedNamespacePrefixes.First();
         }
 
-        ApplyPolicyLocationFields(diagnostic, obj);
+        Reporting.ArchitectureDiagnosticFormatter.ApplyPolicyLocationFields(diagnostic, obj);
 
         return obj;
     }
@@ -666,7 +518,7 @@ public sealed partial class ArchitectureDiagnosticFormatter : IArchitectureDiagn
             details["forbidden_namespace"] = ForbiddenNamespaceOf(diagnostic);
             details["forbidden_references"] = ForbiddenReferencesOf(diagnostic).ToArray();
         }
-        ApplyDiagnosticSpecificCiFields(diagnostic, details);
+        Reporting.ArchitectureDiagnosticFormatter.ApplyDiagnosticSpecificCiFields(diagnostic, details);
         return details;
     }
 

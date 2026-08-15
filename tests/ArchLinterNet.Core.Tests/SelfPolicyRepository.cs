@@ -25,13 +25,74 @@ internal static class SelfPolicyRepository
         Path.Combine(repositoryRoot, "architecture", "dependencies.arch.yml");
 
     /// <summary>
-    /// Reads the real policy with line endings normalized to <c>\n</c>. `.gitattributes` pins only
-    /// `schema/*.json` to LF, so this file is checked out CRLF on Windows; without normalizing here,
-    /// every multi-line mutation anchor in <see cref="Replace"/> would match zero times and the
-    /// negative regressions would fail before reaching the contract they exercise.
+    /// Reads the real policy with line endings normalized to <c>\n</c> and flattens its imported
+    /// contract fragments. The mutation regressions can therefore keep their exact anchors while
+    /// the production policy is decomposed into independently reviewable files. `.gitattributes`
+    /// pins only `schema/*.json` to LF, so this file is checked out CRLF on Windows; without
+    /// normalizing here, every multi-line mutation anchor in <see cref="Replace"/> would match zero
+    /// times and the negative regressions would fail before reaching the contract they exercise.
     /// </summary>
-    public static string ReadPolicy(string repositoryRoot) =>
-        File.ReadAllText(PolicyPath(repositoryRoot)).ReplaceLineEndings("\n");
+    public static string ReadPolicy(string repositoryRoot)
+    {
+        string policyPath = PolicyPath(repositoryRoot);
+        string[] rootLines = File.ReadAllText(policyPath).ReplaceLineEndings("\n").Split('\n');
+        int importsStart = Array.IndexOf(rootLines, "imports:");
+        if (importsStart < 0)
+        {
+            return string.Join('\n', rootLines);
+        }
+
+        int importsEnd = importsStart + 1;
+        while (importsEnd < rootLines.Length &&
+               (string.IsNullOrWhiteSpace(rootLines[importsEnd]) || rootLines[importsEnd].StartsWith(' ')))
+        {
+            importsEnd++;
+        }
+
+        var importPaths = new List<string>();
+        for (int index = importsStart + 1; index < importsEnd; index++)
+        {
+            const string ImportPrefix = "  - ";
+            if (rootLines[index].StartsWith(ImportPrefix, StringComparison.Ordinal))
+            {
+                importPaths.Add(rootLines[index][ImportPrefix.Length..].Trim());
+            }
+        }
+
+        var flattenedRootLines = new List<string>(rootLines.Length - (importsEnd - importsStart));
+        for (int index = 0; index < importsStart; index++)
+        {
+            flattenedRootLines.Add(rootLines[index]);
+        }
+
+        for (int index = importsEnd; index < rootLines.Length; index++)
+        {
+            flattenedRootLines.Add(rootLines[index]);
+        }
+
+        var contractLines = new List<string>();
+        string policyDirectory = Path.GetDirectoryName(policyPath)!;
+        foreach (string importPath in importPaths)
+        {
+            string fragmentPath = Path.Combine(policyDirectory, importPath.Replace('/', Path.DirectorySeparatorChar));
+            string[] fragmentLines = File.ReadAllText(fragmentPath).ReplaceLineEndings("\n").Split('\n');
+            int contractsStart = Array.IndexOf(fragmentLines, "contracts:");
+            if (contractsStart < 0)
+            {
+                throw new InvalidOperationException($"Imported self-policy fragment lacks contracts: {importPath}");
+            }
+
+            for (int index = contractsStart + 1; index < fragmentLines.Length; index++)
+            {
+                contractLines.Add(fragmentLines[index]);
+            }
+        }
+
+        return string.Join('\n', flattenedRootLines).TrimEnd('\n')
+            + "\n\ncontracts:\n"
+            + string.Join('\n', contractLines).TrimEnd('\n')
+            + "\n";
+    }
 
     /// <summary>
     /// Writes <paramref name="content"/> to a uniquely named sibling of the real policy and returns

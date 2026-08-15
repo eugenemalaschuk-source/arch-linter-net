@@ -2,15 +2,6 @@ using YamlDotNet.Serialization;
 
 namespace ArchLinterNet.Core.Contracts.Families;
 
-public sealed partial class ArchitectureContractGroups
-{
-    [YamlMember(Alias = "strict_type_placement")]
-    public List<ArchitectureTypePlacementContract> StrictTypePlacement { get; set; } = new();
-
-    [YamlMember(Alias = "audit_type_placement")]
-    public List<ArchitectureTypePlacementContract> AuditTypePlacement { get; set; } = new();
-}
-
 public sealed class ArchitectureTypeMatcher
 {
     [YamlMember(Alias = "name_suffix")] public string NameSuffix { get; set; } = string.Empty;

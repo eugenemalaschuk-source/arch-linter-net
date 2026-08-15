@@ -48,29 +48,29 @@ internal sealed class ArchitectureCheckerContext
     // evaluation-failure surfacing, so both read one resolution instead of two.
     public string ResolvedBuildConfiguration => _session.ResolvedBuildConfiguration;
 
-    public Type[] FindTypesInLayer(ArchitectureLayer layer) => _session.FindTypesInLayer(layer);
+    public Type[] FindTypesInLayer(ArchitectureLayer layer) => _session.Facts.FindTypesInLayer(layer);
 
-    public bool MatchesLayer(ArchitectureLayer layer, Type type) => _session.MatchesLayer(layer, type);
+    public bool MatchesLayer(ArchitectureLayer layer, Type type) => _session.Facts.MatchesLayer(layer, type);
 
-    public bool IsInAnyDeclaredLayer(Type type) => _session.IsInAnyDeclaredLayer(type);
+    public bool IsInAnyDeclaredLayer(Type type) => _session.Facts.IsInAnyDeclaredLayer(type);
 
     public string? ResolveContainingLayer(Type type, IReadOnlySet<string> candidateLayerNames) =>
-        _session.ResolveContainingLayer(type, candidateLayerNames);
+        _session.Facts.ResolveContainingLayer(type, candidateLayerNames);
 
     public IEnumerable<string> ResolveProjectAssemblyNames(List<string> projectNames) =>
-        _session.ResolveProjectAssemblyNames(projectNames);
+        _session.Facts.ResolveProjectAssemblyNames(projectNames);
 
-    public Dictionary<string, Assembly> BuildAssemblyLookup() => _session.BuildAssemblyLookup();
+    public Dictionary<string, Assembly> BuildAssemblyLookup() => _session.Facts.BuildAssemblyLookup();
 
     public IEnumerable<Type> FindContextSelectorMatchingTypes(ArchitectureContextSelector selector) =>
-        _session.FindContextSelectorMatchingTypes(selector);
+        _session.Facts.FindContextSelectorMatchingTypes(selector);
 
     public bool IsExcludedFromContextMatch(
         Type candidateType,
         IReadOnlyList<ArchitectureContextSelector> excludeSelectors,
         ArchitectureTypeClassificationResult sourceDescriptor,
         Type? sourceType = null) =>
-        _session.IsExcludedFromContextMatch(candidateType, excludeSelectors, sourceDescriptor, sourceType);
+        _session.Facts.IsExcludedFromContextMatch(candidateType, excludeSelectors, sourceDescriptor, sourceType);
 
     // Evaluation is cached per (project, configuration) on the session for the lifetime of the run,
     // so several framework contracts sharing a source project still trigger one design-time build.

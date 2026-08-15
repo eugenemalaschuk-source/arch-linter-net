@@ -1000,6 +1000,16 @@
           "items": { "$ref": "#/$defs/acyclicSiblingContract" },
           "default": []
         },
+        "strict_module_containers": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/moduleContainerContract" },
+          "default": []
+        },
+        "audit_module_containers": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/moduleContainerContract" },
+          "default": []
+        },
         "strict_type_placement": {
           "type": "array",
           "items": { "$ref": "#/$defs/typePlacementContract" },
@@ -1321,6 +1331,21 @@
           "items": { "type": "string", "minLength": 1 },
           "minItems": 1
         },
+        "ignored_violations": { "$ref": "#/$defs/ignoredViolations" },
+        "reason": { "type": "string" }
+      }
+    },
+    "moduleContainerContract": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "container", "profile"],
+      "properties": {
+        "name": { "type": "string", "minLength": 1 },
+        "id": { "type": "string", "minLength": 1 },
+        "container": { "type": "string", "minLength": 1 },
+        "profile": { "type": "string", "enum": ["cli_command"] },
+        "allowed_container_root_types": { "$ref": "#/$defs/stringList" },
+        "allowed_module_root_types": { "$ref": "#/$defs/stringList" },
         "ignored_violations": { "$ref": "#/$defs/ignoredViolations" },
         "reason": { "type": "string" }
       }
@@ -1755,13 +1780,34 @@
             "forbidden_name_suffix": { "type": "string", "minLength": 1 },
             "forbidden_name_prefix": { "type": "string", "minLength": 1 },
             "require_type_name_matches_file_name": { "type": "boolean", "default": false },
+            "max_declarations_per_type": { "type": "integer", "minimum": 1 },
             "require_matching_interface": { "$ref": "#/$defs/requireMatchingInterface" },
+            "all_declarations": { "$ref": "#/$defs/layoutDeclarationShape" },
             "ignored_violations": { "$ref": "#/$defs/ignoredViolations" },
             "reason": { "type": "string" }
           }
         }
       ],
       "unevaluatedProperties": false
+    },
+    "layoutDeclarationShape": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "allowed_type_kinds": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "type": "string", "enum": ["class", "interface", "struct", "enum", "record", "delegate"] },
+          "default": []
+        },
+        "allowed_roles": { "$ref": "#/$defs/stringList" },
+        "require_abstract_classes": { "type": "boolean", "default": false }
+      },
+      "anyOf": [
+        { "required": ["allowed_type_kinds"] },
+        { "required": ["allowed_roles"] }
+      ]
     },
     "publicApiSurfaceSelector": {
       "type": "object",

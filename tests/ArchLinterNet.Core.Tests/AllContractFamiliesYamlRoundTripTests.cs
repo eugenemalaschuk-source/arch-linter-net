@@ -206,6 +206,14 @@ contracts:
   audit_acyclic_siblings:
     - name: acyclic sibling audit rule
       ancestors: [Test.Feature]
+  strict_module_containers:
+    - name: module container strict rule
+      container: Test.Commands
+      profile: cli_command
+  audit_module_containers:
+    - name: module container audit rule
+      container: Test.Commands
+      profile: cli_command
   strict_type_placement:
     - name: type placement strict rule
       types_matching:
@@ -324,6 +332,8 @@ contracts:
         Assert.That(contracts.AuditExternalAllowOnly, Has.Count.EqualTo(1));
         Assert.That(contracts.StrictAcyclicSiblings, Has.Count.EqualTo(1));
         Assert.That(contracts.AuditAcyclicSiblings, Has.Count.EqualTo(1));
+        Assert.That(contracts.StrictModuleContainers, Has.Count.EqualTo(1));
+        Assert.That(contracts.AuditModuleContainers, Has.Count.EqualTo(1));
         Assert.That(contracts.StrictTypePlacement, Has.Count.EqualTo(1));
         Assert.That(contracts.AuditTypePlacement, Has.Count.EqualTo(1));
         Assert.That(contracts.StrictLayoutConventions, Has.Count.EqualTo(1));
@@ -342,8 +352,8 @@ contracts:
         Assert.That(contracts.AuditCoverage, Has.Count.EqualTo(1));
 
         // AllStrict/AllAudit must reflect the populated groups too, excluding layer_template.
-        Assert.That(contracts.AllStrict.Count(), Is.EqualTo(27));
-        Assert.That(contracts.AllAudit.Count(), Is.EqualTo(27));
+        Assert.That(contracts.AllStrict.Count(), Is.EqualTo(28));
+        Assert.That(contracts.AllAudit.Count(), Is.EqualTo(28));
     }
 
     [Test]

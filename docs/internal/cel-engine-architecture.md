@@ -139,11 +139,11 @@ ______________________________________________________________________
 | Component | Owner | Notes |
 |---|---|---|
 | Profile identity (`CelProfile`, `CelProfileId`) | `ArchLinterNet.CEL` public | Stable across versions; v1 ID is `arch-linter/cel/v1` |
-| Grammar gates (token set, operator set) | `ArchLinterNet.CEL.Parsing` internal (`CelTokenizer`, `CelParser`) | No public API. Deviation from the original design: the gate lives in the tokenizer/parser themselves (deferred tokens are lexed, then rejected by the parser with `UnsupportedFeature`), not in `CelEngine` — `CelEngine` remains an unused placeholder. Corrected description: today `CelTokenizer`/`CelParser` hard-code the Profile v1 grammar; `CelProfileId` is threaded through both purely to attribute structured diagnostics to a profile, not to select which grammar rules apply — there is no profile-dispatch mechanism yet, since only `CelProfile.V1` exists publicly. A real "controlled per-profile" gate is v2+ work (see the Language and profile expansion row below). #328 shipped the bounded evaluator as `ArchLinterNet.CEL.Evaluation.CelEvaluator`, a standalone type, not inside `CelEngine`; `CelEngine` is still an empty placeholder after #325–#329, matching the Function catalog row below |
+| Grammar gates (token set, operator set) | `ArchLinterNet.CEL.Parsing` internal (`CelTokenizer`, `CelParser`) | No public API. The gate lives in the tokenizer/parser themselves: deferred tokens are lexed, then rejected by the parser with `UnsupportedFeature`. Today `CelTokenizer`/`CelParser` hard-code the Profile v1 grammar; `CelProfileId` is threaded through both purely to attribute structured diagnostics to a profile, not to select grammar rules. There is no profile-dispatch mechanism yet because only `CelProfile.V1` exists publicly. A real controlled per-profile gate is v2+ work. The bounded evaluator is the standalone `ArchLinterNet.CEL.Evaluation.CelEvaluator`. |
 | Value model (`CelValue`, `CelObjectValue`, `CelValueKind`) | `ArchLinterNet.CEL` public | No CLR reflection; all factories are typed |
 | Type descriptors (`CelType`, `CelTypeKind`) | `ArchLinterNet.CEL` public | Static factories only |
 | Context schema (`CelContextSchema`, `CelVariable`) | `ArchLinterNet.CEL` public | Structural identity is deterministic |
-| Function catalog (declaration) | `ArchLinterNet.CEL.Binding.CelFunctionCatalog` internal | Immutable; no public registration; `CelEngine` remains an unused placeholder. `CelFunctionCatalog` is a single hard-coded Profile v1 list today, not parameterized by profile — a real per-profile catalog is v2+ work, matching the Grammar gates row above |
+| Function catalog (declaration) | `ArchLinterNet.CEL.Binding.CelFunctionCatalog` internal | Immutable; no public registration. `CelFunctionCatalog` is a single hard-coded Profile v1 list today, not parameterized by profile; a real per-profile catalog is v2+ work, matching the Grammar gates row above |
 | Built-in function execution | `ArchLinterNet.CEL.Binding.CelBuiltinFunctionInvoker` internal | Shipped by #327. Pure, stateless, keyed by `CelFunctionOperationId` (carried on each `CelFunctionOverload`); every overload is total, no failure channel. `Invoke` and `ComputeCost` are two separate switches over the same enum — the compiler does NOT enforce that adding an operation id updates both (each has a `default` arm, so an omitted `ComputeCost` case is a silent budget-safety gap, not a build error); a code-review checklist item, not a compiler guarantee, is what closes this. Never exposed; `ArchLinterNet.CEL.Evaluation.CelEvaluator` (#328, shipped) is the only caller |
 | Bound operations (bound plan, binding tables) | `ArchLinterNet.CEL.Binding` internal (`CelBinder`, `CelBoundExpression`, `CelBoundNode` hierarchy) | Never exposed |
 | Bounded evaluator runtime | `ArchLinterNet.CEL.Evaluation.CelEvaluator` internal | Shipped by #328. One per-call runtime state, no shared mutable globals, source-span-aware diagnostics, schema-compatibility check against the full environment schema identity, and budget enforcement over bound-node visits, built-in cost charges, and collection/comparison runtime work |
@@ -190,7 +190,7 @@ Triple-quoted string literals and octal escapes are already tokenized today (`Ce
 |---|---|
 | Classification | Standard CEL (normative spec features) |
 | Intended owner | `ArchLinterNet.CEL` public API (new profile version) |
-| Existing seam | `CelTokenizer`/`CelParser` (not `CelEngine` — see the Grammar gates row above), which today hard-code the Profile v1 grammar; a real per-profile dispatch gate does not exist yet and is v2+ work, not a shipped seam. Type-system additions shipped by task #326 (`ArchLinterNet.CEL.Binding`) |
+| Existing seam | `CelTokenizer`/`CelParser`, which today hard-code the Profile v1 grammar; a real per-profile dispatch gate does not exist yet and is v2+ work, not a shipped seam. Type-system additions shipped by task #326 (`ArchLinterNet.CEL.Binding`) |
 | New profile version required? | Yes — Profile v2+ adds these; Profile v1 semantics remain frozen |
 | Affected layers | Tokenizer, parser, type-checker, evaluator, function catalog, diagnostics |
 | Safety implications | Arithmetic can overflow; timestamp/duration parsing can be malformed; regex can cause ReDoS if unbounded |
@@ -236,7 +236,7 @@ Capabilities deferred: optimized planner, JIT-style compiled backend, alternate 
 | Field | Details |
 |---|---|
 | Classification | Optimization |
-| Intended owner | `CelEngine` internal; pluggable behind the non-public bound plan |
+| Intended owner | Internal evaluator seam behind the non-public bound plan |
 | Existing seam | `CelCompiledPredicate.Evaluate` / `CelCompiledExpression.Evaluate` call the static `ArchLinterNet.CEL.Evaluation.CelEvaluator.Evaluate(...)`, passing the held bound plan, schema, and limits; there is no evaluator *instance* held by the compiled program today, and no swappable-backend abstraction exists yet — a backend swap would first require introducing one (e.g. an internal evaluator seam the compiled program holds instead of calling the static method directly). The bound plan itself is never exposed |
 | New profile version required? | No — backend swap would be transparent to consumers once a swappable seam exists |
 | Affected layers | Bound plan representation, evaluator |
@@ -312,7 +312,7 @@ Capabilities deferred: evaluation trace/explain, intermediate value capture, ste
 | New profile version required? | No — tracing is additive; but the trace data shape must be approved before exposing |
 | Affected layers | Evaluator (trace collection), `CelEvaluationResult` (trace payload) |
 | Safety implications | Traces can expose intermediate data; must be opt-in and bounded |
-| Prohibited shortcut | Do NOT expose engine-internal mutable state or `CelEngine` internals as part of any trace API. Do NOT add trace collection that is always-on (must be opt-in to avoid performance impact) |
+| Prohibited shortcut | Do NOT expose engine-internal mutable state or evaluator internals as part of any trace API. Do NOT add trace collection that is always-on (must be opt-in to avoid performance impact) |
 | Direction | Plausible future work; requires concrete product story |
 
 ______________________________________________________________________

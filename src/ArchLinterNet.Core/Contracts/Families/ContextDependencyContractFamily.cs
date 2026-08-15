@@ -2,15 +2,6 @@ using YamlDotNet.Serialization;
 
 namespace ArchLinterNet.Core.Contracts.Families;
 
-public sealed partial class ArchitectureContractGroups
-{
-    [YamlMember(Alias = "strict_context_dependencies")]
-    public List<ArchitectureContextDependencyContract> StrictContextDependencies { get; set; } = new();
-
-    [YamlMember(Alias = "audit_context_dependencies")]
-    public List<ArchitectureContextDependencyContract> AuditContextDependencies { get; set; } = new();
-}
-
 // Compares discovered role/metadata directly between a source selector and forbidden/exclude
 // selectors, without an intermediate layers.<name> declaration. See
 // openspec/changes/add-contextual-dependency-contracts/specs/contextual-dependency-contracts/spec.md.

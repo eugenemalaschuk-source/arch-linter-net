@@ -86,16 +86,17 @@ public sealed class ArchitecturePolicyProvenanceTests
 
         ArchitecturePolicyImportException exception = Assert.Throws<ArchitecturePolicyImportException>(
             () => new ArchitecturePolicyDocumentLoader().Load(root))!;
+        ArchitecturePolicyDiagnostic diagnostic = (ArchitecturePolicyDiagnostic)exception.Diagnostic!;
 
         Assert.Multiple(() =>
         {
             Assert.That(exception.Category, Is.EqualTo(ArchitecturePolicyImportErrorCategory.CompositionConflict));
             Assert.That(exception.Diagnostic, Is.Not.Null);
-            Assert.That(exception.Diagnostic!.Location!.SourcePath, Is.EqualTo("architecture/root.yml"));
-            Assert.That(exception.Diagnostic.Location.YamlPath, Is.EqualTo("layers.domain"));
-            Assert.That(exception.Diagnostic.RelatedLocations.Single().SourcePath,
+            Assert.That(diagnostic.Location!.SourcePath, Is.EqualTo("architecture/root.yml"));
+            Assert.That(diagnostic.Location.YamlPath, Is.EqualTo("layers.domain"));
+            Assert.That(diagnostic.RelatedLocations.Single().SourcePath,
                 Is.EqualTo("architecture/fragment.yml"));
-            Assert.That(exception.Diagnostic.RelatedLocations.Single().YamlPath, Is.EqualTo("layers.domain"));
+            Assert.That(diagnostic.RelatedLocations.Single().YamlPath, Is.EqualTo("layers.domain"));
         });
     }
 
@@ -247,7 +248,8 @@ public sealed class ArchitecturePolicyProvenanceTests
             Assert.That(exception.Category, Is.EqualTo(ArchitecturePolicyImportErrorCategory.Cycle));
             Assert.That(exception.Diagnostic!.Location!.SourcePath, Is.EqualTo("architecture/nested/b.yml"));
             Assert.That(exception.Diagnostic.Location.YamlPath, Is.EqualTo("imports[0]"));
-            Assert.That(exception.Diagnostic.RelatedLocations.Select(location => location.SourcePath),
+            Assert.That(((ArchitecturePolicyDiagnostic)exception.Diagnostic).RelatedLocations
+                    .Select(location => location.SourcePath),
                 Is.EqualTo(_cycleRelatedSourcePaths));
             Assert.That(exception.Diagnostic.ImportChain, Is.EqualTo(_cycleImportChain));
         });
@@ -277,8 +279,9 @@ public sealed class ArchitecturePolicyProvenanceTests
 
         ArchitecturePolicyImportException exception = Assert.Throws<ArchitecturePolicyImportException>(
             () => new ArchitecturePolicyDocumentLoader().Load(root))!;
-        string[] paths = new[] { exception.Diagnostic!.Location! }
-            .Concat(exception.Diagnostic.RelatedLocations)
+        ArchitecturePolicyDiagnostic diagnostic = (ArchitecturePolicyDiagnostic)exception.Diagnostic!;
+        string[] paths = new[] { diagnostic.Location! }
+            .Concat(diagnostic.RelatedLocations)
             .OrderBy(location => location.SourceOrdinal)
             .Select(location => location.SourcePath)
             .ToArray();
