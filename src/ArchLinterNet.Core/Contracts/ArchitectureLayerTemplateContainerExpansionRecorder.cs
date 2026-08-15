@@ -4,11 +4,11 @@ using ArchLinterNet.Core.Model;
 namespace ArchLinterNet.Core.Contracts;
 
 // Layer templates use the same typed expansion evidence for containers as source-scoped contracts.
-// Split out of ArchitectureSourceSetExpander.cs to keep both files under the repository's
-// file-size lint budget (make/lint.mk CS_SIZE_LINT_ERROR_LINES).
-internal static partial class ArchitectureSourceSetExpander
+// This recorder owns the container-specific form, while ArchitectureSourceSetExpander owns the
+// cross-family expansion lifecycle.
+internal static class ArchitectureLayerTemplateContainerExpansionRecorder
 {
-    private static void RecordLayerTemplateContainerExclusions(
+    internal static void Record(
         ArchitectureContractDocument document,
         List<ArchitectureContractExpansion> expansions,
         string group,
@@ -42,7 +42,8 @@ internal static partial class ArchitectureSourceSetExpander
                 remaining.Remove(container);
                 exclusions.Add(new ArchitectureExpandedContractExclusion(container, null, container, matched)
                 {
-                    PolicyLocation = ExclusionLocation(document, contractLocation, "exclude_containers", index)
+                    PolicyLocation = ArchitectureSourceSetExpander.ExclusionLocation(
+                        document, contractLocation, "exclude_containers", index)
                 });
             }
 
@@ -55,18 +56,20 @@ internal static partial class ArchitectureSourceSetExpander
                     continue;
                 }
 
-                containerLocations.TryAdd(container, ExclusionLocation(document, contractLocation, "containers", index));
+                containerLocations.TryAdd(
+                    container,
+                    ArchitectureSourceSetExpander.ExclusionLocation(document, contractLocation, "containers", index));
             }
 
             List<ArchitectureExpandedContractInstance> inclusions = includedSnapshot
                 .OrderBy(container => container, StringComparer.Ordinal)
-                .Select(container => CreateExpandedInstance(
+                .Select(container => ArchitectureSourceSetExpander.CreateExpandedInstance(
                     $"{authoredId}/{ArchitecturePolicyDocumentLoader.NormalizeToContractId(container)}",
                     container, null, container, containerLocations.GetValueOrDefault(container), contractLocation, null))
                 .ToList();
             List<ArchitectureExpandedContractInstance> instances = remaining
                 .OrderBy(container => container, StringComparer.Ordinal)
-                .Select(container => CreateExpandedInstance(
+                .Select(container => ArchitectureSourceSetExpander.CreateExpandedInstance(
                     $"{authoredId}/{ArchitecturePolicyDocumentLoader.NormalizeToContractId(container)}",
                     container, null, container, containerLocations.GetValueOrDefault(container), contractLocation, null))
                 .ToList();

@@ -4,10 +4,12 @@ using ArchLinterNet.Core.Model;
 
 namespace ArchLinterNet.Core.Contracts;
 
-internal static partial class ArchitectureSourceSetExpander
+// Resolves authored source and source-set inclusions into the exact expansion candidates that the
+// orchestrator subsequently subtracts, validates, and turns into cloned contract instances.
+internal static class ArchitectureSourceSetInclusionResolver
 {
     // Effective selectors are unique; inclusions deliberately retain every authored reference.
-    private sealed class SourceSelectionState
+    internal sealed class SourceSelectionState
     {
         public Dictionary<string, (string? SetName, string Selector)> Selectors { get; } = new(StringComparer.Ordinal);
         public Dictionary<string, ArchitecturePolicySourceLocation?> InstanceLocations { get; } = new(StringComparer.Ordinal);
@@ -16,9 +18,9 @@ internal static partial class ArchitectureSourceSetExpander
         public List<ArchitectureExpandedContractInstance> Inclusions { get; } = new();
     }
 
-    private static SourceSelectionState ResolveIncludedSources<TContract>(
+    internal static SourceSelectionState ResolveIncludedSources<TContract>(
         ArchitectureContractDocument document,
-        SourceSetResolver resolver,
+        ArchitectureSourceSetExpander.SourceSetResolver resolver,
         string group,
         TContract contract,
         string authoredId,
@@ -32,8 +34,10 @@ internal static partial class ArchitectureSourceSetExpander
             if (string.IsNullOrWhiteSpace(source)) continue;
 
             resolver.ValidateExplicitSource(contract.Name, group, contract.SourceKind, source);
-            ArchitecturePolicySourceLocation? location = ExclusionLocation(document, contractLocation, "sources", index);
-            state.Inclusions.Add(CreateExpandedInstance(authoredId, source, null, source, location, contractLocation, null));
+            ArchitecturePolicySourceLocation? location = ArchitectureSourceSetExpander.ExclusionLocation(
+                document, contractLocation, "sources", index);
+            state.Inclusions.Add(ArchitectureSourceSetExpander.CreateExpandedInstance(
+                authoredId, source, null, source, location, contractLocation, null));
             if (state.Selectors.TryAdd(source, (null, source))) state.InstanceLocations[source] = location;
         }
 
@@ -41,7 +45,7 @@ internal static partial class ArchitectureSourceSetExpander
         {
             ArchitectureSourceSetResolution resolution = resolver.Resolve(
                 contract.Name, group, contract.SourceKind, contract.SourceSets[index]);
-            ArchitecturePolicySourceLocation? referenceLocation = ExclusionLocation(
+            ArchitecturePolicySourceLocation? referenceLocation = ArchitectureSourceSetExpander.ExclusionLocation(
                 document, contractLocation, "source_sets", index);
             if (resolution.ResolvedSources.Count == 0)
             {
@@ -60,7 +64,8 @@ internal static partial class ArchitectureSourceSetExpander
             foreach (string source in resolution.ResolvedSources)
             {
                 string selector = resolver.SelectorFor(resolution.Name, source);
-                state.Inclusions.Add(CreateExpandedInstance(authoredId, source, resolution.Name, selector,
+                state.Inclusions.Add(ArchitectureSourceSetExpander.CreateExpandedInstance(
+                    authoredId, source, resolution.Name, selector,
                     resolver.LocationFor(resolution.Name, source), contractLocation, referenceLocation));
                 if (!state.Selectors.TryAdd(source, (resolution.Name, selector))) continue;
 

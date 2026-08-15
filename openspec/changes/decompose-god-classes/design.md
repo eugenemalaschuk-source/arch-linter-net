@@ -93,13 +93,17 @@ non-partial YAML binding root; the contract-family files retain only their own f
 because the `GeneratedRegex` source generator emits the companion declaration; generated code is
 not part of the source declaration inventory.
 
+`ArchitectureSourceSetExpander` is also now a single non-partial expansion orchestrator. Its
+source/source-set inclusion resolution and layer-template container expansion are separately owned
+by `ArchitectureSourceSetInclusionResolver` and
+`ArchitectureLayerTemplateContainerExpansionRecorder`.
+
 The post-tranche audit has ten handwritten source aggregates remaining:
 
 | Type | Declarations |
 | --- | ---: |
 | `ArchitectureDiagnosticFormatter` | 15 |
 | `ValidateCommandHandler` | 5 |
-| `ArchitectureSourceSetExpander` | 3 |
 | `ArchitectureSarifFormatter` | 3 |
 | `ReportCoordinator` | 2 |
 | `ArchitectureSourceFileFactIndex` | 2 |
@@ -127,9 +131,9 @@ with the collaborator that owns their data and dependencies.
   matching, dependency-edge, semantic-coverage, and summary work to focused collaborators.
 - **`ArchitecturePolicyConsistencyAnalysisService`:** owns policy-consistency analysis and its
   protected-importer consistency collaborator.
-- **Remaining seams:** command handling, source expansion/indexing, layout matching, validation
-  snapshots, and diagnostic/SARIF rendering still require named collaborators before the final
-  strict rule can be enabled.
+- **Remaining seams:** command handling, source indexing, layout matching, validation snapshots,
+  and diagnostic/SARIF rendering still require named collaborators before the final strict rule
+  can be enabled.
 
 ### Retire an unused CEL placeholder
 

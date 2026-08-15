@@ -13,6 +13,7 @@
 - [x] 2.3 Replace the `ArchitectureContractGroups` partial aggregation with a single purpose-named, non-partial contract-group binding root while preserving YAML and public API compatibility.
 - [ ] 2.4 Replace `ArchitectureDiagnosticFormatter` and SARIF formatter partial aggregates with named renderers/projections while preserving human, JSON, and SARIF output parity.
 - [ ] 2.5 Remove incidental production partial aggregates created by command, validation, policy-loading, and source-index splits; every replacement must have a named responsibility.
+  - [x] Replace `ArchitectureSourceSetExpander`'s inclusion and layer-template fragments with `ArchitectureSourceSetInclusionResolver` and `ArchitectureLayerTemplateContainerExpansionRecorder`.
 - [x] 2.6 Remove the unused `CelEngine` placeholder and its smoke test; retain the actual CEL evaluator pipeline as the supported execution seam.
 
 ## 3. Test-suite cleanup
