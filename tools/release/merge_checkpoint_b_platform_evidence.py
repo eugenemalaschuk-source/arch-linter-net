@@ -22,7 +22,9 @@ _PLATFORM_SCHEMA = "checkpoint-b-platform-evidence/v1"
 _REQUIRED_SHARDS = {
     "package-and-entrypoints",
     "adopter-runtime",
-    "consumer-cleanup",
+    "consumer-cleanup-policy-foundation",
+    "consumer-cleanup-configuration-and-identity",
+    "consumer-cleanup-source-set-authoring",
     "public-api-surface-selector",
 }
 _COMMON_FIELDS = (
@@ -120,8 +122,8 @@ def merge_platform_shards(input_directory: Path, candidate_manifest: Path) -> di
         for _, record in records
         if record.get("policy_shape") is not None
     ]
-    if len(shapes) != 1 or shapes[0][0] != "consumer-cleanup":
-        raise ValueError("Exactly the consumer-cleanup shard must report policy_shape.")
+    if len(shapes) != 1 or shapes[0][0] != "consumer-cleanup-policy-foundation":
+        raise ValueError("Exactly the consumer-cleanup policy foundation shard must report policy_shape.")
     policy_shape = shapes[0][1]
     if not isinstance(policy_shape, dict) or set(policy_shape) != _POLICY_SHAPE_FIELDS:
         raise ValueError("Checkpoint B consumer-cleanup shard reports an invalid policy_shape.")

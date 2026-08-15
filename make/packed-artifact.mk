@@ -1,6 +1,9 @@
 .PHONY: test-repository _repository-acceptance-test prepare-packed-artifact-candidate \
 	test-packed-artifact-package-and-entrypoints test-packed-artifact-adopter-runtime \
-	test-packed-artifact-consumer-cleanup test-packed-artifact-public-api-surface-selector
+	test-packed-artifact-consumer-cleanup-policy-foundation \
+	test-packed-artifact-consumer-cleanup-configuration-and-identity \
+	test-packed-artifact-consumer-cleanup-source-set-authoring \
+	test-packed-artifact-public-api-surface-selector
 
 # Checkpoint B CI/release sharding. The ordinary `test-packed-artifact` target remains the complete
 # local gate and discovers all CheckpointBReleaseGateTests methods in one NUnit process. These
@@ -8,7 +11,9 @@
 # packed-artifact wall-clock while preserving the exact scenario union.
 TEST_PACKED_ARTIFACT_PACKAGE_AND_ENTRYPOINTS_FILTER := FullyQualifiedName~CheckpointBReleaseGateTests.PackedCandidate_PackageAndEntrypoints
 TEST_PACKED_ARTIFACT_ADOPTER_RUNTIME_FILTER := FullyQualifiedName~CheckpointBReleaseGateTests.PackedCandidate_AdopterRuntimeMatrix
-TEST_PACKED_ARTIFACT_CONSUMER_CLEANUP_FILTER := FullyQualifiedName~CheckpointBReleaseGateTests.PackedCandidate_ConsumerCleanupMatrix
+TEST_PACKED_ARTIFACT_CONSUMER_CLEANUP_POLICY_FOUNDATION_FILTER := FullyQualifiedName~CheckpointBReleaseGateTests.PackedCandidate_ConsumerCleanupPolicyFoundation
+TEST_PACKED_ARTIFACT_CONSUMER_CLEANUP_CONFIGURATION_AND_IDENTITY_FILTER := FullyQualifiedName~CheckpointBReleaseGateTests.PackedCandidate_ConsumerCleanupConfigurationAndIdentity
+TEST_PACKED_ARTIFACT_CONSUMER_CLEANUP_SOURCE_SET_AUTHORING_FILTER := FullyQualifiedName~CheckpointBReleaseGateTests.PackedCandidate_ConsumerCleanupSourceSetAuthoring
 TEST_PACKED_ARTIFACT_PUBLIC_API_SURFACE_SELECTOR_FILTER := FullyQualifiedName~CheckpointBReleaseGateTests.PackedCandidate_PublicApiSurfaceSelectorMatrix
 
 CHECKPOINT_B_CANDIDATE_VERSION ?= 0.6.1
@@ -41,9 +46,17 @@ test-packed-artifact-adopter-runtime:  ## Run Checkpoint B synthetic adopter/run
 	@dotnet build "$(CORE_TESTS_CSPROJ)" --no-restore --nologo
 	@dotnet test "$(CORE_TESTS_CSPROJ)" --no-restore --no-build --filter "$(TEST_PACKED_ARTIFACT_ADOPTER_RUNTIME_FILTER)"
 
-test-packed-artifact-consumer-cleanup:  ## Run Checkpoint B consumer-cleanup shard
+test-packed-artifact-consumer-cleanup-policy-foundation:  ## Run Checkpoint B consumer-cleanup policy shard
 	@dotnet build "$(CORE_TESTS_CSPROJ)" --no-restore --nologo
-	@dotnet test "$(CORE_TESTS_CSPROJ)" --no-restore --no-build --filter "$(TEST_PACKED_ARTIFACT_CONSUMER_CLEANUP_FILTER)"
+	@dotnet test "$(CORE_TESTS_CSPROJ)" --no-restore --no-build --filter "$(TEST_PACKED_ARTIFACT_CONSUMER_CLEANUP_POLICY_FOUNDATION_FILTER)"
+
+test-packed-artifact-consumer-cleanup-configuration-and-identity:  ## Run Checkpoint B consumer-cleanup configuration shard
+	@dotnet build "$(CORE_TESTS_CSPROJ)" --no-restore --nologo
+	@dotnet test "$(CORE_TESTS_CSPROJ)" --no-restore --no-build --filter "$(TEST_PACKED_ARTIFACT_CONSUMER_CLEANUP_CONFIGURATION_AND_IDENTITY_FILTER)"
+
+test-packed-artifact-consumer-cleanup-source-set-authoring:  ## Run Checkpoint B consumer-cleanup source-set shard
+	@dotnet build "$(CORE_TESTS_CSPROJ)" --no-restore --nologo
+	@dotnet test "$(CORE_TESTS_CSPROJ)" --no-restore --no-build --filter "$(TEST_PACKED_ARTIFACT_CONSUMER_CLEANUP_SOURCE_SET_AUTHORING_FILTER)"
 
 test-packed-artifact-public-api-surface-selector:  ## Run Checkpoint B public-API selector shard
 	@dotnet build "$(CORE_TESTS_CSPROJ)" --no-restore --nologo

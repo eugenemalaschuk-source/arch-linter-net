@@ -19,19 +19,12 @@ public sealed partial class CheckpointBReleaseGateTests
     private static readonly Dictionary<string, string> _trackedConsumerCleanupDefects =
         new(StringComparer.Ordinal);
 
-    private static List<CheckpointScenarioResult> AssertConsumerCleanupMatrix(
+    private static List<CheckpointScenarioResult> AssertConsumerCleanupPolicyFoundation(
         CandidatePackageFeed candidate,
         out ConsumerPolicyShape policyShape)
     {
-        using AdoptionAcceptanceFixture consumer = AdoptionAcceptanceFixture.Create(ModularConsumerFixtureId);
-        consumer.Build();
-
-        CommandResult strict = candidate.RunTool(consumer.Root,
-            "--policy", consumer.PolicyPath, "--strict", "--format", "json", "--ensure-built");
-        Assert.That(strict.ExitCode, Is.EqualTo(0),
-            $"The synthetic modular consumer must validate cleanly.{Environment.NewLine}{strict.CombinedOutput}");
-        using JsonDocument strictReport = JsonDocument.Parse(strict.StandardOutput);
-        JsonElement expansion = strictReport.RootElement.GetProperty("source_set_expansion");
+        using PreparedConsumerCleanup prepared = PrepareConsumerCleanup(candidate);
+        AdoptionAcceptanceFixture consumer = prepared.Consumer;
 
         var scenarios = new List<CheckpointScenarioResult>
         {
@@ -41,19 +34,71 @@ public sealed partial class CheckpointBReleaseGateTests
             AssertStrictCyclesBaselineScope(candidate, consumer),
             AssertDependencyContractIdParity(candidate, consumer),
             AssertLayerOverlapAllowance(candidate, consumer),
-            AssertActionableSchemaDiagnostics(candidate),
-            AssertNamespaceAllowancePattern(candidate),
-            AssertJsonConfigurationErrorFormat(candidate, consumer),
-            candidate.AssertReleaseIdentityConsistency(),
-            AssertSourceSetAssemblyAuthoring(expansion),
-            AssertDiscoveredProjectSetAuthoring(expansion),
-            AssertSourceSetEnrolment(candidate),
-            AssertStaleSourceSelectorFailsClosed(candidate),
         };
 
-        policyShape = DescribeConsumerPolicyShape(consumer, expansion);
+        policyShape = DescribeConsumerPolicyShape(consumer, prepared.Expansion);
         scenarios.Add(AssertConsumerPolicyShape(policyShape));
         return scenarios;
+    }
+
+    private static List<CheckpointScenarioResult> AssertConsumerCleanupConfigurationAndIdentity(
+        CandidatePackageFeed candidate)
+    {
+        using PreparedConsumerCleanup prepared = PrepareConsumerCleanup(candidate);
+        return
+        [
+            AssertActionableSchemaDiagnostics(candidate),
+            AssertNamespaceAllowancePattern(candidate),
+            AssertJsonConfigurationErrorFormat(candidate, prepared.Consumer),
+            candidate.AssertReleaseIdentityConsistency(),
+        ];
+    }
+
+    private static List<CheckpointScenarioResult> AssertConsumerCleanupSourceSetAuthoring(
+        CandidatePackageFeed candidate)
+    {
+        using PreparedConsumerCleanup prepared = PrepareConsumerCleanup(candidate);
+        return
+        [
+            AssertSourceSetAssemblyAuthoring(prepared.Expansion),
+            AssertDiscoveredProjectSetAuthoring(prepared.Expansion),
+            AssertSourceSetEnrolment(candidate),
+            AssertStaleSourceSelectorFailsClosed(candidate),
+        ];
+    }
+
+    private static PreparedConsumerCleanup PrepareConsumerCleanup(CandidatePackageFeed candidate)
+    {
+        var consumer = AdoptionAcceptanceFixture.Create(ModularConsumerFixtureId);
+        try
+        {
+            consumer.Build();
+            CommandResult strict = candidate.RunTool(consumer.Root,
+                "--policy", consumer.PolicyPath, "--strict", "--format", "json", "--ensure-built");
+            Assert.That(strict.ExitCode, Is.EqualTo(0),
+                $"The synthetic modular consumer must validate cleanly.{Environment.NewLine}{strict.CombinedOutput}");
+            return new PreparedConsumerCleanup(consumer, JsonDocument.Parse(strict.StandardOutput));
+        }
+        catch
+        {
+            consumer.Dispose();
+            throw;
+        }
+    }
+
+    private sealed class PreparedConsumerCleanup(
+        AdoptionAcceptanceFixture consumer,
+        JsonDocument strictReport) : IDisposable
+    {
+        public AdoptionAcceptanceFixture Consumer => consumer;
+
+        public JsonElement Expansion => strictReport.RootElement.GetProperty("source_set_expansion");
+
+        public void Dispose()
+        {
+            strictReport.Dispose();
+            consumer.Dispose();
+        }
     }
 
     /// <summary>

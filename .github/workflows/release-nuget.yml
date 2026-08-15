@@ -54,9 +54,15 @@ jobs:
           - id: adopter-runtime
             name: Adopter runtime
             target: test-packed-artifact-adopter-runtime
-          - id: consumer-cleanup
-            name: Consumer cleanup
-            target: test-packed-artifact-consumer-cleanup
+          - id: consumer-cleanup-policy-foundation
+            name: Consumer cleanup policy foundation
+            target: test-packed-artifact-consumer-cleanup-policy-foundation
+          - id: consumer-cleanup-configuration-and-identity
+            name: Consumer cleanup configuration + identity
+            target: test-packed-artifact-consumer-cleanup-configuration-and-identity
+          - id: consumer-cleanup-source-set-authoring
+            name: Consumer cleanup source-set authoring
+            target: test-packed-artifact-consumer-cleanup-source-set-authoring
           - id: public-api-surface-selector
             name: Public API selector
             target: test-packed-artifact-public-api-surface-selector

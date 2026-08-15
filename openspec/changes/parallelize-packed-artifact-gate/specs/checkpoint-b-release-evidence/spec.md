@@ -25,7 +25,7 @@ Before final release aggregation, the repository SHALL merge exactly the require
 
 #### Scenario: Consumer policy shape remains canonical platform evidence
 
-- **WHEN** the consumer-cleanup shard completes
+- **WHEN** the consumer-cleanup policy-foundation shard completes
 - **THEN** it reports the typed consumer policy-shape counters
 - **AND** the platform merge requires exactly that shard to supply the counters copied into the canonical platform record
 

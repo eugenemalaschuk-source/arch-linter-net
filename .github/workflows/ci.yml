@@ -633,9 +633,23 @@ jobs:
             name: Windows
             platform: windows-x64
             shell_adapter: pwsh
-            shard: consumer-cleanup
-            shard_name: Consumer cleanup
-            target: test-packed-artifact-consumer-cleanup
+            shard: consumer-cleanup-policy-foundation
+            shard_name: Consumer cleanup policy foundation
+            target: test-packed-artifact-consumer-cleanup-policy-foundation
+          - os: windows-latest
+            name: Windows
+            platform: windows-x64
+            shell_adapter: pwsh
+            shard: consumer-cleanup-configuration-and-identity
+            shard_name: Consumer cleanup configuration + identity
+            target: test-packed-artifact-consumer-cleanup-configuration-and-identity
+          - os: windows-latest
+            name: Windows
+            platform: windows-x64
+            shell_adapter: pwsh
+            shard: consumer-cleanup-source-set-authoring
+            shard_name: Consumer cleanup source-set authoring
+            target: test-packed-artifact-consumer-cleanup-source-set-authoring
           - os: windows-latest
             name: Windows
             platform: windows-x64
@@ -661,9 +675,23 @@ jobs:
             name: Apple Silicon macOS
             platform: macos-arm64
             shell_adapter: bash
-            shard: consumer-cleanup
-            shard_name: Consumer cleanup
-            target: test-packed-artifact-consumer-cleanup
+            shard: consumer-cleanup-policy-foundation
+            shard_name: Consumer cleanup policy foundation
+            target: test-packed-artifact-consumer-cleanup-policy-foundation
+          - os: macos-14
+            name: Apple Silicon macOS
+            platform: macos-arm64
+            shell_adapter: bash
+            shard: consumer-cleanup-configuration-and-identity
+            shard_name: Consumer cleanup configuration + identity
+            target: test-packed-artifact-consumer-cleanup-configuration-and-identity
+          - os: macos-14
+            name: Apple Silicon macOS
+            platform: macos-arm64
+            shell_adapter: bash
+            shard: consumer-cleanup-source-set-authoring
+            shard_name: Consumer cleanup source-set authoring
+            target: test-packed-artifact-consumer-cleanup-source-set-authoring
           - os: macos-14
             name: Apple Silicon macOS
             platform: macos-arm64
