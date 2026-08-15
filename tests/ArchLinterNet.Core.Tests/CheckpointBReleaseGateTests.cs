@@ -58,48 +58,29 @@ public sealed partial class CheckpointBReleaseGateTests
     }
 
     [Test]
-    public void PackedCandidate_AdopterRuntimeMatrix()
+    public void PackedCandidate_AdopterRuntimeCore()
     {
         CandidatePackageFeed candidate = Candidate;
-        var scenarios = new List<CheckpointScenarioResult>();
-        foreach (string fixtureId in new[] { "small", "multi-project", "multi-host", "migration", "aspnet-host" })
+        AssertAdopterRuntimeFixtures(candidate, ["small", "multi-project", "multi-host"]);
+        candidate.WriteShardEvidence("adopter-runtime-core",
+            [Passed("sequential-default-parity"), Passed("profile-generation")]);
+    }
+
+    [Test]
+    public void PackedCandidate_AdopterRuntimeExtended()
+    {
+        CandidatePackageFeed candidate = Candidate;
+        AssertAdopterRuntimeFixtures(candidate, ["migration", "aspnet-host"]);
+
+        var scenarios = new List<CheckpointScenarioResult>
         {
-            using AdoptionAcceptanceFixture fixture = AdoptionAcceptanceFixture.Create(fixtureId);
-            fixture.Build();
-
-            CommandResult sequential = candidate.RunTool(fixture.Root,
-                "--policy", fixture.PolicyPath,
-                "--strict",
-                "--format", "json",
-                "--ensure-built",
-                "--max-parallelism", "1");
-            AssertFixtureOracle(fixtureId, sequential);
-            string profilePath = Path.Combine(fixture.Root, "checkpoint-b-profile.json");
-            CommandResult profiledDefault = candidate.RunTool(fixture.Root,
-                "--policy", fixture.PolicyPath,
-                "--strict",
-                "--format", "json",
-                "--ensure-built",
-                "--profile", profilePath);
-
-            Assert.Multiple(() =>
-            {
-                Assert.That(profiledDefault.ExitCode, Is.EqualTo(sequential.ExitCode), fixtureId);
-                Assert.That(CanonicalJson(profiledDefault.StandardOutput),
-                    Is.EqualTo(CanonicalJson(sequential.StandardOutput)), fixtureId);
-                Assert.That(File.Exists(profilePath), Is.True, profilePath);
-                Assert.That(sequential.StandardError, Does.Not.Contain("\u001b["), fixtureId);
-            });
-        }
-
-        scenarios.Add(AssertPublicApiSnapshotWorkflow(candidate));
+            AssertPublicApiSnapshotWorkflow(candidate),
+        };
         AssertCacheLifecycleOracle(candidate);
         scenarios.Add(candidate.AssertMissingSharedFrameworkDiagnostic());
-        scenarios.Add(Passed("sequential-default-parity"));
-        scenarios.Add(Passed("profile-generation"));
         scenarios.Add(Passed("cache-miss-population-hit"));
         scenarios.Add(Passed("cache-corruption-recompute"));
-        candidate.WriteShardEvidence("adopter-runtime", scenarios);
+        candidate.WriteShardEvidence("adopter-runtime-extended", scenarios);
     }
 
     [Test]
@@ -130,17 +111,70 @@ public sealed partial class CheckpointBReleaseGateTests
     }
 
     [Test]
-    public void PackedCandidate_PublicApiSurfaceSelectorMatrix()
+    public void PackedCandidate_PublicApiSurfaceSelectorSnapshotAndRole()
     {
         CandidatePackageFeed candidate = Candidate;
-        IReadOnlyList<CheckpointScenarioResult> scenarios = AssertPublicApiSurfaceSelectorMatrix(candidate);
-        candidate.WriteShardEvidence("public-api-surface-selector", scenarios);
+        using AdoptionAcceptanceFixture fixture = CreatePublicApiSurfaceSelectorFixture();
+        candidate.WriteShardEvidence("public-api-surface-selector-snapshot-and-role",
+            [AssertSurfaceSelectorSnapshotReduction(candidate, fixture), AssertSurfaceSelectorRolePreservation(candidate, fixture)]);
+    }
+
+    [Test]
+    public void PackedCandidate_PublicApiSurfaceSelectorLifecycle()
+    {
+        CandidatePackageFeed candidate = Candidate;
+        using AdoptionAcceptanceFixture fixture = CreatePublicApiSurfaceSelectorFixture();
+
+        // The lifecycle scenarios consume the initial reviewed snapshots. They re-establish that
+        // fixture-local precondition without emitting the snapshot-reduction scenario a second time.
+        _ = AssertSurfaceSelectorSnapshotReduction(candidate, fixture);
+        candidate.WriteShardEvidence("public-api-surface-selector-lifecycle",
+        [
+            AssertSurfaceSelectorExactDeltaLifecycle(candidate, fixture),
+            AssertSurfaceSelectorMembershipReviewVisibility(candidate, fixture),
+            AssertSurfaceSelectorEscapeFailsClosed(candidate, fixture),
+            AssertSurfaceSelectorStrictRunIsGreen(candidate, fixture),
+            candidate.AssertPublicApiSurfaceSelectorTestingParity(fixture),
+        ]);
     }
 
     private CandidatePackageFeed Candidate => _candidate
         ?? throw new InvalidOperationException("Checkpoint B candidate was not prepared.");
 
     private static CheckpointScenarioResult Passed(string id) => new(id, "passed", null);
+
+    private static void AssertAdopterRuntimeFixtures(CandidatePackageFeed candidate, IEnumerable<string> fixtureIds)
+    {
+        foreach (string fixtureId in fixtureIds)
+        {
+            using AdoptionAcceptanceFixture fixture = AdoptionAcceptanceFixture.Create(fixtureId);
+            fixture.Build();
+
+            CommandResult sequential = candidate.RunTool(fixture.Root,
+                "--policy", fixture.PolicyPath,
+                "--strict",
+                "--format", "json",
+                "--ensure-built",
+                "--max-parallelism", "1");
+            AssertFixtureOracle(fixtureId, sequential);
+            string profilePath = Path.Combine(fixture.Root, "checkpoint-b-profile.json");
+            CommandResult profiledDefault = candidate.RunTool(fixture.Root,
+                "--policy", fixture.PolicyPath,
+                "--strict",
+                "--format", "json",
+                "--ensure-built",
+                "--profile", profilePath);
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(profiledDefault.ExitCode, Is.EqualTo(sequential.ExitCode), fixtureId);
+                Assert.That(CanonicalJson(profiledDefault.StandardOutput),
+                    Is.EqualTo(CanonicalJson(sequential.StandardOutput)), fixtureId);
+                Assert.That(File.Exists(profilePath), Is.True, profilePath);
+                Assert.That(sequential.StandardError, Does.Not.Contain("\u001b["), fixtureId);
+            });
+        }
+    }
 
     private static void AssertFixtureOracle(string fixtureId, CommandResult result)
     {

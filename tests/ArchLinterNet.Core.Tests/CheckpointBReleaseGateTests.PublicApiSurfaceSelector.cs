@@ -65,23 +65,21 @@ contracts:
     // smaller intentional one, selected two bounded ways, without touching CLR visibility or
     // existing semantic roles, and with exact governance, review-visibility, and fail-closed
     // escape checks all still enforced on the selected surface.
-    private static List<CheckpointScenarioResult> AssertPublicApiSurfaceSelectorMatrix(CandidatePackageFeed candidate)
+    private static AdoptionAcceptanceFixture CreatePublicApiSurfaceSelectorFixture()
     {
-        using AdoptionAcceptanceFixture fixture = AdoptionAcceptanceFixture.Create(ApiSurfaceSelectorFixtureId);
-        Directory.CreateDirectory(Path.Combine(fixture.Root, "public-api"));
-        File.AppendAllText(fixture.PolicyPath, PermanentSurfaceSelectorContracts);
-        fixture.Build(configuration: "Release", targetFramework: "net10.0");
-
-        return
-        [
-            AssertSurfaceSelectorSnapshotReduction(candidate, fixture),
-            AssertSurfaceSelectorRolePreservation(candidate, fixture),
-            AssertSurfaceSelectorExactDeltaLifecycle(candidate, fixture),
-            AssertSurfaceSelectorMembershipReviewVisibility(candidate, fixture),
-            AssertSurfaceSelectorEscapeFailsClosed(candidate, fixture),
-            AssertSurfaceSelectorStrictRunIsGreen(candidate, fixture),
-            candidate.AssertPublicApiSurfaceSelectorTestingParity(fixture),
-        ];
+        AdoptionAcceptanceFixture fixture = AdoptionAcceptanceFixture.Create(ApiSurfaceSelectorFixtureId);
+        try
+        {
+            Directory.CreateDirectory(Path.Combine(fixture.Root, "public-api"));
+            File.AppendAllText(fixture.PolicyPath, PermanentSurfaceSelectorContracts);
+            fixture.Build(configuration: "Release", targetFramework: "net10.0");
+            return fixture;
+        }
+        catch
+        {
+            fixture.Dispose();
+            throw;
+        }
     }
 
     // Items 1, 3, 4, 11, 12, 14 — capture all three sibling contracts from one build, prove the

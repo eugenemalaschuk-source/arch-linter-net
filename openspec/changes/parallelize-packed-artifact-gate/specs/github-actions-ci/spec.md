@@ -9,7 +9,7 @@ The existing authoritative check contexts `Packed Artifact Test Suite (Windows)`
 #### Scenario: Independent Checkpoint B work runs concurrently
 
 - **WHEN** pull-request packed-artifact validation starts after the immutable candidate is prepared
-- **THEN** package/entrypoint, adopter-runtime, three consumer-cleanup, and public-API-selector shards run as independently schedulable jobs per supported PR platform
+- **THEN** package/entrypoint, two adopter-runtime, three consumer-cleanup, and two public-API-selector shards run as independently schedulable jobs per supported PR platform
 - **AND** no shard depends on another shard
 - **AND** every shard consumes the same candidate manifest digest
 

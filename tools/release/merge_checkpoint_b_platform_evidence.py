@@ -21,11 +21,13 @@ _SHARD_SCHEMA = "checkpoint-b-platform-shard-evidence/v1"
 _PLATFORM_SCHEMA = "checkpoint-b-platform-evidence/v1"
 _REQUIRED_SHARDS = {
     "package-and-entrypoints",
-    "adopter-runtime",
+    "adopter-runtime-core",
+    "adopter-runtime-extended",
     "consumer-cleanup-policy-foundation",
     "consumer-cleanup-configuration-and-identity",
     "consumer-cleanup-source-set-authoring",
-    "public-api-surface-selector",
+    "public-api-surface-selector-snapshot-and-role",
+    "public-api-surface-selector-lifecycle",
 }
 _COMMON_FIELDS = (
     "checkpoint",

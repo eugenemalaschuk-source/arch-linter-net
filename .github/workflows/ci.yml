@@ -626,9 +626,16 @@ jobs:
             name: Windows
             platform: windows-x64
             shell_adapter: pwsh
-            shard: adopter-runtime
-            shard_name: Adopter runtime
-            target: test-packed-artifact-adopter-runtime
+            shard: adopter-runtime-core
+            shard_name: Adopter runtime core
+            target: test-packed-artifact-adopter-runtime-core
+          - os: windows-latest
+            name: Windows
+            platform: windows-x64
+            shell_adapter: pwsh
+            shard: adopter-runtime-extended
+            shard_name: Adopter runtime extended
+            target: test-packed-artifact-adopter-runtime-extended
           - os: windows-latest
             name: Windows
             platform: windows-x64
@@ -654,9 +661,16 @@ jobs:
             name: Windows
             platform: windows-x64
             shell_adapter: pwsh
-            shard: public-api-surface-selector
-            shard_name: Public API selector
-            target: test-packed-artifact-public-api-surface-selector
+            shard: public-api-surface-selector-snapshot-and-role
+            shard_name: Public API selector snapshot + role
+            target: test-packed-artifact-public-api-surface-selector-snapshot-and-role
+          - os: windows-latest
+            name: Windows
+            platform: windows-x64
+            shell_adapter: pwsh
+            shard: public-api-surface-selector-lifecycle
+            shard_name: Public API selector lifecycle
+            target: test-packed-artifact-public-api-surface-selector-lifecycle
           - os: macos-14
             name: Apple Silicon macOS
             platform: macos-arm64
@@ -668,9 +682,16 @@ jobs:
             name: Apple Silicon macOS
             platform: macos-arm64
             shell_adapter: bash
-            shard: adopter-runtime
-            shard_name: Adopter runtime
-            target: test-packed-artifact-adopter-runtime
+            shard: adopter-runtime-core
+            shard_name: Adopter runtime core
+            target: test-packed-artifact-adopter-runtime-core
+          - os: macos-14
+            name: Apple Silicon macOS
+            platform: macos-arm64
+            shell_adapter: bash
+            shard: adopter-runtime-extended
+            shard_name: Adopter runtime extended
+            target: test-packed-artifact-adopter-runtime-extended
           - os: macos-14
             name: Apple Silicon macOS
             platform: macos-arm64
@@ -696,9 +717,16 @@ jobs:
             name: Apple Silicon macOS
             platform: macos-arm64
             shell_adapter: bash
-            shard: public-api-surface-selector
-            shard_name: Public API selector
-            target: test-packed-artifact-public-api-surface-selector
+            shard: public-api-surface-selector-snapshot-and-role
+            shard_name: Public API selector snapshot + role
+            target: test-packed-artifact-public-api-surface-selector-snapshot-and-role
+          - os: macos-14
+            name: Apple Silicon macOS
+            platform: macos-arm64
+            shell_adapter: bash
+            shard: public-api-surface-selector-lifecycle
+            shard_name: Public API selector lifecycle
+            target: test-packed-artifact-public-api-surface-selector-lifecycle
     permissions:
       contents: read
     env:

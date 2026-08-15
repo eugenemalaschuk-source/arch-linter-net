@@ -33,11 +33,13 @@ _POLICY_SHAPE = {
 }
 _SHARDS = [
     "package-and-entrypoints",
-    "adopter-runtime",
+    "adopter-runtime-core",
+    "adopter-runtime-extended",
     "consumer-cleanup-policy-foundation",
     "consumer-cleanup-configuration-and-identity",
     "consumer-cleanup-source-set-authoring",
-    "public-api-surface-selector",
+    "public-api-surface-selector-snapshot-and-role",
+    "public-api-surface-selector-lifecycle",
 ]
 
 
@@ -104,15 +106,15 @@ def test_merges_complete_disjoint_shards(tmp_path: Path) -> None:
 
 def test_rejects_missing_shard(tmp_path: Path) -> None:
     manifest, shards = _write_corpus(tmp_path)
-    (shards / "checkpoint-b-platform-shard-adopter-runtime.json").unlink()
+    (shards / "checkpoint-b-platform-shard-adopter-runtime-core.json").unlink()
 
-    with pytest.raises(ValueError, match="Expected 6 Checkpoint B shard records"):
+    with pytest.raises(ValueError, match="Expected 8 Checkpoint B shard records"):
         merge_platform_shards(shards, manifest)
 
 
 def test_rejects_malformed_shard_json(tmp_path: Path) -> None:
     manifest, shards = _write_corpus(tmp_path)
-    (shards / "checkpoint-b-platform-shard-adopter-runtime.json").write_text("{not valid json")
+    (shards / "checkpoint-b-platform-shard-adopter-runtime-core.json").write_text("{not valid json")
 
     with pytest.raises(ValueError, match="Cannot read Checkpoint B shard"):
         merge_platform_shards(shards, manifest)
@@ -120,7 +122,7 @@ def test_rejects_malformed_shard_json(tmp_path: Path) -> None:
 
 def test_rejects_non_object_shard_json(tmp_path: Path) -> None:
     manifest, shards = _write_corpus(tmp_path)
-    (shards / "checkpoint-b-platform-shard-adopter-runtime.json").write_text(json.dumps([1, 2, 3]))
+    (shards / "checkpoint-b-platform-shard-adopter-runtime-core.json").write_text(json.dumps([1, 2, 3]))
 
     with pytest.raises(ValueError, match="must be a JSON object"):
         merge_platform_shards(shards, manifest)
@@ -128,7 +130,7 @@ def test_rejects_non_object_shard_json(tmp_path: Path) -> None:
 
 def test_rejects_duplicate_shard_ids(tmp_path: Path) -> None:
     manifest, shards = _write_corpus(tmp_path)
-    _corrupt(shards, "adopter-runtime", lambda record: record.update({"shard_id": "consumer-cleanup-policy-foundation"}))
+    _corrupt(shards, "adopter-runtime-core", lambda record: record.update({"shard_id": "consumer-cleanup-policy-foundation"}))
 
     with pytest.raises(ValueError, match="shard inventory mismatch"):
         merge_platform_shards(shards, manifest)
@@ -136,7 +138,7 @@ def test_rejects_duplicate_shard_ids(tmp_path: Path) -> None:
 
 def test_rejects_unsupported_shard_schema(tmp_path: Path) -> None:
     manifest, shards = _write_corpus(tmp_path)
-    _corrupt(shards, "adopter-runtime", lambda record: record.update({"schema": "wrong/v0"}))
+    _corrupt(shards, "adopter-runtime-core", lambda record: record.update({"schema": "wrong/v0"}))
 
     with pytest.raises(ValueError, match="does not use the supported shard evidence schema"):
         merge_platform_shards(shards, manifest)
@@ -144,7 +146,7 @@ def test_rejects_unsupported_shard_schema(tmp_path: Path) -> None:
 
 def test_rejects_invalid_shard_result(tmp_path: Path) -> None:
     manifest, shards = _write_corpus(tmp_path)
-    _corrupt(shards, "adopter-runtime", lambda record: record.update({"result": "unknown"}))
+    _corrupt(shards, "adopter-runtime-core", lambda record: record.update({"result": "unknown"}))
 
     with pytest.raises(ValueError, match="does not report a Checkpoint B shard result"):
         merge_platform_shards(shards, manifest)
@@ -152,7 +154,7 @@ def test_rejects_invalid_shard_result(tmp_path: Path) -> None:
 
 def test_rejects_non_synthetic_identities(tmp_path: Path) -> None:
     manifest, shards = _write_corpus(tmp_path)
-    _corrupt(shards, "adopter-runtime", lambda record: record.update({"synthetic_identities_only": False}))
+    _corrupt(shards, "adopter-runtime-core", lambda record: record.update({"synthetic_identities_only": False}))
 
     with pytest.raises(ValueError, match="does not affirm synthetic identities only"):
         merge_platform_shards(shards, manifest)
@@ -168,7 +170,7 @@ def test_rejects_candidate_mismatch(tmp_path: Path) -> None:
 
 def test_rejects_source_commit_mismatch(tmp_path: Path) -> None:
     manifest, shards = _write_corpus(tmp_path)
-    _corrupt(shards, "adopter-runtime", lambda record: record.update({"source_commit": "c" * 40}))
+    _corrupt(shards, "adopter-runtime-core", lambda record: record.update({"source_commit": "c" * 40}))
 
     with pytest.raises(ValueError, match="source commit differs from the manifest"):
         merge_platform_shards(shards, manifest)
@@ -176,7 +178,7 @@ def test_rejects_source_commit_mismatch(tmp_path: Path) -> None:
 
 def test_rejects_manifest_digest_mismatch(tmp_path: Path) -> None:
     manifest, shards = _write_corpus(tmp_path)
-    _corrupt(shards, "adopter-runtime", lambda record: record.update({"candidate_manifest_sha256": "0" * 64}))
+    _corrupt(shards, "adopter-runtime-core", lambda record: record.update({"candidate_manifest_sha256": "0" * 64}))
 
     with pytest.raises(ValueError, match="not bound to the candidate manifest digest"):
         merge_platform_shards(shards, manifest)
@@ -184,7 +186,7 @@ def test_rejects_manifest_digest_mismatch(tmp_path: Path) -> None:
 
 def test_rejects_package_inventory_mismatch(tmp_path: Path) -> None:
     manifest, shards = _write_corpus(tmp_path)
-    _corrupt(shards, "adopter-runtime", lambda record: record.update({"packages": []}))
+    _corrupt(shards, "adopter-runtime-core", lambda record: record.update({"packages": []}))
 
     with pytest.raises(ValueError, match="package inventory differs from the candidate manifest"):
         merge_platform_shards(shards, manifest)
@@ -192,7 +194,7 @@ def test_rejects_package_inventory_mismatch(tmp_path: Path) -> None:
 
 def test_rejects_common_field_disagreement(tmp_path: Path) -> None:
     manifest, shards = _write_corpus(tmp_path)
-    _corrupt(shards, "adopter-runtime", lambda record: record.update({"platform_id": "linux-x64"}))
+    _corrupt(shards, "adopter-runtime-core", lambda record: record.update({"platform_id": "linux-x64"}))
 
     with pytest.raises(ValueError, match="shards disagree on 'platform_id'"):
         merge_platform_shards(shards, manifest)
@@ -200,7 +202,7 @@ def test_rejects_common_field_disagreement(tmp_path: Path) -> None:
 
 def test_rejects_shard_without_scenarios(tmp_path: Path) -> None:
     manifest, shards = _write_corpus(tmp_path)
-    _corrupt(shards, "adopter-runtime", lambda record: record.update({"scenarios": []}))
+    _corrupt(shards, "adopter-runtime-core", lambda record: record.update({"scenarios": []}))
 
     with pytest.raises(ValueError, match="has no scenario results"):
         merge_platform_shards(shards, manifest)
@@ -208,7 +210,7 @@ def test_rejects_shard_without_scenarios(tmp_path: Path) -> None:
 
 def test_rejects_malformed_scenario_record(tmp_path: Path) -> None:
     manifest, shards = _write_corpus(tmp_path)
-    _corrupt(shards, "adopter-runtime", lambda record: record["scenarios"].__setitem__(0, "not-a-dict"))
+    _corrupt(shards, "adopter-runtime-core", lambda record: record["scenarios"].__setitem__(0, "not-a-dict"))
 
     with pytest.raises(ValueError, match="contains a malformed scenario record"):
         merge_platform_shards(shards, manifest)
@@ -216,7 +218,7 @@ def test_rejects_malformed_scenario_record(tmp_path: Path) -> None:
 
 def test_rejects_malformed_scenario_result(tmp_path: Path) -> None:
     manifest, shards = _write_corpus(tmp_path)
-    _corrupt(shards, "adopter-runtime", lambda record: record["scenarios"][0].update({"result": "maybe"}))
+    _corrupt(shards, "adopter-runtime-core", lambda record: record["scenarios"][0].update({"result": "maybe"}))
 
     with pytest.raises(ValueError, match="contains a malformed scenario result"):
         merge_platform_shards(shards, manifest)
@@ -229,7 +231,7 @@ def test_rejects_non_passing_scenario_without_reason(tmp_path: Path) -> None:
         record["scenarios"][0]["result"] = "not_applicable"
         record["scenarios"][0]["reason"] = None
 
-    _corrupt(shards, "adopter-runtime", _mutate)
+    _corrupt(shards, "adopter-runtime-core", _mutate)
 
     with pytest.raises(ValueError, match="does not explain a non-passing scenario"):
         merge_platform_shards(shards, manifest)
@@ -241,7 +243,7 @@ def test_rejects_duplicate_scenario_ids_within_shard(tmp_path: Path) -> None:
     def _mutate(record: dict[str, Any]) -> None:
         record["scenarios"][1]["id"] = record["scenarios"][0]["id"]
 
-    _corrupt(shards, "adopter-runtime", _mutate)
+    _corrupt(shards, "adopter-runtime-core", _mutate)
 
     with pytest.raises(ValueError, match="contains duplicate scenario IDs"):
         merge_platform_shards(shards, manifest)
@@ -250,7 +252,7 @@ def test_rejects_duplicate_scenario_ids_within_shard(tmp_path: Path) -> None:
 def test_rejects_overlapping_scenario_ids(tmp_path: Path) -> None:
     manifest, shards = _write_corpus(tmp_path)
     package_path = shards / "checkpoint-b-platform-shard-package-and-entrypoints.json"
-    adopter_path = shards / "checkpoint-b-platform-shard-adopter-runtime.json"
+    adopter_path = shards / "checkpoint-b-platform-shard-adopter-runtime-core.json"
     package = json.loads(package_path.read_text())
     adopter = json.loads(adopter_path.read_text())
     adopter["scenarios"].append(package["scenarios"][0])
@@ -267,7 +269,7 @@ def test_rejects_shard_result_contradicting_scenarios(tmp_path: Path) -> None:
         record["scenarios"][0]["result"] = "failed"
         record["scenarios"][0]["reason"] = "Broken."
 
-    _corrupt(shards, "adopter-runtime", _mutate)
+    _corrupt(shards, "adopter-runtime-core", _mutate)
 
     with pytest.raises(ValueError, match="shard result contradicts its scenario results"):
         merge_platform_shards(shards, manifest)
@@ -275,7 +277,7 @@ def test_rejects_shard_result_contradicting_scenarios(tmp_path: Path) -> None:
 
 def test_rejects_incomplete_scenario_union(tmp_path: Path) -> None:
     manifest, shards = _write_corpus(tmp_path)
-    _corrupt(shards, "adopter-runtime", lambda record: record["scenarios"].pop())
+    _corrupt(shards, "adopter-runtime-core", lambda record: record["scenarios"].pop())
 
     with pytest.raises(ValueError, match="shard union is incomplete"):
         merge_platform_shards(shards, manifest)
@@ -283,7 +285,7 @@ def test_rejects_incomplete_scenario_union(tmp_path: Path) -> None:
 
 def test_rejects_policy_shape_reported_by_wrong_shard(tmp_path: Path) -> None:
     manifest, shards = _write_corpus(tmp_path)
-    _corrupt(shards, "adopter-runtime", lambda record: record.update({"policy_shape": _POLICY_SHAPE}))
+    _corrupt(shards, "adopter-runtime-core", lambda record: record.update({"policy_shape": _POLICY_SHAPE}))
 
     with pytest.raises(ValueError, match="Exactly the consumer-cleanup policy foundation shard must report policy_shape"):
         merge_platform_shards(shards, manifest)

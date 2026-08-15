@@ -51,9 +51,12 @@ jobs:
           - id: package-and-entrypoints
             name: Package + entrypoints
             target: test-packed-artifact-package-and-entrypoints
-          - id: adopter-runtime
-            name: Adopter runtime
-            target: test-packed-artifact-adopter-runtime
+          - id: adopter-runtime-core
+            name: Adopter runtime core
+            target: test-packed-artifact-adopter-runtime-core
+          - id: adopter-runtime-extended
+            name: Adopter runtime extended
+            target: test-packed-artifact-adopter-runtime-extended
           - id: consumer-cleanup-policy-foundation
             name: Consumer cleanup policy foundation
             target: test-packed-artifact-consumer-cleanup-policy-foundation
@@ -63,9 +66,12 @@ jobs:
           - id: consumer-cleanup-source-set-authoring
             name: Consumer cleanup source-set authoring
             target: test-packed-artifact-consumer-cleanup-source-set-authoring
-          - id: public-api-surface-selector
-            name: Public API selector
-            target: test-packed-artifact-public-api-surface-selector
+          - id: public-api-surface-selector-snapshot-and-role
+            name: Public API selector snapshot + role
+            target: test-packed-artifact-public-api-surface-selector-snapshot-and-role
+          - id: public-api-surface-selector-lifecycle
+            name: Public API selector lifecycle
+            target: test-packed-artifact-public-api-surface-selector-lifecycle
     env:
       ARCH_LINTER_SOURCE_SHA: ${{ github.sha }}
       CHECKPOINT_B_CANDIDATE_VERSION: ${{ needs.prepare-candidate.outputs.package_version }}
