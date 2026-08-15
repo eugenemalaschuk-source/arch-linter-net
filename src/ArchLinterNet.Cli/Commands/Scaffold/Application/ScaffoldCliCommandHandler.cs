@@ -40,19 +40,19 @@ internal sealed class ScaffoldCliCommandHandler(ICliConsole console, IFileSystem
         string moduleName = RequirePascalCase(options.ModuleName, "--module");
         string commandToken = RequireCommandToken(options.CommandToken);
         string moduleNamespace = $"{CommandContainerNamespace}.{moduleName}";
-        string modulePath = Path.Combine(CommandContainerPath, moduleName);
+        string modulePath = CombineRepositoryPath(CommandContainerPath, moduleName);
         var files = new List<ScaffoldFile>
         {
             new(
-                Path.Combine(modulePath, "EntryPoint", $"{moduleName}CommandModule.cs"),
+                CombineRepositoryPath(modulePath, "EntryPoint", $"{moduleName}CommandModule.cs"),
                 $"{moduleNamespace}.EntryPoint",
                 EntryPointTemplate(moduleName, commandToken, moduleNamespace)),
             new(
-                Path.Combine(modulePath, "Application", $"{moduleName}CommandHandler.cs"),
+                CombineRepositoryPath(modulePath, "Application", $"{moduleName}CommandHandler.cs"),
                 $"{moduleNamespace}.Application",
                 ApplicationTemplate(moduleName, moduleNamespace)),
             new(
-                Path.Combine(TestPath, $"{moduleName}CommandScaffoldTests.cs"),
+                CombineRepositoryPath(TestPath, $"{moduleName}CommandScaffoldTests.cs"),
                 "ArchLinterNet.Cli.Tests.Scaffolded",
                 TestTemplate(moduleName, commandToken)),
         };
@@ -108,7 +108,7 @@ internal sealed class ScaffoldCliCommandHandler(ICliConsole console, IFileSystem
 
         string name = RequirePascalCase(modelName, "--model");
         files.Add(new ScaffoldFile(
-            Path.Combine(modulePath, "Models", $"{name}.cs"),
+            CombineRepositoryPath(modulePath, "Models", $"{name}.cs"),
             $"{moduleNamespace}.Models",
             $"namespace {moduleNamespace}.Models;\n\ninternal sealed record {name};\n"));
     }
@@ -128,7 +128,7 @@ internal sealed class ScaffoldCliCommandHandler(ICliConsole console, IFileSystem
         }
 
         files.Add(new ScaffoldFile(
-            Path.Combine(modulePath, "Abstractions", $"{name}.cs"),
+            CombineRepositoryPath(modulePath, "Abstractions", $"{name}.cs"),
             $"{moduleNamespace}.Abstractions",
             $"namespace {moduleNamespace}.Abstractions;\n\ninternal interface {name};\n"));
     }
@@ -148,7 +148,7 @@ internal sealed class ScaffoldCliCommandHandler(ICliConsole console, IFileSystem
         }
 
         files.Add(new ScaffoldFile(
-            Path.Combine(modulePath, "Exceptions", $"{name}.cs"),
+            CombineRepositoryPath(modulePath, "Exceptions", $"{name}.cs"),
             $"{moduleNamespace}.Exceptions",
             $"namespace {moduleNamespace}.Exceptions;\n\ninternal sealed class {name} : Exception;\n"));
     }
@@ -164,6 +164,8 @@ internal sealed class ScaffoldCliCommandHandler(ICliConsole console, IFileSystem
 
         return value;
     }
+
+    private static string CombineRepositoryPath(params string[] segments) => string.Join('/', segments);
 
     private static string RequireCommandToken(string? value)
     {
