@@ -9,9 +9,10 @@ The existing authoritative check contexts `Packed Artifact Test Suite (Windows)`
 #### Scenario: Independent Checkpoint B work runs concurrently
 
 - **WHEN** pull-request packed-artifact validation starts after the immutable candidate is prepared
-- **THEN** package/entrypoint, two adopter-runtime, four consumer-cleanup, and three public-API-selector shards run as independently schedulable jobs per supported PR platform
+- **THEN** package/entrypoint, two adopter-runtime, five consumer-cleanup, and three public-API-selector shards run as independently schedulable jobs per supported PR platform
 - **AND** no shard depends on another shard
 - **AND** every shard consumes the same candidate manifest digest
+- **AND** each platform fan-in depends only on that platform's shard matrix
 
 #### Scenario: Branch-protection check names remain stable
 

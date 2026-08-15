@@ -93,12 +93,21 @@ public sealed partial class CheckpointBReleaseGateTests
     }
 
     [Test]
-    public void PackedCandidate_ConsumerCleanupPolicyContractsAndShape()
+    public void PackedCandidate_ConsumerCleanupDependencyContractIdParity()
     {
         CandidatePackageFeed candidate = Candidate;
         IReadOnlyList<CheckpointScenarioResult> scenarios =
-            AssertConsumerCleanupPolicyContractsAndShape(candidate, out ConsumerPolicyShape policyShape);
-        candidate.WriteShardEvidence("consumer-cleanup-policy-contracts-and-shape", scenarios, policyShape);
+            AssertConsumerCleanupDependencyContractIdParity(candidate);
+        candidate.WriteShardEvidence("consumer-cleanup-dependency-contract-id-parity", scenarios);
+    }
+
+    [Test]
+    public void PackedCandidate_ConsumerCleanupLayerOverlapAndPolicyShape()
+    {
+        CandidatePackageFeed candidate = Candidate;
+        IReadOnlyList<CheckpointScenarioResult> scenarios =
+            AssertConsumerCleanupLayerOverlapAndPolicyShape(candidate, out ConsumerPolicyShape policyShape);
+        candidate.WriteShardEvidence("consumer-cleanup-layer-overlap-and-policy-shape", scenarios, policyShape);
     }
 
     [Test]
@@ -153,6 +162,7 @@ public sealed partial class CheckpointBReleaseGateTests
         // Strict validation and Testing-adapter parity require fresh reviewed snapshots but do
         // not independently claim the snapshot-reduction evidence scenario.
         _ = AssertSurfaceSelectorSnapshotReduction(candidate, fixture);
+        _ = AssertSurfaceSelectorExactDeltaLifecycle(candidate, fixture);
         candidate.WriteShardEvidence("public-api-surface-selector-enforcement",
         [
             AssertSurfaceSelectorEscapeFailsClosed(candidate, fixture),

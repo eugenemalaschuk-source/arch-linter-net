@@ -36,7 +36,8 @@ _SHARDS = [
     "adopter-runtime-core",
     "adopter-runtime-extended",
     "consumer-cleanup-policy-execution",
-    "consumer-cleanup-policy-contracts-and-shape",
+    "consumer-cleanup-dependency-contract-id-parity",
+    "consumer-cleanup-layer-overlap-and-policy-shape",
     "consumer-cleanup-configuration-and-identity",
     "consumer-cleanup-source-set-authoring",
     "public-api-surface-selector-snapshot-and-role",
@@ -81,7 +82,7 @@ def _write_corpus(tmp_path: Path) -> tuple[Path, Path]:
             "synthetic_identities_only": True,
             "candidate_manifest_sha256": digest,
             "packages": _PACKAGES,
-            "policy_shape": _POLICY_SHAPE if shard_id == "consumer-cleanup-policy-contracts-and-shape" else None,
+            "policy_shape": _POLICY_SHAPE if shard_id == "consumer-cleanup-layer-overlap-and-policy-shape" else None,
             "scenarios": shard_scenarios,
         }))
     return manifest_path, shards
@@ -110,7 +111,7 @@ def test_rejects_missing_shard(tmp_path: Path) -> None:
     manifest, shards = _write_corpus(tmp_path)
     (shards / "checkpoint-b-platform-shard-adopter-runtime-core.json").unlink()
 
-    with pytest.raises(ValueError, match="Expected 10 Checkpoint B shard records"):
+    with pytest.raises(ValueError, match="Expected 11 Checkpoint B shard records"):
         merge_platform_shards(shards, manifest)
 
 
@@ -289,7 +290,7 @@ def test_rejects_policy_shape_reported_by_wrong_shard(tmp_path: Path) -> None:
     manifest, shards = _write_corpus(tmp_path)
     _corrupt(shards, "adopter-runtime-core", lambda record: record.update({"policy_shape": _POLICY_SHAPE}))
 
-    with pytest.raises(ValueError, match="Exactly the consumer-cleanup policy contracts-and-shape shard must report policy_shape"):
+    with pytest.raises(ValueError, match="Exactly the consumer-cleanup layer-overlap-and-policy-shape shard must report policy_shape"):
         merge_platform_shards(shards, manifest)
 
 
@@ -301,7 +302,7 @@ def test_rejects_invalid_policy_shape_fields(tmp_path: Path) -> None:
         del shape["governed_projects"]
         record["policy_shape"] = shape
 
-    _corrupt(shards, "consumer-cleanup-policy-contracts-and-shape", _mutate)
+    _corrupt(shards, "consumer-cleanup-layer-overlap-and-policy-shape", _mutate)
 
     with pytest.raises(ValueError, match="reports an invalid policy_shape"):
         merge_platform_shards(shards, manifest)
@@ -315,7 +316,7 @@ def test_rejects_non_numeric_policy_shape_counter(tmp_path: Path) -> None:
         shape["governed_projects"] = "22"
         record["policy_shape"] = shape
 
-    _corrupt(shards, "consumer-cleanup-policy-contracts-and-shape", _mutate)
+    _corrupt(shards, "consumer-cleanup-layer-overlap-and-policy-shape", _mutate)
 
     with pytest.raises(ValueError, match="non-numeric counter"):
         merge_platform_shards(shards, manifest)

@@ -2,7 +2,8 @@
 	test-packed-artifact-package-and-entrypoints test-packed-artifact-adopter-runtime-core \
 	test-packed-artifact-adopter-runtime-extended \
 	test-packed-artifact-consumer-cleanup-policy-execution \
-	test-packed-artifact-consumer-cleanup-policy-contracts-and-shape \
+	test-packed-artifact-consumer-cleanup-dependency-contract-id-parity \
+	test-packed-artifact-consumer-cleanup-layer-overlap-and-policy-shape \
 	test-packed-artifact-consumer-cleanup-configuration-and-identity \
 	test-packed-artifact-consumer-cleanup-source-set-authoring \
 	test-packed-artifact-public-api-surface-selector-snapshot-and-role \
@@ -17,7 +18,8 @@ TEST_PACKED_ARTIFACT_PACKAGE_AND_ENTRYPOINTS_FILTER := FullyQualifiedName~Checkp
 TEST_PACKED_ARTIFACT_ADOPTER_RUNTIME_CORE_FILTER := FullyQualifiedName~CheckpointBReleaseGateTests.PackedCandidate_AdopterRuntimeCore
 TEST_PACKED_ARTIFACT_ADOPTER_RUNTIME_EXTENDED_FILTER := FullyQualifiedName~CheckpointBReleaseGateTests.PackedCandidate_AdopterRuntimeExtended
 TEST_PACKED_ARTIFACT_CONSUMER_CLEANUP_POLICY_EXECUTION_FILTER := FullyQualifiedName~CheckpointBReleaseGateTests.PackedCandidate_ConsumerCleanupPolicyExecution
-TEST_PACKED_ARTIFACT_CONSUMER_CLEANUP_POLICY_CONTRACTS_AND_SHAPE_FILTER := FullyQualifiedName~CheckpointBReleaseGateTests.PackedCandidate_ConsumerCleanupPolicyContractsAndShape
+TEST_PACKED_ARTIFACT_CONSUMER_CLEANUP_DEPENDENCY_CONTRACT_ID_PARITY_FILTER := FullyQualifiedName~CheckpointBReleaseGateTests.PackedCandidate_ConsumerCleanupDependencyContractIdParity
+TEST_PACKED_ARTIFACT_CONSUMER_CLEANUP_LAYER_OVERLAP_AND_POLICY_SHAPE_FILTER := FullyQualifiedName~CheckpointBReleaseGateTests.PackedCandidate_ConsumerCleanupLayerOverlapAndPolicyShape
 TEST_PACKED_ARTIFACT_CONSUMER_CLEANUP_CONFIGURATION_AND_IDENTITY_FILTER := FullyQualifiedName~CheckpointBReleaseGateTests.PackedCandidate_ConsumerCleanupConfigurationAndIdentity
 TEST_PACKED_ARTIFACT_CONSUMER_CLEANUP_SOURCE_SET_AUTHORING_FILTER := FullyQualifiedName~CheckpointBReleaseGateTests.PackedCandidate_ConsumerCleanupSourceSetAuthoring
 TEST_PACKED_ARTIFACT_PUBLIC_API_SURFACE_SELECTOR_SNAPSHOT_AND_ROLE_FILTER := FullyQualifiedName~CheckpointBReleaseGateTests.PackedCandidate_PublicApiSurfaceSelectorSnapshotAndRole
@@ -62,9 +64,13 @@ test-packed-artifact-consumer-cleanup-policy-execution:  ## Run Checkpoint B con
 	@dotnet build "$(CORE_TESTS_CSPROJ)" --no-restore --nologo
 	@dotnet test "$(CORE_TESTS_CSPROJ)" --no-restore --no-build --filter "$(TEST_PACKED_ARTIFACT_CONSUMER_CLEANUP_POLICY_EXECUTION_FILTER)"
 
-test-packed-artifact-consumer-cleanup-policy-contracts-and-shape:  ## Run Checkpoint B consumer-cleanup policy contracts shard
+test-packed-artifact-consumer-cleanup-dependency-contract-id-parity:  ## Run Checkpoint B consumer-cleanup dependency-contract id shard
 	@dotnet build "$(CORE_TESTS_CSPROJ)" --no-restore --nologo
-	@dotnet test "$(CORE_TESTS_CSPROJ)" --no-restore --no-build --filter "$(TEST_PACKED_ARTIFACT_CONSUMER_CLEANUP_POLICY_CONTRACTS_AND_SHAPE_FILTER)"
+	@dotnet test "$(CORE_TESTS_CSPROJ)" --no-restore --no-build --filter "$(TEST_PACKED_ARTIFACT_CONSUMER_CLEANUP_DEPENDENCY_CONTRACT_ID_PARITY_FILTER)"
+
+test-packed-artifact-consumer-cleanup-layer-overlap-and-policy-shape:  ## Run Checkpoint B consumer-cleanup layer-overlap and policy-shape shard
+	@dotnet build "$(CORE_TESTS_CSPROJ)" --no-restore --nologo
+	@dotnet test "$(CORE_TESTS_CSPROJ)" --no-restore --no-build --filter "$(TEST_PACKED_ARTIFACT_CONSUMER_CLEANUP_LAYER_OVERLAP_AND_POLICY_SHAPE_FILTER)"
 
 test-packed-artifact-consumer-cleanup-configuration-and-identity:  ## Run Checkpoint B consumer-cleanup configuration shard
 	@dotnet build "$(CORE_TESTS_CSPROJ)" --no-restore --nologo

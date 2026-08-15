@@ -36,12 +36,15 @@ The prior nine-shard topology separated the two independent Windows hot paths:
 - public-API selector: snapshot/role, delta/membership, and enforcement/Testing-adapter parity.
 
 Its release rehearsal showed that consumer-cleanup policy foundation (3:03) still threatened the
-four-minute PR critical path once candidate preparation and fan-in were included. The final
-ten-shard topology separates that work into policy execution and policy contracts plus typed
-policy shape, while preserving every scenario ID exactly once.
+four-minute PR critical path once candidate preparation and fan-in were included. The intermediate
+ten-shard topology separated that work into policy execution and policy contracts plus typed
+policy shape. Its Windows critical shard still reached 3:29 including runner setup, so the final
+eleven-shard topology separates dependency-contract parity from layer overlap and typed policy
+shape, while preserving every scenario ID exactly once.
 
-Every producer emits exactly one named shard record. The merger requires all ten records and
+Every producer emits exactly one named shard record. The merger requires all eleven records and
 rejects duplicate, missing, or overlapping scenario IDs before it emits canonical platform
-evidence; only the policy contracts-and-shape shard may report the typed policy-shape counters.
+evidence; only the layer-overlap-and-policy-shape shard may report the typed policy-shape counters.
 The final timing is recorded after the corresponding PR and non-publishing release workflows
-complete.
+complete. Platform-specific fan-ins depend only on their own producer matrix, so a constrained
+Apple Silicon queue cannot inflate the Windows branch-protection critical path.

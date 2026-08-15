@@ -34,18 +34,23 @@ public sealed partial class CheckpointBReleaseGateTests
         ];
     }
 
-    private static List<CheckpointScenarioResult> AssertConsumerCleanupPolicyContractsAndShape(
+    private static List<CheckpointScenarioResult> AssertConsumerCleanupDependencyContractIdParity(
+        CandidatePackageFeed candidate)
+    {
+        using PreparedConsumerCleanup prepared = PrepareConsumerCleanup(candidate);
+        AdoptionAcceptanceFixture consumer = prepared.Consumer;
+
+        return [AssertDependencyContractIdParity(candidate, consumer)];
+    }
+
+    private static List<CheckpointScenarioResult> AssertConsumerCleanupLayerOverlapAndPolicyShape(
         CandidatePackageFeed candidate,
         out ConsumerPolicyShape policyShape)
     {
         using PreparedConsumerCleanup prepared = PrepareConsumerCleanup(candidate);
         AdoptionAcceptanceFixture consumer = prepared.Consumer;
 
-        var scenarios = new List<CheckpointScenarioResult>
-        {
-            AssertDependencyContractIdParity(candidate, consumer),
-            AssertLayerOverlapAllowance(candidate, consumer),
-        };
+        var scenarios = new List<CheckpointScenarioResult> { AssertLayerOverlapAllowance(candidate, consumer) };
 
         policyShape = DescribeConsumerPolicyShape(consumer, prepared.Expansion);
         scenarios.Add(AssertConsumerPolicyShape(policyShape));

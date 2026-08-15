@@ -60,9 +60,12 @@ jobs:
           - id: consumer-cleanup-policy-execution
             name: Consumer cleanup policy execution
             target: test-packed-artifact-consumer-cleanup-policy-execution
-          - id: consumer-cleanup-policy-contracts-and-shape
-            name: Consumer cleanup policy contracts + shape
-            target: test-packed-artifact-consumer-cleanup-policy-contracts-and-shape
+          - id: consumer-cleanup-dependency-contract-id-parity
+            name: Consumer cleanup dependency-contract id parity
+            target: test-packed-artifact-consumer-cleanup-dependency-contract-id-parity
+          - id: consumer-cleanup-layer-overlap-and-policy-shape
+            name: Consumer cleanup layer overlap + policy shape
+            target: test-packed-artifact-consumer-cleanup-layer-overlap-and-policy-shape
           - id: consumer-cleanup-configuration-and-identity
             name: Consumer cleanup configuration + identity
             target: test-packed-artifact-consumer-cleanup-configuration-and-identity

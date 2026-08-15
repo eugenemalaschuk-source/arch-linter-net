@@ -2,18 +2,19 @@
 
 ## Decision 1: shard by scenario ownership, not by random test selection
 
-Checkpoint B is decomposed into ten explicit NUnit methods:
+Checkpoint B is decomposed into eleven explicit NUnit methods:
 
 1. package and entrypoints;
 2. core adopter runtime/parity;
 3. extended adopter runtime/cache;
 4. consumer-cleanup policy execution;
-5. consumer-cleanup policy contracts and typed policy shape;
-6. consumer-cleanup configuration and identity;
-7. consumer-cleanup source-set authoring;
-8. public-API surface-selector snapshot and role preservation;
-9. public-API surface-selector delta and membership lifecycle;
-10. public-API surface-selector fail-closed enforcement and Testing-adapter parity.
+5. consumer-cleanup dependency-contract id parity;
+6. consumer-cleanup layer-overlap allowance and typed policy shape;
+7. consumer-cleanup configuration and identity;
+8. consumer-cleanup source-set authoring;
+9. public-API surface-selector snapshot and role preservation;
+10. public-API surface-selector delta and membership lifecycle;
+11. public-API surface-selector fail-closed enforcement and Testing-adapter parity.
 
 The complete fixture remains non-parallel locally and uses one `OneTimeSetUp` candidate. CI filters one method per isolated runner. This keeps the scenario partition reviewable and deterministic.
 
@@ -25,13 +26,13 @@ Each shard still gets its own temporary NuGet caches, tool install path, fixture
 
 ## Decision 3: partial execution evidence is not release evidence
 
-A shard writes `checkpoint-b-platform-shard-evidence/v1`. The merge tool requires exactly the ten named shards, validates common candidate/platform metadata, rejects duplicate/overlapping/missing/unexpected scenario IDs, requires policy-shape evidence from the consumer-cleanup policy contracts-and-shape shard, and emits the existing `checkpoint-b-platform-evidence/v1` record.
+A shard writes `checkpoint-b-platform-shard-evidence/v1`. The merge tool requires exactly the eleven named shards, validates common candidate/platform metadata, rejects duplicate/overlapping/missing/unexpected scenario IDs, requires policy-shape evidence from the consumer-cleanup layer-overlap-and-policy-shape shard, and emits the existing `checkpoint-b-platform-evidence/v1` record.
 
 The existing final release aggregator remains the authority over required platforms, complete scenario inventory, policy shape, repository gates, release scope, and publication authorization.
 
 ## Decision 4: preserve required PR check contexts
 
-The active `Main` ruleset requires `Packed Artifact Test Suite (Windows)` and `Packed Artifact Test Suite (Apple Silicon macOS)`. Those names remain as small fan-in jobs that validate canonical merged evidence after producer shards finish. The producer jobs expose detailed failure localization without changing branch-protection contexts.
+The active `Main` ruleset requires `Packed Artifact Test Suite (Windows)` and `Packed Artifact Test Suite (Apple Silicon macOS)`. Those names remain as small platform-specific fan-in jobs that validate canonical merged evidence after their own platform's producer shards finish. Producer matrices are separate per platform, so a constrained Apple Silicon queue cannot delay the Windows branch-protection context. The producer jobs expose detailed failure localization without changing branch-protection contexts.
 
 ## Decision 5: repository gates and packed-candidate gates are separate proofs
 
