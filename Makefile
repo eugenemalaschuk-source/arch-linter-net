@@ -31,13 +31,14 @@
 ##
 ## Testing:
 ##   make acceptance           — lint + all tests
+##   make acceptance-repository — lint + unit + ordinary E2E, excluding packed-artifact release proof
 ##   make test                 — run all tests (unit + E2E + packed-artifact buckets)
 ##   make test-unit            — run the complete coverage-eligible unit bucket (both Core shards plus CEL/Cli)
 ##   make test-unit-core-1     — run only Core unit shard 1 (heaviest fixture classes)
 ##   make test-unit-core-2     — run only Core unit shard 2 (remainder)
 ##   make test-unit-other      — run the unit bucket's non-Core assemblies (CEL.Tests, Cli.Tests)
 ##   make test-e2e             — run only the ordinary E2E bucket (excludes CheckpointBReleaseGateTests)
-##   make test-packed-artifact — run only the packed-artifact release gate (CheckpointBReleaseGateTests)
+##   make test-packed-artifact — run only the complete packed-artifact release gate
 ##   make test-coverage        — run the unit bucket with coverage collection (cobertura XML)
 ##   make test-coverage-badge  — run tests with coverage and print a test-coverage badge line
 ##   make test-release-evidence — run tests for the packed-artifact release-evidence aggregator
@@ -60,6 +61,7 @@ include make/dev.mk
 include make/docs.mk
 include make/lint.mk
 include make/test.mk
+include make/packed-artifact.mk
 
 .DEFAULT_GOAL := help
 .PHONY: help
@@ -76,3 +78,7 @@ build: docs-build pack  ## Build documentation site and NuGet packages
 acceptance:  ## Full project acceptance: lint + all tests (runs independent checks in parallel)
 	@echo "acceptance: running with NPROC=$(NPROC) (override with 'make acceptance NPROC=1' to force serial)"
 	@$(MAKE) -j$(NPROC) lint _acceptance-test
+
+acceptance-repository:  ## Repository correctness gate without duplicate packed-candidate execution
+	@echo "acceptance-repository: lint + unit + ordinary E2E; packed candidate is validated separately"
+	@$(MAKE) -j$(NPROC) lint _repository-acceptance-test

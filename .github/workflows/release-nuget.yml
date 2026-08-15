@@ -24,19 +24,17 @@ on:
         type: string
 
 jobs:
-  checkpoint-b:
-    name: Checkpoint B (${{ matrix.id }})
+  checkpoint-b-shards:
+    name: Checkpoint B shard (${{ matrix.platform.id }} / ${{ matrix.shard.name }})
     needs: prepare-candidate
-    runs-on: ${{ matrix.runner }}
+    runs-on: ${{ matrix.platform.runner }}
+    timeout-minutes: 20
     permissions:
       contents: read
-    # The 0.6.1 consumer-cleanup matrix builds and analyzes the 23-project synthetic modular
-    # consumer several times on top of the existing packaged-artifact scenarios.
-    timeout-minutes: 45
     strategy:
       fail-fast: false
       matrix:
-        include:
+        platform:
           - id: linux-x64
             runner: ubuntu-latest
             shell: bash
@@ -49,14 +47,27 @@ jobs:
           - id: macos-x64
             runner: macos-15-intel
             shell: zsh
+        shard:
+          - id: package-and-entrypoints
+            name: Package + entrypoints
+            target: test-packed-artifact-package-and-entrypoints
+          - id: adopter-runtime
+            name: Adopter runtime
+            target: test-packed-artifact-adopter-runtime
+          - id: consumer-cleanup
+            name: Consumer cleanup
+            target: test-packed-artifact-consumer-cleanup
+          - id: public-api-surface-selector
+            name: Public API selector
+            target: test-packed-artifact-public-api-surface-selector
     env:
       ARCH_LINTER_SOURCE_SHA: ${{ github.sha }}
       CHECKPOINT_B_CANDIDATE_VERSION: ${{ needs.prepare-candidate.outputs.package_version }}
       CHECKPOINT_B_PACKAGE_MANIFEST: ${{ github.workspace }}/artifacts/candidate/package-manifest.json
       CHECKPOINT_B_PACKAGE_FEED: ${{ github.workspace }}/artifacts/candidate
-      CHECKPOINT_B_EVIDENCE_DIRECTORY: ${{ github.workspace }}/artifacts/checkpoint-b/${{ matrix.id }}
-      CHECKPOINT_B_PLATFORM: ${{ matrix.id }}
-      CHECKPOINT_B_SHELL: ${{ matrix.shell }}
+      CHECKPOINT_B_EVIDENCE_DIRECTORY: ${{ github.workspace }}/artifacts/checkpoint-b-shard
+      CHECKPOINT_B_PLATFORM: ${{ matrix.platform.id }}
+      CHECKPOINT_B_SHELL: ${{ matrix.platform.shell }}
 
     steps:
       - name: Checkout
@@ -69,8 +80,16 @@ jobs:
         with:
           dotnet-version: 10.0.x
 
-      - name: Restore
-        run: make restore
+      - name: Cache NuGet packages
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
+        with:
+          path: ~/.nuget/packages
+          key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj') }}
+          restore-keys: |
+            ${{ runner.os }}-nuget-
+
+      - name: Restore packed-artifact test project
+        run: dotnet restore tests/ArchLinterNet.Core.Tests/ArchLinterNet.Core.Tests.csproj --nologo
 
       - name: Download immutable candidate packages
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
@@ -81,33 +100,78 @@ jobs:
       - name: Verify immutable candidate packages
         run: python3 tools/release/package_manifest.py verify --packages-dir artifacts/candidate --manifest artifacts/candidate/package-manifest.json
 
-      - name: Run packed-artifact Checkpoint B with bash
-        if: ${{ matrix.shell == 'bash' }}
+      - name: Run ${{ matrix.shard.name }} shard
         shell: bash
-        run: dotnet test tests/ArchLinterNet.Core.Tests --no-restore --filter FullyQualifiedName~CheckpointBReleaseGateTests
+        run: make ${{ matrix.shard.target }}
 
-      - name: Run packed-artifact Checkpoint B with zsh
-        if: ${{ matrix.shell == 'zsh' }}
-        shell: zsh {0}
-        run: dotnet test tests/ArchLinterNet.Core.Tests --no-restore --filter FullyQualifiedName~CheckpointBReleaseGateTests
+      - name: Upload Checkpoint B shard evidence
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: checkpoint-b-shard-${{ matrix.platform.id }}-${{ matrix.shard.id }}
+          path: artifacts/checkpoint-b-shard
+          if-no-files-found: error
 
-      - name: Run packed-artifact Checkpoint B with PowerShell
-        if: ${{ matrix.shell == 'pwsh' }}
-        shell: pwsh
-        run: dotnet test tests/ArchLinterNet.Core.Tests --no-restore --filter FullyQualifiedName~CheckpointBReleaseGateTests
+  checkpoint-b-platform-evidence:
+    name: Checkpoint B (${{ matrix.platform.id }})
+    needs: [checkpoint-b-shards, prepare-candidate]
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        platform:
+          - id: linux-x64
+          - id: windows-x64
+          - id: macos-arm64
+          - id: macos-x64
+    permissions:
+      contents: read
+
+    steps:
+      - name: Require successful Checkpoint B shards
+        if: needs.checkpoint-b-shards.result != 'success' || needs.prepare-candidate.result != 'success'
+        run: |
+          echo "prepare-candidate: ${{ needs.prepare-candidate.result }}" >&2
+          echo "checkpoint-b-shards: ${{ needs.checkpoint-b-shards.result }}" >&2
+          exit 1
+
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+
+      - name: Download immutable candidate manifest
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+        with:
+          name: nuget-candidate-${{ needs.prepare-candidate.outputs.package_version }}
+          path: artifacts/candidate
+
+      - name: Download platform shard evidence
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+        with:
+          pattern: checkpoint-b-shard-${{ matrix.platform.id }}-*
+          path: artifacts/checkpoint-b-shards
+
+      - name: Merge and validate platform evidence
+        run: |
+          python3 tools/release/merge_checkpoint_b_platform_evidence.py \
+            --input-dir artifacts/checkpoint-b-shards \
+            --candidate-manifest artifacts/candidate/package-manifest.json \
+            --output artifacts/checkpoint-b/${{ matrix.platform.id }}/checkpoint-b-platform-evidence.json
 
       - name: Upload Checkpoint B platform evidence
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: checkpoint-b-evidence-${{ matrix.id }}
-          path: artifacts/checkpoint-b/${{ matrix.id }}
+          name: checkpoint-b-evidence-${{ matrix.platform.id }}
+          path: artifacts/checkpoint-b/${{ matrix.platform.id }}
           if-no-files-found: error
 
   checkpoint-b-evidence:
     name: Aggregate Checkpoint B evidence
-    needs: [checkpoint-b, prepare-candidate]
+    needs: [checkpoint-b-platform-evidence, prepare-candidate]
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 15
     permissions:
       contents: read
       issues: read
@@ -118,20 +182,8 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Setup .NET
-        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68
-        with:
-          dotnet-version: 10.0.x
-
       - name: Setup uv
         uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9
-
-      - name: Restore and run repository gates
-        run: |
-          make restore
-          make acceptance
-          npm ci --ignore-scripts --prefix tools/openspec
-          npm exec --no-install --prefix tools/openspec -- openspec validate --all --strict
 
       - name: Download immutable candidate manifest
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
@@ -142,14 +194,15 @@ jobs:
       - name: Verify immutable candidate manifest
         run: python3 tools/release/package_manifest.py verify --packages-dir artifacts/candidate --manifest artifacts/candidate/package-manifest.json
 
-      - name: Record passed repository gates
-        run: python3 tools/release/create_repository_gate_evidence.py --candidate-manifest artifacts/candidate/package-manifest.json --source-commit "$GITHUB_SHA" --output artifacts/checkpoint-b/repository-gates.json
+      - name: Download repository-gate evidence
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+        with:
+          name: checkpoint-b-repository-gates-${{ needs.prepare-candidate.outputs.package_version }}
+          path: artifacts/checkpoint-b
 
       - name: Resolve authoritative release scope
         env:
           GH_TOKEN: ${{ github.token }}
-        # No path arguments by design: the declaration, candidate manifest, and output are fixed
-        # release-workspace locations inside the tool.
         run: python3 tools/release/create_release_scope_evidence.py --source-commit "$GITHUB_SHA" --repository "$GITHUB_REPOSITORY"
 
       - name: Download platform evidence
@@ -193,6 +246,14 @@ jobs:
         with:
           dotnet-version: 10.0.x
 
+      - name: Cache NuGet packages
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
+        with:
+          path: ~/.nuget/packages
+          key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj') }}
+          restore-keys: |
+            ${{ runner.os }}-nuget-
+
       - name: Setup uv
         uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
 
@@ -220,10 +281,13 @@ jobs:
       - name: Build
         run: dotnet build ArchLinterNet.slnx --configuration Release --no-restore -p:Version="$PACKAGE_VERSION"
 
-      - name: Acceptance
-        env:
-          CHECKPOINT_B_CANDIDATE_VERSION: ${{ env.PACKAGE_VERSION }}
-        run: make acceptance
+      - name: Repository acceptance
+        run: make acceptance-repository
+
+      - name: Validate OpenSpec strictly
+        run: |
+          npm ci --ignore-scripts --prefix tools/openspec
+          npm exec --prefix tools/openspec --no-install -- openspec validate --all --strict
 
       - name: Prepare NuGet package release notes
         shell: bash
@@ -244,12 +308,22 @@ jobs:
       - name: Create immutable candidate manifest
         run: python3 tools/release/package_manifest.py create --packages-dir "$PACKAGE_OUTPUT" --version "$PACKAGE_VERSION" --source-commit "$GITHUB_SHA" --output artifacts/packages/package-manifest.json
 
+      - name: Record passed repository gates
+        run: python3 tools/release/create_repository_gate_evidence.py --candidate-manifest artifacts/packages/package-manifest.json --source-commit "$GITHUB_SHA" --output artifacts/checkpoint-b/repository-gates.json
+
       - name: Upload package artifacts
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: nuget-candidate-${{ env.PACKAGE_VERSION }}
           path: |
             ${{ env.PACKAGE_OUTPUT }}/
+          if-no-files-found: error
+
+      - name: Upload repository-gate evidence
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: checkpoint-b-repository-gates-${{ env.PACKAGE_VERSION }}
+          path: artifacts/checkpoint-b/repository-gates.json
           if-no-files-found: error
 
   release:

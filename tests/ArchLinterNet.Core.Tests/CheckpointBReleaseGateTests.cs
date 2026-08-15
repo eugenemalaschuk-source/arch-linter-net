@@ -8,6 +8,7 @@ namespace ArchLinterNet.Core.Tests;
 [Category("E2E")]
 [Category("ReleaseGate")]
 [CancelAfter(300_000)]
+[NonParallelizable]
 public sealed partial class CheckpointBReleaseGateTests
 {
     private const string CandidateVersionEnvironmentVariable = "CHECKPOINT_B_CANDIDATE_VERSION";
@@ -21,27 +22,46 @@ public sealed partial class CheckpointBReleaseGateTests
     private static readonly string[] _packageIds =
         ["ArchLinterNet.CEL", "ArchLinterNet.Cli", "ArchLinterNet.Core", "ArchLinterNet.Testing"];
 
-    [Test]
-    public void PackedCandidate_InstallsFromAnIsolatedFeedAndPassesTheSyntheticAdopterMatrix()
+    private CandidatePackageFeed? _candidate;
+
+    [OneTimeSetUp]
+    public void PrepareCandidate()
     {
-        using CandidatePackageFeed candidate = CandidatePackageFeed.Create();
+        _candidate = CandidatePackageFeed.Create();
+        _candidate.InstallTool();
+    }
 
-        CheckpointScenarioResult packageProvenance = candidate.AssertPackageProvenance();
-        candidate.InstallTool();
-        candidate.AssertOfflineSchemaRegistry();
-        CheckpointScenarioResult cancellation = candidate.AssertExternalTestingConsumer();
-        AssertCleanCheckoutOracle(candidate);
+    [OneTimeTearDown]
+    public void DisposeCandidate()
+    {
+        _candidate?.Dispose();
+        _candidate = null;
+    }
 
+    [Test]
+    public void PackedCandidate_PackageAndEntrypoints()
+    {
+        CandidatePackageFeed candidate = Candidate;
         var scenarios = new List<CheckpointScenarioResult>
         {
-            packageProvenance,
+            candidate.AssertPackageProvenance(),
             candidate.AssertOfflineSchemaRegistry(),
-            cancellation,
+            candidate.AssertExternalTestingConsumer(),
             AssertCleanCheckoutOracle(candidate),
             candidate.AssertGenericCiNeutralInvocation(),
             candidate.AssertDocumentedEntrypoint(),
             candidate.AssertNonTtyInvocation(),
         };
+        scenarios.AddRange(candidate.ShellScenarios());
+        scenarios.Add(candidate.AssertCliInFlightCancellation());
+        candidate.WriteShardEvidence("package-and-entrypoints", scenarios);
+    }
+
+    [Test]
+    public void PackedCandidate_AdopterRuntimeMatrix()
+    {
+        CandidatePackageFeed candidate = Candidate;
+        var scenarios = new List<CheckpointScenarioResult>();
         foreach (string fixtureId in new[] { "small", "multi-project", "multi-host", "migration", "aspnet-host" })
         {
             using AdoptionAcceptanceFixture fixture = AdoptionAcceptanceFixture.Create(fixtureId);
@@ -54,13 +74,8 @@ public sealed partial class CheckpointBReleaseGateTests
                 "--ensure-built",
                 "--max-parallelism", "1");
             AssertFixtureOracle(fixtureId, sequential);
-            CommandResult defaultParallelism = candidate.RunTool(fixture.Root,
-                "--policy", fixture.PolicyPath,
-                "--strict",
-                "--format", "json",
-                "--ensure-built");
             string profilePath = Path.Combine(fixture.Root, "checkpoint-b-profile.json");
-            CommandResult profiled = candidate.RunTool(fixture.Root,
+            CommandResult profiledDefault = candidate.RunTool(fixture.Root,
                 "--policy", fixture.PolicyPath,
                 "--strict",
                 "--format", "json",
@@ -69,11 +84,8 @@ public sealed partial class CheckpointBReleaseGateTests
 
             Assert.Multiple(() =>
             {
-                Assert.That(sequential.ExitCode, Is.EqualTo(defaultParallelism.ExitCode), fixtureId);
-                Assert.That(CanonicalJson(sequential.StandardOutput),
-                    Is.EqualTo(CanonicalJson(defaultParallelism.StandardOutput)), fixtureId);
-                Assert.That(profiled.ExitCode, Is.EqualTo(sequential.ExitCode), fixtureId);
-                Assert.That(CanonicalJson(profiled.StandardOutput),
+                Assert.That(profiledDefault.ExitCode, Is.EqualTo(sequential.ExitCode), fixtureId);
+                Assert.That(CanonicalJson(profiledDefault.StandardOutput),
                     Is.EqualTo(CanonicalJson(sequential.StandardOutput)), fixtureId);
                 Assert.That(File.Exists(profilePath), Is.True, profilePath);
                 Assert.That(sequential.StandardError, Does.Not.Contain("\u001b["), fixtureId);
@@ -87,12 +99,28 @@ public sealed partial class CheckpointBReleaseGateTests
         scenarios.Add(Passed("profile-generation"));
         scenarios.Add(Passed("cache-miss-population-hit"));
         scenarios.Add(Passed("cache-corruption-recompute"));
-        scenarios.AddRange(candidate.ShellScenarios());
-        scenarios.Add(candidate.AssertCliInFlightCancellation());
-        scenarios.AddRange(AssertConsumerCleanupMatrix(candidate, out ConsumerPolicyShape policyShape));
-        scenarios.AddRange(AssertPublicApiSurfaceSelectorMatrix(candidate));
-        candidate.WriteEvidence(scenarios, policyShape);
+        candidate.WriteShardEvidence("adopter-runtime", scenarios);
     }
+
+    [Test]
+    public void PackedCandidate_ConsumerCleanupMatrix()
+    {
+        CandidatePackageFeed candidate = Candidate;
+        IReadOnlyList<CheckpointScenarioResult> scenarios =
+            AssertConsumerCleanupMatrix(candidate, out ConsumerPolicyShape policyShape);
+        candidate.WriteShardEvidence("consumer-cleanup", scenarios, policyShape);
+    }
+
+    [Test]
+    public void PackedCandidate_PublicApiSurfaceSelectorMatrix()
+    {
+        CandidatePackageFeed candidate = Candidate;
+        IReadOnlyList<CheckpointScenarioResult> scenarios = AssertPublicApiSurfaceSelectorMatrix(candidate);
+        candidate.WriteShardEvidence("public-api-surface-selector", scenarios);
+    }
+
+    private CandidatePackageFeed Candidate => _candidate
+        ?? throw new InvalidOperationException("Checkpoint B candidate was not prepared.");
 
     private static CheckpointScenarioResult Passed(string id) => new(id, "passed", null);
 
@@ -198,17 +226,35 @@ public sealed partial class CheckpointBReleaseGateTests
         return Run(startInfo);
     }
 
-    private static CommandResult Run(ProcessStartInfo startInfo)
+    private static CommandResult Run(ProcessStartInfo startInfo) =>
+        Run(startInfo, TestContext.CurrentContext.CancellationToken);
+
+    internal static CommandResult Run(ProcessStartInfo startInfo, CancellationToken cancellationToken)
     {
         using Process process = Process.Start(startInfo)
             ?? throw new InvalidOperationException($"Failed to start '{startInfo.FileName}'.");
-        string standardOutput = process.StandardOutput.ReadToEnd();
-        string standardError = process.StandardError.ReadToEnd();
-        process.WaitForExit();
-        return new CommandResult(process.ExitCode, standardOutput, standardError);
+        Task<string> standardOutput = process.StandardOutput.ReadToEndAsync();
+        Task<string> standardError = process.StandardError.ReadToEndAsync();
+        try
+        {
+            process.WaitForExitAsync(cancellationToken).GetAwaiter().GetResult();
+        }
+        catch (OperationCanceledException)
+        {
+            if (!process.HasExited)
+            {
+                process.Kill(entireProcessTree: true);
+                process.WaitForExit();
+            }
+            Task.WaitAll(standardOutput, standardError);
+            throw;
+        }
+
+        Task.WaitAll(standardOutput, standardError);
+        return new CommandResult(process.ExitCode, standardOutput.Result, standardError.Result);
     }
 
-    private sealed record CommandResult(int ExitCode, string StandardOutput, string StandardError)
+    internal sealed record CommandResult(int ExitCode, string StandardOutput, string StandardError)
     {
         public string CombinedOutput => $"stdout:{Environment.NewLine}{StandardOutput}{Environment.NewLine}stderr:{Environment.NewLine}{StandardError}";
     }

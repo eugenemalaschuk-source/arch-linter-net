@@ -203,7 +203,6 @@ contracts:
         finally
         {
             File.WriteAllText(moneyPath, original);
-            fixture.Build(configuration: "Release", targetFramework: "net10.0");
         }
 
         Assert.Multiple(() =>

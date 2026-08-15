@@ -45,7 +45,7 @@ def main() -> int:
         "candidate_manifest_sha256": _sha256(candidate_manifest),
         "workflow_run_url": run_url or None,
         "gates": [
-            {"id": "acceptance", "result": "passed", "command": "make acceptance"},
+            {"id": "acceptance", "result": "passed", "command": "make acceptance-repository"},
             {"id": "openspec_strict", "result": "passed", "command": "openspec validate --all --strict"},
         ],
     }
