@@ -164,9 +164,8 @@ def main() -> int:
     # and 'merged' is assembled only from shard files discovered by rglob() strictly under the
     # confined input_directory, so this write cannot escape the release workspace. Sonar's Python
     # taint tracker does not recognize a cross-module call as a sanitizer, so it still reports
-    # pythonsecurity:S2083/S8707 here; the same _safe_path-guarded shape already carries identical
-    # open findings on main in aggregate_checkpoint_b_evidence.py:96/104 and
-    # create_repository_gate_evidence.py:17 for the same reason.
+    # pythonsecurity:S2083/S8707 here; the same _safe_path-guarded shape carries the identical
+    # rationale in aggregate_checkpoint_b_evidence.py and create_repository_gate_evidence.py.
     output.write_text(json.dumps(merged, indent=2, sort_keys=True) + "\n", encoding="utf-8")  # NOSONAR
     return 0
 
