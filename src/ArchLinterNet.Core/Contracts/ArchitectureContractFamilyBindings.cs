@@ -43,6 +43,8 @@ internal static class ArchitectureContractFamilyBindings
             g => g.AuditLayerTemplates, false),
         new ArchitectureContractFamilyBinding("acyclic_sibling", g => g.StrictAcyclicSiblings,
             g => g.AuditAcyclicSiblings, true),
+        new ArchitectureContractFamilyBinding("module_container", g => g.StrictModuleContainers,
+            g => g.AuditModuleContainers, true),
         new ArchitectureContractFamilyBinding("type_placement", g => g.StrictTypePlacement,
             g => g.AuditTypePlacement, true),
         new ArchitectureContractFamilyBinding("layout_conventions", g => g.StrictLayoutConventions,

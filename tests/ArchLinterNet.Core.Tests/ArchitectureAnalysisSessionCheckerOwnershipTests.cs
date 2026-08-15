@@ -88,9 +88,10 @@ public sealed class ArchitectureAnalysisSessionCheckerOwnershipTests
                 + "checker under ArchLinterNet.Core.Execution.Checkers, not in ArchitectureAnalysisSession; "
                 + "the session entry point should only do selection, execution-context lifecycle and delegation.");
 
-            Assert.That(DelegatesToACheckerComponent(method), Is.True,
-                $"{name} does not delegate to a *Checker component. Add the family's checking to a checker "
-                + "under ArchLinterNet.Core.Execution.Checkers and call it from here.");
+            Assert.That(DelegatesToAFamilyAnalysisComponent(method), Is.True,
+                $"{name} does not delegate to a family-analysis component. Keep the session as a lifecycle "
+                + "facade; the component must in turn delegate family semantics to a checker under "
+                + "ArchLinterNet.Core.Execution.Checkers.");
         }
     }
 
@@ -175,13 +176,15 @@ public sealed class ArchitectureAnalysisSessionCheckerOwnershipTests
         Assert.That(File.Exists(attributor), Is.True,
             "Canonical finding-identity attribution must stay in its own component, testable without a session.");
 
-        // The session partial keeps the candidate log and the cursor; the algorithm must not migrate
-        // back into it.
-        string sessionPartial = File.ReadAllText(
-            Path.Combine(ExecutionDirectory(), "ArchitectureAnalysisSession.FindingIdentities.cs"));
-        Assert.That(sessionPartial, Does.Contain("ArchitectureFindingIdentityAttributor.Attach"));
-        Assert.That(NestedStatementCountOf(sessionPartial, "AttachFindingIdentities"), Is.LessThanOrEqualTo(2),
-            "AttachFindingIdentities must stay a delegation to ArchitectureFindingIdentityAttributor.");
+        string service = File.ReadAllText(
+            Path.Combine(ExecutionDirectory(), "ArchitectureFindingIdentityService.cs"));
+        Assert.That(service, Does.Contain("ArchitectureFindingIdentityAttributor.Attach"));
+
+        // The session keeps the candidate log and cursor only; attribution remains delegated.
+        string session = File.ReadAllText(Path.Combine(ExecutionDirectory(), "ArchitectureAnalysisSession.cs"));
+        Assert.That(session, Does.Contain("_findingIdentityService.Attach"));
+        Assert.That(NestedStatementCountOf(session, "AttachFindingIdentities"), Is.LessThanOrEqualTo(2),
+            "AttachFindingIdentities must stay a delegation to ArchitectureFindingIdentityService.");
     }
 
     private static List<MethodDeclarationSyntax> GovernedEntryPoints()
@@ -254,12 +257,14 @@ public sealed class ArchitectureAnalysisSessionCheckerOwnershipTests
         }
     }
 
-    private static bool DelegatesToACheckerComponent(MethodDeclarationSyntax method)
+    private static bool DelegatesToAFamilyAnalysisComponent(MethodDeclarationSyntax method)
     {
         return method.DescendantNodes()
             .OfType<MemberAccessExpressionSyntax>()
             .Any(access => access.Expression is IdentifierNameSyntax identifier
-                && identifier.Identifier.ValueText.EndsWith("Checker", StringComparison.Ordinal));
+                && (identifier.Identifier.ValueText.EndsWith("Checker", StringComparison.Ordinal)
+                    || identifier.Identifier.ValueText.EndsWith("CheckingService", StringComparison.Ordinal)
+                    || identifier.Identifier.ValueText.EndsWith("AnalysisService", StringComparison.Ordinal)));
     }
 
     private static int NestedStatementCountOf(string source, string methodName)

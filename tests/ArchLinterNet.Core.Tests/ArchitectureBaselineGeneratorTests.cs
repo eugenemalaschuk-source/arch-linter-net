@@ -37,6 +37,7 @@ public sealed class ArchitectureBaselineGeneratorTests
         Assert.That(baseline.Baseline.StrictLayers, Is.Empty);
         Assert.That(baseline.Baseline.StrictCycles, Is.Empty);
         Assert.That(baseline.Baseline.StrictAcyclicSiblings, Is.Empty);
+        Assert.That(baseline.Baseline.StrictModuleContainers, Is.Empty);
         Assert.That(baseline.Baseline.StrictMethodBody, Is.Empty);
         Assert.That(baseline.Baseline.StrictProtected, Is.Empty);
         Assert.That(baseline.Baseline.StrictExternal, Is.Empty);

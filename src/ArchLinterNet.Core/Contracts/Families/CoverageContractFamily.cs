@@ -3,19 +3,6 @@ using YamlDotNet.Serialization;
 
 namespace ArchLinterNet.Core.Contracts.Families;
 
-public sealed partial class ArchitectureContractGroups
-{
-    // Bound (not executed) so a schema-valid coverage contract is detected and rejected with a
-    // clear "reserved, not implemented" diagnostic instead of being silently dropped by
-    // IgnoreUnmatchedProperties deserialization. See ArchitecturePolicyDocumentLoader.Load.
-    // The coverage engine itself is implemented by #97-#103.
-    [YamlMember(Alias = "strict_coverage")]
-    public List<ArchitectureCoverageContract> StrictCoverage { get; set; } = new();
-
-    [YamlMember(Alias = "audit_coverage")]
-    public List<ArchitectureCoverageContract> AuditCoverage { get; set; } = new();
-}
-
 public sealed class ArchitectureCoverageRoot
 {
     [YamlMember(Alias = "namespace")] public string Namespace { get; set; } = string.Empty;
@@ -61,7 +48,11 @@ public sealed class ArchitectureOptionalRuleInput
     [YamlIgnore] internal ArchitecturePolicySourceLocation? PolicyLocation { get; set; }
 }
 
-internal sealed record ArchitectureRuleInputReference(string Input, string Layer);
+// A rule-input coverage reference normally points at a declared layer. A module-container
+// contract instead owns a namespace container, which is checked against the namespace inventory
+// directly. Keeping both shapes in one projection lets a single coverage contract prove that no
+// governing input silently becomes empty.
+internal sealed record ArchitectureRuleInputReference(string Input, string Layer, bool IsLayerReference = true);
 
 internal static class ArchitectureRuleInputReferences
 {
@@ -88,6 +79,7 @@ internal static class ArchitectureRuleInputReferences
             ArchitectureInterfaceImplementationContract c => Many("allowed_only_in_layers", c.AllowedOnlyInLayers)
                 .Concat(Many("forbidden_in_layers", c.ForbiddenInLayers)),
             ArchitectureCompositionContract c => Many("allowed_only_in_layers", c.AllowedOnlyInLayers),
+            ArchitectureModuleContainerContract c => OneContainer("container", c.Container),
             _ => Array.Empty<ArchitectureRuleInputReference>()
         };
     }
@@ -100,6 +92,11 @@ internal static class ArchitectureRuleInputReferences
     private static IEnumerable<ArchitectureRuleInputReference> Many(string input, IEnumerable<string> layers) =>
         layers.Where(layer => !string.IsNullOrWhiteSpace(layer))
             .Select(layer => new ArchitectureRuleInputReference(input, layer));
+
+    private static ArchitectureRuleInputReference[] OneContainer(string input, string container) =>
+        string.IsNullOrWhiteSpace(container)
+            ? Array.Empty<ArchitectureRuleInputReference>()
+            : new[] { new ArchitectureRuleInputReference(input, container, IsLayerReference: false) };
 }
 
 public sealed class ArchitectureCoverageContract : IArchitectureContract

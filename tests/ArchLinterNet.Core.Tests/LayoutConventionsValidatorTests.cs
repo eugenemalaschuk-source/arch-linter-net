@@ -73,6 +73,48 @@ public sealed class LayoutConventionsValidatorTests
         Assert.That(exception.Message, Does.Contain("expectation"));
     }
 
+    [TestCase(0)]
+    [TestCase(-1)]
+    public void Load_LayoutConventionContract_NonPositiveMaxDeclarationsPerType_Throws(int value)
+    {
+        string path = WritePolicy($"""
+            version: 1
+            name: Test
+            analysis:
+              target_assemblies: [{AssemblyName}]
+            contracts:
+              strict_layout_conventions:
+                - name: declaration-limit
+                  files_matching:
+                    folder_segment: Services
+                  max_declarations_per_type: {value}
+            """);
+
+        var exception = Assert.Throws<InvalidOperationException>(() => new ArchitecturePolicyDocumentLoader().Load(path));
+        Assert.That(exception!.Message, Does.Contain("max_declarations_per_type"));
+        Assert.That(exception.Message, Does.Contain("positive integer"));
+    }
+
+    [Test]
+    public void Load_LayoutConventionContract_MaxDeclarationsPerType_IsAnExpectation()
+    {
+        string path = WritePolicy($"""
+            version: 1
+            name: Test
+            analysis:
+              target_assemblies: [{AssemblyName}]
+            contracts:
+              strict_layout_conventions:
+                - name: declaration-limit
+                  files_matching:
+                    folder_segment: Services
+                  max_declarations_per_type: 1
+            """);
+
+        ArchitectureContractDocument document = new ArchitecturePolicyDocumentLoader().Load(path);
+        Assert.That(document.Contracts.StrictLayoutConventions.Single().MaxDeclarationsPerType, Is.EqualTo(1));
+    }
+
     [Test]
     public void Load_LayoutConventionContract_UnrecognizedTypeKind_Throws()
     {

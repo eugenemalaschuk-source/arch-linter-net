@@ -622,10 +622,18 @@ public sealed partial class BaselineCommandHandlerTests
             RenameCount++;
         }
 
+        public bool TryRenameTempToNewTarget(string tempPath, string targetPath) => !FileExists(targetPath);
+
         public void DeleteFile(string path)
         {
             DeletedPaths.Add(path);
         }
+
+        public bool TryCreateNewFile(string path) => true;
+
+        public bool DirectoryExists(string path) => true;
+
+        public void DeleteDirectoryIfEmpty(string path) { }
 
         public bool CanWriteToDirectory(string path) => true;
     }

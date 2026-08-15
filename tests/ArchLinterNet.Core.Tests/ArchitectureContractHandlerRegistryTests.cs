@@ -96,6 +96,7 @@ public sealed class ArchitectureContractHandlerRegistryTests
         Assert.That(registry.TryGetHandler("allow_only", out _), Is.True);
         Assert.That(registry.TryGetHandler("cycle", out _), Is.True);
         Assert.That(registry.TryGetHandler("acyclic_sibling", out _), Is.True);
+        Assert.That(registry.TryGetHandler("module_container", out _), Is.True);
         Assert.That(registry.TryGetHandler("method_body", out _), Is.True);
         Assert.That(registry.TryGetHandler("asmdef", out _), Is.True);
         Assert.That(registry.TryGetHandler("independence", out _), Is.True);
@@ -126,6 +127,7 @@ public sealed class ArchitectureContractHandlerRegistryTests
         Assert.That(registry.TryGetHandler("allow_only", out _), Is.True);
         Assert.That(registry.TryGetHandler("cycle", out _), Is.True);
         Assert.That(registry.TryGetHandler("acyclic_sibling", out _), Is.True);
+        Assert.That(registry.TryGetHandler("module_container", out _), Is.True);
         Assert.That(registry.TryGetHandler("method_body", out _), Is.True);
         Assert.That(registry.TryGetHandler("asmdef", out _), Is.True);
         Assert.That(registry.TryGetHandler("independence", out _), Is.True);

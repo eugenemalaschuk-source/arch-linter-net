@@ -229,7 +229,7 @@ internal sealed class CoverageValidator : IArchitecturePolicyDocumentValidator
             throw new InvalidOperationException(
                 $"Rule-input coverage contract '{contract.Name}' references unknown contract ID '{unknownContractId}' " +
                 "in 'contract_ids'. The ID must match a declared dependency, layer, allow_only, cycle, method_body, " +
-                "independence, protected, or external contract. asmdef, acyclic_sibling, and layer_template contracts " +
+                "independence, protected, external, or module_container contract. asmdef, acyclic_sibling, and layer_template contracts " +
                 "are not valid for scope 'rule_input'.");
         }
 
@@ -482,8 +482,9 @@ internal sealed class CoverageValidator : IArchitecturePolicyDocumentValidator
             $"are implemented right now; 'semantic_role' is also implemented. Unsupported coverage contract scopes: {details}.");
     }
 
-    // Limited to the contract families ArchitectureContractRunner's GetReferencedLayerNames
-    // actually maps to document.Layers keys. Asmdef (source_assemblies, not a layer namespace),
+    // Limited to contract families with inputs the rule-input coverage executor can resolve.
+    // Most point at document.Layers; module_container contributes its namespace container directly.
+    // Asmdef (source_assemblies, not a layer namespace),
     // acyclic_sibling (ancestors are namespace prefixes, not layer keys), and layer_template are
     // intentionally excluded: layer_template's expanded ArchitectureLayerContract instances carry
     // synthetic IDs ("<template>/<container>") distinct from the authored template ID, and their
@@ -556,6 +557,8 @@ internal sealed class CoverageValidator : IArchitecturePolicyDocumentValidator
             document.Contracts.AuditInterfaceImplementation,
             document.Contracts.StrictComposition,
             document.Contracts.AuditComposition,
+            document.Contracts.StrictModuleContainers,
+            document.Contracts.AuditModuleContainers,
         ];
 
         return groups.SelectMany(group => group);

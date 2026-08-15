@@ -1,0 +1,12 @@
+# yaml-language-server: $schema=../schema/dependencies.arch.fragment.schema.json
+#
+# Each direct child of Cli.Commands is a user-facing feature module. Commands may share the
+# Cli abstractions and Core application seams, but command behaviour must not be reused by another
+# command through a direct namespace dependency.
+contracts:
+  strict_module_containers:
+    - name: cli-command-modules-follow-the-feature-profile
+      id: cli-command-modules-follow-the-feature-profile
+      container: ArchLinterNet.Cli.Commands
+      profile: cli_command
+      reason: Discover every direct command module without adding it to a central peer list. A direct sibling reference, root type, generic bucket, undeclared segment, or forbidden profile direction is a strict violation.

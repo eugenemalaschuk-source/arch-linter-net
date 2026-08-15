@@ -54,9 +54,15 @@ internal static partial class LayoutConventionChecker
             || contract.ExcludeFilesMatching.Any(MatcherNeedsSourcePath)
             || contract.RequireTypeNameMatchesFileName
             || IsRecordKind(contract.RequireTypeKind)
-            || IsRecordKind(contract.ForbidTypeKind);
+            || IsRecordKind(contract.ForbidTypeKind)
+            || contract.AllDeclarations?.AllowedTypeKinds.Any(IsRecordKind) == true
+            || contract.MaxDeclarationsPerType is not null;
 
-        if (needsSourcePath && context.SourceFileFactIndex.AllFacts.All(fact => fact.SourceFilePath == null))
+        bool hasSourceDeclarationInventory = context.SourceFileFactIndex.SourceDeclarations.Count > 0;
+        bool hasResolvedSourceFact = context.SourceFileFactIndex.AllFacts.Any(fact => fact.SourceFilePath != null);
+        if (needsSourcePath
+            && ((!hasResolvedSourceFact && contract.MaxDeclarationsPerType is null)
+                || (!hasSourceDeclarationInventory && contract.MaxDeclarationsPerType is not null)))
         {
             violations.Add(new ArchitectureViolation(
                 contract.Name,
@@ -87,6 +93,7 @@ internal static partial class LayoutConventionChecker
             contract.FilesMatching.CompiledWhen != null
             || contract.ExcludeFilesMatching.Any(matcher => matcher.CompiledWhen != null)
             || contract.RequireMatchingInterface != null
+            || contract.AllDeclarations != null
                 ? BuildTypeIdentityLookup(context)
                 : null;
 
@@ -98,7 +105,22 @@ internal static partial class LayoutConventionChecker
             EvaluateFileGroupExpectations(contract, context, group, executionContext, violations, typesByIdentity);
         }
 
-        AddAmbiguousSourceDeclarationViolations(contract, context, executionContext, violations, typesByIdentity, tracker);
+        LayoutConventionAmbiguousDeclarationChecker.Result ambiguousDeclarationResult =
+            LayoutConventionAmbiguousDeclarationChecker.Check(contract, context, executionContext, typesByIdentity);
+        violations.AddRange(ambiguousDeclarationResult.Violations);
+        tracker.InclusionMatched |= ambiguousDeclarationResult.InclusionMatched;
+        for (int index = 0; index < tracker.Matched.Length; index++)
+        {
+            tracker.Matched[index] |= ambiguousDeclarationResult.ExclusionMatched[index];
+        }
+        LayoutConventionDeclarationCountChecker.Result declarationCountResult =
+            LayoutConventionDeclarationCountChecker.Check(contract, context, executionContext, typesByIdentity);
+        violations.AddRange(declarationCountResult.Violations);
+        tracker.InclusionMatched |= declarationCountResult.InclusionMatched;
+        for (int index = 0; index < tracker.Matched.Length; index++)
+        {
+            tracker.Matched[index] |= declarationCountResult.ExclusionMatched[index];
+        }
 
         context.RecordSubtractiveMatcherParticipation(
             contract, "files_matching", null, tracker.InclusionMatched, evaluationFailed: tracker.InclusionEvaluationFailed,
@@ -121,7 +143,7 @@ internal static partial class LayoutConventionChecker
     // ContextDependencyChecker's AddWhenExpression for the same reason. Returns a list (of at most
     // one entry, since layout conventions have exactly one `when` location) for uniformity with the
     // contextual dependency/allow-only payloads' WhenExpressions shape.
-    private static ExpressionParticipation[]? BuildLayoutWhenExpressions(
+    internal static ExpressionParticipation[]? BuildLayoutWhenExpressions(
         ArchitectureLayoutConventionContract contract) =>
         BuildLayoutWhenExpressions(
             contract.FilesMatching,
@@ -200,96 +222,11 @@ internal static partial class LayoutConventionChecker
     private static bool IsRecordKind(string value) =>
         ArchitectureLayoutTypeKindParser.TryParse(value, out ArchitectureTypeKind kind) && kind == ArchitectureTypeKind.Record;
 
-    // A partial-class declaration spread across multiple files gets a null SourceFilePath (see
-    // source-file-fact-index's ambiguity model) and is therefore invisible to folder_segment/
-    // file_name_* selectors - CollectMatchedFileGroups correctly cannot place it in any file group.
-    // Left unaddressed, a violating type could dodge a folder-based rule simply by being declared
-    // as a partial class, with zero diagnostic explaining why. Ambiguities do carry every candidate
-    // declaration path, so when at least one of them would satisfy the folder/file-name selector
-    // (and any populated namespace_segment, checked against the fact's always-reliable reflection
-    // namespace), report it as unresolvable instead of silently excluding it.
-    //
-    // A populated `when` still gets the final say, exactly like CollectMatchedFileGroups gives it
-    // for ordinary candidates: if `when` would have excluded this type anyway (e.g. it isn't the
-    // role the predicate scopes to), reporting it as unresolvable would be a false positive - a
-    // blocking diagnostic for a type the policy was never actually going to flag.
-    private static void AddAmbiguousSourceDeclarationViolations(
-        ArchitectureLayoutConventionContract contract,
-        ArchitectureCheckerContext context,
-        ArchitectureContractExecutionContext executionContext,
-        List<ArchitectureViolation> violations,
-        Dictionary<(string AssemblyName, string FullTypeName), Type>? typesByIdentity,
-        LayoutExclusionTracker tracker)
-    {
-        ArchitectureLayoutFileMatcher matcher = contract.FilesMatching;
-        bool selectorNeedsSourcePath = !string.IsNullOrEmpty(matcher.FolderSegment)
-            || !string.IsNullOrEmpty(matcher.FileNameSuffix)
-            || !string.IsNullOrEmpty(matcher.FileNamePrefix);
-        if (!selectorNeedsSourcePath || context.SourceFileFactIndex.Ambiguities.Count == 0)
-        {
-            return;
-        }
-
-        foreach (ArchitectureDeclaredTypeSourceAmbiguity ambiguity in context.SourceFileFactIndex.Ambiguities
-                     .OrderBy(a => a.FullTypeName, StringComparer.Ordinal))
-        {
-            if (!IsUnresolvableAmbiguousMatch(matcher, context, ambiguity, typesByIdentity))
-            {
-                continue;
-            }
-
-            // The positive selector admitted this declaration before source-file ambiguity made
-            // the expectation unavailable (or an exclusion later suppressed it). Participation
-            // must preserve that fact independently of the diagnostic/exclusion outcome.
-            tracker.InclusionMatched = true;
-
-            if (MatchesAnyExclusionForAmbiguity(contract, context, ambiguity, typesByIdentity, tracker))
-            {
-                continue;
-            }
-
-            AddViolation(
-                contract, executionContext, violations,
-                sourceType: ambiguity.FullTypeName,
-                forbiddenReference: "cannot evaluate: declared across multiple source files " +
-                    $"({string.Join(", ", ambiguity.SourceFilePaths)}), so its folder/file-name facts are ambiguous",
-                payload: new LayoutConventionPayload(DataUnavailable: true)
-                {
-                    WhenExpressions = BuildLayoutWhenExpressions(contract),
-                });
-        }
-    }
-
-    private static bool IsUnresolvableAmbiguousMatch(
+    internal static bool MatchesWhenForSourceType(
         ArchitectureLayoutFileMatcher matcher,
         ArchitectureCheckerContext context,
-        ArchitectureDeclaredTypeSourceAmbiguity ambiguity,
-        Dictionary<(string AssemblyName, string FullTypeName), Type>? typesByIdentity)
-    {
-        if (!AnyCandidatePathMatchesFileSelector(matcher, ambiguity.SourceFilePaths))
-        {
-            return false;
-        }
-
-        if (!context.SourceFileFactIndex.TryGetFact(
-                ambiguity.AssemblyName, ambiguity.FullTypeName, out ArchitectureDeclaredTypeFact fact))
-        {
-            return false;
-        }
-
-        if (!string.IsNullOrEmpty(matcher.NamespaceSegment)
-            && !fact.NamespaceSegments.Contains(matcher.NamespaceSegment, StringComparer.Ordinal))
-        {
-            return false;
-        }
-
-        return MatchesWhenForAmbiguity(matcher, context, ambiguity, typesByIdentity);
-    }
-
-    private static bool MatchesWhenForAmbiguity(
-        ArchitectureLayoutFileMatcher matcher,
-        ArchitectureCheckerContext context,
-        ArchitectureDeclaredTypeSourceAmbiguity ambiguity,
+        string assemblyName,
+        string fullTypeName,
         Dictionary<(string AssemblyName, string FullTypeName), Type>? typesByIdentity)
     {
         if (matcher.CompiledWhen == null)
@@ -298,49 +235,8 @@ internal static partial class LayoutConventionChecker
         }
 
         return typesByIdentity != null
-            && typesByIdentity.TryGetValue((ambiguity.AssemblyName, ambiguity.FullTypeName), out Type? type)
+            && typesByIdentity.TryGetValue((assemblyName, fullTypeName), out Type? type)
             && EvaluateLayoutWhen(matcher, context, type);
-    }
-
-    private static bool MatchesAnyExclusionForAmbiguity(
-        ArchitectureLayoutConventionContract contract,
-        ArchitectureCheckerContext context,
-        ArchitectureDeclaredTypeSourceAmbiguity ambiguity,
-        Dictionary<(string AssemblyName, string FullTypeName), Type>? typesByIdentity,
-        LayoutExclusionTracker tracker)
-    {
-        // Same rationale as IsExcludedUnfiledEntry: evaluate every authored exclusion against this
-        // ambiguity independently, not just until the first one matches, so overlapping exclusions
-        // each get their own matched record.
-        bool excludedAny = false;
-        for (int index = 0; index < contract.ExcludeFilesMatching.Count; index++)
-        {
-            ArchitectureLayoutFileMatcher exclusion = contract.ExcludeFilesMatching[index];
-            if (!AnyCandidatePathMatchesFileSelector(exclusion, ambiguity.SourceFilePaths))
-            {
-                continue;
-            }
-
-            if (!context.SourceFileFactIndex.TryGetFact(
-                    ambiguity.AssemblyName, ambiguity.FullTypeName, out ArchitectureDeclaredTypeFact fact))
-            {
-                continue;
-            }
-
-            if (!string.IsNullOrEmpty(exclusion.NamespaceSegment)
-                && !fact.NamespaceSegments.Contains(exclusion.NamespaceSegment, StringComparer.Ordinal))
-            {
-                continue;
-            }
-
-            if (MatchesWhenForAmbiguity(exclusion, context, ambiguity, typesByIdentity))
-            {
-                tracker.Matched[index] = true;
-                excludedAny = true;
-            }
-        }
-
-        return excludedAny;
     }
 
     private static Dictionary<(string AssemblyName, string FullTypeName), Type> BuildTypeIdentityLookup(
@@ -360,7 +256,7 @@ internal static partial class LayoutConventionChecker
         return lookup;
     }
 
-    private static bool AnyCandidatePathMatchesFileSelector(
+    internal static bool AnyCandidatePathMatchesFileSelector(
         ArchitectureLayoutFileMatcher matcher, IReadOnlyList<string> candidatePaths)
     {
         foreach (string path in candidatePaths)
@@ -413,6 +309,7 @@ internal static partial class LayoutConventionChecker
     {
         EvaluateRequireTypeKind(contract, group, executionContext, violations);
         EvaluateForbidTypeKind(contract, group, executionContext, violations);
+        EvaluateAllDeclarationShape(contract, context, group, executionContext, violations, typesByIdentity);
         EvaluateNamingExpectations(contract, group, executionContext, violations);
         EvaluateRequireTypeNameMatchesFileName(contract, group, executionContext, violations);
 
@@ -463,6 +360,76 @@ internal static partial class LayoutConventionChecker
             {
                 WhenExpressions = BuildLayoutWhenExpressions(contract),
             });
+    }
+
+    private static void EvaluateAllDeclarationShape(
+        ArchitectureLayoutConventionContract contract,
+        ArchitectureCheckerContext context,
+        LayoutFileGroup group,
+        ArchitectureContractExecutionContext executionContext,
+        List<ArchitectureViolation> violations,
+        Dictionary<(string AssemblyName, string FullTypeName), Type>? typesByIdentity)
+    {
+        ArchitectureLayoutDeclarationShape? shape = contract.AllDeclarations;
+        if (shape == null)
+        {
+            return;
+        }
+
+        IReadOnlySet<ArchitectureTypeKind> allowedKinds = shape.AllowedTypeKinds
+            .Select(ParseTypeKind)
+            .ToHashSet();
+        IReadOnlySet<string> allowedRoles = shape.AllowedRoles.ToHashSet(StringComparer.Ordinal);
+
+        foreach (ArchitectureDeclaredTypeFact fact in group.Facts
+                     .OrderBy(candidate => candidate.FullTypeName, StringComparer.Ordinal)
+                     .ThenBy(candidate => candidate.AssemblyName, StringComparer.Ordinal))
+        {
+            typesByIdentity!.TryGetValue((fact.AssemblyName, fact.FullTypeName), out Type? type);
+            string? actualRole = type != null && context.RoleIndex.TryGetRole(type, out ArchitectureTypeClassificationResult descriptor)
+                ? descriptor.Role
+                : null;
+            bool isAllowedKind = allowedKinds.Count == 0 || allowedKinds.Contains(fact.TypeKind);
+            bool isAllowedRole = allowedRoles.Count == 0 || (actualRole != null && allowedRoles.Contains(actualRole));
+            bool isAllowedAbstractness = !shape.RequireAbstractClasses
+                || fact.TypeKind != ArchitectureTypeKind.Class
+                || fact.IsAbstract;
+
+            if (isAllowedKind && isAllowedRole && isAllowedAbstractness)
+            {
+                continue;
+            }
+
+            string expectedKinds = shape.AllowedTypeKinds.Count == 0
+                ? "any"
+                : string.Join(", ", shape.AllowedTypeKinds);
+            string expectedRoles = shape.AllowedRoles.Count == 0
+                ? "any"
+                : string.Join(", ", shape.AllowedRoles);
+            string actualRoleDisplay = actualRole ?? "unclassified";
+            string abstractnessRequirement = shape.RequireAbstractClasses ? ", abstract classes required" : string.Empty;
+
+            AddViolation(
+                contract,
+                executionContext,
+                violations,
+                sourceType: fact.FullTypeName,
+                identitySourceType: fact.FullTypeName,
+                forbiddenReference:
+                $"all declarations must use kinds [{expectedKinds}] and roles [{expectedRoles}]{abstractnessRequirement}; " +
+                $"actual kind '{fact.TypeKind}', role '{actualRoleDisplay}', abstract '{fact.IsAbstract}'",
+                payload: new LayoutConventionPayload(
+                    MatchedFilePath: group.SourceFilePath,
+                    ExpectedTypeKind: shape.AllowedTypeKinds.Count == 0 ? null : string.Join(", ", shape.AllowedTypeKinds),
+                    ActualTypeKind: fact.TypeKind.ToString())
+                {
+                    ExpectedRoles = shape.AllowedRoles,
+                    ActualRole = actualRoleDisplay,
+                    ExpectedAbstractClass = shape.RequireAbstractClasses ? true : null,
+                    ActualIsAbstract = fact.IsAbstract,
+                    WhenExpressions = BuildLayoutWhenExpressions(contract),
+                });
+        }
     }
 
     private static void EvaluateForbidTypeKind(
@@ -660,7 +627,7 @@ internal static partial class LayoutConventionChecker
             });
     }
 
-    private static void AddViolation(
+    internal static void AddViolation(
         ArchitectureLayoutConventionContract contract,
         ArchitectureContractExecutionContext executionContext,
         List<ArchitectureViolation> violations,
@@ -711,6 +678,11 @@ internal static partial class LayoutConventionChecker
         if (payload.ExpectedTypeName != null || payload.ActualTypeName != null)
         {
             return $"type-name:{payload.ExpectedTypeName ?? string.Empty}:{payload.ActualTypeName ?? string.Empty}";
+        }
+
+        if (payload.ExpectedDeclarationCount != null || payload.ActualDeclarationCount != null)
+        {
+            return $"declaration-count:{payload.ExpectedDeclarationCount}:{payload.ActualDeclarationCount}";
         }
 
         return $"counterpart:{payload.ExpectedCounterpartName ?? string.Empty}";

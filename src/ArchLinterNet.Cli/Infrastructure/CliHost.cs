@@ -1,6 +1,7 @@
 using System.CommandLine;
 using System.CommandLine.Parsing;
 using ArchLinterNet.Cli.Abstractions;
+using ArchLinterNet.Cli.Commands.Validate.Application;
 
 namespace ArchLinterNet.Cli.Infrastructure;
 
@@ -38,7 +39,7 @@ internal sealed class CliHost(ICliRootCommandFactory rootCommandFactory, ICliCon
             switch (arg)
             {
                 case "--help" or "-h":
-                    console.Out.WriteLine(Commands.Validate.ValidateCommandDefinition.HelpText);
+                    console.Out.WriteLine(ValidateCommandDefinition.HelpText);
                     return true;
                 case "--version" or "-v":
                     console.Out.WriteLine($"arch-linter-net {runtime.Version}");

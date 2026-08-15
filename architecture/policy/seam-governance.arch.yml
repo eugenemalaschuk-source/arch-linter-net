@@ -1,0 +1,68 @@
+# yaml-language-server: $schema=../schema/dependencies.arch.fragment.schema.json
+#
+# Protect the internal seams that let hosts call Core through narrow application
+# boundaries instead of importing scanner, discovery, checker, or validator details.
+contracts:
+  strict_protected:
+    - name: core-scanning-internals-are-protected
+      id: core-scanning-internals-are-protected
+      protected: [core_scanning]
+      allowed_importers: [core]
+      reason: Scanning internals must not be referenced outside Core.
+
+    - name: core-discovery-internals-are-protected
+      id: core-discovery-internals-are-protected
+      protected: [core_discovery]
+      allowed_importers: [core]
+      reason: Project/solution discovery internals must not be referenced outside Core.
+
+    - name: core-resolution-internals-are-protected
+      id: core-resolution-internals-are-protected
+      protected: [core_resolution]
+      allowed_importers: [core]
+      reason: Repository and assembly resolution internals must not be referenced outside Core.
+
+  strict_type_placement:
+    # Post-#452 seam: a new contract-family checker must be a type under the extracted checker
+    # namespace, not a new type grown next to the analysis session. Name-suffix matching is used
+    # deliberately here: checkers are static classes bound through the ArchitectureContractChecker
+    # delegate, so there is no interface or base type to select them by.
+    - name: family-checkers-stay-in-the-extracted-checker-seam
+      id: family-checkers-stay-in-the-extracted-checker-seam
+      types_matching:
+        name_suffix: Checker
+      exclude_types_matching:
+        # ArchitectureContractChecker is the delegate the seam is defined by, not a checker.
+        - base_type: System.MulticastDelegate
+      must_reside_in_namespaces: [ArchLinterNet.Core.Execution.Checkers]
+      reason: Contract-family checking was extracted out of ArchitectureAnalysisSession (#452); a checker type declared anywhere else re-centralizes family logic.
+
+    # Post-#453 seam: the diagnostic model owns every diagnostic type, so the reporting formatter
+    # projects details through the registry instead of switching on host- or execution-owned types.
+    - name: diagnostics-stay-in-the-model-layer
+      id: diagnostics-stay-in-the-model-layer
+      types_matching:
+        base_type: ArchLinterNet.Core.Model.ArchitectureDiagnostic
+      must_reside_in_layers: [core_model]
+      reason: Every diagnostic family is a Core.Model type; declaring one in Reporting or Execution would couple diagnostic shape to a producer or a formatter.
+
+  strict_interface_implementation:
+    - name: diagnostic-detail-payloads-stay-in-the-model-layer
+      id: diagnostic-detail-payloads-stay-in-the-model-layer
+      interfaces: [ArchLinterNet.Core.Model.IArchitectureDiagnosticPayload]
+      allowed_only_in_layers: [core_model]
+      reason: The #453 detail-projection seam depends on every structured payload being a Core.Model type the formatter can project without knowing its producer.
+
+    # Post-#451 seam: policy loading owns raw-YAML validation and document validation in two
+    # dedicated namespaces, keeping the loader itself free of per-family validation branches.
+    - name: raw-policy-document-validators-stay-in-their-loading-seam
+      id: raw-policy-document-validators-stay-in-their-loading-seam
+      interfaces: [ArchLinterNet.Core.Contracts.RawValidators.IArchitecturePolicyRawDocumentValidator]
+      allowed_only_in_namespaces: [ArchLinterNet.Core.Contracts.RawValidators]
+      reason: Raw-node validation is a focused loading-stage contributor set (#451); implementing one elsewhere would reintroduce validation branches into the policy loader.
+
+    - name: policy-document-validators-stay-in-their-loading-seam
+      id: policy-document-validators-stay-in-their-loading-seam
+      interfaces: [ArchLinterNet.Core.Contracts.Validators.IArchitecturePolicyDocumentValidator]
+      allowed_only_in_namespaces: [ArchLinterNet.Core.Contracts.Validators]
+      reason: Typed document validation is a focused loading-stage contributor set (#451); implementing one elsewhere would reintroduce validation branches into the policy loader.

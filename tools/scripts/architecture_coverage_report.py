@@ -8,6 +8,8 @@ import sys
 from dataclasses import dataclass
 from pathlib import Path
 
+from architecture_coverage_failures import collect_failed_rules, render_failed_rules_section
+
 NAMESPACE_RE = re.compile(r"^\s*namespace\s+([A-Za-z_][\w.]*)", re.MULTILINE)
 
 KNOWN_SCOPES = ("namespace", "project", "assembly")
@@ -39,25 +41,39 @@ def total_counts(report: dict) -> dict[str, int]:
     return totals
 
 
-def render_summary_markdown(report: dict) -> str:
+
+def render_summary_markdown(report: dict, max_failure_diagnostics: int | None = None) -> str:
     totals = total_counts(report)
     coverage_contracts_configured = bool(report.get("coverage_summary"))
     status = overall_status(report)
     status_badge = "✅ pass" if status == "pass" else "❌ fail"
+    failed_rules = collect_failed_rules(report) if status == "fail" else []
+    failed_diagnostic_count = sum(len(rule.diagnostics) for rule in failed_rules)
 
     lines = [
         "## Architecture coverage",
         "",
         f"**Status:** {status_badge}",
         "",
-        "| Metric | Count |",
-        "| --- | --- |",
-        f"| Covered | {totals['covered']} |",
-        f"| Excluded | {totals['excluded']} |",
-        f"| Uncovered | {totals['uncovered']} |",
-        f"| Stale | {totals['stale']} |",
-        f"| Unknown | {totals['unknown']} |",
     ]
+
+    if status == "fail":
+        lines.extend(render_failed_rules_section(failed_rules, max_failure_diagnostics))
+        lines.append("")
+
+    lines.extend(
+        [
+            "| Metric | Count |",
+            "| --- | --- |",
+            f"| Failed rules | {len(failed_rules)} |",
+            f"| Failed diagnostics | {failed_diagnostic_count} |",
+            f"| Covered | {totals['covered']} |",
+            f"| Excluded | {totals['excluded']} |",
+            f"| Uncovered | {totals['uncovered']} |",
+            f"| Stale | {totals['stale']} |",
+            f"| Unknown | {totals['unknown']} |",
+        ]
+    )
 
     if not coverage_contracts_configured:
         lines.append("")
@@ -271,8 +287,14 @@ def render_diff_unavailable_section() -> str:
     )
 
 
-def render_report(report: dict, changed_files: list[str] | None, repo_root: Path, diff_failed: bool = False) -> str:
-    sections = [render_summary_markdown(report)]
+def render_report(
+    report: dict,
+    changed_files: list[str] | None,
+    repo_root: Path,
+    diff_failed: bool = False,
+    max_failure_diagnostics: int | None = None,
+) -> str:
+    sections = [render_summary_markdown(report, max_failure_diagnostics)]
 
     if diff_failed:
         sections.append(render_diff_unavailable_section())
@@ -292,6 +314,12 @@ def main() -> int:
     parser.add_argument("--repo-root", type=Path, default=Path("."), help="Repository root used to resolve changed file paths.")
     parser.add_argument("--output", type=Path, default=None, help="Path to write the Markdown report. Defaults to stdout.")
     parser.add_argument(
+        "--max-failure-diagnostics",
+        type=int,
+        default=None,
+        help="Maximum representative diagnostics per failed rule. Omit for a complete report.",
+    )
+    parser.add_argument(
         "--diff-status",
         choices=("ok", "failed"),
         default="ok",
@@ -300,6 +328,8 @@ def main() -> int:
     )
 
     args = parser.parse_args()
+    if args.max_failure_diagnostics is not None and args.max_failure_diagnostics < 1:
+        parser.error("--max-failure-diagnostics must be at least 1")
 
     report = load_coverage(args.json_path)
     diff_failed = args.diff_status == "failed"
@@ -308,7 +338,13 @@ def main() -> int:
     if not diff_failed and args.changed_files is not None and args.changed_files.exists():
         changed_files = [line.strip() for line in args.changed_files.read_text(encoding="utf-8").splitlines() if line.strip()]
 
-    markdown = render_report(report, changed_files, args.repo_root, diff_failed=diff_failed)
+    markdown = render_report(
+        report,
+        changed_files,
+        args.repo_root,
+        diff_failed=diff_failed,
+        max_failure_diagnostics=args.max_failure_diagnostics,
+    )
 
     if args.output is not None:
         args.output.write_text(markdown, encoding="utf-8")

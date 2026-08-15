@@ -5,15 +5,6 @@ using YamlDotNet.Serialization;
 
 namespace ArchLinterNet.Core.Contracts.Families;
 
-public sealed partial class ArchitectureContractGroups
-{
-    [YamlMember(Alias = "strict_layout_conventions")]
-    public List<ArchitectureLayoutConventionContract> StrictLayoutConventions { get; set; } = new();
-
-    [YamlMember(Alias = "audit_layout_conventions")]
-    public List<ArchitectureLayoutConventionContract> AuditLayoutConventions { get; set; } = new();
-}
-
 // files_matching selects candidate source files from ArchitectureSourceFileFactIndex by
 // folder/namespace/file-name path facts (exact/prefix/suffix only, AND-combined) - a distinct type
 // from ArchitectureTypeMatcher (which selects live reflected Types) and from ArchitectureContextSelector
@@ -48,6 +39,24 @@ public sealed class ArchitectureRequireMatchingInterface
     [YamlMember(Alias = "name_prefix")] public string? NamePrefix { get; set; }
 }
 
+/// <summary>
+/// An opt-in file-purity expectation evaluated for every declared type in a matched source file.
+/// Kind and role lists narrow the permitted shape independently; an empty list leaves that axis
+/// unconstrained. <see cref="RequireAbstractClasses"/> applies only to class declarations, so
+/// interfaces remain valid abstraction declarations without pretending they carry the C# modifier.
+/// </summary>
+public sealed class ArchitectureLayoutDeclarationShape
+{
+    [YamlMember(Alias = "allowed_type_kinds")]
+    public List<string> AllowedTypeKinds { get; set; } = new();
+
+    [YamlMember(Alias = "allowed_roles")]
+    public List<string> AllowedRoles { get; set; } = new();
+
+    [YamlMember(Alias = "require_abstract_classes")]
+    public bool RequireAbstractClasses { get; set; }
+}
+
 public sealed class ArchitectureLayoutConventionContract : IArchitectureContract
 {
     [YamlMember(Alias = "name")] public string Name { get; set; } = string.Empty;
@@ -79,8 +88,14 @@ public sealed class ArchitectureLayoutConventionContract : IArchitectureContract
     [YamlMember(Alias = "require_type_name_matches_file_name")]
     public bool RequireTypeNameMatchesFileName { get; set; }
 
+    [YamlMember(Alias = "max_declarations_per_type")]
+    public int? MaxDeclarationsPerType { get; set; }
+
     [YamlMember(Alias = "require_matching_interface")]
     public ArchitectureRequireMatchingInterface? RequireMatchingInterface { get; set; }
+
+    [YamlMember(Alias = "all_declarations")]
+    public ArchitectureLayoutDeclarationShape? AllDeclarations { get; set; }
 
     [YamlMember(Alias = "ignored_violations")]
     public List<ArchitectureIgnoredViolation> IgnoredViolations { get; set; } = new();

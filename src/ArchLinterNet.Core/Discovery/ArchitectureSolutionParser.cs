@@ -5,11 +5,6 @@ using ArchLinterNet.Core.IO.Abstractions;
 
 namespace ArchLinterNet.Core.Discovery;
 
-internal interface IArchitectureSolutionParser
-{
-    IReadOnlyList<string> ParseProjectPaths(string solutionPath, IArchitectureFileSystem? fileSystem = null);
-}
-
 internal sealed partial class ArchitectureSolutionParser : IArchitectureSolutionParser
 {
     [GeneratedRegex("^Project\\(\"\\{[^}]*}\"\\)\\s*=\\s*\"[^\"]*\",\\s*\"([^\"]*)\",\\s*\"\\{[^}]*}\"",

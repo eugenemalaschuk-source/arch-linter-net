@@ -5,12 +5,6 @@ using YamlDotNet.Serialization;
 
 namespace ArchLinterNet.Core.Contracts;
 
-public interface IArchitectureContract
-{
-    string Name { get; }
-    string? Id { get; set; }
-}
-
 public sealed class ArchitectureContractDocument
 {
     [YamlMember(Alias = "version")] public int Version { get; set; }

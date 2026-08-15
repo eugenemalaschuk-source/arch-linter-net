@@ -66,3 +66,23 @@ namespace LayoutConventionContractTestFixtures.AbstractServices
 {
     public abstract class AbstractBaseService;
 }
+
+namespace LayoutConventionContractTestFixtures.FolderPurity.Abstractions
+{
+    public interface IOrderPort;
+
+    public abstract class AbstractOrderPort;
+
+    public sealed class ConcreteOrderPort;
+
+    public readonly struct ValueOrderPort;
+}
+
+namespace LayoutConventionContractTestFixtures.FolderPurity.Exceptions
+{
+    public sealed class OrderRejectedException : Exception;
+
+    public sealed record IncorrectExceptionRecord;
+
+    public interface IIncorrectException;
+}

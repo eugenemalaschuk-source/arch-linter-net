@@ -1,3 +1,4 @@
+using ArchLinterNet.Core.Contracts.PolicyImports.Models;
 using ArchLinterNet.Core.Model;
 using YamlDotNet.RepresentationModel;
 

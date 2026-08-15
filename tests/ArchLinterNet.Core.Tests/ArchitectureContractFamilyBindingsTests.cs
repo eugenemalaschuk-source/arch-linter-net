@@ -16,12 +16,12 @@ public sealed class ArchitectureContractFamilyBindingsTests
 {
     private static readonly string[] _value = { "layer_template" };
     [Test]
-    public void All_HasTwentyNineUniqueFamilyIds()
+    public void All_HasThirtyTwoUniqueFamilyIds()
     {
         var familyIds = ArchitectureContractFamilyBindings.All.Select(b => b.FamilyId).ToList();
 
-        Assert.That(familyIds, Has.Count.EqualTo(31));
-        Assert.That(familyIds.Distinct(StringComparer.Ordinal).Count(), Is.EqualTo(31));
+        Assert.That(familyIds, Has.Count.EqualTo(32));
+        Assert.That(familyIds.Distinct(StringComparer.Ordinal).Count(), Is.EqualTo(32));
     }
 
     [Test]
@@ -61,6 +61,8 @@ public sealed class ArchitectureContractFamilyBindingsTests
         StrictExternalAllowOnly =
             { new ArchitectureExternalAllowOnlyContract { Name = "n", Id = "external_allow_only" } },
         StrictAcyclicSiblings = { new ArchitectureAcyclicSiblingContract { Name = "n", Id = "acyclic_sibling" } },
+        StrictModuleContainers =
+            { new ArchitectureModuleContainerContract { Name = "n", Id = "module_container", Container = "Test.Commands", Profile = "cli_command" } },
         StrictTypePlacement = { new ArchitectureTypePlacementContract { Name = "n", Id = "type_placement" } },
         StrictPublicApiSurface =
             { new ArchitecturePublicApiSurfaceContract { Name = "n", Id = "public_api_surface" } },
@@ -80,7 +82,7 @@ public sealed class ArchitectureContractFamilyBindingsTests
 
         var strictIds = groups.AllStrict.Select(c => c.Id).ToList();
 
-        Assert.That(strictIds, Has.Count.EqualTo(25));
+        Assert.That(strictIds, Has.Count.EqualTo(26));
         Assert.That(strictIds, Does.Not.Contain("layer_template"));
     }
 

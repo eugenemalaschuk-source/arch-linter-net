@@ -1,0 +1,122 @@
+# yaml-language-server: $schema=../schema/dependencies.arch.fragment.schema.json
+#
+# This fragment keeps remaining convention debt in audit mode while strict leaf and folder-purity
+# rules protect the conventions whose production migration has completed.
+contracts:
+  strict_allow_only:
+    - name: models-have-no-first-party-dependencies
+      id: models-have-no-first-party-dependencies
+      source: model_types
+      allowed: []
+      reason: Models are the innermost domain representation and must not depend on another first-party namespace.
+
+    - name: exceptions-have-no-first-party-dependencies
+      id: exceptions-have-no-first-party-dependencies
+      source: exception_types
+      allowed: []
+      reason: Exception types must be self-contained; System.Exception is a BCL base type and is intentionally outside first-party dependency checking.
+
+  strict_layout_conventions:
+    - name: abstractions-directories-contain-only-interfaces-or-abstract-classes
+      id: abstractions-directories-contain-only-interfaces-or-abstract-classes
+      files_matching:
+        folder_segment: Abstractions
+      all_declarations:
+        allowed_type_kinds: [interface, class]
+        require_abstract_classes: true
+      reason: "An Abstractions directory is a published contract surface: interfaces are allowed, and classes must be explicitly abstract extension points."
+
+    - name: exceptions-directories-contain-only-exceptions
+      id: exceptions-directories-contain-only-exception-classes
+      files_matching:
+        folder_segment: Exceptions
+      all_declarations:
+        allowed_roles: [Exception]
+      reason: Exceptions directories contain only types classified by inheritance as Exception.
+
+  audit_layout_conventions:
+    - name: production-types-have-one-source-declaration
+      id: production-types-have-one-source-declaration
+      files_matching:
+        folder_segment: src
+      max_declarations_per_type: 1
+      reason: A production type must have one source declaration; extract collaborators instead of extending a type through partial files.
+
+    - name: production-interfaces-live-in-abstractions
+      id: production-interfaces-live-in-abstractions
+      files_matching:
+        folder_segment: src
+      exclude_files_matching:
+        - folder_segment: Abstractions
+      forbid_type_kind: interface
+      reason: Every production interface is an abstraction and must be declared in an Abstractions directory.
+
+    - name: models-live-in-models-directories-class
+      id: models-live-in-models-directories-class
+      files_matching:
+        folder_segment: src
+        when: subject.role == 'Model'
+      exclude_files_matching:
+        - folder_segment: Models
+      forbid_type_kind: class
+      reason: Model classes must be declared under a Models directory.
+
+    - name: models-live-in-models-directories-record
+      id: models-live-in-models-directories-record
+      files_matching:
+        folder_segment: src
+        when: subject.role == 'Model'
+      exclude_files_matching:
+        - folder_segment: Models
+      forbid_type_kind: record
+      reason: Model records must be declared under a Models directory.
+
+    - name: models-live-in-models-directories-struct
+      id: models-live-in-models-directories-struct
+      files_matching:
+        folder_segment: src
+        when: subject.role == 'Model'
+      exclude_files_matching:
+        - folder_segment: Models
+      forbid_type_kind: struct
+      reason: Model structs must be declared under a Models directory.
+
+    - name: models-live-in-models-directories-enum
+      id: models-live-in-models-directories-enum
+      files_matching:
+        folder_segment: src
+        when: subject.role == 'Model'
+      exclude_files_matching:
+        - folder_segment: Models
+      forbid_type_kind: enum
+      reason: Model enums must be declared under a Models directory.
+
+    - name: models-live-in-models-directories-interface
+      id: models-live-in-models-directories-interface
+      files_matching:
+        folder_segment: src
+        when: subject.role == 'Model'
+      exclude_files_matching:
+        - folder_segment: Models
+      forbid_type_kind: interface
+      reason: Model interfaces must be declared under a Models directory.
+
+    - name: models-live-in-models-directories-delegate
+      id: models-live-in-models-directories-delegate
+      files_matching:
+        folder_segment: src
+        when: subject.role == 'Model'
+      exclude_files_matching:
+        - folder_segment: Models
+      forbid_type_kind: delegate
+      reason: Model delegates must be declared under a Models directory.
+
+    - name: exceptions-live-in-exceptions-directories
+      id: exceptions-live-in-exceptions-directories
+      files_matching:
+        folder_segment: src
+        when: subject.role == 'Exception'
+      exclude_files_matching:
+        - folder_segment: Exceptions
+      forbid_type_kind: class
+      reason: A class derived from System.Exception must be declared under an Exceptions directory.

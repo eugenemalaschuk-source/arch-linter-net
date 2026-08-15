@@ -4,6 +4,7 @@ using ArchLinterNet.Core.Caching;
 using ArchLinterNet.Core.Contracts;
 using ArchLinterNet.Core.Execution;
 using ArchLinterNet.Core.Execution.Abstractions;
+using ArchLinterNet.Core.Execution.Results;
 using ArchLinterNet.Core.Model;
 using ArchLinterNet.Core.Reporting;
 

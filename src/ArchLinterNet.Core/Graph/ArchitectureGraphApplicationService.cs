@@ -1,6 +1,7 @@
 using ArchLinterNet.Core.Contracts;
 using ArchLinterNet.Core.Execution;
 using ArchLinterNet.Core.Execution.Abstractions;
+using ArchLinterNet.Core.Execution.Results;
 using ArchLinterNet.Core.Graph.Abstractions;
 using ArchLinterNet.Core.Model;
 
@@ -51,7 +52,7 @@ public sealed class ArchitectureGraphApplicationService(
         }
         catch (ArchitecturePolicyImportException ex)
         {
-            throw new ArchitecturePolicyLoadException(ex.Message, ex.Diagnostic, ex.Category.ToString(), ex);
+            throw new ArchitecturePolicyLoadException(ex.Message, ex.Diagnostic, ex.Category.ToString() ?? "unknown", ex);
         }
 
         HashSet<string>? selectedIds = request.ContractIds is { Count: > 0 }

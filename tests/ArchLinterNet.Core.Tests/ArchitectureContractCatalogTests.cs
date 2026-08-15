@@ -13,7 +13,7 @@ public sealed class ArchitectureContractCatalogTests
             "dependency", "layer", "layer_template", "allow_only", "cycle", "method_body",
             "asmdef", "independence", "assembly_independence", "assembly_dependency", "assembly_allow_only",
             "package_dependency", "package_allow_only", "framework_dependency", "framework_allow_only", "project_metadata",
-            "protected", "external", "external_allow_only", "acyclic_sibling", "type_placement", "layout_conventions",
+            "protected", "external", "external_allow_only", "acyclic_sibling", "module_container", "type_placement", "layout_conventions",
             "public_api_surface", "attribute_usage", "inheritance", "interface_implementation", "composition", "coverage",
             "context_dependency", "context_allow_only", "port_boundary",
         };
@@ -66,6 +66,10 @@ public sealed class ArchitectureContractCatalogTests
                 {
                     new() { Id = "acyclic-strict", Name = "Acyclic Strict", Ancestors = { "core" } }
                 },
+                StrictModuleContainers = new List<ArchitectureModuleContainerContract>
+                {
+                    new() { Id = "module-container-strict", Name = "Module container Strict", Container = "Test.Commands", Profile = "cli_command" }
+                },
                 StrictLayerTemplates = new List<ArchitectureLayerTemplateContract>
                 {
                     new()
@@ -96,6 +100,7 @@ public sealed class ArchitectureContractCatalogTests
         Assert.That(strictIds, Does.Contain("protected-strict"));
         Assert.That(strictIds, Does.Contain("external-strict"));
         Assert.That(strictIds, Does.Contain("acyclic-strict"));
+        Assert.That(strictIds, Does.Contain("module-container-strict"));
     }
 
     [Test]

@@ -581,10 +581,27 @@ public sealed partial class ReportCoordinatorTests
             OnRenamed?.Invoke(targetPath);
         }
 
+        public bool TryRenameTempToNewTarget(string tempPath, string targetPath)
+        {
+            if (FileExists(targetPath))
+            {
+                return false;
+            }
+
+            RenameTempToTarget(tempPath, targetPath);
+            return true;
+        }
+
         public void DeleteFile(string path)
         {
             _tempContents.Remove(path);
         }
+
+        public bool TryCreateNewFile(string path) => true;
+
+        public bool DirectoryExists(string path) => true;
+
+        public void DeleteDirectoryIfEmpty(string path) { }
 
         public bool CanWriteToDirectory(string path) => !_failOn.Contains(new FailEntry(path, FailPhase.Write));
     }
@@ -596,7 +613,11 @@ public sealed partial class ReportCoordinatorTests
         public void WriteAllText(string path, string contents) { }
         public string WriteAllTextToTemp(string targetPath, string contents) => throw new IOException("Disk full");
         public void RenameTempToTarget(string tempPath, string targetPath) { }
+        public bool TryRenameTempToNewTarget(string tempPath, string targetPath) => false;
         public void DeleteFile(string path) { }
+        public bool TryCreateNewFile(string path) => true;
+        public bool DirectoryExists(string path) => true;
+        public void DeleteDirectoryIfEmpty(string path) { }
         public bool CanWriteToDirectory(string path) => true;
     }
 

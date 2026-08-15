@@ -390,6 +390,7 @@ contracts:
   strict_external: []
   strict_external_allow_only: []
   strict_acyclic_siblings: []
+  strict_module_containers: []
   strict_type_placement: []
   strict_layout_conventions: []
   strict_public_api_surface: []
@@ -411,6 +412,7 @@ contracts:
   audit_external: []
   audit_external_allow_only: []
   audit_acyclic_siblings: []
+  audit_module_containers: []
   audit_type_placement: []
   audit_layout_conventions: []
   audit_public_api_surface: []
@@ -517,6 +519,30 @@ Scans loaded types under each ancestor namespace and groups them by immediate
 child namespace segment. Detects dependency cycles between sibling groups.
 Descendant dependencies are attributed to the direct sibling group. Each ancestor
 is evaluated independently.
+
+### Module-container contract
+
+```yaml
+- id: <string>                         # Optional — stable identifier for CLI selection
+  name: <string>                       # Required
+  container: <namespace-prefix>         # Required — namespace containing feature modules
+  profile: cli_command                 # Required — profile-specific structure and directions
+  allowed_container_root_types: []      # Optional — named exceptions at the container root
+  allowed_module_root_types: []         # Optional — named exceptions at a module root
+  ignored_violations: []                # Optional — baseline known violations
+  reason: <string>                      # Recommended — human-readable justification
+```
+
+Discovers modules dynamically from the immediate child namespaces of `container`; adding a
+module therefore does not require extending a manually maintained layer inventory. Modules may
+not reference one another. The `cli_command` profile reserves `EntryPoint`, `Application`,
+`Abstractions`, `Models`, and `Exceptions` as the only direct module segments and permits only
+the inward dependency directions `EntryPoint → Application/Abstractions/Models/Exceptions`,
+`Application → Abstractions/Models/Exceptions`, and `Abstractions → Models`. `Models` and
+`Exceptions` are leaves. Container roots, generic module names such as `Common`, and undeclared
+segments are violations unless explicitly listed as an exception. Start this contract in audit
+mode while migrating an existing container, then promote it to strict mode once its findings are
+resolved.
 
 ### Method-body contract
 
@@ -731,6 +757,20 @@ naming suffix/prefix. At least one placement (`must_reside_in_*`) or naming
 (`required_name_*`/`forbidden_name_*`) expectation is required — a selector with neither
 fails policy loading with an actionable error. See
 [Type placement contracts](../contracts/type-placement.md) for full semantics.
+
+### Layout convention contract
+
+```yaml
+- id: <string>                        # Optional
+  name: <string>
+  files_matching:                      # Required — source files to examine
+    folder_segment: <folder-name>
+  reason: <string>
+```
+
+Use `all_declarations` to apply a type-kind, semantic-role, or abstract-class purity rule to every
+declaration in the selected folders. See [Layout convention contracts](../contracts/layout-conventions.md)
+for its complete shape and semantics.
 
 ### Public API surface contract
 

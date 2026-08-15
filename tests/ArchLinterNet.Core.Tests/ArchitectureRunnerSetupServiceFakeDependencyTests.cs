@@ -78,8 +78,8 @@ public sealed class ArchitectureRunnerSetupServiceFakeDependencyTests
             bool resolveAssemblyOutputs,
             string? mode,
             HashSet<string>? selectedContractIds,
-            CancellationToken cancellationToken = default,
-            IReadOnlyDictionary<string, string>? expectedArtifactContentDigests = null)
+            IReadOnlyDictionary<string, string>? expectedArtifactContentDigests = null,
+            CancellationToken cancellationToken = default)
         {
             return Resolve(document, repositoryRoot, discovery, resolveAssemblyOutputs, mode, selectedContractIds,
                 cancellationToken);

@@ -1,6 +1,7 @@
 using System.Text.Json;
 using ArchLinterNet.Core.Contracts;
 using ArchLinterNet.Core.Contracts.PolicyImports;
+using ArchLinterNet.Core.Model;
 using ArchLinterNet.Core.Resolution;
 using NUnit.Framework;
 
@@ -97,12 +98,13 @@ public sealed class ArchitecturePolicyImportAcceptanceTests
 
         ArchitecturePolicyImportException exception = Assert.Throws<ArchitecturePolicyImportException>(
             () => Load(relativeRoot))!;
+        ArchitecturePolicyDiagnostic diagnostic = (ArchitecturePolicyDiagnostic)exception.Diagnostic!;
 
         Assert.Multiple(() =>
         {
             Assert.That(exception.Category, Is.EqualTo(ArchitecturePolicyImportErrorCategory.CompositionConflict));
-            Assert.That(exception.Diagnostic!.Location!.SourcePath, Does.EndWith(expectedPrimarySuffix));
-            Assert.That(exception.Diagnostic.RelatedLocations.Single().SourcePath,
+            Assert.That(diagnostic.Location!.SourcePath, Does.EndWith(expectedPrimarySuffix));
+            Assert.That(diagnostic.RelatedLocations.Single().SourcePath,
                 Does.EndWith(expectedRelatedSuffix));
         });
     }

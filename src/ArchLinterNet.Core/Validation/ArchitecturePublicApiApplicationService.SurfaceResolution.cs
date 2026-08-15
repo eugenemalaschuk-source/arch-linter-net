@@ -3,6 +3,7 @@ using ArchLinterNet.Core.Contracts;
 using ArchLinterNet.Core.Contracts.Families;
 using ArchLinterNet.Core.Execution;
 using ArchLinterNet.Core.Execution.Abstractions;
+using ArchLinterNet.Core.Execution.Results;
 using ArchLinterNet.Core.Model;
 
 namespace ArchLinterNet.Core.Validation;

@@ -2,15 +2,6 @@ using YamlDotNet.Serialization;
 
 namespace ArchLinterNet.Core.Contracts.Families;
 
-public sealed partial class ArchitectureContractGroups
-{
-    [YamlMember(Alias = "strict_composition")]
-    public List<ArchitectureCompositionContract> StrictComposition { get; set; } = new();
-
-    [YamlMember(Alias = "audit_composition")]
-    public List<ArchitectureCompositionContract> AuditComposition { get; set; } = new();
-}
-
 public sealed class ArchitectureCompositionContract : IArchitectureContract
 {
     [YamlMember(Alias = "name")] public string Name { get; set; } = string.Empty;

@@ -69,6 +69,8 @@ public sealed class ArchitectureBaselineContractGroups
     [YamlMember(Alias = "audit_external_allow_only")] public List<ArchitectureBaselineContractEntry> AuditExternalAllowOnly { get; set; } = new();
     [YamlMember(Alias = "strict_acyclic_siblings")] public List<ArchitectureBaselineContractEntry> StrictAcyclicSiblings { get; set; } = new();
     [YamlMember(Alias = "audit_acyclic_siblings")] public List<ArchitectureBaselineContractEntry> AuditAcyclicSiblings { get; set; } = new();
+    [YamlMember(Alias = "strict_module_containers")] public List<ArchitectureBaselineContractEntry> StrictModuleContainers { get; set; } = new();
+    [YamlMember(Alias = "audit_module_containers")] public List<ArchitectureBaselineContractEntry> AuditModuleContainers { get; set; } = new();
     [YamlMember(Alias = "strict_type_placement")] public List<ArchitectureBaselineContractEntry> StrictTypePlacement { get; set; } = new();
     [YamlMember(Alias = "audit_type_placement")] public List<ArchitectureBaselineContractEntry> AuditTypePlacement { get; set; } = new();
     [YamlMember(Alias = "strict_layout_conventions")] public List<ArchitectureBaselineContractEntry> StrictLayoutConventions { get; set; } = new();
@@ -116,6 +118,7 @@ public sealed class ArchitectureBaselineContractGroups
         "strict_external", "audit_external",
         "strict_external_allow_only", "audit_external_allow_only",
         "strict_acyclic_siblings", "audit_acyclic_siblings",
+        "strict_module_containers", "audit_module_containers",
         "strict_type_placement", "audit_type_placement",
         "strict_layout_conventions", "audit_layout_conventions",
         "strict_public_api_surface", "audit_public_api_surface",
@@ -169,6 +172,8 @@ public sealed class ArchitectureBaselineContractGroups
             "audit_external_allow_only" => AuditExternalAllowOnly,
             "strict_acyclic_siblings" => StrictAcyclicSiblings,
             "audit_acyclic_siblings" => AuditAcyclicSiblings,
+            "strict_module_containers" => StrictModuleContainers,
+            "audit_module_containers" => AuditModuleContainers,
             "strict_type_placement" => StrictTypePlacement,
             "audit_type_placement" => AuditTypePlacement,
             "strict_layout_conventions" => StrictLayoutConventions,
@@ -236,6 +241,8 @@ public sealed class ArchitectureBaselineContractGroups
             case "audit_external_allow_only": AuditExternalAllowOnly = entries; break;
             case "strict_acyclic_siblings": StrictAcyclicSiblings = entries; break;
             case "audit_acyclic_siblings": AuditAcyclicSiblings = entries; break;
+            case "strict_module_containers": StrictModuleContainers = entries; break;
+            case "audit_module_containers": AuditModuleContainers = entries; break;
             case "strict_type_placement": StrictTypePlacement = entries; break;
             case "audit_type_placement": AuditTypePlacement = entries; break;
             case "strict_layout_conventions": StrictLayoutConventions = entries; break;

@@ -64,9 +64,47 @@ internal sealed class FileSystem : IFileSystem
         File.Move(tempPath, targetPath, overwrite: true);
     }
 
+    public bool TryRenameTempToNewTarget(string tempPath, string targetPath)
+    {
+        try
+        {
+            File.Move(tempPath, targetPath, overwrite: false);
+            return true;
+        }
+        catch (IOException) when (File.Exists(targetPath))
+        {
+            return false;
+        }
+    }
+
     public void DeleteFile(string path)
     {
         File.Delete(path);
+    }
+
+    public bool TryCreateNewFile(string path)
+    {
+        string absolutePath = Path.GetFullPath(path);
+
+        try
+        {
+            using var stream = new FileStream(absolutePath, FileMode.CreateNew, FileAccess.Write, FileShare.None);
+            return true;
+        }
+        catch (IOException) when (File.Exists(absolutePath))
+        {
+            return false;
+        }
+    }
+
+    public bool DirectoryExists(string path)
+    {
+        return Directory.Exists(path);
+    }
+
+    public void DeleteDirectoryIfEmpty(string path)
+    {
+        Directory.Delete(path);
     }
 
     public bool CanWriteToDirectory(string path)

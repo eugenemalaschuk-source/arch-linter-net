@@ -13,6 +13,8 @@ ArchLinterNet supports static architecture validation through documented YAML po
 - allow-only whitelist contracts;
 - dependency cycle contracts;
 - acyclic sibling namespace contracts;
+- module-container contracts that discover direct feature modules dynamically and enforce a
+  profile-specific module topology;
 - independence contracts;
 - assembly independence contracts (direct .NET assembly reference detection);
 - project metadata governance contracts (exact required/forbidden MSBuild property values, friend-assembly allowlists, forbidden project-reference path matches, driven from discovered `.csproj` metadata);
@@ -23,6 +25,8 @@ ArchLinterNet supports static architecture validation through documented YAML po
 - Unity `.asmdef` contracts;
 - reusable layer templates;
 - type placement and naming governance contracts (name suffix/prefix, namespace, layer, base type, interface, and attribute selectors; layer/namespace/project/assembly residency; required/forbidden naming);
+- layout convention contracts with declaration-kind, semantic-role, and abstract-class folder
+  purity checks;
 - public API surface governance contracts (per-assembly declared exported public/protected/protected-internal type and member allowlist, undeclared-surface detection, optional forbid-public-constants-unless-declared lever);
 - attribute usage governance contracts (declared attribute/marker types restricted to, or forbidden from, declared layers/namespaces/projects/assemblies; exact and prefix attribute-name matching; type and member scanning regardless of visibility);
 - inheritance boundary contracts (types in declared source layers/namespaces forbidden from inheriting, directly or transitively, from declared base types; exact and prefix base-type-name matching; generic base types matched by generic type definition);

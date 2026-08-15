@@ -41,6 +41,49 @@ public sealed partial class LayoutConventionContractTests
     }
 
     [Test]
+    public void CheckLayoutConventionsContract_MaxDeclarationsPerType_HonorsWhenAndExclusion()
+    {
+        string assemblyName = typeof(LayoutConventionContractTests).Assembly.GetName().Name!;
+        string policyPath = Path.Combine(_tempDir, "dependencies.arch.yml");
+        File.WriteAllText(policyPath, $"""
+            version: 1
+            name: Test
+            analysis:
+              target_assemblies: [{assemblyName}]
+              source_roots: ["."]
+            contracts:
+              strict_layout_conventions:
+                - name: partial-declaration-budget
+                  files_matching:
+                    folder_segment: Services
+                    when: subject.simpleName == "PartialOffender"
+                  exclude_files_matching:
+                    - folder_segment: Elsewhere
+                  max_declarations_per_type: 1
+            """);
+
+        ArchitectureContractDocument document = new ArchitecturePolicyDocumentLoader().Load(policyPath);
+        var contract = document.Contracts.StrictLayoutConventions[0];
+        var runner = new ArchitectureContractRunner(CreateContext(), document);
+
+        IReadOnlyList<ArchitectureViolation> violations = runner.Session.CheckLayoutConventionsContract(contract);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(violations.Any(violation =>
+                violation.SourceType.Contains("PartialOffender", StringComparison.Ordinal)), Is.False);
+            Assert.That(
+                runner.SubtractiveMatcherParticipation.Select(participation =>
+                    (participation.Kind, participation.Field, participation.Index, participation.Matched)),
+                Is.EqualTo(new[]
+                {
+                    (ArchitectureSelectorParticipationKind.Inclusion, "files_matching", (int?)null, true),
+                    (ArchitectureSelectorParticipationKind.Exclusion, "exclude_files_matching", 0, true),
+                }));
+        });
+    }
+
+    [Test]
     public void CheckLayoutConventionsContract_ExcludeFilesMatching_RecordsMatchedAndStaleParticipation()
     {
         string assemblyName = typeof(LayoutConventionContractTests).Assembly.GetName().Name!;

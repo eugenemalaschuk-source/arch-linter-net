@@ -2,15 +2,6 @@ using YamlDotNet.Serialization;
 
 namespace ArchLinterNet.Core.Contracts.Families;
 
-public sealed partial class ArchitectureContractGroups
-{
-    [YamlMember(Alias = "strict_context_allow_only")]
-    public List<ArchitectureContextAllowOnlyContract> StrictContextAllowOnly { get; set; } = new();
-
-    [YamlMember(Alias = "audit_context_allow_only")]
-    public List<ArchitectureContextAllowOnlyContract> AuditContextAllowOnly { get; set; } = new();
-}
-
 // Restricts a source selector's dependencies to same-context (or explicitly allowed) targets,
 // mirroring ArchitectureContextDependencyContract's selector/operator conventions. See
 // openspec/changes/add-contextual-dependency-contracts/specs/contextual-allow-only-contracts/spec.md.

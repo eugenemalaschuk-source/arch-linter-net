@@ -72,6 +72,7 @@ site/
 architecture-strict.json
 architecture-audit.json
 architecture-coverage.md
+architecture-coverage-comment.md
 changed-files.txt
 
 # BenchmarkDotNet output (make benchmark-cel)

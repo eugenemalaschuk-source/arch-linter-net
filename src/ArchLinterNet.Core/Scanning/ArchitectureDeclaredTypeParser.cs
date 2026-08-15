@@ -15,7 +15,10 @@ internal static class ArchitectureDeclaredTypeParser
         string FullTypeName,
         string SimpleTypeName,
         string Namespace,
-        ArchitectureTypeKind TypeKind);
+        ArchitectureTypeKind TypeKind,
+        bool IsPartial,
+        bool IsAbstract,
+        int SourceLine);
 
     public static IReadOnlyList<ParsedTypeInfo> ParseSourceText(
         string sourceText,
@@ -59,7 +62,14 @@ internal static class ArchitectureDeclaredTypeParser
                     string clrSimple = arity > 0 ? $"{typeName}`{arity}" : typeName;
                     string clrFull = BuildClrFull(ns, outerClrPrefix, clrSimple);
 
-                    results.Add(new ParsedTypeInfo(clrFull, typeName, ns, GetKind(typeDecl)));
+                    results.Add(new ParsedTypeInfo(
+                        clrFull,
+                        typeName,
+                        ns,
+                        GetKind(typeDecl),
+                        typeDecl.Modifiers.Any(SyntaxKind.PartialKeyword),
+                        typeDecl.Modifiers.Any(SyntaxKind.AbstractKeyword),
+                        GetSourceLine(typeDecl)));
 
                     // Recurse for nested type declarations (members of any TypeDeclaration may contain
                     // nested classes, structs, interfaces, records, enums, or delegates).
@@ -69,7 +79,8 @@ internal static class ArchitectureDeclaredTypeParser
                 case EnumDeclarationSyntax enumDecl:
                     string enumName = enumDecl.Identifier.ValueText;
                     string enumFull = BuildClrFull(ns, outerClrPrefix, enumName);
-                    results.Add(new ParsedTypeInfo(enumFull, enumName, ns, ArchitectureTypeKind.Enum));
+                    results.Add(new ParsedTypeInfo(
+                        enumFull, enumName, ns, ArchitectureTypeKind.Enum, IsPartial: false, IsAbstract: false, SourceLine: GetSourceLine(enumDecl)));
                     break;
 
                 case DelegateDeclarationSyntax delegateDecl:
@@ -77,7 +88,8 @@ internal static class ArchitectureDeclaredTypeParser
                     int delArity = delegateDecl.TypeParameterList?.Parameters.Count ?? 0;
                     string delClrSimple = delArity > 0 ? $"{delName}`{delArity}" : delName;
                     string delFull = BuildClrFull(ns, outerClrPrefix, delClrSimple);
-                    results.Add(new ParsedTypeInfo(delFull, delName, ns, ArchitectureTypeKind.Delegate));
+                    results.Add(new ParsedTypeInfo(
+                        delFull, delName, ns, ArchitectureTypeKind.Delegate, IsPartial: false, IsAbstract: false, SourceLine: GetSourceLine(delegateDecl)));
                     break;
             }
         }
@@ -105,6 +117,9 @@ internal static class ArchitectureDeclaredTypeParser
         if (outerClrPrefix != null) return $"{outerClrPrefix}+{clrSimple}";
         return string.IsNullOrEmpty(ns) ? clrSimple : $"{ns}.{clrSimple}";
     }
+
+    private static int GetSourceLine(SyntaxNode declaration) =>
+        declaration.GetLocation().GetLineSpan().StartLinePosition.Line + 1;
 
     // RecordDeclarationSyntax is a distinct node type in Roslyn 4.x and must precede the base
     // TypeDeclarationSyntax cases; without this ordering ClassDeclarationSyntax would never match

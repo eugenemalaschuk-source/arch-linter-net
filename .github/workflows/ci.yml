@@ -401,13 +401,15 @@ jobs:
           path: architecture-coverage.md
 
       - name: Comment architecture coverage on pull request
-        if: always() && hashFiles('architecture-coverage.md') != ''
+        if: always() && hashFiles('architecture-coverage-comment.md') != ''
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3
         with:
           script: |
             const fs = require('fs');
             const marker = '<!-- architecture-coverage-report -->';
-            const body = `${marker}\n${fs.readFileSync('architecture-coverage.md', 'utf8')}`;
+            const artifactsUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}/artifacts`;
+            const detailLink = `[View the full architecture coverage report and strict diagnostics](${artifactsUrl})`;
+            const body = `${marker}\n${fs.readFileSync('architecture-coverage-comment.md', 'utf8')}\n${detailLink}`;
 
             const { data: comments } = await github.rest.issues.listComments({
               owner: context.repo.owner,

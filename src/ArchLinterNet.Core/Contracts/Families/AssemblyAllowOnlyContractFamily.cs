@@ -3,15 +3,6 @@ using YamlDotNet.Serialization;
 
 namespace ArchLinterNet.Core.Contracts.Families;
 
-public sealed partial class ArchitectureContractGroups
-{
-    [YamlMember(Alias = "strict_assembly_allow_only")]
-    public List<ArchitectureAssemblyAllowOnlyContract> StrictAssemblyAllowOnly { get; set; } = new();
-
-    [YamlMember(Alias = "audit_assembly_allow_only")]
-    public List<ArchitectureAssemblyAllowOnlyContract> AuditAssemblyAllowOnly { get; set; } = new();
-}
-
 public sealed class ArchitectureAssemblyAllowOnlyContract : ArchitectureSourceExpandableContractBase
 {
     [YamlMember(Alias = "allowed")] public List<string> Allowed { get; set; } = new();

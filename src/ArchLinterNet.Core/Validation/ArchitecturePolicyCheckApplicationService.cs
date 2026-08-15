@@ -33,15 +33,15 @@ internal sealed class ArchitecturePolicyCheckApplicationService(
         {
             return PolicyCheckOutcome.Invalid(new PolicyCheckFailure(
                 exception.Message,
-                exception.Category.ToString(),
-                exception.Diagnostic));
+                exception.Category.ToString() ?? "unknown",
+                exception.Diagnostic as ArchitecturePolicyDiagnostic));
         }
         catch (ArchitecturePolicyValidationException exception)
         {
             return PolicyCheckOutcome.Invalid(new PolicyCheckFailure(
                 exception.Message,
-                exception.Diagnostic.Kind.ToString(),
-                exception.Diagnostic));
+                (exception.Diagnostic as ArchitecturePolicyDiagnostic)?.Kind.ToString() ?? "unknown",
+                exception.Diagnostic as ArchitecturePolicyDiagnostic));
         }
     }
 

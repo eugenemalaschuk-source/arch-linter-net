@@ -1,3 +1,4 @@
+using System.Text.Encodings.Web;
 using System.Text.Json;
 using ArchLinterNet.Core.Reporting;
 using ArchLinterNet.Core.Validation;
@@ -156,6 +157,77 @@ public sealed class SelfPolicyNegativeRegressionTests
             "diagnostic-detail-payloads-stay-in-the-model-layer");
 
         AssertFailedMentioning(result, "Payload");
+    }
+
+    // ── CLI command module boundaries ───────────────────────────────────────
+    [Test]
+    public void ModuleContainerProfile_RejectsALayoutThatReinterpretsCommandModulesAsNestedSegments()
+    {
+        string mutated = SelfPolicyRepository.Replace(
+            _policy,
+            "      container: ArchLinterNet.Cli.Commands\n      profile: cli_command",
+            "      container: ArchLinterNet.Cli\n      profile: cli_command");
+
+        ArchitectureValidationResult result = ValidateMutated(mutated, "cli-command-modules-follow-the-feature-profile");
+
+        AssertFailedMentioning(result, "<module-root:Abstractions>");
+    }
+
+    // ── Recursive folder-purity and leaf conventions ────────────────────────
+    [Test]
+    public void AbstractionsPurity_RejectsInterfacesWhenTheAllowedKindIsMutatedAway()
+    {
+        string mutated = SelfPolicyRepository.Replace(
+            _policy,
+            "        allowed_type_kinds: [interface, class]\n        require_abstract_classes: true",
+            "        allowed_type_kinds: [record]\n        require_abstract_classes: true");
+
+        ArchitectureValidationResult result = ValidateMutated(
+            mutated,
+            "abstractions-directories-contain-only-interfaces-or-abstract-classes");
+
+        AssertFailedMentioning(result, "Abstractions");
+    }
+
+    [Test]
+    public void ExceptionsPurity_RejectsExceptionTypesWhenTheAllowedRoleIsMutatedAway()
+    {
+        string mutated = SelfPolicyRepository.Replace(
+            _policy,
+            "        allowed_roles: [Exception]",
+            "        allowed_roles: [Model]");
+
+        ArchitectureValidationResult result = ValidateMutated(
+            mutated,
+            "exceptions-directories-contain-only-exception-classes");
+
+        AssertFailedMentioning(result, "Exception");
+    }
+
+    [Test]
+    public void ModelsLeafRule_RejectsCliDependenciesWhenTheRuleIsPointedAtTheCliSourceSet()
+    {
+        string mutated = SelfPolicyRepository.Replace(
+            _policy,
+            "      id: models-have-no-first-party-dependencies\n      source: model_types\n      allowed: []",
+            "      id: models-have-no-first-party-dependencies\n      source: cli\n      allowed: []");
+
+        ArchitectureValidationResult result = ValidateMutated(mutated, "models-have-no-first-party-dependencies");
+
+        AssertFailedMentioning(result, "ArchLinterNet.Core");
+    }
+
+    [Test]
+    public void ExceptionsLeafRule_RejectsCliDependenciesWhenTheRuleIsPointedAtTheCliSourceSet()
+    {
+        string mutated = SelfPolicyRepository.Replace(
+            _policy,
+            "      id: exceptions-have-no-first-party-dependencies\n      source: exception_types\n      allowed: []",
+            "      id: exceptions-have-no-first-party-dependencies\n      source: cli\n      allowed: []");
+
+        ArchitectureValidationResult result = ValidateMutated(mutated, "exceptions-have-no-first-party-dependencies");
+
+        AssertFailedMentioning(result, "ArchLinterNet.Core");
     }
 
     // ── Reviewed public API lifecycle ───────────────────────────────────────
@@ -335,7 +407,8 @@ public sealed class SelfPolicyNegativeRegressionTests
         string rendered = string.Join(
             "\n",
             result.Findings.Select(finding => JsonSerializer.Serialize(
-                ArchitectureDiagnosticFormatter.FormatNormalizedFindingForJson(finding))));
+                ArchitectureDiagnosticFormatter.FormatNormalizedFindingForJson(finding),
+                new JsonSerializerOptions { Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping })));
         Assert.That(rendered, Does.Contain(expectedEvidence));
     }
 }

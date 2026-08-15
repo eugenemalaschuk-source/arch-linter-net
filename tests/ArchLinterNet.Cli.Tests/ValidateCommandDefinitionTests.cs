@@ -3,6 +3,7 @@ using System.Text;
 using System.Text.Json;
 using ArchLinterNet.Cli.Abstractions;
 using ArchLinterNet.Cli.Commands.Validate;
+using ArchLinterNet.Cli.Commands.Validate.EntryPoint;
 using ArchLinterNet.Core.BuildState;
 using ArchLinterNet.Core.Graph;
 using ArchLinterNet.Core.Model;
@@ -337,7 +338,11 @@ public sealed class ValidateCommandDefinitionTests
         public void WriteAllText(string path, string contents) { }
         public string WriteAllTextToTemp(string targetPath, string contents) => targetPath + ".tmp";
         public void RenameTempToTarget(string tempPath, string targetPath) { }
+        public bool TryRenameTempToNewTarget(string tempPath, string targetPath) => !FileExists(targetPath);
         public void DeleteFile(string path) { }
+        public bool TryCreateNewFile(string path) => true;
+        public bool DirectoryExists(string path) => true;
+        public void DeleteDirectoryIfEmpty(string path) { }
         public bool CanWriteToDirectory(string path) => true;
     }
 

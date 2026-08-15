@@ -16,13 +16,17 @@ internal sealed class RawLayoutConventionNodeValidator : IArchitecturePolicyRawD
 
     private static readonly string[] _layoutRequireMatchingInterfaceAllowedKeys = { "name_prefix" };
 
+    private static readonly string[] _layoutAllDeclarationsAllowedKeys =
+        { "allowed_type_kinds", "allowed_roles", "require_abstract_classes" };
+
     private const string ExcludeFilesMatchingKey = "exclude_files_matching";
 
     private static readonly string[] _layoutConventionContractAllowedKeys =
     {
         "name", "id", "files_matching", ExcludeFilesMatchingKey, "require_type_kind", "forbid_type_kind",
         "required_name_suffix", "required_name_prefix", "forbidden_name_suffix", "forbidden_name_prefix",
-        "require_type_name_matches_file_name", "require_matching_interface", "ignored_violations", "reason"
+        "require_type_name_matches_file_name", "max_declarations_per_type", "require_matching_interface",
+        "all_declarations", "ignored_violations", "reason"
     };
 
     public void Validate(ArchitecturePolicyRawDocument document)
@@ -65,6 +69,14 @@ internal sealed class RawLayoutConventionNodeValidator : IArchitecturePolicyRawD
             RawYamlNodes.ValidateKnownKeys(
                 requireMatchingInterfaceMapping, contractName, "require_matching_interface",
                 _layoutRequireMatchingInterfaceAllowedKeys);
+        }
+
+        if (RawYamlNodes.TryGetChild(contractNode, "all_declarations", out YamlNode? allDeclarationsNode)
+            && allDeclarationsNode is YamlMappingNode allDeclarationsMapping)
+        {
+            RawYamlNodes.ValidateKnownKeys(
+                allDeclarationsMapping, contractName, "all_declarations",
+                _layoutAllDeclarationsAllowedKeys);
         }
     }
 

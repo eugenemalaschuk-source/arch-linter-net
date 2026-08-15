@@ -2,15 +2,6 @@ using YamlDotNet.Serialization;
 
 namespace ArchLinterNet.Core.Contracts.Families;
 
-public sealed partial class ArchitectureContractGroups
-{
-    [YamlMember(Alias = "strict_port_boundaries")]
-    public List<ArchitecturePortBoundaryContract> StrictPortBoundaries { get; set; } = new();
-
-    [YamlMember(Alias = "audit_port_boundaries")]
-    public List<ArchitecturePortBoundaryContract> AuditPortBoundaries { get; set; } = new();
-}
-
 /// <summary>Restricts a contextual dependency to a reviewed port or ACL seam.</summary>
 public sealed class ArchitecturePortBoundaryContract : IArchitectureContract
 {

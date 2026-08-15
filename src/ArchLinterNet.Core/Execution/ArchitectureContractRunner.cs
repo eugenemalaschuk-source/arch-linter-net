@@ -74,6 +74,10 @@ public sealed class ArchitectureContractRunner(
 
     public IEnumerable<ArchitectureAcyclicSiblingContract> AuditAcyclicSiblingContracts() => _session.AuditAcyclicSiblingContracts();
 
+    public IEnumerable<ArchitectureModuleContainerContract> StrictModuleContainerContracts() => _session.StrictModuleContainerContracts();
+
+    public IEnumerable<ArchitectureModuleContainerContract> AuditModuleContainerContracts() => _session.AuditModuleContainerContracts();
+
     public List<ArchitectureViolation> CheckConfiguration() => _session.CheckConfiguration();
 
     public List<ArchitectureViolation> CheckConfiguration(bool strict) => _session.CheckConfiguration(strict);
@@ -89,6 +93,8 @@ public sealed class ArchitectureContractRunner(
     public IReadOnlyCollection<string> CheckCycleContract(ArchitectureCycleContract contract) => _session.CheckCycleContract(contract);
 
     public IReadOnlyCollection<string> CheckAcyclicSiblingContract(ArchitectureAcyclicSiblingContract contract) => _session.CheckAcyclicSiblingContract(contract);
+
+    public List<ArchitectureViolation> CheckModuleContainerContract(ArchitectureModuleContainerContract contract) => _session.CheckModuleContainerContract(contract);
 
     public List<ArchitectureViolation> CheckMethodBodyContract(ArchitectureMethodBodyContract contract) => _session.CheckMethodBodyContract(contract);
 

@@ -76,6 +76,24 @@ All optional; declare at least one, or policy loading fails as a configuration e
 - `require_type_name_matches_file_name` — the matched file must declare at least one type whose simple name equals the file name (without extension).
 - `require_matching_interface` — every matched concrete class must have a corresponding interface (`name_prefix` + class name, default prefix `I`) declared somewhere in the analyzed source. Ambiguous candidates (more than one interface with the expected name) are reported as unresolved rather than picked implicitly.
 
+### Folder purity with `all_declarations`
+
+`all_declarations` validates every source declaration in selected folders:
+
+```yaml
+all_declarations:
+  allowed_type_kinds: [interface, class]
+  allowed_roles: [Exception]
+  require_abstract_classes: true
+```
+
+Declare at least one of `allowed_type_kinds` or `allowed_roles`; when both are present, each
+declaration must satisfy both. Roles come from semantic classification. With
+`require_abstract_classes: true`, permitted classes must be explicitly `abstract`; interfaces
+remain valid, while records, structs, delegates, and enums are never reinterpreted as classes.
+This is suited to rules such as “Abstractions contains only interfaces or abstract classes” and
+“Exceptions contains only classified exception declarations”.
+
 ### Source facts and unavailable data
 
 Layout convention contracts read from the same deterministic source-file and declared-type fact index as [type placement](type-placement.md)'s namespace resolution. If a contract is declared but the run has **no** source-enriched declared-type facts at all (for example, `analysis.source_roots` is not configured), validation emits one explicit diagnostic explaining that path-based layout checks are unavailable for this run, instead of silently reporting zero violations.

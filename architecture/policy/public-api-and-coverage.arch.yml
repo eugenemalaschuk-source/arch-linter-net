@@ -1,0 +1,82 @@
+# yaml-language-server: $schema=../schema/dependencies.arch.fragment.schema.json
+#
+# Shipped compatibility surfaces and the meta-rules that ensure every intended
+# source surface remains governed by a live policy input.
+contracts:
+  strict_public_api_surface:
+    # Reviewed compatibility surfaces, captured through `arch-linter-net public-api capture` and
+    # updated only through the explicit `make public-api-update` entrypoint. api_comparison: exact
+    # makes additions, removals, and signature changes all reviewed deltas.
+    - name: cel-public-api-is-reviewed
+      id: cel-public-api-is-reviewed
+      assemblies: [ArchLinterNet.CEL]
+      api_snapshot: architecture/api/ArchLinterNet.CEL.public-api.txt
+      api_comparison: exact
+      reason: CEL ships as a standalone engine package; its whole exported surface is the compatibility contract.
+
+    - name: testing-public-api-is-reviewed
+      id: testing-public-api-is-reviewed
+      assemblies: [ArchLinterNet.Testing]
+      api_snapshot: architecture/api/ArchLinterNet.Testing.public-api.txt
+      api_comparison: exact
+      reason: The NUnit adapter is consumed entirely through its public API, so every exported member is the compatibility contract.
+
+    - name: core-public-api-is-reviewed
+      id: core-public-api-is-reviewed
+      assemblies: [ArchLinterNet.Core]
+      api_snapshot: architecture/api/ArchLinterNet.Core.public-api.txt
+      api_comparison: exact
+      reason: Core is the engine package consumers reference directly; its whole exported surface is the compatibility contract.
+
+  strict_coverage:
+    - name: assembly-coverage
+      id: assembly-coverage
+      scope: assembly
+      reason: Every first-party assembly must be mapped to a declared layer or explicitly excluded.
+
+    - name: project-coverage
+      id: project-coverage
+      scope: project
+      reason: Every first-party production project discovered from ArchLinterNet.slnx must be mapped to a declared layer, so a newly added src/ project cannot silently escape governance.
+
+    - name: namespace-coverage
+      id: namespace-coverage
+      scope: namespace
+      roots:
+        - namespace: ArchLinterNet.Core
+        - namespace: ArchLinterNet.Cli
+        - namespace: ArchLinterNet.Testing
+        - namespace: ArchLinterNet.CEL
+      reason: Every first-party root namespace must be mapped to a declared layer or explicitly excluded.
+
+    - name: self-policy-rule-input-coverage
+      id: self-policy-rule-input-coverage
+      scope: rule_input
+      contract_ids:
+        - cli-must-not-depend-on-testing
+        - testing-must-not-depend-on-cli
+        - cli-must-use-validation-application-seam
+        - testing-must-use-validation-application-seam
+        - core-execution-must-not-depend-on-hosts
+        - core-reporting-stays-a-diagnostics-leaf
+        - core-model-stays-independent
+        - core-io-stays-independent
+        - core-resolution-must-not-depend-on-execution-or-validation
+        - core-scanning-must-not-depend-on-execution-or-validation
+        - core-discovery-must-not-depend-on-execution-or-validation
+        - core-validation-must-not-bypass-application-internals
+        - core-scanning-internals-are-protected
+        - core-discovery-internals-are-protected
+        - core-resolution-internals-are-protected
+        - core-layering
+        - core-application-seam-layering
+        - package-cycles
+        - core-contracts-must-not-depend-on-hosts
+        - core-contracts-must-not-depend-on-execution
+        - cel-must-not-depend-on-core
+        - cel-must-not-depend-on-cli
+        - cel-must-not-depend-on-testing
+        - di-container-stays-in-the-composition-boundary
+        - msbuild-project-evaluation-stays-in-discovery
+        - cli-command-modules-follow-the-feature-profile
+      reason: The recovered Core architecture's base package rules, seam, leaf-isolation, and protected-surface rules must keep matching real code so a renamed or deleted layer cannot silently stop being enforced.

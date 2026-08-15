@@ -50,10 +50,11 @@ outputs are not part of the analysed assembly set. `samples/` contains no projec
 | `allow-only` (namespace) | — | — | **N/A** | The internal layer graph is expressed as targeted forbidden edges plus ordered layers; an allow-only restatement would duplicate them with weaker locality. |
 | `layer-order` | `cli`/`testing` → `core` → `cel`, and `cli` → `core_validation` → `core_execution` → `core_model` | Declared `layers` | **already covered** | `core-layering`, `core-application-seam-layering`. |
 | `cycle` | Packages must not form dependency cycles | Declared `layers` | **already covered** | `package-cycles`. |
-| `independence` (layer) | — | — | **N/A** | Mutual independence between layers is already implied by the directional rules above; the meaningful independence statement here is at assembly level (below). |
+| `independence` (layer) | — | — | **N/A** | The former per-command layer inventory was retired after the dynamic contract reached parity. Maintaining it would recreate the central conflict point this policy removes. |
+| `module-container` | CLI command modules are discovered dynamically, remain independent, and follow a feature-first internal topology | Immediate child namespaces of `Cli.Commands` | **adopt (strict)** | `cli-command-modules-follow-the-feature-profile` rejects container-root writers, generic shared buckets, undeclared segments, sibling references, and forbidden directions without requiring a new command to edit shared YAML. |
 | `protected-surface` | `Core.Scanning` / `Core.Discovery` / `Core.Resolution` internals are Core-only | Declared `layers` | **already covered** | Three pre-existing rules. |
 | `layer-template` | — | — | **N/A** | Layer templates repeat one ordered-layer shape across sibling containers. Core's internal layers are not sibling instances of one shape; they are a single ordered stack. |
-| `acyclic-sibling` | — | — | **N/A** | Same reason: there is no set of sibling module namespaces to keep mutually acyclic. |
+| `acyclic-sibling` | — | — | **N/A** | The module-container contract is stronger for the CLI: it forbids sibling dependencies rather than only cycles. |
 
 ### External, package, and framework families
 
@@ -104,10 +105,10 @@ outputs are not part of the analysed assembly set. `samples/` contains no projec
 | `inheritance` | — | **already covered** | — | The one real base-type invariant (`ArchitectureDiagnostic` residency) is expressed as `type-placement`, which states *where the type must live*; an inheritance contract states *what a type may not inherit from*, and this repository has no forbidden base type. |
 | `composition` | — | — | **already covered** | `di-container-stays-in-the-composition-boundary` already confines container APIs to `Core.Composition` at namespace level, and the repository has no service-locator API to forbid separately. Adding a composition contract over the same boundary would produce a second diagnostic for the same edge. |
 | `attribute-usage` | — | — | **N/A** | The repository declares no first-party attribute type whose placement is architecturally meaningful. Adding one purely to make a selector possible is an explicit non-goal of #464. |
-| `layout-conventions` | — | — | **defer** | File/folder conventions here are real but weakly specified (partial classes deliberately split one type across many files, e.g. `ArchitectureAnalysisSession.*.cs`), so `require_type_name_matches_file_name` and matching-interface expectations would produce large false-positive sets. Revisit only with a specified convention to enforce. |
+| `layout-conventions` | `Abstractions` folders contain only interfaces or abstract classes; `Exceptions` folders contain only exception-role declarations | Source declaration kind, `abstract` modifier, and exception classification | **adopt (strict)** | Focused folder-purity rules now protect the migrated convention without imposing filename or partial-type conventions. Remaining declaration-count and role-placement debt stays separately in audit. |
 | `method-body` | — | — | **defer** | No forbidden call pattern is currently agreed for this codebase. The nearest candidate (direct `File`/`Directory` use outside `Core.IO`) is not yet true — infrastructure seams exist but adoption is partial — so a strict rule would need a broad ignore list, which is an explicit non-goal. |
 | `context-dependency` / `context-allow-only` / `port-boundary` | — | — | **N/A** | All three consume the semantic role/metadata index, which requires a `classification` block. See below. |
-| Semantic classification / `semantic_role` coverage | — | — | **N/A** | The repository has no trustworthy role evidence: no first-party role attributes, and its namespaces are *layer* names (`Core.Execution`, `Core.Reporting`) rather than role names (`Domain`, `Adapter`, `Port`). Deriving roles from these namespaces would restate the layer graph under a second vocabulary, and one-primary-role semantics would then force an arbitrary choice for types that are simultaneously e.g. "reporting" and "model-facing". Introducing annotations to make this possible is explicitly out of scope (#565–#574 own that work). |
+| Semantic classification / `semantic_role` coverage | Exception declarations must be recognizable for `Exceptions` folder purity | Existing exception inheritance and namespace classification | **adopt (limited)** | The policy uses the narrow `Exception` role only; it does not introduce speculative business roles or turn layer names into role evidence. This is sufficient for exception-folder purity while richer semantic classification remains out of scope. |
 | `asmdef` | — | — | **N/A** | Unity `.asmdef` validation is a Core *capability*; this repository ships no Unity assets to validate. |
 
 ## Recorded engine limitations found during this review
@@ -115,10 +116,12 @@ outputs are not part of the analysed assembly set. `samples/` contains no projec
 These are behaviours confirmed against the current engine, recorded so future self-policy work does
 not re-derive them or author policy that looks plausible but is not executable.
 
-1. **Layer-kind source-set globs cannot express "every declared layer."** Layer globs use the
-   dot-segment grammar (`Bare wildcard '*' is not allowed`, `Partial segment wildcard 'core*' is not allowed`). Because every layer key here is a single underscore-joined segment, `all_declared_layers`
-   lists its members explicitly. A newly declared layer must be added to that list; the omission is a
-   one-line review signal next to the layer declaration, not an automatic escape.
+1. **Layer-kind source-set globs cannot express every declared namespace layer.** Layer globs use
+   the dot-segment grammar (`Bare wildcard '*' is not allowed`, `Partial segment wildcard 'core*' is not allowed`). Because every namespace-layer key here is a single underscore-joined segment,
+   `all_declared_layers` lists its members explicitly. Semantic role selectors do not provide a
+   namespace coverage input, so they are governed through their enclosing namespace layers. A newly
+   declared namespace layer must be added to that list; the omission is a one-line review signal next
+   to the layer declaration, not an automatic escape.
 1. **`scope: rule_input` coverage accepts only dependency, layer, allow-only, cycle, method-body,
    independence, protected-surface, and external contract IDs.** Assembly, package, framework,
    project-metadata, type-placement, interface-implementation, public-api, and coverage contracts are

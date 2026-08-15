@@ -2,13 +2,6 @@ using YamlDotNet.Serialization;
 
 namespace ArchLinterNet.Core.Contracts.Families;
 
-public sealed partial class ArchitectureContractGroups
-{
-    [YamlMember(Alias = "strict_cycles")] public List<ArchitectureCycleContract> StrictCycles { get; set; } = new();
-
-    [YamlMember(Alias = "audit_cycles")] public List<ArchitectureCycleContract> AuditCycles { get; set; } = new();
-}
-
 public sealed class ArchitectureCycleContract : IArchitectureContract
 {
     [YamlMember(Alias = "name")] public string Name { get; set; } = string.Empty;

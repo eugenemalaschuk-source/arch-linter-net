@@ -1,0 +1,166 @@
+# yaml-language-server: $schema=../schema/dependencies.arch.fragment.schema.json
+#
+# Namespace-level dependency direction between hosts, Core seams, and the
+# standalone CEL engine.
+contracts:
+  strict:
+    - name: cli-must-not-depend-on-testing
+      id: cli-must-not-depend-on-testing
+      source: cli
+      forbidden: [testing]
+      reason: CLI should only depend on Core.
+
+    - name: testing-must-not-depend-on-cli
+      id: testing-must-not-depend-on-cli
+      source: testing
+      forbidden: [cli]
+      reason: Testing adapter should only depend on Core.
+
+    - name: cli-must-use-validation-application-seam
+      id: cli-must-use-validation-application-seam
+      source: cli
+      forbidden: [core_execution, core_contracts, core_resolution, core_scanning]
+      reason: CLI must call the Core.Validation application seam instead of constructing contract runners or loading policies directly.
+
+    - name: cli-abstractions-must-stay-separate-from-infrastructure-and-command-implementations
+      id: cli-abstractions-must-stay-separate-from-infrastructure-and-command-implementations
+      source: cli_abstractions
+      forbidden: [cli_infrastructure, cli_commands, testing, core_execution, core_contracts, core_resolution, core_scanning, core_discovery]
+      reason: CLI abstractions must remain a narrow contract boundary and must not drift into infrastructure details, command implementations, or Core internals below the application seam.
+
+    - name: cli-commands-must-not-depend-on-cli-infrastructure
+      id: cli-commands-must-not-depend-on-cli-infrastructure
+      source: cli_commands
+      forbidden: [cli_infrastructure]
+      reason: CLI commands must depend on CLI abstractions, not concrete host/runtime/file-system infrastructure implementations.
+
+    - name: cli-infrastructure-must-not-depend-on-cli-command-implementations
+      id: cli-infrastructure-must-not-depend-on-cli-command-implementations
+      source: cli_infrastructure
+      forbidden: [cli_commands]
+      reason: CLI infrastructure should compose command modules through abstractions and discovery, not by coupling back to command implementation namespaces.
+
+    - name: cli-output-formatting-must-not-depend-on-cli-command-implementations
+      id: cli-output-formatting-must-not-depend-on-cli-command-implementations
+      source: cli_integration_output_formatting
+      forbidden: [cli_commands]
+      reason: Shared output formatting is a named integration boundary owned outside Commands; it must not absorb command behaviour or reintroduce a shared command root.
+
+    - name: testing-must-use-validation-application-seam
+      id: testing-must-use-validation-application-seam
+      source: testing
+      forbidden: [core_execution, core_contracts, core_resolution, core_scanning]
+      reason: Testing adapter must call the composed validation seam instead of constructing contract runners, loading policies, resolving roots, or scanning directly.
+
+    - name: core-execution-must-not-depend-on-hosts
+      id: core-execution-must-not-depend-on-hosts
+      source: core_execution
+      forbidden: [cli, testing]
+      reason: Contract execution and handler internals must stay usable from any host and must not couple back to a specific CLI or testing adapter.
+
+    - name: core-graph-must-not-depend-on-hosts
+      id: core-graph-must-not-depend-on-hosts
+      source: core_graph
+      forbidden: [cli, testing]
+      reason: The dependency graph and explain application seam must stay usable from any host and must not couple back to a specific CLI or testing adapter.
+
+    - name: core-reporting-stays-a-diagnostics-leaf
+      id: core-reporting-stays-a-diagnostics-leaf
+      source: core_reporting
+      forbidden: [cli, testing, core_execution, core_validation, core_resolution, core_scanning, core_contracts]
+      reason: Diagnostics formatting is a leaf consumed by higher layers and must not depend back on business logic.
+
+    - name: core-model-stays-independent
+      id: core-model-stays-independent
+      source: core_model
+      forbidden: [cli, testing, core_execution, core_validation, core_resolution, core_scanning, core_contracts, core_reporting]
+      reason: Model types are the most fundamental layer and must not depend on anything else.
+
+    - name: core-io-stays-independent
+      id: core-io-stays-independent
+      source: core_io
+      forbidden: [cli, testing, core_execution, core_validation, core_resolution, core_scanning, core_contracts, core_reporting, core_discovery, core_composition]
+      reason: Infrastructure seams (file system, environment, assembly loading, Roslyn compilation) are a fundamental replaceable boundary and must not depend on the business logic layers that consume them.
+
+    - name: core-resolution-must-not-depend-on-execution-or-validation
+      id: core-resolution-must-not-depend-on-execution-or-validation
+      source: core_resolution
+      forbidden: [core_execution, core_validation, cli, testing]
+      reason: Repository and assembly resolution must not depend upward on contract execution or the application seam.
+
+    - name: core-scanning-must-not-depend-on-execution-or-validation
+      id: core-scanning-must-not-depend-on-execution-or-validation
+      source: core_scanning
+      forbidden: [core_execution, core_validation, cli, testing]
+      reason: Scanning internals must not depend upward on contract execution or the application seam.
+
+    - name: core-discovery-must-not-depend-on-execution-or-validation
+      id: core-discovery-must-not-depend-on-execution-or-validation
+      source: core_discovery
+      forbidden: [core_execution, core_validation, cli, testing]
+      reason: Project/solution discovery internals must not depend upward on contract execution or the application seam.
+
+    - name: core-validation-must-not-bypass-application-internals
+      id: core-validation-must-not-bypass-application-internals
+      source: core_validation
+      forbidden: [core_scanning, core_discovery, core_resolution, core_io]
+      reason: The validation application seam must reach scanning, discovery, resolution, and infrastructure IO only through Core.Execution, while asmdef-only validation remains in Core.Asmdef.
+
+    - name: core-contracts-must-not-depend-on-hosts
+      id: core-contracts-must-not-depend-on-hosts
+      source: core_contracts
+      forbidden: [cli, testing]
+      reason: Contract-family and validator internals must stay usable from any host and must not couple back to a specific CLI or testing adapter.
+
+    - name: core-contracts-must-not-depend-on-execution
+      id: core-contracts-must-not-depend-on-execution
+      source: core_contracts
+      forbidden: [core_execution]
+      reason: Contracts must stay independent of Execution's runtime checker/registry internals; the deliberately-duplicated ArchitectureContractFamilyBindings/ArchitectureContractFamilyBinding registry depends on this separation holding.
+
+    - name: cel-must-not-depend-on-core
+      id: cel-must-not-depend-on-core
+      source: cel
+      forbidden: [core]
+      reason: CEL is an independently buildable engine; it must not depend on Core to remain host-agnostic and usable in isolation.
+
+    - name: cel-must-not-depend-on-cli
+      id: cel-must-not-depend-on-cli
+      source: cel
+      forbidden: [cli]
+      reason: CEL must not depend on the CLI adapter.
+
+    - name: cel-must-not-depend-on-testing
+      id: cel-must-not-depend-on-testing
+      source: cel
+      forbidden: [testing]
+      reason: CEL must not depend on the testing adapter.
+
+  strict_layers:
+    - name: core-layering
+      id: core-layering
+      layers:
+        - cli
+        - testing
+        - core
+        - cel
+      reason: Dependencies must point toward Core and CEL; CEL sits below Core and must not depend upward.
+
+    - name: core-application-seam-layering
+      id: core-application-seam-layering
+      layers:
+        - cli
+        - core_validation
+        - core_execution
+        - core_model
+      reason: CLI calls the Core.Validation application seam, which orchestrates Core.Execution, which ultimately rests on Core.Model.
+
+  strict_cycles:
+    - name: package-cycles
+      id: package-cycles
+      layers:
+        - cel
+        - core
+        - cli
+        - testing
+      reason: Packages must not form dependency cycles.

@@ -6,11 +6,6 @@ using ArchLinterNet.Core.Model;
 
 namespace ArchLinterNet.Core.BuildState;
 
-public interface IBuildStatePreparationService
-{
-    BuildStatePreflightResult Prepare(BuildStatePreflightRequest request);
-}
-
 // Orchestrates all three preparation modes (Ordinary, NoRestore, EnsureBuilt) through one entry
 // point so CLI and Testing API share identical state-machine behavior. Only this service
 // constructs the `dotnet build` invocation — see the security/trust boundary in

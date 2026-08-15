@@ -2,15 +2,6 @@ using YamlDotNet.Serialization;
 
 namespace ArchLinterNet.Core.Contracts.Families;
 
-public sealed partial class ArchitectureContractGroups
-{
-    [YamlMember(Alias = "strict_layer_templates")]
-    public List<ArchitectureLayerTemplateContract> StrictLayerTemplates { get; set; } = new();
-
-    [YamlMember(Alias = "audit_layer_templates")]
-    public List<ArchitectureLayerTemplateContract> AuditLayerTemplates { get; set; } = new();
-}
-
 public sealed class ArchitectureTemplateLayer
 {
     [YamlMember(Alias = "name")] public string Name { get; set; } = string.Empty;

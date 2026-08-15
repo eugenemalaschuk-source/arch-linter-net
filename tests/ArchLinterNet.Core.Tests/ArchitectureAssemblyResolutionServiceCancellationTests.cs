@@ -103,7 +103,7 @@ public sealed class ArchitectureAssemblyResolutionServiceCancellationTests
 
         Assert.Throws<OperationCanceledException>(() => service.ResolvePostBuild(
             document, "/fake/repo", discovery, resolveAssemblyOutputs: true, mode: null,
-            selectedContractIds: null, cts.Token));
+            selectedContractIds: null, cancellationToken: cts.Token));
 
         Assert.Multiple(() =>
         {

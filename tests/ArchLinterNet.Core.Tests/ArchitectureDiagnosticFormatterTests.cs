@@ -1,6 +1,7 @@
 using System.Text.Json;
 using ArchLinterNet.Core.Model;
 using ArchLinterNet.Core.Reporting;
+using ArchLinterNet.Core.Reporting.Abstractions;
 using NUnit.Framework;
 
 namespace ArchLinterNet.Core.Tests;
@@ -273,7 +274,12 @@ public sealed partial class ArchitectureDiagnosticFormatterTests
                 ActualTypeKind: "interface",
                 ExpectedTypeName: "Expected.Name",
                 ActualTypeName: "Actual.Name",
-                ExpectedCounterpartName: "IOrderService") }
+                ExpectedCounterpartName: "IOrderService")
+            {
+                ExpectedDeclarationCount = 1,
+                ActualDeclarationCount = 2,
+                DeclarationPaths = ["src/App/Services/OrderService.Part1.cs", "src/App/Services/OrderService.Part2.cs"],
+            } }
         };
 
         string human = _formatter.FormatViolationsForHumans(violations);
@@ -289,6 +295,8 @@ public sealed partial class ArchitectureDiagnosticFormatterTests
         Assert.That(human, Does.Contain("expected_kind: class, actual_kind: interface"));
         Assert.That(human, Does.Contain("expected_name: Expected.Name, actual_name: Actual.Name"));
         Assert.That(human, Does.Contain("expected_counterpart: IOrderService"));
+        Assert.That(human, Does.Contain("expected_declaration_count: <= 1, actual_declaration_count: 2"));
+        Assert.That(human, Does.Contain("declaration_paths: src/App/Services/OrderService.Part1.cs"));
 
         using var document = JsonDocument.Parse(_formatter.FormatResultForCiArtifacts(
             "strict", false, violations, Array.Empty<string>()));
@@ -304,6 +312,9 @@ public sealed partial class ArchitectureDiagnosticFormatterTests
         Assert.That(serialized.ToString(), Does.Contain("expected_type_kind"));
         Assert.That(serialized.ToString(), Does.Contain("actual_type_kind"));
         Assert.That(serialized.ToString(), Does.Contain("expected_counterpart_name"));
+        Assert.That(serialized.ToString(), Does.Contain("expected_declaration_count"));
+        Assert.That(serialized.ToString(), Does.Contain("actual_declaration_count"));
+        Assert.That(serialized.ToString(), Does.Contain("declaration_paths"));
     }
 
     [Test]

@@ -1,4 +1,4 @@
-.PHONY: lint _lint-dotnet lint-architecture audit-architecture policy-check explain-architecture public-api-check public-api-update-preview public-api-update lint-code-size lint-dotnet-format lint-workflows fmt-workflows test-architecture-coverage-report test-release-evidence test-calculate-version test-coverage-badge-script test-tooling-coverage architecture-coverage-report architecture-strict-json architecture-audit-json architecture-coverage-markdown architecture-coverage-ci
+.PHONY: lint _lint-dotnet lint-architecture audit-architecture policy-check explain-architecture public-api-check public-api-update-preview public-api-update lint-code-size lint-dotnet-format lint-workflows fmt-workflows test-architecture-coverage-report test-release-evidence test-calculate-version test-coverage-badge-script test-tooling-coverage architecture-coverage-report architecture-strict-json architecture-audit-json architecture-coverage-markdown architecture-coverage-comment-markdown architecture-coverage-ci
 
 CHANGED_FILES ?= changed-files.txt
 DIFF_STATUS   ?= ok
@@ -157,11 +157,22 @@ architecture-coverage-markdown:  ## Generate architecture-coverage.md from archi
 		--repo-root "$(PROJECT_ROOT)" \
 		--output architecture-coverage.md
 
+architecture-coverage-comment-markdown:  ## Generate compact architecture-coverage-comment.md for a PR comment
+	@cd "$(PROJECT_ROOT)" && UV_PROJECT_ENVIRONMENT="$(PROJECT_ROOT)/.venv" "$(UV)" run --project tools/pyproject.toml \
+		python tools/scripts/architecture_coverage_report.py architecture-strict.json \
+		--changed-files "$(CHANGED_FILES)" \
+		--diff-status "$(DIFF_STATUS)" \
+		--repo-root "$(PROJECT_ROOT)" \
+		--max-failure-diagnostics 3 \
+		--output architecture-coverage-comment.md
+
 architecture-coverage-ci:  ## CI entrypoint: strict+audit JSON + Markdown report in one call (CHANGED_FILES/DIFF_STATUS env optional)
 	@$(MAKE) architecture-strict-json; STRICT_EXIT=$$?; \
 	$(MAKE) architecture-audit-json || true; \
 	$(MAKE) architecture-coverage-markdown CHANGED_FILES="$(CHANGED_FILES)" DIFF_STATUS="$(DIFF_STATUS)"; MARKDOWN_EXIT=$$?; \
+	$(MAKE) architecture-coverage-comment-markdown CHANGED_FILES="$(CHANGED_FILES)" DIFF_STATUS="$(DIFF_STATUS)"; COMMENT_EXIT=$$?; \
 	if [ $$MARKDOWN_EXIT -ne 0 ]; then exit $$MARKDOWN_EXIT; fi; \
+	if [ $$COMMENT_EXIT -ne 0 ]; then exit $$COMMENT_EXIT; fi; \
 	exit $$STRICT_EXIT
 
 architecture-coverage-report:  ## Show full-solution architecture coverage report locally (Markdown + JSON)
