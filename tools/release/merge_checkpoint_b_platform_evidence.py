@@ -8,6 +8,7 @@ import json
 from pathlib import Path
 from typing import Any
 
+from _release_workspace import _safe_path
 from aggregate_checkpoint_b_evidence import (
     _POLICY_SHAPE_FIELDS,
     _REQUIRED_SCENARIOS,
@@ -153,9 +154,13 @@ def main() -> int:
     parser.add_argument("--output", type=Path, required=True)
     arguments = parser.parse_args()
 
-    merged = merge_platform_shards(arguments.input_dir, arguments.candidate_manifest)
-    arguments.output.parent.mkdir(parents=True, exist_ok=True)
-    arguments.output.write_text(json.dumps(merged, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    input_dir = _safe_path(arguments.input_dir, "input directory")
+    candidate_manifest = _safe_path(arguments.candidate_manifest, "candidate manifest")
+    output = _safe_path(arguments.output, "output path")
+
+    merged = merge_platform_shards(input_dir, candidate_manifest)
+    output.parent.mkdir(parents=True, exist_ok=True)
+    output.write_text(json.dumps(merged, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     return 0
 
 
