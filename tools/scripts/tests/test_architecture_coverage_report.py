@@ -21,8 +21,10 @@ from architecture_coverage_report import (  # noqa: E402
 ALL_SCOPES = {"namespace", "project", "assembly"}
 
 
-def make_report(passed: bool, coverage_summary: list[dict]) -> dict:
-    return {"passed": passed, "coverage_summary": coverage_summary, "coverage_findings": []}
+def make_report(passed: bool, coverage_summary: list[dict], **additional_fields: object) -> dict:
+    report = {"passed": passed, "coverage_summary": coverage_summary, "coverage_findings": []}
+    report.update(additional_fields)
+    return report
 
 
 def write_file(tmp_path: Path, rel_path: str, content: str) -> None:
@@ -52,6 +54,9 @@ def test_render_summary_markdown_zero_findings() -> None:
     assert "| Uncovered | 0 |" in markdown
     assert "| Stale | 0 |" in markdown
     assert "| Unknown | 0 |" in markdown
+    assert "| Failed rules | 0 |" in markdown
+    assert "| Failed diagnostics | 0 |" in markdown
+    assert "### Failed rules" not in markdown
 
 
 def test_render_summary_markdown_notes_when_coverage_unconfigured() -> None:
@@ -103,6 +108,80 @@ def test_render_summary_markdown_failed_gate() -> None:
 
     assert "❌ fail" in markdown
     assert "| Uncovered | 2 |" in markdown
+    assert "### Failed rules (1)" in markdown
+    assert "`namespace-coverage`" in markdown
+    assert "state `uncovered`" in markdown
+    assert "### Failed rules" in markdown.split("| Metric | Count |", 1)[0]
+
+
+def test_render_summary_markdown_groups_and_bounds_contract_diagnostics() -> None:
+    violations = [
+        {
+            "contract_id": "models-no-first-party-dependencies",
+            "contract": "Models must be dependency-free",
+            "message_code": "forbidden-dependency",
+            "source": f"Example.Model{i}",
+            "forbidden_references": [f"Example.Dependency{i}"],
+            "policy_origin": {"path": "architecture/policy/audit-conventions.arch.yml", "line": 42},
+        }
+        for i in (4, 2, 3, 1)
+    ]
+    report = make_report(False, [], violations=violations)
+
+    markdown = render_summary_markdown(report, max_failure_diagnostics=3)
+
+    assert "### Failed rules (1)" in markdown
+    assert "**`models-no-first-party-dependencies` — Models must be dependency-free** — 4 failed diagnostics" in markdown
+    assert "source `Example.Model1`" in markdown
+    assert "forbidden references `Example.Dependency1`" in markdown
+    assert "policy `architecture/policy/audit-conventions.arch.yml:42`" in markdown
+    assert "_1 additional diagnostic omitted._" in markdown
+    assert "| Failed rules | 1 |" in markdown
+    assert "| Failed diagnostics | 4 |" in markdown
+
+    detailed_markdown = render_summary_markdown(report)
+
+    assert "source `Example.Model4`" in detailed_markdown
+    assert "additional diagnostic omitted" not in detailed_markdown
+
+
+def test_render_summary_markdown_sorts_rules_by_contract_id() -> None:
+    report = make_report(
+        False,
+        [],
+        violations=[
+            {"contract_id": "z-models", "contract": "Models", "source": "Example.Model"},
+            {"contract_id": "a-abstractions", "contract": "Abstractions", "source": "Example.IService"},
+        ],
+    )
+
+    markdown = render_summary_markdown(report)
+
+    assert markdown.index("`a-abstractions`") < markdown.index("`z-models`")
+
+
+def test_render_summary_markdown_falls_back_to_coverage_summary_when_findings_absent() -> None:
+    report = make_report(
+        False,
+        [
+            {
+                "contract": "self-policy coverage",
+                "contract_id": "self-policy-coverage",
+                "scope": "rule_input",
+                "counts": {"covered": 0, "excluded": 0, "uncovered": 0, "stale": 1, "unknown": 0},
+                "uncovered_items": [],
+                "stale_items": [{"item": "obsolete-rule", "evidence": "not declared"}],
+                "unknown_items": [],
+            }
+        ],
+    )
+
+    markdown = render_summary_markdown(report)
+
+    assert "**`self-policy-coverage` — self-policy coverage** — 1 failed diagnostic" in markdown
+    assert "state `stale`" in markdown
+    assert "rule_input item `obsolete-rule`" in markdown
+    assert "evidence `not declared`" in markdown
 
 
 def test_total_counts_sums_across_contracts() -> None:
