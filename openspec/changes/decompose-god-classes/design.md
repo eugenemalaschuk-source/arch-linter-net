@@ -83,6 +83,31 @@ reviewable baseline and provides the extraction order.
 | `ArchitectureBaselineApplicationService` | 2 |
 | `ArchitecturePublicApiApplicationService` | 2 |
 
+### Extraction progress (2026-08-15)
+
+The first completed tranche removes the two largest aggregates and three incidental interface or
+policy-loader fragments. `ArchitectureAnalysisSession` is now a one-source orchestration facade
+over named coverage and policy-consistency collaborators. `ArchitectureContractGroups` is a single
+non-partial YAML binding root; the contract-family files retain only their own family model types.
+`ArchitecturePolicyDocumentLoader` remains `partial` in its one handwritten source file only
+because the `GeneratedRegex` source generator emits the companion declaration; generated code is
+not part of the source declaration inventory.
+
+The post-tranche audit has ten handwritten source aggregates remaining:
+
+| Type | Declarations |
+| --- | ---: |
+| `ArchitectureDiagnosticFormatter` | 15 |
+| `ValidateCommandHandler` | 5 |
+| `ArchitectureSourceSetExpander` | 3 |
+| `ArchitectureSarifFormatter` | 3 |
+| `ReportCoordinator` | 2 |
+| `ArchitectureSourceFileFactIndex` | 2 |
+| `LayoutConventionChecker` | 2 |
+| `ArchitectureAnalysisSnapshot` | 2 |
+| `ArchitectureBaselineApplicationService` | 2 |
+| `ArchitecturePublicApiApplicationService` | 2 |
+
 ### Extract collaborators, not more fragments
 
 `ArchitectureAnalysisSession` becomes a coordinator over existing and newly named family analysis
@@ -98,16 +123,29 @@ with the collaborator that owns their data and dependencies.
 - **`ArchitectureConfigurationValidationService`:** owns the ordered configuration-validation
   phase (assembly, discovery, layer, dependency-group and project-metadata diagnostics) while
   consuming the session's cached facts through its narrow internal access surface.
-- **Next seams:** contract-family execution, coverage-summary construction, policy-consistency
-  checks, source expansion, and contextual-consumer tracking become named collaborators rather
-  than additional session source fragments.
+- **`ArchitectureCoverageAnalysisService`:** owns coverage-check orchestration and delegates its
+  matching, dependency-edge, semantic-coverage, and summary work to focused collaborators.
+- **`ArchitecturePolicyConsistencyAnalysisService`:** owns policy-consistency analysis and its
+  protected-importer consistency collaborator.
+- **Remaining seams:** command handling, source expansion/indexing, layout matching, validation
+  snapshots, and diagnostic/SARIF rendering still require named collaborators before the final
+  strict rule can be enabled.
+
+### Retire an unused CEL placeholder
+
+`CelEngine` had no call sites and did not participate in the supported CEL execution path. The
+actual path is `CelEnvironment` through parsing/binding and compiled expressions to
+`CelEvaluator`. Keeping the empty public placeholder would preserve a misleading second execution
+seam, so it and its smoke test are removed rather than expanded into another god class. The
+internal CEL architecture documentation now describes the evaluator pipeline directly.
 
 ### Preserve compatibility by construction
 
-Public entrypoints retain their signatures. Any public interface split uses a primary interface and
-internal collaborators rather than public partial fragments. Public API snapshots are checked
-read-only before and after each migration tranche; an update requires a deliberate, reviewed API
-change, not refactoring churn.
+Public entrypoints retain their signatures unless a deliberate contract correction is required.
+Any public interface split uses a primary interface and internal collaborators rather than public
+partial fragments. Public API snapshots are checked read-only before and after each migration
+tranche; a correction (including a namespace correction) requires an explicit, reviewed snapshot
+update rather than being hidden as refactoring churn.
 
 ## Risks / Trade-offs
 

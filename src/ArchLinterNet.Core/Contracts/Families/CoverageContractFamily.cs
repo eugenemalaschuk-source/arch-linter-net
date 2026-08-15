@@ -3,19 +3,6 @@ using YamlDotNet.Serialization;
 
 namespace ArchLinterNet.Core.Contracts.Families;
 
-public sealed partial class ArchitectureContractGroups
-{
-    // Bound (not executed) so a schema-valid coverage contract is detected and rejected with a
-    // clear "reserved, not implemented" diagnostic instead of being silently dropped by
-    // IgnoreUnmatchedProperties deserialization. See ArchitecturePolicyDocumentLoader.Load.
-    // The coverage engine itself is implemented by #97-#103.
-    [YamlMember(Alias = "strict_coverage")]
-    public List<ArchitectureCoverageContract> StrictCoverage { get; set; } = new();
-
-    [YamlMember(Alias = "audit_coverage")]
-    public List<ArchitectureCoverageContract> AuditCoverage { get; set; } = new();
-}
-
 public sealed class ArchitectureCoverageRoot
 {
     [YamlMember(Alias = "namespace")] public string Namespace { get; set; } = string.Empty;

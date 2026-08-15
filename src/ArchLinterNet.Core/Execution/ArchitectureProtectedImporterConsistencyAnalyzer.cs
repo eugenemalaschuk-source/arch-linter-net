@@ -4,12 +4,19 @@ using ArchLinterNet.Core.Model;
 
 namespace ArchLinterNet.Core.Execution;
 
-public sealed partial class ArchitectureAnalysisSession
+internal sealed class ArchitectureProtectedImporterConsistencyAnalyzer
 {
-    private List<PolicyConsistencyDiagnostic> FindProtectedImporterConflicts()
+    private readonly ArchitectureContractDocument _document;
+
+    public ArchitectureProtectedImporterConsistencyAnalyzer(ArchitectureContractDocument document)
     {
-        List<ArchitectureProtectedContract> protectedContracts = Document.Contracts.StrictProtected
-            .Concat(Document.Contracts.AuditProtected)
+        _document = document;
+    }
+
+    internal List<PolicyConsistencyDiagnostic> FindConflicts()
+    {
+        List<ArchitectureProtectedContract> protectedContracts = _document.Contracts.StrictProtected
+            .Concat(_document.Contracts.AuditProtected)
             .ToList();
 
         List<(string Source, string Target, string Name, string? Id)> forbiddingDependencies =
@@ -33,7 +40,7 @@ public sealed partial class ArchitectureAnalysisSession
         // protected contract over the same surface that does NOT list the importer as allowed.
         List<(string Source, string Target, string Name, string? Id)> forbiddingDependencies = new();
 
-        foreach (ArchitectureDependencyContract c in Document.Contracts.Strict.Concat(Document.Contracts.Audit))
+        foreach (ArchitectureDependencyContract c in _document.Contracts.Strict.Concat(_document.Contracts.Audit))
         {
             foreach (string target in c.Forbidden)
             {

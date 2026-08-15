@@ -1,5 +1,6 @@
 using ArchLinterNet.Core.Contracts;
 using ArchLinterNet.Core.Contracts.Families;
+using ArchLinterNet.Core.Execution.Expressions;
 using ArchLinterNet.Core.Model;
 using ArchLinterNet.Core.Reporting;
 using ArchLinterNet.Core.Resolution;
@@ -7,11 +8,30 @@ using ArchLinterNet.Core.Scanning;
 
 namespace ArchLinterNet.Core.Execution;
 
-public sealed partial class ArchitectureAnalysisSession
+internal sealed class ArchitectureSemanticCoverageService
 {
     private const string UnclassifiedSemanticFact = "unclassified semantic fact";
 
-    private ArchitectureCoverageSummary BuildSemanticRoleCoverageSummary(ArchitectureCoverageContract contract)
+    private readonly ArchitectureAnalysisSession _session;
+    public ArchitectureSemanticCoverageService(ArchitectureAnalysisSession session)
+    {
+        _session = session;
+    }
+
+    private ArchitectureContractDocument Document => _session.Document;
+
+    private ArchitectureTypeIndex TypeIndex => _session.TypeIndex;
+
+    private ArchitectureRoleIndex RoleIndex => _session.RoleIndex;
+
+    private ArchitectureAnalysisFactService Facts => _session.Facts;
+
+    private ArchitectureExpressionFactService ExpressionFacts => _session.ExpressionFacts;
+
+    private IReadOnlyCollection<ArchitectureContextualConsumerReference> RegisteredContextualConsumers =>
+        _session.RegisteredContextualConsumers;
+
+    internal ArchitectureCoverageSummary BuildSummary(ArchitectureCoverageContract contract)
     {
         List<ArchitectureCoverageSummaryExcludedItem> excludedItems = new();
         List<ArchitectureCoverageSummaryEvidenceItem> uncoveredItems = new();
@@ -62,13 +82,13 @@ public sealed partial class ArchitectureAnalysisSession
             excludedItems, uncoveredItems, staleItems, unknownItems, coveredItems);
     }
 
-    private List<ArchitectureViolation> CheckSemanticRoleCoverageContract(ArchitectureCoverageContract contract)
+    internal List<ArchitectureViolation> Check(ArchitectureCoverageContract contract)
     {
         List<ArchitectureViolation> findings = new();
         Type[] types = TypeIndex.AllTypes()
             .OrderBy(type => ArchitectureTypeNames.SafeFullName(type), StringComparer.Ordinal)
             .ToArray();
-        ArchitectureContractExecutionContext executionContext = CreateExecutionContext(contract, contract.IgnoredViolations);
+        ArchitectureContractExecutionContext executionContext = _session.CreateExecutionContext(contract, contract.IgnoredViolations);
 
         foreach (Type type in types)
         {
@@ -125,14 +145,14 @@ public sealed partial class ArchitectureAnalysisSession
             AddSemanticDiagnosticFinding(findings, executionContext, contract, unknown, violation);
         }
 
-        executionContext.CollectUnmatchedIgnores(_unmatchedIgnoredViolations);
+        _session.CollectUnmatchedIgnores(executionContext);
         return findings;
     }
 
     private static bool IsSemanticCoverageTypeInScope(ArchitectureCoverageContract contract, Type type)
     {
         return contract.Roots.Count == 0 || contract.Roots.Any(root =>
-            MatchesNamespaceRoot(root, ArchitectureTypeNames.SafeNamespace(type)));
+            ArchitectureCoverageMatchingService.MatchesNamespaceRoot(root, ArchitectureTypeNames.SafeNamespace(type)));
     }
 
     private static void AddSemanticDiagnosticFinding(

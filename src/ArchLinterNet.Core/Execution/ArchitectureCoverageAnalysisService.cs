@@ -9,44 +9,85 @@ using ArchLinterNet.Core.Scanning;
 
 namespace ArchLinterNet.Core.Execution;
 
-public sealed partial class ArchitectureAnalysisSession
+internal sealed class ArchitectureCoverageAnalysisService
 {
-    public ArchitectureCoverageSummary? BuildCoverageSummary(ArchitectureCoverageContract contract)
+    private readonly ArchitectureAnalysisSession _session;
+    private readonly ArchitectureCoverageMatchingService _matching;
+    private readonly ArchitectureSemanticCoverageService _semanticCoverageService;
+    private readonly ArchitectureDependencyEdgeCoverageService _dependencyEdgeCoverageService;
+
+    public ArchitectureCoverageAnalysisService(ArchitectureAnalysisSession session)
     {
-        if (!IsContractSelected(contract.Id))
-        {
-            return null;
-        }
-
-        if (string.Equals(contract.Scope, "rule_input", StringComparison.Ordinal))
-        {
-            return BuildRuleInputCoverageSummary(contract);
-        }
-
-        if (string.Equals(contract.Scope, "assembly", StringComparison.Ordinal))
-        {
-            return BuildAssemblyCoverageSummary(contract);
-        }
-
-        if (string.Equals(contract.Scope, "project", StringComparison.Ordinal))
-        {
-            return BuildProjectCoverageSummary(contract);
-        }
-
-        if (string.Equals(contract.Scope, "dependency_edge", StringComparison.Ordinal))
-        {
-            return BuildDependencyEdgeCoverageSummary(contract);
-        }
-
-        if (string.Equals(contract.Scope, "semantic_role", StringComparison.Ordinal))
-        {
-            return BuildSemanticRoleCoverageSummary(contract);
-        }
-
-        return BuildNamespaceCoverageSummary(contract);
+        _session = session;
+        _matching = new ArchitectureCoverageMatchingService(session);
+        _semanticCoverageService = new ArchitectureSemanticCoverageService(session);
+        _dependencyEdgeCoverageService = new ArchitectureDependencyEdgeCoverageService(session, this);
     }
 
-    private ArchitectureCoverageSummary BuildNamespaceCoverageSummary(ArchitectureCoverageContract contract)
+    internal ArchitectureSemanticCoverageService SemanticCoverage => _semanticCoverageService;
+
+    private ArchitectureAnalysisContext Context => _session.Context;
+    private ArchitectureContractDocument Document => _session.Document;
+    private bool IsContractSelected(string? contractId) => _session.IsContractSelected(contractId);
+
+    private ArchitectureCoverageInventory BuildCoverageInventory(ArchitectureContractDocument document) =>
+        _session.BuildCoverageInventory(document);
+
+    private ArchitectureContractExecutionContext CreateExecutionContext(
+        IArchitectureContract contract,
+        IReadOnlyList<ArchitectureIgnoredViolation> ignoredViolations) =>
+        _session.CreateExecutionContext(contract, ignoredViolations);
+
+    private List<ArchitectureContractDescriptor> BuildAllDescriptors() => _session.BuildAllDescriptors();
+
+    private Assembly? ResolveProjectAssembly(ArchitectureDiscoveredProject project) =>
+        _matching.ResolveProjectAssembly(project);
+
+    private static string GetAssemblyName(Assembly assembly) =>
+        ArchitectureCoverageMatchingService.GetAssemblyName(assembly);
+
+    private static string[] GetAssemblyNamespaces(Assembly assembly) =>
+        ArchitectureCoverageMatchingService.GetAssemblyNamespaces(assembly);
+
+    private static string GetRepresentativeType(Assembly assembly) =>
+        ArchitectureCoverageMatchingService.GetRepresentativeType(assembly);
+
+    private static string[] GetAssemblyForbiddenReferences(Assembly assembly) =>
+        ArchitectureCoverageMatchingService.GetAssemblyForbiddenReferences(assembly);
+
+    private static string GetAssemblyEvidence(Assembly assembly) =>
+        ArchitectureCoverageMatchingService.GetAssemblyEvidence(assembly);
+
+    private static string GetProjectEvidence(ArchitectureDiscoveredProject project, Assembly resolvedAssembly) =>
+        ArchitectureCoverageMatchingService.GetProjectEvidence(project, resolvedAssembly);
+
+    private static bool MatchesAssemblyExclusion(ArchitectureCoverageExclusion exclusion, string assemblyName) =>
+        ArchitectureCoverageMatchingService.MatchesAssemblyExclusion(exclusion, assemblyName);
+
+    private static bool MatchesProjectExclusion(ArchitectureCoverageExclusion exclusion, ArchitectureDiscoveredProject project) =>
+        ArchitectureCoverageMatchingService.MatchesProjectExclusion(exclusion, project);
+
+    private static bool IsCoveredByDeclaredLayers(ArchitectureCoverageInventory inventory, string namespaceName) =>
+        ArchitectureCoverageMatchingService.IsCoveredByDeclaredLayers(inventory, namespaceName);
+
+    private static bool IsCoveredByExpandedTemplates(ArchitectureCoverageInventory inventory, string namespaceName) =>
+        ArchitectureCoverageMatchingService.IsCoveredByExpandedTemplates(inventory, namespaceName);
+
+    private static bool TryFindLayerExclusionReasons(
+        ArchitectureCoverageInventory inventory,
+        string namespaceName,
+        out string reason,
+        out IReadOnlyList<ArchitecturePolicySourceLocation> policyLocations) =>
+        ArchitectureCoverageMatchingService.TryFindLayerExclusionReasons(
+            inventory, namespaceName, out reason, out policyLocations);
+
+    private static bool MatchesNamespaceRoot(ArchitectureCoverageRoot root, string namespaceName) =>
+        ArchitectureCoverageMatchingService.MatchesNamespaceRoot(root, namespaceName);
+
+    private static bool MatchesNamespaceExclusion(ArchitectureCoverageExclusion exclusion, string namespaceName) =>
+        ArchitectureCoverageMatchingService.MatchesNamespaceExclusion(exclusion, namespaceName);
+
+    internal ArchitectureCoverageSummary BuildNamespaceSummary(ArchitectureCoverageContract contract)
     {
         ArchitectureCoverageInventory inventory = BuildCoverageInventory(Document);
 
@@ -98,7 +139,7 @@ public sealed partial class ArchitectureAnalysisSession
             coveredItems);
     }
 
-    private ArchitectureCoverageSummary BuildRuleInputCoverageSummary(ArchitectureCoverageContract contract)
+    internal ArchitectureCoverageSummary BuildRuleInputSummary(ArchitectureCoverageContract contract)
     {
         ArchitectureCoverageInventory inventory = BuildCoverageInventory(Document);
 
@@ -190,7 +231,7 @@ public sealed partial class ArchitectureAnalysisSession
         };
     }
 
-    private ArchitectureCoverageSummary BuildAssemblyCoverageSummary(ArchitectureCoverageContract contract)
+    internal ArchitectureCoverageSummary BuildAssemblySummary(ArchitectureCoverageContract contract)
     {
         ArchitectureCoverageInventory inventory = BuildCoverageInventory(Document);
 
@@ -235,7 +276,7 @@ public sealed partial class ArchitectureAnalysisSession
             coveredItems);
     }
 
-    private ArchitectureCoverageSummary BuildProjectCoverageSummary(ArchitectureCoverageContract contract)
+    internal ArchitectureCoverageSummary BuildProjectSummary(ArchitectureCoverageContract contract)
     {
         ArchitectureCoverageInventory inventory = BuildCoverageInventory(Document);
         IReadOnlyCollection<ArchitectureDiscoveredProject> discoveredProjects =
@@ -291,7 +332,7 @@ public sealed partial class ArchitectureAnalysisSession
             coveredItems);
     }
 
-    private ArchitectureCoverageSummary BuildDependencyEdgeCoverageSummary(ArchitectureCoverageContract contract)
+    internal ArchitectureCoverageSummary BuildDependencyEdgeSummary(ArchitectureCoverageContract contract)
     {
         ArchitectureCoverageInventory inventory = BuildCoverageInventory(Document);
 
@@ -366,12 +407,12 @@ public sealed partial class ArchitectureAnalysisSession
 
         if (string.Equals(contract.Scope, "dependency_edge", StringComparison.Ordinal))
         {
-            return CheckDependencyEdgeCoverageContract(contract);
+            return _dependencyEdgeCoverageService.Check(contract);
         }
 
         if (string.Equals(contract.Scope, "semantic_role", StringComparison.Ordinal))
         {
-            return CheckSemanticRoleCoverageContract(contract);
+            return _semanticCoverageService.Check(contract);
         }
 
         if (!string.Equals(contract.Scope, "namespace", StringComparison.Ordinal))
@@ -407,7 +448,7 @@ public sealed partial class ArchitectureAnalysisSession
                 new[] { entry.RepresentativeType }))
             .ToList();
 
-        executionContext.CollectUnmatchedIgnores(_unmatchedIgnoredViolations);
+        _session.CollectUnmatchedIgnores(executionContext);
 
         return findings;
     }
@@ -481,7 +522,7 @@ public sealed partial class ArchitectureAnalysisSession
                 contract, authoredContractId, referencedContractId, descriptor, inventory, executionContext, findings);
         }
 
-        executionContext.CollectUnmatchedIgnores(_unmatchedIgnoredViolations);
+        _session.CollectUnmatchedIgnores(executionContext);
 
         return findings
             .OrderBy(f => f.SourceType, StringComparer.Ordinal)
@@ -589,7 +630,7 @@ public sealed partial class ArchitectureAnalysisSession
                 GetAssemblyForbiddenReferences(entry.Assembly)))
             .ToList();
 
-        executionContext.CollectUnmatchedIgnores(_unmatchedIgnoredViolations);
+        _session.CollectUnmatchedIgnores(executionContext);
 
         return findings;
     }
@@ -652,14 +693,14 @@ public sealed partial class ArchitectureAnalysisSession
             }
         }
 
-        executionContext.CollectUnmatchedIgnores(_unmatchedIgnoredViolations);
+        _session.CollectUnmatchedIgnores(executionContext);
 
         return findings
             .OrderBy(f => f.SourceType, StringComparer.Ordinal)
             .ToList();
     }
 
-    private IEnumerable<ArchitectureCoverageDependencyEdge> GetEdgesForLayerPair(string sourceLayer, string targetLayer)
+    internal IEnumerable<ArchitectureCoverageDependencyEdge> GetEdgesForLayerPair(string sourceLayer, string targetLayer)
     {
         ArchitectureCoverageInventory inventory = BuildCoverageInventory(Document);
 
@@ -674,7 +715,7 @@ public sealed partial class ArchitectureAnalysisSession
                && ArchitectureLayerResolver.MatchesNamespace(layer, namespaceName);
     }
 
-    private static string GetRepresentativeNamespaceType(ArchitectureCoverageInventory inventory, string namespaceName)
+    internal static string GetRepresentativeNamespaceType(ArchitectureCoverageInventory inventory, string namespaceName)
     {
         ArchitectureCoverageNamespaceEntry? entry = inventory.Namespaces
             .FirstOrDefault(n => string.Equals(n.Namespace, namespaceName, StringComparison.Ordinal));
@@ -682,7 +723,7 @@ public sealed partial class ArchitectureAnalysisSession
         return entry?.RepresentativeType ?? namespaceName;
     }
 
-    private bool IsLayerPairGoverned(string sourceLayer, string targetLayer)
+    internal bool IsLayerPairGoverned(string sourceLayer, string targetLayer)
     {
         bool governedByDependencyContract = Document.Contracts.Strict
             .Concat(Document.Contracts.Audit)
@@ -746,7 +787,7 @@ public sealed partial class ArchitectureAnalysisSession
             && template.Layers.Any(ns => NamespaceMatchesLayer(ns, targetLayer)));
     }
 
-    private static bool MatchesDependencyEdgeExclusion(
+    internal static bool MatchesDependencyEdgeExclusion(
         ArchitectureCoverageExclusion exclusion, string sourceLayer, string targetLayer)
     {
         return exclusion.Between.Count == 2

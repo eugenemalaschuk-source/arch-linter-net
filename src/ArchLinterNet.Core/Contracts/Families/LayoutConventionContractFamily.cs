@@ -5,15 +5,6 @@ using YamlDotNet.Serialization;
 
 namespace ArchLinterNet.Core.Contracts.Families;
 
-public sealed partial class ArchitectureContractGroups
-{
-    [YamlMember(Alias = "strict_layout_conventions")]
-    public List<ArchitectureLayoutConventionContract> StrictLayoutConventions { get; set; } = new();
-
-    [YamlMember(Alias = "audit_layout_conventions")]
-    public List<ArchitectureLayoutConventionContract> AuditLayoutConventions { get; set; } = new();
-}
-
 // files_matching selects candidate source files from ArchitectureSourceFileFactIndex by
 // folder/namespace/file-name path facts (exact/prefix/suffix only, AND-combined) - a distinct type
 // from ArchitectureTypeMatcher (which selects live reflected Types) and from ArchitectureContextSelector

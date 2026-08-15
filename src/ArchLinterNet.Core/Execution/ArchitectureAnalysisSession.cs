@@ -6,6 +6,7 @@ using ArchLinterNet.Core.Execution.Abstractions;
 using ArchLinterNet.Core.Execution.Checkers;
 using ArchLinterNet.Core.Execution.Expressions;
 using ArchLinterNet.Core.Model;
+using ArchLinterNet.Core.Reporting;
 using ArchLinterNet.Core.Resolution;
 using ArchLinterNet.Core.Scanning;
 
@@ -16,9 +17,8 @@ namespace ArchLinterNet.Core.Execution;
 // contract selection, and the mutable unmatched-ignore/baseline-candidate/rule-input-coverage
 // tracking that accumulates as checks execute). ArchitectureContractRunner is a thin facade over
 // this session kept for public API stability; handlers receive this session, not the runner.
-public sealed partial class ArchitectureAnalysisSession
+public sealed class ArchitectureAnalysisSession
 {
-
     private ArchitectureCoverageInventory? _cachedCoverageInventory;
     private ArchitectureContractDocument? _cachedCoverageInventoryDocument;
 
@@ -47,6 +47,12 @@ public sealed partial class ArchitectureAnalysisSession
     private readonly ArchitectureSubtractiveMatcherParticipationRecorder _subtractiveMatcherParticipationRecorder;
 
     private readonly ArchitectureContractSelectionService _contractSelectionService;
+
+    private readonly ArchitecturePolicyConsistencyAnalysisService _policyConsistencyAnalysisService;
+
+    private readonly ArchitectureCoverageAnalysisService _coverageAnalysisService;
+
+    private readonly ArchitectureCoverageSummaryService _coverageSummaryService;
 
     internal ArchitectureAnalysisFactService Facts { get; }
 
@@ -89,6 +95,10 @@ public sealed partial class ArchitectureAnalysisSession
         _publicApiSurfaceAnalysisService = new ArchitecturePublicApiSurfaceAnalysisService(this);
         _subtractiveMatcherParticipationRecorder = new ArchitectureSubtractiveMatcherParticipationRecorder(this);
         _contractSelectionService = new ArchitectureContractSelectionService(this);
+        _policyConsistencyAnalysisService = new ArchitecturePolicyConsistencyAnalysisService(this);
+        _coverageAnalysisService = new ArchitectureCoverageAnalysisService(this);
+        _coverageSummaryService = new ArchitectureCoverageSummaryService(
+            this, _coverageAnalysisService, _coverageAnalysisService.SemanticCoverage);
     }
 
     // Registered eagerly at construction, before any contract-family checker (including a future
@@ -267,6 +277,18 @@ public sealed partial class ArchitectureAnalysisSession
     {
         return _configurationValidationService.Check(strict);
     }
+
+    public List<PolicyConsistencyDiagnostic> CheckPolicyConsistency() =>
+        _policyConsistencyAnalysisService.Check();
+
+    internal List<ArchitectureContractDescriptor> BuildAllDescriptors() =>
+        _policyConsistencyAnalysisService.BuildAllDescriptors();
+
+    public ArchitectureCoverageSummary? BuildCoverageSummary(ArchitectureCoverageContract contract) =>
+        _coverageSummaryService.Build(contract);
+
+    public List<ArchitectureViolation> CheckCoverageContract(ArchitectureCoverageContract contract) =>
+        _coverageAnalysisService.CheckCoverageContract(contract);
 
     public List<ArchitectureViolation> CheckContract(ArchitectureDependencyContract contract) =>
         _coreContractCheckingService.CheckContract(contract);

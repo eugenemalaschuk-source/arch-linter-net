@@ -8,20 +8,27 @@ using ArchLinterNet.Core.Scanning;
 
 namespace ArchLinterNet.Core.Execution;
 
-public sealed partial class ArchitectureAnalysisSession
+internal sealed class ArchitectureCoverageMatchingService
 {
-    private Assembly? ResolveProjectAssembly(ArchitectureDiscoveredProject project)
+    private readonly ArchitectureAnalysisSession _session;
+
+    public ArchitectureCoverageMatchingService(ArchitectureAnalysisSession session)
     {
-        return Context.TargetAssemblies.FirstOrDefault(assembly =>
+        _session = session;
+    }
+
+    internal Assembly? ResolveProjectAssembly(ArchitectureDiscoveredProject project)
+    {
+        return _session.Context.TargetAssemblies.FirstOrDefault(assembly =>
             string.Equals(GetAssemblyName(assembly), project.AssemblyName, StringComparison.Ordinal));
     }
 
-    private static string GetAssemblyName(Assembly assembly)
+    internal static string GetAssemblyName(Assembly assembly)
     {
         return assembly.GetName().Name ?? assembly.FullName ?? assembly.ToString();
     }
 
-    private static string[] GetAssemblyNamespaces(Assembly assembly)
+    internal static string[] GetAssemblyNamespaces(Assembly assembly)
     {
         return ArchitectureTypeScanner.GetLoadableTypes(assembly)
             .Select(ArchitectureTypeNames.SafeNamespace)
@@ -29,7 +36,7 @@ public sealed partial class ArchitectureAnalysisSession
             .ToArray();
     }
 
-    private static string GetRepresentativeType(Assembly assembly)
+    internal static string GetRepresentativeType(Assembly assembly)
     {
         Type? representative = ArchitectureTypeScanner.GetLoadableTypes(assembly)
             .OrderBy(type => type.FullName, StringComparer.Ordinal)
@@ -38,7 +45,7 @@ public sealed partial class ArchitectureAnalysisSession
         return representative?.FullName ?? representative?.Name ?? GetAssemblyName(assembly);
     }
 
-    private static string[] GetAssemblyForbiddenReferences(Assembly assembly)
+    internal static string[] GetAssemblyForbiddenReferences(Assembly assembly)
     {
         string representativeType = GetRepresentativeType(assembly);
 
@@ -47,7 +54,7 @@ public sealed partial class ArchitectureAnalysisSession
             : new[] { assembly.Location, representativeType };
     }
 
-    private static string GetAssemblyEvidence(Assembly assembly)
+    internal static string GetAssemblyEvidence(Assembly assembly)
     {
         string representativeType = GetRepresentativeType(assembly);
 
@@ -56,18 +63,18 @@ public sealed partial class ArchitectureAnalysisSession
             : $"{assembly.Location} ({representativeType})";
     }
 
-    private static string GetProjectEvidence(ArchitectureDiscoveredProject project, Assembly resolvedAssembly)
+    internal static string GetProjectEvidence(ArchitectureDiscoveredProject project, Assembly resolvedAssembly)
     {
         return $"{project.AssemblyName}: {GetRepresentativeType(resolvedAssembly)}";
     }
 
-    private static bool MatchesAssemblyExclusion(ArchitectureCoverageExclusion exclusion, string assemblyName)
+    internal static bool MatchesAssemblyExclusion(ArchitectureCoverageExclusion exclusion, string assemblyName)
     {
         return !string.IsNullOrWhiteSpace(exclusion.Assembly)
                && string.Equals(exclusion.Assembly, assemblyName, StringComparison.Ordinal);
     }
 
-    private static bool MatchesProjectExclusion(ArchitectureCoverageExclusion exclusion, ArchitectureDiscoveredProject project)
+    internal static bool MatchesProjectExclusion(ArchitectureCoverageExclusion exclusion, ArchitectureDiscoveredProject project)
     {
         if (string.IsNullOrWhiteSpace(exclusion.Project))
         {
@@ -78,13 +85,13 @@ public sealed partial class ArchitectureAnalysisSession
                || string.Equals(exclusion.Project, Path.GetFileName(project.Path), StringComparison.Ordinal);
     }
 
-    private static bool IsCoveredByDeclaredLayers(ArchitectureCoverageInventory inventory, string namespaceName)
+    internal static bool IsCoveredByDeclaredLayers(ArchitectureCoverageInventory inventory, string namespaceName)
     {
         return inventory.DeclaredLayers.Any(layerEntry =>
             ArchitectureLayerResolver.MatchesNamespace(layerEntry.Layer, namespaceName));
     }
 
-    private static bool IsCoveredByExpandedTemplates(ArchitectureCoverageInventory inventory, string namespaceName)
+    internal static bool IsCoveredByExpandedTemplates(ArchitectureCoverageInventory inventory, string namespaceName)
     {
         return inventory.ExpandedLayerTemplates.Any(expandedTemplate =>
             expandedTemplate.Layers.Any(layerNamespace =>
@@ -105,7 +112,7 @@ public sealed partial class ArchitectureAnalysisSession
     // one in another) can both legitimately subtract the same namespace, and dropping all but the
     // first would silently lose provenance for the rest (PR #384 review). Order is deterministic
     // (layer name, then exclude-list position) so JSON/Testing API output is stable across runs.
-    private static bool TryFindLayerExclusionReasons(
+    internal static bool TryFindLayerExclusionReasons(
         ArchitectureCoverageInventory inventory,
         string namespaceName,
         out string reason,
@@ -155,7 +162,7 @@ public sealed partial class ArchitectureAnalysisSession
               $"(namespace_suffix: {exclusion.NamespaceSuffix})";
     }
 
-    private static bool MatchesNamespaceRoot(ArchitectureCoverageRoot root, string namespaceName)
+    internal static bool MatchesNamespaceRoot(ArchitectureCoverageRoot root, string namespaceName)
     {
         if (string.IsNullOrWhiteSpace(root.Namespace))
         {
@@ -171,7 +178,7 @@ public sealed partial class ArchitectureAnalysisSession
             namespaceName);
     }
 
-    private static bool MatchesNamespaceExclusion(ArchitectureCoverageExclusion exclusion, string namespaceName)
+    internal static bool MatchesNamespaceExclusion(ArchitectureCoverageExclusion exclusion, string namespaceName)
     {
         if (!string.IsNullOrWhiteSpace(exclusion.Namespace))
         {

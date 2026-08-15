@@ -9,10 +9,11 @@
 ## 2. Production responsibility extraction
 
 - [x] 2.1 Map the dependencies and responsibility seams currently hidden in `ArchitectureAnalysisSession`; extract the first cohesive analysis collaborator with focused parity tests.
-- [ ] 2.2 Extract the remaining `ArchitectureAnalysisSession` family-analysis collaborators and reduce the session to orchestration without `partial` declarations.
-- [ ] 2.3 Replace the `ArchitectureContractGroups` partial aggregation with named contract-group binding/model collaborators while preserving YAML and public API compatibility.
+- [x] 2.2 Extract the remaining `ArchitectureAnalysisSession` family-analysis collaborators and reduce the session to orchestration without `partial` declarations.
+- [x] 2.3 Replace the `ArchitectureContractGroups` partial aggregation with a single purpose-named, non-partial contract-group binding root while preserving YAML and public API compatibility.
 - [ ] 2.4 Replace `ArchitectureDiagnosticFormatter` and SARIF formatter partial aggregates with named renderers/projections while preserving human, JSON, and SARIF output parity.
 - [ ] 2.5 Remove incidental production partial aggregates created by command, validation, policy-loading, and source-index splits; every replacement must have a named responsibility.
+- [x] 2.6 Remove the unused `CelEngine` placeholder and its smoke test; retain the actual CEL evaluator pipeline as the supported execution seam.
 
 ## 3. Test-suite cleanup
 

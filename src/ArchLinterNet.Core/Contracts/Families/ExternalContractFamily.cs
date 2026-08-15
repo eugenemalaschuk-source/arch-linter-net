@@ -3,15 +3,6 @@ using YamlDotNet.Serialization;
 
 namespace ArchLinterNet.Core.Contracts.Families;
 
-public sealed partial class ArchitectureContractGroups
-{
-    [YamlMember(Alias = "strict_external")]
-    public List<ArchitectureExternalDependencyContract> StrictExternal { get; set; } = new();
-
-    [YamlMember(Alias = "audit_external")]
-    public List<ArchitectureExternalDependencyContract> AuditExternal { get; set; } = new();
-}
-
 public sealed class ArchitectureExternalDependencyContract : ArchitectureSourceExpandableContractBase
 {
     [YamlMember(Alias = "forbidden")] public List<string> Forbidden { get; set; } = new();

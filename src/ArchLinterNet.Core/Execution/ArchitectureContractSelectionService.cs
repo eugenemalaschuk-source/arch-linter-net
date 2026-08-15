@@ -52,7 +52,7 @@ internal sealed class ArchitectureContractSelectionService
             return false;
         }
 
-        return ArchitectureAnalysisSession.GetReferencedLayerNames(contract)
+        return ArchitecturePolicyConsistencyAnalysisService.GetReferencedLayerNames(contract)
             .Any(layerName => !_session.Document.Layers.ContainsKey(layerName));
     }
 }

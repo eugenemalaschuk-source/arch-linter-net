@@ -7,12 +7,27 @@ using ArchitectureContractGroups = ArchLinterNet.Core.Contracts.Families.Archite
 
 namespace ArchLinterNet.Core.Execution;
 
-public sealed partial class ArchitectureAnalysisSession
+internal sealed class ArchitecturePolicyConsistencyAnalysisService
 {
     private const string StrictMode = "strict";
     private const string AuditMode = "audit";
 
-    public List<PolicyConsistencyDiagnostic> CheckPolicyConsistency()
+    private readonly ArchitectureAnalysisSession _session;
+    private readonly ArchitectureProtectedImporterConsistencyAnalyzer _protectedImporterAnalyzer;
+
+    public ArchitecturePolicyConsistencyAnalysisService(ArchitectureAnalysisSession session)
+    {
+        _session = session;
+        _protectedImporterAnalyzer = new ArchitectureProtectedImporterConsistencyAnalyzer(session.Document);
+    }
+
+    private ArchitectureAnalysisContext Context => _session.Context;
+
+    private ArchitectureContractDocument Document => _session.Document;
+
+    private ArchitectureAnalysisFactService Facts => _session.Facts;
+
+    internal List<PolicyConsistencyDiagnostic> Check()
     {
         List<PolicyConsistencyDiagnostic> findings = new();
 
@@ -21,7 +36,7 @@ public sealed partial class ArchitectureAnalysisSession
         findings.AddRange(FindDuplicateContractIds(descriptors));
         findings.AddRange(FindAllowForbidConflicts());
         findings.AddRange(FindIndependenceConflicts());
-        findings.AddRange(FindProtectedImporterConflicts());
+        findings.AddRange(_protectedImporterAnalyzer.FindConflicts());
         findings.AddRange(FindLayerOverlaps());
         findings.AddRange(FindUnreachableContracts(descriptors));
         findings.AddRange(FindUnmatchedLayerExclusions());
@@ -36,7 +51,7 @@ public sealed partial class ArchitectureAnalysisSession
             .ToList();
     }
 
-    private List<ArchitectureContractDescriptor> BuildAllDescriptors()
+    internal List<ArchitectureContractDescriptor> BuildAllDescriptors()
     {
         List<ArchitectureContractDescriptor> descriptors = new();
 

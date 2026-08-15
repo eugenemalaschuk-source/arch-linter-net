@@ -307,7 +307,7 @@ internal static class ArchitectureContractFamilyRegistry
             ConfigurationContributor = (session, collector, contract) =>
             {
                 var c = (ArchitectureTypePlacementContract)contract;
-                collector.AddLayerNames(c, ArchitectureAnalysisSession.GetTypePlacementReferencedLayerNames(c));
+                collector.AddLayerNames(c, ArchitecturePolicyConsistencyAnalysisService.GetTypePlacementReferencedLayerNames(c));
             },
         },
         new(
@@ -336,7 +336,7 @@ internal static class ArchitectureContractFamilyRegistry
             ConfigurationContributor = (session, collector, contract) =>
             {
                 var c = (ArchitectureAttributeUsageContract)contract;
-                collector.AddLayerNames(c, ArchitectureAnalysisSession.GetAttributeUsageReferencedLayerNames(c));
+                collector.AddLayerNames(c, ArchitecturePolicyConsistencyAnalysisService.GetAttributeUsageReferencedLayerNames(c));
             },
         },
         new(
@@ -362,7 +362,7 @@ internal static class ArchitectureContractFamilyRegistry
             ConfigurationContributor = (session, collector, contract) =>
             {
                 var c = (ArchitectureInterfaceImplementationContract)contract;
-                collector.AddLayerNames(c, ArchitectureAnalysisSession.GetInterfaceImplementationReferencedLayerNames(c));
+                collector.AddLayerNames(c, ArchitecturePolicyConsistencyAnalysisService.GetInterfaceImplementationReferencedLayerNames(c));
             },
         },
         new(
