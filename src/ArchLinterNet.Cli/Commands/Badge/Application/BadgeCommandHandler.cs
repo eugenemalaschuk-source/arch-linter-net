@@ -18,7 +18,12 @@ internal sealed class BadgeCommandHandler(ICliConsole console, IFileSystem fileS
         {
             using JsonDocument document = JsonDocument.Parse(fileSystem.ReadAllText(options.InputPath));
             JsonElement result = SelectStrictResult(document.RootElement);
-            bool passed = result.TryGetProperty("passed", out JsonElement value) && value.ValueKind == JsonValueKind.True;
+            if (!result.TryGetProperty("passed", out JsonElement value) || value.ValueKind is not (JsonValueKind.True or JsonValueKind.False))
+            {
+                throw new JsonException("The strict validation result has no Boolean passed value.");
+            }
+
+            bool passed = value.ValueKind == JsonValueKind.True;
             Write(passed ? "passing" : "failing", passed ? "brightgreen" : "red");
             return passed ? CliExitCodes.Success : CliExitCodes.ValidationFailure;
         }

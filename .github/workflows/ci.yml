@@ -321,7 +321,6 @@ jobs:
 
   architecture_coverage:
     name: Architecture Coverage
-    if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
@@ -360,6 +359,7 @@ jobs:
           dotnet build src/ArchLinterNet.Testing/ArchLinterNet.Testing.csproj --nologo -v minimal
 
       - name: Collect changed first-party files
+        if: github.event_name == 'pull_request'
         id: changed_files
         continue-on-error: true
         env:
@@ -400,7 +400,7 @@ jobs:
           path: architecture-coverage.md
 
       - name: Comment architecture coverage on pull request
-        if: always() && hashFiles('architecture-coverage-comment.md') != ''
+        if: github.event_name == 'pull_request' && always() && hashFiles('architecture-coverage-comment.md') != ''
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3
         with:
           script: |
