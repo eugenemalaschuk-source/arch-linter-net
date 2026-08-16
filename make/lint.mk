@@ -139,6 +139,7 @@ architecture-strict-json:  ## Run strict+audit validation once, writing combined
 		--policy "$(POLICY)" --mode strict,audit --ensure-built --format json \
 		> "$(PROJECT_ROOT)/architecture-results.json" || true
 	@dotnet run --no-build --project "$(CLI_PROJECT)" -- coverage extract --input architecture-results.json --mode strict --output architecture-strict.json
+	@dotnet run --no-build --project "$(CLI_PROJECT)" -- badge architecture-policy --input architecture-strict.json > /dev/null
 
 architecture-audit-json:  ## Materialize the shared strict+audit JSON under the audit artifact name
 	@dotnet run --no-build --project "$(CLI_PROJECT)" -- coverage extract --input architecture-results.json --mode audit --output architecture-audit.json
