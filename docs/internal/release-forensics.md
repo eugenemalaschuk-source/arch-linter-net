@@ -39,22 +39,36 @@ The commit object is parsed as LF-delimited headers followed by the first empty
 header line and raw message payload. Malformed required headers or unreadable
 required commit objects fail closed.
 
-### Author identity
+### Exact `author` header parsing
 
-For the raw `author` header:
+Exactly one canonical `author` header is used. After the literal `author ` prefix,
+parse from right to left:
 
-1. use non-empty email after trimming ASCII SP/HT; otherwise use author name;
-2. the selected bytes must strict-UTF8 decode or analysis fails;
-3. trim only leading/trailing ASCII SP/HT;
-4. lowercase ASCII `A-Z` only;
-5. do not Unicode-normalize, locale-case, or Unicode-case-fold;
-6. use `unknown` only when both parsed email and name are empty.
+~~~text
+<identity-bytes> SP <timestamp-token> SP <timezone-token>
+~~~
+
+- timestamp matches `-?[0-9]+`;
+- timezone matches `[+-][0-9]{4}`;
+- remaining identity bytes end in `>`;
+- the final `>` and the last `<` before it delimit email bytes;
+- bytes before that `<` are name bytes.
+
+If this structure is not uniquely parseable, analysis fails instead of delegating
+to backend identity formatting.
+
+Canonical author identity then:
+
+1. trims ASCII SP/HT from email bytes;
+2. selects non-empty email, otherwise ASCII-SP/HT-trimmed name;
+3. strict-UTF8 decodes the selected bytes or fails closed;
+4. trims only ASCII SP/HT;
+5. lowercases ASCII `A-Z` only;
+6. performs no Unicode normalization, locale casing, or full Unicode case folding;
+7. uses `unknown` only when both parsed email and name are empty.
 
 The optional Git `encoding` header is evidence only. It never causes canonical
-transcoding.
-
-This intentionally rejects some legacy metadata instead of making author spread
-depend on platform code pages or Git client behavior.
+transcoding of author or message bytes.
 
 ## Canonical task references
 
@@ -76,13 +90,13 @@ TaskKey = (namespace, positive_decimal_id)
 The decimal is arbitrary precision and renders without leading zeroes. Therefore:
 
 ~~~text
-#001  -> (issue, 1)
-#1    -> (issue, 1)
+#001   -> (issue, 1)
+#1     -> (issue, 1)
 jira-1 -> (jira, 1)
 ~~~
 
 `issue#1` and `jira#1` are different tasks. Source spelling, extractor ID, matched
-span, and matched text are evidence, not identity.
+byte span, and matched text are evidence, not identity.
 
 Repeated matches producing the same TaskKey deduplicate. If the **same message
 byte span** maps to different TaskKeys, analysis fails with an extraction-
@@ -266,14 +280,6 @@ Q(v) = round-half-to-even(v, 9 decimal places)
 Components, proximity, edge weights, final scores, and thresholds are quantized
 before threshold comparison, ranking, or serialization.
 
-Useful vectors:
-
-~~~text
-Q(1.2345678905) = 1.234567890
-Q(1.2345678915) = 1.234567892
-Q(log(51)/log(101)) = 0.851944303
-~~~
-
 Default profiles:
 
 | Profile | Weights |
@@ -364,7 +370,6 @@ days_between = 0                         if gap_seconds <= 0
 TemporalProximity(x,y) = Q(1/(1+days_between))
 ~~~
 
-For positive integer gaps, `(gap_seconds + 86399) div 86400` is equivalent.
 Calendar dates, timezone, local midnight, and DST never participate. A 25-hour
 gap therefore gives `days_between=2`.
 
@@ -439,6 +444,18 @@ Candidates are evidence-derived investigations carrying source findings,
 components, thresholds, cohort identity, and caveats. They are not automatic
 redesign decisions.
 
+## Successful reports vs fail-closed diagnostics
+
+Canonical Markdown/JSON reports exist **only after successful analysis**. Invalid
+refs, malformed/unreadable commit metadata, invalid selected author/message/path
+UTF-8, TaskKey extraction ambiguity, missing required objects, or invalid config
+produce a command/error diagnostic and no partial report, ranking, or candidate
+set.
+
+Diagnostics are a separate error surface. They identify a stable failure kind and
+relevant object/span when available, but are not records inside a successful
+canonical report and are not hashed as successful report bytes.
+
 ## Canonical JSON string and byte profile
 
 Canonical JSON strings contain valid Unicode scalars and are never Unicode-
@@ -462,12 +479,12 @@ Report identity is over these exact bytes.
 
 ## Report semantics and limitations
 
-Reports expose input/config/history identity, excluded merge count, raw commit-
-metadata/task extraction status, canonical TaskKeys and source evidence, accepted
-and DAG-ambiguous rename evidence, canonical file events/line-count status,
-categories/cohorts, raw/canonical components, effective weights/thresholds,
-`G0`/clusters, bottleneck/OCP evidence, optional enrichment status, candidates,
-and interpretation notes.
+Successful reports expose input/config/history identity, excluded merge count,
+raw metadata/task extraction provenance for successfully parsed evidence,
+canonical TaskKeys and source evidence, accepted/`ambiguous_dag` rename evidence,
+canonical file events/line-count status, categories/cohorts, raw/canonical
+components, effective weights/thresholds, `G0`/clusters, bottleneck/OCP evidence,
+optional enrichment status, candidates, and interpretation notes.
 
 Optional .NET/Roslyn enrichment is downstream and cannot drop, change, rescore, or
 reorder Git-level findings.
@@ -494,6 +511,7 @@ Reports state at least:
 
 At minimum cover:
 
+- exact raw `author` grammar, malformed/ambiguous identity fail-closed;
 - raw author/message bytes, non-UTF8 fail-closed, ASCII-only author casing;
 - `#001`/`#1` TaskKey normalization, namespace separation, extractor collision;
 - reachability independent of traversal order;
@@ -506,8 +524,7 @@ At minimum cover:
 - raw-LF/LCS counts with ambiguous diff scripts;
 - NUL/non-blob zero counts and missing-object failure;
 - distinct-commit file `commit_count`;
-- category isolation and numeric half-even/log vectors;
-- exact valid/invalid weight profiles;
+- category isolation and numeric/weight goldens;
 - task-only association not creating `G0`;
 - threshold changes not affecting `D_f/K_f`/file scores;
 - qualifying-edge-only cluster aggregate;
@@ -515,14 +532,15 @@ At minimum cover:
 - 25-hour gap -> `days_between=2`;
 - mixed endpoint-category centrality;
 - ASCII role-token vectors;
+- fail-closed analysis emits no successful canonical report;
 - canonical JSON escaping, scalar key order, and byte identity;
 - empty range/all-zero evidence.
 
 ## Ownership
 
-- #236: raw commit metadata, TaskKey extraction mechanics, reachability, Git
-  objects/deltas, strict paths, DAG-safe exact renames, canonical file events/LCS
-  churn, authors, CLI family.
+- #236: raw commit metadata, exact author parsing, TaskKey extraction mechanics,
+  reachability, Git objects/deltas, strict paths, DAG-safe exact renames, canonical
+  file events/LCS churn, CLI/error diagnostics.
 - #237: schema-backed task extractor namespaces/patterns, classification, ignores,
   thresholds, effective profiles.
 - #238: canonical hotspot scoring.
@@ -530,5 +548,6 @@ At minimum cover:
 - #240: independent-TaskKey bottlenecks and exact temporal gaps.
 - #241: repeated-edit/OCP evidence and role tokens.
 - #242: optional downstream .NET enrichment.
-- #243: versioned Markdown/canonical JSON report schema and bytes.
+- #243: versioned Markdown/canonical JSON successful-report schema/bytes and report
+  vs diagnostic boundary.
 - #244: dogfood and conformance/governance guardrails.
