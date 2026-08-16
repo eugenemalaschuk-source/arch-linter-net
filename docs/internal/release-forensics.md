@@ -21,10 +21,10 @@ Release forensics asks:
 > by that evidence?
 
 The result is evidence-backed pressure, not proof of a design-law violation.
-Canonical scoring is deterministic: it does not depend on an LLM or other
+Canonical scoring is deterministic and does not depend on an LLM or other
 stochastic inference.
 
-## Canonical input and entities
+## Canonical input
 
 One analysis is identified by:
 
@@ -33,42 +33,61 @@ One analysis is identified by:
  effective history_analysis policy, tool version)
 ~~~
 
-From is exclusive and to is inclusive. Both refs must resolve before analysis;
-unknown or ambiguous refs fail closed. Canonical metadata retains the authored
-refs and their resolved commit IDs. An empty range succeeds with an explicit
-empty summary and zero/empty evidence.
+`from` is exclusive and `to` is inclusive. Both refs must resolve before
+analysis; unknown or ambiguous refs fail closed. Canonical metadata retains the
+authored refs and their resolved commit IDs. An empty range succeeds with an
+explicit empty summary and zero/empty evidence.
 
-Canonical evidence includes repository-relative logical paths using /, a commit
-sequence ordered by committer UTC timestamp then ordinal SHA, normalized author
-identities, extracted and ordered task/issue references, effective configuration
-identity, and tool version. It excludes absolute checkout paths, generated
-timestamps, timezone, locale, machine/process state, and uncommitted
-working-tree changes.
+Canonical evidence uses repository-relative paths with `/`, commit records
+ordered by committer UTC timestamp then ordinal SHA, normalized author
+identities, ordered task references, effective configuration identity, and tool
+version. Absolute checkout paths, generated timestamps, locale, timezone,
+machine/process state, and uncommitted working-tree changes are not canonical.
 
-| Term | Meaning |
-| --- | --- |
-| Logical file | One repository-relative file identity after unambiguous rename-chain normalization. |
-| Task episode | Commits linked to one extracted task/issue reference. |
-| Churn | Additions plus deletions across a logical file; volume, not complexity. |
-| Hotspot | A file with repeated change pressure. |
-| Co-change edge | An undirected relation between two logical files changed together. |
-| Bottleneck | A file where workstream and graph evidence indicate coordination pressure. |
-| OCP pressure | Heuristic evidence that unrelated work repeatedly modifies a likely extension or dispatch surface. |
-| Refactoring candidate | An evidence-derived investigation, not an automatic redesign. |
+An author identity is the trimmed invariant-lowercase email when present,
+otherwise the trimmed invariant-lowercase author name, otherwise `unknown`.
 
-An author identity is the trimmed, invariant-lowercase email when present;
-otherwise it is the trimmed, invariant-lowercase author name; an absent value is
-unknown. Task references are extracted, deduplicated, and sorted according to
-the effective configuration.
+## Logical files, renames, and categories
 
-Each commit-file record retains Git status, additions, deletions, and its
-logical-file identity. An unambiguous rename belongs to one logical file:
+A logical file is one unambiguous linear rename chain. Its **canonical logical
+path** is the normalized path at the last in-range occurrence of the chain. If
+the last occurrence is a deletion, the deleted path is canonical. Earlier paths
+remain ordered aliases/evidence but do not receive independent scores.
+
+Copies, splits, merges, or otherwise ambiguous rename relationships are not
+collapsed. Each affected path remains a separate logical identity unless Git
+evidence establishes one unambiguous chain.
+
+Each commit-file record retains status, additions, deletions, the observed path,
+and logical-file identity:
 
 ~~~text
 churn(file, range) = Σ(additions(file, commit) + deletions(file, commit))
 ~~~
 
-## Normalization and configuration
+Churn is change volume, not complexity.
+
+Every logical file has exactly one primary category derived from its canonical
+logical path:
+
+- production
+- tests
+- docs
+- generated
+- build_ci
+- samples_examples
+- unknown
+
+Alias classifications may be retained as evidence, but the canonical path owns
+the primary category and the ranking path. `unknown` remains visible. #237 owns
+the schema-backed matcher, ignore rules, category overrides, thresholds, and
+other bounded `history_analysis` configuration.
+
+Example: if `src/Old.cs` is unambiguously renamed to `tests/New.cs`, the range
+contains one logical file, its canonical path is `tests/New.cs`, and its primary
+category is derived from that path.
+
+## Normalization populations
 
 All score functions are total over non-negative populations:
 
@@ -82,45 +101,42 @@ normalized_log(x) =
   log(1 + x) / log(1 + max(x in population)), otherwise
 ~~~
 
-Empty and all-zero populations yield finite 0, never NaN, Infinity, an
-exception, or an implementation-dependent fallback. Missing optional evidence
-is raw 0: no task references means every task-dependent component is zero. The
-remaining weights are never silently renormalized. Disabling a component is
-allowed only through explicit, validated configuration.
+Empty and all-zero populations produce finite `0`, never NaN, Infinity, an
+exception, or an implementation-specific fallback. Missing optional evidence is
+raw `0`; weights are not silently renormalized.
 
-The initial effective profiles are:
+Population membership is part of the deterministic contract:
 
-| Profile | Components and weights |
+- #237 ignore rules are **analysis filters**; ignored logical files are removed
+  before normalization and graph construction;
+- presentation-only suppression never changes canonical scores;
+- file-level metrics normalize against retained logical files in the same
+  primary category;
+- co-change edge components normalize against retained edges with the same
+  unordered endpoint-category pair.
+
+Therefore generated/docs/test/build noise cannot set a production normalization
+maximum merely because those paths exist in the same Git range.
+
+## Effective scoring configuration
+
+The default profiles are:
+
+| Profile | Default components and weights |
 | --- | --- |
 | Hotspot | commit 0.30, churn 0.25, task 0.25, author 0.10, temporal 0.10 |
-| Bottleneck | task 0.35, author 0.15, temporal 0.20, degree 0.20, centrality 0.10 |
-| OCP pressure | task 0.40, centrality 0.25, repeated episode edit 0.25, role hint 0.10 |
+| Bottleneck | independent task 0.35, author 0.15, temporal 0.20, degree 0.20, centrality 0.10 |
+| OCP pressure | independent task 0.40, centrality 0.25, repeated episode edit 0.25, role hint 0.10 |
 | Combined co-change | commit evidence 0.75, task evidence 0.25 |
 
-Issue #237 owns the normal, schema-backed history_analysis configuration,
-bounded reference/path matching, path overrides, and threshold validation. This
-theory deliberately creates no second configuration authority.
+These numbers are defaults, not hard-coded alternate formulas. #237 may expose
+validated configuration for them. Every run has one effective profile and all
+formulas consume those effective weights. Disabling a component is explicit in
+the effective configuration; missing evidence never changes weights at runtime.
 
-## Path categories
+## Hotspots
 
-Every path has exactly one category:
-
-- production
-- tests
-- docs
-- generated
-- build_ci
-- samples_examples
-- unknown
-
-Production findings are primary architecture signals. Other categories are
-available for separate reporting or policy-controlled suppression. Unknown
-remains visible and is never discarded. Classification uses normalized,
-repository-relative logical paths, never an absolute checkout root.
-
-## Hotspots and co-change
-
-For logical file f:
+For logical file `f`:
 
 ~~~text
 C_f = normalized(commit_count(f))
@@ -129,87 +145,150 @@ T_f = normalized(distinct_task_references(f))
 A_f = normalized(distinct_normalized_authors(f))
 R_f = normalized(temporal_span_seconds(f))
 
-HotspotScore(f) = .30*C_f + .25*H_f + .25*T_f + .10*A_f + .10*R_f
+HotspotScore(f) = w_c*C_f + w_h*H_f + w_t*T_f + w_a*A_f + w_r*R_f
 ~~~
 
-temporal_span_seconds(f) is the non-negative difference between the latest and
-earliest UTC Unix commit timestamps touching f. It measures persistent edit
-pressure, not wall-clock recency; a one-commit file has span 0.
+The default `w_*` values are `.30,.25,.25,.10,.10`.
+`temporal_span_seconds(f)` is the non-negative difference between latest and
+earliest UTC Unix commit timestamps touching `f`. It measures persistent edit
+pressure, not wall-clock recency; a one-commit file has span `0`.
 
-The co-change graph is weighted and undirected. Its vertices are logical files;
-edge paths are in ascending ordinal order. For distinct a and b:
+Findings retain raw metrics, normalized components, and effective weights.
+
+## Co-change
+
+The co-change graph is weighted and undirected. Its vertices are retained
+logical files. Pair paths are canonical paths in ascending ordinal order.
 
 ~~~text
 CommitCoChange(a,b) = count(commits containing both a and b)
 TaskCoChange(a,b)   = count(distinct tasks whose episodes contain both a and b)
 
-CombinedCoChange(a,b) = .75*normalized(CommitCoChange)
-                        + .25*normalized(TaskCoChange)
+CombinedCoChange(a,b) = alpha*normalized(CommitCoChange)
+                        + beta*normalized(TaskCoChange)
 ~~~
 
-Absent task evidence contributes zero with unchanged weights. High co-change is
-a coupling/coordination signal, not proof that files belong in one module.
+The default `alpha=.75` and `beta=.25`; effective values come from the run's
+validated profile. Missing task evidence contributes zero without changing the
+weights.
 
 A cluster is a connected component formed only from edges meeting an explicit
-effective significance threshold. With no threshold, the result reports stable
-pair evidence and an empty cluster list instead of inferring an arbitrary cutoff.
+effective significance threshold. With no threshold, pair evidence remains but
+the cluster list is empty rather than using an invented cutoff.
 
-## Bottleneck and OCP-pressure evidence
+## Task episodes and independent-work evidence
 
-For two different task episodes touching a file, the episode intervals overlap
-when their UTC time intervals intersect. Otherwise their gap rounds up to whole
-days:
+A task episode is the commits linked to one extracted task/issue reference. A
+single commit may reference several tasks and may contribute ordinary task spread
+or task-level co-change to each. That does **not** establish parallel work.
 
-~~~text
-days_between(e1, e2) = 0                            if UTC intervals overlap
-                       ceil(positive UTC gap in days) otherwise
+For one logical file, task references `x` and `y` are an **independent task
+pair** only when both sides have pair-exclusive evidence:
 
-TemporalProximity(e1, e2) = 1 / (1 + days_between(e1, e2))
-~~~
+- at least one commit touching the file references `x` but not `y`;
+- at least one commit touching the file references `y` but not `x`.
 
-The file-level raw temporal value is the maximum proximity across episode pairs;
-it is 0 for fewer than two episodes. D_f is normalized distinct-neighbor
-degree. K_f is normalized weighted degree, the sum of combined co-change
-weights. With O_f as normalized raw temporal proximity:
+A commit referencing both tasks cannot establish independence, temporal overlap,
+or repeated-episode-edit evidence for that pair.
 
 ~~~text
-BottleneckScore(f) = .35*T_f + .15*A_f + .20*O_f + .20*D_f + .10*K_f
+IndependentTaskSpread(f) =
+  count(task refs participating in at least one independent pair for f)
 ~~~
 
-This describes parallel-development bottleneck or pressure; it does not prove a
-merge conflict occurred.
+For an independent pair, each interval is built from that side's pair-exclusive
+commits:
 
-For OCP pressure, E_f is the sum of commits after the first in each task
-episode touching f, but only if at least two task episodes touch it. Otherwise
-it is zero. N_f is 1 if the normalized file stem has one reported bounded
-token, otherwise 0. The default tokens are:
+~~~text
+days_between(e1,e2) = 0                              if intervals overlap
+                      ceil(positive UTC gap in days) otherwise
+
+TemporalProximity(e1,e2) = 1 / (1 + days_between(e1,e2))
+~~~
+
+The file-level raw temporal value is the maximum proximity across independent
+pairs, or `0` when none exists.
+
+This prevents a commit such as `fix parser (#101, #102)` from producing a false
+parallel-development signal merely because two references occur in one commit.
+Ordinary hotspot task spread may still record both references.
+
+## Bottleneck score
+
+For bottlenecks:
+
+~~~text
+T_f = normalized(IndependentTaskSpread(f))
+A_f = normalized(author spread)
+O_f = normalized(independent-task temporal proximity)
+D_f = normalized(distinct-neighbor degree)
+K_f = normalized(weighted degree)
+
+BottleneckScore(f) = b_t*T_f + b_a*A_f + b_o*O_f + b_d*D_f + b_c*K_f
+~~~
+
+The default `b_*` values are `.35,.15,.20,.20,.10`.
+
+The result is described as parallel-development bottleneck/pressure. It does not
+claim that a merge conflict actually occurred.
+
+## OCP-pressure score and role tokens
+
+OCP task spread also uses `IndependentTaskSpread`. `E_f` measures repeated
+pair-exclusive editing across references that participate in at least one
+independent pair: for each such reference, qualifying commits after its first
+unique pair-exclusive commit are counted, with a commit counted at most once per
+task reference. With no independent pair, `E_f = 0`.
+
+Role/name evidence is deterministic. Start from the canonical file name without
+its final extension. Tokenize by splitting on:
+
+- non-alphanumeric characters;
+- lower-to-upper camel/Pascal transitions;
+- acronym-to-word boundaries;
+- letter/digit boundaries.
+
+Tokens are invariant-lowercase and are matched by **exact token equality only**.
+There is no substring, glob, or regex matching.
+
+Default tokens:
 
 ~~~text
 dispatcher, registry, handler, loader, session, options, configuration,
 command, diagnostic, mapper, dto, model, service, orchestrator
 ~~~
 
+`N_f = 1` if at least one token matches, otherwise `0`. All matched tokens are
+reported in ascending ordinal order. Thus `OrderService` matches `service`,
+`DiagnosticMapper` matches `diagnostic` and `mapper`, and `ViewModel` matches
+`model`; a token merely embedded inside an unsplit identifier does not match.
+
 ~~~text
-OcpPressureScore(f) = .40*T_f + .25*K_f + .25*normalized(E_f) + .10*N_f
+OcpPressureScore(f) = o_t*T_f + o_c*K_f + o_r*normalized(E_f) + o_n*N_f
 ~~~
 
-The matched token is reported and provides at most 10% of the default score. It
-is heuristic evidence, not semantic proof. Reports say OCP pressure or likely
-OCP violation, never OCP violation proven without separate direct evidence.
+The default `o_*` values are `.40,.25,.25,.10`.
 
-## Ranking and recommendations
+Role evidence is bounded heuristic evidence, not semantic proof. Reports say
+`OCP pressure` or `likely OCP violation`, never `OCP violation proven` without
+separate direct evidence.
+
+## Ranking
 
 File findings sort by:
 
 1. descending score;
-2. descending task spread;
+2. descending ordinary task spread;
 3. descending churn;
 4. descending commit count;
-5. ascending normalized logical path.
+5. ascending canonical logical path.
 
 Pairs sort by descending combined weight, commit weight, task weight, then
-ascending first and second paths. Clusters sort by descending maximum edge,
-descending aggregate edge weight, then ascending first member path.
+ascending first and second canonical paths. Clusters sort by descending maximum
+edge, descending aggregate edge weight, then ascending first member canonical
+path.
+
+## Recommendations
 
 Recommendations are investigations with source findings, component values,
 effective thresholds, and caveats:
@@ -221,19 +300,18 @@ effective thresholds, and caveats:
 | High bottleneck score | Split orchestration from feature-specific behavior. |
 | High test-only hotspot | Improve fixture/helper architecture. |
 
-Candidate thresholds belong to #237's schema-backed model. When nothing
-qualifies, the deterministic candidate collection is empty; the tool does not
-fabricate recommendations.
+Candidate thresholds belong to #237. If nothing qualifies, the deterministic
+candidate collection is empty.
 
 ## Report semantics and limits
 
 Markdown contains the analyzed range/effective configuration, hotspots,
 co-change pairs/clusters, bottlenecks, OCP pressure, candidates, and limitations.
-Canonical JSON contains metadata/input refs, effective configuration
-identity/summary, categories, hotspot components, co-change summary, bottleneck
-evidence, OCP-pressure evidence, and candidates. Arrays use the ordering above;
-fields follow the documented schema order. Generated timestamps and environment
-display data do not alter canonical result identity.
+Canonical JSON contains input metadata, effective configuration, canonical paths
+and aliases, primary categories, raw and normalized score components, effective
+weights, co-change evidence, independent-task evidence, OCP evidence, and
+candidates. Generated timestamps and environment-specific display data do not
+alter canonical result identity.
 
 The Git/history core remains independent of optional .NET/Roslyn enrichment.
 Later enrichment may attach project, namespace, or type facts, but parse/mapping
@@ -243,7 +321,9 @@ Every report must make these limits clear:
 
 - churn is not complexity;
 - incomplete task/author references can understate components;
-- non-production categories can dominate raw volume;
+- a multi-reference commit is not proof of independent workstreams;
+- non-production categories can dominate their own raw volume but not a
+  production normalization cohort;
 - co-change does not prove module ownership;
 - role/name hints are bounded heuristics;
 - people decide whether evidence warrants a refactor.
@@ -251,12 +331,11 @@ Every report must make these limits clear:
 ## Ownership and non-goals
 
 - #236 implements deterministic Git ingestion and the existing CLI command family.
-- #237 owns normal policy schema/configuration and path classification.
+- #237 owns normal policy schema/configuration, filtering, and path classification.
 - #238/#239 implement hotspots and co-change independently.
-- #240/#241 consume that evidence for bottleneck and OCP pressure.
+- #240/#241 consume the defined independent-work evidence for bottleneck and OCP pressure.
 - #242 adds optional .NET enrichment; #243 renders stable reports and candidates.
 
 This document does not implement the analyzer, prove a formal design-law
 violation, require LLM conclusions, create a separate product/configuration
 authority, or freeze future scoring changes without reviewed specification work.
-
