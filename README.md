@@ -15,9 +15,8 @@
 YAML-first architecture governance for .NET repositories.
 
 The architecture-policy badge is available from the CLI as well: run
-`arch-linter-net badge architecture-policy --policy architecture/dependencies.arch.yml --ensure-built`
-to emit a Shields endpoint payload. It returns the strict validation result, so it can serve both
-as a badge source and as a blocking CI gate.
+`arch-linter-net badge architecture-policy --input architecture-strict.json`
+to project an existing strict result as a Shields endpoint payload. It never reruns analysis.
 
 ArchLinterNet turns architectural decisions into executable contracts: layered boundaries, protected internal APIs, dependency policies, baseline-aware adoption, architecture coverage, and CI-ready diagnostics. It helps teams catch architecture drift in pull requests before it becomes hidden design debt.
 

@@ -74,8 +74,8 @@ See [Exit codes](../usage/exit-codes.md) for details.
 
 ## Architecture-policy badge payload
 
-`arch-linter-net badge architecture-policy --policy architecture/dependencies.arch.yml --ensure-built`
-performs the same strict validation and writes a Shields endpoint JSON payload to standard output.
+`arch-linter-net badge architecture-policy --input architecture-strict.json`
+projects strict validation JSON into a Shields endpoint payload without rerunning analysis.
 It returns `0` with `passing`/`brightgreen`, `1` with `failing`/`red`, and `2` with
 `unavailable`/`red`. A workflow can use its exit status as the blocking gate while a
 badge service consumes the JSON endpoint.

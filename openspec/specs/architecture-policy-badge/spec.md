@@ -36,12 +36,12 @@ creation.
 
 ### Requirement: Badge payload is available from the standard CLI
 The repository's architecture-policy workflow SHALL use the native
-`badge architecture-policy` CLI command as the strict-policy gate and payload
-producer. The command SHALL be usable by other repositories without copying a
-Python script.
+`badge architecture-policy` CLI command to project the strict result produced
+by central CI. The command SHALL be usable by other repositories without copying
+a Python script or triggering another analysis.
 
 #### Scenario: Workflow produces the payload through CLI
 - **WHEN** the dedicated architecture-policy workflow runs
-- **THEN** it invokes `badge architecture-policy` with the repository policy
+- **THEN** it invokes `badge architecture-policy` with the strict JSON artifact
 - **AND** the workflow status and the command's payload represent the same
   strict-policy outcome

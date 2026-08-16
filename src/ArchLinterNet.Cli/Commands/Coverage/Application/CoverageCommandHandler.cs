@@ -26,7 +26,8 @@ internal sealed class CoverageCommandHandler(ICliConsole console, IFileSystem fi
             IReadOnlyList<string>? changedFiles = options.DiffStatus == "failed" || options.ChangedFilesPath is null || !fileSystem.FileExists(options.ChangedFilesPath)
                 ? null
                 : fileSystem.ReadAllText(options.ChangedFilesPath).Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
-            string markdown = CoverageReportRenderer.Render(document.RootElement, changedFiles, options.RepositoryRoot,
+            JsonElement report = SelectStrictResult(document.RootElement);
+            string markdown = CoverageReportRenderer.Render(report, changedFiles, options.RepositoryRoot,
                 options.DiffStatus == "failed", options.MaxFailureDiagnostics);
             if (options.OutputPath is null)
             {
@@ -44,5 +45,12 @@ internal sealed class CoverageCommandHandler(ICliConsole console, IFileSystem fi
             console.Error.WriteLine($"Could not render architecture coverage report: {exception.Message}");
             return CliExitCodes.InvalidArgumentsOrRuntimeError;
         }
+    }
+
+    private static JsonElement SelectStrictResult(JsonElement document)
+    {
+        if (!document.TryGetProperty("results", out JsonElement results) || results.ValueKind != JsonValueKind.Array) return document;
+        foreach (JsonElement result in results.EnumerateArray()) if (result.TryGetProperty("mode", out JsonElement mode) && mode.GetString() == "strict") return result;
+        throw new JsonException("The input does not contain a strict validation result.");
     }
 }

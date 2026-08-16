@@ -1,8 +1,11 @@
 name: Architecture Policy
 
 on:
-  pull_request:
-  push:
+  workflow_run:
+    workflows:
+      - CI
+    types:
+      - completed
     branches:
       - main
 
@@ -11,6 +14,7 @@ concurrency:
   cancel-in-progress: true
 
 permissions:
+  actions: read
   contents: read
 
 jobs:
@@ -19,12 +23,14 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
+      actions: read
       contents: read
 
     steps:
-      - name: Checkout
+      - name: Checkout validated revision
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
+          ref: ${{ github.event.workflow_run.head_sha }}
           persist-credentials: false
 
       - name: Setup .NET
@@ -32,10 +38,10 @@ jobs:
         with:
           dotnet-version: 10.0.x
 
-      - name: Restore
-        run: make restore
+      - name: Download strict validation result
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh run download "${{ github.event.workflow_run.id }}" --name architecture-strict
 
       - name: Generate strict architecture-policy badge payload
-        run: >-
-          dotnet run --project src/ArchLinterNet.Cli -- badge architecture-policy
-          --policy architecture/dependencies.arch.yml --ensure-built
+        run: dotnet run --project src/ArchLinterNet.Cli -- badge architecture-policy --input architecture-strict.json

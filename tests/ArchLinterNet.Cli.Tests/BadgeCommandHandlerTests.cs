@@ -1,11 +1,6 @@
 using System.Text.Json;
 using ArchLinterNet.Cli.Commands;
 using ArchLinterNet.Cli.Commands.Badge.Application;
-using ArchLinterNet.Core.Contracts;
-using ArchLinterNet.Core.Graph;
-using ArchLinterNet.Core.Model;
-using ArchLinterNet.Core.Reporting;
-using ArchLinterNet.Core.Validation;
 using NUnit.Framework;
 
 namespace ArchLinterNet.Cli.Tests;
@@ -16,17 +11,15 @@ public sealed partial class ValidateCommandHandlerReportModeTests
     [Test]
     public void BadgeHandler_EmitsShieldsPayloadForPassingAndFailingStrictValidation()
     {
-        FakeCliRuntime passingRuntime = new();
         FakeCliConsole passingConsole = new();
-        int passingExit = new BadgeCommandHandler(passingRuntime, passingConsole, default).Execute(new("policy.yml", true, false, null, false));
+        FakeFileSystem passingFiles = new(exists: true);
+        passingFiles.Contents["passing.json"] = "{\"passed\":true}";
+        int passingExit = new BadgeCommandHandler(passingConsole, passingFiles).Execute(new("passing.json", false));
 
-        FakeCliRuntime failingRuntime = new()
-        {
-            ForcedOutcome = new ValidationOutcome(false,
-                [new ArchitectureViolation("rule-a", null, "source", "target", Array.Empty<string>())], [], [], "off", [], "off", [], "off", [], [], []),
-        };
         FakeCliConsole failingConsole = new();
-        int failingExit = new BadgeCommandHandler(failingRuntime, failingConsole, default).Execute(new("policy.yml", false, false, null, false));
+        FakeFileSystem failingFiles = new(exists: true);
+        failingFiles.Contents["failing.json"] = "{\"passed\":false}";
+        int failingExit = new BadgeCommandHandler(failingConsole, failingFiles).Execute(new("failing.json", false));
 
         using JsonDocument passing = JsonDocument.Parse(passingConsole.StdOut);
         using JsonDocument failing = JsonDocument.Parse(failingConsole.StdOut);
@@ -42,12 +35,12 @@ public sealed partial class ValidateCommandHandlerReportModeTests
     }
 
     [Test]
-    public void BadgeHandler_EmitsUnavailablePayloadWhenValidationCannotRun()
+    public void BadgeHandler_EmitsUnavailablePayloadWhenInputCannotBeRead()
     {
         FakeCliConsole console = new();
-        FakeCliRuntime runtime = new() { ExceptionToThrow = new InvalidOperationException("missing build receipt") };
+        FakeFileSystem files = new(exists: false);
 
-        int exitCode = new BadgeCommandHandler(runtime, console, default).Execute(new("policy.yml", true, false, null, false));
+        int exitCode = new BadgeCommandHandler(console, files).Execute(new("missing.json", false));
 
         using JsonDocument payload = JsonDocument.Parse(console.StdOut);
         Assert.Multiple(() =>

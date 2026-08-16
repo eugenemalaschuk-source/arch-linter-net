@@ -129,11 +129,18 @@ internal static class CoverageReportRenderer
             if (file.Replace('\\', '/').Contains("AdoptionAcceptance/Fixtures", StringComparison.Ordinal)) continue;
             string? project = FindProject(file, root);
             if (project is not null && Path.GetFileNameWithoutExtension(project).EndsWith(".Tests", StringComparison.Ordinal)) continue;
+            bool classified = false;
             foreach ((string scope, string? item) in DetectedUnits(file, project, root, scopes))
             {
                 if (item is null) continue;
+                classified = true;
                 string state = index.GetValueOrDefault((scope, item), "unknown"); units[(scope, item)] = state;
                 if (state != "covered") attention.Add($"- `{file}` — `{item}` ({scope}): **{state}**");
+            }
+            if (!classified)
+            {
+                units[("unknown", file)] = "unknown";
+                attention.Add($"- `{file}` — `{file}` (unknown): **unknown**");
             }
         }
         int covered = units.Values.Count(static state => state == "covered");
@@ -166,9 +173,9 @@ internal static class CoverageReportRenderer
 
     private static string Assembly(string project)
     {
-        string text = File.ReadAllText(project); const string start = "<AssemblyName>"; const string end = "</AssemblyName>";
-        int index = text.IndexOf(start, StringComparison.Ordinal); if (index < 0) return Path.GetFileNameWithoutExtension(project);
-        int close = text.IndexOf(end, index, StringComparison.Ordinal); return close < 0 ? Path.GetFileNameWithoutExtension(project) : text[(index + start.Length)..close].Trim();
+        string text = File.ReadAllText(project); const string StartTag = "<AssemblyName>"; const string EndTag = "</AssemblyName>";
+        int index = text.IndexOf(StartTag, StringComparison.Ordinal); if (index < 0) return Path.GetFileNameWithoutExtension(project);
+        int close = text.IndexOf(EndTag, index, StringComparison.Ordinal); return close < 0 ? Path.GetFileNameWithoutExtension(project) : text[(index + StartTag.Length)..close].Trim();
     }
 
     private static bool Passed(JsonElement element) => element.TryGetProperty("passed", out JsonElement passed) && passed.ValueKind == JsonValueKind.True;
@@ -176,8 +183,16 @@ internal static class CoverageReportRenderer
     private static JsonElement Object(JsonElement element, string name) => element.TryGetProperty(name, out JsonElement value) && value.ValueKind == JsonValueKind.Object ? value : default;
     private static int Int(JsonElement element, string name) => element.TryGetProperty(name, out JsonElement value) && value.TryGetInt32(out int number) ? number : 0;
     private static string? String(JsonElement element, string name) => element.TryGetProperty(name, out JsonElement value) && value.ValueKind is JsonValueKind.String or JsonValueKind.Number ? value.ToString() : null;
-    private static Dictionary<string, string?> Properties(JsonElement element) => element.ValueKind != JsonValueKind.Object ? [] : element.EnumerateObject().ToDictionary(static property => property.Name, static property => property.Value.ValueKind is JsonValueKind.String or JsonValueKind.Number ? property.Value.ToString() : null, StringComparer.Ordinal);
-    private static string Summary(IReadOnlyDictionary<string, string?> values) => string.Join("; ", new[] { ("code", "message_code"), ("source", "source"), ("subject", "subject"), ("state", "state"), ("item", "item"), ("evidence", "evidence"), ("reason", "reason"), ("detail", "detail") }.Where(pair => values.GetValueOrDefault(pair.Item2) is not null).Select(pair => $"{pair.Item1} `{Code(values[pair.Item2]!)}`"));
+    private static Dictionary<string, string?> Properties(JsonElement element)
+    {
+        if (element.ValueKind != JsonValueKind.Object) return [];
+        Dictionary<string, string?> values = element.EnumerateObject().ToDictionary(static property => property.Name, static property => property.Value.ValueKind is JsonValueKind.String or JsonValueKind.Number ? property.Value.ToString() : null, StringComparer.Ordinal);
+        if (element.TryGetProperty("forbidden_references", out JsonElement references) && references.ValueKind == JsonValueKind.Array) values["forbidden_references"] = string.Join(", ", references.EnumerateArray().Select(static item => item.ToString()));
+        foreach (string location in new[] { "source_location", "policy_origin", "policy_location" }) if (element.TryGetProperty(location, out JsonElement value)) values[location] = Location(value);
+        return values;
+    }
+    private static string? Location(JsonElement value) => value.ValueKind != JsonValueKind.Object ? value.ToString() : String(value, "path") is { } path ? path + (String(value, "line") is { } line ? ":" + line : string.Empty) + (String(value, "column") is { } column ? ":" + column : string.Empty) : null;
+    private static string Summary(IReadOnlyDictionary<string, string?> values) => string.Join("; ", new[] { ("code", "message_code"), ("source", "source"), ("subject", "subject"), ("state", "state"), ("item", "item"), ("forbidden namespace", "forbidden_namespace"), ("forbidden references", "forbidden_references"), ("evidence", "evidence"), ("reason", "reason"), ("detail", "detail"), ("source", "source_location"), ("policy", "policy_origin"), ("policy", "policy_location") }.Where(pair => values.GetValueOrDefault(pair.Item2) is not null).Select(pair => $"{pair.Item1} `{Code(values[pair.Item2]!)}`"));
     private static string Code(string value) => Compact(value).Replace("`", "'", StringComparison.Ordinal);
     private static string Compact(string value) { string text = string.Join(' ', value.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries)); return text.Length <= 240 ? text : text[..237] + "..."; }
 

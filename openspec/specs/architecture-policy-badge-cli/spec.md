@@ -5,28 +5,27 @@ Provide native CLI output for the strict architecture-policy badge and for the
 Markdown report posted to pull requests.
 ## Requirements
 ### Requirement: Native architecture-policy badge command
-The CLI SHALL expose `badge architecture-policy`, which SHALL execute complete
-strict validation and write a Shields endpoint JSON object to stdout with
+The CLI SHALL expose `badge architecture-policy`, which SHALL read a completed
+strict validation JSON result and write a Shields endpoint JSON object to stdout with
 `schemaVersion`, `label`, `message`, and `color` fields. The label SHALL be
 `architecture policy`; a passing strict result SHALL use `passing` and
 `brightgreen`, and a strict-policy failure SHALL use `failing` and `red`.
 
 #### Scenario: Strict policy passes
-- **WHEN** a user runs `arch-linter-net badge architecture-policy` for a valid
-  policy with no strict findings
+- **WHEN** a user runs `arch-linter-net badge architecture-policy --input strict.json`
+  for a strict result with no findings
 - **THEN** stdout is a Shields endpoint JSON object with message `passing` and
   color `brightgreen`
 - **AND** the command exits 0
 
 #### Scenario: Strict policy fails
-- **WHEN** a user runs the command for a policy with strict findings
+- **WHEN** a user runs the command for a strict result with findings
 - **THEN** stdout is a Shields endpoint JSON object with message `failing` and
   color `red`
 - **AND** the command exits 1
 
 #### Scenario: Validation cannot execute
-- **WHEN** validation cannot execute because of invalid input or build-state
-  failure
+- **WHEN** the strict-result input cannot be read or parsed
 - **THEN** stdout is a Shields endpoint JSON object with message `unavailable`
   and color `red`
 - **AND** the command exits 2

@@ -1,35 +1,26 @@
 using System.Text.Json;
 using ArchLinterNet.Cli.Abstractions;
 using ArchLinterNet.Cli.Commands;
-using ArchLinterNet.Core.BuildState;
-using ArchLinterNet.Core.Validation;
 
 namespace ArchLinterNet.Cli.Commands.Badge.Application;
 
-internal sealed class BadgeCommandHandler(ICliRuntime runtime, ICliConsole console, CancellationToken cancellationToken)
+internal sealed class BadgeCommandHandler(ICliConsole console, IFileSystem fileSystem)
 {
     public int Execute(BadgeCommandOptions options)
     {
         if (options.ShowHelp)
         {
-            console.Out.WriteLine("arch-linter-net badge architecture-policy [--policy <path>] [--ensure-built] [--no-restore] [--configuration <name>]");
+            console.Out.WriteLine("arch-linter-net badge architecture-policy --input <architecture-strict.json>");
             return CliExitCodes.Success;
         }
 
         try
         {
-            ValidationOutcome outcome = runtime.Validate(new ValidationRequest
-            {
-                PolicyPath = options.PolicyPath,
-                Mode = "strict",
-                EnforceUnmatchedIgnoredViolationsPolicy = true,
-                PreparationMode = options.EnsureBuilt ? BuildPreparationMode.EnsureBuilt : BuildPreparationMode.Ordinary,
-                NoRestore = options.NoRestore,
-                RequestedConfiguration = options.Configuration,
-                CancellationToken = cancellationToken,
-            }, null);
-            Write(outcome.Passed ? "passing" : "failing", outcome.Passed ? "brightgreen" : "red");
-            return outcome.Passed ? CliExitCodes.Success : CliExitCodes.ValidationFailure;
+            using JsonDocument document = JsonDocument.Parse(fileSystem.ReadAllText(options.InputPath));
+            JsonElement result = SelectStrictResult(document.RootElement);
+            bool passed = result.TryGetProperty("passed", out JsonElement value) && value.ValueKind == JsonValueKind.True;
+            Write(passed ? "passing" : "failing", passed ? "brightgreen" : "red");
+            return passed ? CliExitCodes.Success : CliExitCodes.ValidationFailure;
         }
         catch (Exception)
         {
@@ -45,4 +36,11 @@ internal sealed class BadgeCommandHandler(ICliRuntime runtime, ICliConsole conso
         message,
         color,
     }));
+
+    private static JsonElement SelectStrictResult(JsonElement document)
+    {
+        if (!document.TryGetProperty("results", out JsonElement results) || results.ValueKind != JsonValueKind.Array) return document;
+        foreach (JsonElement result in results.EnumerateArray()) if (result.TryGetProperty("mode", out JsonElement mode) && mode.GetString() == "strict") return result;
+        throw new JsonException("The input does not contain a strict validation result.");
+    }
 }

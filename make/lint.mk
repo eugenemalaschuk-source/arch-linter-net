@@ -134,15 +134,13 @@ test-tooling-coverage:  ## Run all Python tooling tests with coverage (coverage-
 # --ensure-built prepares and verifies the analysed project graph; the policy declares
 # analysis.solution, so a run without a build receipt is blocked by build-state preflight. It never
 # writes to architecture/. --no-build applies to the CLI host itself, which the caller builds.
-architecture-strict-json:  ## Run strict architecture validation, writing architecture-strict.json (CLI must already be built)
+architecture-strict-json:  ## Run strict+audit validation once, writing combined JSON (CLI must already be built)
 	@dotnet run --no-build --project "$(CLI_PROJECT)" -- \
-		--policy "$(POLICY)" --mode strict --ensure-built --format json \
+		--policy "$(POLICY)" --mode strict,audit --ensure-built --format json \
 		> "$(PROJECT_ROOT)/architecture-strict.json"
 
-architecture-audit-json:  ## Run audit architecture validation, writing architecture-audit.json (CLI must already be built)
-	@dotnet run --no-build --project "$(CLI_PROJECT)" -- \
-		--policy "$(POLICY)" --mode audit --ensure-built --format json \
-		> "$(PROJECT_ROOT)/architecture-audit.json"
+architecture-audit-json:  ## Materialize the shared strict+audit JSON under the audit artifact name
+	@cp "$(PROJECT_ROOT)/architecture-strict.json" "$(PROJECT_ROOT)/architecture-audit.json"
 
 architecture-coverage-markdown:  ## Generate architecture-coverage.md from architecture-strict.json (CHANGED_FILES/DIFF_STATUS env optional)
 	@dotnet run --no-build --project "$(CLI_PROJECT)" -- coverage report \
