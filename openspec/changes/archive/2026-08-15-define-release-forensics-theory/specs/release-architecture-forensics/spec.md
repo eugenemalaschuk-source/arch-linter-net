@@ -8,14 +8,29 @@ history-semantics profile identity, and tool version while excluding local
 environment presentation data.
 
 ### Requirement: Raw commit metadata and canonical author identity
-Canonical author/task evidence SHALL be parsed from raw Git commit-object bytes,
-not presentation APIs that can transcode or locale-decode metadata. Required raw
-commit structure SHALL parse or analysis fails closed.
+Canonical author/task/time evidence SHALL be parsed from raw Git commit-object
+bytes, not presentation APIs that can transcode, normalize, locale-decode, or
+calendar-convert metadata. Required raw commit structure SHALL parse or analysis
+fails closed.
 
-The selected author email, else author name, SHALL strict-UTF8 decode. Canonical
-author normalization trims ASCII SP/HT, lowercases ASCII `A-Z` only, applies no
-Unicode normalization/case folding, and uses `unknown` only when email/name are
-both empty. A Git `encoding` header SHALL NOT trigger canonical transcoding.
+Exactly one canonical `author` header SHALL use the right-to-left suffix grammar
+`<identity> SP <timestamp> SP <timezone>`, with timestamp `-?[0-9]+`, timezone
+`[+-][0-9]{4}`, and final angle-bracketed email delimited by the last `<` and final
+`>`. Malformed/non-unique structure SHALL fail closed.
+
+Canonical author SHALL select non-empty ASCII-SP/HT-trimmed email else name,
+strict-UTF8 decode the selected bytes, trim ASCII SP/HT, lowercase ASCII `A-Z`
+only, perform no Unicode normalization/case folding, and use `unknown` only when
+email/name are both empty. A Git `encoding` header SHALL NOT trigger canonical
+transcoding.
+
+### Requirement: Canonical committer epoch-second integer
+Exactly one canonical `committer` header SHALL use the same suffix grammar. Its
+timestamp token SHALL be an arbitrary-precision signed base-10 Unix epoch-second
+integer. The timezone token SHALL be validated/retained as metadata but SHALL NOT
+shift the epoch value. Canonical commit order and temporal math SHALL use the exact
+integer, not wall-clock conversion, floating seconds, or a host date/time range.
+Malformed/missing/duplicate committer headers SHALL fail closed.
 
 ### Requirement: Canonical TaskKey identity
 Raw commit-message payload SHALL strict-UTF8 decode before task extraction;
@@ -28,11 +43,11 @@ Every #237 extractor SHALL map one match to an ASCII-lowercase namespace
 TaskKey = (namespace, positive_decimal_id)
 ```
 
-IDs are arbitrary precision and render without leading zeroes. Same-key matches
-deduplicate; different namespaces remain distinct. If the same message byte span
-maps to different TaskKeys, extraction SHALL fail closed rather than depend on
-extractor ordering. All task-derived metrics SHALL consume TaskKeys, not source
-spellings.
+IDs are arbitrary precision, greater than zero, and render without leading zeroes.
+`#0` produces no default TaskKey. Extractor matches expose non-empty half-open raw
+message byte spans. Same-key matches deduplicate; overlapping spans mapping to
+different TaskKeys fail closed. Non-overlapping distinct matches may remain
+distinct. All task-derived metrics SHALL consume TaskKeys, not source spellings.
 
 ### Requirement: Canonical commit set and file evidence
 The analyzed commit set SHALL be:
@@ -41,10 +56,10 @@ The analyzed commit set SHALL be:
 Commits(from,to) = Reachable(to) \ Reachable(from)
 ```
 
-Commits SHALL sort by committer UTC epoch second then full SHA. One-parent
-commits SHALL use parent-tree -> commit-tree deltas; roots SHALL compare with the
-empty tree. Merge commits SHALL remain metadata-only and SHALL NOT contribute
-file-derived evidence in the initial profile.
+Commits SHALL sort by exact canonical committer epoch-second integer then full
+SHA. One-parent commits SHALL use parent-tree -> commit-tree deltas; roots SHALL
+compare with the empty tree. Merge commits SHALL remain metadata-only and SHALL
+NOT contribute file-derived evidence in the initial profile.
 
 ### Requirement: Canonical Git path text and ordering
 Every Git path entering canonical evidence SHALL decode as strict UTF-8.
@@ -55,21 +70,29 @@ Canonical ordinal string order SHALL be lexicographic by Unicode scalar numeric
 value, prefix-shorter-first. It SHALL NOT depend on UTF-16 code-unit ordering,
 locale/filesystem collation, or normalization libraries.
 
-### Requirement: DAG-safe exact rename identity
+### Requirement: Formal DAG-safe exact rename identity
 V1 SHALL create a local exact-rename candidate only for a same-commit one-to-one
 delete/add relation with identical Git blob identity and no competing source or
 destination. Similarity/copy inference and rename-with-edit SHALL NOT create
 candidates.
 
-Candidates SHALL collapse logical identity only when their connected/competing
-lineage component has exactly one all-candidate sequence whose commits are
-strictly increasing by Git ancestry and whose destination/source paths connect in
-sequence. An ancestry-incomparable fork/join or otherwise non-unique component
-SHALL be `ambiguous_dag`; none of its candidates collapse identity. Timestamp/SHA
-ordering SHALL NOT resolve DAG ambiguity.
+For each candidate `c`, define `Endpoints(c)={src(c),dst(c)}`. Build an undirected
+candidate-overlap graph whose vertices are candidates and whose edges connect
+candidates exactly when endpoint sets intersect. Its connected components are the
+potential lineage components.
 
-Accepted unique lineages use the final in-range canonical path and deterministic
-aliases. Ambiguous candidates remain evidence while involved paths stay separate.
+A component SHALL collapse only when exactly one permutation uses all candidates
+and all three hold: every earlier candidate commit is a strict ancestor of every
+later candidate commit; each destination equals the next source; and no ordinary
+canonical add/delete of the shared path occurs in a non-merge commit strictly
+between adjacent candidate commits. Such an intervening add/delete is a lifecycle
+break.
+
+An ancestry-incomparable fork/join, non-unique sequence, or lifecycle break SHALL
+produce `ambiguous_dag`; none of its candidates collapse identity. Timestamp/SHA
+ordering SHALL NOT repair DAG/path-lifecycle ambiguity. Accepted lineages use the
+final in-range canonical path and deterministic aliases; ambiguous candidates
+remain evidence while involved paths stay separate.
 
 ### Requirement: Canonical file events and line churn
 There SHALL be one canonical file event per logical file per canonical
@@ -133,7 +156,7 @@ Hotspot components SHALL be canonicalized and combined with effective weights:
 ```text
 C_f=Q(normalized(commit_count)); H_f=Q(normalized_log(churn))
 T_f=Q(normalized(canonical_TaskKey_spread)); A_f=Q(normalized(author_spread))
-R_f=Q(normalized(temporal_span))
+R_f=Q(normalized(exact_epoch_second_span))
 HotspotScore=Q(w_c*C_f+w_h*H_f+w_t*T_f+w_a*A_f+w_r*R_f)
 ```
 
@@ -163,7 +186,8 @@ A multi-reference commit may contribute ordinary canonical TaskKey breadth/co-
 change but SHALL not establish independent work alone. Independent pairs require
 pair-exclusive canonical file-evidence commits on both sides.
 
-Pair intervals SHALL be closed intervals over committer epoch seconds:
+Pair intervals SHALL be closed intervals over exact canonical committer epoch-
+second integers:
 
 ```text
 gap_seconds = later.start_epoch_second - earlier.end_epoch_second
@@ -172,7 +196,8 @@ days_between = 0                         when gap_seconds <= 0
 TemporalProximity = Q(1/(1+days_between))
 ```
 
-Calendar dates, timezone, local midnight, and DST SHALL NOT participate.
+Calendar dates, timezone, local midnight, host date ranges, and DST SHALL NOT
+participate.
 
 ### Requirement: Cohort-safe centrality and OCP evidence
 File centrality SHALL use raw `G0` incident commit/task degrees normalized in the
@@ -188,6 +213,13 @@ File, `G0` pair, cluster, and candidate results SHALL remain grouped by comparab
 cohort and rank only within that cohort. Candidate records SHALL carry source
 evidence, thresholds, cohort identity, and caveats.
 
+### Requirement: Successful reports and fail-closed diagnostics
+Canonical Markdown/JSON SHALL be emitted only after all fail-closed validation
+succeeds. Invalid refs, commit metadata/UTF-8/config, TaskKey overlap ambiguity,
+missing required objects, or other canonical failures SHALL emit no partial
+successful report, ranking, or candidate set. Failure diagnostics are a separate
+command/error surface and SHALL NOT be successful report records.
+
 ### Requirement: Canonical JSON string escaping and bytes
 Canonical strings SHALL contain valid Unicode scalar values and SHALL NOT be
 Unicode-normalized during serialization. JSON escaping SHALL use `\"` for quote,
@@ -201,13 +233,15 @@ without BOM, LF, two-space indentation, no trailing whitespace, exactly one
 terminal LF, fixed nine-decimal non-exponent canonical reals, and the escaping
 profile above. Report identity SHALL be over those exact bytes.
 
-Reports SHALL expose raw commit-metadata/task extraction status, canonical
-TaskKeys/source evidence, and accepted/`ambiguous_dag` rename evidence.
+Successful reports SHALL expose canonical committer epoch integers/timezone-token
+evidence, raw commit-metadata/task provenance, canonical TaskKeys/source evidence,
+and accepted/`ambiguous_dag` rename evidence.
 
 ### Requirement: Contributor reference
 The internal contributor reference SHALL remain synchronized with the capability,
-including raw commit metadata/TaskKey identity, reachability/merge semantics,
-strict UTF-8/scalar ordering, DAG-safe exact rename, raw-byte LCS line churn,
-cohort/numeric rules, `G0/Gtheta`, temporal/OCP semantics, portable role tokens,
-canonical JSON bytes, and interpretation limits. Public MkDocs navigation SHALL
-not advertise the feature before it ships.
+including exact author/committer metadata parsing, TaskKey identity, reachability/
+merge semantics, strict UTF-8/scalar ordering, formal DAG-safe exact rename and
+lifecycle guard, raw-byte LCS line churn, cohort/numeric rules, `G0/Gtheta`,
+temporal/OCP semantics, report/failure boundary, portable role tokens, canonical
+JSON bytes, and interpretation limits. Public MkDocs navigation SHALL not
+advertise the feature before it ships.
