@@ -90,12 +90,12 @@ internal static class CoverageReportRenderer
         if (ArrayElement(report, "coverage_findings").GetArrayLength() == 0)
         {
             foreach (JsonElement entry in ArrayElement(report, "coverage_summary").EnumerateArray())
-            foreach ((string bucket, string state) in new[] { ("uncovered_items", "uncovered"), ("stale_items", "stale"), ("unknown_items", "unknown") })
-            foreach (JsonElement item in ArrayElement(entry, bucket).EnumerateArray())
-            {
-                var fallback = new Dictionary<string, string?> { ["contract_id"] = String(entry, "contract_id"), ["contract"] = String(entry, "contract"), ["scope"] = String(entry, "scope"), ["state"] = state, ["item"] = String(item, "item"), ["evidence"] = String(item, "evidence") ?? String(item, "reason") };
-                AddFailure(result, fallback, "Coverage summary");
-            }
+                foreach ((string bucket, string state) in new[] { ("uncovered_items", "uncovered"), ("stale_items", "stale"), ("unknown_items", "unknown") })
+                    foreach (JsonElement item in ArrayElement(entry, bucket).EnumerateArray())
+                    {
+                        var fallback = new Dictionary<string, string?> { ["contract_id"] = String(entry, "contract_id"), ["contract"] = String(entry, "contract"), ["scope"] = String(entry, "scope"), ["state"] = state, ["item"] = String(item, "item"), ["evidence"] = String(item, "evidence") ?? String(item, "reason") };
+                        AddFailure(result, fallback, "Coverage summary");
+                    }
         }
 
         return result.Values.Select(static value => value.Build()).OrderBy(static rule => rule.Identifier, StringComparer.Ordinal).ThenBy(static rule => rule.Name, StringComparer.Ordinal).ToArray();
@@ -119,8 +119,8 @@ internal static class CoverageReportRenderer
         {
             string? scope = String(entry, "scope"); if (scope is not ("namespace" or "project" or "assembly")) continue; scopes.Add(scope);
             foreach (string state in _states)
-            foreach (JsonElement item in ArrayElement(entry, state + "_items").EnumerateArray())
-                if (String(item, "item") is { } name) index[(scope, name)] = state;
+                foreach (JsonElement item in ArrayElement(entry, state + "_items").EnumerateArray())
+                    if (String(item, "item") is { } name) index[(scope, name)] = state;
         }
         var units = new Dictionary<(string Scope, string Item), string>();
         var attention = new List<string>();
