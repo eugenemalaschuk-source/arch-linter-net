@@ -32,12 +32,14 @@ working-tree changes do not enter Git-only canonical identity.
 
 ## Raw commit metadata is canonical input
 
-Commit author/message evidence is read from raw Git commit object bytes, not from
-`git log` or a library presentation API that may silently transcode text.
+Commit author/message/time evidence is read from raw Git commit object bytes, not
+from `git log` or a library presentation API that may silently transcode or
+calendar-convert metadata.
 
-The commit object is parsed as LF-delimited headers followed by the first empty
-header line and raw message payload. Malformed required headers or unreadable
-required commit objects fail closed.
+The raw commit object is parsed as LF-delimited headers followed by the first
+empty header line and raw message payload. Malformed required headers or unreadable
+required commit objects fail closed. Continuation lines of unrelated headers may
+be retained opaquely; they do not change direct `author ` / `committer ` matching.
 
 ### Exact `author` header parsing
 
@@ -51,7 +53,7 @@ parse from right to left:
 - timestamp matches `-?[0-9]+`;
 - timezone matches `[+-][0-9]{4}`;
 - remaining identity bytes end in `>`;
-- the final `>` and the last `<` before it delimit email bytes;
+- the final `>` and last `<` before it delimit email bytes;
 - bytes before that `<` are name bytes.
 
 If this structure is not uniquely parseable, analysis fails instead of delegating
@@ -61,11 +63,27 @@ Canonical author identity then:
 
 1. trims ASCII SP/HT from email bytes;
 2. selects non-empty email, otherwise ASCII-SP/HT-trimmed name;
-3. strict-UTF8 decodes the selected bytes or fails closed;
+3. strict-UTF8 decodes selected bytes or fails closed;
 4. trims only ASCII SP/HT;
 5. lowercases ASCII `A-Z` only;
 6. performs no Unicode normalization, locale casing, or full Unicode case folding;
 7. uses `unknown` only when both parsed email and name are empty.
+
+### Exact `committer` epoch-second parsing
+
+Exactly one canonical `committer` header is required and uses the same right-to-
+left suffix grammar. Its timestamp token is interpreted as an arbitrary-precision
+signed base-10 **Unix epoch-second integer**. Leading zeroes and `-0` are only
+spellings; canonical numeric zero is `0`.
+
+The timezone token is structurally validated and retained as metadata, but it is
+never added to or subtracted from the epoch value. Canonical commit ordering and
+all temporal math compare/use the exact timestamp integer directly, then full SHA
+as the commit-order tie-break.
+
+No local date, wall-clock conversion, DST rule, floating seconds, or host
+`DateTime` range participates. Even an epoch integer outside a host calendar
+library's representable range remains valid canonical temporal evidence.
 
 The optional Git `encoding` header is evidence only. It never causes canonical
 transcoding of author or message bytes.
@@ -87,20 +105,24 @@ Canonical identity is structural:
 TaskKey = (namespace, positive_decimal_id)
 ~~~
 
-The decimal is arbitrary precision and renders without leading zeroes. Therefore:
+The decimal is arbitrary precision, greater than zero, and renders without leading
+zeroes. Therefore:
 
 ~~~text
 #001   -> (issue, 1)
 #1     -> (issue, 1)
+#0     -> no default TaskKey
 jira-1 -> (jira, 1)
 ~~~
 
 `issue#1` and `jira#1` are different tasks. Source spelling, extractor ID, matched
-byte span, and matched text are evidence, not identity.
+text, and half-open **raw message byte span** `[start,end)` are evidence, not
+identity.
 
-Repeated matches producing the same TaskKey deduplicate. If the **same message
-byte span** maps to different TaskKeys, analysis fails with an extraction-
-ambiguity diagnostic rather than depending on extractor order.
+Repeated matches producing the same TaskKey deduplicate. If overlapping byte
+spans map to different TaskKeys, analysis fails with an extraction-ambiguity
+diagnostic rather than depending on extractor order or nesting. Non-overlapping
+matches may yield distinct TaskKeys.
 
 The default extractor uses namespace `issue` and recognizes `#<positive decimal>`.
 All task spread, task episodes, TaskCoChange, independent pairs, and repeated-edit
@@ -117,12 +139,10 @@ Commits(from,to) = Reachable(to) \ Reachable(from)
 `Reachable(r)` includes `r` and every parent-reachable commit. The formula also
 applies when `from` is not an ancestor of `to`.
 
-Commits sort by committer UTC epoch second, then full SHA. Temporal metrics use
-those epoch seconds.
-
-A one-parent commit uses the parent-tree -> commit-tree delta. A root commit uses
-the empty tree. Merge commits stay in range metadata but contribute no v1
-file-derived evidence, preventing first-parent/combined-diff ambiguity and double
+Commits sort by exact canonical committer epoch-second integer, then full SHA. A
+one-parent commit uses the parent-tree -> commit-tree delta. A root commit uses
+the empty tree. Merge commits stay in range metadata but contribute no v1 file-
+derived evidence, preventing first-parent/combined-diff ambiguity and double
 counting while knowingly understating merge-resolution-only edits.
 
 ## Canonical Git paths and ordering
@@ -147,36 +167,47 @@ normalization libraries are not authoritative. Repository paths use `/`.
 ## Exact rename candidates and Git-DAG safety
 
 V1 does not use ambient Git similarity heuristics. Inside one non-merge commit, a
-**local exact-rename candidate** exists only when:
-
-- one source is deleted;
-- one destination is added for that relation;
-- preimage/postimage have the identical blob object ID;
-- no competing same-commit source/destination exists.
+**local exact-rename candidate** exists only when a one-to-one delete/add relation
+has identical preimage/postimage blob ID and no competing same-commit source or
+destination.
 
 Similarity, copy inference, rename-with-edit, candidate thresholds, and Git client
 configuration cannot create canonical candidates.
 
-Local candidates are then validated across the Git DAG. Candidates belong to one
-potential lineage when source/destination paths connect or compete through shared
-endpoints. The component canonicalizes only if exactly one sequence contains all
-of its candidates and:
+For candidate `c`, define `src(c)`, `dst(c)`, and `commit(c)`. Build an undirected
+candidate-overlap graph `H`:
 
-- candidate commits are strictly increasing by **Git ancestry**, not timestamps;
-- every candidate destination equals the next candidate source.
+~~~text
+Endpoints(c) = { src(c), dst(c) }
+H edge(c1,c2) iff Endpoints(c1) intersects Endpoints(c2)
+~~~
 
-If zero or multiple all-candidate sequences exist, the component is
-`ambiguous_dag`. No candidate in it collapses identity. Timestamp+SHA commit order
-never turns incomparable branches into a rename chain.
+Connected components of `H` are the exact potential lineages. A component
+canonicalizes only if **exactly one** permutation `(c1,...,ck)` uses every
+candidate and:
+
+1. every earlier candidate commit is a strict Git ancestor of every later one;
+2. each `dst(ci) == src(c{i+1})`;
+3. for shared path `p` between adjacent candidates, no ordinary canonical add or
+   delete of `p` occurs in a non-merge commit strictly between their commits.
+
+Rule 3 is the lifecycle guard: deleting and later recreating the same path breaks
+identity even if the path spelling happens to connect two exact moves.
+
+If no such all-candidate sequence exists, more than one exists, or a lifecycle
+break exists, the component is `ambiguous_dag`. No candidate in it collapses
+identity. Timestamp+SHA order never turns incomparable branches or reused path
+names into a lineage.
 
 Examples:
 
 ~~~text
-A -> B -> C on descendants     => one logical file, canonical C
-A -> B -> A on descendants     => one logical file, canonical A, alias B
-A -> {B, C} same commit        => no local candidate for competing split
+A -> B -> C on descendants, no lifecycle break => one logical file, canonical C
+A -> B -> A on descendants                    => canonical A, alias B
+A -> {B, C} same commit                       => no competing local candidate
 branch 1: A -> B
-branch 2: A -> C               => ambiguous_dag; A, B, C stay separate
+branch 2: A -> C                              => ambiguous_dag
+A -> B ; ordinary delete B ; add B ; B -> C  => ambiguous_dag lifecycle break
 ~~~
 
 For an accepted unique lineage, canonical path is the last in-range occurrence
@@ -307,8 +338,8 @@ R_f = Q(normalized(temporal_span_seconds(f)))
 HotspotScore(f) = Q(w_c*C_f + w_h*H_f + w_t*T_f + w_a*A_f + w_r*R_f)
 ~~~
 
-Temporal span is latest minus earliest canonical file-evidence committer epoch
-second. Rankings remain category-local; production is the primary human-facing
+Temporal span is exact latest-minus-earliest canonical committer epoch-second
+integer. Rankings remain category-local; production is the primary human-facing
 group.
 
 ## Base co-change graph `G0`
@@ -361,6 +392,9 @@ TaskKeys `x,y` are independent for file `f` only when each has at least one pair
 exclusive canonical file-evidence commit touching `f`. Shared-key commits do not
 enter pair-exclusive intervals.
 
+Pair-side intervals are closed intervals over exact arbitrary-precision committer
+epoch-second integers:
+
 ~~~text
 gap_seconds = later.start_epoch_second - earlier.end_epoch_second
 
@@ -370,8 +404,8 @@ days_between = 0                         if gap_seconds <= 0
 TemporalProximity(x,y) = Q(1/(1+days_between))
 ~~~
 
-Calendar dates, timezone, local midnight, and DST never participate. A 25-hour
-gap therefore gives `days_between=2`.
+Calendar dates, timezone, local midnight, DST, bounded host date ranges, and
+floating-point seconds never participate. A 25-hour gap gives `days_between=2`.
 
 ## Cohort-safe centrality and bottleneck score
 
@@ -447,10 +481,10 @@ redesign decisions.
 ## Successful reports vs fail-closed diagnostics
 
 Canonical Markdown/JSON reports exist **only after successful analysis**. Invalid
-refs, malformed/unreadable commit metadata, invalid selected author/message/path
-UTF-8, TaskKey extraction ambiguity, missing required objects, or invalid config
-produce a command/error diagnostic and no partial report, ranking, or candidate
-set.
+refs, malformed/unreadable author or committer metadata, invalid selected author/
+message/path UTF-8, TaskKey overlap ambiguity, missing required objects, or invalid
+config produce a command/error diagnostic and no partial report, ranking, or
+candidate set.
 
 Diagnostics are a separate error surface. They identify a stable failure kind and
 relevant object/span when available, but are not records inside a successful
@@ -480,11 +514,12 @@ Report identity is over these exact bytes.
 ## Report semantics and limitations
 
 Successful reports expose input/config/history identity, excluded merge count,
-raw metadata/task extraction provenance for successfully parsed evidence,
-canonical TaskKeys and source evidence, accepted/`ambiguous_dag` rename evidence,
-canonical file events/line-count status, categories/cohorts, raw/canonical
-components, effective weights/thresholds, `G0`/clusters, bottleneck/OCP evidence,
-optional enrichment status, candidates, and interpretation notes.
+canonical committer epoch-second integers and timezone-token evidence, raw
+metadata/task extraction provenance for successfully parsed evidence, canonical
+TaskKeys/source evidence, accepted/`ambiguous_dag` rename evidence, canonical file
+events/line-count status, categories/cohorts, raw/canonical components, effective
+weights/thresholds, `G0`/clusters, bottleneck/OCP evidence, optional enrichment
+status, candidates, and interpretation notes.
 
 Optional .NET/Roslyn enrichment is downstream and cannot drop, change, rescore, or
 reorder Git-level findings.
@@ -495,11 +530,12 @@ Reports state at least:
 - co-change is not module proof;
 - task/author evidence may be incomplete;
 - non-UTF8 selected author/message metadata fails closed in v1;
+- committer epoch seconds are exact integers; timezone token does not shift them;
 - source task spellings normalize to canonical TaskKeys;
 - multi-reference commits do not prove independent work;
 - excluded merge deltas can understate merge-resolution edits;
 - exact rename detection misses rename-with-edit;
-- DAG-ambiguous rename candidates do not collapse identity;
+- DAG-ambiguous or lifecycle-broken rename candidates do not collapse identity;
 - accepted exact renames contribute zero content churn;
 - NUL/gitlink/non-line events contribute zero line churn with explicit status;
 - v1 requires strict UTF-8 Git paths and performs no Unicode normalization;
@@ -511,14 +547,16 @@ Reports state at least:
 
 At minimum cover:
 
-- exact raw `author` grammar, malformed/ambiguous identity fail-closed;
+- exact raw author/committer grammar and malformed/duplicate-header failure;
+- timezone token not shifting epoch value and epoch integers outside host date range;
 - raw author/message bytes, non-UTF8 fail-closed, ASCII-only author casing;
-- `#001`/`#1` TaskKey normalization, namespace separation, extractor collision;
+- `#001`/`#1`, `#0`, namespace separation, overlapping extractor collision;
 - reachability independent of traversal order;
 - root empty-tree delta and merge metadata-only behavior;
 - strict UTF-8 path rejection;
 - NFC/NFD distinction and non-BMP scalar ordering;
-- linear exact rename, same-commit split, alias cycle, parallel DAG fork;
+- formal candidate-overlap graph, linear exact rename, same-commit split, alias cycle,
+  parallel DAG fork, path delete/recreate lifecycle break;
 - pure accepted exact rename -> one touch/zero churn;
 - DAG-ambiguous candidate -> ordinary add/delete events;
 - raw-LF/LCS counts with ambiguous diff scripts;
@@ -538,9 +576,10 @@ At minimum cover:
 
 ## Ownership
 
-- #236: raw commit metadata, exact author parsing, TaskKey extraction mechanics,
-  reachability, Git objects/deltas, strict paths, DAG-safe exact renames, canonical
-  file events/LCS churn, CLI/error diagnostics.
+- #236: raw commit metadata, exact author/committer parsing and temporal integers,
+  TaskKey extraction mechanics, reachability, Git objects/deltas, strict paths,
+  candidate-overlap graph/DAG-safe exact renames/lifecycle breaks, canonical file
+  events/LCS churn, CLI/error diagnostics.
 - #237: schema-backed task extractor namespaces/patterns, classification, ignores,
   thresholds, effective profiles.
 - #238: canonical hotspot scoring.
