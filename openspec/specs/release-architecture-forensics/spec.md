@@ -9,22 +9,70 @@ canonical report semantics for Release Architecture Forensics.
 
 ### Requirement: Explicit deterministic analysis identity
 Release Architecture Forensics SHALL analyze an explicit Git range with
-exclusive `from` and inclusive `to`. Both refs SHALL resolve before analysis;
-missing, ambiguous, or unresolvable refs SHALL fail closed.
+exclusive `from` and inclusive `to`. Both operands SHALL resolve to commits before
+analysis; missing, ambiguous, unsupported, or unresolvable operands SHALL fail
+closed.
 
-Canonical identity SHALL contain authored refs, resolved commit IDs, effective
-`history_analysis` configuration identity, history-semantics profile identity,
-and tool version. It SHALL exclude absolute checkout roots, generated timestamps,
-timezone, locale, process state, and other environment-dependent presentation
-data. Uncommitted working-tree state SHALL NOT alter Git-only evidence.
+Canonical identity SHALL contain authored operands, resolved canonical commit
+object IDs, repository Git object-hash format, effective `history_analysis`
+configuration identity, history-semantics profile identity, and tool version. It
+SHALL exclude absolute checkout roots, generated timestamps, timezone, locale,
+process state, and other environment-dependent presentation data. Uncommitted
+working-tree state SHALL NOT alter Git-only evidence.
 
 #### Scenario: Equivalent environments
-- **WHEN** identical repository objects, refs, effective configuration, history-semantics profile, and tool version are analyzed in different environments
+- **WHEN** identical repository objects, authored operands, effective configuration, history-semantics profile, and tool version are analyzed in different environments
 - **THEN** canonical identity, evidence, rankings, and canonical JSON bytes are identical
 
-#### Scenario: Missing ref
-- **WHEN** either explicit ref cannot be resolved unambiguously
-- **THEN** analysis fails instead of selecting a default branch, checkout, or range
+### Requirement: Canonical Git object IDs and authored-ref resolution
+The repository-declared Git object-hash format SHALL be canonical analysis input.
+Canonical object-ID text SHALL be the full raw digest rendered as lowercase ASCII
+hexadecimal with exactly two characters per digest byte. For SHA-1 repositories
+this is 40 hexadecimal characters; for SHA-256 repositories this is 64. Short or
+abbreviated object IDs SHALL NOT be canonical operands in v1.
+
+Each authored `from`/`to` operand SHALL resolve by exactly one of these mutually
+exclusive v1 forms:
+
+1. literal `HEAD`;
+2. a full hexadecimal object ID whose length matches the repository object format;
+3. a fully-qualified ref name beginning with literal `refs/`;
+4. otherwise, an unqualified shorthand looked up against exactly
+   `refs/tags/<operand>` and `refs/heads/<operand>`.
+
+A full-length hexadecimal operand SHALL be interpreted as an object ID, not as a
+shorthand ref name. `HEAD` SHALL resolve the repository's HEAD symbolic/detached
+reference. Fully-qualified refs SHALL use exact ref-name lookup. For an
+unqualified shorthand, exactly one of the tag/head candidates SHALL exist; zero
+is unresolved and two is ambiguous. Remote-ref shorthand is not inferred; callers
+may use a fully-qualified `refs/remotes/...` name when desired.
+
+Symbolic refs SHALL be dereferenced recursively with cycle detection. The
+resolved object SHALL then peel zero or more annotated tag objects by following
+their target object IDs until a non-tag object is reached. The final object MUST
+be a commit. Missing objects, symbolic/tag cycles, or a final tree/blob/other
+object SHALL fail closed.
+
+V1 authored operands SHALL NOT interpret Git revision-expression grammar,
+reflog selectors, path suffixes, `~`/`^` ancestry expressions, `^{...}` operators,
+or abbreviated object IDs. Such inputs may only succeed when they are themselves
+valid exact ref names under the rules above.
+
+Resolved commit IDs SHALL be retained canonically using lowercase full object-ID
+text. All blob/tree/commit/tag IDs retained in canonical evidence SHALL use the
+same lowercase full-digest representation.
+
+#### Scenario: Annotated tag peeling
+- **WHEN** shorthand `v1.2.3` resolves only to `refs/tags/v1.2.3` and that ref points through annotated tag objects to a commit
+- **THEN** the operand resolves deterministically to the peeled commit object ID
+
+#### Scenario: Branch/tag shorthand collision
+- **WHEN** both `refs/tags/release` and `refs/heads/release` exist
+- **THEN** authored shorthand `release` fails as ambiguous rather than using Git DWIM precedence
+
+#### Scenario: Unsupported revision expression
+- **WHEN** authored operand `HEAD~2` is not itself an exact ref name under the v1 lookup rules
+- **THEN** resolution fails instead of evaluating revision-expression syntax
 
 ### Requirement: Canonical raw commit metadata and author identity
 Commit metadata used by canonical evidence SHALL be parsed from raw Git commit
@@ -36,8 +84,8 @@ The raw commit object SHALL be structurally parsed using LF-delimited commit
 headers and the first empty header line as the message separator. Required commit
 objects and required headers SHALL be readable and structurally valid; otherwise
 analysis SHALL fail closed. Header continuation lines belonging to unrelated
-headers MAY be retained as opaque raw evidence but SHALL NOT alter recognition of
-direct `author ` and `committer ` header lines.
+headers MAY be retained outside canonical report evidence but SHALL NOT alter
+recognition of direct `author `, `committer `, or `encoding ` header lines.
 
 Exactly one canonical `author` header SHALL be present. Its bytes after the
 literal `author ` prefix SHALL be parsed from right to left as:
@@ -65,8 +113,12 @@ For canonical author identity:
 7. use literal `unknown` only when both parsed email and name are empty after the
    canonical ASCII trim.
 
-The optional Git `encoding` commit header MAY be retained as evidence but SHALL
-NOT cause canonical transcoding of author headers or commit-message bytes.
+Every direct `encoding ` header SHALL be retained as canonical provenance even
+though it SHALL NOT affect decoding. Its raw value bytes after the literal prefix
+SHALL be represented as lowercase hexadecimal, two digits per byte, in original
+header order. Zero headers therefore yield an empty canonical array. This preserves
+what the commit claimed without introducing legacy transcoding or an optional
+canonical-report field.
 
 #### Scenario: Legacy author bytes
 - **WHEN** the selected author email/name bytes are not valid UTF-8
@@ -97,30 +149,31 @@ metadata evidence but SHALL NOT be added to, subtracted from, or otherwise used
 to transform the epoch-second value.
 
 Canonical commit order SHALL compare this exact numeric committer epoch-second
-value first and full commit SHA second. Every temporal span, interval boundary,
-gap, and difference in this capability SHALL use exact integer arithmetic over
-these epoch-second values. Implementations SHALL NOT route canonical temporal
-math through local dates, wall-clock conversion, bounded `DateTime` ranges, or
-floating-point seconds. A malformed/missing/duplicate canonical committer header
-SHALL fail analysis closed.
+value first and canonical lowercase full commit object ID second. Every temporal
+span, interval boundary, gap, and difference in this capability SHALL use exact
+integer arithmetic over these epoch-second values. Implementations SHALL NOT
+route canonical temporal math through local dates, wall-clock conversion, bounded
+`DateTime` ranges, or floating-point seconds. A malformed/missing/duplicate
+canonical committer header SHALL fail analysis closed.
 
 #### Scenario: Timezone token does not shift epoch
 - **WHEN** two commits carry the same committer timestamp integer with different valid timezone tokens
-- **THEN** their canonical epoch-second values are equal and SHA is the ordering tie-breaker
+- **THEN** their canonical epoch-second values are equal and canonical commit ID is the ordering tie-breaker
 
 #### Scenario: Large epoch value
 - **WHEN** a valid committer timestamp lies outside a host date/time library's supported calendar range
 - **THEN** canonical analysis still uses the exact integer value rather than overflowing or rejecting it solely because of that library range
 
-### Requirement: Canonical task-reference extraction and identity
+### Requirement: Canonical task-reference extraction, provenance, and identity
 Task-reference extraction SHALL operate on the raw commit-message payload bytes
 from the commit object, after the header/message separator. The raw payload SHALL
 decode as strict UTF-8 before any configured extractor runs. Invalid UTF-8 SHALL
-fail analysis closed; the commit `encoding` header SHALL NOT trigger canonical
+fail analysis closed; commit `encoding ` headers SHALL NOT trigger canonical
 transcoding.
 
-#237 owns bounded extractor configuration. Every effective extractor SHALL map a
-match to exactly:
+#237 owns bounded extractor configuration. Every effective extractor SHALL have a
+unique stable extractor ID matching `[a-z][a-z0-9._-]*` and SHALL map a match to
+exactly:
 
 - one stable ASCII-lowercase namespace matching `[a-z][a-z0-9._-]*`;
 - one positive ASCII-decimal identifier captured from `[0-9]+`.
@@ -134,31 +187,41 @@ TaskKey = (namespace, positive_decimal_id)
 The decimal identifier SHALL be interpreted at arbitrary precision and SHALL be
 greater than zero. It SHALL render without leading zeroes. Consequently
 `issue#001` and `issue#1` are one canonical key, while `issue#1` and `jira#1` are
-distinct. `#0` SHALL NOT produce a default v1 TaskKey. Source spelling, extractor
-ID, message byte span, and matched text MAY be retained as evidence but SHALL NOT
-alter TaskKey identity.
+distinct.
 
-Every extractor match SHALL expose a non-empty half-open byte span `[start,end)`
-into the original raw commit-message payload. Multiple matches mapping to the same
-TaskKey SHALL deduplicate. If two matches with overlapping byte spans map to
-different canonical TaskKeys, extraction SHALL fail closed with an ambiguity
-diagnostic rather than choosing extractor order or accepting nested competing
-interpretations. Non-overlapping matches MAY produce distinct TaskKeys. TaskKeys
-SHALL order first by canonical scalar-value namespace order and then by exact
-numeric identifier value.
+Every extractor match SHALL retain a mandatory canonical provenance record
+containing extractor ID, canonical TaskKey, non-empty half-open raw message byte
+span `[start,end)`, and the exactly matched decoded UTF-8 substring. Identical
+provenance records SHALL deduplicate. Provenance records SHALL order by ascending
+`start`, ascending `end`, canonical scalar-value extractor ID, then canonical
+TaskKey order. The canonical TaskKey set SHALL deduplicate independently of the
+provenance collection.
 
-The default v1 issue extractor SHALL use namespace `issue` and recognize
-`#<positive ASCII decimal>` references. All ordinary task spread, task episodes,
-TaskCoChange, independent-task pairs, and repeated-edit evidence SHALL consume
-canonical TaskKeys rather than source spellings.
+If two matches with overlapping raw byte spans map to different canonical
+TaskKeys, extraction SHALL fail closed with an ambiguity diagnostic rather than
+choosing extractor order or nested competing interpretations. Non-overlapping
+matches MAY produce distinct TaskKeys. TaskKeys SHALL order first by canonical
+scalar-value namespace order and then by exact numeric identifier value.
+
+The default v1 issue extractor SHALL have extractor ID `issue`, namespace `issue`,
+and match a literal `#` followed by one or more ASCII digits whose numeric value
+is greater than zero. The scalar immediately before `#`, when present, and the
+scalar immediately after the final digit, when present, SHALL each be outside
+`[A-Za-z0-9_#]`. The matched span contains exactly `#` plus its digits. Thus
+`(#12)` and `fix #12, #13.` match, while `abc#12`, `#12foo`, `##12`, `#12#13`,
+and `#0` do not produce default TaskKeys.
+
+All ordinary task spread, task episodes, TaskCoChange, independent-task pairs,
+and repeated-edit evidence SHALL consume canonical TaskKeys rather than source
+spellings.
 
 #### Scenario: Leading-zero task identity
 - **WHEN** one commit contains `#001` and another contains `#1` under the default extractor
 - **THEN** both map to canonical TaskKey `(issue,1)` and do not manufacture two tasks
 
-#### Scenario: Zero task id
-- **WHEN** the default extractor encounters `#0`
-- **THEN** it emits no canonical TaskKey
+#### Scenario: Default lexical boundaries
+- **WHEN** a message contains `abc#12 #12foo ##12 #12#13 (#14)`
+- **THEN** the default extractor emits only canonical TaskKey `(issue,14)`
 
 #### Scenario: Namespaced identities
 - **WHEN** configured extractors produce `(issue,42)` and `(jira,42)` from non-overlapping matches
@@ -184,7 +247,7 @@ following zero or more parent edges. This rule applies whether or not `from` is
 an ancestor of `to`.
 
 Canonical commit order SHALL be ascending by the exact canonical committer epoch-
-second integer, then ascending ordinal full commit SHA.
+second integer, then ascending canonical lowercase full commit object ID.
 
 For a non-merge commit with exactly one parent, canonical file-touch evidence
 SHALL come from the tree delta from that parent to the commit. For a root commit,
@@ -247,6 +310,29 @@ Repository-relative `/` separators are canonical.
 - **WHEN** canonical strings contain valid non-BMP Unicode scalars
 - **THEN** ordering follows scalar numeric values rather than host-language code-unit ordering
 
+### Requirement: Baseline same-path identity in v1
+Before accepted rename lineages are applied, all canonical non-merge file events
+whose canonical repository-relative path strings are exactly equal SHALL belong to
+one baseline path identity for the entire analyzed commit set. V1 SHALL NOT split
+that baseline identity merely because the path is deleted and later re-added,
+changes blob identity, or appears on different reachable branches.
+
+Accepted exact-rename lineages MAY union several baseline path identities into one
+logical file according to the DAG-safe rules below. An `ambiguous_dag` component
+SHALL perform no such cross-path union. Because one baseline identity exists per
+exact path string, v1 logical files retain a unique canonical path after accepted
+rename union and do not require a separate same-path lifetime discriminator.
+
+This rule is deliberately conservative in implementation complexity and MAY
+conflate unrelated generations that reuse the same pathname after deletion. That
+known false-positive/over-aggregation risk SHALL be disclosed in report
+limitations. Introducing path-lifetime segmentation is a future semantic-profile
+change, not an implementation-local choice.
+
+#### Scenario: Plain delete and recreate
+- **WHEN** path `src/X.cs` is modified, deleted, later re-added with unrelated blob content, and no accepted rename lineage changes its path
+- **THEN** v1 treats all those `src/X.cs` events as one baseline logical-file identity and reports pathname-reuse conflation as a limitation
+
 ### Requirement: Canonical exact-rename candidates and DAG-safe logical identity
 Inside each canonical non-merge commit delta, a local exact-rename candidate SHALL
 exist only for a one-to-one delete/add relation whose deleted preimage and added
@@ -257,10 +343,10 @@ Similarity-based rename inference, copy inference, rename-with-edit, ambient Git
 rename thresholds, candidate limits, client configuration, and backend rename
 heuristics SHALL NOT create local canonical candidates.
 
-For every local candidate `c`, define `src(c)`, `dst(c)`, and `commit(c)`. Build an
-undirected candidate-overlap graph `H` whose vertices are local candidates and
-whose edges connect two distinct candidates exactly when their endpoint-path sets
-intersect:
+For every local candidate `c`, define `src(c)`, `dst(c)`, `commit(c)`, and the
+canonical lowercase full blob object ID. Build an undirected candidate-overlap
+graph `H` whose vertices are local candidates and whose edges connect two distinct
+candidates exactly when their endpoint-path sets intersect:
 
 ```text
 Endpoints(c) = { src(c), dst(c) }
@@ -283,20 +369,30 @@ one permutation `(c1,...,ck)` containing every candidate in `C` such that:
 
 If no such all-candidate permutation exists, more than one exists, or a lifecycle
 break exists, the component is `ambiguous_dag`. None of its candidates SHALL
-collapse logical-file identity. Canonical timestamp/SHA ordering SHALL NOT turn
-ancestry-incomparable commits or reused path names into a rename chain.
+collapse logical-file identity. Canonical timestamp/object-ID ordering SHALL NOT
+turn ancestry-incomparable commits or reused path names into a rename chain.
 
-For a canonicalizable component, the unique sequence is one logical file. Its
-canonical path SHALL be the last in-range occurrence, including a deleted path
-when deletion is final. Distinct historical non-canonical paths SHALL be aliases,
-ordered by first in-range occurrence using canonical commit order and then
-canonical scalar-value string order. The canonical path SHALL NOT also appear in
-aliases.
+For a canonicalizable component, the unique sequence SHALL union the baseline
+path identities corresponding to every source/destination path in the sequence
+into one logical file. Its canonical path SHALL be the terminal destination path
+of the accepted candidate sequence unless a later canonical event on that same
+terminal path deletes it, in which case that deleted path remains the canonical
+path. Distinct historical non-canonical path strings SHALL be aliases, ordered by
+first in-range occurrence using canonical commit order and then canonical scalar-
+value string order. The canonical path SHALL NOT also appear in aliases.
 
-For an `ambiguous_dag` component, involved paths remain separate logical
-identities. Local candidate evidence MAY be reported, but its raw delete/add
-entries SHALL continue as separate canonical file events and SHALL NOT receive
-exact-rename zero-churn treatment.
+For an `ambiguous_dag` component, involved baseline path identities remain
+separate. Every local candidate SHALL nevertheless be retained as mandatory
+canonical provenance with canonical commit ID, source path, destination path,
+blob object ID, component membership/status, and accepted/ambiguous outcome. Its
+raw delete/add entries SHALL continue as separate canonical file events and SHALL
+NOT receive exact-rename zero-churn treatment.
+
+Canonical local-candidate records SHALL order by canonical commit order, source
+path, destination path, then blob object ID. A lineage-component record SHALL
+order its candidate records by that same order; components SHALL order by their
+minimum candidate record key. #243 SHALL serialize every such record; this is not
+optional debug evidence.
 
 #### Scenario: Exact rename across categories
 - **WHEN** one commit exactly moves blob `src/Old.cs` to `tests/New.cs` with no competing source or destination and no DAG ambiguity
@@ -316,11 +412,11 @@ exact-rename zero-churn treatment.
 
 #### Scenario: Parallel rename fork
 - **WHEN** two ancestry-incomparable branch commits independently contain exact candidates `A -> B` and `A -> C`
-- **THEN** their overlap component is `ambiguous_dag`, canonical commit timestamps do not select a winner, and `A`, `B`, and `C` remain separate identities
+- **THEN** their overlap component is `ambiguous_dag`, canonical commit timestamps do not select a winner, and `A`, `B`, and `C` remain separate baseline identities
 
 #### Scenario: Path deletion and recreation breaks lineage
 - **WHEN** an accepted-looking `A -> B` candidate is followed by an ordinary deletion and later ordinary recreation of `B` before a `B -> C` candidate
-- **THEN** the component is `ambiguous_dag` and the analyzer does not chain the two rename candidates across the reused path name
+- **THEN** the overlap component is `ambiguous_dag`; `A` and `C` are not unioned with baseline path `B`, while all same-path `B` events still belong to the single v1 baseline `B` identity
 
 ### Requirement: Canonical file events, binary classification, and line churn
 Canonical file evidence SHALL contain one logical-file event per logical file per
@@ -328,8 +424,8 @@ canonical file-evidence commit.
 
 After a local exact-rename candidate is accepted by the DAG-safe lineage rule,
 the matching delete/add raw entries SHALL collapse into one `rename` event
-retaining old path, new path, blob identity, and rename status. Its content counts
-SHALL be:
+retaining old path, new path, canonical blob object ID, and rename status. Its
+content counts SHALL be:
 
 ```text
 canonical_additions = 0
@@ -396,9 +492,9 @@ churn(f) = Σ(canonical_additions(event) + canonical_deletions(event))
            over canonical file events for f
 ```
 
-Churn is change volume, not complexity. Exact-rename zero churn and
-binary/unavailable zero line churn are deliberate v1 limitations and SHALL be
-visible in report interpretation notes.
+Churn is change volume, not complexity. Exact-rename zero churn,
+binary/unavailable zero line churn, and same-path delete/recreate aggregation are
+deliberate v1 limitations and SHALL be visible in report interpretation notes.
 
 #### Scenario: Pure exact rename has zero churn
 - **WHEN** a 100-line file moves by an accepted exact-blob rename with no content change
@@ -527,7 +623,8 @@ HotspotScore(f) = Q(w_c*C_f + w_h*H_f + w_t*T_f + w_a*A_f + w_r*R_f)
 `temporal_span_seconds` is the exact integer difference between latest and
 earliest canonical file-evidence committer epoch-second values; a one-touch file
 has span zero. Findings retain raw metrics, canonical components, effective
-weights, primary category, and line-count status needed to interpret churn.
+weights, primary category, line-count status, and pathname-reuse limitation
+status needed to interpret evidence.
 
 Hotspot rankings SHALL be independent per primary category. Production is the
 default human-facing top-hotspot group. Cross-category scores SHALL NOT be
@@ -783,11 +880,11 @@ SHALL NOT be introduced during JSON serialization.
 ### Requirement: Successful reports and fail-closed diagnostics
 Canonical Markdown/JSON reports SHALL exist only after the analysis has completed
 successfully and all fail-closed validation has passed. A failure caused by an
-invalid ref, malformed/unreadable required commit object, malformed author or
-committer header, invalid selected author or message UTF-8, TaskKey extraction
-ambiguity, invalid Git path UTF-8, missing required tree/blob object, or invalid
-configuration SHALL NOT emit a partial canonical report, partial ranking, or
-refactoring-candidate set.
+invalid/ambiguous/unsupported ref operand, malformed/unreadable required commit
+object, malformed author or committer header, invalid selected author or message
+UTF-8, TaskKey extraction ambiguity, invalid Git path UTF-8, missing required
+Git object, or invalid configuration SHALL NOT emit a partial canonical report,
+partial ranking, or refactoring-candidate set.
 
 Failure diagnostics are a separate command/error surface. They SHALL identify a
 stable diagnostic kind and the relevant canonical object identity or source span
@@ -799,23 +896,31 @@ CLI/report tasks and SHALL NOT alter successful report artifact identity.
 - **WHEN** a canonical TaskKey extraction collision or invalid UTF-8 commit message causes analysis to fail
 - **THEN** no successful canonical Markdown/JSON report or candidate set is emitted
 
-### Requirement: Deterministic report semantics and canonical JSON bytes
+### Requirement: Deterministic report semantics and mandatory canonical provenance
 Markdown SHALL contain range/config summary, analyzed/excluded merge counts,
 production hotspots, separate non-production groups, co-change cohorts,
 bottlenecks, OCP pressure, candidates, and interpretation limits.
 
 Successful canonical JSON SHALL include input/config/history-semantics identity,
-canonical numeric scale, exact canonical committer epoch-second integers and raw
-timezone-token evidence, raw commit-metadata/task extraction provenance for
-successfully parsed evidence, canonical TaskKeys and source evidence,
-paths/aliases/categories, accepted/ambiguous rename evidence, canonical file
-events and line-count status, raw/canonical score components, weights/thresholds,
-`G0`/cluster cohort identity, independent-task and centrality evidence, OCP
-evidence, enrichment status where available, excluded merge count, and candidates.
+repository object-hash format, authored operands and resolved lowercase full
+commit IDs, canonical numeric scale, exact canonical committer epoch-second
+integers and raw timezone-token evidence, the mandatory ordered hexadecimal
+`encoding ` header provenance arrays, canonical author identities, the complete
+ordered TaskKey match-provenance collection plus deduplicated canonical TaskKeys,
+paths/aliases/categories, the complete ordered local rename-candidate/component
+provenance with accepted/`ambiguous_dag` outcome, canonical file events and line-
+count status, raw/canonical score components, weights/thresholds, `G0`/cluster
+cohort identity, independent-task and centrality evidence, OCP evidence,
+enrichment status where available, excluded merge count, and candidates.
+
+Canonical evidence required by the successful report SHALL NOT be optional at an
+upstream layer. Additional debug-only evidence MAY exist outside canonical JSON,
+but its presence/absence SHALL NOT alter successful canonical artifact identity.
 
 Object properties SHALL serialize in the order declared by #243's versioned
 schema. Dynamic object/map keys SHALL use canonical scalar-value string ordering.
-Arrays SHALL preserve the category/cohort/ranking order defined by this capability.
+Arrays SHALL preserve the category/cohort/ranking/provenance ordering defined by
+this capability and #243.
 
 Canonical JSON bytes SHALL use:
 
@@ -825,6 +930,9 @@ Canonical JSON bytes SHALL use:
 - no trailing whitespace;
 - exactly one terminal LF;
 - canonical JSON escaping above;
+- exact lowercase full hexadecimal Git object IDs;
+- exact non-exponent decimal integers for raw counts, TaskKey IDs, epoch seconds,
+  and gaps;
 - exactly nine fractional digits for canonical real values;
 - no exponent notation for canonical real values.
 
@@ -837,15 +945,16 @@ rescore, or reorder Git-level findings.
 Reports SHALL state that churn is not complexity; co-change is not module proof;
 task/author evidence may be incomplete; raw non-UTF8 author/message metadata fails
 closed in v1; canonical temporal math uses raw committer epoch-second integers and
-ignores timezone token for the epoch value; multi-reference commits do not prove
-independent work; task source spellings are normalized to canonical TaskKeys;
-excluded merge file deltas can understate merge-resolution edits; exact rename
-misses rename-with-edit; DAG-ambiguous or lifecycle-broken rename candidates are
-not collapsed; accepted exact renames contribute zero content churn;
-NUL/gitlink/non-line events contribute zero line churn with explicit status;
-strict UTF-8 is required for v1 Git paths; normalized scores compare only inside
-their cohorts; role hints are bounded heuristics; and people decide whether to
-refactor.
+ignores timezone token for the epoch value; task source spellings are normalized
+to canonical TaskKeys; excluded merge file deltas can understate merge-resolution
+edits; exact rename misses rename-with-edit; DAG-ambiguous or lifecycle-broken
+rename candidates are not collapsed; v1 intentionally aggregates delete/recreate
+events at the same pathname into one baseline identity and may therefore conflate
+unrelated pathname generations; accepted exact renames contribute zero content
+churn; NUL/gitlink/non-line events contribute zero line churn with explicit
+status; strict UTF-8 is required for v1 Git paths; normalized scores compare only
+inside their cohorts; role hints are bounded heuristics; and people decide
+whether to refactor.
 
 #### Scenario: Deterministic rendering
 - **WHEN** identical successful canonical evidence is rendered by two conforming implementations
@@ -853,16 +962,17 @@ refactor.
 
 ### Requirement: Contributor theory reference
 The repository SHALL contain an internal contributor reference consistent with
-this capability, including raw commit metadata/task identity, precise author and
+this capability, including deterministic ref resolution/object-ID format,
+mandatory provenance, raw commit metadata/task identity, precise author and
 committer header parsing, exact temporal integer semantics, reachability/merge
-semantics, strict UTF-8 path model, scalar-value string ordering, formal DAG-safe
-exact rename component/lifecycle semantics, canonical file-event and LCS line-
-churn semantics, category/cohort normalization, numeric/weight rules,
-`G0/Gtheta`, cluster aggregation, exact epoch-second temporal proximity,
-independent-task/repeated-edit semantics, cohort-safe centrality, ASCII role
-tokenization, successful-report/failure boundary, canonical JSON escaping/bytes,
-reports, ownership, and limitations. Public MkDocs navigation SHALL NOT advertise
-the feature before implementation ships.
+semantics, strict UTF-8 path model, baseline same-path identity, scalar-value
+string ordering, formal DAG-safe exact rename component/lifecycle semantics,
+canonical file-event and LCS line-churn semantics, category/cohort normalization,
+numeric/weight rules, `G0/Gtheta`, cluster aggregation, exact epoch-second
+temporal proximity, independent-task/repeated-edit semantics, cohort-safe
+centrality, ASCII role tokenization, successful-report/failure boundary,
+canonical JSON escaping/bytes, reports, ownership, and limitations. Public MkDocs
+navigation SHALL NOT advertise the feature before implementation ships.
 
 #### Scenario: Contributor discovers theory
 - **WHEN** a contributor opens the internal documentation index
