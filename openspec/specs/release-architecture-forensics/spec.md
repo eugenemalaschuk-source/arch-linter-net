@@ -2,8 +2,8 @@
 
 ## Purpose
 
-Define the deterministic Git-range evidence, scoring, findings, recommendations,
-and canonical report semantics for Release Architecture Forensics.
+Define deterministic Git-range evidence, scoring, findings, recommendations, and
+canonical report semantics for Release Architecture Forensics.
 
 ## Requirements
 
@@ -18,10 +18,6 @@ and tool version. It SHALL exclude absolute checkout roots, generated timestamps
 timezone, locale, process state, and other environment-dependent presentation
 data. Uncommitted working-tree state SHALL NOT alter Git-only evidence.
 
-Normalized author identity SHALL be trimmed invariant-lowercase email when
-present, otherwise trimmed invariant-lowercase author name, otherwise `unknown`.
-Task refs SHALL be deterministically extracted, deduplicated, and ordered.
-
 #### Scenario: Equivalent environments
 - **WHEN** identical repository objects, refs, effective configuration, history-semantics profile, and tool version are analyzed in different environments
 - **THEN** canonical identity, evidence, rankings, and canonical JSON bytes are identical
@@ -29,6 +25,91 @@ Task refs SHALL be deterministically extracted, deduplicated, and ordered.
 #### Scenario: Missing ref
 - **WHEN** either explicit ref cannot be resolved unambiguously
 - **THEN** analysis fails instead of selecting a default branch, checkout, or range
+
+### Requirement: Canonical raw commit metadata and author identity
+Commit metadata used by canonical evidence SHALL be parsed from raw Git commit
+object bytes. Implementations SHALL NOT use a `git log`/library presentation API
+that may transcode, normalize, replace, or locale-decode author/message content
+before canonical parsing.
+
+The raw commit object SHALL be structurally parsed using Git's LF-delimited commit
+headers and the first empty header line as the message separator. Malformed
+required headers or unreadable required commit objects SHALL fail analysis closed.
+
+For canonical author identity:
+
+1. parse the raw `author` header;
+2. use the email field when it is present and non-empty after trimming leading and
+   trailing ASCII SP (`0x20`) and HT (`0x09`); otherwise use the author-name field;
+3. the selected raw byte slice SHALL decode as strict UTF-8 or analysis fails;
+4. trim only leading/trailing ASCII SP and HT from the decoded scalar sequence;
+5. map ASCII `A-Z` to `a-z` and leave every other scalar unchanged;
+6. apply no Unicode normalization, locale casing, or full Unicode case folding;
+7. use literal `unknown` only when both parsed email and name are empty after the
+   canonical trim.
+
+The optional Git `encoding` commit header MAY be retained as evidence but SHALL
+NOT cause canonical transcoding of author headers or commit-message bytes.
+
+#### Scenario: Legacy author bytes
+- **WHEN** the selected author email/name bytes are not valid UTF-8
+- **THEN** analysis fails closed instead of using locale/code-page decoding or replacement characters
+
+#### Scenario: Portable author normalization
+- **WHEN** two runtimes have different Unicode/culture casing behavior
+- **THEN** canonical author identity is unchanged because only ASCII `A-Z` is lowercased
+
+### Requirement: Canonical task-reference extraction and identity
+Task-reference extraction SHALL operate on the raw commit-message payload bytes
+from the commit object, after the header/message separator. The raw payload SHALL
+decode as strict UTF-8 before any configured extractor runs. Invalid UTF-8 SHALL
+fail analysis closed; the commit `encoding` header SHALL NOT trigger canonical
+transcoding.
+
+#237 owns bounded extractor configuration. Every effective extractor SHALL map a
+match to exactly:
+
+- one stable ASCII-lowercase namespace matching `[a-z][a-z0-9._-]*`;
+- one positive ASCII-decimal identifier captured from `[0-9]+`.
+
+The canonical task identity SHALL be the structural tuple:
+
+```text
+TaskKey = (namespace, positive_decimal_id)
+```
+
+The decimal identifier SHALL be interpreted at arbitrary precision and rendered
+without leading zeroes. Consequently `issue#001` and `issue#1` are one canonical
+key, while `issue#1` and `jira#1` are distinct. Source spelling, extractor ID,
+message span, and matched text MAY be retained as evidence but SHALL NOT alter
+TaskKey identity.
+
+Multiple matches that map to the same TaskKey SHALL deduplicate. If the same
+message byte span maps to two different canonical TaskKeys, extraction SHALL fail
+closed with an ambiguity diagnostic rather than choosing extractor order. TaskKeys
+SHALL order first by canonical scalar-value namespace order and then by exact
+numeric identifier value.
+
+The default v1 issue extractor SHALL use namespace `issue` and recognize
+`#<positive ASCII decimal>` references. All ordinary task spread, task episodes,
+TaskCoChange, independent-task pairs, and repeated-edit evidence SHALL consume
+canonical TaskKeys rather than source spellings.
+
+#### Scenario: Leading-zero task identity
+- **WHEN** one commit contains `#001` and another contains `#1` under the default extractor
+- **THEN** both map to canonical TaskKey `(issue,1)` and do not manufacture two tasks
+
+#### Scenario: Namespaced identities
+- **WHEN** configured extractors produce `(issue,42)` and `(jira,42)`
+- **THEN** the two canonical TaskKeys remain distinct
+
+#### Scenario: Extractor collision
+- **WHEN** the same message byte span is claimed by two extractors and maps to different TaskKeys
+- **THEN** analysis fails closed instead of depending on extractor iteration order
+
+#### Scenario: Non-UTF8 commit message
+- **WHEN** raw commit-message bytes are not valid UTF-8
+- **THEN** canonical task extraction fails closed even if a Git client could transcode them using an `encoding` header
 
 ### Requirement: Canonical commit set and file-touch deltas
 After refs resolve, the canonical analyzed commit set SHALL be:
@@ -106,53 +187,71 @@ Repository-relative `/` separators are canonical.
 - **WHEN** canonical strings contain valid non-BMP Unicode scalars
 - **THEN** ordering follows scalar numeric values rather than host-language code-unit ordering
 
-### Requirement: Canonical exact rename recognition and logical-file identity
-A rename SHALL be recognized only inside one canonical non-merge commit delta as
-a one-to-one delete/add relation whose deleted preimage and added postimage have
-exactly the same Git blob object identity.
+### Requirement: Canonical exact-rename candidates and DAG-safe logical identity
+Inside each canonical non-merge commit delta, a local exact-rename candidate SHALL
+exist only for a one-to-one delete/add relation whose deleted preimage and added
+postimage have exactly the same Git blob object identity and have no competing
+source or destination in that commit.
 
-Similarity-based rename inference and copy inference SHALL NOT participate in
-canonical logical-file identity in the initial profile. Ambient Git rename
-thresholds, candidate limits, client configuration, or backend heuristics SHALL
-NOT change canonical evidence.
+Similarity-based rename inference, copy inference, rename-with-edit, ambient Git
+rename thresholds, candidate limits, client configuration, and backend rename
+heuristics SHALL NOT create local canonical candidates.
 
-If one deleted source can correspond to multiple added destinations, one added
-destination can correspond to multiple deleted sources, blob identity differs,
-or the relationship is otherwise not one-to-one, affected paths SHALL remain
-separate logical identities.
+Local candidates SHALL then be validated across the analyzed Git DAG before they
+can collapse logical identity. Candidate relations belong to the same potential
+lineage component when their source/destination paths connect or compete through
+shared endpoints. A component is canonicalizable only when there is exactly one
+sequence containing every candidate in that component such that:
 
-A logical file SHALL represent one linear chain of exact rename relations. Its
-canonical path SHALL be the last in-range occurrence, including the deleted path
-when deletion is final.
+1. candidate commit SHAs are strictly ordered by Git ancestry, where every earlier
+   candidate commit is an ancestor of the next candidate commit; and
+2. the destination path of each candidate equals the source path of the next.
 
-Aliases SHALL contain each distinct historical non-canonical path exactly once.
-Aliases SHALL be ordered by first in-range occurrence using canonical commit
-order and then canonical scalar-value string ordering. The canonical path SHALL
-NOT also appear in aliases.
+If no such all-candidate sequence exists, or more than one exists, the component
+is `ambiguous_dag`. None of its candidates SHALL collapse logical-file identity.
+Canonical timestamp/SHA ordering SHALL NOT be used to turn ancestry-incomparable
+commits into a rename chain.
+
+For a canonicalizable component, the unique sequence is one logical file. Its
+canonical path SHALL be the last in-range occurrence, including a deleted path
+when deletion is final. Distinct historical non-canonical paths SHALL be aliases,
+ordered by first in-range occurrence using canonical commit order and then
+canonical scalar-value string order. The canonical path SHALL NOT also appear in
+aliases.
+
+For an `ambiguous_dag` component, involved paths remain separate logical
+identities. Local candidate evidence MAY be reported, but its raw delete/add
+entries SHALL continue as separate canonical file events and SHALL NOT receive
+exact-rename zero-churn treatment.
 
 #### Scenario: Exact rename across categories
-- **WHEN** one commit exactly moves blob `src/Old.cs` to `tests/New.cs` with no competing source or destination
+- **WHEN** one commit exactly moves blob `src/Old.cs` to `tests/New.cs` with no competing source or destination and no DAG ambiguity
 - **THEN** one logical file uses `tests/New.cs` as canonical path and retains `src/Old.cs` as an alias
 
-#### Scenario: Modified move is not an exact rename
+#### Scenario: Modified move is not an exact candidate
 - **WHEN** a delete/add pair has different blob object identities
 - **THEN** the initial profile keeps both paths as separate logical identities
 
-#### Scenario: Split is not a rename chain
+#### Scenario: Same-commit split is not a candidate
 - **WHEN** one deleted blob has two same-blob added destinations in one commit
-- **THEN** no arbitrary destination is selected and all affected paths remain separate identities
+- **THEN** no local exact-rename candidate is created for that competing relation
 
-#### Scenario: Alias de-duplication
-- **WHEN** an exact rename chain moves `A` to `B` and later back to `A`
-- **THEN** canonical path is `A`, aliases contain `B` once, and canonical `A` is not duplicated as an alias
+#### Scenario: Linear alias cycle
+- **WHEN** ancestry-ordered candidates move `A` to `B` and later `B` to `A`
+- **THEN** the unique lineage canonicalizes to path `A` with alias `B`
+
+#### Scenario: Parallel rename fork
+- **WHEN** two ancestry-incomparable branch commits independently contain exact candidates `A -> B` and `A -> C`
+- **THEN** the component is `ambiguous_dag`, canonical commit timestamps do not select a winner, and `A`, `B`, and `C` remain separate identities
 
 ### Requirement: Canonical file events, binary classification, and line churn
 Canonical file evidence SHALL contain one logical-file event per logical file per
 canonical file-evidence commit.
 
-After exact rename recognition, the matching delete/add raw entries SHALL collapse
-into one `rename` event retaining old path, new path, blob identity, and rename
-status. Its content counts SHALL be:
+After a local exact-rename candidate is accepted by the DAG-safe lineage rule,
+the matching delete/add raw entries SHALL collapse into one `rename` event
+retaining old path, new path, blob identity, and rename status. Its content counts
+SHALL be:
 
 ```text
 canonical_additions = 0
@@ -161,7 +260,8 @@ canonical_churn     = 0
 line_count_status   = exact_rename
 ```
 
-A pure exact-blob move therefore records one file touch but zero content churn.
+An exact candidate in an `ambiguous_dag` component SHALL NOT collapse and SHALL
+instead produce its ordinary delete/add canonical events under the rules below.
 
 For every other file event, required old/new Git object content SHALL be loaded
 from repository objects. If an object required by the analyzed refs is missing or
@@ -189,7 +289,7 @@ without decoding file contents to Unicode:
 2. LF terminates a line and is not part of the line payload.
 3. `0x0D` (CR) and every other byte remain part of the line payload.
 4. Empty byte sequence has zero lines.
-5. A final non-empty or empty segment after the last LF is a line only when bytes remain after that LF; a terminal LF does not create an additional trailing line.
+5. A final segment after the last LF is a line only when bytes remain after that LF; a terminal LF does not create an additional trailing line.
 6. Line equality is exact byte-sequence equality.
 7. Let `L` be the mathematical length of a longest common subsequence of the old and new line sequences.
 
@@ -201,14 +301,14 @@ canonical_additions = new_line_count - L
 line_count_status   = text
 ```
 
-The LCS *length* is unique even when multiple LCS alignments exist, so these
-addition/deletion totals SHALL NOT depend on diff-algorithm tie-breaking, Git diff
-heuristics, attributes, textconv, external diff, or backend implementation.
+The LCS length is unique even when multiple LCS alignments exist, so these totals
+SHALL NOT depend on diff-algorithm tie-breaking, Git diff heuristics, attributes,
+textconv, external diff, or backend implementation.
 
 If multiple raw entries from one commit map to the same logical file after
 canonical identity construction, the analyzer SHALL emit one canonical file
-commit touch and aggregate canonical content counts only after exact-rename
-collapse.
+commit touch and aggregate canonical content counts only after accepted exact-
+rename collapse.
 
 `commit_count(f)` SHALL equal the number of distinct canonical file-evidence
 commits touching logical file `f`, not raw delta-entry count.
@@ -223,8 +323,12 @@ binary/unavailable zero line churn are deliberate v1 limitations and SHALL be
 visible in report interpretation notes.
 
 #### Scenario: Pure exact rename has zero churn
-- **WHEN** a 100-line file moves by exact-blob rename with no content change
+- **WHEN** a 100-line file moves by an accepted exact-blob rename with no content change
 - **THEN** the logical file receives one commit touch and zero additions, deletions, and churn
+
+#### Scenario: Ambiguous rename uses ordinary events
+- **WHEN** a local exact candidate belongs to an `ambiguous_dag` component
+- **THEN** its delete/add entries remain separate events and do not receive exact-rename zero-churn treatment
 
 #### Scenario: Deterministic text line counts
 - **WHEN** two text blobs can be aligned by several equally valid diff scripts
@@ -259,7 +363,7 @@ or ranking path. #237 owns schema-backed bounded matching, ignores, category
 overrides, thresholds, and effective configuration. `unknown` remains visible.
 
 #### Scenario: Rename across categories
-- **WHEN** an exact logical-file chain ends at `tests/New.cs`
+- **WHEN** an accepted exact logical-file chain ends at `tests/New.cs`
 - **THEN** primary category derives from `tests/New.cs`, not an earlier alias
 
 ### Requirement: Total normalization, canonical numbers, and populations
@@ -335,7 +439,7 @@ For retained file `f`, using its primary-category population:
 ```text
 C_f = Q(normalized(commit_count(f)))
 H_f = Q(normalized_log(churn(f)))
-T_f = Q(normalized(distinct_task_refs(f)))
+T_f = Q(normalized(distinct_canonical_task_keys(f)))
 A_f = Q(normalized(distinct_authors(f)))
 R_f = Q(normalized(temporal_span_seconds(f)))
 
@@ -364,7 +468,7 @@ V  = retained logical files
 E0 = { unordered(a,b) : a != b and CommitCoChange(a,b) > 0 }
 
 CommitCoChange(a,b) = count(canonical file-evidence commits containing both)
-TaskCoChange(a,b)   = count(distinct tasks whose canonical file episodes contain both)
+TaskCoChange(a,b)   = count(distinct canonical TaskKeys whose file episodes contain both)
 ```
 
 Task co-change MAY weight an existing `G0` edge but SHALL NOT create an edge when
@@ -387,11 +491,11 @@ use `G0`, never `Gtheta`. V1 deliberately reuses effective co-change
 `alpha/beta` for centrality; there is no second hidden mix.
 
 #### Scenario: Task-only association
-- **WHEN** one task changes A in one commit and B in another but no commit changes both
+- **WHEN** one canonical TaskKey changes A in one commit and B in another but no commit changes both
 - **THEN** TaskCoChange may be positive, CommitCoChange is zero, and no `G0` edge exists
 
 #### Scenario: Co-change without tasks
-- **WHEN** files change together but no task refs exist
+- **WHEN** files change together but no canonical TaskKeys exist
 - **THEN** a `G0` edge exists from commit evidence while task evidence is zero and weights remain unchanged
 
 ### Requirement: Threshold graph and deterministic clusters
@@ -435,15 +539,15 @@ descending aggregate, then ascending first member path.
 - **THEN** cluster `{A,B,C}` has maximum `.700000000`, aggregate `1.300000000`, and AC contributes nothing
 
 ### Requirement: Independent task evidence and temporal proximity
-A task episode is canonical file-evidence commits linked to one extracted task
-ref. A multi-reference commit MAY contribute ordinary task breadth and task
-co-change but SHALL NOT alone establish independent work.
+A task episode is canonical file-evidence commits linked to one canonical TaskKey.
+A multi-reference commit MAY contribute ordinary task breadth and task co-change
+but SHALL NOT alone establish independent work.
 
-For file `f`, refs `x,y` form an independent pair only when each side has at
-least one pair-exclusive canonical file-evidence commit touching `f`. Shared-ref
+For file `f`, TaskKeys `x,y` form an independent pair only when each side has at
+least one pair-exclusive canonical file-evidence commit touching `f`. Shared-key
 commits do not establish independence and do not enter pair-exclusive intervals.
 
-`IndependentTaskSpread(f)` counts task refs participating in at least one
+`IndependentTaskSpread(f)` counts canonical TaskKeys participating in at least one
 independent pair.
 
 Each pair-side interval is the closed interval
@@ -465,8 +569,8 @@ NOT participate. File temporal value is maximum canonical pair proximity, or zer
 when no independent pair exists.
 
 #### Scenario: One multi-reference commit
-- **WHEN** the only file-touch commit references `#101` and `#102`
-- **THEN** ordinary task breadth may contain both refs but independent spread and temporal proximity are zero
+- **WHEN** the only file-touch commit references canonical TaskKeys `issue#101` and `issue#102`
+- **THEN** ordinary task breadth may contain both keys but independent spread and temporal proximity are zero
 
 #### Scenario: Twenty-five hour gap
 - **WHEN** pair-exclusive intervals have a positive gap of 90000 seconds
@@ -510,27 +614,27 @@ OCP uses canonical normalized `IndependentTaskSpread` and the same `G0`-derived
 Repeated independent editing is:
 
 ```text
-Partners_f(t) = { u : (t,u) is independent for f }
+Partners_f(t) = { u : canonical TaskKeys (t,u) are independent for f }
 PairExclusive_f(t,u) = { canonical commit c touching f : c references t and not u }
 Qualifying_f(t) = SHA-deduplicated union of PairExclusive_f(t,u) over Partners_f(t)
 Repeated_f(t) = max(|Qualifying_f(t)| - 1, 0)
 E_f = sum(Repeated_f(t) for t with Partners_f(t) non-empty)
 ```
 
-One commit counts at most once per task after the SHA union, even when it
-qualifies against several partners. No independent pair means `E_f=0`.
+One commit counts at most once per canonical TaskKey after the SHA union, even
+when it qualifies against several partners. No independent pair means `E_f=0`.
 
 #### Scenario: Task with multiple partners
-- **WHEN** task `#101` is independently paired with `#102` and `#103`
+- **WHEN** canonical TaskKey `issue#101` is independently paired with `issue#102` and `issue#103`
 - **THEN** its pair-exclusive sets are unioned and SHA-deduplicated before repeated edits are counted
 
 ### Requirement: Portable deterministic role-token evidence
 Role hints operate on canonical filename stem using this ASCII tokenizer:
 
 1. any character outside `[A-Za-z0-9]` delimits tokens;
-2. split lowercase-letter → uppercase-letter transitions;
+2. split lowercase-letter -> uppercase-letter transitions;
 3. split before the final uppercase letter of an uppercase run when the next character is lowercase;
-4. split letter ↔ digit transitions;
+4. split letter <-> digit transitions;
 5. map ASCII `A-Z` to `a-z` by ordinal mapping.
 
 Non-ASCII characters are delimiters. Matching uses exact token equality only;
@@ -556,7 +660,7 @@ violation` with caveats and SHALL NOT claim formal proof.
 Within one primary-category cohort, file findings rank by:
 
 1. descending canonical score;
-2. descending ordinary task spread;
+2. descending ordinary canonical TaskKey spread;
 3. descending churn;
 4. descending commit count;
 5. ascending canonical path by scalar-value ordering.
@@ -604,10 +708,12 @@ production hotspots, separate non-production groups, co-change cohorts,
 bottlenecks, OCP pressure, candidates, and interpretation limits.
 
 Canonical JSON SHALL include input/config/history-semantics identity, canonical
-numeric scale, paths/aliases/categories, canonical file events and line-count
-status, raw/canonical score components, weights/thresholds, `G0`/cluster cohort
-identity, independent-task and centrality evidence, OCP evidence, enrichment
-status where available, excluded merge count, and candidates.
+numeric scale, raw commit-metadata/task extraction status, canonical TaskKeys and
+source evidence, paths/aliases/categories, accepted/ambiguous rename evidence,
+canonical file events and line-count status, raw/canonical score components,
+weights/thresholds, `G0`/cluster cohort identity, independent-task and centrality
+evidence, OCP evidence, enrichment status where available, excluded merge count,
+and candidates.
 
 Object properties SHALL serialize in the order declared by #243's versioned
 schema. Dynamic object/map keys SHALL use canonical scalar-value string ordering.
@@ -631,13 +737,15 @@ Optional .NET/Roslyn enrichment is downstream; failure SHALL NOT drop, change,
 rescore, or reorder Git-level findings.
 
 Reports SHALL state that churn is not complexity; co-change is not module proof;
-task/author evidence may be incomplete; multi-reference commits do not prove
-independent work; excluded merge file deltas can understate merge-resolution
-edits; exact rename misses rename-with-edit; exact renames contribute zero content
-churn; NUL/gitlink/non-line events contribute zero line churn with explicit
-status; strict UTF-8 is required for v1 Git paths; normalized scores compare only
-inside their cohorts; role hints are bounded heuristics; and people decide
-whether to refactor.
+task/author evidence may be incomplete; raw non-UTF8 author/message metadata fails
+closed in v1; multi-reference commits do not prove independent work; task source
+spellings are normalized to canonical TaskKeys; excluded merge file deltas can
+understate merge-resolution edits; exact rename misses rename-with-edit;
+DAG-ambiguous rename candidates are not collapsed; accepted exact renames
+contribute zero content churn; NUL/gitlink/non-line events contribute zero line
+churn with explicit status; strict UTF-8 is required for v1 Git paths; normalized
+scores compare only inside their cohorts; role hints are bounded heuristics; and
+people decide whether to refactor.
 
 #### Scenario: Deterministic rendering
 - **WHEN** identical canonical evidence is rendered by two conforming implementations
@@ -645,14 +753,14 @@ whether to refactor.
 
 ### Requirement: Contributor theory reference
 The repository SHALL contain an internal contributor reference consistent with
-this capability, including reachability/merge semantics, strict UTF-8 path model,
-scalar-value string ordering, exact rename identity, canonical file-event and LCS
-line-churn semantics, category/cohort normalization, numeric/weight rules,
-`G0/Gtheta`, cluster aggregation, exact epoch-second temporal proximity,
-independent-task/repeated-edit semantics, cohort-safe centrality, ASCII role
-tokenization, canonical JSON escaping/bytes, reports, ownership, and limitations.
-Public MkDocs navigation SHALL NOT advertise the feature before implementation
-ships.
+this capability, including raw commit metadata/task identity, reachability/merge
+semantics, strict UTF-8 path model, scalar-value string ordering, DAG-safe exact
+rename identity, canonical file-event and LCS line-churn semantics,
+category/cohort normalization, numeric/weight rules, `G0/Gtheta`, cluster
+aggregation, exact epoch-second temporal proximity, independent-task/repeated-edit
+semantics, cohort-safe centrality, ASCII role tokenization, canonical JSON
+escaping/bytes, reports, ownership, and limitations. Public MkDocs navigation
+SHALL NOT advertise the feature before implementation ships.
 
 #### Scenario: Contributor discovers theory
 - **WHEN** a contributor opens the internal documentation index
