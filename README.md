@@ -6,12 +6,17 @@
   <a href="https://www.nuget.org/packages/ArchLinterNet.Cli/"><img alt="NuGet version" src="https://img.shields.io/nuget/v/ArchLinterNet.Cli.svg"></a>
   <a href="https://www.nuget.org/packages/ArchLinterNet.Cli/"><img alt="NuGet downloads" src="https://img.shields.io/nuget/dt/ArchLinterNet.Cli"></a>
   <a href="https://github.com/eugenemalaschuk-source/arch-linter-net/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/eugenemalaschuk-source/arch-linter-net/actions/workflows/ci.yml/badge.svg"></a>
+  <a href="https://github.com/eugenemalaschuk-source/arch-linter-net/actions/workflows/ci.yml"><img alt="Architecture policy" src="https://github.com/eugenemalaschuk-source/arch-linter-net/actions/workflows/ci.yml/badge.svg?branch=main"></a>
   <a href="https://app.codecov.io/github/eugenemalaschuk-source/arch-linter-net"><img alt="Test coverage" src="https://codecov.io/github/eugenemalaschuk-source/arch-linter-net/graph/badge.svg"></a>
   <a href="https://eugenemalaschuk-source.github.io/arch-linter-net/"><img alt="Documentation" src="https://img.shields.io/badge/docs-GitHub%20Pages-blue"></a>
   <a href="LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-blue.svg"></a>
 </p>
 
 YAML-first architecture governance for .NET repositories.
+
+The architecture-policy badge is available from the CLI as well: run
+`arch-linter-net badge architecture-policy --input architecture-strict.json`
+to project an existing strict result as a Shields endpoint payload. It never reruns analysis.
 
 ArchLinterNet turns architectural decisions into executable contracts: layered boundaries, protected internal APIs, dependency policies, baseline-aware adoption, architecture coverage, and CI-ready diagnostics. It helps teams catch architecture drift in pull requests before it becomes hidden design debt.
 
@@ -155,19 +160,25 @@ Generated `site/` output is a build artifact and should not be committed.
   <a href="https://sonarcloud.io/summary/overall?id=eugenemalaschuk-source_arch-linter-net&branch=main"><img alt="Sonar Security" src="https://sonarcloud.io/api/project_badges/measure?project=eugenemalaschuk-source_arch-linter-net&metric=security_rating&branch=main"></a>
 </p>
 
-The CI badge tracks one workflow that runs all quality signals in the same `validate` job, so a green badge means all of them passed. SonarCloud also analyzes trusted pull requests, decorates the PR, and evaluates the quality gate on new code rather than forcing the entire historical codebase to be clean before the PR can merge:
+The CI badge tracks the central CI workflow. The Architecture policy badge is a
+separate dynamic status for the latest `main` run of strict ArchLinterNet
+self-policy validation; it does not claim test coverage or architecture
+coverage. SonarCloud also analyzes trusted pull requests, decorates the PR, and
+evaluates the quality gate on new code rather than forcing the entire historical
+codebase to be clean before the PR can merge:
 
 | Quality signal | Source |
 |---|---|
 | Build/test | `make acceptance` (lint + all tests) |
 | Test coverage (line %) | CI runs `make test-coverage`, uploads Cobertura XML to Codecov, and the primary coverage badge updates dynamically from Codecov |
+| Architecture policy | The Architecture policy badge tracks the latest `main` run of `make lint-architecture`; it proves the repository's strict, read-only self-policy passed, not a coverage percentage |
 | SonarCloud PR quality gate | trusted `pull_request` runs analyze new code, publish a SonarCloud PR result link, and fail CI when the Sonar quality gate fails |
 | SonarCloud main quality signals | the Sonar badges track the `main` branch project status for quality gate, maintainability, reliability, and security |
 | OpenSSF Scorecard | trusted pull requests produce reviewable SARIF; default-branch and scheduled runs publish the supply-chain score to the public Scorecard API and GitHub code scanning |
 | Architecture validation | strict ArchLinterNet self-policy check (`architecture/dependencies.arch.yml`), including the reviewed public API snapshots under `architecture/api/`; read-only, never rewrites either |
 | Architecture coverage | strict/audit coverage JSON artifacts + Markdown report + sticky PR comment |
 
-See [CI integration](docs/guides/ci-integration.md#test-coverage-with-codecov-and-sonarcloud) for how test coverage upload, SonarCloud PR analysis, the dynamic badge, and the architecture coverage gate fit together.
+See [CI integration](docs/guides/ci-integration.md#architecture-policy-badge) for how the strict-policy badge, test coverage upload, SonarCloud PR analysis, and the separate architecture coverage gate fit together.
 
 </details>
 
