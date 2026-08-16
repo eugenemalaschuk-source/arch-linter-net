@@ -153,10 +153,11 @@ architecture-coverage-comment-markdown:  ## Generate compact architecture-covera
 		--repo-root "$(PROJECT_ROOT)" --max-failure-diagnostics 3 --output architecture-coverage-comment.md
 
 architecture-coverage-ci:  ## CI entrypoint: strict+audit JSON + Markdown report in one call (CHANGED_FILES/DIFF_STATUS env optional)
-	@$(MAKE) architecture-strict-json; STRICT_EXIT=$$?; \
+	@$(MAKE) architecture-strict-json || true; \
 	$(MAKE) architecture-audit-json || true; \
 	$(MAKE) architecture-coverage-markdown CHANGED_FILES="$(CHANGED_FILES)" DIFF_STATUS="$(DIFF_STATUS)"; MARKDOWN_EXIT=$$?; \
 	$(MAKE) architecture-coverage-comment-markdown CHANGED_FILES="$(CHANGED_FILES)" DIFF_STATUS="$(DIFF_STATUS)"; COMMENT_EXIT=$$?; \
+	dotnet run --no-build --project "$(CLI_PROJECT)" -- badge architecture-policy --input architecture-strict.json > /dev/null; STRICT_EXIT=$$?; \
 	if [ $$MARKDOWN_EXIT -ne 0 ]; then exit $$MARKDOWN_EXIT; fi; \
 	if [ $$COMMENT_EXIT -ne 0 ]; then exit $$COMMENT_EXIT; fi; \
 	exit $$STRICT_EXIT
