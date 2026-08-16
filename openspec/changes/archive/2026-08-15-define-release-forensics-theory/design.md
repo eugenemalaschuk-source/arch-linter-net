@@ -1,178 +1,157 @@
 ## Context
 
-Issue #235 establishes the theory contract for Release Architecture Forensics
-before implementation begins. The current product evaluates present-state
-architecture contracts; the planned feature evaluates evidence accumulated in
-an explicit Git range. Downstream implementation tasks need one source of truth
-for input identity, normalization populations, numeric canonicalization, scoring,
-ranking, and cautious report language.
+Issue #235 defines Release Architecture Forensics theory before implementation.
+Downstream tasks need one reviewed source of truth for Git-range identity,
+normalization, numeric precision, task independence, graph semantics, ranking,
+and cautious report language.
 
-The feature does not yet exist. Public MkDocs pages must describe implemented
-product behavior, while this issue needs durable contributor-facing guidance.
+The feature is planned, not shipped, so public MkDocs pages must not present it
+as current product behavior.
 
 ## Goals / Non-Goals
 
 **Goals:**
 
-- Define deterministic Git-only canonical evidence and score semantics.
-- Fix the initial score profiles, normalization populations, numeric precision,
-  ordering, and evidence vocabulary consumed by #236 through #243.
-- Preserve a clean boundary between Git/history core, optional .NET enrichment,
-  schema-backed configuration, and presentation.
-- Prevent independent implementations from making different legitimate choices
-  for rename identity, multi-reference task evidence, thresholds, or ranking.
+- deterministic Git-only evidence and canonical scoring;
+- one canonical rename/category model;
+- explicit comparable normalization cohorts and numeric precision;
+- validated effective profiles and threshold semantics;
+- false-positive control for multi-reference task evidence;
+- cohort-safe graph centrality and ranking;
+- optional .NET enrichment strictly downstream.
 
 **Non-Goals:**
 
-- Implement Git ingestion, CLI parsing, policy schema, scoring, reports, or
-  Roslyn enrichment.
-- Create a second configuration language, executable, or public documentation
-  promise for unimplemented behavior.
-- Treat heuristic output as formal proof of coupling, merge conflicts, or OCP
-  violations.
+- implementing CLI, policy schema, analyzer, reports, or Roslyn enrichment;
+- a second config language or executable;
+- formal proof of coupling, merge conflicts, or OCP violations.
 
 ## Decisions
 
-### Keep theory in the capability spec and internal contributor reference
+### Internal reference plus capability spec
 
-The `release-architecture-forensics` capability is the testable contract;
-`docs/internal/release-forensics.md` is the readable formula-oriented reference.
-The feature stays outside public MkDocs navigation until implementation ships.
+The OpenSpec capability is the testable contract and
+`docs/internal/release-forensics.md` is the readable contributor reference.
+Public navigation remains unchanged until implementation ships.
 
-### Resolve canonical inputs before analysis
+### Canonical inputs and logical-file identity
 
-Canonical identity records authored refs, resolved commit IDs, effective
-history-analysis configuration identity, and tool version. Logical paths,
-normalized authors, ordered task references, and deterministic commits are
-canonical evidence. Checkout paths, generated timestamps, locale, timezone, and
-process environment are not.
+Authored/resolved refs, effective config identity, tool version, normalized
+logical paths, authors, task refs, and commit order are canonical. Checkout and
+environment presentation data are not.
 
-### Give each rename chain one canonical to-side path
+One unambiguous linear rename chain is one logical file. The last in-range path
+is canonical; earlier paths remain aliases. Copy/split/merge/ambiguous relations
+stay separate. Primary category derives from the canonical path.
 
-One unambiguous linear rename chain is one logical file. Its canonical path is
-the last in-range occurrence, including a deleted path when deletion is last.
-Earlier paths remain aliases. Copy/split/merge/ambiguous relations stay separate.
-Primary category comes from the canonical path.
+### Comparable normalization cohorts
 
-### Normalize after analysis filtering and by comparable cohort
+#237 ignores remove files before score/graph construction. File metrics normalize
+within primary-category cohorts; edge metrics within unordered endpoint-category
+cohorts. Presentation suppression cannot affect scores.
 
-#237 ignore rules remove files before graph/score construction. Presentation
-suppression is downstream. File metrics normalize within primary-category
-cohorts. Edge metrics normalize within unordered endpoint-category cohorts.
-This prevents generated/docs/test/build volume from setting production maxima.
+Because cohort-local normalized values are not a common absolute scale, findings,
+pairs, clusters, and candidates remain grouped and rank only within comparable
+cohorts. Production is the primary human hotspot ranking.
 
-The consequence is explicit: normalized values from different cohorts are not
-one common scale. File, pair, cluster, and candidate rankings therefore remain
-cohort-local. Production is the primary human-facing hotspot ranking; other
-categories are separate groups in fixed canonical order.
+### Nine-decimal canonical numeric model
 
-Alternative considered: globally rank category-local scores. Rejected because a
-`0.95` docs score and `0.80` production score are relative to different maxima.
-
-### Canonicalize derived real numbers at nine decimal places
-
-The mathematical formulas remain the authority, including logarithmic churn.
-Canonical derived real values use:
+Mathematical formulas remain authoritative. Canonical derived reals use:
 
 ```text
 Q(v) = round-half-to-even(v, 9 decimal places)
 ```
 
-Normalized components, temporal proximity, combined edge weight, final scores,
-and numeric thresholds are canonicalized before comparisons/ranking/JSON.
-Canonical JSON emits exactly nine fractional digits, invariant culture, and no
-exponent notation.
+Components, temporal proximity, edge weights, final scores, and thresholds are
+canonicalized before comparison/ranking/serialization. JSON uses exactly nine
+fractional digits, invariant culture, no exponent notation. This avoids making
+canonical output depend on `Math.Log`, libc, CPU, or intermediate floating-point
+representation.
 
-This deliberately specifies the correctly rounded mathematical result rather
-than a specific `Math.Log`, libc, CPU, or intermediate floating representation.
-Implementations may use different internal algorithms but must converge on the
-same canonical fixed-scale value.
+### Validated effective profiles
 
-### Validate effective profiles instead of repairing them at runtime
+Weights are finite non-negative base-10 decimals with at most nine fractional
+digits. Enabled components are positive, disabled components zero, at least one
+is enabled, and each profile sums exactly to `1.000000000`; co-change therefore
+requires `alpha + beta = 1.000000000`. Invalid profiles fail rather than being
+silently normalized. Missing evidence never alters weights.
 
-Effective weights are finite non-negative base-10 decimals with at most nine
-fractional digits. Enabled components are positive, disabled components are zero,
-at least one is enabled, and each profile sums exactly to `1.000000000`. For
-co-change, `alpha + beta = 1.000000000`.
+### Independent task evidence
 
-Invalid profiles fail validation. Missing evidence never triggers implicit
-renormalization. This keeps a score's meaning stable between ranges.
+Multi-reference commits may contribute ordinary breadth/co-change but cannot by
+themselves prove independent work. A task pair requires pair-exclusive commits
+on both sides. Temporal proximity uses those pair-exclusive intervals.
 
-### Separate ordinary task breadth from independent-work evidence
+For repeated OCP editing, a task participating in multiple independent pairs
+unions its pair-exclusive commit sets and deduplicates by SHA before counting
+repeated edits. This prevents partner-count multiplication.
 
-A commit may reference multiple issues and contribute ordinary task spread or
-task co-change to each. It cannot by itself establish independent workstreams.
-Two task refs become an independent pair for a file only when each has at least
-one pair-exclusive commit touching that file. Temporal proximity uses those
-pair-exclusive intervals.
+### Metric-bound cluster thresholds
 
-### Make repeated-edit aggregation total for multi-pair tasks
+A significance threshold applies only to canonical `CombinedCoChange`, uses
+inclusive `>=`, and lies in `[0,1]`. Clusters are connected components of
+qualifying edges built independently per endpoint-category cohort. No threshold
+means no inferred clusters.
 
-A task may be independently paired with several other tasks. For one task `t`,
-collect every pair-exclusive commit set against each independent partner, union
-those sets, deduplicate by SHA, then count qualifying commits after the first.
-The resulting `Repeated_f(t)` is summed over participating task refs.
+### Cohort-safe centrality
 
-Alternative considered: sum repeated edits independently per pair. Rejected
-because one commit could then be multiplied by the number of partners.
+Endpoint-cohort-normalized edge scores cannot be summed into one file centrality
+value because a file may have edges from several endpoint-category cohorts.
+Therefore centrality uses raw incident evidence first:
 
-### Bind cluster thresholds to one canonical metric
+```text
+IncidentCommitDegree(f) = Σ CommitCoChange(f,n)
+IncidentTaskDegree(f)   = Σ TaskCoChange(f,n)
+IC_f = normalized IncidentCommitDegree inside f's primary-category cohort
+IT_f = normalized IncidentTaskDegree inside f's primary-category cohort
+K_f  = Q(alpha*IC_f + beta*IT_f)
+```
 
-A significance threshold applies only to canonical `CombinedCoChange`, uses an
-inclusive `>=` comparison, and is restricted to `[0,1]`. Clusters are connected
-components of qualifying edges built independently inside each endpoint-category
-cohort. No configured threshold means no inferred cluster cutoff.
+This preserves category-local comparability without mixing separately normalized
+edge scales. Bottleneck and OCP scoring reuse this `K_f`.
 
-Alternative considered: allow threshold implementations to choose raw commit,
-task, or component weights. Rejected because identical config could then produce
-different cluster membership and refactoring candidates.
+Alternative considered: sum canonical `CombinedCoChange` over incident edges.
+Rejected because production-production and production-tests edge scores may have
+been normalized against different populations.
 
-### Use bounded deterministic role-token proxies
+### Bounded role-token evidence
 
-Role/name hints tokenize the canonical file stem at deterministic identifier
-boundaries and use invariant-lowercase exact token equality. Substring/glob/regex
-matching is excluded. Matched tokens are reported and the default role-hint
-contribution remains 10%.
+Role hints use deterministic identifier-boundary tokenization, invariant-lowercase
+exact equality, stable token reporting, and a bounded default score contribution.
+Substring/glob/regex matching is excluded.
 
-### Keep optional .NET enrichment strictly downstream
+### Optional .NET enrichment stays downstream
 
-Git evidence remains useful if a C# file cannot be parsed. Project, namespace,
-and type data enrich completed file-level findings but cannot remove, reorder,
-or manufacture core evidence.
+Project/namespace/type facts enrich completed file findings but cannot remove,
+reorder, or manufacture Git evidence.
 
 ## Risks / Trade-offs
 
-- [Task references may be absent/inconsistent] → missing metrics are zero;
-  effective weights remain unchanged and the limitation is reported.
-- [Multi-reference commits] → ordinary breadth is preserved, but independent
-  work evidence requires pair-exclusive commits.
-- [Category-local normalization] → scores cannot be globally compared; reports
-  use explicit category/cohort groups instead.
-- [Floating/log implementation variance] → only correctly rounded nine-decimal
-  canonical values participate in output and decisions.
-- [High churn may be mechanical] → path categories and #237 ignore rules provide
-  deterministic noise control.
-- [Name hints can overfit vocabulary] → exact bounded tokens and a 10% default cap.
-- [Co-change clusters can broaden] → threshold is explicit, metric-bound,
-  inclusive, and cohort-local; pair evidence is always retained.
+- Missing/inconsistent task refs understate signals → preserve zero semantics and
+  report the limitation.
+- Category-local normalization prevents noise domination → cross-category scores
+  cannot be interpreted as one global ranking.
+- Different math libraries may vary internally → only correctly rounded
+  nine-decimal canonical values participate in decisions/output.
+- Multi-reference commits may represent legitimate shared work → preserve
+  ordinary breadth while requiring pair-exclusive evidence for parallel pressure.
+- Cluster threshold choice influences grouping → bind it to one canonical metric
+  and keep pair evidence available.
+- Role tokens may overfit names → exact bounded matching and caveats.
 
 ## Migration Plan
 
-1. Archive this theory contract into the main OpenSpec capability.
-2. #236 implements Git-range ingestion, canonical rename identity, and task refs.
-3. #237 supplies validated `history_analysis` configuration, category rules,
-   ignores, thresholds, and effective profiles.
-4. #238/#239 implement hotspot/co-change evidence using canonical numeric and
-   cohort semantics.
-5. #240/#241 consume independent-task and repeated-edit evidence.
-6. #242/#243 add optional enrichment and stable grouped reports without silently
-   changing the theory contract.
+1. Archive this theory contract into the main capability.
+2. #236 implements deterministic Git ingestion, logical identity, and task refs.
+3. #237 implements validated config, ignores, categories, thresholds, profiles.
+4. #238/#239 implement canonical hotspot/co-change evidence.
+5. #240/#241 implement independent-task, cohort-safe centrality, and OCP pressure.
+6. #242/#243 add optional enrichment and stable grouped reports.
 
 No deployment or rollback action is required because this change adds no runtime
 behavior.
 
 ## Open Questions
 
-- None for the first deterministic profile. Later changes may revise defaults,
-  numeric scale, or evidence semantics only through reviewed specification work
-  with migration notes.
+- None for the first deterministic profile. Changes to defaults, numeric scale,
+or evidence semantics require reviewed specification work with migration notes.
