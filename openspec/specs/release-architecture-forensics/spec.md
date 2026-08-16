@@ -13,17 +13,17 @@ exclusive `from` and inclusive `to`. Both refs SHALL resolve before analysis;
 missing, ambiguous, or unresolvable refs SHALL fail closed.
 
 Canonical identity SHALL contain authored refs, resolved commit IDs, effective
-`history_analysis` configuration identity, and tool version. It SHALL exclude
-absolute checkout roots, generated timestamps, timezone, locale, and other
-environment-dependent presentation data. Uncommitted working-tree state SHALL
-not alter Git-only evidence.
+`history_analysis` configuration identity, history-semantics profile identity,
+and tool version. It SHALL exclude absolute checkout roots, generated timestamps,
+timezone, locale, and other environment-dependent presentation data.
+Uncommitted working-tree state SHALL NOT alter Git-only evidence.
 
 Normalized author identity SHALL be trimmed invariant-lowercase email, else name,
 else `unknown`. Task refs SHALL be deterministically extracted, deduplicated, and
 ordered.
 
 #### Scenario: Equivalent environments
-- **WHEN** identical repository objects, refs, effective configuration, and tool version are analyzed from different checkout roots or timezones
+- **WHEN** identical repository objects, refs, effective configuration, history-semantics profile, and tool version are analyzed in different environments
 - **THEN** canonical identity, evidence, rankings, and canonical JSON are identical
 
 #### Scenario: Missing ref
@@ -75,6 +75,23 @@ file-level temporal spans. Merge commit timestamps remain range metadata only.
 - **WHEN** `Reachable(to) \ Reachable(from)` contains no commits
 - **THEN** analysis succeeds with deterministic empty/zero evidence
 
+### Requirement: Canonical Git path text
+Git tree paths are byte sequences. For the initial deterministic profile, every
+path participating in canonical evidence SHALL decode as strict UTF-8. Invalid,
+overlong, truncated, or otherwise ill-formed UTF-8 SHALL fail analysis closed
+with a path-encoding diagnostic before classification, rename chaining, ranking,
+or JSON serialization.
+
+Implementations SHALL NOT use locale/code-page fallback, replacement characters,
+or platform filesystem decoding for canonical Git paths. After strict UTF-8
+decoding, path comparison and ordering SHALL be ordinal by Unicode scalar/code
+unit sequence as defined by the implementation-independent canonical string model.
+Repository-relative `/` separators are canonical.
+
+#### Scenario: Non-UTF8 Git path
+- **WHEN** an analyzed tree contains a path whose raw Git bytes are not valid UTF-8
+- **THEN** analysis fails deterministically instead of replacing or locale-decoding the path
+
 ### Requirement: Canonical rename recognition and logical-file identity
 For the initial deterministic profile, a rename relation SHALL be recognized
 only inside one canonical non-merge commit delta as a one-to-one delete/add
@@ -100,15 +117,6 @@ Aliases SHALL be ordered by first in-range occurrence using canonical commit
 order and then ascending ordinal path. The canonical path SHALL NOT also appear
 in the alias collection.
 
-Commit-file entries SHALL retain status, additions, deletions, observed path, and
-logical-file identity. Churn SHALL be additions plus deletions summed over that
-logical identity and SHALL be described as volume, not complexity.
-
-A future similarity-based rename profile SHALL define its similarity algorithm,
-threshold, candidate-limit behavior, copy semantics, compatibility identity, and
-migration rules through reviewed specification work before it affects canonical
-results.
-
 #### Scenario: Exact rename across categories
 - **WHEN** one commit exactly moves blob `src/Old.cs` to `tests/New.cs` with no competing source or destination
 - **THEN** one logical file uses canonical path `tests/New.cs` and retains `src/Old.cs` as an alias
@@ -124,6 +132,64 @@ results.
 #### Scenario: Alias de-duplication
 - **WHEN** an exact rename chain moves `A` to `B` and later back to `A`
 - **THEN** canonical path is `A`, aliases contain `B` exactly once, and canonical `A` is not duplicated as an alias
+
+### Requirement: Canonical file events, line counts, churn, and commit count
+Canonical file evidence SHALL be represented as one logical-file event per
+logical file per canonical file-evidence commit.
+
+After exact rename recognition, the matching delete/add raw delta entries SHALL
+collapse into one canonical `rename` event. That event SHALL retain old path, new
+path, blob identity, and rename status as evidence, but SHALL have:
+
+```text
+canonical_additions = 0
+canonical_deletions = 0
+canonical_churn     = 0
+line_count_status   = exact_rename
+```
+
+A pure exact-blob move therefore records one file touch without manufacturing
+content churn from backend-specific delete/add line counts.
+
+For a non-rename text event whose line counts are available, canonical additions
+and deletions SHALL be the non-negative line counts returned by the deterministic
+file-delta reader and `line_count_status = text`.
+
+When a delta is binary or meaningful line counts are otherwise unavailable,
+canonical additions and deletions SHALL both be zero and
+`line_count_status = binary_or_unavailable`. Implementations SHALL NOT substitute
+byte counts, estimated lines, text-conversion output, or backend-specific sentinel
+values in the initial profile.
+
+If multiple raw delta entries for one commit map to the same logical file after
+canonical identity construction, the analyzer SHALL emit one canonical file
+commit touch and aggregate only canonical content counts that are not part of an
+exact-rename collapse. `commit_count(f)` SHALL equal the number of distinct
+canonical file-evidence commits touching logical file `f`, not the number of raw
+delta entries.
+
+Churn SHALL be:
+
+```text
+churn(f) = Σ(canonical_additions(event) + canonical_deletions(event))
+           over canonical file events for f
+```
+
+Churn is change volume, not complexity. Binary/unavailable zero counts and exact
+rename zero churn are deliberate v1 limitations and SHALL be disclosed in report
+interpretation notes.
+
+#### Scenario: Pure exact rename has zero churn
+- **WHEN** a 100-line file is moved by an exact-blob rename with no content change
+- **THEN** the logical file receives one commit touch, additions `0`, deletions `0`, and churn `0`
+
+#### Scenario: Binary line counts are unavailable
+- **WHEN** a binary file changes and no meaningful line additions/deletions exist
+- **THEN** additions and deletions are `0`, `line_count_status` is `binary_or_unavailable`, and byte size is not substituted for churn
+
+#### Scenario: Commit count is commit-distinct
+- **WHEN** raw delta normalization produces more than one raw entry for the same logical file in one canonical file-evidence commit
+- **THEN** `commit_count` increases by exactly one for that logical file
 
 ### Requirement: Path classification
 Each logical file SHALL have one primary category derived from its canonical
@@ -172,7 +238,7 @@ are mathematical definitions; implementations MAY use any higher-precision or
 equivalent internal algorithm but SHALL emit the same correctly rounded result.
 Canonical JSON SHALL serialize canonical reals with exactly nine fractional
 digits, invariant culture, and no exponent notation. Raw commit/task/author/churn
-counts and day gaps remain exact integers.
+counts, line counts, epoch-second gaps, and day gaps remain exact integers.
 
 #237 ignore rules SHALL act as analysis filters before normalization and base-graph
 construction. Presentation-only suppression SHALL NOT change canonical scores.
@@ -232,7 +298,8 @@ HotspotScore(f) = Q(w_c*C_f + w_h*H_f + w_t*T_f + w_a*A_f + w_r*R_f)
 
 `temporal_span_seconds` SHALL be latest minus earliest canonical file-evidence
 committer timestamp; a one-touch file has span zero. Findings SHALL retain raw
-metrics, canonical components, and effective weights.
+metrics, canonical components, effective weights, and line-count limitation
+markers needed to interpret churn.
 
 Hotspot rankings SHALL be independent per primary-category cohort. Production is
 the default human-facing `top hotspots` ranking; non-production categories are
@@ -350,11 +417,22 @@ independent pair. Each pair-side interval SHALL be the closed interval
 `[min(committer_epoch_second), max(committer_epoch_second)]` over that side's
 pair-exclusive canonical file-evidence commits.
 
+For two non-overlapping intervals, identify the earlier interval and later
+interval and define:
+
 ```text
-days_between = 0                              when closed intervals overlap
-               ceil(positive UTC gap in days) otherwise
-TemporalProximity(x,y) = Q(1/(1+days_between))
+gap_seconds  = later.start_epoch_second - earlier.end_epoch_second
+
+days_between = 0                                      when gap_seconds <= 0
+               ceil(gap_seconds / 86400)              when gap_seconds > 0
+
+TemporalProximity(x,y) = Q(1 / (1 + days_between))
 ```
+
+`ceil(gap_seconds / 86400)` is mathematical ceiling over the positive integer
+second gap; an equivalent integer implementation is
+`(gap_seconds + 86399) div 86400`. Calendar dates, local midnights, DST, and
+fractional-day truncation SHALL NOT participate.
 
 The file temporal value SHALL be the maximum canonical proximity across
 independent pairs, or zero when none exists.
@@ -363,9 +441,9 @@ independent pairs, or zero when none exists.
 - **WHEN** the only file-touching commit references `#101` and `#102`
 - **THEN** ordinary task spread may contain both refs but independent task spread, temporal proximity, and repeated-edit evidence are zero
 
-#### Scenario: Shared commit does not collapse a gap
-- **WHEN** pair-exclusive `#101` evidence and pair-exclusive `#102` evidence are separated by two days with a shared-reference commit between them
-- **THEN** the shared commit does not enter either pair interval and proximity is derived only from the pair-exclusive intervals
+#### Scenario: Twenty-five hour gap
+- **WHEN** pair-exclusive closed intervals have a positive epoch-second gap of exactly 90000 seconds
+- **THEN** `days_between=2` and temporal proximity is `Q(1/3)=0.333333333`
 
 ### Requirement: Deterministic bottleneck centrality and score
 Distinct-neighbor degree SHALL be counted from `G0` and normalized within the
@@ -480,28 +558,49 @@ Empty qualifying sets SHALL remain empty.
 - **WHEN** same-cohort file findings tie on numeric rank dimensions
 - **THEN** ascending canonical path is the final discriminator
 
-### Requirement: Deterministic report semantics and canonical JSON
+### Requirement: Canonical JSON string escaping
+Every canonical JSON string SHALL be a sequence of valid Unicode scalar values.
+Unpaired surrogate code units or otherwise invalid internal Unicode SHALL fail
+canonical serialization rather than be replaced.
+
+Canonical JSON escaping SHALL use exactly this profile:
+
+- `"` for quotation mark U+0022;
+- `\\` for reverse solidus U+005C;
+- `\b`, `\t`, `\n`, `\f`, and `\r` for U+0008, U+0009, U+000A, U+000C, and U+000D;
+- `\u00XX` with uppercase hexadecimal digits for every other U+0000..U+001F control scalar;
+- solidus `/` SHALL remain unescaped;
+- every other Unicode scalar, including non-ASCII scalars, SHALL be emitted directly as its UTF-8 encoding and SHALL NOT be rewritten as `\uXXXX` or surrogate-pair escapes.
+
+This escaping profile applies to property names and string values alike.
+
+#### Scenario: Canonical JSON escaping vector
+- **WHEN** canonical string content contains quote, backslash, slash, U+0001, newline, and `é`
+- **THEN** quote/backslash use short JSON escapes, slash is literal, U+0001 is `\u0001`, newline is `\n`, and `é` is emitted as its UTF-8 scalar bytes
+
+### Requirement: Deterministic report semantics and canonical JSON bytes
 Markdown SHALL contain range/config summary, analyzed/excluded merge counts,
 production hotspots, separate non-production rankings, co-change cohorts,
 bottlenecks, OCP pressure, candidates, and interpretation limits.
 
-Canonical JSON SHALL include input/config identity, commit-set/merge/rename
-semantics identity, canonical numeric scale, paths/aliases, categories,
+Canonical JSON SHALL include input/config identity, commit-set/merge/rename/file-
+event semantics identity, canonical numeric scale, paths/aliases, categories,
 raw/canonical score components, effective weights/thresholds, `G0`/cluster cohort
 identity, independent-task and centrality evidence, OCP evidence, excluded merge
-count, and candidates.
+count, line-count limitation markers, and candidates.
 
 Arrays SHALL preserve the category/cohort grouping and stable within-group
 ordering defined by this capability. Object properties SHALL serialize in the
 order declared by the versioned report schema owned by #243. Dynamic object/map
-keys SHALL serialize in ascending ordinal key order after their canonical string
+keys SHALL serialize in ascending ordinal key order after canonical string
 normalization.
 
 Canonical JSON bytes SHALL use UTF-8 without a byte-order mark, LF (`\n`) line
 endings, two-space indentation, no trailing whitespace, and exactly one terminal
 LF. Canonical real values SHALL use exactly nine fractional digits without
-exponent notation. The canonical report-artifact identity SHALL be over these
-canonical JSON bytes, not an implementation's in-memory dictionary ordering.
+exponent notation. All JSON strings SHALL use the canonical escaping profile
+above. The canonical report-artifact identity SHALL be over these exact canonical
+JSON bytes, not an implementation's in-memory dictionary ordering.
 
 Optional .NET/Roslyn enrichment SHALL remain downstream; failure SHALL NOT drop,
 change, or reorder file-level findings.
@@ -510,8 +609,10 @@ Reports SHALL state that churn is not complexity; co-change is not module proof;
 task/author evidence may be incomplete; multi-reference commits are not
 independent-work proof; excluded merge file deltas can understate merge-resolution
 edits; exact-blob rename recognition intentionally misses rename-with-edit cases;
-normalized scores are comparable only in their declared category/cohort; role
-hints are bounded heuristics; and people decide whether to refactor.
+exact renames contribute zero content churn; binary/unavailable line counts
+contribute zero churn; v1 requires strict UTF-8 Git paths; normalized scores are
+comparable only in their declared category/cohort; role hints are bounded
+heuristics; and people decide whether to refactor.
 
 #### Scenario: Deterministic rendering
 - **WHEN** identical canonical evidence is rendered by two conforming implementations
@@ -519,13 +620,14 @@ hints are bounded heuristics; and people decide whether to refactor.
 
 ### Requirement: Contributor theory reference
 The repository SHALL contain an internal contributor reference consistent with
-this capability, including commit-set and merge semantics, exact rename
-recognition, logical identity, category-cohort normalization, canonical numeric
-rules, weight validation, `G0`/`Gtheta`, cluster aggregation, independent-task and
-repeated-edit semantics, cohort-safe centrality, ASCII role tokenization,
-cohort-local rankings, canonical JSON, reports, ownership, and interpretation
-limits. The internal docs index SHALL link it; public MkDocs navigation SHALL not
-advertise the feature before it ships.
+this capability, including commit-set and merge semantics, strict UTF-8 Git path
+handling, exact rename recognition, canonical file-event/churn semantics,
+category-cohort normalization, canonical numeric rules, weight validation,
+`G0`/`Gtheta`, cluster aggregation, exact epoch-second temporal proximity,
+independent-task and repeated-edit semantics, cohort-safe centrality, ASCII role
+tokenization, cohort-local rankings, canonical JSON escaping/bytes, reports,
+ownership, and interpretation limits. The internal docs index SHALL link it;
+public MkDocs navigation SHALL not advertise the feature before it ships.
 
 #### Scenario: Contributor discovers theory
 - **WHEN** a contributor opens the internal documentation index
