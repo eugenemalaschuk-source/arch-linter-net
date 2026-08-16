@@ -62,8 +62,7 @@ jobs:
     name: Repository Lint
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
-    # `make lint` (code size, dotnet format, self-architecture, docs) — not coupled to Sonar or
-    # coverage collection.
+    # Keep fast repository hygiene separate from the single architecture-analysis owner below.
     timeout-minutes: 15
     permissions:
       contents: read
@@ -94,7 +93,7 @@ jobs:
         run: make restore
 
       - name: Lint
-        run: make lint
+        run: make lint-code-size lint-docs lint-dotnet-format lint-test-shard-membership
 
   dotnet_coverage:
     name: .NET Coverage (${{ matrix.name }})

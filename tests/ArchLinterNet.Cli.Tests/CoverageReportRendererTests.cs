@@ -8,6 +8,17 @@ namespace ArchLinterNet.Cli.Tests;
 public sealed class CoverageReportRendererTests
 {
     [Test]
+    public void Renderer_RendersZeroFindingsAsPass()
+    {
+        const string Json = """{"passed":true,"coverage_summary":[]}""";
+        using JsonDocument document = JsonDocument.Parse(Json);
+
+        string markdown = CoverageReportRenderer.Render(document.RootElement, null, ".", false, null);
+
+        Assert.That(markdown, Does.Contain("**Status:** ✅ pass"));
+    }
+
+    [Test]
     public void Renderer_RendersSummaryFailuresAndDiffUnavailable()
     {
         const string Json = """

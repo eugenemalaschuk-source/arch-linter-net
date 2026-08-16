@@ -6,7 +6,7 @@
   <a href="https://www.nuget.org/packages/ArchLinterNet.Cli/"><img alt="NuGet version" src="https://img.shields.io/nuget/v/ArchLinterNet.Cli.svg"></a>
   <a href="https://www.nuget.org/packages/ArchLinterNet.Cli/"><img alt="NuGet downloads" src="https://img.shields.io/nuget/dt/ArchLinterNet.Cli"></a>
   <a href="https://github.com/eugenemalaschuk-source/arch-linter-net/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/eugenemalaschuk-source/arch-linter-net/actions/workflows/ci.yml/badge.svg"></a>
-  <a href="https://github.com/eugenemalaschuk-source/arch-linter-net/actions/workflows/architecture-policy.yml"><img alt="Architecture policy" src="https://github.com/eugenemalaschuk-source/arch-linter-net/actions/workflows/architecture-policy.yml/badge.svg?branch=main"></a>
+  <a href="https://github.com/eugenemalaschuk-source/arch-linter-net/actions/workflows/ci.yml"><img alt="Architecture policy" src="https://github.com/eugenemalaschuk-source/arch-linter-net/actions/workflows/ci.yml/badge.svg?branch=main"></a>
   <a href="https://app.codecov.io/github/eugenemalaschuk-source/arch-linter-net"><img alt="Test coverage" src="https://codecov.io/github/eugenemalaschuk-source/arch-linter-net/graph/badge.svg"></a>
   <a href="https://eugenemalaschuk-source.github.io/arch-linter-net/"><img alt="Documentation" src="https://img.shields.io/badge/docs-GitHub%20Pages-blue"></a>
   <a href="LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-blue.svg"></a>

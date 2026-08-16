@@ -29,6 +29,15 @@ internal sealed class CoverageCommandDefinition(CoverageCommandHandler handler)
             result.GetValue(input) ?? string.Empty, result.GetValue(changedFiles), result.GetValue(repoRoot) ?? ".",
             result.GetValue(output), result.GetValue(maxFailures), result.GetValue(diffStatus) ?? "ok", result.GetValue(help))));
         coverage.Subcommands.Add(report);
+        Command extract = new("extract", "Extract one mode from combined validation JSON.");
+        Option<string> extractInput = new("--input");
+        Option<string> mode = new("--mode");
+        Option<string> extractOutput = new("--output");
+        extract.Options.Add(extractInput);
+        extract.Options.Add(mode);
+        extract.Options.Add(extractOutput);
+        extract.SetAction(result => handler.Extract(result.GetValue(extractInput) ?? string.Empty, result.GetValue(mode) ?? string.Empty, result.GetValue(extractOutput) ?? string.Empty));
+        coverage.Subcommands.Add(extract);
         return coverage;
     }
 }

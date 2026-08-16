@@ -5,13 +5,13 @@ Expose the repository's strict self-policy result through a stable badge source.
 ## Requirements
 ### Requirement: Dynamic strict self-policy badge
 The repository SHALL expose an ArchLinterNet-specific README badge sourced from
-the latest `main` run of a dedicated GitHub Actions workflow that performs the
+the latest `main` run of central CI, whose Architecture Coverage job performs the
 authoritative strict self-policy validation. The badge SHALL communicate
 `architecture policy` status and SHALL not represent test coverage or
 architecture-coverage percentage.
 
 #### Scenario: Default branch strict self-policy passes
-- **WHEN** the dedicated architecture-policy workflow completes successfully on
+- **WHEN** central CI completes successfully on
   `main`
 - **THEN** the README badge renders the workflow's passing status for `main`
 - **AND** the linked workflow shows that `badge architecture-policy` passed
@@ -30,18 +30,16 @@ creation.
 
 #### Scenario: Main workflow refreshes the badge source
 - **WHEN** code is pushed to `main`
-- **THEN** the architecture-policy workflow runs strict self-policy validation
+- **THEN** central CI runs strict self-policy validation
 - **AND** GitHub updates the workflow-status badge source without a repository
   content write
 
 ### Requirement: Badge payload is available from the standard CLI
-The repository's architecture-policy workflow SHALL use the native
-`badge architecture-policy` CLI command to project the strict result produced
-by central CI. The command SHALL be usable by other repositories without copying
-a Python script or triggering another analysis.
+The native `badge architecture-policy` CLI command SHALL project the strict result
+produced by central CI. The command SHALL be usable by other repositories without
+copying a Python script or triggering another analysis.
 
 #### Scenario: Workflow produces the payload through CLI
-- **WHEN** the dedicated architecture-policy workflow runs
-- **THEN** it invokes `badge architecture-policy` with the strict JSON artifact
-- **AND** the workflow status and the command's payload represent the same
-  strict-policy outcome
+- **WHEN** central CI produces its strict JSON artifact
+- **THEN** `badge architecture-policy` can project that artifact
+- **AND** the workflow status and the command's payload represent the same strict-policy outcome

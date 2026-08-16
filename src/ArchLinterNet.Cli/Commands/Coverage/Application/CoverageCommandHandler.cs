@@ -6,6 +6,25 @@ namespace ArchLinterNet.Cli.Commands.Coverage.Application;
 
 internal sealed class CoverageCommandHandler(ICliConsole console, IFileSystem fileSystem)
 {
+    public int Extract(string inputPath, string mode, string outputPath)
+    {
+        try
+        {
+            using JsonDocument document = JsonDocument.Parse(fileSystem.ReadAllText(inputPath));
+            JsonElement result = document.RootElement.TryGetProperty("results", out JsonElement results) && results.ValueKind == JsonValueKind.Array
+                ? results.EnumerateArray().FirstOrDefault(item => item.TryGetProperty("mode", out JsonElement itemMode) && itemMode.GetString() == mode)
+                : document.RootElement;
+            if (result.ValueKind != JsonValueKind.Object || result.GetProperty("mode").GetString() != mode) throw new JsonException($"The input does not contain a {mode} validation result.");
+            fileSystem.WriteAllText(outputPath, result.GetRawText());
+            return CliExitCodes.Success;
+        }
+        catch (Exception exception) when (exception is IOException or JsonException or UnauthorizedAccessException or ArgumentException)
+        {
+            console.Error.WriteLine($"Could not extract architecture validation result: {exception.Message}");
+            return CliExitCodes.InvalidArgumentsOrRuntimeError;
+        }
+    }
+
     public int Execute(CoverageReportCommandOptions options)
     {
         if (options.ShowHelp)

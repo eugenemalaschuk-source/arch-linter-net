@@ -137,10 +137,11 @@ test-tooling-coverage:  ## Run all Python tooling tests with coverage (coverage-
 architecture-strict-json:  ## Run strict+audit validation once, writing combined JSON (CLI must already be built)
 	@dotnet run --no-build --project "$(CLI_PROJECT)" -- \
 		--policy "$(POLICY)" --mode strict,audit --ensure-built --format json \
-		> "$(PROJECT_ROOT)/architecture-strict.json"
+		> "$(PROJECT_ROOT)/architecture-results.json" || true
+	@dotnet run --no-build --project "$(CLI_PROJECT)" -- coverage extract --input architecture-results.json --mode strict --output architecture-strict.json
 
 architecture-audit-json:  ## Materialize the shared strict+audit JSON under the audit artifact name
-	@cp "$(PROJECT_ROOT)/architecture-strict.json" "$(PROJECT_ROOT)/architecture-audit.json"
+	@dotnet run --no-build --project "$(CLI_PROJECT)" -- coverage extract --input architecture-results.json --mode audit --output architecture-audit.json
 
 architecture-coverage-markdown:  ## Generate architecture-coverage.md from architecture-strict.json (CHANGED_FILES/DIFF_STATUS env optional)
 	@dotnet run --no-build --project "$(CLI_PROJECT)" -- coverage report \

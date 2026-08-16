@@ -39,7 +39,15 @@ internal sealed class BadgeCommandHandler(ICliConsole console, IFileSystem fileS
 
     private static JsonElement SelectStrictResult(JsonElement document)
     {
-        if (!document.TryGetProperty("results", out JsonElement results) || results.ValueKind != JsonValueKind.Array) return document;
+        if (!document.TryGetProperty("results", out JsonElement results) || results.ValueKind != JsonValueKind.Array)
+        {
+            if (!document.TryGetProperty("mode", out JsonElement mode) || mode.GetString() != "strict")
+            {
+                throw new JsonException("The input is not a strict validation result.");
+            }
+
+            return document;
+        }
         foreach (JsonElement result in results.EnumerateArray()) if (result.TryGetProperty("mode", out JsonElement mode) && mode.GetString() == "strict") return result;
         throw new JsonException("The input does not contain a strict validation result.");
     }

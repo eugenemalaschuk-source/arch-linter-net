@@ -740,8 +740,6 @@ public sealed partial class ValidateCommandHandlerReportModeTests
     {
         private readonly Dictionary<string, string> _tempContents = new();
 
-        public Dictionary<string, string> Contents { get; } = new();
-
         public HashSet<string> FailOnWrite { get; } = new();
 
         public List<string> CommittedPaths { get; } = new();
@@ -758,9 +756,7 @@ public sealed partial class ValidateCommandHandlerReportModeTests
 
         public string ReadAllText(string path)
         {
-            return Contents.TryGetValue(path, out string? content)
-                ? content
-                : _tempContents.TryGetValue(path, out content) ? content : string.Empty;
+            return _tempContents.TryGetValue(path, out string? content) ? content : string.Empty;
         }
 
         public void WriteAllText(string path, string contents)
