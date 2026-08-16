@@ -2,8 +2,8 @@
 
 ## Purpose
 
-Define deterministic Git-range evidence, scoring, findings, recommendations, and
-report semantics for Release Architecture Forensics.
+Define the deterministic Git-range evidence, scoring, findings, recommendations,
+and canonical report semantics for Release Architecture Forensics.
 
 ## Requirements
 
@@ -15,16 +15,16 @@ missing, ambiguous, or unresolvable refs SHALL fail closed.
 Canonical identity SHALL contain authored refs, resolved commit IDs, effective
 `history_analysis` configuration identity, history-semantics profile identity,
 and tool version. It SHALL exclude absolute checkout roots, generated timestamps,
-timezone, locale, and other environment-dependent presentation data.
-Uncommitted working-tree state SHALL NOT alter Git-only evidence.
+timezone, locale, process state, and other environment-dependent presentation
+data. Uncommitted working-tree state SHALL NOT alter Git-only evidence.
 
-Normalized author identity SHALL be trimmed invariant-lowercase email, else name,
-else `unknown`. Task refs SHALL be deterministically extracted, deduplicated, and
-ordered.
+Normalized author identity SHALL be trimmed invariant-lowercase email when
+present, otherwise trimmed invariant-lowercase author name, otherwise `unknown`.
+Task refs SHALL be deterministically extracted, deduplicated, and ordered.
 
 #### Scenario: Equivalent environments
 - **WHEN** identical repository objects, refs, effective configuration, history-semantics profile, and tool version are analyzed in different environments
-- **THEN** canonical identity, evidence, rankings, and canonical JSON are identical
+- **THEN** canonical identity, evidence, rankings, and canonical JSON bytes are identical
 
 #### Scenario: Missing ref
 - **WHEN** either explicit ref cannot be resolved unambiguously
@@ -42,104 +42,117 @@ following zero or more parent edges. This rule applies whether or not `from` is
 an ancestor of `to`.
 
 Canonical commit order SHALL be ascending by committer UTC epoch-second timestamp,
-then ascending ordinal full commit SHA. All temporal metrics in this capability
-SHALL use committer timestamps represented as UTC epoch seconds.
+then ascending ordinal full commit SHA. All temporal metrics SHALL use committer
+timestamps represented as UTC epoch seconds.
 
 For a non-merge commit with exactly one parent, canonical file-touch evidence
-SHALL be the tree delta from that parent to the commit. For a root commit with no
-parent, the canonical parent tree SHALL be the empty Git tree.
+SHALL come from the tree delta from that parent to the commit. For a root commit,
+the canonical parent tree SHALL be the empty Git tree.
 
 For the initial deterministic profile, a merge commit with two or more parents
 SHALL remain present in analyzed-range metadata but SHALL NOT contribute file
 touches, churn, per-file commit count, per-file author spread, task-episode file
 membership, rename evidence, co-change evidence, or any downstream file score.
-The report SHALL expose the number of excluded merge commits and SHALL state that
-merge-resolution-only edits may therefore be understated.
+Reports SHALL expose the excluded merge count and state that merge-resolution-only
+edits may therefore be understated.
 
-Only commits that contribute canonical file-touch evidence participate in
-file-level temporal spans. Merge commit timestamps remain range metadata only.
+Only commits contributing canonical file-touch evidence participate in file-level
+temporal spans. Merge timestamps remain range metadata only.
 
 #### Scenario: Reachability range
-- **WHEN** a side-branch commit is reachable from `to` but not reachable from `from`
-- **THEN** it belongs to the analyzed commit set regardless of enumeration or first-parent history
+- **WHEN** a side-branch commit is reachable from `to` but not from `from`
+- **THEN** it belongs to the analyzed commit set regardless of traversal or first-parent enumeration
 
 #### Scenario: Merge does not double-count
-- **WHEN** two non-merge branch commits touch a file and a later merge commit joins those branches
-- **THEN** the branch commits contribute file evidence while the merge remains metadata-only and does not add another file touch
+- **WHEN** two non-merge branch commits touch a file and a later merge joins those branches
+- **THEN** the branch commits contribute file evidence while the merge remains metadata-only
 
 #### Scenario: Root commit
-- **WHEN** a root commit belongs to the analyzed commit set
-- **THEN** its file evidence is computed against the empty tree
+- **WHEN** a root commit belongs to the analyzed range
+- **THEN** its file delta is computed against the empty tree
 
 #### Scenario: Empty range
-- **WHEN** `Reachable(to) \ Reachable(from)` contains no commits
+- **WHEN** `Reachable(to) \ Reachable(from)` is empty
 - **THEN** analysis succeeds with deterministic empty/zero evidence
 
-### Requirement: Canonical Git path text
-Git tree paths are byte sequences. For the initial deterministic profile, every
-path participating in canonical evidence SHALL decode as strict UTF-8. Invalid,
-overlong, truncated, or otherwise ill-formed UTF-8 SHALL fail analysis closed
-with a path-encoding diagnostic before classification, rename chaining, ranking,
-or JSON serialization.
+### Requirement: Canonical Git path text and string ordering
+Git tree paths are byte sequences. Every path participating in canonical evidence
+in the initial profile SHALL decode as strict UTF-8. Invalid, overlong, truncated,
+or otherwise ill-formed UTF-8 SHALL fail analysis closed before classification,
+rename chaining, ranking, or JSON serialization.
 
 Implementations SHALL NOT use locale/code-page fallback, replacement characters,
-or platform filesystem decoding for canonical Git paths. After strict UTF-8
-decoding, path comparison and ordering SHALL be ordinal by Unicode scalar/code
-unit sequence as defined by the implementation-independent canonical string model.
+or platform filesystem decoding. Strict UTF-8 decoding SHALL preserve the exact
+Unicode scalar sequence encoded by the Git path bytes. Unicode normalization
+(NFC, NFD, NFKC, NFKD) SHALL NOT be applied.
+
+Canonical string ordering for paths, aliases, dynamic-map keys, and any other
+field specified as ordinal SHALL be lexicographic by Unicode scalar numeric value.
+At the first differing scalar, the lower scalar value sorts first; when one scalar
+sequence is an exact prefix of the other, the shorter sequence sorts first.
+This definition SHALL NOT depend on UTF-16 code-unit order, UTF-32 representation,
+locale collation, filesystem collation, or Unicode normalization libraries.
 Repository-relative `/` separators are canonical.
 
 #### Scenario: Non-UTF8 Git path
-- **WHEN** an analyzed tree contains a path whose raw Git bytes are not valid UTF-8
-- **THEN** analysis fails deterministically instead of replacing or locale-decoding the path
+- **WHEN** a path's raw Git bytes are not valid UTF-8
+- **THEN** analysis fails instead of locale-decoding or inserting replacement characters
 
-### Requirement: Canonical rename recognition and logical-file identity
-For the initial deterministic profile, a rename relation SHALL be recognized
-only inside one canonical non-merge commit delta as a one-to-one delete/add
-relation whose deleted preimage and added postimage have exactly the same Git
-blob object identity.
+#### Scenario: Canonically distinct Unicode spellings
+- **WHEN** two valid UTF-8 paths encode canonically equivalent but scalar-distinct Unicode sequences such as precomposed and decomposed accents
+- **THEN** they remain distinct paths and sort by their actual decoded scalar sequences without Unicode normalization
+
+#### Scenario: Supplementary scalar ordering
+- **WHEN** canonical strings contain valid non-BMP Unicode scalars
+- **THEN** ordering follows scalar numeric values rather than host-language code-unit ordering
+
+### Requirement: Canonical exact rename recognition and logical-file identity
+A rename SHALL be recognized only inside one canonical non-merge commit delta as
+a one-to-one delete/add relation whose deleted preimage and added postimage have
+exactly the same Git blob object identity.
 
 Similarity-based rename inference and copy inference SHALL NOT participate in
 canonical logical-file identity in the initial profile. Ambient Git rename
-thresholds, rename limits, client configuration, or backend heuristics SHALL NOT
-change canonical evidence.
+thresholds, candidate limits, client configuration, or backend heuristics SHALL
+NOT change canonical evidence.
 
 If one deleted source can correspond to multiple added destinations, one added
 destination can correspond to multiple deleted sources, blob identity differs,
-or the relationship is otherwise not one-to-one, the affected paths SHALL remain
+or the relationship is otherwise not one-to-one, affected paths SHALL remain
 separate logical identities.
 
-A logical file SHALL represent one linear chain of these exact rename relations.
-Its canonical path SHALL be the normalized repository-relative path at the last
-in-range occurrence, including a deleted path when deletion is final.
+A logical file SHALL represent one linear chain of exact rename relations. Its
+canonical path SHALL be the last in-range occurrence, including the deleted path
+when deletion is final.
 
 Aliases SHALL contain each distinct historical non-canonical path exactly once.
 Aliases SHALL be ordered by first in-range occurrence using canonical commit
-order and then ascending ordinal path. The canonical path SHALL NOT also appear
-in the alias collection.
+order and then canonical scalar-value string ordering. The canonical path SHALL
+NOT also appear in aliases.
 
 #### Scenario: Exact rename across categories
 - **WHEN** one commit exactly moves blob `src/Old.cs` to `tests/New.cs` with no competing source or destination
-- **THEN** one logical file uses canonical path `tests/New.cs` and retains `src/Old.cs` as an alias
+- **THEN** one logical file uses `tests/New.cs` as canonical path and retains `src/Old.cs` as an alias
 
 #### Scenario: Modified move is not an exact rename
 - **WHEN** a delete/add pair has different blob object identities
-- **THEN** the initial profile keeps the two paths as separate logical identities
+- **THEN** the initial profile keeps both paths as separate logical identities
 
 #### Scenario: Split is not a rename chain
-- **WHEN** one deleted blob has two same-blob added destinations in the same commit
-- **THEN** no arbitrary destination is selected and the affected paths remain separate identities
+- **WHEN** one deleted blob has two same-blob added destinations in one commit
+- **THEN** no arbitrary destination is selected and all affected paths remain separate identities
 
 #### Scenario: Alias de-duplication
 - **WHEN** an exact rename chain moves `A` to `B` and later back to `A`
-- **THEN** canonical path is `A`, aliases contain `B` exactly once, and canonical `A` is not duplicated as an alias
+- **THEN** canonical path is `A`, aliases contain `B` once, and canonical `A` is not duplicated as an alias
 
-### Requirement: Canonical file events, line counts, churn, and commit count
-Canonical file evidence SHALL be represented as one logical-file event per
-logical file per canonical file-evidence commit.
+### Requirement: Canonical file events, binary classification, and line churn
+Canonical file evidence SHALL contain one logical-file event per logical file per
+canonical file-evidence commit.
 
-After exact rename recognition, the matching delete/add raw delta entries SHALL
-collapse into one canonical `rename` event. That event SHALL retain old path, new
-path, blob identity, and rename status as evidence, but SHALL have:
+After exact rename recognition, the matching delete/add raw entries SHALL collapse
+into one `rename` event retaining old path, new path, blob identity, and rename
+status. Its content counts SHALL be:
 
 ```text
 canonical_additions = 0
@@ -148,52 +161,90 @@ canonical_churn     = 0
 line_count_status   = exact_rename
 ```
 
-A pure exact-blob move therefore records one file touch without manufacturing
-content churn from backend-specific delete/add line counts.
+A pure exact-blob move therefore records one file touch but zero content churn.
 
-For a non-rename text event whose line counts are available, canonical additions
-and deletions SHALL be the non-negative line counts returned by the deterministic
-file-delta reader and `line_count_status = text`.
+For every other file event, required old/new Git object content SHALL be loaded
+from repository objects. If an object required by the analyzed refs is missing or
+unreadable, analysis SHALL fail closed rather than invent zero evidence.
 
-When a delta is binary or meaningful line counts are otherwise unavailable,
-canonical additions and deletions SHALL both be zero and
-`line_count_status = binary_or_unavailable`. Implementations SHALL NOT substitute
-byte counts, estimated lines, text-conversion output, or backend-specific sentinel
-values in the initial profile.
+A participating side that is absent because the event is an add or delete SHALL
+be represented by the empty byte sequence. Gitlink/tree/non-blob entries, or an
+event for which line semantics are structurally not applicable, SHALL have:
 
-If multiple raw delta entries for one commit map to the same logical file after
+```text
+canonical_additions = 0
+canonical_deletions = 0
+line_count_status   = binary_or_unavailable
+```
+
+For blob-to-blob, empty-to-blob, or blob-to-empty events, if either non-empty blob
+contains byte `0x00`, the event SHALL also use `binary_or_unavailable` and zero
+canonical additions/deletions. Implementations SHALL NOT substitute byte counts,
+estimated lines, textconv output, external-diff output, or backend sentinels.
+
+Otherwise the event SHALL be canonical text evidence computed over raw blob bytes,
+without decoding file contents to Unicode:
+
+1. `Lines(bytes)` splits on byte `0x0A` (LF).
+2. LF terminates a line and is not part of the line payload.
+3. `0x0D` (CR) and every other byte remain part of the line payload.
+4. Empty byte sequence has zero lines.
+5. A final non-empty or empty segment after the last LF is a line only when bytes remain after that LF; a terminal LF does not create an additional trailing line.
+6. Line equality is exact byte-sequence equality.
+7. Let `L` be the mathematical length of a longest common subsequence of the old and new line sequences.
+
+Canonical counts SHALL be:
+
+```text
+canonical_deletions = old_line_count - L
+canonical_additions = new_line_count - L
+line_count_status   = text
+```
+
+The LCS *length* is unique even when multiple LCS alignments exist, so these
+addition/deletion totals SHALL NOT depend on diff-algorithm tie-breaking, Git diff
+heuristics, attributes, textconv, external diff, or backend implementation.
+
+If multiple raw entries from one commit map to the same logical file after
 canonical identity construction, the analyzer SHALL emit one canonical file
-commit touch and aggregate only canonical content counts that are not part of an
-exact-rename collapse. `commit_count(f)` SHALL equal the number of distinct
-canonical file-evidence commits touching logical file `f`, not the number of raw
-delta entries.
+commit touch and aggregate canonical content counts only after exact-rename
+collapse.
 
-Churn SHALL be:
+`commit_count(f)` SHALL equal the number of distinct canonical file-evidence
+commits touching logical file `f`, not raw delta-entry count.
 
 ```text
 churn(f) = Σ(canonical_additions(event) + canonical_deletions(event))
            over canonical file events for f
 ```
 
-Churn is change volume, not complexity. Binary/unavailable zero counts and exact
-rename zero churn are deliberate v1 limitations and SHALL be disclosed in report
-interpretation notes.
+Churn is change volume, not complexity. Exact-rename zero churn and
+binary/unavailable zero line churn are deliberate v1 limitations and SHALL be
+visible in report interpretation notes.
 
 #### Scenario: Pure exact rename has zero churn
-- **WHEN** a 100-line file is moved by an exact-blob rename with no content change
-- **THEN** the logical file receives one commit touch, additions `0`, deletions `0`, and churn `0`
+- **WHEN** a 100-line file moves by exact-blob rename with no content change
+- **THEN** the logical file receives one commit touch and zero additions, deletions, and churn
 
-#### Scenario: Binary line counts are unavailable
-- **WHEN** a binary file changes and no meaningful line additions/deletions exist
-- **THEN** additions and deletions are `0`, `line_count_status` is `binary_or_unavailable`, and byte size is not substituted for churn
+#### Scenario: Deterministic text line counts
+- **WHEN** two text blobs can be aligned by several equally valid diff scripts
+- **THEN** additions/deletions derive only from old/new line counts and mathematical LCS length, producing identical totals across implementations
+
+#### Scenario: NUL-containing blob
+- **WHEN** either non-empty participating blob contains byte `0x00`
+- **THEN** additions/deletions are zero and status is `binary_or_unavailable`
+
+#### Scenario: Missing required blob object
+- **WHEN** a required blob object cannot be loaded from the repository object database
+- **THEN** analysis fails closed instead of treating the content as zero churn
 
 #### Scenario: Commit count is commit-distinct
-- **WHEN** raw delta normalization produces more than one raw entry for the same logical file in one canonical file-evidence commit
-- **THEN** `commit_count` increases by exactly one for that logical file
+- **WHEN** raw normalization yields several entries for the same logical file in one canonical file-evidence commit
+- **THEN** `commit_count` increases by exactly one
 
 ### Requirement: Path classification
-Each logical file SHALL have one primary category derived from its canonical
-path. Canonical category order SHALL be:
+Each logical file SHALL have one primary category derived from its canonical path.
+Canonical category order SHALL be:
 
 1. `production`
 2. `tests`
@@ -203,16 +254,16 @@ path. Canonical category order SHALL be:
 6. `samples_examples`
 7. `unknown`
 
-Alias classifications MAY remain evidence but SHALL NOT replace the primary
-category or ranking path. #237 owns schema-backed bounded matching, ignores,
-category overrides, thresholds, and effective configuration.
+Alias classifications MAY remain evidence but SHALL NOT replace primary category
+or ranking path. #237 owns schema-backed bounded matching, ignores, category
+overrides, thresholds, and effective configuration. `unknown` remains visible.
 
 #### Scenario: Rename across categories
-- **WHEN** an exact logical-file chain ends at canonical path `tests/New.cs`
-- **THEN** primary category is derived from `tests/New.cs`, not from an earlier alias
+- **WHEN** an exact logical-file chain ends at `tests/New.cs`
+- **THEN** primary category derives from `tests/New.cs`, not an earlier alias
 
-### Requirement: Total normalization, canonical numbers, and deterministic populations
-For a non-negative population, mathematical normalization SHALL be:
+### Requirement: Total normalization, canonical numbers, and populations
+For any non-negative population:
 
 ```text
 normalized(x) = 0                              when max(population) = 0
@@ -222,8 +273,8 @@ normalized_log(x) = 0                          when max(population) = 0
                     log(1+x) / log(1+max)      otherwise
 ```
 
-Empty/all-zero populations SHALL produce finite zero; missing optional evidence
-SHALL contribute raw zero; runtime weight renormalization SHALL NOT occur.
+Empty/all-zero populations SHALL produce finite zero. Missing optional evidence
+SHALL contribute raw zero. Runtime weight renormalization SHALL NOT occur.
 
 Canonical derived real values SHALL use:
 
@@ -232,59 +283,54 @@ Q(v) = round-half-to-even(v, 9 decimal places)
 ```
 
 Every normalized component, temporal proximity, combined edge weight, final
-score, and configured numeric threshold SHALL be reduced to `Q(v)` before it is
-used for threshold comparison, ranking, or canonical serialization. The formulas
-are mathematical definitions; implementations MAY use any higher-precision or
-equivalent internal algorithm but SHALL emit the same correctly rounded result.
-Canonical JSON SHALL serialize canonical reals with exactly nine fractional
-digits, invariant culture, and no exponent notation. Raw commit/task/author/churn
-counts, line counts, epoch-second gaps, and day gaps remain exact integers.
+score, and numeric threshold SHALL be reduced to `Q(v)` before threshold
+comparison, ranking, or canonical serialization. Mathematical formulas are
+authoritative; implementations MAY use any internal algorithm that produces the
+same correctly rounded result.
 
-#237 ignore rules SHALL act as analysis filters before normalization and base-graph
-construction. Presentation-only suppression SHALL NOT change canonical scores.
-File-level populations SHALL contain retained logical files in the same primary
-category. Edge-level populations SHALL contain base graph edges in the same
-unordered endpoint-category pair, ordered by canonical category order.
-
-#### Scenario: Canonical numeric boundary
-- **WHEN** two implementations use different internal floating-point or logarithm algorithms for the same mathematical input
-- **THEN** they compare and serialize the same nine-decimal `Q(v)` value
+#237 analysis ignores SHALL remove logical files before score populations and
+`G0` construction. Presentation-only suppression SHALL NOT change canonical
+scores. File-level populations contain retained logical files in the same primary
+category. Edge populations contain `G0` edges in the same unordered endpoint-
+category cohort.
 
 #### Scenario: Category isolation
 - **WHEN** generated churn is much larger than production churn
 - **THEN** it does not set the production normalization maximum
 
+#### Scenario: All-zero population
+- **WHEN** every raw value in a component population is zero
+- **THEN** every normalized component is canonical zero rather than NaN/Infinity
+
 ### Requirement: Valid effective scoring configuration
-Each run SHALL use one validated effective scoring configuration. Defaults are:
-hotspot `(commit .30, churn .25, task .25, author .10, temporal .10)`;
-bottleneck `(independent_task .35, author .15, temporal .20, degree .20,
-centrality .10)`; OCP `(independent_task .40, centrality .25,
-repeated_episode_edit .25, role_hint .10)`; co-change `(commit .75, task .25)`.
+Each run SHALL have one validated effective scoring configuration. Initial
+default profiles are:
 
-Every configured weight SHALL be a finite non-negative base-10 decimal with at
-most nine fractional digits. Authored weight values SHALL use ordinary decimal
-notation rather than exponent notation.
+- hotspot: commit `.30`, churn `.25`, task `.25`, author `.10`, temporal `.10`;
+- bottleneck: independent task `.35`, author `.15`, temporal `.20`, degree `.20`, centrality `.10`;
+- OCP: independent task `.40`, centrality `.25`, repeated edit `.25`, role hint `.10`;
+- co-change: commit `.75`, task `.25`.
 
-A scoring component SHALL be enabled if and only if its effective weight is
-greater than zero. A zero effective weight SHALL mean disabled. Evidence
-availability SHALL NOT change enabledness.
+Each configured weight SHALL be a finite non-negative ordinary base-10 decimal
+with at most nine fractional digits. Exponent-form authoring is not canonical.
+Positive weight means enabled; zero means disabled; at least one component SHALL
+be enabled; every exact profile SHALL sum to `1.000000000`. Co-change therefore
+requires `alpha + beta = 1.000000000`.
 
-At least one component SHALL be enabled and each profile SHALL sum exactly to
-`1.000000000` using the exact authored/effective decimal values. For co-change,
-`alpha + beta = 1.000000000`. Validation SHALL occur before score quantization;
-`Q(v)` SHALL NOT repair an invalid profile sum. Invalid profiles SHALL fail
-validation instead of being silently rounded, rescaled, or renormalized.
+Validation SHALL occur before `Q`; invalid profiles SHALL fail instead of being
+rounded, rescaled, or normalized. Evidence absence SHALL NOT change weights or
+enabledness.
 
 #### Scenario: Invalid profile sum
 - **WHEN** effective weights do not sum exactly to `1.000000000`
-- **THEN** validation fails and analysis does not silently normalize them
+- **THEN** validation fails and analysis does not repair the profile
 
-#### Scenario: Evidence absence does not disable a component
-- **WHEN** task evidence is absent but the effective task weight is positive
-- **THEN** the component remains enabled with raw value zero and other weights remain unchanged
+#### Scenario: Missing task evidence
+- **WHEN** task evidence is absent but task weight is positive
+- **THEN** the task component remains enabled with raw zero and other weights remain unchanged
 
 ### Requirement: Deterministic hotspot evidence
-For retained file `f` within its primary-category population:
+For retained file `f`, using its primary-category population:
 
 ```text
 C_f = Q(normalized(commit_count(f)))
@@ -296,161 +342,138 @@ R_f = Q(normalized(temporal_span_seconds(f)))
 HotspotScore(f) = Q(w_c*C_f + w_h*H_f + w_t*T_f + w_a*A_f + w_r*R_f)
 ```
 
-`temporal_span_seconds` SHALL be latest minus earliest canonical file-evidence
-committer timestamp; a one-touch file has span zero. Findings SHALL retain raw
-metrics, canonical components, effective weights, and line-count limitation
-markers needed to interpret churn.
+`temporal_span_seconds` is latest minus earliest canonical file-evidence committer
+epoch second; a one-touch file has span zero. Findings retain raw metrics,
+canonical components, effective weights, primary category, and line-count status
+needed to interpret churn.
 
-Hotspot rankings SHALL be independent per primary-category cohort. Production is
-the default human-facing `top hotspots` ranking; non-production categories are
-separate groups. Scores from different cohorts SHALL NOT be interleaved as one
-numeric ranking.
+Hotspot rankings SHALL be independent per primary category. Production is the
+default human-facing top-hotspot group. Cross-category scores SHALL NOT be
+interleaved as one numeric ranking.
 
-#### Scenario: Cross-category hotspot scores
-- **WHEN** docs score `0.950000000` and production score `0.800000000`
-- **THEN** the report keeps them in separate category rankings rather than claiming docs outranks production
+#### Scenario: Cross-category scores
+- **WHEN** docs hotspot score is `0.950000000` and production score is `0.800000000`
+- **THEN** the report does not claim the docs file outranks the production file
 
 ### Requirement: Canonical base co-change graph
-After analysis ignores, the canonical base co-change graph SHALL be:
+After analysis ignores:
 
 ```text
-G0 = (V, E0)
+G0 = (V,E0)
 V  = retained logical files
-E0 = { unordered (a,b) : a != b and CommitCoChange(a,b) > 0 }
+E0 = { unordered(a,b) : a != b and CommitCoChange(a,b) > 0 }
 
-CommitCoChange(a,b) = count(canonical file-evidence commits containing both a and b)
-TaskCoChange(a,b)   = count(distinct tasks whose canonical file episodes contain both a and b)
+CommitCoChange(a,b) = count(canonical file-evidence commits containing both)
+TaskCoChange(a,b)   = count(distinct tasks whose canonical file episodes contain both)
 ```
 
-Task co-change MAY contribute to the weight of an edge already in `E0` but SHALL
-NOT create a base edge when `CommitCoChange(a,b) = 0` in the initial profile.
+Task co-change MAY weight an existing `G0` edge but SHALL NOT create an edge when
+`CommitCoChange=0`.
 
-For each base edge:
+For each `G0` edge:
 
 ```text
-CommitComponent(a,b)  = Q(normalized(CommitCoChange(a,b)))
-TaskComponent(a,b)    = Q(normalized(TaskCoChange(a,b)))
-CombinedCoChange(a,b) = Q(alpha*CommitComponent + beta*TaskComponent)
+CommitComponent  = Q(normalized(CommitCoChange))
+TaskComponent    = Q(normalized(TaskCoChange))
+CombinedCoChange = Q(alpha*CommitComponent + beta*TaskComponent)
 ```
 
-Edge components SHALL normalize over `E0` edges inside their unordered
-endpoint-category cohort. Pair paths SHALL be canonical paths in ascending
-ordinal order. Pair rankings SHALL use `E0` and remain endpoint-cohort-local.
+Edge components SHALL normalize within the edge's unordered endpoint-category
+cohort. Pair paths SHALL use canonical scalar-value string ordering. Pair
+rankings are endpoint-cohort-local.
 
-Distinct-neighbor degree, `IncidentCommitDegree`, `IncidentTaskDegree`, `IC_f`,
-`IT_f`, and `K_f` SHALL always be derived from `G0`, never from a thresholded
-cluster graph. The initial profile deliberately reuses the effective co-change
-`alpha/beta` mix for `K_f`; it has no second hidden centrality mix.
+Distinct-neighbor degree, incident degrees, `IC_f`, `IT_f`, and `K_f` SHALL always
+use `G0`, never `Gtheta`. V1 deliberately reuses effective co-change
+`alpha/beta` for centrality; there is no second hidden mix.
 
-#### Scenario: Task-only association does not create a base edge
-- **WHEN** one task changes `A` in one commit and `B` in another commit but no canonical file-evidence commit changes them together
-- **THEN** `TaskCoChange(A,B)` may be positive, `CommitCoChange(A,B)=0`, and `(A,B)` is not an edge in `E0`
+#### Scenario: Task-only association
+- **WHEN** one task changes A in one commit and B in another but no commit changes both
+- **THEN** TaskCoChange may be positive, CommitCoChange is zero, and no `G0` edge exists
 
 #### Scenario: Co-change without tasks
-- **WHEN** files change together but no task refs are extracted
-- **THEN** a base edge exists from commit evidence, task evidence is zero, and effective weights remain unchanged
+- **WHEN** files change together but no task refs exist
+- **THEN** a `G0` edge exists from commit evidence while task evidence is zero and weights remain unchanged
 
 ### Requirement: Threshold graph and deterministic clusters
-A significance threshold SHALL be canonical, lie in
-`[0.000000000,1.000000000]`, and apply only to canonical `CombinedCoChange`.
-Qualification SHALL be inclusive.
-
-When an effective threshold `theta` exists, define:
+A configured significance threshold SHALL be canonical, lie in `[0,1]`, apply
+only to canonical `CombinedCoChange`, and use inclusive `>=`.
 
 ```text
 Gtheta = (V, { e in E0 : CombinedCoChange(e) >= theta })
 ```
 
-`Gtheta` SHALL be used only for cluster construction and cluster-derived candidate
-logic. Changing `theta` SHALL NOT change `G0`, edge normalization populations,
-pair weights/rankings, `D_f`, `IC_f`, `IT_f`, `K_f`, hotspot scores, bottleneck
-scores, or OCP scores.
+`Gtheta` SHALL be used only for cluster construction and cluster-derived
+candidate logic. Changing `theta` SHALL NOT change `G0`, edge populations, pair
+weights/ranking, `D_f`, `IC_f`, `IT_f`, `K_f`, hotspot, bottleneck, or OCP scores.
 
-Clusters SHALL be connected components of `Gtheta` with at least two vertices,
-constructed independently inside each endpoint-category cohort. With no effective
-threshold, pair evidence remains and cluster output is empty.
+Clusters are connected components of `Gtheta` with at least two vertices,
+constructed independently inside endpoint-category cohorts. Without a threshold,
+pair evidence remains and cluster output is empty.
 
-For cluster `C` inside endpoint-category cohort `h`:
+For cluster `C`:
 
 ```text
-ClusterEdges(C) =
-  { e in Gtheta(h) : both endpoints of e are members of C }
-
-ClusterMaximum(C) =
-  max(CombinedCoChange(e) for e in ClusterEdges(C))
-
-ClusterAggregate(C) =
-  Q(sum(CombinedCoChange(e) for e in ClusterEdges(C)))
+ClusterEdges(C) = { qualifying Gtheta edges whose endpoints are members of C }
+ClusterMaximum(C) = max(CombinedCoChange(e) for e in ClusterEdges(C))
+ClusterAggregate(C) = Q(sum(CombinedCoChange(e) for e in ClusterEdges(C)))
 ```
 
-Sub-threshold `G0` edges between cluster members SHALL NOT participate in
-`ClusterAggregate`. Clusters SHALL rank within their endpoint-category cohort by
-descending `ClusterMaximum`, descending `ClusterAggregate`, then ascending first
-canonical member path. Cluster members SHALL serialize in ascending canonical
-path order.
+Sub-threshold internal `G0` edges SHALL NOT contribute. Cluster members serialize
+in canonical scalar-value path order. Cluster ranking is descending maximum,
+descending aggregate, then ascending first member path.
 
 #### Scenario: Threshold equality
-- **WHEN** edge weight and threshold both equal `0.600000000`
-- **THEN** the edge belongs to `Gtheta`
+- **WHEN** edge weight equals the threshold
+- **THEN** the edge qualifies for `Gtheta`
 
-#### Scenario: Threshold does not rescore centrality
-- **WHEN** the same `G0` is analyzed with no threshold and with a threshold that removes every edge from `Gtheta`
-- **THEN** `D_f`, `IC_f`, `IT_f`, `K_f`, bottleneck scores, and OCP scores are identical while cluster output changes
+#### Scenario: Threshold does not rescore files
+- **WHEN** threshold changes remove all `Gtheta` edges while `G0` is unchanged
+- **THEN** `D_f`, `K_f`, bottleneck, and OCP scores remain identical
 
-#### Scenario: Cluster aggregate uses qualifying edges only
-- **WHEN** `AB=0.600000000`, `BC=0.700000000`, `AC=0.590000000`, and `theta=0.600000000`
-- **THEN** cluster `{A,B,C}` has maximum `0.700000000`, aggregate `1.300000000`, and `AC` does not contribute to the aggregate
+#### Scenario: Qualifying-edge aggregate
+- **WHEN** AB=.600000000, BC=.700000000, AC=.590000000, theta=.600000000
+- **THEN** cluster `{A,B,C}` has maximum `.700000000`, aggregate `1.300000000`, and AC contributes nothing
 
-### Requirement: Independent task evidence for parallel-development signals
-A task episode SHALL be canonical file-evidence commits linked to one extracted
-task ref. A commit MAY reference multiple tasks and contribute ordinary task
-spread/task co-change to each, but that alone SHALL NOT establish independent
-workstreams.
+### Requirement: Independent task evidence and temporal proximity
+A task episode is canonical file-evidence commits linked to one extracted task
+ref. A multi-reference commit MAY contribute ordinary task breadth and task
+co-change but SHALL NOT alone establish independent work.
 
-For file `f`, refs `x,y` form an independent pair only when both sides have
-pair-exclusive evidence: at least one file-touching commit references `x` but not
-`y`, and at least one references `y` but not `x`. Shared-reference commits SHALL
-NOT establish independence or temporal overlap/proximity for that pair.
+For file `f`, refs `x,y` form an independent pair only when each side has at
+least one pair-exclusive canonical file-evidence commit touching `f`. Shared-ref
+commits do not establish independence and do not enter pair-exclusive intervals.
 
-`IndependentTaskSpread(f)` SHALL count refs participating in at least one
-independent pair. Each pair-side interval SHALL be the closed interval
-`[min(committer_epoch_second), max(committer_epoch_second)]` over that side's
-pair-exclusive canonical file-evidence commits.
+`IndependentTaskSpread(f)` counts task refs participating in at least one
+independent pair.
 
-For two non-overlapping intervals, identify the earlier interval and later
-interval and define:
+Each pair-side interval is the closed interval
+`[min(committer_epoch_second), max(committer_epoch_second)]` of its pair-exclusive
+commits. For two intervals, identify earlier and later and define:
 
 ```text
-gap_seconds  = later.start_epoch_second - earlier.end_epoch_second
+gap_seconds = later.start_epoch_second - earlier.end_epoch_second
 
-days_between = 0                                      when gap_seconds <= 0
-               ceil(gap_seconds / 86400)              when gap_seconds > 0
+days_between = 0                         when gap_seconds <= 0
+               ceil(gap_seconds / 86400) when gap_seconds > 0
 
 TemporalProximity(x,y) = Q(1 / (1 + days_between))
 ```
 
-`ceil(gap_seconds / 86400)` is mathematical ceiling over the positive integer
-second gap; an equivalent integer implementation is
-`(gap_seconds + 86399) div 86400`. Calendar dates, local midnights, DST, and
-fractional-day truncation SHALL NOT participate.
-
-The file temporal value SHALL be the maximum canonical proximity across
-independent pairs, or zero when none exists.
+For positive integer gaps, `(gap_seconds + 86399) div 86400` is equivalent.
+Calendar dates, local midnight, timezone, DST, and fractional-day truncation SHALL
+NOT participate. File temporal value is maximum canonical pair proximity, or zero
+when no independent pair exists.
 
 #### Scenario: One multi-reference commit
-- **WHEN** the only file-touching commit references `#101` and `#102`
-- **THEN** ordinary task spread may contain both refs but independent task spread, temporal proximity, and repeated-edit evidence are zero
+- **WHEN** the only file-touch commit references `#101` and `#102`
+- **THEN** ordinary task breadth may contain both refs but independent spread and temporal proximity are zero
 
 #### Scenario: Twenty-five hour gap
-- **WHEN** pair-exclusive closed intervals have a positive epoch-second gap of exactly 90000 seconds
-- **THEN** `days_between=2` and temporal proximity is `Q(1/3)=0.333333333`
+- **WHEN** pair-exclusive intervals have a positive gap of 90000 seconds
+- **THEN** `days_between=2` and proximity is `0.333333333`
 
-### Requirement: Deterministic bottleneck centrality and score
-Distinct-neighbor degree SHALL be counted from `G0` and normalized within the
-file's primary-category cohort.
-
-File centrality SHALL NOT sum endpoint-cohort-normalized edge scores. Instead,
-for retained file `f` and its `G0` neighbors:
+### Requirement: Cohort-safe bottleneck centrality and score
+Using `G0` neighbors:
 
 ```text
 IncidentCommitDegree(f) = Σ CommitCoChange(f,n)
@@ -460,174 +483,176 @@ IT_f = Q(normalized(IncidentTaskDegree(f)))   within f's primary-category cohort
 K_f  = Q(alpha*IC_f + beta*IT_f)
 ```
 
-This gives one category-local centrality scale even when `f` has incident edges
-from several endpoint-category cohorts.
-
-Bottleneck components SHALL be:
+Bottleneck components are:
 
 ```text
 T_f = Q(normalized(IndependentTaskSpread(f)))
-A_f = Q(normalized(author_spread(f)))
+A_f = Q(normalized(distinct_authors(f)))
 O_f = Q(normalized(independent_temporal_proximity(f)))
-D_f = Q(normalized(distinct_neighbor_degree(f)))
+D_f = Q(normalized(distinct_neighbor_degree_G0(f)))
 K_f = canonical centrality above
 
 BottleneckScore(f) = Q(b_t*T_f + b_a*A_f + b_o*O_f + b_d*D_f + b_c*K_f)
 ```
 
-Bottleneck rankings SHALL be independent per primary-category cohort.
+Rankings are primary-category-local. Reports call this parallel-development
+bottleneck/pressure and SHALL NOT claim actual merge conflict absent direct
+separate evidence.
 
-#### Scenario: Mixed-category incident edges
-- **WHEN** a production file has both production-production and production-tests `G0` edges
-- **THEN** its centrality uses raw incident commit/task degrees normalized in the production file cohort, not a sum of incomparable endpoint-cohort edge scores
+#### Scenario: Mixed endpoint cohorts
+- **WHEN** a production file has production-production and production-tests `G0` edges
+- **THEN** centrality uses raw incident evidence normalized in the production file cohort rather than summing incomparable edge-normalized weights
 
 ### Requirement: Deterministic OCP-pressure evidence
-OCP task spread SHALL use canonical normalized `IndependentTaskSpread(f)` and
-centrality SHALL reuse the `K_f` definition above.
+OCP uses canonical normalized `IndependentTaskSpread` and the same `G0`-derived
+`K_f`.
 
-Repeated independent editing SHALL be total for tasks participating in several
-independent pairs:
+Repeated independent editing is:
 
 ```text
-Partners_f(t) = {u : (t,u) is independent for f}
-PairExclusive_f(t,u) = {c touching f : c references t and not u}
+Partners_f(t) = { u : (t,u) is independent for f }
+PairExclusive_f(t,u) = { canonical commit c touching f : c references t and not u }
 Qualifying_f(t) = SHA-deduplicated union of PairExclusive_f(t,u) over Partners_f(t)
 Repeated_f(t) = max(|Qualifying_f(t)| - 1, 0)
 E_f = sum(Repeated_f(t) for t with Partners_f(t) non-empty)
 ```
 
-A commit SHALL count at most once per task ref after SHA deduplication. It MAY
-count once for two different task refs when it independently qualifies for each.
-With no independent pair, `E_f=0`.
+One commit counts at most once per task after the SHA union, even when it
+qualifies against several partners. No independent pair means `E_f=0`.
 
-### Requirement: Deterministic role-token evidence
-Role hints SHALL operate on the canonical filename stem using this ASCII tokenizer:
+#### Scenario: Task with multiple partners
+- **WHEN** task `#101` is independently paired with `#102` and `#103`
+- **THEN** its pair-exclusive sets are unioned and SHA-deduplicated before repeated edits are counted
 
-1. any character outside `[A-Za-z0-9]` SHALL delimit tokens;
-2. inside one ASCII alphanumeric run, split between a lowercase letter and a following uppercase letter;
+### Requirement: Portable deterministic role-token evidence
+Role hints operate on canonical filename stem using this ASCII tokenizer:
+
+1. any character outside `[A-Za-z0-9]` delimits tokens;
+2. split lowercase-letter → uppercase-letter transitions;
 3. split before the final uppercase letter of an uppercase run when the next character is lowercase;
-4. split between a letter and a digit in either direction;
+4. split letter ↔ digit transitions;
 5. map ASCII `A-Z` to `a-z` by ordinal mapping.
 
-Non-ASCII characters therefore act as delimiters in the initial profile.
-Matching SHALL use exact token equality only; substring, glob, regex, and
-culture-sensitive matching are forbidden.
+Non-ASCII characters are delimiters. Matching uses exact token equality only;
+substring, glob, regex, and culture-sensitive matching are forbidden.
 
-Default role tokens are `dispatcher`, `registry`, `handler`, `loader`, `session`,
+Default tokens are `dispatcher`, `registry`, `handler`, `loader`, `session`,
 `options`, `configuration`, `command`, `diagnostic`, `mapper`, `dto`, `model`,
-`service`, `orchestrator`. `N_f` SHALL be `1.000000000` when any token matches,
-else zero. All matched role tokens SHALL report in ascending ordinal order.
+`service`, and `orchestrator`. `N_f` is `1.000000000` when any token matches and
+zero otherwise. Matched tokens report in canonical scalar-value string order.
 
 ```text
 OcpPressureScore(f) = Q(o_t*T_f + o_c*K_f + o_r*Q(normalized(E_f)) + o_n*N_f)
 ```
 
-OCP rankings SHALL be category-local. Reports SHALL describe bottleneck/OCP
-results as heuristic pressure, never proof of a merge conflict or formal OCP
-violation without separate direct evidence.
+OCP rankings are category-local. Findings use `OCP pressure` or `likely OCP
+violation` with caveats and SHALL NOT claim formal proof.
 
-#### Scenario: Task in multiple independent pairs
-- **WHEN** `#101` is independently paired with both `#102` and `#103`
-- **THEN** its pair-exclusive sets are unioned and SHA-deduplicated before repeated-edit counting
+#### Scenario: Role-token vectors
+- **WHEN** stems include `OrderService`, `DiagnosticMapper`, `ViewModel`, `XMLParser2`, `Serviceable`, and `MyDispatcherFactory`
+- **THEN** exact token matches include `service`, `diagnostic`, `mapper`, `model`, and `dispatcher`, while `Serviceable` does not match `service`
 
-#### Scenario: Role tokenizer vectors
-- **WHEN** stems are `OrderService`, `DiagnosticMapper`, `ViewModel`, `XMLParser2`, `Serviceable`, and `MyDispatcherFactory`
-- **THEN** relevant tokens are respectively `order/service`, `diagnostic/mapper`, `view/model`, `xml/parser/2`, `serviceable`, and `my/dispatcher/factory`; exact matches include `service`, `diagnostic`, `mapper`, `model`, and `dispatcher`, while `Serviceable` does not match `service`
+### Requirement: Stable rankings and refactoring investigations
+Within one primary-category cohort, file findings rank by:
 
-### Requirement: Stable cohort-local rankings and refactoring investigations
-Within one primary-category cohort, file findings SHALL rank by descending
-canonical score, ordinary task spread, churn, commit count, then ascending
-canonical path. Cross-category findings SHALL remain grouped in canonical
-category order rather than interleaved by score.
+1. descending canonical score;
+2. descending ordinary task spread;
+3. descending churn;
+4. descending commit count;
+5. ascending canonical path by scalar-value ordering.
 
-Within one endpoint-category cohort, `G0` pairs SHALL rank by descending canonical
-combined, commit, and task component, then paths. Clusters SHALL use the exact
-`ClusterMaximum`/`ClusterAggregate` ordering above. Cross-cohort pair/cluster
-results SHALL remain grouped.
+Cross-category file findings remain grouped in canonical category order.
 
-Candidates SHALL carry source finding IDs, evidence/components, effective
-thresholds, category/cohort identity, and caveats. Candidate threshold evaluation
-SHALL use canonical values inside the finding's own cohort. Cluster-derived
-candidate logic SHALL consume `Gtheta`; non-cluster file scores SHALL remain
-`G0`-derived. High OCP plus role hint suggests extension-point investigation;
-high co-change cluster suggests boundary investigation; high bottleneck suggests
-orchestration/feature split; high test hotspot suggests fixture/helper work.
-Empty qualifying sets SHALL remain empty.
+Within one endpoint-category cohort, `G0` pairs rank by descending canonical
+combined weight, commit component, task component, then canonical paths. Clusters
+use the exact maximum/aggregate/path order above. Cross-cohort pair/cluster
+results remain grouped.
 
-#### Scenario: Equivalent-score total order
-- **WHEN** same-cohort file findings tie on numeric rank dimensions
-- **THEN** ascending canonical path is the final discriminator
+Candidates are evidence-derived investigations, not automatic redesign decisions.
+They retain source finding IDs, evidence/components, effective thresholds,
+category/cohort identity, and caveats. Cluster-derived candidate logic uses
+`Gtheta`; file scores remain `G0`-derived.
+
+#### Scenario: Same-cohort total order
+- **WHEN** same-cohort file findings tie on all numeric dimensions
+- **THEN** canonical scalar-value path ordering is the final discriminator
 
 ### Requirement: Canonical JSON string escaping
-Every canonical JSON string SHALL be a sequence of valid Unicode scalar values.
-Unpaired surrogate code units or otherwise invalid internal Unicode SHALL fail
-canonical serialization rather than be replaced.
+Every canonical JSON string SHALL contain valid Unicode scalar values. Unpaired
+surrogates or otherwise invalid internal Unicode SHALL fail serialization rather
+than be replaced.
 
-Canonical JSON escaping SHALL use exactly this profile:
+Escaping SHALL be exactly:
 
-- `"` for quotation mark U+0022;
-- `\\` for reverse solidus U+005C;
-- `\b`, `\t`, `\n`, `\f`, and `\r` for U+0008, U+0009, U+000A, U+000C, and U+000D;
-- `\u00XX` with uppercase hexadecimal digits for every other U+0000..U+001F control scalar;
-- solidus `/` SHALL remain unescaped;
-- every other Unicode scalar, including non-ASCII scalars, SHALL be emitted directly as its UTF-8 encoding and SHALL NOT be rewritten as `\uXXXX` or surrogate-pair escapes.
+- U+0022 quotation mark => `\"`;
+- U+005C reverse solidus => `\\`;
+- U+0008/U+0009/U+000A/U+000C/U+000D => `\b`, `\t`, `\n`, `\f`, `\r`;
+- other U+0000..U+001F => `\u00XX` with uppercase hexadecimal digits;
+- solidus `/` remains unescaped;
+- every other Unicode scalar, including non-ASCII, is emitted directly as UTF-8 and SHALL NOT be rewritten as optional `\uXXXX` or surrogate-pair escapes.
 
-This escaping profile applies to property names and string values alike.
+This applies equally to property names and string values. Unicode normalization
+SHALL NOT be introduced during JSON serialization.
 
-#### Scenario: Canonical JSON escaping vector
+#### Scenario: Escaping vector
 - **WHEN** canonical string content contains quote, backslash, slash, U+0001, newline, and `é`
-- **THEN** quote/backslash use short JSON escapes, slash is literal, U+0001 is `\u0001`, newline is `\n`, and `é` is emitted as its UTF-8 scalar bytes
+- **THEN** each uses exactly the canonical escape/direct-UTF8 representation above
 
 ### Requirement: Deterministic report semantics and canonical JSON bytes
 Markdown SHALL contain range/config summary, analyzed/excluded merge counts,
-production hotspots, separate non-production rankings, co-change cohorts,
+production hotspots, separate non-production groups, co-change cohorts,
 bottlenecks, OCP pressure, candidates, and interpretation limits.
 
-Canonical JSON SHALL include input/config identity, commit-set/merge/rename/file-
-event semantics identity, canonical numeric scale, paths/aliases, categories,
-raw/canonical score components, effective weights/thresholds, `G0`/cluster cohort
-identity, independent-task and centrality evidence, OCP evidence, excluded merge
-count, line-count limitation markers, and candidates.
+Canonical JSON SHALL include input/config/history-semantics identity, canonical
+numeric scale, paths/aliases/categories, canonical file events and line-count
+status, raw/canonical score components, weights/thresholds, `G0`/cluster cohort
+identity, independent-task and centrality evidence, OCP evidence, enrichment
+status where available, excluded merge count, and candidates.
 
-Arrays SHALL preserve the category/cohort grouping and stable within-group
-ordering defined by this capability. Object properties SHALL serialize in the
-order declared by the versioned report schema owned by #243. Dynamic object/map
-keys SHALL serialize in ascending ordinal key order after canonical string
-normalization.
+Object properties SHALL serialize in the order declared by #243's versioned
+schema. Dynamic object/map keys SHALL use canonical scalar-value string ordering.
+Arrays SHALL preserve the category/cohort/ranking order defined by this capability.
 
-Canonical JSON bytes SHALL use UTF-8 without a byte-order mark, LF (`\n`) line
-endings, two-space indentation, no trailing whitespace, and exactly one terminal
-LF. Canonical real values SHALL use exactly nine fractional digits without
-exponent notation. All JSON strings SHALL use the canonical escaping profile
-above. The canonical report-artifact identity SHALL be over these exact canonical
-JSON bytes, not an implementation's in-memory dictionary ordering.
+Canonical JSON bytes SHALL use:
 
-Optional .NET/Roslyn enrichment SHALL remain downstream; failure SHALL NOT drop,
-change, or reorder file-level findings.
+- UTF-8 without BOM;
+- LF (`\n`) line endings;
+- two-space indentation;
+- no trailing whitespace;
+- exactly one terminal LF;
+- canonical JSON escaping above;
+- exactly nine fractional digits for canonical real values;
+- no exponent notation for canonical real values.
+
+Canonical report artifact identity SHALL be over these exact bytes, not semantic
+JSON equivalence or in-memory dictionary order.
+
+Optional .NET/Roslyn enrichment is downstream; failure SHALL NOT drop, change,
+rescore, or reorder Git-level findings.
 
 Reports SHALL state that churn is not complexity; co-change is not module proof;
-task/author evidence may be incomplete; multi-reference commits are not
-independent-work proof; excluded merge file deltas can understate merge-resolution
-edits; exact-blob rename recognition intentionally misses rename-with-edit cases;
-exact renames contribute zero content churn; binary/unavailable line counts
-contribute zero churn; v1 requires strict UTF-8 Git paths; normalized scores are
-comparable only in their declared category/cohort; role hints are bounded
-heuristics; and people decide whether to refactor.
+task/author evidence may be incomplete; multi-reference commits do not prove
+independent work; excluded merge file deltas can understate merge-resolution
+edits; exact rename misses rename-with-edit; exact renames contribute zero content
+churn; NUL/gitlink/non-line events contribute zero line churn with explicit
+status; strict UTF-8 is required for v1 Git paths; normalized scores compare only
+inside their cohorts; role hints are bounded heuristics; and people decide
+whether to refactor.
 
 #### Scenario: Deterministic rendering
 - **WHEN** identical canonical evidence is rendered by two conforming implementations
-- **THEN** canonical JSON bytes are identical across environments
+- **THEN** canonical JSON bytes are identical
 
 ### Requirement: Contributor theory reference
 The repository SHALL contain an internal contributor reference consistent with
-this capability, including commit-set and merge semantics, strict UTF-8 Git path
-handling, exact rename recognition, canonical file-event/churn semantics,
-category-cohort normalization, canonical numeric rules, weight validation,
-`G0`/`Gtheta`, cluster aggregation, exact epoch-second temporal proximity,
-independent-task and repeated-edit semantics, cohort-safe centrality, ASCII role
-tokenization, cohort-local rankings, canonical JSON escaping/bytes, reports,
-ownership, and interpretation limits. The internal docs index SHALL link it;
-public MkDocs navigation SHALL not advertise the feature before it ships.
+this capability, including reachability/merge semantics, strict UTF-8 path model,
+scalar-value string ordering, exact rename identity, canonical file-event and LCS
+line-churn semantics, category/cohort normalization, numeric/weight rules,
+`G0/Gtheta`, cluster aggregation, exact epoch-second temporal proximity,
+independent-task/repeated-edit semantics, cohort-safe centrality, ASCII role
+tokenization, canonical JSON escaping/bytes, reports, ownership, and limitations.
+Public MkDocs navigation SHALL NOT advertise the feature before implementation
+ships.
 
 #### Scenario: Contributor discovers theory
 - **WHEN** a contributor opens the internal documentation index
