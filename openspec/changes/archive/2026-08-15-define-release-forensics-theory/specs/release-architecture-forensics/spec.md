@@ -2,70 +2,51 @@
 
 ### Requirement: Explicit deterministic analysis identity
 Release Architecture Forensics SHALL analyze an explicit Git range whose
-`from` ref is exclusive and whose `to` ref is inclusive. Both refs SHALL be
-resolved before analysis; a missing, ambiguous, or unresolvable ref SHALL fail
-closed with a diagnostic rather than selecting a default branch or range.
-
-The canonical analysis identity SHALL contain the authored refs, their resolved
-commit IDs, the effective `history_analysis` configuration identity, and the
-tool version. It SHALL use normalized repository-relative logical paths and
-shall not contain an absolute checkout root, local timezone, generated-at
-timestamp, or other environment-dependent presentation data. Uncommitted
-working-tree state SHALL not alter Git-only evidence.
-
-Commit records SHALL use a stable ascending order of committer UTC timestamp
-followed by ordinal commit SHA. A normalized author identity SHALL be the
-trimmed, invariant-lowercase email when one is present; otherwise it SHALL be
-the trimmed, invariant-lowercase author name; an absent value SHALL be the
-literal `unknown`. Task/issue references SHALL be extracted, deduplicated, and
-ordered deterministically under the effective configuration.
-
-#### Scenario: Missing explicit ref
-- **WHEN** an analysis request names a `from` or `to` ref that cannot be resolved
-- **THEN** the analysis fails with a non-success result and does not substitute another ref
+`from` ref is exclusive and whose `to` ref is inclusive. Both refs SHALL resolve
+before analysis; missing, ambiguous, or unresolvable refs SHALL fail closed.
+Canonical identity SHALL contain authored refs, resolved commit IDs, effective
+`history_analysis` configuration identity, and tool version, while excluding
+absolute checkout roots, generated timestamps, timezone, locale, and other
+environment-dependent presentation data. Commit records SHALL sort ascending by
+committer UTC timestamp then ordinal SHA. Author identity SHALL use trimmed
+invariant-lowercase email, else name, else `unknown`. Task references SHALL be
+extracted, deduplicated, and ordered deterministically.
 
 #### Scenario: Equivalent execution environments
-- **WHEN** the same repository objects, resolved refs, effective configuration, and tool version are analyzed from two checkout roots or timezones
-- **THEN** their canonical results have identical identities, logical paths, findings, and canonical JSON
+- **WHEN** identical repository objects, refs, configuration, and tool version are analyzed from different checkout roots or timezones
+- **THEN** canonical identity, evidence, findings, and JSON are identical
 
 #### Scenario: Empty range
-- **WHEN** an explicit range resolves to no commits
-- **THEN** the result succeeds with an explicit empty-range summary and deterministic empty/zero findings rather than an undefined result
+- **WHEN** an explicit range contains no commits
+- **THEN** analysis succeeds with deterministic empty/zero evidence
 
-### Requirement: Canonical evidence entities and path classification
-The Git/history core SHALL model an analyzed range, commits, normalized authors,
-repository-relative logical file paths and rename chains, extracted task/issue
-references and task episodes, path categories, file hotspots, co-change edges
-and clusters, parallel-development bottlenecks, OCP-pressure points, and
-evidence-backed refactoring candidates.
+### Requirement: Canonical logical-file identity and path classification
+A logical file SHALL represent one unambiguous linear rename chain. Its canonical
+logical path SHALL be the normalized repository-relative path at the last
+in-range occurrence, including the deleted path when the final occurrence is a
+deletion. Earlier paths SHALL remain ordered aliases/evidence and SHALL NOT
+receive independent file scores. Copies, splits, merges, and otherwise ambiguous
+rename relationships SHALL remain separate logical identities unless Git
+evidence establishes one unambiguous chain.
 
-A logical path SHALL be repository-relative, use `/` separators, and represent
-one unambiguous rename chain as one file identity. Commit file entries SHALL
-retain status, additions, and deletions. Churn for file `f` in range `r` SHALL
-be `Σ(additions(f, commit) + deletions(f, commit))` over its logical identity.
-Churn is change volume, not a complexity measure.
+Each logical file SHALL have exactly one primary category derived by applying the
+effective #237 classifier to its canonical logical path: `production`, `tests`,
+`docs`, `generated`, `build_ci`, `samples_examples`, or `unknown`. Alias
+classifications MAY remain evidence but SHALL NOT replace the primary category
+or ranking path. Commit-file entries SHALL retain status, additions, deletions,
+observed path, and logical identity. Churn SHALL be the sum of additions plus
+deletions over that identity and SHALL be described as volume, not complexity.
 
-Every logical path SHALL be classified as exactly one of `production`, `tests`,
-`docs`, `generated`, `build_ci`, `samples_examples`, or `unknown`. The
-schema-backed, bounded matcher and override syntax belong to the normal policy
-model owned by #237; this capability SHALL NOT define a second configuration
-authority. `unknown` paths SHALL remain visible and shall not be silently
-dropped.
+#### Scenario: Rename across categories
+- **WHEN** `src/Old.cs` is unambiguously renamed to `tests/New.cs` in range
+- **THEN** one logical file is scored using canonical path `tests/New.cs` and the primary category derived from that path
 
-#### Scenario: Rename-chain normalization
-- **WHEN** Git evidence unambiguously identifies a file rename within the analyzed range
-- **THEN** its earlier and later paths contribute to one logical-file identity rather than independent scores
+#### Scenario: Ambiguous rename evidence
+- **WHEN** Git evidence represents a copy, split, merge, or otherwise ambiguous relationship
+- **THEN** the analyzer keeps the affected paths as separate logical identities
 
-#### Scenario: Unknown path category
-- **WHEN** a logical path matches no effective path category rule
-- **THEN** the result records the path as `unknown` and preserves it in applicable evidence output
-
-#### Scenario: Non-production changes
-- **WHEN** a docs, generated, build/CI, test, or sample path has high churn
-- **THEN** its category remains available so reporting policy can distinguish it from a primary production signal
-
-### Requirement: Total normalization and effective scoring configuration
-For every non-negative component population, the normalizer SHALL be:
+### Requirement: Total normalization and deterministic populations
+For every non-negative component population:
 
 ```text
 normalized(x) = 0                              when max(population) = 0
@@ -75,35 +56,41 @@ normalized_log(x) = 0                          when max(population) = 0
                     log(1 + x) / log(1 + max)  otherwise
 ```
 
-All-zero and empty populations SHALL return finite `0` values; they SHALL NOT
-produce NaN, Infinity, exceptions, or implementation-specific fallbacks. A
-missing optional evidence family, including absent task references, contributes
-raw `0` to each dependent component. The system SHALL NOT renormalize remaining
-component weights because an evidence family is absent.
+Empty/all-zero populations SHALL produce finite `0`; missing optional evidence
+SHALL contribute raw `0`; runtime weight renormalization SHALL NOT occur. #237
+ignore rules are analysis filters, so ignored logical files SHALL be removed
+before normalization and graph construction. Presentation-only suppression
+SHALL NOT alter canonical scores.
 
-Each run SHALL have one validated effective scoring configuration. The initial
-default profiles are: hotspot `(commit .30, churn .25, task .25, author .10,
-temporal .10)`; bottleneck `(task .35, author .15, temporal .20, degree .20,
-centrality .10)`; OCP pressure `(task .40, centrality .25, repeated_episode_edit
-.25, role_hint .10)`; and combined co-change `(commit .75, task .25)`. Later
-configuration is schema-backed and validated by #237; a disabled component is
-an explicit effective-configuration decision, not a runtime response to absent
-evidence.
+File-level hotspot, bottleneck, and OCP components SHALL normalize against
+retained logical files in the same primary category. Co-change edge components
+SHALL normalize against retained edges with the same unordered endpoint-category
+pair. Thus non-production volume SHALL NOT set production normalization maxima.
 
-#### Scenario: All-zero normalization
-- **WHEN** every file in an analyzed population has zero churn, zero task spread, or another zero-valued component
-- **THEN** every normalized value for that component is finite `0`
+#### Scenario: Category isolation
+- **WHEN** a generated file has much higher churn than retained production files
+- **THEN** it does not alter the production churn normalization maximum
 
-#### Scenario: No task references
-- **WHEN** no commit in the range yields a task/issue reference
-- **THEN** task-dependent raw components are `0`, configured task weights remain unchanged, and the report records that limitation
+#### Scenario: Ignored file
+- **WHEN** policy ignores a logical file
+- **THEN** it does not participate in normalization, graph evidence, findings, or candidates
 
-#### Scenario: Intentional component disablement
-- **WHEN** a validated effective configuration disables a score component
-- **THEN** the component is omitted only according to that configuration and the effective weights remain explicit in result metadata
+### Requirement: Effective scoring configuration
+Each run SHALL use one validated effective scoring configuration. Defaults are:
+hotspot `(commit .30, churn .25, task .25, author .10, temporal .10)`;
+bottleneck `(independent task .35, author .15, temporal .20, degree .20,
+centrality .10)`; OCP pressure `(independent task .40, centrality .25,
+repeated_episode_edit .25, role_hint .10)`; co-change `(commit .75, task .25)`.
+#237 MAY make weights configurable. Every formula SHALL consume the effective
+validated weights; a disabled component SHALL be explicit, and missing evidence
+SHALL NOT change other weights at runtime.
+
+#### Scenario: Configured weight
+- **WHEN** an effective profile changes a default weight
+- **THEN** scoring consumes and reports the effective value rather than the default literal
 
 ### Requirement: Deterministic hotspot and co-change evidence
-For every logical file `f`, the system SHALL compute:
+For retained logical file `f`, using effective hotspot weights:
 
 ```text
 C_f = normalized(commit_count(f))
@@ -112,166 +99,146 @@ T_f = normalized(distinct_task_references(f))
 A_f = normalized(distinct_normalized_authors(f))
 R_f = normalized(temporal_span_seconds(f))
 
-HotspotScore(f) = .30*C_f + .25*H_f + .25*T_f + .10*A_f + .10*R_f
+HotspotScore(f) = w_c*C_f + w_h*H_f + w_t*T_f + w_a*A_f + w_r*R_f
 ```
 
-`temporal_span_seconds(f)` SHALL be the non-negative difference between the
-latest and earliest UTC Unix commit timestamps touching `f`; a one-commit file
-has span `0`. This is a persistent-edit signal, not a wall-clock recency value.
-Each finding SHALL retain its raw metrics and normalized components.
+`temporal_span_seconds` SHALL be latest minus earliest UTC Unix timestamp for the
+file, with one-commit span `0`. Findings SHALL retain raw metrics, normalized
+components, and effective weights.
 
-The co-change graph SHALL be weighted, undirected, and contain one vertex per
-logical file in the range. For distinct logical files `a` and `b`:
+For retained logical files `a,b`, using effective co-change weights:
 
 ```text
 CommitCoChange(a,b) = count(commits containing both a and b)
 TaskCoChange(a,b)   = count(distinct tasks whose episodes contain both a and b)
-CombinedCoChange(a,b) = .75*normalized(CommitCoChange)
-                        + .25*normalized(TaskCoChange)
+CombinedCoChange(a,b) = alpha*normalized(CommitCoChange)
+                        + beta*normalized(TaskCoChange)
 ```
 
-Absent task evidence contributes zero. An edge pair SHALL be stored in
-ascending logical-path order. A co-change cluster SHALL be a connected component
-of edges meeting an explicitly configured significance threshold; when no such
-threshold is effective, the result SHALL emit pair-level evidence and an empty
-cluster list rather than infer a cluster from an arbitrary cutoff.
+Pair paths SHALL use ascending canonical logical-path order. Missing task
+evidence SHALL be zero without weight renormalization. Clusters SHALL be emitted
+only from edges crossing an explicit effective threshold; without one, pair
+evidence remains and the cluster list is empty.
 
 #### Scenario: Stable tied hotspot ranking
-- **WHEN** two production files have equal hotspot scores
-- **THEN** they are ordered by descending task spread, descending churn, descending commit count, then ascending normalized logical path
+- **WHEN** same-category files have equal hotspot scores
+- **THEN** ranking uses descending ordinary task spread, churn, commit count, then ascending canonical path
 
 #### Scenario: Co-change without tasks
-- **WHEN** two files change together in commits but no task references are extracted
-- **THEN** their commit co-change weight is retained, task co-change is zero, and combined co-change uses the fixed effective weights without renormalization
+- **WHEN** files co-change but no task refs are extracted
+- **THEN** commit evidence remains, task evidence is zero, and effective weights remain unchanged
 
-#### Scenario: Stable graph input order
-- **WHEN** equivalent commit/file evidence is enumerated in different input orders
-- **THEN** vertices, ordered edge pairs, weights, rankings, and any thresholded clusters are identical
+### Requirement: Independent task evidence for parallel-development signals
+A task episode SHALL be commits linked to one extracted reference. A commit MAY
+reference multiple tasks and contribute ordinary task spread/task co-change to
+each, but that alone SHALL NOT establish independent workstreams.
+
+For file `f`, refs `x,y` form an independent pair only when each side has at
+least one pair-exclusive commit touching `f`: one references `x` but not `y`,
+and one references `y` but not `x`. Shared-reference commits SHALL NOT establish
+independence, temporal overlap/proximity, or repeated-episode-edit evidence for
+that pair. `IndependentTaskSpread(f)` SHALL count references participating in at
+least one independent pair.
+
+Temporal intervals SHALL use pair-exclusive commits. Their gap is zero when UTC
+intervals overlap, otherwise the ceiling of the positive gap in days, and
+`TemporalProximity = 1/(1+days_between)`. File raw temporal value SHALL be the
+maximum across independent pairs, or zero when none exist.
+
+#### Scenario: One multi-reference commit
+- **WHEN** the only file-touching commit references both `#101` and `#102`
+- **THEN** ordinary task spread may contain both refs but independent task spread, temporal proximity, and repeated-episode-edit evidence are zero
+
+#### Scenario: Independent pair
+- **WHEN** each of two refs has file-touching pair-exclusive commit evidence
+- **THEN** temporal proximity is calculated from those pair-exclusive intervals
 
 ### Requirement: Deterministic bottleneck and OCP-pressure evidence
-A task episode SHALL be the commits for one extracted task/issue reference.
-For a file and two distinct task episodes, `days_between` SHALL be zero when
-their UTC intervals overlap; otherwise it SHALL be the ceiling of the positive
-UTC interval gap in days. `TemporalProximity(e1,e2) = 1 / (1 + days_between)`.
-The raw temporal-overlap value for a file is the maximum proximity across its
-distinct task-episode pairs, or `0` when fewer than two exist.
-
-For bottlenecks, `D_f` SHALL be normalized distinct-neighbor degree and `K_f`
-shall be normalized weighted degree (the sum of combined co-change weights).
-With `O_f` as normalized raw temporal proximity, the score SHALL be:
+Bottleneck `T_f` SHALL be normalized `IndependentTaskSpread`, `A_f` normalized
+author spread, `O_f` normalized independent-task temporal proximity, `D_f`
+normalized distinct-neighbor degree, and `K_f` normalized weighted degree.
+Using effective weights:
 
 ```text
-BottleneckScore(f) = .35*T_f + .15*A_f + .20*O_f + .20*D_f + .10*K_f
+BottleneckScore(f) = b_t*T_f + b_a*A_f + b_o*O_f + b_d*D_f + b_c*K_f
 ```
 
-For OCP pressure, `E_f` SHALL be the sum of additional commits after the first
-commit in each task episode touching `f`, provided `f` has at least two distinct
-task episodes; otherwise it is zero. `N_f` SHALL be `1` only when the normalized
-file stem matches a bounded, reported default role/name token: `dispatcher`,
-`registry`, `handler`, `loader`, `session`, `options`, `configuration`,
-`command`, `diagnostic`, `mapper`, `dto`, `model`, `service`, or `orchestrator`.
-It is `0` otherwise. The score SHALL be:
+OCP `T_f` SHALL also use independent task spread. `E_f` SHALL count repeated
+pair-exclusive edits for refs participating in at least one independent pair,
+counting qualifying commits after the first unique commit per task ref and no
+commit more than once per task ref; with no independent pair `E_f=0`.
+
+Role hints SHALL use the canonical filename without final extension. The stem
+SHALL be tokenized by non-alphanumeric boundaries, lower-to-upper camel/Pascal
+transitions, acronym-to-word boundaries, and letter/digit boundaries, then
+invariant-lowercased. Matching SHALL use exact token equality only, never
+substring/glob/regex matching. Default tokens are `dispatcher`, `registry`,
+`handler`, `loader`, `session`, `options`, `configuration`, `command`,
+`diagnostic`, `mapper`, `dto`, `model`, `service`, `orchestrator`. `N_f=1` when
+one or more tokens match, otherwise zero, and all matched tokens SHALL be
+reported in ascending ordinal order.
 
 ```text
-OcpPressureScore(f) = .40*T_f + .25*K_f + .25*normalized(E_f) + .10*N_f
+OcpPressureScore(f) = o_t*T_f + o_c*K_f + o_r*normalized(E_f) + o_n*N_f
 ```
 
-Reports SHALL call these results `parallel-development bottleneck` or
-`parallel-development pressure`, and `OCP pressure` or `likely OCP violation`.
-They SHALL NOT claim that a merge conflict occurred or that an OCP violation is
-proven unless separate direct evidence establishes that fact.
+Reports SHALL describe parallel-development pressure/bottlenecks and OCP
+pressure/likely OCP violations as heuristic evidence, never proof of an actual
+merge conflict or formal OCP violation without separate direct evidence.
+
+#### Scenario: Role tokenization
+- **WHEN** stems are `OrderService`, `DiagnosticMapper`, and `ViewModel`
+- **THEN** exact token matches are `service`, `diagnostic`/`mapper`, and `model`; a substring inside an unsplit token does not match
 
 #### Scenario: One task episode
-- **WHEN** a file is touched by commits linked to only one task episode
-- **THEN** its temporal-proximity and repeated-episode-edit raw values are zero
+- **WHEN** only one task ref touches a file
+- **THEN** independent task spread, temporal proximity, and repeated-episode-edit evidence are zero
 
-#### Scenario: Overlapping task episodes
-- **WHEN** two distinct task episodes touching a file overlap in UTC time
-- **THEN** their temporal proximity is `1` and the finding retains the episode evidence that produced it
+### Requirement: Stable rankings and refactoring investigations
+File findings SHALL rank by descending score, ordinary task spread, churn,
+commit count, then ascending canonical logical path. Co-change pairs SHALL rank
+by descending combined, commit, task weight, then ascending canonical paths.
+Clusters SHALL rank by descending maximum edge, aggregate edge weight, then
+ascending first-member canonical path.
 
-#### Scenario: Role hint limitation
-- **WHEN** an OCP-pressure finding receives role/name-hint evidence
-- **THEN** the report identifies the matched token and describes it as bounded heuristic evidence rather than semantic proof
-
-### Requirement: Stable rankings, findings, and refactoring investigations
-Every ranked file finding SHALL use descending score, then descending task
-spread, descending churn, descending commit count, and ascending normalized
-logical path as its stable tie-break sequence. Co-change pair rankings SHALL
-use descending combined weight, descending commit weight, descending task
-weight, then ascending first and second logical paths. Cluster order SHALL use
-descending maximum edge weight, descending aggregate edge weight, then
-ascending first member path.
-
-Refactoring candidates SHALL be evidence-derived investigations, not automatic
-redesign decisions. Each candidate SHALL carry its source finding identifiers,
-component/evidence values, effective thresholds, and interpretation caveat. The
-canonical mapping is: high OCP pressure plus role-hint evidence suggests
-investigating extension-point extraction; a high co-change cluster suggests
-investigating a module or contract boundary; a high bottleneck suggests
-investigating orchestration or feature separation; and a high test-only hotspot
-suggests investigating fixture/helper architecture. Candidate emission
-thresholds are schema-backed configuration owned by #237.
+Candidates SHALL be evidence-derived investigations with source finding IDs,
+components/evidence, effective thresholds, and caveats. High OCP pressure plus a
+role hint suggests extension-point investigation; high co-change cluster suggests
+boundary investigation; high bottleneck suggests orchestration/feature split;
+high test-only hotspot suggests fixture/helper architecture. No qualifying
+finding SHALL produce an empty candidate collection rather than fabricated work.
 
 #### Scenario: Equivalent-score total order
-- **WHEN** all numeric rank dimensions for two file findings are equal
-- **THEN** ascending normalized logical path provides the final deterministic discriminator
-
-#### Scenario: Evidence-backed candidate
-- **WHEN** a finding qualifies for a refactoring candidate
-- **THEN** the candidate names the source evidence and caveat and does not present a refactoring as an automatic conclusion
-
-#### Scenario: No qualifying candidates
-- **WHEN** no finding crosses effective candidate thresholds
-- **THEN** the report emits an empty deterministic candidate collection and does not fabricate recommendations
+- **WHEN** numeric rank dimensions tie
+- **THEN** ascending canonical logical path is the final discriminator
 
 ### Requirement: Deterministic report semantics and interpretation limits
-The reporting layer SHALL produce stable markdown and canonical JSON from the
-same file-level evidence. Markdown SHALL contain analyzed range and effective
-configuration summary, top hotspots, co-change pairs/clusters, bottlenecks, OCP
-pressure, refactoring candidates, and limitations/interpretation notes.
-Canonical JSON SHALL contain metadata/input refs, effective configuration
-identity/summary, path categories, hotspot components, co-change summary,
-bottleneck evidence, OCP-pressure evidence, and refactoring candidates.
+Markdown SHALL contain range/config summary, hotspots, co-change pairs/clusters,
+bottlenecks, OCP pressure, candidates, and interpretation limits. Canonical JSON
+SHALL include input/config identity, canonical paths and aliases, primary
+categories, raw/normalized components, effective weights, co-change evidence,
+independent-task evidence, OCP evidence, and candidates with stable array and
+field ordering. Generated timestamps and environment display data SHALL NOT alter
+canonical identity. Optional .NET/Roslyn enrichment SHALL remain downstream and
+failure SHALL NOT drop, change, or reorder file-level findings.
 
-Canonical JSON arrays SHALL use the ordering defined by this capability and
-fields SHALL be serialized in the documented schema order. Generated timestamps
-and environment-specific display values SHALL be excluded from canonical result
-identity. The Git-only core SHALL remain independent of optional .NET/Roslyn
-enrichment; failed or unavailable enrichment SHALL preserve the file-level
-finding unchanged.
+Reports SHALL state that churn is not complexity, co-change is not module-ownership
+proof, task/author evidence may be incomplete, multi-reference commits are not
+independent-work proof, role hints are bounded heuristics, and refactoring needs
+human judgment. Canonical scoring/recommendations SHALL not require stochastic
+inference.
 
-The report SHALL state that churn is not complexity; high co-change is a
-coupling/coordination signal rather than proof of module ownership; task and
-author evidence may be incomplete; non-production categories can dominate raw
-volume; role hints are bounded heuristics; and recommendations require human
-review. Canonical scoring and recommendations SHALL not require LLM or other
-stochastic inference.
-
-#### Scenario: Deterministic report serialization
+#### Scenario: Deterministic rendering
 - **WHEN** identical canonical evidence is rendered twice
-- **THEN** markdown ordering and canonical JSON content are identical without generated-time or checkout-root differences
-
-#### Scenario: Unavailable .NET enrichment
-- **WHEN** optional C# enrichment cannot parse or map a changed file
-- **THEN** the report retains the original file-level finding and records enrichment as unavailable rather than dropping or changing the score
-
-#### Scenario: Interpretation notes
-- **WHEN** a report contains a hotspot, co-change, bottleneck, OCP-pressure finding, or candidate
-- **THEN** it includes the applicable evidence and limitation language required to prevent it being interpreted as formal design-law proof
+- **THEN** markdown ordering and canonical JSON content are identical
 
 ### Requirement: Contributor theory reference
-The repository SHALL contain a contributor-facing Release Architecture Forensics
-reference that explains the product boundary, canonical input model, entities,
-formulas, fixed initial profiles, ranking, report semantics, configuration
-ownership, and interpretation limits in terms consistent with this capability.
-The internal documentation index SHALL link to that reference. It SHALL not be
-added to public MkDocs navigation until an implementation change establishes a
-user-facing product contract.
+The repository SHALL contain an internal contributor reference consistent with
+this capability, covering logical-file identity, category-cohort normalization,
+independent-task semantics, effective scoring profiles, role-token matching,
+rankings, reports, ownership, and limits. The internal docs index SHALL link it;
+public MkDocs navigation SHALL not advertise the unimplemented feature.
 
 #### Scenario: Contributor discovers theory
 - **WHEN** a contributor opens the internal documentation index
 - **THEN** it links to the Release Architecture Forensics theory reference
-
-#### Scenario: Public documentation boundary
-- **WHEN** the MkDocs navigation is built before the feature is implemented
-- **THEN** it does not advertise Release Architecture Forensics as a shipped user-facing command or policy feature
