@@ -35,8 +35,8 @@ One analysis is identified by:
 
 `from` is exclusive and `to` is inclusive. Both refs must resolve before
 analysis; unknown or ambiguous refs fail closed. Canonical metadata retains the
-authored refs and their resolved commit IDs. An empty range succeeds with an
-explicit empty summary and zero/empty evidence.
+authored refs and resolved commit IDs. An empty range succeeds with explicit
+empty/zero evidence.
 
 Canonical evidence uses repository-relative paths with `/`, commit records
 ordered by committer UTC timestamp then ordinal SHA, normalized author
@@ -70,111 +70,149 @@ Churn is change volume, not complexity.
 Every logical file has exactly one primary category derived from its canonical
 logical path:
 
-- production
-- tests
-- docs
-- generated
-- build_ci
-- samples_examples
-- unknown
+1. production
+2. tests
+3. docs
+4. generated
+5. build_ci
+6. samples_examples
+7. unknown
 
-Alias classifications may be retained as evidence, but the canonical path owns
-the primary category and the ranking path. `unknown` remains visible. #237 owns
-the schema-backed matcher, ignore rules, category overrides, thresholds, and
-other bounded `history_analysis` configuration.
-
-Example: if `src/Old.cs` is unambiguously renamed to `tests/New.cs`, the range
-contains one logical file, its canonical path is `tests/New.cs`, and its primary
-category is derived from that path.
+This is also the canonical serialization/group order. Alias classifications may
+remain evidence, but the canonical path owns the primary category and ranking
+path. `unknown` remains visible. #237 owns schema-backed matcher/ignore rules,
+category overrides, thresholds, and the bounded `history_analysis` configuration.
 
 ## Normalization populations
 
-All score functions are total over non-negative populations:
+Ignore rules are **analysis filters**: ignored logical files are removed before
+normalization and graph construction. Presentation-only suppression never changes
+canonical scores.
+
+File-level components normalize against retained files in the same primary
+category. Co-change edge components normalize against retained edges having the
+same unordered endpoint-category pair. The endpoint-category pair is ordered by
+the category order above.
+
+This prevents generated/docs/test/build volume from setting production maxima.
+It also means normalized values from separate cohorts are **not numerically
+comparable** as one global ranking.
+
+The mathematical normalizers are:
 
 ~~~text
 normalized(x) =
-  0,                         if max(x in population) = 0
-  x / max(x in population), otherwise
+  0,                         if max(population) = 0
+  x / max(population), otherwise
 
 normalized_log(x) =
-  0,                                         if max(x in population) = 0
-  log(1 + x) / log(1 + max(x in population)), otherwise
+  0,                                         if max(population) = 0
+  log(1 + x) / log(1 + max(population)), otherwise
 ~~~
 
-Empty and all-zero populations produce finite `0`, never NaN, Infinity, an
-exception, or an implementation-specific fallback. Missing optional evidence is
-raw `0`; weights are not silently renormalized.
+Empty/all-zero populations produce finite zero. Missing optional evidence is raw
+zero; weights are never silently renormalized.
 
-Population membership is part of the deterministic contract:
+## Canonical numeric model
 
-- #237 ignore rules are **analysis filters**; ignored logical files are removed
-  before normalization and graph construction;
-- presentation-only suppression never changes canonical scores;
-- file-level metrics normalize against retained logical files in the same
-  primary category;
-- co-change edge components normalize against retained edges with the same
-  unordered endpoint-category pair.
+All canonical derived real values use nine decimal places:
 
-Therefore generated/docs/test/build noise cannot set a production normalization
-maximum merely because those paths exist in the same Git range.
+~~~text
+Q(v) = round-half-to-even(v, 9 decimal places)
+~~~
+
+The formulas define mathematical real values. Implementations may use any
+higher-precision or equivalent internal algorithm, but every normalized
+component, temporal proximity, combined edge weight, final score, and configured
+numeric threshold is reduced to `Q(v)` **before** threshold comparison, ranking,
+or canonical serialization.
+
+Canonical JSON writes those values with exactly nine fractional digits,
+invariant culture, and no exponent notation. Raw integral evidence such as
+commit count, churn, task count, author count, and day gaps remains integer data.
+
+This makes canonical output independent of platform-specific floating-point or
+`log` implementation details: implementations must agree on the correctly
+rounded mathematical result rather than on an intermediate machine representation.
 
 ## Effective scoring configuration
 
-The default profiles are:
+Default profiles are:
 
 | Profile | Default components and weights |
 | --- | --- |
 | Hotspot | commit 0.30, churn 0.25, task 0.25, author 0.10, temporal 0.10 |
 | Bottleneck | independent task 0.35, author 0.15, temporal 0.20, degree 0.20, centrality 0.10 |
 | OCP pressure | independent task 0.40, centrality 0.25, repeated episode edit 0.25, role hint 0.10 |
-| Combined co-change | commit evidence 0.75, task evidence 0.25 |
+| Combined co-change | commit 0.75, task 0.25 |
 
-These numbers are defaults, not hard-coded alternate formulas. #237 may expose
-validated configuration for them. Every run has one effective profile and all
-formulas consume those effective weights. Disabling a component is explicit in
-the effective configuration; missing evidence never changes weights at runtime.
+#237 may expose validated configuration for those weights. Every effective weight
+is a finite non-negative base-10 decimal with at most nine fractional digits.
+Within one profile:
+
+- enabled components have weight `> 0`;
+- disabled components have weight exactly `0`;
+- at least one component is enabled;
+- all effective weights sum exactly to `1.000000000`.
+
+For co-change this means `alpha + beta = 1.000000000`. Invalid profiles fail
+validation; they are not repaired by runtime normalization. Missing evidence does
+not alter the effective profile.
 
 ## Hotspots
 
 For logical file `f`:
 
 ~~~text
-C_f = normalized(commit_count(f))
-H_f = normalized_log(churn(f))
-T_f = normalized(distinct_task_references(f))
-A_f = normalized(distinct_normalized_authors(f))
-R_f = normalized(temporal_span_seconds(f))
+C_f = Q(normalized(commit_count(f)))
+H_f = Q(normalized_log(churn(f)))
+T_f = Q(normalized(distinct_task_references(f)))
+A_f = Q(normalized(distinct_normalized_authors(f)))
+R_f = Q(normalized(temporal_span_seconds(f)))
 
-HotspotScore(f) = w_c*C_f + w_h*H_f + w_t*T_f + w_a*A_f + w_r*R_f
+HotspotScore(f) = Q(w_c*C_f + w_h*H_f + w_t*T_f + w_a*A_f + w_r*R_f)
 ~~~
 
 The default `w_*` values are `.30,.25,.25,.10,.10`.
-`temporal_span_seconds(f)` is the non-negative difference between latest and
-earliest UTC Unix commit timestamps touching `f`. It measures persistent edit
-pressure, not wall-clock recency; a one-commit file has span `0`.
+`temporal_span_seconds(f)` is latest minus earliest UTC Unix commit timestamp;
+a one-commit file has span zero.
 
-Findings retain raw metrics, normalized components, and effective weights.
+Hotspots are ranked **inside each category cohort**. The default human `top
+hotspots` section means production hotspots. Tests/docs/generated/build/sample/
+unknown findings are separate ranked groups. A docs score of `0.950000000` does
+not outrank a production score of `0.800000000`; their maxima came from different
+populations.
 
 ## Co-change
 
-The co-change graph is weighted and undirected. Its vertices are retained
-logical files. Pair paths are canonical paths in ascending ordinal order.
+The co-change graph is weighted and undirected. Vertices are retained logical
+files; pair paths are canonical paths in ascending ordinal order.
 
 ~~~text
 CommitCoChange(a,b) = count(commits containing both a and b)
 TaskCoChange(a,b)   = count(distinct tasks whose episodes contain both a and b)
 
-CombinedCoChange(a,b) = alpha*normalized(CommitCoChange)
-                        + beta*normalized(TaskCoChange)
+CommitComponent = Q(normalized(CommitCoChange))
+TaskComponent   = Q(normalized(TaskCoChange))
+CombinedCoChange = Q(alpha*CommitComponent + beta*TaskComponent)
 ~~~
 
-The default `alpha=.75` and `beta=.25`; effective values come from the run's
-validated profile. Missing task evidence contributes zero without changing the
-weights.
+Defaults are `alpha=.75`, `beta=.25`.
 
-A cluster is a connected component formed only from edges meeting an explicit
-effective significance threshold. With no threshold, pair evidence remains but
-the cluster list is empty rather than using an invented cutoff.
+A configured co-change significance threshold is a canonical value in `[0,1]`
+and applies **only to canonical `CombinedCoChange`**. The comparison is inclusive:
+
+~~~text
+edge qualifies iff CombinedCoChange >= threshold
+~~~
+
+Clusters are built independently for each unordered endpoint-category cohort
+from qualifying edges in that cohort. A cluster is a connected component with at
+least two vertices. If no threshold is configured, pair evidence remains and the
+cluster list is empty.
+
+Pairs and clusters are ranked only within their endpoint-category cohort; there
+is no global numeric comparison across cohorts.
 
 ## Task episodes and independent-work evidence
 
@@ -182,116 +220,116 @@ A task episode is the commits linked to one extracted task/issue reference. A
 single commit may reference several tasks and may contribute ordinary task spread
 or task-level co-change to each. That does **not** establish parallel work.
 
-For one logical file, task references `x` and `y` are an **independent task
-pair** only when both sides have pair-exclusive evidence:
+For one logical file, references `x` and `y` are an **independent pair** only when
+both sides have pair-exclusive evidence:
 
-- at least one commit touching the file references `x` but not `y`;
-- at least one commit touching the file references `y` but not `x`.
+- at least one file-touching commit references `x` but not `y`;
+- at least one file-touching commit references `y` but not `x`.
 
-A commit referencing both tasks cannot establish independence, temporal overlap,
-or repeated-episode-edit evidence for that pair.
+A commit referencing both tasks cannot establish independence or temporal overlap
+for that pair.
 
 ~~~text
 IndependentTaskSpread(f) =
   count(task refs participating in at least one independent pair for f)
 ~~~
 
-For an independent pair, each interval is built from that side's pair-exclusive
-commits:
+For an independent pair, each interval is built from pair-exclusive commits:
 
 ~~~text
-days_between(e1,e2) = 0                              if intervals overlap
-                      ceil(positive UTC gap in days) otherwise
+days_between = 0                              if intervals overlap
+               ceil(positive UTC gap in days) otherwise
 
-TemporalProximity(e1,e2) = 1 / (1 + days_between(e1,e2))
+TemporalProximity = Q(1 / (1 + days_between))
 ~~~
 
-The file-level raw temporal value is the maximum proximity across independent
-pairs, or `0` when none exists.
-
-This prevents a commit such as `fix parser (#101, #102)` from producing a false
-parallel-development signal merely because two references occur in one commit.
-Ordinary hotspot task spread may still record both references.
+The file temporal value is the maximum canonical proximity across independent
+pairs, or zero when none exists.
 
 ## Bottleneck score
 
-For bottlenecks:
-
 ~~~text
-T_f = normalized(IndependentTaskSpread(f))
-A_f = normalized(author spread)
-O_f = normalized(independent-task temporal proximity)
-D_f = normalized(distinct-neighbor degree)
-K_f = normalized(weighted degree)
+T_f = Q(normalized(IndependentTaskSpread(f)))
+A_f = Q(normalized(author spread))
+O_f = Q(normalized(independent-task temporal proximity))
+D_f = Q(normalized(distinct-neighbor degree))
+K_f = Q(normalized(weighted degree))
 
-BottleneckScore(f) = b_t*T_f + b_a*A_f + b_o*O_f + b_d*D_f + b_c*K_f
+BottleneckScore(f) = Q(b_t*T_f + b_a*A_f + b_o*O_f + b_d*D_f + b_c*K_f)
 ~~~
 
 The default `b_*` values are `.35,.15,.20,.20,.10`.
 
-The result is described as parallel-development bottleneck/pressure. It does not
-claim that a merge conflict actually occurred.
+Bottleneck rankings are category-local. The result is parallel-development
+bottleneck/pressure evidence, not proof that a merge conflict occurred.
 
-## OCP-pressure score and role tokens
+## OCP-pressure score and repeated editing
 
-OCP task spread also uses `IndependentTaskSpread`. `E_f` measures repeated
-pair-exclusive editing across references that participate in at least one
-independent pair: for each such reference, qualifying commits after its first
-unique pair-exclusive commit are counted, with a commit counted at most once per
-task reference. With no independent pair, `E_f = 0`.
+OCP task spread also uses `IndependentTaskSpread`.
 
-Role/name evidence is deterministic. Start from the canonical file name without
-its final extension. Tokenize by splitting on:
+For a task reference `t`:
 
-- non-alphanumeric characters;
+~~~text
+Partners_f(t) = { u : (t,u) is an independent pair for f }
+PairExclusive_f(t,u) = { commit c touching f : c references t and not u }
+Qualifying_f(t) = union(PairExclusive_f(t,u) for u in Partners_f(t)), deduplicated by SHA
+Repeated_f(t) = max(|Qualifying_f(t)| - 1, 0)
+E_f = sum(Repeated_f(t) for t with Partners_f(t) non-empty)
+~~~
+
+This resolves the multi-pair case explicitly. If `#101` is independent from both
+`#102` and `#103`, its qualifying commit sets are unioned and SHA-deduplicated;
+a commit contributes at most once to `Repeated_f(#101)`. The same SHA may count
+once for two different task references if it independently qualifies for each.
+If no independent pair exists, `E_f = 0`.
+
+Role/name evidence starts from the canonical filename without its final extension.
+Tokenize by:
+
+- non-alphanumeric boundaries;
 - lower-to-upper camel/Pascal transitions;
 - acronym-to-word boundaries;
 - letter/digit boundaries.
 
-Tokens are invariant-lowercase and are matched by **exact token equality only**.
-There is no substring, glob, or regex matching.
+Tokens are invariant-lowercase and use exact equality only. No substring, glob,
+or regex matching.
 
-Default tokens:
+Default tokens are:
 
 ~~~text
 dispatcher, registry, handler, loader, session, options, configuration,
 command, diagnostic, mapper, dto, model, service, orchestrator
 ~~~
 
-`N_f = 1` if at least one token matches, otherwise `0`. All matched tokens are
-reported in ascending ordinal order. Thus `OrderService` matches `service`,
-`DiagnosticMapper` matches `diagnostic` and `mapper`, and `ViewModel` matches
-`model`; a token merely embedded inside an unsplit identifier does not match.
+`N_f = 1.000000000` if at least one token matches, otherwise `0.000000000`.
+Matched tokens are reported in ascending ordinal order.
 
 ~~~text
-OcpPressureScore(f) = o_t*T_f + o_c*K_f + o_r*normalized(E_f) + o_n*N_f
+OcpPressureScore(f) = Q(o_t*T_f + o_c*K_f + o_r*Q(normalized(E_f)) + o_n*N_f)
 ~~~
 
-The default `o_*` values are `.40,.25,.25,.10`.
+The default `o_*` values are `.40,.25,.25,.10`. OCP rankings are category-local.
+Reports say `OCP pressure` or `likely OCP violation`, never formal proof.
 
-Role evidence is bounded heuristic evidence, not semantic proof. Reports say
-`OCP pressure` or `likely OCP violation`, never `OCP violation proven` without
-separate direct evidence.
+## Ranking and candidates
 
-## Ranking
+Within one primary-category cohort, file findings sort by:
 
-File findings sort by:
-
-1. descending score;
+1. descending canonical score;
 2. descending ordinary task spread;
 3. descending churn;
 4. descending commit count;
 5. ascending canonical logical path.
 
-Pairs sort by descending combined weight, commit weight, task weight, then
-ascending first and second canonical paths. Clusters sort by descending maximum
-edge, descending aggregate edge weight, then ascending first member canonical
-path.
+Category groups use the fixed category order and are not interleaved by score.
 
-## Recommendations
+Within one endpoint-category cohort, pairs sort by descending canonical combined
+weight, commit component, task component, then paths. Clusters sort by descending
+canonical maximum edge, canonical sum of member-edge weights, then first member
+path. Endpoint-category groups stay separate.
 
-Recommendations are investigations with source findings, component values,
-effective thresholds, and caveats:
+Recommendations are investigations with source findings, components, effective
+thresholds, category/cohort identity, and caveats:
 
 | Evidence | Candidate investigation |
 | --- | --- |
@@ -300,40 +338,44 @@ effective thresholds, and caveats:
 | High bottleneck score | Split orchestration from feature-specific behavior. |
 | High test-only hotspot | Improve fixture/helper architecture. |
 
-Candidate thresholds belong to #237. If nothing qualifies, the deterministic
-candidate collection is empty.
+Candidate thresholds compare canonical quantized values inside the finding's own
+cohort. There is no cross-category claim that a larger normalized score means
+more absolute architecture pressure. Empty qualifying sets remain empty; the tool
+does not fabricate recommendations.
 
 ## Report semantics and limits
 
-Markdown contains the analyzed range/effective configuration, hotspots,
-co-change pairs/clusters, bottlenecks, OCP pressure, candidates, and limitations.
-Canonical JSON contains input metadata, effective configuration, canonical paths
-and aliases, primary categories, raw and normalized score components, effective
-weights, co-change evidence, independent-task evidence, OCP evidence, and
-candidates. Generated timestamps and environment-specific display data do not
-alter canonical result identity.
+Markdown contains the analyzed range/effective configuration, production hotspot
+ranking, separate non-production rankings, co-change cohort groups, bottlenecks,
+OCP pressure, candidates, and limitations.
+
+Canonical JSON contains input/config identity, canonical numeric scale, canonical
+paths/aliases, primary categories, raw and canonical score components, effective
+weights/thresholds, co-change cohort identity, independent-task evidence, OCP
+evidence, and candidates. Arrays follow category/cohort grouping and stable
+within-group ordering. Canonical real numbers have exactly nine fractional digits
+and no exponent notation.
 
 The Git/history core remains independent of optional .NET/Roslyn enrichment.
-Later enrichment may attach project, namespace, or type facts, but parse/mapping
-failure never drops, changes, or reorders the file-level finding.
+Later enrichment may attach project, namespace, or type facts, but mapping failure
+never drops, changes, or reorders a file-level finding.
 
-Every report must make these limits clear:
+Every report must make clear that:
 
 - churn is not complexity;
-- incomplete task/author references can understate components;
-- a multi-reference commit is not proof of independent workstreams;
-- non-production categories can dominate their own raw volume but not a
-  production normalization cohort;
 - co-change does not prove module ownership;
-- role/name hints are bounded heuristics;
+- task/author references may be incomplete;
+- multi-reference commits are not independent-work proof;
+- normalized scores are comparable only inside their declared category/cohort;
+- role hints are bounded heuristics;
 - people decide whether evidence warrants a refactor.
 
 ## Ownership and non-goals
 
 - #236 implements deterministic Git ingestion and the existing CLI command family.
-- #237 owns normal policy schema/configuration, filtering, and path classification.
+- #237 owns normal policy schema/configuration, path classification, thresholds, and effective profiles.
 - #238/#239 implement hotspots and co-change independently.
-- #240/#241 consume the defined independent-work evidence for bottleneck and OCP pressure.
+- #240/#241 consume independent-task evidence for bottleneck and OCP pressure.
 - #242 adds optional .NET enrichment; #243 renders stable reports and candidates.
 
 This document does not implement the analyzer, prove a formal design-law
