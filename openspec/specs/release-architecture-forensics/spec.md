@@ -32,21 +32,36 @@ object bytes. Implementations SHALL NOT use a `git log`/library presentation API
 that may transcode, normalize, replace, or locale-decode author/message content
 before canonical parsing.
 
-The raw commit object SHALL be structurally parsed using Git's LF-delimited commit
-headers and the first empty header line as the message separator. Malformed
-required headers or unreadable required commit objects SHALL fail analysis closed.
+The raw commit object SHALL be structurally parsed using LF-delimited commit
+headers and the first empty header line as the message separator. Required commit
+objects and required headers SHALL be readable and structurally valid; otherwise
+analysis SHALL fail closed.
+
+Exactly one canonical `author` header SHALL be used for author evidence. Its bytes
+after the literal `author ` prefix SHALL be parsed from right to left as:
+
+```text
+<identity-bytes> SP <timestamp-token> SP <timezone-token>
+```
+
+The timestamp token SHALL match `-?[0-9]+`. The timezone token SHALL match
+`[+-][0-9]{4}`. The remaining `identity-bytes` SHALL end in `>`. The final `>` and
+the last `<` preceding it delimit the email bytes; bytes before that `<` are the
+name bytes. Any structure that cannot be parsed uniquely by this rule SHALL fail
+closed rather than delegating identity parsing to a Git/runtime formatter.
 
 For canonical author identity:
 
-1. parse the raw `author` header;
-2. use the email field when it is present and non-empty after trimming leading and
-   trailing ASCII SP (`0x20`) and HT (`0x09`); otherwise use the author-name field;
+1. trim leading/trailing ASCII SP (`0x20`) and HT (`0x09`) from the parsed email
+   byte slice;
+2. when the trimmed email is non-empty, select it; otherwise trim ASCII SP/HT from
+   the parsed name byte slice and select the name;
 3. the selected raw byte slice SHALL decode as strict UTF-8 or analysis fails;
 4. trim only leading/trailing ASCII SP and HT from the decoded scalar sequence;
 5. map ASCII `A-Z` to `a-z` and leave every other scalar unchanged;
 6. apply no Unicode normalization, locale casing, or full Unicode case folding;
 7. use literal `unknown` only when both parsed email and name are empty after the
-   canonical trim.
+   canonical ASCII trim.
 
 The optional Git `encoding` commit header MAY be retained as evidence but SHALL
 NOT cause canonical transcoding of author headers or commit-message bytes.
@@ -58,6 +73,10 @@ NOT cause canonical transcoding of author headers or commit-message bytes.
 #### Scenario: Portable author normalization
 - **WHEN** two runtimes have different Unicode/culture casing behavior
 - **THEN** canonical author identity is unchanged because only ASCII `A-Z` is lowercased
+
+#### Scenario: Ambiguous author structure
+- **WHEN** an `author` header cannot be uniquely parsed into identity, timestamp, timezone, final angle-bracketed email, and name by the canonical rule
+- **THEN** analysis fails closed instead of using backend-specific identity parsing
 
 ### Requirement: Canonical task-reference extraction and identity
 Task-reference extraction SHALL operate on the raw commit-message payload bytes
@@ -81,8 +100,8 @@ TaskKey = (namespace, positive_decimal_id)
 The decimal identifier SHALL be interpreted at arbitrary precision and rendered
 without leading zeroes. Consequently `issue#001` and `issue#1` are one canonical
 key, while `issue#1` and `jira#1` are distinct. Source spelling, extractor ID,
-message span, and matched text MAY be retained as evidence but SHALL NOT alter
-TaskKey identity.
+message byte span, and matched text MAY be retained as evidence but SHALL NOT
+alter TaskKey identity.
 
 Multiple matches that map to the same TaskKey SHALL deduplicate. If the same
 message byte span maps to two different canonical TaskKeys, extraction SHALL fail
@@ -702,18 +721,36 @@ SHALL NOT be introduced during JSON serialization.
 - **WHEN** canonical string content contains quote, backslash, slash, U+0001, newline, and `é`
 - **THEN** each uses exactly the canonical escape/direct-UTF8 representation above
 
+### Requirement: Successful reports and fail-closed diagnostics
+Canonical Markdown/JSON reports SHALL exist only after the analysis has completed
+successfully and all fail-closed validation has passed. A failure caused by an
+invalid ref, malformed/unreadable required commit object, invalid selected author
+or message UTF-8, TaskKey extraction ambiguity, invalid Git path UTF-8, missing
+required tree/blob object, or invalid configuration SHALL NOT emit a partial
+canonical report, partial ranking, or refactoring-candidate set.
+
+Failure diagnostics are a separate command/error surface. They SHALL identify a
+stable diagnostic kind and the relevant canonical object identity or source span
+when available, but they SHALL NOT be represented as successful canonical report
+records. Exact diagnostic rendering/exit-code schema belongs to the implementing
+CLI/report tasks and SHALL NOT alter successful report artifact identity.
+
+#### Scenario: Fail-closed analysis produces no report
+- **WHEN** a canonical TaskKey extraction collision or invalid UTF-8 commit message causes analysis to fail
+- **THEN** no successful canonical Markdown/JSON report or candidate set is emitted
+
 ### Requirement: Deterministic report semantics and canonical JSON bytes
 Markdown SHALL contain range/config summary, analyzed/excluded merge counts,
 production hotspots, separate non-production groups, co-change cohorts,
 bottlenecks, OCP pressure, candidates, and interpretation limits.
 
-Canonical JSON SHALL include input/config/history-semantics identity, canonical
-numeric scale, raw commit-metadata/task extraction status, canonical TaskKeys and
-source evidence, paths/aliases/categories, accepted/ambiguous rename evidence,
-canonical file events and line-count status, raw/canonical score components,
-weights/thresholds, `G0`/cluster cohort identity, independent-task and centrality
-evidence, OCP evidence, enrichment status where available, excluded merge count,
-and candidates.
+Successful canonical JSON SHALL include input/config/history-semantics identity,
+canonical numeric scale, raw commit-metadata/task extraction provenance for
+successfully parsed evidence, canonical TaskKeys and source evidence,
+paths/aliases/categories, accepted/ambiguous rename evidence, canonical file
+events and line-count status, raw/canonical score components, weights/thresholds,
+`G0`/cluster cohort identity, independent-task and centrality evidence, OCP
+evidence, enrichment status where available, excluded merge count, and candidates.
 
 Object properties SHALL serialize in the order declared by #243's versioned
 schema. Dynamic object/map keys SHALL use canonical scalar-value string ordering.
@@ -748,19 +785,20 @@ scores compare only inside their cohorts; role hints are bounded heuristics; and
 people decide whether to refactor.
 
 #### Scenario: Deterministic rendering
-- **WHEN** identical canonical evidence is rendered by two conforming implementations
+- **WHEN** identical successful canonical evidence is rendered by two conforming implementations
 - **THEN** canonical JSON bytes are identical
 
 ### Requirement: Contributor theory reference
 The repository SHALL contain an internal contributor reference consistent with
-this capability, including raw commit metadata/task identity, reachability/merge
-semantics, strict UTF-8 path model, scalar-value string ordering, DAG-safe exact
-rename identity, canonical file-event and LCS line-churn semantics,
-category/cohort normalization, numeric/weight rules, `G0/Gtheta`, cluster
-aggregation, exact epoch-second temporal proximity, independent-task/repeated-edit
-semantics, cohort-safe centrality, ASCII role tokenization, canonical JSON
-escaping/bytes, reports, ownership, and limitations. Public MkDocs navigation
-SHALL NOT advertise the feature before implementation ships.
+this capability, including raw commit metadata/task identity, precise author
+header parsing, reachability/merge semantics, strict UTF-8 path model,
+scalar-value string ordering, DAG-safe exact rename identity, canonical file-event
+and LCS line-churn semantics, category/cohort normalization, numeric/weight rules,
+`G0/Gtheta`, cluster aggregation, exact epoch-second temporal proximity,
+independent-task/repeated-edit semantics, cohort-safe centrality, ASCII role
+tokenization, successful-report/failure boundary, canonical JSON escaping/bytes,
+reports, ownership, and limitations. Public MkDocs navigation SHALL NOT advertise
+the feature before implementation ships.
 
 #### Scenario: Contributor discovers theory
 - **WHEN** a contributor opens the internal documentation index
