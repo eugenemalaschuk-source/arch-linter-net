@@ -546,7 +546,8 @@ contracts:
                 "ArchLinterNet.Core.Asmdef", "ArchLinterNet.Core.BuildState", "ArchLinterNet.Core.Caching",
                 "ArchLinterNet.Core.Composition",
                 "ArchLinterNet.Core.Contracts", "ArchLinterNet.Core.Discovery", "ArchLinterNet.Core.Execution",
-                "ArchLinterNet.Core.Graph", "ArchLinterNet.Core.IO", "ArchLinterNet.Core.Model",
+                "ArchLinterNet.Core.Graph", "ArchLinterNet.Core.History", "ArchLinterNet.Core.IO",
+                "ArchLinterNet.Core.Model",
                 "ArchLinterNet.Core.Profiling", "ArchLinterNet.Core.Reporting", "ArchLinterNet.Core.Resolution",
                 "ArchLinterNet.Core.Scanning", "ArchLinterNet.Core.Schema", "ArchLinterNet.Core.Validation"
             },
