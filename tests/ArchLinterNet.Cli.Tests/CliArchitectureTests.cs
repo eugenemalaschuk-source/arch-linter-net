@@ -27,7 +27,7 @@ namespace ArchLinterNet.Cli.Tests;
 [TestFixture]
 public sealed class CliArchitectureTests
 {
-    private static readonly string[] _value = { "badge", "baseline", "cache", "coverage", "graph", "explain", "policy", "public-api", "scaffold", "schema" };
+    private static readonly string[] _value = { "badge", "baseline", "cache", "coverage", "graph", "explain", "history", "policy", "public-api", "scaffold", "schema" };
     private static readonly string[] _value1 = { "generate", "update", "prune", "diff", "verify", "migrate" };
     private static readonly string[] _value2 = { "rule-1" };
     [Test]
@@ -49,6 +49,7 @@ public sealed class CliArchitectureTests
                 typeof(CoverageCommandModule),
                 typeof(GraphCommandModule),
                 typeof(ExplainCommandModule),
+                typeof(ArchLinterNet.Cli.Commands.History.EntryPoint.HistoryCommandModule),
                 typeof(PolicyCommandModule),
                 typeof(PublicApiCommandModule),
                 typeof(ScaffoldCommandModule),
