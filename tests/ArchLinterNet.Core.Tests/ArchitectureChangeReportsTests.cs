@@ -80,6 +80,22 @@ public sealed class ArchitectureChangeReportsTests
         });
     }
 
+    [Test]
+    public void Compare_BaseBaselineDebtMakesCurrentFindingExisting()
+    {
+        ArchitectureChangeSnapshot baseline = Snapshot(debt: new[] { "frozen-debt" });
+        ArchitectureChangeSnapshot current = Snapshot(
+            findings: new[] { new ArchitectureChangeFinding("frozen-debt", "dependency", "known debt") });
+
+        ArchitectureChangeReport report = ArchitectureChangeReports.Compare(baseline, current);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(report.NewFindings, Is.Empty);
+            Assert.That(report.ExistingFindings.Select(static finding => finding.Identity), Is.EqualTo(new[] { "frozen-debt" }));
+        });
+    }
+
     private static ArchitectureChangeSnapshot Snapshot(
         ArchitectureChangeEntry? first = null,
         ArchitectureChangeEntry? second = null,

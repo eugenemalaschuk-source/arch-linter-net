@@ -32,7 +32,7 @@ public sealed record ArchitectureChangeReport(
 /// <summary>Serializes, validates, and compares architecture change snapshots.</summary>
 public static class ArchitectureChangeReports
 {
-    private static readonly JsonSerializerOptions JsonOptions = new()
+    private static readonly JsonSerializerOptions _jsonOptions = new()
     {
         PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower,
         WriteIndented = true,
@@ -48,13 +48,13 @@ public static class ArchitectureChangeReports
             snapshot.Mode,
             Order(snapshot.Entries),
             Order(snapshot.Findings),
-            snapshot.BaselineDebt.OrderBy(static value => value, StringComparer.Ordinal).ToArray()), JsonOptions);
+            snapshot.BaselineDebt.OrderBy(static value => value, StringComparer.Ordinal).ToArray()), _jsonOptions);
     }
 
     public static ArchitectureChangeSnapshot DeserializeSnapshot(string json)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(json);
-        SnapshotDocument document = JsonSerializer.Deserialize<SnapshotDocument>(json, JsonOptions)
+        SnapshotDocument document = JsonSerializer.Deserialize<SnapshotDocument>(json, _jsonOptions)
             ?? throw new ArgumentException("The architecture change snapshot is empty.", nameof(json));
         if (!string.Equals(document.SnapshotKind, ArchitectureChangeSnapshot.Kind, StringComparison.Ordinal))
         {
@@ -89,20 +89,23 @@ public static class ArchitectureChangeReports
 
         Dictionary<string, ArchitectureChangeEntry> baseEntries = baseline.Entries.ToDictionary(Key, StringComparer.Ordinal);
         Dictionary<string, ArchitectureChangeEntry> currentEntries = current.Entries.ToDictionary(Key, StringComparer.Ordinal);
-        HashSet<string> baseFindings = baseline.Findings.Select(static finding => finding.Identity).ToHashSet(StringComparer.Ordinal);
+        HashSet<string> knownBaseIdentities = baseline.Findings
+            .Select(static finding => finding.Identity)
+            .Concat(baseline.BaselineDebt)
+            .ToHashSet(StringComparer.Ordinal);
 
         return new ArchitectureChangeReport(
             Order(currentEntries.Where(pair => !baseEntries.ContainsKey(pair.Key)).Select(static pair => pair.Value)),
             Order(baseEntries.Where(pair => !currentEntries.ContainsKey(pair.Key)).Select(static pair => pair.Value)),
-            Order(current.Findings.Where(finding => !baseFindings.Contains(finding.Identity))),
-            Order(current.Findings.Where(finding => baseFindings.Contains(finding.Identity))),
+            Order(current.Findings.Where(finding => !knownBaseIdentities.Contains(finding.Identity))),
+            Order(current.Findings.Where(finding => knownBaseIdentities.Contains(finding.Identity))),
             current.BaselineDebt.OrderBy(static value => value, StringComparer.Ordinal).ToArray());
     }
 
     public static string FormatJson(ArchitectureChangeReport report)
     {
         ArgumentNullException.ThrowIfNull(report);
-        return JsonSerializer.Serialize(report, JsonOptions);
+        return JsonSerializer.Serialize(report, _jsonOptions);
     }
 
     public static string FormatHuman(ArchitectureChangeReport report)

@@ -404,6 +404,70 @@ sealed class ArchLinterNet.Core.Caching.AnalysisCacheWorkProvenanceV1 : System.I
   property int FactIndexMaterializations {get;init;}
   property int SourceScanPasses {get;init;}
   property long ArtifactBytesLoaded {get;init;}
+sealed class ArchLinterNet.Core.Change.ArchitectureChangeEntry : System.IEquatable<ArchLinterNet.Core.Change.ArchitectureChangeEntry>
+  ctor(string Kind, string Identity, string Display)
+  method ArchLinterNet.Core.Change.ArchitectureChangeEntry <Clone>$()
+  method bool Equals(ArchLinterNet.Core.Change.ArchitectureChangeEntry? other)
+  method bool Equals(object? obj)
+  method int GetHashCode()
+  method string ToString()
+  method void Deconstruct(out string Kind, out string Identity, out string Display)
+  operator !=(ArchLinterNet.Core.Change.ArchitectureChangeEntry? left, ArchLinterNet.Core.Change.ArchitectureChangeEntry? right)
+  operator ==(ArchLinterNet.Core.Change.ArchitectureChangeEntry? left, ArchLinterNet.Core.Change.ArchitectureChangeEntry? right)
+  property string Display {get;init;}
+  property string Identity {get;init;}
+  property string Kind {get;init;}
+sealed class ArchLinterNet.Core.Change.ArchitectureChangeFinding : System.IEquatable<ArchLinterNet.Core.Change.ArchitectureChangeFinding>
+  ctor(string Identity, string Kind, string Display)
+  method ArchLinterNet.Core.Change.ArchitectureChangeFinding <Clone>$()
+  method bool Equals(ArchLinterNet.Core.Change.ArchitectureChangeFinding? other)
+  method bool Equals(object? obj)
+  method int GetHashCode()
+  method string ToString()
+  method void Deconstruct(out string Identity, out string Kind, out string Display)
+  operator !=(ArchLinterNet.Core.Change.ArchitectureChangeFinding? left, ArchLinterNet.Core.Change.ArchitectureChangeFinding? right)
+  operator ==(ArchLinterNet.Core.Change.ArchitectureChangeFinding? left, ArchLinterNet.Core.Change.ArchitectureChangeFinding? right)
+  property string Display {get;init;}
+  property string Identity {get;init;}
+  property string Kind {get;init;}
+sealed class ArchLinterNet.Core.Change.ArchitectureChangeReport : System.IEquatable<ArchLinterNet.Core.Change.ArchitectureChangeReport>
+  ctor(System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Change.ArchitectureChangeEntry> Added, System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Change.ArchitectureChangeEntry> Removed, System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Change.ArchitectureChangeFinding> NewFindings, System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Change.ArchitectureChangeFinding> ExistingFindings, System.Collections.Generic.IReadOnlyList<string> BaselineDebt)
+  method ArchLinterNet.Core.Change.ArchitectureChangeReport <Clone>$()
+  method bool Equals(ArchLinterNet.Core.Change.ArchitectureChangeReport? other)
+  method bool Equals(object? obj)
+  method int GetHashCode()
+  method string ToString()
+  method void Deconstruct(out System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Change.ArchitectureChangeEntry> Added, out System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Change.ArchitectureChangeEntry> Removed, out System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Change.ArchitectureChangeFinding> NewFindings, out System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Change.ArchitectureChangeFinding> ExistingFindings, out System.Collections.Generic.IReadOnlyList<string> BaselineDebt)
+  operator !=(ArchLinterNet.Core.Change.ArchitectureChangeReport? left, ArchLinterNet.Core.Change.ArchitectureChangeReport? right)
+  operator ==(ArchLinterNet.Core.Change.ArchitectureChangeReport? left, ArchLinterNet.Core.Change.ArchitectureChangeReport? right)
+  property System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Change.ArchitectureChangeEntry> Added {get;init;}
+  property System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Change.ArchitectureChangeEntry> Removed {get;init;}
+  property System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Change.ArchitectureChangeFinding> ExistingFindings {get;init;}
+  property System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Change.ArchitectureChangeFinding> NewFindings {get;init;}
+  property System.Collections.Generic.IReadOnlyList<string> BaselineDebt {get;init;}
+static class ArchLinterNet.Core.Change.ArchitectureChangeReports
+  method static ArchLinterNet.Core.Change.ArchitectureChangeReport Compare(ArchLinterNet.Core.Change.ArchitectureChangeSnapshot baseline, ArchLinterNet.Core.Change.ArchitectureChangeSnapshot current)
+  method static ArchLinterNet.Core.Change.ArchitectureChangeSnapshot DeserializeSnapshot(string json)
+  method static string FormatHuman(ArchLinterNet.Core.Change.ArchitectureChangeReport report)
+  method static string FormatJson(ArchLinterNet.Core.Change.ArchitectureChangeReport report)
+  method static string SerializeSnapshot(ArchLinterNet.Core.Change.ArchitectureChangeSnapshot snapshot)
+sealed class ArchLinterNet.Core.Change.ArchitectureChangeSnapshot : System.IEquatable<ArchLinterNet.Core.Change.ArchitectureChangeSnapshot>
+  ctor(int SchemaVersion, string Mode, System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Change.ArchitectureChangeEntry> Entries, System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Change.ArchitectureChangeFinding> Findings, System.Collections.Generic.IReadOnlyList<string> BaselineDebt)
+  field const int CurrentSchemaVersion = 1
+  field const string Kind = "architecture-change-snapshot"
+  method ArchLinterNet.Core.Change.ArchitectureChangeSnapshot <Clone>$()
+  method bool Equals(ArchLinterNet.Core.Change.ArchitectureChangeSnapshot? other)
+  method bool Equals(object? obj)
+  method int GetHashCode()
+  method string ToString()
+  method void Deconstruct(out int SchemaVersion, out string Mode, out System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Change.ArchitectureChangeEntry> Entries, out System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Change.ArchitectureChangeFinding> Findings, out System.Collections.Generic.IReadOnlyList<string> BaselineDebt)
+  operator !=(ArchLinterNet.Core.Change.ArchitectureChangeSnapshot? left, ArchLinterNet.Core.Change.ArchitectureChangeSnapshot? right)
+  operator ==(ArchLinterNet.Core.Change.ArchitectureChangeSnapshot? left, ArchLinterNet.Core.Change.ArchitectureChangeSnapshot? right)
+  property System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Change.ArchitectureChangeEntry> Entries {get;init;}
+  property System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Change.ArchitectureChangeFinding> Findings {get;init;}
+  property System.Collections.Generic.IReadOnlyList<string> BaselineDebt {get;init;}
+  property int SchemaVersion {get;init;}
+  property string Mode {get;init;}
 sealed class ArchLinterNet.Core.Composition.ArchitectureEngine : System.IAsyncDisposable, System.IDisposable
   method (ArchLinterNet.Core.Validation.ValidationOutcome Outcome, ArchLinterNet.Core.Validation.ArchitectureAnalysisSnapshotCounters Counters) ValidateWithCounters(ArchLinterNet.Core.Validation.ValidationRequest request, ArchLinterNet.Core.Reporting.ValidationTiming? timing = null)
   method ArchLinterNet.Core.Asmdef.AsmdefValidationOutcome ValidateAsmdef(ArchLinterNet.Core.Asmdef.AsmdefValidationRequest request)

@@ -102,7 +102,7 @@ internal sealed class ChangeCommandHandler(ICliRuntime runtime, ICliConsole cons
         ConditionSetName = options.ConditionSetName,
     };
 
-    private static ArchitectureChangeSnapshot BuildSnapshot(
+    internal static ArchitectureChangeSnapshot BuildSnapshot(
         string mode, ValidationOutcome validation, ArchitectureGraphOutcome namespaceGraph, ArchitectureGraphOutcome assemblyGraph,
         IReadOnlyList<string> baselineDebt)
     {
@@ -113,8 +113,7 @@ internal sealed class ChangeCommandHandler(ICliRuntime runtime, ICliConsole cons
         entries.AddRange(assemblyGraph.Graph.Nodes
             .Where(static node => node.Kind == ArchitectureGraphNodeKind.Assembly)
             .Select(static node => new ArchitectureChangeEntry("assembly", node.Id, node.Id)));
-        entries.AddRange(validation.DiscoveredProjectPaths.Select(static path =>
-            new ArchitectureChangeEntry("project", path, path)));
+        entries.AddRange(validation.DiscoveredProjectPaths.Select(path => Project(validation.RepositoryRoot, path)));
         entries.AddRange(namespaceGraph.Graph.Edges.Select(static edge => Edge("namespace", edge)));
         entries.AddRange(assemblyGraph.Graph.Edges.Select(static edge => Edge("assembly", edge)));
         entries.AddRange(validation.ClassificationRoles.Select(Role));
@@ -136,6 +135,27 @@ internal sealed class ChangeCommandHandler(ICliRuntime runtime, ICliConsole cons
     private static ArchitectureChangeEntry Edge(string level, ArchitectureGraphEdge edge) => new(
         "dependency_edge", level + ":" + edge.SourceId + "->" + edge.TargetId,
         level + ": " + edge.SourceId + " -> " + edge.TargetId);
+
+    internal static string CanonicalProjectIdentity(string repositoryRoot, string projectPath)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(repositoryRoot);
+        ArgumentException.ThrowIfNullOrWhiteSpace(projectPath);
+        string root = NormalizePath(repositoryRoot).TrimEnd('/');
+        string project = NormalizePath(projectPath);
+        string rootWithSeparator = root + "/";
+        if (!project.StartsWith(rootWithSeparator, StringComparison.OrdinalIgnoreCase))
+        {
+            throw new ArgumentException("Discovered project path is outside the authoritative repository root.", nameof(projectPath));
+        }
+
+        return project[rootWithSeparator.Length..];
+    }
+
+    private static ArchitectureChangeEntry Project(string repositoryRoot, string projectPath)
+    {
+        string identity = CanonicalProjectIdentity(repositoryRoot, projectPath);
+        return new ArchitectureChangeEntry("project", identity, identity);
+    }
 
     private static ArchitectureChangeEntry Role(ArchitectureClassificationRoleFact role) => new(
         "semantic_role", role.Subject + "|" + role.Role + "|" + Metadata(role.Metadata),
@@ -183,4 +203,6 @@ internal sealed class ChangeCommandHandler(ICliRuntime runtime, ICliConsole cons
         .Select(entry => entry.Key + "=" + Value(entry.Value)));
 
     private static string Value(object value) => Convert.ToString(value, CultureInfo.InvariantCulture) ?? string.Empty;
+
+    private static string NormalizePath(string path) => path.Replace('\\', '/');
 }
