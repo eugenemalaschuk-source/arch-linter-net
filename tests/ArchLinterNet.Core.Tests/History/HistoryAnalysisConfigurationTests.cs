@@ -3,6 +3,7 @@ using ArchLinterNet.Core.Contracts;
 using ArchLinterNet.Core.Contracts.Abstractions;
 using ArchLinterNet.Core.History.Configuration;
 using ArchLinterNet.Core.History.Tasks;
+using ArchLinterNet.Core.Model;
 using NUnit.Framework;
 
 namespace ArchLinterNet.Core.Tests.History;
@@ -90,6 +91,102 @@ public sealed class HistoryAnalysisConfigurationTests
         Assert.That(document.HistoryAnalysis.Thresholds.CoChangeSignificance, Is.EqualTo(0.750000000m));
     }
 
+    [Test]
+    public void ImportedHistoryAnalysisIsComposedIntoTheEffectivePolicy()
+    {
+        string root = WriteFile(
+            "architecture/root.yml",
+            """
+            version: 1
+            name: Imported history configuration
+            imports: [history.yml]
+            layers: {}
+            analysis:
+              target_assemblies: [App]
+            contracts:
+              strict: []
+            history_analysis:
+              paths:
+                docs: [docs/**]
+            """);
+        WriteFile(
+            "architecture/history.yml",
+            """
+            history_analysis:
+              extractors:
+                - id: jira
+                  namespace: jira
+                  pattern:
+                    prefix: JIRA-
+              paths:
+                production: [src/**]
+              ignore: [src/generated/**]
+              weights:
+                co_change:
+                  commit: 0.75
+                  task: 0.25
+              thresholds:
+                co_change_significance: 0.750000000
+            """);
+
+        ArchitectureContractDocument document = new ArchitecturePolicyDocumentLoader().Load(root);
+        (IReadOnlyList<TaskKeyMatch> matches, IReadOnlyList<TaskKey> keys) = TaskKeyExtraction
+            .FromConfiguration(document.HistoryAnalysis)
+            .Extract(Encoding.UTF8.GetBytes("JIRA-001 #2"), "commit");
+        var classifier = new HistoryPathClassifier(document.HistoryAnalysis);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(document.HistoryAnalysis.Extractors.Select(static extractor => extractor.Id), Is.EqualTo(new[] { "jira" }));
+            Assert.That(document.HistoryAnalysis.Paths.Production, Is.EqualTo(new[] { "src/**" }));
+            Assert.That(document.HistoryAnalysis.Paths.Docs, Is.EqualTo(new[] { "docs/**" }));
+            Assert.That(document.HistoryAnalysis.Ignore, Is.EqualTo(new[] { "src/generated/**" }));
+            Assert.That(document.HistoryAnalysis.Weights.CoChange.Commit, Is.EqualTo(0.75m));
+            Assert.That(document.HistoryAnalysis.Thresholds.CoChangeSignificance, Is.EqualTo(0.750000000m));
+            Assert.That(matches.Select(static match => match.MatchedText), Is.EqualTo(new[] { "JIRA-001", "#2" }));
+            Assert.That(keys.Select(static key => key.ToString()), Is.EqualTo(new[] { "issue#2", "jira#1" }));
+            Assert.That(classifier.Classify("src/service.cs").Category, Is.EqualTo(HistoryPathCategory.Production));
+            Assert.That(classifier.Classify("docs/guide.md").Category, Is.EqualTo(HistoryPathCategory.Docs));
+            Assert.That(classifier.Classify("src/generated/code.cs").IsIgnored, Is.True);
+        });
+    }
+
+    [Test]
+    public void InvalidImportedHistoryPathReportsItsFragmentProvenance()
+    {
+        string root = WriteFile(
+            "architecture/root.yml",
+            """
+            version: 1
+            name: Imported history provenance
+            imports: [history.yml]
+            layers: {}
+            analysis:
+              target_assemblies: [App]
+            contracts:
+              strict: []
+            """);
+        WriteFile(
+            "architecture/history.yml",
+            """
+            history_analysis:
+              paths:
+                production: [src/partial*.cs]
+            """);
+
+        ArchitecturePolicyValidationException exception = Assert.Throws<ArchitecturePolicyValidationException>(
+            () => new ArchitecturePolicyDocumentLoader().Load(root))!;
+        ArchitecturePolicyDiagnostic locationDiagnostic = exception.Diagnostic;
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(exception.Message, Does.Contain("supports only whole-segment"));
+            Assert.That(locationDiagnostic.Location, Is.Not.Null);
+            Assert.That(locationDiagnostic.Location!.SourcePath, Is.EqualTo("architecture/history.yml"));
+            Assert.That(locationDiagnostic.Location.YamlPath, Is.EqualTo("history_analysis.paths.production[0]"));
+        });
+    }
+
     [TestCase("history_analysis:\n  unknwon: true\n", "unknown property 'unknwon'")]
     [TestCase("history_analysis:\n  extractors:\n    - id: issue\n      namespace: issue\n      pattern:\n        prefix: ISSUE-\n", "reserved")]
     [TestCase("history_analysis:\n  weights:\n    hotspot:\n      commit: 0.30\n      churn: 0.25\n      task: 0.25\n      author: 0.10\n      temporal: 0.09\n", "sum exactly")]
@@ -163,6 +260,14 @@ public sealed class HistoryAnalysisConfigurationTests
               strict: []
             {{historyAnalysis}}
             """);
+        return path;
+    }
+
+    private string WriteFile(string relativePath, string yaml)
+    {
+        string path = Path.Combine(_temporaryDirectory, relativePath.Replace('/', Path.DirectorySeparatorChar));
+        Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+        File.WriteAllText(path, yaml);
         return path;
     }
 }

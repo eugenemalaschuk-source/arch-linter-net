@@ -29,7 +29,13 @@ internal sealed class RawHistoryAnalysisNodeValidator : IArchitecturePolicyRawDo
         ValidateKeys(history, _historyAnalysisKeys, "history_analysis");
         ValidateExtractors(history, document);
         ValidatePaths(history, document);
-        ValidateStringList(history, "ignore", "history_analysis.ignore", document);
+        ValidateStringList(
+            history,
+            "ignore",
+            "history_analysis.ignore",
+            ArchitecturePolicyProvenancePath.AppendProperty(
+                ArchitecturePolicyProvenancePath.Property("history_analysis"), "ignore"),
+            document);
         ValidateWeights(history, document);
         ValidateThresholds(history, document);
     }
@@ -41,6 +47,8 @@ internal sealed class RawHistoryAnalysisNodeValidator : IArchitecturePolicyRawDo
             return;
         }
 
+        document.Provenance.SetValidationSubject(Property(
+            ArchitecturePolicyProvenancePath.Property("history_analysis"), "extractors"));
         if (extractorsNode is not YamlSequenceNode extractors)
         {
             throw new InvalidOperationException("history_analysis.extractors must be a list.");
@@ -48,12 +56,16 @@ internal sealed class RawHistoryAnalysisNodeValidator : IArchitecturePolicyRawDo
 
         for (int index = 0; index < extractors.Children.Count; index++)
         {
-            document.Provenance.SetValidationSubject(Path("extractors", index));
+            string extractorPath = Path("extractors", index);
+            document.Provenance.SetValidationSubject(extractorPath);
             YamlMappingNode extractor = RequireMapping(extractors.Children[index], $"history_analysis.extractors[{index}]");
             ValidateKeys(extractor, _extractorKeys, $"history_analysis.extractors[{index}]");
+            document.Provenance.SetValidationSubject(Property(extractorPath, "id"));
             RequireString(extractor, "id", $"history_analysis.extractors[{index}].id");
+            document.Provenance.SetValidationSubject(Property(extractorPath, "namespace"));
             RequireString(extractor, "namespace", $"history_analysis.extractors[{index}].namespace");
 
+            document.Provenance.SetValidationSubject(Property(extractorPath, "pattern"));
             if (!RawYamlNodes.TryGetChild(extractor, "pattern", out YamlNode? patternNode))
             {
                 throw new InvalidOperationException($"history_analysis.extractors[{index}] must declare pattern.");
@@ -61,7 +73,9 @@ internal sealed class RawHistoryAnalysisNodeValidator : IArchitecturePolicyRawDo
 
             YamlMappingNode pattern = RequireMapping(patternNode, $"history_analysis.extractors[{index}].pattern");
             ValidateKeys(pattern, _patternKeys, $"history_analysis.extractors[{index}].pattern");
+            document.Provenance.SetValidationSubject(Property(Property(extractorPath, "pattern"), "prefix"));
             RequireString(pattern, "prefix", $"history_analysis.extractors[{index}].pattern.prefix", requireNonEmpty: true);
+            document.Provenance.SetValidationSubject(Property(Property(extractorPath, "pattern"), "suffix"));
             OptionalString(pattern, "suffix", $"history_analysis.extractors[{index}].pattern.suffix");
         }
     }
@@ -79,7 +93,11 @@ internal sealed class RawHistoryAnalysisNodeValidator : IArchitecturePolicyRawDo
         ValidateKeys(paths, _pathKeys, "history_analysis.paths");
         foreach (string pathKey in _pathKeys)
         {
-            ValidateStringList(paths, pathKey, $"history_analysis.paths.{pathKey}", document);
+            string effectivePath = Property(
+                Property(ArchitecturePolicyProvenancePath.Property("history_analysis"), "paths"),
+                pathKey);
+            document.Provenance.SetValidationSubject(effectivePath);
+            ValidateStringList(paths, pathKey, $"history_analysis.paths.{pathKey}", effectivePath, document);
         }
     }
 
@@ -94,23 +112,35 @@ internal sealed class RawHistoryAnalysisNodeValidator : IArchitecturePolicyRawDo
             ArchitecturePolicyProvenancePath.Property("history_analysis"), "weights"));
         YamlMappingNode weights = RequireMapping(weightsNode, "history_analysis.weights");
         ValidateKeys(weights, _weightKeys, "history_analysis.weights");
-        ValidateProfile(weights, "hotspot", ["commit", "churn", "task", "author", "temporal"]);
-        ValidateProfile(weights, "co_change", ["commit", "task"]);
-        ValidateProfile(weights, "bottleneck", ["independent_task", "author", "temporal", "degree", "centrality"]);
-        ValidateProfile(weights, "ocp", ["independent_task", "centrality", "repeated_edit", "role_hint"]);
+        ValidateProfile(weights, "hotspot", ["commit", "churn", "task", "author", "temporal"], document);
+        ValidateProfile(weights, "co_change", ["commit", "task"], document);
+        ValidateProfile(weights, "bottleneck", ["independent_task", "author", "temporal", "degree", "centrality"], document);
+        ValidateProfile(weights, "ocp", ["independent_task", "centrality", "repeated_edit", "role_hint"], document);
     }
 
-    private static void ValidateProfile(YamlMappingNode weights, string profileName, IReadOnlyList<string> keys)
+    private static void ValidateProfile(
+        YamlMappingNode weights,
+        string profileName,
+        IReadOnlyList<string> keys,
+        ArchitecturePolicyRawDocument document)
     {
         if (!RawYamlNodes.TryGetChild(weights, profileName, out YamlNode? profileNode))
         {
             return;
         }
 
+        document.Provenance.SetValidationSubject(Property(
+            Property(ArchitecturePolicyProvenancePath.Property("history_analysis"), "weights"),
+            profileName));
         YamlMappingNode profile = RequireMapping(profileNode, $"history_analysis.weights.{profileName}");
         ValidateKeys(profile, keys, $"history_analysis.weights.{profileName}");
         foreach (string key in keys)
         {
+            document.Provenance.SetValidationSubject(Property(
+                Property(
+                    Property(ArchitecturePolicyProvenancePath.Property("history_analysis"), "weights"),
+                    profileName),
+                key));
             if (!RawYamlNodes.TryGetChild(profile, key, out YamlNode? valueNode))
             {
                 throw new InvalidOperationException($"history_analysis.weights.{profileName} must declare '{key}'.");
@@ -133,12 +163,19 @@ internal sealed class RawHistoryAnalysisNodeValidator : IArchitecturePolicyRawDo
         ValidateKeys(thresholds, _thresholdKeys, "history_analysis.thresholds");
         if (RawYamlNodes.TryGetChild(thresholds, "co_change_significance", out YamlNode? threshold))
         {
+            document.Provenance.SetValidationSubject(Property(
+                Property(ArchitecturePolicyProvenancePath.Property("history_analysis"), "thresholds"),
+                "co_change_significance"));
             RequireDecimal(threshold, "history_analysis.thresholds.co_change_significance");
         }
     }
 
     private static void ValidateStringList(
-        YamlMappingNode parent, string key, string location, ArchitecturePolicyRawDocument document)
+        YamlMappingNode parent,
+        string key,
+        string location,
+        string effectivePath,
+        ArchitecturePolicyRawDocument document)
     {
         if (!RawYamlNodes.TryGetChild(parent, key, out YamlNode? node))
         {
@@ -152,7 +189,7 @@ internal sealed class RawHistoryAnalysisNodeValidator : IArchitecturePolicyRawDo
 
         for (int index = 0; index < values.Children.Count; index++)
         {
-            document.Provenance.SetValidationSubject(Path(key, index));
+            document.Provenance.SetValidationSubject(ArchitecturePolicyProvenancePath.AppendIndex(effectivePath, index));
             if (values.Children[index] is not YamlScalarNode scalar
                 || RawYamlNodes.IsExplicitNull(scalar)
                 || string.IsNullOrWhiteSpace(scalar.Value))
@@ -247,4 +284,7 @@ internal sealed class RawHistoryAnalysisNodeValidator : IArchitecturePolicyRawDo
 
     private static string Path(string property, int index) => ArchitecturePolicyProvenancePath.AppendIndex(
         ArchitecturePolicyProvenancePath.AppendProperty(ArchitecturePolicyProvenancePath.Property("history_analysis"), property), index);
+
+    private static string Property(string parent, string property) =>
+        ArchitecturePolicyProvenancePath.AppendProperty(parent, property);
 }
