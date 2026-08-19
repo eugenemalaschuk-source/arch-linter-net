@@ -5,8 +5,10 @@ Architecture Forensics introduced by #234. It is owned by #235 and synchronized
 with the
 [OpenSpec capability](../../openspec/specs/release-architecture-forensics/spec.md).
 
-It describes planned behavior for #236–#244, not a currently shipped command or
-policy surface.
+Its ingestion half is implemented by #236, which ships the internal
+`arch-linter-net history ingest` command and the canonical Git evidence it emits.
+Everything below scoring, graphs, configuration, and the versioned report schema
+still describes planned behavior for #237–#244 rather than a shipped surface.
 
 ## Product boundary
 
