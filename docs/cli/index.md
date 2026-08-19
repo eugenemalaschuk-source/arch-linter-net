@@ -14,6 +14,8 @@ arch-linter-net baseline verify --config <path> --baseline <path> [options]
 arch-linter-net policy check --policy <path> [options]
 arch-linter-net schema list
 arch-linter-net schema print <logical-id>
+arch-linter-net change snapshot --policy <path> --output <path> [options]
+arch-linter-net change report --base <snapshot> --current <snapshot> [options]
 arch-linter-net public-api capture --policy <path> --contract <id> --output <path> [options]
 arch-linter-net public-api diff --policy <path> --contract <id> --snapshot <path> [options]
 arch-linter-net public-api update --policy <path> --contract <id> --snapshot <path> [options]
@@ -258,6 +260,38 @@ closure rather than the CLI host's default runtime closure.
 
 See [Migration baselines](../guides/migration-baselines.md) for the full
 lifecycle walkthrough.
+
+## Architecture change reports
+
+`change snapshot` records a complete strict or audit analysis as a versioned,
+deterministic `architecture-change-snapshot/v1` artifact. It runs normal validation and complete
+namespace and assembly graph collection; it does not treat a Git diff, changed files, or changed
+projects as sufficient analysis scope.
+
+`change report` compares two such artifacts. It separates added and removed architecture
+surfaces from new findings, findings already present in the base, and baseline debt. The command
+is read-only and exits successfully when it completed, even when the report contains drift; use
+the JSON output as an input to a separate CI policy decision when a gate is required.
+
+```bash
+# Produce these from independently prepared, complete base and current analyses.
+arch-linter-net change snapshot \
+  --policy architecture/dependencies.arch.yml \
+  --mode strict \
+  --baseline architecture/baseline.arch.yml \
+  --output artifacts/current.architecture-change.json
+
+arch-linter-net change report \
+  --base artifacts/base.architecture-change.json \
+  --current artifacts/current.architecture-change.json \
+  --format json \
+  --output artifacts/architecture-change-report.json
+```
+
+The report intentionally does not inspect Git history, fetch a pull request, check out a base
+revision, or perform partial analysis. CI must create or retrieve the base artifact through its
+own complete authoritative analysis workflow. Pass `--baseline` when producing a snapshot to
+retain identities of matched, existing baseline debt separately from newly reported findings.
 
 ## public-api
 
