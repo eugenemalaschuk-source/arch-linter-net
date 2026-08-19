@@ -94,12 +94,15 @@ internal sealed class HistoryIngestionService(TaskKeyExtraction taskExtraction)
             GitObjectId parentTree = commit.Parents.Count == 1 ? commitReader.Read(commit.Parents[0]).Tree : default;
             IReadOnlyList<GitTreeChange> changes = differ.Diff(parentTree, commit.Tree, commit.Id.Hex);
             deltas.Add(new CommitDelta(commit, changes));
-            foreach (GitTreeChange change in changes.Where(static change => change.Kind is GitTreeChangeKind.Add or GitTreeChangeKind.Delete))
+            IEnumerable<string> addOrDeletePaths = changes
+                .Where(static change => change.Kind is GitTreeChangeKind.Add or GitTreeChangeKind.Delete)
+                .Select(static change => change.Path);
+            foreach (string path in addOrDeletePaths)
             {
-                if (!addDeleteCommitsByPath.TryGetValue(change.Path, out List<GitCommit>? touching))
+                if (!addDeleteCommitsByPath.TryGetValue(path, out List<GitCommit>? touching))
                 {
                     touching = [];
-                    addDeleteCommitsByPath[change.Path] = touching;
+                    addDeleteCommitsByPath[path] = touching;
                 }
 
                 touching.Add(commit);

@@ -151,35 +151,51 @@ internal sealed class GitRepositoryLayout
         foreach (string rawLine in File.ReadAllLines(configPath))
         {
             string line = rawLine.Trim();
-            if (line.Length == 0 || line[0] is '#' or ';')
+            if (IsCommentOrBlank(line))
             {
                 continue;
             }
 
-            if (line[0] == '[')
+            if (TryParseSectionName(line, out string sectionName))
             {
-                int end = line.IndexOf(']');
-                section = end > 1 ? line[1..end].Trim().ToLowerInvariant() : string.Empty;
+                section = sectionName;
                 continue;
             }
 
-            if (section != "extensions")
+            if (section == "extensions" && TryParseObjectFormatValue(line, out string value))
             {
-                continue;
-            }
-
-            int separator = line.IndexOf('=');
-            if (separator < 0)
-            {
-                continue;
-            }
-
-            if (line[..separator].Trim().Equals(ObjectFormatKey, StringComparison.OrdinalIgnoreCase))
-            {
-                return line[(separator + 1)..].Trim().ToLowerInvariant();
+                return value;
             }
         }
 
         return "sha1";
+    }
+
+    private static bool IsCommentOrBlank(string line) => line.Length == 0 || line[0] is '#' or ';';
+
+    private static bool TryParseSectionName(string line, out string sectionName)
+    {
+        if (line[0] != '[')
+        {
+            sectionName = string.Empty;
+            return false;
+        }
+
+        int end = line.IndexOf(']');
+        sectionName = end > 1 ? line[1..end].Trim().ToLowerInvariant() : string.Empty;
+        return true;
+    }
+
+    private static bool TryParseObjectFormatValue(string line, out string value)
+    {
+        int separator = line.IndexOf('=');
+        if (separator >= 0 && line[..separator].Trim().Equals(ObjectFormatKey, StringComparison.OrdinalIgnoreCase))
+        {
+            value = line[(separator + 1)..].Trim().ToLowerInvariant();
+            return true;
+        }
+
+        value = string.Empty;
+        return false;
     }
 }

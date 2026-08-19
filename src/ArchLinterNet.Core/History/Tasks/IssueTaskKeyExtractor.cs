@@ -18,45 +18,63 @@ internal sealed class IssueTaskKeyExtractor : ITaskKeyExtractor
 
     public void Extract(byte[] rawMessage, ICollection<TaskKeyMatch> matches)
     {
-        for (int index = 0; index < rawMessage.Length; index++)
+        int index = 0;
+        while (index < rawMessage.Length)
         {
-            if (rawMessage[index] != (byte)'#')
+            bool precededByBoundaryExcluded = index > 0 && IsBoundaryExcluded(rawMessage[index - 1]);
+            if (rawMessage[index] != (byte)'#' || precededByBoundaryExcluded)
             {
+                index++;
                 continue;
             }
 
-            if (index > 0 && IsBoundaryExcluded(rawMessage[index - 1]))
+            int digitsEnd = ScanDigits(rawMessage, index + 1);
+            if (!IsValidMatch(rawMessage, index, digitsEnd))
             {
+                index++;
                 continue;
             }
 
-            int digitsStart = index + 1;
-            int digitsEnd = digitsStart;
-            while (digitsEnd < rawMessage.Length && rawMessage[digitsEnd] is >= (byte)'0' and <= (byte)'9')
-            {
-                digitsEnd++;
-            }
-
-            if (digitsEnd == digitsStart || (digitsEnd < rawMessage.Length && IsBoundaryExcluded(rawMessage[digitsEnd])))
-            {
-                continue;
-            }
-
-            string digits = Encoding.ASCII.GetString(rawMessage, digitsStart, digitsEnd - digitsStart);
-            BigInteger id = BigInteger.Parse(digits, System.Globalization.CultureInfo.InvariantCulture);
-            if (id > BigInteger.Zero)
-            {
-                matches.Add(new TaskKeyMatch(
-                    ExtractorId,
-                    new TaskKey(Namespace, id),
-                    index,
-                    digitsEnd,
-                    Encoding.ASCII.GetString(rawMessage, index, digitsEnd - index)));
-            }
+            AddMatch(matches, rawMessage, index, digitsEnd);
 
             // Continue from the final digit so `#12#13` is rejected by the trailing boundary check
             // on both candidates rather than by scan position.
-            index = digitsEnd - 1;
+            index = digitsEnd;
+        }
+    }
+
+    private static int ScanDigits(byte[] rawMessage, int start)
+    {
+        int end = start;
+        while (end < rawMessage.Length && rawMessage[end] is >= (byte)'0' and <= (byte)'9')
+        {
+            end++;
+        }
+
+        return end;
+    }
+
+    private static bool IsValidMatch(byte[] rawMessage, int hashIndex, int digitsEnd)
+    {
+        int digitsStart = hashIndex + 1;
+        bool hasDigits = digitsEnd > digitsStart;
+        bool trailingBoundaryExcluded = digitsEnd < rawMessage.Length && IsBoundaryExcluded(rawMessage[digitsEnd]);
+        return hasDigits && !trailingBoundaryExcluded;
+    }
+
+    private void AddMatch(ICollection<TaskKeyMatch> matches, byte[] rawMessage, int hashIndex, int digitsEnd)
+    {
+        int digitsStart = hashIndex + 1;
+        string digits = Encoding.ASCII.GetString(rawMessage, digitsStart, digitsEnd - digitsStart);
+        BigInteger id = BigInteger.Parse(digits, System.Globalization.CultureInfo.InvariantCulture);
+        if (id > BigInteger.Zero)
+        {
+            matches.Add(new TaskKeyMatch(
+                ExtractorId,
+                new TaskKey(Namespace, id),
+                hashIndex,
+                digitsEnd,
+                Encoding.ASCII.GetString(rawMessage, hashIndex, digitsEnd - hashIndex)));
         }
     }
 

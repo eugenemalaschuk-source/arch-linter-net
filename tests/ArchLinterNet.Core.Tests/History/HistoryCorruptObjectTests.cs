@@ -108,8 +108,7 @@ public sealed class HistoryCorruptObjectTests
     // `hash-object --literally` still writes a well-formed header/size pair).
     private static string WriteCorruptLooseObject(GitTestRepository repository, byte[] rawContent)
     {
-        using System.Security.Cryptography.SHA1 sha1 = System.Security.Cryptography.SHA1.Create();
-        string id = Convert.ToHexStringLower(sha1.ComputeHash(rawContent));
+        string id = Convert.ToHexStringLower(System.Security.Cryptography.SHA1.HashData(rawContent));
         string directory = Path.Combine(repository.Path, ".git", "objects", id[..2]);
         Directory.CreateDirectory(directory);
         using FileStream file = File.Create(Path.Combine(directory, id[2..]));

@@ -13,12 +13,9 @@ internal sealed class CommitGraph(GitCommitReader commits)
     {
         HashSet<GitObjectId> excluded = Reachable(from);
         List<GitCommit> range = [];
-        foreach (GitObjectId id in Reachable(to))
+        foreach (GitObjectId id in Reachable(to).Where(id => !excluded.Contains(id)))
         {
-            if (!excluded.Contains(id))
-            {
-                range.Add(commits.Read(id));
-            }
+            range.Add(commits.Read(id));
         }
 
         range.Sort(GitCommit.CompareCanonical);
@@ -46,12 +43,9 @@ internal sealed class CommitGraph(GitCommitReader commits)
                 continue;
             }
 
-            foreach (GitObjectId parent in commits.Read(current).Parents)
+            foreach (GitObjectId parent in commits.Read(current).Parents.Where(parent => !visited.Contains(parent)))
             {
-                if (!visited.Contains(parent))
-                {
-                    pending.Push(parent);
-                }
+                pending.Push(parent);
             }
         }
 

@@ -95,29 +95,59 @@ internal sealed class RenameLineageResolver(CommitGraph graph, IReadOnlyDictiona
             return group;
         }
 
-        List<RenameCandidate> ordered = [.. group];
-        for (int outer = 0; outer < ordered.Count; outer++)
+        if (!AllPairwiseStrictlyComparable(group))
         {
-            for (int inner = outer + 1; inner < ordered.Count; inner++)
+            return [];
+        }
+
+        List<RenameCandidate> ordered = [.. group];
+        ordered.Sort(CompareByAncestry);
+        return HasUnbrokenChain(ordered) ? ordered : [];
+    }
+
+    // A permutation is fixed uniquely only when every pair of candidate commits is strictly
+    // ancestry-comparable; any incomparable pair (a fork, or two candidates in one commit) leaves
+    // the ordering ambiguous.
+    private bool AllPairwiseStrictlyComparable(List<RenameCandidate> group)
+    {
+        for (int outer = 0; outer < group.Count; outer++)
+        {
+            for (int inner = outer + 1; inner < group.Count; inner++)
             {
-                if (!AreStrictlyComparable(ordered[outer], ordered[inner]))
+                if (!AreStrictlyComparable(group[outer], group[inner]))
                 {
-                    return [];
+                    return false;
                 }
             }
         }
 
-        ordered.Sort((left, right) => ReferenceEquals(left, right) ? 0 : graph.IsStrictAncestor(left.Commit.Id, right.Commit.Id) ? -1 : 1);
+        return true;
+    }
+
+    private int CompareByAncestry(RenameCandidate left, RenameCandidate right)
+    {
+        if (ReferenceEquals(left, right))
+        {
+            return 0;
+        }
+
+        return graph.IsStrictAncestor(left.Commit.Id, right.Commit.Id) ? -1 : 1;
+    }
+
+    // The lifecycle guard: an intervening ordinary add/delete of the shared path between two
+    // adjacent candidates breaks the chain even though the candidates are otherwise endpoint-linked.
+    private bool HasUnbrokenChain(List<RenameCandidate> ordered)
+    {
         for (int index = 0; index + 1 < ordered.Count; index++)
         {
             if (!string.Equals(ordered[index].DestinationPath, ordered[index + 1].SourcePath, StringComparison.Ordinal)
                 || HasLifecycleBreak(ordered[index], ordered[index + 1]))
             {
-                return [];
+                return false;
             }
         }
 
-        return ordered;
+        return true;
     }
 
     private bool AreStrictlyComparable(RenameCandidate left, RenameCandidate right)
@@ -132,14 +162,6 @@ internal sealed class RenameLineageResolver(CommitGraph graph, IReadOnlyDictiona
             return false;
         }
 
-        foreach (GitCommit between in touching)
-        {
-            if (graph.IsStrictAncestor(earlier.Commit.Id, between.Id) && graph.IsStrictAncestor(between.Id, later.Commit.Id))
-            {
-                return true;
-            }
-        }
-
-        return false;
+        return touching.Any(between => graph.IsStrictAncestor(earlier.Commit.Id, between.Id) && graph.IsStrictAncestor(between.Id, later.Commit.Id));
     }
 }
