@@ -105,16 +105,21 @@ internal sealed class GitTestRepository : IDisposable
 
     public string Git(params string[] arguments) => GitWithEnvironment(arguments, null);
 
-    public void Dispose()
+    public void Dispose() => DeleteDirectoryRecursively(Path);
+
+    // Git writes loose objects, packfiles, and pack indexes read-only, which Windows refuses to
+    // delete without the attribute cleared first. Any fixture directory a real `git` command wrote
+    // into — not just the primary repository path — needs this instead of a plain recursive delete.
+    public static void DeleteDirectoryRecursively(string path)
     {
         try
         {
-            foreach (string file in Directory.EnumerateFiles(Path, "*", SearchOption.AllDirectories))
+            foreach (string file in Directory.EnumerateFiles(path, "*", SearchOption.AllDirectories))
             {
                 File.SetAttributes(file, FileAttributes.Normal);
             }
 
-            Directory.Delete(Path, recursive: true);
+            Directory.Delete(path, recursive: true);
         }
         catch (IOException)
         {

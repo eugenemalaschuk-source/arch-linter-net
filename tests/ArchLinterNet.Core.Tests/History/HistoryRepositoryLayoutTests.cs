@@ -56,7 +56,7 @@ public sealed class HistoryRepositoryLayoutTests
         }
         finally
         {
-            Directory.Delete(barePath, recursive: true);
+            GitTestRepository.DeleteDirectoryRecursively(barePath);
         }
     }
 
