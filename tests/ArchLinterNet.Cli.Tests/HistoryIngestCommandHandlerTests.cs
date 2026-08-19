@@ -75,7 +75,47 @@ public sealed class HistoryIngestCommandHandlerTests
         {
             Assert.That(exitCode, Is.EqualTo(CliExitCodes.Success));
             Assert.That(console.Output, Does.Contain("arch-linter-net history ingest"));
+            Assert.That(console.Output, Does.Contain("--policy <path>"));
         });
+    }
+
+    [Test]
+    public void InvalidSelectedPolicyFailsBeforeRepositoryIngestion()
+    {
+        FakeConsole console = new();
+        string directory = Path.Combine(Path.GetTempPath(), "arch-linter-history-policy-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directory);
+        string policyPath = Path.Combine(directory, "policy.yml");
+        File.WriteAllText(policyPath, """
+            version: 1
+            name: invalid history policy
+            layers: {}
+            analysis:
+              target_assemblies: [App]
+            contracts:
+              strict: []
+            history_analysis:
+              thresholds:
+                co_change_significance: 1.000000001
+            """);
+
+        try
+        {
+            int exitCode = new HistoryIngestCommandHandler(console).Execute(
+                new HistoryIngestCommandOptions(directory, "HEAD", "HEAD", "json", false, policyPath));
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(exitCode, Is.EqualTo(CliExitCodes.InvalidArgumentsOrRuntimeError));
+                Assert.That(console.Output, Is.Empty);
+                Assert.That(console.ErrorOutput, Does.Contain("\"kind\": \"configuration_invalid\""));
+                Assert.That(console.ErrorOutput, Does.Contain("co_change_significance"));
+            });
+        }
+        finally
+        {
+            Directory.Delete(directory, recursive: true);
+        }
     }
 
     private sealed class FakeConsole : ICliConsole

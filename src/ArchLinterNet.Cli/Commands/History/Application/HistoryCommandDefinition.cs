@@ -12,6 +12,7 @@ internal sealed class HistoryCommandDefinition(HistoryIngestCommandHandler handl
         repository.DefaultValueFactory = _ => ".";
         Option<string> from = new("--from");
         Option<string> to = new("--to");
+        Option<string?> policy = new("--policy");
         Option<string> format = new("--format");
         format.DefaultValueFactory = _ => "json";
         Option<bool> help = new("--help");
@@ -19,6 +20,7 @@ internal sealed class HistoryCommandDefinition(HistoryIngestCommandHandler handl
         ingest.Options.Add(repository);
         ingest.Options.Add(from);
         ingest.Options.Add(to);
+        ingest.Options.Add(policy);
         ingest.Options.Add(format);
         ingest.Options.Add(help);
         ingest.SetAction(result => handler.Execute(new HistoryIngestCommandOptions(
@@ -26,7 +28,8 @@ internal sealed class HistoryCommandDefinition(HistoryIngestCommandHandler handl
             result.GetValue(from) ?? string.Empty,
             result.GetValue(to) ?? string.Empty,
             result.GetValue(format) ?? "json",
-            result.GetValue(help))));
+            result.GetValue(help),
+            result.GetValue(policy))));
         history.Subcommands.Add(ingest);
         return history;
     }
