@@ -28,7 +28,12 @@ internal sealed class GitPackFile : IDisposable
     }
 
     public GitRawObject? TryRead(GitObjectId id)
-        => _index.TryFindOffset(id, out long offset) ? ReadAt(offset) : null;
+        => HistoryFailures.WrapObjectAccess(
+            HistoryDiagnosticKind.ObjectMalformed,
+            $"The packfile object '{id.Hex}' could not be read",
+            objectId: id.Hex,
+            path: null,
+            read: () => _index.TryFindOffset(id, out long offset) ? ReadAt(offset) : null);
 
     public void Dispose() => _pack.Dispose();
 

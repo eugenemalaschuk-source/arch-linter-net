@@ -43,10 +43,14 @@ internal sealed class GitPackIndex
         }
 
         int count = checked((int)BinaryPrimitives.ReadUInt32BigEndian(content.AsSpan(FanoutOffset + FanoutLength - 4, 4)));
-        int namesOffset = FanoutOffset + FanoutLength;
-        int smallOffsetsOffset = namesOffset + (count * digestLength) + (count * 4);
-        int largeOffsetsOffset = smallOffsetsOffset + (count * 4);
-        if (content.Length < largeOffsetsOffset)
+        long namesOffsetLong = FanoutOffset + FanoutLength;
+
+        // Long arithmetic here on purpose: a corrupt or hostile index can declare a `count` large
+        // enough that the int-sized layout math below would silently wrap instead of exceeding the
+        // file's actual length, which would then pass the bounds check on a wrapped-around value.
+        long smallOffsetsOffsetLong = namesOffsetLong + ((long)count * digestLength) + ((long)count * 4);
+        long largeOffsetsOffsetLong = smallOffsetsOffsetLong + ((long)count * 4);
+        if (content.Length < largeOffsetsOffsetLong)
         {
             throw HistoryFailures.Fail(
                 HistoryDiagnosticKind.ObjectMalformed,
@@ -54,6 +58,11 @@ internal sealed class GitPackIndex
                 path: indexPath);
         }
 
+        // These casts cannot overflow: the check above already proved each long offset is no larger
+        // than content.Length, which is itself a valid array length and therefore fits in an int.
+        int namesOffset = checked((int)namesOffsetLong);
+        int smallOffsetsOffset = checked((int)smallOffsetsOffsetLong);
+        int largeOffsetsOffset = checked((int)largeOffsetsOffsetLong);
         return new GitPackIndex(content, digestLength, count, namesOffset, smallOffsetsOffset, largeOffsetsOffset);
     }
 

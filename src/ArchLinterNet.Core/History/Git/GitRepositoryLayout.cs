@@ -9,25 +9,35 @@ internal sealed class GitRepositoryLayout
 {
     private const string ObjectFormatKey = "objectformat";
 
-    private GitRepositoryLayout(string gitDirectory, string objectFormatName, int digestLength)
+    private GitRepositoryLayout(string gitDirectory, string commonDirectory, string objectFormatName, int digestLength)
     {
         GitDirectory = gitDirectory;
+        CommonDirectory = commonDirectory;
         ObjectFormatName = objectFormatName;
         DigestLength = digestLength;
     }
 
+    // Per-worktree: only HEAD (and other worktree-private state outside canonical ingestion's scope,
+    // such as the index) lives here.
     public string GitDirectory { get; }
+
+    // Shared across every worktree of the repository: objects, repository config, branch/tag refs,
+    // and packed-refs live here. Equal to GitDirectory except inside a linked worktree (`git worktree
+    // add`), where a linked worktree's private GitDirectory names its common directory through a
+    // `commondir` file rather than containing these itself.
+    public string CommonDirectory { get; }
 
     public string ObjectFormatName { get; }
 
     public int DigestLength { get; }
 
-    public string ObjectsDirectory => Path.Combine(GitDirectory, "objects");
+    public string ObjectsDirectory => Path.Combine(CommonDirectory, "objects");
 
     public static GitRepositoryLayout Discover(string startDirectory)
     {
         string gitDirectory = FindGitDirectory(startDirectory);
-        string objectFormatName = ReadObjectFormat(Path.Combine(gitDirectory, "config"));
+        string commonDirectory = ResolveCommonDirectory(gitDirectory);
+        string objectFormatName = ReadObjectFormat(Path.Combine(commonDirectory, "config"));
         int digestLength = objectFormatName switch
         {
             "sha1" => 20,
@@ -37,7 +47,25 @@ internal sealed class GitRepositoryLayout
                 $"Unsupported repository object format '{objectFormatName}'."),
         };
 
-        return new GitRepositoryLayout(gitDirectory, objectFormatName, digestLength);
+        return new GitRepositoryLayout(gitDirectory, commonDirectory, objectFormatName, digestLength);
+    }
+
+    private static string ResolveCommonDirectory(string gitDirectory)
+    {
+        string commondirFile = Path.Combine(gitDirectory, "commondir");
+        if (!File.Exists(commondirFile))
+        {
+            return gitDirectory;
+        }
+
+        string pointer = File.ReadAllText(commondirFile).Trim();
+        string resolved = Path.IsPathRooted(pointer) ? pointer : Path.GetFullPath(Path.Combine(gitDirectory, pointer));
+        return Directory.Exists(resolved)
+            ? resolved
+            : throw HistoryFailures.Fail(
+                HistoryDiagnosticKind.RepositoryNotFound,
+                $"The worktree common-directory pointer '{commondirFile}' does not name an existing directory.",
+                path: commondirFile);
     }
 
     private static string FindGitDirectory(string startDirectory)

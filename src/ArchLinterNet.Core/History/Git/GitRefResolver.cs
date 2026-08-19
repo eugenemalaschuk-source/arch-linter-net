@@ -141,7 +141,11 @@ internal sealed class GitRefResolver(GitRepositoryLayout layout, GitObjectDataba
     {
         target = default;
         symbolicTarget = null;
-        string loosePath = Path.Combine(layout.GitDirectory, refName.Replace('/', Path.DirectorySeparatorChar));
+
+        // HEAD is worktree-private; every other ref (branches, tags, fully-qualified refs) is shared
+        // across all worktrees and lives under the common directory, exactly like packed-refs below.
+        string baseDirectory = refName == "HEAD" ? layout.GitDirectory : layout.CommonDirectory;
+        string loosePath = Path.Combine(baseDirectory, refName.Replace('/', Path.DirectorySeparatorChar));
         if (File.Exists(loosePath))
         {
             string content = File.ReadAllText(loosePath).Trim();
@@ -172,7 +176,7 @@ internal sealed class GitRefResolver(GitRepositoryLayout layout, GitObjectDataba
         }
 
         _packedRefs = new Dictionary<string, GitObjectId>(StringComparer.Ordinal);
-        string path = Path.Combine(layout.GitDirectory, "packed-refs");
+        string path = Path.Combine(layout.CommonDirectory, "packed-refs");
         if (!File.Exists(path))
         {
             return _packedRefs;

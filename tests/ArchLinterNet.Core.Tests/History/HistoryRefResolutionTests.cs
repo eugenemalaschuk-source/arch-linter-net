@@ -129,4 +129,37 @@ public sealed class HistoryRefResolutionTests
 
         Assert.That(packed, Is.EqualTo(loose));
     }
+
+    // The tiny blobs above are too small for git to bother deltifying, so `OBJ_OFS_DELTA`
+    // reconstruction needs its own fixture: a large enough file, changed enough times, repacked with
+    // a delta window. `git verify-pack` confirms real delta objects landed in the pack rather than
+    // this test silently degrading into loose-object coverage if a future git version's heuristics
+    // change.
+    [Test]
+    public void OffsetDeltaObjectsReconstructToTheSameEvidenceAsLooseObjects()
+    {
+        using GitTestRepository repository = GitTestRepository.Create();
+        string first = string.Empty;
+        string last = string.Empty;
+        for (int revision = 0; revision < 6; revision++)
+        {
+            repository.Write("big.txt", string.Concat(Enumerable.Range(0, 400)
+                .Select(line => $"line {line} revision {revision} filler {line * line}\n")));
+            last = repository.Commit($"revision {revision}");
+            first = revision == 0 ? last : first;
+        }
+
+        string loose = ArchLinterNet.Core.History.Reporting.HistoryIngestionJsonWriter.Write(
+            HistoryIngestionFixture.Succeed(repository, first, last));
+
+        repository.Git("repack", "-a", "-d", "-f", "-q", "--depth=50", "--window=50");
+        string packPath = Directory.GetFiles(Path.Combine(repository.Path, ".git", "objects", "pack"), "*.pack").Single();
+        string verify = repository.Git("verify-pack", "-v", packPath);
+        Assert.That(verify, Does.Contain("chain length"), "the fixture must actually produce delta objects to exercise OBJ_OFS_DELTA reconstruction");
+
+        string packed = ArchLinterNet.Core.History.Reporting.HistoryIngestionJsonWriter.Write(
+            HistoryIngestionFixture.Succeed(repository, first, last));
+
+        Assert.That(packed, Is.EqualTo(loose));
+    }
 }

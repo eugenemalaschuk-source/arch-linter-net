@@ -15,12 +15,22 @@ internal sealed class GitTestRepository : IDisposable
 
     public string Path { get; }
 
-    public static GitTestRepository Create()
+    public static GitTestRepository Create() => Create(objectFormat: null);
+
+    public static GitTestRepository CreateWithObjectFormat(string objectFormat) => Create(objectFormat);
+
+    private static GitTestRepository Create(string? objectFormat)
     {
         string path = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "arch-linter-history-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(path);
         GitTestRepository repository = new(path);
-        repository.Git("init", "-b", "main");
+        List<string> initArguments = ["init", "-b", "main"];
+        if (objectFormat is not null)
+        {
+            initArguments.Add($"--object-format={objectFormat}");
+        }
+
+        repository.Git([.. initArguments]);
         repository.Git("config", "user.name", "Fixture Author");
         repository.Git("config", "user.email", "Fixture@Example.COM");
         repository.Git("config", "commit.gpgsign", "false");

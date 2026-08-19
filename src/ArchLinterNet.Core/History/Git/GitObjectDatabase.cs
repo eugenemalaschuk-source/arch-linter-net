@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.IO;
 using System.IO.Compression;
 using System.Text;
@@ -86,7 +87,12 @@ internal sealed class GitObjectDatabase : IDisposable
             string packPath = Path.ChangeExtension(indexPath, ".pack");
             if (File.Exists(packPath))
             {
-                _packs.Add(new GitPackFile(packPath, indexPath, _layout.DigestLength, TryReadLoose));
+                _packs.Add(HistoryFailures.WrapObjectAccess(
+                    HistoryDiagnosticKind.ObjectMalformed,
+                    $"The packfile '{packPath}' could not be opened",
+                    objectId: null,
+                    path: packPath,
+                    read: () => new GitPackFile(packPath, indexPath, _layout.DigestLength, TryReadLoose)));
             }
         }
 
@@ -107,7 +113,20 @@ internal sealed class GitObjectDatabase : IDisposable
             return null;
         }
 
-        byte[] inflated = InflateLoose(path);
+        return HistoryFailures.WrapObjectAccess(
+            HistoryDiagnosticKind.ObjectMalformed,
+            $"The loose Git object '{hex}' could not be read",
+            objectId: hex,
+            path: path,
+            read: () => ParseLoose(hex, InflateLoose(path)));
+    }
+
+    // The loose-object header grammar is `<type> SP <size> NUL<payload>`, where `size` is the exact
+    // ASCII-decimal payload byte count. Both the type and the declared size are validated: a payload
+    // whose length disagrees with its declared size is exactly the kind of structurally invalid
+    // object the canonical pipeline must fail closed on rather than silently accept.
+    private static GitRawObject ParseLoose(string hex, byte[] inflated)
+    {
         int terminator = Array.IndexOf(inflated, (byte)0);
         if (terminator <= 0)
         {
@@ -127,7 +146,18 @@ internal sealed class GitObjectDatabase : IDisposable
                 objectId: hex);
         }
 
-        return new GitRawObject(kind, inflated[(terminator + 1)..]);
+        string sizeText = header[(space + 1)..];
+        byte[] payload = inflated[(terminator + 1)..];
+        if (!long.TryParse(sizeText, NumberStyles.None, CultureInfo.InvariantCulture, out long declaredSize)
+            || declaredSize != payload.LongLength)
+        {
+            throw HistoryFailures.Fail(
+                HistoryDiagnosticKind.ObjectMalformed,
+                $"The loose Git object '{hex}' declares size '{sizeText}' in header '{header}' that does not match its {payload.LongLength}-byte payload.",
+                objectId: hex);
+        }
+
+        return new GitRawObject(kind, payload);
     }
 
     private static byte[] InflateLoose(string path)
