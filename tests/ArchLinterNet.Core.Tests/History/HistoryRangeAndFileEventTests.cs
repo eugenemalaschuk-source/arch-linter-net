@@ -126,7 +126,7 @@ public sealed class HistoryRangeAndFileEventTests
         repository.Write("a.txt", "one\ntwo\n");
         string second = repository.Commit("second");
         string blobId = repository.Git("rev-parse", $"{second}:a.txt").Trim();
-        File.Delete(System.IO.Path.Combine(repository.Path, ".git", "objects", blobId[..2], blobId[2..]));
+        repository.DeleteLooseObject(blobId);
 
         HistoryDiagnostic diagnostic = HistoryIngestionFixture.Fail(repository, first, second);
 

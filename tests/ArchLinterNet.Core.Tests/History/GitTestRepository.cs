@@ -63,9 +63,21 @@ internal sealed class GitTestRepository : IDisposable
 
     public string Head() => Git("rev-parse", "HEAD").Trim();
 
+    // Git writes loose objects read-only. Deleting one to simulate a missing/corrupt object needs
+    // the read-only attribute cleared first, or Windows refuses the delete outright.
+    public void DeleteLooseObject(string objectId)
+    {
+        string path = System.IO.Path.Combine(Path, ".git", "objects", objectId[..2], objectId[2..]);
+        File.SetAttributes(path, FileAttributes.Normal);
+        File.Delete(path);
+    }
+
     public string WriteRawObject(string type, byte[] payload)
     {
-        ProcessStartInfo startInfo = NewStartInfo(["hash-object", "-w", "-t", type, "--stdin"]);
+        // --literally: several fixtures write deliberately malformed commit objects (missing
+        // author, non-UTF8 bytes) to exercise fail-closed parsing. Git's own fsck-style validation
+        // on `hash-object -w` would otherwise refuse to write them before the reader ever sees them.
+        ProcessStartInfo startInfo = NewStartInfo(["hash-object", "-w", "-t", type, "--stdin", "--literally"]);
         startInfo.RedirectStandardInput = true;
         using Process process = Process.Start(startInfo)!;
         using (Stream input = process.StandardInput.BaseStream)
