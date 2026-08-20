@@ -1,6 +1,7 @@
 using System.Globalization;
 using ArchLinterNet.Cli.Abstractions;
 using ArchLinterNet.Cli.Commands;
+using ArchLinterNet.Core.BuildState;
 using ArchLinterNet.Core.Change;
 using ArchLinterNet.Core.Graph;
 using ArchLinterNet.Core.Model;
@@ -52,6 +53,13 @@ internal sealed class ChangeCommandHandler(ICliRuntime runtime, ICliConsole cons
                     Mode = options.Mode,
                     ConditionSetName = options.ConditionSetName,
                 }).Frozen.Select(BaselineIdentity).OrderBy(static value => value, StringComparer.Ordinal).ToArray();
+            string? consumedInputCollision = FindSnapshotConsumedInputCollision(options.OutputPath, validation);
+            if (consumedInputCollision is not null)
+            {
+                console.Error.WriteLine(consumedInputCollision);
+                return CliExitCodes.InvalidArgumentsOrRuntimeError;
+            }
+
             ArchitectureChangeSnapshot snapshot = BuildSnapshot(
                 options.Mode, validation, namespaces, assemblies, baselineDebt, options.ConditionSetName);
             fileSystem.WriteAllText(options.OutputPath, ArchitectureChangeReports.SerializeSnapshot(snapshot));
@@ -199,10 +207,8 @@ internal sealed class ChangeCommandHandler(ICliRuntime runtime, ICliConsole cons
     {
         ArchitectureViolationIdentity? identity = entry.Identity;
         return identity is null
-            ? string.Join("|", entry.ContractGroup, entry.ContractId, entry.SourceType, entry.ForbiddenReference)
-            : string.Join("|", identity.ContractFamily, identity.Kind, identity.ContractId, identity.SourceAssembly,
-                identity.SourceType, identity.SourceMember, identity.TargetAssembly, identity.TargetType,
-                identity.TargetMember, identity.Occurrence, identity.Configuration);
+            ? throw new ArgumentException("Frozen baseline debt must have an authoritative identity.", nameof(entry))
+            : ArchitectureViolationIdentityJson.Serialize(identity);
     }
 
     private static string Metadata(IReadOnlyDictionary<string, object> metadata) => string.Join(";", metadata
@@ -223,6 +229,20 @@ internal sealed class ChangeCommandHandler(ICliRuntime runtime, ICliConsole cons
         : FindOutputCollision(options.OutputPath,
             ("--base", options.BasePath),
             ("--current", options.CurrentPath));
+
+    internal static string? FindSnapshotConsumedInputCollision(string outputPath, ValidationOutcome validation)
+    {
+        ArgumentNullException.ThrowIfNull(validation);
+        return FindOutputCollision(outputPath,
+            validation.PolicyImportPaths.Select(static path => ("imported policy file", (string?)path))
+                .Concat(validation.ResolvedAssemblyPaths.SelectMany(static path => new[]
+                {
+                    ("a build artifact loaded during this run", (string?)path),
+                    ("a build receipt loaded during this run", (string?)BuildReceiptStore.ReceiptPathFor(path)),
+                }))
+                .Concat(validation.DiscoveredProjectPaths.Select(static path => ("a project file loaded during this run", (string?)path)))
+                .ToArray());
+    }
 
     private static string? FindOutputCollision(string outputPath, params (string Name, string? Path)[] inputPaths)
     {

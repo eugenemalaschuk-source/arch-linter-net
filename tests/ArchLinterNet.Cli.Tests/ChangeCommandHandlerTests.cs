@@ -1,3 +1,4 @@
+using ArchLinterNet.Core.BuildState;
 using ArchLinterNet.Core.Change;
 using ArchLinterNet.Core.Graph;
 using ArchLinterNet.Core.Model;
@@ -103,6 +104,33 @@ public sealed class ChangeCommandHandlerTests
             Assert.That(ChangeCommandHandler.FindSnapshotOutputCollision(snapshotWithBaselineCollision), Does.Contain("--baseline"));
             Assert.That(ChangeCommandHandler.FindReportOutputCollision(reportWithBaseCollision), Does.Contain("--base"));
             Assert.That(ChangeCommandHandler.FindReportOutputCollision(reportWithCurrentCollision), Does.Contain("--current"));
+        });
+    }
+
+    [Test]
+    public void SnapshotConsumedInputCollisionGuard_RejectsEveryPostAnalysisInput()
+    {
+        ValidationOutcome outcome = Outcome("/repo", "/repo/src/Acme/Acme.csproj") with
+        {
+            PolicyImportPaths = new[] { "/repo/architecture/imported.yml" },
+            ResolvedAssemblyPaths = new[] { "/repo/bin/Acme.dll" },
+        };
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(
+                ChangeCommandHandler.FindSnapshotConsumedInputCollision("/repo/architecture/imported.yml", outcome),
+                Does.Contain("imported policy file"));
+            Assert.That(
+                ChangeCommandHandler.FindSnapshotConsumedInputCollision("/repo/bin/Acme.dll", outcome),
+                Does.Contain("build artifact"));
+            Assert.That(
+                ChangeCommandHandler.FindSnapshotConsumedInputCollision(
+                    BuildReceiptStore.ReceiptPathFor("/repo/bin/Acme.dll"), outcome),
+                Does.Contain("build receipt"));
+            Assert.That(
+                ChangeCommandHandler.FindSnapshotConsumedInputCollision("/repo/src/Acme/Acme.csproj", outcome),
+                Does.Contain("project file"));
         });
     }
 

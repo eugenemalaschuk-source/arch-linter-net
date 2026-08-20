@@ -158,8 +158,14 @@ public static class ArchitectureBaselineComparer
                 classification.Resolved.Add(comparisonEntry);
                 break;
             case 1:
+                ArchitectureViolationIdentity matchedIdentity = matches[0].Identity
+                    ?? BuildFallbackIdentity(groupName, canonicalContractId, matches[0]);
                 classification.Frozen.Add(
-                    comparisonEntry with { CurrentForbiddenReference = matches[0].ForbiddenReference });
+                    comparisonEntry with
+                    {
+                        Identity = matchedIdentity with { ContractId = canonicalContractId },
+                        CurrentForbiddenReference = matches[0].ForbiddenReference,
+                    });
                 break;
             default:
                 classification.Ambiguous.Add(comparisonEntry);

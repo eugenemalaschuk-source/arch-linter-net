@@ -452,21 +452,22 @@ static class ArchLinterNet.Core.Change.ArchitectureChangeReports
   method static string FormatJson(ArchLinterNet.Core.Change.ArchitectureChangeReport report)
   method static string SerializeSnapshot(ArchLinterNet.Core.Change.ArchitectureChangeSnapshot snapshot)
 sealed class ArchLinterNet.Core.Change.ArchitectureChangeSnapshot : System.IEquatable<ArchLinterNet.Core.Change.ArchitectureChangeSnapshot>
-  ctor(int SchemaVersion, string Mode, System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Change.ArchitectureChangeEntry> Entries, System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Change.ArchitectureChangeFinding> Findings, System.Collections.Generic.IReadOnlyList<string> BaselineDebt)
-  field const int CurrentSchemaVersion = 1
+  ctor(int SchemaVersion, string Mode, string ConditionSetName, System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Change.ArchitectureChangeEntry> Entries, System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Change.ArchitectureChangeFinding> Findings, System.Collections.Generic.IReadOnlyList<string> BaselineDebt)
+  field const int CurrentSchemaVersion = 2
   field const string Kind = "architecture-change-snapshot"
   method ArchLinterNet.Core.Change.ArchitectureChangeSnapshot <Clone>$()
   method bool Equals(ArchLinterNet.Core.Change.ArchitectureChangeSnapshot? other)
   method bool Equals(object? obj)
   method int GetHashCode()
   method string ToString()
-  method void Deconstruct(out int SchemaVersion, out string Mode, out System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Change.ArchitectureChangeEntry> Entries, out System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Change.ArchitectureChangeFinding> Findings, out System.Collections.Generic.IReadOnlyList<string> BaselineDebt)
+  method void Deconstruct(out int SchemaVersion, out string Mode, out string ConditionSetName, out System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Change.ArchitectureChangeEntry> Entries, out System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Change.ArchitectureChangeFinding> Findings, out System.Collections.Generic.IReadOnlyList<string> BaselineDebt)
   operator !=(ArchLinterNet.Core.Change.ArchitectureChangeSnapshot? left, ArchLinterNet.Core.Change.ArchitectureChangeSnapshot? right)
   operator ==(ArchLinterNet.Core.Change.ArchitectureChangeSnapshot? left, ArchLinterNet.Core.Change.ArchitectureChangeSnapshot? right)
   property System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Change.ArchitectureChangeEntry> Entries {get;init;}
   property System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Change.ArchitectureChangeFinding> Findings {get;init;}
   property System.Collections.Generic.IReadOnlyList<string> BaselineDebt {get;init;}
   property int SchemaVersion {get;init;}
+  property string ConditionSetName {get;init;}
   property string Mode {get;init;}
 sealed class ArchLinterNet.Core.Composition.ArchitectureEngine : System.IAsyncDisposable, System.IDisposable
   method (ArchLinterNet.Core.Validation.ValidationOutcome Outcome, ArchLinterNet.Core.Validation.ArchitectureAnalysisSnapshotCounters Counters) ValidateWithCounters(ArchLinterNet.Core.Validation.ValidationRequest request, ArchLinterNet.Core.Reporting.ValidationTiming? timing = null)

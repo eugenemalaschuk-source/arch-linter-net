@@ -1,4 +1,5 @@
 using ArchLinterNet.Core.Model;
+using ArchLinterNet.Core.Reporting;
 using ArchLinterNet.Testing;
 using NUnit.Framework;
 
@@ -518,7 +519,11 @@ baseline:
         Assert.Multiple(() =>
         {
             Assert.That(outcome.Succeeded, Is.True);
-            Assert.That(outcome.Frozen.Count + outcome.Ambiguous.Count, Is.GreaterThan(0));
+            Assert.That(outcome.Frozen, Has.Count.EqualTo(1));
+            Assert.That(outcome.Frozen[0].Identity, Is.Not.Null);
+            Assert.That(
+                ArchitectureViolationIdentityJson.Serialize(outcome.Frozen[0].Identity!),
+                Is.EqualTo(ArchitectureFindingMapper.FromViolation(current).CanonicalIdentity));
         });
     }
 

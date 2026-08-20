@@ -1,7 +1,7 @@
 ## ADDED Requirements
 
 ### Requirement: Complete architecture analysis can be persisted as a change snapshot
-The system SHALL provide a versioned `architecture-change-snapshot/v1` artifact that is built from a complete authoritative architecture analysis and contains stable entries for observed namespaces, projects, assemblies, semantic roles and contexts, dependency edges, coverage blind spots, normalized findings, and baseline-debt identities. The artifact SHALL identify its analysis mode, policy inputs, and scope and SHALL use deterministic ordering.
+The system SHALL provide a versioned `architecture-change-snapshot/v2` artifact that is built from a complete authoritative architecture analysis and contains stable entries for observed namespaces, projects, assemblies, semantic roles and contexts, dependency edges, coverage blind spots, normalized findings, and baseline-debt identities. The artifact SHALL identify its analysis mode and condition-set scope and SHALL use deterministic ordering. A snapshot document missing required authority metadata or entries, findings, or baseline-debt collections SHALL be rejected.
 
 #### Scenario: Snapshot retains complete analysis facts
 - **WHEN** a user creates a snapshot for a policy in the supported analysis mode
@@ -13,7 +13,7 @@ The system SHALL provide a versioned `architecture-change-snapshot/v1` artifact 
 - **THEN** the snapshot assigns them different stable identities
 
 ### Requirement: Architecture snapshots are compared by stable identity
-The system SHALL compare a base and current `architecture-change-snapshot/v1` artifact by typed, stable identity and SHALL report added and removed namespaces, projects, assemblies, semantic roles, contexts, dependency edges, and coverage blind spots. The result SHALL be deterministically ordered and SHALL reject incompatible or unsupported snapshot inputs.
+The system SHALL compare a base and current `architecture-change-snapshot/v2` artifact by typed, stable identity and SHALL report added and removed namespaces, projects, assemblies, semantic roles, contexts, dependency edges, and coverage blind spots. The result SHALL be deterministically ordered and SHALL reject incompatible, incomplete, or unsupported snapshot inputs.
 
 #### Scenario: New dependency edge is reported
 - **WHEN** the current snapshot contains a dependency edge absent from the base snapshot

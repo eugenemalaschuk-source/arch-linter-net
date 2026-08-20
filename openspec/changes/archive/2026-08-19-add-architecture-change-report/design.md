@@ -19,7 +19,7 @@ The CLI can already perform complete validation, export a dependency graph, emit
 
 ## Decisions
 
-1. **Use a dedicated `architecture-change-snapshot/v1` artifact.** A `change snapshot` command runs a complete requested-mode analysis and serializes the resulting namespaces, project and assembly identities, semantic roles/contexts, dependency edges, coverage blind spots, findings, and baseline-state facts. A snapshot records its schema/version and analysis scope so a report can reject unsupported or non-authoritative input. This is preferable to overloading ordinary validation JSON, which deliberately omits several observed surfaces.
+1. **Use a dedicated `architecture-change-snapshot/v2` artifact.** A `change snapshot` command runs a complete requested-mode analysis and serializes the resulting namespaces, project and assembly identities, semantic roles/contexts, dependency edges, coverage blind spots, findings, and baseline-state facts. A snapshot records its schema/version, mode, and condition-set scope so a report can reject unsupported, incomplete, or mismatched input. This is preferable to overloading ordinary validation JSON, which deliberately omits several observed surfaces.
 2. **Compare two persisted snapshots, never a Git ref.** `change report --base <path> --current <path>` is deterministic and permits CI to create the base snapshot in its own full-analysis job. This avoids making Git availability or a branch checkout an implicit analysis authority.
 3. **Use canonical identities as set keys.** Surface entries have stable typed IDs; dependency edges use `(level, source, target)`; roles include subject/role/sorted metadata; findings use the existing normalized canonical identity. Comparison outputs are ordinally sorted by kind then identity. This preserves same-named entities from distinct assemblies and makes JSON suitable for an AI consumer.
 4. **Report drift and debt separately.** Added/removed surfaces are structural deltas. Current findings whose identity is absent from the base are `new`; identities present in both are `existing`; matched baseline identities are separately listed as `baseline_debt`. No category is treated as a pass/fail decision by the report command.
@@ -27,7 +27,7 @@ The CLI can already perform complete validation, export a dependency graph, emit
 
 ## Risks / Trade-offs
 
-- [Snapshots from different policies or scopes can create noisy deltas] → include canonical policy inputs and requested-mode/scope metadata; reject incompatible schema/scope before comparison.
+- [Snapshots from different policies or scopes can create noisy deltas] → require CI to pair snapshots produced from the same policy inputs, and reject incompatible schema, requested mode, or condition-set scope before comparison.
 - [A graph or semantic shape evolves] → version the artifact and reject unknown versions rather than silently interpreting it as empty data.
 - [Large reports can be noisy] → keep full JSON lossless but use ordered per-kind counts and bounded human representatives with an explicit omitted count.
 - [Baseline suppression hides debt] → snapshot baseline entries as an explicit identity collection rather than inferring debt from the absence of a current violation.

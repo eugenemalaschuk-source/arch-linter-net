@@ -264,7 +264,8 @@ lifecycle walkthrough.
 ## Architecture change reports
 
 `change snapshot` records a complete strict or audit analysis as a versioned,
-deterministic `architecture-change-snapshot/v1` artifact. It runs normal validation and complete
+deterministic `architecture-change-snapshot/v2` artifact. It records the analysis mode and
+condition-set scope, and it runs normal validation and complete
 namespace and assembly graph collection; it does not treat a Git diff, changed files, or changed
 projects as sufficient analysis scope.
 
@@ -272,6 +273,7 @@ projects as sufficient analysis scope.
 surfaces from new findings, findings already present in the base, and baseline debt. The command
 is read-only and exits successfully when it completed, even when the report contains drift; use
 the JSON output as an input to a separate CI policy decision when a gate is required.
+It rejects snapshots whose mode or condition-set scope differs.
 
 ```bash
 # Produce these from independently prepared, complete base and current analyses.
