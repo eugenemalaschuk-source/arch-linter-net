@@ -1,4 +1,5 @@
 using System.Text;
+using ArchLinterNet.Core.Contracts;
 using ArchLinterNet.Core.History.Git;
 using ArchLinterNet.Core.History.Tasks.Abstractions;
 
@@ -12,6 +13,13 @@ internal sealed class TaskKeyExtraction(IReadOnlyList<ITaskKeyExtractor> extract
     private static readonly UTF8Encoding _strictUtf8 = new(encoderShouldEmitUTF8Identifier: false, throwOnInvalidBytes: true);
 
     public static TaskKeyExtraction Default { get; } = new([new IssueTaskKeyExtractor()]);
+
+    public static TaskKeyExtraction FromConfiguration(HistoryAnalysisConfiguration configuration)
+    {
+        var extractors = new List<ITaskKeyExtractor> { new IssueTaskKeyExtractor() };
+        extractors.AddRange(configuration.Extractors.Select(static extractor => (ITaskKeyExtractor)new ConfiguredTaskKeyExtractor(extractor)));
+        return new TaskKeyExtraction(extractors);
+    }
 
     public (IReadOnlyList<TaskKeyMatch> Matches, IReadOnlyList<TaskKey> Keys) Extract(byte[] rawMessage, string commitId)
     {
