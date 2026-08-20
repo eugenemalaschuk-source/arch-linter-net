@@ -39,6 +39,11 @@ class ArchLinterNet.Core.Caching.AnalysisCachePopulation [static]
 class ArchLinterNet.Core.Caching.AnalysisCacheProjectManifest [sealed]
 class ArchLinterNet.Core.Caching.AnalysisCacheStore [static]
 class ArchLinterNet.Core.Caching.AnalysisCacheWorkProvenanceV1 [sealed]
+class ArchLinterNet.Core.Change.ArchitectureChangeEntry [sealed]
+class ArchLinterNet.Core.Change.ArchitectureChangeFinding [sealed]
+class ArchLinterNet.Core.Change.ArchitectureChangeReport [sealed]
+class ArchLinterNet.Core.Change.ArchitectureChangeReports [static]
+class ArchLinterNet.Core.Change.ArchitectureChangeSnapshot [sealed]
 class ArchLinterNet.Core.Composition.ArchitectureEngine [sealed]
 class ArchLinterNet.Core.Composition.ArchitectureEngineBuilder [sealed]
 class ArchLinterNet.Core.Composition.ServiceCollectionExtensions [static]
@@ -364,6 +369,8 @@ const ArchLinterNet.Core.Caching.AnalysisCacheRejectReason.PathUnsafe: ArchLinte
 const ArchLinterNet.Core.Caching.AnalysisCacheRejectReason.ProjectSetMismatch: ArchLinterNet.Core.Caching.AnalysisCacheRejectReason [value:9]
 const ArchLinterNet.Core.Caching.AnalysisCacheRejectReason.SizeExceeded: ArchLinterNet.Core.Caching.AnalysisCacheRejectReason [value:16]
 const ArchLinterNet.Core.Caching.AnalysisCacheRejectReason.Truncated: ArchLinterNet.Core.Caching.AnalysisCacheRejectReason [value:3]
+const ArchLinterNet.Core.Change.ArchitectureChangeSnapshot.CurrentSchemaVersion: System.Int32 [value:2]
+const ArchLinterNet.Core.Change.ArchitectureChangeSnapshot.Kind: System.String [value:"architecture-change-snapshot"]
 const ArchLinterNet.Core.Contracts.ArchitecturePolicyImportErrorCategory.CompositionConflict: ArchLinterNet.Core.Contracts.ArchitecturePolicyImportErrorCategory [value:8]
 const ArchLinterNet.Core.Contracts.ArchitecturePolicyImportErrorCategory.Cycle: ArchLinterNet.Core.Contracts.ArchitecturePolicyImportErrorCategory [value:4]
 const ArchLinterNet.Core.Contracts.ArchitecturePolicyImportErrorCategory.DuplicateImport: ArchLinterNet.Core.Contracts.ArchitecturePolicyImportErrorCategory [value:5]
@@ -524,6 +531,10 @@ ctor ArchLinterNet.Core.Caching.AnalysisCachePopulation+Outcome(System.Nullable`
 ctor ArchLinterNet.Core.Caching.AnalysisCacheProjectManifest(System.String, System.String, ArchLinterNet.Core.BuildState.CacheEligibility)
 ctor ArchLinterNet.Core.Caching.AnalysisCacheStore+PutResult(System.Nullable`1[ArchLinterNet.Core.Caching.AnalysisCacheRejectReason], System.Int64)
 ctor ArchLinterNet.Core.Caching.AnalysisCacheWorkProvenanceV1(System.Int32, System.Int32, System.Int32, System.Int32, System.Int64)
+ctor ArchLinterNet.Core.Change.ArchitectureChangeEntry(System.String, System.String, System.String)
+ctor ArchLinterNet.Core.Change.ArchitectureChangeFinding(System.String, System.String, System.String)
+ctor ArchLinterNet.Core.Change.ArchitectureChangeReport(System.Collections.Generic.IReadOnlyList`1[ArchLinterNet.Core.Change.ArchitectureChangeEntry], System.Collections.Generic.IReadOnlyList`1[ArchLinterNet.Core.Change.ArchitectureChangeEntry], System.Collections.Generic.IReadOnlyList`1[ArchLinterNet.Core.Change.ArchitectureChangeFinding], System.Collections.Generic.IReadOnlyList`1[ArchLinterNet.Core.Change.ArchitectureChangeFinding], System.Collections.Generic.IReadOnlyList`1[System.String])
+ctor ArchLinterNet.Core.Change.ArchitectureChangeSnapshot(System.Int32, System.String, System.String, System.Collections.Generic.IReadOnlyList`1[ArchLinterNet.Core.Change.ArchitectureChangeEntry], System.Collections.Generic.IReadOnlyList`1[ArchLinterNet.Core.Change.ArchitectureChangeFinding], System.Collections.Generic.IReadOnlyList`1[System.String])
 ctor ArchLinterNet.Core.Composition.ArchitectureEngineBuilder()
 ctor ArchLinterNet.Core.Contracts.ArchitectureAnalysisConfiguration()
 ctor ArchLinterNet.Core.Contracts.ArchitectureAttributeClassificationMapping()
@@ -921,6 +932,11 @@ method ArchLinterNet.Core.Caching.AnalysisCacheStore.Put(ArchLinterNet.Core.Cach
 method ArchLinterNet.Core.Caching.AnalysisCacheStore.Put(ArchLinterNet.Core.Caching.AnalysisCacheLocation, ArchLinterNet.Core.Caching.AnalysisCacheKey, System.Collections.Generic.IReadOnlyList`1[ArchLinterNet.Core.Caching.AnalysisCacheProjectManifest], System.Collections.Generic.IReadOnlyList`1[ArchLinterNet.Core.Caching.AnalysisCacheArtifactManifest], ArchLinterNet.Core.Caching.AnalysisCacheOutcomeV1, ArchLinterNet.Core.Caching.AnalysisCacheWorkProvenanceV1, System.Threading.CancellationToken): ArchLinterNet.Core.Caching.AnalysisCacheStore+PutResult [static]
 method ArchLinterNet.Core.Caching.AnalysisCacheStore.TryGet(ArchLinterNet.Core.Caching.AnalysisCacheLocation, ArchLinterNet.Core.Caching.AnalysisCacheKey, System.Collections.Generic.IReadOnlyList`1[ArchLinterNet.Core.Caching.AnalysisCacheProjectManifest]): ArchLinterNet.Core.Caching.AnalysisCacheLookupResult [static]
 method ArchLinterNet.Core.Caching.AnalysisCacheStore.TryGet(ArchLinterNet.Core.Caching.AnalysisCacheLocation, ArchLinterNet.Core.Caching.AnalysisCacheKey, System.Collections.Generic.IReadOnlyList`1[ArchLinterNet.Core.Caching.AnalysisCacheProjectManifest], System.Collections.Generic.IReadOnlyList`1[ArchLinterNet.Core.Caching.AnalysisCacheArtifactManifest]): ArchLinterNet.Core.Caching.AnalysisCacheLookupResult [static]
+method ArchLinterNet.Core.Change.ArchitectureChangeReports.Compare(ArchLinterNet.Core.Change.ArchitectureChangeSnapshot, ArchLinterNet.Core.Change.ArchitectureChangeSnapshot): ArchLinterNet.Core.Change.ArchitectureChangeReport [static]
+method ArchLinterNet.Core.Change.ArchitectureChangeReports.DeserializeSnapshot(System.String): ArchLinterNet.Core.Change.ArchitectureChangeSnapshot [static]
+method ArchLinterNet.Core.Change.ArchitectureChangeReports.FormatHuman(ArchLinterNet.Core.Change.ArchitectureChangeReport): System.String [static]
+method ArchLinterNet.Core.Change.ArchitectureChangeReports.FormatJson(ArchLinterNet.Core.Change.ArchitectureChangeReport): System.String [static]
+method ArchLinterNet.Core.Change.ArchitectureChangeReports.SerializeSnapshot(ArchLinterNet.Core.Change.ArchitectureChangeSnapshot): System.String [static]
 method ArchLinterNet.Core.Composition.ArchitectureEngine.BuildGraph(ArchLinterNet.Core.Graph.ArchitectureGraphRequest): ArchLinterNet.Core.Graph.ArchitectureGraphOutcome
 method ArchLinterNet.Core.Composition.ArchitectureEngine.CapturePublicApi(ArchLinterNet.Core.Validation.PublicApiCaptureRequest): ArchLinterNet.Core.Validation.PublicApiCaptureOutcome
 method ArchLinterNet.Core.Composition.ArchitectureEngine.CheckPolicy(System.String): ArchLinterNet.Core.Validation.PolicyCheckOutcome
@@ -1471,6 +1487,23 @@ property ArchLinterNet.Core.Caching.AnalysisCacheWorkProvenanceV1.AssemblyLoads:
 property ArchLinterNet.Core.Caching.AnalysisCacheWorkProvenanceV1.ContractExecutions: System.Int32 [get, init]
 property ArchLinterNet.Core.Caching.AnalysisCacheWorkProvenanceV1.FactIndexMaterializations: System.Int32 [get, init]
 property ArchLinterNet.Core.Caching.AnalysisCacheWorkProvenanceV1.SourceScanPasses: System.Int32 [get, init]
+property ArchLinterNet.Core.Change.ArchitectureChangeEntry.Display: System.String [get, init]
+property ArchLinterNet.Core.Change.ArchitectureChangeEntry.Identity: System.String [get, init]
+property ArchLinterNet.Core.Change.ArchitectureChangeEntry.Kind: System.String [get, init]
+property ArchLinterNet.Core.Change.ArchitectureChangeFinding.Display: System.String [get, init]
+property ArchLinterNet.Core.Change.ArchitectureChangeFinding.Identity: System.String [get, init]
+property ArchLinterNet.Core.Change.ArchitectureChangeFinding.Kind: System.String [get, init]
+property ArchLinterNet.Core.Change.ArchitectureChangeReport.Added: System.Collections.Generic.IReadOnlyList`1[ArchLinterNet.Core.Change.ArchitectureChangeEntry] [get, init]
+property ArchLinterNet.Core.Change.ArchitectureChangeReport.BaselineDebt: System.Collections.Generic.IReadOnlyList`1[System.String] [get, init]
+property ArchLinterNet.Core.Change.ArchitectureChangeReport.ExistingFindings: System.Collections.Generic.IReadOnlyList`1[ArchLinterNet.Core.Change.ArchitectureChangeFinding] [get, init]
+property ArchLinterNet.Core.Change.ArchitectureChangeReport.NewFindings: System.Collections.Generic.IReadOnlyList`1[ArchLinterNet.Core.Change.ArchitectureChangeFinding] [get, init]
+property ArchLinterNet.Core.Change.ArchitectureChangeReport.Removed: System.Collections.Generic.IReadOnlyList`1[ArchLinterNet.Core.Change.ArchitectureChangeEntry] [get, init]
+property ArchLinterNet.Core.Change.ArchitectureChangeSnapshot.BaselineDebt: System.Collections.Generic.IReadOnlyList`1[System.String] [get, init]
+property ArchLinterNet.Core.Change.ArchitectureChangeSnapshot.ConditionSetName: System.String [get, init]
+property ArchLinterNet.Core.Change.ArchitectureChangeSnapshot.Entries: System.Collections.Generic.IReadOnlyList`1[ArchLinterNet.Core.Change.ArchitectureChangeEntry] [get, init]
+property ArchLinterNet.Core.Change.ArchitectureChangeSnapshot.Findings: System.Collections.Generic.IReadOnlyList`1[ArchLinterNet.Core.Change.ArchitectureChangeFinding] [get, init]
+property ArchLinterNet.Core.Change.ArchitectureChangeSnapshot.Mode: System.String [get, init]
+property ArchLinterNet.Core.Change.ArchitectureChangeSnapshot.SchemaVersion: System.Int32 [get, init]
 property ArchLinterNet.Core.Composition.ArchitectureEngine.GraphFormatter: ArchLinterNet.Core.Graph.IArchitectureGraphFormatter [get]
 property ArchLinterNet.Core.Contracts.ArchitectureAnalysisConfiguration.AssemblySearchPaths: System.Collections.Generic.List`1[System.String] [get, set]
 property ArchLinterNet.Core.Contracts.ArchitectureAnalysisConfiguration.ConditionSets: System.Collections.Generic.Dictionary`2[System.String,System.Collections.Generic.List`1[System.String]] [get, set]

@@ -58,6 +58,8 @@ layers:
     namespace: ArchLinterNet.Core.Execution
   core_graph:
     namespace: ArchLinterNet.Core.Graph
+  core_change:
+    namespace: ArchLinterNet.Core.Change
   core_validation:
     namespace: ArchLinterNet.Core.Validation
   core_profiling:
@@ -150,6 +152,7 @@ source_sets:
       - core_contracts
       - core_execution
       - core_graph
+      - core_change
       - core_validation
       - core_profiling
       - core_asmdef
