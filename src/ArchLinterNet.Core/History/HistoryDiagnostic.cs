@@ -37,6 +37,7 @@ internal sealed class HistoryDiagnostic(
         HistoryDiagnosticKind.AuthorEncodingInvalid => "author_encoding_invalid",
         HistoryDiagnosticKind.MessageEncodingInvalid => "message_encoding_invalid",
         HistoryDiagnosticKind.PathEncodingInvalid => "path_encoding_invalid",
+        HistoryDiagnosticKind.ConfigurationInvalid => "configuration_invalid",
         HistoryDiagnosticKind.TaskKeyOverlap => "task_key_overlap",
         _ => "unknown",
     };

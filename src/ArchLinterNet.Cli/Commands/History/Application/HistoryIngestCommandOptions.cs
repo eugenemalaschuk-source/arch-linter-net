@@ -5,4 +5,5 @@ internal sealed record HistoryIngestCommandOptions(
     string From,
     string To,
     string Format,
-    bool ShowHelp);
+    bool ShowHelp,
+    string? PolicyPath = null);

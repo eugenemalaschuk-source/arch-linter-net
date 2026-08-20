@@ -57,7 +57,8 @@
     },
     "analysis": { "$ref": "#/$defs/analysis" },
     "contracts": { "$ref": "#/$defs/contracts" },
-    "classification": { "$ref": "#/$defs/classification" }
+    "classification": { "$ref": "#/$defs/classification" },
+    "history_analysis": { "$ref": "#/$defs/historyAnalysis" }
   },
   "$defs": {
     "imports": {
@@ -443,6 +444,134 @@
         "framework_name_prefixes": {
           "$ref": "#/$defs/nonBlankStringList",
           "description": "FrameworkReference Include name prefixes matched with exact or dot-segment child semantics (case-insensitively) against declared FrameworkReference items."
+        }
+      }
+    },
+    "historyAnalysis": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Bounded configuration for Release Architecture Forensics. It configures only task literals, exact path cohorts, ignores, score profiles, and the Gtheta significance threshold; canonical Git, metadata, TaskKey, and provenance semantics remain fixed.",
+      "properties": {
+        "extractors": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/historyTaskExtractor" },
+          "default": []
+        },
+        "paths": { "$ref": "#/$defs/historyPaths" },
+        "ignore": { "$ref": "#/$defs/historyPathPatternList" },
+        "weights": { "$ref": "#/$defs/historyWeightProfiles" },
+        "thresholds": { "$ref": "#/$defs/historyThresholds" }
+      }
+    },
+    "historyTaskExtractor": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "namespace", "pattern"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9._-]*$"
+        },
+        "namespace": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9._-]*$"
+        },
+        "pattern": { "$ref": "#/$defs/historyTaskPattern" }
+      }
+    },
+    "historyTaskPattern": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["prefix"],
+      "properties": {
+        "prefix": { "type": "string", "minLength": 1 },
+        "suffix": { "type": "string", "default": "" }
+      }
+    },
+    "historyPathPatternList": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 },
+      "default": []
+    },
+    "historyPaths": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "production": { "$ref": "#/$defs/historyPathPatternList" },
+        "tests": { "$ref": "#/$defs/historyPathPatternList" },
+        "docs": { "$ref": "#/$defs/historyPathPatternList" },
+        "generated": { "$ref": "#/$defs/historyPathPatternList" },
+        "build_ci": { "$ref": "#/$defs/historyPathPatternList" },
+        "samples_examples": { "$ref": "#/$defs/historyPathPatternList" }
+      }
+    },
+    "historyWeightProfiles": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "hotspot": { "$ref": "#/$defs/historyHotspotWeights" },
+        "co_change": { "$ref": "#/$defs/historyCoChangeWeights" },
+        "bottleneck": { "$ref": "#/$defs/historyBottleneckWeights" },
+        "ocp": { "$ref": "#/$defs/historyOcpWeights" }
+      }
+    },
+    "historyHotspotWeights": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["commit", "churn", "task", "author", "temporal"],
+      "properties": {
+        "commit": { "$ref": "#/$defs/historyWeight" },
+        "churn": { "$ref": "#/$defs/historyWeight" },
+        "task": { "$ref": "#/$defs/historyWeight" },
+        "author": { "$ref": "#/$defs/historyWeight" },
+        "temporal": { "$ref": "#/$defs/historyWeight" }
+      }
+    },
+    "historyCoChangeWeights": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["commit", "task"],
+      "properties": {
+        "commit": { "$ref": "#/$defs/historyWeight" },
+        "task": { "$ref": "#/$defs/historyWeight" }
+      }
+    },
+    "historyBottleneckWeights": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["independent_task", "author", "temporal", "degree", "centrality"],
+      "properties": {
+        "independent_task": { "$ref": "#/$defs/historyWeight" },
+        "author": { "$ref": "#/$defs/historyWeight" },
+        "temporal": { "$ref": "#/$defs/historyWeight" },
+        "degree": { "$ref": "#/$defs/historyWeight" },
+        "centrality": { "$ref": "#/$defs/historyWeight" }
+      }
+    },
+    "historyOcpWeights": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["independent_task", "centrality", "repeated_edit", "role_hint"],
+      "properties": {
+        "independent_task": { "$ref": "#/$defs/historyWeight" },
+        "centrality": { "$ref": "#/$defs/historyWeight" },
+        "repeated_edit": { "$ref": "#/$defs/historyWeight" },
+        "role_hint": { "$ref": "#/$defs/historyWeight" }
+      }
+    },
+    "historyWeight": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1
+    },
+    "historyThresholds": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "co_change_significance": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
         }
       }
     },

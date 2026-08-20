@@ -7,8 +7,9 @@ with the
 
 Its ingestion half is implemented by #236, which ships the internal
 `arch-linter-net history ingest` command and the canonical Git evidence it emits.
-Everything below scoring, graphs, configuration, and the versioned report schema
-still describes planned behavior for #237–#244 rather than a shipped surface.
+The policy-backed configuration described in #237 is now implemented. Everything
+below scoring, graphs, and the versioned report schema still describes planned
+behavior for #238–#244 rather than a shipped surface.
 
 ## Product boundary
 
@@ -24,12 +25,12 @@ canonical scoring or recommendations.
 
 One successful run is identified by:
 
-~~~text
+```text
 (repository objects, repository object-hash format,
  authored from operand, authored to operand,
  resolved canonical from commit ID, resolved canonical to commit ID,
  effective history_analysis policy, history-semantics profile, tool version)
-~~~
+```
 
 Canonical Git object IDs use the repository-declared hash format and render the
 full digest as lowercase ASCII hexadecimal, two characters per digest byte. SHA-1
@@ -44,9 +45,9 @@ working-tree changes do not enter Git-only canonical identity.
 V1 accepts exactly four authored operand forms:
 
 1. literal `HEAD`;
-2. a full hexadecimal object ID matching the repository hash length;
-3. a fully-qualified ref beginning `refs/`;
-4. otherwise a shorthand looked up only as `refs/tags/<operand>` and
+1. a full hexadecimal object ID matching the repository hash length;
+1. a fully-qualified ref beginning `refs/`;
+1. otherwise a shorthand looked up only as `refs/tags/<operand>` and
    `refs/heads/<operand>`.
 
 A full-length hex operand is an object ID, not shorthand. `HEAD` resolves the
@@ -64,9 +65,9 @@ unless that exact text is itself a valid ref name under the rules above.
 
 After resolution:
 
-~~~text
+```text
 Commits(from,to) = Reachable(to) \ Reachable(from)
-~~~
+```
 
 `Reachable(r)` includes `r` and every parent-reachable commit, even when `from` is
 not an ancestor of `to`.
@@ -86,9 +87,9 @@ missing, malformed, or unreadable fail closed.
 Exactly one direct `author ` header is required. After its literal prefix, parse
 from right to left:
 
-~~~text
+```text
 <identity-bytes> SP <timestamp-token> SP <timezone-token>
-~~~
+```
 
 - timestamp matches `-?[0-9]+`;
 - timezone matches `[+-][0-9]{4}`;
@@ -102,12 +103,12 @@ formatting.
 Canonical author identity:
 
 1. trim ASCII SP/HT from email bytes;
-2. select non-empty email, otherwise ASCII-SP/HT-trimmed name;
-3. strict-UTF8 decode selected bytes or fail closed;
-4. trim only ASCII SP/HT;
-5. lowercase ASCII `A-Z` only;
-6. perform no Unicode normalization, locale casing, or full Unicode case folding;
-7. use `unknown` only when both parsed email and name are empty.
+1. select non-empty email, otherwise ASCII-SP/HT-trimmed name;
+1. strict-UTF8 decode selected bytes or fail closed;
+1. trim only ASCII SP/HT;
+1. lowercase ASCII `A-Z` only;
+1. perform no Unicode normalization, locale casing, or full Unicode case folding;
+1. use `unknown` only when both parsed email and name are empty.
 
 ### Exact `committer` epoch-second parsing
 
@@ -147,18 +148,18 @@ Each #237 extractor has a unique stable extractor ID
 
 Canonical identity is structural:
 
-~~~text
+```text
 TaskKey = (namespace, positive_decimal_id)
-~~~
+```
 
 The decimal is arbitrary precision, greater than zero, and renders without leading
 zeroes.
 
 Every extractor match retains mandatory canonical provenance:
 
-~~~text
+```text
 (extractor_id, TaskKey, raw_message_byte_span[start,end), matched_utf8_text)
-~~~
+```
 
 Spans are non-empty and half-open. Identical provenance records deduplicate.
 Records order by start, end, extractor ID scalar order, then TaskKey order. The
@@ -176,7 +177,7 @@ present, must both be outside `[A-Za-z0-9_#]`.
 
 The matched span contains exactly `#` plus digits.
 
-~~~text
+```text
 #001     -> (issue, 1)
 #1       -> (issue, 1)
 #0       -> no TaskKey
@@ -185,7 +186,7 @@ abc#12   -> no match
 #12foo   -> no match
 ##12     -> no match
 #12#13   -> no match
-~~~
+```
 
 All task spread, task episodes, TaskCoChange, independent pairs, and repeated-edit
 evidence consume canonical TaskKeys rather than source spellings.
@@ -194,9 +195,9 @@ evidence consume canonical TaskKeys rather than source spellings.
 
 After ref resolution:
 
-~~~text
+```text
 Commits(from,to) = Reachable(to) \ Reachable(from)
-~~~
+```
 
 Commits sort by exact committer epoch integer then full commit ID.
 
@@ -218,8 +219,8 @@ spellings remain distinct.
 Canonical ordinal ordering means lexicographic Unicode scalar numeric value:
 
 1. compare corresponding scalars numerically;
-2. lower first differing scalar sorts first;
-3. exact-prefix shorter sequence sorts first.
+1. lower first differing scalar sorts first;
+1. exact-prefix shorter sequence sorts first.
 
 Host UTF-16 ordering, filesystem collation, locale collation, and normalization
 libraries are not authoritative. Repository paths use `/`.
@@ -238,10 +239,10 @@ profile change.
 
 Thus:
 
-~~~text
+```text
 modify X ; delete X ; later add unrelated X
 => one baseline X identity in v1
-~~~
+```
 
 Accepted exact-rename lineages may union several baseline path identities.
 `ambiguous_dag` components perform no cross-path union.
@@ -257,9 +258,9 @@ configuration cannot create canonical candidates.
 
 For candidate `c`:
 
-~~~text
+```text
 Endpoints(c) = { src(c), dst(c) }
-~~~
+```
 
 Build undirected overlap graph `H` whose candidate vertices connect exactly when
 endpoint sets intersect. Connected components of `H` are potential rename
@@ -269,8 +270,8 @@ A component canonicalizes only if exactly one permutation `(c1,...,ck)` contains
 all candidates and:
 
 1. every earlier candidate commit is a strict ancestor of every later one;
-2. each `dst(ci) == src(c{i+1})`;
-3. for a shared adjacent path `p`, no ordinary canonical add/delete of `p` occurs
+1. each `dst(ci) == src(c{i+1})`;
+1. for a shared adjacent path `p`, no ordinary canonical add/delete of `p` occurs
    in a non-merge commit strictly between the two candidate commits.
 
 Rule 3 is the lifecycle guard: deleting and later recreating the same path breaks
@@ -283,13 +284,13 @@ repairs topology or pathname reuse ambiguity.
 
 Examples:
 
-~~~text
+```text
 A -> B -> C on descendants, no lifecycle break => one logical file, canonical C
 A -> B -> A on descendants                    => canonical A, alias B
 branch 1: A -> B
 branch 2: A -> C                              => ambiguous_dag
 A -> B ; delete B ; add B ; B -> C            => ambiguous_dag lifecycle break
-~~~
+```
 
 For an accepted lineage, baseline path identities in the sequence are unioned.
 The terminal destination is canonical path unless a later event on that same
@@ -316,12 +317,12 @@ commit.
 
 An accepted exact rename collapses its delete/add pair into one event:
 
-~~~text
+```text
 canonical_additions = 0
 canonical_deletions = 0
 canonical_churn     = 0
 line_count_status   = exact_rename
-~~~
+```
 
 A candidate in `ambiguous_dag` does not collapse; its delete/add entries remain
 ordinary events.
@@ -331,11 +332,11 @@ required objects fail closed. An absent add/delete side is empty bytes.
 
 Gitlink/tree/non-blob/non-line events use:
 
-~~~text
+```text
 canonical_additions = 0
 canonical_deletions = 0
 line_count_status   = binary_or_unavailable
-~~~
+```
 
 Blob events also use that status when either non-empty participating blob contains
 NUL (`0x00`). V1 never substitutes byte counts, textconv, external diff, estimates,
@@ -344,18 +345,18 @@ or backend sentinels.
 Otherwise line churn uses raw bytes:
 
 1. split on LF `0x0A`;
-2. LF is terminator, not payload;
-3. CR and all other bytes remain payload;
-4. empty bytes have zero lines;
-5. terminal LF adds no extra trailing line;
-6. equality is exact byte equality;
-7. let `L` be mathematical LCS length.
+1. LF is terminator, not payload;
+1. CR and all other bytes remain payload;
+1. empty bytes have zero lines;
+1. terminal LF adds no extra trailing line;
+1. equality is exact byte equality;
+1. let `L` be mathematical LCS length.
 
-~~~text
+```text
 canonical_deletions = old_line_count - L
 canonical_additions = new_line_count - L
 line_count_status   = text
-~~~
+```
 
 Only LCS length matters, so Myers/histogram/patience choices, Git attributes,
 textconv, and diff-script tie breaking cannot change totals.
@@ -363,9 +364,9 @@ textconv, and diff-script tie breaking cannot change totals.
 `commit_count(f)` counts distinct canonical file-evidence commits, not raw delta
 entries.
 
-~~~text
+```text
 churn(f) = sum(canonical_additions + canonical_deletions over canonical events)
-~~~
+```
 
 Churn is volume, not complexity.
 
@@ -374,33 +375,75 @@ Churn is volume, not complexity.
 Primary category derives from canonical path. Fixed order:
 
 1. production
-2. tests
-3. docs
-4. generated
-5. build_ci
-6. samples_examples
-7. unknown
+1. tests
+1. docs
+1. generated
+1. build_ci
+1. samples_examples
+1. unknown
 
 #237 analysis ignores happen before score populations and `G0`. Presentation
 suppression is downstream and cannot rescore evidence.
+
+## Bounded `history_analysis` configuration
+
+Release-forensics configuration belongs in the normal architecture policy under
+`history_analysis`; there is no separate history configuration file. The section
+is optional: omission retains the built-in `issue` extractor, no path patterns
+or ignores, the default profiles below, and no `Gtheta` threshold.
+
+```yaml
+history_analysis:
+  extractors:
+    - id: jira
+      namespace: jira
+      pattern:
+        prefix: JIRA-
+  paths:
+    production: [src/**]
+    tests: [tests/**]
+    docs: [docs/**]
+  ignore: ["**/obj/**", "**/bin/**"]
+  weights:
+    hotspot: { commit: 0.30, churn: 0.25, task: 0.25, author: 0.10, temporal: 0.10 }
+  thresholds:
+    co_change_significance: 0.750000000
+```
+
+Configured extractors use a deliberately small literal pattern:
+`prefix + [0-9]+ + suffix` (where `prefix` is non-empty and `suffix` is
+optional). The complete literal match has the usual half-open raw byte span;
+the decimal is positive and canonicalized by the existing TaskKey machinery.
+The built-in `issue` extractor remains present and cannot be replaced.
+
+Path patterns are `/`-separated literal segments with only `*` (one segment)
+and `**` (zero or more); backslashes, dot segments, partial wildcards, and
+character classes are rejected. They compare exact canonical Git path scalars
+without Unicode normalization or filesystem conversion. Ignores run before
+fixed-order category selection and all future score/graph populations.
+
+Every configured profile is complete and must contain finite nonnegative plain
+base-10 decimals with no more than nine fractional digits and an exact sum of
+`1.000000000`. Invalid sums and thresholds are rejected before analysis; they
+are never rounded, rescaled, or repaired.
 
 File metrics normalize within primary-category cohorts. Base-edge metrics normalize
 within unordered endpoint-category cohorts. Cross-cohort normalized scores are not
 globally comparable.
 
-~~~text
+```text
 normalized(x) = 0 if max(population)=0, else x/max(population)
 normalized_log(x) = 0 if max(population)=0,
                     else log(1+x)/log(1+max(population))
-~~~
+```
 
 Missing optional evidence is raw zero. Remaining weights are never renormalized.
 
 ## Canonical numeric model and weights
 
-~~~text
+```text
 Q(v) = round-half-to-even(v, 9 decimal places)
-~~~
+```
 
 Components, proximity, edge weights, final scores, and thresholds are quantized
 before threshold comparison, ranking, or serialization.
@@ -422,7 +465,7 @@ repaired. Evidence absence never changes enabledness or weights.
 
 ## Hotspots
 
-~~~text
+```text
 C_f = Q(normalized(commit_count(f)))
 H_f = Q(normalized_log(churn(f)))
 T_f = Q(normalized(distinct_canonical_task_keys(f)))
@@ -430,7 +473,7 @@ A_f = Q(normalized(distinct_authors(f)))
 R_f = Q(normalized(temporal_span_seconds(f)))
 
 HotspotScore(f) = Q(w_c*C_f + w_h*H_f + w_t*T_f + w_a*A_f + w_r*R_f)
-~~~
+```
 
 Temporal span is exact latest-minus-earliest canonical committer epoch-second
 integer. Rankings remain category-local; production is the primary human-facing
@@ -438,42 +481,42 @@ group.
 
 ## Base co-change graph `G0`
 
-~~~text
+```text
 G0 = (V,E0)
 V  = retained logical files
 E0 = { unordered(a,b) : CommitCoChange(a,b) > 0 }
 
 CommitCoChange(a,b) = count(canonical file-evidence commits containing both)
 TaskCoChange(a,b)   = count(distinct canonical TaskKeys whose episodes contain both)
-~~~
+```
 
 Task evidence can weight an existing edge but cannot create topology when
 `CommitCoChange=0`.
 
-~~~text
+```text
 CommitComponent  = Q(normalized(CommitCoChange))
 TaskComponent    = Q(normalized(TaskCoChange))
 CombinedCoChange = Q(alpha*CommitComponent + beta*TaskComponent)
-~~~
+```
 
 Pair normalization/ranking is endpoint-category-cohort-local. Distinct-neighbor
 and centrality evidence always uses `G0`.
 
 ## Threshold graph `Gtheta` and clusters
 
-~~~text
+```text
 Gtheta = (V, { e in E0 : CombinedCoChange(e) >= theta })
-~~~
+```
 
 Threshold comparison is inclusive. `Gtheta` exists only for clusters and cluster-
 derived candidates. Changing `theta` cannot alter `G0`, pair weights, `D_f`,
 `K_f`, hotspot, bottleneck, or OCP scores.
 
-~~~text
+```text
 ClusterEdges(C) = qualifying Gtheta edges internal to C
 ClusterMaximum(C) = max(CombinedCoChange(e) for e in ClusterEdges(C))
 ClusterAggregate(C) = Q(sum(CombinedCoChange(e) for e in ClusterEdges(C)))
-~~~
+```
 
 Sub-threshold internal `G0` edges do not enter the aggregate.
 
@@ -489,50 +532,50 @@ enter pair-exclusive intervals.
 Pair-side intervals are closed intervals over exact arbitrary-precision committer
 epoch-second integers:
 
-~~~text
+```text
 gap_seconds = later.start_epoch_second - earlier.end_epoch_second
 
 days_between = 0                         if gap_seconds <= 0
                ceil(gap_seconds / 86400) if gap_seconds > 0
 
 TemporalProximity(x,y) = Q(1/(1+days_between))
-~~~
+```
 
 Calendar dates, timezone, local midnight, DST, bounded host date ranges, and
 floating-point seconds never participate. A 25-hour gap gives `days_between=2`.
 
 ## Cohort-safe centrality and bottleneck score
 
-~~~text
+```text
 IncidentCommitDegree(f) = Σ CommitCoChange(f,n)
 IncidentTaskDegree(f)   = Σ TaskCoChange(f,n)
 IC_f = Q(normalized(IncidentCommitDegree(f))) within f's category
 IT_f = Q(normalized(IncidentTaskDegree(f))) within f's category
 K_f  = Q(alpha*IC_f + beta*IT_f)
-~~~
+```
 
 V1 reuses co-change `alpha/beta` for centrality.
 
-~~~text
+```text
 T_f = Q(normalized(IndependentTaskSpread(f)))
 A_f = Q(normalized(author_spread(f)))
 O_f = Q(normalized(independent_temporal_proximity(f)))
 D_f = Q(normalized(distinct_neighbor_degree_G0(f)))
 
 BottleneckScore(f) = Q(b_t*T_f + b_a*A_f + b_o*O_f + b_d*D_f + b_c*K_f)
-~~~
+```
 
 Rankings are category-local and describe pressure, not proven merge conflicts.
 
 ## OCP pressure and repeated edits
 
-~~~text
+```text
 Partners_f(t) = {u : canonical TaskKeys (t,u) independent for f}
 PairExclusive_f(t,u) = {c touching f : c references t and not u}
 Qualifying_f(t) = SHA-deduplicated union over Partners_f(t)
 Repeated_f(t) = max(|Qualifying_f(t)| - 1, 0)
 E_f = Σ Repeated_f(t)
-~~~
+```
 
 A commit counts at most once per canonical TaskKey after the SHA union, regardless
 of partner count.
@@ -542,25 +585,25 @@ of partner count.
 Starting from canonical filename stem:
 
 1. characters outside `[A-Za-z0-9]` delimit tokens;
-2. split lowercase -> uppercase;
-3. split before final uppercase of an acronym when next character is lowercase;
-4. split letter <-> digit;
-5. map ASCII `A-Z` to `a-z`.
+1. split lowercase -> uppercase;
+1. split before final uppercase of an acronym when next character is lowercase;
+1. split letter \<-> digit;
+1. map ASCII `A-Z` to `a-z`.
 
 Non-ASCII characters are delimiters. Matching is exact equality only.
 
 Default tokens:
 
-~~~text
+```text
 dispatcher, registry, handler, loader, session, options, configuration,
 command, diagnostic, mapper, dto, model, service, orchestrator
-~~~
+```
 
 `N_f = 1.000000000` when any token matches, otherwise zero.
 
-~~~text
+```text
 OcpPressureScore(f) = Q(o_t*T_f + o_c*K_f + o_r*Q(normalized(E_f)) + o_n*N_f)
-~~~
+```
 
 ## Ranking and candidates
 

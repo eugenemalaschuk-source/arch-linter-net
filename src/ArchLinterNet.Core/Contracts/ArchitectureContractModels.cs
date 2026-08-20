@@ -30,6 +30,9 @@ public sealed class ArchitectureContractDocument
 
     [YamlMember(Alias = "analysis")] public ArchitectureAnalysisConfiguration Analysis { get; set; } = new();
 
+    [YamlMember(Alias = "history_analysis")]
+    public HistoryAnalysisConfiguration HistoryAnalysis { get; set; } = new();
+
     [YamlMember(Alias = "contracts")] public Families.ArchitectureContractGroups Contracts { get; set; } = new();
 
     [YamlMember(Alias = "classification")]
