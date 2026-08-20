@@ -5,6 +5,7 @@ using ArchLinterNet.Cli.Abstractions;
 using ArchLinterNet.Cli.Commands.Badge.EntryPoint;
 using ArchLinterNet.Cli.Commands.Baseline;
 using ArchLinterNet.Cli.Commands.Cache;
+using ArchLinterNet.Cli.Commands.Change.EntryPoint;
 using ArchLinterNet.Cli.Commands.Coverage.EntryPoint;
 using ArchLinterNet.Cli.Commands.Explain;
 using ArchLinterNet.Cli.Commands.Graph;
@@ -27,7 +28,7 @@ namespace ArchLinterNet.Cli.Tests;
 [TestFixture]
 public sealed class CliArchitectureTests
 {
-    private static readonly string[] _value = { "badge", "baseline", "cache", "coverage", "graph", "explain", "history", "policy", "public-api", "scaffold", "schema" };
+    private static readonly string[] _value = { "badge", "baseline", "cache", "change", "coverage", "graph", "explain", "history", "policy", "public-api", "scaffold", "schema" };
     private static readonly string[] _value1 = { "generate", "update", "prune", "diff", "verify", "migrate" };
     private static readonly string[] _value2 = { "rule-1" };
     [Test]
@@ -46,6 +47,7 @@ public sealed class CliArchitectureTests
                 typeof(BadgeCommandModule),
                 typeof(BaselineCommandModule),
                 typeof(CacheCommandModule),
+                typeof(ChangeCommandModule),
                 typeof(CoverageCommandModule),
                 typeof(GraphCommandModule),
                 typeof(ExplainCommandModule),

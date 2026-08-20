@@ -4,6 +4,8 @@ global using ArchLinterNet.Cli.Commands.Baseline.Application;
 global using ArchLinterNet.Cli.Commands.Baseline.EntryPoint;
 global using ArchLinterNet.Cli.Commands.Cache.Application;
 global using ArchLinterNet.Cli.Commands.Cache.EntryPoint;
+global using ArchLinterNet.Cli.Commands.Change.Application;
+global using ArchLinterNet.Cli.Commands.Change.EntryPoint;
 global using ArchLinterNet.Cli.Commands.Explain.Application;
 global using ArchLinterNet.Cli.Commands.Explain.EntryPoint;
 global using ArchLinterNet.Cli.Commands.Graph.Application;
