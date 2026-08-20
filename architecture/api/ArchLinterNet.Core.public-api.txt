@@ -121,6 +121,16 @@ class ArchLinterNet.Core.Contracts.Families.ArchitectureTemplateLayer [sealed]
 class ArchLinterNet.Core.Contracts.Families.ArchitectureTypeMatcher [sealed]
 class ArchLinterNet.Core.Contracts.Families.ArchitectureTypePlacementContract [sealed]
 class ArchLinterNet.Core.Contracts.Families.PublicApiComparisonModes [static]
+class ArchLinterNet.Core.Contracts.HistoryAnalysisConfiguration [sealed]
+class ArchLinterNet.Core.Contracts.HistoryAnalysisThresholds [sealed]
+class ArchLinterNet.Core.Contracts.HistoryAnalysisWeightProfiles [sealed]
+class ArchLinterNet.Core.Contracts.HistoryBottleneckWeightProfile [sealed]
+class ArchLinterNet.Core.Contracts.HistoryCoChangeWeightProfile [sealed]
+class ArchLinterNet.Core.Contracts.HistoryHotspotWeightProfile [sealed]
+class ArchLinterNet.Core.Contracts.HistoryOcpWeightProfile [sealed]
+class ArchLinterNet.Core.Contracts.HistoryPathConfiguration [sealed]
+class ArchLinterNet.Core.Contracts.HistoryTaskExtractorConfiguration [sealed]
+class ArchLinterNet.Core.Contracts.HistoryTaskExtractorPattern [sealed]
 class ArchLinterNet.Core.Contracts.PublicApiSnapshotDiffer [static]
 class ArchLinterNet.Core.Contracts.PublicApiSnapshotFormat [static]
 class ArchLinterNet.Core.Contracts.PublicApiSnapshotStore [sealed]
@@ -599,6 +609,16 @@ ctor ArchLinterNet.Core.Contracts.Families.ArchitectureRequireMatchingInterface(
 ctor ArchLinterNet.Core.Contracts.Families.ArchitectureTemplateLayer()
 ctor ArchLinterNet.Core.Contracts.Families.ArchitectureTypeMatcher()
 ctor ArchLinterNet.Core.Contracts.Families.ArchitectureTypePlacementContract()
+ctor ArchLinterNet.Core.Contracts.HistoryAnalysisConfiguration()
+ctor ArchLinterNet.Core.Contracts.HistoryAnalysisThresholds()
+ctor ArchLinterNet.Core.Contracts.HistoryAnalysisWeightProfiles()
+ctor ArchLinterNet.Core.Contracts.HistoryBottleneckWeightProfile()
+ctor ArchLinterNet.Core.Contracts.HistoryCoChangeWeightProfile()
+ctor ArchLinterNet.Core.Contracts.HistoryHotspotWeightProfile()
+ctor ArchLinterNet.Core.Contracts.HistoryOcpWeightProfile()
+ctor ArchLinterNet.Core.Contracts.HistoryPathConfiguration()
+ctor ArchLinterNet.Core.Contracts.HistoryTaskExtractorConfiguration()
+ctor ArchLinterNet.Core.Contracts.HistoryTaskExtractorPattern()
 ctor ArchLinterNet.Core.Contracts.PublicApiSnapshotStore(ArchLinterNet.Core.IO.Abstractions.IArchitectureFileSystem)
 ctor ArchLinterNet.Core.Discovery.ArchitectureDiscoveredFrameworkReference(System.String, System.String, System.Boolean, System.String, System.String)
 ctor ArchLinterNet.Core.Discovery.ArchitectureDiscoveredFriendAssembly(System.String, System.String)
@@ -1600,6 +1620,7 @@ property ArchLinterNet.Core.Contracts.ArchitectureContractDocument.Classificatio
 property ArchLinterNet.Core.Contracts.ArchitectureContractDocument.Contracts: ArchLinterNet.Core.Contracts.Families.ArchitectureContractGroups [get, set]
 property ArchLinterNet.Core.Contracts.ArchitectureContractDocument.ExternalDependencies: System.Collections.Generic.Dictionary`2[System.String,ArchLinterNet.Core.Contracts.ArchitectureExternalDependencyGroup] [get, set]
 property ArchLinterNet.Core.Contracts.ArchitectureContractDocument.FrameworkReferences: System.Collections.Generic.Dictionary`2[System.String,ArchLinterNet.Core.Contracts.ArchitectureFrameworkReferenceGroup] [get, set]
+property ArchLinterNet.Core.Contracts.ArchitectureContractDocument.HistoryAnalysis: ArchLinterNet.Core.Contracts.HistoryAnalysisConfiguration [get, set]
 property ArchLinterNet.Core.Contracts.ArchitectureContractDocument.Layers: System.Collections.Generic.Dictionary`2[System.String,ArchLinterNet.Core.Contracts.ArchitectureLayer] [get, set]
 property ArchLinterNet.Core.Contracts.ArchitectureContractDocument.LegacyRuntimeLayers: System.Collections.Generic.List`1[System.String] [get, set]
 property ArchLinterNet.Core.Contracts.ArchitectureContractDocument.Name: System.String [get, set]
@@ -2021,6 +2042,43 @@ property ArchLinterNet.Core.Contracts.Families.ArchitectureTypePlacementContract
 property ArchLinterNet.Core.Contracts.Families.ArchitectureTypePlacementContract.RequiredNamePrefix: System.String [get, set]
 property ArchLinterNet.Core.Contracts.Families.ArchitectureTypePlacementContract.RequiredNameSuffix: System.String [get, set]
 property ArchLinterNet.Core.Contracts.Families.ArchitectureTypePlacementContract.TypesMatching: ArchLinterNet.Core.Contracts.Families.ArchitectureTypeMatcher [get, set]
+property ArchLinterNet.Core.Contracts.HistoryAnalysisConfiguration.Extractors: System.Collections.Generic.List`1[ArchLinterNet.Core.Contracts.HistoryTaskExtractorConfiguration] [get, set]
+property ArchLinterNet.Core.Contracts.HistoryAnalysisConfiguration.Ignore: System.Collections.Generic.List`1[System.String] [get, set]
+property ArchLinterNet.Core.Contracts.HistoryAnalysisConfiguration.Paths: ArchLinterNet.Core.Contracts.HistoryPathConfiguration [get, set]
+property ArchLinterNet.Core.Contracts.HistoryAnalysisConfiguration.Thresholds: ArchLinterNet.Core.Contracts.HistoryAnalysisThresholds [get, set]
+property ArchLinterNet.Core.Contracts.HistoryAnalysisConfiguration.Weights: ArchLinterNet.Core.Contracts.HistoryAnalysisWeightProfiles [get, set]
+property ArchLinterNet.Core.Contracts.HistoryAnalysisThresholds.CoChangeSignificance: System.Nullable`1[System.Decimal] [get, set]
+property ArchLinterNet.Core.Contracts.HistoryAnalysisWeightProfiles.Bottleneck: ArchLinterNet.Core.Contracts.HistoryBottleneckWeightProfile [get, set]
+property ArchLinterNet.Core.Contracts.HistoryAnalysisWeightProfiles.CoChange: ArchLinterNet.Core.Contracts.HistoryCoChangeWeightProfile [get, set]
+property ArchLinterNet.Core.Contracts.HistoryAnalysisWeightProfiles.Hotspot: ArchLinterNet.Core.Contracts.HistoryHotspotWeightProfile [get, set]
+property ArchLinterNet.Core.Contracts.HistoryAnalysisWeightProfiles.Ocp: ArchLinterNet.Core.Contracts.HistoryOcpWeightProfile [get, set]
+property ArchLinterNet.Core.Contracts.HistoryBottleneckWeightProfile.Author: System.Decimal [get, set]
+property ArchLinterNet.Core.Contracts.HistoryBottleneckWeightProfile.Centrality: System.Decimal [get, set]
+property ArchLinterNet.Core.Contracts.HistoryBottleneckWeightProfile.Degree: System.Decimal [get, set]
+property ArchLinterNet.Core.Contracts.HistoryBottleneckWeightProfile.IndependentTask: System.Decimal [get, set]
+property ArchLinterNet.Core.Contracts.HistoryBottleneckWeightProfile.Temporal: System.Decimal [get, set]
+property ArchLinterNet.Core.Contracts.HistoryCoChangeWeightProfile.Commit: System.Decimal [get, set]
+property ArchLinterNet.Core.Contracts.HistoryCoChangeWeightProfile.Task: System.Decimal [get, set]
+property ArchLinterNet.Core.Contracts.HistoryHotspotWeightProfile.Author: System.Decimal [get, set]
+property ArchLinterNet.Core.Contracts.HistoryHotspotWeightProfile.Churn: System.Decimal [get, set]
+property ArchLinterNet.Core.Contracts.HistoryHotspotWeightProfile.Commit: System.Decimal [get, set]
+property ArchLinterNet.Core.Contracts.HistoryHotspotWeightProfile.Task: System.Decimal [get, set]
+property ArchLinterNet.Core.Contracts.HistoryHotspotWeightProfile.Temporal: System.Decimal [get, set]
+property ArchLinterNet.Core.Contracts.HistoryOcpWeightProfile.Centrality: System.Decimal [get, set]
+property ArchLinterNet.Core.Contracts.HistoryOcpWeightProfile.IndependentTask: System.Decimal [get, set]
+property ArchLinterNet.Core.Contracts.HistoryOcpWeightProfile.RepeatedEdit: System.Decimal [get, set]
+property ArchLinterNet.Core.Contracts.HistoryOcpWeightProfile.RoleHint: System.Decimal [get, set]
+property ArchLinterNet.Core.Contracts.HistoryPathConfiguration.BuildCi: System.Collections.Generic.List`1[System.String] [get, set]
+property ArchLinterNet.Core.Contracts.HistoryPathConfiguration.Docs: System.Collections.Generic.List`1[System.String] [get, set]
+property ArchLinterNet.Core.Contracts.HistoryPathConfiguration.Generated: System.Collections.Generic.List`1[System.String] [get, set]
+property ArchLinterNet.Core.Contracts.HistoryPathConfiguration.Production: System.Collections.Generic.List`1[System.String] [get, set]
+property ArchLinterNet.Core.Contracts.HistoryPathConfiguration.SamplesExamples: System.Collections.Generic.List`1[System.String] [get, set]
+property ArchLinterNet.Core.Contracts.HistoryPathConfiguration.Tests: System.Collections.Generic.List`1[System.String] [get, set]
+property ArchLinterNet.Core.Contracts.HistoryTaskExtractorConfiguration.Id: System.String [get, set]
+property ArchLinterNet.Core.Contracts.HistoryTaskExtractorConfiguration.Namespace: System.String [get, set]
+property ArchLinterNet.Core.Contracts.HistoryTaskExtractorConfiguration.Pattern: ArchLinterNet.Core.Contracts.HistoryTaskExtractorPattern [get, set]
+property ArchLinterNet.Core.Contracts.HistoryTaskExtractorPattern.Prefix: System.String [get, set]
+property ArchLinterNet.Core.Contracts.HistoryTaskExtractorPattern.Suffix: System.String [get, set]
 property ArchLinterNet.Core.Contracts.IArchitectureContract.Id: System.String [abstract, get, set]
 property ArchLinterNet.Core.Contracts.IArchitectureContract.Name: System.String [abstract, get]
 property ArchLinterNet.Core.Contracts.IArchitectureSourceExpandableContract.ExcludedSourceSets: System.Collections.Generic.List`1[System.String] [abstract, get, set]

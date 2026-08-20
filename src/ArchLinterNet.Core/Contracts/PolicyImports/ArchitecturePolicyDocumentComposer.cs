@@ -6,6 +6,7 @@ namespace ArchLinterNet.Core.Contracts.PolicyImports;
 internal sealed class ArchitecturePolicyDocumentComposer
 {
     private const string AnalysisSection = "analysis";
+    private const string HistoryAnalysisSection = "history_analysis";
     private const string ContractsSection = "contracts";
     private const string ClassificationSection = "classification";
 
@@ -75,6 +76,10 @@ internal sealed class ArchitecturePolicyDocumentComposer
             {
                 MergeAnalysis(effective, value, source);
             }
+            else if (key == HistoryAnalysisSection)
+            {
+                MergeHistoryAnalysis(effective, value, source);
+            }
             else if (key == ContractsSection)
             {
                 MergeContracts(effective, value, source);
@@ -128,6 +133,112 @@ internal sealed class ArchitecturePolicyDocumentComposer
             {
                 AddSingleton(target, key, child, source, yamlPath, effectivePath);
             }
+        }
+    }
+
+    // History configuration is a normal composable policy section. Lists accumulate across
+    // fragments, while fixed-shape profiles and threshold members remain authored singletons so
+    // composition cannot silently choose one semantic tuning value over another.
+    private void MergeHistoryAnalysis(YamlMappingNode effective, YamlNode value, ArchitecturePolicySource source)
+    {
+        YamlMappingNode sourceMap = RequireMapping(value, source, HistoryAnalysisSection);
+        YamlMappingNode target = GetOrAddMapping(effective, HistoryAnalysisSection, source, HistoryAnalysisSection);
+        foreach ((YamlNode keyNode, YamlNode child) in sourceMap.Children)
+        {
+            string key = ScalarKey(keyNode, source, HistoryAnalysisSection, "history-analysis field");
+            string yamlPath = $"{HistoryAnalysisSection}.{key}";
+            string effectivePath = ArchitecturePolicyProvenancePath.AppendProperty(
+                ArchitecturePolicyProvenancePath.Property(HistoryAnalysisSection), key);
+            switch (key)
+            {
+                case "extractors":
+                case "ignore":
+                    AppendSequence(target, key, child, source, yamlPath, effectivePath);
+                    break;
+                case "paths":
+                    MergeHistoryPathPatterns(target, child, source, yamlPath, effectivePath);
+                    break;
+                case "weights":
+                    MergeHistoryWeightProfiles(target, child, source, yamlPath, effectivePath);
+                    break;
+                case "thresholds":
+                    MergeHistoryThresholds(target, child, source, yamlPath, effectivePath);
+                    break;
+                default:
+                    AddSingleton(target, key, child, source, yamlPath, effectivePath);
+                    break;
+            }
+        }
+    }
+
+    private void MergeHistoryPathPatterns(
+        YamlMappingNode parent,
+        YamlNode value,
+        ArchitecturePolicySource source,
+        string yamlPath,
+        string effectivePath)
+    {
+        YamlMappingNode sourceMap = RequireMapping(value, source, yamlPath);
+        YamlMappingNode target = GetOrAddMapping(parent, "paths", source, yamlPath);
+        foreach ((YamlNode keyNode, YamlNode child) in sourceMap.Children)
+        {
+            string key = ScalarKey(keyNode, source, yamlPath, "history path category");
+            string childYamlPath = $"{yamlPath}.{key}";
+            string childEffectivePath = ArchitecturePolicyProvenancePath.AppendProperty(effectivePath, key);
+            if (key is "production" or "tests" or "docs" or "generated" or "build_ci" or "samples_examples")
+            {
+                AppendSequence(target, key, child, source, childYamlPath, childEffectivePath);
+            }
+            else
+            {
+                AddSingleton(target, key, child, source, childYamlPath, childEffectivePath);
+            }
+        }
+    }
+
+    private void MergeHistoryWeightProfiles(
+        YamlMappingNode parent,
+        YamlNode value,
+        ArchitecturePolicySource source,
+        string yamlPath,
+        string effectivePath)
+    {
+        YamlMappingNode sourceMap = RequireMapping(value, source, yamlPath);
+        YamlMappingNode target = GetOrAddMapping(parent, "weights", source, yamlPath);
+        foreach ((YamlNode keyNode, YamlNode child) in sourceMap.Children)
+        {
+            string key = ScalarKey(keyNode, source, yamlPath, "history weight profile");
+            string childYamlPath = $"{yamlPath}.{key}";
+            AddSingleton(
+                target,
+                key,
+                child,
+                source,
+                childYamlPath,
+                ArchitecturePolicyProvenancePath.AppendProperty(effectivePath, key));
+        }
+    }
+
+    private void MergeHistoryThresholds(
+        YamlMappingNode parent,
+        YamlNode value,
+        ArchitecturePolicySource source,
+        string yamlPath,
+        string effectivePath)
+    {
+        YamlMappingNode sourceMap = RequireMapping(value, source, yamlPath);
+        YamlMappingNode target = GetOrAddMapping(parent, "thresholds", source, yamlPath);
+        foreach ((YamlNode keyNode, YamlNode child) in sourceMap.Children)
+        {
+            string key = ScalarKey(keyNode, source, yamlPath, "history threshold");
+            string childYamlPath = $"{yamlPath}.{key}";
+            AddSingleton(
+                target,
+                key,
+                child,
+                source,
+                childYamlPath,
+                ArchitecturePolicyProvenancePath.AppendProperty(effectivePath, key));
         }
     }
 

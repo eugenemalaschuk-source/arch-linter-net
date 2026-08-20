@@ -670,6 +670,7 @@ sealed class ArchLinterNet.Core.Contracts.ArchitectureContractDocument
   property ArchLinterNet.Core.Contracts.ArchitectureClassificationConfiguration Classification {get;set;}
   property ArchLinterNet.Core.Contracts.ArchitecturePolicyProvenanceIndex Provenance {get;internal set;}
   property ArchLinterNet.Core.Contracts.Families.ArchitectureContractGroups Contracts {get;set;}
+  property ArchLinterNet.Core.Contracts.HistoryAnalysisConfiguration HistoryAnalysis {get;set;}
   property ArchLinterNet.Core.Model.ArchitectureClassificationPathDeferredNotice? ClassificationPathDeferred {get;set;}
   property ArchLinterNet.Core.Model.ArchitectureSourceExpansionInventory SourceExpansion {get;internal set;}
   property System.Collections.Generic.Dictionary<string,ArchLinterNet.Core.Contracts.ArchitectureExternalDependencyGroup> ExternalDependencies {get;set;}
@@ -1253,6 +1254,63 @@ enum ArchLinterNet.Core.Contracts.Families.PublicApiSnapshotErrorKind : int
   enum-member None = 0
   enum-member OwnershipError = 3
   enum-member ParseError = 2
+sealed class ArchLinterNet.Core.Contracts.HistoryAnalysisConfiguration
+  ctor()
+  property ArchLinterNet.Core.Contracts.HistoryAnalysisThresholds Thresholds {get;set;}
+  property ArchLinterNet.Core.Contracts.HistoryAnalysisWeightProfiles Weights {get;set;}
+  property ArchLinterNet.Core.Contracts.HistoryPathConfiguration Paths {get;set;}
+  property System.Collections.Generic.List<ArchLinterNet.Core.Contracts.HistoryTaskExtractorConfiguration> Extractors {get;set;}
+  property System.Collections.Generic.List<string> Ignore {get;set;}
+sealed class ArchLinterNet.Core.Contracts.HistoryAnalysisThresholds
+  ctor()
+  property decimal? CoChangeSignificance {get;set;}
+sealed class ArchLinterNet.Core.Contracts.HistoryAnalysisWeightProfiles
+  ctor()
+  property ArchLinterNet.Core.Contracts.HistoryBottleneckWeightProfile Bottleneck {get;set;}
+  property ArchLinterNet.Core.Contracts.HistoryCoChangeWeightProfile CoChange {get;set;}
+  property ArchLinterNet.Core.Contracts.HistoryHotspotWeightProfile Hotspot {get;set;}
+  property ArchLinterNet.Core.Contracts.HistoryOcpWeightProfile Ocp {get;set;}
+sealed class ArchLinterNet.Core.Contracts.HistoryBottleneckWeightProfile
+  ctor()
+  property decimal Author {get;set;}
+  property decimal Centrality {get;set;}
+  property decimal Degree {get;set;}
+  property decimal IndependentTask {get;set;}
+  property decimal Temporal {get;set;}
+sealed class ArchLinterNet.Core.Contracts.HistoryCoChangeWeightProfile
+  ctor()
+  property decimal Commit {get;set;}
+  property decimal Task {get;set;}
+sealed class ArchLinterNet.Core.Contracts.HistoryHotspotWeightProfile
+  ctor()
+  property decimal Author {get;set;}
+  property decimal Churn {get;set;}
+  property decimal Commit {get;set;}
+  property decimal Task {get;set;}
+  property decimal Temporal {get;set;}
+sealed class ArchLinterNet.Core.Contracts.HistoryOcpWeightProfile
+  ctor()
+  property decimal Centrality {get;set;}
+  property decimal IndependentTask {get;set;}
+  property decimal RepeatedEdit {get;set;}
+  property decimal RoleHint {get;set;}
+sealed class ArchLinterNet.Core.Contracts.HistoryPathConfiguration
+  ctor()
+  property System.Collections.Generic.List<string> BuildCi {get;set;}
+  property System.Collections.Generic.List<string> Docs {get;set;}
+  property System.Collections.Generic.List<string> Generated {get;set;}
+  property System.Collections.Generic.List<string> Production {get;set;}
+  property System.Collections.Generic.List<string> SamplesExamples {get;set;}
+  property System.Collections.Generic.List<string> Tests {get;set;}
+sealed class ArchLinterNet.Core.Contracts.HistoryTaskExtractorConfiguration
+  ctor()
+  property ArchLinterNet.Core.Contracts.HistoryTaskExtractorPattern Pattern {get;set;}
+  property string Id {get;set;}
+  property string Namespace {get;set;}
+sealed class ArchLinterNet.Core.Contracts.HistoryTaskExtractorPattern
+  ctor()
+  property string Prefix {get;set;}
+  property string Suffix {get;set;}
 interface ArchLinterNet.Core.Contracts.IArchitectureContract
   property string Name {get;}
   property string? Id {get;set;}
