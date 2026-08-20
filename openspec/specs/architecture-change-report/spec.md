@@ -4,11 +4,11 @@
 Provide a deterministic, machine-readable architecture delta between complete analysis snapshots for branch and pull-request workflows.
 ## Requirements
 ### Requirement: Complete architecture analysis can be persisted as a change snapshot
-The system SHALL provide a versioned `architecture-change-snapshot/v1` artifact that is built from a complete authoritative architecture analysis and contains stable entries for observed namespaces, projects, assemblies, semantic roles and contexts, dependency edges, coverage blind spots, normalized findings, and baseline-debt identities. The artifact SHALL identify its analysis mode and SHALL use deterministic ordering.
+The system SHALL provide a versioned `architecture-change-snapshot/v2` artifact that is built from a complete authoritative architecture analysis and contains stable entries for observed namespaces, projects, assemblies, semantic roles and contexts, dependency edges, coverage blind spots, normalized findings, and baseline-debt identities. The artifact SHALL identify its analysis mode and condition-set scope and SHALL use deterministic ordering. A snapshot document missing any required authority metadata or a required entries, findings, or baseline-debt collection SHALL be rejected rather than treated as an empty collection.
 
 #### Scenario: Snapshot retains complete analysis facts
 - **WHEN** a user creates a snapshot for a policy in the supported analysis mode
-- **THEN** the artifact contains its versioned authority metadata and sorted architecture surfaces
+- **THEN** the artifact contains its versioned mode and condition-set scope metadata and sorted architecture surfaces
 - **AND THEN** it does not claim to represent only changed files or projects
 
 #### Scenario: Surface kinds remain distinct
@@ -16,7 +16,7 @@ The system SHALL provide a versioned `architecture-change-snapshot/v1` artifact 
 - **THEN** the snapshot assigns them identities in distinct surface kinds
 
 ### Requirement: Architecture snapshots are compared by stable identity
-The system SHALL compare a base and current `architecture-change-snapshot/v1` artifact by typed, stable identity and SHALL report added and removed namespaces, projects, assemblies, semantic roles, contexts, dependency edges, and coverage blind spots. The result SHALL be deterministically ordered and SHALL reject incompatible or unsupported snapshot inputs.
+The system SHALL compare a base and current `architecture-change-snapshot/v2` artifact by typed, stable identity and SHALL report added and removed namespaces, projects, assemblies, semantic roles, contexts, dependency edges, and coverage blind spots. The result SHALL be deterministically ordered and SHALL reject incompatible, incomplete, or unsupported snapshot inputs.
 
 #### Scenario: New dependency edge is reported
 - **WHEN** the current snapshot contains a dependency edge absent from the base snapshot
@@ -27,7 +27,7 @@ The system SHALL compare a base and current `architecture-change-snapshot/v1` ar
 - **THEN** the report lists that namespace as removed
 
 #### Scenario: Incompatible input fails closed
-- **WHEN** either input lacks a supported snapshot version or the snapshots use different analysis modes
+- **WHEN** either input lacks a supported snapshot version, required collections or authority metadata, or the snapshots use different analysis modes or condition-set scopes
 - **THEN** report creation fails with an actionable input error
 
 ### Requirement: New drift is distinct from known baseline debt

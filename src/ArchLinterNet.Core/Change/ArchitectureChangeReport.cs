@@ -7,11 +7,12 @@ namespace ArchLinterNet.Core.Change;
 public sealed record ArchitectureChangeSnapshot(
     int SchemaVersion,
     string Mode,
+    string ConditionSetName,
     IReadOnlyList<ArchitectureChangeEntry> Entries,
     IReadOnlyList<ArchitectureChangeFinding> Findings,
     IReadOnlyList<string> BaselineDebt)
 {
-    public const int CurrentSchemaVersion = 1;
+    public const int CurrentSchemaVersion = 2;
     public const string Kind = "architecture-change-snapshot";
 }
 
@@ -46,6 +47,7 @@ public static class ArchitectureChangeReports
             ArchitectureChangeSnapshot.Kind,
             snapshot.SchemaVersion,
             snapshot.Mode,
+            snapshot.ConditionSetName,
             Order(snapshot.Entries),
             Order(snapshot.Findings),
             snapshot.BaselineDebt.OrderBy(static value => value, StringComparer.Ordinal).ToArray()), _jsonOptions);
@@ -61,12 +63,22 @@ public static class ArchitectureChangeReports
             throw new ArgumentException("The input is not an architecture-change-snapshot artifact.", nameof(json));
         }
 
+        if (document.Mode is null
+            || document.ConditionSetName is null
+            || document.Entries is null
+            || document.Findings is null
+            || document.BaselineDebt is null)
+        {
+            throw new ArgumentException("The architecture change snapshot is incomplete.", nameof(json));
+        }
+
         ArchitectureChangeSnapshot snapshot = new(
             document.SchemaVersion,
-            document.Mode ?? string.Empty,
-            document.Entries ?? Array.Empty<ArchitectureChangeEntry>(),
-            document.Findings ?? Array.Empty<ArchitectureChangeFinding>(),
-            document.BaselineDebt ?? Array.Empty<string>());
+            document.Mode,
+            document.ConditionSetName,
+            document.Entries,
+            document.Findings,
+            document.BaselineDebt);
         Validate(snapshot);
         return snapshot with
         {
@@ -85,6 +97,11 @@ public static class ArchitectureChangeReports
         if (!string.Equals(baseline.Mode, current.Mode, StringComparison.Ordinal))
         {
             throw new ArgumentException("Base and current snapshots must use the same analysis mode.");
+        }
+
+        if (!string.Equals(baseline.ConditionSetName, current.ConditionSetName, StringComparison.Ordinal))
+        {
+            throw new ArgumentException("Base and current snapshots must use the same condition set.");
         }
 
         Dictionary<string, ArchitectureChangeEntry> baseEntries = baseline.Entries.ToDictionary(Key, StringComparer.Ordinal);
@@ -138,6 +155,11 @@ public static class ArchitectureChangeReports
             throw new ArgumentException("Architecture change snapshots must use strict or audit mode.");
         }
 
+        if (snapshot.ConditionSetName is null)
+        {
+            throw new ArgumentException("Architecture change snapshots must record their condition set.");
+        }
+
         EnsureUnique(snapshot.Entries.Select(Key), "entry");
         EnsureUnique(snapshot.Findings.Select(static finding => finding.Identity), "finding");
     }
@@ -184,6 +206,7 @@ public static class ArchitectureChangeReports
         string SnapshotKind,
         int SchemaVersion,
         string? Mode,
+        string? ConditionSetName,
         IReadOnlyList<ArchitectureChangeEntry>? Entries,
         IReadOnlyList<ArchitectureChangeFinding>? Findings,
         IReadOnlyList<string>? BaselineDebt);

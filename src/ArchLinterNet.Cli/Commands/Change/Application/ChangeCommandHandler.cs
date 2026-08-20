@@ -27,6 +27,13 @@ internal sealed class ChangeCommandHandler(ICliRuntime runtime, ICliConsole cons
 
         try
         {
+            string? outputCollision = FindSnapshotOutputCollision(options);
+            if (outputCollision is not null)
+            {
+                console.Error.WriteLine(outputCollision);
+                return CliExitCodes.InvalidArgumentsOrRuntimeError;
+            }
+
             ValidationOutcome validation = runtime.Validate(new ValidationRequest
             {
                 PolicyPath = options.PolicyPath,
@@ -45,7 +52,8 @@ internal sealed class ChangeCommandHandler(ICliRuntime runtime, ICliConsole cons
                     Mode = options.Mode,
                     ConditionSetName = options.ConditionSetName,
                 }).Frozen.Select(BaselineIdentity).OrderBy(static value => value, StringComparer.Ordinal).ToArray();
-            ArchitectureChangeSnapshot snapshot = BuildSnapshot(options.Mode, validation, namespaces, assemblies, baselineDebt);
+            ArchitectureChangeSnapshot snapshot = BuildSnapshot(
+                options.Mode, validation, namespaces, assemblies, baselineDebt, options.ConditionSetName);
             fileSystem.WriteAllText(options.OutputPath, ArchitectureChangeReports.SerializeSnapshot(snapshot));
             return CliExitCodes.Success;
         }
@@ -72,6 +80,13 @@ internal sealed class ChangeCommandHandler(ICliRuntime runtime, ICliConsole cons
 
         try
         {
+            string? outputCollision = FindReportOutputCollision(options);
+            if (outputCollision is not null)
+            {
+                console.Error.WriteLine(outputCollision);
+                return CliExitCodes.InvalidArgumentsOrRuntimeError;
+            }
+
             ArchitectureChangeSnapshot baseline = ArchitectureChangeReports.DeserializeSnapshot(fileSystem.ReadAllText(options.BasePath));
             ArchitectureChangeSnapshot current = ArchitectureChangeReports.DeserializeSnapshot(fileSystem.ReadAllText(options.CurrentPath));
             ArchitectureChangeReport report = ArchitectureChangeReports.Compare(baseline, current);
@@ -104,7 +119,7 @@ internal sealed class ChangeCommandHandler(ICliRuntime runtime, ICliConsole cons
 
     internal static ArchitectureChangeSnapshot BuildSnapshot(
         string mode, ValidationOutcome validation, ArchitectureGraphOutcome namespaceGraph, ArchitectureGraphOutcome assemblyGraph,
-        IReadOnlyList<string> baselineDebt)
+        IReadOnlyList<string> baselineDebt, string? conditionSetName = null)
     {
         List<ArchitectureChangeEntry> entries = new();
         entries.AddRange(namespaceGraph.Graph.Nodes
@@ -120,13 +135,17 @@ internal sealed class ChangeCommandHandler(ICliRuntime runtime, ICliConsole cons
         entries.AddRange(validation.ClassificationRoles.SelectMany(ContextEntries));
         entries.AddRange(CoverageBlindSpots(validation));
 
-        List<ArchitectureChangeFinding> findings = validation.Violations
-            .Concat(validation.CoverageFindings)
-            .Select(Finding)
+        List<ArchitectureChangeFinding> findings = ArchitectureFindingMapper
+            .FromViolations(validation.Violations.Concat(validation.CoverageFindings), mode)
+            .Select(static finding => new ArchitectureChangeFinding(
+                finding.CanonicalIdentity,
+                finding.Kind,
+                finding.ContractName))
             .ToList();
         return new ArchitectureChangeSnapshot(
             ArchitectureChangeSnapshot.CurrentSchemaVersion,
             mode,
+            conditionSetName ?? string.Empty,
             entries,
             findings,
             baselineDebt);
@@ -176,18 +195,6 @@ internal sealed class ChangeCommandHandler(ICliRuntime runtime, ICliConsole cons
         "coverage_blind_spot", (summary.ContractId ?? summary.ContractName) + "|" + summary.Scope + "|" + state + "|" + item,
         state + " " + summary.Scope + ": " + item);
 
-    private static ArchitectureChangeFinding Finding(ArchitectureViolation violation)
-    {
-        ArchitectureViolationIdentity? resolved = violation.Identity;
-        string identity = resolved is null
-            ? string.Join("|", violation.ContractId, violation.SourceType, violation.ForbiddenNamespace,
-                string.Join(",", violation.ForbiddenReferences.OrderBy(static value => value, StringComparer.Ordinal)))
-            : string.Join("|", resolved.ContractFamily, resolved.Kind, resolved.ContractId, resolved.SourceAssembly,
-                resolved.SourceType, resolved.SourceMember, resolved.TargetAssembly, resolved.TargetType,
-                resolved.TargetMember, resolved.Occurrence, resolved.Configuration);
-        return new ArchitectureChangeFinding(identity, violation.ContractName, violation.SourceType + " -> " + violation.ForbiddenNamespace);
-    }
-
     private static string BaselineIdentity(ArchitectureBaselineComparisonEntry entry)
     {
         ArchitectureViolationIdentity? identity = entry.Identity;
@@ -205,4 +212,30 @@ internal sealed class ChangeCommandHandler(ICliRuntime runtime, ICliConsole cons
     private static string Value(object value) => Convert.ToString(value, CultureInfo.InvariantCulture) ?? string.Empty;
 
     private static string NormalizePath(string path) => path.Replace('\\', '/');
+
+    internal static string? FindSnapshotOutputCollision(ChangeSnapshotCommandOptions options) =>
+        FindOutputCollision(options.OutputPath,
+            ("--policy", options.PolicyPath),
+            ("--baseline", options.BaselinePath));
+
+    internal static string? FindReportOutputCollision(ChangeReportCommandOptions options) => options.OutputPath is null
+        ? null
+        : FindOutputCollision(options.OutputPath,
+            ("--base", options.BasePath),
+            ("--current", options.CurrentPath));
+
+    private static string? FindOutputCollision(string outputPath, params (string Name, string? Path)[] inputPaths)
+    {
+        string output = Path.GetFullPath(outputPath);
+        foreach ((string name, string? inputPath) in inputPaths)
+        {
+            if (inputPath is not null
+                && string.Equals(output, Path.GetFullPath(inputPath), StringComparison.OrdinalIgnoreCase))
+            {
+                return $"--output destination '{outputPath}' matches {name} input '{inputPath}'";
+            }
+        }
+
+        return null;
+    }
 }

@@ -81,6 +81,23 @@ public sealed class ArchitectureChangeReportsTests
     }
 
     [Test]
+    public void Compare_RejectsSnapshotsFromDifferentConditionSets()
+    {
+        ArchitectureChangeSnapshot baseline = Snapshot(conditionSetName: "ci");
+        ArchitectureChangeSnapshot current = Snapshot(conditionSetName: "developer");
+
+        Assert.That(() => ArchitectureChangeReports.Compare(baseline, current), Throws.ArgumentException);
+    }
+
+    [TestCase("{\"snapshot_kind\":\"architecture-change-snapshot\",\"schema_version\":2,\"mode\":\"strict\",\"condition_set_name\":\"\",\"findings\":[],\"baseline_debt\":[]}")]
+    [TestCase("{\"snapshot_kind\":\"architecture-change-snapshot\",\"schema_version\":2,\"mode\":\"strict\",\"condition_set_name\":\"\",\"entries\":[],\"baseline_debt\":[]}")]
+    [TestCase("{\"snapshot_kind\":\"architecture-change-snapshot\",\"schema_version\":2,\"mode\":\"strict\",\"condition_set_name\":\"\",\"entries\":[],\"findings\":[]}")]
+    public void DeserializeSnapshot_RejectsTruncatedAuthoritativeArtifact(string json)
+    {
+        Assert.That(() => ArchitectureChangeReports.DeserializeSnapshot(json), Throws.ArgumentException);
+    }
+
+    [Test]
     public void Compare_BaseBaselineDebtMakesCurrentFindingExisting()
     {
         ArchitectureChangeSnapshot baseline = Snapshot(debt: new[] { "frozen-debt" });
@@ -102,11 +119,13 @@ public sealed class ArchitectureChangeReportsTests
         ArchitectureChangeEntry? third = null,
         ArchitectureChangeEntry? fourth = null,
         IReadOnlyList<ArchitectureChangeFinding>? findings = null,
-        IReadOnlyList<string>? debt = null)
+        IReadOnlyList<string>? debt = null,
+        string conditionSetName = "")
     {
         return new ArchitectureChangeSnapshot(
             ArchitectureChangeSnapshot.CurrentSchemaVersion,
             "strict",
+            conditionSetName,
             new[] { first, second, third, fourth }.OfType<ArchitectureChangeEntry>().ToArray(),
             findings ?? Array.Empty<ArchitectureChangeFinding>(),
             debt ?? Array.Empty<string>());
