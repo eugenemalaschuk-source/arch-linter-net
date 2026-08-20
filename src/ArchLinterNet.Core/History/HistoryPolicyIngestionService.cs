@@ -14,9 +14,10 @@ internal sealed class HistoryPolicyIngestionService
     public HistoryIngestionOutcome Ingest(HistoryIngestionRequest request, string? policyPath)
     {
         TaskKeyExtraction taskExtraction;
+        HistoryAnalysisConfiguration configuration;
         try
         {
-            HistoryAnalysisConfiguration configuration = string.IsNullOrWhiteSpace(policyPath)
+            configuration = string.IsNullOrWhiteSpace(policyPath)
                 ? new HistoryAnalysisConfiguration()
                 : new ArchitecturePolicyDocumentLoader().Load(policyPath).HistoryAnalysis;
             taskExtraction = TaskKeyExtraction.FromConfiguration(configuration);
@@ -28,6 +29,6 @@ internal sealed class HistoryPolicyIngestionService
                 $"history_analysis policy configuration is invalid: {exception.Message}"));
         }
 
-        return new HistoryIngestionService(taskExtraction).Ingest(request);
+        return new HistoryIngestionService(taskExtraction, configuration).Ingest(request);
     }
 }

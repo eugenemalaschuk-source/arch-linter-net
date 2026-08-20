@@ -1,4 +1,5 @@
 using ArchLinterNet.Core.History.Analysis;
+using ArchLinterNet.Core.History.Configuration;
 using ArchLinterNet.Core.History.Tasks;
 
 namespace ArchLinterNet.Core.History.Reporting;
@@ -24,6 +25,7 @@ internal static class HistoryIngestionJsonWriter
         WriteRenameCandidates(writer, result);
         WriteRenameComponents(writer, result);
         WriteLogicalFiles(writer, result);
+        WriteCoChangeGraph(writer, result);
         writer.EndObject();
         return writer.ToCanonicalText() + "\n";
     }
@@ -169,6 +171,121 @@ internal static class HistoryIngestionJsonWriter
         writer.EndArray();
     }
 
+    private static void WriteCoChangeGraph(CanonicalJsonWriter writer, HistoryIngestionResult result)
+    {
+        CoChangeGraph graph = result.CoChangeGraph;
+        writer.BeginObject("coChangeGraph");
+        writer.BeginObject("weights");
+        writer.WriteCanonicalDecimal("commit", graph.CommitWeight);
+        writer.WriteCanonicalDecimal("task", graph.TaskWeight);
+        writer.EndObject();
+        writer.WriteOptionalCanonicalDecimal("significanceThreshold", graph.SignificanceThreshold);
+        WriteVertices(writer, result, graph);
+        WritePairs(writer, graph);
+        WriteClusters(writer, graph);
+        writer.EndObject();
+    }
+
+    private static void WriteVertices(CanonicalJsonWriter writer, HistoryIngestionResult result, CoChangeGraph graph)
+    {
+        writer.BeginArray("vertices");
+        foreach (CoChangeVertex vertex in graph.Vertices)
+        {
+            writer.BeginObject();
+            writer.WriteString("canonicalPath", vertex.CanonicalPath);
+            writer.WriteString("category", CategoryText(vertex.Category));
+            writer.BeginArray("renameComponentIndexes");
+            foreach (RenameComponent component in vertex.RenameComponents)
+            {
+                writer.WriteNumberElement(IndexOf(result.RenameComponents, component));
+            }
+
+            writer.EndArray();
+            writer.EndObject();
+        }
+
+        writer.EndArray();
+    }
+
+    private static void WritePairs(CanonicalJsonWriter writer, CoChangeGraph graph)
+    {
+        writer.BeginArray("pairs");
+        foreach (CoChangePair pair in graph.Pairs)
+        {
+            writer.BeginObject();
+            writer.WriteString("firstPath", pair.First.CanonicalPath);
+            writer.WriteString("secondPath", pair.Second.CanonicalPath);
+            WriteCohort(writer, pair.Cohort);
+            writer.WriteNumber("commitCoChange", pair.CommitCoChange);
+            writer.WriteNumber("taskCoChange", pair.TaskCoChange);
+            writer.WriteBoolean("isBaseEdge", pair.IsBaseEdge);
+            writer.WriteOptionalNumber("cohortRank", pair.CohortRank);
+            writer.WriteOptionalCanonicalDecimal("commitComponent", pair.CommitComponent);
+            writer.WriteOptionalCanonicalDecimal("taskComponent", pair.TaskComponent);
+            writer.WriteOptionalCanonicalDecimal("combinedCoChange", pair.CombinedCoChange);
+            writer.BeginArray("commitIds");
+            foreach (string commitId in pair.CommitIds)
+            {
+                writer.WriteStringElement(commitId);
+            }
+
+            writer.EndArray();
+            writer.BeginArray("taskKeys");
+            foreach (TaskKey key in pair.TaskKeys)
+            {
+                writer.BeginObject();
+                writer.WriteString("namespace", key.Namespace);
+                writer.WriteIntegerText("id", key.IdText);
+                writer.EndObject();
+            }
+
+            writer.EndArray();
+            writer.EndObject();
+        }
+
+        writer.EndArray();
+    }
+
+    private static void WriteClusters(CanonicalJsonWriter writer, CoChangeGraph graph)
+    {
+        writer.BeginArray("clusters");
+        foreach (CoChangeCluster cluster in graph.Clusters)
+        {
+            writer.BeginObject();
+            WriteCohort(writer, cluster.Cohort);
+            writer.WriteCanonicalDecimal("maximum", cluster.Maximum);
+            writer.WriteCanonicalDecimal("aggregate", cluster.Aggregate);
+            writer.BeginArray("members");
+            foreach (CoChangeVertex member in cluster.Members)
+            {
+                writer.WriteStringElement(member.CanonicalPath);
+            }
+
+            writer.EndArray();
+            writer.BeginArray("edges");
+            foreach (CoChangePair edge in cluster.Edges)
+            {
+                writer.BeginObject();
+                writer.WriteString("firstPath", edge.First.CanonicalPath);
+                writer.WriteString("secondPath", edge.Second.CanonicalPath);
+                writer.EndObject();
+            }
+
+            writer.EndArray();
+            writer.EndObject();
+        }
+
+        writer.EndArray();
+    }
+
+    private static void WriteCohort(CanonicalJsonWriter writer, CoChangeCohort cohort)
+    {
+        writer.BeginObject("cohort");
+        writer.WriteString("firstCategory", CategoryText(cohort.First));
+        writer.WriteString("secondCategory", CategoryText(cohort.Second));
+        writer.EndObject();
+    }
+
     private static int IndexOf(IReadOnlyList<RenameCandidate> candidates, RenameCandidate candidate)
     {
         for (int index = 0; index < candidates.Count; index++)
@@ -181,4 +298,29 @@ internal static class HistoryIngestionJsonWriter
 
         return -1;
     }
+
+    private static int IndexOf(IReadOnlyList<RenameComponent> components, RenameComponent component)
+    {
+        for (int index = 0; index < components.Count; index++)
+        {
+            if (ReferenceEquals(components[index], component))
+            {
+                return index;
+            }
+        }
+
+        return -1;
+    }
+
+    private static string CategoryText(HistoryPathCategory category) => category switch
+    {
+        HistoryPathCategory.Production => "production",
+        HistoryPathCategory.Tests => "tests",
+        HistoryPathCategory.Docs => "docs",
+        HistoryPathCategory.Generated => "generated",
+        HistoryPathCategory.BuildCi => "build_ci",
+        HistoryPathCategory.SamplesExamples => "samples_examples",
+        HistoryPathCategory.Unknown => "unknown",
+        _ => "unknown",
+    };
 }
