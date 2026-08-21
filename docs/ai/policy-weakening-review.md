@@ -40,10 +40,11 @@ as `impact_not_proven` for review, with no fabricated affected types. Treat a
 Shared, Common, or Utils-style exemption as a warning sign to narrow and
 explain, not as a substitute for fixing code.
 
-Semantic inventory comparison is explicit and shape-aware: a known scalar
-string-set inventory may prove a relaxation, while a boolean prohibition has
-its own `true` → `false` direction. A scalar predicate or structured contract
-fact without a dedicated rule is `impact_not_proven`; it is never silently
+Semantic inventory comparison is explicit and shape-aware: only known scalar
+sets of exact identities may prove a relaxation, while a boolean prohibition
+has its own `true` → `false` direction. Prefixes, globs, call patterns, and
+cross-field location allowances are `impact_not_proven` until a containment or
+trusted effective-membership comparator exists. They are never silently
 discarded or presented as proof of affected architecture subjects.
 
 `analysis.project_include` and `analysis.project_exclude` are globs. A context

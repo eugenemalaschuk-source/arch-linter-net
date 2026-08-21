@@ -119,9 +119,10 @@ type/role/attribute/inheritance/CEL/public-API selector change is reported as
 proves the removed canonical subjects. Architecture change snapshots and a
 green validation result are not selector-membership evidence.
 The command establishes direction only for explicit fact-and-shape pairs:
-supported scalar string-set inventories and known boolean prohibitions. An
-unsupported changed typed contract fact is `impact_not_proven`, with no
-invented affected subjects.
+supported scalar string sets of exact identities and known boolean
+prohibitions. Prefix/glob/call-pattern facts and cross-field location unions
+remain `impact_not_proven` until membership or containment is proven. No
+unsupported typed fact receives invented affected subjects.
 
 ## Validate options
 

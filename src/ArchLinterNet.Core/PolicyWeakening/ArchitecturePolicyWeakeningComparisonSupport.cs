@@ -213,27 +213,13 @@ internal static class ArchitecturePolicyWeakeningComparisonSupport
         .SingleOrDefault(item => item.Name == name)?.Values.SingleOrDefault() ?? string.Empty;
 
     private static bool IsProhibitionInventoryName(string name) => name is "forbidden"
-        or "forbidden_calls"
-        or "forbidden_asmdef_prefixes"
-        or "forbidden_base_types"
-        or "forbidden_base_type_prefixes"
-        or "forbidden_apis"
-        or "forbidden_project_references"
-        or "forbidden_in_layers"
-        or "forbidden_in_namespaces"
-        or "forbidden_in_projects"
-        or "forbidden_in_assemblies";
+        or "forbidden_base_types";
 
     private static bool IsPermissionInventoryName(string name) => name is "allowed"
         or "allowed_types"
         or "allowed_importers"
         or "allowed_friend_assemblies"
         or "allowed_public_constants"
-        or "allowed_only_in_layers"
-        or "allowed_only_in_namespaces"
-        or "allowed_only_in_projects"
-        or "allowed_only_in_assemblies"
-        or "allowed_only_in_assembly_sets"
         or "allowed_container_root_types"
         or "allowed_module_root_types";
 

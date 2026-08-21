@@ -32,9 +32,10 @@ contains a stable identity, weakening kind, control identity, semantic versus
 optional canonical affected subjects, and existing schema-backed rationale.
 Project include/exclude glob changes are emitted as `impact_not_proven` unless
 complete resolved project membership is supplied; they are never treated as
-literal-string inventories. A changed typed contract fact without a supported
-fact-and-shape directional rule is likewise `impact_not_proven`; a required
-source expansion made empty-tolerant is a semantic finding.
+literal-string inventories. Prefix/glob/call-pattern facts and cross-field
+location unions are also `impact_not_proven` until their effective membership
+or containment is proven. A required source expansion made empty-tolerant is a
+semantic finding.
 
 Human, JSON, and SARIF project that same result. JSON is suitable for CI and
 SARIF uses one `ArchLinterNet.PolicyWeakening.<kind>` rule for each weakening

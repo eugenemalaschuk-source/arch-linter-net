@@ -56,7 +56,7 @@ public sealed class ArchitecturePolicyWeakeningComparerTests
     }
 
     [Test]
-    public void Compare_StaticScopeAndPermissionRelaxation_UsesTypedEffectiveInputs()
+    public void Compare_StaticScopeAndPredicateChanges_UsesBoundedTypedEvidence()
     {
         ArchitecturePolicyContextContract baselineContract = Contract(
             "strict",
@@ -93,10 +93,10 @@ public sealed class ArchitecturePolicyWeakeningComparerTests
         {
             "analysis_project_exclude_impact_not_proven",
             "analysis_scope_input_removed",
-            "permission_broadened",
-            "prohibition_removed",
             "scope_inventory_narrowed",
             "source_set_member_removed",
+            "typed_fact_impact_not_proven",
+            "typed_fact_impact_not_proven",
         }));
     }
 
@@ -321,6 +321,60 @@ public sealed class ArchitecturePolicyWeakeningComparerTests
             FactItems("allowed_only_in_types",
                 FactItems("type", Fact("assembly", "Sample.Host"), Fact("type", "Sample.Program")),
                 FactItems("type", Fact("assembly", "Sample.Host"), Fact("type", "Sample.Bootstrap"))),
+        ]);
+
+        ArchitecturePolicyWeakeningFinding finding = ArchitecturePolicyWeakeningComparer.Compare(new(
+            Context(contracts: [baseline]),
+            Context(contracts: [current]))).Findings.Single();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(finding.Kind, Is.EqualTo("typed_fact_impact_not_proven"));
+            Assert.That(finding.Classification, Is.EqualTo("impact_not_proven"));
+            Assert.That(finding.AffectedSubjects, Is.Empty);
+        });
+    }
+
+    [TestCase("UnityEngine.UI.", "UnityEngine.")]
+    [TestCase("UnityEngine.", "UnityEngine.UI.")]
+    public void Compare_ForbiddenBaseTypePrefixChange_IsImpactNotProven(string baselinePrefix, string currentPrefix)
+    {
+        ArchitecturePolicyWeakeningFinding finding = ArchitecturePolicyWeakeningComparer.Compare(new(
+            Context(contracts: [Contract("strict", "inheritance", "inheritance", [Fact("forbidden_base_type_prefixes", baselinePrefix)])]),
+            Context(contracts: [Contract("strict", "inheritance", "inheritance", [Fact("forbidden_base_type_prefixes", currentPrefix)])]))).Findings.Single();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(finding.Kind, Is.EqualTo("typed_fact_impact_not_proven"));
+            Assert.That(finding.Classification, Is.EqualTo("impact_not_proven"));
+            Assert.That(finding.AffectedSubjects, Is.Empty);
+        });
+    }
+
+    [Test]
+    public void Compare_AllowedOnlyInNamespacesGlobChange_IsImpactNotProven()
+    {
+        ArchitecturePolicyWeakeningFinding finding = ArchitecturePolicyWeakeningComparer.Compare(new(
+            Context(contracts: [Contract("strict", "composition", "composition", [Fact("allowed_only_in_namespaces", "Sample.Application.*")])]),
+            Context(contracts: [Contract("strict", "composition", "composition", [Fact("allowed_only_in_namespaces", "Sample.Application.Api")])]))).Findings.Single();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(finding.Kind, Is.EqualTo("typed_fact_impact_not_proven"));
+            Assert.That(finding.Classification, Is.EqualTo("impact_not_proven"));
+            Assert.That(finding.AffectedSubjects, Is.Empty);
+        });
+    }
+
+    [Test]
+    public void Compare_AddedProjectAllowanceWithAllowedAssembly_IsImpactNotProven()
+    {
+        ArchitecturePolicyContextContract baseline = Contract("strict", "composition", "composition", [
+            Fact("allowed_only_in_assemblies", "Sample.Host"),
+        ]);
+        ArchitecturePolicyContextContract current = Contract("strict", "composition", "composition", [
+            Fact("allowed_only_in_assemblies", "Sample.Host"),
+            Fact("allowed_only_in_projects", "src/Sample.Host/Sample.Host.csproj"),
         ]);
 
         ArchitecturePolicyWeakeningFinding finding = ArchitecturePolicyWeakeningComparer.Compare(new(
