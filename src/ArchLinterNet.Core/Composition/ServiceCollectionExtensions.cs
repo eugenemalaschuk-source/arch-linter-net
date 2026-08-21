@@ -11,6 +11,8 @@ using ArchLinterNet.Core.Graph;
 using ArchLinterNet.Core.Graph.Abstractions;
 using ArchLinterNet.Core.IO;
 using ArchLinterNet.Core.IO.Abstractions;
+using ArchLinterNet.Core.PolicyContext;
+using ArchLinterNet.Core.PolicyContext.Abstractions;
 using ArchLinterNet.Core.Reporting;
 using ArchLinterNet.Core.Reporting.Abstractions;
 using ArchLinterNet.Core.Resolution;
@@ -63,6 +65,7 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<IBuildStatePreparationService, BuildStatePreparationService>();
         services.AddSingleton<IArchitectureValidationApplicationService, ArchitectureValidationApplicationService>();
         services.AddSingleton<IArchitecturePolicyCheckApplicationService, ArchitecturePolicyCheckApplicationService>();
+        services.AddSingleton<IArchitecturePolicyContextApplicationService, ArchitecturePolicyContextApplicationService>();
         services.AddSingleton<IArchitectureBaselineApplicationService, ArchitectureBaselineApplicationService>();
         services.AddSingleton<IPublicApiSnapshotStore, PublicApiSnapshotStore>();
         services.AddSingleton<IArchitecturePublicApiApplicationService, ArchitecturePublicApiApplicationService>();

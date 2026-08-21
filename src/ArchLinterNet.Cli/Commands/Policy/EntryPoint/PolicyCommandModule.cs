@@ -8,6 +8,8 @@ internal sealed class PolicyCommandModule : ITopLevelCliSubcommandModule
 
     public System.CommandLine.Command CreateCommand(ICliRuntime runtime, ICliConsole console, IFileSystem fileSystem, CancellationToken cancellationToken = default)
     {
-        return new PolicyCommandDefinition(new PolicyCheckCommandHandler(console)).Create();
+        return new PolicyCommandDefinition(
+            new PolicyCheckCommandHandler(console),
+            new PolicyContextCommandHandler(runtime, console)).Create();
     }
 }

@@ -41,6 +41,11 @@ public sealed class ArchitectureContractCatalog
     // (plus a handler/registration) - no edits to this file are needed.
     public IReadOnlyList<string> FamiliesInOrder => _familiesInOrder;
 
+    // Internal projection seam for policy-only consumers that need the same
+    // effective contract identities and provenance binding as execution, without
+    // constructing a runner or loading analysis inputs.
+    internal IReadOnlyList<ArchitectureContractDescriptor> Descriptors => _descriptors;
+
     public static ArchitectureContractCatalog Build(ArchitectureContractDocument document)
     {
         ArchitectureContractGroups groups = document.Contracts;

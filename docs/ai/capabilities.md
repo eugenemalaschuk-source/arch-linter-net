@@ -31,6 +31,13 @@ Installed releases expose their immutable offline `adoption-stabilization/v1` sc
 
 `arch-linter-net policy check --policy <path>` validates policy syntax, imports, composition, static declarations, and static path/configuration references without building projects or loading target assemblies. It explicitly reports fact-dependent architecture checks as deferred; use ordinary strict validation to determine architecture compliance.
 
+`arch-linter-net policy context --policy <path> --format json|markdown` exports
+the effective policy facts an agent should inspect before editing: declared
+layers, active contracts, semantic roles and metadata, coverage scopes, narrow
+exceptions, portable provenance, and safe review guidance. It does not validate
+projects, assemblies, or architecture results; run normal strict validation
+after the change.
+
 ## Supported contract families
 
 | Family | Strict group | Audit group | Validates |

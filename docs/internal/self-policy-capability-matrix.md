@@ -46,9 +46,9 @@ outputs are not part of the analysed assembly set. `samples/` contains no projec
 
 | Family | Repository invariant | Evidence source | Decision | Notes |
 | --- | --- | --- | --- | --- |
-| `dependency` | Namespace-level direction between Core's internal layers and the hosts | Declared `layers` | **already covered** | 21 pre-existing strict rules; unchanged by this work. |
+| `dependency` | Namespace-level direction between Core's internal layers and the hosts | Declared `layers` | **already covered** | 22 strict rules, including the Core.PolicyContext application seam. |
 | `allow-only` (namespace) | — | — | **N/A** | The internal layer graph is expressed as targeted forbidden edges plus ordered layers; an allow-only restatement would duplicate them with weaker locality. |
-| `layer-order` | `cli`/`testing` → `core` → `cel`, and `cli` → `core_validation` → `core_execution` → `core_model` | Declared `layers` | **already covered** | `core-layering`, `core-application-seam-layering`. |
+| `layer-order` | `cli`/`testing` → `core` → `cel`, and `cli` → `core_validation`/`core_policy_context` → `core_execution` → `core_model` | Declared `layers` | **already covered** | `core-layering`, `core-application-seam-layering`. |
 | `cycle` | Packages must not form dependency cycles | Declared `layers` | **already covered** | `package-cycles`. |
 | `independence` (layer) | — | — | **N/A** | The former per-command layer inventory was retired after the dynamic contract reached parity. Maintaining it would recreate the central conflict point this policy removes. |
 | `module-container` | CLI command modules are discovered dynamically, remain independent, and follow a feature-first internal topology | Immediate child namespaces of `Cli.Commands` | **adopt (strict)** | `cli-command-modules-follow-the-feature-profile` rejects container-root writers, generic shared buckets, undeclared segments, sibling references, and forbidden directions without requiring a new command to edit shared YAML. |

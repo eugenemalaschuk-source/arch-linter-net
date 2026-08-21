@@ -1,5 +1,6 @@
 using ArchLinterNet.Core.Composition;
 using ArchLinterNet.Core.Model;
+using ArchLinterNet.Core.PolicyContext;
 using ArchLinterNet.Core.Reporting;
 using ArchLinterNet.Core.Validation;
 
@@ -58,6 +59,12 @@ public static class ArchitectureValidator
     public static PolicyCheckOutcome CheckPolicy(string policyPath)
     {
         return _engine.Value.CheckPolicy(policyPath);
+    }
+
+    /// <summary>Exports effective-policy facts without project or assembly analysis.</summary>
+    public static ArchitecturePolicyContextExport ExportPolicyContext(string policyPath)
+    {
+        return _engine.Value.ExportPolicyContext(new ArchitecturePolicyContextRequest { PolicyPath = policyPath });
     }
 
     private static ArchitectureViolation ToViolation(PolicyConsistencyDiagnostic finding)

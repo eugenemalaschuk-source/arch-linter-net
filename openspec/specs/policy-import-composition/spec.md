@@ -206,8 +206,9 @@ Imported nodes SHALL additionally retain their authored import edge and concise 
 chain from the explicit root. Contract nodes and nested ignored violations SHALL retain
 their contract family and effective contract ID where applicable. Provenance SHALL
 survive composition, deserialization, fallback ID assignment, semantic validation,
-configuration checking, policy-consistency checking, graph/explain setup, and Testing
-adapter loading without storing machine-specific absolute paths in public output.
+configuration checking, policy-consistency checking, graph/explain setup,
+policy-context export setup, and Testing adapter loading without storing
+machine-specific absolute paths in public output.
 
 Conflict diagnostics SHALL carry both the original and conflicting typed locations.
 Shape, effective-schema, semantic, missing-reference, consistency, and contract-family
@@ -247,8 +248,10 @@ SHALL follow composed source order.
 - **THEN** diagnostic categories, contract behavior, YAML paths, and ordering are unchanged while portable source paths reflect the new names
 
 #### Scenario: Every entry point consumes one provenance model
-- **WHEN** the same imported policy is loaded through CLI validation, the Testing adapter, graph, or explain
-- **THEN** each flow consumes the same graph-derived resolved provenance without reclassifying documents from filenames
+- **WHEN** the same imported policy is loaded through CLI validation, the
+  Testing adapter, graph, explain, or policy-context export
+- **THEN** each flow consumes the same graph-derived resolved provenance without
+  reclassifying documents from filenames
 
 ### Requirement: Root and fragment schemas do not depend on filenames
 The system SHALL publish a root-policy schema and a fragment schema that share policy definitions. Runtime schema selection SHALL use graph role. Editor support SHALL allow explicit schema selection, including an inline YAML language-server schema directive, without requiring root or fragment filename patterns.

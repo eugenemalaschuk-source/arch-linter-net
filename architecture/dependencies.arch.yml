@@ -56,6 +56,8 @@ layers:
     namespace: ArchLinterNet.Core.Contracts
   core_execution:
     namespace: ArchLinterNet.Core.Execution
+  core_policy_context:
+    namespace: ArchLinterNet.Core.PolicyContext
   core_graph:
     namespace: ArchLinterNet.Core.Graph
   core_change:
@@ -151,6 +153,7 @@ source_sets:
       - core_scanning
       - core_contracts
       - core_execution
+      - core_policy_context
       - core_graph
       - core_change
       - core_validation
