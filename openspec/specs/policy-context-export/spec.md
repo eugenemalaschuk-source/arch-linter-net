@@ -42,6 +42,13 @@ layers, and exhaustive setting; composition contracts SHALL retain forbidden
 APIs and every allowed-only scope, including assembly sets and typed assembly/
 type selectors.
 
+For every source-set or container expansion, the context SHALL retain the
+authored contract-to-set relation as well as the executable effective instances,
+positive inclusions, and source/source-set/container exclusions. Each entry
+SHALL retain matched or stale state, optional-empty state and reason where
+applicable, and the portable authored, source-set-reference, and exclusion
+provenance already produced by effective-policy loading.
+
 #### Scenario: Modular-monolith context exposes governed boundaries
 - **WHEN** a policy declares Sales, Catalog, and SharedKernel semantic roles,
   contextual contracts, semantic coverage, and a narrow exception
@@ -53,6 +60,13 @@ type selectors.
   exhaustive composition contract with typed allowed-only locations
 - **THEN** the JSON and Markdown context retain those ordered, nested, allowed,
   and forbidden rule inputs from the same effective-policy model
+
+#### Scenario: Source-set fan-out retains authored subtraction evidence
+- **WHEN** a fan-out contract selects sources through named source sets and
+  subtracts both an explicit source and a source set
+- **THEN** the context names the authored contract and sets, the remaining
+  effective instances, the pre-subtraction inclusions, matched exclusions, and
+  the policy locations of source-set and exclusion references
 
 #### Scenario: Unity/client policy context exposes client classification
 - **WHEN** a policy declares Unity player and editor roles with namespace or

@@ -19,6 +19,7 @@ public sealed record ArchitecturePolicyContextExport(
     IReadOnlyList<string> SemanticRoles,
     IReadOnlyList<ArchitecturePolicyContextValue> Contexts,
     IReadOnlyList<ArchitecturePolicyContextSourceSet> SourceSets,
+    IReadOnlyList<ArchitecturePolicyContextSourceExpansion> SourceExpansions,
     IReadOnlyList<ArchitecturePolicyContextException> Exceptions,
     IReadOnlyList<string> Guidance);
 
@@ -99,6 +100,43 @@ public sealed record ArchitecturePolicyContextSourceSet(
     IReadOnlyList<string> ResolvedSources,
     bool Optional,
     string Reason,
+    ArchitecturePolicyContextProvenance? Provenance);
+
+/// <summary>Describes one authored contract's effective source-set expansion and subtraction evidence.</summary>
+public sealed record ArchitecturePolicyContextSourceExpansion(
+    string Group,
+    string AuthoredContractId,
+    string AuthoredContractName,
+    string Kind,
+    string? SelectorField,
+    IReadOnlyList<string> SetNames,
+    bool OptionalEmpty,
+    string OptionalReason,
+    ArchitecturePolicyContextProvenance? Provenance,
+    IReadOnlyList<ArchitecturePolicyContextExpandedInstance> Instances,
+    IReadOnlyList<ArchitecturePolicyContextExpandedInstance> Inclusions,
+    IReadOnlyList<ArchitecturePolicyContextExpandedExclusion> Exclusions);
+
+/// <summary>Describes one source selected for an authored contract before or after subtraction.</summary>
+public sealed record ArchitecturePolicyContextExpandedInstance(
+    string ContractId,
+    string? Source,
+    string? SetName,
+    string? Selector,
+    bool OptionalEmpty,
+    string OptionalReason,
+    ArchitecturePolicyContextProvenance? Provenance,
+    ArchitecturePolicyContextProvenance? AuthoredContractProvenance,
+    ArchitecturePolicyContextProvenance? SourceSetReferenceProvenance);
+
+/// <summary>Describes one authored source, source-set, or template-container exclusion.</summary>
+public sealed record ArchitecturePolicyContextExpandedExclusion(
+    string? Source,
+    string? SetName,
+    string? Selector,
+    bool Matched,
+    bool OptionalEmpty,
+    string OptionalReason,
     ArchitecturePolicyContextProvenance? Provenance);
 
 /// <summary>Describes a narrow declared exclusion or ignored-policy exception.</summary>

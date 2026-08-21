@@ -294,6 +294,87 @@ public sealed class ArchitecturePolicyContextApplicationServiceTests
     }
 
     [Test]
+    public void Export_SourceExpansions_RetainsAuthoredFanOutExclusionsAndProvenance()
+    {
+        string temporaryDirectory = Path.Combine(Path.GetTempPath(), $"arch-linter-policy-context-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(temporaryDirectory);
+        string policyPath = Path.Combine(temporaryDirectory, "policy.yml");
+        try
+        {
+            File.WriteAllText(policyPath, """
+                version: 1
+                name: Source Expansion Context
+                analysis:
+                  target_assemblies: [Sample.Host.Api, Sample.Host.Worker, Sample.Legacy.Host, Sample.Forbidden]
+                source_sets:
+                  host_assemblies:
+                    globs: [Sample.Host.*]
+                  legacy_assemblies:
+                    globs: [Sample.Legacy.*]
+                  future_assemblies:
+                    globs: [Sample.Future.*]
+                    optional: true
+                    reason: Future hosts have not been extracted yet.
+                contracts:
+                  strict_assembly_dependency:
+                    - id: hosts-avoid-forbidden
+                      name: hosts-avoid-forbidden
+                      source_sets: [host_assemblies, legacy_assemblies, future_assemblies]
+                      exclude_sources: [Sample.Host.Worker]
+                      exclude_source_sets: [legacy_assemblies]
+                      forbidden: [Sample.Forbidden]
+                      reason: Only the reviewed host source remains in scope.
+                """);
+
+            ArchitecturePolicyContextExport context = _engine.ExportPolicyContext(
+                new ArchitecturePolicyContextRequest { PolicyPath = policyPath });
+            ArchitecturePolicyContextSourceExpansion expansion = context.SourceExpansions.Single(item =>
+                item.AuthoredContractId == "hosts-avoid-forbidden");
+            ArchitecturePolicyContextExpandedInstance optionalInclusion = expansion.Inclusions.Single(item =>
+                item.SetName == "future_assemblies");
+            ArchitecturePolicyContextExpandedExclusion directExclusion = expansion.Exclusions.Single(item =>
+                item.Source == "Sample.Host.Worker" && item.SetName is null);
+            ArchitecturePolicyContextExpandedExclusion setExclusion = expansion.Exclusions.Single(item =>
+                item.SetName == "legacy_assemblies");
+            string json = ArchitecturePolicyContextFormatter.FormatAsJson(context);
+            string markdown = ArchitecturePolicyContextFormatter.FormatAsMarkdown(context);
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(expansion.Kind, Is.EqualTo("fan_out"));
+                Assert.That(expansion.SetNames,
+                    Is.EqualTo(new[] { "host_assemblies", "legacy_assemblies", "future_assemblies" }));
+                Assert.That(expansion.Instances.Select(item => item.Source), Is.EqualTo(new[] { "Sample.Host.Api" }));
+                Assert.That(expansion.Inclusions.Select(item => item.Source),
+                    Does.Contain("Sample.Host.Worker").And.Contain("Sample.Legacy.Host"));
+                Assert.That(optionalInclusion.OptionalEmpty, Is.True);
+                Assert.That(optionalInclusion.OptionalReason, Does.Contain("not been extracted"));
+                Assert.That(optionalInclusion.SourceSetReferenceProvenance!.YamlPath,
+                    Is.EqualTo("contracts.strict_assembly_dependency[0]/source_sets/2"));
+                Assert.That(directExclusion.Matched, Is.True);
+                Assert.That(directExclusion.Provenance!.YamlPath,
+                    Is.EqualTo("contracts.strict_assembly_dependency[0]/exclude_sources/0"));
+                Assert.That(setExclusion.Matched, Is.True);
+                Assert.That(setExclusion.Source, Is.EqualTo("Sample.Legacy.Host"));
+                Assert.That(setExclusion.Provenance!.YamlPath,
+                    Is.EqualTo("contracts.strict_assembly_dependency[0]/exclude_source_sets/0"));
+                Assert.That(context.Exceptions.Any(item => item is
+                {
+                    Scope: "source_expansion",
+                    Subject: "hosts-avoid-forbidden",
+                    Kind: "exclude_source_set",
+                }), Is.True);
+                Assert.That(json, Does.Contain("\"source_expansions\"").And.Contain("exclude_source_sets/0"));
+                Assert.That(markdown, Does.Contain("## Source-set expansions").And.Contain("excluded source set `legacy_assemblies`"));
+            });
+        }
+        finally
+        {
+            Directory.Delete(temporaryDirectory, recursive: true);
+        }
+    }
+
+    [Test]
     public void ContractFactsProjector_CoversEveryRegisteredContractFamily()
     {
         Type[] registeredContractTypes = ArchitectureContractFamilyRegistry.All

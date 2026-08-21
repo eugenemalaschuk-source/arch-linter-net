@@ -34,6 +34,7 @@ public static class ArchitecturePolicyContextFormatter
 
         AppendLayers(markdown, context.Layers);
         AppendContracts(markdown, context.Contracts);
+        AppendSourceExpansions(markdown, context.SourceExpansions);
         AppendClassification(markdown, context.Classification, context.Contexts);
         AppendExceptions(markdown, context.Exceptions);
 
@@ -142,6 +143,57 @@ public static class ArchitecturePolicyContextFormatter
         }
     }
 
+    private static void AppendSourceExpansions(
+        StringBuilder markdown,
+        IReadOnlyList<ArchitecturePolicyContextSourceExpansion> expansions)
+    {
+        if (expansions.Count == 0)
+        {
+            return;
+        }
+
+        markdown.AppendLine();
+        markdown.AppendLine("## Source-set expansions");
+        foreach (ArchitecturePolicyContextSourceExpansion expansion in expansions)
+        {
+            List<string> details = new() { $"kind `{Inline(expansion.Kind)}`" };
+            if (expansion.SetNames.Count > 0)
+            {
+                details.Add($"source sets {string.Join(", ", expansion.SetNames.Select(name => $"`{Inline(name)}`"))}");
+            }
+
+            if (!string.IsNullOrWhiteSpace(expansion.SelectorField)) details.Add($"field `{Inline(expansion.SelectorField)}`");
+            if (expansion.OptionalEmpty) details.Add("optional-empty");
+            if (!string.IsNullOrWhiteSpace(expansion.OptionalReason)) details.Add($"reason `{Inline(expansion.OptionalReason)}`");
+            markdown.AppendLine($"- `{Inline(expansion.Group)}` `{Inline(expansion.AuthoredContractId)}`: {string.Join("; ", details)}");
+
+            foreach (ArchitecturePolicyContextExpandedInstance instance in expansion.Instances)
+            {
+                markdown.AppendLine($"  - effective {FormatExpandedInstance(instance)}");
+            }
+
+            foreach (ArchitecturePolicyContextExpandedInstance inclusion in expansion.Inclusions)
+            {
+                markdown.AppendLine($"  - included {FormatExpandedInstance(inclusion)}");
+            }
+
+            foreach (ArchitecturePolicyContextExpandedExclusion exclusion in expansion.Exclusions)
+            {
+                string kind = exclusion.SetName is null ? "source" : "source set";
+                string state = exclusion.Matched ? "matched" : "stale";
+                string optional = exclusion.OptionalEmpty ? "; optional-empty" : string.Empty;
+                string source = exclusion.SetName is not null && !string.IsNullOrWhiteSpace(exclusion.Source)
+                    ? $"; source `{Inline(exclusion.Source)}`"
+                    : string.Empty;
+                string reason = string.IsNullOrWhiteSpace(exclusion.OptionalReason)
+                    ? string.Empty
+                    : $"; reason `{Inline(exclusion.OptionalReason)}`";
+                string provenance = FormatProvenance(exclusion.Provenance);
+                markdown.AppendLine($"  - excluded {kind} `{Inline(exclusion.SetName ?? exclusion.Source ?? string.Empty)}` ({state}{optional}){source}{reason}{provenance}");
+            }
+        }
+    }
+
     private static void AppendFact(StringBuilder markdown, ArchitecturePolicyContextContractFact fact, int indent)
     {
         string prefix = new(' ', indent);
@@ -178,6 +230,26 @@ public static class ArchitecturePolicyContextFormatter
         string when = string.IsNullOrWhiteSpace(selector.When) ? string.Empty : $" when `{Inline(selector.When)}`";
         return $"{Inline(selector.Kind)} selector: role `{Inline(selector.Role)}`{metadata}{when}";
     }
+
+    private static string FormatExpandedInstance(ArchitecturePolicyContextExpandedInstance instance)
+    {
+        List<string> details = new() { $"contract `{Inline(instance.ContractId)}`" };
+        if (!string.IsNullOrWhiteSpace(instance.Source)) details.Add($"source `{Inline(instance.Source)}`");
+        if (!string.IsNullOrWhiteSpace(instance.SetName)) details.Add($"set `{Inline(instance.SetName)}`");
+        if (!string.IsNullOrWhiteSpace(instance.Selector)) details.Add($"selector `{Inline(instance.Selector)}`");
+        if (instance.OptionalEmpty) details.Add("optional-empty");
+        if (!string.IsNullOrWhiteSpace(instance.OptionalReason)) details.Add($"reason `{Inline(instance.OptionalReason)}`");
+        if (instance.SourceSetReferenceProvenance is not null)
+        {
+            details.Add($"source-set reference `{Inline(instance.SourceSetReferenceProvenance.YamlPath)}`");
+        }
+
+        return string.Join("; ", details);
+    }
+
+    private static string FormatProvenance(ArchitecturePolicyContextProvenance? provenance) => provenance is null
+        ? string.Empty
+        : $" at `{Inline(provenance.YamlPath)}`";
 
     private static string FormatMetadata(IReadOnlyDictionary<string, string> metadata)
     {
