@@ -177,7 +177,8 @@ public sealed class HistoryBottleneckScorerTests
             Thresholds = new HistoryAnalysisThresholds { CoChangeSignificance = threshold },
         };
         CoChangeGraph graph = new CoChangeGraphBuilder(configuration).Build(files, commits, []);
-        var result = new HistoryIngestionResult("sha1", "from", "to", "from", "to", commits, 0, [], [], files, graph, new HistoryBottleneckAnalysis([]));
+        var result = new HistoryIngestionResult(
+            "sha1", "from", "to", "from", "to", commits, 0, [], [], files, graph, new HistoryBottleneckAnalysis([]), new HistoryOcpAnalysis([]));
         return new HistoryBottleneckScorer().Score(result, configuration);
     }
 
