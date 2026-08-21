@@ -3,6 +3,7 @@ using ArchLinterNet.Core.BuildState;
 using ArchLinterNet.Core.Composition;
 using ArchLinterNet.Core.Graph;
 using ArchLinterNet.Core.Model;
+using ArchLinterNet.Core.PolicyContext;
 using ArchLinterNet.Core.Reporting;
 using ArchLinterNet.Core.Validation;
 
@@ -328,6 +329,21 @@ internal sealed class CliRuntime : ICliRuntime
     public PublicApiMigrateOutcome MigratePublicApi(PublicApiMigrateRequest request)
     {
         return _engine.MigratePublicApi(request);
+    }
+
+    public ArchitecturePolicyContextExport ExportPolicyContext(ArchitecturePolicyContextRequest request)
+    {
+        return _engine.ExportPolicyContext(request);
+    }
+
+    public string FormatPolicyContextAsJson(ArchitecturePolicyContextExport context)
+    {
+        return ArchitecturePolicyContextFormatter.FormatAsJson(context);
+    }
+
+    public string FormatPolicyContextAsMarkdown(ArchitecturePolicyContextExport context)
+    {
+        return ArchitecturePolicyContextFormatter.FormatAsMarkdown(context);
     }
 
     public ArchitectureGraphOutcome BuildGraph(ArchitectureGraphRequest request)

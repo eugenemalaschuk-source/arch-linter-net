@@ -2,6 +2,8 @@ using ArchLinterNet.Core.Asmdef;
 using ArchLinterNet.Core.Asmdef.Abstractions;
 using ArchLinterNet.Core.Graph;
 using ArchLinterNet.Core.Graph.Abstractions;
+using ArchLinterNet.Core.PolicyContext;
+using ArchLinterNet.Core.PolicyContext.Abstractions;
 using ArchLinterNet.Core.Reporting;
 using ArchLinterNet.Core.Validation;
 using ArchLinterNet.Core.Validation.Abstractions;
@@ -35,6 +37,13 @@ public sealed class ArchitectureEngine : IDisposable, IAsyncDisposable
     {
         return _serviceProvider.GetRequiredService<IArchitecturePolicyCheckApplicationService>()
             .Check(policyPath);
+    }
+
+    /// <summary>Exports effective-policy facts without project or assembly analysis.</summary>
+    public ArchitecturePolicyContextExport ExportPolicyContext(ArchitecturePolicyContextRequest request)
+    {
+        return _serviceProvider.GetRequiredService<IArchitecturePolicyContextApplicationService>()
+            .Export(request);
     }
 
     public ArchitectureAnalysisSnapshot CreateSnapshot(AnalysisSnapshotRequest request, ValidationTiming? timing = null)

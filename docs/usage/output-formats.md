@@ -5,6 +5,16 @@ ArchLinterNet supports human-readable output for local development, JSON output 
 For report routing, partial-output, profile, and cancellation workflows, see
 [Adopt or Upgrade ArchLinterNet](../guides/upgrading.md#reports-artifacts-and-completion-status).
 
+## Policy context output
+
+`arch-linter-net policy context --format json` writes one deterministic
+`architecture-policy-context` document with `schema_version: 1`. It is a
+policy-only artifact for coding-agent context: it describes effective declared
+policy facts and portable provenance, and does not report an architecture
+validation result. `--format markdown` renders the same model as a compact
+prompt-ready summary. Neither format includes local absolute paths, build
+receipts, target-assembly results, or runtime environment values.
+
 ## Human output
 
 Use human output when reading diagnostics in a terminal or CI log:
