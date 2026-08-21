@@ -76,15 +76,25 @@ provenance already produced by effective-policy loading.
 
 ### Requirement: JSON context output is deterministic and safe for tools
 Core SHALL format the policy-context representation as a single deterministic
-JSON document with `schema_version: 1` and a stable context kind. Repeated
+JSON document with `schema_version: 3` and a stable context kind. Repeated
 exports of unchanged policy inputs SHALL produce byte-identical JSON. The JSON
 SHALL not include absolute local paths, runtime environment values, build
-receipts, target-assembly facts, or other sensitive machine-specific data.
+receipts, target-assembly facts, or other sensitive machine-specific data. It
+SHALL include typed declared analysis inputs, the explicit schema-validated
+policy-weakening severity, and typed ignored-violation `source_type` and
+`forbidden_reference` matchers so a separate-state guardrail comparison has no
+implicit empty input or display-string parsing.
 
 #### Scenario: Imported policy has portable JSON provenance
 - **WHEN** JSON is exported for a policy composed from a root and fragment
 - **THEN** its provenance names portable policy paths and document roles in a
   deterministic order and contains no rooted filesystem path
+
+#### Scenario: Ignored violation retains typed matcher evidence
+- **WHEN** a policy declares an ignored violation with `source_type: "*"` and
+  `forbidden_reference: "*"`
+- **THEN** the JSON includes those values as typed matcher evidence alongside
+  its human-readable exception detail
 
 ### Requirement: Markdown context is concise and derived from the same model
 Core SHALL format the same context representation as concise Markdown suitable
@@ -106,3 +116,16 @@ its programmatic and CLI boundaries.
 - **WHEN** an imported policy contains an invalid effective value
 - **THEN** policy-context export fails with the same typed fragment and root
   diagnostic information as another effective-policy consumer
+
+### Requirement: Policy context projects configured weakening severity
+
+The versioned effective policy context SHALL include the explicit,
+schema-validated `analysis.policy_weakening` severity that governs an invoked
+policy-weakening comparison.  Export SHALL continue to avoid architecture
+analysis and SHALL not change ordinary validation behavior.
+
+#### Scenario: Context carries explicit severity
+- **WHEN** a valid policy configures `analysis.policy_weakening` as `warn`
+- **THEN** JSON and Markdown context output identify that configured severity
+alongside the effective policy facts
+

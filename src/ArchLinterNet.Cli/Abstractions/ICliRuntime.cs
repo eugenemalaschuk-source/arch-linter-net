@@ -2,6 +2,7 @@ using ArchLinterNet.Core.BuildState;
 using ArchLinterNet.Core.Graph;
 using ArchLinterNet.Core.Model;
 using ArchLinterNet.Core.PolicyContext;
+using ArchLinterNet.Core.PolicyWeakening;
 using ArchLinterNet.Core.Reporting;
 using ArchLinterNet.Core.Validation;
 
@@ -237,6 +238,18 @@ internal interface ICliRuntime
 
     string FormatPolicyContextAsMarkdown(ArchitecturePolicyContextExport context) =>
         ArchitecturePolicyContextFormatter.FormatAsMarkdown(context);
+
+    ArchitecturePolicyWeakeningResult ComparePolicyWeakening(ArchitecturePolicyWeakeningRequest request) =>
+        ArchitecturePolicyWeakeningComparer.Compare(request);
+
+    string FormatPolicyWeakeningAsHuman(ArchitecturePolicyWeakeningResult result) =>
+        ArchitecturePolicyWeakeningFormatter.FormatAsHuman(result);
+
+    string FormatPolicyWeakeningAsJson(ArchitecturePolicyWeakeningResult result) =>
+        ArchitecturePolicyWeakeningFormatter.FormatAsJson(result);
+
+    string FormatPolicyWeakeningAsSarif(ArchitecturePolicyWeakeningResult result) =>
+        ArchitecturePolicyWeakeningFormatter.FormatAsSarif(result);
 
     ArchitectureGraphOutcome BuildGraph(ArchitectureGraphRequest request);
 

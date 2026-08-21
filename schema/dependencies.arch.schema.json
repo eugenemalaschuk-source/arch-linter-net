@@ -909,6 +909,12 @@
           "default": "error",
           "description": "Behavior when a declared coverage contract finds uncovered, unknown, stale, or empty-input first-party units. 'error' (default) fails validation, 'warn' reports but does not fail, 'off' suppresses findings even for an explicitly declared coverage contract. Backward compatibility does not depend on this default: a policy with no strict_coverage/audit_coverage contracts is unaffected regardless of this setting, because no coverage contract exists to produce a finding."
         },
+        "policy_weakening": {
+          "type": "string",
+          "enum": ["error", "warn", "off"],
+          "default": "error",
+          "description": "Severity used only by the explicit policy weakening comparison workflow. 'error' fails that comparison when weakening is found; 'warn' and 'off' retain evidence without a failing comparison exit code. Ordinary strict/audit validation is unaffected."
+        },
         "condition_sets": {
           "type": "object",
           "description": "Named preprocessor symbol sets for conditional compilation analysis. Each key is a condition set name (e.g. 'runtime', 'editor'), each value is an array of preprocessor symbols (e.g. ['UNITY_EDITOR']). Only affects Roslyn source/method-body scanning.",

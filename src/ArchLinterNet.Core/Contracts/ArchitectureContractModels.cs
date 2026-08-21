@@ -110,6 +110,9 @@ public sealed class ArchitectureAnalysisConfiguration
     [YamlMember(Alias = "coverage")]
     public string Coverage { get; set; } = "error";
 
+    [YamlMember(Alias = "policy_weakening")]
+    public string PolicyWeakening { get; set; } = "error";
+
     [YamlMember(Alias = "condition_sets")]
     public Dictionary<string, List<string>> ConditionSets { get; set; } = new();
 

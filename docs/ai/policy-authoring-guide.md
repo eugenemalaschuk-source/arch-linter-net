@@ -912,6 +912,13 @@ linter warns about `ignored_violations` entries that match no current violation.
 Remove stale entries proactively to keep the baseline trustworthy and avoid CI
 failures. Use `warn` during migration cleanup, then switch to `error`.
 
+## Review Policy Weakening Explicitly
+
+Policy changes deserve a separate review gate: a green current validation run
+does not prove that governed scope or a boundary was retained. Use the
+[policy weakening review guide](policy-weakening-review.md) to configure and
+run the change-time comparison safely.
+
 ## Policy Consistency Checks
 
 Separately from scanning code, the linter always runs a policy-consistency

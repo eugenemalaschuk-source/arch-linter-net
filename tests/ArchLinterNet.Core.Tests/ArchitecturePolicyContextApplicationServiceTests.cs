@@ -34,8 +34,9 @@ public sealed class ArchitecturePolicyContextApplicationServiceTests
 
         Assert.Multiple(() =>
         {
-            Assert.That(context.SchemaVersion, Is.EqualTo(1));
+            Assert.That(context.SchemaVersion, Is.EqualTo(3));
             Assert.That(context.Kind, Is.EqualTo("architecture-policy-context"));
+            Assert.That(context.Guardrails.PolicyWeakening, Is.EqualTo("error"));
             Assert.That(context.Policy.HasImports, Is.True);
             Assert.That(context.Contracts.Select(contract => contract.Id), Does.Contain("sales-to-catalog-through-port"));
             Assert.That(context.Contracts.Single(contract => contract.Id == "sales-to-catalog-through-port")
@@ -64,11 +65,119 @@ public sealed class ArchitecturePolicyContextApplicationServiceTests
         {
             Assert.That(secondJson, Is.EqualTo(firstJson));
             Assert.That(secondMarkdown, Is.EqualTo(firstMarkdown));
-            Assert.That(document.RootElement.GetProperty("schema_version").GetInt32(), Is.EqualTo(1));
+            Assert.That(document.RootElement.GetProperty("schema_version").GetInt32(), Is.EqualTo(3));
             Assert.That(document.RootElement.GetProperty("kind").GetString(), Is.EqualTo("architecture-policy-context"));
             Assert.That(firstMarkdown, Does.Contain("# Architecture policy context"));
+            Assert.That(firstMarkdown, Does.Contain("Policy weakening severity: `error`"));
             Assert.That(firstMarkdown, Does.Contain("does not build projects, analyze assemblies, or prove architecture compliance"));
         });
+    }
+
+    [Test]
+    public void Export_ProjectsSchemaValidatedPolicyWeakeningSeverity()
+    {
+        string temporaryDirectory = Path.Combine(Path.GetTempPath(), $"arch-linter-policy-context-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(temporaryDirectory);
+        string policyPath = Path.Combine(temporaryDirectory, "policy.yml");
+        try
+        {
+            File.WriteAllText(policyPath, """
+                version: 1
+                name: Policy weakening severity
+                analysis:
+                  policy_weakening: warn
+                  projects: [src/Sample.Host/Sample.Host.csproj]
+                  project_exclude: [tests/**]
+                """);
+
+            ArchitecturePolicyContextExport context = _engine.ExportPolicyContext(
+                new ArchitecturePolicyContextRequest { PolicyPath = policyPath });
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(context.Guardrails.PolicyWeakening, Is.EqualTo("warn"));
+                Assert.That(context.Analysis.Projects, Is.EqualTo(new[] { "src/Sample.Host/Sample.Host.csproj" }));
+                Assert.That(context.Analysis.ProjectExclude, Is.EqualTo(new[] { "tests/**" }));
+                Assert.That(ArchitecturePolicyContextFormatter.FormatAsJson(context),
+                    Does.Contain("\"policy_weakening\": \"warn\""));
+                Assert.That(ArchitecturePolicyContextFormatter.FormatAsMarkdown(context),
+                    Does.Contain("Policy weakening severity: `warn`"));
+            });
+        }
+        finally
+        {
+            Directory.Delete(temporaryDirectory, recursive: true);
+        }
+    }
+
+    [Test]
+    public void Export_InvalidPolicyWeakeningSeverity_FailsPolicyLoading()
+    {
+        string temporaryDirectory = Path.Combine(Path.GetTempPath(), $"arch-linter-policy-context-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(temporaryDirectory);
+        string policyPath = Path.Combine(temporaryDirectory, "policy.yml");
+        try
+        {
+            File.WriteAllText(policyPath, """
+                version: 1
+                name: Invalid policy weakening severity
+                analysis:
+                  policy_weakening: trace
+                """);
+
+            InvalidOperationException exception = Assert.Throws<InvalidOperationException>(() =>
+                _engine.ExportPolicyContext(new ArchitecturePolicyContextRequest { PolicyPath = policyPath }))!;
+
+            Assert.That(exception.Message, Does.Contain("analysis.policy_weakening"));
+        }
+        finally
+        {
+            Directory.Delete(temporaryDirectory, recursive: true);
+        }
+    }
+
+    [Test]
+    public void Export_IgnoredViolation_RetainsTypedMatchersAlongsideDisplayDetails()
+    {
+        string temporaryDirectory = Path.Combine(Path.GetTempPath(), $"arch-linter-policy-context-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(temporaryDirectory);
+        string policyPath = Path.Combine(temporaryDirectory, "policy.yml");
+        try
+        {
+            File.WriteAllText(policyPath, """
+                version: 1
+                name: Typed ignore context
+                layers:
+                  application: { namespace: Sample.Application }
+                  infrastructure: { namespace: Sample.Infrastructure }
+                contracts:
+                  strict:
+                    - id: application-no-infrastructure
+                      name: application-no-infrastructure
+                      source: application
+                      forbidden: [infrastructure]
+                      ignored_violations:
+                        - source_type: "*"
+                          forbidden_reference: "*"
+                          reason: Reviewed temporary migration.
+                """);
+
+            ArchitecturePolicyContextExport context = _engine.ExportPolicyContext(
+                new ArchitecturePolicyContextRequest { PolicyPath = policyPath });
+            ArchitecturePolicyContextException ignored = context.Exceptions.Single(item => item.Kind == "ignored_violation");
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(ignored.Details, Is.EqualTo("*; *"));
+                Assert.That(ignored.IgnoredViolation, Is.EqualTo(new ArchitecturePolicyContextIgnoredViolation("*", "*")));
+                Assert.That(ArchitecturePolicyContextFormatter.FormatAsJson(context),
+                    Does.Contain("\"ignored_violation\": {").And.Contain("\"source_type\": \"*\""));
+            });
+        }
+        finally
+        {
+            Directory.Delete(temporaryDirectory, recursive: true);
+        }
     }
 
     [Test]

@@ -32,6 +32,12 @@ public static class ArchitecturePolicyContextFormatter
         markdown.AppendLine();
         markdown.AppendLine("> This is an effective-policy summary. It does not build projects, analyze assemblies, or prove architecture compliance.");
 
+        markdown.AppendLine();
+        markdown.AppendLine("## Change-time guardrails");
+        markdown.AppendLine($"- Policy weakening severity: `{Inline(context.Guardrails.PolicyWeakening)}`");
+
+        AppendAnalysisInputs(markdown, context.Analysis);
+
         AppendLayers(markdown, context.Layers);
         AppendContracts(markdown, context.Contracts);
         AppendSourceExpansions(markdown, context.SourceExpansions);
@@ -66,6 +72,25 @@ public static class ArchitecturePolicyContextFormatter
             if (layer.External) details.Add("external");
             if (layer.Selector is not null) details.Add(FormatSelector(layer.Selector));
             markdown.AppendLine($"- `{Inline(layer.Name)}`: {string.Join("; ", details)}");
+        }
+    }
+
+    private static void AppendAnalysisInputs(StringBuilder markdown, ArchitecturePolicyContextAnalysis analysis)
+    {
+        markdown.AppendLine();
+        markdown.AppendLine("## Declared analysis scope");
+        AppendAnalysisValues(markdown, "target assemblies", analysis.TargetAssemblies);
+        AppendAnalysisValues(markdown, "projects", analysis.Projects);
+        AppendAnalysisValues(markdown, "project include", analysis.ProjectInclude);
+        AppendAnalysisValues(markdown, "project exclude", analysis.ProjectExclude);
+        AppendAnalysisValues(markdown, "source roots", analysis.SourceRoots);
+    }
+
+    private static void AppendAnalysisValues(StringBuilder markdown, string label, IReadOnlyList<string> values)
+    {
+        if (values.Count > 0)
+        {
+            markdown.AppendLine($"- {label}: {string.Join(", ", values.Select(value => $"`{Inline(value)}`"))}");
         }
     }
 

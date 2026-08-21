@@ -14,6 +14,7 @@ internal static class ArchitecturePolicyDocumentValidatorPipeline
     public static IReadOnlyList<IArchitecturePolicyDocumentValidator> All { get; } =
     [
         new HistoryAnalysisConfigurationValidator(),
+        new PolicyWeakeningSeverityValidator(),
         new DuplicateIdValidator(),
         new AcyclicSiblingValidator(),
         new ModuleContainerValidator(),

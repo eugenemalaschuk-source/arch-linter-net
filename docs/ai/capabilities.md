@@ -38,6 +38,33 @@ exceptions, portable provenance, and safe review guidance. It does not validate
 projects, assemblies, or architecture results; run normal strict validation
 after the change.
 
+`arch-linter-net policy weakening --base-context <path> --current-context <path>` is a change-time guardrail, not a second architecture evaluator. It
+compares separately exported policy-context JSON artifacts from the base and
+current states. It proves only typed, explicit relaxations (such as a
+same-control strict-to-audit change, a resolved source-set reduction, or an
+added permission); selector-based changes require complete, context-bound
+membership evidence. Without that evidence the command reports a bounded
+`impact_not_proven` review finding rather than inventing affected types. It
+does not run normal validation, simulate a candidate policy, or establish a
+baseline for existing code.
+
+The same bounded rule applies to `project_include` and `project_exclude`: they
+are project-discovery globs, not literal project inventories. A changed glob
+is reviewable `impact_not_proven` unless resolved project membership is present.
+The authored `target_assemblies`, `projects`, and `source_roots` fields are
+also bounded: discovery and scanner defaults can make textual removal an
+effective expansion, so context-only comparison cannot classify it as semantic.
+In contrast, a source set or source expansion changing from required to
+optional/empty-tolerant, and an ignored violation whose typed `source_type` and
+`forbidden_reference` matchers are both `*`, are provable semantic relaxations.
+Semantic inventory comparison is restricted to explicit scalar string sets of
+exact identities; prefixes such as `forbidden_` and `allowed_only_in_` do not
+establish direction by themselves. Prefix/glob/call-pattern facts and
+cross-field location unions require containment or trusted effective membership
+before they can be semantic. Known boolean prohibitions weaken only from `true`
+to `false`; any other changed typed contract shape without a dedicated rule is
+bounded `impact_not_proven`, rather than being silently ignored or guessed.
+
 ## Supported contract families
 
 | Family | Strict group | Audit group | Validates |
