@@ -39,9 +39,15 @@ public sealed class HistoryHotspotScorerTests
             Assert.That(first.CanonicalPath, Is.EqualTo("src/A.cs"));
             Assert.That(first.RawEvidence.CommitCount, Is.EqualTo(2));
             Assert.That(first.RawEvidence.TaskSpread, Is.EqualTo(1), "#001 and #1 are one canonical TaskKey");
+            Assert.That(first.RawEvidence.TaskKeys.Select(static key => key.ToString()), Is.EqualTo(["issue#1"]));
+            Assert.That(first.RawEvidence.TaskKeyProvenance.Select(static item => item.Match.MatchedText), Is.EqualTo(["#001", "#1"]));
+            Assert.That(first.RawEvidence.CanonicalAuthors, Is.EqualTo(["fixture@example.com"]));
+            Assert.That(first.RawEvidence.AuthorProvenance, Has.Count.EqualTo(2));
             Assert.That(first.RawEvidence.TemporalSpanSeconds, Is.EqualTo(new BigInteger(3600)));
             Assert.That(first.Components.Churn, Is.EqualTo(1m), "generated churn cannot set the production maximum");
             Assert.That(second.CanonicalPath, Is.EqualTo("src/B.cs"));
+            Assert.That(second.Components.Churn, Is.EqualTo(0.630929754m), "Q(log(1 + 1) / log(1 + 2))");
+            Assert.That(second.PathEvents, Has.Count.EqualTo(1));
         });
     }
 

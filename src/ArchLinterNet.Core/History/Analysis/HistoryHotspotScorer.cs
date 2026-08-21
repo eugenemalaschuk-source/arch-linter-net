@@ -10,7 +10,9 @@ namespace ArchLinterNet.Core.History.Analysis;
 internal sealed class HistoryHotspotScorer
 {
     private const decimal Scale = 1_000_000_000m;
-    private static readonly BigInteger IntegerScale = new(1_000_000_000);
+    private static readonly BigInteger _integerScale = new(1_000_000_000);
+    private static readonly BigInteger _fixedPointScale = BigInteger.Pow(10, 60);
+    private static readonly BigInteger _naturalLogOfTwo = AtanhScaled(BigInteger.One, new BigInteger(3));
 
     public HistoryHotspotAnalysis Score(HistoryIngestionResult result, HistoryAnalysisConfiguration configuration)
     {
@@ -50,7 +52,9 @@ internal sealed class HistoryHotspotScorer
         IReadOnlyDictionary<string, CommitEvidence> commits)
     {
         var taskKeys = new HashSet<Tasks.TaskKey>();
+        var taskKeyProvenance = new List<HotspotTaskKeyProvenance>();
         var authors = new HashSet<string>(StringComparer.Ordinal);
+        var authorProvenance = new List<HotspotAuthorProvenance>();
         BigInteger? earliest = null;
         BigInteger? latest = null;
         foreach (FileEvent fileEvent in file.Events)
@@ -61,7 +65,9 @@ internal sealed class HistoryHotspotScorer
             }
 
             taskKeys.UnionWith(evidence.TaskKeys);
+            taskKeyProvenance.AddRange(evidence.TaskKeyMatches.Select(match => new HotspotTaskKeyProvenance(fileEvent.CommitId, match)));
             authors.Add(evidence.CanonicalAuthor);
+            authorProvenance.Add(new HotspotAuthorProvenance(fileEvent.CommitId, evidence.CanonicalAuthor));
             BigInteger epoch = evidence.Commit.CommitterEpochSecond;
             earliest = earliest is null || epoch < earliest ? epoch : earliest;
             latest = latest is null || epoch > latest ? epoch : latest;
@@ -69,10 +75,25 @@ internal sealed class HistoryHotspotScorer
 
         BigInteger span = earliest is null ? BigInteger.Zero : latest!.Value - earliest.Value;
         LineCountStatus[] statuses = file.Events.Select(static item => item.LineCountStatus).Distinct().Order().ToArray();
+        Tasks.TaskKey[] canonicalTaskKeys = taskKeys.Order().ToArray();
+        string[] canonicalAuthors = [.. authors];
+        Array.Sort(canonicalAuthors, GitPathDecoder.CompareScalarValue);
         return new Candidate(
             file.CanonicalPath,
+            file.Aliases,
+            file.Events,
             category,
-            new HotspotRawEvidence(file.CommitCount, file.Churn, taskKeys.Count, authors.Count, span, statuses));
+            new HotspotRawEvidence(
+                file.CommitCount,
+                file.Churn,
+                taskKeys.Count,
+                authors.Count,
+                span,
+                statuses,
+                canonicalTaskKeys,
+                taskKeyProvenance,
+                canonicalAuthors,
+                authorProvenance));
     }
 
     private static List<HotspotFinding> ScoreCohort(IReadOnlyList<Candidate> candidates, HotspotWeights weights)
@@ -98,7 +119,15 @@ internal sealed class HistoryHotspotScorer
                 (weights.Task * components.Task) +
                 (weights.Author * components.Author) +
                 (weights.Temporal * components.Temporal));
-            findings.Add(new HotspotFinding(candidate.CanonicalPath, candidate.Category, raw, components, weights, score));
+            findings.Add(new HotspotFinding(
+                candidate.CanonicalPath,
+                candidate.Aliases,
+                candidate.PathEvents,
+                candidate.Category,
+                raw,
+                components,
+                weights,
+                score));
         }
 
         return findings;
@@ -116,7 +145,7 @@ internal sealed class HistoryHotspotScorer
             return 0m;
         }
 
-        BigInteger scaledNumerator = value * IntegerScale;
+        BigInteger scaledNumerator = value * _integerScale;
         BigInteger quotient = BigInteger.DivRem(scaledNumerator, maximum, out BigInteger remainder);
         int comparison = (remainder * 2).CompareTo(maximum);
         if (comparison > 0 || (comparison == 0 && !quotient.IsEven))
@@ -134,9 +163,47 @@ internal sealed class HistoryHotspotScorer
             return 0m;
         }
 
-        double ratio = Math.Log(1d + value) / Math.Log(1d + maximum);
-        return Quantize((decimal)ratio);
+        BigInteger numerator = NaturalLog(BigInteger.One + value);
+        BigInteger denominator = NaturalLog(BigInteger.One + maximum);
+        return QuantizedRatio(numerator, denominator);
     }
+
+    // This is a fixed-point implementation of ln(n) = k*ln(2) + 2*atanh((y-1)/(y+1)), where
+    // n = 2^k*y and 1 <= y < 2. The atanh argument is at most 1/3, so truncating only after 60
+    // decimal places makes the nine-decimal Q boundary independent of OS math libraries and CPUs.
+    private static BigInteger NaturalLog(BigInteger argument)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(argument);
+        int exponent = 0;
+        BigInteger powerOfTwo = BigInteger.One;
+        while ((powerOfTwo << 1) <= argument)
+        {
+            powerOfTwo <<= 1;
+            exponent++;
+        }
+
+        BigInteger mantissaLog = argument == powerOfTwo
+            ? BigInteger.Zero
+            : AtanhScaled(argument - powerOfTwo, argument + powerOfTwo);
+        return (exponent * _naturalLogOfTwo) + mantissaLog;
+    }
+
+    private static BigInteger AtanhScaled(BigInteger numerator, BigInteger denominator)
+    {
+        BigInteger scaledValue = (numerator * _fixedPointScale) / denominator;
+        BigInteger squared = MultiplyScaled(scaledValue, scaledValue);
+        BigInteger power = scaledValue;
+        BigInteger sum = BigInteger.Zero;
+        for (int divisor = 1; !power.IsZero; divisor += 2)
+        {
+            sum += power / divisor;
+            power = MultiplyScaled(power, squared);
+        }
+
+        return sum * 2;
+    }
+
+    private static BigInteger MultiplyScaled(BigInteger left, BigInteger right) => (left * right) / _fixedPointScale;
 
     private static decimal Quantize(decimal value) => Math.Round(value, 9, MidpointRounding.ToEven);
 
@@ -149,9 +216,18 @@ internal sealed class HistoryHotspotScorer
         return comparison != 0 ? comparison : GitPathDecoder.CompareScalarValue(left.CanonicalPath, right.CanonicalPath);
     }
 
-    private sealed class Candidate(string canonicalPath, HistoryPathCategory category, HotspotRawEvidence rawEvidence)
+    private sealed class Candidate(
+        string canonicalPath,
+        IReadOnlyList<string> aliases,
+        IReadOnlyList<FileEvent> pathEvents,
+        HistoryPathCategory category,
+        HotspotRawEvidence rawEvidence)
     {
         public string CanonicalPath { get; } = canonicalPath;
+
+        public IReadOnlyList<string> Aliases { get; } = aliases;
+
+        public IReadOnlyList<FileEvent> PathEvents { get; } = pathEvents;
 
         public HistoryPathCategory Category { get; } = category;
 

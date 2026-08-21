@@ -1,5 +1,6 @@
 using System.Numerics;
 using ArchLinterNet.Core.History.Configuration;
+using ArchLinterNet.Core.History.Tasks;
 
 namespace ArchLinterNet.Core.History.Analysis;
 
@@ -9,7 +10,11 @@ internal sealed class HotspotRawEvidence(
     int taskSpread,
     int authorSpread,
     BigInteger temporalSpanSeconds,
-    IReadOnlyList<LineCountStatus> lineCountStatuses)
+    IReadOnlyList<LineCountStatus> lineCountStatuses,
+    IReadOnlyList<TaskKey> taskKeys,
+    IReadOnlyList<HotspotTaskKeyProvenance> taskKeyProvenance,
+    IReadOnlyList<string> canonicalAuthors,
+    IReadOnlyList<HotspotAuthorProvenance> authorProvenance)
 {
     public int CommitCount { get; } = commitCount;
 
@@ -23,6 +28,14 @@ internal sealed class HotspotRawEvidence(
 
     public IReadOnlyList<LineCountStatus> LineCountStatuses { get; } = lineCountStatuses;
 
+    public IReadOnlyList<TaskKey> TaskKeys { get; } = taskKeys;
+
+    public IReadOnlyList<HotspotTaskKeyProvenance> TaskKeyProvenance { get; } = taskKeyProvenance;
+
+    public IReadOnlyList<string> CanonicalAuthors { get; } = canonicalAuthors;
+
+    public IReadOnlyList<HotspotAuthorProvenance> AuthorProvenance { get; } = authorProvenance;
+
     public bool HasBinaryOrUnavailableEvidence => LineCountStatuses.Contains(LineCountStatus.BinaryOrUnavailable);
 
     public bool HasExactRenameEvidence => LineCountStatuses.Contains(LineCountStatus.ExactRename);
@@ -30,6 +43,21 @@ internal sealed class HotspotRawEvidence(
     // V1 creates one baseline identity per exact pathname, so every logical-file finding carries
     // this inherited limitation even where a particular range did not happen to reuse a path.
     public bool PathnameReuseMayConflateGenerations => true;
+}
+
+// Each provenance item stays anchored to the canonical file-evidence commit that contributed it.
+internal sealed class HotspotTaskKeyProvenance(string commitId, TaskKeyMatch match)
+{
+    public string CommitId { get; } = commitId;
+
+    public TaskKeyMatch Match { get; } = match;
+}
+
+internal sealed class HotspotAuthorProvenance(string commitId, string canonicalAuthor)
+{
+    public string CommitId { get; } = commitId;
+
+    public string CanonicalAuthor { get; } = canonicalAuthor;
 }
 
 internal sealed class HotspotComponents(decimal commit, decimal churn, decimal task, decimal author, decimal temporal)
@@ -60,6 +88,8 @@ internal sealed class HotspotWeights(decimal commit, decimal churn, decimal task
 
 internal sealed class HotspotFinding(
     string canonicalPath,
+    IReadOnlyList<string> aliases,
+    IReadOnlyList<FileEvent> pathEvents,
     HistoryPathCategory category,
     HotspotRawEvidence rawEvidence,
     HotspotComponents components,
@@ -67,6 +97,10 @@ internal sealed class HotspotFinding(
     decimal score)
 {
     public string CanonicalPath { get; } = canonicalPath;
+
+    public IReadOnlyList<string> Aliases { get; } = aliases;
+
+    public IReadOnlyList<FileEvent> PathEvents { get; } = pathEvents;
 
     public HistoryPathCategory Category { get; } = category;
 
