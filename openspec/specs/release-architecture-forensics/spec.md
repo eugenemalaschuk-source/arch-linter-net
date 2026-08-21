@@ -278,6 +278,7 @@ temporal spans. Merge timestamps remain range metadata only.
 - **THEN** analysis succeeds with deterministic empty/zero evidence
 
 ### Requirement: Canonical Git path text and string ordering
+This requirement SHALL preserve canonical Git path text and ordering semantics.
 Git tree paths are byte sequences. Every path participating in canonical evidence
 in the initial profile SHALL decode as strict UTF-8. Invalid, overlong, truncated,
 or otherwise ill-formed UTF-8 SHALL fail analysis closed before classification,
@@ -309,6 +310,7 @@ Repository-relative `/` separators are canonical.
 - **THEN** ordering follows scalar numeric values rather than host-language code-unit ordering
 
 ### Requirement: Baseline same-path identity in v1
+This requirement SHALL preserve one baseline identity for each exact pathname.
 Before accepted rename lineages are applied, all canonical non-merge file events
 whose canonical repository-relative path strings are exactly equal SHALL belong to
 one baseline path identity for the entire analyzed commit set. V1 SHALL NOT split
@@ -539,6 +541,7 @@ overrides, thresholds, and effective configuration. `unknown` remains visible.
 - **THEN** primary category derives from `tests/New.cs`, not an earlier alias
 
 ### Requirement: Total normalization, canonical numbers, and populations
+This requirement SHALL define total cohort normalization and canonical numeric values.
 For any non-negative population:
 
 ```text
@@ -606,6 +609,7 @@ enabledness.
 - **THEN** the task component remains enabled with raw zero and other weights remain unchanged
 
 ### Requirement: Deterministic hotspot evidence
+This requirement SHALL define deterministic hotspot evidence and scores.
 For retained file `f`, using its primary-category population:
 
 ```text
@@ -633,6 +637,7 @@ interleaved as one numeric ranking.
 - **THEN** the report does not claim the docs file outranks the production file
 
 ### Requirement: Canonical base co-change graph
+This requirement SHALL define the canonical base co-change graph.
 After analysis ignores:
 
 ```text
@@ -712,6 +717,7 @@ descending aggregate, then ascending first member path.
 - **THEN** cluster `{A,B,C}` has maximum `.700000000`, aggregate `1.300000000`, and AC contributes nothing
 
 ### Requirement: Independent task evidence and temporal proximity
+This requirement SHALL define independent task evidence and exact temporal proximity.
 A task episode is canonical file-evidence commits linked to one canonical TaskKey.
 A multi-reference commit MAY contribute ordinary task breadth and task co-change
 but SHALL NOT alone establish independent work.
@@ -750,6 +756,7 @@ canonical pair proximity, or zero when no independent pair exists.
 - **THEN** `days_between=2` and proximity is `0.333333333`
 
 ### Requirement: Cohort-safe bottleneck centrality and score
+This requirement SHALL define cohort-safe bottleneck centrality and scoring.
 Using `G0` neighbors:
 
 ```text
@@ -802,6 +809,7 @@ when it qualifies against several partners. No independent pair means `E_f=0`.
 - **THEN** its pair-exclusive sets are unioned and SHA-deduplicated before repeated edits are counted
 
 ### Requirement: Portable deterministic role-token evidence
+This requirement SHALL define portable deterministic role-token evidence.
 Role hints operate on canonical filename stem using this ASCII tokenizer:
 
 1. any character outside `[A-Za-z0-9]` delimits tokens;
@@ -977,6 +985,7 @@ navigation SHALL NOT advertise the feature before implementation ships.
 - **THEN** it links to the Release Architecture Forensics theory reference
 
 ### Requirement: One bounded history-analysis policy authority
+This requirement SHALL retain one bounded history-analysis policy authority.
 The architecture policy MAY contain one optional `history_analysis` object. It
 SHALL be loaded, composed, provenance-checked, schema-validated, and raw-YAML
 validated by the normal policy lifecycle; a history command SHALL NOT accept a
@@ -1024,6 +1033,7 @@ different-key failure. Extractor declaration order SHALL NOT select a result.
 - **THEN** canonical extraction fails with the existing ambiguity diagnostic regardless of declaration order
 
 ### Requirement: Deterministic path categories and analysis ignores
+This requirement SHALL define deterministic path categories and analysis ignores.
 `history_analysis.paths` MAY configure segment-glob pattern lists for
 `production`, `tests`, `docs`, `generated`, `build_ci`, and `samples_examples`.
 A glob SHALL use `/`-separated literal segments, `*` as one segment, and `**`
@@ -1047,6 +1057,7 @@ first matching configured category in fixed order `production`, `tests`,
 - **THEN** it is removed before category and score population construction
 
 ### Requirement: Exact validated analysis profiles and threshold
+This requirement SHALL define exact validated analysis profiles and thresholds.
 `history_analysis.weights` MAY explicitly set complete hotspot, co-change,
 bottleneck, and OCP profiles. Each value SHALL be a finite nonnegative ordinary
 base-10 decimal literal with at most nine fractional digits; a positive value
@@ -1067,4 +1078,36 @@ construction, never as a score or `G0` control.
 #### Scenario: Threshold equality qualifies only for Gtheta
 - **WHEN** a future combined co-change edge equals the configured threshold
 - **THEN** it qualifies for `Gtheta` without changing `G0` or file-score inputs
+
+### Requirement: Deterministic in-memory hotspot findings
+The Core history-analysis layer SHALL expose a deterministic in-memory hotspot
+analysis result for a successful canonical ingestion result and its validated
+effective `history_analysis` configuration. Each retained logical-file finding
+SHALL retain canonical path, primary category, raw commit/churn/TaskKey/author/
+temporal evidence, nine-decimal canonical components and score, effective
+hotspot weights, line-count statuses, and the inherited pathname-reuse
+limitation status. The analysis layer SHALL consume only canonical ingestion
+evidence and SHALL NOT re-resolve refs, re-decode metadata, re-extract task keys,
+segment same-path lifetimes, re-evaluate rename candidates, or use host
+date/time conversion.
+
+#### Scenario: Canonical evidence is independent of source spellings
+- **WHEN** canonical evidence contains task spellings `#001` and `#1`, or equal
+  committer epoch integers with distinct timezone tokens
+- **THEN** hotspot task breadth and temporal span consume the canonical TaskKey
+  and exact epoch integer without observing those source spelling/token variants
+
+### Requirement: Cohort-safe hotspot result ordering
+The hotspot analysis layer SHALL apply configured history ignores before
+classification, normalization, and scoring. It SHALL normalize each hotspot
+component only among retained files in the same primary category and SHALL group
+results in canonical category order with production as the first human-facing
+group. Within one category it SHALL order findings by descending canonical score,
+descending canonical TaskKey spread, descending churn, descending commit count,
+and ascending scalar-value canonical path.
+
+#### Scenario: Non-production cannot change production scores
+- **WHEN** a generated file has more churn than every production file
+- **THEN** the generated file does not affect any production hotspot component,
+  score, or production-group ranking
 
