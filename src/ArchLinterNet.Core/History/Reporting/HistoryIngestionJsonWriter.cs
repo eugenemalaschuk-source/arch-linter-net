@@ -27,6 +27,7 @@ internal static class HistoryIngestionJsonWriter
         WriteLogicalFiles(writer, result);
         WriteCoChangeGraph(writer, result);
         WriteBottleneckAnalysis(writer, result.BottleneckAnalysis);
+        WriteOcpAnalysis(writer, result.OcpAnalysis);
         writer.EndObject();
         return writer.ToCanonicalText() + "\n";
     }
@@ -205,6 +206,79 @@ internal static class HistoryIngestionJsonWriter
         }
 
         writer.EndArray();
+    }
+
+    private static void WriteOcpAnalysis(CanonicalJsonWriter writer, HistoryOcpAnalysis analysis)
+    {
+        writer.BeginArray("ocpGroups");
+        foreach (HistoryOcpCategoryGroup group in analysis.Groups)
+        {
+            writer.BeginObject();
+            writer.WriteString("category", CategoryText(group.Category));
+            writer.BeginArray("findings");
+            foreach (HistoryOcpFinding finding in group.Findings)
+            {
+                WriteOcpFinding(writer, finding);
+            }
+
+            writer.EndArray();
+            writer.EndObject();
+        }
+
+        writer.EndArray();
+    }
+
+    private static void WriteOcpFinding(CanonicalJsonWriter writer, HistoryOcpFinding finding)
+    {
+        writer.BeginObject();
+        writer.WriteString("canonicalPath", finding.CanonicalPath);
+        WriteStringArray(writer, "aliases", finding.Aliases);
+        writer.WriteBoolean("pathnameReuseMayConflateGenerations", finding.RawEvidence.PathnameReuseMayConflateGenerations);
+        writer.WriteNumber("independentTaskSpread", finding.RawEvidence.IndependentTaskSpread);
+        writer.WriteNumber("incidentCommitDegree", finding.RawEvidence.IncidentCommitDegree);
+        writer.WriteNumber("incidentTaskDegree", finding.RawEvidence.IncidentTaskDegree);
+        writer.WriteNumber("repeatedEditTotal", finding.RawEvidence.RepeatedEditTotal);
+        writer.WriteCanonicalDecimal("roleHint", finding.RawEvidence.RoleHint);
+        writer.BeginObject("components");
+        writer.WriteCanonicalDecimal("independentTask", finding.Components.IndependentTask);
+        writer.WriteCanonicalDecimal("centrality", finding.Components.Centrality);
+        writer.WriteCanonicalDecimal("repeatedEdit", finding.Components.RepeatedEdit);
+        writer.WriteCanonicalDecimal("roleHint", finding.Components.RoleHint);
+        writer.EndObject();
+        writer.BeginObject("weights");
+        writer.WriteCanonicalDecimal("independentTask", finding.Weights.IndependentTask);
+        writer.WriteCanonicalDecimal("centrality", finding.Weights.Centrality);
+        writer.WriteCanonicalDecimal("repeatedEdit", finding.Weights.RepeatedEdit);
+        writer.WriteCanonicalDecimal("roleHint", finding.Weights.RoleHint);
+        writer.EndObject();
+        writer.WriteCanonicalDecimal("score", finding.Score);
+        writer.BeginArray("taskKeys");
+        foreach (TaskKey key in finding.RawEvidence.TaskKeys)
+        {
+            WriteTaskKey(writer, key);
+        }
+
+        writer.EndArray();
+        writer.BeginArray("independentTaskPairs");
+        foreach (BottleneckTaskPair pair in finding.RawEvidence.IndependentTaskPairs)
+        {
+            WriteBottleneckPair(writer, pair);
+        }
+
+        writer.EndArray();
+        writer.BeginArray("repeatedEdits");
+        foreach (OcpTaskRepeatedEdit repeated in finding.RawEvidence.RepeatedEdits)
+        {
+            writer.BeginObject();
+            WriteTaskKey(writer, "task", repeated.TaskKey);
+            WriteStringArray(writer, "qualifyingCommitIds", repeated.QualifyingCommitIds);
+            writer.WriteNumber("repeatedEditCount", repeated.RepeatedEditCount);
+            writer.EndObject();
+        }
+
+        writer.EndArray();
+        WriteStringArray(writer, "roleTokens", finding.RawEvidence.RoleTokens);
+        writer.EndObject();
     }
 
     private static void WriteBottleneckFinding(CanonicalJsonWriter writer, HistoryBottleneckFinding finding)
