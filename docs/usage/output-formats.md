@@ -33,8 +33,8 @@ optional canonical affected subjects, and existing schema-backed rationale.
 Project include/exclude glob changes are emitted as `impact_not_proven` unless
 complete resolved project membership is supplied; they are never treated as
 literal-string inventories. A changed typed contract fact without a supported
-directional rule is likewise `impact_not_proven`; a required source expansion
-made empty-tolerant is a semantic finding.
+fact-and-shape directional rule is likewise `impact_not_proven`; a required
+source expansion made empty-tolerant is a semantic finding.
 
 Human, JSON, and SARIF project that same result. JSON is suitable for CI and
 SARIF uses one `ArchLinterNet.PolicyWeakening.<kind>` rule for each weakening

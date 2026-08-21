@@ -118,8 +118,10 @@ type/role/attribute/inheritance/CEL/public-API selector change is reported as
 `impact_not_proven` unless complete context-bound evaluator membership evidence
 proves the removed canonical subjects. Architecture change snapshots and a
 green validation result are not selector-membership evidence.
-An unsupported changed typed contract fact is likewise `impact_not_proven`,
-with no invented affected subjects.
+The command establishes direction only for explicit fact-and-shape pairs:
+supported scalar string-set inventories and known boolean prohibitions. An
+unsupported changed typed contract fact is `impact_not_proven`, with no
+invented affected subjects.
 
 ## Validate options
 

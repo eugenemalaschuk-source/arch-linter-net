@@ -256,6 +256,86 @@ public sealed class ArchitecturePolicyWeakeningComparerTests
     }
 
     [Test]
+    public void Compare_ForbiddenLegacyRuntimeStrengthening_IsNotWeakening()
+    {
+        ArchitecturePolicyWeakeningResult result = ArchitecturePolicyWeakeningComparer.Compare(new(
+            Context(contracts: [Contract("strict", "dependency", "boundary", [Fact("forbidden_legacy_runtime", "false")])]),
+            Context(contracts: [Contract("strict", "dependency", "boundary", [Fact("forbidden_legacy_runtime", "true")])])));
+
+        Assert.That(result.Findings, Is.Empty);
+    }
+
+    [Test]
+    public void Compare_ForbiddenLegacyRuntimeRelaxation_IsSemanticWeakening()
+    {
+        ArchitecturePolicyWeakeningFinding finding = ArchitecturePolicyWeakeningComparer.Compare(new(
+            Context(contracts: [Contract("strict", "dependency", "boundary", [Fact("forbidden_legacy_runtime", "true")])]),
+            Context(contracts: [Contract("strict", "dependency", "boundary", [Fact("forbidden_legacy_runtime", "false")])]))).Findings.Single();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(finding.Kind, Is.EqualTo("prohibition_removed"));
+            Assert.That(finding.Classification, Is.EqualTo("semantic"));
+            Assert.That(finding.BaseValues, Is.EqualTo(new[] { "true" }));
+            Assert.That(finding.CurrentValues, Is.EqualTo(new[] { "false" }));
+        });
+    }
+
+    [Test]
+    public void Compare_ForbiddenNameSuffixChange_IsImpactNotProven()
+    {
+        ArchitecturePolicyWeakeningFinding finding = ArchitecturePolicyWeakeningComparer.Compare(new(
+            Context(contracts: [Contract("strict", "type_placement", "placement", [Fact("forbidden_name_suffix", "Legacy")])]),
+            Context(contracts: [Contract("strict", "type_placement", "placement", [Fact("forbidden_name_suffix", "Deprecated")])]))).Findings.Single();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(finding.Kind, Is.EqualTo("typed_fact_impact_not_proven"));
+            Assert.That(finding.Classification, Is.EqualTo("impact_not_proven"));
+            Assert.That(finding.AffectedSubjects, Is.Empty);
+        });
+    }
+
+    [Test]
+    public void Compare_ScalarLayerInventoryChange_IsImpactNotProven()
+    {
+        ArchitecturePolicyWeakeningFinding finding = ArchitecturePolicyWeakeningComparer.Compare(new(
+            Context(contracts: [Contract("strict", "cycle", "cycle", [Fact("layers", "Application")])]),
+            Context(contracts: [Contract("strict", "cycle", "cycle", [Fact("layers", "Infrastructure")])]))).Findings.Single();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(finding.Kind, Is.EqualTo("typed_fact_impact_not_proven"));
+            Assert.That(finding.Classification, Is.EqualTo("impact_not_proven"));
+            Assert.That(finding.AffectedSubjects, Is.Empty);
+        });
+    }
+
+    [Test]
+    public void Compare_StructuredAllowedOnlyInTypesExpansion_IsImpactNotProven()
+    {
+        ArchitecturePolicyContextContract baseline = Contract("strict", "composition", "composition", [
+            FactItems("allowed_only_in_types", FactItems("type", Fact("assembly", "Sample.Host"), Fact("type", "Sample.Program"))),
+        ]);
+        ArchitecturePolicyContextContract current = Contract("strict", "composition", "composition", [
+            FactItems("allowed_only_in_types",
+                FactItems("type", Fact("assembly", "Sample.Host"), Fact("type", "Sample.Program")),
+                FactItems("type", Fact("assembly", "Sample.Host"), Fact("type", "Sample.Bootstrap"))),
+        ]);
+
+        ArchitecturePolicyWeakeningFinding finding = ArchitecturePolicyWeakeningComparer.Compare(new(
+            Context(contracts: [baseline]),
+            Context(contracts: [current]))).Findings.Single();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(finding.Kind, Is.EqualTo("typed_fact_impact_not_proven"));
+            Assert.That(finding.Classification, Is.EqualTo("impact_not_proven"));
+            Assert.That(finding.AffectedSubjects, Is.Empty);
+        });
+    }
+
+    [Test]
     public void Compare_EquivalentEffectiveValuesWithDifferentOrdering_IsNoOp()
     {
         ArchitecturePolicyContextExport baseline = Context(

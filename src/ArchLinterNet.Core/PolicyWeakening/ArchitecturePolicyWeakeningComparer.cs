@@ -263,17 +263,17 @@ public static class ArchitecturePolicyWeakeningComparer
                 continue;
             }
 
-            IReadOnlyDictionary<string, IReadOnlyList<string>> baseFacts = TopLevelFactValues(baseContract);
-            IReadOnlyDictionary<string, IReadOnlyList<string>> currentFacts = TopLevelFactValues(currentContract);
+            IReadOnlyDictionary<string, ArchitecturePolicyContextContractFact> baseFacts = FactMap(baseContract);
+            IReadOnlyDictionary<string, ArchitecturePolicyContextContractFact> currentFacts = FactMap(currentContract);
             IReadOnlyDictionary<string, string> baseFactEvidence = FactEvidenceMap(baseContract);
             IReadOnlyDictionary<string, string> currentFactEvidence = FactEvidenceMap(currentContract);
             foreach (string factName in baseFacts.Keys.Concat(currentFacts.Keys).Distinct(_comparer).OrderBy(value => value, _comparer))
             {
-                baseFacts.TryGetValue(factName, out IReadOnlyList<string>? baseValues);
-                baseValues ??= Array.Empty<string>();
-                currentFacts.TryGetValue(factName, out IReadOnlyList<string>? currentValues);
-                currentValues ??= Array.Empty<string>();
-                if (IsForbiddenFact(factName))
+                baseFacts.TryGetValue(factName, out ArchitecturePolicyContextContractFact? baseFact);
+                currentFacts.TryGetValue(factName, out ArchitecturePolicyContextContractFact? currentFact);
+                IReadOnlyList<string> baseValues = FactValuesOrEmpty(baseFact);
+                IReadOnlyList<string> currentValues = FactValuesOrEmpty(currentFact);
+                if (IsSupportedProhibitionInventory(factName, baseFact, currentFact))
                 {
                     string[] removed = baseValues.Except(currentValues, _comparer).OrderBy(value => value, _comparer).ToArray();
                     if (removed.Length > 0)
@@ -292,7 +292,7 @@ public static class ArchitecturePolicyWeakeningComparer
                     }
                 }
 
-                if (IsAllowFact(factName))
+                if (IsSupportedPermissionInventory(factName, baseFact, currentFact))
                 {
                     string[] added = currentValues.Except(baseValues, _comparer).OrderBy(value => value, _comparer).ToArray();
                     if (added.Length > 0)
@@ -311,7 +311,7 @@ public static class ArchitecturePolicyWeakeningComparer
                     }
                 }
 
-                if (IsScopeInventoryFact(factName))
+                if (IsSupportedScopeInventory(factName, baseFact, currentFact))
                 {
                     string[] removed = baseValues.Except(currentValues, _comparer).OrderBy(value => value, _comparer).ToArray();
                     if (removed.Length > 0)
@@ -329,13 +329,32 @@ public static class ArchitecturePolicyWeakeningComparer
                             currentContract.Reason ?? baseContract.Reason));
                     }
                 }
+
+                if (TryGetSupportedProhibitionFlag(factName, baseFact, currentFact, out bool baselineFlag, out bool currentFlag)
+                    && baselineFlag && !currentFlag)
+                {
+                    findings.Add(CreateFinding(
+                        "prohibition_removed",
+                        ControlIdentity(baseContract) + ":" + factName,
+                        "semantic",
+                        severity,
+                        ["true"],
+                        ["false"],
+                        baseContract.Provenance,
+                        currentContract.Provenance,
+                        Array.Empty<string>(),
+                        currentContract.Reason ?? baseContract.Reason));
+                }
             }
 
             foreach (string factName in baseFactEvidence.Keys.Concat(currentFactEvidence.Keys).Distinct(_comparer).OrderBy(value => value, _comparer))
             {
                 baseFactEvidence.TryGetValue(factName, out string? baseEvidence);
                 currentFactEvidence.TryGetValue(factName, out string? currentEvidence);
-                if (IsKnownDirectionalFact(factName) || string.Equals(baseEvidence, currentEvidence, StringComparison.Ordinal))
+                baseFacts.TryGetValue(factName, out ArchitecturePolicyContextContractFact? baseFact);
+                currentFacts.TryGetValue(factName, out ArchitecturePolicyContextContractFact? currentFact);
+                if (IsKnownDirectionalFact(factName, baseFact, currentFact)
+                    || string.Equals(baseEvidence, currentEvidence, StringComparison.Ordinal))
                 {
                     continue;
                 }

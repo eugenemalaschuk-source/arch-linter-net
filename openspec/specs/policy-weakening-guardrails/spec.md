@@ -30,9 +30,11 @@ same-ID strict control is removed or downgraded to audit, a resolved
 source-set member is removed, a source set or source expansion becomes
 optional or empty-tolerant, a typed required rule input becomes optional, a
 matched subtractive exclusion is added, a typed universal ignored violation is
-added, or a supported explicit forbidden/allow-only inventory is relaxed. It
-SHALL retain an existing schema-backed reason as rationale evidence when
-present.
+added, or a supported explicit forbidden/allow-only inventory is relaxed. A
+fact SHALL be compared as an inventory only when its explicitly supported typed
+shape is a scalar string set; fact-name prefixes alone SHALL NOT establish
+semantic direction. It SHALL retain an existing schema-backed reason as
+rationale evidence when present.
 
 #### Scenario: Strict control becomes audit
 - **WHEN** a strict contract and an audit contract share the same family and
@@ -67,6 +69,14 @@ present.
   changes from required to `optional_empty`
 - **THEN** comparison reports semantic weakening with both expansion
   provenances
+
+#### Scenario: Boolean prohibition is strengthened
+- **WHEN** a known boolean prohibition changes from `false` to `true`
+- **THEN** comparison does not report weakening
+
+#### Scenario: Boolean prohibition is relaxed
+- **WHEN** a known boolean prohibition changes from `true` to `false`
+- **THEN** comparison reports semantic prohibition removal
 
 ### Requirement: Unproved selector impact remains bounded
 
@@ -130,13 +140,20 @@ classified as semantic scope weakening.
 ### Requirement: Unsupported typed-fact changes remain bounded
 
 When a typed contract fact changes but no supported directional comparison rule
-applies, the comparator SHALL emit one deterministic `impact_not_proven`
-finding with canonical base/current fact evidence and no affected subjects. It
-SHALL leave facts handled by the dedicated selector comparison to that path.
+applies for that fact's actual shape, the comparator SHALL emit one
+deterministic `impact_not_proven` finding with canonical base/current fact
+evidence and no affected subjects. It SHALL leave facts handled by the
+dedicated selector comparison to that path.
 
 #### Scenario: Unknown typed fact changes
 - **WHEN** a same-control typed contract fact changes and has no supported
   directional weakening rule
 - **THEN** comparison reports `impact_not_proven` without claiming semantic
   weakening or affected architecture subjects
+
+#### Scenario: Structured allow-list expands
+- **WHEN** a structured allow-list fact changes without a dedicated typed
+  comparison rule
+- **THEN** comparison reports `impact_not_proven` rather than silently
+  discarding the expansion or claiming semantic direction
 

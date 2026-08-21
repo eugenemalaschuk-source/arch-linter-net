@@ -54,7 +54,10 @@ is reviewable `impact_not_proven` unless resolved project membership is present.
 In contrast, a source set or source expansion changing from required to
 optional/empty-tolerant, and an ignored violation whose typed `source_type` and
 `forbidden_reference` matchers are both `*`, are provable semantic relaxations.
-Any other changed typed contract fact without a directional comparison rule is
+Semantic inventory comparison is restricted to explicit scalar string-set
+facts; prefixes such as `forbidden_` and `allowed_only_in_` do not establish
+direction by themselves. Known boolean prohibitions weaken only from `true` to
+`false`; any other changed typed contract shape without a dedicated rule is
 bounded `impact_not_proven`, rather than being silently ignored or guessed.
 
 ## Supported contract families

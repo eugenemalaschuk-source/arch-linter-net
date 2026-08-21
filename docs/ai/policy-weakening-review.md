@@ -40,9 +40,11 @@ as `impact_not_proven` for review, with no fabricated affected types. Treat a
 Shared, Common, or Utils-style exemption as a warning sign to narrow and
 explain, not as a substitute for fixing code.
 
-Any changed typed contract fact without a supported directional rule is also
-reported as `impact_not_proven`; it is never silently discarded or presented as
-proof of affected architecture subjects.
+Semantic inventory comparison is explicit and shape-aware: a known scalar
+string-set inventory may prove a relaxation, while a boolean prohibition has
+its own `true` → `false` direction. A scalar predicate or structured contract
+fact without a dedicated rule is `impact_not_proven`; it is never silently
+discarded or presented as proof of affected architecture subjects.
 
 `analysis.project_include` and `analysis.project_exclude` are globs. A context
 alone does not prove whether one glob contains another, so a changed glob is

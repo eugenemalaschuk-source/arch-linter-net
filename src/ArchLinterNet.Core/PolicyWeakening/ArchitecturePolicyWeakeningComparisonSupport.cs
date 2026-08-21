@@ -27,9 +27,8 @@ internal static class ArchitecturePolicyWeakeningComparisonSupport
         ArchitecturePolicyContextExport context,
         string side) => context.SourceExpansions.ToDictionary(ExpansionKey, _comparer);
 
-    internal static IReadOnlyDictionary<string, IReadOnlyList<string>> TopLevelFactValues(ArchitecturePolicyContextContract contract) => contract.Facts
-        .Where(fact => fact.Values.Count > 0)
-        .ToDictionary(fact => fact.Name, fact => fact.Values, _comparer);
+    internal static IReadOnlyDictionary<string, ArchitecturePolicyContextContractFact> FactMap(ArchitecturePolicyContextContract contract) => contract.Facts
+        .ToDictionary(fact => fact.Name, _comparer);
 
     internal static IReadOnlyDictionary<string, string> FactEvidenceMap(ArchitecturePolicyContextContract contract) => contract.Facts
         .GroupBy(fact => fact.Name, _comparer)
@@ -38,20 +37,51 @@ internal static class ArchitecturePolicyWeakeningComparisonSupport
             group => string.Join("\u001e", group.Select(FactKey).OrderBy(value => value, _comparer)),
             _comparer);
 
-    internal static bool IsForbiddenFact(string name) => name == "forbidden" || name.StartsWith("forbidden_", StringComparison.Ordinal);
+    internal static bool IsSupportedProhibitionInventory(
+        string name,
+        ArchitecturePolicyContextContractFact? baseline,
+        ArchitecturePolicyContextContractFact? current) => IsProhibitionInventoryName(name)
+        && IsStringSetOrAbsent(baseline)
+        && IsStringSetOrAbsent(current);
 
-    internal static bool IsAllowFact(string name) => name == "allowed"
-        || name == "allowed_types"
-        || name.StartsWith("allowed_only_in_", StringComparison.Ordinal)
-        || name is "allowed_importers" or "allowed_friend_assemblies" or "allowed_public_constants";
+    internal static bool IsSupportedPermissionInventory(
+        string name,
+        ArchitecturePolicyContextContractFact? baseline,
+        ArchitecturePolicyContextContractFact? current) => IsPermissionInventoryName(name)
+        && IsStringSetOrAbsent(baseline)
+        && IsStringSetOrAbsent(current);
 
-    internal static bool IsScopeInventoryFact(string name) => name is "assemblies" or "projects" or "source_assemblies";
+    internal static bool IsSupportedScopeInventory(
+        string name,
+        ArchitecturePolicyContextContractFact? baseline,
+        ArchitecturePolicyContextContractFact? current) => name is "assemblies" or "projects" or "source_assemblies"
+        && IsStringSetOrAbsent(baseline)
+        && IsStringSetOrAbsent(current);
 
-    internal static bool IsKnownDirectionalFact(string name) => IsForbiddenFact(name)
-        || IsAllowFact(name)
-        || IsScopeInventoryFact(name)
+    internal static bool TryGetSupportedProhibitionFlag(
+        string name,
+        ArchitecturePolicyContextContractFact? baseline,
+        ArchitecturePolicyContextContractFact? current,
+        out bool baselineValue,
+        out bool currentValue)
+    {
+        baselineValue = false;
+        currentValue = false;
+        return name is "forbidden_legacy_runtime" or "forbidden_editor_refs"
+            && TryGetBooleanValue(baseline, out baselineValue)
+            && TryGetBooleanValue(current, out currentValue);
+    }
+
+    internal static bool IsKnownDirectionalFact(
+        string name,
+        ArchitecturePolicyContextContractFact? baseline,
+        ArchitecturePolicyContextContractFact? current) => IsSupportedProhibitionInventory(name, baseline, current)
+        || IsSupportedPermissionInventory(name, baseline, current)
+        || IsSupportedScopeInventory(name, baseline, current)
+        || TryGetSupportedProhibitionFlag(name, baseline, current, out _, out _)
         || IsFactDependentSelectorFact(name)
-        || name is "layers" or "optional_inputs";
+        || IsComparableOptionalLayerFact(name, baseline, current)
+        || IsSupportedOptionalInputFact(name, baseline, current);
 
     internal static bool IsFactDependentSelectorFact(string name) => name is "types_matching"
         or "exclude_types_matching"
@@ -76,6 +106,8 @@ internal static class ArchitecturePolicyWeakeningComparisonSupport
         .Select(input => string.Join("\u001f", FactValue(input, "contract_id"), FactValue(input, "input"), FactValue(input, "layer")))
         .Where(key => key != "\u001f\u001f")
         .ToHashSet(_comparer);
+
+    internal static IReadOnlyList<string> FactValuesOrEmpty(ArchitecturePolicyContextContractFact? fact) => fact?.Values ?? Array.Empty<string>();
 
     internal static bool HasFactDependentSelectorChange(
         ArchitecturePolicyContextContract baseline,
@@ -179,4 +211,89 @@ internal static class ArchitecturePolicyWeakeningComparisonSupport
 
     private static string FactValue(ArchitecturePolicyContextContractFact fact, string name) => fact.Items
         .SingleOrDefault(item => item.Name == name)?.Values.SingleOrDefault() ?? string.Empty;
+
+    private static bool IsProhibitionInventoryName(string name) => name is "forbidden"
+        or "forbidden_calls"
+        or "forbidden_asmdef_prefixes"
+        or "forbidden_base_types"
+        or "forbidden_base_type_prefixes"
+        or "forbidden_apis"
+        or "forbidden_project_references"
+        or "forbidden_in_layers"
+        or "forbidden_in_namespaces"
+        or "forbidden_in_projects"
+        or "forbidden_in_assemblies";
+
+    private static bool IsPermissionInventoryName(string name) => name is "allowed"
+        or "allowed_types"
+        or "allowed_importers"
+        or "allowed_friend_assemblies"
+        or "allowed_public_constants"
+        or "allowed_only_in_layers"
+        or "allowed_only_in_namespaces"
+        or "allowed_only_in_projects"
+        or "allowed_only_in_assemblies"
+        or "allowed_only_in_assembly_sets"
+        or "allowed_container_root_types"
+        or "allowed_module_root_types";
+
+    private static bool IsStringSetOrAbsent(ArchitecturePolicyContextContractFact? fact) => fact is null
+        || (fact.Items.Count == 0 && fact.Values.Count > 0);
+
+    private static bool TryGetBooleanValue(ArchitecturePolicyContextContractFact? fact, out bool value)
+    {
+        value = false;
+        if (fact is null || fact.Items.Count != 0 || fact.Values.Count != 1)
+        {
+            return false;
+        }
+
+        return bool.TryParse(fact.Values[0], out value);
+    }
+
+    private static bool IsComparableOptionalLayerFact(
+        string name,
+        ArchitecturePolicyContextContractFact? baseline,
+        ArchitecturePolicyContextContractFact? current)
+    {
+        if (name != "layers"
+            || baseline is null
+            || current is null
+            || baseline.Values.Count != 0
+            || current.Values.Count != 0
+            || baseline.Items.Count == 0
+            || current.Items.Count == 0)
+        {
+            return false;
+        }
+
+        IReadOnlyDictionary<string, bool> baselineLayers = OptionalLayerMap(baseline);
+        IReadOnlyDictionary<string, bool> currentLayers = OptionalLayerMap(current);
+        return baselineLayers.Count == baseline.Items.Count
+            && currentLayers.Count == current.Items.Count
+            && baselineLayers.Keys.OrderBy(value => value, _comparer).SequenceEqual(currentLayers.Keys.OrderBy(value => value, _comparer), _comparer);
+    }
+
+    private static bool IsSupportedOptionalInputFact(
+        string name,
+        ArchitecturePolicyContextContractFact? baseline,
+        ArchitecturePolicyContextContractFact? current) => name == "optional_inputs"
+        && IsOptionalInputFactOrAbsent(baseline)
+        && IsOptionalInputFactOrAbsent(current);
+
+    private static bool IsOptionalInputFactOrAbsent(ArchitecturePolicyContextContractFact? fact) => fact is null
+        || (fact.Values.Count == 0
+            && fact.Items.Count > 0
+            && fact.Items.All(item => item.Name == "input"
+                && FactValue(item, "contract_id") is { Length: > 0 }
+                && FactValue(item, "input") is { Length: > 0 }));
+
+    private static IReadOnlyDictionary<string, bool> OptionalLayerMap(ArchitecturePolicyContextContractFact fact) => fact.Items
+        .Select(layer => new
+        {
+            Name = FactValue(layer, "name"),
+            Optional = FactValue(layer, "optional"),
+        })
+        .Where(layer => !string.IsNullOrWhiteSpace(layer.Name) && layer.Optional is "true" or "false")
+        .ToDictionary(layer => layer.Name!, layer => layer.Optional == "true", _comparer);
 }
