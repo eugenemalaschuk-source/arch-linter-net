@@ -90,8 +90,8 @@ public sealed class HistoryBottleneckScorerTests
         {
             Assert.That(pair.FirstInterval.StartEpochSecond, Is.EqualTo(BigInteger.Parse("1000000000000000000000000000000")));
             Assert.That(pair.SecondInterval.StartEpochSecond, Is.EqualTo(BigInteger.Parse("1000000000000000000000000000000")));
-            Assert.That(pair.GapSeconds, Is.Zero);
-            Assert.That(pair.DaysBetween, Is.Zero);
+            Assert.That(pair.GapSeconds, Is.EqualTo(BigInteger.Zero));
+            Assert.That(pair.DaysBetween, Is.EqualTo(BigInteger.Zero));
             Assert.That(pair.TemporalProximity, Is.EqualTo(1.000000000m));
         });
     }
