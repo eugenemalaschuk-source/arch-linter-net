@@ -52,3 +52,9 @@ alone does not prove whether one glob contains another, so a changed glob is
 also `impact_not_proven` unless complete resolved project membership evidence
 is available. Do not treat the addition or removal of a glob string as a
 semantic scope change.
+
+`analysis.target_assemblies`, `analysis.projects`, and `analysis.source_roots`
+are authored inputs in the context artifact, not proof of effective runtime
+scope. Discovery can seed assemblies and roots, and an empty source-root list
+can select scanner defaults. Any change to these fields is therefore
+`impact_not_proven` until a resolved effective-scope artifact is available.

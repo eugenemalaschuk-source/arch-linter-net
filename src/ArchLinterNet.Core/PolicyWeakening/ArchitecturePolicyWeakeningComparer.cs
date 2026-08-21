@@ -201,29 +201,30 @@ public static class ArchitecturePolicyWeakeningComparer
         ArchitecturePolicyContextExport current,
         ICollection<ArchitecturePolicyWeakeningFinding> findings)
     {
-        CompareRemovedAnalysisValues("target_assemblies", baseline.Analysis.TargetAssemblies, current.Analysis.TargetAssemblies);
-        CompareRemovedAnalysisValues("projects", baseline.Analysis.Projects, current.Analysis.Projects);
-        CompareRemovedAnalysisValues("source_roots", baseline.Analysis.SourceRoots, current.Analysis.SourceRoots);
+        CompareBoundedAnalysisChange("target_assemblies", baseline.Analysis.TargetAssemblies, current.Analysis.TargetAssemblies);
+        CompareBoundedAnalysisChange("projects", baseline.Analysis.Projects, current.Analysis.Projects);
+        CompareBoundedAnalysisChange("source_roots", baseline.Analysis.SourceRoots, current.Analysis.SourceRoots);
         CompareProjectGlobChange("project_include", baseline.Analysis.ProjectInclude, current.Analysis.ProjectInclude);
         CompareProjectGlobChange("project_exclude", baseline.Analysis.ProjectExclude, current.Analysis.ProjectExclude);
 
-        void CompareRemovedAnalysisValues(string name, IReadOnlyList<string> baseValues, IReadOnlyList<string> currentValues)
+        void CompareBoundedAnalysisChange(string name, IReadOnlyList<string> baseValues, IReadOnlyList<string> currentValues)
         {
-            string[] removed = baseValues.Except(currentValues, _comparer).OrderBy(value => value, _comparer).ToArray();
-            if (removed.Length > 0)
+            if (baseValues.OrderBy(value => value, _comparer).SequenceEqual(currentValues.OrderBy(value => value, _comparer), _comparer))
             {
-                findings.Add(CreateFinding(
-                    "analysis_scope_input_removed",
-                    "analysis:" + name,
-                    "semantic",
-                    current.Guardrails.PolicyWeakening,
-                    removed,
-                    currentValues,
-                    null,
-                    null,
-                    Array.Empty<string>(),
-                    null));
+                return;
             }
+
+            findings.Add(CreateFinding(
+                "analysis_" + name + "_impact_not_proven",
+                "analysis:" + name,
+                "impact_not_proven",
+                current.Guardrails.PolicyWeakening,
+                baseValues,
+                currentValues,
+                null,
+                null,
+                Array.Empty<string>(),
+                "Analysis inputs may be expanded by project discovery or scanner defaults; context artifacts do not prove their effective analysed membership."));
         }
 
         void CompareProjectGlobChange(string name, IReadOnlyList<string> baseValues, IReadOnlyList<string> currentValues)

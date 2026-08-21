@@ -51,6 +51,9 @@ baseline for existing code.
 The same bounded rule applies to `project_include` and `project_exclude`: they
 are project-discovery globs, not literal project inventories. A changed glob
 is reviewable `impact_not_proven` unless resolved project membership is present.
+The authored `target_assemblies`, `projects`, and `source_roots` fields are
+also bounded: discovery and scanner defaults can make textual removal an
+effective expansion, so context-only comparison cannot classify it as semantic.
 In contrast, a source set or source expansion changing from required to
 optional/empty-tolerant, and an ignored violation whose typed `source_type` and
 `forbidden_reference` matchers are both `*`, are provable semantic relaxations.

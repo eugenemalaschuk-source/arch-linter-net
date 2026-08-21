@@ -36,6 +36,9 @@ literal-string inventories. Prefix/glob/call-pattern facts and cross-field
 location unions are also `impact_not_proven` until their effective membership
 or containment is proven. A required source expansion made empty-tolerant is a
 semantic finding.
+Changes to authored analysis `target_assemblies`, `projects`, and `source_roots`
+are likewise `impact_not_proven` until effective discovery/scanner scope is
+available as trusted evidence.
 
 Human, JSON, and SARIF project that same result. JSON is suitable for CI and
 SARIF uses one `ArchLinterNet.PolicyWeakening.<kind>` rule for each weakening

@@ -92,7 +92,7 @@ public sealed class ArchitecturePolicyWeakeningComparerTests
         Assert.That(result.Findings.Select(finding => finding.Kind), Is.EquivalentTo(new[]
         {
             "analysis_project_exclude_impact_not_proven",
-            "analysis_scope_input_removed",
+            "analysis_projects_impact_not_proven",
             "scope_inventory_narrowed",
             "source_set_member_removed",
             "typed_fact_impact_not_proven",
@@ -212,6 +212,37 @@ public sealed class ArchitecturePolicyWeakeningComparerTests
                 "analysis_project_include_impact_not_proven",
             }));
             Assert.That(result.Findings.All(finding => finding.Classification == "impact_not_proven"), Is.True);
+        });
+    }
+
+    [TestCase("src/Core", "src")]
+    [TestCase("src", "")]
+    public void Compare_SourceRootChange_IsImpactNotProvenWithoutEffectiveScopeEvidence(string baselineRoot, string currentRoot)
+    {
+        ArchitecturePolicyWeakeningFinding finding = ArchitecturePolicyWeakeningComparer.Compare(new(
+            Context(analysis: Analysis(sourceRoots: [baselineRoot])),
+            Context(analysis: Analysis(sourceRoots: string.IsNullOrEmpty(currentRoot) ? [] : [currentRoot])))).Findings.Single();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(finding.Kind, Is.EqualTo("analysis_source_roots_impact_not_proven"));
+            Assert.That(finding.Classification, Is.EqualTo("impact_not_proven"));
+            Assert.That(finding.AffectedSubjects, Is.Empty);
+        });
+    }
+
+    [Test]
+    public void Compare_TargetAssembliesChangedToEmptyAuthoredList_IsImpactNotProvenWithoutEffectiveScopeEvidence()
+    {
+        ArchitecturePolicyWeakeningFinding finding = ArchitecturePolicyWeakeningComparer.Compare(new(
+            Context(analysis: Analysis(targetAssemblies: ["Sample.Host"])),
+            Context(analysis: Analysis()))).Findings.Single();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(finding.Kind, Is.EqualTo("analysis_target_assemblies_impact_not_proven"));
+            Assert.That(finding.Classification, Is.EqualTo("impact_not_proven"));
+            Assert.That(finding.AffectedSubjects, Is.Empty);
         });
     }
 
@@ -499,9 +530,12 @@ public sealed class ArchitecturePolicyWeakeningComparerTests
         []);
 
     private static ArchitecturePolicyContextAnalysis Analysis(
+        IReadOnlyList<string>? targetAssemblies = null,
         IReadOnlyList<string>? projects = null,
         IReadOnlyList<string>? projectInclude = null,
-        IReadOnlyList<string>? projectExclude = null) => new([], projects ?? [], projectInclude ?? [], projectExclude ?? [], []);
+        IReadOnlyList<string>? projectExclude = null,
+        IReadOnlyList<string>? sourceRoots = null) => new(
+        targetAssemblies ?? [], projects ?? [], projectInclude ?? [], projectExclude ?? [], sourceRoots ?? []);
 
     private static ArchitecturePolicyContextContract Contract(
         string mode,

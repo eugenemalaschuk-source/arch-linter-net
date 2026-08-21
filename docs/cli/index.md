@@ -124,6 +124,10 @@ prohibitions. Prefix/glob/call-pattern facts and cross-field location unions
 remain `impact_not_proven` until membership or containment is proven. No
 unsupported typed fact receives invented affected subjects.
 
+`target_assemblies`, `projects`, and `source_roots` are also bounded analysis
+inputs: the artifact does not prove discovery-seeded values, path containment,
+or empty-root scanner defaults, so a change is `impact_not_proven`.
+
 ## Validate options
 
 | Option | Description | Default |
