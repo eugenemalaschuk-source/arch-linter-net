@@ -10,6 +10,7 @@ Internal repository-maintenance instructions, backlog governance, issue-writing 
 
 - [Agent Guide](agent-guide.md) — investigation workflow before editing a policy.
 - [Policy Authoring Guide](policy-authoring-guide.md) — YAML authoring rules.
+- [Policy Weakening Review](policy-weakening-review.md) — change-time guardrail guidance.
 - [Semantic-role governance](semantic-role-governance.md) — AI-first workflow, diagnostics, examples, and safe exceptions for semantic roles.
 - [Semantic role catalog](../policy-format/semantic-role-catalog.md) — reviewed role and metadata vocabulary for future semantic policies.
 - [Capabilities](capabilities.md) — supported contract families and limits.

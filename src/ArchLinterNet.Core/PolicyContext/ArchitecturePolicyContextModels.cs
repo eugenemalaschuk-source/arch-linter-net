@@ -12,6 +12,8 @@ public sealed record ArchitecturePolicyContextExport(
     int SchemaVersion,
     string Kind,
     ArchitecturePolicyContextPolicy Policy,
+    ArchitecturePolicyContextGuardrails Guardrails,
+    ArchitecturePolicyContextAnalysis Analysis,
     IReadOnlyList<ArchitecturePolicyContextSource> Sources,
     IReadOnlyList<ArchitecturePolicyContextLayer> Layers,
     IReadOnlyList<ArchitecturePolicyContextContract> Contracts,
@@ -21,10 +23,25 @@ public sealed record ArchitecturePolicyContextExport(
     IReadOnlyList<ArchitecturePolicyContextSourceSet> SourceSets,
     IReadOnlyList<ArchitecturePolicyContextSourceExpansion> SourceExpansions,
     IReadOnlyList<ArchitecturePolicyContextException> Exceptions,
-    IReadOnlyList<string> Guidance);
+    IReadOnlyList<string> Guidance)
+{
+    /// <summary>Current supported policy-context schema version.</summary>
+    public const int CurrentSchemaVersion = 3;
+}
 
 /// <summary>Identifies the effective policy that produced a context export.</summary>
 public sealed record ArchitecturePolicyContextPolicy(string Name, int Version, string RootPath, bool HasImports);
+
+/// <summary>Explicit policy configuration for change-time architecture guardrails.</summary>
+public sealed record ArchitecturePolicyContextGuardrails(string PolicyWeakening);
+
+/// <summary>Typed static analysis inputs that define declared governed scope.</summary>
+public sealed record ArchitecturePolicyContextAnalysis(
+    IReadOnlyList<string> TargetAssemblies,
+    IReadOnlyList<string> Projects,
+    IReadOnlyList<string> ProjectInclude,
+    IReadOnlyList<string> ProjectExclude,
+    IReadOnlyList<string> SourceRoots);
 
 /// <summary>Describes one portable source contributing to the effective policy.</summary>
 public sealed record ArchitecturePolicyContextSource(
@@ -145,7 +162,14 @@ public sealed record ArchitecturePolicyContextException(
     string Subject,
     string Kind,
     string Details,
-    string? Reason);
+    string? Reason)
+{
+    /// <summary>Gets the typed matcher evidence when this is an ignored-violation exception.</summary>
+    public ArchitecturePolicyContextIgnoredViolation? IgnoredViolation { get; init; }
+}
+
+/// <summary>Typed source and forbidden-reference matchers for an ignored violation.</summary>
+public sealed record ArchitecturePolicyContextIgnoredViolation(string SourceType, string ForbiddenReference);
 
 /// <summary>Describes a portable location in the effective policy graph.</summary>
 public sealed record ArchitecturePolicyContextProvenance(
