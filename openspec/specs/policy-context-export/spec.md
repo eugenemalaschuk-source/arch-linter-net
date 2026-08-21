@@ -25,7 +25,8 @@ invoke project or assembly analysis, or change validation behavior.
 
 ### Requirement: Context contains compact architecture facts and bounded guidance
 The context SHALL include the policy identity; active contract IDs and names;
-contract modes and families; layers and selectors; declared semantic roles and
+contract modes and families; layers and selectors; each port boundary's typed
+adapter bindings (adapter, expected port, and allowed contexts); declared semantic roles and
 metadata keys; declared context values; coverage scopes; important exclusions;
 and portable authored/effective provenance where available. It SHALL include
 only reviewed, static-analysis-safe guidance that tells agents to inspect
@@ -36,7 +37,7 @@ and keep human review.
 - **WHEN** a policy declares Sales, Catalog, and SharedKernel semantic roles,
   contextual contracts, semantic coverage, and a narrow exception
 - **THEN** the context names the declared roles, metadata/context values,
-  contract IDs, coverage scope, exception, and portable source provenance
+  contract IDs, port adapter bindings, coverage scope, exception, and portable source provenance
 
 #### Scenario: Unity/client policy context exposes client classification
 - **WHEN** a policy declares Unity player and editor roles with namespace or

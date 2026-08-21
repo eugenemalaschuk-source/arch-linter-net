@@ -54,6 +54,7 @@ public sealed record ArchitecturePolicyContextContract(
     string? Reason,
     IReadOnlyList<ArchitecturePolicyContextReference> References,
     IReadOnlyList<ArchitecturePolicyContextSelector> Selectors,
+    IReadOnlyList<ArchitecturePolicyContextAdapterBinding> AdapterBindings,
     IReadOnlyList<ArchitecturePolicyContextSelector> Exclusions,
     IReadOnlyList<string> CoverageScopes,
     ArchitecturePolicyContextProvenance? Provenance);
@@ -67,6 +68,12 @@ public sealed record ArchitecturePolicyContextSelector(
     string Role,
     IReadOnlyDictionary<string, string> Metadata,
     string? When);
+
+/// <summary>Describes one reviewed adapter-to-port binding in a port boundary.</summary>
+public sealed record ArchitecturePolicyContextAdapterBinding(
+    ArchitecturePolicyContextSelector Adapter,
+    ArchitecturePolicyContextSelector ExpectedPort,
+    IReadOnlyList<ArchitecturePolicyContextSelector> AllowedContexts);
 
 /// <summary>Describes one semantic classification rule.</summary>
 public sealed record ArchitecturePolicyContextClassification(

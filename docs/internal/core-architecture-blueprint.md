@@ -205,6 +205,7 @@ Current inventory:
 | Interface | Category | Namespace |
 |---|---|---|
 | `IArchitectureValidationApplicationService`, `IArchitectureBaselineApplicationService` | Public/application seam | `ArchLinterNet.Core.Validation.Abstractions` |
+| `IArchitecturePolicyContextApplicationService` | Public/application seam | `ArchLinterNet.Core.PolicyContext.Abstractions` |
 | `ArchitectureContractChecker` delegate (+ `ArchitectureHandlerResult`) | Extension/plugin contract | `ArchLinterNet.Core.Execution.Abstractions` |
 | `IArchitectureContractExecutor` (+ `ArchitectureContractExecutionResult`), `IArchitectureRunnerSetupService` (+ `ArchitectureRunnerSetup`) | Public/application seam | `ArchLinterNet.Core.Execution.Abstractions` |
 | `IArchitectureContractHandlerRegistry`, `IArchitectureContractRunner` | Public/application seam (extracted from `ArchitectureContractHandlerRegistry`/`ArchitectureContractRunner` so the seam interfaces above don't take a concrete Execution type as a parameter or payload) | `ArchLinterNet.Core.Execution.Abstractions` |

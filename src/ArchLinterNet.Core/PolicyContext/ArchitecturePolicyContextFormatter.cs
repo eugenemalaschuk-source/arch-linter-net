@@ -93,6 +93,17 @@ public static class ArchitecturePolicyContextFormatter
                 markdown.AppendLine($"  - {FormatSelector(selector)}");
             }
 
+            foreach (ArchitecturePolicyContextAdapterBinding binding in contract.AdapterBindings)
+            {
+                markdown.AppendLine("  - adapter binding:");
+                markdown.AppendLine($"    - {FormatSelector(binding.Adapter)}");
+                markdown.AppendLine($"    - {FormatSelector(binding.ExpectedPort)}");
+                foreach (ArchitecturePolicyContextSelector allowedContext in binding.AllowedContexts)
+                {
+                    markdown.AppendLine($"    - {FormatSelector(allowedContext)}");
+                }
+            }
+
             foreach (string scope in contract.CoverageScopes)
             {
                 markdown.AppendLine($"  - coverage scope: `{Inline(scope)}`");

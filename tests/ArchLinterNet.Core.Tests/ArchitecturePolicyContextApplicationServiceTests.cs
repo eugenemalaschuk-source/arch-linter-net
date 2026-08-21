@@ -133,6 +133,82 @@ public sealed class ArchitecturePolicyContextApplicationServiceTests
         }
     }
 
+    [Test]
+    public void Export_PortBoundaryAdapterBindings_RetainsTheCompleteEffectivePolicyBinding()
+    {
+        string temporaryDirectory = Path.Combine(Path.GetTempPath(), $"arch-linter-policy-context-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(temporaryDirectory);
+        string policyPath = Path.Combine(temporaryDirectory, "policy.yml");
+        try
+        {
+            File.WriteAllText(policyPath, """
+                version: 1
+                name: Port Boundary Context
+                contracts:
+                  strict_port_boundaries:
+                    - id: sales-to-catalog-through-port
+                      name: sales-to-catalog-through-port
+                      source:
+                        role: ApplicationLayer
+                        metadata: { module: Sales }
+                      target_context:
+                        metadata: { module: Catalog }
+                      allowed_seams:
+                        - role: Port
+                          metadata: { module: Catalog }
+                      forbidden:
+                        - role: DomainLayer
+                          metadata: { module: Catalog }
+                      adapter_bindings:
+                        - adapter:
+                            role: Adapter
+                            metadata: { module: Catalog, transport: http }
+                          expected_port:
+                            role: Port
+                            metadata: { module: Catalog, direction: inbound }
+                          allowed_contexts:
+                            - role: ApplicationLayer
+                              metadata: { module: Sales }
+                            - role: DomainLayer
+                              metadata: { module: Sales }
+                      reason: Sales reaches Catalog only through the reviewed port.
+                """);
+
+            ArchitecturePolicyContextExport context = _engine.ExportPolicyContext(
+                new ArchitecturePolicyContextRequest { PolicyPath = policyPath });
+            ArchitecturePolicyContextContract boundary = context.Contracts.Single();
+            ArchitecturePolicyContextAdapterBinding binding = boundary.AdapterBindings.Single();
+            string json = ArchitecturePolicyContextFormatter.FormatAsJson(context);
+            string markdown = ArchitecturePolicyContextFormatter.FormatAsMarkdown(context);
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(binding.Adapter.Role, Is.EqualTo("Adapter"));
+                Assert.That(binding.Adapter.Metadata, Is.EqualTo(new Dictionary<string, string>
+                {
+                    ["module"] = "Catalog",
+                    ["transport"] = "http",
+                }));
+                Assert.That(binding.ExpectedPort.Role, Is.EqualTo("Port"));
+                Assert.That(binding.ExpectedPort.Metadata["direction"], Is.EqualTo("inbound"));
+                Assert.That(binding.AllowedContexts.Select(selector => selector.Role),
+                    Is.EqualTo(new[] { "ApplicationLayer", "DomainLayer" }));
+                Assert.That(context.SemanticRoles,
+                    Does.Contain("Adapter").And.Contain("Port").And.Contain("DomainLayer"));
+                Assert.That(context.Contexts.Single(value => value.Key == "transport").Values, Is.EqualTo(new[] { "http" }));
+                Assert.That(json, Does.Contain("\"adapter_bindings\""));
+                Assert.That(json, Does.Contain("\"expected_port\""));
+                Assert.That(json, Does.Contain("\"allowed_contexts\""));
+                Assert.That(markdown, Does.Contain("adapter binding:"));
+                Assert.That(markdown, Does.Contain("expected_port selector: role `Port`"));
+            });
+        }
+        finally
+        {
+            Directory.Delete(temporaryDirectory, recursive: true);
+        }
+    }
+
     private ArchitecturePolicyContextExport Export(string relativePolicyPath)
     {
         return _engine.ExportPolicyContext(new ArchitecturePolicyContextRequest

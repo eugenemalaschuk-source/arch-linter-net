@@ -140,6 +140,7 @@ public sealed class ArchitecturePolicyContextApplicationService(IArchitecturePol
                 ReadReason(descriptor.Contract),
                 ProjectReferences(descriptor.Contract),
                 ProjectSelectors(descriptor.Contract),
+                ProjectAdapterBindings(descriptor.Contract),
                 ProjectExclusionSelectors(descriptor.Contract),
                 descriptor.Contract is ArchitectureCoverageContract coverage ? [coverage.Scope] : Array.Empty<string>(),
                 ProjectProvenance(provenance.LocationFor(descriptor.Contract))))
@@ -208,6 +209,18 @@ public sealed class ArchitecturePolicyContextApplicationService(IArchitecturePol
         };
     }
 
+    private static IReadOnlyList<ArchitecturePolicyContextAdapterBinding> ProjectAdapterBindings(
+        IArchitectureContract contract)
+    {
+        return contract is ArchitecturePortBoundaryContract value
+            ? value.AdapterBindings.Select(binding => new ArchitecturePolicyContextAdapterBinding(
+                ProjectSelector("adapter", binding.Adapter),
+                ProjectSelector("expected_port", binding.ExpectedPort),
+                binding.AllowedContexts.Select(context => ProjectSelector("allowed_context", context)).ToArray()))
+                .ToArray()
+            : Array.Empty<ArchitecturePolicyContextAdapterBinding>();
+    }
+
     private static IReadOnlyList<ArchitecturePolicyContextSelector> ProjectExclusionSelectors(IArchitectureContract contract)
     {
         return contract switch
@@ -238,7 +251,7 @@ public sealed class ArchitecturePolicyContextApplicationService(IArchitecturePol
     {
         return layers.Select(layer => layer.Selector?.Role)
             .Concat(classification.Select(item => item.Role))
-            .Concat(contracts.SelectMany(contract => contract.Selectors.Select(selector => selector.Role)))
+            .Concat(contracts.SelectMany(ContractSelectors).Select(selector => selector.Role))
             .Where(role => !string.IsNullOrWhiteSpace(role))
             .Select(role => role!)
             .Distinct(StringComparer.Ordinal)
@@ -255,7 +268,7 @@ public sealed class ArchitecturePolicyContextApplicationService(IArchitecturePol
             .Where(layer => layer.Selector is not null)
             .Select(layer => layer.Selector!.Metadata)
             .Concat(classification.Select(item => item.Metadata))
-            .Concat(contracts.SelectMany(contract => contract.Selectors.Select(selector => selector.Metadata)));
+            .Concat(contracts.SelectMany(ContractSelectors).Select(selector => selector.Metadata));
 
         return metadata.SelectMany(values => values)
             .GroupBy(item => item.Key, StringComparer.Ordinal)
@@ -264,6 +277,15 @@ public sealed class ArchitecturePolicyContextApplicationService(IArchitecturePol
                 group.Key,
                 group.Select(item => item.Value).Distinct(StringComparer.Ordinal).OrderBy(value => value, StringComparer.Ordinal).ToArray()))
             .ToArray();
+    }
+
+    private static IEnumerable<ArchitecturePolicyContextSelector> ContractSelectors(
+        ArchitecturePolicyContextContract contract)
+    {
+        return contract.Selectors
+            .Concat(contract.AdapterBindings.Select(binding => binding.Adapter))
+            .Concat(contract.AdapterBindings.Select(binding => binding.ExpectedPort))
+            .Concat(contract.AdapterBindings.SelectMany(binding => binding.AllowedContexts));
     }
 
     private static IReadOnlyList<ArchitecturePolicyContextException> ProjectExceptions(

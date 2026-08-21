@@ -4,18 +4,26 @@
 Define and enforce ArchLinterNet's own internal validation-pipeline boundaries (application seam, contract execution, diagnostics, resolution, scanning) through the repository's architecture policy and acceptance gate, so the post-#69 split does not regress into central orchestration coupling.
 ## Requirements
 ### Requirement: Repository governs its own internal validation-pipeline boundaries
-The repository's architecture contract (`architecture/dependencies.arch.yml`) SHALL declare namespace layers for `ArchLinterNet.Core.Model`, `ArchLinterNet.Core.Reporting`, `ArchLinterNet.Core.Resolution`, `ArchLinterNet.Core.Contracts`, `ArchLinterNet.Core.Execution`, `ArchLinterNet.Core.Validation`, and `ArchLinterNet.Core.Asmdef`, in addition to the package-level layers (`core`, `core_scanning`, `cli`, `testing`).
+The repository's architecture contract (`architecture/dependencies.arch.yml`) SHALL declare namespace layers for `ArchLinterNet.Core.Model`, `ArchLinterNet.Core.Reporting`, `ArchLinterNet.Core.Resolution`, `ArchLinterNet.Core.Contracts`, `ArchLinterNet.Core.Execution`, `ArchLinterNet.Core.PolicyContext`, `ArchLinterNet.Core.Validation`, and `ArchLinterNet.Core.Asmdef`, in addition to the package-level layers (`core`, `core_scanning`, `cli`, `testing`).
 
 #### Scenario: Internal layers are declared
 - **WHEN** the policy file is loaded
-- **THEN** it defines a layer for each of `Core.Model`, `Core.Reporting`, `Core.Resolution`, `Core.Contracts`, `Core.Execution`, `Core.Validation`, and `Core.Asmdef`
+- **THEN** it defines a layer for each of `Core.Model`, `Core.Reporting`, `Core.Resolution`, `Core.Contracts`, `Core.Execution`, `Core.PolicyContext`, `Core.Validation`, and `Core.Asmdef`
 
 ### Requirement: CLI must use the application seam
-`ArchLinterNet.Cli` SHALL NOT depend directly on `ArchLinterNet.Core.Execution`, `ArchLinterNet.Core.Contracts`, `ArchLinterNet.Core.Resolution`, or `ArchLinterNet.Core.Scanning`. It SHALL route validation and baseline-generation behavior through `ArchLinterNet.Core.Validation`.
+`ArchLinterNet.Cli` SHALL NOT depend directly on `ArchLinterNet.Core.Execution`, `ArchLinterNet.Core.Contracts`, `ArchLinterNet.Core.Resolution`, or `ArchLinterNet.Core.Scanning`. It SHALL route validation and baseline-generation behavior through `ArchLinterNet.Core.Validation` and effective-policy context exports through `ArchLinterNet.Core.PolicyContext`.
 
 #### Scenario: CLI depends only on the seam and shared leaves
 - **WHEN** `ArchLinterNet.Cli` source is scanned for namespace references
-- **THEN** it references only `ArchLinterNet.Core.Model`, `ArchLinterNet.Core.Reporting`, and `ArchLinterNet.Core.Validation` from Core
+- **THEN** it references only `ArchLinterNet.Core.Model`, `ArchLinterNet.Core.Reporting`, `ArchLinterNet.Core.Validation`, and `ArchLinterNet.Core.PolicyContext` from Core
+
+### Requirement: Policy context is an application seam above execution
+`ArchLinterNet.Core.PolicyContext` SHALL project effective policy facts through the Contracts and Execution seams. It SHALL NOT depend on host adapters or directly on scanning, discovery, resolution, or IO implementation seams.
+
+#### Scenario: Policy context stays within its declared seam
+- **WHEN** `ArchLinterNet.Core.PolicyContext` source is scanned for namespace references
+- **THEN** it may depend on `ArchLinterNet.Core.Contracts`, `ArchLinterNet.Core.Execution`, and `ArchLinterNet.Core.Model`
+- **AND** it does not reference `ArchLinterNet.Cli`, `ArchLinterNet.Testing`, `ArchLinterNet.Core.Scanning`, `ArchLinterNet.Core.Discovery`, `ArchLinterNet.Core.Resolution`, or `ArchLinterNet.Core.IO`
 
 ### Requirement: Contract execution does not depend on hosts
 `ArchLinterNet.Core.Execution` (including contract handlers) SHALL NOT depend on `ArchLinterNet.Cli` or `ArchLinterNet.Testing`.
@@ -278,4 +286,3 @@ plausible but is not executable. A family SHALL NOT be enabled solely to claim d
 #### Scenario: A new contract family is added to the engine
 - **WHEN** a change adds a contract family to the engine
 - **THEN** the capability matrix gains a row with that family's decision and rationale
-
