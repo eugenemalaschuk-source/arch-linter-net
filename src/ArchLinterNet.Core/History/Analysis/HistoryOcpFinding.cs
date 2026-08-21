@@ -18,6 +18,9 @@ internal sealed class OcpTaskRepeatedEdit(
 
 internal sealed class OcpRawEvidence(
     int independentTaskSpread,
+    int ordinaryTaskKeySpread,
+    long churn,
+    int commitCount,
     int incidentCommitDegree,
     int incidentTaskDegree,
     int repeatedEditTotal,
@@ -28,6 +31,12 @@ internal sealed class OcpRawEvidence(
     IReadOnlyList<string> roleTokens)
 {
     public int IndependentTaskSpread { get; } = independentTaskSpread;
+
+    public int OrdinaryTaskKeySpread { get; } = ordinaryTaskKeySpread;
+
+    public long Churn { get; } = churn;
+
+    public int CommitCount { get; } = commitCount;
 
     public int IncidentCommitDegree { get; } = incidentCommitDegree;
 

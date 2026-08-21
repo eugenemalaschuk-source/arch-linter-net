@@ -14,13 +14,23 @@ internal sealed class HistoryOcpScorer
         "command", "diagnostic", "mapper", "dto", "model", "service", "orchestrator",
     };
 
-    public HistoryOcpAnalysis Score(HistoryBottleneckAnalysis bottleneckAnalysis, HistoryAnalysisConfiguration configuration)
+    public HistoryOcpAnalysis Score(
+        HistoryBottleneckAnalysis bottleneckAnalysis,
+        CoChangeGraph coChangeGraph,
+        HistoryAnalysisConfiguration configuration)
     {
         ArgumentNullException.ThrowIfNull(bottleneckAnalysis);
+        ArgumentNullException.ThrowIfNull(coChangeGraph);
         ArgumentNullException.ThrowIfNull(configuration);
 
         OcpWeights weights = Weights(configuration.Weights.Ocp);
-        List<Candidate> candidates = bottleneckAnalysis.Findings.Select(CreateCandidate).ToList();
+        IReadOnlyDictionary<string, LogicalFile> filesByPath = coChangeGraph.Vertices.ToDictionary(
+            static vertex => vertex.CanonicalPath,
+            static vertex => vertex.File,
+            StringComparer.Ordinal);
+        List<Candidate> candidates = bottleneckAnalysis.Findings
+            .Select(finding => CreateCandidate(finding, filesByPath[finding.CanonicalPath]))
+            .ToList();
         List<HistoryOcpCategoryGroup> groups = [];
         foreach (IGrouping<HistoryPathCategory, Candidate> category in candidates.GroupBy(static candidate => candidate.Bottleneck.Category)
                      .OrderBy(static group => group.Key))
@@ -104,7 +114,7 @@ internal sealed class HistoryOcpScorer
         return findings;
     }
 
-    private static Candidate CreateCandidate(HistoryBottleneckFinding bottleneck)
+    private static Candidate CreateCandidate(HistoryBottleneckFinding bottleneck, LogicalFile file)
     {
         Dictionary<TaskKey, HashSet<string>> qualifyingByTask = [];
         foreach (BottleneckTaskPair pair in bottleneck.RawEvidence.IndependentTaskPairs)
@@ -123,6 +133,9 @@ internal sealed class HistoryOcpScorer
             bottleneck,
             new OcpRawEvidence(
                 bottleneck.RawEvidence.IndependentTaskSpread,
+                bottleneck.RawEvidence.TaskKeys.Count,
+                file.Churn,
+                file.CommitCount,
                 bottleneck.RawEvidence.IncidentCommitDegree,
                 bottleneck.RawEvidence.IncidentTaskDegree,
                 repeatedTotal,
@@ -158,7 +171,25 @@ internal sealed class HistoryOcpScorer
     private static int CompareFindings(HistoryOcpFinding left, HistoryOcpFinding right)
     {
         int byScore = right.Score.CompareTo(left.Score);
-        return byScore != 0 ? byScore : GitPathDecoder.CompareScalarValue(left.CanonicalPath, right.CanonicalPath);
+        if (byScore != 0)
+        {
+            return byScore;
+        }
+
+        int byTaskSpread = right.RawEvidence.OrdinaryTaskKeySpread.CompareTo(left.RawEvidence.OrdinaryTaskKeySpread);
+        if (byTaskSpread != 0)
+        {
+            return byTaskSpread;
+        }
+
+        int byChurn = right.RawEvidence.Churn.CompareTo(left.RawEvidence.Churn);
+        if (byChurn != 0)
+        {
+            return byChurn;
+        }
+
+        int byCommitCount = right.RawEvidence.CommitCount.CompareTo(left.RawEvidence.CommitCount);
+        return byCommitCount != 0 ? byCommitCount : GitPathDecoder.CompareScalarValue(left.CanonicalPath, right.CanonicalPath);
     }
 
     private static string FilenameStem(string path)

@@ -144,6 +144,69 @@ public sealed class HistoryOcpScorerTests
     }
 
     [Test]
+    public void EqualScoresUseOrdinaryTaskSpreadChurnAndCommitCountBeforePath()
+    {
+        using GitTestRepository repository = GitTestRepository.Create();
+        repository.Write("A.cs", "base\n");
+        repository.Write("B.cs", "base\n");
+        repository.Write("C.cs", "base\n");
+        repository.Write("D.cs", "base\n");
+        string first = repository.Commit("base");
+
+        repository.Write("A.cs", "base\na\n");
+        repository.Commit("a #1");
+        repository.Write("B.cs", "base\nb\n");
+        repository.Commit("b #1");
+        repository.Write("B.cs", "base\nb\nc\n");
+        repository.Commit("b #2");
+        repository.Write("C.cs", "base\nc\nd\n");
+        repository.Commit("c #1");
+        repository.Write("C.cs", "base\nc\nd\ne\n");
+        repository.Commit("c #2");
+        repository.Write("D.cs", "base\nd\n");
+        repository.Commit("d #1");
+        repository.Write("D.cs", "base\nd\ne\n");
+        repository.Commit("d #2");
+        repository.Write("D.cs", "base\nd\ne\nf\n");
+        string last = repository.Commit("d #1");
+
+        var configuration = new HistoryAnalysisConfiguration
+        {
+            Weights = new HistoryAnalysisWeightProfiles
+            {
+                Ocp = new HistoryOcpWeightProfile
+                {
+                    IndependentTask = 0m,
+                    Centrality = 0m,
+                    RepeatedEdit = 0m,
+                    RoleHint = 1m,
+                },
+            },
+        };
+
+        HistoryOcpAnalysis analysis = HistoryIngestionFixture.Succeed(repository, first, last, configuration).OcpAnalysis;
+
+        Assert.That(analysis.Findings.Select(static finding => finding.CanonicalPath), Is.EqualTo(new[] { "D.cs", "C.cs", "B.cs", "A.cs" }));
+    }
+
+    [Test]
+    public void IgnoredLogicalFilesDoNotProduceOcpFindings()
+    {
+        using GitTestRepository repository = GitTestRepository.Create();
+        repository.Write("ignored/X.cs", "base\n");
+        repository.Write("Y.cs", "base\n");
+        string first = repository.Commit("base");
+        repository.Write("ignored/X.cs", "changed\n");
+        repository.Write("Y.cs", "changed\n");
+        string last = repository.Commit("change #1");
+        var configuration = new HistoryAnalysisConfiguration { Ignore = ["ignored/**"] };
+
+        HistoryOcpAnalysis analysis = HistoryIngestionFixture.Succeed(repository, first, last, configuration).OcpAnalysis;
+
+        Assert.That(analysis.Findings.Select(static finding => finding.CanonicalPath), Is.EqualTo(new[] { "Y.cs" }));
+    }
+
+    [Test]
     public void JsonExposesOcpEvidenceAndPathnameReuseCaveat()
     {
         using GitTestRepository repository = GitTestRepository.Create();
