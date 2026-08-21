@@ -58,6 +58,12 @@ contracts:
       forbidden: [cli, testing]
       reason: Contract execution and handler internals must stay usable from any host and must not couple back to a specific CLI or testing adapter.
 
+    - name: core-policy-context-must-not-depend-on-hosts-or-internal-implementation-seams
+      id: core-policy-context-must-not-depend-on-hosts-or-internal-implementation-seams
+      source: core_policy_context
+      forbidden: [cli, testing, core_scanning, core_discovery, core_resolution, core_io]
+      reason: Policy context is a Core application seam that projects effective policy facts through Contracts and Execution without coupling to hosts or protected loading, scanning, discovery, and IO implementation details.
+
     - name: core-graph-must-not-depend-on-hosts
       id: core-graph-must-not-depend-on-hosts
       source: core_graph
@@ -151,9 +157,10 @@ contracts:
       layers:
         - cli
         - core_validation
+        - core_policy_context
         - core_execution
         - core_model
-      reason: CLI calls the Core.Validation application seam, which orchestrates Core.Execution, which ultimately rests on Core.Model.
+      reason: CLI calls the Core.Validation or Core.PolicyContext application seam; both orchestrate Core.Execution, which ultimately rests on Core.Model.
 
   strict_cycles:
     - name: package-cycles

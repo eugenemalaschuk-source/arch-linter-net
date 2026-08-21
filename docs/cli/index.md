@@ -12,6 +12,7 @@ arch-linter-net baseline prune --config <path> --baseline <path> --output <path>
 arch-linter-net baseline diff --config <path> --baseline <path> [options]
 arch-linter-net baseline verify --config <path> --baseline <path> [options]
 arch-linter-net policy check --policy <path> [options]
+arch-linter-net policy context --policy <path> [options]
 arch-linter-net schema list
 arch-linter-net schema print <logical-id>
 arch-linter-net change snapshot --policy <path> --output <path> [options]
@@ -55,6 +56,25 @@ arch-linter-net policy check --policy architecture/dependencies.arch.yml --forma
 ```
 
 The command exits `0` for valid static policy/configuration and reports fact-dependent validation as explicit deferred checks. Invalid policy/configuration exits `2`.
+
+## Policy context
+
+`policy context` exports a compact, deterministic summary of the selected
+effective policy for AI coding agents and PR instructions. It follows the
+normal policy import/composition path, but it does not build projects, load
+target assemblies, or validate architecture results.
+
+```bash
+arch-linter-net policy context --policy architecture/dependencies.arch.yml --format json
+arch-linter-net policy context --policy architecture/dependencies.arch.yml --format markdown
+```
+
+The JSON document has `schema_version: 1` and kind
+`architecture-policy-context`. Both formats include declared layers and
+selectors, active contract IDs/names, semantic roles and contexts, coverage
+scopes, narrow exceptions, portable policy provenance, and safe review
+guidance. The default format is `markdown`; use it as pre-edit context, then
+run normal architecture validation after making a change.
 
 ## Validate options
 

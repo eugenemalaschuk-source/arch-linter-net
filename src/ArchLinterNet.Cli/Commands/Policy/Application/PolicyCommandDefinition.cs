@@ -2,27 +2,21 @@ using System.CommandLine;
 
 namespace ArchLinterNet.Cli.Commands.Policy.Application;
 
-internal sealed class PolicyCommandDefinition(PolicyCheckCommandHandler handler)
+internal sealed class PolicyCommandDefinition(PolicyCheckCommandHandler checkHandler, PolicyContextCommandHandler contextHandler)
 {
     public const string HelpText =
         """
-        arch-linter-net policy check — validate policy and static configuration
+        arch-linter-net policy — inspect or validate policy configuration
 
         Usage:
           arch-linter-net policy check --policy <path> [options]
+          arch-linter-net policy context --policy <path> [options]
 
-        This command does not invoke MSBuild, evaluate projects, load target assemblies,
-        or claim that the architecture is clean.
+        `check` validates policy and static configuration without architecture analysis.
+        `context` summarizes effective policy facts for coding agents without project or assembly analysis.
 
         Options:
-          -p, --policy <path>   Path to YAML contract file
-                                (default: architecture/dependencies.arch.yml)
-          -f, --format <fmt>    Output format: human, json, or sarif (default: human)
           -h, --help            Show this help message
-
-        Exit codes:
-          0   Policy and static configuration are valid; fact-dependent checks may be deferred
-          2   Invalid arguments or policy/configuration error
         """;
 
     public Command Create()
@@ -41,11 +35,31 @@ internal sealed class PolicyCommandDefinition(PolicyCheckCommandHandler handler)
         check.Options.Add(policyOption);
         check.Options.Add(formatOption);
         check.Options.Add(helpOption);
-        check.SetAction(parseResult => handler.Execute(new PolicyCheckCommandOptions(
+        check.SetAction(parseResult => checkHandler.Execute(new PolicyCheckCommandOptions(
             parseResult.GetValue(policyOption) ?? "architecture/dependencies.arch.yml",
             parseResult.GetValue(formatOption) ?? "human",
             parseResult.GetValue(helpOption))));
+
+        Command context = new("context");
+        Option<string> contextPolicyOption = new("--policy");
+        contextPolicyOption.Aliases.Add("-p");
+        contextPolicyOption.DefaultValueFactory = _ => "architecture/dependencies.arch.yml";
+        Option<string> contextFormatOption = new("--format");
+        contextFormatOption.Aliases.Add("-f");
+        contextFormatOption.DefaultValueFactory = _ => "markdown";
+        Option<bool> contextHelpOption = new("--help");
+        contextHelpOption.Aliases.Add("-h");
+
+        context.Options.Add(contextPolicyOption);
+        context.Options.Add(contextFormatOption);
+        context.Options.Add(contextHelpOption);
+        context.SetAction(parseResult => contextHandler.Execute(new PolicyContextCommandOptions(
+            parseResult.GetValue(contextPolicyOption) ?? "architecture/dependencies.arch.yml",
+            parseResult.GetValue(contextFormatOption) ?? "markdown",
+            parseResult.GetValue(contextHelpOption))));
+
         policy.Subcommands.Add(check);
+        policy.Subcommands.Add(context);
         return policy;
     }
 }

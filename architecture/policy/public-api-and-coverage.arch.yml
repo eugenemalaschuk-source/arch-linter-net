@@ -58,6 +58,7 @@ contracts:
         - cli-must-use-validation-application-seam
         - testing-must-use-validation-application-seam
         - core-execution-must-not-depend-on-hosts
+        - core-policy-context-must-not-depend-on-hosts-or-internal-implementation-seams
         - core-reporting-stays-a-diagnostics-leaf
         - core-model-stays-independent
         - core-io-stays-independent

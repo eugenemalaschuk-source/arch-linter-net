@@ -42,6 +42,9 @@ public sealed partial class ProtectedContractTests
                 // ArchitectureExplainApplicationService) orchestrate Core.Execution the same way
                 // Validation does, so Graph is expected to import Execution too.
                 ["graph"] = new() { Namespace = "ArchLinterNet.Core.Graph" },
+                // PolicyContext is an application seam that projects effective policy through
+                // Execution's catalog, so this real-assembly fixture allows that importer too.
+                ["policy_context"] = new() { Namespace = "ArchLinterNet.Core.PolicyContext" },
                 ["execution"] = new() { Namespace = "ArchLinterNet.Core.Execution" }
             },
             Analysis = new ArchitectureAnalysisConfiguration
@@ -60,7 +63,7 @@ public sealed partial class ProtectedContractTests
                     {
                         Name = "execution-is-protected",
                         Protected = new List<string> { "execution" },
-                        AllowedImporters = new List<string> { "test_area", "validation", "composition", "graph" }
+                        AllowedImporters = new List<string> { "test_area", "validation", "composition", "graph", "policy_context" }
                     }
                 }
             }
@@ -289,11 +292,12 @@ public sealed partial class ProtectedContractTests
             {
                 ["test_area"] = new() { Namespace = "ArchLinterNet.Core.Tests" },
                 // See CheckProtectedContract_AllowedImporter_NoViolations for why "validation",
-                // "composition", and "graph" must be allowed importers of "execution" in this
-                // real-assembly fixture.
+                // "composition", "graph", and "policy_context" must be allowed importers of
+                // "execution" in this real-assembly fixture.
                 ["validation"] = new() { Namespace = "ArchLinterNet.Core.Validation" },
                 ["composition"] = new() { Namespace = "ArchLinterNet.Core.Composition" },
                 ["graph"] = new() { Namespace = "ArchLinterNet.Core.Graph" },
+                ["policy_context"] = new() { Namespace = "ArchLinterNet.Core.PolicyContext" },
                 ["execution"] = new() { Namespace = "ArchLinterNet.Core.Execution" }
             },
             Analysis = new ArchitectureAnalysisConfiguration
@@ -318,7 +322,7 @@ public sealed partial class ProtectedContractTests
                     {
                         Name = "execution-allowed-for-test",
                         Protected = new List<string> { "execution" },
-                        AllowedImporters = new List<string> { "test_area", "validation", "composition", "graph" }
+                        AllowedImporters = new List<string> { "test_area", "validation", "composition", "graph", "policy_context" }
                     }
                 }
             }

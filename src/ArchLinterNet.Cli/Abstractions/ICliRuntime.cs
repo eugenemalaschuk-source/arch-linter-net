@@ -1,6 +1,7 @@
 using ArchLinterNet.Core.BuildState;
 using ArchLinterNet.Core.Graph;
 using ArchLinterNet.Core.Model;
+using ArchLinterNet.Core.PolicyContext;
 using ArchLinterNet.Core.Reporting;
 using ArchLinterNet.Core.Validation;
 
@@ -227,6 +228,15 @@ internal interface ICliRuntime
     PublicApiUpdateOutcome UpdatePublicApi(PublicApiUpdateRequest request);
 
     PublicApiMigrateOutcome MigratePublicApi(PublicApiMigrateRequest request);
+
+    ArchitecturePolicyContextExport ExportPolicyContext(ArchitecturePolicyContextRequest request) =>
+        throw new NotSupportedException("Policy-context export is not configured for this CLI runtime.");
+
+    string FormatPolicyContextAsJson(ArchitecturePolicyContextExport context) =>
+        ArchitecturePolicyContextFormatter.FormatAsJson(context);
+
+    string FormatPolicyContextAsMarkdown(ArchitecturePolicyContextExport context) =>
+        ArchitecturePolicyContextFormatter.FormatAsMarkdown(context);
 
     ArchitectureGraphOutcome BuildGraph(ArchitectureGraphRequest request);
 
