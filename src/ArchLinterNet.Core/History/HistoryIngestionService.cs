@@ -1,3 +1,4 @@
+using ArchLinterNet.Core.Contracts;
 using ArchLinterNet.Core.History.Analysis;
 using ArchLinterNet.Core.History.Git;
 using ArchLinterNet.Core.History.Tasks;
@@ -7,9 +8,11 @@ namespace ArchLinterNet.Core.History;
 // The canonical ingestion pipeline entry point. Everything downstream of the authored operands is
 // derived from raw repository objects, and any fail-closed condition unwinds to a diagnostic before
 // a result object exists.
-internal sealed class HistoryIngestionService(TaskKeyExtraction taskExtraction)
+internal sealed class HistoryIngestionService(
+    TaskKeyExtraction taskExtraction,
+    HistoryAnalysisConfiguration configuration)
 {
-    public static HistoryIngestionService Default { get; } = new(TaskKeyExtraction.Default);
+    public static HistoryIngestionService Default { get; } = new(TaskKeyExtraction.Default, new HistoryAnalysisConfiguration());
 
     public HistoryIngestionOutcome Ingest(HistoryIngestionRequest request)
     {
@@ -61,6 +64,7 @@ internal sealed class HistoryIngestionService(TaskKeyExtraction taskExtraction)
         }
 
         IReadOnlyList<LogicalFile> files = new FileEvidenceBuilder(objects, identity).Build(deltas, components);
+        CoChangeGraph coChangeGraph = new CoChangeGraphBuilder(configuration).Build(files, commits, components);
         candidates.Sort(RenameCandidate.CompareCanonical);
         return new HistoryIngestionResult(
             layout.ObjectFormatName,
@@ -72,7 +76,8 @@ internal sealed class HistoryIngestionService(TaskKeyExtraction taskExtraction)
             range.Count(static commit => commit.IsMerge),
             candidates,
             components,
-            files);
+            files,
+            coChangeGraph);
     }
 
     private CommitEvidence BuildCommitEvidence(GitCommit commit)
