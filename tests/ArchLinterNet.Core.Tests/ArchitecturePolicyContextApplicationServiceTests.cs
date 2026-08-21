@@ -1,5 +1,6 @@
 using System.Text.Json;
 using ArchLinterNet.Core.Composition;
+using ArchLinterNet.Core.Execution;
 using ArchLinterNet.Core.PolicyContext;
 using ArchLinterNet.Core.Resolution;
 using NUnit.Framework;
@@ -207,6 +208,101 @@ public sealed class ArchitecturePolicyContextApplicationServiceTests
         {
             Directory.Delete(temporaryDirectory, recursive: true);
         }
+    }
+
+    [Test]
+    public void Export_TypedContractFacts_RetainsLayerTemplateAndCompositionSemantics()
+    {
+        string temporaryDirectory = Path.Combine(Path.GetTempPath(), $"arch-linter-policy-context-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(temporaryDirectory);
+        string policyPath = Path.Combine(temporaryDirectory, "policy.yml");
+        try
+        {
+            File.WriteAllText(policyPath, """
+                version: 1
+                name: Complete Contract Facts
+                layers:
+                  composition:
+                    namespace: Sample.Composition
+                analysis:
+                  target_assemblies: [Sample.Host]
+                source_sets:
+                  host_assemblies:
+                    globs: [Sample.Host]
+                contracts:
+                  strict_layer_templates:
+                    - id: module-shape
+                      name: module-shape
+                      containers: [Sample.Modules.Sales, Sample.Modules.Legacy]
+                      exclude_containers: [Sample.Modules.Legacy]
+                      layers:
+                        - name: Api
+                        - name: Application
+                          optional: true
+                        - name: Domain
+                      exhaustive: true
+                      reason: Every module follows the reviewed shape.
+                  strict_composition:
+                    - id: composition-root-only
+                      name: composition-root-only
+                      forbidden_apis: [Legacy.ServiceLocator.Get, Legacy.Container.Register]
+                      allowed_only_in_layers: [composition]
+                      allowed_only_in_namespaces: [Sample.Bootstrap]
+                      allowed_only_in_projects: [src/Sample.Host/Sample.Host.csproj]
+                      allowed_only_in_assemblies: [Sample.Host]
+                      allowed_only_in_assembly_sets: [host_assemblies]
+                      allowed_only_in_types:
+                        - assembly: Sample.Host
+                          type: Sample.Program
+                      reason: Registration belongs only in the composition root.
+                """);
+
+            ArchitecturePolicyContextExport context = _engine.ExportPolicyContext(
+                new ArchitecturePolicyContextRequest { PolicyPath = policyPath });
+            ArchitecturePolicyContextContract template = context.Contracts.Single(contract => contract.Id == "module-shape");
+            ArchitecturePolicyContextContract composition = context.Contracts.Single(contract => contract.Id == "composition-root-only");
+            ArchitecturePolicyContextContractFact layers = template.Facts.Single(fact => fact.Name == "layers");
+            ArchitecturePolicyContextContractFact allowedType = composition.Facts.Single(fact => fact.Name == "allowed_only_in_types").Items.Single();
+            string json = ArchitecturePolicyContextFormatter.FormatAsJson(context);
+            string markdown = ArchitecturePolicyContextFormatter.FormatAsMarkdown(context);
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(template.Facts.Single(fact => fact.Name == "containers").Values,
+                    Is.EqualTo(new[] { "Sample.Modules.Sales", "Sample.Modules.Legacy" }));
+                Assert.That(template.Facts.Single(fact => fact.Name == "exclude_containers").Values,
+                    Is.EqualTo(new[] { "Sample.Modules.Legacy" }));
+                Assert.That(layers.Items.Select(item => item.Items.Single(field => field.Name == "name").Values.Single()),
+                    Is.EqualTo(new[] { "Api", "Application", "Domain" }));
+                Assert.That(layers.Items.Select(item => item.Items.Single(field => field.Name == "optional").Values.Single()),
+                    Is.EqualTo(new[] { "false", "true", "false" }));
+                Assert.That(template.Facts.Single(fact => fact.Name == "exhaustive").Values, Is.EqualTo(new[] { "true" }));
+                Assert.That(composition.Facts.Single(fact => fact.Name == "forbidden_apis").Values,
+                    Is.EqualTo(new[] { "Legacy.ServiceLocator.Get", "Legacy.Container.Register" }));
+                Assert.That(composition.Facts.Single(fact => fact.Name == "allowed_only_in_assembly_sets").Values,
+                    Is.EqualTo(new[] { "host_assemblies" }));
+                Assert.That(allowedType.Items.Single(field => field.Name == "assembly").Values.Single(), Is.EqualTo("Sample.Host"));
+                Assert.That(allowedType.Items.Single(field => field.Name == "type").Values.Single(), Is.EqualTo("Sample.Program"));
+                Assert.That(json, Does.Contain("\"facts\"").And.Contain("\"allowed_only_in_types\""));
+                Assert.That(markdown, Does.Contain("exclude_containers:").And.Contain("allowed_only_in_types"));
+            });
+        }
+        finally
+        {
+            Directory.Delete(temporaryDirectory, recursive: true);
+        }
+    }
+
+    [Test]
+    public void ContractFactsProjector_CoversEveryRegisteredContractFamily()
+    {
+        Type[] registeredContractTypes = ArchitectureContractFamilyRegistry.All
+            .SelectMany(descriptor => descriptor.OwnedContractTypes)
+            .Distinct()
+            .ToArray();
+
+        Assert.That(ArchitecturePolicyContextContractFactsProjector.SupportedContractTypes,
+            Is.EquivalentTo(registeredContractTypes));
     }
 
     private ArchitecturePolicyContextExport Export(string relativePolicyPath)

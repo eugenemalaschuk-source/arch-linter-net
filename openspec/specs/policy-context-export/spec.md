@@ -33,11 +33,26 @@ only reviewed, static-analysis-safe guidance that tells agents to inspect
 facts, use narrow schema-backed changes, avoid broad ignores or overrides,
 and keep human review.
 
+The context SHALL project every supported contract family's effective rule
+inputs through typed projections. It SHALL preserve ordered and nested inputs,
+booleans, source-set references, allowed and forbidden directions, and typed
+selectors rather than silently flattening or omitting them. Layer-template
+contracts SHALL retain their containers, container exclusions, ordered optional
+layers, and exhaustive setting; composition contracts SHALL retain forbidden
+APIs and every allowed-only scope, including assembly sets and typed assembly/
+type selectors.
+
 #### Scenario: Modular-monolith context exposes governed boundaries
 - **WHEN** a policy declares Sales, Catalog, and SharedKernel semantic roles,
   contextual contracts, semantic coverage, and a narrow exception
 - **THEN** the context names the declared roles, metadata/context values,
   contract IDs, port adapter bindings, coverage scope, exception, and portable source provenance
+
+#### Scenario: Contract context retains nested executable semantics
+- **WHEN** a policy declares a layer template with optional layers and an
+  exhaustive composition contract with typed allowed-only locations
+- **THEN** the JSON and Markdown context retain those ordered, nested, allowed,
+  and forbidden rule inputs from the same effective-policy model
 
 #### Scenario: Unity/client policy context exposes client classification
 - **WHEN** a policy declares Unity player and editor roles with namespace or

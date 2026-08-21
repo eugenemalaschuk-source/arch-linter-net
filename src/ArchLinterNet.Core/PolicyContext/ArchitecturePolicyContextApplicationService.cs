@@ -1,6 +1,5 @@
 using System.Collections;
 using System.Globalization;
-using System.Reflection;
 using ArchLinterNet.Core.Contracts;
 using ArchLinterNet.Core.Contracts.Abstractions;
 using ArchLinterNet.Core.Contracts.Families;
@@ -15,13 +14,6 @@ public sealed class ArchitecturePolicyContextApplicationService(IArchitecturePol
     : IArchitecturePolicyContextApplicationService
 {
     private const string ContextKind = "architecture-policy-context";
-    private static readonly string[] _referenceProperties =
-    [
-        "Source", "Sources", "SourceSets", "ExcludedSources", "ExcludedSourceSets", "Forbidden", "Allowed",
-        "AllowedTypes", "Layers", "Protected", "AllowedImporters", "SourceLayers", "MustResideInLayers",
-        "AllowedOnlyInLayers", "ForbiddenInLayers", "Container", "Projects", "Assemblies",
-    ];
-
     private static readonly string[] _guidance =
     [
         "Inspect the policy facts and current code before choosing a role, layer, or boundary.",
@@ -45,7 +37,7 @@ public sealed class ArchitecturePolicyContextApplicationService(IArchitecturePol
         ArchitectureContractCatalog catalog = ArchitectureContractCatalog.Build(document);
 
         IReadOnlyList<ArchitecturePolicyContextClassification> classification = ProjectClassification(document.Classification);
-        IReadOnlyList<ArchitecturePolicyContextContract> contracts = ProjectContracts(catalog, document.Provenance);
+        IReadOnlyList<ArchitecturePolicyContextContract> contracts = ProjectContracts(catalog, document);
         IReadOnlyList<ArchitecturePolicyContextLayer> layers = ProjectLayers(document);
 
         return new ArchitecturePolicyContextExport(
@@ -128,23 +120,42 @@ public sealed class ArchitecturePolicyContextApplicationService(IArchitecturePol
 
     private static IReadOnlyList<ArchitecturePolicyContextContract> ProjectContracts(
         ArchitectureContractCatalog catalog,
-        ArchitecturePolicyProvenanceIndex provenance)
+        ArchitectureContractDocument document)
     {
         return catalog.Descriptors
-            .Select(descriptor => new ArchitecturePolicyContextContract(
-                descriptor.Mode,
-                descriptor.Family,
-                descriptor.Id ?? descriptor.Name,
-                descriptor.Name,
-                descriptor.AuthoredId,
-                ReadReason(descriptor.Contract),
-                ProjectReferences(descriptor.Contract),
-                ProjectSelectors(descriptor.Contract),
-                ProjectAdapterBindings(descriptor.Contract),
-                ProjectExclusionSelectors(descriptor.Contract),
-                descriptor.Contract is ArchitectureCoverageContract coverage ? [coverage.Scope] : Array.Empty<string>(),
-                ProjectProvenance(provenance.LocationFor(descriptor.Contract))))
+            .Select(descriptor => ProjectContract(
+                descriptor.Mode, descriptor.Family, descriptor.Name, descriptor.Id, descriptor.AuthoredId, descriptor.Contract, document.Provenance))
+            .Concat(document.Contracts.StrictLayerTemplates.Select(contract => ProjectContract(
+                "strict", "layer_template", contract.Name, contract.Id, null, contract, document.Provenance)))
+            .Concat(document.Contracts.AuditLayerTemplates.Select(contract => ProjectContract(
+                "audit", "layer_template", contract.Name, contract.Id, null, contract, document.Provenance)))
             .ToArray();
+    }
+
+    private static ArchitecturePolicyContextContract ProjectContract(
+        string mode,
+        string family,
+        string name,
+        string? id,
+        string? authoredId,
+        IArchitectureContract contract,
+        ArchitecturePolicyProvenanceIndex provenance)
+    {
+        ArchitecturePolicyContextContractProjection projection = ArchitecturePolicyContextContractFactsProjector.Project(contract);
+        return new ArchitecturePolicyContextContract(
+            mode,
+            family,
+            id ?? name,
+            name,
+            authoredId,
+            projection.Reason,
+            ProjectReferences(projection.Facts),
+            projection.Facts,
+            ProjectSelectors(contract),
+            ProjectAdapterBindings(contract),
+            ProjectExclusionSelectors(contract),
+            contract is ArchitectureCoverageContract coverage ? [coverage.Scope] : Array.Empty<string>(),
+            ProjectProvenance(provenance.LocationFor(contract)));
     }
 
     private static IReadOnlyList<ArchitecturePolicyContextClassification> ProjectClassification(
@@ -162,27 +173,11 @@ public sealed class ArchitecturePolicyContextApplicationService(IArchitecturePol
         return projected.ToArray();
     }
 
-    private static IReadOnlyList<ArchitecturePolicyContextReference> ProjectReferences(IArchitectureContract contract)
-    {
-        List<ArchitecturePolicyContextReference> references = new();
-        Type type = contract.GetType();
-        foreach (string propertyName in _referenceProperties)
-        {
-            PropertyInfo? property = type.GetProperty(propertyName, BindingFlags.Instance | BindingFlags.Public);
-            if (property?.GetValue(contract) is not object value)
-            {
-                continue;
-            }
-
-            string[] values = StringValues(value).ToArray();
-            if (values.Length > 0)
-            {
-                references.Add(new ArchitecturePolicyContextReference(ToSnakeCase(propertyName), values));
-            }
-        }
-
-        return references;
-    }
+    private static IReadOnlyList<ArchitecturePolicyContextReference> ProjectReferences(
+        IReadOnlyList<ArchitecturePolicyContextContractFact> facts) => facts
+        .Where(fact => fact.Values.Count > 0)
+        .Select(fact => new ArchitecturePolicyContextReference(fact.Name, fact.Values))
+        .ToArray();
 
     private static IReadOnlyList<ArchitecturePolicyContextSelector> ProjectSelectors(IArchitectureContract contract)
     {
@@ -298,6 +293,11 @@ public sealed class ArchitecturePolicyContextApplicationService(IArchitecturePol
                 "layer", layer.Key, "exclude", JoinNonEmpty(exclusion.Namespace, exclusion.NamespaceSuffix), null)))
             .ToList();
 
+        exceptions.AddRange(document.Contracts.StrictLayerTemplates
+            .Concat(document.Contracts.AuditLayerTemplates)
+            .SelectMany(contract => contract.ExcludeContainers.Select(container => new ArchitecturePolicyContextException(
+                "contract", contract.Id ?? contract.Name, "exclude_container", container, contract.Reason))));
+
         foreach (ArchitecturePolicyContextContract contract in contracts)
         {
             exceptions.AddRange(contract.Exclusions.Select(selector => new ArchitecturePolicyContextException(
@@ -307,7 +307,7 @@ public sealed class ArchitecturePolicyContextApplicationService(IArchitecturePol
         foreach (ArchitectureContractDescriptor descriptor in catalog.Descriptors)
         {
             string subject = descriptor.Id ?? descriptor.Name;
-            exceptions.AddRange(ReadIgnoredViolations(descriptor.Contract).Select(ignored => new ArchitecturePolicyContextException(
+            exceptions.AddRange(ArchitecturePolicyContextContractFactsProjector.Project(descriptor.Contract).IgnoredViolations.Select(ignored => new ArchitecturePolicyContextException(
                 "contract",
                 subject,
                 "ignored_violation",
@@ -348,28 +348,6 @@ public sealed class ArchitecturePolicyContextApplicationService(IArchitecturePol
             .ToDictionary(item => item.Key, item => DisplayValue(item.Value), StringComparer.Ordinal);
     }
 
-    private static string? ReadReason(IArchitectureContract contract) =>
-        contract.GetType().GetProperty("Reason", BindingFlags.Instance | BindingFlags.Public)?.GetValue(contract) as string;
-
-    private static IEnumerable<ArchitectureIgnoredViolation> ReadIgnoredViolations(IArchitectureContract contract) =>
-        contract.GetType().GetProperty("IgnoredViolations", BindingFlags.Instance | BindingFlags.Public)?.GetValue(contract)
-            as IEnumerable<ArchitectureIgnoredViolation> ?? Array.Empty<ArchitectureIgnoredViolation>();
-
-    private static IEnumerable<string> StringValues(object value)
-    {
-        if (value is string text)
-        {
-            return string.IsNullOrWhiteSpace(text) ? Array.Empty<string>() : [text];
-        }
-
-        if (value is IEnumerable values)
-        {
-            return values.Cast<object?>().OfType<string>().Where(value => !string.IsNullOrWhiteSpace(value)).ToArray();
-        }
-
-        return Array.Empty<string>();
-    }
-
     private static string DisplayValue(object? value)
     {
         return value switch
@@ -398,9 +376,6 @@ public sealed class ArchitecturePolicyContextApplicationService(IArchitecturePol
         JoinNonEmpty(selector.Role, string.Join(", ", selector.Metadata.Select(item => $"{item.Key}={item.Value}")), selector.When ?? string.Empty);
 
     private static string JoinNonEmpty(params string[] values) => string.Join("; ", values.Where(value => !string.IsNullOrWhiteSpace(value)));
-
-    private static string ToSnakeCase(string value) => string.Concat(value.Select((character, index) =>
-        index > 0 && char.IsUpper(character) ? "_" + char.ToLowerInvariant(character) : char.ToLowerInvariant(character).ToString()));
 
     private static string? PortablePathOrNull(string? path) => path is null ? null : PortablePath(path);
 

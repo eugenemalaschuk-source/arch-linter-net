@@ -3514,17 +3514,18 @@ sealed class ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextClassific
   property string Role {get;init;}
   property string Source {get;init;}
 sealed class ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextContract : System.IEquatable<ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextContract>
-  ctor(string Mode, string Family, string Id, string Name, string? AuthoredId, string? Reason, System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextReference> References, System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextSelector> Selectors, System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextAdapterBinding> AdapterBindings, System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextSelector> Exclusions, System.Collections.Generic.IReadOnlyList<string> CoverageScopes, ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextProvenance? Provenance)
+  ctor(string Mode, string Family, string Id, string Name, string? AuthoredId, string? Reason, System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextReference> References, System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextContractFact> Facts, System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextSelector> Selectors, System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextAdapterBinding> AdapterBindings, System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextSelector> Exclusions, System.Collections.Generic.IReadOnlyList<string> CoverageScopes, ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextProvenance? Provenance)
   method ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextContract <Clone>$()
   method bool Equals(ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextContract? other)
   method bool Equals(object? obj)
   method int GetHashCode()
   method string ToString()
-  method void Deconstruct(out string Mode, out string Family, out string Id, out string Name, out string? AuthoredId, out string? Reason, out System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextReference> References, out System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextSelector> Selectors, out System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextAdapterBinding> AdapterBindings, out System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextSelector> Exclusions, out System.Collections.Generic.IReadOnlyList<string> CoverageScopes, out ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextProvenance? Provenance)
+  method void Deconstruct(out string Mode, out string Family, out string Id, out string Name, out string? AuthoredId, out string? Reason, out System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextReference> References, out System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextContractFact> Facts, out System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextSelector> Selectors, out System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextAdapterBinding> AdapterBindings, out System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextSelector> Exclusions, out System.Collections.Generic.IReadOnlyList<string> CoverageScopes, out ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextProvenance? Provenance)
   operator !=(ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextContract? left, ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextContract? right)
   operator ==(ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextContract? left, ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextContract? right)
   property ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextProvenance? Provenance {get;init;}
   property System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextAdapterBinding> AdapterBindings {get;init;}
+  property System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextContractFact> Facts {get;init;}
   property System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextReference> References {get;init;}
   property System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextSelector> Exclusions {get;init;}
   property System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextSelector> Selectors {get;init;}
@@ -3535,6 +3536,19 @@ sealed class ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextContract 
   property string Name {get;init;}
   property string? AuthoredId {get;init;}
   property string? Reason {get;init;}
+sealed class ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextContractFact : System.IEquatable<ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextContractFact>
+  ctor(string Name, System.Collections.Generic.IReadOnlyList<string> Values, System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextContractFact> Items)
+  method ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextContractFact <Clone>$()
+  method bool Equals(ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextContractFact? other)
+  method bool Equals(object? obj)
+  method int GetHashCode()
+  method string ToString()
+  method void Deconstruct(out string Name, out System.Collections.Generic.IReadOnlyList<string> Values, out System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextContractFact> Items)
+  operator !=(ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextContractFact? left, ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextContractFact? right)
+  operator ==(ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextContractFact? left, ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextContractFact? right)
+  property System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextContractFact> Items {get;init;}
+  property System.Collections.Generic.IReadOnlyList<string> Values {get;init;}
+  property string Name {get;init;}
 sealed class ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextException : System.IEquatable<ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextException>
   ctor(string Scope, string Subject, string Kind, string Details, string? Reason)
   method ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextException <Clone>$()

@@ -53,6 +53,7 @@ public sealed record ArchitecturePolicyContextContract(
     string? AuthoredId,
     string? Reason,
     IReadOnlyList<ArchitecturePolicyContextReference> References,
+    IReadOnlyList<ArchitecturePolicyContextContractFact> Facts,
     IReadOnlyList<ArchitecturePolicyContextSelector> Selectors,
     IReadOnlyList<ArchitecturePolicyContextAdapterBinding> AdapterBindings,
     IReadOnlyList<ArchitecturePolicyContextSelector> Exclusions,
@@ -61,6 +62,12 @@ public sealed record ArchitecturePolicyContextContract(
 
 /// <summary>Describes one named relationship from a declared contract.</summary>
 public sealed record ArchitecturePolicyContextReference(string Kind, IReadOnlyList<string> Values);
+
+/// <summary>Describes a typed effective-policy rule, including nested rule inputs where needed.</summary>
+public sealed record ArchitecturePolicyContextContractFact(
+    string Name,
+    IReadOnlyList<string> Values,
+    IReadOnlyList<ArchitecturePolicyContextContractFact> Items);
 
 /// <summary>Describes a semantic role selector using only declared policy facts.</summary>
 public sealed record ArchitecturePolicyContextSelector(

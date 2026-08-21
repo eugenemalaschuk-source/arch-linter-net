@@ -88,6 +88,11 @@ public static class ArchitecturePolicyContextFormatter
                 markdown.AppendLine($"  - {Inline(reference.Kind)}: {string.Join(", ", reference.Values.Select(value => $"`{Inline(value)}`"))}");
             }
 
+            foreach (ArchitecturePolicyContextContractFact fact in contract.Facts.Where(fact => fact.Items.Count > 0))
+            {
+                AppendFact(markdown, fact, 2);
+            }
+
             foreach (ArchitecturePolicyContextSelector selector in contract.Selectors)
             {
                 markdown.AppendLine($"  - {FormatSelector(selector)}");
@@ -134,6 +139,19 @@ public static class ArchitecturePolicyContextFormatter
         foreach (ArchitecturePolicyContextValue context in contexts)
         {
             markdown.AppendLine($"- context `{Inline(context.Key)}`: {string.Join(", ", context.Values.Select(value => $"`{Inline(value)}`"))}");
+        }
+    }
+
+    private static void AppendFact(StringBuilder markdown, ArchitecturePolicyContextContractFact fact, int indent)
+    {
+        string prefix = new(' ', indent);
+        string values = fact.Values.Count == 0
+            ? string.Empty
+            : $": {string.Join(", ", fact.Values.Select(value => $"`{Inline(value)}`"))}";
+        markdown.AppendLine($"{prefix}- {Inline(fact.Name)}{values}");
+        foreach (ArchitecturePolicyContextContractFact item in fact.Items)
+        {
+            AppendFact(markdown, item, indent + 2);
         }
     }
 
