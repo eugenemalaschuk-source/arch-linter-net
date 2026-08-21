@@ -7,9 +7,10 @@ with the
 
 Its ingestion half is implemented by #236, which ships the internal
 `arch-linter-net history ingest` command and the canonical Git evidence it emits.
-The policy-backed configuration described in #237 is now implemented. Everything
-below scoring, graphs, and the versioned report schema still describes planned
-behavior for #238–#244 rather than a shipped surface.
+The policy-backed configuration described in #237 and the internal `G0`/
+`Gtheta` co-change evidence described in #239 are now implemented. Hotspot,
+bottleneck, OCP, enrichment, and the versioned report schema remain planned
+behavior for #238 and #240–#244 rather than a shipped surface.
 
 ## Product boundary
 

@@ -14,7 +14,8 @@ internal sealed class HistoryIngestionResult(
     int excludedMergeCount,
     IReadOnlyList<RenameCandidate> renameCandidates,
     IReadOnlyList<RenameComponent> renameComponents,
-    IReadOnlyList<LogicalFile> logicalFiles)
+    IReadOnlyList<LogicalFile> logicalFiles,
+    CoChangeGraph coChangeGraph)
 {
     public string ObjectFormatName { get; } = objectFormatName;
 
@@ -35,4 +36,6 @@ internal sealed class HistoryIngestionResult(
     public IReadOnlyList<RenameComponent> RenameComponents { get; } = renameComponents;
 
     public IReadOnlyList<LogicalFile> LogicalFiles { get; } = logicalFiles;
+
+    public CoChangeGraph CoChangeGraph { get; } = coChangeGraph;
 }

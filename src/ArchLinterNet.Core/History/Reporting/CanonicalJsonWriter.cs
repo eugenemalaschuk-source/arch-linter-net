@@ -47,12 +47,30 @@ internal sealed class CanonicalJsonWriter
         _builder.Append(value.ToString(CultureInfo.InvariantCulture));
     }
 
+    public void WriteOptionalNumber(string name, int? value)
+    {
+        WriteMemberPrefix(name);
+        _builder.Append(value?.ToString(CultureInfo.InvariantCulture) ?? "null");
+    }
+
     // Counts, TaskKey identifiers, and epoch seconds are exact non-exponent integers at arbitrary
     // precision, so they are written from their canonical decimal text rather than a host numeric type.
     public void WriteIntegerText(string name, string decimalText)
     {
         WriteMemberPrefix(name);
         _builder.Append(decimalText);
+    }
+
+    public void WriteCanonicalDecimal(string name, decimal value)
+    {
+        WriteMemberPrefix(name);
+        _builder.Append(value.ToString("F9", CultureInfo.InvariantCulture));
+    }
+
+    public void WriteOptionalCanonicalDecimal(string name, decimal? value)
+    {
+        WriteMemberPrefix(name);
+        _builder.Append(value is null ? "null" : value.Value.ToString("F9", CultureInfo.InvariantCulture));
     }
 
     public void WriteBoolean(string name, bool value)

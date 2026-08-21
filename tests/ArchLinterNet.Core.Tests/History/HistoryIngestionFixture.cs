@@ -1,5 +1,7 @@
+using ArchLinterNet.Core.Contracts;
 using ArchLinterNet.Core.History;
 using ArchLinterNet.Core.History.Analysis;
+using ArchLinterNet.Core.History.Tasks;
 using NUnit.Framework;
 
 namespace ArchLinterNet.Core.Tests.History;
@@ -14,12 +16,31 @@ internal static class HistoryIngestionFixture
     public static HistoryIngestionOutcome Ingest(string repositoryPath, string from, string to)
         => HistoryIngestionService.Default.Ingest(new HistoryIngestionRequest(repositoryPath, from, to));
 
+    public static HistoryIngestionOutcome Ingest(
+        string repositoryPath,
+        string from,
+        string to,
+        HistoryAnalysisConfiguration configuration)
+        => new HistoryIngestionService(TaskKeyExtraction.FromConfiguration(configuration), configuration)
+            .Ingest(new HistoryIngestionRequest(repositoryPath, from, to));
+
     public static HistoryIngestionResult Succeed(GitTestRepository repository, string from, string to)
         => Succeed(repository.Path, from, to);
 
     public static HistoryIngestionResult Succeed(string repositoryPath, string from, string to)
     {
         HistoryIngestionOutcome outcome = Ingest(repositoryPath, from, to);
+        Assert.That(outcome.Diagnostic?.KindText, Is.Null, "ingestion was expected to succeed");
+        return outcome.Result!;
+    }
+
+    public static HistoryIngestionResult Succeed(
+        GitTestRepository repository,
+        string from,
+        string to,
+        HistoryAnalysisConfiguration configuration)
+    {
+        HistoryIngestionOutcome outcome = Ingest(repository.Path, from, to, configuration);
         Assert.That(outcome.Diagnostic?.KindText, Is.Null, "ingestion was expected to succeed");
         return outcome.Result!;
     }
