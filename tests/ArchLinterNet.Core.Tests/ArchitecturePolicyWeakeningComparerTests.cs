@@ -91,7 +91,7 @@ public sealed class ArchitecturePolicyWeakeningComparerTests
 
         Assert.That(result.Findings.Select(finding => finding.Kind), Is.EquivalentTo(new[]
         {
-            "analysis_project_exclusion_added",
+            "analysis_project_exclude_impact_not_proven",
             "analysis_scope_input_removed",
             "permission_broadened",
             "prohibition_removed",
@@ -116,7 +116,13 @@ public sealed class ArchitecturePolicyWeakeningComparerTests
         ArchitecturePolicyContextExport current = Context(
             contracts: [contract],
             expansions: [currentExpansion],
-            exceptions: [new ArchitecturePolicyContextException("contract", "core-dependency", "ignored_violation", "* | *", "Temporary migration")]);
+            exceptions:
+            [
+                new ArchitecturePolicyContextException("contract", "core-dependency", "ignored_violation", "*; *", "Temporary migration")
+                {
+                    IgnoredViolation = new ArchitecturePolicyContextIgnoredViolation("*", "*"),
+                },
+            ]);
 
         ArchitecturePolicyWeakeningResult result = ArchitecturePolicyWeakeningComparer.Compare(new(baseline, current));
 
@@ -135,12 +141,118 @@ public sealed class ArchitecturePolicyWeakeningComparerTests
         ArchitecturePolicyContextContract contract = Contract("strict", "dependency", "bounded-boundary");
         ArchitecturePolicyContextExport current = Context(
             contracts: [contract],
-            exceptions: [new ArchitecturePolicyContextException(
-                "contract", "bounded-boundary", "ignored_violation", "Sample.Legacy.Type | Sample.Infrastructure.LegacyGateway", "Tracked in #119")]);
+            exceptions:
+            [
+                new ArchitecturePolicyContextException(
+                    "contract", "bounded-boundary", "ignored_violation", "Sample.Legacy.Type; Sample.Infrastructure.LegacyGateway", "Tracked in #119")
+                {
+                    IgnoredViolation = new ArchitecturePolicyContextIgnoredViolation(
+                        "Sample.Legacy.Type",
+                        "Sample.Infrastructure.LegacyGateway"),
+                },
+            ]);
 
         ArchitecturePolicyWeakeningResult result = ArchitecturePolicyWeakeningComparer.Compare(new(Context(contracts: [contract]), current));
 
         Assert.That(result.Findings, Is.Empty);
+    }
+
+    [Test]
+    public void Compare_SourceSetMadeOptionalWithUnchangedMembers_IsSemanticWeakening()
+    {
+        ArchitecturePolicyContextSourceSet required = new("hosts", "explicit", ["Sample.Host"], false, "", _importedProvenance);
+        ArchitecturePolicyContextSourceSet optional = required with { Optional = true, Reason = "Future extraction" };
+
+        ArchitecturePolicyWeakeningFinding finding = ArchitecturePolicyWeakeningComparer.Compare(new(
+            Context(sourceSets: [required]),
+            Context(sourceSets: [optional]))).Findings.Single();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(finding.Kind, Is.EqualTo("source_set_made_optional"));
+            Assert.That(finding.Classification, Is.EqualTo("semantic"));
+            Assert.That(finding.BaseValues, Is.EqualTo(new[] { "required" }));
+            Assert.That(finding.CurrentValues, Is.EqualTo(new[] { "optional" }));
+        });
+    }
+
+    [Test]
+    public void Compare_SourceExpansionMadeEmptyTolerant_IsSemanticWeakening()
+    {
+        ArchitecturePolicyContextSourceExpansion required = new(
+            "strict_dependency", "boundary", "boundary", "fan_out", null, [], false, "", _importedProvenance,
+            [Expanded("Sample.Application")], [Expanded("Sample.Application")], []);
+        ArchitecturePolicyContextSourceExpansion optional = required with { OptionalEmpty = true, OptionalReason = "Planned split" };
+
+        ArchitecturePolicyWeakeningFinding finding = ArchitecturePolicyWeakeningComparer.Compare(new(
+            Context(expansions: [required]),
+            Context(expansions: [optional]))).Findings.Single();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(finding.Kind, Is.EqualTo("source_expansion_made_empty_tolerant"));
+            Assert.That(finding.Classification, Is.EqualTo("semantic"));
+            Assert.That(finding.BaseValues, Is.EqualTo(new[] { "required" }));
+            Assert.That(finding.CurrentValues, Is.EqualTo(new[] { "optional_empty" }));
+        });
+    }
+
+    [Test]
+    public void Compare_ProjectGlobChanges_AreBoundedWithoutResolvedProjectMembership()
+    {
+        ArchitecturePolicyWeakeningResult result = ArchitecturePolicyWeakeningComparer.Compare(new(
+            Context(analysis: Analysis(projectInclude: ["src/Core/**"], projectExclude: ["tests/**"])),
+            Context(analysis: Analysis(projectInclude: ["src/**"], projectExclude: ["tests/Fixtures/**"]))));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(result.Findings.Select(finding => finding.Kind), Is.EquivalentTo(new[]
+            {
+                "analysis_project_exclude_impact_not_proven",
+                "analysis_project_include_impact_not_proven",
+            }));
+            Assert.That(result.Findings.All(finding => finding.Classification == "impact_not_proven"), Is.True);
+        });
+    }
+
+    [Test]
+    public void Compare_RequiredTemplateLayerAndCoverageInputMadeOptional_AreSemanticWeakening()
+    {
+        ArchitecturePolicyContextContract baseline = Contract("strict", "coverage", "coverage", [
+            FactItems("layers", FactItems("layer", Fact("name", "Application"), Fact("optional", "false"))),
+        ]);
+        ArchitecturePolicyContextContract current = Contract("strict", "coverage", "coverage", [
+            FactItems("layers", FactItems("layer", Fact("name", "Application"), Fact("optional", "true"))),
+            FactItems("optional_inputs", FactItems("input", Fact("contract_id", "coverage"), Fact("input", "roots"), Fact("layer", "Application"))),
+        ]);
+
+        ArchitecturePolicyWeakeningResult result = ArchitecturePolicyWeakeningComparer.Compare(new(
+            Context(contracts: [baseline]),
+            Context(contracts: [current])));
+
+        Assert.That(result.Findings.Select(finding => finding.Kind), Is.EquivalentTo(new[]
+        {
+            "required_input_made_optional",
+            "required_layer_made_optional",
+        }));
+    }
+
+    [Test]
+    public void Compare_ChangedUnsupportedTypedFact_IsImpactNotProven()
+    {
+        ArchitecturePolicyContextContract baseline = Contract("strict", "dependency", "boundary", [Fact("unmodeled_constraint", "one")]);
+        ArchitecturePolicyContextContract current = Contract("strict", "dependency", "boundary", [Fact("unmodeled_constraint", "two")]);
+
+        ArchitecturePolicyWeakeningFinding finding = ArchitecturePolicyWeakeningComparer.Compare(new(
+            Context(contracts: [baseline]),
+            Context(contracts: [current]))).Findings.Single();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(finding.Kind, Is.EqualTo("typed_fact_impact_not_proven"));
+            Assert.That(finding.Classification, Is.EqualTo("impact_not_proven"));
+            Assert.That(finding.AffectedSubjects, Is.Empty);
+        });
     }
 
     [Test]
@@ -254,7 +366,8 @@ public sealed class ArchitecturePolicyWeakeningComparerTests
 
     private static ArchitecturePolicyContextAnalysis Analysis(
         IReadOnlyList<string>? projects = null,
-        IReadOnlyList<string>? projectExclude = null) => new([], projects ?? [], [], projectExclude ?? [], []);
+        IReadOnlyList<string>? projectInclude = null,
+        IReadOnlyList<string>? projectExclude = null) => new([], projects ?? [], projectInclude ?? [], projectExclude ?? [], []);
 
     private static ArchitecturePolicyContextContract Contract(
         string mode,
@@ -283,6 +396,10 @@ public sealed class ArchitecturePolicyWeakeningComparerTests
         [new ArchitecturePolicyContextContractFact("surface_selector", [], [Fact("role", role)])]);
 
     private static ArchitecturePolicyContextContractFact Fact(string name, params string[] values) => new(name, values, []);
+
+    private static ArchitecturePolicyContextContractFact FactItems(
+        string name,
+        params ArchitecturePolicyContextContractFact[] items) => new(name, [], items);
 
     private static ArchitecturePolicyContextExpandedInstance Expanded(string source) => new(
         "core-dependency", source, null, null, false, "", null, null, null);

@@ -70,15 +70,18 @@ arch-linter-net policy context --policy architecture/dependencies.arch.yml --for
 arch-linter-net policy context --policy architecture/dependencies.arch.yml --format markdown
 ```
 
-The JSON document has `schema_version: 2` and kind
+The JSON document has `schema_version: 3` and kind
 `architecture-policy-context`. Both formats include declared layers and
 selectors, active contract IDs/names, semantic roles and contexts, coverage
 scopes, narrow exceptions, portable policy provenance, and safe review
 guidance. The default format is `markdown`; use it as pre-edit context, then
 run normal architecture validation after making a change.
 
-Version 2 also records typed declared analysis inputs and the schema-backed
-policy-weakening severity used by the explicit comparison workflow below.
+Version 3 records typed declared analysis inputs, the schema-backed
+policy-weakening severity, and typed `source_type`/`forbidden_reference`
+matchers for ignored violations. The matcher evidence is separate from the
+human-readable exception detail so comparison never infers universality from
+display text.
 
 ## Policy weakening
 
@@ -106,12 +109,17 @@ remain visible but do not fail the comparison. It returns `2` for unreadable,
 incomplete, unsupported, or incompatible artifacts.
 
 Exact semantic findings cover same-control strict-to-audit/removal, resolved
-source-set or declared analysis-scope reduction, matched subtraction, explicit
-forbidden/allow-only inventory relaxation, and universal ignore matchers. A
+source-set reduction or required-to-optional/empty-tolerant relaxation, matched
+subtraction, explicit forbidden/allow-only inventory relaxation, and universal
+ignore matchers. `project_include` and `project_exclude` changes are glob
+predicates, not inventories; without resolved project membership they are reported as
+`impact_not_proven`. A
 type/role/attribute/inheritance/CEL/public-API selector change is reported as
 `impact_not_proven` unless complete context-bound evaluator membership evidence
 proves the removed canonical subjects. Architecture change snapshots and a
 green validation result are not selector-membership evidence.
+An unsupported changed typed contract fact is likewise `impact_not_proven`,
+with no invented affected subjects.
 
 ## Validate options
 

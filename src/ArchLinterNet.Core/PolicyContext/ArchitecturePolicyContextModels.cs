@@ -26,7 +26,7 @@ public sealed record ArchitecturePolicyContextExport(
     IReadOnlyList<string> Guidance)
 {
     /// <summary>Current supported policy-context schema version.</summary>
-    public const int CurrentSchemaVersion = 2;
+    public const int CurrentSchemaVersion = 3;
 }
 
 /// <summary>Identifies the effective policy that produced a context export.</summary>
@@ -162,7 +162,14 @@ public sealed record ArchitecturePolicyContextException(
     string Subject,
     string Kind,
     string Details,
-    string? Reason);
+    string? Reason)
+{
+    /// <summary>Gets the typed matcher evidence when this is an ignored-violation exception.</summary>
+    public ArchitecturePolicyContextIgnoredViolation? IgnoredViolation { get; init; }
+}
+
+/// <summary>Typed source and forbidden-reference matchers for an ignored violation.</summary>
+public sealed record ArchitecturePolicyContextIgnoredViolation(string SourceType, string ForbiddenReference);
 
 /// <summary>Describes a portable location in the effective policy graph.</summary>
 public sealed record ArchitecturePolicyContextProvenance(

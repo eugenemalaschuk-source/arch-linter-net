@@ -29,10 +29,23 @@ arch-linter-net policy weakening --base-context base.json --current-context curr
 ```
 
 The guardrail proves direction for same-ID strict-to-audit/removal, resolved
-source-set and explicit analysis scope reduction, matched subtractive
-exclusions, explicit permission/prohibition inventories, and universal ignores.
+source-set and explicit analysis scope reduction, required-to-optional source
+sets, source expansions, or rule inputs, matched subtractive exclusions, explicit
+permission/prohibition inventories, and universal ignores. It recognizes a
+universal ignore from the context artifact's typed `source_type` and
+`forbidden_reference` matchers, never from the display string.
 Changes to type, role, attribute, inheritance, CEL, or public-API selectors are
 not guessed: without complete evaluator membership evidence they are reported
 as `impact_not_proven` for review, with no fabricated affected types. Treat a
 Shared, Common, or Utils-style exemption as a warning sign to narrow and
 explain, not as a substitute for fixing code.
+
+Any changed typed contract fact without a supported directional rule is also
+reported as `impact_not_proven`; it is never silently discarded or presented as
+proof of affected architecture subjects.
+
+`analysis.project_include` and `analysis.project_exclude` are globs. A context
+alone does not prove whether one glob contains another, so a changed glob is
+also `impact_not_proven` unless complete resolved project membership evidence
+is available. Do not treat the addition or removal of a glob string as a
+semantic scope change.

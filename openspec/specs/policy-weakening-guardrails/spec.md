@@ -27,9 +27,12 @@ weakening.
 The comparator SHALL emit a `semantic` finding with stable control identity,
 base/current evidence, and authored/effective provenance when same-family and
 same-ID strict control is removed or downgraded to audit, a resolved
-source-set member is removed, a matched subtractive exclusion is added, or a
-supported explicit forbidden/allow-only inventory is relaxed.  It SHALL retain
-an existing schema-backed reason as rationale evidence when present.
+source-set member is removed, a source set or source expansion becomes
+optional or empty-tolerant, a typed required rule input becomes optional, a
+matched subtractive exclusion is added, a typed universal ignored violation is
+added, or a supported explicit forbidden/allow-only inventory is relaxed. It
+SHALL retain an existing schema-backed reason as rationale evidence when
+present.
 
 #### Scenario: Strict control becomes audit
 - **WHEN** a strict contract and an audit contract share the same family and
@@ -46,6 +49,24 @@ an existing schema-backed reason as rationale evidence when present.
 - **WHEN** a current source expansion has a newly matched source or source-set
   exclusion
 - **THEN** comparison reports semantic static-scope weakening
+
+#### Scenario: Required source set becomes optional
+- **WHEN** a named source set retains its resolved members but changes from
+  required to optional
+- **THEN** comparison reports semantic weakening with both source-set
+  provenances
+
+#### Scenario: Universal ignore uses typed matchers
+- **WHEN** a current ignored violation has typed `source_type` and
+  `forbidden_reference` matchers that are both `*`
+- **THEN** comparison reports semantic universal-exception weakening without
+  parsing its display detail
+
+#### Scenario: Required source expansion becomes empty-tolerant
+- **WHEN** an authored source expansion retains its effective identity but
+  changes from required to `optional_empty`
+- **THEN** comparison reports semantic weakening with both expansion
+  provenances
 
 ### Requirement: Unproved selector impact remains bounded
 
@@ -85,4 +106,37 @@ assigned baseline-debt lifecycle identity.
 - **WHEN** current policy configures weakening severity as `warn`
 - **THEN** the finding remains visible without a failing guardrail outcome or
   a persistent architecture baseline-debt identity
+
+### Requirement: Project-discovery glob changes remain bounded
+
+The comparator SHALL treat `analysis.project_include` and
+`analysis.project_exclude` as project-discovery glob predicates, not literal
+inventories. Without complete resolved project membership evidence, a changed
+glob SHALL produce deterministic `impact_not_proven` evidence and SHALL NOT be
+classified as semantic scope weakening.
+
+#### Scenario: Include glob broadens textually
+- **WHEN** `project_include` changes from `src/Core/**` to `src/**` without
+  resolved project membership evidence
+- **THEN** comparison reports `impact_not_proven` rather than semantic
+  weakening
+
+#### Scenario: Exclude glob narrows textually
+- **WHEN** `project_exclude` changes from `tests/**` to `tests/Fixtures/**`
+  without resolved project membership evidence
+- **THEN** comparison reports `impact_not_proven` rather than semantic
+  weakening
+
+### Requirement: Unsupported typed-fact changes remain bounded
+
+When a typed contract fact changes but no supported directional comparison rule
+applies, the comparator SHALL emit one deterministic `impact_not_proven`
+finding with canonical base/current fact evidence and no affected subjects. It
+SHALL leave facts handled by the dedicated selector comparison to that path.
+
+#### Scenario: Unknown typed fact changes
+- **WHEN** a same-control typed contract fact changes and has no supported
+  directional weakening rule
+- **THEN** comparison reports `impact_not_proven` without claiming semantic
+  weakening or affected architecture subjects
 

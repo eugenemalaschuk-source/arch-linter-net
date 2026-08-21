@@ -371,7 +371,12 @@ public sealed class ArchitecturePolicyContextApplicationService(IArchitecturePol
                 subject,
                 "ignored_violation",
                 JoinNonEmpty(ignored.SourceType, ignored.ForbiddenReference),
-                ignored.Reason)));
+                ignored.Reason)
+            {
+                IgnoredViolation = new ArchitecturePolicyContextIgnoredViolation(
+                    ignored.SourceType,
+                    ignored.ForbiddenReference),
+            }));
 
             if (descriptor.Contract is ArchitectureCoverageContract coverage)
             {

@@ -48,6 +48,15 @@ membership evidence. Without that evidence the command reports a bounded
 does not run normal validation, simulate a candidate policy, or establish a
 baseline for existing code.
 
+The same bounded rule applies to `project_include` and `project_exclude`: they
+are project-discovery globs, not literal project inventories. A changed glob
+is reviewable `impact_not_proven` unless resolved project membership is present.
+In contrast, a source set or source expansion changing from required to
+optional/empty-tolerant, and an ignored violation whose typed `source_type` and
+`forbidden_reference` matchers are both `*`, are provable semantic relaxations.
+Any other changed typed contract fact without a directional comparison rule is
+bounded `impact_not_proven`, rather than being silently ignored or guessed.
+
 ## Supported contract families
 
 | Family | Strict group | Audit group | Validates |

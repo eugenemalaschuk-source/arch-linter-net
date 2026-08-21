@@ -8,15 +8,16 @@ For report routing, partial-output, profile, and cancellation workflows, see
 ## Policy context output
 
 `arch-linter-net policy context --format json` writes one deterministic
-`architecture-policy-context` document with `schema_version: 2`. It is a
+`architecture-policy-context` document with `schema_version: 3`. It is a
 policy-only artifact for coding-agent context: it describes effective declared
 policy facts and portable provenance, and does not report an architecture
 validation result. `--format markdown` renders the same model as a compact
 prompt-ready summary. Neither format includes local absolute paths, build
 receipts, target-assembly results, or runtime environment values.
 
-Version 2 additionally records typed declared analysis inputs and the explicit
-`analysis.policy_weakening` severity. It is not backward-compatible as a
+Version 3 additionally records typed ignored-violation matchers alongside the
+typed declared analysis inputs and explicit `analysis.policy_weakening`
+severity. It is not backward-compatible as a
 weakening-comparison input: regenerate base and current contexts with the same
 supported CLI version rather than treating a missing section as empty.
 
@@ -29,6 +30,11 @@ configured severity, and deterministically ordered findings. Every finding
 contains a stable identity, weakening kind, control identity, semantic versus
 `impact_not_proven` classification, base/current values and provenance,
 optional canonical affected subjects, and existing schema-backed rationale.
+Project include/exclude glob changes are emitted as `impact_not_proven` unless
+complete resolved project membership is supplied; they are never treated as
+literal-string inventories. A changed typed contract fact without a supported
+directional rule is likewise `impact_not_proven`; a required source expansion
+made empty-tolerant is a semantic finding.
 
 Human, JSON, and SARIF project that same result. JSON is suitable for CI and
 SARIF uses one `ArchLinterNet.PolicyWeakening.<kind>` rule for each weakening

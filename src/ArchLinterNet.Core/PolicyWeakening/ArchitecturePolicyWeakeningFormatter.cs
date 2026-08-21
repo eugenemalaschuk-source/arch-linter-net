@@ -203,7 +203,14 @@ public static class ArchitecturePolicyWeakeningFormatter
             || context.Contracts.Any(contract => contract is null || string.IsNullOrWhiteSpace(contract.Family)
                 || string.IsNullOrWhiteSpace(contract.Id) || contract.Mode is not ("strict" or "audit"))
             || context.SourceSets.Any(sourceSet => sourceSet is null || string.IsNullOrWhiteSpace(sourceSet.Name))
-            || context.SourceExpansions.Any(expansion => expansion is null || string.IsNullOrWhiteSpace(expansion.AuthoredContractId)))
+            || context.SourceExpansions.Any(expansion => expansion is null || string.IsNullOrWhiteSpace(expansion.AuthoredContractId))
+            || context.Exceptions.Any(exceptionItem => exceptionItem is null
+                || string.IsNullOrWhiteSpace(exceptionItem.Scope)
+                || string.IsNullOrWhiteSpace(exceptionItem.Subject)
+                || string.IsNullOrWhiteSpace(exceptionItem.Kind)
+                || (exceptionItem.Kind == "ignored_violation" && (exceptionItem.IgnoredViolation is null
+                    || string.IsNullOrWhiteSpace(exceptionItem.IgnoredViolation.SourceType)
+                    || string.IsNullOrWhiteSpace(exceptionItem.IgnoredViolation.ForbiddenReference)))))
         {
             throw new ArgumentException($"The {inputName} contains incomplete effective-policy evidence.");
         }

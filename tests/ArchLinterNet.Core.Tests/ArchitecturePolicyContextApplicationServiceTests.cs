@@ -34,7 +34,7 @@ public sealed class ArchitecturePolicyContextApplicationServiceTests
 
         Assert.Multiple(() =>
         {
-            Assert.That(context.SchemaVersion, Is.EqualTo(2));
+            Assert.That(context.SchemaVersion, Is.EqualTo(3));
             Assert.That(context.Kind, Is.EqualTo("architecture-policy-context"));
             Assert.That(context.Guardrails.PolicyWeakening, Is.EqualTo("error"));
             Assert.That(context.Policy.HasImports, Is.True);
@@ -65,7 +65,7 @@ public sealed class ArchitecturePolicyContextApplicationServiceTests
         {
             Assert.That(secondJson, Is.EqualTo(firstJson));
             Assert.That(secondMarkdown, Is.EqualTo(firstMarkdown));
-            Assert.That(document.RootElement.GetProperty("schema_version").GetInt32(), Is.EqualTo(2));
+            Assert.That(document.RootElement.GetProperty("schema_version").GetInt32(), Is.EqualTo(3));
             Assert.That(document.RootElement.GetProperty("kind").GetString(), Is.EqualTo("architecture-policy-context"));
             Assert.That(firstMarkdown, Does.Contain("# Architecture policy context"));
             Assert.That(firstMarkdown, Does.Contain("Policy weakening severity: `error`"));
@@ -129,6 +129,50 @@ public sealed class ArchitecturePolicyContextApplicationServiceTests
                 _engine.ExportPolicyContext(new ArchitecturePolicyContextRequest { PolicyPath = policyPath }))!;
 
             Assert.That(exception.Message, Does.Contain("analysis.policy_weakening"));
+        }
+        finally
+        {
+            Directory.Delete(temporaryDirectory, recursive: true);
+        }
+    }
+
+    [Test]
+    public void Export_IgnoredViolation_RetainsTypedMatchersAlongsideDisplayDetails()
+    {
+        string temporaryDirectory = Path.Combine(Path.GetTempPath(), $"arch-linter-policy-context-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(temporaryDirectory);
+        string policyPath = Path.Combine(temporaryDirectory, "policy.yml");
+        try
+        {
+            File.WriteAllText(policyPath, """
+                version: 1
+                name: Typed ignore context
+                layers:
+                  application: { namespace: Sample.Application }
+                  infrastructure: { namespace: Sample.Infrastructure }
+                contracts:
+                  strict:
+                    - id: application-no-infrastructure
+                      name: application-no-infrastructure
+                      source: application
+                      forbidden: [infrastructure]
+                      ignored_violations:
+                        - source_type: "*"
+                          forbidden_reference: "*"
+                          reason: Reviewed temporary migration.
+                """);
+
+            ArchitecturePolicyContextExport context = _engine.ExportPolicyContext(
+                new ArchitecturePolicyContextRequest { PolicyPath = policyPath });
+            ArchitecturePolicyContextException ignored = context.Exceptions.Single(item => item.Kind == "ignored_violation");
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(ignored.Details, Is.EqualTo("*; *"));
+                Assert.That(ignored.IgnoredViolation, Is.EqualTo(new ArchitecturePolicyContextIgnoredViolation("*", "*")));
+                Assert.That(ArchitecturePolicyContextFormatter.FormatAsJson(context),
+                    Does.Contain("\"ignored_violation\": {").And.Contain("\"source_type\": \"*\""));
+            });
         }
         finally
         {
