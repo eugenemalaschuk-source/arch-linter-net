@@ -75,6 +75,7 @@ nav:
       - Overview: ai/index.md
       - Agent guide: ai/agent-guide.md
       - Policy authoring guide: ai/policy-authoring-guide.md
+      - Policy weakening review: ai/policy-weakening-review.md
       - Semantic-role governance: ai/semantic-role-governance.md
       - Capabilities: ai/capabilities.md
       - Policy review checklist: ai/policy-review-checklist.md

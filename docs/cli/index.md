@@ -13,6 +13,7 @@ arch-linter-net baseline diff --config <path> --baseline <path> [options]
 arch-linter-net baseline verify --config <path> --baseline <path> [options]
 arch-linter-net policy check --policy <path> [options]
 arch-linter-net policy context --policy <path> [options]
+arch-linter-net policy weakening --base-context <path> --current-context <path> [options]
 arch-linter-net schema list
 arch-linter-net schema print <logical-id>
 arch-linter-net change snapshot --policy <path> --output <path> [options]
@@ -69,12 +70,48 @@ arch-linter-net policy context --policy architecture/dependencies.arch.yml --for
 arch-linter-net policy context --policy architecture/dependencies.arch.yml --format markdown
 ```
 
-The JSON document has `schema_version: 1` and kind
+The JSON document has `schema_version: 2` and kind
 `architecture-policy-context`. Both formats include declared layers and
 selectors, active contract IDs/names, semantic roles and contexts, coverage
 scopes, narrow exceptions, portable policy provenance, and safe review
 guidance. The default format is `markdown`; use it as pre-edit context, then
 run normal architecture validation after making a change.
+
+Version 2 also records typed declared analysis inputs and the schema-backed
+policy-weakening severity used by the explicit comparison workflow below.
+
+## Policy weakening
+
+`policy weakening` compares two separately exported effective policy-context
+JSON artifacts. Produce the base artifact from the base repository/policy state
+and the current artifact from the current state; the command deliberately does
+not accept two policy YAML paths, so it cannot accidentally reinterpret the
+base from the current checkout.
+
+```bash
+# In the base checkout/state
+arch-linter-net policy context --policy architecture/dependencies.arch.yml --format json > base-policy-context.json
+
+# In the current checkout/state
+arch-linter-net policy context --policy architecture/dependencies.arch.yml --format json > current-policy-context.json
+arch-linter-net policy weakening \
+  --base-context base-policy-context.json \
+  --current-context current-policy-context.json \
+  --format json
+```
+
+The command supports `human`, `json`, and `sarif`. It returns `1` only when a
+finding has current-policy `analysis.policy_weakening: error`; `warn` and `off`
+remain visible but do not fail the comparison. It returns `2` for unreadable,
+incomplete, unsupported, or incompatible artifacts.
+
+Exact semantic findings cover same-control strict-to-audit/removal, resolved
+source-set or declared analysis-scope reduction, matched subtraction, explicit
+forbidden/allow-only inventory relaxation, and universal ignore matchers. A
+type/role/attribute/inheritance/CEL/public-API selector change is reported as
+`impact_not_proven` unless complete context-bound evaluator membership evidence
+proves the removed canonical subjects. Architecture change snapshots and a
+green validation result are not selector-membership evidence.
 
 ## Validate options
 

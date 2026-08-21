@@ -8,12 +8,33 @@ For report routing, partial-output, profile, and cancellation workflows, see
 ## Policy context output
 
 `arch-linter-net policy context --format json` writes one deterministic
-`architecture-policy-context` document with `schema_version: 1`. It is a
+`architecture-policy-context` document with `schema_version: 2`. It is a
 policy-only artifact for coding-agent context: it describes effective declared
 policy facts and portable provenance, and does not report an architecture
 validation result. `--format markdown` renders the same model as a compact
 prompt-ready summary. Neither format includes local absolute paths, build
 receipts, target-assembly results, or runtime environment values.
+
+Version 2 additionally records typed declared analysis inputs and the explicit
+`analysis.policy_weakening` severity. It is not backward-compatible as a
+weakening-comparison input: regenerate base and current contexts with the same
+supported CLI version rather than treating a missing section as empty.
+
+## Policy weakening output
+
+`arch-linter-net policy weakening --base-context <path> --current-context <path>` compares two separately generated policy-context JSON artifacts. It
+does not load YAML or perform project/assembly analysis. The normalized result
+has kind `architecture-policy-weakening`, schema version 1, the current
+configured severity, and deterministically ordered findings. Every finding
+contains a stable identity, weakening kind, control identity, semantic versus
+`impact_not_proven` classification, base/current values and provenance,
+optional canonical affected subjects, and existing schema-backed rationale.
+
+Human, JSON, and SARIF project that same result. JSON is suitable for CI and
+SARIF uses one `ArchLinterNet.PolicyWeakening.<kind>` rule for each weakening
+kind. An `error` finding exits 1; `warn` and `off` findings remain visible and
+exit 0. Invalid, incomplete, or incompatible context input exits 2 instead of
+being interpreted as a clean comparison.
 
 ## Human output
 

@@ -12,6 +12,8 @@ public sealed record ArchitecturePolicyContextExport(
     int SchemaVersion,
     string Kind,
     ArchitecturePolicyContextPolicy Policy,
+    ArchitecturePolicyContextGuardrails Guardrails,
+    ArchitecturePolicyContextAnalysis Analysis,
     IReadOnlyList<ArchitecturePolicyContextSource> Sources,
     IReadOnlyList<ArchitecturePolicyContextLayer> Layers,
     IReadOnlyList<ArchitecturePolicyContextContract> Contracts,
@@ -21,10 +23,25 @@ public sealed record ArchitecturePolicyContextExport(
     IReadOnlyList<ArchitecturePolicyContextSourceSet> SourceSets,
     IReadOnlyList<ArchitecturePolicyContextSourceExpansion> SourceExpansions,
     IReadOnlyList<ArchitecturePolicyContextException> Exceptions,
-    IReadOnlyList<string> Guidance);
+    IReadOnlyList<string> Guidance)
+{
+    /// <summary>Current supported policy-context schema version.</summary>
+    public const int CurrentSchemaVersion = 2;
+}
 
 /// <summary>Identifies the effective policy that produced a context export.</summary>
 public sealed record ArchitecturePolicyContextPolicy(string Name, int Version, string RootPath, bool HasImports);
+
+/// <summary>Explicit policy configuration for change-time architecture guardrails.</summary>
+public sealed record ArchitecturePolicyContextGuardrails(string PolicyWeakening);
+
+/// <summary>Typed static analysis inputs that define declared governed scope.</summary>
+public sealed record ArchitecturePolicyContextAnalysis(
+    IReadOnlyList<string> TargetAssemblies,
+    IReadOnlyList<string> Projects,
+    IReadOnlyList<string> ProjectInclude,
+    IReadOnlyList<string> ProjectExclude,
+    IReadOnlyList<string> SourceRoots);
 
 /// <summary>Describes one portable source contributing to the effective policy.</summary>
 public sealed record ArchitecturePolicyContextSource(

@@ -29,11 +29,19 @@ Use this checklist before opening or approving an AI-generated policy change.
 - [ ] New violations are not hidden by expanding an unrelated ignore.
 - [ ] Generated baselines are reviewed before being committed.
 
+## Policy weakening guardrail
+
+- [ ] Base and current policy-context artifacts were generated from their respective repository/policy states, not both from the current checkout.
+- [ ] `policy weakening` findings are reviewed separately from architecture baseline debt; neither a green validation run nor fewer findings proves scope was retained.
+- [ ] `analysis.policy_weakening` is an explicit reviewed `error`, `warn`, or `off` choice; a temporary warning retains a narrow migration rationale.
+- [ ] Strict-to-audit/removal, source-set/subtractive scope changes, explicit inventory relaxation, and broad ignores are justified by the requested policy change rather than used to make CI green.
+- [ ] Fact-dependent selector/public-surface changes remain `impact_not_proven` unless complete evaluator membership evidence proves canonical affected subjects.
+
 ## Schema and capability fit
 
 - [ ] The selected root uses `schema/dependencies.arch.schema.json`, and imported partial documents use `schema/dependencies.arch.fragment.schema.json` regardless of filename.
 - [ ] The policy uses only contract families listed in `archlinternet.capabilities.json` and public docs.
-- [ ] No unsupported fields such as `regex`, `severity`, `from`, `to`, `owner`, custom groups, or unsupported namespace pattern syntax were invented.
+- [ ] No unsupported per-contract fields such as `regex`, `from`, `to`, `owner`, custom groups, or unsupported namespace pattern syntax were invented; the schema-backed `analysis.policy_weakening` setting is the only new severity knob for this workflow.
 - [ ] Any layer `namespace` using `*` uses it as a full segment and still maps to real repeated namespaces in the repository.
 - [ ] Documentation and sample policy snippets match executable YAML.
 - [ ] Semantic-role changes identify role, metadata, source, evidence, coverage deltas, and new cross-context edges for AI and human review.

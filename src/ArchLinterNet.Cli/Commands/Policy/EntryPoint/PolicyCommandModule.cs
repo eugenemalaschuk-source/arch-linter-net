@@ -10,6 +10,7 @@ internal sealed class PolicyCommandModule : ITopLevelCliSubcommandModule
     {
         return new PolicyCommandDefinition(
             new PolicyCheckCommandHandler(console),
-            new PolicyContextCommandHandler(runtime, console)).Create();
+            new PolicyContextCommandHandler(runtime, console),
+            new PolicyWeakeningCommandHandler(runtime, console, fileSystem)).Create();
     }
 }

@@ -38,6 +38,16 @@ exceptions, portable provenance, and safe review guidance. It does not validate
 projects, assemblies, or architecture results; run normal strict validation
 after the change.
 
+`arch-linter-net policy weakening --base-context <path> --current-context <path>` is a change-time guardrail, not a second architecture evaluator. It
+compares separately exported policy-context JSON artifacts from the base and
+current states. It proves only typed, explicit relaxations (such as a
+same-control strict-to-audit change, a resolved source-set reduction, or an
+added permission); selector-based changes require complete, context-bound
+membership evidence. Without that evidence the command reports a bounded
+`impact_not_proven` review finding rather than inventing affected types. It
+does not run normal validation, simulate a candidate policy, or establish a
+baseline for existing code.
+
 ## Supported contract families
 
 | Family | Strict group | Audit group | Validates |

@@ -41,13 +41,20 @@ public sealed class ArchitecturePolicyContextApplicationService(IArchitecturePol
         IReadOnlyList<ArchitecturePolicyContextLayer> layers = ProjectLayers(document);
 
         return new ArchitecturePolicyContextExport(
-            SchemaVersion: 1,
+            SchemaVersion: ArchitecturePolicyContextExport.CurrentSchemaVersion,
             Kind: ContextKind,
             Policy: new ArchitecturePolicyContextPolicy(
                 document.Name,
                 document.Version,
                 PortablePath(document.Provenance.RootSource?.RootPath ?? string.Empty),
                 document.Provenance.HasImports),
+            Guardrails: new ArchitecturePolicyContextGuardrails(document.Analysis.PolicyWeakening),
+            Analysis: new ArchitecturePolicyContextAnalysis(
+                document.Analysis.TargetAssemblies.OrderBy(value => value, StringComparer.Ordinal).ToArray(),
+                document.Analysis.Projects.OrderBy(value => value, StringComparer.Ordinal).ToArray(),
+                document.Analysis.ProjectInclude.OrderBy(value => value, StringComparer.Ordinal).ToArray(),
+                document.Analysis.ProjectExclude.OrderBy(value => value, StringComparer.Ordinal).ToArray(),
+                document.Analysis.SourceRoots.OrderBy(value => value, StringComparer.Ordinal).ToArray()),
             Sources: document.Provenance.Sources
                 .OrderBy(source => source.SourceOrdinal)
                 .Select(ProjectSource)
