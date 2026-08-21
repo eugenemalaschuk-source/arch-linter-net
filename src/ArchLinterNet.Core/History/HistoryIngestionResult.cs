@@ -15,7 +15,8 @@ internal sealed class HistoryIngestionResult(
     IReadOnlyList<RenameCandidate> renameCandidates,
     IReadOnlyList<RenameComponent> renameComponents,
     IReadOnlyList<LogicalFile> logicalFiles,
-    CoChangeGraph coChangeGraph)
+    CoChangeGraph coChangeGraph,
+    HistoryBottleneckAnalysis bottleneckAnalysis)
 {
     public string ObjectFormatName { get; } = objectFormatName;
 
@@ -38,4 +39,6 @@ internal sealed class HistoryIngestionResult(
     public IReadOnlyList<LogicalFile> LogicalFiles { get; } = logicalFiles;
 
     public CoChangeGraph CoChangeGraph { get; } = coChangeGraph;
+
+    public HistoryBottleneckAnalysis BottleneckAnalysis { get; } = bottleneckAnalysis;
 }

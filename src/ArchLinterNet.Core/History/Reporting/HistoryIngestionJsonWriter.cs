@@ -26,6 +26,7 @@ internal static class HistoryIngestionJsonWriter
         WriteRenameComponents(writer, result);
         WriteLogicalFiles(writer, result);
         WriteCoChangeGraph(writer, result);
+        WriteBottleneckAnalysis(writer, result.BottleneckAnalysis);
         writer.EndObject();
         return writer.ToCanonicalText() + "\n";
     }
@@ -184,6 +185,164 @@ internal static class HistoryIngestionJsonWriter
         WritePairs(writer, graph);
         WriteClusters(writer, graph);
         writer.EndObject();
+    }
+
+    private static void WriteBottleneckAnalysis(CanonicalJsonWriter writer, HistoryBottleneckAnalysis analysis)
+    {
+        writer.BeginArray("bottleneckGroups");
+        foreach (HistoryBottleneckCategoryGroup group in analysis.Groups)
+        {
+            writer.BeginObject();
+            writer.WriteString("category", CategoryText(group.Category));
+            writer.BeginArray("findings");
+            foreach (HistoryBottleneckFinding finding in group.Findings)
+            {
+                WriteBottleneckFinding(writer, finding);
+            }
+
+            writer.EndArray();
+            writer.EndObject();
+        }
+
+        writer.EndArray();
+    }
+
+    private static void WriteBottleneckFinding(CanonicalJsonWriter writer, HistoryBottleneckFinding finding)
+    {
+        writer.BeginObject();
+        writer.WriteString("canonicalPath", finding.CanonicalPath);
+        writer.BeginArray("aliases");
+        foreach (string alias in finding.Aliases)
+        {
+            writer.WriteStringElement(alias);
+        }
+
+        writer.EndArray();
+        writer.WriteBoolean("pathnameReuseMayConflateGenerations", finding.RawEvidence.PathnameReuseMayConflateGenerations);
+        writer.WriteNumber("independentTaskSpread", finding.RawEvidence.IndependentTaskSpread);
+        writer.WriteNumber("distinctAuthorCount", finding.RawEvidence.DistinctAuthorCount);
+        writer.WriteCanonicalDecimal("independentTemporalProximity", finding.RawEvidence.IndependentTemporalProximity);
+        writer.WriteNumber("distinctNeighborDegree", finding.RawEvidence.DistinctNeighborDegree);
+        writer.WriteNumber("incidentCommitDegree", finding.RawEvidence.IncidentCommitDegree);
+        writer.WriteNumber("incidentTaskDegree", finding.RawEvidence.IncidentTaskDegree);
+        WriteBottleneckComponents(writer, finding.Components);
+        WriteBottleneckWeights(writer, finding.Weights);
+        writer.WriteCanonicalDecimal("score", finding.Score);
+        writer.BeginArray("canonicalAuthors");
+        foreach (string author in finding.RawEvidence.CanonicalAuthors)
+        {
+            writer.WriteStringElement(author);
+        }
+
+        writer.EndArray();
+        writer.BeginArray("taskKeys");
+        foreach (TaskKey key in finding.RawEvidence.TaskKeys)
+        {
+            WriteTaskKey(writer, key);
+        }
+
+        writer.EndArray();
+        writer.BeginArray("independentTaskPairs");
+        foreach (BottleneckTaskPair pair in finding.RawEvidence.IndependentTaskPairs)
+        {
+            WriteBottleneckPair(writer, pair);
+        }
+
+        writer.EndArray();
+        writer.EndObject();
+    }
+
+    private static void WriteBottleneckComponents(CanonicalJsonWriter writer, BottleneckComponents components)
+    {
+        writer.BeginObject("components");
+        writer.WriteCanonicalDecimal("independentTask", components.IndependentTask);
+        writer.WriteCanonicalDecimal("author", components.Author);
+        writer.WriteCanonicalDecimal("temporal", components.Temporal);
+        writer.WriteCanonicalDecimal("degree", components.Degree);
+        writer.WriteCanonicalDecimal("incidentCommit", components.IncidentCommit);
+        writer.WriteCanonicalDecimal("incidentTask", components.IncidentTask);
+        writer.WriteCanonicalDecimal("centrality", components.Centrality);
+        writer.EndObject();
+    }
+
+    private static void WriteBottleneckWeights(CanonicalJsonWriter writer, BottleneckWeights weights)
+    {
+        writer.BeginObject("weights");
+        writer.WriteCanonicalDecimal("independentTask", weights.IndependentTask);
+        writer.WriteCanonicalDecimal("author", weights.Author);
+        writer.WriteCanonicalDecimal("temporal", weights.Temporal);
+        writer.WriteCanonicalDecimal("degree", weights.Degree);
+        writer.WriteCanonicalDecimal("centrality", weights.Centrality);
+        writer.EndObject();
+    }
+
+    private static void WriteBottleneckPair(CanonicalJsonWriter writer, BottleneckTaskPair pair)
+    {
+        writer.BeginObject();
+        WriteTaskKey(writer, "firstTask", pair.First);
+        WriteTaskKey(writer, "secondTask", pair.Second);
+        WriteBottleneckInterval(writer, "firstInterval", pair.FirstInterval);
+        WriteBottleneckInterval(writer, "secondInterval", pair.SecondInterval);
+        writer.WriteIntegerText("gapSeconds", pair.GapSeconds.ToString(System.Globalization.CultureInfo.InvariantCulture));
+        writer.WriteIntegerText("daysBetween", pair.DaysBetween.ToString(System.Globalization.CultureInfo.InvariantCulture));
+        writer.WriteCanonicalDecimal("temporalProximity", pair.TemporalProximity);
+        WriteStringArray(writer, "firstExclusiveCommitIds", pair.FirstExclusiveCommitIds);
+        WriteStringArray(writer, "secondExclusiveCommitIds", pair.SecondExclusiveCommitIds);
+        WriteBottleneckProvenance(writer, "firstProvenance", pair.FirstProvenance);
+        WriteBottleneckProvenance(writer, "secondProvenance", pair.SecondProvenance);
+        writer.EndObject();
+    }
+
+    private static void WriteTaskKey(CanonicalJsonWriter writer, TaskKey key)
+    {
+        writer.BeginObject();
+        writer.WriteString("namespace", key.Namespace);
+        writer.WriteIntegerText("id", key.IdText);
+        writer.EndObject();
+    }
+
+    private static void WriteTaskKey(CanonicalJsonWriter writer, string propertyName, TaskKey key)
+    {
+        writer.BeginObject(propertyName);
+        writer.WriteString("namespace", key.Namespace);
+        writer.WriteIntegerText("id", key.IdText);
+        writer.EndObject();
+    }
+
+    private static void WriteBottleneckInterval(CanonicalJsonWriter writer, string propertyName, BottleneckTaskInterval interval)
+    {
+        writer.BeginObject(propertyName);
+        writer.WriteIntegerText("startEpochSecond", interval.StartEpochSecond.ToString(System.Globalization.CultureInfo.InvariantCulture));
+        writer.WriteIntegerText("endEpochSecond", interval.EndEpochSecond.ToString(System.Globalization.CultureInfo.InvariantCulture));
+        writer.EndObject();
+    }
+
+    private static void WriteStringArray(CanonicalJsonWriter writer, string propertyName, IReadOnlyList<string> values)
+    {
+        writer.BeginArray(propertyName);
+        foreach (string value in values)
+        {
+            writer.WriteStringElement(value);
+        }
+
+        writer.EndArray();
+    }
+
+    private static void WriteBottleneckProvenance(CanonicalJsonWriter writer, string propertyName, IReadOnlyList<BottleneckTaskProvenance> provenance)
+    {
+        writer.BeginArray(propertyName);
+        foreach (BottleneckTaskProvenance item in provenance)
+        {
+            writer.BeginObject();
+            writer.WriteString("commitId", item.CommitId);
+            writer.WriteString("extractorId", item.Match.ExtractorId);
+            writer.WriteNumber("spanStart", item.Match.SpanStart);
+            writer.WriteNumber("spanEnd", item.Match.SpanEnd);
+            writer.WriteString("text", item.Match.MatchedText);
+            writer.EndObject();
+        }
+
+        writer.EndArray();
     }
 
     private static void WriteVertices(CanonicalJsonWriter writer, HistoryIngestionResult result, CoChangeGraph graph)

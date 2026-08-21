@@ -65,6 +65,7 @@ internal sealed class HistoryIngestionService(
 
         IReadOnlyList<LogicalFile> files = new FileEvidenceBuilder(objects, identity).Build(deltas, components);
         CoChangeGraph coChangeGraph = new CoChangeGraphBuilder(configuration).Build(files, commits, components);
+        HistoryBottleneckAnalysis bottleneckAnalysis = new HistoryBottleneckScorer().Score(commits, coChangeGraph, configuration);
         candidates.Sort(RenameCandidate.CompareCanonical);
         return new HistoryIngestionResult(
             layout.ObjectFormatName,
@@ -77,7 +78,8 @@ internal sealed class HistoryIngestionService(
             candidates,
             components,
             files,
-            coChangeGraph);
+            coChangeGraph,
+            bottleneckAnalysis);
     }
 
     private CommitEvidence BuildCommitEvidence(GitCommit commit)
