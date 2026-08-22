@@ -174,7 +174,6 @@ public sealed class BuildStatePreflightTests
         Assert.That(preflight.Blocked, Is.False);
         Assert.That(preflight.VerifiedArtifactContentDigests[Path.GetFullPath(assemblyPath)], Is.EqualTo(verifiedDigest));
         Assert.That(BuildStateCanonicalHasher.ComputeContentDigest(assemblyPath), Is.Not.EqualTo(verifiedDigest));
-
         using IArchitectureAssemblyLoadScope scope = ArchitectureAssemblyLoader.Real.CreateIsolatedLoadScope(
             Array.Empty<string>(),
             new Dictionary<string, string>(StringComparer.Ordinal),
