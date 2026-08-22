@@ -29,6 +29,7 @@ _UNSUPPORTED_SCHEMA = "Unsupported candidate manifest schema."
 
 
 def _sha256(path: Path) -> str:
+    path = _safe_path(path, "release subject")
     digest = hashlib.sha256()
     with path.open("rb") as source:
         for block in iter(lambda: source.read(1024 * 1024), b""):
@@ -267,6 +268,7 @@ def _verify_release_evidence(
     if expected_source_commit is not None and manifest["source_commit"] != expected_source_commit:
         raise ValueError("Candidate manifest source commit does not match the expected source commit.")
     _verify_inventory(packages_directory, manifest)
+    checksums_path = _safe_path(checksums_path, "candidate checksum evidence")
     if not checksums_path.is_file() or checksums_path.read_text(encoding="utf-8") != _checksum_text(manifest):
         raise ValueError("Canonical candidate checksum evidence differs from the manifest rendering.")
 

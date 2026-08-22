@@ -7,19 +7,22 @@ import argparse
 import json
 import subprocess
 import tempfile
-from typing import Any
 from pathlib import Path
+from typing import Any
 
 import package_manifest
+from _release_workspace import _safe_path
 
 
-def _outer_evidence_subjects(arguments: argparse.Namespace) -> tuple[Path, Path]:
-    _, manifest_path, checksums_path = package_manifest._canonical_evidence_paths(
+_GH_COMMAND = "gh"
+
+
+def _outer_evidence_subjects(arguments: argparse.Namespace) -> tuple[Path, Path, Path]:
+    return package_manifest._canonical_evidence_paths(
         arguments.packages_dir,
         arguments.manifest,
         arguments.checksums,
     )
-    return manifest_path, checksums_path
 
 
 def _verified_subjects(arguments: argparse.Namespace) -> list[Path]:
@@ -33,14 +36,15 @@ def _verified_subjects(arguments: argparse.Namespace) -> list[Path]:
     if manifest["source_commit"] != arguments.source_commit:
         raise ValueError("Candidate manifest source commit does not match the expected source commit.")
     return [
-        arguments.packages_dir / subject["file"]
+        _safe_path(arguments.packages_dir / subject["file"], "candidate package subject")
         for subject in package_manifest._subjects(manifest)
     ]
 
 
 def _command(arguments: argparse.Namespace, subject: Path) -> list[str]:
+    subject = _safe_path(subject, "attestation subject")
     return [
-        arguments.gh_command,
+        _GH_COMMAND,
         "attestation",
         "verify",
         str(subject),
@@ -69,31 +73,43 @@ def _verify(arguments: argparse.Namespace, subject: Path) -> list[dict[str, Any]
     return attestations
 
 
+def _attested_subjects(attestation: dict[str, Any]) -> list[dict[str, Any]]:
+    verification_result = attestation.get("verificationResult")
+    if not isinstance(verification_result, dict):
+        return []
+    statement = verification_result.get("statement")
+    if not isinstance(statement, dict):
+        return []
+    subjects = statement.get("subject")
+    if not isinstance(subjects, list):
+        return []
+    return [subject for subject in subjects if isinstance(subject, dict)]
+
+
+def _subject_digest(subject: dict[str, Any]) -> str | None:
+    digest = subject.get("digest")
+    if not isinstance(digest, dict):
+        return None
+    sha256 = digest.get("sha256")
+    return sha256 if isinstance(sha256, str) else None
+
+
 def _verified_attestation_digests(subject: Path, attestations: list[dict[str, Any]]) -> set[str]:
-    digests: set[str] = set()
-    for attestation in attestations:
-        verification_result = attestation.get("verificationResult")
-        if not isinstance(verification_result, dict):
-            continue
-        statement = verification_result.get("statement")
-        if not isinstance(statement, dict):
-            continue
-        attested_subjects = statement.get("subject")
-        if not isinstance(attested_subjects, list):
-            continue
-        for attested_subject in attested_subjects:
-            if not isinstance(attested_subject, dict):
-                continue
-            digest_map = attested_subject.get("digest")
-            if isinstance(digest_map, dict) and isinstance(digest_map.get("sha256"), str):
-                digests.add(digest_map["sha256"])
+    digests = {
+        digest
+        for attestation in attestations
+        for attested_subject in _attested_subjects(attestation)
+        if (digest := _subject_digest(attested_subject)) is not None
+    }
     if package_manifest._sha256(subject) not in digests:
         raise ValueError(f"Verified attestation does not contain '{subject.name}' as a SHA-256 subject.")
     return digests
 
 
 def _verify_tamper_is_rejected(subject: Path, attested_digests: set[str], directory: Path) -> None:
-    tampered = directory / f"tampered-{subject.name}"
+    subject = _safe_path(subject, "attestation subject")
+    directory = _safe_path(directory, "tamper evidence directory")
+    tampered = _safe_path(directory / f"tampered-{subject.name}", "tampered release subject")
     tampered.write_bytes(subject.read_bytes() + b"\nattestation-tamper-negative\n")
     if package_manifest._sha256(tampered) in attested_digests:
         raise ValueError(f"Tampered release subject unexpectedly matches an attestation: '{subject.name}'.")
@@ -108,14 +124,13 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument("--source-commit", required=True)
     parser.add_argument("--repository", required=True)
     parser.add_argument("--signer-workflow", required=True)
-    parser.add_argument("--gh-command", default="gh")
     return parser.parse_args()
 
 
 def main() -> int:
     arguments = _parse_args()
     verified_attestations: dict[Path, set[str]] = {}
-    manifest_subject, checksums_subject = _outer_evidence_subjects(arguments)
+    packages_directory, manifest_subject, checksums_subject = _outer_evidence_subjects(arguments)
     for subject in (manifest_subject, checksums_subject):
         verified_attestations[subject] = _verified_attestation_digests(subject, _verify(arguments, subject))
 
@@ -124,7 +139,7 @@ def main() -> int:
         verified_attestations[subject] = _verified_attestation_digests(subject, _verify(arguments, subject))
 
     package_subject = next(subject for subject in subjects if subject.suffix == ".nupkg")
-    with tempfile.TemporaryDirectory(prefix="archlinternet-provenance-") as temporary_directory:
+    with tempfile.TemporaryDirectory(prefix="archlinternet-provenance-", dir=packages_directory) as temporary_directory:
         directory = Path(temporary_directory)
         _verify_tamper_is_rejected(package_subject, verified_attestations[package_subject], directory)
         _verify_tamper_is_rejected(manifest_subject, verified_attestations[manifest_subject], directory)

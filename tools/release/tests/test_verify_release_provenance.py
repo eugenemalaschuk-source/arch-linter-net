@@ -48,7 +48,6 @@ def _arguments(tmp_path: Path) -> argparse.Namespace:
         source_commit=_COMMIT,
         repository="owner/repository",
         signer_workflow="owner/repository/.github/workflows/release-nuget.yml",
-        gh_command="gh",
     )
 
 
@@ -101,6 +100,15 @@ def test_main_authenticates_outer_evidence_before_deriving_package_inventory(tmp
         _COMMIT,
     ]
     assert all(command[-2:] == ["--format", "json"] for command in calls)
+
+
+def test_command_uses_only_the_github_cli_executable(tmp_path: Path) -> None:
+    arguments = _arguments(tmp_path)
+    arguments.gh_command = "untrusted-command"
+
+    command = provenance._command(arguments, arguments.manifest)
+
+    assert command[0] == "gh"
 
 
 def test_main_fails_when_an_expected_subject_has_no_attestation(tmp_path: Path, monkeypatch) -> None:

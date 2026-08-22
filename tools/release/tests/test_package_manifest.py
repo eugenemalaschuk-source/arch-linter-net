@@ -93,6 +93,14 @@ def test_manifest_reading_rejects_a_path_outside_the_release_workspace(tmp_path:
         manifest._read_manifest(outside_manifest)
 
 
+def test_hashing_rejects_a_path_outside_the_release_workspace(tmp_path: Path) -> None:
+    outside_subject = tmp_path.parent / "outside-release-subject.nupkg"
+    outside_subject.write_bytes(b"outside")
+
+    with pytest.raises(ValueError, match="outside the release workspace"):
+        manifest._sha256(outside_subject)
+
+
 @pytest.mark.parametrize(
     "mutate",
     [
