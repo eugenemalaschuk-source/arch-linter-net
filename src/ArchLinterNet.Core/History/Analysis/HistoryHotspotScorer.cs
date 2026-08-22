@@ -2,7 +2,7 @@ using System.Numerics;
 using ArchLinterNet.Core.Contracts;
 using ArchLinterNet.Core.History.Canonical;
 using ArchLinterNet.Core.History.Configuration;
-using ArchLinterNet.Core.History.Git;
+using ArchLinterNet.Core.History.Evidence;
 
 namespace ArchLinterNet.Core.History.Analysis;
 

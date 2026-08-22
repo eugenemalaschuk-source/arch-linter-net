@@ -1,4 +1,5 @@
 using ArchLinterNet.Core.History.Analysis;
+using ArchLinterNet.Core.History.Evidence;
 using ArchLinterNet.Core.History.Git;
 using NUnit.Framework;
 

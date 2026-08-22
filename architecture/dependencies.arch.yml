@@ -73,7 +73,9 @@ layers:
     namespace: ArchLinterNet.Core.History.Configuration
   core_history_tasks:
     namespace: ArchLinterNet.Core.History.Tasks
-  core_history_analysis:
+  core_history_evidence:
+    namespace: ArchLinterNet.Core.History.Evidence
+  core_history_scoring:
     namespace: ArchLinterNet.Core.History.Analysis
   core_history_reporting:
     namespace: ArchLinterNet.Core.History.Reporting
@@ -182,7 +184,8 @@ source_sets:
       - core_history_git
       - core_history_configuration
       - core_history_tasks
-      - core_history_analysis
+      - core_history_evidence
+      - core_history_scoring
       - core_history_reporting
       - core_history_enrichment
       - core_validation

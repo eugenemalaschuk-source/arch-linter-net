@@ -1205,6 +1205,13 @@ environment presentation variation and that available or unavailable optional
 .NET enrichment changes only the reserved enrichment projection, never Git-level
 evidence, findings, scores, ranks, or candidate ordering.
 
+Canonical file-identity, rename-lineage, and churn construction SHALL remain
+separate from heuristic scoring. Dogfood evidence SHALL NOT be used to retune or
+otherwise change finalized canonical evidence semantics within the release-story
+scope. If a dogfood run establishes a need to change those semantics, the change
+SHALL be proposed as separate reviewed specification and migration work before
+implementation.
+
 #### Scenario: Historical range has unavailable enrichment
 - **WHEN** a real historical release range is analyzed with requested .NET
   enrichment from a worktree whose checked-out `HEAD` differs from resolved `to`
@@ -1217,4 +1224,11 @@ evidence, findings, scores, ranks, or candidate ordering.
   different presentation environments
 - **THEN** the canonical JSON bytes before the reserved enrichment projection
   are identical and retain the same findings, scores, ranks, and candidates
+
+#### Scenario: Dogfood reveals a canonical-evidence semantic change
+- **WHEN** release dogfooding shows that canonical file identity, rename lineage,
+  or churn semantics need to change
+- **THEN** the release story records the observation without retuning those
+  semantics and a separate reviewed specification/migration change is required
+  before implementing it
 

@@ -1,6 +1,7 @@
 using System.Text;
 using ArchLinterNet.Core.History;
 using ArchLinterNet.Core.History.Analysis;
+using ArchLinterNet.Core.History.Evidence;
 using NUnit.Framework;
 
 namespace ArchLinterNet.Core.Tests.History;

@@ -1,4 +1,4 @@
-namespace ArchLinterNet.Core.History.Analysis;
+namespace ArchLinterNet.Core.History.Evidence;
 
 // A connected component of the candidate endpoint-overlap graph `H`. A component either canonicalizes
 // into one accepted lineage or stays `ambiguous_dag` as a whole; timestamps never break the tie.

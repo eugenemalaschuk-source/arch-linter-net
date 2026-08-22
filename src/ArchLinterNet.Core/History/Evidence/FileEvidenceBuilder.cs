@@ -1,7 +1,7 @@
 using ArchLinterNet.Core.History.Canonical;
 using ArchLinterNet.Core.History.Git;
 
-namespace ArchLinterNet.Core.History.Analysis;
+namespace ArchLinterNet.Core.History.Evidence;
 
 // Turns raw per-commit deltas plus resolved rename lineages into canonical file events and logical
 // files. Required blob objects are loaded directly; a missing one fails closed rather than being

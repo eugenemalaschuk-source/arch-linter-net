@@ -1,7 +1,7 @@
 using ArchLinterNet.Core.History.Canonical;
 using ArchLinterNet.Core.History.Git;
 
-namespace ArchLinterNet.Core.History.Analysis;
+namespace ArchLinterNet.Core.History.Evidence;
 
 // A local exact-rename candidate: a one-to-one delete/add relation inside one non-merge commit whose
 // preimage and postimage share a blob object ID with no competing source or destination. Every

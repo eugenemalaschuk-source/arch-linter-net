@@ -4,7 +4,7 @@ using ArchLinterNet.Core.History.Configuration;
 using ArchLinterNet.Core.History.Git;
 using ArchLinterNet.Core.History.Tasks;
 
-namespace ArchLinterNet.Core.History.Analysis;
+namespace ArchLinterNet.Core.History.Evidence;
 
 // Builds the graph only from canonical evidence produced by ingestion. In particular, it never
 // revisits source spellings, raw paths, or rename decisions; it projects the settled evidence.
