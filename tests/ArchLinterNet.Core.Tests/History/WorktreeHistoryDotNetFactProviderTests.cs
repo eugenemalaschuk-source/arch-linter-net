@@ -107,6 +107,8 @@ public sealed class WorktreeHistoryDotNetFactProviderTests
             analysis:
               projects:
                 - src/Fixture/Fixture.csproj
+              target_assemblies:
+                - ArchLinterNet.Core
             """);
         head = repository.Commit("fixture");
         return repository;
@@ -114,18 +116,18 @@ public sealed class WorktreeHistoryDotNetFactProviderTests
 
     private static void PrepareVerifiedCoreArtifact(GitTestRepository repository)
     {
-        const string projectPath = "src/Fixture/Fixture.csproj";
+        const string ProjectPath = "src/Fixture/Fixture.csproj";
         string outputDirectory = Path.Combine(repository.Path, "src", "Fixture", "bin", "Debug", "net10.0");
         Directory.CreateDirectory(outputDirectory);
         string assemblyPath = Path.Combine(outputDirectory, "ArchLinterNet.Core.dll");
         File.Copy(typeof(HistoryIngestionRequest).Assembly.Location, assemblyPath, overwrite: true);
         File.SetLastWriteTimeUtc(assemblyPath, DateTime.UtcNow.AddSeconds(2));
         BuildReceiptStore.Write(assemblyPath, new BuildReceiptV1(
-            projectPath,
+            ProjectPath,
             "ArchLinterNet.Core",
-            Configuration: null,
-            TargetFramework: null,
-            BuildStateCanonicalHasher.ComputeBuildInputFingerprint(projectPath, repository.Path),
+            Configuration: "Debug",
+            TargetFramework: "net10.0",
+            BuildStateCanonicalHasher.ComputeBuildInputFingerprint(ProjectPath, repository.Path),
             BuildStateCanonicalHasher.ComputeContentDigest(assemblyPath)));
     }
 }
