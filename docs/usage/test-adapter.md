@@ -55,3 +55,21 @@ Use `WithBaseline(path).VerifyBaseline()` for a read-only CI gate. Keep
 baseline/API capture and update actions in a reviewed local workflow; test code
 must not automatically approve or rewrite them. See
 [Adopt or Upgrade ArchLinterNet](../guides/upgrading.md#solution-shapes).
+
+For the combined new-debt gate, keep the same explicit baseline and optionally
+provide policy contexts exported from independently prepared base/current states:
+
+```csharp
+ArchitectureDebtGateOutcome gate = ArchitectureAssertions
+    .FromPolicy("architecture/dependencies.arch.yml")
+    .WithBaseline("architecture/baseline.arch.yml")
+    .WithPolicyWeakeningContexts("base-policy-context.json", "current-policy-context.json")
+    .EvaluateDebtGate();
+
+Assert.That(gate.Passed, Is.True);
+```
+
+`gate.PersistentDebt` exposes exact lifecycle entries and `gate.PolicyWeakening`
+exposes the independent change-time records. A policy warning or
+`impact_not_proven` record is not a fake baseline entry; only error-severity
+weakening contributes to the final gate decision.

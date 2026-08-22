@@ -108,6 +108,8 @@ treated as successful report bytes.
   successful Markdown or JSON report
 
 ### Requirement: Scalar-valid canonical report serialization
+The canonical report serializer SHALL emit only Unicode scalar-valid successful reports.
+
 Every property name and string value in a successful canonical JSON report
 SHALL contain only Unicode scalar values. A valid UTF-16 surrogate pair SHALL
 be retained as its corresponding non-BMP scalar without normalization. A lone

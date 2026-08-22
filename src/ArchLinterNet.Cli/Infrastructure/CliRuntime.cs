@@ -311,6 +311,11 @@ internal sealed class CliRuntime : ICliRuntime
         return _engine.MigrateBaseline(request);
     }
 
+    public ArchitectureDebtGateOutcome EvaluateDebtGate(ArchitectureDebtGateRequest request)
+    {
+        return _engine.EvaluateDebtGate(request);
+    }
+
     public PublicApiCaptureOutcome CapturePublicApi(PublicApiCaptureRequest request)
     {
         return _engine.CapturePublicApi(request);

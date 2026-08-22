@@ -18,6 +18,7 @@ Exit code `1` means the tool worked and found architecture violations. Examples:
 - a namespace coverage contract reported `coverage_findings` while `analysis.coverage` is `error`;
 - the policy-consistency pass reported `policy_consistency_findings` while `analysis.policy_consistency` is `error`;
 - a stale ignored violation is treated as a blocking policy error by current configuration.
+- `gate` completed but found new, resolved, stale, ambiguous, or configuration-error persistent debt, or an error-severity policy-weakening finding.
 
 Note: coverage, policy-consistency, and unmatched-ignore failures do not appear in `--format sarif` results — see [Output Formats — SARIF output](output-formats.md#sarif-output) if you rely on SARIF alone in CI.
 
@@ -35,6 +36,7 @@ Exit code `2` means the run could not be trusted as normal validation. Examples:
 - baseline references a contract ID that does not exist in the policy;
 - required target assemblies cannot be resolved when configuration treats that as fatal;
 - `--report` destination is not writable, collides with an input file, or has an invalid format.
+- `gate` received only one policy-context artifact, or a supplied baseline/policy-context comparison could not be trusted.
 
 When a `--report` file sink fails, the validation result is still reported. The exit code is `2` with a typed status: `output-failed` if no file sinks wrote, or `partial-output` if some sinks succeeded and some failed. The error is written to stderr (human format) or as a JSON error with `output_status` field (json/sarif format).
 
