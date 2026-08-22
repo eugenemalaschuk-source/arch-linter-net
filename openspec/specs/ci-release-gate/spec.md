@@ -25,16 +25,21 @@ The pull request CI workflow SHALL NOT be modified by this change.
 ### Requirement: Release pipeline publishes validated immutable candidates
 The manual release workflow SHALL calculate version, build final metadata, pack
 and manifest the complete paired primary-package and symbol-package candidate
-set once, validate the downloaded candidate set through Checkpoint B, and
-publish or attach only the same manifest-selected digest-verified subjects. Any
-manifest-verification step that uses Bash environment-variable syntax SHALL
-declare Bash explicitly, including Windows matrix jobs. The workflow SHALL use
-exactly one primary-package NuGet push per pair, verify the adjacent
-manifest-selected symbol package before the push, and SHALL fail closed when a
-primary package already exists; it SHALL NOT use duplicate-success behavior
-that can complete while its paired symbol package is absent. It SHALL install
-the pinned OpenSpec CLI and run `openspec validate --all --strict` before
-evidence aggregation.
+set once, validate the downloaded candidate set through Checkpoint B, attest
+the exact frozen package and outer release-evidence subject inventories, and
+independently verify every resulting GitHub build-provenance attestation before
+it publishes or attaches only the same manifest-selected digest-verified
+subjects. Any manifest-verification step that uses Bash environment-variable
+syntax SHALL declare Bash explicitly, including Windows matrix jobs. The
+workflow SHALL use exactly one primary-package NuGet push per pair, verify the
+adjacent manifest-selected symbol package before the push, and SHALL fail closed
+when a primary package already exists; it SHALL NOT use duplicate-success
+behavior that can complete while its paired symbol package is absent. It SHALL
+install the pinned OpenSpec CLI and run `openspec validate --all --strict` before
+evidence aggregation. The attestation-producing job SHALL use an immutable
+action commit pin and job-scoped `contents: read`, `id-token: write`, and
+`attestations: write` permissions; no unrelated job SHALL receive those
+attestation write permissions.
 
 #### Scenario: Strict OpenSpec validation fails
 - **WHEN** the strict OpenSpec gate fails or its pinned executable is unavailable
@@ -53,4 +58,9 @@ evidence aggregation.
 #### Scenario: A partial publish is retried
 - **WHEN** a primary package already exists but its paired symbol package may be absent
 - **THEN** the NuGet push step fails and does not report the release as successfully published
+
+#### Scenario: Attestation cannot be verified independently
+- **WHEN** any expected package or release-evidence subject has no valid
+  repository-, workflow-, and source-commit-bound attestation
+- **THEN** NuGet publication and GitHub Release attachment do not run
 

@@ -355,9 +355,109 @@ jobs:
           path: artifacts/checkpoint-b/repository-gates.json
           if-no-files-found: error
 
+  attest-prepublication-provenance:
+    name: Attest frozen pre-publication release subjects
+    needs: [prepare-candidate, checkpoint-b-evidence]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
+
+    steps:
+      - name: Checkout release metadata
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+
+      - name: Download Checkpoint-B-approved candidate
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+        with:
+          name: nuget-candidate-${{ needs.prepare-candidate.outputs.package_version }}
+          path: artifacts/packages
+
+      - name: Verify frozen package and release evidence subjects
+        shell: bash
+        run: |
+          python3 tools/release/package_manifest.py verify-release-evidence \
+            --packages-dir artifacts/packages \
+            --manifest artifacts/packages/package-manifest.json \
+            --checksums artifacts/packages/package-checksums.txt \
+            --version "${{ needs.prepare-candidate.outputs.package_version }}" \
+            --source-commit "$GITHUB_SHA"
+
+      - name: Generate exact package attestation inventory
+        shell: bash
+        run: |
+          python3 tools/release/package_manifest.py render-attestation-subject-checksums \
+            --packages-dir artifacts/packages \
+            --manifest artifacts/packages/package-manifest.json \
+            --checksums artifacts/packages/package-checksums.txt \
+            --subject-class package \
+            --output artifacts/provenance/package-subjects.sha256
+
+      - name: Generate exact release-evidence attestation inventory
+        shell: bash
+        run: |
+          python3 tools/release/package_manifest.py render-attestation-subject-checksums \
+            --packages-dir artifacts/packages \
+            --manifest artifacts/packages/package-manifest.json \
+            --checksums artifacts/packages/package-checksums.txt \
+            --subject-class evidence \
+            --output artifacts/provenance/evidence-subjects.sha256
+
+      - name: Attest exact package and symbol subjects
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
+        with:
+          subject-checksums: artifacts/provenance/package-subjects.sha256
+
+      - name: Attest exact manifest and checksum evidence subjects
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
+        with:
+          subject-checksums: artifacts/provenance/evidence-subjects.sha256
+
+  verify-prepublication-provenance:
+    name: Verify pre-publication release provenance
+    needs: [prepare-candidate, attest-prepublication-provenance]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      attestations: read
+
+    steps:
+      - name: Checkout release metadata
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+
+      - name: Download frozen attested candidate
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+        with:
+          name: nuget-candidate-${{ needs.prepare-candidate.outputs.package_version }}
+          path: artifacts/packages
+
+      - name: Verify every attestation as a consumer
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python3 tools/release/verify_release_provenance.py \
+            --packages-dir artifacts/packages \
+            --manifest artifacts/packages/package-manifest.json \
+            --checksums artifacts/packages/package-checksums.txt \
+            --version "${{ needs.prepare-candidate.outputs.package_version }}" \
+            --source-commit "$GITHUB_SHA" \
+            --repository "$GITHUB_REPOSITORY" \
+            --signer-workflow "$GITHUB_REPOSITORY/.github/workflows/release-nuget.yml"
+
   release:
     name: Publish verified NuGet candidate
-    needs: [prepare-candidate, checkpoint-b-evidence]
+    needs:
+      [
+        prepare-candidate,
+        checkpoint-b-evidence,
+        verify-prepublication-provenance,
+      ]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -379,9 +479,15 @@ jobs:
           name: nuget-candidate-${{ needs.prepare-candidate.outputs.package_version }}
           path: artifacts/packages
 
-      - name: Verify candidate manifest before publication
+      - name: Verify frozen candidate and release evidence before publication
         shell: bash
-        run: python3 tools/release/package_manifest.py verify --packages-dir artifacts/packages --manifest artifacts/packages/package-manifest.json --version "${{ needs.prepare-candidate.outputs.package_version }}" --source-commit "$GITHUB_SHA"
+        run: |
+          python3 tools/release/package_manifest.py verify-release-evidence \
+            --packages-dir artifacts/packages \
+            --manifest artifacts/packages/package-manifest.json \
+            --checksums artifacts/packages/package-checksums.txt \
+            --version "${{ needs.prepare-candidate.outputs.package_version }}" \
+            --source-commit "$GITHUB_SHA"
 
       - name: Generate release notes after Checkpoint B
         shell: bash
@@ -449,9 +555,15 @@ jobs:
           name: nuget-candidate-${{ needs.release.outputs.package_version }}
           path: artifacts/packages
 
-      - name: Verify release attachment subjects
+      - name: Verify frozen release attachment subjects
         shell: bash
-        run: python3 tools/release/package_manifest.py verify --packages-dir artifacts/packages --manifest artifacts/packages/package-manifest.json --version "${{ needs.release.outputs.package_version }}" --source-commit "$GITHUB_SHA"
+        run: |
+          python3 tools/release/package_manifest.py verify-release-evidence \
+            --packages-dir artifacts/packages \
+            --manifest artifacts/packages/package-manifest.json \
+            --checksums artifacts/packages/package-checksums.txt \
+            --version "${{ needs.release.outputs.package_version }}" \
+            --source-commit "$GITHUB_SHA"
 
       - name: Create GitHub Release
         shell: bash
