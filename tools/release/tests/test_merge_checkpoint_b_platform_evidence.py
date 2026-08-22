@@ -15,9 +15,15 @@ import merge_checkpoint_b_platform_evidence as merger  # noqa: E402
 from aggregate_checkpoint_b_evidence import _REQUIRED_SCENARIOS  # noqa: E402
 from merge_checkpoint_b_platform_evidence import merge_platform_shards  # noqa: E402
 
+_PACKAGE_IDS = ("ArchLinterNet.CEL", "ArchLinterNet.Cli", "ArchLinterNet.Core", "ArchLinterNet.Testing")
 _PACKAGES = [
-    {"id": name, "version": "0.6.1", "file": f"{name}.0.6.1.nupkg", "size": 1, "sha256": "a" * 64}
-    for name in ("ArchLinterNet.CEL", "ArchLinterNet.Cli", "ArchLinterNet.Core", "ArchLinterNet.Testing")
+    {
+        "id": name,
+        "version": "0.6.1",
+        "package": {"kind": "package", "file": f"{name}.0.6.1.nupkg", "size": 1, "sha256": "a" * 64},
+        "symbols": {"kind": "symbols", "file": f"{name}.0.6.1.snupkg", "size": 1, "sha256": "c" * 64},
+    }
+    for name in _PACKAGE_IDS
 ]
 _COMMIT = "b" * 40
 _POLICY_SHAPE = {
@@ -49,7 +55,7 @@ _SHARDS = [
 def _write_corpus(tmp_path: Path) -> tuple[Path, Path]:
     manifest_path = tmp_path / "package-manifest.json"
     manifest_path.write_text(json.dumps({
-        "schema": "checkpoint-b-candidate-manifest/v1",
+        "schema": "checkpoint-b-candidate-manifest/v2",
         "version": "0.6.1",
         "source_commit": _COMMIT,
         "packages": _PACKAGES,

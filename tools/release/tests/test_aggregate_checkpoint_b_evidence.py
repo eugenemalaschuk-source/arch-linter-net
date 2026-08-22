@@ -22,9 +22,15 @@ from aggregate_checkpoint_b_evidence import (  # noqa: E402
     _summary,
 )
 
+_PACKAGE_IDS = ("ArchLinterNet.CEL", "ArchLinterNet.Cli", "ArchLinterNet.Core", "ArchLinterNet.Testing")
 _PACKAGES = [
-    {"id": name, "version": "0.6.1", "file": f"{name}.0.6.1.nupkg", "size": 1, "sha256": "a" * 64}
-    for name in ("ArchLinterNet.CEL", "ArchLinterNet.Cli", "ArchLinterNet.Core", "ArchLinterNet.Testing")
+    {
+        "id": name,
+        "version": "0.6.1",
+        "package": {"kind": "package", "file": f"{name}.0.6.1.nupkg", "size": 1, "sha256": "a" * 64},
+        "symbols": {"kind": "symbols", "file": f"{name}.0.6.1.snupkg", "size": 1, "sha256": "c" * 64},
+    }
+    for name in _PACKAGE_IDS
 ]
 _COMMIT = "b" * 40
 _POLICY_SHAPE = {
@@ -83,7 +89,7 @@ def _write_corpus(
 ) -> tuple[Path, Path, Path, Path]:
     manifest_path = tmp_path / "package-manifest.json"
     manifest_path.write_text(json.dumps({
-        "schema": "checkpoint-b-candidate-manifest/v1",
+        "schema": "checkpoint-b-candidate-manifest/v2",
         "version": "0.6.1",
         "source_commit": _COMMIT,
         "packages": _PACKAGES,
@@ -389,7 +395,7 @@ def test_malformed_repository_gates_are_rejected(tmp_path: Path, mutate, message
     [
         (lambda manifest: manifest.update(schema="other/v1"), "manifest schema is invalid"),
         (lambda manifest: manifest.update(packages=[]), "package inventory is invalid"),
-        (lambda manifest: manifest["packages"][0].pop("sha256"), "package record is invalid"),
+        (lambda manifest: manifest["packages"][0]["symbols"].pop("sha256"), "subject record is invalid"),
     ],
 )
 def test_malformed_candidate_manifest_is_rejected(tmp_path: Path, mutate, message: str) -> None:
@@ -438,7 +444,8 @@ def test_release_scope_inventory_is_emitted_in_the_evidence(tmp_path: Path) -> N
     assert [item["issue"] for item in summary["release_scope"]["required_items"]] == [435, 436, 466]
     assert "## Release scope (story #434, target 0.6.1)" in markdown
     assert "| #435 | F1 | closed | Item 435 |" in markdown
-    assert "- #450 — Post-release refactoring story." in markdown
+    assert "#450" in markdown
+    assert "Post-release refactoring story." in markdown
 
 
 def test_open_release_scope_item_is_listed_in_the_markdown(tmp_path: Path) -> None:

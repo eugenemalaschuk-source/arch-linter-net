@@ -591,7 +591,7 @@ jobs:
         run: make prepare-packed-artifact-candidate
 
       - name: Verify candidate manifest
-        run: python3 tools/release/package_manifest.py verify --packages-dir artifacts/checkpoint-b-candidate --manifest artifacts/checkpoint-b-candidate/package-manifest.json
+        run: python3 tools/release/package_manifest.py verify --packages-dir artifacts/checkpoint-b-candidate --manifest artifacts/checkpoint-b-candidate/package-manifest.json --version "$CHECKPOINT_B_CANDIDATE_VERSION" --source-commit "$ARCH_LINTER_SOURCE_SHA"
 
       - name: Upload immutable candidate
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
@@ -732,7 +732,7 @@ jobs:
           path: artifacts/candidate
 
       - name: Verify immutable candidate
-        run: python3 tools/release/package_manifest.py verify --packages-dir artifacts/candidate --manifest artifacts/candidate/package-manifest.json
+        run: python3 tools/release/package_manifest.py verify --packages-dir artifacts/candidate --manifest artifacts/candidate/package-manifest.json --version "$CHECKPOINT_B_CANDIDATE_VERSION" --source-commit "$ARCH_LINTER_SOURCE_SHA"
 
       - name: Run ${{ matrix.shard_name }} shard
         shell: bash
@@ -832,7 +832,7 @@ jobs:
           path: artifacts/candidate
 
       - name: Verify immutable candidate
-        run: python3 tools/release/package_manifest.py verify --packages-dir artifacts/candidate --manifest artifacts/candidate/package-manifest.json
+        run: python3 tools/release/package_manifest.py verify --packages-dir artifacts/candidate --manifest artifacts/candidate/package-manifest.json --version "$CHECKPOINT_B_CANDIDATE_VERSION" --source-commit "$ARCH_LINTER_SOURCE_SHA"
 
       - name: Run ${{ matrix.shard_name }} shard
         shell: bash

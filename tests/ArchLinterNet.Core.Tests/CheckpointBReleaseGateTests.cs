@@ -344,7 +344,13 @@ public sealed partial class CheckpointBReleaseGateTests
         public string CombinedOutput => $"stdout:{Environment.NewLine}{StandardOutput}{Environment.NewLine}stderr:{Environment.NewLine}{StandardError}";
     }
 
-    private sealed record PackageEvidence(string Id, string Version, string File, long Size, string Sha256);
+    private sealed record PackagePairEvidence(
+        string Id,
+        string Version,
+        PackageSubjectEvidence Package,
+        PackageSubjectEvidence Symbols);
+
+    private sealed record PackageSubjectEvidence(string Kind, string File, long Size, string Sha256);
 
     private sealed record CheckpointScenarioResult(string Id, string Result, string? Reason);
 }

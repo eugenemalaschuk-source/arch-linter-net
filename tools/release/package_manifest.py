@@ -1,12 +1,14 @@
 #!/usr/bin/env python3
-"""Create and verify the immutable package manifest used by Checkpoint B."""
+"""Create, verify, and render immutable NuGet candidate package manifests."""
 
 from __future__ import annotations
 
 import argparse
 import hashlib
 import json
+import re
 from pathlib import Path
+from typing import Any
 
 
 _PACKAGE_IDS = (
@@ -15,7 +17,11 @@ _PACKAGE_IDS = (
     "ArchLinterNet.Core",
     "ArchLinterNet.Testing",
 )
-_SCHEMA = "checkpoint-b-candidate-manifest/v1"
+_SCHEMA_V1 = "checkpoint-b-candidate-manifest/v1"
+_SCHEMA_V2 = "checkpoint-b-candidate-manifest/v2"
+_SUBJECT_KINDS = ("package", "symbols")
+_SHA256_PATTERN = re.compile(r"[0-9a-f]{64}")
+_SOURCE_COMMIT_PATTERN = re.compile(r"[0-9a-f]{40,64}")
 
 
 def _sha256(path: Path) -> str:
@@ -26,58 +32,205 @@ def _sha256(path: Path) -> str:
     return digest.hexdigest()
 
 
-def _expected_path(packages_directory: Path, package_id: str, version: str) -> Path:
-    return packages_directory / f"{package_id}.{version}.nupkg"
+def _expected_filename(package_id: str, version: str, kind: str) -> str:
+    extension = ".nupkg" if kind == "package" else ".snupkg"
+    return f"{package_id}.{version}{extension}"
+
+
+def _subject(path: Path, kind: str) -> dict[str, Any]:
+    return {
+        "kind": kind,
+        "file": path.name,
+        "size": path.stat().st_size,
+        "sha256": _sha256(path),
+    }
+
+
+def _read_manifest(path: Path) -> dict[str, Any]:
+    try:
+        value = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as error:
+        raise ValueError(f"Cannot read candidate manifest '{path}': {error}") from error
+    if not isinstance(value, dict):
+        raise ValueError("Candidate manifest must be a JSON object.")
+    return value
+
+
+def _validate_identity(manifest: dict[str, Any]) -> None:
+    version = manifest.get("version")
+    source_commit = manifest.get("source_commit")
+    if not isinstance(version, str) or not version or Path(version).name != version:
+        raise ValueError("Candidate manifest version is invalid.")
+    if not isinstance(source_commit, str) or not _SOURCE_COMMIT_PATTERN.fullmatch(source_commit):
+        raise ValueError("Candidate manifest source commit is invalid.")
+
+
+def _validate_subject(subject: Any, package_id: str, version: str, kind: str) -> dict[str, Any]:
+    if not isinstance(subject, dict) or set(subject) != {"kind", "file", "size", "sha256"}:
+        raise ValueError("Candidate manifest subject record is invalid.")
+    if subject.get("kind") != kind:
+        raise ValueError("Candidate manifest subject kind is invalid.")
+    if subject.get("file") != _expected_filename(package_id, version, kind):
+        raise ValueError("Candidate manifest subject filename is invalid.")
+    if not isinstance(subject.get("size"), int) or isinstance(subject["size"], bool) or subject["size"] < 0:
+        raise ValueError("Candidate manifest subject size is invalid.")
+    if not isinstance(subject.get("sha256"), str) or not _SHA256_PATTERN.fullmatch(subject["sha256"]):
+        raise ValueError("Candidate manifest subject digest is invalid.")
+    return subject
+
+
+def _validate_v2(manifest: dict[str, Any]) -> dict[str, Any]:
+    if set(manifest) != {"schema", "version", "source_commit", "packages"}:
+        raise ValueError("Candidate manifest fields are invalid.")
+    if manifest.get("schema") != _SCHEMA_V2:
+        raise ValueError("Unsupported candidate manifest schema.")
+    _validate_identity(manifest)
+    version = manifest["version"]
+    packages = manifest.get("packages")
+    if not isinstance(packages, list) or len(packages) != len(_PACKAGE_IDS):
+        raise ValueError("Candidate manifest package inventory is invalid.")
+
+    subject_files: set[str] = set()
+    for package_id, record in zip(_PACKAGE_IDS, packages, strict=True):
+        if not isinstance(record, dict) or set(record) != {"id", "version", "package", "symbols"}:
+            raise ValueError("Candidate manifest package record is invalid.")
+        if record.get("id") != package_id or record.get("version") != version:
+            raise ValueError("Candidate manifest package identity is invalid.")
+        for kind in _SUBJECT_KINDS:
+            subject = _validate_subject(record.get(kind), package_id, version, kind)
+            if subject["file"] in subject_files:
+                raise ValueError("Candidate manifest contains duplicated subject files.")
+            subject_files.add(subject["file"])
+    return manifest
+
+
+def _validate_v1(manifest: dict[str, Any]) -> dict[str, Any]:
+    """Read only historical v1 evidence; it intentionally proves no symbol coverage."""
+    if set(manifest) != {"schema", "version", "source_commit", "packages"} or manifest.get("schema") != _SCHEMA_V1:
+        raise ValueError("Unsupported candidate manifest schema.")
+    _validate_identity(manifest)
+    packages = manifest.get("packages")
+    if not isinstance(packages, list) or len(packages) != len(_PACKAGE_IDS):
+        raise ValueError("Candidate manifest package inventory is invalid.")
+    for package_id, record in zip(_PACKAGE_IDS, packages, strict=True):
+        if not isinstance(record, dict) or set(record) != {"id", "version", "file", "size", "sha256"}:
+            raise ValueError("Candidate manifest package record is invalid.")
+        if record.get("id") != package_id or record.get("version") != manifest["version"]:
+            raise ValueError("Candidate manifest package identity is invalid.")
+        _validate_subject(
+            {"kind": "package", **{key: record.get(key) for key in ("file", "size", "sha256")}},
+            package_id,
+            manifest["version"],
+            "package",
+        )
+    return manifest
+
+
+def _load_manifest(path: Path, allow_v1: bool = False) -> dict[str, Any]:
+    manifest = _read_manifest(path)
+    if manifest.get("schema") == _SCHEMA_V2:
+        return _validate_v2(manifest)
+    if allow_v1 and manifest.get("schema") == _SCHEMA_V1:
+        return _validate_v1(manifest)
+    raise ValueError("Unsupported candidate manifest schema.")
+
+
+def _subjects(manifest: dict[str, Any]) -> list[dict[str, Any]]:
+    if manifest["schema"] != _SCHEMA_V2:
+        raise ValueError("Candidate manifest does not contain a complete package-subject inventory.")
+    return [
+        {"id": record["id"], "version": record["version"], **record[kind]}
+        for record in manifest["packages"]
+        for kind in _SUBJECT_KINDS
+    ]
+
+
+def _verify_subject(path: Path, subject: dict[str, Any]) -> None:
+    if not path.is_file():
+        raise ValueError(f"Missing manifested package subject: {path}")
+    if path.stat().st_size != subject["size"] or _sha256(path) != subject["sha256"]:
+        raise ValueError(f"Candidate package subject digest mismatch: {path.name}")
+
+
+def _verify_inventory(packages_directory: Path, manifest: dict[str, Any]) -> None:
+    if manifest["schema"] == _SCHEMA_V1:
+        expected = {record["file"] for record in manifest["packages"]}
+        actual = {path.name for path in packages_directory.glob("*.nupkg")}
+        if actual != expected:
+            raise ValueError("Historical v1 candidate package inventory differs from the manifest.")
+        for record in manifest["packages"]:
+            _verify_subject(packages_directory / record["file"], record)
+        return
+
+    subjects = _subjects(manifest)
+    expected = {subject["file"] for subject in subjects}
+    actual = {
+        path.name
+        for extension in ("*.nupkg", "*.snupkg")
+        for path in packages_directory.glob(extension)
+    }
+    if actual != expected:
+        missing = sorted(expected - actual)
+        unexpected = sorted(actual - expected)
+        raise ValueError(
+            f"Candidate package subject inventory differs from the manifest: missing={missing}, unexpected={unexpected}."
+        )
+    for subject in subjects:
+        _verify_subject(packages_directory / subject["file"], subject)
 
 
 def _create(arguments: argparse.Namespace) -> None:
     records = []
     for package_id in _PACKAGE_IDS:
-        path = _expected_path(arguments.packages_dir, package_id, arguments.version)
-        if not path.is_file():
-            raise ValueError(f"Missing candidate package: {path}")
-        records.append(
-            {
-                "id": package_id,
-                "version": arguments.version,
-                "file": path.name,
-                "size": path.stat().st_size,
-                "sha256": _sha256(path),
-            }
-        )
-
-    unexpected = sorted(
-        path.name
-        for path in arguments.packages_dir.glob("*.nupkg")
-        if path.name not in {record["file"] for record in records}
-    )
-    if unexpected:
-        raise ValueError(f"Unexpected candidate packages: {', '.join(unexpected)}")
+        subjects: dict[str, dict[str, Any]] = {}
+        for kind in _SUBJECT_KINDS:
+            path = arguments.packages_dir / _expected_filename(package_id, arguments.version, kind)
+            if not path.is_file():
+                raise ValueError(f"Missing candidate {kind} package: {path}")
+            subjects[kind] = _subject(path, kind)
+        records.append({"id": package_id, "version": arguments.version, **subjects})
 
     manifest = {
-        "schema": _SCHEMA,
+        "schema": _SCHEMA_V2,
         "version": arguments.version,
         "source_commit": arguments.source_commit,
         "packages": records,
     }
+    _validate_v2(manifest)
+    _verify_inventory(arguments.packages_dir, manifest)
     arguments.output.parent.mkdir(parents=True, exist_ok=True)
     arguments.output.write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8")
 
 
 def _verify(arguments: argparse.Namespace) -> None:
-    manifest = json.loads(arguments.manifest.read_text(encoding="utf-8"))
-    if manifest.get("schema") != _SCHEMA:
-        raise ValueError("Unsupported candidate manifest schema.")
-    records = manifest.get("packages")
-    if not isinstance(records, list) or [record.get("id") for record in records] != list(_PACKAGE_IDS):
-        raise ValueError("Candidate manifest package inventory is invalid.")
+    manifest = _load_manifest(arguments.manifest, arguments.allow_v1)
+    if arguments.version is not None and manifest["version"] != arguments.version:
+        raise ValueError("Candidate manifest version does not match the expected version.")
+    if arguments.source_commit is not None and manifest["source_commit"] != arguments.source_commit:
+        raise ValueError("Candidate manifest source commit does not match the expected source commit.")
+    _verify_inventory(arguments.packages_dir, manifest)
 
-    for record in records:
-        path = arguments.packages_dir / str(record["file"])
-        if not path.is_file():
-            raise ValueError(f"Missing manifested package: {path}")
-        if path.stat().st_size != record.get("size") or _sha256(path) != record.get("sha256"):
-            raise ValueError(f"Candidate package digest mismatch: {path.name}")
+
+def _render_checksums(arguments: argparse.Namespace) -> None:
+    manifest = _load_manifest(arguments.manifest)
+    lines = [
+        "# ArchLinterNet pre-publication package checksums",
+        f"# manifest-schema: {manifest['schema']}",
+        f"# version: {manifest['version']}",
+        f"# source-commit: {manifest['source_commit']}",
+        "",
+    ]
+    lines.extend(f"{subject['sha256']}  {subject['file']}" for subject in _subjects(manifest))
+    arguments.output.parent.mkdir(parents=True, exist_ok=True)
+    arguments.output.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+
+def _paths(arguments: argparse.Namespace) -> None:
+    manifest = _load_manifest(arguments.manifest)
+    _verify_inventory(arguments.packages_dir, manifest)
+    for subject in _subjects(manifest):
+        if arguments.kind == "all" or subject["kind"] == arguments.kind:
+            print(subject["file"])
 
 
 def main() -> int:
@@ -94,7 +247,21 @@ def main() -> int:
     verify = subcommands.add_parser("verify")
     verify.add_argument("--packages-dir", type=Path, required=True)
     verify.add_argument("--manifest", type=Path, required=True)
+    verify.add_argument("--version")
+    verify.add_argument("--source-commit")
+    verify.add_argument("--allow-v1", action="store_true")
     verify.set_defaults(handler=_verify)
+
+    render = subcommands.add_parser("render-checksums")
+    render.add_argument("--manifest", type=Path, required=True)
+    render.add_argument("--output", type=Path, required=True)
+    render.set_defaults(handler=_render_checksums)
+
+    paths = subcommands.add_parser("paths")
+    paths.add_argument("--packages-dir", type=Path, required=True)
+    paths.add_argument("--manifest", type=Path, required=True)
+    paths.add_argument("--kind", choices=(*_SUBJECT_KINDS, "all"), required=True)
+    paths.set_defaults(handler=_paths)
 
     arguments = parser.parse_args()
     arguments.handler(arguments)
