@@ -1,3 +1,4 @@
+using ArchLinterNet.Core.History.Canonical;
 using ArchLinterNet.Core.History.Git;
 
 namespace ArchLinterNet.Core.History.Analysis;
@@ -53,7 +54,7 @@ internal sealed class LogicalFileIdentity
         return [.. _pathsOfGroup[group]
             .Where(path => !string.Equals(path, canonical, StringComparison.Ordinal))
             .OrderBy(path => firstOccurrenceOrder.TryGetValue(path, out int order) ? order : int.MaxValue)
-            .ThenBy(static path => path, GitScalarValueComparer.Instance)];
+            .ThenBy(static path => path, HistoryScalarValueComparer.Instance)];
     }
 
     private int Union(int left, int right)

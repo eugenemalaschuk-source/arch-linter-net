@@ -1,3 +1,4 @@
+using ArchLinterNet.Core.History.Canonical;
 using ArchLinterNet.Core.History.Git;
 
 namespace ArchLinterNet.Core.History.Analysis;
@@ -30,7 +31,7 @@ internal sealed class FileEvidenceBuilder(GitObjectDatabase objects, LogicalFile
             files.Add(new LogicalFile(identity.CanonicalPathOf(group), identity.AliasesOf(group, firstOccurrence), events));
         }
 
-        files.Sort(static (left, right) => GitPathDecoder.CompareScalarValue(left.CanonicalPath, right.CanonicalPath));
+        files.Sort(static (left, right) => HistoryScalarValueComparer.Compare(left.CanonicalPath, right.CanonicalPath));
         return files;
     }
 

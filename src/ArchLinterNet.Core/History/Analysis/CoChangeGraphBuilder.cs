@@ -1,4 +1,5 @@
 using ArchLinterNet.Core.Contracts;
+using ArchLinterNet.Core.History.Canonical;
 using ArchLinterNet.Core.History.Configuration;
 using ArchLinterNet.Core.History.Git;
 using ArchLinterNet.Core.History.Tasks;
@@ -323,7 +324,7 @@ internal sealed class CoChangeGraphBuilder(HistoryAnalysisConfiguration configur
     }
 
     private static int CompareVertices(CoChangeVertex left, CoChangeVertex right)
-        => GitPathDecoder.CompareScalarValue(left.CanonicalPath, right.CanonicalPath);
+        => HistoryScalarValueComparer.Compare(left.CanonicalPath, right.CanonicalPath);
 
     private static int ComparePairs(CoChangePair left, CoChangePair right)
     {

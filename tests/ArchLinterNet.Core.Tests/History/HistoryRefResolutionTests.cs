@@ -37,6 +37,21 @@ public sealed class HistoryRefResolutionTests
     }
 
     [Test]
+    public void SymbolicReferenceCycleFailsClosed()
+    {
+        using GitTestRepository repository = GitTestRepository.Create();
+        repository.Write("a.txt", "one\n");
+        repository.Commit("first");
+        string headsDirectory = Path.Combine(repository.Path, ".git", "refs", "heads");
+        File.WriteAllText(Path.Combine(headsDirectory, "loop-a"), "ref: refs/heads/loop-b\n");
+        File.WriteAllText(Path.Combine(headsDirectory, "loop-b"), "ref: refs/heads/loop-a\n");
+
+        HistoryDiagnostic diagnostic = HistoryIngestionFixture.Fail(repository, "loop-a", "HEAD");
+
+        Assert.That(diagnostic.KindText, Is.EqualTo("ref_cycle"));
+    }
+
+    [Test]
     public void RevisionExpressionsAreNotInterpreted()
     {
         using GitTestRepository repository = GitTestRepository.Create();

@@ -2,9 +2,8 @@ using System.Text;
 
 namespace ArchLinterNet.Core.History.Git;
 
-// Strict UTF-8 Git paths with no normalization and no locale fallback. Canonical ordering is by
-// Unicode scalar value, which is deliberately not the host's UTF-16 string ordering: a supplementary
-// scalar must sort above every BMP scalar.
+// Strict UTF-8 Git paths with no normalization and no locale fallback. Canonical scalar ordering is
+// owned by History.Canonical so reporting can share it without importing this raw decoder.
 internal static class GitPathDecoder
 {
     private static readonly UTF8Encoding _strictUtf8 = new(encoderShouldEmitUTF8Identifier: false, throwOnInvalidBytes: true);
@@ -25,34 +24,4 @@ internal static class GitPathDecoder
         }
     }
 
-    public static int CompareScalarValue(string left, string right)
-    {
-        int leftIndex = 0;
-        int rightIndex = 0;
-        while (leftIndex < left.Length && rightIndex < right.Length)
-        {
-            int leftScalar = NextScalar(left, ref leftIndex);
-            int rightScalar = NextScalar(right, ref rightIndex);
-            if (leftScalar != rightScalar)
-            {
-                return leftScalar < rightScalar ? -1 : 1;
-            }
-        }
-
-        return (left.Length - leftIndex).CompareTo(right.Length - rightIndex);
-    }
-
-    private static int NextScalar(string value, ref int index)
-    {
-        char current = value[index];
-        if (char.IsHighSurrogate(current) && index + 1 < value.Length && char.IsLowSurrogate(value[index + 1]))
-        {
-            int scalar = char.ConvertToUtf32(current, value[index + 1]);
-            index += 2;
-            return scalar;
-        }
-
-        index++;
-        return current;
-    }
 }
