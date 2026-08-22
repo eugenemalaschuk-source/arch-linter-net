@@ -1,11 +1,12 @@
 # release-artifact-provenance Specification
 
 ## Purpose
-TBD - created by archiving change attest-release-artifacts. Update Purpose after archive.
+Defines GitHub-hosted signed build provenance and independent verification for
+frozen pre-publication release subjects.
 ## Requirements
 ### Requirement: Frozen release subjects receive signed GitHub build provenance
-After Checkpoint B has accepted the immutable candidate, the release workflow
-SHALL re-verify its canonical v2 manifest and deterministic checksum evidence
+The release workflow SHALL, after Checkpoint B has accepted the immutable
+candidate, re-verify its canonical v2 manifest and deterministic checksum evidence
 before creating GitHub-hosted build-provenance attestations. It SHALL attest
 exactly every manifest-selected pre-publication `.nupkg` and `.snupkg` subject
 and, in a separate outer evidence inventory, exactly the canonical manifest and

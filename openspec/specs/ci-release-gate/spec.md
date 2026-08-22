@@ -45,7 +45,9 @@ the pinned OpenSpec CLI and run `openspec validate --all --strict` before
 evidence aggregation. The attestation-producing job SHALL use an immutable
 action commit pin and job-scoped `contents: read`, `id-token: write`, and
 `attestations: write` permissions; no unrelated job SHALL receive those
-attestation write permissions.
+attestation write permissions. The GitHub Release body SHALL append a stable
+link to the canonical provenance verification guide while retaining the same
+frozen package, manifest, and checksum attachment paths.
 
 #### Scenario: Strict OpenSpec validation fails
 - **WHEN** the strict OpenSpec gate fails or its pinned executable is unavailable
@@ -76,3 +78,6 @@ attestation write permissions.
   repository-, workflow-, and source-commit-bound attestation
 - **THEN** NuGet publication and GitHub Release attachment do not run
 
+#### Scenario: A GitHub Release is created
+- **WHEN** the `publish=true` path creates a GitHub Release from frozen attested subjects
+- **THEN** its generated body contains the stable canonical verification-guide link
