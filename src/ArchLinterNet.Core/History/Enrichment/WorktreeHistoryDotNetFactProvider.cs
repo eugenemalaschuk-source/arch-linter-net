@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using ArchLinterNet.Core.BuildState;
 using ArchLinterNet.Core.Contracts;
 using ArchLinterNet.Core.Discovery;
 using ArchLinterNet.Core.Execution;
@@ -44,6 +45,23 @@ internal sealed class WorktreeHistoryDotNetFactProvider : IHistoryDotNetFactProv
         if (discovery.Diagnostics.Count > 0 || discovery.DiscoveredProjects.Count == 0)
         {
             throw new HistoryDotNetEnrichmentUnavailableException("project_discovery_failed");
+        }
+
+        // Git cleanliness proves only tracked source state. The receipt/fingerprint authority is
+        // what proves ignored build output was produced from that same source state.
+        BuildStatePreflightResult preflight = BuildStatePreflightEvaluator.Evaluate(new BuildStatePreflightRequest(
+            repositoryRoot,
+            discovery,
+            new BuildStateResolvedAssemblies(Array.Empty<System.Reflection.Assembly>(), Array.Empty<string>())
+            {
+                ResolvedAssemblyPaths = discovery.ResolvedAssemblyPaths
+            },
+            BuildPreparationMode.Ordinary,
+            RequestedConfiguration: document.Analysis.Configuration,
+            RequestedTargetFramework: document.Analysis.TargetFramework));
+        if (preflight.Blocked)
+        {
+            throw new HistoryDotNetEnrichmentUnavailableException("build_state_unavailable");
         }
 
         ResolutionResult resolution;

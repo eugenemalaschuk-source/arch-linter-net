@@ -49,6 +49,7 @@ public sealed class HistoryDotNetEnricherTests
 
         HistoryDotNetEnrichment enrichment = enricher.Enrich(
             result, new HistoryIngestionRequest(repository.Path, first, second, requestDotNetEnrichment: true), "architecture/dependencies.arch.yml");
+        string gitOnlyJson = HistoryIngestionJsonWriter.Write(result);
         result.ApplyDotNetEnrichment(enrichment);
         HistoryDotNetFileEnrichment source = enrichment.Files.Single(file => file.CanonicalPath == "src/Widget.cs");
 
@@ -59,7 +60,7 @@ public sealed class HistoryDotNetEnricherTests
             Assert.That(source.Types, Is.EqualTo(new[] { type }));
             Assert.That(enrichment.Files.Single(file => file.CanonicalPath == "README.md").Status,
                 Is.EqualTo(HistoryDotNetFileEnrichmentStatus.NotApplicable));
-            Assert.That(HistoryIngestionJsonWriter.Write(result), Does.Contain("\"dotNetEnrichment\": {\n    \"status\": \"available\""));
+            Assert.That(HistoryIngestionJsonWriter.Write(result), Is.EqualTo(gitOnlyJson));
         });
     }
 
@@ -84,8 +85,8 @@ public sealed class HistoryDotNetEnricherTests
             Assert.That(enrichment.Reason, Is.EqualTo("revision_mismatch"));
             Assert.That(result.LogicalFiles.Single().CanonicalPath, Is.EqualTo("src/Widget.cs"));
             Assert.That(result.Commits.Single().TaskKeys.Single().IdText, Is.EqualTo("9"));
-            Assert.That(HistoryIngestionJsonWriter.Write(result), Does.Contain("\"reason\": \"revision_mismatch\""));
-            Assert.That(gitOnlyJson, Does.Contain("\"status\": \"not_requested\""));
+            Assert.That(HistoryIngestionJsonWriter.Write(result), Is.EqualTo(gitOnlyJson));
+            Assert.That(gitOnlyJson, Does.Not.Contain("dotNetEnrichment"));
         });
     }
 

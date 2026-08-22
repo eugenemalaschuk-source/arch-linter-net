@@ -17,11 +17,6 @@ internal static class HistoryIngestionTextWriter
         Append(text, $"commits: {result.Commits.Count.ToString(CultureInfo.InvariantCulture)} (excluded merges: {result.ExcludedMergeCount.ToString(CultureInfo.InvariantCulture)})");
         Append(text, $"rename candidates: {result.RenameCandidates.Count.ToString(CultureInfo.InvariantCulture)}");
         Append(text, $"logical files: {result.LogicalFiles.Count.ToString(CultureInfo.InvariantCulture)}");
-        Append(text, $".NET enrichment: {ToText(result.DotNetEnrichment.Status)}");
-        if (result.DotNetEnrichment.Reason is not null)
-        {
-            Append(text, $".NET enrichment reason: {result.DotNetEnrichment.Reason}");
-        }
         foreach (LogicalFile file in result.LogicalFiles)
         {
             string aliases = file.Aliases.Count == 0 ? string.Empty : $" (aliases: {string.Join(", ", file.Aliases)})";
@@ -33,11 +28,4 @@ internal static class HistoryIngestionTextWriter
 
     private static void Append(StringBuilder text, string line) => text.Append(line).Append('\n');
 
-    private static string ToText(Enrichment.HistoryDotNetEnrichmentStatus status) => status switch
-    {
-        Enrichment.HistoryDotNetEnrichmentStatus.NotRequested => "not_requested",
-        Enrichment.HistoryDotNetEnrichmentStatus.NotApplicable => "not_applicable",
-        Enrichment.HistoryDotNetEnrichmentStatus.Available => "available",
-        _ => "unavailable"
-    };
 }
