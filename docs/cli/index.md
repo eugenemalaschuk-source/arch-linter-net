@@ -14,6 +14,7 @@ arch-linter-net baseline verify --config <path> --baseline <path> [options]
 arch-linter-net policy check --policy <path> [options]
 arch-linter-net policy context --policy <path> [options]
 arch-linter-net policy weakening --base-context <path> --current-context <path> [options]
+arch-linter-net history analyze --from <rev> --to <rev> [--repository <path>] [--policy <path>] [--format json|markdown]
 arch-linter-net schema list
 arch-linter-net schema print <logical-id>
 arch-linter-net change snapshot --policy <path> --output <path> [options]
@@ -29,6 +30,26 @@ During repository development, replace `arch-linter-net` with:
 ```bash
 dotnet run --project src/ArchLinterNet.Cli --
 ```
+
+## Release forensics report
+
+`history analyze` evaluates an explicit exclusive `--from` / inclusive `--to`
+Git range and writes a versioned Release Architecture Forensics report. JSON is
+the default byte-canonical artifact; `--format markdown` writes the deterministic
+human-readable view instead.
+
+```bash
+arch-linter-net history analyze \
+  --from v0.3.1 \
+  --to v0.4.0 \
+  --policy architecture/dependencies.arch.yml \
+  --format markdown
+```
+
+Successful reports retain the finalized Git evidence, configuration identity,
+ranked evidence groups, optional-enrichment status, and evidence-backed
+refactoring candidates. A canonical-analysis error writes a separate stable
+diagnostic and no partial report.
 
 ## Packaged schemas
 

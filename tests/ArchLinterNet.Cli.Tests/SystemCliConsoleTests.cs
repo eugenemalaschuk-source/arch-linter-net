@@ -1,3 +1,4 @@
+using ArchLinterNet.Cli.Commands.History.Application;
 using ArchLinterNet.Cli.Infrastructure;
 using NUnit.Framework;
 
@@ -89,6 +90,31 @@ public sealed class SystemCliConsoleTests
         {
             Assert.That(outWriter.ToString(), Is.EqualTo("\u001b[31mred"));
             Assert.That(errorWriter.ToString(), Is.EqualTo("\u001b[33mwarning"));
+        });
+    }
+
+    [Test]
+    public void HistoryCanonicalJsonWritesDirectUtf8BytesWithoutBom()
+    {
+        using var textOutput = new StringWriter();
+        using var errorWriter = new StringWriter();
+        using var jsonBytes = new MemoryStream();
+        var console = new SystemCliConsole(
+            textOutput,
+            errorWriter,
+            outputRedirected: true,
+            errorRedirected: true,
+            canonicalJsonOutput: jsonBytes);
+        const string Json = "{\"canonicalPath\":\"src/café/😀.cs\"}\n";
+
+        bool succeeded = HistoryReportOutputWriter.TryWriteJson(console, () => Json);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(succeeded, Is.True);
+            Assert.That(textOutput.ToString(), Is.Empty);
+            Assert.That(errorWriter.ToString(), Is.Empty);
+            Assert.That(jsonBytes.ToArray(), Is.EqualTo("{\"canonicalPath\":\"src/café/😀.cs\"}\n"u8.ToArray()));
         });
     }
 }

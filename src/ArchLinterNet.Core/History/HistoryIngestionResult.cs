@@ -1,5 +1,5 @@
+using ArchLinterNet.Core.Contracts;
 using ArchLinterNet.Core.History.Analysis;
-using ArchLinterNet.Core.History.Enrichment;
 
 namespace ArchLinterNet.Core.History;
 
@@ -18,7 +18,10 @@ internal sealed class HistoryIngestionResult(
     IReadOnlyList<LogicalFile> logicalFiles,
     CoChangeGraph coChangeGraph,
     HistoryBottleneckAnalysis bottleneckAnalysis,
-    HistoryOcpAnalysis ocpAnalysis)
+    HistoryOcpAnalysis ocpAnalysis,
+    HistoryAnalysisConfiguration? configuration = null,
+    HistoryHotspotAnalysis? hotspotAnalysis = null,
+    HistoryEnrichmentProjection? enrichment = null)
 {
     public string ObjectFormatName { get; } = objectFormatName;
 
@@ -46,7 +49,9 @@ internal sealed class HistoryIngestionResult(
 
     public HistoryOcpAnalysis OcpAnalysis { get; } = ocpAnalysis;
 
-    public HistoryDotNetEnrichment DotNetEnrichment { get; private set; } = HistoryDotNetEnrichment.NotRequested;
+    public HistoryAnalysisConfiguration Configuration { get; } = configuration ?? new HistoryAnalysisConfiguration();
 
-    internal void ApplyDotNetEnrichment(HistoryDotNetEnrichment enrichment) => DotNetEnrichment = enrichment;
+    public HistoryHotspotAnalysis HotspotAnalysis { get; } = hotspotAnalysis ?? new HistoryHotspotAnalysis([]);
+
+    public HistoryEnrichmentProjection Enrichment { get; } = enrichment ?? HistoryEnrichmentProjection.NotRequested;
 }
