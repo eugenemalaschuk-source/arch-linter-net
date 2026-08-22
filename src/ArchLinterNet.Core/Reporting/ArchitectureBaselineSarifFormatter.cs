@@ -116,7 +116,9 @@ public static class ArchitectureBaselineSarifFormatter
         }
     }
 
-    private static Dictionary<string, object?> BuildResult(BaselineLifecycleEntry lifecycle)
+    internal static Dictionary<string, object?> BuildResult(
+        BaselineLifecycleEntry lifecycle,
+        string? ruleId = null)
     {
         ArchitectureBaselineComparisonEntry entry = lifecycle.Entry;
         ArchitectureFinding finding = ArchitectureFindingMapper.FromBaseline(lifecycle);
@@ -145,7 +147,7 @@ public static class ArchitectureBaselineSarifFormatter
 
         return new Dictionary<string, object?>
         {
-            ["ruleId"] = entry.ContractId,
+            ["ruleId"] = ruleId ?? entry.ContractId,
             ["level"] = lifecycle.Lifecycle is BaselineEntryLifecycle.Matched ? "note" : "warning",
             ["message"] = new Dictionary<string, string>
             {

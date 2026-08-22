@@ -2,6 +2,7 @@ using System.Text;
 using System.Text.Json;
 using ArchLinterNet.Core.Model;
 using ArchLinterNet.Core.PolicyWeakening;
+using ArchLinterNet.Core.Reporting;
 
 namespace ArchLinterNet.Core.Validation;
 
@@ -160,23 +161,13 @@ public static class ArchitectureDebtGateFormatter
     private static Dictionary<string, object?> BuildPersistentSarifResult(BaselineLifecycleEntry lifecycle)
     {
         ArchitectureBaselineComparisonEntry entry = lifecycle.Entry;
-        return new Dictionary<string, object?>
-        {
-            ["ruleId"] = "ArchLinterNet.DebtGate.Persistent." + entry.ContractId,
-            ["level"] = lifecycle.Lifecycle is BaselineEntryLifecycle.Matched ? "note" : "warning",
-            ["message"] = new Dictionary<string, string>
-            {
-                ["text"] = $"[{BaselineEntryLifecycleNames.WireName(lifecycle.Lifecycle)}] {entry.SourceType} -> {entry.ForbiddenReference}",
-            },
-            ["properties"] = new Dictionary<string, object?>
-            {
-                ["gate_section"] = "persistent_debt",
-                ["baseline_status"] = BaselineEntryLifecycleNames.WireName(lifecycle.Lifecycle),
-                ["canonical_identity"] = entry.Identity,
-                ["contract_group"] = entry.ContractGroup,
-                ["contract_id"] = entry.ContractId,
-            },
-        };
+        Dictionary<string, object?> result = ArchitectureBaselineSarifFormatter.BuildResult(
+            lifecycle,
+            "ArchLinterNet.DebtGate.Persistent." + entry.ContractId);
+        var properties = (Dictionary<string, object?>)result["properties"]!;
+        properties["gate_section"] = "persistent_debt";
+        properties["canonical_identity"] = ArchitectureFindingMapper.FromBaseline(lifecycle).CanonicalIdentity;
+        return result;
     }
 
     private static Dictionary<string, object?> BuildWeakeningSarifResult(ArchitecturePolicyWeakeningFinding finding) => new()

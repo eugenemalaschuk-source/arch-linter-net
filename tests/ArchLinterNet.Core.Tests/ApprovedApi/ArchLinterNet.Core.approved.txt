@@ -477,6 +477,7 @@ sealed class ArchLinterNet.Core.Composition.ArchitectureEngine : System.IAsyncDi
   method ArchLinterNet.Core.Graph.ArchitectureGraphOutcome BuildGraph(ArchLinterNet.Core.Graph.ArchitectureGraphRequest request)
   method ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextExport ExportPolicyContext(ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextRequest request)
   method ArchLinterNet.Core.Validation.ArchitectureAnalysisSnapshot CreateSnapshot(ArchLinterNet.Core.Validation.AnalysisSnapshotRequest request, ArchLinterNet.Core.Reporting.ValidationTiming? timing = null)
+  method ArchLinterNet.Core.Validation.ArchitectureDebtGateOutcome EvaluateDebtGate(ArchLinterNet.Core.Validation.ArchitectureDebtGateRequest request)
   method ArchLinterNet.Core.Validation.BaselineDiffOutcome DiffBaseline(ArchLinterNet.Core.Validation.BaselineDiffRequest request)
   method ArchLinterNet.Core.Validation.BaselineGenerationOutcome GenerateBaseline(ArchLinterNet.Core.Validation.BaselineGenerationRequest request)
   method ArchLinterNet.Core.Validation.BaselineMigrateOutcome MigrateBaseline(ArchLinterNet.Core.Validation.BaselineMigrateRequest request)
@@ -4300,6 +4301,8 @@ interface ArchLinterNet.Core.Validation.Abstractions.IArchitectureBaselineApplic
   method ArchLinterNet.Core.Validation.BaselinePruneOutcome Prune(ArchLinterNet.Core.Validation.BaselinePruneRequest request)
   method ArchLinterNet.Core.Validation.BaselineUpdateOutcome Update(ArchLinterNet.Core.Validation.BaselineUpdateRequest request)
   method ArchLinterNet.Core.Validation.BaselineVerifyOutcome Verify(ArchLinterNet.Core.Validation.BaselineVerifyRequest request)
+interface ArchLinterNet.Core.Validation.Abstractions.IArchitectureDebtGateApplicationService
+  method ArchLinterNet.Core.Validation.ArchitectureDebtGateOutcome Evaluate(ArchLinterNet.Core.Validation.ArchitectureDebtGateRequest request)
 interface ArchLinterNet.Core.Validation.Abstractions.IArchitecturePolicyCheckApplicationService
   method ArchLinterNet.Core.Validation.PolicyCheckOutcome Check(string policyPath)
 interface ArchLinterNet.Core.Validation.Abstractions.IArchitecturePublicApiApplicationService
@@ -4410,6 +4413,65 @@ sealed class ArchLinterNet.Core.Validation.ArchitectureBaselineApplicationServic
   method ArchLinterNet.Core.Validation.BaselineVerifyOutcome Verify(ArchLinterNet.Core.Validation.BaselineVerifyRequest request)
 static class ArchLinterNet.Core.Validation.ArchitectureBaselineService
   method static ArchLinterNet.Core.Validation.BaselineGenerationOutcome Generate(ArchLinterNet.Core.Validation.BaselineGenerationRequest request)
+sealed class ArchLinterNet.Core.Validation.ArchitectureDebtGateApplicationService : ArchLinterNet.Core.Validation.Abstractions.IArchitectureDebtGateApplicationService
+  ctor(ArchLinterNet.Core.Validation.Abstractions.IArchitectureBaselineApplicationService baselineService)
+  method ArchLinterNet.Core.Validation.ArchitectureDebtGateOutcome Evaluate(ArchLinterNet.Core.Validation.ArchitectureDebtGateRequest request)
+sealed class ArchLinterNet.Core.Validation.ArchitectureDebtGateEvaluation : System.IEquatable<ArchLinterNet.Core.Validation.ArchitectureDebtGateEvaluation>
+  ctor(bool Completed, string Mode, System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Model.BuildStatePreflightDiagnostic> PreflightDiagnostics)
+  method ArchLinterNet.Core.Validation.ArchitectureDebtGateEvaluation <Clone>$()
+  method bool Equals(ArchLinterNet.Core.Validation.ArchitectureDebtGateEvaluation? other)
+  method bool Equals(object? obj)
+  method int GetHashCode()
+  method string ToString()
+  method void Deconstruct(out bool Completed, out string Mode, out System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Model.BuildStatePreflightDiagnostic> PreflightDiagnostics)
+  operator !=(ArchLinterNet.Core.Validation.ArchitectureDebtGateEvaluation? left, ArchLinterNet.Core.Validation.ArchitectureDebtGateEvaluation? right)
+  operator ==(ArchLinterNet.Core.Validation.ArchitectureDebtGateEvaluation? left, ArchLinterNet.Core.Validation.ArchitectureDebtGateEvaluation? right)
+  property System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Model.BuildStatePreflightDiagnostic> PreflightDiagnostics {get;init;}
+  property bool Completed {get;init;}
+  property string Mode {get;init;}
+static class ArchLinterNet.Core.Validation.ArchitectureDebtGateFormatter
+  method static string FormatAsHuman(ArchLinterNet.Core.Validation.ArchitectureDebtGateOutcome outcome)
+  method static string FormatAsJson(ArchLinterNet.Core.Validation.ArchitectureDebtGateOutcome outcome)
+  method static string FormatAsSarif(ArchLinterNet.Core.Validation.ArchitectureDebtGateOutcome outcome, string toolVersion)
+sealed class ArchLinterNet.Core.Validation.ArchitectureDebtGateOutcome : System.IEquatable<ArchLinterNet.Core.Validation.ArchitectureDebtGateOutcome>
+  ctor(bool Succeeded, bool Passed, ArchLinterNet.Core.Validation.ArchitectureDebtGateEvaluation Evaluation, ArchLinterNet.Core.Validation.BaselineVerifyOutcome PersistentDebt)
+  method ArchLinterNet.Core.Validation.ArchitectureDebtGateOutcome <Clone>$()
+  method bool Equals(ArchLinterNet.Core.Validation.ArchitectureDebtGateOutcome? other)
+  method bool Equals(object? obj)
+  method int GetHashCode()
+  method string ToString()
+  method void Deconstruct(out bool Succeeded, out bool Passed, out ArchLinterNet.Core.Validation.ArchitectureDebtGateEvaluation Evaluation, out ArchLinterNet.Core.Validation.BaselineVerifyOutcome PersistentDebt)
+  operator !=(ArchLinterNet.Core.Validation.ArchitectureDebtGateOutcome? left, ArchLinterNet.Core.Validation.ArchitectureDebtGateOutcome? right)
+  operator ==(ArchLinterNet.Core.Validation.ArchitectureDebtGateOutcome? left, ArchLinterNet.Core.Validation.ArchitectureDebtGateOutcome? right)
+  property ArchLinterNet.Core.PolicyWeakening.ArchitecturePolicyWeakeningResult? PolicyWeakening {get;init;}
+  property ArchLinterNet.Core.Validation.ArchitectureDebtGateEvaluation Evaluation {get;init;}
+  property ArchLinterNet.Core.Validation.BaselineVerifyOutcome PersistentDebt {get;init;}
+  property bool Passed {get;init;}
+  property bool PolicyWeakeningRequested {get;init;}
+  property bool Succeeded {get;init;}
+sealed class ArchLinterNet.Core.Validation.ArchitectureDebtGateRequest : System.IEquatable<ArchLinterNet.Core.Validation.ArchitectureDebtGateRequest>
+  ctor()
+  method ArchLinterNet.Core.Validation.ArchitectureDebtGateRequest <Clone>$()
+  method bool Equals(ArchLinterNet.Core.Validation.ArchitectureDebtGateRequest? other)
+  method bool Equals(object? obj)
+  method int GetHashCode()
+  method string ToString()
+  operator !=(ArchLinterNet.Core.Validation.ArchitectureDebtGateRequest? left, ArchLinterNet.Core.Validation.ArchitectureDebtGateRequest? right)
+  operator ==(ArchLinterNet.Core.Validation.ArchitectureDebtGateRequest? left, ArchLinterNet.Core.Validation.ArchitectureDebtGateRequest? right)
+  property ArchLinterNet.Core.BuildState.BuildPreparationMode PreparationMode {get;init;}
+  property ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextExport? BasePolicyContext {get;init;}
+  property ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextExport? CurrentPolicyContext {get;init;}
+  property System.Collections.Generic.IReadOnlyCollection<string>? ContractIds {get;init;}
+  property System.Threading.CancellationToken CancellationToken {get;init;}
+  property bool NoRestore {get;init;}
+  property string BaselinePath {get;init;}
+  property string Mode {get;init;}
+  property string PolicyPath {get;init;}
+  property string? ConditionSetName {get;init;}
+  property string? RequestedConfiguration {get;init;}
+  property string? RequestedPlatform {get;init;}
+  property string? RequestedRuntimeIdentifier {get;init;}
+  property string? RequestedTargetFramework {get;init;}
 sealed class ArchLinterNet.Core.Validation.ArchitecturePublicApiApplicationService : ArchLinterNet.Core.Validation.Abstractions.IArchitecturePublicApiApplicationService
   ctor(ArchLinterNet.Core.Execution.Abstractions.IArchitectureRunnerSetupService runnerSetupService, ArchLinterNet.Core.BuildState.IBuildStatePreparationService buildStatePreparationService, ArchLinterNet.Core.Contracts.Abstractions.IPublicApiSnapshotStore snapshotStore)
   method ArchLinterNet.Core.Validation.PublicApiCaptureOutcome Capture(ArchLinterNet.Core.Validation.PublicApiCaptureRequest request)
