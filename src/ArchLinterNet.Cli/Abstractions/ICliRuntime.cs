@@ -222,6 +222,18 @@ internal interface ICliRuntime
 
     BaselineMigrateOutcome MigrateBaseline(BaselineMigrateRequest request);
 
+    ArchitectureDebtGateOutcome EvaluateDebtGate(ArchitectureDebtGateRequest request) =>
+        throw new NotSupportedException("Architecture debt gate is not configured for this CLI runtime.");
+
+    string FormatDebtGateAsHuman(ArchitectureDebtGateOutcome outcome) =>
+        ArchitectureDebtGateFormatter.FormatAsHuman(outcome);
+
+    string FormatDebtGateAsJson(ArchitectureDebtGateOutcome outcome) =>
+        ArchitectureDebtGateFormatter.FormatAsJson(outcome);
+
+    string FormatDebtGateAsSarif(ArchitectureDebtGateOutcome outcome) =>
+        ArchitectureDebtGateFormatter.FormatAsSarif(outcome, Version);
+
     PublicApiCaptureOutcome CapturePublicApi(PublicApiCaptureRequest request);
 
     PublicApiDiffOutcome DiffPublicApi(PublicApiDiffRequest request);

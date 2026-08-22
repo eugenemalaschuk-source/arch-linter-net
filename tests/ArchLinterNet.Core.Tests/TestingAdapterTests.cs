@@ -1,5 +1,6 @@
 using ArchLinterNet.Core.Model;
 using ArchLinterNet.Core.Reporting;
+using ArchLinterNet.Core.Validation;
 using ArchLinterNet.Testing;
 using NUnit.Framework;
 
@@ -524,6 +525,27 @@ baseline:
             Assert.That(
                 ArchitectureViolationIdentityJson.Serialize(outcome.Frozen[0].Identity!),
                 Is.EqualTo(ArchitectureFindingMapper.FromViolation(current).CanonicalIdentity));
+        });
+    }
+
+    [Test]
+    public void EvaluateDebtGate_ExposesMatchedPersistentDebtWithoutParsingOutput()
+    {
+        string contractPath = WriteSelfForbiddenPolicy();
+        string baselinePath = Path.Combine(_tempDir, "baseline.yml");
+        File.WriteAllText(baselinePath, "version: 2\nbaseline: {}\n");
+
+        ArchitectureDebtGateOutcome outcome = ArchitectureAssertions.FromPolicy(contractPath)
+            .WithContracts("harmless")
+            .WithBaseline(baselinePath)
+            .EvaluateDebtGate("strict");
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(outcome.Passed, Is.True);
+            Assert.That(outcome.PersistentDebt.New, Is.Empty);
+            Assert.That(outcome.PersistentDebt.Frozen, Is.Empty);
+            Assert.That(outcome.PolicyWeakening, Is.Null);
         });
     }
 

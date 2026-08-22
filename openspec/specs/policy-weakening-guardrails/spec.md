@@ -146,6 +146,8 @@ classified as semantic scope weakening.
 
 ### Requirement: Unsupported typed-fact changes remain bounded
 
+The comparator SHALL keep unsupported typed-fact changes within a deterministic bounded outcome.
+
 When a typed contract fact changes but no supported directional comparison rule
 applies for that fact's actual shape, the comparator SHALL emit one
 deterministic `impact_not_proven` finding with canonical base/current fact
@@ -204,4 +206,3 @@ semantic scope weakening.
   does not prove whether project discovery supplies effective assemblies
 - **THEN** comparison reports `impact_not_proven` rather than semantic scope
   weakening
-

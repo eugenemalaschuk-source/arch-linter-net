@@ -529,3 +529,28 @@ A coverage baseline entry whose underlying gap has since been resolved (the
 namespace became covered, or the rule reference became resolved again) is
 reported as a stale baseline entry through the same
 `unmatched_ignored_violations` mechanism described above.
+
+## Gate new debt without rewriting the baseline
+
+After a baseline is reviewed, CI can compare complete current architecture
+results through the read-only gate:
+
+```bash
+arch-linter-net gate \
+  --policy architecture/dependencies.arch.yml \
+  --baseline architecture/baseline.arch.yml \
+  --mode all \
+  --format json
+```
+
+Matched entries are reported as existing reviewed debt. New entries, a second
+canonical occurrence, an identically named type from another assembly, resolved
+entries, stale/configuration entries, and ambiguous entries remain distinct and
+fail the gate rather than being silently accepted. `gate` does not modify the
+file; use the explicit baseline lifecycle commands only after review.
+
+To include policy-change protection, provide the optional base/current
+effective-policy context artifacts. Those findings are a separate guardrail:
+an `error` can fail the combined gate while no persistent finding is new, while
+a `warn` or `impact_not_proven` result remains review evidence and is never
+stored in `baseline.yml` merely to make CI green.

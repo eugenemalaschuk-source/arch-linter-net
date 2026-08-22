@@ -105,6 +105,39 @@ For existing repositories with known debt:
 
 The baseline should be reviewed like code and cleaned up as violations are fixed.
 
+### New-debt gate with policy-weakening guardrails
+
+Use `gate` when CI needs one read-only decision over both exact reviewed
+persistent debt and the separate change-time policy-weakening guardrail. It is
+not a third validation mode: `strict` and `audit` retain their usual meanings,
+and `--mode all` merely collects complete candidates from both existing modes.
+
+```yaml
+- name: Export base policy context
+  run: git worktree add --detach .ci-base origin/main && dotnet arch-linter-net policy context --policy .ci-base/architecture/dependencies.arch.yml --format json > base-policy-context.json
+
+- name: Export current policy context
+  run: dotnet arch-linter-net policy context --policy architecture/dependencies.arch.yml --format json > current-policy-context.json
+
+- name: Reject new architecture debt and policy weakening
+  run: dotnet arch-linter-net gate \
+    --policy architecture/dependencies.arch.yml \
+    --baseline architecture/baseline.arch.yml \
+    --base-context base-policy-context.json \
+    --current-context current-policy-context.json \
+    --format json > architecture-debt-gate.json
+```
+
+The base context must be exported from the base policy state, not reloaded from
+the current checkout. The gate returns `1` for a new, resolved, stale,
+configuration-error, or ambiguous persistent-debt comparison and for an
+`error` policy-weakening finding. `warn` and `impact_not_proven` weakening
+records remain visible without becoming baseline debt. It returns `2` for
+missing/incomplete inputs or blocked complete analysis; CI must fail closed.
+
+`gate` never writes a baseline. Use `baseline diff`, `update`, or `prune` in a
+separate reviewed maintenance change.
+
 ### CI reads baselines; it never writes them
 
 CI runs only the read-only baseline commands:

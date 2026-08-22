@@ -30,7 +30,8 @@ _acceptance-test: | _lint-dotnet
 # same policy through the ArchLinterNet.Testing adapter as parity evidence inside `make test`; it is
 # not a second definition of success.
 lint-architecture:  ## Canonical read-only strict self-policy gate (builds and verifies the project graph)
-	@dotnet run --project "$(CLI_PROJECT)" -- \
+	@dotnet build "$(SLNX)" --nologo --no-restore -m:1
+	@dotnet run --no-build --project "$(CLI_PROJECT)" -- \
 		--policy "$(POLICY)" --mode strict --ensure-built
 
 audit-architecture:  ## Run diagnostic architecture audit contracts

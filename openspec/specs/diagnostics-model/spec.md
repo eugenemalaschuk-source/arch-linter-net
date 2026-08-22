@@ -151,6 +151,8 @@ kinds, ordering, and compatibility for diagnostics without policy provenance.
 
 ### Requirement: Every diagnostic subtype is recognized at every concrete-subtype dispatch point
 
+Every concrete-subtype dispatch point SHALL preserve the evidence of recognized diagnostic subtypes.
+
 Formatting adapters that read shared display fields (`SourceType`, `ForbiddenNamespace`, `ForbiddenReferences`)
 off a diagnostic by pattern-matching on its concrete `ArchitectureDiagnostic` subtype SHALL include every
 subtype that declares those fields. Introducing a new diagnostic subtype without extending every such
@@ -211,4 +213,3 @@ comparison projections SHALL consume that identity without reconstructing it fro
 #### Scenario: Rendering does not affect a finding identity
 - **WHEN** the same validation result is rendered sequentially to human, JSON, SARIF, or Testing output
 - **THEN** every projection SHALL expose the same canonical identity for the finding.
-

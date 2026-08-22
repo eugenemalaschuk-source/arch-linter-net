@@ -1188,6 +1188,8 @@ ordering. A valid Git-only result SHALL remain reportable without enrichment.
 - **THEN** enrichment does not split, merge, or otherwise modify the finalized logical-file identity
 
 ### Requirement: Release-closure dogfood and conformance evidence
+The release process SHALL retain deterministic dogfood and conformance evidence before the story closes.
+
 Before a Release Architecture Forensics v1 release story closes, the repository
 SHALL retain a repository-safe deterministic dogfood summary for at least one
 real ArchLinterNet release range. The summary SHALL record separate authored
@@ -1231,4 +1233,3 @@ implementation.
 - **THEN** the release story records the observation without retuning those
   semantics and a separate reviewed specification/migration change is required
   before implementing it
-

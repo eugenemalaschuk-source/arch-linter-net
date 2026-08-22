@@ -373,6 +373,8 @@ The compatibility workflow SHALL maintain one reusable synthetic adopter corpus 
 - **THEN** the recorded evidence identifies the exercised scenarios and platform while retaining Checkpoint B as the only release authorization gate
 
 ### Requirement: Canonical identity requalification has an explicit baseline lifecycle
+The baseline lifecycle SHALL require explicit review when canonical identity changes.
+
 When a structured baseline identity gains required canonical qualification, documentation and
 machine comparison results SHALL direct users to review `changed`, `stale`, or `ambiguous` entries
 and explicitly update or recapture before pruning. The system SHALL not automatically approve,
@@ -424,4 +426,3 @@ long-term shape once its blocker is fixed.
 - **WHEN** a consumer scenario this line is intended to fix still requires a workaround-shaped
   policy or build wrapper when driven from the packed candidate
 - **THEN** the release gate records the failure and the line is not authorized for publication
-

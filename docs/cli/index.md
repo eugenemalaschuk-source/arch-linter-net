@@ -354,6 +354,35 @@ closure rather than the CLI host's default runtime closure.
 See [Migration baselines](../guides/migration-baselines.md) for the full
 lifecycle walkthrough.
 
+## Architecture debt gate
+
+`gate` is the explicit CI composition layer for reviewed persistent debt and,
+when requested, policy-weakening guardrails. It does not replace `strict` or
+`audit`, and it does not write a baseline.
+
+```bash
+arch-linter-net gate \
+  --policy architecture/dependencies.arch.yml \
+  --baseline architecture/baseline.arch.yml \
+  --base-context base-policy-context.json \
+  --current-context current-policy-context.json \
+  --mode all \
+  --format json
+```
+
+`--baseline` is required. `--base-context` and `--current-context` are optional
+but must be supplied together, and must be separately exported from the base
+and current policy states. The command accepts `strict`, `audit`, or `all` for
+candidate collection, repeatable `--contract`, `--condition-set`, and the same
+`--ensure-built`, `--no-restore`, `--configuration`, `--framework`,
+`--platform`, and `--runtime` selectors as `baseline verify`.
+
+It exits `0` only when the persistent comparison is in sync and no
+error-severity weakening is present; `1` identifies new or untrusted debt
+state, or error-severity weakening; `2` identifies invalid/unreadable inputs or
+blocked analysis. Human, JSON, and SARIF output all keep persistent debt and
+policy weakening in separate typed sections.
+
 ## Architecture change reports
 
 `change snapshot` records a complete strict or audit analysis as a versioned,
