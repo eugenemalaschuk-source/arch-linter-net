@@ -18,7 +18,7 @@ public sealed partial class CheckpointBReleaseGateTests
         private readonly string _candidateVersion;
         private readonly string _repositoryRoot;
         private readonly string _shell;
-        private readonly IReadOnlyList<PackageEvidence> _packages;
+        private readonly IReadOnlyList<PackagePairEvidence> _packages;
         private readonly string _manifestSha256;
 
         private static readonly JsonSerializerOptions _evidenceSerializerOptions = new()
@@ -28,7 +28,7 @@ public sealed partial class CheckpointBReleaseGateTests
         };
 
         private CandidatePackageFeed(string root, string candidateVersion, string repositoryRoot, string feed,
-            string shell, IReadOnlyList<PackageEvidence> packages, string manifestSha256)
+            string shell, IReadOnlyList<PackagePairEvidence> packages, string manifestSha256)
         {
             _root = root;
             _feed = feed;
@@ -60,7 +60,7 @@ public sealed partial class CheckpointBReleaseGateTests
                 throw new InvalidOperationException($"Checkpoint B candidate feed '{feed}' does not exist.");
             }
 
-            (IReadOnlyList<PackageEvidence> packages, string manifestSha256) = LoadManifest(feed, candidateVersion, packCandidate);
+            (IReadOnlyList<PackagePairEvidence> packages, string manifestSha256) = LoadManifest(feed, candidateVersion, packCandidate);
             string shell = Environment.GetEnvironmentVariable("CHECKPOINT_B_SHELL") ?? NativeShell();
             var candidate = new CandidatePackageFeed(root, candidateVersion, repositoryRoot, feed, shell, packages, manifestSha256);
             candidate.PopulateIsolatedDependencyCache();
@@ -599,7 +599,7 @@ public sealed partial class CheckpointBReleaseGateTests
             Assert.That(result.ExitCode, Is.EqualTo(0), result.CombinedOutput);
         }
 
-        private static (IReadOnlyList<PackageEvidence> Packages, string ManifestSha256) LoadManifest(
+        private static (IReadOnlyList<PackagePairEvidence> Packages, string ManifestSha256) LoadManifest(
             string feed, string candidateVersion, bool createdLocally)
         {
             string? manifestPath = Environment.GetEnvironmentVariable("CHECKPOINT_B_PACKAGE_MANIFEST");
@@ -613,37 +613,56 @@ public sealed partial class CheckpointBReleaseGateTests
                 string path = Path.GetFullPath(manifestPath);
                 using JsonDocument document = JsonDocument.Parse(File.ReadAllText(path));
                 JsonElement root = document.RootElement;
-                Assert.That(root.GetProperty("schema").GetString(), Is.EqualTo("checkpoint-b-candidate-manifest/v1"));
+                Assert.That(root.GetProperty("schema").GetString(), Is.EqualTo("checkpoint-b-candidate-manifest/v2"));
                 Assert.That(root.GetProperty("version").GetString(), Is.EqualTo(candidateVersion));
-                PackageEvidence[] packages = root.GetProperty("packages").EnumerateArray()
-                    .Select(package => new PackageEvidence(
+                PackagePairEvidence[] packages = root.GetProperty("packages").EnumerateArray()
+                    .Select(package => new PackagePairEvidence(
                         package.GetProperty("id").GetString()!,
                         package.GetProperty("version").GetString()!,
-                        package.GetProperty("file").GetString()!,
-                        package.GetProperty("size").GetInt64(),
-                        package.GetProperty("sha256").GetString()!))
+                        ReadSubject(package.GetProperty("package")),
+                        ReadSubject(package.GetProperty("symbols"))))
                     .ToArray();
-                foreach (PackageEvidence package in packages)
+                foreach (PackagePairEvidence package in packages)
                 {
-                    string packagePath = Path.Combine(feed, package.File);
-                    Assert.Multiple(() =>
+                    foreach (PackageSubjectEvidence subject in new[] { package.Package, package.Symbols })
                     {
-                        Assert.That(new FileInfo(packagePath).Length, Is.EqualTo(package.Size), package.File);
-                        Assert.That(Sha256(packagePath), Is.EqualTo(package.Sha256), package.File);
-                    });
+                        string packagePath = Path.Combine(feed, subject.File);
+                        Assert.Multiple(() =>
+                        {
+                            Assert.That(new FileInfo(packagePath).Length, Is.EqualTo(subject.Size), subject.File);
+                            Assert.That(Sha256(packagePath), Is.EqualTo(subject.Sha256), subject.File);
+                        });
+                    }
                 }
 
                 return (packages, Sha256(path));
             }
 
-            PackageEvidence[] localPackages = _packageIds.Select(packageId =>
+            PackagePairEvidence[] localPackages = _packageIds.Select(packageId =>
             {
-                string path = Path.Combine(feed, $"{packageId}.{candidateVersion}.nupkg");
-                return new PackageEvidence(packageId, candidateVersion, Path.GetFileName(path), new FileInfo(path).Length, Sha256(path));
+                string packagePath = Path.Combine(feed, $"{packageId}.{candidateVersion}.nupkg");
+                string symbolsPath = Path.Combine(feed, $"{packageId}.{candidateVersion}.snupkg");
+                return new PackagePairEvidence(
+                    packageId,
+                    candidateVersion,
+                    CreateSubject("package", packagePath),
+                    CreateSubject("symbols", symbolsPath));
             }).ToArray();
             string localManifest = JsonSerializer.Serialize(localPackages);
             return (localPackages, Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(localManifest))));
         }
+
+        private static PackageSubjectEvidence ReadSubject(JsonElement subject) => new(
+            subject.GetProperty("kind").GetString()!,
+            subject.GetProperty("file").GetString()!,
+            subject.GetProperty("size").GetInt64(),
+            subject.GetProperty("sha256").GetString()!);
+
+        private static PackageSubjectEvidence CreateSubject(string kind, string path) => new(
+            kind,
+            Path.GetFileName(path),
+            new FileInfo(path).Length,
+            Sha256(path));
 
         private static string NativeShell() => OperatingSystem.IsWindows() ? "pwsh" : "bash";
 

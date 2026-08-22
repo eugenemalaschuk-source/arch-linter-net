@@ -33,6 +33,28 @@ or workaround-shaped consumer policy blocks publication. A dry-run is evidence
 for its own immutable artifact only: a later publish run creates and validates a
 new candidate artifact.
 
+### Pre-publication package identity
+
+The canonical candidate manifest is the one authority for project-controlled
+pre-publication package bytes. For every shipped package ID it records an
+explicit pair of the primary `.nupkg` and corresponding `.snupkg`, including
+their filenames, sizes, and SHA-256 digests. Checkpoint B, NuGet publication,
+and GitHub Release attachment re-verify and consume that exact paired inventory;
+the workflow does not rebuild a publishable subject after manifest creation.
+
+The workflow also attaches `package-checksums.txt`, a deterministic
+human-readable rendering derived mechanically from the canonical manifest. It
+is convenient verification evidence, not a second checksum authority, and is
+not recursively included as a hashed subject in the package manifest. The
+canonical JSON manifest is attached alongside it.
+
+These digests identify the exact project-controlled bytes before upload. A
+later NuGet.org download of a primary package can have different raw bytes
+because NuGet.org repository-signs submissions; verify that package under
+NuGet's repository-signature and package-identity rules rather than expecting
+pre-upload SHA-256 equality. This boundary says nothing about post-upload
+symbol-service behavior, which follows its own supported NuGet.org contract.
+
 Before publication, verify the generated release notes, the
 [evergreen adoption/upgrade guide](../guides/upgrading.md), and installed-schema
 commands against the candidate packages. Release-specific history belongs in
@@ -178,7 +200,8 @@ After dry-run artifacts are checked, rerun the workflow with the same release sc
 Expected public result:
 
 - packages are pushed to NuGet.org;
-- duplicate pushes are skipped for safer reruns;
+- an existing primary package causes a fail-closed error; inspect the paired
+  primary/symbol state on NuGet.org before deciding on a corrected release path;
 - GitHub tag and release are created from the workflow commit;
 - generated package assets are attached to the GitHub Release;
 - MkDocs product documentation is built and deployed to GitHub Pages.
