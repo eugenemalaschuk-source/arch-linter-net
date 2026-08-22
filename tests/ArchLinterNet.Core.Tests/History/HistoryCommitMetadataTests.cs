@@ -1,6 +1,7 @@
 using System.Text;
 using ArchLinterNet.Core.History;
 using ArchLinterNet.Core.History.Analysis;
+using ArchLinterNet.Core.History.Evidence;
 using NUnit.Framework;
 
 namespace ArchLinterNet.Core.Tests.History;
@@ -90,6 +91,25 @@ public sealed class HistoryCommitMetadataTests
             "committer A <a@example.com> 1700000900 +0000",
             "second",
             extraHeaders: "author B <b@example.com> 1700000900 +0000\n");
+
+        HistoryDiagnostic diagnostic = HistoryIngestionFixture.Fail(repository, first, second);
+
+        Assert.That(diagnostic.KindText, Is.EqualTo("commit_metadata_malformed"));
+        Assert.That(diagnostic.ObjectId, Is.EqualTo(second));
+    }
+
+    [Test]
+    public void ADuplicateCommitterHeaderFailsClosed()
+    {
+        using GitTestRepository repository = GitTestRepository.Create();
+        string first = SyntheticCommit(repository, [], "author A <a@example.com> 1700000000 +0000", "committer A <a@example.com> 1700000000 +0000", "root");
+        string second = SyntheticCommit(
+            repository,
+            [first],
+            "author A <a@example.com> 1700000900 +0000",
+            "committer A <a@example.com> 1700000900 +0000",
+            "second",
+            extraHeaders: "committer B <b@example.com> 1700000900 +0000\n");
 
         HistoryDiagnostic diagnostic = HistoryIngestionFixture.Fail(repository, first, second);
 

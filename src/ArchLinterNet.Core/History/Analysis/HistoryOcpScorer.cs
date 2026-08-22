@@ -1,6 +1,7 @@
 using ArchLinterNet.Core.Contracts;
+using ArchLinterNet.Core.History.Canonical;
 using ArchLinterNet.Core.History.Configuration;
-using ArchLinterNet.Core.History.Git;
+using ArchLinterNet.Core.History.Evidence;
 using ArchLinterNet.Core.History.Tasks;
 
 namespace ArchLinterNet.Core.History.Analysis;
@@ -80,7 +81,7 @@ internal sealed class HistoryOcpScorer
             start = end;
         }
 
-        tokens.Sort(GitPathDecoder.CompareScalarValue);
+        tokens.Sort(HistoryScalarValueComparer.Compare);
         return tokens.Distinct(StringComparer.Ordinal).ToArray();
     }
 
@@ -189,7 +190,7 @@ internal sealed class HistoryOcpScorer
         }
 
         int byCommitCount = right.RawEvidence.CommitCount.CompareTo(left.RawEvidence.CommitCount);
-        return byCommitCount != 0 ? byCommitCount : GitPathDecoder.CompareScalarValue(left.CanonicalPath, right.CanonicalPath);
+        return byCommitCount != 0 ? byCommitCount : HistoryScalarValueComparer.Compare(left.CanonicalPath, right.CanonicalPath);
     }
 
     private static string FilenameStem(string path)

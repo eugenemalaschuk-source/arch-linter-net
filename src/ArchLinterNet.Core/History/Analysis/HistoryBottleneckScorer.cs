@@ -1,7 +1,8 @@
 using System.Numerics;
 using ArchLinterNet.Core.Contracts;
+using ArchLinterNet.Core.History.Canonical;
 using ArchLinterNet.Core.History.Configuration;
-using ArchLinterNet.Core.History.Git;
+using ArchLinterNet.Core.History.Evidence;
 using ArchLinterNet.Core.History.Tasks;
 
 namespace ArchLinterNet.Core.History.Analysis;
@@ -83,11 +84,11 @@ internal sealed class HistoryBottleneckScorer
             .Select(fileEvent => commits.TryGetValue(fileEvent.CommitId, out CommitEvidence? evidence)
                 ? evidence
                 : throw new InvalidOperationException($"Canonical file event references unknown commit '{fileEvent.CommitId}'."))
-            .OrderBy(static evidence => evidence.Commit, Comparer<GitCommit>.Create(GitCommit.CompareCanonical))
+            .OrderBy(static evidence => evidence, Comparer<CommitEvidence>.Create(CommitEvidence.CompareCanonical))
             .ToList();
         TaskKey[] taskKeys = fileCommits.SelectMany(static evidence => evidence.TaskKeys).Distinct().Order().ToArray();
         string[] authors = fileCommits.Select(static evidence => evidence.CanonicalAuthor).Distinct(StringComparer.Ordinal).ToArray();
-        Array.Sort(authors, GitPathDecoder.CompareScalarValue);
+        Array.Sort(authors, HistoryScalarValueComparer.Compare);
         List<BottleneckTaskPair> pairs = BuildIndependentPairs(taskKeys, fileCommits);
         HashSet<TaskKey> independentKeys = [];
         foreach (BottleneckTaskPair pair in pairs)
@@ -262,7 +263,7 @@ internal sealed class HistoryBottleneckScorer
     private static int CompareFindings(HistoryBottleneckFinding left, HistoryBottleneckFinding right)
     {
         int byScore = right.Score.CompareTo(left.Score);
-        return byScore != 0 ? byScore : GitPathDecoder.CompareScalarValue(left.CanonicalPath, right.CanonicalPath);
+        return byScore != 0 ? byScore : HistoryScalarValueComparer.Compare(left.CanonicalPath, right.CanonicalPath);
     }
 
     private sealed class Candidate(CoChangeVertex vertex, BottleneckRawEvidence rawEvidence)

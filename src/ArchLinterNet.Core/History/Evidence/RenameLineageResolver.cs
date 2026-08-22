@@ -1,6 +1,6 @@
 using ArchLinterNet.Core.History.Git;
 
-namespace ArchLinterNet.Core.History.Analysis;
+namespace ArchLinterNet.Core.History.Evidence;
 
 // Builds the candidate endpoint-overlap graph `H` and decides which components canonicalize.
 //

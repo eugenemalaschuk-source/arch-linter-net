@@ -1,6 +1,7 @@
+using ArchLinterNet.Core.History.Canonical;
 using ArchLinterNet.Core.History.Git;
 
-namespace ArchLinterNet.Core.History.Analysis;
+namespace ArchLinterNet.Core.History.Evidence;
 
 // Baseline same-path identity plus accepted-lineage unions. Every event whose canonical path string
 // is exactly equal shares one identity across the whole analyzed range — deliberately including
@@ -53,7 +54,7 @@ internal sealed class LogicalFileIdentity
         return [.. _pathsOfGroup[group]
             .Where(path => !string.Equals(path, canonical, StringComparison.Ordinal))
             .OrderBy(path => firstOccurrenceOrder.TryGetValue(path, out int order) ? order : int.MaxValue)
-            .ThenBy(static path => path, GitScalarValueComparer.Instance)];
+            .ThenBy(static path => path, HistoryScalarValueComparer.Instance)];
     }
 
     private int Union(int left, int right)

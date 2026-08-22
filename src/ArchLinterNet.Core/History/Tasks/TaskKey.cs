@@ -1,6 +1,6 @@
 using System.Globalization;
 using System.Numerics;
-using ArchLinterNet.Core.History.Git;
+using ArchLinterNet.Core.History.Canonical;
 
 namespace ArchLinterNet.Core.History.Tasks;
 
@@ -24,7 +24,7 @@ internal readonly struct TaskKey(string keyNamespace, BigInteger id) : IEquatabl
 
     public int CompareTo(TaskKey other)
     {
-        int byNamespace = GitPathDecoder.CompareScalarValue(Namespace, other.Namespace);
+        int byNamespace = HistoryScalarValueComparer.Compare(Namespace, other.Namespace);
         return byNamespace != 0 ? byNamespace : Id.CompareTo(other.Id);
     }
 

@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Text;
 using ArchLinterNet.Core.Contracts;
 using ArchLinterNet.Core.History;
@@ -41,6 +42,36 @@ public sealed class HistoryCanonicalJsonTests
         string secondRun = HistoryIngestionJsonWriter.Write(HistoryIngestionFixture.Succeed(repository, first, second));
 
         Assert.That(secondRun, Is.EqualTo(firstRun));
+    }
+
+    [Test]
+    [NonParallelizable]
+    public void CanonicalBytesIgnorePresentationCulture()
+    {
+        using GitTestRepository repository = GitTestRepository.Create();
+        repository.Write("café.txt", "one\n");
+        string first = repository.Commit("first");
+        repository.Write("café.txt", "one\ntwo\n");
+        string second = repository.Commit("second #12");
+        CultureInfo originalCulture = CultureInfo.CurrentCulture;
+        CultureInfo originalUiCulture = CultureInfo.CurrentUICulture;
+        try
+        {
+            CultureInfo.CurrentCulture = CultureInfo.GetCultureInfo("tr-TR");
+            CultureInfo.CurrentUICulture = CultureInfo.GetCultureInfo("tr-TR");
+            string turkish = HistoryIngestionJsonWriter.Write(HistoryIngestionFixture.Succeed(repository, first, second));
+
+            CultureInfo.CurrentCulture = CultureInfo.InvariantCulture;
+            CultureInfo.CurrentUICulture = CultureInfo.InvariantCulture;
+            string invariant = HistoryIngestionJsonWriter.Write(HistoryIngestionFixture.Succeed(repository, first, second));
+
+            Assert.That(turkish, Is.EqualTo(invariant));
+        }
+        finally
+        {
+            CultureInfo.CurrentCulture = originalCulture;
+            CultureInfo.CurrentUICulture = originalUiCulture;
+        }
     }
 
     [Test]

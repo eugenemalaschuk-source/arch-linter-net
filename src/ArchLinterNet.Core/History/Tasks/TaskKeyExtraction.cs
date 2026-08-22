@@ -1,5 +1,6 @@
 using System.Text;
 using ArchLinterNet.Core.Contracts;
+using ArchLinterNet.Core.History.Canonical;
 using ArchLinterNet.Core.History.Git;
 using ArchLinterNet.Core.History.Tasks.Abstractions;
 
@@ -34,7 +35,7 @@ internal sealed class TaskKeyExtraction(IReadOnlyList<ITaskKeyExtractor> extract
             .Distinct()
             .OrderBy(static match => match.SpanStart)
             .ThenBy(static match => match.SpanEnd)
-            .ThenBy(static match => match.ExtractorId, GitScalarValueComparer.Instance)
+            .ThenBy(static match => match.ExtractorId, HistoryScalarValueComparer.Instance)
             .ThenBy(static match => match.Key)
             .ToList();
 

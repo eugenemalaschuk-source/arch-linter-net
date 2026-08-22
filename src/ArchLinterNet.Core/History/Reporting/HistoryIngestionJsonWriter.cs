@@ -1,6 +1,7 @@
 using ArchLinterNet.Core.History.Analysis;
+using ArchLinterNet.Core.History.Canonical;
 using ArchLinterNet.Core.History.Configuration;
-using ArchLinterNet.Core.History.Git;
+using ArchLinterNet.Core.History.Evidence;
 using ArchLinterNet.Core.History.Tasks;
 
 namespace ArchLinterNet.Core.History.Reporting;
@@ -11,7 +12,7 @@ internal static class HistoryIngestionJsonWriter
 {
     private const string ReportKind = "release-architecture-forensics";
     private const string HistorySemanticsVersion = "v1";
-    private static readonly IComparer<string> _scalarStringComparer = Comparer<string>.Create(GitPathDecoder.CompareScalarValue);
+    private static readonly IComparer<string> _scalarStringComparer = HistoryScalarValueComparer.Instance;
 
     public static string Write(HistoryIngestionResult result)
     {

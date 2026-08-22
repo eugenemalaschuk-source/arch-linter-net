@@ -1,4 +1,4 @@
-using ArchLinterNet.Core.History.Git;
+using ArchLinterNet.Core.History.Canonical;
 
 namespace ArchLinterNet.Core.History.Reporting;
 
@@ -6,7 +6,7 @@ namespace ArchLinterNet.Core.History.Reporting;
 // affect any Git-derived evidence, finding, score, rank, or candidate decision.
 internal static class HistoryReportEnrichmentWriter
 {
-    private static readonly IComparer<string> _scalarStringComparer = Comparer<string>.Create(GitPathDecoder.CompareScalarValue);
+    private static readonly IComparer<string> _scalarStringComparer = HistoryScalarValueComparer.Instance;
 
     public static void Write(CanonicalJsonWriter writer, HistoryEnrichmentProjection enrichment)
     {

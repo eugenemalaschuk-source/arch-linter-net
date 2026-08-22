@@ -1,4 +1,4 @@
-namespace ArchLinterNet.Core.History.Analysis;
+namespace ArchLinterNet.Core.History.Evidence;
 
 // Canonical text churn: raw LF-separated byte lines and the mathematical LCS length. Only the length
 // matters, so the totals cannot depend on Myers/histogram/patience tie-breaking, Git attributes,
