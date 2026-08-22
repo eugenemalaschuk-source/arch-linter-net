@@ -1,18 +1,44 @@
 using ArchLinterNet.Core.History.Analysis;
 using ArchLinterNet.Core.History.Configuration;
+using ArchLinterNet.Core.History.Git;
 using ArchLinterNet.Core.History.Tasks;
 
 namespace ArchLinterNet.Core.History.Reporting;
 
-// The minimal deterministic ingestion result #236 owns. It carries the provenance
-// release-architecture-forensics declares mandatory; the versioned successful report schema stays
-// owned by #243.
+// The versioned successful report is a read-only projection of finalized canonical evidence. It
+// neither reads Git/policy input nor recalculates a finding, preserving the fail-closed boundary.
 internal static class HistoryIngestionJsonWriter
 {
+    private const string ReportKind = "release-architecture-forensics";
+    private const string HistorySemanticsVersion = "v1";
+    private static readonly IComparer<string> _scalarStringComparer = Comparer<string>.Create(GitPathDecoder.CompareScalarValue);
+
     public static string Write(HistoryIngestionResult result)
     {
         CanonicalJsonWriter writer = new();
         writer.BeginObject();
+        writer.WriteNumber("schemaVersion", 1);
+        writer.WriteString("kind", ReportKind);
+        writer.WriteString("historySemanticsVersion", HistorySemanticsVersion);
+        writer.WriteString("toolVersion", ToolVersion());
+        WriteAnalysis(writer, result);
+        WriteCommits(writer, result);
+        WriteRenameCandidates(writer, result);
+        WriteRenameComponents(writer, result);
+        WriteLogicalFiles(writer, result);
+        WriteHotspotAnalysis(writer, result.HotspotAnalysis);
+        WriteCoChangeGraph(writer, result);
+        WriteBottleneckAnalysis(writer, result.BottleneckAnalysis);
+        WriteOcpAnalysis(writer, result.OcpAnalysis);
+        HistoryReportEnrichmentWriter.Write(writer, result.Enrichment);
+        HistoryReportCandidateWriter.Write(writer, result);
+        writer.EndObject();
+        return writer.ToCanonicalText() + "\n";
+    }
+
+    private static void WriteAnalysis(CanonicalJsonWriter writer, HistoryIngestionResult result)
+    {
+        writer.BeginObject("analysis");
         writer.WriteString("objectFormat", result.ObjectFormatName);
         writer.BeginObject("range");
         writer.WriteString("authoredFrom", result.AuthoredFrom);
@@ -20,17 +46,85 @@ internal static class HistoryIngestionJsonWriter
         writer.WriteString("resolvedFrom", result.ResolvedFrom);
         writer.WriteString("resolvedTo", result.ResolvedTo);
         writer.EndObject();
+        writer.WriteNumber("analyzedCommitCount", result.Commits.Count);
         writer.WriteNumber("excludedMergeCount", result.ExcludedMergeCount);
-        WriteCommits(writer, result);
-        WriteRenameCandidates(writer, result);
-        WriteRenameComponents(writer, result);
-        WriteLogicalFiles(writer, result);
-        WriteCoChangeGraph(writer, result);
-        WriteBottleneckAnalysis(writer, result.BottleneckAnalysis);
-        WriteOcpAnalysis(writer, result.OcpAnalysis);
+        WriteConfiguration(writer, result.Configuration);
         writer.EndObject();
-        return writer.ToCanonicalText() + "\n";
     }
+
+    private static void WriteConfiguration(CanonicalJsonWriter writer, Contracts.HistoryAnalysisConfiguration configuration)
+    {
+        writer.BeginObject("historyAnalysisConfiguration");
+        writer.BeginArray("builtInExtractors");
+        writer.WriteStringElement("issue");
+        writer.EndArray();
+        writer.BeginArray("extractors");
+        foreach (Contracts.HistoryTaskExtractorConfiguration extractor in configuration.Extractors.OrderBy(static item => item.Id, _scalarStringComparer))
+        {
+            writer.BeginObject();
+            writer.WriteString("id", extractor.Id);
+            writer.WriteString("namespace", extractor.Namespace);
+            writer.BeginObject("pattern");
+            writer.WriteString("prefix", extractor.Pattern.Prefix);
+            writer.WriteString("suffix", extractor.Pattern.Suffix);
+            writer.EndObject();
+            writer.EndObject();
+        }
+
+        writer.EndArray();
+        writer.BeginObject("paths");
+        WriteSortedStrings(writer, "production", configuration.Paths.Production);
+        WriteSortedStrings(writer, "tests", configuration.Paths.Tests);
+        WriteSortedStrings(writer, "docs", configuration.Paths.Docs);
+        WriteSortedStrings(writer, "generated", configuration.Paths.Generated);
+        WriteSortedStrings(writer, "buildCi", configuration.Paths.BuildCi);
+        WriteSortedStrings(writer, "samplesExamples", configuration.Paths.SamplesExamples);
+        writer.EndObject();
+        WriteSortedStrings(writer, "ignore", configuration.Ignore);
+        writer.BeginObject("weights");
+        writer.BeginObject("hotspot");
+        writer.WriteCanonicalDecimal("commit", configuration.Weights.Hotspot.Commit);
+        writer.WriteCanonicalDecimal("churn", configuration.Weights.Hotspot.Churn);
+        writer.WriteCanonicalDecimal("task", configuration.Weights.Hotspot.Task);
+        writer.WriteCanonicalDecimal("author", configuration.Weights.Hotspot.Author);
+        writer.WriteCanonicalDecimal("temporal", configuration.Weights.Hotspot.Temporal);
+        writer.EndObject();
+        writer.BeginObject("coChange");
+        writer.WriteCanonicalDecimal("commit", configuration.Weights.CoChange.Commit);
+        writer.WriteCanonicalDecimal("task", configuration.Weights.CoChange.Task);
+        writer.EndObject();
+        writer.BeginObject("bottleneck");
+        writer.WriteCanonicalDecimal("independentTask", configuration.Weights.Bottleneck.IndependentTask);
+        writer.WriteCanonicalDecimal("author", configuration.Weights.Bottleneck.Author);
+        writer.WriteCanonicalDecimal("temporal", configuration.Weights.Bottleneck.Temporal);
+        writer.WriteCanonicalDecimal("degree", configuration.Weights.Bottleneck.Degree);
+        writer.WriteCanonicalDecimal("centrality", configuration.Weights.Bottleneck.Centrality);
+        writer.EndObject();
+        writer.BeginObject("ocp");
+        writer.WriteCanonicalDecimal("independentTask", configuration.Weights.Ocp.IndependentTask);
+        writer.WriteCanonicalDecimal("centrality", configuration.Weights.Ocp.Centrality);
+        writer.WriteCanonicalDecimal("repeatedEdit", configuration.Weights.Ocp.RepeatedEdit);
+        writer.WriteCanonicalDecimal("roleHint", configuration.Weights.Ocp.RoleHint);
+        writer.EndObject();
+        writer.EndObject();
+        writer.BeginObject("thresholds");
+        writer.WriteOptionalCanonicalDecimal("coChangeSignificance", configuration.Thresholds.CoChangeSignificance);
+        writer.EndObject();
+        writer.EndObject();
+    }
+
+    private static void WriteSortedStrings(CanonicalJsonWriter writer, string propertyName, IEnumerable<string> values)
+    {
+        writer.BeginArray(propertyName);
+        foreach (string value in values.OrderBy(static item => item, _scalarStringComparer))
+        {
+            writer.WriteStringElement(value);
+        }
+
+        writer.EndArray();
+    }
+
+    private static string ToolVersion() => typeof(HistoryIngestionJsonWriter).Assembly.GetName().Version?.ToString(3) ?? "unknown";
 
     private static void WriteCommits(CanonicalJsonWriter writer, HistoryIngestionResult result)
     {
@@ -173,6 +267,95 @@ internal static class HistoryIngestionJsonWriter
         writer.EndArray();
     }
 
+    private static void WriteHotspotAnalysis(CanonicalJsonWriter writer, HistoryHotspotAnalysis analysis)
+    {
+        writer.BeginArray("hotspotGroups");
+        foreach (HotspotCategoryGroup group in analysis.Groups)
+        {
+            writer.BeginObject();
+            writer.WriteString("category", CategoryText(group.Category));
+            writer.BeginArray("findings");
+            foreach (HotspotFinding finding in group.Findings)
+            {
+                WriteHotspotFinding(writer, finding);
+            }
+
+            writer.EndArray();
+            writer.EndObject();
+        }
+
+        writer.EndArray();
+    }
+
+    private static void WriteHotspotFinding(CanonicalJsonWriter writer, HotspotFinding finding)
+    {
+        writer.BeginObject();
+        writer.WriteString("id", FindingId("hotspot", finding.Category, finding.CanonicalPath));
+        writer.WriteString("canonicalPath", finding.CanonicalPath);
+        WriteStringArray(writer, "aliases", finding.Aliases);
+        writer.WriteBoolean("pathnameReuseMayConflateGenerations", finding.RawEvidence.PathnameReuseMayConflateGenerations);
+        writer.WriteNumber("commitCount", finding.RawEvidence.CommitCount);
+        writer.WriteNumber("churn", finding.RawEvidence.Churn);
+        writer.WriteNumber("taskSpread", finding.RawEvidence.TaskSpread);
+        writer.WriteNumber("authorSpread", finding.RawEvidence.AuthorSpread);
+        writer.WriteIntegerText("temporalSpanSeconds", finding.RawEvidence.TemporalSpanSeconds.ToString(System.Globalization.CultureInfo.InvariantCulture));
+        writer.BeginArray("lineCountStatuses");
+        foreach (LineCountStatus status in finding.RawEvidence.LineCountStatuses)
+        {
+            writer.WriteStringElement(LineCountStatusText(status));
+        }
+
+        writer.EndArray();
+        writer.BeginObject("components");
+        writer.WriteCanonicalDecimal("commit", finding.Components.Commit);
+        writer.WriteCanonicalDecimal("churn", finding.Components.Churn);
+        writer.WriteCanonicalDecimal("task", finding.Components.Task);
+        writer.WriteCanonicalDecimal("author", finding.Components.Author);
+        writer.WriteCanonicalDecimal("temporal", finding.Components.Temporal);
+        writer.EndObject();
+        writer.BeginObject("weights");
+        writer.WriteCanonicalDecimal("commit", finding.Weights.Commit);
+        writer.WriteCanonicalDecimal("churn", finding.Weights.Churn);
+        writer.WriteCanonicalDecimal("task", finding.Weights.Task);
+        writer.WriteCanonicalDecimal("author", finding.Weights.Author);
+        writer.WriteCanonicalDecimal("temporal", finding.Weights.Temporal);
+        writer.EndObject();
+        writer.WriteCanonicalDecimal("score", finding.Score);
+        writer.BeginArray("taskKeys");
+        foreach (TaskKey key in finding.RawEvidence.TaskKeys)
+        {
+            WriteTaskKey(writer, key);
+        }
+
+        writer.EndArray();
+        writer.BeginArray("taskKeyProvenance");
+        foreach (HotspotTaskKeyProvenance item in finding.RawEvidence.TaskKeyProvenance)
+        {
+            writer.BeginObject();
+            writer.WriteString("commitId", item.CommitId);
+            writer.WriteString("extractorId", item.Match.ExtractorId);
+            WriteTaskKey(writer, "task", item.Match.Key);
+            writer.WriteNumber("spanStart", item.Match.SpanStart);
+            writer.WriteNumber("spanEnd", item.Match.SpanEnd);
+            writer.WriteString("text", item.Match.MatchedText);
+            writer.EndObject();
+        }
+
+        writer.EndArray();
+        WriteStringArray(writer, "canonicalAuthors", finding.RawEvidence.CanonicalAuthors);
+        writer.BeginArray("authorProvenance");
+        foreach (HotspotAuthorProvenance item in finding.RawEvidence.AuthorProvenance)
+        {
+            writer.BeginObject();
+            writer.WriteString("commitId", item.CommitId);
+            writer.WriteString("author", item.CanonicalAuthor);
+            writer.EndObject();
+        }
+
+        writer.EndArray();
+        writer.EndObject();
+    }
+
     private static void WriteCoChangeGraph(CanonicalJsonWriter writer, HistoryIngestionResult result)
     {
         CoChangeGraph graph = result.CoChangeGraph;
@@ -231,6 +414,7 @@ internal static class HistoryIngestionJsonWriter
     private static void WriteOcpFinding(CanonicalJsonWriter writer, HistoryOcpFinding finding)
     {
         writer.BeginObject();
+        writer.WriteString("id", FindingId("ocp-pressure", finding.Category, finding.CanonicalPath));
         writer.WriteString("canonicalPath", finding.CanonicalPath);
         WriteStringArray(writer, "aliases", finding.Aliases);
         writer.WriteBoolean("pathnameReuseMayConflateGenerations", finding.RawEvidence.PathnameReuseMayConflateGenerations);
@@ -284,6 +468,7 @@ internal static class HistoryIngestionJsonWriter
     private static void WriteBottleneckFinding(CanonicalJsonWriter writer, HistoryBottleneckFinding finding)
     {
         writer.BeginObject();
+        writer.WriteString("id", FindingId("bottleneck", finding.Category, finding.CanonicalPath));
         writer.WriteString("canonicalPath", finding.CanonicalPath);
         writer.BeginArray("aliases");
         foreach (string alias in finding.Aliases)
@@ -485,6 +670,7 @@ internal static class HistoryIngestionJsonWriter
         foreach (CoChangeCluster cluster in graph.Clusters)
         {
             writer.BeginObject();
+            writer.WriteString("id", ClusterId(cluster));
             WriteCohort(writer, cluster.Cohort);
             writer.WriteCanonicalDecimal("maximum", cluster.Maximum);
             writer.WriteCanonicalDecimal("aggregate", cluster.Aggregate);
@@ -556,4 +742,21 @@ internal static class HistoryIngestionJsonWriter
         HistoryPathCategory.Unknown => "unknown",
         _ => "unknown",
     };
+
+    internal static string FindingId(string kind, HistoryPathCategory category, string path) => $"{kind}:{CategoryText(category)}:{path}";
+
+    internal static string ClusterId(CoChangeCluster cluster)
+    {
+        string members = string.Concat(cluster.Members.Select(static item => $"{item.CanonicalPath.Length}:{item.CanonicalPath}"));
+        return $"co-change-cluster:{CategoryText(cluster.Cohort.First)}:{CategoryText(cluster.Cohort.Second)}:{members}";
+    }
+
+    private static string LineCountStatusText(LineCountStatus status) => status switch
+    {
+        LineCountStatus.Text => "text",
+        LineCountStatus.ExactRename => "exact_rename",
+        LineCountStatus.BinaryOrUnavailable => "binary_or_unavailable",
+        _ => "unknown",
+    };
+
 }

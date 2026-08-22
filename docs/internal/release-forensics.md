@@ -5,12 +5,12 @@ Architecture Forensics introduced by #234. It is owned by #235 and synchronized
 with the
 [OpenSpec capability](../../openspec/specs/release-architecture-forensics/spec.md).
 
-Its ingestion half is implemented by #236, which ships the internal
-`arch-linter-net history ingest` command and the canonical Git evidence it emits.
-The policy-backed configuration described in #237 and the internal `G0`/
-`Gtheta` co-change evidence described in #239 are now implemented. Hotspot,
-bottleneck, OCP, enrichment, and the versioned report schema remain planned
-behavior for #238 and #240–#244 rather than a shipped surface.
+Its Git-only analysis and reporting are implemented through #243. Use
+`arch-linter-net history analyze` to emit the versioned JSON report or its
+deterministic Markdown view. The policy-backed configuration, hotspots,
+`G0`/`Gtheta` co-change evidence, bottlenecks, OCP pressure, and
+evidence-backed investigation candidates are all Git-only report inputs.
+Optional .NET enrichment remains a downstream projection owned by #242.
 
 ## Product boundary
 
@@ -705,6 +705,22 @@ Reports state at least:
 - normalized scores compare only inside their declared cohort;
 - role hints are bounded heuristics;
 - humans decide whether to refactor.
+
+### Report command and formats
+
+Run a report over an explicit exclusive `from` and inclusive `to` range:
+
+```bash
+arch-linter-net history analyze --from <from-ref> --to <to-ref> --policy architecture/dependencies.arch.yml
+arch-linter-net history analyze --from <from-ref> --to <to-ref> --format markdown
+```
+
+JSON is the canonical successful artifact. It has schema version `1`, stable
+finding/candidate IDs, exact finalized Git evidence, the effective
+`history_analysis` configuration, a versioned enrichment status, and candidates
+that reference their source evidence. Markdown is a deterministic reading view;
+it cannot alter JSON bytes. A failed canonical analysis emits only the separate
+deterministic diagnostic, never a partial report or candidate set.
 
 ## Verification vectors for downstream implementation
 

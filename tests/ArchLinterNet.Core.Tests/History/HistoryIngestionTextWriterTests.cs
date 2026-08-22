@@ -1,4 +1,3 @@
-using ArchLinterNet.Core.History;
 using ArchLinterNet.Core.History.Reporting;
 using NUnit.Framework;
 
@@ -8,42 +7,41 @@ namespace ArchLinterNet.Core.Tests.History;
 public sealed class HistoryIngestionTextWriterTests
 {
     [Test]
-    public void SummarizesRangeCommitsAndLogicalFiles()
+    public void RendersDeterministicMarkdownWithReportSectionsAndLimits()
     {
         using GitTestRepository repository = GitTestRepository.Create();
         repository.Write("src/Old.cs", "one\ntwo\n");
         string first = repository.Commit("first #5");
         repository.Move("src/Old.cs", "src/New.cs");
-        string second = repository.Commit("rename");
+        string second = repository.Commit("rename #6");
 
-        string text = HistoryIngestionTextWriter.Write(HistoryIngestionFixture.Succeed(repository, first, second));
-        string[] lines = text.Split('\n');
+        string markdown = HistoryIngestionTextWriter.Write(HistoryIngestionFixture.Succeed(repository, first, second));
 
         Assert.Multiple(() =>
         {
-            Assert.That(lines[0], Is.EqualTo("object format: sha1"));
-            Assert.That(lines[1], Does.StartWith($"from: {first} -> {first}"));
-            Assert.That(lines[2], Does.StartWith($"to: {second} -> {second}"));
-            Assert.That(lines[3], Is.EqualTo("commits: 1 (excluded merges: 0)"));
-            Assert.That(lines[4], Is.EqualTo("rename candidates: 1"));
-            Assert.That(lines[5], Is.EqualTo("logical files: 1"));
-            Assert.That(lines[6], Is.EqualTo("  src/New.cs (aliases: src/Old.cs): commits=1 additions=0 deletions=0 churn=0"));
-            Assert.That(text, Does.EndWith("\n"));
+            Assert.That(markdown, Does.StartWith("# Release Architecture Forensics\n"));
+            Assert.That(markdown, Does.Contain("## Analysis identity"));
+            Assert.That(markdown, Does.Contain("## Hotspots"));
+            Assert.That(markdown, Does.Contain("## Co-change clusters"));
+            Assert.That(markdown, Does.Contain("## Parallel-development bottlenecks"));
+            Assert.That(markdown, Does.Contain("## OCP pressure"));
+            Assert.That(markdown, Does.Contain("## Refactoring candidates"));
+            Assert.That(markdown, Does.Contain("## Enrichment"));
+            Assert.That(markdown, Does.Contain("## Interpretation limits"));
+            Assert.That(markdown, Does.Contain("Churn is change volume, not complexity."));
+            Assert.That(markdown, Does.EndWith("\n"));
         });
     }
 
     [Test]
-    public void OmitsTheAliasParenthesesWhenALogicalFileHasNoAliases()
+    public void RepresentsAnEmptyCandidateSetExplicitly()
     {
         using GitTestRepository repository = GitTestRepository.Create();
         repository.Write("a.txt", "one\n");
         string first = repository.Commit("first");
-        repository.Write("a.txt", "one\ntwo\n");
-        string second = repository.Commit("second");
 
-        string text = HistoryIngestionTextWriter.Write(HistoryIngestionFixture.Succeed(repository, first, second));
+        string markdown = HistoryIngestionTextWriter.Write(HistoryIngestionFixture.Succeed(repository, first, first));
 
-        Assert.That(text, Does.Contain("  a.txt: commits=1 additions=1 deletions=0 churn=1"));
-        Assert.That(text, Does.Not.Contain("aliases"));
+        Assert.That(markdown, Does.Contain("No qualifying candidates."));
     }
 }

@@ -67,6 +67,7 @@ internal sealed class HistoryIngestionService(
         CoChangeGraph coChangeGraph = new CoChangeGraphBuilder(configuration).Build(files, commits, components);
         HistoryBottleneckAnalysis bottleneckAnalysis = new HistoryBottleneckScorer().Score(commits, coChangeGraph, configuration);
         HistoryOcpAnalysis ocpAnalysis = new HistoryOcpScorer().Score(bottleneckAnalysis, coChangeGraph, configuration);
+        HistoryHotspotAnalysis hotspotAnalysis = new HistoryHotspotScorer().Score(commits, files, configuration);
         candidates.Sort(RenameCandidate.CompareCanonical);
         return new HistoryIngestionResult(
             layout.ObjectFormatName,
@@ -81,7 +82,10 @@ internal sealed class HistoryIngestionService(
             files,
             coChangeGraph,
             bottleneckAnalysis,
-            ocpAnalysis);
+            ocpAnalysis,
+            configuration,
+            hotspotAnalysis,
+            HistoryEnrichmentProjection.NotRequested);
     }
 
     private CommitEvidence BuildCommitEvidence(GitCommit commit)

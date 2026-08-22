@@ -17,14 +17,24 @@ internal sealed class HistoryHotspotScorer
     public HistoryHotspotAnalysis Score(HistoryIngestionResult result, HistoryAnalysisConfiguration configuration)
     {
         ArgumentNullException.ThrowIfNull(result);
+        return Score(result.Commits, result.LogicalFiles, configuration);
+    }
+
+    public HistoryHotspotAnalysis Score(
+        IReadOnlyList<CommitEvidence> commitEvidence,
+        IReadOnlyList<LogicalFile> logicalFiles,
+        HistoryAnalysisConfiguration configuration)
+    {
+        ArgumentNullException.ThrowIfNull(commitEvidence);
+        ArgumentNullException.ThrowIfNull(logicalFiles);
         ArgumentNullException.ThrowIfNull(configuration);
 
-        Dictionary<string, CommitEvidence> commits = result.Commits.ToDictionary(
+        Dictionary<string, CommitEvidence> commits = commitEvidence.ToDictionary(
             static evidence => evidence.Commit.Id.Hex,
             StringComparer.Ordinal);
         var classifier = new HistoryPathClassifier(configuration);
         List<Candidate> candidates = [];
-        foreach (LogicalFile file in result.LogicalFiles)
+        foreach (LogicalFile file in logicalFiles)
         {
             HistoryPathClassification classification = classifier.Classify(file.CanonicalPath);
             if (!classification.IsIgnored)

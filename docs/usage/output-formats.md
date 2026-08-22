@@ -5,6 +5,21 @@ ArchLinterNet supports human-readable output for local development, JSON output 
 For report routing, partial-output, profile, and cancellation workflows, see
 [Adopt or Upgrade ArchLinterNet](../guides/upgrading.md#reports-artifacts-and-completion-status).
 
+## Release forensics report output
+
+`arch-linter-net history analyze --from <rev> --to <rev>` writes the version-1
+Release Architecture Forensics JSON report to standard output. Its canonical
+bytes use UTF-8 without BOM, LF, two-space indentation, exactly one terminal LF,
+fixed schema/property order, exact integer fields, and nine-place canonical
+real values. Artifact equality is byte equality, not semantic JSON equality.
+
+Use `--format markdown` for the deterministic human reading view. It summarizes
+the range/configuration, hotspots, co-change clusters, bottlenecks, OCP pressure,
+candidates, enrichment, and interpretation limits; it never changes the JSON
+artifact. Git-only analysis remains valid when enrichment is not requested,
+inapplicable, or unavailable. Failed canonical analysis writes a separate stable
+diagnostic and no partial report, ranking, or candidate set.
+
 ## Policy context output
 
 `arch-linter-net policy context --format json` writes one deterministic
