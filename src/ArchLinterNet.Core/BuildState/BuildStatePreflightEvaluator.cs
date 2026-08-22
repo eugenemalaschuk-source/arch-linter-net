@@ -30,6 +30,7 @@ public static class BuildStatePreflightEvaluator
         HashSet<string> missing = new(request.Resolution.MissingAssemblyNames, StringComparer.Ordinal);
 
         Dictionary<string, BuildStatePreflightDiagnostic> diagnosticsByProjectPath = new(StringComparer.Ordinal);
+        Dictionary<string, string> verifiedArtifactContentDigests = new(StringComparer.OrdinalIgnoreCase);
 
         // Only evaluate discovered projects that assembly resolution actually attempted to
         // resolve (present in either the resolved or the missing name set). A policy may declare
@@ -44,12 +45,25 @@ public static class BuildStatePreflightEvaluator
                 continue;
             }
 
-            diagnosticsByProjectPath[project.Path] = EvaluateProject(project, request, resolvedByName, missing);
+            diagnosticsByProjectPath[project.Path] = EvaluateProject(
+                project,
+                request,
+                resolvedByName,
+                missing,
+                out string? verifiedArtifactPath,
+                out string? verifiedArtifactContentDigest);
+            if (verifiedArtifactPath is not null && verifiedArtifactContentDigest is not null)
+            {
+                verifiedArtifactContentDigests.Add(verifiedArtifactPath, verifiedArtifactContentDigest);
+            }
         }
 
         ElevateInconsistentDependencyArtifacts(discoveredProjects, diagnosticsByProjectPath);
 
-        return new BuildStatePreflightResult(diagnosticsByProjectPath.Values.Select(EnsureCacheEligibility).ToArray());
+        return new BuildStatePreflightResult(diagnosticsByProjectPath.Values.Select(EnsureCacheEligibility).ToArray())
+        {
+            VerifiedArtifactContentDigests = verifiedArtifactContentDigests
+        };
     }
 
     // Shared with BuildStatePreparationService.CheckRestorePrerequisites so --no-restore checks
@@ -67,15 +81,25 @@ public static class BuildStatePreflightEvaluator
         ArchitectureDiscoveredProject project,
         BuildStatePreflightRequest request,
         Dictionary<string, Assembly> resolvedByName,
-        HashSet<string> missing)
+        HashSet<string> missing,
+        out string? verifiedArtifactPath,
+        out string? verifiedArtifactContentDigest)
     {
+        verifiedArtifactPath = null;
+        verifiedArtifactContentDigest = null;
         BuildStatePreflightDiagnostic? artifactPresence =
             CheckArtifactPresence(project, request, resolvedByName, missing, out string? assemblyPath);
 
-        return CheckCancellation(project, request)
+        BuildStatePreflightDiagnostic result = CheckCancellation(project, request)
             ?? artifactPresence
             ?? CheckRequestedTargetFrameworkAgainstProject(project, request)
-            ?? CheckReceipt(project, request, assemblyPath!);
+            ?? CheckReceipt(project, request, assemblyPath!, out verifiedArtifactContentDigest);
+        if (result.State == BuildStatePreflightState.Current)
+        {
+            verifiedArtifactPath = assemblyPath;
+        }
+
+        return result;
     }
 
     private static BuildStatePreflightDiagnostic? CheckCancellation(
@@ -158,8 +182,12 @@ public static class BuildStatePreflightEvaluator
     }
 
     private static BuildStatePreflightDiagnostic CheckReceipt(
-        ArchitectureDiscoveredProject project, BuildStatePreflightRequest request, string assemblyPath)
+        ArchitectureDiscoveredProject project,
+        BuildStatePreflightRequest request,
+        string assemblyPath,
+        out string? verifiedArtifactContentDigest)
     {
+        verifiedArtifactContentDigest = null;
         if (!BuildReceiptStore.TryRead(assemblyPath, out BuildReceiptV1? receipt) || receipt is null)
         {
             return Diagnostic(project, BuildStatePreflightState.UnverifiableArtifact,
@@ -171,9 +199,15 @@ public static class BuildStatePreflightEvaluator
                 });
         }
 
-        return CheckReceiptIdentity(project, request, assemblyPath, receipt)
+        BuildStatePreflightDiagnostic result = CheckReceiptIdentity(project, request, assemblyPath, receipt)
             ?? CheckReceiptFreshness(project, request, assemblyPath, receipt)
             ?? CurrentDiagnostic(project, request, assemblyPath, receipt);
+        if (result.State == BuildStatePreflightState.Current)
+        {
+            verifiedArtifactContentDigest = receipt.AssemblyContentDigest;
+        }
+
+        return result;
     }
 
     private static BuildStatePreflightDiagnostic? CheckReceiptIdentity(

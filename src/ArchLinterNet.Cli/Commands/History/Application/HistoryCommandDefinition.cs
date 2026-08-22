@@ -13,6 +13,7 @@ internal sealed class HistoryCommandDefinition(HistoryIngestCommandHandler handl
         Option<string> from = new("--from");
         Option<string> to = new("--to");
         Option<string?> policy = new("--policy");
+        Option<bool> enrichDotNet = new("--enrich-dotnet");
         Option<string> format = new("--format");
         format.DefaultValueFactory = _ => "json";
         Option<bool> help = new("--help");
@@ -21,6 +22,7 @@ internal sealed class HistoryCommandDefinition(HistoryIngestCommandHandler handl
         analyze.Options.Add(from);
         analyze.Options.Add(to);
         analyze.Options.Add(policy);
+        analyze.Options.Add(enrichDotNet);
         analyze.Options.Add(format);
         analyze.Options.Add(help);
         analyze.SetAction(result => handler.Execute(new HistoryIngestCommandOptions(
@@ -29,7 +31,8 @@ internal sealed class HistoryCommandDefinition(HistoryIngestCommandHandler handl
             result.GetValue(to) ?? string.Empty,
             result.GetValue(format) ?? "json",
             result.GetValue(help),
-            result.GetValue(policy))));
+            result.GetValue(policy),
+            result.GetValue(enrichDotNet))));
         history.Subcommands.Add(analyze);
         return history;
     }
