@@ -119,6 +119,7 @@ jobs:
           path: artifacts/candidate
 
       - name: Verify immutable candidate packages
+        shell: bash
         run: python3 tools/release/package_manifest.py verify --packages-dir artifacts/candidate --manifest artifacts/candidate/package-manifest.json --version "$CHECKPOINT_B_CANDIDATE_VERSION" --source-commit "$ARCH_LINTER_SOURCE_SHA"
 
       - name: Run ${{ matrix.shard.name }} shard
@@ -213,6 +214,7 @@ jobs:
           path: artifacts/candidate
 
       - name: Verify immutable candidate manifest
+        shell: bash
         run: python3 tools/release/package_manifest.py verify --packages-dir artifacts/candidate --manifest artifacts/candidate/package-manifest.json --version "${{ needs.prepare-candidate.outputs.package_version }}" --source-commit "$GITHUB_SHA"
 
       - name: Download repository-gate evidence
@@ -378,6 +380,7 @@ jobs:
           path: artifacts/packages
 
       - name: Verify candidate manifest before publication
+        shell: bash
         run: python3 tools/release/package_manifest.py verify --packages-dir artifacts/packages --manifest artifacts/packages/package-manifest.json --version "${{ needs.prepare-candidate.outputs.package_version }}" --source-commit "$GITHUB_SHA"
 
       - name: Generate release notes after Checkpoint B
@@ -418,7 +421,7 @@ jobs:
           test "${#packages[@]}" -eq "${#symbols[@]}"
           for index in "${!packages[@]}"; do
             test -f "artifacts/packages/${symbols[$index]}"
-            dotnet nuget push "artifacts/packages/${packages[$index]}" --source https://api.nuget.org/v3/index.json --api-key "${{ steps.nuget-login.outputs.NUGET_API_KEY }}" --skip-duplicate
+            dotnet nuget push "artifacts/packages/${packages[$index]}" --source https://api.nuget.org/v3/index.json --api-key "${{ steps.nuget-login.outputs.NUGET_API_KEY }}"
           done
 
   create-release:
@@ -447,6 +450,7 @@ jobs:
           path: artifacts/packages
 
       - name: Verify release attachment subjects
+        shell: bash
         run: python3 tools/release/package_manifest.py verify --packages-dir artifacts/packages --manifest artifacts/packages/package-manifest.json --version "${{ needs.release.outputs.package_version }}" --source-commit "$GITHUB_SHA"
 
       - name: Create GitHub Release

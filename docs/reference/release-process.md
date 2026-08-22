@@ -200,7 +200,8 @@ After dry-run artifacts are checked, rerun the workflow with the same release sc
 Expected public result:
 
 - packages are pushed to NuGet.org;
-- duplicate pushes are skipped for safer reruns;
+- an existing primary package causes a fail-closed error; inspect the paired
+  primary/symbol state on NuGet.org before deciding on a corrected release path;
 - GitHub tag and release are created from the workflow commit;
 - generated package assets are attached to the GitHub Release;
 - MkDocs product documentation is built and deployed to GitHub Pages.
