@@ -1,6 +1,5 @@
 using ArchLinterNet.Core.History;
 using ArchLinterNet.Core.History.Enrichment;
-using ArchLinterNet.Core.History.Reporting;
 using ArchLinterNet.Core.Model;
 using NUnit.Framework;
 
@@ -24,7 +23,7 @@ public sealed class HistoryDotNetEnricherTests
         {
             Assert.That(enrichment.Status, Is.EqualTo(HistoryDotNetEnrichmentStatus.NotRequested));
             Assert.That(enrichment.Files, Is.Empty);
-            Assert.That(result.DotNetEnrichment.Status, Is.EqualTo(HistoryDotNetEnrichmentStatus.NotRequested));
+            Assert.That(result.Enrichment.Status, Is.EqualTo(HistoryEnrichmentStatus.NotRequested));
         });
     }
 
@@ -49,8 +48,7 @@ public sealed class HistoryDotNetEnricherTests
 
         HistoryDotNetEnrichment enrichment = enricher.Enrich(
             result, new HistoryIngestionRequest(repository.Path, first, second, requestDotNetEnrichment: true), "architecture/dependencies.arch.yml");
-        string gitOnlyJson = HistoryIngestionJsonWriter.Write(result);
-        result.ApplyDotNetEnrichment(enrichment);
+        result.ApplyEnrichment(enrichment.ToReportProjection(result.ResolvedTo));
         HistoryDotNetFileEnrichment source = enrichment.Files.Single(file => file.CanonicalPath == "src/Widget.cs");
 
         Assert.Multiple(() =>
@@ -60,7 +58,11 @@ public sealed class HistoryDotNetEnricherTests
             Assert.That(source.Types, Is.EqualTo(new[] { type }));
             Assert.That(enrichment.Files.Single(file => file.CanonicalPath == "README.md").Status,
                 Is.EqualTo(HistoryDotNetFileEnrichmentStatus.NotApplicable));
-            Assert.That(HistoryIngestionJsonWriter.Write(result), Is.EqualTo(gitOnlyJson));
+            Assert.That(result.Enrichment.Status, Is.EqualTo(HistoryEnrichmentStatus.Available));
+            Assert.That(result.Enrichment.Context.Any(item =>
+                item.Kind == "dotnet.file.available" && item.Value == "src/Widget.cs"), Is.True);
+            Assert.That(result.Enrichment.Context.Any(item =>
+                item.Kind == "dotnet.type" && item.Value.Contains("Example.Widget", StringComparison.Ordinal)), Is.True);
         });
     }
 
@@ -73,20 +75,21 @@ public sealed class HistoryDotNetEnricherTests
         repository.Write("src/Widget.cs", "namespace Example; public class Widget { public int Value => 1; }\n");
         string second = repository.Commit("second #9");
         HistoryIngestionResult result = HistoryIngestionFixture.Succeed(repository, first, second);
-        string gitOnlyJson = HistoryIngestionJsonWriter.Write(result);
+        string canonicalPath = result.LogicalFiles.Single().CanonicalPath;
+        string taskKey = result.Commits.Single().TaskKeys.Single().IdText;
 
         HistoryDotNetEnrichment enrichment = new HistoryDotNetEnricher(new ThrowingFactProvider("revision_mismatch"))
             .Enrich(result, new HistoryIngestionRequest(repository.Path, first, second, requestDotNetEnrichment: true), "architecture/dependencies.arch.yml");
-        result.ApplyDotNetEnrichment(enrichment);
+        result.ApplyEnrichment(enrichment.ToReportProjection(result.ResolvedTo));
 
         Assert.Multiple(() =>
         {
             Assert.That(enrichment.Status, Is.EqualTo(HistoryDotNetEnrichmentStatus.Unavailable));
             Assert.That(enrichment.Reason, Is.EqualTo("revision_mismatch"));
-            Assert.That(result.LogicalFiles.Single().CanonicalPath, Is.EqualTo("src/Widget.cs"));
-            Assert.That(result.Commits.Single().TaskKeys.Single().IdText, Is.EqualTo("9"));
-            Assert.That(HistoryIngestionJsonWriter.Write(result), Is.EqualTo(gitOnlyJson));
-            Assert.That(gitOnlyJson, Does.Not.Contain("dotNetEnrichment"));
+            Assert.That(result.Enrichment.Status, Is.EqualTo(HistoryEnrichmentStatus.Unavailable));
+            Assert.That(result.Enrichment.Reason, Is.EqualTo("revision_mismatch"));
+            Assert.That(result.LogicalFiles.Single().CanonicalPath, Is.EqualTo(canonicalPath));
+            Assert.That(result.Commits.Single().TaskKeys.Single().IdText, Is.EqualTo(taskKey));
         });
     }
 
@@ -97,7 +100,7 @@ public sealed class HistoryDotNetEnricherTests
         repository.Write("src/Widget.cs", "namespace Example; public class Widget { }\n");
         string first = repository.Commit("first");
         repository.Write("src/Widget.cs", "namespace Example; public class Widget { public int Value => 1; }\n");
-        string second = repository.Commit("second");
+        repository.Commit("second");
         HistoryIngestionResult result = HistoryIngestionFixture.Succeed(repository, first, first);
 
         HistoryDotNetEnrichment enrichment = new HistoryDotNetEnricher().Enrich(

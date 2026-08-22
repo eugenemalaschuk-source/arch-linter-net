@@ -31,9 +31,10 @@ internal sealed class HistoryPolicyIngestionService
         }
 
         HistoryIngestionOutcome outcome = new HistoryIngestionService(taskExtraction, configuration).Ingest(request);
-        if (outcome.Result is not null)
+        if (outcome.Result is HistoryIngestionResult result)
         {
-            outcome.Result.ApplyDotNetEnrichment(new HistoryDotNetEnricher().Enrich(outcome.Result, request, policyPath));
+            HistoryDotNetEnrichment dotNetEnrichment = new HistoryDotNetEnricher().Enrich(result, request, policyPath);
+            result.ApplyEnrichment(dotNetEnrichment.ToReportProjection(result.ResolvedTo));
         }
 
         return outcome;
