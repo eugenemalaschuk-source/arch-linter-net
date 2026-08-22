@@ -15,7 +15,7 @@ oracle; otherwise existing deterministic tests are retained.
 | Priority | Surface | Custom-code exposure | Decision | Rationale |
 | --- | --- | --- | --- | --- |
 | 1 | Loose Git objects; pack index, entry header, and delta bytes | High | A | Custom binary layout, size arithmetic, decompression, offset handling, and delta instruction reconstruction consume repository-controlled bytes. The fail-closed/no-crash/no-hang/no-unbounded-allocation oracle is clear. |
-| 2 | Repository object-format in `.git/config` | Low | C | `GitRepositoryLayout.ReadObjectFormat` is a small, grammar-led custom parser. Deterministic tests cover SHA-256/64-hex resolution, unsupported format failure, case-insensitive section/key/value with comments and unrelated sections, and absent-config default SHA-1. A byte fuzzer would add little beyond these bounded branches; the A harness therefore does not include digest-length paths. |
+| 2 | Repository object-format in `.git/config` | Low | C | `GitRepositoryLayout.ReadObjectFormat` is a small, grammar-led custom parser. Deterministic tests cover SHA-256/64-hex resolution, unsupported format failure, case-insensitive section/key/value with comments and unrelated sections, and absent-config default SHA-1. This C decision excludes only fuzzing that configuration parser; it does not exclude digest-length coverage from the selected binary parser harness. |
 | 3 | Git refs, commit headers, paths, tree objects, and TaskKey spans | Medium | C | They are small, grammar-led layers with extensive deterministic corrupt-object, malformed-metadata, ref-cycle, UTF-8, path, and span fixtures. Mutating repository-wide structures would add setup cost without increasing the selected parser seam's coverage. |
 | 4 | Policy root/import YAML, raw schema validation, source selectors, CEL fields | Medium | C | YAML syntax is owned by YamlDotNet and custom rules have focused schema/import/cycle/depth and CEL-profile fixtures. No current generator has a stated invariant whose shrinking value exceeds that suite. Reassess if a new custom language or stateful import evaluator is added. |
 | 5 | Baselines, canonical reports, cache envelopes, packaged schemas, release evidence | Low to medium | C | The current boundaries use explicit version/schema checks and deterministic serialization/deserialization tests; most parsing is System.Text.Json or packaged-resource handling. A raw-byte fuzzer would predominantly exercise framework behavior rather than unique ArchLinterNet parsing. |
@@ -30,6 +30,10 @@ The follow-up is limited to byte-level seams below `Core.History.Git`:
 - version-2 pack-index fanout/name/offset layout and lookup;
 - pack-entry header, `OBJ_OFS_DELTA`, and `OBJ_REF_DELTA` decoding;
 - delta size varints and copy/insert reconstruction.
+
+The harness exercises every selected pack/index/`OBJ_REF_DELTA` seam in both
+supported digest-length modes: 20-byte SHA-1 and 32-byte SHA-256. This is
+separate from the C decision for `.git/config` object-format parsing.
 
 The oracle accepts either a canonical bounded parse result or the existing
 fail-closed `HistoryDiagnostic` route. It rejects unhandled exceptions,
