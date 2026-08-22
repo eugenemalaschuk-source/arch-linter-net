@@ -1,6 +1,8 @@
 using System.Reflection;
 using ArchLinterNet.Core.BuildState;
 using ArchLinterNet.Core.Discovery;
+using ArchLinterNet.Core.IO;
+using ArchLinterNet.Core.IO.Abstractions;
 using ArchLinterNet.Core.Model;
 using NUnit.Framework;
 
@@ -146,6 +148,39 @@ public sealed class BuildStatePreflightTests
 
         Assert.That(result.Blocked, Is.False);
         Assert.That(result.Diagnostics.Single().State, Is.EqualTo(BuildStatePreflightState.Current));
+    }
+
+    [Test]
+    public void Evaluate_CurrentArtifact_HandoffRejectsReplacementBeforeLoad()
+    {
+        string projectPath = CreateProjectFixture("Fixture", "class C {}");
+        string assemblyPath = CreateFakeAssemblyFile("Fixture");
+        string verifiedDigest = BuildStateCanonicalHasher.ComputeContentDigest(assemblyPath);
+        BuildReceiptStore.Write(assemblyPath, new BuildReceiptV1(
+            projectPath,
+            "Fixture",
+            "Debug",
+            "net10.0",
+            BuildStateCanonicalHasher.ComputeBuildInputFingerprint(projectPath, _repoRoot),
+            verifiedDigest));
+
+        BuildStatePreflightResult preflight = BuildStatePreflightEvaluator.Evaluate(new BuildStatePreflightRequest(
+            _repoRoot,
+            SingleProjectDiscovery(projectPath, "Fixture"),
+            SingleAssemblyResolution(assemblyPath),
+            BuildPreparationMode.Ordinary));
+        File.WriteAllBytes(assemblyPath, System.Text.Encoding.UTF8.GetBytes("replacement-artifact-bytes"));
+
+        Assert.That(preflight.Blocked, Is.False);
+        Assert.That(preflight.VerifiedArtifactContentDigests[Path.GetFullPath(assemblyPath)], Is.EqualTo(verifiedDigest));
+        Assert.That(BuildStateCanonicalHasher.ComputeContentDigest(assemblyPath), Is.Not.EqualTo(verifiedDigest));
+
+        using IArchitectureAssemblyLoadScope scope = ArchitectureAssemblyLoader.Real.CreateIsolatedLoadScope(
+            Array.Empty<string>(),
+            new Dictionary<string, string>(StringComparer.Ordinal),
+            preflight.VerifiedArtifactContentDigests);
+        InvalidOperationException exception = Assert.Throws<InvalidOperationException>(() => scope.LoadFrom(assemblyPath))!;
+        Assert.That(exception.Message, Does.Contain("changed before LoadFromStream"));
     }
 
     [Test]

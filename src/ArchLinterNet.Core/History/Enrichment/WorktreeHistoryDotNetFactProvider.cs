@@ -64,7 +64,7 @@ internal sealed class WorktreeHistoryDotNetFactProvider : IHistoryDotNetFactProv
             throw new HistoryDotNetEnrichmentUnavailableException("build_state_unavailable");
         }
 
-        IReadOnlyDictionary<string, string> verifiedArtifactDigests = CaptureVerifiedArtifactDigests(discovery);
+        IReadOnlyDictionary<string, string> verifiedArtifactDigests = RequireVerifiedArtifactDigests(preflight, discovery);
 
         ResolutionResult resolution;
         try
@@ -100,21 +100,20 @@ internal sealed class WorktreeHistoryDotNetFactProvider : IHistoryDotNetFactProv
         return new HistoryDotNetFactMaterialization(facts);
     }
 
-    private static IReadOnlyDictionary<string, string> CaptureVerifiedArtifactDigests(ProjectDiscoveryResult discovery)
+    private static IReadOnlyDictionary<string, string> RequireVerifiedArtifactDigests(
+        BuildStatePreflightResult preflight,
+        ProjectDiscoveryResult discovery)
     {
-        Dictionary<string, string> digests = new(StringComparer.OrdinalIgnoreCase);
         foreach (string path in discovery.ResolvedAssemblyPaths.Values)
         {
             string fullPath = Path.GetFullPath(path);
-            if (!File.Exists(fullPath))
+            if (!preflight.VerifiedArtifactContentDigests.ContainsKey(fullPath))
             {
                 throw new HistoryDotNetEnrichmentUnavailableException("build_state_unavailable");
             }
-
-            digests[fullPath] = BuildStateCanonicalHasher.ComputeContentDigest(fullPath);
         }
 
-        return digests;
+        return preflight.VerifiedArtifactContentDigests;
     }
 
     private static IReadOnlyDictionary<string, IReadOnlyList<HistoryDotNetTypeContext>> BuildPathIndex(
