@@ -40,6 +40,10 @@ internal sealed class WorktreeHistoryDotNetFactProvider : IHistoryDotNetFactProv
             throw new HistoryDotNetEnrichmentUnavailableException("project_discovery_failed");
         }
 
+        string? requestedTargetFramework = string.IsNullOrWhiteSpace(document.Analysis.TargetFramework)
+            ? null
+            : document.Analysis.TargetFramework;
+
         // Git cleanliness proves only tracked source state. The receipt/fingerprint authority is
         // what proves ignored build output was produced from that same source state.
         BuildStatePreflightResult preflight = BuildStatePreflightEvaluator.Evaluate(new BuildStatePreflightRequest(
@@ -51,7 +55,7 @@ internal sealed class WorktreeHistoryDotNetFactProvider : IHistoryDotNetFactProv
             },
             BuildPreparationMode.Ordinary,
             RequestedConfiguration: document.Analysis.Configuration,
-            RequestedTargetFramework: document.Analysis.TargetFramework));
+            RequestedTargetFramework: requestedTargetFramework));
         if (preflight.Blocked)
         {
             throw new HistoryDotNetEnrichmentUnavailableException("build_state_unavailable");
