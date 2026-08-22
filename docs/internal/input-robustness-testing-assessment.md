@@ -15,11 +15,12 @@ oracle; otherwise existing deterministic tests are retained.
 | Priority | Surface | Custom-code exposure | Decision | Rationale |
 | --- | --- | --- | --- | --- |
 | 1 | Loose Git objects; pack index, entry header, and delta bytes | High | A | Custom binary layout, size arithmetic, decompression, offset handling, and delta instruction reconstruction consume repository-controlled bytes. The fail-closed/no-crash/no-hang/no-unbounded-allocation oracle is clear. |
-| 2 | Git refs, commit headers, paths, tree objects, and TaskKey spans | Medium | C | They are small, grammar-led layers with extensive deterministic corrupt-object, malformed-metadata, ref-cycle, UTF-8, path, and span fixtures. Mutating repository-wide structures would add setup cost without increasing the selected parser seam's coverage. |
-| 3 | Policy root/import YAML, raw schema validation, source selectors, CEL fields | Medium | C | YAML syntax is owned by YamlDotNet and custom rules have focused schema/import/cycle/depth and CEL-profile fixtures. No current generator has a stated invariant whose shrinking value exceeds that suite. Reassess if a new custom language or stateful import evaluator is added. |
-| 4 | Baselines, canonical reports, cache envelopes, packaged schemas, release evidence | Low to medium | C | The current boundaries use explicit version/schema checks and deterministic serialization/deserialization tests; most parsing is System.Text.Json or packaged-resource handling. A raw-byte fuzzer would predominantly exercise framework behavior rather than unique ArchLinterNet parsing. |
-| 5 | Solution/project selection, PE/assembly metadata, PDB/manifest mapping | Low | C | MSBuild, Roslyn, and metadata libraries own the underlying formats. ArchLinterNet's value is in post-parse interpretation, already covered by project-selection and assembly fixtures; fuzzing opaque framework parsers is out of scope. |
-| 6 | TaskKey normalization, canonical ordering/identity, policy composition, JSON round trips, graph/scoring thresholds | Medium semantic / low byte-parser | C | The candidate invariants are valuable, but current bounded example, golden, and boundary tests exhaust the small supported domains. No property-testing dependency is selected without an observed gap requiring generation and shrinking. |
+| 2 | Repository object-format in `.git/config` | Low | C | `GitRepositoryLayout.ReadObjectFormat` is a small, grammar-led custom parser. Deterministic tests cover SHA-256/64-hex resolution, unsupported format failure, case-insensitive section/key/value with comments and unrelated sections, and absent-config default SHA-1. A byte fuzzer would add little beyond these bounded branches; the A harness therefore does not include digest-length paths. |
+| 3 | Git refs, commit headers, paths, tree objects, and TaskKey spans | Medium | C | They are small, grammar-led layers with extensive deterministic corrupt-object, malformed-metadata, ref-cycle, UTF-8, path, and span fixtures. Mutating repository-wide structures would add setup cost without increasing the selected parser seam's coverage. |
+| 4 | Policy root/import YAML, raw schema validation, source selectors, CEL fields | Medium | C | YAML syntax is owned by YamlDotNet and custom rules have focused schema/import/cycle/depth and CEL-profile fixtures. No current generator has a stated invariant whose shrinking value exceeds that suite. Reassess if a new custom language or stateful import evaluator is added. |
+| 5 | Baselines, canonical reports, cache envelopes, packaged schemas, release evidence | Low to medium | C | The current boundaries use explicit version/schema checks and deterministic serialization/deserialization tests; most parsing is System.Text.Json or packaged-resource handling. A raw-byte fuzzer would predominantly exercise framework behavior rather than unique ArchLinterNet parsing. |
+| 6 | Solution/project selection, PE/assembly metadata, PDB/manifest mapping | Low | C | MSBuild, Roslyn, and metadata libraries own the underlying formats. ArchLinterNet's value is in post-parse interpretation, already covered by project-selection and assembly fixtures; fuzzing opaque framework parsers is out of scope. |
+| 7 | TaskKey normalization, canonical ordering/identity, policy composition, JSON round trips, graph/scoring thresholds | Medium semantic / low byte-parser | C | The candidate invariants are valuable, but current bounded example, golden, and boundary tests exhaust the small supported domains. No property-testing dependency is selected without an observed gap requiring generation and shrinking. |
 
 ## Selected A target: Git binary parser harness
 
@@ -68,6 +69,9 @@ result.
 
 - `GitObjectDatabase`, `GitPackIndex`, `GitPackFile`, and `GitDeltaDecoder`
   directly process object, index, pack, and delta bytes.
+- `GitRepositoryLayout.ReadObjectFormat` parses the repository-controlled
+  `.git/config` `[extensions] objectformat` value; its deterministic tests cover
+  SHA-256, unsupported formats, case/comments, and the default SHA-1 path.
 - Existing `HistoryCorruptObjectTests` and `GitDeltaDecoderTests` provide
   deterministic malformed-input fixtures but are intentionally finite.
 - SharpFuzz documents .NET assembly instrumentation for AFL-style fuzzing;
