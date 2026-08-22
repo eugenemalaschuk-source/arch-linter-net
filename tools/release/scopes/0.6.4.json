@@ -1,15 +1,13 @@
 {
-  "schema": "checkpoint-b-release-scope-declaration/v1",
+  "schema": "checkpoint-b-release-scope-declaration/v2",
+  "declaration_id": "v0.6.4-public-api-consumer-exit",
   "release_target": "0.6.4",
   "story": 527,
   "_comment": [
-    "The authoritative release scope for the packed-artifact gate. It is declared here, in the",
-    "repository, so the set of blocking work is reviewed like any other release artifact instead of",
-    "being derived from mutable issue text at release time. The generator resolves only the current",
-    "GitHub state of these numbers; the aggregator refuses to authorize publication unless every",
-    "required item is closed.",
-    "Adding release-blocking work under the story means adding it here in the same change.",
-    "0.6.1 (story #434) shipped; this declaration covers the current 0.6.4 patch (story #527)."
+    "The reviewed v0.6.4 release authority. Issue #527 records that its actual NuGet publication",
+    "has not been triggered, so this declaration remains a supported maintenance-release target.",
+    "The generator resolves only live states for required items; it never derives blockers from",
+    "mutable issue text or milestone membership."
   ],
   "required_items": [
     { "issue": 525, "finding": "selector", "summary": "Complete intentional type selection for public API snapshots" },
@@ -22,5 +20,6 @@
     { "issue": 464, "reason": "Self-policy hardening under #450; not a v0.6.4 release prerequisite." },
     { "issue": 528, "reason": "SonarCloud quality-debt cleanup; not linked to v0.6.4 release authority." },
     { "issue": 575, "reason": "Evergreen-documentation cleanup; not linked to v0.6.4 release authority." }
-  ]
+  ],
+  "delivered_items": []
 }

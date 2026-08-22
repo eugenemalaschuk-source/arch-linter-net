@@ -23,12 +23,13 @@ from aggregate_checkpoint_b_evidence import (  # noqa: E402
 )
 
 _PACKAGE_IDS = ("ArchLinterNet.CEL", "ArchLinterNet.Cli", "ArchLinterNet.Core", "ArchLinterNet.Testing")
+_VERSION = "0.6.4"
 _PACKAGES = [
     {
         "id": name,
-        "version": "0.6.1",
-        "package": {"kind": "package", "file": f"{name}.0.6.1.nupkg", "size": 1, "sha256": "a" * 64},
-        "symbols": {"kind": "symbols", "file": f"{name}.0.6.1.snupkg", "size": 1, "sha256": "c" * 64},
+        "version": _VERSION,
+        "package": {"kind": "package", "file": f"{name}.{_VERSION}.nupkg", "size": 1, "sha256": "a" * 64},
+        "symbols": {"kind": "symbols", "file": f"{name}.{_VERSION}.snupkg", "size": 1, "sha256": "c" * 64},
     }
     for name in _PACKAGE_IDS
 ]
@@ -71,18 +72,22 @@ def _scenarios(shell: str, platform: str, failed: dict[str, str] | None = None) 
 def _release_scope(digest: str, open_items: set[int] | None = None) -> dict:
     open_items = open_items or set()
     return {
-        "schema": "checkpoint-b-release-scope/v1",
-        "release_target": "0.6.1",
-        "story": 434,
+        "schema": "checkpoint-b-release-scope/v2",
+        "declaration_id": "v0.6.4-public-api-consumer-exit",
+        "declaration_sha256": "d" * 64,
+        "candidate_version": _VERSION,
+        "release_target": _VERSION,
+        "story": 527,
         "repository": "owner/repo",
         "source_commit": _COMMIT,
         "candidate_manifest_sha256": digest,
         "required_items": [
             {"issue": number, "finding": f"F{index + 1}", "summary": f"Item {number}",
              "state": "open" if number in open_items else "closed"}
-            for index, number in enumerate((435, 436, 466))
+            for index, number in enumerate((525, 526))
         ],
         "excluded_items": [{"issue": 450, "reason": "Post-release refactoring story."}],
+        "delivered_items": [],
     }
 
 
@@ -95,7 +100,7 @@ def _write_corpus(
     manifest_path = tmp_path / "package-manifest.json"
     manifest_path.write_text(json.dumps({
         "schema": "checkpoint-b-candidate-manifest/v2",
-        "version": "0.6.1",
+        "version": _VERSION,
         "source_commit": _COMMIT,
         "packages": _PACKAGES,
     }))
@@ -109,7 +114,7 @@ def _write_corpus(
             "schema": "checkpoint-b-platform-evidence/v1",
             "checkpoint": "B",
             "result": "failed" if any(s["result"] == "failed" for s in scenarios) else "passed",
-            "candidate_version": "0.6.1",
+            "candidate_version": _VERSION,
             "source_commit": _COMMIT,
             "platform_id": platform,
             "platform": platform,
@@ -155,7 +160,7 @@ def test_complete_matrix_authorizes_publication(tmp_path: Path) -> None:
     summary = _aggregate(tmp_path)
 
     assert summary["result"] == "passed"
-    assert summary["authorization"].startswith("PASS: the manifested 0.6.1 candidate is authorized")
+    assert summary["authorization"].startswith("PASS: the manifested 0.6.4 candidate is authorized")
     assert summary["failed_scenarios"] == []
     assert summary["policy_shape_defects"] == []
 
@@ -164,7 +169,7 @@ def test_failed_consumer_cleanup_scenario_blocks_publication(tmp_path: Path) -> 
     summary = _aggregate(tmp_path, failed={"actionable-schema-diagnostics": "Blocked by #471."})
 
     assert summary["result"] == "failed"
-    assert summary["authorization"].startswith("FAIL: the manifested 0.6.1 candidate is NOT authorized")
+    assert summary["authorization"].startswith("FAIL: the manifested 0.6.4 candidate is NOT authorized")
     assert [failure["id"] for failure in summary["failed_scenarios"]] == ["actionable-schema-diagnostics"]
     assert summary["failed_scenarios"][0]["reason"] == "Blocked by #471."
 
@@ -257,7 +262,7 @@ def test_main_writes_pass_evidence_and_succeeds(tmp_path: Path) -> None:
 
     assert exit_code == 0
     assert summary["result"] == "passed"
-    assert "PASS: the manifested 0.6.1 candidate is authorized for publication." in markdown
+    assert "PASS: the manifested 0.6.4 candidate is authorized for publication." in markdown
     assert "Composed policy documents: 5 (4 imported fragments)" in markdown
     assert "Copied project inventories: 0" in markdown
     assert markdown.count("| passed |") == len(_REQUIRED_PLATFORMS)
@@ -434,10 +439,10 @@ def test_empty_evidence_directory_is_rejected(tmp_path: Path) -> None:
 
 
 def test_open_release_scope_item_blocks_publication(tmp_path: Path) -> None:
-    summary = _aggregate(tmp_path, open_scope_items={436})
+    summary = _aggregate(tmp_path, open_scope_items={526})
 
     assert summary["result"] == "failed"
-    assert summary["open_release_scope_items"] == ["#436 (F2) is open: Item 436"]
+    assert summary["open_release_scope_items"] == ["#526 (F2) is open: Item 526"]
     assert summary["authorization"].startswith("FAIL")
 
 
@@ -445,30 +450,36 @@ def test_release_scope_inventory_is_emitted_in_the_evidence(tmp_path: Path) -> N
     exit_code, summary, markdown = _run_main(tmp_path)
 
     assert exit_code == 0
-    assert summary["release_scope"]["story"] == 434
-    assert [item["issue"] for item in summary["release_scope"]["required_items"]] == [435, 436, 466]
-    assert "## Release scope (story #434, target 0.6.1)" in markdown
-    assert "| #435 | F1 | closed | Item 435 |" in markdown
+    assert summary["release_scope"]["story"] == 527
+    assert [item["issue"] for item in summary["release_scope"]["required_items"]] == [525, 526]
+    assert "## Release scope (story #527, target 0.6.4)" in markdown
+    assert "- Declaration: `v0.6.4-public-api-consumer-exit`" in markdown
+    assert "| #525 | F1 | closed | Item 525 |" in markdown
     assert "#450" in markdown
     assert "Post-release refactoring story." in markdown
 
 
 def test_open_release_scope_item_is_listed_in_the_markdown(tmp_path: Path) -> None:
-    exit_code, _, markdown = _run_main(tmp_path, open_scope_items={466})
+    exit_code, _, markdown = _run_main(tmp_path, open_scope_items={526})
 
     assert exit_code == 1
-    assert "| #466 | F3 | open | Item 466 |" in markdown
+    assert "| #526 | F2 | open | Item 526 |" in markdown
 
 
 @pytest.mark.parametrize(
     ("mutate", "message"),
     [
         (lambda scope: scope.update(schema="other/v1"), "Release-scope schema"),
+        (lambda scope: scope.update(candidate_version="0.7.0"), "candidate version differs"),
+        (lambda scope: scope.update(release_target="0.7.0"), "target differs"),
+        (lambda scope: scope.update(declaration_id="invalid identity"), "declaration identity"),
+        (lambda scope: scope.update(declaration_sha256="short"), "declaration hash"),
         (lambda scope: scope.update(candidate_manifest_sha256="e" * 64), "not bound to the candidate"),
         (lambda scope: scope.update(source_commit="f" * 40), "source commit differs"),
         (lambda scope: scope.update(required_items=[]), "declares no required items"),
-        (lambda scope: scope["required_items"][0].update(issue="435"), "item is malformed"),
+        (lambda scope: scope["required_items"][0].update(issue="525"), "item is malformed"),
         (lambda scope: scope["required_items"][0].update(state="unknown"), "no resolved state"),
+        (lambda scope: scope.update(delivered_items=[{"issue": 525, "reason": "Duplicate."}]), "delivered items"),
     ],
 )
 def test_malformed_release_scope_is_rejected(tmp_path: Path, mutate, message: str) -> None:

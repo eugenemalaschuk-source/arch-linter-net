@@ -77,18 +77,22 @@ These scenarios are required alongside the existing consumer-cleanup matrix; the
 
 ## Release-scope closure
 
-`tools/release/release-scope.json` declares the authoritative release scope for the *current*
-release cycle: the required items, and the items explicitly excluded with their reasons. It lives
-in the repository so the set of blocking work is reviewed like any other release artifact rather
-than derived from mutable issue text at release time. It advanced from the shipped 0.6.1/#434 scope
-to the current 0.6.4/#527 scope when the surface-selector consumer-exit matrix was added.
+`tools/release/scopes/` contains one reviewed declaration per supported release authority. The
+declaration content — not its filename — supplies its stable `release_target`, authority story,
+required items, explicit exclusions, and delivered context. v0.6.4/#527 remains a supported
+maintenance authority because its publication has not been triggered; v0.7.0/#613 has a separate
+declaration. No declaration is inferred from milestone membership or mutable issue text.
 
-`create_release_scope_evidence.py` resolves only the *current* state of those issues from the issue
-tracker and binds the result to the candidate manifest digest and source commit. The aggregator
-refuses to authorize publication while any required item is open, and emits the inventory —
-including exclusions — in both the JSON and Markdown evidence.
+`create_release_scope_evidence.py` reads only that fixed tracked directory and selects exactly one
+declaration whose stable target equals the immutable candidate manifest version. It rejects
+preview, unknown, malformed, duplicate, or incompatible mappings before it resolves live required
+issue states. Its evidence binds the selected declaration identity and SHA-256, candidate version,
+candidate manifest digest, and source commit. The aggregator rechecks those bindings, refuses
+authorization while any required item is open, and emits required, excluded, and delivered-context
+inventories in both JSON and Markdown evidence.
 
-Adding release-blocking work under the story means adding it to the declaration in the same change.
+Adding release-blocking work under an authority means updating that authority's declaration in the
+same reviewed change; creating a new release target requires a new explicit declaration.
 
 ## Tracked defects
 

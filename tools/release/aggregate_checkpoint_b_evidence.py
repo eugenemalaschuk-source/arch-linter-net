@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import re
 from pathlib import Path
 from typing import Any
 
@@ -15,7 +16,9 @@ from package_manifest import _load_manifest as _load_candidate_manifest
 _EVIDENCE_SCHEMA = "checkpoint-b-platform-evidence/v1"
 _GATES_SCHEMA = "checkpoint-b-repository-gates/v1"
 _MANIFEST_SCHEMA = "checkpoint-b-candidate-manifest/v2"
-_RELEASE_SCOPE_SCHEMA = "checkpoint-b-release-scope/v1"
+_RELEASE_SCOPE_SCHEMA = "checkpoint-b-release-scope/v2"
+_RELEASE_SCOPE_SHA256_PATTERN = re.compile(r"^[0-9a-f]{64}$")
+_RELEASE_SCOPE_DECLARATION_ID_PATTERN = re.compile(r"^[a-z0-9][a-z0-9._-]*$")
 _REQUIRED_PLATFORMS = {
     "linux-x64": ("x64", "bash"),
     "macos-arm64": ("arm64", "zsh"),
@@ -259,27 +262,65 @@ def _read_gates(path: Path, manifest: dict[str, Any], manifest_digest: str) -> d
 
 
 def _read_release_scope(path: Path, manifest: dict[str, Any], manifest_digest: str) -> dict[str, Any]:
-    """The authoritative #434 release-scope inventory, bound to this candidate."""
+    """Read the candidate-selected release-scope inventory and verify every binding."""
     scope = _load_json(path, "release-scope inventory")
     if scope.get("schema") != _RELEASE_SCOPE_SCHEMA:
         raise ValueError("Release-scope schema is invalid.")
+    if scope.get("candidate_version") != manifest["version"]:
+        raise ValueError("Release scope candidate version differs from the candidate manifest.")
+    if scope.get("release_target") != manifest["version"]:
+        raise ValueError("Release scope target differs from the candidate manifest version.")
+    if not isinstance(scope.get("declaration_id"), str) or not _RELEASE_SCOPE_DECLARATION_ID_PATTERN.fullmatch(
+        scope["declaration_id"]
+    ):
+        raise ValueError("Release scope declaration identity is invalid.")
+    if not isinstance(scope.get("declaration_sha256"), str) or not _RELEASE_SCOPE_SHA256_PATTERN.fullmatch(
+        scope["declaration_sha256"]
+    ):
+        raise ValueError("Release scope declaration hash is invalid.")
     if scope.get("candidate_manifest_sha256") != manifest_digest:
         raise ValueError("Release scope is not bound to the candidate manifest.")
     if scope.get("source_commit") != manifest["source_commit"]:
         raise ValueError("Release scope source commit differs from the candidate manifest.")
+    if not isinstance(scope.get("story"), int) or isinstance(scope["story"], bool) or scope["story"] <= 0:
+        raise ValueError("Release scope authority story is invalid.")
     required = scope.get("required_items")
     if not isinstance(required, list) or not required:
         raise ValueError("Release scope declares no required items.")
     for item in required:
-        if not isinstance(item, dict) or not isinstance(item.get("issue"), int):
+        if (
+            not isinstance(item, dict)
+            or not isinstance(item.get("issue"), int)
+            or isinstance(item["issue"], bool)
+            or item["issue"] <= 0
+        ):
             raise ValueError("Release-scope item is malformed.")
         if item.get("state") not in {"open", "closed"}:
             raise ValueError(f"Release-scope item #{item.get('issue')} has no resolved state.")
+    inventory_numbers = {item["issue"] for item in required}
+    if len(inventory_numbers) != len(required):
+        raise ValueError("Release scope repeats a required item.")
+    for inventory_name in ("excluded_items", "delivered_items"):
+        inventory = scope.get(inventory_name)
+        if not isinstance(inventory, list):
+            raise ValueError(f"Release scope {inventory_name.replace('_', ' ')} is malformed.")
+        for item in inventory:
+            if (
+                not isinstance(item, dict)
+                or not isinstance(item.get("issue"), int)
+                or isinstance(item["issue"], bool)
+                or item["issue"] <= 0
+                or not isinstance(item.get("reason"), str)
+                or not item["reason"].strip()
+                or item["issue"] in inventory_numbers
+            ):
+                raise ValueError(f"Release scope {inventory_name.replace('_', ' ')} is malformed.")
+            inventory_numbers.add(item["issue"])
     return scope
 
 
 def _release_scope_defects(scope: dict[str, Any]) -> list[str]:
-    """#466: no required release-scope item may be open when publication is authorized."""
+    """A candidate cannot be authorized while a selected required item is open."""
     return [
         f"#{item['issue']} ({item.get('finding', 'release scope')}) is {item['state']}: "
         f"{item.get('summary') or item.get('title', '')}".strip()
@@ -351,6 +392,10 @@ def _markdown(summary: dict[str, Any]) -> str:
     scope_section = [
         f"## Release scope (story #{scope['story']}, target {scope['release_target']})",
         "",
+        f"- Declaration: `{scope['declaration_id']}`",
+        f"- Declaration SHA-256: `{scope['declaration_sha256']}`",
+        f"- Candidate version: `{scope['candidate_version']}`",
+        "",
         "| Item | Finding | State | Summary |",
         "| --- | --- | --- | --- |",
         *[
@@ -368,6 +413,12 @@ def _markdown(summary: dict[str, Any]) -> str:
             *[f"- #{item['issue']} — {item['reason']}" for item in scope.get("excluded_items", [])],
             "",
         ] if scope.get("excluded_items") else []),
+        *([
+            "Delivered release context:",
+            "",
+            *[f"- #{item['issue']} — {item['reason']}" for item in scope.get("delivered_items", [])],
+            "",
+        ] if scope.get("delivered_items") else []),
     ]
     return "\n".join([
         "# Packed-artifact release evidence",
