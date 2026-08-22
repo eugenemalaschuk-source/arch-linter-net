@@ -233,13 +233,11 @@ def _checksum_text(manifest: dict[str, Any]) -> str:
     return "\n".join(lines) + "\n"
 
 
-def _verify_release_evidence(
+def _canonical_evidence_paths(
     packages_directory: Path,
     manifest_path: Path,
     checksums_path: Path,
-    expected_version: str | None = None,
-    expected_source_commit: str | None = None,
-) -> dict[str, Any]:
+) -> tuple[Path, Path, Path]:
     manifest_path = _safe_path(manifest_path, "candidate manifest")
     checksums_path = _safe_path(checksums_path, "candidate checksum evidence")
     packages_directory = _safe_path(packages_directory, "candidate packages directory")
@@ -247,6 +245,21 @@ def _verify_release_evidence(
         raise ValueError("Canonical candidate manifest path is invalid.")
     if checksums_path.parent != packages_directory or checksums_path.name != _CANONICAL_CHECKSUM_FILE:
         raise ValueError("Canonical candidate checksum evidence path is invalid.")
+    return packages_directory, manifest_path, checksums_path
+
+
+def _verify_release_evidence(
+    packages_directory: Path,
+    manifest_path: Path,
+    checksums_path: Path,
+    expected_version: str | None = None,
+    expected_source_commit: str | None = None,
+) -> dict[str, Any]:
+    packages_directory, manifest_path, checksums_path = _canonical_evidence_paths(
+        packages_directory,
+        manifest_path,
+        checksums_path,
+    )
 
     manifest = _load_manifest(manifest_path)
     if expected_version is not None and manifest["version"] != expected_version:

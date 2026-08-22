@@ -4,11 +4,22 @@
 from __future__ import annotations
 
 import argparse
+import json
 import subprocess
 import tempfile
+from typing import Any
 from pathlib import Path
 
 import package_manifest
+
+
+def _outer_evidence_subjects(arguments: argparse.Namespace) -> tuple[Path, Path]:
+    _, manifest_path, checksums_path = package_manifest._canonical_evidence_paths(
+        arguments.packages_dir,
+        arguments.manifest,
+        arguments.checksums,
+    )
+    return manifest_path, checksums_path
 
 
 def _verified_subjects(arguments: argparse.Namespace) -> list[Path]:
@@ -24,7 +35,7 @@ def _verified_subjects(arguments: argparse.Namespace) -> list[Path]:
     return [
         arguments.packages_dir / subject["file"]
         for subject in package_manifest._subjects(manifest)
-    ] + [arguments.manifest, arguments.checksums]
+    ]
 
 
 def _command(arguments: argparse.Namespace, subject: Path) -> list[str]:
@@ -39,22 +50,53 @@ def _command(arguments: argparse.Namespace, subject: Path) -> list[str]:
         arguments.signer_workflow,
         "--source-digest",
         arguments.source_commit,
+        "--format",
+        "json",
     ]
 
 
-def _verify(arguments: argparse.Namespace, subject: Path) -> None:
+def _verify(arguments: argparse.Namespace, subject: Path) -> list[dict[str, Any]]:
     completed = subprocess.run(_command(arguments, subject), check=False, capture_output=True, text=True)
     if completed.returncode != 0:
         details = completed.stderr.strip() or completed.stdout.strip()
         raise ValueError(f"Attestation verification failed for '{subject.name}': {details}")
+    try:
+        attestations = json.loads(completed.stdout)
+    except json.JSONDecodeError as error:
+        raise ValueError(f"Attestation verification returned invalid JSON for '{subject.name}'.") from error
+    if not isinstance(attestations, list) or not attestations:
+        raise ValueError(f"Attestation verification returned no attestations for '{subject.name}'.")
+    return attestations
 
 
-def _verify_tamper_is_rejected(arguments: argparse.Namespace, subject: Path, directory: Path) -> None:
+def _verified_attestation_digests(subject: Path, attestations: list[dict[str, Any]]) -> set[str]:
+    digests: set[str] = set()
+    for attestation in attestations:
+        verification_result = attestation.get("verificationResult")
+        if not isinstance(verification_result, dict):
+            continue
+        statement = verification_result.get("statement")
+        if not isinstance(statement, dict):
+            continue
+        attested_subjects = statement.get("subject")
+        if not isinstance(attested_subjects, list):
+            continue
+        for attested_subject in attested_subjects:
+            if not isinstance(attested_subject, dict):
+                continue
+            digest_map = attested_subject.get("digest")
+            if isinstance(digest_map, dict) and isinstance(digest_map.get("sha256"), str):
+                digests.add(digest_map["sha256"])
+    if package_manifest._sha256(subject) not in digests:
+        raise ValueError(f"Verified attestation does not contain '{subject.name}' as a SHA-256 subject.")
+    return digests
+
+
+def _verify_tamper_is_rejected(subject: Path, attested_digests: set[str], directory: Path) -> None:
     tampered = directory / f"tampered-{subject.name}"
     tampered.write_bytes(subject.read_bytes() + b"\nattestation-tamper-negative\n")
-    completed = subprocess.run(_command(arguments, tampered), check=False, capture_output=True, text=True)
-    if completed.returncode == 0:
-        raise ValueError(f"Tampered release subject unexpectedly verified: '{subject.name}'.")
+    if package_manifest._sha256(tampered) in attested_digests:
+        raise ValueError(f"Tampered release subject unexpectedly matches an attestation: '{subject.name}'.")
 
 
 def _parse_args() -> argparse.Namespace:
@@ -72,16 +114,21 @@ def _parse_args() -> argparse.Namespace:
 
 def main() -> int:
     arguments = _parse_args()
+    verified_attestations: dict[Path, set[str]] = {}
+    manifest_subject, checksums_subject = _outer_evidence_subjects(arguments)
+    for subject in (manifest_subject, checksums_subject):
+        verified_attestations[subject] = _verified_attestation_digests(subject, _verify(arguments, subject))
+
     subjects = _verified_subjects(arguments)
     for subject in subjects:
-        _verify(arguments, subject)
+        verified_attestations[subject] = _verified_attestation_digests(subject, _verify(arguments, subject))
 
     package_subject = next(subject for subject in subjects if subject.suffix == ".nupkg")
     with tempfile.TemporaryDirectory(prefix="archlinternet-provenance-") as temporary_directory:
         directory = Path(temporary_directory)
-        _verify_tamper_is_rejected(arguments, package_subject, directory)
-        _verify_tamper_is_rejected(arguments, arguments.manifest, directory)
-        _verify_tamper_is_rejected(arguments, arguments.checksums, directory)
+        _verify_tamper_is_rejected(package_subject, verified_attestations[package_subject], directory)
+        _verify_tamper_is_rejected(manifest_subject, verified_attestations[manifest_subject], directory)
+        _verify_tamper_is_rejected(checksums_subject, verified_attestations[checksums_subject], directory)
     return 0
 
 
