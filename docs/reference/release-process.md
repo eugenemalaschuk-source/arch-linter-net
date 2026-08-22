@@ -21,12 +21,13 @@ is not package publication evidence.
 
 The manual release workflow resolves the release version, packs one immutable
 candidate artifact, runs the required consumer/platform gate against that
-candidate, re-verifies its manifest, and publishes those exact `.nupkg` files.
-It must not repack after the authorization gate. The workflow uploads its
-release-evidence artifact as the audit record for that candidate; inspect its
-JSON/Markdown evidence for package digests, candidate-manifest digest, commit,
-platform matrix, gate status, consumer policy shape, and explicit PASS/FAIL
-statement.
+candidate, re-verifies its manifest and release evidence, attests the frozen
+subjects, and verifies those attestations from a separate job before publication
+is reachable. It must not repack or regenerate an attested subject after the
+authorization gate. The workflow uploads its release-evidence artifact as the
+audit record for that candidate; inspect its JSON/Markdown evidence for package
+digests, candidate-manifest digest, commit, platform matrix, gate status,
+consumer policy shape, and explicit PASS/FAIL statement.
 
 A missing required platform artifact, invalid digest, failed required scenario,
 or workaround-shaped consumer policy blocks publication. A dry-run is evidence
@@ -48,12 +49,46 @@ is convenient verification evidence, not a second checksum authority, and is
 not recursively included as a hashed subject in the package manifest. The
 canonical JSON manifest is attached alongside it.
 
-These digests identify the exact project-controlled bytes before upload. A
-later NuGet.org download of a primary package can have different raw bytes
-because NuGet.org repository-signs submissions; verify that package under
-NuGet's repository-signature and package-identity rules rather than expecting
-pre-upload SHA-256 equality. This boundary says nothing about post-upload
-symbol-service behavior, which follows its own supported NuGet.org contract.
+After Checkpoint B, GitHub-hosted build provenance attests each manifest-selected
+`.nupkg` and `.snupkg` subject and separately attests the exact canonical
+manifest/checksum bytes. The manifest does not hash either evidence file; their
+attestations are the outer signed identity. The release workflow then verifies
+every subject with the GitHub CLI in a separate job before it can upload to
+NuGet.org or attach a GitHub Release asset.
+
+To verify a downloaded GitHub Release asset, use its exact release-source commit
+and verify every package, symbol, manifest, and checksum file separately. For
+example:
+
+```bash
+gh attestation verify ArchLinterNet.Core.<version>.nupkg \
+  --repo eugenemalaschuk-source/arch-linter-net \
+  --signer-workflow eugenemalaschuk-source/arch-linter-net/.github/workflows/release-nuget.yml \
+  --source-digest <release-source-commit>
+```
+
+First verify `package-manifest.json` and `package-checksums.txt`, then use the
+attested manifest/checksum inventory to verify the GitHub Release package and
+symbol asset bytes. GitHub provenance binds the exact subject digest to the
+repository, workflow, and source commit; it is not a claim that the package is
+secure or that the release meets a formal SLSA level.
+
+These digests identify the exact project-controlled bytes before upload and in
+GitHub Release attachments. A later NuGet.org download of a primary package can
+have different raw bytes because NuGet.org repository-signs submissions; verify
+that package under NuGet's repository-signature/trusted-repository and expected
+package-ID/version rules rather than expecting pre-upload SHA-256 equality. This
+boundary says nothing about post-upload symbol-service behavior, which follows
+its own documented NuGet.org contract.
+
+NuGet trusted publishing, GitHub build provenance, NuGet.org repository
+signing, and optional NuGet author signing are distinct mechanisms. Trusted
+publishing authorizes this workflow to publish through short-lived OIDC-backed
+credentials; it does not attest arbitrary downloaded bytes. GitHub provenance
+authenticates the frozen project-controlled artifacts. NuGet.org repository
+signing is an external post-upload transformation, while author signing is a
+separate project-controlled certificate/key decision that is not implemented by
+this workflow.
 
 Before publication, verify the generated release notes, the
 [evergreen adoption/upgrade guide](../guides/upgrading.md), and installed-schema
@@ -181,6 +216,9 @@ Expected dry-run result:
 - release notes are generated as workflow artifacts;
 - package artifacts are built with one calculated package version;
 - packages contain public metadata and package README;
+- every frozen package, symbol, canonical manifest, and checksum subject is
+  attested and independently verified when GitHub attestation permissions are
+  available;
 - nothing is pushed to NuGet.org;
 - no GitHub tag or GitHub Release is created;
 - docs are not deployed.
@@ -203,7 +241,8 @@ Expected public result:
 - an existing primary package causes a fail-closed error; inspect the paired
   primary/symbol state on NuGet.org before deciding on a corrected release path;
 - GitHub tag and release are created from the workflow commit;
-- generated package assets are attached to the GitHub Release;
+- the attested package, symbol, canonical manifest, and checksum assets are
+  attached to the GitHub Release without regeneration;
 - MkDocs product documentation is built and deployed to GitHub Pages.
 
 After publication, verify:
@@ -212,9 +251,19 @@ After publication, verify:
 - NuGet package project links open the public product docs;
 - NuGet repository links open the GitHub repository;
 - NuGet package README is product-facing;
-- GitHub Release exists and contains expected assets;
+- GitHub Release exists and contains every expected attested package, symbol,
+  manifest, and checksum asset;
 - GitHub Pages deployment completed successfully;
 - internal docs are not visible in the published site navigation.
+
+For post-publication integrity confirmation, download the GitHub Release assets,
+verify their GitHub attestations with the command above, then compare their
+SHA-256 values with the verified canonical manifest. For a NuGet.org-downloaded
+primary package, verify NuGet repository-signature/trusted-repository semantics
+and expected package ID/version instead; do not report its expected
+repository-signing byte change as tampering. Do not assume the same raw-byte or
+signature behavior for downloaded `.snupkg` files without documented
+symbol-service evidence.
 
 Record the published package IDs, version, GitHub Release URL, NuGet package URL, and GitHub Pages URL in the related issue or pull request notes.
 
@@ -222,7 +271,7 @@ Record the published package IDs, version, GitHub Release URL, NuGet package URL
 
 - If the dry-run fails, fix the underlying problem and rerun with `publish: false`.
 - If public publication fails before NuGet push completes, no GitHub Release should be created.
-- If NuGet publication partially succeeds, inspect NuGet.org and workflow logs before rerunning. The workflow should use duplicate-safe push behavior where possible.
+- If NuGet publication partially succeeds, inspect NuGet.org and workflow logs before rerunning. A duplicate primary-package push is fail-closed because it cannot prove the paired symbol state; do not use duplicate-success behavior.
 - If a GitHub Release already exists for the target tag, do not overwrite it blindly. Inspect the existing release and decide whether to fix the release manually or publish a new version.
 
 ## Non-goals

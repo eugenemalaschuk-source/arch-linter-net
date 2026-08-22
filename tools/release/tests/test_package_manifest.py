@@ -48,6 +48,13 @@ def _verify(packages: Path, output: Path, allow_v1: bool = False) -> None:
     ))
 
 
+def _release_evidence(packages: Path, output: Path) -> Path:
+    checksums = packages / "package-checksums.txt"
+    manifest._render_checksums(argparse.Namespace(manifest=output, output=checksums))
+    manifest._verify_release_evidence(packages, output, checksums)
+    return checksums
+
+
 def test_create_records_deterministic_paired_subject_inventory(tmp_path: Path) -> None:
     packages, output = _candidate(tmp_path)
 
@@ -86,6 +93,14 @@ def test_manifest_reading_rejects_a_path_outside_the_release_workspace(tmp_path:
         manifest._read_manifest(outside_manifest)
 
 
+def test_hashing_rejects_a_path_outside_the_release_workspace(tmp_path: Path) -> None:
+    outside_subject = tmp_path.parent / "outside-release-subject.nupkg"
+    outside_subject.write_bytes(b"outside")
+
+    with pytest.raises(ValueError, match="outside the release workspace"):
+        manifest._sha256(outside_subject)
+
+
 @pytest.mark.parametrize(
     "mutate",
     [
@@ -119,6 +134,56 @@ def test_checksum_rendering_and_subject_paths_are_deterministic(tmp_path: Path, 
     assert paths[::2] == [manifest._expected_filename(package_id, _VERSION, "package") for package_id in manifest._PACKAGE_IDS]
     assert paths[1::2] == [manifest._expected_filename(package_id, _VERSION, "symbols") for package_id in manifest._PACKAGE_IDS]
     assert all(path in checksums.read_text() for path in paths)
+
+
+def test_release_evidence_verification_rejects_missing_unexpected_or_tampered_evidence(tmp_path: Path) -> None:
+    packages, output = _candidate(tmp_path)
+    checksums = _release_evidence(packages, output)
+    checksums.write_text("tampered\n")
+
+    with pytest.raises(ValueError, match="differs from the manifest rendering"):
+        manifest._verify_release_evidence(packages, output, checksums)
+
+    packages, output = _candidate(tmp_path / "missing")
+    checksums = _release_evidence(packages, output)
+    checksums.unlink()
+    with pytest.raises(ValueError, match="differs from the manifest rendering"):
+        manifest._verify_release_evidence(packages, output, checksums)
+
+    packages, output = _candidate(tmp_path / "unexpected")
+    checksums = _release_evidence(packages, output)
+    (packages / "unrelated-release-evidence.txt").write_text("unexpected\n")
+    with pytest.raises(ValueError, match="unexpected="):
+        manifest._verify_release_evidence(packages, output, checksums)
+
+
+def test_attestation_subject_checksums_are_exact_and_deterministic(tmp_path: Path) -> None:
+    packages, output = _candidate(tmp_path)
+    checksums = _release_evidence(packages, output)
+    package_subjects = tmp_path / "package-subjects.txt"
+    evidence_subjects = tmp_path / "evidence-subjects.txt"
+
+    for subject_class, target in (("package", package_subjects), ("evidence", evidence_subjects)):
+        manifest._render_attestation_subject_checksums(argparse.Namespace(
+            packages_dir=packages,
+            manifest=output,
+            checksums=checksums,
+            subject_class=subject_class,
+            output=target,
+        ))
+
+    package_lines = package_subjects.read_text().splitlines()
+    evidence_lines = evidence_subjects.read_text().splitlines()
+    assert [line.rsplit("  ", maxsplit=1)[1] for line in package_lines] == [
+        manifest._expected_filename(package_id, _VERSION, kind)
+        for package_id in manifest._PACKAGE_IDS
+        for kind in manifest._SUBJECT_KINDS
+    ]
+    assert [line.rsplit("  ", maxsplit=1)[1] for line in evidence_lines] == [
+        "package-manifest.json",
+        "package-checksums.txt",
+    ]
+    assert all(line.count("  ") == 1 for line in package_lines + evidence_lines)
 
 
 def test_main_dispatches_the_verified_manifest_path_listing(tmp_path: Path, monkeypatch, capsys) -> None:
