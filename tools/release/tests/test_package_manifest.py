@@ -78,6 +78,14 @@ def test_verification_rejects_missing_unexpected_or_tampered_subjects(tmp_path: 
         _verify(packages, output)
 
 
+def test_manifest_reading_rejects_a_path_outside_the_release_workspace(tmp_path: Path) -> None:
+    outside_manifest = tmp_path.parent / "outside-candidate-manifest.json"
+    outside_manifest.write_text("{}")
+
+    with pytest.raises(ValueError, match="outside the release workspace"):
+        manifest._read_manifest(outside_manifest)
+
+
 @pytest.mark.parametrize(
     "mutate",
     [

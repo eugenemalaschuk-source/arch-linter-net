@@ -51,7 +51,8 @@ def _subject(path: Path, kind: str) -> dict[str, Any]:
 def _read_manifest(path: Path) -> dict[str, Any]:
     path = _safe_path(path, "candidate manifest")
     try:
-        value = json.loads(path.read_text(encoding="utf-8"))  # NOSONAR: _safe_path confines this path.
+        # _safe_path confines this read to the release workspace or repository root.
+        value = json.loads(path.read_text(encoding="utf-8"))  # NOSONAR
     except (OSError, json.JSONDecodeError) as error:
         raise ValueError(f"Cannot read candidate manifest '{path}': {error}") from error
     if not isinstance(value, dict):
