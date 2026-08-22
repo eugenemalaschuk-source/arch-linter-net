@@ -1,4 +1,5 @@
 using ArchLinterNet.Core.Contracts;
+using ArchLinterNet.Core.History.Enrichment;
 using ArchLinterNet.Core.History.Tasks;
 
 namespace ArchLinterNet.Core.History;
@@ -29,6 +30,13 @@ internal sealed class HistoryPolicyIngestionService
                 $"history_analysis policy configuration is invalid: {exception.Message}"));
         }
 
-        return new HistoryIngestionService(taskExtraction, configuration).Ingest(request);
+        HistoryIngestionOutcome outcome = new HistoryIngestionService(taskExtraction, configuration).Ingest(request);
+        if (outcome.Result is HistoryIngestionResult result)
+        {
+            HistoryDotNetEnrichment dotNetEnrichment = new HistoryDotNetEnricher().Enrich(result, request, policyPath);
+            result.ApplyEnrichment(dotNetEnrichment.ToReportProjection(result.ResolvedTo));
+        }
+
+        return outcome;
     }
 }

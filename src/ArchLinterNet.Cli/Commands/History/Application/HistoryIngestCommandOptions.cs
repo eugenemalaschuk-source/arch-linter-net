@@ -6,4 +6,5 @@ internal sealed record HistoryIngestCommandOptions(
     string To,
     string Format,
     bool ShowHelp,
-    string? PolicyPath = null);
+    string? PolicyPath = null,
+    bool RequestDotNetEnrichment = false);

@@ -53,5 +53,11 @@ internal sealed class HistoryIngestionResult(
 
     public HistoryHotspotAnalysis HotspotAnalysis { get; } = hotspotAnalysis ?? new HistoryHotspotAnalysis([]);
 
-    public HistoryEnrichmentProjection Enrichment { get; } = enrichment ?? HistoryEnrichmentProjection.NotRequested;
+    public HistoryEnrichmentProjection Enrichment { get; private set; } = enrichment ?? HistoryEnrichmentProjection.NotRequested;
+
+    internal void ApplyEnrichment(HistoryEnrichmentProjection enrichmentProjection)
+    {
+        ArgumentNullException.ThrowIfNull(enrichmentProjection);
+        Enrichment = enrichmentProjection;
+    }
 }
