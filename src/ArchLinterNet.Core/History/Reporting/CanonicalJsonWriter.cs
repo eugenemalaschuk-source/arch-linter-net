@@ -82,8 +82,25 @@ internal sealed class CanonicalJsonWriter
     public static string Quote(string value)
     {
         StringBuilder quoted = new("\"");
-        foreach (char character in value)
+        for (int index = 0; index < value.Length; index++)
         {
+            char character = value[index];
+            if (char.IsHighSurrogate(character))
+            {
+                if (index + 1 >= value.Length || !char.IsLowSurrogate(value[index + 1]))
+                {
+                    throw new CanonicalJsonUnicodeException(index);
+                }
+
+                quoted.Append(character).Append(value[++index]);
+                continue;
+            }
+
+            if (char.IsLowSurrogate(character))
+            {
+                throw new CanonicalJsonUnicodeException(index);
+            }
+
             switch (character)
             {
                 case '"':
@@ -172,4 +189,12 @@ internal sealed class CanonicalJsonWriter
 
         _pendingSeparator = true;
     }
+}
+
+// Report strings originate with canonical Git evidence, but optional downstream enrichment can
+// introduce .NET text independently. A dedicated type lets the CLI retain the normal fail-closed
+// diagnostic boundary instead of relying on a host encoder to replace malformed UTF-16 later.
+internal sealed class CanonicalJsonUnicodeException(int utf16Index)
+    : ArgumentException($"A canonical JSON string contains an unpaired UTF-16 surrogate at index {utf16Index.ToString(CultureInfo.InvariantCulture)}.")
+{
 }

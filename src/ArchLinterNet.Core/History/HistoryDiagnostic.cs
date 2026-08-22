@@ -39,6 +39,7 @@ internal sealed class HistoryDiagnostic(
         HistoryDiagnosticKind.PathEncodingInvalid => "path_encoding_invalid",
         HistoryDiagnosticKind.ConfigurationInvalid => "configuration_invalid",
         HistoryDiagnosticKind.TaskKeyOverlap => "task_key_overlap",
+        HistoryDiagnosticKind.ReportSerializationInvalid => "report_serialization_invalid",
         _ => "unknown",
     };
 }
