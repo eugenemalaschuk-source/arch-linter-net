@@ -13,6 +13,10 @@ internal sealed class HistoryCommandDefinition(HistoryIngestCommandHandler handl
         Option<string> from = new("--from");
         Option<string> to = new("--to");
         Option<string?> policy = new("--policy");
+        Option<bool> enrichDotNet = new("--enrich-dotnet")
+        {
+            Description = "Attach optional .NET source facts when the checkout exactly matches --to."
+        };
         Option<string> format = new("--format");
         format.DefaultValueFactory = _ => "json";
         Option<bool> help = new("--help");
@@ -21,6 +25,7 @@ internal sealed class HistoryCommandDefinition(HistoryIngestCommandHandler handl
         ingest.Options.Add(from);
         ingest.Options.Add(to);
         ingest.Options.Add(policy);
+        ingest.Options.Add(enrichDotNet);
         ingest.Options.Add(format);
         ingest.Options.Add(help);
         ingest.SetAction(result => handler.Execute(new HistoryIngestCommandOptions(
@@ -29,7 +34,8 @@ internal sealed class HistoryCommandDefinition(HistoryIngestCommandHandler handl
             result.GetValue(to) ?? string.Empty,
             result.GetValue(format) ?? "json",
             result.GetValue(help),
-            result.GetValue(policy))));
+            result.GetValue(policy),
+            result.GetValue(enrichDotNet))));
         history.Subcommands.Add(ingest);
         return history;
     }

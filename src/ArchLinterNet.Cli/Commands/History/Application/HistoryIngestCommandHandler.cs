@@ -8,7 +8,7 @@ namespace ArchLinterNet.Cli.Commands.History.Application;
 // stream stays empty, so no partial ingestion result can ever reach a consumer.
 internal sealed class HistoryIngestCommandHandler(ICliConsole console)
 {
-    private const string Usage = "arch-linter-net history ingest --from <rev> --to <rev> [--repository <path>] [--policy <path>] [--format json|text]";
+    private const string Usage = "arch-linter-net history ingest --from <rev> --to <rev> [--repository <path>] [--policy <path>] [--enrich-dotnet] [--format json|text]";
 
     public int Execute(HistoryIngestCommandOptions options)
     {
@@ -31,7 +31,7 @@ internal sealed class HistoryIngestCommandHandler(ICliConsole console)
         }
 
         HistoryIngestionOutcome outcome = HistoryPolicyIngestionService.Default.Ingest(
-            new HistoryIngestionRequest(options.Repository, options.From, options.To), options.PolicyPath);
+            new HistoryIngestionRequest(options.Repository, options.From, options.To, options.RequestDotNetEnrichment), options.PolicyPath);
         if (outcome.Result is not HistoryIngestionResult result)
         {
             console.Error.Write(HistoryDiagnosticJsonWriter.Write(outcome.Diagnostic!));

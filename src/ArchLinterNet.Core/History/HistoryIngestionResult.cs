@@ -1,4 +1,5 @@
 using ArchLinterNet.Core.History.Analysis;
+using ArchLinterNet.Core.History.Enrichment;
 
 namespace ArchLinterNet.Core.History;
 
@@ -44,4 +45,8 @@ internal sealed class HistoryIngestionResult(
     public HistoryBottleneckAnalysis BottleneckAnalysis { get; } = bottleneckAnalysis;
 
     public HistoryOcpAnalysis OcpAnalysis { get; } = ocpAnalysis;
+
+    public HistoryDotNetEnrichment DotNetEnrichment { get; private set; } = HistoryDotNetEnrichment.NotRequested;
+
+    internal void ApplyDotNetEnrichment(HistoryDotNetEnrichment enrichment) => DotNetEnrichment = enrichment;
 }

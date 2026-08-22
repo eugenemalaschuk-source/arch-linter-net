@@ -1,5 +1,6 @@
 using ArchLinterNet.Core.History.Analysis;
 using ArchLinterNet.Core.History.Configuration;
+using ArchLinterNet.Core.History.Enrichment;
 using ArchLinterNet.Core.History.Tasks;
 
 namespace ArchLinterNet.Core.History.Reporting;
@@ -28,9 +29,61 @@ internal static class HistoryIngestionJsonWriter
         WriteCoChangeGraph(writer, result);
         WriteBottleneckAnalysis(writer, result.BottleneckAnalysis);
         WriteOcpAnalysis(writer, result.OcpAnalysis);
+        WriteDotNetEnrichment(writer, result.DotNetEnrichment);
         writer.EndObject();
         return writer.ToCanonicalText() + "\n";
     }
+
+    private static void WriteDotNetEnrichment(CanonicalJsonWriter writer, HistoryDotNetEnrichment enrichment)
+    {
+        writer.BeginObject("dotNetEnrichment");
+        writer.WriteString("status", ToText(enrichment.Status));
+        if (enrichment.Reason is not null)
+        {
+            writer.WriteString("reason", enrichment.Reason);
+        }
+
+        writer.BeginArray("files");
+        foreach (HistoryDotNetFileEnrichment file in enrichment.Files)
+        {
+            writer.BeginObject();
+            writer.WriteString("canonicalPath", file.CanonicalPath);
+            writer.WriteString("status", ToText(file.Status));
+            writer.BeginArray("types");
+            foreach (HistoryDotNetTypeContext type in file.Types)
+            {
+                writer.BeginObject();
+                writer.WriteString("projectPath", type.ProjectPath);
+                writer.WriteString("assembly", type.AssemblyName);
+                writer.WriteString("namespace", type.NamespaceName);
+                writer.WriteString("fullName", type.FullTypeName);
+                writer.WriteString("name", type.SimpleTypeName);
+                writer.WriteString("kind", type.TypeKind.ToString().ToLowerInvariant());
+                writer.WriteBoolean("isAbstract", type.IsAbstract);
+                writer.EndObject();
+            }
+
+            writer.EndArray();
+            writer.EndObject();
+        }
+
+        writer.EndArray();
+        writer.EndObject();
+    }
+
+    private static string ToText(HistoryDotNetEnrichmentStatus status) => status switch
+    {
+        HistoryDotNetEnrichmentStatus.NotRequested => "not_requested",
+        HistoryDotNetEnrichmentStatus.NotApplicable => "not_applicable",
+        HistoryDotNetEnrichmentStatus.Available => "available",
+        _ => "unavailable"
+    };
+
+    private static string ToText(HistoryDotNetFileEnrichmentStatus status) => status switch
+    {
+        HistoryDotNetFileEnrichmentStatus.Available => "available",
+        _ => "not_applicable"
+    };
 
     private static void WriteCommits(CanonicalJsonWriter writer, HistoryIngestionResult result)
     {

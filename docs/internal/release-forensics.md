@@ -685,6 +685,13 @@ notes.
 Optional .NET/Roslyn enrichment is downstream and cannot drop, change, rescore, or
 reorder Git-level findings.
 
+When requested, enrichment is available only when the selected architecture policy,
+project/build facts, and a clean checkout can be verified against the resolved
+`to` commit. It reports `not_requested`, `not_applicable`, `available`, or
+`unavailable` with a bounded reason. A revision mismatch, dirty checkout, or
+project/source failure leaves the completed Git result intact; enrichment never
+reconstructs historical source from an unrelated current worktree.
+
 Reports state at least:
 
 - churn is not complexity;
@@ -757,7 +764,7 @@ At minimum cover:
 - #239: `G0`, `Gtheta`, pairs, clusters.
 - #240: independent-TaskKey bottlenecks and exact temporal gaps.
 - #241: repeated-edit/OCP evidence and role tokens.
-- #242: optional downstream .NET enrichment.
+- #242: revision-safe optional downstream .NET enrichment.
 - #243: versioned successful Markdown/canonical JSON schema/bytes, mandatory
   provenance serialization, and report-vs-diagnostic boundary.
 - #244: dogfood and conformance/governance guardrails.
