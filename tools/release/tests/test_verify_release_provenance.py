@@ -111,6 +111,22 @@ def test_command_uses_only_the_github_cli_executable(tmp_path: Path) -> None:
     assert command[0] == "gh"
 
 
+@pytest.mark.parametrize(
+    ("attribute", "value"),
+    [
+        ("repository", "--repo=attacker/repository"),
+        ("signer_workflow", "owner/repository/--config"),
+        ("source_commit", "not-a-commit"),
+    ],
+)
+def test_command_rejects_invalid_attestation_selectors(tmp_path: Path, attribute: str, value: str) -> None:
+    arguments = _arguments(tmp_path)
+    setattr(arguments, attribute, value)
+
+    with pytest.raises(ValueError, match="is invalid"):
+        provenance._command(arguments, arguments.manifest)
+
+
 def test_main_fails_when_an_expected_subject_has_no_attestation(tmp_path: Path, monkeypatch) -> None:
     arguments = _arguments(tmp_path)
 

@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import subprocess
 import tempfile
 from pathlib import Path
@@ -15,6 +16,9 @@ from _release_workspace import _safe_path
 
 
 _GH_COMMAND = "gh"
+_REPOSITORY_PATTERN = re.compile(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+")
+_SOURCE_COMMIT_PATTERN = re.compile(r"[0-9a-f]{40,64}")
+_WORKFLOW_PATTERN = re.compile(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+/\.github/workflows/[A-Za-z0-9_.-]+\.ya?ml")
 
 
 def _outer_evidence_subjects(arguments: argparse.Namespace) -> tuple[Path, Path, Path]:
@@ -43,24 +47,35 @@ def _verified_subjects(arguments: argparse.Namespace) -> list[Path]:
 
 def _command(arguments: argparse.Namespace, subject: Path) -> list[str]:
     subject = _safe_path(subject, "attestation subject")
+    repository = _validated_selector(arguments.repository, _REPOSITORY_PATTERN, "repository")
+    workflow = _validated_selector(arguments.signer_workflow, _WORKFLOW_PATTERN, "signer workflow")
+    source_commit = _validated_selector(arguments.source_commit, _SOURCE_COMMIT_PATTERN, "source commit")
     return [
         _GH_COMMAND,
         "attestation",
         "verify",
         str(subject),
         "--repo",
-        arguments.repository,
+        repository,
         "--signer-workflow",
-        arguments.signer_workflow,
+        workflow,
         "--source-digest",
-        arguments.source_commit,
+        source_commit,
         "--format",
         "json",
     ]
 
 
+def _validated_selector(value: Any, pattern: re.Pattern[str], description: str) -> str:
+    if not isinstance(value, str) or not pattern.fullmatch(value):
+        raise ValueError(f"Attestation {description} is invalid.")
+    return value
+
+
 def _verify(arguments: argparse.Namespace, subject: Path) -> list[dict[str, Any]]:
-    completed = subprocess.run(_command(arguments, subject), check=False, capture_output=True, text=True)
+    # NOSONAR: _command uses the literal `gh` executable; all selectors and the file subject are
+    # validated before they enter this argument vector, and subprocess is never run through a shell.
+    completed = subprocess.run(_command(arguments, subject), check=False, capture_output=True, text=True)  # NOSONAR
     if completed.returncode != 0:
         details = completed.stderr.strip() or completed.stdout.strip()
         raise ValueError(f"Attestation verification failed for '{subject.name}': {details}")
@@ -110,7 +125,9 @@ def _verify_tamper_is_rejected(subject: Path, attested_digests: set[str], direct
     subject = _safe_path(subject, "attestation subject")
     directory = _safe_path(directory, "tamper evidence directory")
     tampered = _safe_path(directory / f"tampered-{subject.name}", "tampered release subject")
-    tampered.write_bytes(subject.read_bytes() + b"\nattestation-tamper-negative\n")
+    # NOSONAR: subject and tampered are confined by _safe_path above, and tampered is created in a
+    # TemporaryDirectory rooted inside the already confined candidate packages directory.
+    tampered.write_bytes(subject.read_bytes() + b"\nattestation-tamper-negative\n")  # NOSONAR
     if package_manifest._sha256(tampered) in attested_digests:
         raise ValueError(f"Tampered release subject unexpectedly matches an attestation: '{subject.name}'.")
 
