@@ -1,6 +1,6 @@
 using ArchLinterNet.Core.History.Git;
 
-namespace ArchLinterNet.Core.History.Analysis;
+namespace ArchLinterNet.Core.History.Evidence;
 
 // `Commits(from,to) = Reachable(to) \ Reachable(from)` plus the strict-ancestor test the rename
 // lineage rule needs. Reachability is defined over parent edges only, so the analyzed set never

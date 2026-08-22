@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Text;
 using ArchLinterNet.Core.History.Analysis;
 using ArchLinterNet.Core.History.Configuration;
+using ArchLinterNet.Core.History.Evidence;
 
 namespace ArchLinterNet.Core.History.Reporting;
 

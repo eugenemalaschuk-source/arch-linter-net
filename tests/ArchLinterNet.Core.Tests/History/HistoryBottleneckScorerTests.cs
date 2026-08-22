@@ -5,6 +5,7 @@ using ArchLinterNet.Core.Contracts;
 using ArchLinterNet.Core.History;
 using ArchLinterNet.Core.History.Analysis;
 using ArchLinterNet.Core.History.Configuration;
+using ArchLinterNet.Core.History.Evidence;
 using ArchLinterNet.Core.History.Git;
 using ArchLinterNet.Core.History.Reporting;
 using ArchLinterNet.Core.History.Tasks;

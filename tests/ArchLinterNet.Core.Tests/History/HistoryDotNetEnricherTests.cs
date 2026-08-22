@@ -1,5 +1,6 @@
 using ArchLinterNet.Core.History;
 using ArchLinterNet.Core.History.Enrichment;
+using ArchLinterNet.Core.History.Reporting;
 using ArchLinterNet.Core.Model;
 using NUnit.Framework;
 
@@ -94,6 +95,45 @@ public sealed class HistoryDotNetEnricherTests
     }
 
     [Test]
+    public void AvailableAndUnavailableEnrichmentChangeOnlyTheReservedReportProjection()
+    {
+        using GitTestRepository repository = GitTestRepository.Create();
+        repository.Write("src/Widget.cs", "namespace Example; public class Widget { }\n");
+        string first = repository.Commit("first");
+        repository.Write("src/Widget.cs", "namespace Example; public class Widget { public int Value => 1; }\n");
+        string second = repository.Commit("second #9");
+        HistoryIngestionResult result = HistoryIngestionFixture.Succeed(repository, first, second);
+        string gitOnly = HistoryIngestionJsonWriter.Write(result);
+        HistoryDotNetTypeContext type = new(
+            "src/Example/Example.csproj", "Example", "Example", "Example.Widget", "Widget",
+            ArchitectureTypeKind.Class, isAbstract: false);
+        var availableProvider = new StubFactProvider(new Dictionary<string, IReadOnlyList<HistoryDotNetTypeContext>>
+        {
+            ["src/Widget.cs"] = [type],
+        });
+
+        HistoryDotNetEnrichment available = new HistoryDotNetEnricher(availableProvider).Enrich(
+            result, new HistoryIngestionRequest(repository.Path, first, second, requestDotNetEnrichment: true), "architecture/dependencies.arch.yml");
+        result.ApplyEnrichment(available.ToReportProjection(result.ResolvedTo));
+        string availableReport = HistoryIngestionJsonWriter.Write(result);
+
+        HistoryDotNetEnrichment unavailable = new HistoryDotNetEnricher(new ThrowingFactProvider("revision_mismatch")).Enrich(
+            result, new HistoryIngestionRequest(repository.Path, first, second, requestDotNetEnrichment: true), "architecture/dependencies.arch.yml");
+        result.ApplyEnrichment(unavailable.ToReportProjection(result.ResolvedTo));
+        string unavailableReport = HistoryIngestionJsonWriter.Write(result);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(available.Status, Is.EqualTo(HistoryDotNetEnrichmentStatus.Available));
+            Assert.That(unavailable.Status, Is.EqualTo(HistoryDotNetEnrichmentStatus.Unavailable));
+            Assert.That(availableReport, Does.Contain("\"status\": \"available\""));
+            Assert.That(unavailableReport, Does.Contain("\"status\": \"unavailable\""));
+            Assert.That(WithoutEnrichmentProjection(availableReport), Is.EqualTo(WithoutEnrichmentProjection(gitOnly)));
+            Assert.That(WithoutEnrichmentProjection(unavailableReport), Is.EqualTo(WithoutEnrichmentProjection(gitOnly)));
+        });
+    }
+
+    [Test]
     public void RevisionMismatchIsReportedBeforePolicyOrBuildFactsAreRead()
     {
         using GitTestRepository repository = GitTestRepository.Create();
@@ -171,5 +211,16 @@ public sealed class HistoryDotNetEnricherTests
     {
         public HistoryDotNetFactMaterialization Materialize(string repositoryPath, string resolvedTo, string policyPath) =>
             throw new HistoryDotNetEnrichmentUnavailableException(reason);
+    }
+
+    private static string WithoutEnrichmentProjection(string json)
+    {
+        const string EnrichmentStart = "\n  \"enrichment\": {";
+        const string CandidatesStart = "\n  \"candidates\":";
+        int start = json.IndexOf(EnrichmentStart, StringComparison.Ordinal);
+        int end = json.IndexOf(CandidatesStart, start, StringComparison.Ordinal);
+        Assert.That(start, Is.GreaterThanOrEqualTo(0));
+        Assert.That(end, Is.GreaterThan(start));
+        return json.Remove(start, end - start);
     }
 }

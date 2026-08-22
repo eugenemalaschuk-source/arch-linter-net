@@ -1,7 +1,7 @@
 using ArchLinterNet.Core.History.Configuration;
 using ArchLinterNet.Core.History.Tasks;
 
-namespace ArchLinterNet.Core.History.Analysis;
+namespace ArchLinterNet.Core.History.Evidence;
 
 // The graph is an immutable projection over canonical ingestion evidence. It deliberately retains
 // task-only pairs so the evidence is auditable, while `BaseEdges` alone defines G0 topology.

@@ -1,4 +1,4 @@
-namespace ArchLinterNet.Core.History.Analysis;
+namespace ArchLinterNet.Core.History.Evidence;
 
 // A logical file: one baseline path identity, or several unioned by an accepted exact-rename lineage.
 // `CommitCount` counts distinct canonical file-evidence commits, not raw delta entries.

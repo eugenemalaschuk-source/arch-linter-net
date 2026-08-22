@@ -1,9 +1,10 @@
 using ArchLinterNet.Core.Contracts;
+using ArchLinterNet.Core.History.Canonical;
 using ArchLinterNet.Core.History.Configuration;
 using ArchLinterNet.Core.History.Git;
 using ArchLinterNet.Core.History.Tasks;
 
-namespace ArchLinterNet.Core.History.Analysis;
+namespace ArchLinterNet.Core.History.Evidence;
 
 // Builds the graph only from canonical evidence produced by ingestion. In particular, it never
 // revisits source spellings, raw paths, or rename decisions; it projects the settled evidence.
@@ -323,7 +324,7 @@ internal sealed class CoChangeGraphBuilder(HistoryAnalysisConfiguration configur
     }
 
     private static int CompareVertices(CoChangeVertex left, CoChangeVertex right)
-        => GitPathDecoder.CompareScalarValue(left.CanonicalPath, right.CanonicalPath);
+        => HistoryScalarValueComparer.Compare(left.CanonicalPath, right.CanonicalPath);
 
     private static int ComparePairs(CoChangePair left, CoChangePair right)
     {

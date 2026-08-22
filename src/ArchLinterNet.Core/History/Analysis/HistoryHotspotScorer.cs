@@ -1,7 +1,8 @@
 using System.Numerics;
 using ArchLinterNet.Core.Contracts;
+using ArchLinterNet.Core.History.Canonical;
 using ArchLinterNet.Core.History.Configuration;
-using ArchLinterNet.Core.History.Git;
+using ArchLinterNet.Core.History.Evidence;
 
 namespace ArchLinterNet.Core.History.Analysis;
 
@@ -87,7 +88,7 @@ internal sealed class HistoryHotspotScorer
         LineCountStatus[] statuses = file.Events.Select(static item => item.LineCountStatus).Distinct().Order().ToArray();
         Tasks.TaskKey[] canonicalTaskKeys = taskKeys.Order().ToArray();
         string[] canonicalAuthors = [.. authors];
-        Array.Sort(canonicalAuthors, GitPathDecoder.CompareScalarValue);
+        Array.Sort(canonicalAuthors, HistoryScalarValueComparer.Compare);
         return new Candidate(
             file.CanonicalPath,
             file.Aliases,
@@ -223,7 +224,7 @@ internal sealed class HistoryHotspotScorer
         comparison = comparison != 0 ? comparison : right.RawEvidence.TaskSpread.CompareTo(left.RawEvidence.TaskSpread);
         comparison = comparison != 0 ? comparison : right.RawEvidence.Churn.CompareTo(left.RawEvidence.Churn);
         comparison = comparison != 0 ? comparison : right.RawEvidence.CommitCount.CompareTo(left.RawEvidence.CommitCount);
-        return comparison != 0 ? comparison : GitPathDecoder.CompareScalarValue(left.CanonicalPath, right.CanonicalPath);
+        return comparison != 0 ? comparison : HistoryScalarValueComparer.Compare(left.CanonicalPath, right.CanonicalPath);
     }
 
     private sealed class Candidate(

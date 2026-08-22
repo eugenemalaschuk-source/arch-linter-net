@@ -74,6 +74,15 @@ contracts:
         - package-cycles
         - core-contracts-must-not-depend-on-hosts
         - core-contracts-must-not-depend-on-execution
+        - core-history-canonical-must-stay-independent
+        - core-history-git-ingestion-must-not-depend-on-evidence-scoring-reports-or-enrichment
+        - core-history-configuration-must-not-depend-on-runtime-evidence-or-rendering
+        - core-history-task-extraction-must-not-depend-on-evidence-scoring-reports-or-enrichment
+        - core-history-evidence-must-not-depend-on-scoring-reports-or-enrichment
+        - core-history-scoring-must-consume-finalized-evidence
+        - core-history-reporting-must-not-depend-on-git-ingestion-or-enrichment
+        - core-history-enrichment-must-not-depend-on-git-ingestion-or-reports
+        - cli-history-command-must-not-bypass-history-composition
         - cel-must-not-depend-on-core
         - cel-must-not-depend-on-cli
         - cel-must-not-depend-on-testing

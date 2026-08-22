@@ -1,7 +1,7 @@
 using ArchLinterNet.Core.History.Git;
 using ArchLinterNet.Core.History.Tasks;
 
-namespace ArchLinterNet.Core.History.Analysis;
+namespace ArchLinterNet.Core.History.Evidence;
 
 // Per-commit canonical metadata evidence. Merge commits stay here as range metadata even though they
 // contribute no file-derived evidence, so the excluded merge count is visible rather than implied.
@@ -18,4 +18,7 @@ internal sealed class CommitEvidence(
     public IReadOnlyList<TaskKeyMatch> TaskKeyMatches { get; } = taskKeyMatches;
 
     public IReadOnlyList<TaskKey> TaskKeys { get; } = taskKeys;
+
+    public static int CompareCanonical(CommitEvidence left, CommitEvidence right)
+        => GitCommit.CompareCanonical(left.Commit, right.Commit);
 }

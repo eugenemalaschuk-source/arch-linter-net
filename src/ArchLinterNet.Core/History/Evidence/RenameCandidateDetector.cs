@@ -1,6 +1,6 @@
 using ArchLinterNet.Core.History.Git;
 
-namespace ArchLinterNet.Core.History.Analysis;
+namespace ArchLinterNet.Core.History.Evidence;
 
 // Detects local exact-rename candidates inside one non-merge commit delta. Similarity inference, copy
 // inference, rename-with-edit, and any ambient Git rename threshold deliberately cannot create a

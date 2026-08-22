@@ -1,5 +1,6 @@
 using System.Text;
 using ArchLinterNet.Core.History;
+using ArchLinterNet.Core.History.Canonical;
 using ArchLinterNet.Core.History.Git;
 using NUnit.Framework;
 
@@ -47,10 +48,10 @@ public sealed class HistoryPathSemanticsTests
     public void ScalarValueOrderingPlacesSupplementaryScalarsAboveEveryBmpScalar()
     {
         // U+1F600 is above U+FF21, but its UTF-16 lead surrogate U+D83D is below it.
-        Assert.That(GitPathDecoder.CompareScalarValue("\U0001F600", "\uFF21"), Is.GreaterThan(0));
+        Assert.That(HistoryScalarValueComparer.Compare("\U0001F600", "\uFF21"), Is.GreaterThan(0));
         Assert.That(string.CompareOrdinal("\U0001F600", "\uFF21"), Is.LessThan(0));
-        Assert.That(GitPathDecoder.CompareScalarValue("ab", "abc"), Is.LessThan(0));
-        Assert.That(GitPathDecoder.CompareScalarValue("abc", "abc"), Is.Zero);
+        Assert.That(HistoryScalarValueComparer.Compare("ab", "abc"), Is.LessThan(0));
+        Assert.That(HistoryScalarValueComparer.Compare("abc", "abc"), Is.Zero);
     }
 
     private static string SeedRoot(GitTestRepository repository)

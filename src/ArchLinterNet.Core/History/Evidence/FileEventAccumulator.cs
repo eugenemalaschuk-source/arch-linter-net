@@ -1,4 +1,4 @@
-namespace ArchLinterNet.Core.History.Analysis;
+namespace ArchLinterNet.Core.History.Evidence;
 
 // Collects every raw delta entry that maps to one logical file inside one commit. Several entries
 // still produce exactly one canonical event, which is what makes `commit_count` commit-distinct

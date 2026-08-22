@@ -1,4 +1,4 @@
-namespace ArchLinterNet.Core.History.Analysis;
+namespace ArchLinterNet.Core.History.Evidence;
 
 internal enum FileEventKind
 {

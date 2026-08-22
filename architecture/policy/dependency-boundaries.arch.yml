@@ -124,6 +124,60 @@ contracts:
       forbidden: [core_execution]
       reason: Contracts must stay independent of Execution's runtime checker/registry internals; the deliberately-duplicated ArchitectureContractFamilyBindings/ArchitectureContractFamilyBinding registry depends on this separation holding.
 
+    - name: core-history-canonical-must-stay-independent
+      id: core-history-canonical-must-stay-independent
+      source: core_history_canonical
+      forbidden: [cli, testing, core_history_git, core_history_configuration, core_history_tasks, core_history_evidence, core_history_scoring, core_history_reporting, core_history_enrichment]
+      reason: Canonical History scalar ordering is a neutral deterministic primitive shared by finalized evidence and reports; it must not absorb pipeline behaviour.
+
+    - name: core-history-git-ingestion-must-not-depend-on-evidence-scoring-reports-or-enrichment
+      id: core-history-git-ingestion-must-not-depend-on-evidence-scoring-reports-or-enrichment
+      source: core_history_git
+      forbidden: [cli, testing, core_history_evidence, core_history_scoring, core_history_reporting, core_history_enrichment]
+      reason: Raw ref/object, metadata, path, and delta ingestion establishes canonical evidence before scoring, report rendering, or optional enrichment.
+
+    - name: core-history-configuration-must-not-depend-on-runtime-evidence-or-rendering
+      id: core-history-configuration-must-not-depend-on-runtime-evidence-or-rendering
+      source: core_history_configuration
+      forbidden: [cli, testing, core_history_git, core_history_evidence, core_history_scoring, core_history_reporting, core_history_enrichment]
+      reason: History configuration defines bounded classification and profiles; it must not select or reconstruct runtime evidence, scores, or reports.
+
+    - name: core-history-task-extraction-must-not-depend-on-evidence-scoring-reports-or-enrichment
+      id: core-history-task-extraction-must-not-depend-on-evidence-scoring-reports-or-enrichment
+      source: core_history_tasks
+      forbidden: [cli, testing, core_history_git, core_history_evidence, core_history_scoring, core_history_reporting, core_history_enrichment]
+      reason: Canonical TaskKey extraction is raw-message evidence construction and must not depend on scoring, rendering, or optional enrichment.
+
+    - name: core-history-evidence-must-not-depend-on-scoring-reports-or-enrichment
+      id: core-history-evidence-must-not-depend-on-scoring-reports-or-enrichment
+      source: core_history_evidence
+      forbidden: [cli, testing, core_history_scoring, core_history_reporting, core_history_enrichment]
+      reason: Canonical file identity, rename lineage, churn, commit, and co-change evidence are finalized before scoring and must not depend on scores, report rendering, or optional enrichment.
+
+    - name: core-history-scoring-must-consume-finalized-evidence
+      id: core-history-scoring-must-consume-finalized-evidence
+      source: core_history_scoring
+      forbidden: [cli, testing, core_history_git, core_history_reporting, core_history_enrichment]
+      reason: Scorers may consume finalized evidence but must not read raw Git ingestion, render reports, or use optional enrichment to influence scores.
+
+    - name: core-history-reporting-must-not-depend-on-git-ingestion-or-enrichment
+      id: core-history-reporting-must-not-depend-on-git-ingestion-or-enrichment
+      source: core_history_reporting
+      forbidden: [cli, testing, core_history_git, core_history_enrichment]
+      reason: Canonical serialization and report projection consume only finalized reusable History results and must not read raw Git inputs or enrichment implementation details.
+
+    - name: core-history-enrichment-must-not-depend-on-git-ingestion-or-reports
+      id: core-history-enrichment-must-not-depend-on-git-ingestion-or-reports
+      source: core_history_enrichment
+      forbidden: [cli, testing, core_history_git, core_history_reporting]
+      reason: Optional .NET enrichment is a downstream projection and must not re-ingest Git data or render successful reports.
+
+    - name: cli-history-command-must-not-bypass-history-composition
+      id: cli-history-command-must-not-bypass-history-composition
+      source: cli_history
+      forbidden: [core_history_canonical, core_history_git, core_history_configuration, core_history_tasks, core_history_evidence, core_history_scoring, core_history_enrichment]
+      reason: The CLI History command composes the reusable result and report/error surface without importing canonical-ingestion, scoring, or enrichment internals.
+
     - name: cel-must-not-depend-on-core
       id: cel-must-not-depend-on-core
       source: cel

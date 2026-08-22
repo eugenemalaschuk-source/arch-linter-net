@@ -1,4 +1,5 @@
 using ArchLinterNet.Core.History.Analysis;
+using ArchLinterNet.Core.History.Evidence;
 
 namespace ArchLinterNet.Core.History.Reporting;
 

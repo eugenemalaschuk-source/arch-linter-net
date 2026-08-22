@@ -1,6 +1,7 @@
+using ArchLinterNet.Core.History.Canonical;
 using ArchLinterNet.Core.History.Git;
 
-namespace ArchLinterNet.Core.History.Analysis;
+namespace ArchLinterNet.Core.History.Evidence;
 
 // A local exact-rename candidate: a one-to-one delete/add relation inside one non-merge commit whose
 // preimage and postimage share a blob object ID with no competing source or destination. Every
@@ -27,13 +28,13 @@ internal sealed class RenameCandidate(GitCommit commit, string sourcePath, strin
             return byCommit;
         }
 
-        int bySource = GitPathDecoder.CompareScalarValue(left.SourcePath, right.SourcePath);
+        int bySource = HistoryScalarValueComparer.Compare(left.SourcePath, right.SourcePath);
         if (bySource != 0)
         {
             return bySource;
         }
 
-        int byDestination = GitPathDecoder.CompareScalarValue(left.DestinationPath, right.DestinationPath);
+        int byDestination = HistoryScalarValueComparer.Compare(left.DestinationPath, right.DestinationPath);
         return byDestination != 0 ? byDestination : string.CompareOrdinal(left.BlobId.Hex, right.BlobId.Hex);
     }
 }
