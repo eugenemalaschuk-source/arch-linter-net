@@ -10,10 +10,11 @@ from pathlib import Path
 from typing import Any
 
 from _release_workspace import _safe_path
+from package_manifest import _load_manifest as _load_candidate_manifest
 
 _EVIDENCE_SCHEMA = "checkpoint-b-platform-evidence/v1"
 _GATES_SCHEMA = "checkpoint-b-repository-gates/v1"
-_MANIFEST_SCHEMA = "checkpoint-b-candidate-manifest/v1"
+_MANIFEST_SCHEMA = "checkpoint-b-candidate-manifest/v2"
 _RELEASE_SCOPE_SCHEMA = "checkpoint-b-release-scope/v1"
 _REQUIRED_PLATFORMS = {
     "linux-x64": ("x64", "bash"),
@@ -117,16 +118,10 @@ def _load_json(path: Path, description: str) -> dict[str, Any]:
 
 
 def _read_manifest(path: Path) -> dict[str, Any]:
-    manifest = _load_json(path, "candidate manifest")
-    if manifest.get("schema") != _MANIFEST_SCHEMA:
+    raw_manifest = _load_json(path, "candidate manifest")
+    if raw_manifest.get("schema") != _MANIFEST_SCHEMA:
         raise ValueError("Candidate manifest schema is invalid.")
-    packages = manifest.get("packages")
-    if not isinstance(packages, list) or len(packages) != 4:
-        raise ValueError("Candidate manifest package inventory is invalid.")
-    required_fields = {"id", "version", "file", "size", "sha256"}
-    if any(not isinstance(package, dict) or set(package) != required_fields for package in packages):
-        raise ValueError("Candidate manifest package record is invalid.")
-    return manifest
+    return _load_candidate_manifest(path)
 
 
 def _read_policy_shape(path: Path, record: dict[str, Any]) -> dict[str, Any]:
