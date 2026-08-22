@@ -220,6 +220,7 @@ public static class ArchitectureFindingMapper
             PolicyOrigin = diagnostic.PolicyLocation,
             RelatedPolicyOrigins = diagnostic.RelatedPolicyLocations,
             SourceLocation = SourceLocationOf(diagnostic),
+            RemediationHint = ArchitectureRemediationHintFactory.Create(diagnostic, identity),
         };
 
     private static string? SeverityFor(string? mode)

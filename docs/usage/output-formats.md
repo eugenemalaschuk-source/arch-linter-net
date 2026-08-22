@@ -95,6 +95,68 @@ Example shape:
 
 Human output is optimized for readability, not machine parsing.
 
+## Remediation hints
+
+When a diagnostic contains enough typed policy and analysis evidence, its
+normalized finding can include an optional deterministic remediation hint. A
+Human report appends a concise `remediation: <category>: <summary>` clause; JSON
+exposes the full structured value as `remediation_guidance`; and SARIF retains the
+same normalized value under `properties.arch_linter_net.remediation_guidance`.
+The existing port-boundary `remediation_hint` string remains available unchanged
+for v1 consumers, including in typed details.
+
+Hints are guidance, not edits. They never create code changes, rewrite YAML,
+baselines, or reviewed public-API snapshots, and SARIF output does not emit
+`fixes` for them.
+
+The category is a finite machine-readable token:
+
+- `move_code` — move code to an already-evidenced architectural owner;
+- `depend_on_abstraction` / `invert_dependency` — only when policy evidence
+  already establishes the required abstraction or direction;
+- `introduce_adapter` / `use_declared_port` — use an already-declared adapter
+  or port seam;
+- `fix_classification` / `fix_policy_input` — correct role, location,
+  coverage, build, or policy input facts before changing structure;
+- `narrow_exception` — a precise exception may need explicit review;
+- `remove_or_replace_dependency` — remove a forbidden dependency when no
+  approved seam is evidenced;
+- `review_contract` — existing evidence is insufficient to prescribe a safe
+  structural repair.
+
+Every populated hint carries its category, summary, stable contract identity,
+structured canonical finding identity, ordered evidence, optional expected seam
+or direction, caveat, and review flag. The structured identity keeps
+same-named subjects from different assemblies distinct; never use the display
+text as identity.
+
+For example, a port-boundary result with a declared seam includes compact data
+like this:
+
+```json
+"remediation_guidance": {
+  "category": "use_declared_port",
+  "summary": "Use the declared port seam instead of the direct cross-context dependency.",
+  "contract_identity": "orders-boundary",
+  "finding_identity": { "source_assembly": "App", "source_type": "App.Orders.OrderService" },
+  "evidence": [
+    { "kind": "evidence_kind", "value": "direct_edge" },
+    { "kind": "expected_seam", "value": "role:Port, name: Orders" }
+  ],
+  "expected_seam_or_direction": "role:Port, name: Orders",
+  "caveat": "The declared seam is the only supported alternative; do not add a broad exception.",
+  "requires_review": false
+}
+```
+
+Treat a hint as an evidence-backed starting point, not permission to make the
+policy easier to satisfy. In particular, do not respond by adding broad ignores
+or exclusions, expanding allow-lists merely to permit the observed edge,
+reducing governed scope, baselining new debt, changing `strict` to `audit`, or
+deleting a contract without evidence that it is wrong. When no safe specialized
+hint is present, keep the existing diagnostic unchanged and review the contract
+and policy context.
+
 When enabled and non-empty, supplemental diagnostics are emitted in dedicated sections:
 
 - `Coverage findings:` for namespace, rule-input, project, assembly, and dependency-edge coverage contracts;

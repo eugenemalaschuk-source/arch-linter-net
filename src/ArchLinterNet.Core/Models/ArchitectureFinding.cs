@@ -34,6 +34,12 @@ public sealed record ArchitectureFinding(
     /// </summary>
     public ArchitectureViolationIdentity? Identity { get; init; }
 
+    /// <summary>
+    /// Optional deterministic remediation guidance. This does not change finding identity and is
+    /// never an executable fix or authorization to weaken policy.
+    /// </summary>
+    public ArchitectureRemediationHint? RemediationHint { get; init; }
+
     public ArchitecturePolicySourceLocation? PolicyLocation => PolicyOrigin;
 
     public IReadOnlyCollection<ArchitecturePolicySourceLocation> RelatedPolicyOrigins { get; init; } =

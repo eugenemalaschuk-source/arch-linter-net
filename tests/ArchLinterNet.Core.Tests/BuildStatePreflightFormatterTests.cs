@@ -70,6 +70,18 @@ public sealed class BuildStatePreflightFormatterTests
     }
 
     [Test]
+    public void FormatBuildStatePreflightForHumans_IncludesNormalizedRemediationHint()
+    {
+        var diagnostic = new BuildStatePreflightDiagnostic(
+            "build-state-preflight", "Fixture.csproj", BuildStatePreflightState.MissingArtifact,
+            new BuildStatePreflightEvidence("Fixture.csproj", "Fixture"));
+
+        string result = _formatter.FormatBuildStatePreflightForHumans(new[] { diagnostic });
+
+        Assert.That(result, Does.Contain("remediation: fix_policy_input: Restore the required project/build input"));
+    }
+
+    [Test]
     public void FormatBuildStatePreflightForHumans_MultipleDiagnostics_OrdersByProjectPath()
     {
         var b = new BuildStatePreflightDiagnostic(

@@ -2268,6 +2268,7 @@ sealed class ArchLinterNet.Core.Model.ArchitectureFinding : System.IEquatable<Ar
   property ArchLinterNet.Core.Model.ArchitectureFindingSourceLocation? SourceLocation {get;init;}
   property ArchLinterNet.Core.Model.ArchitecturePolicySourceLocation? PolicyLocation {get;}
   property ArchLinterNet.Core.Model.ArchitecturePolicySourceLocation? PolicyOrigin {get;init;}
+  property ArchLinterNet.Core.Model.ArchitectureRemediationHint? RemediationHint {get;init;}
   property ArchLinterNet.Core.Model.ArchitectureViolationIdentity? Identity {get;init;}
   property System.Collections.Generic.IReadOnlyCollection<ArchLinterNet.Core.Model.ArchitecturePolicySourceLocation> RelatedPolicyLocations {get;}
   property System.Collections.Generic.IReadOnlyCollection<ArchLinterNet.Core.Model.ArchitecturePolicySourceLocation> RelatedPolicyOrigins {get;init;}
@@ -2298,6 +2299,8 @@ sealed class ArchLinterNet.Core.Model.ArchitectureFindingReadEnvelope : System.I
   property System.Text.Json.JsonElement RawDetails {get;init;}
   property System.Text.Json.JsonElement RawEnvelope {get;init;}
   property System.Text.Json.JsonElement? RawPolicyOrigin {get;init;}
+  property System.Text.Json.JsonElement? RawRemediationGuidance {get;init;}
+  property System.Text.Json.JsonElement? RawRemediationHint {get;init;}
   property System.Text.Json.JsonElement? RawSourceLocation {get;init;}
   property bool IsOpaque {get;init;}
   property int SchemaVersion {get;init;}
@@ -2457,6 +2460,47 @@ sealed class ArchLinterNet.Core.Model.ArchitecturePolicySourceLocation : System.
 sealed class ArchLinterNet.Core.Model.ArchitecturePolicyValidationException : System.InvalidOperationException
   ctor(string message, object diagnostic, System.Exception innerException)
   property object Diagnostic {get;}
+sealed class ArchLinterNet.Core.Model.ArchitectureRemediationHint : System.IEquatable<ArchLinterNet.Core.Model.ArchitectureRemediationHint>
+  ctor(ArchLinterNet.Core.Model.ArchitectureRemediationHintCategory Category, string Summary, string ContractIdentity, ArchLinterNet.Core.Model.ArchitectureViolationIdentity FindingIdentity, System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Model.ArchitectureRemediationHintEvidence> Evidence)
+  method ArchLinterNet.Core.Model.ArchitectureRemediationHint <Clone>$()
+  method bool Equals(ArchLinterNet.Core.Model.ArchitectureRemediationHint? other)
+  method bool Equals(object? obj)
+  method int GetHashCode()
+  method string ToString()
+  method void Deconstruct(out ArchLinterNet.Core.Model.ArchitectureRemediationHintCategory Category, out string Summary, out string ContractIdentity, out ArchLinterNet.Core.Model.ArchitectureViolationIdentity FindingIdentity, out System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Model.ArchitectureRemediationHintEvidence> Evidence)
+  operator !=(ArchLinterNet.Core.Model.ArchitectureRemediationHint? left, ArchLinterNet.Core.Model.ArchitectureRemediationHint? right)
+  operator ==(ArchLinterNet.Core.Model.ArchitectureRemediationHint? left, ArchLinterNet.Core.Model.ArchitectureRemediationHint? right)
+  property ArchLinterNet.Core.Model.ArchitectureRemediationHintCategory Category {get;init;}
+  property ArchLinterNet.Core.Model.ArchitectureViolationIdentity FindingIdentity {get;init;}
+  property System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Model.ArchitectureRemediationHintEvidence> Evidence {get;init;}
+  property bool RequiresReview {get;init;}
+  property string ContractIdentity {get;init;}
+  property string Summary {get;init;}
+  property string? Caveat {get;init;}
+  property string? ExpectedSeamOrDirection {get;init;}
+enum ArchLinterNet.Core.Model.ArchitectureRemediationHintCategory : int
+  enum-member DependOnAbstraction = 1
+  enum-member FixClassification = 5
+  enum-member FixPolicyInput = 6
+  enum-member IntroduceAdapter = 3
+  enum-member InvertDependency = 2
+  enum-member MoveCode = 0
+  enum-member NarrowException = 7
+  enum-member RemoveOrReplaceDependency = 8
+  enum-member ReviewContract = 9
+  enum-member UseDeclaredPort = 4
+sealed class ArchLinterNet.Core.Model.ArchitectureRemediationHintEvidence : System.IEquatable<ArchLinterNet.Core.Model.ArchitectureRemediationHintEvidence>
+  ctor(string Kind, string Value)
+  method ArchLinterNet.Core.Model.ArchitectureRemediationHintEvidence <Clone>$()
+  method bool Equals(ArchLinterNet.Core.Model.ArchitectureRemediationHintEvidence? other)
+  method bool Equals(object? obj)
+  method int GetHashCode()
+  method string ToString()
+  method void Deconstruct(out string Kind, out string Value)
+  operator !=(ArchLinterNet.Core.Model.ArchitectureRemediationHintEvidence? left, ArchLinterNet.Core.Model.ArchitectureRemediationHintEvidence? right)
+  operator ==(ArchLinterNet.Core.Model.ArchitectureRemediationHintEvidence? left, ArchLinterNet.Core.Model.ArchitectureRemediationHintEvidence? right)
+  property string Kind {get;init;}
+  property string Value {get;init;}
 enum ArchLinterNet.Core.Model.ArchitectureSelectorParticipationKind : int
   enum-member Exclusion = 1
   enum-member Inclusion = 0

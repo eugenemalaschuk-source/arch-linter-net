@@ -14,13 +14,14 @@ public sealed partial class ArchitectureDiagnosticFormatter
         var lines = diagnostics
             .Select(diagnostic => ArchitectureFindingMapper.FromDiagnostic(diagnostic))
             .OrderBy(finding => ((BuildStatePreflightDiagnostic)finding.Details).Evidence.ProjectPath, StringComparer.Ordinal)
-            .Select(finding => FormatBuildStatePreflightLine((BuildStatePreflightDiagnostic)finding.Details));
+            .Select(FormatBuildStatePreflightLine);
 
         return "Build-state preflight:" + Environment.NewLine + string.Join(Environment.NewLine, lines);
     }
 
-    private static string FormatBuildStatePreflightLine(BuildStatePreflightDiagnostic diagnostic)
+    private static string FormatBuildStatePreflightLine(ArchitectureFinding finding)
     {
+        var diagnostic = (BuildStatePreflightDiagnostic)finding.Details;
         string state = StateToken(diagnostic.State);
         BuildStatePreflightEvidence evidence = diagnostic.Evidence;
 
@@ -51,7 +52,8 @@ public sealed partial class ArchitectureDiagnosticFormatter
             parts.Add(evidence.Detail);
         }
 
-        return string.Join(Environment.NewLine + "    ", parts);
+        string line = string.Join(Environment.NewLine + "    ", parts);
+        return finding.RemediationHint is null ? line : line + FormatRemediationHintForHumans(finding.RemediationHint);
     }
 
     private static object[] BuildStatePreflightJson(
