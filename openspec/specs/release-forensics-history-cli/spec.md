@@ -208,6 +208,8 @@ NOT alter successful JSON bytes.
 - **THEN** redirected JSON stdout contains the direct UTF-8 bytes for that scalar and no BOM
 
 ### Requirement: Report serialization failure diagnostic
+The CLI SHALL fail closed when successful report serialization cannot produce valid output.
+
 If successful report rendering rejects invalid internal Unicode, `history
 analyze` SHALL emit a `report_serialization_invalid` diagnostic to standard
 error, leave standard output empty, and exit non-zero.

@@ -88,6 +88,13 @@ public sealed class ArchitectureEngine : IDisposable, IAsyncDisposable
             .Migrate(request);
     }
 
+    /// <summary>Evaluates a read-only gate over exact baseline debt and optional weakening evidence.</summary>
+    public ArchitectureDebtGateOutcome EvaluateDebtGate(ArchitectureDebtGateRequest request)
+    {
+        return _serviceProvider.GetRequiredService<IArchitectureDebtGateApplicationService>()
+            .Evaluate(request);
+    }
+
     public PublicApiCaptureOutcome CapturePublicApi(PublicApiCaptureRequest request)
     {
         return _serviceProvider.GetRequiredService<IArchitecturePublicApiApplicationService>()

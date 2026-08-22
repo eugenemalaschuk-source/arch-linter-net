@@ -2,6 +2,7 @@ using System.Diagnostics;
 using ArchLinterNet.Core.BuildState;
 using ArchLinterNet.Core.Caching;
 using ArchLinterNet.Core.Composition;
+using ArchLinterNet.Core.PolicyWeakening;
 using ArchLinterNet.Core.Profiling;
 using ArchLinterNet.Core.Reporting;
 using ArchLinterNet.Core.Validation;
@@ -17,6 +18,8 @@ public sealed class ArchitectureValidationBuilder
     private string? _conditionSetName;
     private IReadOnlyCollection<string>? _contractIds;
     private string? _baselinePath;
+    private string? _basePolicyContextPath;
+    private string? _currentPolicyContextPath;
     private bool _enforceUnmatchedIgnoredViolationsPolicy;
     private bool _collectTimings;
     private bool _collectProfile;
@@ -56,6 +59,17 @@ public sealed class ArchitectureValidationBuilder
     public ArchitectureValidationBuilder WithBaseline(string baselinePath)
     {
         _baselinePath = baselinePath;
+        return this;
+    }
+
+    /// <summary>
+    /// Enables the independent policy-weakening section for a subsequent debt-gate evaluation.
+    /// Both contexts must have been exported from their respective policy states.
+    /// </summary>
+    public ArchitectureValidationBuilder WithPolicyWeakeningContexts(string baseContextPath, string currentContextPath)
+    {
+        _basePolicyContextPath = baseContextPath;
+        _currentPolicyContextPath = currentContextPath;
         return this;
     }
 
@@ -169,6 +183,35 @@ public sealed class ArchitectureValidationBuilder
             Mode = mode,
             ConditionSetName = _conditionSetName,
             ContractIds = _contractIds?.ToList(),
+        });
+    }
+
+    /// <summary>
+    /// Runs the read-only new-debt gate against the configured reviewed baseline and optional
+    /// explicit policy-context artifacts.
+    /// </summary>
+    public ArchitectureDebtGateOutcome EvaluateDebtGate(string mode = "all")
+    {
+        return _engine.Value.EvaluateDebtGate(new ArchitectureDebtGateRequest
+        {
+            PolicyPath = _policyPath,
+            BaselinePath = RequireBaselinePath(),
+            Mode = mode,
+            ConditionSetName = _conditionSetName,
+            ContractIds = _contractIds,
+            BasePolicyContext = _basePolicyContextPath is null
+                ? null
+                : ArchitecturePolicyWeakeningFormatter.DeserializeContext(File.ReadAllText(_basePolicyContextPath)),
+            CurrentPolicyContext = _currentPolicyContextPath is null
+                ? null
+                : ArchitecturePolicyWeakeningFormatter.DeserializeContext(File.ReadAllText(_currentPolicyContextPath)),
+            PreparationMode = _preparationMode,
+            NoRestore = _noRestore,
+            RequestedConfiguration = _requestedConfiguration,
+            RequestedTargetFramework = _requestedTargetFramework,
+            RequestedPlatform = _requestedPlatform,
+            RequestedRuntimeIdentifier = _requestedRuntimeIdentifier,
+            CancellationToken = _cancellationToken,
         });
     }
 

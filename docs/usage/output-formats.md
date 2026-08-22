@@ -61,6 +61,24 @@ kind. An `error` finding exits 1; `warn` and `off` findings remain visible and
 exit 0. Invalid, incomplete, or incompatible context input exits 2 instead of
 being interpreted as a clean comparison.
 
+## Architecture debt gate output
+
+`arch-linter-net gate --policy <path> --baseline <path>` composes complete
+current persistent-debt comparison with optional explicitly exported base/current
+policy contexts. Its result has kind `architecture-debt-gate` and three
+independent sections: `evaluation`, `persistent_debt`, and
+`policy_weakening`. Persistent entries retain the exact baseline identity and
+`new`/`matched`/`resolved`/`stale`/`ambiguous`/`configuration-error` lifecycle
+status. Weakening entries retain their own identity, classification, severity,
+values, provenance, and rationale; they never get a baseline status.
+
+Human output is a readable sectioned report. JSON is one deterministic document
+for automation. SARIF emits `gate_section: persistent_debt` or
+`gate_section: policy_weakening` result properties with separate rule
+namespaces. A matched entry is still visible, but only new or untrusted
+persistent-debt state fails the debt dimension. The command is read-only and
+does not add a `ratchet` validation mode.
+
 ## Human output
 
 Use human output when reading diagnostics in a terminal or CI log:

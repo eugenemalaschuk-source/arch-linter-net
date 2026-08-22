@@ -108,6 +108,8 @@ The system SHALL preserve deterministic layer include-minus-exclude behavior and
 - **THEN** its resolved membership SHALL remain unchanged
 
 ### Requirement: Layer overlap can be explicitly acknowledged
+The policy model SHALL allow an intentional layer overlap to be explicitly acknowledged.
+
 A layer declaration MAY include `overlaps_with`, a list of other declared
 layer names that this layer is intentionally allowed to match the same
 concrete type as. Declaring the pairing on either of the two layers SHALL be
@@ -141,4 +143,3 @@ naming the offending layer and entry.
 - **GIVEN** a layer `sales_domain` with `overlaps_with: [sales_domain]`
 - **WHEN** the policy document loads
 - **THEN** loading fails with an error naming `sales_domain`
-

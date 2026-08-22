@@ -2,9 +2,7 @@
 
 ## Purpose
 Sets up the MkDocs-based documentation site tooling, including a gitignored Python virtual environment.
-
 ## Requirements
-
 ### Requirement: Documentation tooling setup
 The repository SHALL contain a Python tooling project at `tools/pyproject.toml` that defines MkDocs and mkdocs-material as dependencies, managed via `uv` with a committed `tools/uv.lock` file.
 
@@ -128,3 +126,10 @@ The YAML schema reference MAY document exact immutable schema IDs when those IDs
 #### Scenario: Adopter distinguishes product and schema versions
 - **WHEN** an adopter reads schema guidance
 - **THEN** it explains that schema/document identities evolve independently from package SemVer and that the installed schema registry, not a guessed package-version URL, is authoritative
+
+### Requirement: New-debt CI workflow is documented
+Public MkDocs guidance SHALL document invoking the architecture-debt gate, its strict/audit boundary, exact baseline lifecycle, optional policy-weakening integration, output and exit behavior, and fail-closed comparison limits. The examples SHALL distinguish matched/new/resolved/stale debt from independent weakening failures and SHALL state that baseline updates remain explicit review operations.
+
+#### Scenario: CI adopter can compose the gate safely
+- **WHEN** an adopter follows the CI integration and baseline migration guidance
+- **THEN** they can run the gate with explicit baseline and policy-context artifacts without treating warnings or policy weakening as persistent baseline debt

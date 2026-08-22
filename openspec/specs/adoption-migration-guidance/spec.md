@@ -113,6 +113,8 @@ network access in a prepared environment.
 
 ### Requirement: Evergreen documentation identity is enforced
 
+The documentation set SHALL enforce durable, product-version-neutral identities.
+
 README, MkDocs navigation, normal public documentation filenames/routes, and
 current user guidance SHALL use durable conceptual identities rather than the
 ArchLinterNet product package SemVer. Release-specific historical information

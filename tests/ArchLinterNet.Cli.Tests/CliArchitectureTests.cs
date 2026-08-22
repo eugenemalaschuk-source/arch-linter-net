@@ -8,6 +8,7 @@ using ArchLinterNet.Cli.Commands.Cache;
 using ArchLinterNet.Cli.Commands.Change.EntryPoint;
 using ArchLinterNet.Cli.Commands.Coverage.EntryPoint;
 using ArchLinterNet.Cli.Commands.Explain;
+using ArchLinterNet.Cli.Commands.Gate.EntryPoint;
 using ArchLinterNet.Cli.Commands.Graph;
 using ArchLinterNet.Cli.Commands.Policy;
 using ArchLinterNet.Cli.Commands.PublicApi;
@@ -28,7 +29,7 @@ namespace ArchLinterNet.Cli.Tests;
 [TestFixture]
 public sealed class CliArchitectureTests
 {
-    private static readonly string[] _value = { "badge", "baseline", "cache", "change", "coverage", "graph", "explain", "history", "policy", "public-api", "scaffold", "schema" };
+    private static readonly string[] _value = { "badge", "baseline", "cache", "change", "coverage", "graph", "explain", "gate", "history", "policy", "public-api", "scaffold", "schema" };
     private static readonly string[] _value1 = { "generate", "update", "prune", "diff", "verify", "migrate" };
     private static readonly string[] _value2 = { "rule-1" };
     [Test]
@@ -51,6 +52,7 @@ public sealed class CliArchitectureTests
                 typeof(CoverageCommandModule),
                 typeof(GraphCommandModule),
                 typeof(ExplainCommandModule),
+                typeof(GateCommandModule),
                 typeof(ArchLinterNet.Cli.Commands.History.EntryPoint.HistoryCommandModule),
                 typeof(PolicyCommandModule),
                 typeof(PublicApiCommandModule),
