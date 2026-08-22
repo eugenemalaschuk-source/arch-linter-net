@@ -29,7 +29,7 @@ public sealed class HistoryIngestCommandHandlerTests
     {
         FakeConsole console = new();
 
-        int exitCode = new HistoryIngestCommandHandler(console).Execute(new HistoryIngestCommandOptions(".", "HEAD", "HEAD", "yaml", false));
+        int exitCode = new HistoryIngestCommandHandler(console).Execute(new HistoryIngestCommandOptions(".", "HEAD", "HEAD", "text", false));
 
         Assert.Multiple(() =>
         {
@@ -74,9 +74,33 @@ public sealed class HistoryIngestCommandHandlerTests
         Assert.Multiple(() =>
         {
             Assert.That(exitCode, Is.EqualTo(CliExitCodes.Success));
-            Assert.That(console.Output, Does.Contain("arch-linter-net history ingest"));
+            Assert.That(console.Output, Does.Contain("arch-linter-net history analyze"));
             Assert.That(console.Output, Does.Contain("--policy <path>"));
         });
+    }
+
+    [Test]
+    public void MarkdownIsASupportedReportFormat()
+    {
+        FakeConsole console = new();
+        string outsideAnyRepository = Path.Combine(Path.GetTempPath(), "arch-linter-history-markdown-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(outsideAnyRepository);
+        try
+        {
+            int exitCode = new HistoryIngestCommandHandler(console).Execute(
+                new HistoryIngestCommandOptions(outsideAnyRepository, "HEAD", "HEAD", "markdown", false));
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(exitCode, Is.Not.EqualTo(CliExitCodes.Success));
+                Assert.That(console.Output, Is.Empty);
+                Assert.That(console.ErrorOutput, Does.Contain("\"kind\": \"repository_not_found\""));
+            });
+        }
+        finally
+        {
+            Directory.Delete(outsideAnyRepository, recursive: true);
+        }
     }
 
     [Test]

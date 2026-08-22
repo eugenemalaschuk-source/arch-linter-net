@@ -22,7 +22,8 @@ public sealed class HistoryCanonicalJsonTests
         Assert.That(json, Does.EndWith("}\n"));
         Assert.That(json[..^1], Does.Not.EndWith("\n"));
         Assert.That(json.Split('\n'), Has.None.Matches<string>(static line => line.Length > 0 && line.TrimEnd() != line));
-        Assert.That(json, Does.Contain("\n  \"objectFormat\": \"sha1\""));
+        Assert.That(json, Does.Contain("\n  \"schemaVersion\": 1"));
+        Assert.That(json, Does.Contain("\n  \"analysis\": {\n    \"objectFormat\": \"sha1\""));
     }
 
     [Test]
@@ -59,7 +60,9 @@ public sealed class HistoryCanonicalJsonTests
 
         Assert.That(json, Does.Contain("\"commits\": []"));
         Assert.That(json, Does.Contain("\"logicalFiles\": []"));
+        Assert.That(json, Does.Contain("\"analyzedCommitCount\": 0"));
         Assert.That(json, Does.Contain("\"excludedMergeCount\": 0"));
+        Assert.That(json, Does.Contain("\"candidates\": []"));
     }
 
     [Test]
@@ -89,5 +92,71 @@ public sealed class HistoryCanonicalJsonTests
         Assert.That(json, Does.StartWith("{\n  \"kind\": \"ref_unresolved\""));
         Assert.That(json, Does.EndWith("}\n"));
         Assert.That(json, Does.Not.Contain("logicalFiles"));
+    }
+
+    [Test]
+    public void SuccessfulReportCarriesCanonicalConfigurationEnrichmentAndCandidates()
+    {
+        using GitTestRepository repository = GitTestRepository.Create();
+        repository.Write("a.txt", "one\n");
+        string first = repository.Commit("first");
+        repository.Write("a.txt", "one\ntwo\n");
+        string second = repository.Commit("second #12");
+
+        string json = HistoryIngestionJsonWriter.Write(HistoryIngestionFixture.Succeed(repository, first, second));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(json, Does.Contain("\"historyAnalysisConfiguration\""));
+            Assert.That(json, Does.Contain("\"hotspotGroups\""));
+            Assert.That(json, Does.Contain("\"status\": \"not_requested\""));
+            Assert.That(json, Does.Contain("\"kind\": \"hotspot\""));
+            Assert.That(json, Does.Contain("\"sourceFindingIds\""));
+        });
+    }
+
+    [Test]
+    public void EnrichmentProjectionUsesDeterministicOrderedProvenanceWithoutChangingCandidates()
+    {
+        using GitTestRepository repository = GitTestRepository.Create();
+        repository.Write("a.txt", "one\n");
+        string first = repository.Commit("first");
+        repository.Write("a.txt", "one\ntwo\n");
+        string second = repository.Commit("second #12");
+        HistoryIngestionResult original = HistoryIngestionFixture.Succeed(repository, first, second);
+        var enrichment = new HistoryEnrichmentProjection(
+            HistoryEnrichmentStatus.Unavailable,
+            "no trusted source state",
+            [new HistoryEnrichmentProvenance("zeta", "second"), new HistoryEnrichmentProvenance("alpha", "first")]);
+        var projected = new HistoryIngestionResult(
+            original.ObjectFormatName,
+            original.AuthoredFrom,
+            original.AuthoredTo,
+            original.ResolvedFrom,
+            original.ResolvedTo,
+            original.Commits,
+            original.ExcludedMergeCount,
+            original.RenameCandidates,
+            original.RenameComponents,
+            original.LogicalFiles,
+            original.CoChangeGraph,
+            original.BottleneckAnalysis,
+            original.OcpAnalysis,
+            original.Configuration,
+            original.HotspotAnalysis,
+            enrichment);
+
+        string json = HistoryIngestionJsonWriter.Write(projected);
+        int alpha = json.IndexOf("\"kind\": \"alpha\"", StringComparison.Ordinal);
+        int zeta = json.IndexOf("\"kind\": \"zeta\"", StringComparison.Ordinal);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(json, Does.Contain("\"status\": \"unavailable\""));
+            Assert.That(json, Does.Contain("\"reason\": \"no trusted source state\""));
+            Assert.That(alpha, Is.GreaterThanOrEqualTo(0));
+            Assert.That(zeta, Is.GreaterThan(alpha));
+            Assert.That(json, Does.Contain("\"candidates\""));
+        });
     }
 }
