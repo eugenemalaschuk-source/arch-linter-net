@@ -387,7 +387,8 @@ public sealed class PortBoundaryContractTests
 
         Assert.That(json, Does.Contain("\"evidence_kind\":\"direct_reference\""));
         Assert.That(json, Does.Contain("\"expected_seam\":\"role:Port\""));
-        Assert.That(json, Does.Contain("\"remediation_hint\":{\"category\":\"use_declared_port\""));
+        Assert.That(json, Does.Contain("\"remediation_hint\":\"Depend on the approved port abstraction.\""));
+        Assert.That(json, Does.Contain("\"remediation_guidance\":{\"category\":\"use_declared_port\""));
     }
 
     [Test]

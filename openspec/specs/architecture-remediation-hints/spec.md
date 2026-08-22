@@ -34,6 +34,29 @@ The system SHALL produce specialized categories only from architecture facts alr
 - **WHEN** a port-boundary diagnostic records a direct edge and its expected port seam
 - **THEN** the hint category is `use_declared_port` and its evidence identifies the expected seam
 
+#### Scenario: An existing adapter is in the wrong context
+- **WHEN** a port-boundary diagnostic records `adapter_context` and its expected port seam
+- **THEN** the hint category is `move_code` and directs the existing adapter to the declared adapter context
+
+#### Scenario: An existing adapter implements the wrong port
+- **WHEN** a port-boundary diagnostic records `adapter_port_mismatch` and its expected port seam
+- **THEN** the hint category is `use_declared_port` and directs the existing adapter to implement that seam without creating a second adapter
+
+#### Scenario: A configuration-shaped diagnostic lacks unambiguous repair evidence
+- **WHEN** a configuration diagnostic can represent either a policy input problem or a forbidden dependency preserved with template metadata
+- **THEN** it uses `review_contract` rather than `fix_policy_input`
+
+#### Scenario: An unmatched ignore is a pattern rather than a current edge
+- **WHEN** an unmatched ignore contains wildcard source or reference patterns
+- **THEN** it uses `fix_policy_input` to remove the stale rule and does not suggest an exact-edge exception
+
+### Requirement: Structured remediation guidance evolves the JSON envelope additively
+The system SHALL publish structured remediation guidance at `remediation_guidance`. It SHALL NOT replace or change the type of an existing family-owned `remediation_hint` value while the normalized finding schema version remains unchanged.
+
+#### Scenario: Port-boundary legacy hint remains a string
+- **WHEN** a port-boundary diagnostic has its existing remediation-hint text and normalized guidance
+- **THEN** `remediation_hint` remains the legacy string in both the envelope and details, while `remediation_guidance` contains the structured object
+
 #### Scenario: External dependency has no declared seam
 - **WHEN** an external, package, or framework boundary diagnostic has no existing adapter or port evidence
 - **THEN** the hint category is `remove_or_replace_dependency` with a caveat that no alternative seam was evidenced

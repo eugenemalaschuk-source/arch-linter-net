@@ -2469,6 +2469,7 @@ property ArchLinterNet.Core.Model.ArchitectureFindingReadEnvelope.Mode: System.S
 property ArchLinterNet.Core.Model.ArchitectureFindingReadEnvelope.RawDetails: System.Text.Json.JsonElement [get, init]
 property ArchLinterNet.Core.Model.ArchitectureFindingReadEnvelope.RawEnvelope: System.Text.Json.JsonElement [get, init]
 property ArchLinterNet.Core.Model.ArchitectureFindingReadEnvelope.RawPolicyOrigin: System.Nullable`1[System.Text.Json.JsonElement] [get, init]
+property ArchLinterNet.Core.Model.ArchitectureFindingReadEnvelope.RawRemediationGuidance: System.Nullable`1[System.Text.Json.JsonElement] [get, init]
 property ArchLinterNet.Core.Model.ArchitectureFindingReadEnvelope.RawRemediationHint: System.Nullable`1[System.Text.Json.JsonElement] [get, init]
 property ArchLinterNet.Core.Model.ArchitectureFindingReadEnvelope.RawSourceLocation: System.Nullable`1[System.Text.Json.JsonElement] [get, init]
 property ArchLinterNet.Core.Model.ArchitectureFindingReadEnvelope.SchemaVersion: System.Int32 [get, init]

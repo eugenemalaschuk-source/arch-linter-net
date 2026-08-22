@@ -2299,6 +2299,7 @@ sealed class ArchLinterNet.Core.Model.ArchitectureFindingReadEnvelope : System.I
   property System.Text.Json.JsonElement RawDetails {get;init;}
   property System.Text.Json.JsonElement RawEnvelope {get;init;}
   property System.Text.Json.JsonElement? RawPolicyOrigin {get;init;}
+  property System.Text.Json.JsonElement? RawRemediationGuidance {get;init;}
   property System.Text.Json.JsonElement? RawRemediationHint {get;init;}
   property System.Text.Json.JsonElement? RawSourceLocation {get;init;}
   property bool IsOpaque {get;init;}

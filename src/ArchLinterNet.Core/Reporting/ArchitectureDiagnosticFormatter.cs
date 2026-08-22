@@ -487,7 +487,7 @@ public sealed partial class ArchitectureDiagnosticFormatter : IArchitectureDiagn
 
         if (finding.RemediationHint is not null)
         {
-            obj["remediation_hint"] = FormatRemediationHintForJson(finding.RemediationHint);
+            obj["remediation_guidance"] = FormatRemediationHintForJson(finding.RemediationHint);
         }
 
         if (includeContract)

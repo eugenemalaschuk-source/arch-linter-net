@@ -62,14 +62,29 @@ public sealed class ArchitectureRemediationHintTests
     }
 
     [Test]
-    public void FromViolation_PortBoundaryAdapterMismatch_UsesAdapterGuidance()
+    public void FromViolation_PortBoundaryAdapterContext_MovesExistingAdapter()
     {
-        ArchitectureViolation violation = PortViolation("adapter_port_mismatch");
+        ArchitectureRemediationHint hint = ArchitectureFindingMapper.FromViolation(
+            PortViolation("adapter_context")).RemediationHint!;
 
-        ArchitectureRemediationHint hint = ArchitectureFindingMapper.FromViolation(violation).RemediationHint!;
+        Assert.Multiple(() =>
+        {
+            Assert.That(hint.Category, Is.EqualTo(ArchitectureRemediationHintCategory.MoveCode));
+            Assert.That(hint.Summary, Does.Contain("existing adapter"));
+        });
+    }
 
-        Assert.That(hint.Category, Is.EqualTo(ArchitectureRemediationHintCategory.IntroduceAdapter));
-        Assert.That(hint.Summary, Does.Contain("adapter"));
+    [Test]
+    public void FromViolation_PortBoundaryAdapterPortMismatch_UsesExpectedPortOnExistingAdapter()
+    {
+        ArchitectureRemediationHint hint = ArchitectureFindingMapper.FromViolation(
+            PortViolation("adapter_port_mismatch")).RemediationHint!;
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(hint.Category, Is.EqualTo(ArchitectureRemediationHintCategory.UseDeclaredPort));
+            Assert.That(hint.Summary, Does.Contain("existing adapter"));
+        });
     }
 
     [Test]
@@ -138,6 +153,23 @@ public sealed class ArchitectureRemediationHintTests
     }
 
     [Test]
+    public void FromViolation_LayerTemplateForbiddenDependency_RequiresReviewInsteadOfPolicyMutation()
+    {
+        var violation = new ArchitectureViolation(
+            "layer-template", "layers", "App.Feature.Api", "App.Feature.Domain", ["App.Feature.Domain.Entity"])
+        {
+            Payload = new ConfigurationPayload(
+                TemplateName: "feature-clean-architecture",
+                ContainerNamespace: "App.Feature",
+                DependencyPaths: [new[] { "App.Feature.Api", "App.Feature.Domain.Entity" }]),
+        };
+
+        ArchitectureRemediationHint hint = ArchitectureFindingMapper.FromViolation(violation).RemediationHint!;
+
+        Assert.That(hint.Category, Is.EqualTo(ArchitectureRemediationHintCategory.ReviewContract));
+    }
+
+    [Test]
     public void FromDiagnostic_ExternalPackageAndFrameworkBoundaries_RecommendBoundedReplacement()
     {
         var external = new ExternalDependencyDiagnostic(
@@ -159,10 +191,10 @@ public sealed class ArchitectureRemediationHintTests
     }
 
     [Test]
-    public void FromDiagnostic_StaleIgnoreAndPublicSurface_RequireBoundedReviewWithoutAutomaticMutation()
+    public void FromDiagnostic_WildcardStaleIgnoreAndPublicSurface_RequireBoundedReviewWithoutAutomaticMutation()
     {
         var staleIgnore = new UnmatchedIgnoreDiagnostic(
-            "ignore", "ignore-id", 0, "App.Service", "Vendor.Client", "obsolete exception");
+            "ignore", "ignore-id", 0, "MyApp.Legacy.*", "*", "obsolete wildcard exception");
         var publicSurface = new PublicApiSurfaceDiagnostic(
             "public-api", "api-id", "App.Api.Service", "public API", ["App.Api.Service.NewMember"])
         {
@@ -175,9 +207,11 @@ public sealed class ArchitectureRemediationHintTests
 
         Assert.Multiple(() =>
         {
-            Assert.That(ignoreHint.Category, Is.EqualTo(ArchitectureRemediationHintCategory.NarrowException));
+            Assert.That(ignoreHint.Category, Is.EqualTo(ArchitectureRemediationHintCategory.FixPolicyInput));
             Assert.That(ignoreHint.RequiresReview, Is.True);
-            Assert.That(ignoreHint.Caveat, Does.Contain("never replace").IgnoreCase);
+            Assert.That(ignoreHint.Summary, Does.Contain("stale ignore").IgnoreCase);
+            Assert.That(ignoreHint.Summary, Does.Not.Contain("exact edge").IgnoreCase);
+            Assert.That(ignoreHint.Caveat, Does.Contain("pattern").IgnoreCase);
             Assert.That(apiHint.Category, Is.EqualTo(ArchitectureRemediationHintCategory.ReviewContract));
             Assert.That(apiHint.Summary, Does.Not.Contain("rewrite").IgnoreCase);
         });
@@ -207,9 +241,12 @@ public sealed class ArchitectureRemediationHintTests
         {
             Assert.That(human, Does.Contain("remediation: use_declared_port"));
             Assert.That(JsonNode.DeepEquals(jsonFinding, sarifFinding), Is.True);
-            Assert.That(readEnvelope.RawRemediationHint!.Value.ValueKind, Is.EqualTo(JsonValueKind.Object),
-                readEnvelope.RawRemediationHint.Value.GetRawText());
-            Assert.That(readEnvelope.RawRemediationHint!.Value.GetProperty("category").GetString(),
+            Assert.That(jsonFinding!.AsObject()["remediation_hint"]!.GetValue<string>(), Is.EqualTo("Use the approved port."));
+            Assert.That(jsonFinding.AsObject()["details"]!.AsObject()["remediation_hint"]!.GetValue<string>(), Is.EqualTo("Use the approved port."));
+            Assert.That(readEnvelope.RawRemediationHint!.Value.GetString(), Is.EqualTo("Use the approved port."));
+            Assert.That(readEnvelope.RawRemediationGuidance!.Value.ValueKind, Is.EqualTo(JsonValueKind.Object),
+                readEnvelope.RawRemediationGuidance.Value.GetRawText());
+            Assert.That(readEnvelope.RawRemediationGuidance!.Value.GetProperty("category").GetString(),
                 Is.EqualTo("use_declared_port"));
             Assert.That(sarifResult.TryGetProperty("fixes", out _), Is.False);
             Assert.That(testingResult.Findings.Single().RemediationHint!.Category,

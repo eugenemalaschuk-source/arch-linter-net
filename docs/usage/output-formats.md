@@ -100,8 +100,10 @@ Human output is optimized for readability, not machine parsing.
 When a diagnostic contains enough typed policy and analysis evidence, its
 normalized finding can include an optional deterministic remediation hint. A
 Human report appends a concise `remediation: <category>: <summary>` clause; JSON
-exposes the full structured value as `remediation_hint`; and SARIF retains the
-same normalized value under `properties.arch_linter_net.remediation_hint`.
+exposes the full structured value as `remediation_guidance`; and SARIF retains the
+same normalized value under `properties.arch_linter_net.remediation_guidance`.
+The existing port-boundary `remediation_hint` string remains available unchanged
+for v1 consumers, including in typed details.
 
 Hints are guidance, not edits. They never create code changes, rewrite YAML,
 baselines, or reviewed public-API snapshots, and SARIF output does not emit
@@ -132,7 +134,7 @@ For example, a port-boundary result with a declared seam includes compact data
 like this:
 
 ```json
-"remediation_hint": {
+"remediation_guidance": {
   "category": "use_declared_port",
   "summary": "Use the declared port seam instead of the direct cross-context dependency.",
   "contract_identity": "orders-boundary",

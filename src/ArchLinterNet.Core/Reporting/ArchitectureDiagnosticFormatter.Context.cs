@@ -145,5 +145,6 @@ public sealed partial class ArchitectureDiagnosticFormatter
         obj["source_metadata"] = diagnostic.SourceMetadata;
         obj["target_role"] = diagnostic.TargetRole;
         obj["target_metadata"] = diagnostic.TargetMetadata;
+        obj["remediation_hint"] = diagnostic.RemediationHint;
     }
 }

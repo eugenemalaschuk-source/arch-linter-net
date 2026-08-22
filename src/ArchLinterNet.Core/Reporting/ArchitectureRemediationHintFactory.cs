@@ -247,12 +247,7 @@ internal static class ArchitectureRemediationHintFactory
 
     internal static ArchitectureRemediationHint ForConfiguration(
         ConfigurationDiagnostic diagnostic,
-        ArchitectureViolationIdentity identity) => Create(
-        ArchitectureRemediationHintCategory.FixPolicyInput,
-        "Correct the identified policy or configuration input before changing application code.",
-        diagnostic,
-        identity,
-        Evidence("configuration", diagnostic.TemplateName ?? diagnostic.ForbiddenNamespace));
+        ArchitectureViolationIdentity identity) => Review(diagnostic, identity);
 
     internal static ArchitectureRemediationHint ForContextDependency(
         ContextDependencyDiagnostic diagnostic,
@@ -281,12 +276,18 @@ internal static class ArchitectureRemediationHintFactory
             return Review(diagnostic, identity);
         }
 
-        ArchitectureRemediationHintCategory category = diagnostic.EvidenceKind is "adapter_context" or "adapter_port_mismatch"
-            ? ArchitectureRemediationHintCategory.IntroduceAdapter
-            : ArchitectureRemediationHintCategory.UseDeclaredPort;
-        string summary = category == ArchitectureRemediationHintCategory.IntroduceAdapter
-            ? "Repair the adapter against the declared adapter/port seam."
-            : "Use the declared port seam instead of the direct cross-context dependency.";
+        ArchitectureRemediationHintCategory category = diagnostic.EvidenceKind switch
+        {
+            "adapter_context" => ArchitectureRemediationHintCategory.MoveCode,
+            "adapter_port_mismatch" => ArchitectureRemediationHintCategory.UseDeclaredPort,
+            _ => ArchitectureRemediationHintCategory.UseDeclaredPort,
+        };
+        string summary = diagnostic.EvidenceKind switch
+        {
+            "adapter_context" => "Move the existing adapter into the policy-declared adapter context.",
+            "adapter_port_mismatch" => "Update the existing adapter to implement the declared port seam.",
+            _ => "Use the declared port seam instead of the direct cross-context dependency.",
+        };
         return Create(
             category,
             summary,
@@ -314,13 +315,13 @@ internal static class ArchitectureRemediationHintFactory
     internal static ArchitectureRemediationHint ForUnmatchedIgnore(
         UnmatchedIgnoreDiagnostic diagnostic,
         ArchitectureViolationIdentity identity) => Create(
-        ArchitectureRemediationHintCategory.NarrowException,
-        "If an exception remains necessary, record only this exact edge through explicit review.",
+        ArchitectureRemediationHintCategory.FixPolicyInput,
+        "Remove the stale ignore; derive any future exception only from a current finding.",
         diagnostic,
         identity,
         Evidence("ignored_source", diagnostic.SourceType),
         Evidence("ignored_reference", diagnostic.ForbiddenReference),
-        caveat: "Remove stale ignores; never replace them with wildcard or broad exclusions.",
+        caveat: "This unmatched ignore is a pattern, not a current edge; do not add wildcard or broad exceptions.",
         requiresReview: true);
 
     internal static ArchitectureRemediationHint ForPolicyConsistency(
