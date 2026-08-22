@@ -21,6 +21,9 @@ public sealed record ArchitectureFindingReadEnvelope(
 
     public JsonElement? RawSourceLocation { get; init; }
 
+    /// <summary>Optional structured remediation metadata retained from the normalized envelope.</summary>
+    public JsonElement? RawRemediationHint { get; init; }
+
     /// <summary>The original normalized envelope, retained for lossless forwarding.</summary>
     public JsonElement RawEnvelope { get; init; }
 
@@ -81,6 +84,7 @@ public static class ArchitectureFindingJsonReader
             ContractId = ReadOptionalNullableString(root, "contract_id"),
             RawPolicyOrigin = ReadOptionalElement(root, "policy_origin"),
             RawSourceLocation = ReadOptionalElement(root, "source_location"),
+            RawRemediationHint = ReadOptionalElement(root, "remediation_hint"),
             RawEnvelope = root.Clone(),
         };
     }

@@ -135,7 +135,7 @@ public sealed partial class ArchitectureDiagnosticFormatter
         $" (kind: port_boundary, evidence_kind: {diagnostic.EvidenceKind ?? "?"}, " +
         $"expected_seam: {diagnostic.ExpectedSeam ?? "?"}, source_role: {diagnostic.SourceRole ?? "?"}, " +
         $"source_metadata: {FormatMetadataForHumans(diagnostic.SourceMetadata)}, target_role: {diagnostic.TargetRole ?? "?"}, " +
-        $"target_metadata: {FormatMetadataForHumans(diagnostic.TargetMetadata)}, remediation: {diagnostic.RemediationHint ?? "?"})";
+        $"target_metadata: {FormatMetadataForHumans(diagnostic.TargetMetadata)})";
 
     private static void ApplyPortBoundaryCiFields(PortBoundaryDiagnostic diagnostic, Dictionary<string, object?> obj)
     {
@@ -145,6 +145,5 @@ public sealed partial class ArchitectureDiagnosticFormatter
         obj["source_metadata"] = diagnostic.SourceMetadata;
         obj["target_role"] = diagnostic.TargetRole;
         obj["target_metadata"] = diagnostic.TargetMetadata;
-        obj["remediation_hint"] = diagnostic.RemediationHint;
     }
 }

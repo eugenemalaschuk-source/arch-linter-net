@@ -54,7 +54,10 @@ public sealed partial class ArchitectureDiagnosticFormatter : IArchitectureDiagn
                         return $"  {idPrefix}[{u.ContractName}] ignored_violations[{u.IgnoreIndex}] no longer matches any current violation:{Environment.NewLine}" +
                                $"    source_type: {u.SourceType}{Environment.NewLine}" +
                                $"    forbidden_reference: {u.ForbiddenReference}{Environment.NewLine}" +
-                               $"    reason: {u.Reason}" + Reporting.ArchitectureDiagnosticFormatter.FormatPolicyLocationSuffix(u);
+                               $"    reason: {u.Reason}" + Reporting.ArchitectureDiagnosticFormatter.FormatPolicyLocationSuffix(u) +
+                               (finding.RemediationHint is null
+                                   ? string.Empty
+                                   : FormatRemediationHintForHumans(finding.RemediationHint));
                     }));
     }
 
@@ -82,7 +85,10 @@ public sealed partial class ArchitectureDiagnosticFormatter : IArchitectureDiagn
                         string names = string.Join(", ", f.ConflictingContractNames);
                         return $"  {idPrefix}[{f.CheckKind}] {f.Reason}" +
                                (names.Length > 0 ? $" (contracts: {names})" : string.Empty) +
-                               Reporting.ArchitectureDiagnosticFormatter.FormatPolicyLocationSuffix(f);
+                               Reporting.ArchitectureDiagnosticFormatter.FormatPolicyLocationSuffix(f) +
+                               (finding.RemediationHint is null
+                                   ? string.Empty
+                                   : FormatRemediationHintForHumans(finding.RemediationHint));
                     }));
     }
 
@@ -243,10 +249,18 @@ public sealed partial class ArchitectureDiagnosticFormatter : IArchitectureDiagn
     private static string FormatFindingForHumans(ArchitectureFinding finding)
     {
         string text = FormatForHumans(finding.Details);
+        if (finding.RemediationHint is not null)
+        {
+            text += FormatRemediationHintForHumans(finding.RemediationHint);
+        }
+
         return finding.Details is CompositionDiagnostic && finding.Identity is not null
             ? $"{text} (occurrence: {finding.Identity.Occurrence})"
             : text;
     }
+
+    private static string FormatRemediationHintForHumans(ArchitectureRemediationHint hint) =>
+        $" (remediation: {ArchitectureRemediationHintFactory.CategoryToken(hint.Category)}: {hint.Summary})";
 
     private static string BuildHumanContext(ArchitectureDiagnostic diagnostic)
     {
@@ -471,6 +485,11 @@ public sealed partial class ArchitectureDiagnosticFormatter : IArchitectureDiagn
             };
         obj["baseline_state"] = finding.BaselineState;
 
+        if (finding.RemediationHint is not null)
+        {
+            obj["remediation_hint"] = FormatRemediationHintForJson(finding.RemediationHint);
+        }
+
         if (includeContract)
         {
             obj["contract"] = diagnostic.ContractName;
@@ -502,6 +521,22 @@ public sealed partial class ArchitectureDiagnosticFormatter : IArchitectureDiagn
 
     public static Dictionary<string, object?> FormatNormalizedFindingForJson(ArchitectureFinding finding) =>
         ToCiJsonObject(finding, includeContract: true);
+
+    private static Dictionary<string, object?> FormatRemediationHintForJson(ArchitectureRemediationHint hint) => new()
+    {
+        ["category"] = ArchitectureRemediationHintFactory.CategoryToken(hint.Category),
+        ["summary"] = hint.Summary,
+        ["contract_identity"] = hint.ContractIdentity,
+        ["finding_identity"] = ArchitectureViolationIdentityJson.ToWireObject(hint.FindingIdentity),
+        ["evidence"] = hint.Evidence.Select(evidence => (object)new Dictionary<string, object?>
+        {
+            ["kind"] = evidence.Kind,
+            ["value"] = evidence.Value,
+        }).ToArray(),
+        ["expected_seam_or_direction"] = hint.ExpectedSeamOrDirection,
+        ["caveat"] = hint.Caveat,
+        ["requires_review"] = hint.RequiresReview,
+    };
 
     private static Dictionary<string, object?> BuildDetailsJsonObject(ArchitectureDiagnostic diagnostic)
     {
