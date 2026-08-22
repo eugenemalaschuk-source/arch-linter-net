@@ -21,6 +21,8 @@ _PACKAGE_IDS = (
 _SCHEMA_V1 = "checkpoint-b-candidate-manifest/v1"
 _SCHEMA_V2 = "checkpoint-b-candidate-manifest/v2"
 _SUBJECT_KINDS = ("package", "symbols")
+_CANONICAL_MANIFEST_FILE = "package-manifest.json"
+_CANONICAL_CHECKSUM_FILE = "package-checksums.txt"
 _SHA256_PATTERN = re.compile(r"[0-9a-f]{64}")
 _SOURCE_COMMIT_PATTERN = re.compile(r"[0-9a-f]{40,64}")
 _UNSUPPORTED_SCHEMA = "Unsupported candidate manifest schema."
@@ -219,8 +221,7 @@ def _verify(arguments: argparse.Namespace) -> None:
     _verify_inventory(arguments.packages_dir, manifest)
 
 
-def _render_checksums(arguments: argparse.Namespace) -> None:
-    manifest = _load_manifest(arguments.manifest)
+def _checksum_text(manifest: dict[str, Any]) -> str:
     lines = [
         "# ArchLinterNet pre-publication package checksums",
         f"# manifest-schema: {manifest['schema']}",
@@ -229,8 +230,74 @@ def _render_checksums(arguments: argparse.Namespace) -> None:
         "",
     ]
     lines.extend(f"{subject['sha256']}  {subject['file']}" for subject in _subjects(manifest))
+    return "\n".join(lines) + "\n"
+
+
+def _verify_release_evidence(
+    packages_directory: Path,
+    manifest_path: Path,
+    checksums_path: Path,
+    expected_version: str | None = None,
+    expected_source_commit: str | None = None,
+) -> dict[str, Any]:
+    manifest_path = _safe_path(manifest_path, "candidate manifest")
+    checksums_path = _safe_path(checksums_path, "candidate checksum evidence")
+    packages_directory = _safe_path(packages_directory, "candidate packages directory")
+    if manifest_path.parent != packages_directory or manifest_path.name != _CANONICAL_MANIFEST_FILE:
+        raise ValueError("Canonical candidate manifest path is invalid.")
+    if checksums_path.parent != packages_directory or checksums_path.name != _CANONICAL_CHECKSUM_FILE:
+        raise ValueError("Canonical candidate checksum evidence path is invalid.")
+
+    manifest = _load_manifest(manifest_path)
+    if expected_version is not None and manifest["version"] != expected_version:
+        raise ValueError("Candidate manifest version does not match the expected version.")
+    if expected_source_commit is not None and manifest["source_commit"] != expected_source_commit:
+        raise ValueError("Candidate manifest source commit does not match the expected source commit.")
+    _verify_inventory(packages_directory, manifest)
+    if not checksums_path.is_file() or checksums_path.read_text(encoding="utf-8") != _checksum_text(manifest):
+        raise ValueError("Canonical candidate checksum evidence differs from the manifest rendering.")
+
+    expected = {subject["file"] for subject in _subjects(manifest)} | {
+        _CANONICAL_MANIFEST_FILE,
+        _CANONICAL_CHECKSUM_FILE,
+    }
+    actual = {path.name for path in packages_directory.iterdir() if path.is_file()}
+    if actual != expected:
+        missing = sorted(expected - actual)
+        unexpected = sorted(actual - expected)
+        raise ValueError(
+            "Candidate release evidence inventory differs from the canonical set: "
+            f"missing={missing}, unexpected={unexpected}."
+        )
+    return manifest
+
+
+def _render_checksums(arguments: argparse.Namespace) -> None:
+    manifest = _load_manifest(arguments.manifest)
+    arguments.output.parent.mkdir(parents=True, exist_ok=True)
+    arguments.output.write_text(_checksum_text(manifest), encoding="utf-8")
+
+
+def _render_attestation_subject_checksums(arguments: argparse.Namespace) -> None:
+    manifest = _verify_release_evidence(arguments.packages_dir, arguments.manifest, arguments.checksums)
+    if arguments.subject_class == "package":
+        subjects = _subjects(manifest)
+        lines = [f"{subject['sha256']}  {subject['file']}" for subject in subjects]
+    else:
+        evidence_subjects = (arguments.manifest, arguments.checksums)
+        lines = [f"{_sha256(path)}  {path.name}" for path in evidence_subjects]
     arguments.output.parent.mkdir(parents=True, exist_ok=True)
     arguments.output.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+
+def _verify_release_evidence_command(arguments: argparse.Namespace) -> None:
+    _verify_release_evidence(
+        arguments.packages_dir,
+        arguments.manifest,
+        arguments.checksums,
+        arguments.version,
+        arguments.source_commit,
+    )
 
 
 def _paths(arguments: argparse.Namespace) -> None:
@@ -264,6 +331,22 @@ def main() -> int:
     render.add_argument("--manifest", type=Path, required=True)
     render.add_argument("--output", type=Path, required=True)
     render.set_defaults(handler=_render_checksums)
+
+    verify_evidence = subcommands.add_parser("verify-release-evidence")
+    verify_evidence.add_argument("--packages-dir", type=Path, required=True)
+    verify_evidence.add_argument("--manifest", type=Path, required=True)
+    verify_evidence.add_argument("--checksums", type=Path, required=True)
+    verify_evidence.add_argument("--version")
+    verify_evidence.add_argument("--source-commit")
+    verify_evidence.set_defaults(handler=_verify_release_evidence_command)
+
+    attest_subjects = subcommands.add_parser("render-attestation-subject-checksums")
+    attest_subjects.add_argument("--packages-dir", type=Path, required=True)
+    attest_subjects.add_argument("--manifest", type=Path, required=True)
+    attest_subjects.add_argument("--checksums", type=Path, required=True)
+    attest_subjects.add_argument("--subject-class", choices=("package", "evidence"), required=True)
+    attest_subjects.add_argument("--output", type=Path, required=True)
+    attest_subjects.set_defaults(handler=_render_attestation_subject_checksums)
 
     paths = subcommands.add_parser("paths")
     paths.add_argument("--packages-dir", type=Path, required=True)
