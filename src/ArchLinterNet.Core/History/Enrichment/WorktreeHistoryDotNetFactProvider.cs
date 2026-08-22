@@ -168,19 +168,19 @@ internal sealed class WorktreeHistoryDotNetFactProvider : IHistoryDotNetFactProv
 
     private static void VerifyWorktree(string repositoryPath, string resolvedTo)
     {
-        string head = RunGit(repositoryPath, "rev-parse", "--verify", "HEAD").Trim();
+        string head = RunGit(repositoryPath, readHead: true).Trim();
         if (!string.Equals(head, resolvedTo, StringComparison.Ordinal))
         {
             throw new HistoryDotNetEnrichmentUnavailableException("revision_mismatch");
         }
 
-        if (RunGit(repositoryPath, "status", "--porcelain=v1", "--untracked-files=all").Length > 0)
+        if (RunGit(repositoryPath, readHead: false).Length > 0)
         {
             throw new HistoryDotNetEnrichmentUnavailableException("worktree_dirty");
         }
     }
 
-    private static string RunGit(string repositoryPath, params string[] arguments)
+    private static string RunGit(string repositoryPath, bool readHead)
     {
         ProcessStartInfo startInfo = new("git")
         {
@@ -190,9 +190,17 @@ internal sealed class WorktreeHistoryDotNetFactProvider : IHistoryDotNetFactProv
             CreateNoWindow = true,
             WorkingDirectory = repositoryPath
         };
-        foreach (string argument in arguments)
+        if (readHead)
         {
-            startInfo.ArgumentList.Add(argument);
+            startInfo.ArgumentList.Add("rev-parse");
+            startInfo.ArgumentList.Add("--verify");
+            startInfo.ArgumentList.Add("HEAD");
+        }
+        else
+        {
+            startInfo.ArgumentList.Add("status");
+            startInfo.ArgumentList.Add("--porcelain=v1");
+            startInfo.ArgumentList.Add("--untracked-files=all");
         }
 
         try
