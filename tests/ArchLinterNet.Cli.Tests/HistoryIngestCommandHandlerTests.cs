@@ -142,6 +142,24 @@ public sealed class HistoryIngestCommandHandlerTests
         }
     }
 
+    [Test]
+    public void SerializationFailureWritesOnlyTheDedicatedDiagnostic()
+    {
+        FakeConsole console = new();
+
+        bool succeeded = HistoryReportOutputWriter.TryWriteJson(
+            console,
+            static () => "bad\uD800");
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(succeeded, Is.False);
+            Assert.That(console.Output, Is.Empty);
+            Assert.That(console.ErrorOutput, Does.StartWith("{\n  \"kind\": \"report_serialization_invalid\""));
+            Assert.That(console.ErrorOutput, Does.Not.Contain("candidates"));
+        });
+    }
+
     private sealed class FakeConsole : ICliConsole
     {
         private readonly StringBuilder _output = new();

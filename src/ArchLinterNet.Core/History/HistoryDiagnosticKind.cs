@@ -18,4 +18,5 @@ internal enum HistoryDiagnosticKind
     PathEncodingInvalid,
     ConfigurationInvalid,
     TaskKeyOverlap,
+    ReportSerializationInvalid,
 }

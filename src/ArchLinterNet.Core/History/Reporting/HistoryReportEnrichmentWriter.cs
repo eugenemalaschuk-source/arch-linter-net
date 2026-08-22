@@ -6,7 +6,7 @@ namespace ArchLinterNet.Core.History.Reporting;
 // affect any Git-derived evidence, finding, score, rank, or candidate decision.
 internal static class HistoryReportEnrichmentWriter
 {
-    private static readonly IComparer<string> ScalarStringComparer = Comparer<string>.Create(GitPathDecoder.CompareScalarValue);
+    private static readonly IComparer<string> _scalarStringComparer = Comparer<string>.Create(GitPathDecoder.CompareScalarValue);
 
     public static void Write(CanonicalJsonWriter writer, HistoryEnrichmentProjection enrichment)
     {
@@ -25,7 +25,7 @@ internal static class HistoryReportEnrichmentWriter
     private static void WriteItems(CanonicalJsonWriter writer, string propertyName, IEnumerable<(string Kind, string Value)> items)
     {
         writer.BeginArray(propertyName);
-        foreach ((string kind, string value) in items.OrderBy(static item => item.Kind, ScalarStringComparer).ThenBy(static item => item.Value, ScalarStringComparer))
+        foreach ((string kind, string value) in items.OrderBy(static item => item.Kind, _scalarStringComparer).ThenBy(static item => item.Value, _scalarStringComparer))
         {
             writer.BeginObject();
             writer.WriteString("kind", kind);

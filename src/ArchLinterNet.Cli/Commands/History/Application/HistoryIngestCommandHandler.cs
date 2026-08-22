@@ -38,9 +38,14 @@ internal sealed class HistoryIngestCommandHandler(ICliConsole console)
             return CliExitCodes.InvalidArgumentsOrRuntimeError;
         }
 
-        console.Out.Write(options.Format == "markdown"
-            ? HistoryIngestionTextWriter.Write(result)
-            : HistoryIngestionJsonWriter.Write(result));
-        return CliExitCodes.Success;
+        if (options.Format == "markdown")
+        {
+            console.Out.Write(HistoryIngestionTextWriter.Write(result));
+            return CliExitCodes.Success;
+        }
+
+        return HistoryReportOutputWriter.TryWriteJson(console, () => HistoryIngestionJsonWriter.Write(result))
+            ? CliExitCodes.Success
+            : CliExitCodes.InvalidArgumentsOrRuntimeError;
     }
 }

@@ -11,7 +11,7 @@ internal static class HistoryIngestionJsonWriter
 {
     private const string ReportKind = "release-architecture-forensics";
     private const string HistorySemanticsVersion = "v1";
-    private static readonly IComparer<string> ScalarStringComparer = Comparer<string>.Create(GitPathDecoder.CompareScalarValue);
+    private static readonly IComparer<string> _scalarStringComparer = Comparer<string>.Create(GitPathDecoder.CompareScalarValue);
 
     public static string Write(HistoryIngestionResult result)
     {
@@ -59,7 +59,7 @@ internal static class HistoryIngestionJsonWriter
         writer.WriteStringElement("issue");
         writer.EndArray();
         writer.BeginArray("extractors");
-        foreach (Contracts.HistoryTaskExtractorConfiguration extractor in configuration.Extractors.OrderBy(static item => item.Id, ScalarStringComparer))
+        foreach (Contracts.HistoryTaskExtractorConfiguration extractor in configuration.Extractors.OrderBy(static item => item.Id, _scalarStringComparer))
         {
             writer.BeginObject();
             writer.WriteString("id", extractor.Id);
@@ -116,7 +116,7 @@ internal static class HistoryIngestionJsonWriter
     private static void WriteSortedStrings(CanonicalJsonWriter writer, string propertyName, IEnumerable<string> values)
     {
         writer.BeginArray(propertyName);
-        foreach (string value in values.OrderBy(static item => item, ScalarStringComparer))
+        foreach (string value in values.OrderBy(static item => item, _scalarStringComparer))
         {
             writer.WriteStringElement(value);
         }
