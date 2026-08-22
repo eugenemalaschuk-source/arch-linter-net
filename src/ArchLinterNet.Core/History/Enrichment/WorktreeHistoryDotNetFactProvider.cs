@@ -13,14 +13,7 @@ internal sealed class WorktreeHistoryDotNetFactProvider : IHistoryDotNetFactProv
     {
         string repositoryRoot = Path.GetFullPath(repositoryPath);
         VerifyWorktree(repositoryRoot, resolvedTo);
-        string resolvedPolicyPath = Path.GetFullPath(Path.IsPathRooted(policyPath)
-            ? policyPath
-            : Path.Combine(repositoryRoot, policyPath));
-        if (!string.Equals(Path.GetDirectoryName(resolvedPolicyPath), repositoryRoot, StringComparison.OrdinalIgnoreCase)
-            && !resolvedPolicyPath.StartsWith(repositoryRoot + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase))
-        {
-            throw new HistoryDotNetEnrichmentUnavailableException("policy_repository_mismatch");
-        }
+        string resolvedPolicyPath = ResolveRepositoryPolicyPath(repositoryRoot, policyPath);
 
         ArchitectureContractDocument document;
         try
@@ -98,6 +91,24 @@ internal sealed class WorktreeHistoryDotNetFactProvider : IHistoryDotNetFactProv
             BuildPathIndex(runner.Session.SourceFileFactIndex.AllFacts, discovery);
         VerifyWorktree(repositoryRoot, resolvedTo);
         return new HistoryDotNetFactMaterialization(facts);
+    }
+
+    private static string ResolveRepositoryPolicyPath(string repositoryRoot, string policyPath)
+    {
+        string candidate = Path.GetFullPath(Path.IsPathRooted(policyPath)
+            ? policyPath
+            : Path.Combine(repositoryRoot, policyPath));
+        string relative = Path.GetRelativePath(repositoryRoot, candidate);
+        bool outsideRepository = Path.IsPathRooted(relative)
+            || string.Equals(relative, "..", StringComparison.Ordinal)
+            || relative.StartsWith($"..{Path.DirectorySeparatorChar}", StringComparison.Ordinal)
+            || relative.StartsWith($"..{Path.AltDirectorySeparatorChar}", StringComparison.Ordinal);
+        if (outsideRepository)
+        {
+            throw new HistoryDotNetEnrichmentUnavailableException("policy_repository_mismatch");
+        }
+
+        return Path.GetFullPath(Path.Combine(repositoryRoot, relative));
     }
 
     private static IReadOnlyDictionary<string, string> RequireVerifiedArtifactDigests(
