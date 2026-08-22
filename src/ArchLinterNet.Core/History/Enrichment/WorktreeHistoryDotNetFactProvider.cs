@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Text.RegularExpressions;
 using ArchLinterNet.Core.BuildState;
 using ArchLinterNet.Core.Contracts;
 using ArchLinterNet.Core.Discovery;
@@ -9,6 +10,9 @@ namespace ArchLinterNet.Core.History.Enrichment;
 
 internal sealed class WorktreeHistoryDotNetFactProvider : IHistoryDotNetFactProvider
 {
+    private const string PortableRelativePolicyPathPattern =
+        @"^(?:(?!\.\.(?:[/\\]|$)|\.(?:[/\\]|$))[^<>:""|?*\u0000-\u001F])+$";
+
     public HistoryDotNetFactMaterialization Materialize(string repositoryPath, string resolvedTo, string policyPath)
     {
         string repositoryRoot = Path.GetFullPath(repositoryPath);
@@ -107,7 +111,9 @@ internal sealed class WorktreeHistoryDotNetFactProvider : IHistoryDotNetFactProv
             || string.Equals(relative, "..", StringComparison.Ordinal)
             || relative.StartsWith($"..{Path.DirectorySeparatorChar}", StringComparison.Ordinal)
             || relative.StartsWith($"..{Path.AltDirectorySeparatorChar}", StringComparison.Ordinal);
-        if (outsideRepository)
+        bool portableRelativePath = !string.Equals(relative, ".", StringComparison.Ordinal)
+            && Regex.IsMatch(relative, PortableRelativePolicyPathPattern, RegexOptions.CultureInvariant);
+        if (outsideRepository || !portableRelativePath)
         {
             throw new HistoryDotNetEnrichmentUnavailableException("policy_repository_mismatch");
         }
