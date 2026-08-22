@@ -61,8 +61,18 @@ internal static class ArchitectureRemediationHintFactory
     {
         if (!ArchitectureRemediationHintProviderRegistry.ByType.TryGetValue(diagnostic.GetType(), out ArchitectureRemediationHintProvider? provider))
         {
-            throw new InvalidOperationException(
-                $"No remediation-hint provider registered for diagnostic type '{diagnostic.GetType().Name}'.");
+            // ArchitectureDiagnostic and ArchitectureFindingMapper.FromDiagnostic are public extension
+            // points. An external consumer's subtype must keep mapping successfully even when Core
+            // cannot safely infer remediation evidence for it. Core's own concrete diagnostics stay
+            // fail-closed: the completeness test and this guard expose any new sealed type that has
+            // not been deliberately registered.
+            if (diagnostic.GetType().Assembly == typeof(ArchitectureDiagnostic).Assembly && diagnostic.GetType().IsSealed)
+            {
+                throw new InvalidOperationException(
+                    $"No remediation-hint provider registered for diagnostic type '{diagnostic.GetType().Name}'.");
+            }
+
+            return null;
         }
 
         return provider(diagnostic, identity);

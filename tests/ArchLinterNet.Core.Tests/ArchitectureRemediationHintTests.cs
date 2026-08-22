@@ -27,14 +27,17 @@ public sealed class ArchitectureRemediationHintTests
     }
 
     [Test]
-    public void Factory_UnregisteredDiagnosticType_ThrowsInsteadOfSilentlyOmittingGuidance()
+    public void FromDiagnostic_ExternalSubtype_RemainsCompatibleWithoutFabricatedGuidance()
     {
         var diagnostic = new UnregisteredDiagnostic("contract", "contract-id");
 
-        InvalidOperationException thrown = Assert.Throws<InvalidOperationException>(() =>
-            ArchitectureRemediationHintFactory.Create(diagnostic, Identity("contract-id", "Source.Type")))!;
+        ArchitectureFinding finding = ArchitectureFindingMapper.FromDiagnostic(diagnostic);
 
-        Assert.That(thrown.Message, Does.Contain(nameof(UnregisteredDiagnostic)));
+        Assert.Multiple(() =>
+        {
+            Assert.That(finding.Details, Is.SameAs(diagnostic));
+            Assert.That(finding.RemediationHint, Is.Null);
+        });
     }
 
     [Test]
