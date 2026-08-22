@@ -16,6 +16,11 @@ _COMMIT = "b" * 40
 _VERSION = "0.7.0-preview.1"
 
 
+@pytest.fixture(autouse=True)
+def _release_workspace(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.chdir(tmp_path)
+
+
 def _candidate(tmp_path: Path) -> tuple[Path, Path]:
     packages = tmp_path / "packages"
     packages.mkdir(parents=True)
@@ -108,6 +113,23 @@ def test_checksum_rendering_and_subject_paths_are_deterministic(tmp_path: Path, 
     assert all(path in checksums.read_text() for path in paths)
 
 
+def test_main_dispatches_the_verified_manifest_path_listing(tmp_path: Path, monkeypatch, capsys) -> None:
+    packages, output = _candidate(tmp_path)
+    monkeypatch.setattr(sys, "argv", [
+        "package_manifest.py",
+        "paths",
+        "--packages-dir", str(packages),
+        "--manifest", str(output),
+        "--kind", "package",
+    ])
+
+    assert manifest.main() == 0
+    assert capsys.readouterr().out.splitlines() == [
+        manifest._expected_filename(package_id, _VERSION, "package")
+        for package_id in manifest._PACKAGE_IDS
+    ]
+
+
 def test_v1_reading_requires_explicit_compatibility_mode(tmp_path: Path) -> None:
     packages = tmp_path / "packages"
     packages.mkdir()
@@ -133,5 +155,6 @@ def test_v1_reading_requires_explicit_compatibility_mode(tmp_path: Path) -> None
     with pytest.raises(ValueError, match="Unsupported candidate manifest schema"):
         manifest._load_manifest(output)
     _verify(packages, output, allow_v1=True)
+    historical_manifest = manifest._load_manifest(output, allow_v1=True)
     with pytest.raises(ValueError, match="complete package-subject inventory"):
-        manifest._subjects(manifest._load_manifest(output, allow_v1=True))
+        manifest._subjects(historical_manifest)

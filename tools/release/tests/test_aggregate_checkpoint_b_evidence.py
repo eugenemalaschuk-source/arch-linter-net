@@ -46,6 +46,11 @@ _POLICY_SHAPE = {
 }
 
 
+@pytest.fixture(autouse=True)
+def _release_workspace(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.chdir(tmp_path)
+
+
 def _scenarios(shell: str, platform: str, failed: dict[str, str] | None = None) -> list[dict]:
     failed = failed or {}
     results = []

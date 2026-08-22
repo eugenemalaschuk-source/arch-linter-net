@@ -10,6 +10,7 @@ import re
 from pathlib import Path
 from typing import Any
 
+from _release_workspace import _safe_path
 
 _PACKAGE_IDS = (
     "ArchLinterNet.CEL",
@@ -22,6 +23,7 @@ _SCHEMA_V2 = "checkpoint-b-candidate-manifest/v2"
 _SUBJECT_KINDS = ("package", "symbols")
 _SHA256_PATTERN = re.compile(r"[0-9a-f]{64}")
 _SOURCE_COMMIT_PATTERN = re.compile(r"[0-9a-f]{40,64}")
+_UNSUPPORTED_SCHEMA = "Unsupported candidate manifest schema."
 
 
 def _sha256(path: Path) -> str:
@@ -47,8 +49,9 @@ def _subject(path: Path, kind: str) -> dict[str, Any]:
 
 
 def _read_manifest(path: Path) -> dict[str, Any]:
+    path = _safe_path(path, "candidate manifest")
     try:
-        value = json.loads(path.read_text(encoding="utf-8"))
+        value = json.loads(path.read_text(encoding="utf-8"))  # NOSONAR: _safe_path confines this path.
     except (OSError, json.JSONDecodeError) as error:
         raise ValueError(f"Cannot read candidate manifest '{path}': {error}") from error
     if not isinstance(value, dict):
@@ -83,7 +86,7 @@ def _validate_v2(manifest: dict[str, Any]) -> dict[str, Any]:
     if set(manifest) != {"schema", "version", "source_commit", "packages"}:
         raise ValueError("Candidate manifest fields are invalid.")
     if manifest.get("schema") != _SCHEMA_V2:
-        raise ValueError("Unsupported candidate manifest schema.")
+        raise ValueError(_UNSUPPORTED_SCHEMA)
     _validate_identity(manifest)
     version = manifest["version"]
     packages = manifest.get("packages")
@@ -92,22 +95,26 @@ def _validate_v2(manifest: dict[str, Any]) -> dict[str, Any]:
 
     subject_files: set[str] = set()
     for package_id, record in zip(_PACKAGE_IDS, packages, strict=True):
-        if not isinstance(record, dict) or set(record) != {"id", "version", "package", "symbols"}:
-            raise ValueError("Candidate manifest package record is invalid.")
-        if record.get("id") != package_id or record.get("version") != version:
-            raise ValueError("Candidate manifest package identity is invalid.")
-        for kind in _SUBJECT_KINDS:
-            subject = _validate_subject(record.get(kind), package_id, version, kind)
-            if subject["file"] in subject_files:
-                raise ValueError("Candidate manifest contains duplicated subject files.")
-            subject_files.add(subject["file"])
+        _validate_package_record(record, package_id, version, subject_files)
     return manifest
+
+
+def _validate_package_record(record: Any, package_id: str, version: str, subject_files: set[str]) -> None:
+    if not isinstance(record, dict) or set(record) != {"id", "version", "package", "symbols"}:
+        raise ValueError("Candidate manifest package record is invalid.")
+    if record.get("id") != package_id or record.get("version") != version:
+        raise ValueError("Candidate manifest package identity is invalid.")
+    for kind in _SUBJECT_KINDS:
+        subject = _validate_subject(record.get(kind), package_id, version, kind)
+        if subject["file"] in subject_files:
+            raise ValueError("Candidate manifest contains duplicated subject files.")
+        subject_files.add(subject["file"])
 
 
 def _validate_v1(manifest: dict[str, Any]) -> dict[str, Any]:
     """Read only historical v1 evidence; it intentionally proves no symbol coverage."""
     if set(manifest) != {"schema", "version", "source_commit", "packages"} or manifest.get("schema") != _SCHEMA_V1:
-        raise ValueError("Unsupported candidate manifest schema.")
+        raise ValueError(_UNSUPPORTED_SCHEMA)
     _validate_identity(manifest)
     packages = manifest.get("packages")
     if not isinstance(packages, list) or len(packages) != len(_PACKAGE_IDS):
@@ -132,7 +139,7 @@ def _load_manifest(path: Path, allow_v1: bool = False) -> dict[str, Any]:
         return _validate_v2(manifest)
     if allow_v1 and manifest.get("schema") == _SCHEMA_V1:
         return _validate_v1(manifest)
-    raise ValueError("Unsupported candidate manifest schema.")
+    raise ValueError(_UNSUPPORTED_SCHEMA)
 
 
 def _subjects(manifest: dict[str, Any]) -> list[dict[str, Any]]:

@@ -52,6 +52,11 @@ _SHARDS = [
 ]
 
 
+@pytest.fixture(autouse=True)
+def _release_workspace(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.chdir(tmp_path)
+
+
 def _write_corpus(tmp_path: Path) -> tuple[Path, Path]:
     manifest_path = tmp_path / "package-manifest.json"
     manifest_path.write_text(json.dumps({
