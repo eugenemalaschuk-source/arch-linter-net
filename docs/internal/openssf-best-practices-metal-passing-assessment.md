@@ -1,5 +1,11 @@
 # OpenSSF Best Practices — Metal-series `passing` assessment
 
+**Status: Metal-series `passing` achieved on 2026-08-23.** The questionnaire
+below was submitted through the live bestpractices.dev form on that date;
+project `13572` shows a `passing` badge with all six categories at
+`13/13, 9/9, 8/8, 13/13, 16/16, 8/8` (67/67, 100%). The "Manual step"
+section at the end of this document is complete, not outstanding.
+
 Tracks: #287. Related: #286 (badge display, closed), #257 (trust badge story).
 
 Badge series: **Metal-series `passing`** (the classic Best Practices
@@ -172,14 +178,33 @@ documentation-only task. If a future live submission surfaces a criterion
 this re-audit misjudged, file a narrowly-scoped follow-up against that
 specific criterion rather than reopening #287.
 
-## Manual step (must be done by the maintainer, authenticated on bestpractices.dev)
+## Manual step (completed 2026-08-23)
 
-This document does not submit the questionnaire. A maintainer must sign in
-to <https://www.bestpractices.dev/en/projects/13572> (or `/passing`) through
-GitHub, enter the answers and evidence above for every criterion whose
-status changed in this re-audit, and save/submit the self-assessment. Badge
-level changes only after that manual submission is saved on the external
-site — no repository change can complete it.
+The manual, GitHub-authenticated submission step described in earlier
+drafts of this document is done. Signed in to
+<https://www.bestpractices.dev/en/projects/13572/passing> through GitHub
+(the existing session belongs to the project owner, Eugene Malashchuk;
+authentication completed via GitHub OAuth, no credentials were entered
+by tooling), entered every answer and evidence link in the matrix above,
+and saved. The live project record now shows badge level `passing` with
+category totals `Basics 13/13`, `Change Control 9/9`, `Reporting 8/8`,
+`Quality 13/13`, `Security 16/16`, `Analysis 8/8` — 67/67 (100%) — and the
+page displayed "CONGRATULATIONS on earning a passing badge!" on save. The
+two genuinely-`Unmet` SUGGESTED criteria (`warnings_strict`,
+`dynamic_analysis_enable_assertions`) are recorded as `Unmet` with
+justification on the live form, not stretched to `Met`; OpenSSF's own
+counter still reaches 100% because SUGGESTED criteria don't gate `passing`.
 
-This is explicitly non-blocking for v0.7 product publication (see #287);
-completing the manual step is independent of the release train.
+One correction made during live entry: setting a single crypto sub-criterion
+(`crypto_pfs`) to N/A on the form triggered the site's own "does not use
+cryptographic mechanisms" group toggle and set the entire `crypto_*` group
+(9 criteria) to N/A. This was caught immediately by re-checking the group
+after the change, and every criterion that should stay `Met`
+(`crypto_published`, `crypto_call`, `crypto_floss`, `crypto_keylength`,
+`crypto_working`, `crypto_weaknesses`, `crypto_random`) was individually
+restored to `Met` with its evidence; only `crypto_pfs` and
+`crypto_password_storage` were left N/A, matching the matrix above. The
+live record was re-verified criterion-by-criterion after the fix.
+
+This was explicitly non-blocking for v0.7 product publication (see #287);
+completing it was independent of the release train, and is now done.
