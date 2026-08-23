@@ -12,12 +12,16 @@ def test_guide_verifies_outer_evidence_before_package_subjects() -> None:
 
     manifest_verification = guide.index("gh attestation verify package-manifest.json")
     checksum_verification = guide.index("gh attestation verify package-checksums.txt")
+    package_set_verification = guide.index("diff -u expected-package-subjects.txt actual-package-subjects.txt")
     package_hash_verification = guide.index("sha256sum --check expected-package-subjects.sha256")
     package_attestation = guide.index("Verify every package and symbol attestation")
 
-    assert manifest_verification < checksum_verification < package_hash_verification < package_attestation
+    assert manifest_verification < checksum_verification < package_set_verification < package_hash_verification < package_attestation
     assert "while IFS= read -r subject" in guide
     assert ".package.file, .symbols.file" in guide
+    assert "for asset in ./*.nupkg ./*.snupkg" in guide
+    assert "actual-package-subjects.txt" in guide
+    assert "Package/symbol release assets do not match the verified manifest." in guide
 
 
 def test_guide_documents_fail_closed_tamper_and_nuget_repository_boundaries() -> None:
@@ -27,6 +31,16 @@ def test_guide_documents_fail_closed_tamper_and_nuget_repository_boundaries() ->
     assert "Modifying `package-manifest.json` or `package-checksums.txt`" in guide
     assert "not expected** to\nequal the pre-upload manifest digest" in guide
     assert "dotnet nuget verify" in guide
+    assert "dotnet nuget trust source nuget.org" in guide
+    assert 'signatureValidationMode" value="require"' in guide
+    assert '<clear />\n    <add key="nuget.org" value="https://api.nuget.org/v3/index.json"' in guide
+    assert "generated `trustedSigners` repository entry" in guide
+    assert "`serviceIndex` is\n`https://api.nuget.org/v3/index.json`" in guide
+    assert 'hashAlgorithm="SHA256"' in guide
+    assert 'allowUntrustedRoot="false"' in guide
+    assert guide.index("cat > nuget.config") < guide.index("dotnet nuget trust source nuget.org") < guide.index(
+        "dotnet nuget verify"
+    )
     assert "Do not strip or rewrite signatures" in guide
     assert "not assumed to mirror the primary package" in guide
 

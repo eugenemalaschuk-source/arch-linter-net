@@ -75,9 +75,32 @@ jq -e --arg commit "$SOURCE_COMMIT" \
 ```
 
 Confirm the displayed package IDs and version are the release you intended to
-verify. Then derive the expected SHA-256 lines from the verified manifest and
-compare both the derived checksum evidence and the downloaded project-controlled
-package bytes:
+verify. The manifest-selected filenames are the complete package/symbol
+subject set. Compare that set with every downloaded `.nupkg` and `.snupkg`
+before calculating any hashes; this fails closed on both missing and extra
+release assets:
+
+```bash
+jq -r '.packages[] | .package.file, .symbols.file' package-manifest.json \
+  | LC_ALL=C sort -u > expected-package-subjects.txt
+
+for asset in ./*.nupkg ./*.snupkg; do
+  if [ -f "$asset" ]; then
+    printf '%s\n' "${asset#./}"
+  fi
+done | LC_ALL=C sort -u > actual-package-subjects.txt
+
+if ! diff -u expected-package-subjects.txt actual-package-subjects.txt; then
+  echo "Package/symbol release assets do not match the verified manifest." >&2
+  exit 1
+fi
+```
+
+An empty release directory, a missing manifest-selected file, or an extra
+`.nupkg`/`.snupkg` therefore stops the procedure before a package can be
+accepted. Now derive the expected SHA-256 lines from the verified manifest and
+compare both the derived checksum evidence and the downloaded
+project-controlled package bytes:
 
 ```bash
 jq -r '.packages[] | .package, .symbols | "\(.sha256)  \(.file)"' \
@@ -119,8 +142,8 @@ These checks are intentionally fail-closed:
   `gh attestation verify` subject digest fail.
 - Modifying `package-manifest.json` or `package-checksums.txt` makes its own
   GitHub attestation verification fail before it can be trusted.
-- Removing an asset or selecting one not named by the verified manifest means
-  the release-subject set is incomplete or unexpected; do not substitute a
+- Removing an asset or adding one not named by the verified manifest makes the
+  filename-set diff fail before hashing or attestation; do not substitute a
   similarly named file.
 
 ## Verify a package downloaded from NuGet.org
@@ -132,9 +155,45 @@ SHA-256 of a NuGet.org-downloaded `.nupkg` is therefore **not expected** to
 equal the pre-upload manifest digest or GitHub Release attachment digest.
 
 First verify that you selected the expected package ID, version, and
-`https://api.nuget.org/v3/index.json` source. Then verify the downloaded primary
-package with NuGet's supported signature tooling and your organization's
-trusted-repository policy:
+`https://api.nuget.org/v3/index.json` source. Create the consumer configuration
+in the same empty directory so this path does not depend on a machine- or
+user-level NuGet configuration. The `packageSources` entry pins the source,
+`signatureValidationMode=require` makes signature policy mandatory, and
+`dotnet nuget trust source` obtains the current NuGet.org repository
+certificates from its v3 service index:
+
+```bash
+cat > nuget.config <<'EOF'
+<?xml version="1.0" encoding="utf-8"?>
+<configuration>
+  <config>
+    <add key="signatureValidationMode" value="require" />
+  </config>
+  <packageSources>
+    <clear />
+    <add key="nuget.org" value="https://api.nuget.org/v3/index.json" protocolVersion="3" />
+  </packageSources>
+</configuration>
+EOF
+
+dotnet nuget trust source nuget.org \
+  --source-url https://api.nuget.org/v3/index.json \
+  --configfile ./nuget.config
+
+dotnet nuget trust list --configfile ./nuget.config
+```
+
+Review the list and keep the generated `trustedSigners` repository entry with
+the verification record. If NuGet.org rotates its repository certificates,
+rerun the `trust source` command to refresh this consumer policy. The
+generated block must contain a `repository` whose `serviceIndex` is
+`https://api.nuget.org/v3/index.json` and one or more current `certificate`
+entries with `hashAlgorithm="SHA256"` and
+`allowUntrustedRoot="false"`; do not hand-copy stale certificate fingerprints.
+The configuration is intentionally explicit: `--configfile` makes these
+`packageSources` and `trustedSigners` settings the only settings used by the
+verification command. Then verify the downloaded primary package with NuGet's
+supported signature tooling:
 
 ```bash
 dotnet nuget trust list --configfile ./nuget.config
@@ -147,7 +206,10 @@ dotnet nuget verify ./ArchLinterNet.Core.<version>.nupkg \
 lets a consumer apply its required package sources and trusted signers. See the
 [.NET verification command](https://learn.microsoft.com/dotnet/core/tools/dotnet-nuget-verify)
 and [NuGet trust-boundary guidance](https://learn.microsoft.com/nuget/consume-packages/installing-signed-packages)
-for supported platform and trusted-signer configuration details.
+for supported platform and trusted-signer configuration details. The
+[NuGet trust command](https://learn.microsoft.com/dotnet/core/tools/dotnet-nuget-trust)
+and [nuget.config reference](https://learn.microsoft.com/nuget/reference/nuget-config-file)
+describe the `trustedSigners` repository and certificate properties used above.
 
 Do not strip or rewrite signatures to manufacture raw-byte equality, and do not
 report the expected repository-signing difference as tampering. `.snupkg`
