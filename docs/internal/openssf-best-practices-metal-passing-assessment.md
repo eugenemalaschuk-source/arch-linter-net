@@ -131,7 +131,7 @@ called out with why.
 | `static_analysis_often` | Met (unchanged) | CodeQL runs on every PR, every push to `main`, and on a weekly schedule (`cron: "17 4 * * 1"`). |
 | `dynamic_analysis` | Met (unchanged) | The NUnit test suite is dynamic analysis; it runs in CI on every PR. |
 | `dynamic_analysis_unsafe` | Met (unchanged) | No `unsafe` C# code exists in `src/` (confirmed via `grep -rn '\bunsafe\b' src/`, only comment/string matches); the project is memory-safe by construction as fully managed .NET code. |
-| `dynamic_analysis_enable_assertions` | **Met (changed from Unknown)** | The automated test suite (`tests/*`, NUnit) runs with assertions enabled by construction; NUnit's `Assert.*`/`Assert.That` API is the test mechanism itself, not an optional flag. |
+| `dynamic_analysis_enable_assertions` | **Unmet (changed from Unknown)** | This criterion asks for runtime assertions (e.g. `Debug.Assert`/`Contract.Assert`) inside the software being analyzed, enabled during dynamic analysis — not test-oracle assertions in the test framework itself. `grep -rn 'Debug\.Assert\|Contract\.Assert\|Trace\.Assert' src/` finds zero matches: no production code carries invariant assertions today. NUnit's `Assert.*`/`Assert.That` express expected test outcomes and do not satisfy this criterion. Recorded as genuinely `Unmet`; this is SUGGESTED-level and does not block passing. |
 | `dynamic_analysis_fixed` | Met (unchanged) | No known unfixed defect surfaced by the test suite; test failures block merge via required CI checks. |
 
 ## Repository changes made for this assessment
@@ -147,9 +147,14 @@ called out with why.
 
 ## Follow-up issues
 
-None created. Every one of the 67 criteria above resolves to Met or N/A
-using current repository evidence or the new CONTRIBUTING.md; no genuine
-repository gap remains that would justify a separate tracked issue. If a
+None created. 66 of the 67 criteria above resolve to Met or N/A using
+current repository evidence or the new CONTRIBUTING.md. The one exception,
+`dynamic_analysis_enable_assertions`, is genuinely `Unmet` (no runtime
+assertions exist in production source) and is SUGGESTED-level, so it does
+not block Metal `passing`; it is not treated as a repository gap requiring
+a follow-up issue, per the issue's own "create only real follow-ups"
+guidance — adding invariant assertions purely to satisfy this SUGGESTED
+criterion would be questionnaire-driven, not requirement-driven. If a
 future live submission surfaces a criterion this re-audit misjudged, file a
 narrowly-scoped follow-up against that specific criterion rather than
 reopening #287.
