@@ -220,6 +220,7 @@ analysis:
   project_exclude:
     - tests/**
     - benchmarks/**
+    - tools/**
   target_assemblies:
     - ArchLinterNet.Core
     - ArchLinterNet.Cli

@@ -65,7 +65,8 @@ contracts:
       allowed_friend_assemblies:
         - ArchLinterNet.Core.Tests
         - ArchLinterNet.Cli
-      reason: Core's internals are deliberately visible to its own test assembly and to the CLI adapter; any further friend assembly widens the effective API surface without review.
+        - ArchLinterNet.GitFuzz
+      reason: Core's internals are deliberately visible to its own test assembly, the CLI adapter, and the non-shipping synthetic Git-parser fuzz harness; any further friend assembly widens the effective API surface without review.
 
     - name: cel-friend-assemblies-are-reviewed
       id: cel-friend-assemblies-are-reviewed

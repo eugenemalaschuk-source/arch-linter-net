@@ -160,9 +160,26 @@ internal sealed class GitObjectDatabase : IDisposable
         return new GitRawObject(kind, payload);
     }
 
+    internal static GitRawObject ParseLooseBytes(byte[] compressed)
+        => HistoryFailures.WrapObjectAccess(
+            HistoryDiagnosticKind.ObjectMalformed,
+            "The synthetic loose Git object could not be read",
+            objectId: "fuzz",
+            path: null,
+            read: () => ParseLoose("fuzz", InflateLoose(compressed)));
+
     private static byte[] InflateLoose(string path)
     {
         using FileStream file = new(path, FileMode.Open, FileAccess.Read, FileShare.Read);
+        using ZLibStream stream = new(file, CompressionMode.Decompress);
+        using MemoryStream buffer = new();
+        stream.CopyTo(buffer);
+        return buffer.ToArray();
+    }
+
+    private static byte[] InflateLoose(byte[] compressed)
+    {
+        using MemoryStream file = new(compressed, writable: false);
         using ZLibStream stream = new(file, CompressionMode.Decompress);
         using MemoryStream buffer = new();
         stream.CopyTo(buffer);

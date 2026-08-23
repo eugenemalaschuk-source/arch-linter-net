@@ -1,0 +1,242 @@
+name: Git parser fuzzing
+
+on:
+  schedule:
+    - cron: "17 2 * * 0"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: git-parser-fuzzing
+  cancel-in-progress: true
+
+jobs:
+  campaign:
+    name: Bounded AFL++ campaign
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    env:
+      SHARPFUZZ_VERSION: 2.3.0
+      AFLPP_IMAGE: aflplusplus/aflplusplus@sha256:2627e783e460c18ccc205587800a32cc92971795c80440171dc93d7121c5b6fa
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up .NET 10
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Restore the fuzz harness
+        shell: bash
+        run: dotnet restore tools/ArchLinterNet.GitFuzz/ArchLinterNet.GitFuzz.csproj --runtime linux-x64
+
+      - name: Materialize the synthetic corpus
+        shell: bash
+        run: |
+          set -euo pipefail
+          CORPUS_DIR="$RUNNER_TEMP/git-parser-fuzz-corpus"
+          mkdir -p "$CORPUS_DIR"
+          dotnet run \
+            --project tools/ArchLinterNet.GitFuzz \
+            --configuration Release \
+            --no-restore \
+            -- \
+            --materialize-corpus "$CORPUS_DIR"
+          test -n "$(find "$CORPUS_DIR" -type f -print -quit)"
+          chmod -R a-w "$CORPUS_DIR"
+
+      - name: Publish the self-contained Linux harness
+        shell: bash
+        run: |
+          set -euo pipefail
+          PUBLISH_DIR="$RUNNER_TEMP/git-parser-fuzz-harness"
+          mkdir -p "$PUBLISH_DIR"
+          dotnet publish \
+            tools/ArchLinterNet.GitFuzz/ArchLinterNet.GitFuzz.csproj \
+            --configuration Release \
+            --runtime linux-x64 \
+            --self-contained true \
+            --no-restore \
+            --output "$PUBLISH_DIR"
+          test -x "$PUBLISH_DIR/ArchLinterNet.GitFuzz"
+          test -f "$PUBLISH_DIR/ArchLinterNet.GitFuzz.dll"
+          cat > "$PUBLISH_DIR/dotnet" <<'EOF'
+          #!/bin/sh
+          target="$1"
+          shift
+          case "$target" in
+            *.dll) exec "${target%.dll}" "$@" ;;
+            *) exec "$target" "$@" ;;
+          esac
+          EOF
+          chmod 500 "$PUBLISH_DIR/dotnet"
+          test -x "$PUBLISH_DIR/dotnet"
+
+      - name: Install the pinned SharpFuzz tool
+        shell: bash
+        run: |
+          set -euo pipefail
+          dotnet tool install \
+            --tool-path "$RUNNER_TEMP/sharpfuzz" \
+            SharpFuzz.CommandLine \
+            --version "$SHARPFUZZ_VERSION"
+          test -x "$RUNNER_TEMP/sharpfuzz/sharpfuzz"
+          dotnet tool list --tool-path "$RUNNER_TEMP/sharpfuzz" \
+            | grep -F "sharpfuzz.commandline" \
+            | grep -F "$SHARPFUZZ_VERSION"
+
+      - name: Instrument the published harness
+        shell: bash
+        run: |
+          set -euo pipefail
+          PUBLISH_DIR="$RUNNER_TEMP/git-parser-fuzz-harness"
+          "$RUNNER_TEMP/sharpfuzz/sharpfuzz" \
+            "$PUBLISH_DIR/ArchLinterNet.Core.dll"
+
+      - name: Validate private triage key
+        shell: bash
+        env:
+          FUZZ_TRIAGE_KEY: ${{ secrets.GIT_PARSER_FUZZ_TRIAGE_KEY }}
+        run: |
+          set -euo pipefail
+          if [ -z "$FUZZ_TRIAGE_KEY" ]; then
+            echo "::error::Configure the GIT_PARSER_FUZZ_TRIAGE_KEY repository secret before running the campaign."
+            exit 1
+          fi
+
+      - name: Run the bounded AFL++ campaign
+        shell: bash
+        run: |
+          set -euo pipefail
+          CORPUS_DIR="$RUNNER_TEMP/git-parser-fuzz-corpus"
+          PUBLISH_DIR="$RUNNER_TEMP/git-parser-fuzz-harness"
+          FINDINGS_DIR="$RUNNER_TEMP/git-parser-fuzz-findings"
+          RUNNER_UID="$(id -u)"
+          RUNNER_GID="$(id -g)"
+          mkdir -p "$FINDINGS_DIR"
+          chmod 700 "$FINDINGS_DIR"
+          docker run --rm \
+            --platform linux/amd64 \
+            --user "$RUNNER_UID:$RUNNER_GID" \
+            --network none \
+            --memory=512m \
+            --cpus=1 \
+            --read-only \
+            --tmpfs /tmp:rw,nosuid,nodev,noexec,size=128m \
+            --tmpfs /run:rw,nosuid,nodev,noexec,size=16m \
+            --tmpfs /dev/shm:rw,nosuid,nodev,noexec,size=64m \
+            --mount "type=bind,src=$CORPUS_DIR,dst=/corpus,readonly" \
+            --mount "type=bind,src=$PUBLISH_DIR,dst=/harness,readonly" \
+            --mount "type=bind,src=$FINDINGS_DIR,dst=/findings" \
+            --workdir /tmp \
+            --env AFL_SKIP_CPUFREQ=1 \
+            --env AFL_SKIP_BIN_CHECK=1 \
+            --env AFL_NO_AFFINITY=1 \
+            --env AFL_NO_UI=1 \
+            --env AFL_I_DONT_CARE_ABOUT_MISSING_CRASHES=1 \
+            --env AFL_HANG_TMOUT=100 \
+            --env HOME=/tmp \
+            --env PATH="/harness:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" \
+            "$AFLPP_IMAGE" \
+            afl-fuzz \
+              -i /corpus \
+              -o /findings \
+              -t 100 \
+              -m none \
+              -V 300 \
+              -- /harness/ArchLinterNet.GitFuzz
+
+      - name: Report candidate crashes and hangs
+        id: findings
+        shell: bash
+        if: always()
+        run: |
+          set -euo pipefail
+          FINDINGS_DIR="$RUNNER_TEMP/git-parser-fuzz-findings"
+          if [ -d "$FINDINGS_DIR" ]; then
+            candidates="$(find "$FINDINGS_DIR" -type f \( \
+              -path '*/crashes/id:*' -o \
+              -path '*/hangs/id:*' \
+            \) | wc -l)"
+          else
+            candidates=0
+          fi
+          echo "count=$candidates" >> "$GITHUB_OUTPUT"
+          if [ "$candidates" -gt 0 ]; then
+            echo "present=true" >> "$GITHUB_OUTPUT"
+            echo "Found $candidates candidate crash/hang input(s); the encrypted triage bundle is retained for private review."
+            {
+              echo "### Git parser fuzzing candidate report"
+              echo "- Candidate crash/hang inputs: $candidates"
+              echo "- Raw inputs: encrypted and retained for private triage; the decryption key is never uploaded."
+            } >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "present=false" >> "$GITHUB_OUTPUT"
+            echo "No candidate crash or hang artifacts were produced."
+          fi
+
+      - name: Encrypt the private triage bundle
+        id: encrypt
+        if: always() && steps.findings.outputs.present == 'true'
+        shell: bash
+        env:
+          FUZZ_TRIAGE_KEY: ${{ secrets.GIT_PARSER_FUZZ_TRIAGE_KEY }}
+        run: |
+          set -euo pipefail
+          FINDINGS_DIR="$RUNNER_TEMP/git-parser-fuzz-findings"
+          TRIAGE_DIR="$RUNNER_TEMP/git-parser-fuzz-triage"
+          ARCHIVE="$RUNNER_TEMP/git-parser-fuzz-triage.tar.gz"
+          ENCRYPTED="$RUNNER_TEMP/git-parser-fuzz-triage.tar.gz.enc"
+          HMAC="$RUNNER_TEMP/git-parser-fuzz-triage.tar.gz.enc.hmac"
+          mkdir -p "$TRIAGE_DIR"
+          printf 'run_id=%s\ncommit=%s\ncandidates=%s\n' \
+            "$GITHUB_RUN_ID" "$GITHUB_SHA" "${{ steps.findings.outputs.count }}" \
+            > "$TRIAGE_DIR/manifest.txt"
+          while IFS= read -r -d '' relative; do
+            destination="$TRIAGE_DIR/$relative"
+            mkdir -p "$(dirname "$destination")"
+            cp -- "$FINDINGS_DIR/$relative" "$destination"
+          done < <(find "$FINDINGS_DIR" -type f \( \
+            -path '*/crashes/id:*' -o \
+            -path '*/hangs/id:*' \
+          \) -printf '%P\0')
+          tar -C "$TRIAGE_DIR" -czf "$ARCHIVE" .
+          openssl enc -aes-256-cbc -pbkdf2 -iter 200000 -salt \
+            -in "$ARCHIVE" -out "$ENCRYPTED" -pass env:FUZZ_TRIAGE_KEY
+          openssl dgst -sha256 -hmac "$FUZZ_TRIAGE_KEY" "$ENCRYPTED" > "$HMAC"
+          rm -rf -- "$TRIAGE_DIR" "$ARCHIVE"
+
+      - name: Upload encrypted private triage bundle
+        id: upload
+        if: always() && steps.findings.outputs.present == 'true'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: git-parser-fuzz-triage-${{ github.run_id }}
+          path: |
+            ${{ runner.temp }}/git-parser-fuzz-triage.tar.gz.enc
+            ${{ runner.temp }}/git-parser-fuzz-triage.tar.gz.enc.hmac
+          if-no-files-found: error
+          retention-days: 14
+
+      # Skip cleanup (fail closed) if a candidate was found but its encrypted bundle
+      # was not both created and uploaded — deleting the only copy of an unsaved
+      # candidate would make it unrecoverable.
+      - name: Remove ephemeral raw findings
+        if: >-
+          always() &&
+          (steps.findings.outputs.present != 'true' ||
+           (steps.encrypt.outcome == 'success' && steps.upload.outcome == 'success'))
+        shell: bash
+        run: |
+          set -euo pipefail
+          FINDINGS_DIR="$RUNNER_TEMP/git-parser-fuzz-findings"
+          if [ -d "$FINDINGS_DIR" ]; then
+            chmod -R u+rwX "$FINDINGS_DIR"
+            rm -rf -- "$FINDINGS_DIR"
+          fi

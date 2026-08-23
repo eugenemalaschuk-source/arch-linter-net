@@ -36,9 +36,11 @@ ArchLinterNet.Testing ─┘
 - `ArchLinterNet.CEL` — standalone, dependency-light, host-agnostic expression engine.
 
 Project discovery is authoritative: `analysis.solution: ArchLinterNet.slnx`, with
-`project_exclude` removing `tests/**` and `benchmarks/**`. Those two roots are deliberately outside
-the governed project universe — they are neither shipped nor consumer-visible, and their build
-outputs are not part of the analysed assembly set. `samples/` contains no project files.
+`project_exclude` removing `tests/**`, `benchmarks/**`, and `tools/**`. Those roots are deliberately
+outside the governed project universe — they are neither shipped nor consumer-visible, and their
+build outputs are not part of the analysed assembly set. `tools/ArchLinterNet.GitFuzz` is an
+explicitly reviewed synthetic-input security harness, not a shipped product project. `samples/`
+contains no project files.
 
 ## Matrix
 

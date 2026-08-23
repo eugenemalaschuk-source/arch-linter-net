@@ -30,6 +30,19 @@ internal sealed class GitPackIndex
     public static GitPackIndex Load(string indexPath, int digestLength)
     {
         byte[] content = File.ReadAllBytes(indexPath);
+        return Parse(content, indexPath, digestLength);
+    }
+
+    internal static GitPackIndex Load(byte[] content, int digestLength)
+        => HistoryFailures.WrapObjectAccess(
+            HistoryDiagnosticKind.ObjectMalformed,
+            "The synthetic pack index could not be read",
+            objectId: null,
+            path: null,
+            read: () => Parse(content, "<synthetic>", digestLength));
+
+    private static GitPackIndex Parse(byte[] content, string indexPath, int digestLength)
+    {
         const int FanoutOffset = 8;
         const int FanoutLength = 256 * 4;
         if (content.Length < FanoutOffset + FanoutLength
