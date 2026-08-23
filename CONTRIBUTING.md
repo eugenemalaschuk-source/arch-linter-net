@@ -24,15 +24,20 @@ that applies to vulnerability reports specifically.
 - **Warnings as errors.** `TreatWarningsAsErrors` is enabled solution-wide in
   `Directory.Build.props`. A change that introduces a compiler warning will
   fail the build.
-- **Tests.** Add or update tests for behavior changes. Tests use **NUnit**;
-  run the focused test project with
+- **Tests.** Add or update tests for behavior changes. C# tests use
+  **NUnit**; run the focused test project with
   `dotnet test tests/<Project> --no-restore` before running the full suite.
+  Python release/tooling scripts under `tools/` use **pytest**; run them
+  with `make test-release-evidence`, `make test-calculate-version`,
+  `make test-coverage-badge-script`, or `make test-tooling-coverage` for
+  the full Python suite with coverage.
 - **Architecture governance.** Changes must satisfy the repository's own
   architecture policy: run `make lint-architecture` (read-only) before
   submitting. See `architecture/dependencies.arch.yml` for the enforced
   rules.
-- **File size.** Keep files under the repository's size thresholds (warning
-  at 500 lines, error at 800); `make lint-code-size` checks this.
+- **File size.** Keep files under the repository's size thresholds: C#
+  files warn at 500 lines and fail at 800; Markdown files warn at 600
+  lines and fail at 1000. `make lint-code-size` checks both.
 - **Public API changes.** If a change affects a reviewed public API surface,
   see the reviewed public API lifecycle in [AGENTS.md](AGENTS.md) — snapshot
   rewrites (`make public-api-update`) are a separate, explicit step and are
