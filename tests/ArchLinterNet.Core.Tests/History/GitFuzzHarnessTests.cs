@@ -84,6 +84,10 @@ public sealed class GitFuzzHarnessTests
         BoundedReplayRunner.ReplayCommand command = BoundedReplayRunner.CreateCommand("synthetic.bin");
         BoundedReplayRunner.ReplayCommand dotnetCommand =
             BoundedReplayRunner.CreateCommand("synthetic.bin", "dotnet");
+        BoundedReplayRunner.ReplayCommand appHostCommand =
+            BoundedReplayRunner.CreateCommand(
+                "synthetic.bin",
+                "/Users/dev/repo/tools/ArchLinterNet.GitFuzz/bin/Debug/net10.0/ArchLinterNet.GitFuzz");
 
         Assert.That(BoundedReplayRunner.PerCaseTimeoutMilliseconds, Is.EqualTo(100));
         Assert.That(BoundedReplayRunner.WorkerStartupTimeoutMilliseconds, Is.EqualTo(20_000));
@@ -108,6 +112,14 @@ public sealed class GitFuzzHarnessTests
             Assert.That(command.Arguments, Does.Contain(BoundedReplayRunner.ReplayContainerImage));
             Assert.That(command.ContainerName, Does.StartWith("arch-linter-git-fuzz-"));
             Assert.That(dotnetCommand.Arguments, Does.Contain("/harness/ArchLinterNet.GitFuzz.dll"));
+
+            // A native apphost (produced by "dotnet run"/"dotnet build" on macOS or Linux
+            // whenever UseAppHost is not disabled) is never runnable inside the Linux
+            // container: the container must always dispatch through its own "dotnet",
+            // never through the host process's own executable name.
+            Assert.That(appHostCommand.Arguments, Does.Contain("dotnet"));
+            Assert.That(appHostCommand.Arguments, Does.Contain("/harness/ArchLinterNet.GitFuzz.dll"));
+            Assert.That(appHostCommand.Arguments, Does.Not.Contain("/harness/ArchLinterNet.GitFuzz"));
         }
         Assert.That(
             command.UsesWindowsJobObject,
@@ -177,7 +189,19 @@ public sealed class GitFuzzHarnessTests
         {
             string inputPath = FuzzCorpus.Materialize(outputDirectory)
                 .Single(path => path.EndsWith("ofs-delta-copy-base.bin", StringComparison.Ordinal));
-            BoundedReplayRunner.ReplayCommand command = BoundedReplayRunner.CreateCommand(inputPath, "dotnet");
+
+            // Simulate the documented "dotnet run" entry point on a real host: on Unix that
+            // resolves Environment.ProcessPath to a native apphost, not literally "dotnet"
+            // (see BoundedReplayUsesTheRequiredWatchdogAndMemoryEnvelope). Using an apphost-shaped
+            // path here — instead of "dotnet" — is what makes this an end-to-end regression
+            // check for the container command translation, not just the launcher plumbing.
+            string simulatedHostProcessPath = OperatingSystem.IsWindows()
+                ? "dotnet"
+                : Path.Combine(
+                    Path.GetDirectoryName(typeof(Program).Assembly.Location)!,
+                    "ArchLinterNet.GitFuzz");
+            BoundedReplayRunner.ReplayCommand command =
+                BoundedReplayRunner.CreateCommand(inputPath, simulatedHostProcessPath);
 
             int exitCode = BoundedReplayRunner.Run(command, RelaxedPerCaseTimeoutMillisecondsForRoundTripOnly);
 

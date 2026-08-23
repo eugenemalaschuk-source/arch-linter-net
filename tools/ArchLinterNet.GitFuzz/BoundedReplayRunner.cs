@@ -168,17 +168,14 @@ internal static partial class BoundedReplayRunner
 
         if (OperatingSystem.IsLinux() || OperatingSystem.IsMacOS())
         {
-            return CreateContainerCommand(inputPath, resolvedProcessPath, assemblyPath);
+            return CreateContainerCommand(inputPath, assemblyPath);
         }
 
         throw new PlatformNotSupportedException(
             "Bounded replay supports Windows, Linux, and macOS hosts only.");
     }
 
-    private static ReplayCommand CreateContainerCommand(
-        string inputPath,
-        string resolvedProcessPath,
-        string assemblyPath)
+    private static ReplayCommand CreateContainerCommand(string inputPath, string assemblyPath)
     {
         string assemblyDirectory = Path.GetDirectoryName(assemblyPath)
             ?? throw new InvalidOperationException("The bounded replay launcher has no assembly directory.");
@@ -240,15 +237,13 @@ internal static partial class BoundedReplayRunner
             ReplayContainerImage,
         ];
 
-        if (IsDotNetHost(resolvedProcessPath))
-        {
-            containerArguments.Add("dotnet");
-            containerArguments.Add($"/harness/{Path.GetFileName(assemblyPath)}");
-        }
-        else
-        {
-            containerArguments.Add($"/harness/{Path.GetFileName(resolvedProcessPath)}");
-        }
+        // Always run the managed assembly through the container's own dotnet runtime
+        // (ReplayContainerImage), never the host's process name: on Unix, "dotnet run"/"dotnet
+        // build" produce a native apphost (Mach-O on macOS, ELF on Linux) at that path unless
+        // UseAppHost=false is set, and a macOS apphost cannot execute inside a Linux container
+        // regardless of what CreateJobObject/IsDotNetHost concluded about the host process.
+        containerArguments.Add("dotnet");
+        containerArguments.Add($"/harness/{Path.GetFileName(assemblyPath)}");
 
         containerArguments.Add("--replay-worker");
         containerArguments.Add($"/input/{inputFileName}");
