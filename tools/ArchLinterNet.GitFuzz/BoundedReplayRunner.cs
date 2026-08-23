@@ -21,6 +21,31 @@ internal static partial class BoundedReplayRunner
         "mcr.microsoft.com/dotnet/runtime@sha256:a365ce6a50b09176855d085c69da3fc1204a48432e36087e9a208f6e5860e235";
     internal const int ReplayTimedOutExitCode = 124;
     internal const int ReplayLimitSetupExitCode = 125;
+    private const string ContainerScratchDirectory = "/run/arch-linter-git-fuzz-replay";
+
+    // Resolved once, to an absolute path, rather than launching "docker" and relying on
+    // PATH lookup at every invocation.
+    private static readonly Lazy<string> _resolvedDockerExecutablePath = new(() => ResolveExecutablePath("docker"));
+
+    private static string ResolveExecutablePath(string executableName)
+    {
+        string? pathVariable = Environment.GetEnvironmentVariable("PATH");
+        if (string.IsNullOrEmpty(pathVariable))
+        {
+            return executableName;
+        }
+
+        foreach (string directory in pathVariable.Split(Path.PathSeparator, StringSplitOptions.RemoveEmptyEntries))
+        {
+            string candidate = Path.Combine(directory, executableName);
+            if (File.Exists(candidate))
+            {
+                return candidate;
+            }
+        }
+
+        return executableName;
+    }
 
     internal static int Run(string inputPath)
         => Run(inputPath, Environment.ProcessPath);
@@ -185,17 +210,22 @@ internal static partial class BoundedReplayRunner
             "--cpus=1",
             "--read-only",
             "--tmpfs",
-            "/tmp:rw,nosuid,nodev,noexec,size=128m",
+            $"{ContainerScratchDirectory}:rw,nosuid,nodev,noexec,size=128m",
             "--mount",
             $"type=bind,src={assemblyDirectory},dst=/harness,readonly",
             "--mount",
             $"type=bind,src={inputDirectory},dst=/input,readonly",
             "--workdir",
-            "/tmp",
+            ContainerScratchDirectory,
             "--env",
             $"{WorkerEnvironmentVariable}=1",
             "--env",
             $"DOTNET_GCHeapHardLimit={ManagedHeapHardLimit}",
+            // A dedicated, non-well-known scratch directory rather than the shared "/tmp"
+            // name: the corpus warm-up materializes files via Path.GetTempPath(), which
+            // .NET resolves from TMPDIR on Unix.
+            "--env",
+            $"TMPDIR={ContainerScratchDirectory}",
             ReplayContainerImage,
         ];
 
@@ -212,7 +242,7 @@ internal static partial class BoundedReplayRunner
         containerArguments.Add("--replay-worker");
         containerArguments.Add($"/input/{inputFileName}");
         return new ReplayCommand(
-            "docker",
+            _resolvedDockerExecutablePath.Value,
             containerArguments,
             UsesWindowsJobObject: false,
             ContainerName: containerName);
@@ -370,7 +400,7 @@ internal static partial class BoundedReplayRunner
     {
         try
         {
-            ProcessStartInfo startInfo = new("docker")
+            ProcessStartInfo startInfo = new(_resolvedDockerExecutablePath.Value)
             {
                 UseShellExecute = false,
                 RedirectStandardOutput = true,

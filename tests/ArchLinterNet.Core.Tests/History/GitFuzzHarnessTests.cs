@@ -101,7 +101,7 @@ public sealed class GitFuzzHarnessTests
         }
         else
         {
-            Assert.That(command.FileName, Is.EqualTo("docker"));
+            Assert.That(Path.GetFileName(command.FileName), Is.EqualTo("docker"));
             Assert.That(command.Arguments, Does.Contain("--memory=512m"));
             Assert.That(command.Arguments, Does.Contain("--memory-swap=512m"));
             Assert.That(command.Arguments, Does.Contain("--network"));
