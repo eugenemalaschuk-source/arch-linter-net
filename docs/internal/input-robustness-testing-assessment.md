@@ -56,8 +56,8 @@ breaches. It does not fuzz a live repository.
   replay and containment guarantees.
 - Replay: the user-facing one-input command launches a worker under the same
   100 ms/512 MiB envelope; the launcher uses a Windows Job Object, Linux
-  `prlimit`, or macOS `ulimit -v`, with tool versions recorded alongside the
-  candidate. The managed heap guard is the hex value `0x20000000`.
+  `prlimit --data`, or macOS `ulimit -d`, with tool versions recorded alongside
+  the candidate. The managed heap guard is the hex value `0x20000000`.
 - Triage: raw campaign inputs stay on the ephemeral runner and are never placed
   in public GitHub artifacts. Rerun in a restricted private environment,
   minimize with the fuzzer tooling, commit only a public-safe minimized

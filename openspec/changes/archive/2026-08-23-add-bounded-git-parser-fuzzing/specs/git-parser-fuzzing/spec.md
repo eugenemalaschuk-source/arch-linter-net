@@ -58,8 +58,8 @@ ephemeral and SHALL NOT be uploaded as ordinary GitHub Actions artifacts.
 #### Scenario: Bounded replay launcher
 
 - **WHEN** a maintainer invokes the documented `--replay <input-file>` command
-- **THEN** it starts a worker process with a hard 512 MiB process-memory
-  envelope (Windows Job Object, Linux `prlimit`, or macOS `ulimit -v`), sets
+- **THEN** it starts a worker process with a hard 512 MiB allocation envelope
+  (Windows Job Object, Linux `prlimit --data`, or macOS `ulimit -d`), sets
   the managed heap guard to hex `0x20000000`, warms only the built-in
   public-safe corpus, and starts a 100 ms post-warm-up watchdog before the
   worker reads the candidate input

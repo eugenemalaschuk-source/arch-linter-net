@@ -19,8 +19,8 @@ internal static class BoundedReplayRunner
     internal const long ProcessMemoryLimitBytes = 512L * 1024 * 1024;
     internal const string ManagedHeapHardLimit = "0x20000000";
     private const long MacMemoryLimitKilobytes = ProcessMemoryLimitBytes / 1024;
-    private static readonly string MacMemoryLauncherScript =
-        "ulimit -v " + MacMemoryLimitKilobytes.ToString(CultureInfo.InvariantCulture)
+    private static readonly string _macMemoryLauncherScript =
+        "ulimit -d " + MacMemoryLimitKilobytes.ToString(CultureInfo.InvariantCulture)
         + " || exit 125; exec \"$0\" \"$@\"";
     internal const int ReplayTimedOutExitCode = 124;
     internal const int ReplayLimitSetupExitCode = 125;
@@ -58,21 +58,28 @@ internal static class BoundedReplayRunner
         if (!WaitForWorkerMarker(process, WorkerReadyMarker))
         {
             Kill(process);
+            ForwardRemainingOutput(process);
             Console.Error.WriteLine("Bounded replay worker did not become ready within 5 seconds.");
             return ReplayTimedOutExitCode;
         }
 
-        process.StandardInput.WriteLine(WorkerWarmupMarker);
-        process.StandardInput.Flush();
-        if (!WaitForWorkerMarker(process, WorkerCaseReadyMarker))
+        if (!TrySendWorkerMarker(process, WorkerWarmupMarker)
+            || !WaitForWorkerMarker(process, WorkerCaseReadyMarker))
         {
             Kill(process);
+            ForwardRemainingOutput(process);
             Console.Error.WriteLine("Bounded replay worker did not finish warm-up within 5 seconds.");
             return ReplayTimedOutExitCode;
         }
 
-        process.StandardInput.WriteLine(WorkerStartMarker);
-        process.StandardInput.Flush();
+        if (!TrySendWorkerMarker(process, WorkerStartMarker))
+        {
+            Kill(process);
+            ForwardRemainingOutput(process);
+            Console.Error.WriteLine("Bounded replay worker exited before the candidate case started.");
+            return ReplayTimedOutExitCode;
+        }
+
         if (!process.WaitForExit(PerCaseTimeoutMilliseconds))
         {
             Kill(process);
@@ -131,7 +138,7 @@ internal static class BoundedReplayRunner
         {
             List<string> prlimitArguments =
             [
-                $"--as={ProcessMemoryLimitBytes.ToString(CultureInfo.InvariantCulture)}",
+                $"--data={ProcessMemoryLimitBytes.ToString(CultureInfo.InvariantCulture)}",
                 "--",
                 resolvedProcessPath,
                 .. workerArguments,
@@ -144,7 +151,7 @@ internal static class BoundedReplayRunner
             string[] shellArguments =
             [
                 "-c",
-                MacMemoryLauncherScript,
+                _macMemoryLauncherScript,
                 resolvedProcessPath,
                 .. workerArguments,
             ];
@@ -182,7 +189,7 @@ internal static class BoundedReplayRunner
         {
             throw new InvalidOperationException(
                 "The bounded replay memory launcher is unavailable on this host. "
-                + "Install prlimit on Unix-like hosts or use Windows Job Objects.",
+                + "Install prlimit on Linux or use the platform replay launcher.",
                 exception);
         }
     }
@@ -250,6 +257,29 @@ internal static class BoundedReplayRunner
         catch (InvalidOperationException)
         {
             return false;
+        }
+    }
+
+    private static bool TrySendWorkerMarker(Process process, string marker)
+    {
+        try
+        {
+            process.StandardInput.WriteLine(marker);
+            process.StandardInput.Flush();
+            return true;
+        }
+        catch (Exception exception) when (exception is IOException or ObjectDisposedException)
+        {
+            return false;
+        }
+    }
+
+    private static void ForwardRemainingOutput(Process process)
+    {
+        string standardError = process.StandardError.ReadToEnd();
+        if (standardError.Length > 0)
+        {
+            Console.Error.Write(standardError);
         }
     }
 

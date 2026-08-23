@@ -55,11 +55,14 @@ digest length. It accepts only a bounded canonical parser result or
 AFL++ crash. Input acquisition stops after 1 MiB plus one byte, before the
 selected parser is invoked. The user-facing `--replay` mode launches a worker
 and enforces a 100 ms post-warm-up watchdog plus a 512 MiB process-memory
-limit through a Windows Job Object, Linux `prlimit`, or macOS `ulimit -v`; the
+limit through a Windows Job Object, Linux `prlimit --data`, or macOS `ulimit -d`; the
 worker also receives the hexadecimal .NET `DOTNET_GCHeapHardLimit=0x20000000`.
-The worker-only argument is not accepted without the launcher marker. This
-keeps deterministic replay outside SharpFuzz's out-of-process execution path
-without leaving triage uncontained.
+The Unix allocation limit uses the data/heap resource rather than virtual
+address space because CoreCLR reserves more than 512 MiB during startup; an
+`--as`/`ulimit -v` cap would fail before the worker became ready. The
+worker-only argument is not accepted without the launcher marker. This keeps
+deterministic replay outside SharpFuzz's out-of-process execution path without
+leaving triage uncontained.
 
 This is preferred to fuzzing temporary Git directories because byte-array
 routes are faster, reproducible, and cannot accidentally use a developer's
