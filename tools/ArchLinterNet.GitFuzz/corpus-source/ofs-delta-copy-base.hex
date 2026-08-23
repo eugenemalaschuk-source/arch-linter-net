@@ -1,0 +1,3 @@
+# route 4: OFS-delta entry at offset 13, copying the synthetic base "base"
+# envelope: route + big-endian delta-entry offset + base entry + OFS-delta entry
+04 0000000d 34 789c4b4a2c4e050003fa019c 69 0d 789c6361632b492c4a4f2d0100095f0298

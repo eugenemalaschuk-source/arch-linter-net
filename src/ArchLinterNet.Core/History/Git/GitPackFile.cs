@@ -1,5 +1,4 @@
 using System.IO;
-using System.IO.Compression;
 
 namespace ArchLinterNet.Core.History.Git;
 
@@ -7,7 +6,6 @@ namespace ArchLinterNet.Core.History.Git;
 // by pack offset because long delta chains otherwise re-inflate the same base once per link.
 internal sealed class GitPackFile : IDisposable
 {
-    private const int TypeCommit = 1;
     private const int TypeOffsetDelta = 6;
     private const int TypeReferenceDelta = 7;
     private const int BaseCacheCapacity = 256;
@@ -39,7 +37,12 @@ internal sealed class GitPackFile : IDisposable
 
     private GitRawObject ReadAt(long offset)
     {
-        (int type, long size, long dataOffset, long baseOffset, GitObjectId baseId) = ReadEntryHeader(offset);
+        GitPackEntryHeader header = ReadEntryHeader(offset);
+        int type = header.Type;
+        long size = header.Size;
+        long dataOffset = header.DataOffset;
+        long baseOffset = header.BaseOffset;
+        GitObjectId baseId = header.BaseId;
         byte[] content = Inflate(dataOffset, size);
         if (type is not (TypeOffsetDelta or TypeReferenceDelta))
         {
@@ -83,67 +86,13 @@ internal sealed class GitPackFile : IDisposable
             : (resolved.Kind, resolved.Payload);
     }
 
-    private (int Type, long Size, long DataOffset, long BaseOffset, GitObjectId BaseId) ReadEntryHeader(long offset)
-    {
-        long position = offset;
-        byte current = ReadByte(ref position);
-        int type = (current >> 4) & 0x07;
-        long size = current & 0x0F;
-        int shift = 4;
-        while ((current & 0x80) != 0)
-        {
-            current = ReadByte(ref position);
-            size |= (long)(current & 0x7F) << shift;
-            shift += 7;
-        }
-
-        long baseOffset = 0;
-        GitObjectId baseId = default;
-        if (type == TypeOffsetDelta)
-        {
-            current = ReadByte(ref position);
-            long relative = current & 0x7F;
-            while ((current & 0x80) != 0)
-            {
-                current = ReadByte(ref position);
-                relative = ((relative + 1) << 7) | (uint)(current & 0x7F);
-            }
-
-            baseOffset = offset - relative;
-            if (baseOffset < 0)
-            {
-                throw HistoryFailures.Fail(
-                    HistoryDiagnosticKind.ObjectMalformed,
-                    "A packfile offset delta points before the start of its pack.");
-            }
-        }
-        else if (type == TypeReferenceDelta)
-        {
-            byte[] digest = new byte[_digestLength];
-            ReadExactly(position, digest);
-            position += _digestLength;
-            baseId = GitObjectId.FromBytes(digest);
-        }
-        else if (type is < TypeCommit or > 4)
-        {
-            throw HistoryFailures.Fail(
-                HistoryDiagnosticKind.ObjectMalformed,
-                $"A packfile entry declares unsupported object type {type}.");
-        }
-
-        return (type, size, position, baseOffset, baseId);
-    }
-
     private byte[] Inflate(long dataOffset, long size)
     {
         _pack.Position = dataOffset;
-        byte[] content = new byte[checked((int)size)];
-        using ZLibStream stream = new(_pack, CompressionMode.Decompress, leaveOpen: true);
-        stream.ReadExactly(content);
-        return content;
+        return GitPackPayloadInflater.Inflate(_pack, size);
     }
 
-    private byte ReadByte(ref long position)
+    private byte ReadByteAt(long position)
     {
         _pack.Position = position;
         int value = _pack.ReadByte();
@@ -154,15 +103,19 @@ internal sealed class GitPackFile : IDisposable
                 "A packfile entry header runs past the end of the pack.");
         }
 
-        position++;
         return (byte)value;
     }
 
-    private void ReadExactly(long position, byte[] destination)
+    private byte[] ReadExactlyAt(long position, int length)
     {
+        byte[] destination = new byte[length];
         _pack.Position = position;
         _pack.ReadExactly(destination);
+        return destination;
     }
+
+    private GitPackEntryHeader ReadEntryHeader(long offset)
+        => GitPackEntryHeaderParser.Read(offset, _digestLength, ReadByteAt, ReadExactlyAt);
 
     private static GitObjectKind ToKind(int type) => type switch
     {

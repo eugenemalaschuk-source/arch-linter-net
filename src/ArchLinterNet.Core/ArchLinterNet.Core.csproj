@@ -16,6 +16,7 @@
   <ItemGroup>
     <InternalsVisibleTo Include="ArchLinterNet.Core.Tests" />
     <InternalsVisibleTo Include="ArchLinterNet.Cli" />
+    <InternalsVisibleTo Include="ArchLinterNet.GitFuzz" />
   </ItemGroup>
 
   <ItemGroup>

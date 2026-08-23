@@ -271,10 +271,13 @@ public sealed partial class CheckpointBReleaseGateTests
         string layers = Path.Combine(consumer.Root, "fragments", "layers.yml");
         string original = File.ReadAllText(layers);
         CommandResult withdrawn;
+        string withdrawnPolicy;
         try
         {
-            File.WriteAllText(layers, original.Replace(
-                $"    overlaps_with: [modules]{Environment.NewLine}", string.Empty, StringComparison.Ordinal));
+            withdrawnPolicy = original
+                .Replace("    overlaps_with: [modules]\r\n", string.Empty, StringComparison.Ordinal)
+                .Replace("    overlaps_with: [modules]\n", string.Empty, StringComparison.Ordinal);
+            File.WriteAllText(layers, withdrawnPolicy);
             withdrawn = candidate.RunTool(consumer.Root,
                 "--policy", consumer.PolicyPath, "--strict", "--format", "json", "--ensure-built");
         }
@@ -288,6 +291,8 @@ public sealed partial class CheckpointBReleaseGateTests
         {
             Assert.That(original, Does.Contain("overlaps_with: [modules]"),
                 "The fixture must declare the intentional overlap it is meant to prove.");
+            Assert.That(withdrawnPolicy, Does.Not.Contain("overlaps_with: [modules]"),
+                "The negative probe must actually withdraw the overlap declaration.");
             Assert.That(declared.ExitCode, Is.EqualTo(0), declared.CombinedOutput);
             Assert.That(accepted.RootElement.GetProperty("policy_consistency_findings").GetArrayLength(), Is.Zero);
             Assert.That(withdrawn.ExitCode, Is.EqualTo(1), withdrawn.CombinedOutput);
