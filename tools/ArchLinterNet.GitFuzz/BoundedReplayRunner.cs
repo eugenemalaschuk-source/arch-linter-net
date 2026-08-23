@@ -172,6 +172,10 @@ internal static partial class BoundedReplayRunner
             "run",
             "--rm",
             "--init",
+            // The READY/WARMUP/CASE_READY/GO handshake runs over stdin/stdout; without -i, docker
+            // does not forward the host process's stdin into the container, so the worker never
+            // receives WARMUP/GO and the launcher fails closed on every Unix invocation.
+            "-i",
             "--name",
             containerName,
             "--network",

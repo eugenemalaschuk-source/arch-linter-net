@@ -160,8 +160,8 @@ public sealed class GitFuzzHarnessTests
     // BoundedReplayKillsAWorkerThatExceedsTheCaseWatchdog, which races a deterministic
     // synthetic delay rather than a real worker. This test instead checks that the bounded
     // launcher completes a genuine round trip (process/container spawn, handshake,
-    // FuzzInputProcessor execution) at all, so it must not race real worker startup and
-    // JIT/coverage-instrumentation overhead against that same tight production bound.
+    // FuzzInputProcessor execution) at all, so it must not race real container cold-start
+    // and JIT startup latency against that same tight production bound.
     private const int RelaxedPerCaseTimeoutMillisecondsForRoundTripOnly = 10_000;
 
     [Test, NonParallelizable]
