@@ -14,7 +14,7 @@ internal static partial class BoundedReplayRunner
     internal const string WorkerCaseReadyMarker = "ARCHLINTERNET_GIT_FUZZ_REPLAY_CASE_READY";
     internal const string WorkerStartMarker = "ARCHLINTERNET_GIT_FUZZ_REPLAY_GO";
     internal const int PerCaseTimeoutMilliseconds = 100;
-    internal const int WorkerStartupTimeoutMilliseconds = 5_000;
+    internal const int WorkerStartupTimeoutMilliseconds = 20_000;
     internal const long ProcessMemoryLimitBytes = 512L * 1024 * 1024;
     internal const string ManagedHeapHardLimit = "0x20000000";
     internal const string ReplayContainerImage =
@@ -56,7 +56,8 @@ internal static partial class BoundedReplayRunner
         {
             Kill(process, command);
             ForwardRemainingOutput(process);
-            Console.Error.WriteLine("Bounded replay worker did not become ready within 5 seconds.");
+            Console.Error.WriteLine(
+                $"Bounded replay worker did not become ready within {WorkerStartupTimeoutMilliseconds} ms.");
             return ReplayTimedOutExitCode;
         }
 
@@ -65,7 +66,8 @@ internal static partial class BoundedReplayRunner
         {
             Kill(process, command);
             ForwardRemainingOutput(process);
-            Console.Error.WriteLine("Bounded replay worker did not finish warm-up within 5 seconds.");
+            Console.Error.WriteLine(
+                $"Bounded replay worker did not finish warm-up within {WorkerStartupTimeoutMilliseconds} ms.");
             return ReplayTimedOutExitCode;
         }
 

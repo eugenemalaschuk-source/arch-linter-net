@@ -86,7 +86,7 @@ public sealed class GitFuzzHarnessTests
             BoundedReplayRunner.CreateCommand("synthetic.bin", "dotnet");
 
         Assert.That(BoundedReplayRunner.PerCaseTimeoutMilliseconds, Is.EqualTo(100));
-        Assert.That(BoundedReplayRunner.WorkerStartupTimeoutMilliseconds, Is.EqualTo(5_000));
+        Assert.That(BoundedReplayRunner.WorkerStartupTimeoutMilliseconds, Is.EqualTo(20_000));
         Assert.That(BoundedReplayRunner.ProcessMemoryLimitBytes, Is.EqualTo(512L * 1024 * 1024));
         Assert.That(BoundedReplayRunner.WorkerReadyMarker, Does.Contain("READY"));
         Assert.That(BoundedReplayRunner.WorkerWarmupMarker, Does.Contain("WARMUP"));
