@@ -38,6 +38,8 @@ It is intentionally excluded from the public MkDocs/GitHub Pages product site.
 
 - [Self-policy capability matrix](self-policy-capability-matrix.md) — per-family adopt / already-covered / not-applicable / defer decisions for the repository's own architecture policy, recorded engine limitations, and the read-only vs writing developer commands (#464).
 
+- [OpenSSF Best Practices Metal-passing assessment](openssf-best-practices-metal-passing-assessment.md) — per-criterion evidence checklist and manual-submission notes for project `13572`'s passing-level self-assessment (#287).
+
 ## Publishing rule
 
 Only public product documentation should appear in `mkdocs.yml` navigation and GitHub Pages output.
