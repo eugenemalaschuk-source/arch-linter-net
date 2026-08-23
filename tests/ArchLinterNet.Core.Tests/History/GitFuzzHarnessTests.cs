@@ -156,6 +156,14 @@ public sealed class GitFuzzHarnessTests
                     : BoundedReplayRunner.ReplayTimedOutExitCode));
     }
 
+    // The production PerCaseTimeoutMilliseconds (100 ms) is proven by
+    // BoundedReplayKillsAWorkerThatExceedsTheCaseWatchdog, which races a deterministic
+    // synthetic delay rather than a real worker. This test instead checks that the bounded
+    // launcher completes a genuine round trip (process/container spawn, handshake,
+    // FuzzInputProcessor execution) at all, so it must not race real worker startup and
+    // JIT/coverage-instrumentation overhead against that same tight production bound.
+    private const int RelaxedPerCaseTimeoutMillisecondsForRoundTripOnly = 10_000;
+
     [Test, NonParallelizable]
     public void UserFacingReplayExecutesThroughTheBoundedWorker()
     {
@@ -169,8 +177,9 @@ public sealed class GitFuzzHarnessTests
         {
             string inputPath = FuzzCorpus.Materialize(outputDirectory)
                 .Single(path => path.EndsWith("ofs-delta-copy-base.bin", StringComparison.Ordinal));
+            BoundedReplayRunner.ReplayCommand command = BoundedReplayRunner.CreateCommand(inputPath, "dotnet");
 
-            int exitCode = Program.RunMain(["--replay", inputPath], "dotnet");
+            int exitCode = BoundedReplayRunner.Run(command, RelaxedPerCaseTimeoutMillisecondsForRoundTripOnly);
 
             Assert.That(exitCode, Is.Zero);
         }

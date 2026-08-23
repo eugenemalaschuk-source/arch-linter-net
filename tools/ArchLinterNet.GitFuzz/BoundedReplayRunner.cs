@@ -29,6 +29,14 @@ internal static partial class BoundedReplayRunner
         => Run(CreateCommand(inputPath, processPath));
 
     internal static int Run(ReplayCommand command)
+        => Run(command, PerCaseTimeoutMilliseconds);
+
+    // The per-case timeout is only overridable from tests, so an end-to-end mechanism
+    // check (does the bounded launcher complete a real round trip at all) can use a
+    // relaxed bound instead of racing the coverage-instrumented worker against the
+    // production 100 ms hang watchdog. BoundedReplayKillsAWorkerThatExceedsTheCaseWatchdog
+    // is what actually proves the production PerCaseTimeoutMilliseconds enforces a kill.
+    internal static int Run(ReplayCommand command, int perCaseTimeoutMilliseconds)
     {
         using Process process = Start(command);
         IDisposable memoryLimit;
@@ -46,11 +54,11 @@ internal static partial class BoundedReplayRunner
 
         using (memoryLimit)
         {
-            return RunBoundedWorker(process, command);
+            return RunBoundedWorker(process, command, perCaseTimeoutMilliseconds);
         }
     }
 
-    private static int RunBoundedWorker(Process process, ReplayCommand command)
+    private static int RunBoundedWorker(Process process, ReplayCommand command, int perCaseTimeoutMilliseconds)
     {
         if (!WaitForWorkerMarker(process, WorkerReadyMarker))
         {
@@ -79,11 +87,11 @@ internal static partial class BoundedReplayRunner
             return ReplayTimedOutExitCode;
         }
 
-        if (!process.WaitForExit(PerCaseTimeoutMilliseconds))
+        if (!process.WaitForExit(perCaseTimeoutMilliseconds))
         {
             Kill(process, command);
             Console.Error.WriteLine(
-                $"Bounded replay exceeded the {PerCaseTimeoutMilliseconds} ms per-case limit.");
+                $"Bounded replay exceeded the {perCaseTimeoutMilliseconds} ms per-case limit.");
             return ReplayTimedOutExitCode;
         }
 
