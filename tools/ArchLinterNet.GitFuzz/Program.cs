@@ -14,56 +14,19 @@ internal static class Program
     {
         if (args.Length == 2 && args[0] == "--materialize-corpus")
         {
-            foreach (string path in FuzzCorpus.Materialize(args[1]))
-            {
-                Console.WriteLine(path);
-            }
-
-            return 0;
+            return MaterializeCorpus(args[1]);
         }
 
         if (args.Length == 2 && args[0] == "--replay")
         {
-            try
-            {
-                return BoundedReplayRunner.Run(args[1], processPath);
-            }
-            catch (Exception exception) when (
-                exception is InvalidOperationException or PlatformNotSupportedException)
-            {
-                Console.Error.WriteLine(exception.Message);
-                return BoundedReplayRunner.ReplayLimitSetupExitCode;
-            }
+            return RunReplay(args[1], processPath);
         }
 
         if (args.Length == 2
             && args[0] == ReplayWorkerArgument
             && Environment.GetEnvironmentVariable(BoundedReplayRunner.WorkerEnvironmentVariable) == "1")
         {
-            Console.WriteLine(BoundedReplayRunner.WorkerReadyMarker);
-            Console.Out.Flush();
-            if (!string.Equals(
-                    Console.ReadLine(),
-                    BoundedReplayRunner.WorkerWarmupMarker,
-                    StringComparison.Ordinal))
-            {
-                return UsageError;
-            }
-
-            WarmUpParserSeams();
-            Console.WriteLine(BoundedReplayRunner.WorkerCaseReadyMarker);
-            Console.Out.Flush();
-            if (!string.Equals(
-                    Console.ReadLine(),
-                    BoundedReplayRunner.WorkerStartMarker,
-                    StringComparison.Ordinal))
-            {
-                return UsageError;
-            }
-
-            using FileStream stream = File.OpenRead(args[1]);
-            Console.WriteLine(FuzzInputProcessor.Execute(stream));
-            return 0;
+            return RunReplayWorker(args[1]);
         }
 
         if (args.Length <= 1)
@@ -74,6 +37,58 @@ internal static class Program
 
         Console.Error.WriteLine("Usage: ArchLinterNet.GitFuzz [--materialize-corpus <output-dir>|--replay <input-file>]");
         return UsageError;
+    }
+
+    private static int MaterializeCorpus(string outputDirectory)
+    {
+        foreach (string path in FuzzCorpus.Materialize(outputDirectory))
+        {
+            Console.WriteLine(path);
+        }
+
+        return 0;
+    }
+
+    private static int RunReplay(string inputPath, string? processPath)
+    {
+        try
+        {
+            return BoundedReplayRunner.Run(inputPath, processPath);
+        }
+        catch (Exception exception) when (
+            exception is InvalidOperationException or PlatformNotSupportedException)
+        {
+            Console.Error.WriteLine(exception.Message);
+            return BoundedReplayRunner.ReplayLimitSetupExitCode;
+        }
+    }
+
+    private static int RunReplayWorker(string inputPath)
+    {
+        Console.WriteLine(BoundedReplayRunner.WorkerReadyMarker);
+        Console.Out.Flush();
+        if (!string.Equals(
+                Console.ReadLine(),
+                BoundedReplayRunner.WorkerWarmupMarker,
+                StringComparison.Ordinal))
+        {
+            return UsageError;
+        }
+
+        WarmUpParserSeams();
+        Console.WriteLine(BoundedReplayRunner.WorkerCaseReadyMarker);
+        Console.Out.Flush();
+        if (!string.Equals(
+                Console.ReadLine(),
+                BoundedReplayRunner.WorkerStartMarker,
+                StringComparison.Ordinal))
+        {
+            return UsageError;
+        }
+
+        using FileStream stream = File.OpenRead(inputPath);
+        Console.WriteLine(FuzzInputProcessor.Execute(stream));
+        return 0;
     }
 
     private static void WarmUpParserSeams()

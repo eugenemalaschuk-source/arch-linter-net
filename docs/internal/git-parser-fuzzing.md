@@ -35,7 +35,7 @@ The workflow and local investigations use the following fixed values:
 | Input cap | 1 MiB, rejected before parser dispatch |
 | Per-case timeout | 100 ms (`afl-fuzz -t 100`) |
 | Process/container memory | 512 MiB Docker cgroup cap (`--memory=512m`); AFL virtual-memory cap disabled with `-m none` for the .NET/SharpFuzz target |
-| Replay memory/timeout | `--replay` launches a worker with a 100 ms post-warm-up watchdog and a hard 512 MiB allocation envelope (Windows Job Object, Linux `prlimit --data`, or macOS child launcher plus RSS watchdog) |
+| Replay memory/timeout | `--replay` launches a worker with a 100 ms post-warm-up watchdog and a hard 512 MiB Docker cgroup envelope on Unix (Windows Job Object) |
 | CPU | One CPU (`docker --cpus=1`) |
 | Campaign duration | 300 seconds (`afl-fuzz -V 300`) |
 | Network and filesystem | `--network none`, read-only root, only the findings mount writable; the container runs as the host runner UID/GID |
@@ -43,16 +43,15 @@ The workflow and local investigations use the following fixed values:
 | AFL++ hang threshold | `AFL_HANG_TMOUT=100`, so a 100 ms stall is retained as a candidate instead of waiting for AFL++'s default minimum hang timeout |
 | SharpFuzz child launcher | Harness-local `dotnet` wrapper that maps the harness `.dll` child command to its self-contained apphost |
 | Managed heap guard | `DOTNET_GCHeapHardLimit=0x20000000` (hex, 512 MiB) in the replay worker |
-| Candidate retention | Ephemeral runner only; raw crash/hang inputs are never uploaded as public GitHub artifacts |
+| Candidate retention | Encrypted triage bundle in a 14-day GitHub artifact; the decryption key is a repository secret and raw inputs are never uploaded in plaintext |
 
-The Linux launcher uses the data/heap limit intentionally: CoreCLR reserves
-more than 512 MiB of virtual address space during startup, so an
-`--as`/`ulimit -v` cap would fail before the worker becomes ready.
-`prlimit --data` bounds the anonymous data/heap allocation while the
-hexadecimal managed-heap guard remains exactly 512 MiB. macOS does not provide
-a reliable per-process `setrlimit` memory cap, so its `/bin/sh` child launcher
-is paired with a 10 ms RSS watchdog that kills the worker above 512 MiB;
-Windows uses a Job Object for the process-memory cap.
+On Unix, the replay launcher runs the worker in the pinned .NET runtime Docker
+image with `--memory=512m` and `--memory-swap=512m`. This cgroup is the hard
+process/container envelope: it remains effective during CoreCLR startup and
+does not pretend that a data-segment or post-facto RSS check limits the whole
+process. Windows uses a Job Object for the equivalent hard process cap. If
+Docker is unavailable on Linux or macOS, replay fails closed with the launcher
+setup exit code rather than running without containment.
 
 The scheduled workflow is intentionally separate from pull-request validation.
 It has only `schedule` and `workflow_dispatch` triggers. A normal PR must run
@@ -104,10 +103,11 @@ dotnet run --project tools/ArchLinterNet.GitFuzz -- --materialize-corpus artifac
 ```
 
 Replay one materialized input by path. The user-facing command is already
-bounded; it starts a worker, waits for its readiness marker, and only then
-installs the 512 MiB process limit. The worker then warms the built-in
-public-safe corpus, reports that the candidate case is ready, and only then
-starts the 100 ms case watchdog before reading the candidate:
+bounded; on Unix it starts a Docker worker with the 512 MiB cgroup before the
+worker becomes ready, while Windows installs its Job Object before the same
+handshake. The worker then warms the built-in public-safe corpus, reports that
+the candidate case is ready, and only then starts the 100 ms case watchdog
+before reading the candidate:
 
 ```bash
 dotnet run --project tools/ArchLinterNet.GitFuzz -- --replay artifacts/git-parser-corpus/<input-file>
@@ -135,8 +135,10 @@ operations in order:
 1. runs the pinned AFL++ image with `-t 100 -m none -V 300` and
     `AFL_HANG_TMOUT=100` inside the Docker 512 MiB memory envelope as the host
     runner UID/GID; and
-1. reports only a candidate count in the workflow summary, then removes the
-    raw findings from the ephemeral runner.
+1. reports the candidate count, encrypts the crash/hang files with the
+     `GIT_PARSER_FUZZ_TRIAGE_KEY` secret, uploads only the encrypted bundle and
+     its HMAC for 14 days, then removes the raw findings from the ephemeral
+     runner.
 
 The container mounts the corpus and published harness read-only. It mounts
 only the temporary findings directory read-write, runs as the host runner UID/GID
@@ -158,20 +160,35 @@ without installing a runtime or allowing network access in the campaign
 container. The AFL++ output directory is not a general build or repository
 workspace.
 
-When candidates exist, the workflow writes only the count and a no-upload
-notice to the job summary. Raw AFL++ crash/hang inputs remain on the ephemeral
-runner and are deleted in an `always()` cleanup step; they are never placed in
-ordinary GitHub Actions artifacts, which are readable to users with access to a
-public repository. A run with no candidate crash or hang reports zero and also
-produces no findings artifact.
+When candidates exist, the workflow writes the count and uploads an encrypted
+triage bundle. The artifact contains AES-256-CBC ciphertext plus a separate
+HMAC; the `GIT_PARSER_FUZZ_TRIAGE_KEY` repository secret is never written to
+the job summary, logs, or artifact. This preserves the exact bytes for private
+replay/minimization without exposing raw exploit-relevant inputs to ordinary
+artifact readers. The raw working directory is still deleted in an `always()`
+cleanup step. A run with no candidate crash or hang reports zero and produces
+no findings artifact.
 
 ## Minimize and triage a candidate
 
 Every crash, hang, timeout, resource-limit breach, and unexpected successful
-parse is a candidate finding. The scheduled workflow does not expose raw
-inputs; rerun the pinned campaign in an access-controlled private scratch
-environment to obtain and triage a candidate. Treat every candidate as
+parse is a candidate finding. Download the encrypted artifact from the
+workflow run in an access-controlled maintainer session, verify its HMAC, and
+decrypt it with the repository secret before triage. Treat every candidate as
 untrusted input.
+
+The private bundle can be recovered with OpenSSL (never paste the key into a
+command line visible to other users):
+
+```bash
+openssl dgst -sha256 -hmac "$GIT_PARSER_FUZZ_TRIAGE_KEY" \
+  git-parser-fuzz-triage.tar.gz.enc
+openssl enc -d -aes-256-cbc -pbkdf2 -iter 200000 \
+  -in git-parser-fuzz-triage.tar.gz.enc \
+  -out git-parser-fuzz-triage.tar.gz \
+  -pass env:GIT_PARSER_FUZZ_TRIAGE_KEY
+tar -xzf git-parser-fuzz-triage.tar.gz
+```
 
 For each candidate:
 
@@ -215,7 +232,10 @@ content, adopter data, credentials, secrets, machine-specific paths, or any
 other non-synthetic material.
 
 Generated binary materializations, AFL++ queues, and candidate artifacts do
-not belong in source control. Workflow candidates exist only on the ephemeral
-runner until cleanup. Private triage copies must be deleted after replay,
-minimization, and review; never mirror raw findings into a public artifact or
-another long-lived location.
+not belong in source control. Workflow candidates are retained only as
+encrypted artifacts for 14 days, and the raw working directory is deleted from
+the runner after the upload step. Maintainers must delete the downloaded
+plaintext bundle after replay, minimization, and review; never mirror raw
+findings into a public artifact or another long-lived location. The encrypted
+artifact is the durable hand-off that makes replay → minimize → review →
+regression possible without exposing the testcase in plaintext.

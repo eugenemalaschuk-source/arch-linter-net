@@ -55,16 +55,14 @@ digest length. It accepts only a bounded canonical parser result or
 AFL++ crash. Input acquisition stops after 1 MiB plus one byte, before the
 selected parser is invoked. The user-facing `--replay` mode launches a worker
 and enforces a 100 ms post-warm-up watchdog plus a 512 MiB process-memory
-limit through a Windows Job Object, Linux `prlimit --data`, or a macOS child
-launcher plus an RSS watchdog; the worker also receives the hexadecimal .NET
-`DOTNET_GCHeapHardLimit=0x20000000`.
-The Linux allocation limit uses the data/heap resource rather than virtual
-address space because CoreCLR reserves more than 512 MiB during startup; an
-`--as`/`ulimit -v` cap would fail before the worker became ready. macOS has no
-reliable per-process setrlimit memory cap, so the launcher uses a 10 ms RSS
-watchdog there. The worker-only argument is not accepted without the launcher
-marker. This keeps deterministic replay outside SharpFuzz's out-of-process
-execution path without leaving triage uncontained.
+limit through a Windows Job Object or, on Linux/macOS, the pinned .NET runtime
+Docker image with `--memory=512m --memory-swap=512m`; the worker also receives
+the hexadecimal .NET `DOTNET_GCHeapHardLimit=0x20000000`. Docker's cgroup
+remains effective during CoreCLR startup, unlike a virtual-address limit that
+can fail before the worker becomes ready. If Docker is unavailable on Unix,
+the launcher fails closed. The worker-only argument is not accepted without
+the launcher marker. This keeps deterministic replay outside SharpFuzz's
+out-of-process execution path without leaving triage uncontained.
 
 This is preferred to fuzzing temporary Git directories because byte-array
 routes are faster, reproducible, and cannot accidentally use a developer's
@@ -107,12 +105,11 @@ oversized input in both applicable digest modes.
 
 The new workflow has only `schedule` and `workflow_dispatch` triggers. It
 passes the host runner UID/GID to the container so AFL++'s 0700/0600 findings
-remain readable, reports only the candidate count in the workflow summary, and
-removes raw findings from the ephemeral runner. It never uploads raw crash or
-hang inputs as ordinary GitHub Actions artifacts; triage reruns a pinned
-campaign in an access-controlled private environment. The campaign runs with
-Docker networking disabled; ordinary PR CI retains only the deterministic
-NUnit regressions.
+remain readable, reports the candidate count, encrypts candidate files with
+the `GIT_PARSER_FUZZ_TRIAGE_KEY` repository secret, and uploads only the
+encrypted bundle plus its HMAC for 14 days before removing raw findings from
+the ephemeral runner. The campaign runs with Docker networking disabled;
+ordinary PR CI retains only the deterministic NUnit regressions.
 
 ## Risks / Trade-offs
 
@@ -123,8 +120,9 @@ NUnit regressions.
   AFL++ time/memory flags, finite duration, Docker memory/cpu limits, and a
   no-network container are all mandatory.
 - [An externally readable corpus leaks repository information] → committed
-  seeds are authored format fragments only; raw campaign outputs never enter
-  public workflow artifacts and are removed from the ephemeral runner.
+  seeds are authored format fragments only; campaign outputs are encrypted
+  before the short-lived artifact upload and the decryption key is never
+  published.
 - [A friend assembly widens Core's effective API] → the exact friend and
   non-shipping project exclusion are recorded in the self-policy, with no
   exported Core member added.

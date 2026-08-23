@@ -99,6 +99,17 @@ jobs:
           "$RUNNER_TEMP/sharpfuzz/sharpfuzz" \
             "$PUBLISH_DIR/ArchLinterNet.Core.dll"
 
+      - name: Validate private triage key
+        shell: bash
+        env:
+          FUZZ_TRIAGE_KEY: ${{ secrets.GIT_PARSER_FUZZ_TRIAGE_KEY }}
+        run: |
+          set -euo pipefail
+          if [ -z "$FUZZ_TRIAGE_KEY" ]; then
+            echo "::error::Configure the GIT_PARSER_FUZZ_TRIAGE_KEY repository secret before running the campaign."
+            exit 1
+          fi
+
       - name: Run the bounded AFL++ campaign
         shell: bash
         run: |
@@ -141,7 +152,7 @@ jobs:
               -V 300 \
               -- /harness/ArchLinterNet.GitFuzz
 
-      - name: Report candidate crashes and hangs without publishing inputs
+      - name: Report candidate crashes and hangs
         id: findings
         shell: bash
         if: always()
@@ -156,18 +167,60 @@ jobs:
           else
             candidates=0
           fi
+          echo "count=$candidates" >> "$GITHUB_OUTPUT"
           if [ "$candidates" -gt 0 ]; then
             echo "present=true" >> "$GITHUB_OUTPUT"
-            echo "Found $candidates candidate crash/hang input(s); raw inputs stay on the ephemeral runner and are not uploaded."
+            echo "Found $candidates candidate crash/hang input(s); the encrypted triage bundle is retained for private review."
             {
               echo "### Git parser fuzzing candidate report"
               echo "- Candidate crash/hang inputs: $candidates"
-              echo "- Raw inputs: not uploaded; rerun the campaign in a private triage environment."
+              echo "- Raw inputs: encrypted and retained for private triage; the decryption key is never uploaded."
             } >> "$GITHUB_STEP_SUMMARY"
           else
             echo "present=false" >> "$GITHUB_OUTPUT"
             echo "No candidate crash or hang artifacts were produced."
           fi
+
+      - name: Encrypt the private triage bundle
+        if: steps.findings.outputs.present == 'true'
+        shell: bash
+        env:
+          FUZZ_TRIAGE_KEY: ${{ secrets.GIT_PARSER_FUZZ_TRIAGE_KEY }}
+        run: |
+          set -euo pipefail
+          FINDINGS_DIR="$RUNNER_TEMP/git-parser-fuzz-findings"
+          TRIAGE_DIR="$RUNNER_TEMP/git-parser-fuzz-triage"
+          ARCHIVE="$RUNNER_TEMP/git-parser-fuzz-triage.tar.gz"
+          ENCRYPTED="$RUNNER_TEMP/git-parser-fuzz-triage.tar.gz.enc"
+          HMAC="$RUNNER_TEMP/git-parser-fuzz-triage.tar.gz.enc.hmac"
+          mkdir -p "$TRIAGE_DIR"
+          printf 'run_id=%s\ncommit=%s\ncandidates=%s\n' \
+            "$GITHUB_RUN_ID" "$GITHUB_SHA" "${{ steps.findings.outputs.count }}" \
+            > "$TRIAGE_DIR/manifest.txt"
+          while IFS= read -r -d '' relative; do
+            destination="$TRIAGE_DIR/$relative"
+            mkdir -p "$(dirname "$destination")"
+            cp -- "$FINDINGS_DIR/$relative" "$destination"
+          done < <(find "$FINDINGS_DIR" -type f \( \
+            -path '*/crashes/id:*' -o \
+            -path '*/hangs/id:*' \
+          \) -printf '%P\0')
+          tar -C "$TRIAGE_DIR" -czf "$ARCHIVE" .
+          openssl enc -aes-256-cbc -pbkdf2 -iter 200000 -salt \
+            -in "$ARCHIVE" -out "$ENCRYPTED" -pass env:FUZZ_TRIAGE_KEY
+          openssl dgst -sha256 -hmac "$FUZZ_TRIAGE_KEY" "$ENCRYPTED" > "$HMAC"
+          rm -rf -- "$TRIAGE_DIR" "$ARCHIVE"
+
+      - name: Upload encrypted private triage bundle
+        if: steps.findings.outputs.present == 'true'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: git-parser-fuzz-triage-${{ github.run_id }}
+          path: |
+            ${{ runner.temp }}/git-parser-fuzz-triage.tar.gz.enc
+            ${{ runner.temp }}/git-parser-fuzz-triage.tar.gz.enc.hmac
+          if-no-files-found: error
+          retention-days: 14
 
       - name: Remove ephemeral raw findings
         if: always()

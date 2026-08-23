@@ -47,8 +47,10 @@ Committed seeds SHALL contain only authored format fragments or test-derived
 synthetic data and SHALL not contain private repository, adopter, path, secret,
 or credential data. The AFL++ campaign SHALL set `AFL_HANG_TMOUT=100` and run
 the container as the host runner UID/GID so its 0700/0600 findings remain
-readable to the host cleanup step. Raw campaign crash/hang inputs SHALL remain
-ephemeral and SHALL NOT be uploaded as ordinary GitHub Actions artifacts.
+  readable to the host cleanup step. When candidates exist, the workflow SHALL
+  encrypt the crash/hang files with the repository `GIT_PARSER_FUZZ_TRIAGE_KEY`
+  secret and retain only the encrypted bundle and integrity sidecar for 14 days;
+  raw inputs SHALL never be uploaded in plaintext.
 
 #### Scenario: Oversized replay input
 - **WHEN** a replay input is larger than 1 MiB
@@ -65,18 +67,19 @@ ephemeral and SHALL NOT be uploaded as ordinary GitHub Actions artifacts.
 
 - **WHEN** a maintainer invokes the documented `--replay <input-file>` command
 - **THEN** it starts a worker process with a hard 512 MiB allocation envelope
-  (Windows Job Object, Linux `prlimit --data`, or macOS child launcher plus an
-  RSS watchdog), sets
+  (Windows Job Object, or the pinned .NET runtime Docker image with
+  `--memory=512m --memory-swap=512m` on Linux/macOS), sets
   the managed heap guard to hex `0x20000000`, warms only the built-in
   public-safe corpus, and starts a 100 ms post-warm-up watchdog before the
   worker reads the candidate input
 
 ### Requirement: Finding promotion and corpus triage
 The repository SHALL retain campaign crash and hang artifacts only long enough
-for triage and SHALL require review for safe publication before a minimized
-input enters the committed corpus. Every confirmed parser defect discovered by
-the campaign SHALL be minimized, replayed under the recorded limits, and
-promoted to a deterministic NUnit regression before the defect is closed.
+for triage in an encrypted 14-day artifact and SHALL require review for safe
+publication before a minimized input enters the committed corpus. Every
+confirmed parser defect discovered by the campaign SHALL be minimized, replayed
+under the recorded limits, and promoted to a deterministic NUnit regression
+before the defect is closed.
 
 #### Scenario: Campaign reports a candidate failure
 - **WHEN** AFL++ reports a crash, timeout, resource-limit breach, or unexpected

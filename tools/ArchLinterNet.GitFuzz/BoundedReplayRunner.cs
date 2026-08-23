@@ -1,13 +1,12 @@
 using System.ComponentModel;
 using System.Diagnostics;
-using System.Globalization;
 using System.Runtime.InteropServices;
 
 namespace ArchLinterNet.GitFuzz;
 
 // User-facing replay is always a separate process. The worker is intentionally not a public
 // command: only this launcher supplies the process-memory envelope and the watchdog.
-internal static class BoundedReplayRunner
+internal static partial class BoundedReplayRunner
 {
     internal const string WorkerEnvironmentVariable = "ARCHLINTERNET_GIT_FUZZ_REPLAY_WORKER";
     internal const string WorkerReadyMarker = "ARCHLINTERNET_GIT_FUZZ_REPLAY_READY";
@@ -18,8 +17,8 @@ internal static class BoundedReplayRunner
     internal const int WorkerStartupTimeoutMilliseconds = 5_000;
     internal const long ProcessMemoryLimitBytes = 512L * 1024 * 1024;
     internal const string ManagedHeapHardLimit = "0x20000000";
-    private static readonly string _macMemoryLauncherScript =
-        "exec \"$0\" \"$@\"";
+    internal const string ReplayContainerImage =
+        "mcr.microsoft.com/dotnet/runtime@sha256:a365ce6a50b09176855d085c69da3fc1204a48432e36087e9a208f6e5860e235";
     internal const int ReplayTimedOutExitCode = 124;
     internal const int ReplayLimitSetupExitCode = 125;
 
@@ -39,7 +38,7 @@ internal static class BoundedReplayRunner
         }
         catch (Exception exception) when (exception is Win32Exception or InvalidOperationException)
         {
-            Kill(process);
+            Kill(process, command);
             throw new InvalidOperationException(
                 "The bounded replay memory envelope could not be installed.",
                 exception);
@@ -47,15 +46,15 @@ internal static class BoundedReplayRunner
 
         using (memoryLimit)
         {
-            return RunBoundedWorker(process);
+            return RunBoundedWorker(process, command);
         }
     }
 
-    private static int RunBoundedWorker(Process process)
+    private static int RunBoundedWorker(Process process, ReplayCommand command)
     {
         if (!WaitForWorkerMarker(process, WorkerReadyMarker))
         {
-            Kill(process);
+            Kill(process, command);
             ForwardRemainingOutput(process);
             Console.Error.WriteLine("Bounded replay worker did not become ready within 5 seconds.");
             return ReplayTimedOutExitCode;
@@ -64,7 +63,7 @@ internal static class BoundedReplayRunner
         if (!TrySendWorkerMarker(process, WorkerWarmupMarker)
             || !WaitForWorkerMarker(process, WorkerCaseReadyMarker))
         {
-            Kill(process);
+            Kill(process, command);
             ForwardRemainingOutput(process);
             Console.Error.WriteLine("Bounded replay worker did not finish warm-up within 5 seconds.");
             return ReplayTimedOutExitCode;
@@ -72,7 +71,7 @@ internal static class BoundedReplayRunner
 
         if (!TrySendWorkerMarker(process, WorkerStartMarker))
         {
-            Kill(process);
+            Kill(process, command);
             ForwardRemainingOutput(process);
             Console.Error.WriteLine("Bounded replay worker exited before the candidate case started.");
             return ReplayTimedOutExitCode;
@@ -80,7 +79,7 @@ internal static class BoundedReplayRunner
 
         if (!process.WaitForExit(PerCaseTimeoutMilliseconds))
         {
-            Kill(process);
+            Kill(process, command);
             Console.Error.WriteLine(
                 $"Bounded replay exceeded the {PerCaseTimeoutMilliseconds} ms per-case limit.");
             return ReplayTimedOutExitCode;
@@ -132,32 +131,77 @@ internal static class BoundedReplayRunner
             return new ReplayCommand(resolvedProcessPath, workerArguments, UsesWindowsJobObject: true);
         }
 
-        if (OperatingSystem.IsLinux())
+        if (OperatingSystem.IsLinux() || OperatingSystem.IsMacOS())
         {
-            List<string> prlimitArguments =
-            [
-                $"--data={ProcessMemoryLimitBytes.ToString(CultureInfo.InvariantCulture)}",
-                "--",
-                resolvedProcessPath,
-                .. workerArguments,
-            ];
-            return new ReplayCommand("prlimit", prlimitArguments, UsesWindowsJobObject: false);
-        }
-
-        if (OperatingSystem.IsMacOS())
-        {
-            string[] shellArguments =
-            [
-                "-c",
-                _macMemoryLauncherScript,
-                resolvedProcessPath,
-                .. workerArguments,
-            ];
-            return new ReplayCommand("/bin/sh", shellArguments, UsesWindowsJobObject: false);
+            return CreateContainerCommand(inputPath, resolvedProcessPath, assemblyPath);
         }
 
         throw new PlatformNotSupportedException(
             "Bounded replay supports Windows, Linux, and macOS hosts only.");
+    }
+
+    private static ReplayCommand CreateContainerCommand(
+        string inputPath,
+        string resolvedProcessPath,
+        string assemblyPath)
+    {
+        string assemblyDirectory = Path.GetDirectoryName(assemblyPath)
+            ?? throw new InvalidOperationException("The bounded replay launcher has no assembly directory.");
+        string fullInputPath = Path.GetFullPath(inputPath);
+        string inputDirectory = Path.GetDirectoryName(fullInputPath)
+            ?? throw new InvalidOperationException("The bounded replay input has no parent directory.");
+        string inputFileName = Path.GetFileName(fullInputPath);
+        if (string.IsNullOrWhiteSpace(inputFileName))
+        {
+            throw new InvalidOperationException("The bounded replay input has no file name.");
+        }
+
+        string containerName = $"arch-linter-git-fuzz-{Guid.NewGuid():N}";
+        List<string> containerArguments =
+        [
+            "run",
+            "--rm",
+            "--init",
+            "--name",
+            containerName,
+            "--network",
+            "none",
+            "--memory=512m",
+            "--memory-swap=512m",
+            "--cpus=1",
+            "--read-only",
+            "--tmpfs",
+            "/tmp:rw,nosuid,nodev,noexec,size=128m",
+            "--mount",
+            $"type=bind,src={assemblyDirectory},dst=/harness,readonly",
+            "--mount",
+            $"type=bind,src={inputDirectory},dst=/input,readonly",
+            "--workdir",
+            "/tmp",
+            "--env",
+            $"{WorkerEnvironmentVariable}=1",
+            "--env",
+            $"DOTNET_GCHeapHardLimit={ManagedHeapHardLimit}",
+            ReplayContainerImage,
+        ];
+
+        if (IsDotNetHost(resolvedProcessPath))
+        {
+            containerArguments.Add("dotnet");
+            containerArguments.Add($"/harness/{Path.GetFileName(assemblyPath)}");
+        }
+        else
+        {
+            containerArguments.Add($"/harness/{Path.GetFileName(resolvedProcessPath)}");
+        }
+
+        containerArguments.Add("--replay-worker");
+        containerArguments.Add($"/input/{inputFileName}");
+        return new ReplayCommand(
+            "docker",
+            containerArguments,
+            UsesWindowsJobObject: false,
+            ContainerName: containerName);
     }
 
     private static Process Start(ReplayCommand command)
@@ -187,18 +231,13 @@ internal static class BoundedReplayRunner
         {
             throw new InvalidOperationException(
                 "The bounded replay memory launcher is unavailable on this host. "
-                + "Install prlimit on Linux or use the platform replay launcher.",
+                + "Install Docker on Linux or macOS, or use the Windows replay launcher.",
                 exception);
         }
     }
 
     private static IDisposable AttachMemoryLimit(Process process)
     {
-        if (OperatingSystem.IsMacOS())
-        {
-            return new ProcessMemoryWatchdog(process, ProcessMemoryLimitBytes);
-        }
-
         if (!OperatingSystem.IsWindows())
         {
             return NoopDisposable.Instance;
@@ -286,7 +325,7 @@ internal static class BoundedReplayRunner
         }
     }
 
-    private static void Kill(Process process)
+    private static void Kill(Process process, ReplayCommand? command = null)
     {
         try
         {
@@ -300,7 +339,40 @@ internal static class BoundedReplayRunner
             // The worker exited between the timeout check and the kill request.
         }
 
-        process.WaitForExit();
+        try
+        {
+            process.WaitForExit();
+        }
+        finally
+        {
+            if (command?.ContainerName is not null)
+            {
+                RemoveContainer(command.Value.ContainerName);
+            }
+        }
+    }
+
+    private static void RemoveContainer(string containerName)
+    {
+        try
+        {
+            ProcessStartInfo startInfo = new("docker")
+            {
+                UseShellExecute = false,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                CreateNoWindow = true,
+            };
+            startInfo.ArgumentList.Add("rm");
+            startInfo.ArgumentList.Add("--force");
+            startInfo.ArgumentList.Add(containerName);
+            using Process cleanup = Process.Start(startInfo)!;
+            _ = cleanup.WaitForExit(2_000);
+        }
+        catch (Win32Exception)
+        {
+            // The Docker launcher itself is unavailable; the main process already failed closed.
+        }
     }
 
     private static bool IsDotNetHost(string processPath)
@@ -312,7 +384,8 @@ internal static class BoundedReplayRunner
     internal readonly record struct ReplayCommand(
         string FileName,
         IReadOnlyList<string> Arguments,
-        bool UsesWindowsJobObject);
+        bool UsesWindowsJobObject,
+        string? ContainerName = null);
 
     private sealed class NoopDisposable : IDisposable
     {
@@ -320,67 +393,6 @@ internal static class BoundedReplayRunner
 
         public void Dispose()
         {
-        }
-    }
-
-    private sealed class ProcessMemoryWatchdog : IDisposable
-    {
-        private readonly Process _process;
-        private readonly long _limitBytes;
-        private readonly CancellationTokenSource _cancellation = new();
-        private readonly Task _monitor;
-
-        internal ProcessMemoryWatchdog(Process process, long limitBytes)
-        {
-            _process = process;
-            _limitBytes = limitBytes;
-            _monitor = Task.Run(Monitor);
-        }
-
-        public void Dispose()
-        {
-            _cancellation.Cancel();
-            try
-            {
-                _monitor.GetAwaiter().GetResult();
-            }
-            catch (ObjectDisposedException)
-            {
-                // The cancellation source was disposed after the monitor completed.
-            }
-
-            _cancellation.Dispose();
-        }
-
-        private void Monitor()
-        {
-            try
-            {
-                while (!_cancellation.IsCancellationRequested)
-                {
-                    if (_process.HasExited)
-                    {
-                        return;
-                    }
-
-                    if (_process.WorkingSet64 > _limitBytes)
-                    {
-                        Console.Error.WriteLine(
-                            $"Bounded replay exceeded the {_limitBytes / (1024 * 1024)} MiB memory limit.");
-                        _process.Kill(entireProcessTree: true);
-                        return;
-                    }
-
-                    if (_cancellation.Token.WaitHandle.WaitOne(10))
-                    {
-                        return;
-                    }
-                }
-            }
-            catch (InvalidOperationException)
-            {
-                // The worker exited or disposal raced with the final monitor tick.
-            }
         }
     }
 
@@ -429,19 +441,23 @@ internal static class BoundedReplayRunner
         internal nuint PeakJobMemoryUsed;
     }
 
-    [DllImport("kernel32.dll", SetLastError = true)]
-    private static extern nint CreateJobObject(nint attributes, string? name);
+    [LibraryImport("kernel32.dll", EntryPoint = "CreateJobObjectW", SetLastError = true,
+        StringMarshalling = StringMarshalling.Utf16)]
+    private static partial nint CreateJobObject(nint attributes, string? name);
 
-    [DllImport("kernel32.dll", SetLastError = true)]
-    private static extern bool SetInformationJobObject(
+    [LibraryImport("kernel32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static partial bool SetInformationJobObject(
         nint job,
         int informationClass,
         ref JobObjectExtendedLimitInformation information,
         uint informationLength);
 
-    [DllImport("kernel32.dll", SetLastError = true)]
-    private static extern bool AssignProcessToJobObject(nint job, nint process);
+    [LibraryImport("kernel32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static partial bool AssignProcessToJobObject(nint job, nint process);
 
-    [DllImport("kernel32.dll", SetLastError = true)]
-    private static extern bool CloseHandle(nint handle);
+    [LibraryImport("kernel32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static partial bool CloseHandle(nint handle);
 }

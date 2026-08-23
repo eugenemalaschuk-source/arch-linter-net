@@ -55,14 +55,16 @@ breaches. It does not fuzz a live repository.
   adoption. A maintained equivalent may replace SharpFuzz only with the same
   replay and containment guarantees.
 - Replay: the user-facing one-input command launches a worker under the same
-  100 ms/512 MiB envelope; the launcher uses a Windows Job Object, Linux
-  `prlimit --data`, or macOS `/bin/sh` plus the RSS watchdog, with tool versions
-  recorded alongside the candidate. The managed heap guard is the hex value
-  `0x20000000`.
-- Triage: raw campaign inputs stay on the ephemeral runner and are never placed
-  in public GitHub artifacts. Rerun in a restricted private environment,
-  minimize with the fuzzer tooling, commit only a public-safe minimized
-  reproduction, and add a deterministic NUnit regression before closing.
+  100 ms/512 MiB envelope; Windows uses a Job Object and Linux/macOS use the
+  pinned .NET runtime Docker image with `--memory=512m` and
+  `--memory-swap=512m`. If Docker is unavailable, replay fails closed. The
+  managed heap guard is the hex value `0x20000000`.
+- Triage: candidate files are encrypted with the repository's
+  `GIT_PARSER_FUZZ_TRIAGE_KEY` and retained for 14 days in an artifact; the
+  plaintext key and raw bytes are never published. Maintainers decrypt in a
+  restricted session, replay and minimize with the fuzzer tooling, commit
+  only a public-safe minimized reproduction, and add a deterministic NUnit
+  regression before closing.
 - Cadence: scheduled/manual campaign. Normal PR CI runs the deterministic
   regressions, not a long-running campaign. A bounded smoke run needs a
   separate decision backed by stable timing evidence.

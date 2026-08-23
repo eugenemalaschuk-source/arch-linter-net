@@ -94,22 +94,25 @@ public sealed class GitFuzzHarnessTests
         Assert.That(BoundedReplayRunner.WorkerStartMarker, Does.Contain("GO"));
         Assert.That(BoundedReplayRunner.ManagedHeapHardLimit, Is.EqualTo("0x20000000"));
         Assert.That(command.Arguments, Does.Contain("--replay-worker"));
-        Assert.That(command.Arguments, Does.Contain(Path.GetFullPath("synthetic.bin")));
-        Assert.That(dotnetCommand.Arguments, Does.Contain(typeof(Program).Assembly.Location));
+        if (OperatingSystem.IsWindows())
+        {
+            Assert.That(command.Arguments, Does.Contain(Path.GetFullPath("synthetic.bin")));
+            Assert.That(dotnetCommand.Arguments, Does.Contain(typeof(Program).Assembly.Location));
+        }
+        else
+        {
+            Assert.That(command.FileName, Is.EqualTo("docker"));
+            Assert.That(command.Arguments, Does.Contain("--memory=512m"));
+            Assert.That(command.Arguments, Does.Contain("--memory-swap=512m"));
+            Assert.That(command.Arguments, Does.Contain("--network"));
+            Assert.That(command.Arguments, Does.Contain(BoundedReplayRunner.ReplayContainerImage));
+            Assert.That(command.ContainerName, Does.StartWith("arch-linter-git-fuzz-"));
+            Assert.That(dotnetCommand.Arguments, Does.Contain("/harness/ArchLinterNet.GitFuzz.dll"));
+        }
         Assert.That(
             command.UsesWindowsJobObject,
             Is.EqualTo(OperatingSystem.IsWindows()),
-            "Windows uses a process-memory Job Object; Linux uses prlimit and macOS uses ulimit.");
-        if (OperatingSystem.IsLinux())
-        {
-            Assert.That(command.FileName, Is.EqualTo("prlimit"));
-            Assert.That(command.Arguments, Does.Contain("--data=536870912"));
-        }
-        else if (OperatingSystem.IsMacOS())
-        {
-            Assert.That(command.FileName, Is.EqualTo("/bin/sh"));
-            Assert.That(command.Arguments, Has.Some.Contains("exec \"$0\" \"$@\""));
-        }
+            "Windows uses a process-memory Job Object; Linux and macOS use a Docker cgroup.");
     }
 
     [Test]
@@ -140,6 +143,11 @@ public sealed class GitFuzzHarnessTests
     [Test]
     public void ReplayReportsLauncherSetupFailureAsTypedExitCode()
     {
+        if (!OperatingSystem.IsWindows() && !DockerIsUsable())
+        {
+            Assert.Ignore("The Unix launcher setup test requires a Docker daemon.");
+        }
+
         Assert.That(
             Program.RunMain(["--replay", "missing.bin"], "arch-linter-git-fuzz-missing-launcher"),
             Is.EqualTo(
@@ -151,9 +159,9 @@ public sealed class GitFuzzHarnessTests
     [Test, NonParallelizable]
     public void UserFacingReplayExecutesThroughTheBoundedWorker()
     {
-        if (OperatingSystem.IsLinux() && !CommandIsAvailable("prlimit"))
+        if (!OperatingSystem.IsWindows() && !DockerIsUsable())
         {
-            Assert.Ignore("The Unix bounded replay acceptance test requires prlimit.");
+            Assert.Ignore("The Unix bounded replay acceptance test requires a Docker daemon.");
         }
 
         string outputDirectory = Path.Combine(Path.GetTempPath(), $"arch-linter-git-fuzz-replay-{Guid.NewGuid():N}");
@@ -323,18 +331,18 @@ public sealed class GitFuzzHarnessTests
         Assert.That(Program.RunMain(["--unknown", "value"], "dotnet"), Is.EqualTo(2));
     }
 
-    private static bool CommandIsAvailable(string command)
+    private static bool DockerIsUsable()
     {
         try
         {
-            using Process process = Process.Start(new ProcessStartInfo(command, "--version")
+            using Process process = Process.Start(new ProcessStartInfo("docker", "info")
             {
                 UseShellExecute = false,
                 RedirectStandardOutput = true,
                 RedirectStandardError = true,
                 CreateNoWindow = true,
             })!;
-            return process.WaitForExit(2_000) && process.ExitCode == 0;
+            return process.WaitForExit(5_000) && process.ExitCode == 0;
         }
         catch (Win32Exception)
         {

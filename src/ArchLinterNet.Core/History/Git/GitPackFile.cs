@@ -6,7 +6,6 @@ namespace ArchLinterNet.Core.History.Git;
 // by pack offset because long delta chains otherwise re-inflate the same base once per link.
 internal sealed class GitPackFile : IDisposable
 {
-    private const int TypeCommit = 1;
     private const int TypeOffsetDelta = 6;
     private const int TypeReferenceDelta = 7;
     private const int BaseCacheCapacity = 256;

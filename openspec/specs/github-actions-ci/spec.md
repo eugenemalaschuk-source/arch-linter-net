@@ -344,9 +344,10 @@ campaign with no container network access, a 100 ms per-case timeout, and a
 512 MiB memory limit.
 
 The workflow SHALL not run from ordinary pull-request CI. It SHALL report the
-candidate crash/hang count in the workflow summary, SHALL NOT upload raw
-candidate inputs as ordinary GitHub Actions artifacts, and SHALL remove raw
-findings from the ephemeral runner after reporting.
+candidate crash/hang count in the workflow summary, SHALL encrypt candidate
+inputs with the repository `GIT_PARSER_FUZZ_TRIAGE_KEY` secret, SHALL retain
+only the encrypted bundle and integrity sidecar for 14 days, and SHALL remove
+raw findings from the ephemeral runner after upload.
 
 #### Scenario: Ordinary pull request validation
 - **WHEN** a pull request changes code or the fuzzing harness

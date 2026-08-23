@@ -17,8 +17,8 @@
 - [x] 3.2 Document local toolchain verification, replay, minimization, corpus ownership, artifact retention, and confirmed-finding promotion.
 - [x] 3.3 Smoke the fixed-limit workflow path with synthetic inputs and inspect the resulting containment behavior.
 - [x] 3.4 Make `--replay` launch a child under the 100 ms/512 MiB envelope and cover the launcher contract with an acceptance regression.
-- [x] 3.5 Set `AFL_HANG_TMOUT=100`, run the AFL++ container as the host UID/GID, and report/remove findings without uploading raw inputs.
-- [x] 3.6 Cover the hexadecimal managed-heap limit and the macOS child launcher/RSS watchdog in the acceptance contract.
+- [x] 3.5 Set `AFL_HANG_TMOUT=100`, run the AFL++ container as the host UID/GID, encrypt candidate findings for private triage, and remove raw inputs after upload.
+- [x] 3.6 Cover the hexadecimal managed-heap limit and the Unix Docker cgroup launcher in the acceptance contract.
 
 ## 4. Verification and lifecycle completion
 
