@@ -39,7 +39,10 @@ The repository SHALL version a public-safe synthetic seed corpus and provide
 deterministic materialization, single-input replay, and minimization commands.
 Committed seeds SHALL contain only authored format fragments or test-derived
 synthetic data and SHALL not contain private repository, adopter, path, secret,
-or credential data.
+or credential data. The AFL++ campaign SHALL set `AFL_HANG_TMOUT=100` and run
+the container as the host runner UID/GID so its 0700/0600 findings remain
+readable to the host cleanup step. Raw campaign crash/hang inputs SHALL remain
+ephemeral and SHALL NOT be uploaded as ordinary GitHub Actions artifacts.
 
 #### Scenario: Oversized replay input
 - **WHEN** a replay input is larger than 1 MiB
@@ -56,7 +59,8 @@ or credential data.
 
 - **WHEN** a maintainer invokes the documented `--replay <input-file>` command
 - **THEN** it starts a worker process with a hard 512 MiB process-memory
-  envelope (Windows Job Object or Unix `prlimit`), warms only the built-in
+  envelope (Windows Job Object, Linux `prlimit`, or macOS `ulimit -v`), sets
+  the managed heap guard to hex `0x20000000`, warms only the built-in
   public-safe corpus, and starts a 100 ms post-warm-up watchdog before the
   worker reads the candidate input
 

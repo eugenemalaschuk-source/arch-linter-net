@@ -22,8 +22,8 @@ as explicit reviewed contracts.
   and 32-byte SHA-256 modes.
 - Make the 1 MiB input cap, 100 ms case timeout, and 512 MiB process limit
   mechanically visible in replay and campaign commands.
-- Version only synthetic, reviewable seeds and make campaign artifacts
-  private-by-default and time-limited.
+- Version only synthetic, reviewable seeds; keep raw campaign findings
+  ephemeral and out of ordinary public GitHub Actions artifacts.
 
 **Non-Goals:**
 
@@ -55,10 +55,11 @@ digest length. It accepts only a bounded canonical parser result or
 AFL++ crash. Input acquisition stops after 1 MiB plus one byte, before the
 selected parser is invoked. The user-facing `--replay` mode launches a worker
 and enforces a 100 ms post-warm-up watchdog plus a 512 MiB process-memory
-limit through a Windows Job Object or Unix `prlimit`; the worker-only argument
-is not accepted without the launcher marker. This keeps deterministic replay
-outside SharpFuzz's out-of-process execution path without leaving triage
-uncontained.
+limit through a Windows Job Object, Linux `prlimit`, or macOS `ulimit -v`; the
+worker also receives the hexadecimal .NET `DOTNET_GCHeapHardLimit=0x20000000`.
+The worker-only argument is not accepted without the launcher marker. This
+keeps deterministic replay outside SharpFuzz's out-of-process execution path
+without leaving triage uncontained.
 
 This is preferred to fuzzing temporary Git directories because byte-array
 routes are faster, reproducible, and cannot accidentally use a developer's
@@ -75,8 +76,9 @@ The workflow publishes a self-contained `linux-x64` target so the AFL++ image
 does not need to contain an SDK or receive network access.
 
 The immutable digest is chosen over a mutable image tag. AFL++'s `-t 100`
-provides the per-case timeout, while Docker's `--memory=512m` is the campaign's
-memory envelope. The workflow uses `afl-fuzz -m none` because SharpFuzz's .NET
+provides the per-case timeout and `AFL_HANG_TMOUT=100` makes the hang retention
+threshold match it, while Docker's `--memory=512m` is the campaign's memory
+envelope. The workflow uses `afl-fuzz -m none` because SharpFuzz's .NET
 fork-server model reserves virtual address space above AFL++'s process-memory
 limit even when Docker still enforces the 512 MiB container cap. The campaign
 also has an explicit finite duration.
@@ -99,10 +101,13 @@ oversized input in both applicable digest modes.
 ### Scheduled/manual workflow with conservative artifact handling
 
 The new workflow has only `schedule` and `workflow_dispatch` triggers. It
-uploads findings only when present, with short retention, and documentation
-requires review for public safety before a minimized input is committed. The
-campaign runs with Docker networking disabled; ordinary PR CI retains only the
-deterministic NUnit regressions.
+passes the host runner UID/GID to the container so AFL++'s 0700/0600 findings
+remain readable, reports only the candidate count in the workflow summary, and
+removes raw findings from the ephemeral runner. It never uploads raw crash or
+hang inputs as ordinary GitHub Actions artifacts; triage reruns a pinned
+campaign in an access-controlled private environment. The campaign runs with
+Docker networking disabled; ordinary PR CI retains only the deterministic
+NUnit regressions.
 
 ## Risks / Trade-offs
 
@@ -113,8 +118,8 @@ deterministic NUnit regressions.
   AFL++ time/memory flags, finite duration, Docker memory/cpu limits, and a
   no-network container are all mandatory.
 - [An externally readable corpus leaks repository information] → committed
-  seeds are authored format fragments only; raw campaign outputs are retained
-  briefly and require review before promotion.
+  seeds are authored format fragments only; raw campaign outputs never enter
+  public workflow artifacts and are removed from the ephemeral runner.
 - [A friend assembly widens Core's effective API] → the exact friend and
   non-shipping project exclusion are recorded in the self-policy, with no
   exported Core member added.

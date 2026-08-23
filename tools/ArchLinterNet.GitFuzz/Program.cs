@@ -8,6 +8,9 @@ internal static class Program
     private const string ReplayWorkerArgument = "--replay-worker";
 
     private static int Main(string[] args)
+        => RunMain(args, Environment.ProcessPath);
+
+    internal static int RunMain(string[] args, string? processPath)
     {
         if (args.Length == 2 && args[0] == "--materialize-corpus")
         {
@@ -23,9 +26,10 @@ internal static class Program
         {
             try
             {
-                return BoundedReplayRunner.Run(args[1]);
+                return BoundedReplayRunner.Run(args[1], processPath);
             }
-            catch (InvalidOperationException exception)
+            catch (Exception exception) when (
+                exception is InvalidOperationException or PlatformNotSupportedException)
             {
                 Console.Error.WriteLine(exception.Message);
                 return BoundedReplayRunner.ReplayLimitSetupExitCode;

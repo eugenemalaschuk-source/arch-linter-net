@@ -1,3 +1,5 @@
+using System.ComponentModel;
+using System.Diagnostics;
 using ArchLinterNet.GitFuzz;
 using NUnit.Framework;
 
@@ -80,6 +82,8 @@ public sealed class GitFuzzHarnessTests
     public void BoundedReplayUsesTheRequiredWatchdogAndMemoryEnvelope()
     {
         BoundedReplayRunner.ReplayCommand command = BoundedReplayRunner.CreateCommand("synthetic.bin");
+        BoundedReplayRunner.ReplayCommand dotnetCommand =
+            BoundedReplayRunner.CreateCommand("synthetic.bin", "dotnet");
 
         Assert.That(BoundedReplayRunner.PerCaseTimeoutMilliseconds, Is.EqualTo(100));
         Assert.That(BoundedReplayRunner.WorkerStartupTimeoutMilliseconds, Is.EqualTo(5_000));
@@ -88,16 +92,266 @@ public sealed class GitFuzzHarnessTests
         Assert.That(BoundedReplayRunner.WorkerWarmupMarker, Does.Contain("WARMUP"));
         Assert.That(BoundedReplayRunner.WorkerCaseReadyMarker, Does.Contain("CASE_READY"));
         Assert.That(BoundedReplayRunner.WorkerStartMarker, Does.Contain("GO"));
+        Assert.That(BoundedReplayRunner.ManagedHeapHardLimit, Is.EqualTo("0x20000000"));
         Assert.That(command.Arguments, Does.Contain("--replay-worker"));
         Assert.That(command.Arguments, Does.Contain(Path.GetFullPath("synthetic.bin")));
+        Assert.That(dotnetCommand.Arguments, Does.Contain(typeof(Program).Assembly.Location));
         Assert.That(
             command.UsesWindowsJobObject,
             Is.EqualTo(OperatingSystem.IsWindows()),
-            "Windows uses a process-memory Job Object; Unix uses the prlimit launcher.");
-        if (!OperatingSystem.IsWindows())
+            "Windows uses a process-memory Job Object; Linux uses prlimit and macOS uses ulimit.");
+        if (OperatingSystem.IsLinux())
         {
             Assert.That(command.FileName, Is.EqualTo("prlimit"));
             Assert.That(command.Arguments, Does.Contain("--as=536870912"));
         }
+        else if (OperatingSystem.IsMacOS())
+        {
+            Assert.That(command.FileName, Is.EqualTo("/bin/sh"));
+            Assert.That(command.Arguments, Does.Contain("ulimit -v 524288"));
+        }
     }
+
+    [Test]
+    public void InvalidLauncherInputIsRejected()
+    {
+        Assert.Throws<ArgumentException>(
+            () => BoundedReplayRunner.CreateCommand(string.Empty, "dotnet"));
+    }
+
+    [Test]
+    public void MaterializeCommandReportsItsGeneratedInputs()
+    {
+        string outputDirectory = Path.Combine(Path.GetTempPath(), $"arch-linter-git-fuzz-materialize-{Guid.NewGuid():N}");
+        try
+        {
+            Assert.That(Program.RunMain(["--materialize-corpus", outputDirectory], "dotnet"), Is.Zero);
+            Assert.That(Directory.EnumerateFiles(outputDirectory, "*.bin"), Is.Not.Empty);
+        }
+        finally
+        {
+            if (Directory.Exists(outputDirectory))
+            {
+                Directory.Delete(outputDirectory, recursive: true);
+            }
+        }
+    }
+
+    [Test]
+    public void ReplayReportsLauncherSetupFailureAsTypedExitCode()
+    {
+        Assert.That(
+            Program.RunMain(["--replay", "missing.bin"], "arch-linter-git-fuzz-missing-launcher"),
+            Is.EqualTo(BoundedReplayRunner.ReplayLimitSetupExitCode));
+    }
+
+    [Test, NonParallelizable]
+    public void UserFacingReplayExecutesThroughTheBoundedWorker()
+    {
+        if (OperatingSystem.IsLinux() && !CommandIsAvailable("prlimit"))
+        {
+            Assert.Ignore("The Unix bounded replay acceptance test requires prlimit.");
+        }
+
+        string outputDirectory = Path.Combine(Path.GetTempPath(), $"arch-linter-git-fuzz-replay-{Guid.NewGuid():N}");
+        try
+        {
+            string inputPath = FuzzCorpus.Materialize(outputDirectory)
+                .Single(path => path.EndsWith("ofs-delta-copy-base.bin", StringComparison.Ordinal));
+
+            int exitCode = Program.RunMain(["--replay", inputPath], "dotnet");
+
+            Assert.That(exitCode, Is.Zero);
+        }
+        finally
+        {
+            if (Directory.Exists(outputDirectory))
+            {
+                Directory.Delete(outputDirectory, recursive: true);
+            }
+        }
+    }
+
+    [Test, NonParallelizable]
+    public void BoundedReplayFailsClosedWhenTheWorkerIsNotReady()
+    {
+        BoundedReplayRunner.ReplayCommand command = ShellCommand("echo NOT_READY");
+
+        Assert.That(BoundedReplayRunner.Run(command), Is.EqualTo(BoundedReplayRunner.ReplayTimedOutExitCode));
+    }
+
+    [Test, NonParallelizable]
+    public void BoundedReplayFailsClosedWhenWarmupDoesNotComplete()
+    {
+        BoundedReplayRunner.ReplayCommand command = ShellCommand("echo READY");
+
+        Assert.That(BoundedReplayRunner.Run(command), Is.EqualTo(BoundedReplayRunner.ReplayTimedOutExitCode));
+    }
+
+    [Test, NonParallelizable]
+    public void BoundedReplayForwardsWorkerStandardError()
+    {
+        string script = OperatingSystem.IsWindows()
+            ? $"echo {BoundedReplayRunner.WorkerReadyMarker}&echo {BoundedReplayRunner.WorkerCaseReadyMarker}&echo worker-error 1>&2"
+            : $"printf '{BoundedReplayRunner.WorkerReadyMarker}\\n{BoundedReplayRunner.WorkerCaseReadyMarker}\\n'; printf 'worker-error\\n' >&2";
+        BoundedReplayRunner.ReplayCommand command = ShellCommand(script);
+
+        Assert.That(BoundedReplayRunner.Run(command), Is.Zero);
+    }
+
+    [Test, NonParallelizable]
+    public void BoundedReplayKillsAWorkerThatExceedsTheCaseWatchdog()
+    {
+        string script = OperatingSystem.IsWindows()
+            ? "echo ARCHLINTERNET_GIT_FUZZ_REPLAY_READY&echo ARCHLINTERNET_GIT_FUZZ_REPLAY_CASE_READY&ping 127.0.0.1 -n 3 >NUL"
+            : "printf 'ARCHLINTERNET_GIT_FUZZ_REPLAY_READY\\nARCHLINTERNET_GIT_FUZZ_REPLAY_CASE_READY\\n'; sleep 1";
+        BoundedReplayRunner.ReplayCommand command = ShellCommand(script);
+
+        Assert.That(BoundedReplayRunner.Run(command), Is.EqualTo(BoundedReplayRunner.ReplayTimedOutExitCode));
+    }
+
+    [Test]
+    public void BoundedReplayReportsAnUnavailableLauncher()
+    {
+        BoundedReplayRunner.ReplayCommand command = new(
+            "arch-linter-git-fuzz-missing-launcher",
+            [],
+            UsesWindowsJobObject: false);
+
+        Assert.Throws<InvalidOperationException>(() => BoundedReplayRunner.Run(command));
+    }
+
+    [Test, NonParallelizable]
+    public void ReplayWorkerRequiresTheLauncherEnvironmentToken()
+    {
+        string? previous = Environment.GetEnvironmentVariable(BoundedReplayRunner.WorkerEnvironmentVariable);
+        try
+        {
+            Environment.SetEnvironmentVariable(BoundedReplayRunner.WorkerEnvironmentVariable, null);
+
+            Assert.That(Program.RunMain(["--replay-worker", "missing.bin"], "dotnet"), Is.EqualTo(2));
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable(BoundedReplayRunner.WorkerEnvironmentVariable, previous);
+        }
+    }
+
+    [Test, NonParallelizable]
+    public void ReplayWorkerRejectsAnIncorrectWarmupMarker()
+    {
+        string? previous = Environment.GetEnvironmentVariable(BoundedReplayRunner.WorkerEnvironmentVariable);
+        TextReader originalInput = Console.In;
+        try
+        {
+            Environment.SetEnvironmentVariable(BoundedReplayRunner.WorkerEnvironmentVariable, "1");
+            Console.SetIn(new StringReader("WRONG\n"));
+
+            Assert.That(Program.RunMain(["--replay-worker", "missing.bin"], "dotnet"), Is.EqualTo(2));
+        }
+        finally
+        {
+            Console.SetIn(originalInput);
+            Environment.SetEnvironmentVariable(BoundedReplayRunner.WorkerEnvironmentVariable, previous);
+        }
+    }
+
+    [Test, NonParallelizable]
+    public void ReplayWorkerRejectsAnIncorrectStartMarker()
+    {
+        string outputDirectory = Path.Combine(Path.GetTempPath(), $"arch-linter-git-fuzz-worker-marker-{Guid.NewGuid():N}");
+        string? previous = Environment.GetEnvironmentVariable(BoundedReplayRunner.WorkerEnvironmentVariable);
+        TextReader originalInput = Console.In;
+        try
+        {
+            string inputPath = FuzzCorpus.Materialize(outputDirectory)
+                .Single(path => path.EndsWith("ofs-delta-copy-base.bin", StringComparison.Ordinal));
+            Environment.SetEnvironmentVariable(BoundedReplayRunner.WorkerEnvironmentVariable, "1");
+            Console.SetIn(new StringReader(
+                $"{BoundedReplayRunner.WorkerWarmupMarker}{Environment.NewLine}WRONG{Environment.NewLine}"));
+
+            Assert.That(Program.RunMain(["--replay-worker", inputPath], "dotnet"), Is.EqualTo(2));
+        }
+        finally
+        {
+            Console.SetIn(originalInput);
+            Environment.SetEnvironmentVariable(BoundedReplayRunner.WorkerEnvironmentVariable, previous);
+            if (Directory.Exists(outputDirectory))
+            {
+                Directory.Delete(outputDirectory, recursive: true);
+            }
+        }
+    }
+
+    [Test, NonParallelizable]
+    public void ReplayWorkerCompletesTheWarmupAndCandidateHandshake()
+    {
+        string outputDirectory = Path.Combine(Path.GetTempPath(), $"arch-linter-git-fuzz-worker-{Guid.NewGuid():N}");
+        string? previous = Environment.GetEnvironmentVariable(BoundedReplayRunner.WorkerEnvironmentVariable);
+        TextReader originalInput = Console.In;
+        TextWriter originalOutput = Console.Out;
+        TextWriter originalError = Console.Error;
+        using StringWriter output = new();
+        using StringWriter error = new();
+        try
+        {
+            string inputPath = FuzzCorpus.Materialize(outputDirectory)
+                .Single(path => path.EndsWith("ofs-delta-copy-base.bin", StringComparison.Ordinal));
+            Environment.SetEnvironmentVariable(BoundedReplayRunner.WorkerEnvironmentVariable, "1");
+            Console.SetIn(new StringReader(
+                $"{BoundedReplayRunner.WorkerWarmupMarker}{Environment.NewLine}"
+                + $"{BoundedReplayRunner.WorkerStartMarker}{Environment.NewLine}"));
+            Console.SetOut(output);
+            Console.SetError(error);
+
+            int exitCode = Program.RunMain(["--replay-worker", inputPath], "dotnet");
+
+            Assert.That(exitCode, Is.Zero);
+            Assert.That(output.ToString(), Does.Contain(BoundedReplayRunner.WorkerReadyMarker));
+            Assert.That(output.ToString(), Does.Contain(BoundedReplayRunner.WorkerCaseReadyMarker));
+            Assert.That(output.ToString(), Does.Contain("Canonical"));
+            Assert.That(error.ToString(), Is.Empty);
+        }
+        finally
+        {
+            Console.SetIn(originalInput);
+            Console.SetOut(originalOutput);
+            Console.SetError(originalError);
+            Environment.SetEnvironmentVariable(BoundedReplayRunner.WorkerEnvironmentVariable, previous);
+            if (Directory.Exists(outputDirectory))
+            {
+                Directory.Delete(outputDirectory, recursive: true);
+            }
+        }
+    }
+
+    [Test]
+    public void ProgramUsageRejectsUnknownArguments()
+    {
+        Assert.That(Program.RunMain(["--unknown", "value"], "dotnet"), Is.EqualTo(2));
+    }
+
+    private static bool CommandIsAvailable(string command)
+    {
+        try
+        {
+            using Process process = Process.Start(new ProcessStartInfo(command, "--version")
+            {
+                UseShellExecute = false,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                CreateNoWindow = true,
+            })!;
+            return process.WaitForExit(2_000) && process.ExitCode == 0;
+        }
+        catch (Win32Exception)
+        {
+            return false;
+        }
+    }
+
+    private static BoundedReplayRunner.ReplayCommand ShellCommand(string script)
+        => OperatingSystem.IsWindows()
+            ? new("cmd.exe", ["/c", script], UsesWindowsJobObject: true)
+            : new("/bin/sh", ["-c", script], UsesWindowsJobObject: false);
 }

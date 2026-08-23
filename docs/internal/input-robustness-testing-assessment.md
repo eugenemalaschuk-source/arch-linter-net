@@ -45,6 +45,8 @@ breaches. It does not fuzz a live repository.
 - Input: one synthetic byte fixture capped at 1 MiB; no network or external
   repository access.
 - Per case: 100 ms timeout; campaign process memory cap: 512 MiB.
+- AFL++ hang retention: `AFL_HANG_TMOUT=100`, so the campaign records the same
+  100 ms candidate threshold that it enforces during execution.
 - Corpus: versioned, public-safe synthetic seeds under the future fuzz project;
   generated from test fixtures or format fragments only, never from an adopter
   or developer checkout.
@@ -53,11 +55,13 @@ breaches. It does not fuzz a live repository.
   adoption. A maintained equivalent may replace SharpFuzz only with the same
   replay and containment guarantees.
 - Replay: the user-facing one-input command launches a worker under the same
-  100 ms/512 MiB envelope; the launcher uses a Windows Job Object or Unix
-  `prlimit`, with tool versions recorded alongside the candidate.
-- Triage: preserve a failing input only in restricted CI artifacts while
-  reviewing it; minimize with the fuzzer tooling; commit only a public-safe
-  minimized reproduction; add a deterministic NUnit regression before closing.
+  100 ms/512 MiB envelope; the launcher uses a Windows Job Object, Linux
+  `prlimit`, or macOS `ulimit -v`, with tool versions recorded alongside the
+  candidate. The managed heap guard is the hex value `0x20000000`.
+- Triage: raw campaign inputs stay on the ephemeral runner and are never placed
+  in public GitHub artifacts. Rerun in a restricted private environment,
+  minimize with the fuzzer tooling, commit only a public-safe minimized
+  reproduction, and add a deterministic NUnit regression before closing.
 - Cadence: scheduled/manual campaign. Normal PR CI runs the deterministic
   regressions, not a long-running campaign. A bounded smoke run needs a
   separate decision backed by stable timing evidence.

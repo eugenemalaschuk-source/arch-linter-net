@@ -106,10 +106,13 @@ jobs:
           CORPUS_DIR="$RUNNER_TEMP/git-parser-fuzz-corpus"
           PUBLISH_DIR="$RUNNER_TEMP/git-parser-fuzz-harness"
           FINDINGS_DIR="$RUNNER_TEMP/git-parser-fuzz-findings"
+          RUNNER_UID="$(id -u)"
+          RUNNER_GID="$(id -g)"
           mkdir -p "$FINDINGS_DIR"
           chmod 700 "$FINDINGS_DIR"
           docker run --rm \
             --platform linux/amd64 \
+            --user "$RUNNER_UID:$RUNNER_GID" \
             --network none \
             --memory=512m \
             --cpus=1 \
@@ -126,6 +129,8 @@ jobs:
             --env AFL_NO_AFFINITY=1 \
             --env AFL_NO_UI=1 \
             --env AFL_I_DONT_CARE_ABOUT_MISSING_CRASHES=1 \
+            --env AFL_HANG_TMOUT=100 \
+            --env HOME=/tmp \
             --env PATH="/harness:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" \
             "$AFLPP_IMAGE" \
             afl-fuzz \
@@ -136,31 +141,41 @@ jobs:
               -V 300 \
               -- /harness/ArchLinterNet.GitFuzz
 
-      - name: Detect candidate crashes and hangs
+      - name: Report candidate crashes and hangs without publishing inputs
         id: findings
         shell: bash
+        if: always()
         run: |
           set -euo pipefail
           FINDINGS_DIR="$RUNNER_TEMP/git-parser-fuzz-findings"
-          candidates="$(find "$FINDINGS_DIR" -type f \( \
-            -path '*/crashes/id:*' -o \
-            -path '*/hangs/id:*' \
-          \) | wc -l)"
+          if [ -d "$FINDINGS_DIR" ]; then
+            candidates="$(find "$FINDINGS_DIR" -type f \( \
+              -path '*/crashes/id:*' -o \
+              -path '*/hangs/id:*' \
+            \) | wc -l)"
+          else
+            candidates=0
+          fi
           if [ "$candidates" -gt 0 ]; then
             echo "present=true" >> "$GITHUB_OUTPUT"
-            echo "Found $candidates candidate crash/hang artifact(s)."
+            echo "Found $candidates candidate crash/hang input(s); raw inputs stay on the ephemeral runner and are not uploaded."
+            {
+              echo "### Git parser fuzzing candidate report"
+              echo "- Candidate crash/hang inputs: $candidates"
+              echo "- Raw inputs: not uploaded; rerun the campaign in a private triage environment."
+            } >> "$GITHUB_STEP_SUMMARY"
           else
             echo "present=false" >> "$GITHUB_OUTPUT"
             echo "No candidate crash or hang artifacts were produced."
           fi
 
-      - name: Upload candidate crashes and hangs
-        if: steps.findings.outputs.present == 'true'
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        with:
-          name: git-parser-fuzzing-findings-${{ github.run_id }}
-          path: |
-            ${{ runner.temp }}/git-parser-fuzz-findings/default/crashes
-            ${{ runner.temp }}/git-parser-fuzz-findings/default/hangs
-          if-no-files-found: warn
-          retention-days: 7
+      - name: Remove ephemeral raw findings
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          FINDINGS_DIR="$RUNNER_TEMP/git-parser-fuzz-findings"
+          if [ -d "$FINDINGS_DIR" ]; then
+            chmod -R u+rwX "$FINDINGS_DIR"
+            rm -rf -- "$FINDINGS_DIR"
+          fi

@@ -17,12 +17,22 @@ internal static class BoundedReplayRunner
     internal const int PerCaseTimeoutMilliseconds = 100;
     internal const int WorkerStartupTimeoutMilliseconds = 5_000;
     internal const long ProcessMemoryLimitBytes = 512L * 1024 * 1024;
+    internal const string ManagedHeapHardLimit = "0x20000000";
+    private const long MacMemoryLimitKilobytes = ProcessMemoryLimitBytes / 1024;
+    private static readonly string MacMemoryLauncherScript =
+        "ulimit -v " + MacMemoryLimitKilobytes.ToString(CultureInfo.InvariantCulture)
+        + " || exit 125; exec \"$0\" \"$@\"";
     internal const int ReplayTimedOutExitCode = 124;
     internal const int ReplayLimitSetupExitCode = 125;
 
     internal static int Run(string inputPath)
+        => Run(inputPath, Environment.ProcessPath);
+
+    internal static int Run(string inputPath, string? processPath)
+        => Run(CreateCommand(inputPath, processPath));
+
+    internal static int Run(ReplayCommand command)
     {
-        ReplayCommand command = CreateCommand(inputPath);
         using Process process = Start(command);
         IDisposable memoryLimit;
         try
@@ -87,11 +97,16 @@ internal static class BoundedReplayRunner
     }
 
     internal static ReplayCommand CreateCommand(string inputPath)
+        => CreateCommand(inputPath, Environment.ProcessPath);
+
+    internal static ReplayCommand CreateCommand(string inputPath, string? processPath)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(inputPath);
 
-        string processPath = Environment.ProcessPath
-            ?? throw new InvalidOperationException("The bounded replay launcher has no process path.");
+        string resolvedProcessPath = processPath
+            ?? Environment.ProcessPath
+            ?? throw new InvalidOperationException(
+                "The bounded replay launcher has no process path.");
         string assemblyPath = typeof(Program).Assembly.Location;
         if (string.IsNullOrWhiteSpace(assemblyPath))
         {
@@ -99,7 +114,7 @@ internal static class BoundedReplayRunner
         }
 
         List<string> workerArguments = [];
-        if (IsDotNetHost(processPath))
+        if (IsDotNetHost(resolvedProcessPath))
         {
             workerArguments.Add(assemblyPath);
         }
@@ -109,17 +124,35 @@ internal static class BoundedReplayRunner
 
         if (OperatingSystem.IsWindows())
         {
-            return new ReplayCommand(processPath, workerArguments, UsesWindowsJobObject: true);
+            return new ReplayCommand(resolvedProcessPath, workerArguments, UsesWindowsJobObject: true);
         }
 
-        List<string> prlimitArguments =
-        [
-            $"--as={ProcessMemoryLimitBytes.ToString(CultureInfo.InvariantCulture)}",
-            "--",
-            processPath,
-            .. workerArguments,
-        ];
-        return new ReplayCommand("prlimit", prlimitArguments, UsesWindowsJobObject: false);
+        if (OperatingSystem.IsLinux())
+        {
+            List<string> prlimitArguments =
+            [
+                $"--as={ProcessMemoryLimitBytes.ToString(CultureInfo.InvariantCulture)}",
+                "--",
+                resolvedProcessPath,
+                .. workerArguments,
+            ];
+            return new ReplayCommand("prlimit", prlimitArguments, UsesWindowsJobObject: false);
+        }
+
+        if (OperatingSystem.IsMacOS())
+        {
+            string[] shellArguments =
+            [
+                "-c",
+                MacMemoryLauncherScript,
+                resolvedProcessPath,
+                .. workerArguments,
+            ];
+            return new ReplayCommand("/bin/sh", shellArguments, UsesWindowsJobObject: false);
+        }
+
+        throw new PlatformNotSupportedException(
+            "Bounded replay supports Windows, Linux, and macOS hosts only.");
     }
 
     private static Process Start(ReplayCommand command)
@@ -138,8 +171,7 @@ internal static class BoundedReplayRunner
         }
 
         startInfo.Environment[WorkerEnvironmentVariable] = "1";
-        startInfo.Environment["DOTNET_GCHeapHardLimit"] =
-            ProcessMemoryLimitBytes.ToString(CultureInfo.InvariantCulture);
+        startInfo.Environment["DOTNET_GCHeapHardLimit"] = ManagedHeapHardLimit;
 
         try
         {

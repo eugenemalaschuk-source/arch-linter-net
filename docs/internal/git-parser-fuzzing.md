@@ -35,13 +35,15 @@ The workflow and local investigations use the following fixed values:
 | Input cap | 1 MiB, rejected before parser dispatch |
 | Per-case timeout | 100 ms (`afl-fuzz -t 100`) |
 | Process/container memory | 512 MiB Docker cgroup cap (`--memory=512m`); AFL virtual-memory cap disabled with `-m none` for the .NET/SharpFuzz target |
-| Replay memory/timeout | `--replay` launches a worker with a 100 ms post-warm-up watchdog and a hard 512 MiB process envelope (Windows Job Object or Unix `prlimit`) |
+| Replay memory/timeout | `--replay` launches a worker with a 100 ms post-warm-up watchdog and a hard 512 MiB process envelope (Windows Job Object, Linux `prlimit`, or macOS `ulimit -v`) |
 | CPU | One CPU (`docker --cpus=1`) |
 | Campaign duration | 300 seconds (`afl-fuzz -V 300`) |
-| Network and filesystem | `--network none`, read-only root, only the findings mount writable |
+| Network and filesystem | `--network none`, read-only root, only the findings mount writable; the container runs as the host runner UID/GID |
 | AFL++ managed-target check | `AFL_SKIP_BIN_CHECK=1`, because SharpFuzz instruments the managed DLL while AFL++ validates the native apphost |
+| AFL++ hang threshold | `AFL_HANG_TMOUT=100`, so a 100 ms stall is retained as a candidate instead of waiting for AFL++'s default minimum hang timeout |
 | SharpFuzz child launcher | Harness-local `dotnet` wrapper that maps the harness `.dll` child command to its self-contained apphost |
-| Candidate retention | 7 days, only when a crash or hang exists |
+| Managed heap guard | `DOTNET_GCHeapHardLimit=0x20000000` (hex, 512 MiB) in the replay worker |
+| Candidate retention | Ephemeral runner only; raw crash/hang inputs are never uploaded as public GitHub artifacts |
 
 The scheduled workflow is intentionally separate from pull-request validation.
 It has only `schedule` and `workflow_dispatch` triggers. A normal PR must run
@@ -121,13 +123,16 @@ operations in order:
 1. restores and materializes the synthetic corpus;
 1. publishes the harness self-contained for `linux-x64`;
 1. instruments the published `ArchLinterNet.Core.dll` with SharpFuzz 2.3.0;
-1. runs the pinned AFL++ image with `-t 100 -m none -V 300` inside the Docker
-   512 MiB memory envelope; and
-1. checks for candidate files before attempting an upload.
+1. runs the pinned AFL++ image with `-t 100 -m none -V 300` and
+    `AFL_HANG_TMOUT=100` inside the Docker 512 MiB memory envelope as the host
+    runner UID/GID; and
+1. reports only a candidate count in the workflow summary, then removes the
+    raw findings from the ephemeral runner.
 
 The container mounts the corpus and published harness read-only. It mounts
-only the temporary findings directory read-write, uses `--network none`, one
-CPU, a 512 MiB memory envelope, a read-only root filesystem, and temporary
+only the temporary findings directory read-write, runs as the host runner UID/GID
+so AFL++'s 0700/0600 outputs remain readable to the host step, uses
+`--network none`, one CPU, a 512 MiB memory envelope, a read-only root filesystem, and temporary
 filesystems for runtime scratch space. It instruments `ArchLinterNet.Core.dll`,
 not the thin harness assembly, because the parser code under test lives in
 Core. It sets `AFL_SKIP_BIN_CHECK=1` for the SharpFuzz-managed target: the
@@ -144,16 +149,20 @@ without installing a runtime or allowing network access in the campaign
 container. The AFL++ output directory is not a general build or repository
 workspace.
 
-When candidates exist, the workflow uploads only AFL++ crash and hang files
-from `default/crashes` and `default/hangs`. The artifact is private to the
-workflow's repository permissions and expires after seven days. A run with no
-candidate crash or hang produces no findings artifact.
+When candidates exist, the workflow writes only the count and a no-upload
+notice to the job summary. Raw AFL++ crash/hang inputs remain on the ephemeral
+runner and are deleted in an `always()` cleanup step; they are never placed in
+ordinary GitHub Actions artifacts, which are readable to users with access to a
+public repository. A run with no candidate crash or hang reports zero and also
+produces no findings artifact.
 
 ## Minimize and triage a candidate
 
 Every crash, hang, timeout, resource-limit breach, and unexpected successful
-parse is a candidate finding. Treat the artifact as untrusted input and keep it
-in a private scratch directory during triage.
+parse is a candidate finding. The scheduled workflow does not expose raw
+inputs; rerun the pinned campaign in an access-controlled private scratch
+environment to obtain and triage a candidate. Treat every candidate as
+untrusted input.
 
 For each candidate:
 
@@ -164,8 +173,8 @@ For each candidate:
    100 ms/512 MiB limits. Confirm whether the behavior is deterministic.
 
 1. Minimize it with `afl-tmin` from the same pinned AFL++ image, with the same
-   no-network, one-CPU, read-only-root, Docker 512 MiB memory envelope, `-t 100`,
-   and `-m none` .NET virtual-memory handling. For a file mounted at
+    no-network, one-CPU, read-only-root, Docker 512 MiB memory envelope, `-t 100`,
+    `AFL_HANG_TMOUT=100`, and `-m none` .NET virtual-memory handling. For a file mounted at
    `/findings/default/crashes/id:...`, the target shape is:
 
    ```bash
@@ -197,7 +206,7 @@ content, adopter data, credentials, secrets, machine-specific paths, or any
 other non-synthetic material.
 
 Generated binary materializations, AFL++ queues, and candidate artifacts do
-not belong in source control. Candidate artifacts are retained for seven days
-only to support replay, minimization, and review. After triage, delete local
-copies that are no longer needed and do not mirror the temporary workflow
-artifact into another long-lived location.
+not belong in source control. Workflow candidates exist only on the ephemeral
+runner until cleanup. Private triage copies must be deleted after replay,
+minimization, and review; never mirror raw findings into a public artifact or
+another long-lived location.
