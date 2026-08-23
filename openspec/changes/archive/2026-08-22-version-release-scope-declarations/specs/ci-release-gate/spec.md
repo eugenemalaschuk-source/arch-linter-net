@@ -1,0 +1,55 @@
+## MODIFIED Requirements
+
+### Requirement: Release pipeline publishes validated immutable candidates
+The manual release workflow SHALL calculate version, build final metadata, pack
+and manifest the complete paired primary-package and symbol-package candidate
+set once, validate the downloaded candidate set through Checkpoint B, select
+the release-scope declaration from that candidate's immutable manifest version,
+attest the exact frozen package and outer release-evidence subject inventories,
+and independently verify every resulting GitHub build-provenance attestation
+before it publishes or attaches only the same manifest-selected digest-verified
+subjects. The release-scope step SHALL not select a declaration from a
+caller-provided path, mutable global declaration, milestone membership, or
+issue-text inference, and `publish=true` SHALL not bypass selection or its
+evidence validation.
+
+Any manifest-verification step that uses Bash environment-variable syntax SHALL
+declare Bash explicitly, including Windows matrix jobs. The workflow SHALL use
+exactly one primary-package NuGet push per pair, verify the adjacent
+manifest-selected symbol package before the push, and SHALL fail closed when a
+primary package already exists; it SHALL NOT use duplicate-success behavior
+that can complete while its paired symbol package is absent. It SHALL install
+the pinned OpenSpec CLI and run `openspec validate --all --strict` before
+evidence aggregation. The attestation-producing job SHALL use an immutable
+action commit pin and job-scoped `contents: read`, `id-token: write`, and
+`attestations: write` permissions; no unrelated job SHALL receive those
+attestation write permissions.
+
+#### Scenario: Strict OpenSpec validation fails
+- **WHEN** the strict OpenSpec gate fails or its pinned executable is unavailable
+- **THEN** evidence aggregation and publication do not run
+
+#### Scenario: Candidate target does not resolve a declaration
+- **WHEN** the immutable candidate version has no single valid reviewed
+  release-scope declaration
+- **THEN** Checkpoint B evidence aggregation fails before provenance or
+  publication regardless of the `publish` input
+
+#### Scenario: Publication selects an unexpected package file
+- **WHEN** the publication or GitHub Release attachment path selects a package
+  or symbol file outside the verified manifest inventory
+- **THEN** the workflow fails before publication or attachment
+
+#### Scenario: Windows verifies the downloaded candidate
+- **WHEN** a Windows Checkpoint B matrix job verifies its candidate manifest
+- **THEN** the step uses Bash and passes the candidate version and source commit
+  to the verifier without PowerShell interpolation
+
+#### Scenario: A partial publish is retried
+- **WHEN** a primary package already exists but its paired symbol package may be absent
+- **THEN** the NuGet push step fails and does not report the release as successfully published
+
+#### Scenario: Attestation cannot be verified independently
+- **WHEN** any expected package or release-evidence subject has no valid
+  repository-, workflow-, and source-commit-bound attestation
+- **THEN** NuGet publication and GitHub Release attachment do not run

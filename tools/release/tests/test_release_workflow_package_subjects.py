@@ -42,6 +42,17 @@ def test_manifest_verification_uses_bash_on_windows_and_release_matrices() -> No
     assert ci_workflow.count("- name: Verify immutable candidate\n        shell: bash") == 2
 
 
+def test_release_scope_resolution_uses_the_verified_immutable_candidate() -> None:
+    workflow = _workflow()
+
+    assert "- name: Resolve authoritative release scope" in workflow
+    assert "create_release_scope_evidence.py --source-commit \"$GITHUB_SHA\" --repository \"$GITHUB_REPOSITORY\"" in workflow
+    assert "--scope-dir" not in workflow
+    assert workflow.index("- name: Verify immutable candidate manifest") < workflow.index(
+        "- name: Resolve authoritative release scope"
+    ) < workflow.index("- name: Generate deterministic release evidence")
+
+
 def test_github_release_attachment_uses_manifest_selected_subjects_without_globs() -> None:
     workflow = _workflow()
 

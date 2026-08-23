@@ -1,0 +1,24 @@
+{
+  "schema": "checkpoint-b-release-scope-declaration/v2",
+  "declaration_id": "v0.7.0-release-architecture-forensics",
+  "release_target": "0.7.0",
+  "story": 613,
+  "_comment": [
+    "The reviewed v0.7.0 release authority owned by #613. Required and excluded items are",
+    "reviewed release intent; they are not inferred from milestone membership or mutable issue text.",
+    "#614 is required because actual release-scope authorization occurs after this plumbing task closes."
+  ],
+  "required_items": [
+    { "issue": 234, "finding": "forensics", "summary": "Deliver release architecture forensics" },
+    { "issue": 116, "finding": "drift-control", "summary": "Deliver AI-first architecture drift control" },
+    { "issue": 269, "finding": "provenance", "summary": "Complete pre-publication provenance and integrity authority" },
+    { "issue": 267, "finding": "robustness", "summary": "Record the fuzzing and robustness assessment decision" },
+    { "issue": 614, "finding": "release-scope", "summary": "Bind versioned release-scope declarations to the immutable candidate" }
+  ],
+  "excluded_items": [
+    { "issue": 287, "reason": "OpenSSF Metal-series passing self-assessment is manual/external trust housekeeping and is non-blocking by #613 design." }
+  ],
+  "delivered_items": [
+    { "issue": 222, "reason": "Architecture policy badge is completed release context and is not an open v0.7 publication blocker." }
+  ]
+}
