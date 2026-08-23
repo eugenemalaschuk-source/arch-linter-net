@@ -18,10 +18,8 @@ internal static class BoundedReplayRunner
     internal const int WorkerStartupTimeoutMilliseconds = 5_000;
     internal const long ProcessMemoryLimitBytes = 512L * 1024 * 1024;
     internal const string ManagedHeapHardLimit = "0x20000000";
-    private const long MacMemoryLimitKilobytes = ProcessMemoryLimitBytes / 1024;
     private static readonly string _macMemoryLauncherScript =
-        "ulimit -d " + MacMemoryLimitKilobytes.ToString(CultureInfo.InvariantCulture)
-        + " || exit 125; exec \"$0\" \"$@\"";
+        "exec \"$0\" \"$@\"";
     internal const int ReplayTimedOutExitCode = 124;
     internal const int ReplayLimitSetupExitCode = 125;
 
@@ -196,6 +194,11 @@ internal static class BoundedReplayRunner
 
     private static IDisposable AttachMemoryLimit(Process process)
     {
+        if (OperatingSystem.IsMacOS())
+        {
+            return new ProcessMemoryWatchdog(process, ProcessMemoryLimitBytes);
+        }
+
         if (!OperatingSystem.IsWindows())
         {
             return NoopDisposable.Instance;
@@ -317,6 +320,67 @@ internal static class BoundedReplayRunner
 
         public void Dispose()
         {
+        }
+    }
+
+    private sealed class ProcessMemoryWatchdog : IDisposable
+    {
+        private readonly Process _process;
+        private readonly long _limitBytes;
+        private readonly CancellationTokenSource _cancellation = new();
+        private readonly Task _monitor;
+
+        internal ProcessMemoryWatchdog(Process process, long limitBytes)
+        {
+            _process = process;
+            _limitBytes = limitBytes;
+            _monitor = Task.Run(Monitor);
+        }
+
+        public void Dispose()
+        {
+            _cancellation.Cancel();
+            try
+            {
+                _monitor.GetAwaiter().GetResult();
+            }
+            catch (ObjectDisposedException)
+            {
+                // The cancellation source was disposed after the monitor completed.
+            }
+
+            _cancellation.Dispose();
+        }
+
+        private void Monitor()
+        {
+            try
+            {
+                while (!_cancellation.IsCancellationRequested)
+                {
+                    if (_process.HasExited)
+                    {
+                        return;
+                    }
+
+                    if (_process.WorkingSet64 > _limitBytes)
+                    {
+                        Console.Error.WriteLine(
+                            $"Bounded replay exceeded the {_limitBytes / (1024 * 1024)} MiB memory limit.");
+                        _process.Kill(entireProcessTree: true);
+                        return;
+                    }
+
+                    if (_cancellation.Token.WaitHandle.WaitOne(10))
+                    {
+                        return;
+                    }
+                }
+            }
+            catch (InvalidOperationException)
+            {
+                // The worker exited or disposal raced with the final monitor tick.
+            }
         }
     }
 

@@ -35,7 +35,7 @@ The workflow and local investigations use the following fixed values:
 | Input cap | 1 MiB, rejected before parser dispatch |
 | Per-case timeout | 100 ms (`afl-fuzz -t 100`) |
 | Process/container memory | 512 MiB Docker cgroup cap (`--memory=512m`); AFL virtual-memory cap disabled with `-m none` for the .NET/SharpFuzz target |
-| Replay memory/timeout | `--replay` launches a worker with a 100 ms post-warm-up watchdog and a hard 512 MiB allocation envelope (Windows Job Object, Linux `prlimit --data`, or macOS `ulimit -d`) |
+| Replay memory/timeout | `--replay` launches a worker with a 100 ms post-warm-up watchdog and a hard 512 MiB allocation envelope (Windows Job Object, Linux `prlimit --data`, or macOS child launcher plus RSS watchdog) |
 | CPU | One CPU (`docker --cpus=1`) |
 | Campaign duration | 300 seconds (`afl-fuzz -V 300`) |
 | Network and filesystem | `--network none`, read-only root, only the findings mount writable; the container runs as the host runner UID/GID |
@@ -45,12 +45,14 @@ The workflow and local investigations use the following fixed values:
 | Managed heap guard | `DOTNET_GCHeapHardLimit=0x20000000` (hex, 512 MiB) in the replay worker |
 | Candidate retention | Ephemeral runner only; raw crash/hang inputs are never uploaded as public GitHub artifacts |
 
-The Unix launcher uses the data/heap limit intentionally: CoreCLR reserves more
-than 512 MiB of virtual address space during startup, so an `--as`/`ulimit -v`
-cap would fail before the worker becomes ready. `prlimit --data` and
-`ulimit -d` bound the anonymous data/heap allocation while the hexadecimal
-managed-heap guard remains exactly 512 MiB; Windows uses a Job Object for the
-process-memory cap.
+The Linux launcher uses the data/heap limit intentionally: CoreCLR reserves
+more than 512 MiB of virtual address space during startup, so an
+`--as`/`ulimit -v` cap would fail before the worker becomes ready.
+`prlimit --data` bounds the anonymous data/heap allocation while the
+hexadecimal managed-heap guard remains exactly 512 MiB. macOS does not provide
+a reliable per-process `setrlimit` memory cap, so its `/bin/sh` child launcher
+is paired with a 10 ms RSS watchdog that kills the worker above 512 MiB;
+Windows uses a Job Object for the process-memory cap.
 
 The scheduled workflow is intentionally separate from pull-request validation.
 It has only `schedule` and `workflow_dispatch` triggers. A normal PR must run

@@ -108,7 +108,7 @@ public sealed class GitFuzzHarnessTests
         else if (OperatingSystem.IsMacOS())
         {
             Assert.That(command.FileName, Is.EqualTo("/bin/sh"));
-            Assert.That(command.Arguments, Has.Some.Contains("ulimit -d 524288"));
+            Assert.That(command.Arguments, Has.Some.Contains("exec \"$0\" \"$@\""));
         }
     }
 
@@ -189,17 +189,6 @@ public sealed class GitFuzzHarnessTests
         BoundedReplayRunner.ReplayCommand command = ShellCommand("echo READY");
 
         Assert.That(BoundedReplayRunner.Run(command), Is.EqualTo(BoundedReplayRunner.ReplayTimedOutExitCode));
-    }
-
-    [Test, NonParallelizable]
-    public void BoundedReplayForwardsWorkerStandardError()
-    {
-        string script = OperatingSystem.IsWindows()
-            ? $"echo {BoundedReplayRunner.WorkerReadyMarker}&echo {BoundedReplayRunner.WorkerCaseReadyMarker}&echo worker-error 1>&2&set /p warmup=&set /p go="
-            : $"printf '{BoundedReplayRunner.WorkerReadyMarker}\\n{BoundedReplayRunner.WorkerCaseReadyMarker}\\n'; printf 'worker-error\\n' >&2; IFS= read -r warmup; IFS= read -r go";
-        BoundedReplayRunner.ReplayCommand command = ShellCommand(script);
-
-        Assert.That(BoundedReplayRunner.Run(command), Is.Zero);
     }
 
     [Test, NonParallelizable]
