@@ -193,6 +193,8 @@ These checks are intentionally fail-closed:
 - Removing an asset or adding one not named by the verified manifest makes the
   filename-set diff fail before hashing or attestation; do not substitute a
   similarly named file.
+- If the NuGet output directory contains zero or more than one `.nupkg`, package
+  discovery fails closed before identity or signature checks.
 - Downloading from a source other than NuGet.org, or changing the downloaded
   package's embedded ID/version, makes the source or `.nuspec` identity check
   fail before signature verification.
@@ -249,6 +251,10 @@ verification command. Then verify the downloaded primary package with NuGet's
 supported signature tooling. Downloading through the pinned source is part of
 the check; do not substitute a package obtained from an unrecorded URL:
 
+This path requires the .NET 10.0.2xx SDK or later because `dotnet package download` is available starting with that SDK line. See the [dotnet package
+download command](https://learn.microsoft.com/dotnet/core/tools/dotnet-package-download)
+for the supported SDK and command options.
+
 ```bash
 export PACKAGE_ID=ArchLinterNet.Core
 export PACKAGE_VERSION='<version>'
@@ -260,11 +266,15 @@ dotnet package download "$PACKAGE_ID@$PACKAGE_VERSION" \
   --prerelease \
   --output ./nuget-package
 
-export PACKAGE_FILE="./nuget-package/$PACKAGE_ID.$PACKAGE_VERSION.nupkg"
-if [ ! -f "$PACKAGE_FILE" ]; then
-  echo "NuGet did not produce the expected package path: $PACKAGE_FILE" >&2
+mapfile -d '' -t downloaded_packages < <(
+  find ./nuget-package -type f -name '*.nupkg' -print0
+)
+if [ "${#downloaded_packages[@]}" -ne 1 ]; then
+  printf 'Expected exactly one downloaded .nupkg, found %s.\n' \
+    "${#downloaded_packages[@]}" >&2
   exit 1
 fi
+export PACKAGE_FILE="${downloaded_packages[0]}"
 
 python3 - "$PACKAGE_FILE" "$PACKAGE_ID" "$PACKAGE_VERSION" <<'PY'
 from __future__ import annotations

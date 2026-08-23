@@ -50,10 +50,18 @@ def test_guide_documents_fail_closed_tamper_and_nuget_repository_boundaries() ->
     assert 'allowUntrustedRoot="false"' in guide
     assert 'dotnet package download "$PACKAGE_ID@$PACKAGE_VERSION"' in guide
     assert '--source "$NUGET_SOURCE"' in guide
-    assert 'export PACKAGE_FILE="./nuget-package/$PACKAGE_ID.$PACKAGE_VERSION.nupkg"' in guide
+    assert ".NET 10.0.2xx SDK or later" in guide
+    assert "https://learn.microsoft.com/dotnet/core/tools/dotnet-package-download" in guide
+    assert "mapfile -d '' -t downloaded_packages" in guide
+    assert "find ./nuget-package -type f -name '*.nupkg' -print0" in guide
+    assert 'export PACKAGE_FILE="${downloaded_packages[0]}"' in guide
+    assert 'export PACKAGE_FILE="./nuget-package/$PACKAGE_ID.$PACKAGE_VERSION.nupkg"' not in guide
     assert "Expected exactly one .nuspec" in guide
     assert "Package identity mismatch" in guide
     assert 'dotnet nuget verify "$PACKAGE_FILE"' in guide
+    assert guide.index('dotnet package download "$PACKAGE_ID@$PACKAGE_VERSION"') < guide.index(
+        "find ./nuget-package -type f -name '*.nupkg' -print0"
+    ) < guide.index('dotnet nuget verify "$PACKAGE_FILE"')
     assert guide.index("cat > nuget.config") < guide.index("dotnet nuget trust source nuget.org") < guide.index(
         "dotnet nuget verify"
     )
