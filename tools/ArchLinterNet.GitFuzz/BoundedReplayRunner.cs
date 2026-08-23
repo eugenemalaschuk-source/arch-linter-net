@@ -211,6 +211,17 @@ internal static partial class BoundedReplayRunner
             "--read-only",
             "--tmpfs",
             $"{ContainerScratchDirectory}:rw,nosuid,nodev,noexec,size=128m",
+            // GitFuzz itself is excluded from coverage instrumentation (see
+            // TEST_COVERAGE_COLLECTOR_EXCLUDE in make/test.mk), but ArchLinterNet.Core is a
+            // runtime dependency copied alongside it into /harness, and Core IS legitimately
+            // instrumented under the coverage-collecting CI job. .NET's named Mutex/Semaphore
+            // support creates its lock files under a fixed, TMPDIR-independent path so
+            // unrelated processes can rendezvous on the same name; Coverlet's tracker opens
+            // one of these on module unload for whichever instrumented assembly is loaded.
+            // This stays writable purely for that runtime requirement — the application
+            // itself never reads or writes here (see ContainerScratchDirectory/TMPDIR above).
+            "--tmpfs",
+            "/tmp:rw,nosuid,nodev,noexec,size=16m",
             "--mount",
             $"type=bind,src={assemblyDirectory},dst=/harness,readonly",
             "--mount",
