@@ -10,18 +10,28 @@ _GUIDE = _ROOT / "docs" / "guides" / "release-provenance-verification.md"
 def test_guide_verifies_outer_evidence_before_package_subjects() -> None:
     guide = _GUIDE.read_text(encoding="utf-8")
 
+    release_download = guide.index("gh release download")
+    release_source = guide.index('gh api "repos/$REPOSITORY/commits/$RELEASE_TAG"')
+    rehearsal_download = guide.index('gh run download "$RUN_ID"')
+    rehearsal_source = guide.index('gh run view "$RUN_ID"')
     manifest_verification = guide.index("gh attestation verify package-manifest.json")
     checksum_verification = guide.index("gh attestation verify package-checksums.txt")
     package_set_verification = guide.index("diff -u expected-package-subjects.txt actual-package-subjects.txt")
     package_hash_verification = guide.index("sha256sum --check expected-package-subjects.sha256")
     package_attestation = guide.index("Verify every package and symbol attestation")
 
+    assert release_download < release_source < manifest_verification
+    assert rehearsal_download < rehearsal_source < manifest_verification
     assert manifest_verification < checksum_verification < package_set_verification < package_hash_verification < package_attestation
     assert "while IFS= read -r subject" in guide
     assert ".package.file, .symbols.file" in guide
     assert "for asset in ./*.nupkg ./*.snupkg" in guide
     assert "actual-package-subjects.txt" in guide
     assert "Package/symbol release assets do not match the verified manifest." in guide
+    assert "--pattern '*.nupkg'" in guide
+    assert "--pattern '*.snupkg'" in guide
+    assert '--name "nuget-candidate-$CANDIDATE_VERSION"' in guide
+    assert '--json headSha' in guide
 
 
 def test_guide_documents_fail_closed_tamper_and_nuget_repository_boundaries() -> None:
@@ -38,6 +48,12 @@ def test_guide_documents_fail_closed_tamper_and_nuget_repository_boundaries() ->
     assert "`serviceIndex` is\n`https://api.nuget.org/v3/index.json`" in guide
     assert 'hashAlgorithm="SHA256"' in guide
     assert 'allowUntrustedRoot="false"' in guide
+    assert 'dotnet package download "$PACKAGE_ID@$PACKAGE_VERSION"' in guide
+    assert '--source "$NUGET_SOURCE"' in guide
+    assert 'export PACKAGE_FILE="./nuget-package/$PACKAGE_ID.$PACKAGE_VERSION.nupkg"' in guide
+    assert "Expected exactly one .nuspec" in guide
+    assert "Package identity mismatch" in guide
+    assert 'dotnet nuget verify "$PACKAGE_FILE"' in guide
     assert guide.index("cat > nuget.config") < guide.index("dotnet nuget trust source nuget.org") < guide.index(
         "dotnet nuget verify"
     )

@@ -25,19 +25,67 @@ outer evidence subjects.
 
 ## Verify GitHub Release or rehearsal assets
 
-Install a current [GitHub CLI](https://cli.github.com/) and download all of the
-following into one empty directory: `package-manifest.json`,
-`package-checksums.txt`, and every `.nupkg` and `.snupkg` attached to the same
-GitHub Release or release-rehearsal candidate artifact. Do not mix assets from
-different runs, versions, or commits.
-
-Set the release identity from the GitHub Release tag/commit or rehearsal run:
+Install a current [GitHub CLI](https://cli.github.com/), `jq`, and work in one
+empty directory. Use exactly one of the following acquisition paths. Each path
+downloads `package-manifest.json`, `package-checksums.txt`, and every
+`.nupkg`/`.snupkg` for one release or rehearsal, and sets `SOURCE_COMMIT` from
+the selected GitHub object. Do not mix assets from different runs, versions,
+or commits.
 
 ```bash
 export REPOSITORY=eugenemalaschuk-source/arch-linter-net
 export WORKFLOW="$REPOSITORY/.github/workflows/release-nuget.yml"
-export SOURCE_COMMIT=<40-or-64-character-release-source-commit>
 ```
+
+### Obtain a GitHub Release
+
+Use the exact release tag shown on the GitHub Release page. The API lookup
+resolves that tag to the commit whose SHA is recorded in the candidate manifest:
+
+```bash
+export RELEASE_TAG='<release-tag>'
+
+gh release download "$RELEASE_TAG" \
+  --repo "$REPOSITORY" \
+  --dir . \
+  --pattern 'package-manifest.json' \
+  --pattern 'package-checksums.txt' \
+  --pattern '*.nupkg' \
+  --pattern '*.snupkg'
+
+export SOURCE_COMMIT="$(gh api "repos/$REPOSITORY/commits/$RELEASE_TAG" --jq '.sha')"
+if [ -z "$SOURCE_COMMIT" ] || [ "$SOURCE_COMMIT" = "null" ]; then
+  echo "Could not resolve the release tag to a source commit." >&2
+  exit 1
+fi
+```
+
+### Obtain a release-rehearsal candidate
+
+Use the workflow run ID and candidate version from the rehearsal run. The
+artifact name is the one used by `release-nuget.yml`:
+
+```bash
+export RUN_ID='<rehearsal-run-id>'
+export CANDIDATE_VERSION='<candidate-version>'
+
+gh run download "$RUN_ID" \
+  --repo "$REPOSITORY" \
+  --name "nuget-candidate-$CANDIDATE_VERSION" \
+  --dir .
+
+export SOURCE_COMMIT="$(gh run view "$RUN_ID" \
+  --repo "$REPOSITORY" \
+  --json headSha \
+  --jq '.headSha')"
+if [ -z "$SOURCE_COMMIT" ] || [ "$SOURCE_COMMIT" = "null" ]; then
+  echo "Could not resolve the rehearsal run head SHA." >&2
+  exit 1
+fi
+```
+
+The two acquisition blocks are alternatives: run only the block matching the
+artifact being verified, then continue with the common trust-order steps below.
 
 ### 1. Authenticate evidence before using it
 
@@ -145,6 +193,9 @@ These checks are intentionally fail-closed:
 - Removing an asset or adding one not named by the verified manifest makes the
   filename-set diff fail before hashing or attestation; do not substitute a
   similarly named file.
+- Downloading from a source other than NuGet.org, or changing the downloaded
+  package's embedded ID/version, makes the source or `.nuspec` identity check
+  fail before signature verification.
 
 ## Verify a package downloaded from NuGet.org
 
@@ -154,13 +205,15 @@ when an author signature exists). That is expected platform behavior: the raw
 SHA-256 of a NuGet.org-downloaded `.nupkg` is therefore **not expected** to
 equal the pre-upload manifest digest or GitHub Release attachment digest.
 
-First verify that you selected the expected package ID, version, and
-`https://api.nuget.org/v3/index.json` source. Create the consumer configuration
-in the same empty directory so this path does not depend on a machine- or
-user-level NuGet configuration. The `packageSources` entry pins the source,
-`signatureValidationMode=require` makes signature policy mandatory, and
-`dotnet nuget trust source` obtains the current NuGet.org repository
-certificates from its v3 service index:
+Start this path in a fresh empty directory, separate from any GitHub Release
+asset directory. Set the expected primary package ID and version, and use only
+`https://api.nuget.org/v3/index.json` as the source. Create the consumer
+configuration there so this path does not depend on a machine- or user-level
+NuGet configuration. The `packageSources` entry pins
+the source, `signatureValidationMode=require` makes signature policy
+mandatory, and `dotnet nuget trust source` obtains the current NuGet.org
+repository certificates from its v3 service index. The identity check below
+uses only the Python 3 standard library:
 
 ```bash
 cat > nuget.config <<'EOF'
@@ -193,17 +246,79 @@ entries with `hashAlgorithm="SHA256"` and
 The configuration is intentionally explicit: `--configfile` makes these
 `packageSources` and `trustedSigners` settings the only settings used by the
 verification command. Then verify the downloaded primary package with NuGet's
-supported signature tooling:
+supported signature tooling. Downloading through the pinned source is part of
+the check; do not substitute a package obtained from an unrecorded URL:
 
 ```bash
-dotnet nuget trust list --configfile ./nuget.config
-dotnet nuget verify ./ArchLinterNet.Core.<version>.nupkg \
+export PACKAGE_ID=ArchLinterNet.Core
+export PACKAGE_VERSION='<version>'
+export NUGET_SOURCE=https://api.nuget.org/v3/index.json
+
+dotnet package download "$PACKAGE_ID@$PACKAGE_VERSION" \
+  --source "$NUGET_SOURCE" \
+  --configfile ./nuget.config \
+  --prerelease \
+  --output ./nuget-package
+
+export PACKAGE_FILE="./nuget-package/$PACKAGE_ID.$PACKAGE_VERSION.nupkg"
+if [ ! -f "$PACKAGE_FILE" ]; then
+  echo "NuGet did not produce the expected package path: $PACKAGE_FILE" >&2
+  exit 1
+fi
+
+python3 - "$PACKAGE_FILE" "$PACKAGE_ID" "$PACKAGE_VERSION" <<'PY'
+from __future__ import annotations
+
+import sys
+from pathlib import Path
+from zipfile import ZipFile
+from xml.etree import ElementTree
+
+
+package_path = Path(sys.argv[1])
+expected_id, expected_version = sys.argv[2:]
+
+
+def local_name(tag: str) -> str:
+    return tag.rsplit("}", maxsplit=1)[-1]
+
+
+def child_text(parent: ElementTree.Element, name: str) -> str | None:
+    for child in parent:
+        if local_name(child.tag) == name:
+            return (child.text or "").strip()
+    return None
+
+
+with ZipFile(package_path) as package:
+    nuspecs = [name for name in package.namelist() if name.lower().endswith(".nuspec")]
+    if len(nuspecs) != 1:
+        raise SystemExit(f"Expected exactly one .nuspec in {package_path}, found {len(nuspecs)}.")
+    root = ElementTree.fromstring(package.read(nuspecs[0]))
+
+metadata = next((child for child in root if local_name(child.tag) == "metadata"), None)
+if metadata is None:
+    raise SystemExit(f"Package {package_path} has no metadata element.")
+
+actual_id = child_text(metadata, "id")
+actual_version = child_text(metadata, "version")
+if (actual_id, actual_version) != (expected_id, expected_version):
+    raise SystemExit(
+        f"Package identity mismatch: expected {expected_id}@{expected_version}, "
+        f"found {actual_id}@{actual_version}."
+    )
+print(f"Verified package identity: {actual_id}@{actual_version}")
+PY
+
+dotnet nuget verify "$PACKAGE_FILE" \
   --all \
   --configfile ./nuget.config
 ```
 
-`dotnet nuget verify` validates the signed package; the explicit configuration
-lets a consumer apply its required package sources and trusted signers. See the
+The `dotnet package download` command proves the selected source and requested
+ID/version, the embedded `.nuspec` check proves the downloaded bytes carry that
+same identity, and `dotnet nuget verify` validates the repository signature
+under the explicit trusted-signer configuration. See the
 [.NET verification command](https://learn.microsoft.com/dotnet/core/tools/dotnet-nuget-verify)
 and [NuGet trust-boundary guidance](https://learn.microsoft.com/nuget/consume-packages/installing-signed-packages)
 for supported platform and trusted-signer configuration details. The
