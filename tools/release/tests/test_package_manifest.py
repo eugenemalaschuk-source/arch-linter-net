@@ -67,21 +67,25 @@ def test_create_records_deterministic_paired_subject_inventory(tmp_path: Path) -
     _verify(packages, output)
 
 
-def test_verification_rejects_missing_unexpected_or_tampered_subjects(tmp_path: Path) -> None:
+def test_verification_rejects_missing_or_tampered_subjects(tmp_path: Path) -> None:
     packages, output = _candidate(tmp_path)
     (packages / manifest._expected_filename(manifest._PACKAGE_IDS[0], _VERSION, "symbols")).unlink()
 
     with pytest.raises(ValueError, match="missing="):
         _verify(packages, output)
 
-    packages, output = _candidate(tmp_path / "unexpected")
-    (packages / "unrelated.0.7.0-preview.1.nupkg").write_bytes(b"unexpected")
-    with pytest.raises(ValueError, match="unexpected="):
-        _verify(packages, output)
-
     packages, output = _candidate(tmp_path / "tampered")
     (packages / manifest._expected_filename(manifest._PACKAGE_IDS[0], _VERSION, "package")).write_bytes(b"tampered")
     with pytest.raises(ValueError, match="digest mismatch"):
+        _verify(packages, output)
+
+
+@pytest.mark.parametrize("extension", [".nupkg", ".snupkg"])
+def test_verification_rejects_unexpected_package_or_symbol_asset(tmp_path: Path, extension: str) -> None:
+    packages, output = _candidate(tmp_path)
+    (packages / f"stale-release-asset{extension}").write_bytes(b"unexpected")
+
+    with pytest.raises(ValueError, match="unexpected="):
         _verify(packages, output)
 
 

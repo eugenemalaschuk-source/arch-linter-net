@@ -120,6 +120,7 @@ Public product documentation is published through MkDocs and GitHub Pages:
 - [Getting started](https://eugenemalaschuk-source.github.io/arch-linter-net/getting-started/)
 - [Installation](https://eugenemalaschuk-source.github.io/arch-linter-net/installation/)
 - [CLI usage](https://eugenemalaschuk-source.github.io/arch-linter-net/cli/)
+- [Verify release provenance](https://eugenemalaschuk-source.github.io/arch-linter-net/guides/release-provenance-verification/)
 - [Policy format](https://eugenemalaschuk-source.github.io/arch-linter-net/policy-format/)
 - [Policy imports](https://eugenemalaschuk-source.github.io/arch-linter-net/policy-format/imports/)
 - [CEL policy expressions](https://eugenemalaschuk-source.github.io/arch-linter-net/policy-format/cel-expressions/)

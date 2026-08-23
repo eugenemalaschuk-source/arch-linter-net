@@ -68,6 +68,7 @@ nav:
       - Adopt in an existing repository: guides/adoption.md
       - Adopt or upgrade: guides/upgrading.md
       - Reference entrypoints: guides/reference-entrypoints.md
+      - Verify release provenance: guides/release-provenance-verification.md
       - Clean architecture policy: guides/clean-architecture.md
       - Unity boundaries: guides/unity-boundaries.md
       - Troubleshooting: guides/troubleshooting.md
