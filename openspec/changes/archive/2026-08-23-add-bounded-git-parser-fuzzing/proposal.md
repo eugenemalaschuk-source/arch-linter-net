@@ -8,7 +8,8 @@ material value beyond the deterministic corrupt-object fixtures.
 ## What Changes
 
 - Add a small executable harness over synthetic byte-array seams for loose
-  objects, version-2 pack indexes, pack-entry headers, and REF-delta decoding.
+  objects, version-2 pack indexes, pack-entry headers, and OFS/REF-delta
+  decoding.
 - Version a public-safe seed corpus, deterministic replay command, and NUnit
   regression coverage for the harness contract.
 - Pin and verify the .NET 10 SharpFuzz/AFL++ Linux campaign toolchain, with

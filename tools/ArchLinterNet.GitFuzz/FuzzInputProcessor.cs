@@ -47,7 +47,7 @@ internal static class FuzzInputProcessor
     }
 
     private static int[] DigestLengthsFor(byte[] input)
-        => input.Length > 0 && input[0] is 1 or 2 or 3
+        => input.Length > 0 && input[0] is 1 or 2 or 3 or 4
             ? _sha1AndSha256
             : _sha1Only;
 

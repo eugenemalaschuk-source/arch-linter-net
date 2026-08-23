@@ -71,8 +71,11 @@ internal static class GitPackEntryHeaderParser
     }
 
     internal static GitPackEntryHeader Read(byte[] content, int digestLength)
+        => Read(content, offset: 0, digestLength);
+
+    internal static GitPackEntryHeader Read(byte[] content, long offset, int digestLength)
         => Read(
-            offset: 0,
+            offset,
             digestLength,
             readByte: position => ReadByte(content, position),
             readExactly: (position, length) => ReadExactly(content, position, length));

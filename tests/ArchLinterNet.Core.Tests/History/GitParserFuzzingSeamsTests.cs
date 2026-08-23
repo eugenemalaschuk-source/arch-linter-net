@@ -81,6 +81,25 @@ public sealed class GitParserFuzzingSeamsTests
         AssertFailsClosed([3, 0x76, .. digest], digestLength);
     }
 
+    [TestCase(20)]
+    [TestCase(32)]
+    public void OffsetDeltaRouteReconstructsAgainstTheSyntheticBase(int digestLength)
+    {
+        byte[] input = BuildOffsetDeltaInput();
+
+        Assert.DoesNotThrow(() => GitParserFuzzingSeams.Execute(input, digestLength));
+    }
+
+    [TestCase(20)]
+    [TestCase(32)]
+    public void OffsetDeltaRouteFailsClosedWhenTheBaseOffsetIsInvalid(int digestLength)
+    {
+        byte[] input = BuildOffsetDeltaInput();
+        input[5 + 1 + 12 + 1] = 0x7F;
+
+        AssertFailsClosed(input, digestLength);
+    }
+
     [Test]
     public void EmptyAndUnknownRoutesFailClosed()
     {
@@ -118,6 +137,19 @@ public sealed class GitParserFuzzingSeamsTests
 
     private static byte[] BuildDelta(long baseSize, long resultSize, params byte[][] instructions)
         => [.. WriteSizeVarint(baseSize), .. WriteSizeVarint(resultSize), .. instructions.SelectMany(static bytes => bytes)];
+
+    private static byte[] BuildOffsetDeltaInput()
+    {
+        byte[] baseEntry = [0x34, .. Compress(Encoding.ASCII.GetBytes("base"))];
+        byte[] delta = BuildDelta(baseSize: 4, resultSize: 6, [6, .. Encoding.ASCII.GetBytes("target")]);
+        byte[] deltaEntry = [0x69, 0x0D, .. Compress(delta)];
+        byte[] packContent = [.. baseEntry, .. deltaEntry];
+        byte[] input = new byte[1 + sizeof(int) + packContent.Length];
+        input[0] = 4;
+        BinaryPrimitives.WriteInt32BigEndian(input.AsSpan(1, sizeof(int)), baseEntry.Length);
+        packContent.CopyTo(input, 1 + sizeof(int));
+        return input;
+    }
 
     private static byte[] WriteSizeVarint(long value)
     {

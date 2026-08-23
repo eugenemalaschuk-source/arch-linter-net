@@ -16,9 +16,9 @@ as explicit reviewed contracts.
 
 **Goals:**
 
-- Exercise the four selected parsers using one synthetic input format and a
+- Exercise the five selected parser routes using one synthetic input format and a
   canonical-success-or-fail-closed oracle.
-- Run each pack-index, pack-entry, and REF-delta route in both 20-byte SHA-1
+- Run each pack-index, pack-entry, OFS-delta, and REF-delta route in both 20-byte SHA-1
   and 32-byte SHA-256 modes.
 - Make the 1 MiB input cap, 100 ms case timeout, and 512 MiB process limit
   mechanically visible in replay and campaign commands.
@@ -48,13 +48,17 @@ architecture universe.
 
 ### One selector byte and a stable oracle
 
-The first input byte selects loose object, pack index, pack entry, or
-REF-delta. The harness applies the three digest-sensitive modes twice, once
-per supported digest length. It accepts only a bounded canonical parser result
-or `HistoryFailureException`; every other exception remains observable as an
+The first input byte selects loose object, pack index, pack entry, REF-delta, or
+OFS-delta. The harness applies every pack/delta route twice, once per supported
+digest length. It accepts only a bounded canonical parser result or
+`HistoryFailureException`; every other exception remains observable as an
 AFL++ crash. Input acquisition stops after 1 MiB plus one byte, before the
-selected parser is invoked. The harness has deterministic `--replay` and
-`--materialize-corpus` modes outside SharpFuzz's out-of-process execution path.
+selected parser is invoked. The user-facing `--replay` mode launches a worker
+and enforces a 100 ms post-warm-up watchdog plus a 512 MiB process-memory
+limit through a Windows Job Object or Unix `prlimit`; the worker-only argument
+is not accepted without the launcher marker. This keeps deterministic replay
+outside SharpFuzz's out-of-process execution path without leaving triage
+uncontained.
 
 This is preferred to fuzzing temporary Git directories because byte-array
 routes are faster, reproducible, and cannot accidentally use a developer's
@@ -89,7 +93,7 @@ The committed corpus stores hex-encoded synthetic inputs, which keeps every
 byte reviewable in ordinary diffs without relying on an unreviewable binary
 patch format. The harness materializes those files to an ignored temporary
 binary corpus before AFL++ runs. Seeds include valid and malformed examples for
-all four routes; tests replay every materialized seed and a deliberately
+all five routes; tests replay every materialized seed and a deliberately
 oversized input in both applicable digest modes.
 
 ### Scheduled/manual workflow with conservative artifact handling

@@ -3,14 +3,14 @@
 ### Requirement: Synthetic Git binary-parser fuzz seam
 The repository SHALL provide an executable fuzz harness whose synthetic,
 byte-array input selects only loose-object header/payload validation, version-2
-pack-index layout and offset lookup, pack-entry header decoding, or
-`OBJ_REF_DELTA` reconstruction. The harness SHALL not locate, open, mutate, or
-otherwise consume a live Git repository.
+pack-index layout and offset lookup, pack-entry header decoding,
+`OBJ_OFS_DELTA` reconstruction, or `OBJ_REF_DELTA` reconstruction. The harness
+SHALL not locate, open, mutate, or otherwise consume a live Git repository.
 
-The pack-index, pack-entry, and `OBJ_REF_DELTA` routes SHALL each execute in
-both supported Git object-ID modes: 20-byte SHA-1 and 32-byte SHA-256. The
-oracle SHALL accept only a canonical bounded parser result or the existing
-fail-closed history diagnostic route; an unhandled exception, hang,
+The pack-index, pack-entry, `OBJ_OFS_DELTA`, and `OBJ_REF_DELTA` routes SHALL
+each execute in both supported Git object-ID modes: 20-byte SHA-1 and 32-byte
+SHA-256. The oracle SHALL accept only a canonical bounded parser result or the
+existing fail-closed history diagnostic route; an unhandled exception, hang,
 resource-limit breach, or partial success SHALL be a fuzzing failure.
 
 #### Scenario: Valid synthetic parser input
@@ -24,14 +24,16 @@ resource-limit breach, or partial success SHALL be a fuzzing failure.
   does not surface a raw runtime exception
 
 #### Scenario: Digest-sensitive routes
-- **WHEN** a pack-index, pack-entry, or REF-delta seed is replayed
+- **WHEN** a pack-index, pack-entry, OFS-delta, or REF-delta seed is replayed
 - **THEN** the harness executes it once with a 20-byte digest and once with a
   32-byte digest before reporting the result
 
 ### Requirement: Bounded replay and synthetic corpus
 The harness SHALL reject an input larger than 1 MiB before selected-parser
 execution. Every replay and campaign invocation SHALL enforce a 100 ms
-per-case limit and a 512 MiB process-memory limit.
+per-case limit and a 512 MiB process-memory limit. The user-facing `--replay`
+command SHALL launch an isolated worker under those limits; the worker SHALL
+not be directly reachable through the documented replay command.
 
 The repository SHALL version a public-safe synthetic seed corpus and provide
 deterministic materialization, single-input replay, and minimization commands.
@@ -49,6 +51,14 @@ or credential data.
   committed seed and one malformed input
 - **THEN** every case has the recorded time and memory limits and produces the
   same canonical or fail-closed outcome
+
+#### Scenario: Bounded replay launcher
+
+- **WHEN** a maintainer invokes the documented `--replay <input-file>` command
+- **THEN** it starts a worker process with a hard 512 MiB process-memory
+  envelope (Windows Job Object or Unix `prlimit`), warms only the built-in
+  public-safe corpus, and starts a 100 ms post-warm-up watchdog before the
+  worker reads the candidate input
 
 ### Requirement: Finding promotion and corpus triage
 The repository SHALL retain campaign crash and hang artifacts only long enough

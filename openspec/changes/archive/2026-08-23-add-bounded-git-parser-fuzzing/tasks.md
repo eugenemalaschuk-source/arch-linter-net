@@ -9,12 +9,14 @@
 - [x] 2.1 Add the .NET 10 console harness with SharpFuzz integration, a pre-dispatch 1 MiB input cap, and deterministic replay/materialization modes.
 - [x] 2.2 Add public-safe textual synthetic seed sources for all selected seams and deterministic materialization to binary campaign inputs.
 - [x] 2.3 Add deterministic regression tests that replay every seed and an oversized input under both relevant digest modes.
+- [x] 2.4 Add synthetic `OBJ_OFS_DELTA` reconstruction, corpus coverage, and both-digest regression tests.
 
 ## 3. Campaign operation and documentation
 
 - [x] 3.1 Add the pinned scheduled/manual AFL++ workflow with fixed time, memory, CPU, no-network, and finite-duration containment.
 - [x] 3.2 Document local toolchain verification, replay, minimization, corpus ownership, artifact retention, and confirmed-finding promotion.
 - [x] 3.3 Smoke the fixed-limit workflow path with synthetic inputs and inspect the resulting containment behavior.
+- [x] 3.4 Make `--replay` launch a child under the 100 ms/512 MiB envelope and cover the launcher contract with an acceptance regression.
 
 ## 4. Verification and lifecycle completion
 

@@ -9,11 +9,12 @@ The harness exercises only the selected byte-array parser seams:
 
 - loose-object header and payload validation;
 - version-2 pack-index layout and offset lookup;
-- pack-entry header decoding; and
+- pack-entry header decoding;
+- `OBJ_OFS_DELTA` reconstruction; and
 - `OBJ_REF_DELTA` reconstruction.
 
-Pack-index, pack-entry, and REF-delta inputs run in both 20-byte SHA-1 and
-32-byte SHA-256 modes. The harness does not locate, open, mutate, or otherwise
+Pack-index, pack-entry, OFS-delta, and REF-delta inputs run in both 20-byte
+SHA-1 and 32-byte SHA-256 modes. The harness does not locate, open, mutate, or otherwise
 consume a live Git repository, and it does not make network requests.
 
 Never use a private checkout, adopter repository, live-repository object, path,
@@ -34,6 +35,7 @@ The workflow and local investigations use the following fixed values:
 | Input cap | 1 MiB, rejected before parser dispatch |
 | Per-case timeout | 100 ms (`afl-fuzz -t 100`) |
 | Process/container memory | 512 MiB Docker cgroup cap (`--memory=512m`); AFL virtual-memory cap disabled with `-m none` for the .NET/SharpFuzz target |
+| Replay memory/timeout | `--replay` launches a worker with a 100 ms post-warm-up watchdog and a hard 512 MiB process envelope (Windows Job Object or Unix `prlimit`) |
 | CPU | One CPU (`docker --cpus=1`) |
 | Campaign duration | 300 seconds (`afl-fuzz -V 300`) |
 | Network and filesystem | `--network none`, read-only root, only the findings mount writable |
@@ -90,7 +92,11 @@ directory for materialization:
 dotnet run --project tools/ArchLinterNet.GitFuzz -- --materialize-corpus artifacts/git-parser-corpus
 ```
 
-Replay one materialized input by path:
+Replay one materialized input by path. The user-facing command is already
+bounded; it starts a worker, waits for its readiness marker, and only then
+installs the 512 MiB process limit. The worker then warms the built-in
+public-safe corpus, reports that the candidate case is ready, and only then
+starts the 100 ms case watchdog before reading the candidate:
 
 ```bash
 dotnet run --project tools/ArchLinterNet.GitFuzz -- --replay artifacts/git-parser-corpus/<input-file>
@@ -101,9 +107,10 @@ files. Do not edit or commit those generated files. A replay must use one of
 those synthetic files (or a private scratch copy of a candidate under review),
 and must retain the recorded input, route selector, digest mode, and result.
 
-For a candidate from AFL++, replay it first under the same 100 ms and 512 MiB
-envelope used by the campaign. A local replay that is not run inside Docker
-still must not be given network access or sensitive inputs.
+For a candidate from AFL++, use that same `--replay` command first. It enforces
+the replay envelope mechanically; do not invoke the internal worker argument
+directly. A replay still must use a private scratch path and a public-safe
+candidate, and it must not be given sensitive inputs.
 
 ## Run and inspect a campaign
 

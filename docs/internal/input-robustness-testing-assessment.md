@@ -31,7 +31,7 @@ The follow-up is limited to byte-level seams below `Core.History.Git`:
 - pack-entry header, `OBJ_OFS_DELTA`, and `OBJ_REF_DELTA` decoding;
 - delta size varints and copy/insert reconstruction.
 
-The harness exercises every selected pack/index/`OBJ_REF_DELTA` seam in both
+The harness exercises every selected pack/index/OFS-delta/REF-delta seam in both
 supported digest-length modes: 20-byte SHA-1 and 32-byte SHA-256. This is
 separate from the C decision for `.git/config` object-format parsing.
 
@@ -52,8 +52,9 @@ breaches. It does not fuzz a live repository.
   AFL++ Linux container, both verified against .NET 10 by the follow-up before
   adoption. A maintained equivalent may replace SharpFuzz only with the same
   replay and containment guarantees.
-- Replay: documented one-input command with the identical input/time/memory
-  limits and tool versions.
+- Replay: the user-facing one-input command launches a worker under the same
+  100 ms/512 MiB envelope; the launcher uses a Windows Job Object or Unix
+  `prlimit`, with tool versions recorded alongside the candidate.
 - Triage: preserve a failing input only in restricted CI artifacts while
   reviewing it; minimize with the fuzzer tooling; commit only a public-safe
   minimized reproduction; add a deterministic NUnit regression before closing.

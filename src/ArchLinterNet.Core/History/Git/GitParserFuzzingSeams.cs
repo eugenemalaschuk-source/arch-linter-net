@@ -1,3 +1,5 @@
+using System.Buffers.Binary;
+
 namespace ArchLinterNet.Core.History.Git;
 
 // Internal, byte-array-only entry point for the selected parser seams. The caller owns input
@@ -7,6 +9,7 @@ internal static class GitParserFuzzingSeams
     private const int Sha1DigestLength = 20;
     private const int Sha256DigestLength = 32;
     private const int TypeReferenceDelta = 7;
+    private const int TypeOffsetDelta = 6;
     private static readonly byte[] _syntheticBase = "base"u8.ToArray();
 
     internal static void Execute(byte[] input, int digestLength)
@@ -34,6 +37,9 @@ internal static class GitParserFuzzingSeams
                 return;
             case 3:
                 ParseReferenceDelta(input, digestLength);
+                return;
+            case 4:
+                ParseOffsetDelta(input, digestLength);
                 return;
             default:
                 throw HistoryFailures.Fail(
@@ -96,6 +102,62 @@ internal static class GitParserFuzzingSeams
             objectId: header.BaseId.Hex,
             path: null,
             read: () => GitDeltaDecoder.Apply(_syntheticBase, delta));
+    }
+
+    private static void ParseOffsetDelta(byte[] input, int digestLength)
+    {
+        const int EnvelopeLength = 1 + sizeof(int);
+        if (input.Length < EnvelopeLength)
+        {
+            throw HistoryFailures.Fail(
+                HistoryDiagnosticKind.ObjectMalformed,
+                "A synthetic OFS-delta input is missing its delta-entry offset.");
+        }
+
+        int deltaOffset = BinaryPrimitives.ReadInt32BigEndian(input.AsSpan(1, sizeof(int)));
+        byte[] packContent = input.AsSpan(EnvelopeLength).ToArray();
+        if (deltaOffset <= 0 || deltaOffset >= packContent.Length)
+        {
+            throw HistoryFailures.Fail(
+                HistoryDiagnosticKind.ObjectMalformed,
+                "A synthetic OFS-delta input declares an invalid delta-entry offset.");
+        }
+
+        GitPackEntryHeader baseHeader = GitPackEntryHeaderParser.Read(packContent, digestLength);
+        if (baseHeader.Type is TypeOffsetDelta or TypeReferenceDelta)
+        {
+            throw HistoryFailures.Fail(
+                HistoryDiagnosticKind.ObjectMalformed,
+                "A synthetic OFS-delta base entry must be a non-delta object.");
+        }
+
+        byte[] baseContent = HistoryFailures.WrapObjectAccess(
+            HistoryDiagnosticKind.ObjectMalformed,
+            "The synthetic OFS-delta base payload could not be inflated",
+            objectId: null,
+            path: null,
+            read: () => GitPackPayloadInflater.Inflate(packContent, baseHeader.DataOffset, baseHeader.Size));
+
+        GitPackEntryHeader header = GitPackEntryHeaderParser.Read(packContent, deltaOffset, digestLength);
+        if (header.Type != TypeOffsetDelta || header.BaseOffset != 0)
+        {
+            throw HistoryFailures.Fail(
+                HistoryDiagnosticKind.ObjectMalformed,
+                "A synthetic OFS-delta input does not point at its synthetic base entry.");
+        }
+
+        byte[] delta = HistoryFailures.WrapObjectAccess(
+            HistoryDiagnosticKind.ObjectMalformed,
+            "The synthetic OFS-delta payload could not be inflated",
+            objectId: null,
+            path: null,
+            read: () => GitPackPayloadInflater.Inflate(packContent, header.DataOffset, header.Size));
+        _ = HistoryFailures.WrapObjectAccess(
+            HistoryDiagnosticKind.ObjectMalformed,
+            "The synthetic OFS-delta could not be reconstructed",
+            objectId: null,
+            path: null,
+            read: () => GitDeltaDecoder.Apply(baseContent, delta));
     }
 
     private static void ValidateDigestLength(int digestLength)
