@@ -100,6 +100,74 @@ public sealed class GitParserFuzzingSeamsTests
         AssertFailsClosed(input, digestLength);
     }
 
+    [TestCase(20)]
+    [TestCase(32)]
+    public void OffsetDeltaRouteFailsClosedWhenTheDeltaEntryDoesNotPointAtTheBase(int digestLength)
+    {
+        byte[] input = BuildOffsetDeltaInput();
+        input[5 + 1 + 12 + 1] = 0x0C;
+
+        AssertFailsClosed(input, digestLength);
+    }
+
+    [TestCase(20)]
+    [TestCase(32)]
+    public void OffsetDeltaRouteFailsClosedWhenTheEnvelopeIsTruncated(int digestLength)
+    {
+        AssertFailsClosed([4, 0, 0], digestLength);
+    }
+
+    [TestCase(20)]
+    [TestCase(32)]
+    public void OffsetDeltaRouteFailsClosedWhenTheDeltaOffsetIsOutOfRange(int digestLength)
+    {
+        AssertFailsClosed([4, 0, 0, 0, 0], digestLength);
+    }
+
+    [TestCase(20)]
+    [TestCase(32)]
+    public void OffsetDeltaRouteFailsClosedWhenTheBaseEntryIsItselfADelta(int digestLength)
+    {
+        byte[] input = [4, 0, 0, 0, 1, 0x60, 0x00];
+
+        AssertFailsClosed(input, digestLength);
+    }
+
+    [TestCase(20)]
+    [TestCase(32)]
+    public void ReferenceDeltaRouteFailsClosedWhenTheHeaderIsNotAReferenceDelta(int digestLength)
+    {
+        AssertFailsClosed([3, 0x10], digestLength);
+    }
+
+    [TestCase(20)]
+    [TestCase(32)]
+    public void PackIndexRouteFailsClosedWhenTheLookupDigestIsMissing(int digestLength)
+    {
+        AssertFailsClosed([1], digestLength);
+    }
+
+    [Test]
+    public void PackEntryRouteFailsClosedForAnUnsupportedObjectType()
+    {
+        AssertFailsClosed([2, 0x00], 20);
+    }
+
+    [Test]
+    public void PackEntryRouteFailsClosedWhenTheHeaderByteIsMissing()
+    {
+        AssertFailsClosed([2], 20);
+    }
+
+    [Test]
+    public void ExecuteRejectsAnUnsupportedDigestLength()
+    {
+        ArgumentOutOfRangeException exception = Assert.Throws<ArgumentOutOfRangeException>(
+            () => GitParserFuzzingSeams.Execute([0], 16))!;
+
+        Assert.That(exception.ParamName, Is.EqualTo("digestLength"));
+    }
+
     [Test]
     public void EmptyAndUnknownRoutesFailClosed()
     {
