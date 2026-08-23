@@ -1,0 +1,2 @@
+# route 1: 32-byte lookup digest, minimal v2 index with zero objects
+01 00*32 ff744f63 00000002 00*1024

@@ -1,0 +1,2 @@
+# route 3: REF-delta header, 20-byte base id, zlib(delta copy of synthetic base "base")
+03 74 00*20 78da636199c002000144009d

@@ -1,0 +1,166 @@
+name: Git parser fuzzing
+
+on:
+  schedule:
+    - cron: "17 2 * * 0"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: git-parser-fuzzing
+  cancel-in-progress: true
+
+jobs:
+  campaign:
+    name: Bounded AFL++ campaign
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    env:
+      SHARPFUZZ_VERSION: 2.3.0
+      AFLPP_IMAGE: aflplusplus/aflplusplus@sha256:2627e783e460c18ccc205587800a32cc92971795c80440171dc93d7121c5b6fa
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up .NET 10
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Restore the fuzz harness
+        shell: bash
+        run: dotnet restore tools/ArchLinterNet.GitFuzz/ArchLinterNet.GitFuzz.csproj --runtime linux-x64
+
+      - name: Materialize the synthetic corpus
+        shell: bash
+        run: |
+          set -euo pipefail
+          CORPUS_DIR="$RUNNER_TEMP/git-parser-fuzz-corpus"
+          mkdir -p "$CORPUS_DIR"
+          dotnet run \
+            --project tools/ArchLinterNet.GitFuzz \
+            --configuration Release \
+            --no-restore \
+            -- \
+            --materialize-corpus "$CORPUS_DIR"
+          test -n "$(find "$CORPUS_DIR" -type f -print -quit)"
+          chmod -R a-w "$CORPUS_DIR"
+
+      - name: Publish the self-contained Linux harness
+        shell: bash
+        run: |
+          set -euo pipefail
+          PUBLISH_DIR="$RUNNER_TEMP/git-parser-fuzz-harness"
+          mkdir -p "$PUBLISH_DIR"
+          dotnet publish \
+            tools/ArchLinterNet.GitFuzz/ArchLinterNet.GitFuzz.csproj \
+            --configuration Release \
+            --runtime linux-x64 \
+            --self-contained true \
+            --no-restore \
+            --output "$PUBLISH_DIR"
+          test -x "$PUBLISH_DIR/ArchLinterNet.GitFuzz"
+          test -f "$PUBLISH_DIR/ArchLinterNet.GitFuzz.dll"
+          cat > "$PUBLISH_DIR/dotnet" <<'EOF'
+          #!/bin/sh
+          target="$1"
+          shift
+          case "$target" in
+            *.dll) exec "${target%.dll}" "$@" ;;
+            *) exec "$target" "$@" ;;
+          esac
+          EOF
+          chmod 500 "$PUBLISH_DIR/dotnet"
+          test -x "$PUBLISH_DIR/dotnet"
+
+      - name: Install the pinned SharpFuzz tool
+        shell: bash
+        run: |
+          set -euo pipefail
+          dotnet tool install \
+            --tool-path "$RUNNER_TEMP/sharpfuzz" \
+            SharpFuzz.CommandLine \
+            --version "$SHARPFUZZ_VERSION"
+          test -x "$RUNNER_TEMP/sharpfuzz/sharpfuzz"
+          dotnet tool list --tool-path "$RUNNER_TEMP/sharpfuzz" \
+            | grep -F "sharpfuzz.commandline" \
+            | grep -F "$SHARPFUZZ_VERSION"
+
+      - name: Instrument the published harness
+        shell: bash
+        run: |
+          set -euo pipefail
+          PUBLISH_DIR="$RUNNER_TEMP/git-parser-fuzz-harness"
+          "$RUNNER_TEMP/sharpfuzz/sharpfuzz" \
+            "$PUBLISH_DIR/ArchLinterNet.Core.dll"
+
+      - name: Run the bounded AFL++ campaign
+        shell: bash
+        run: |
+          set -euo pipefail
+          CORPUS_DIR="$RUNNER_TEMP/git-parser-fuzz-corpus"
+          PUBLISH_DIR="$RUNNER_TEMP/git-parser-fuzz-harness"
+          FINDINGS_DIR="$RUNNER_TEMP/git-parser-fuzz-findings"
+          mkdir -p "$FINDINGS_DIR"
+          chmod 700 "$FINDINGS_DIR"
+          docker run --rm \
+            --platform linux/amd64 \
+            --network none \
+            --memory=512m \
+            --cpus=1 \
+            --read-only \
+            --tmpfs /tmp:rw,nosuid,nodev,noexec,size=128m \
+            --tmpfs /run:rw,nosuid,nodev,noexec,size=16m \
+            --tmpfs /dev/shm:rw,nosuid,nodev,noexec,size=64m \
+            --mount "type=bind,src=$CORPUS_DIR,dst=/corpus,readonly" \
+            --mount "type=bind,src=$PUBLISH_DIR,dst=/harness,readonly" \
+            --mount "type=bind,src=$FINDINGS_DIR,dst=/findings" \
+            --workdir /tmp \
+            --env AFL_SKIP_CPUFREQ=1 \
+            --env AFL_SKIP_BIN_CHECK=1 \
+            --env AFL_NO_AFFINITY=1 \
+            --env AFL_NO_UI=1 \
+            --env AFL_I_DONT_CARE_ABOUT_MISSING_CRASHES=1 \
+            --env PATH="/harness:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" \
+            "$AFLPP_IMAGE" \
+            afl-fuzz \
+              -i /corpus \
+              -o /findings \
+              -t 100 \
+              -m none \
+              -V 300 \
+              -- /harness/ArchLinterNet.GitFuzz
+
+      - name: Detect candidate crashes and hangs
+        id: findings
+        shell: bash
+        run: |
+          set -euo pipefail
+          FINDINGS_DIR="$RUNNER_TEMP/git-parser-fuzz-findings"
+          candidates="$(find "$FINDINGS_DIR" -type f \( \
+            -path '*/crashes/id:*' -o \
+            -path '*/hangs/id:*' \
+          \) | wc -l)"
+          if [ "$candidates" -gt 0 ]; then
+            echo "present=true" >> "$GITHUB_OUTPUT"
+            echo "Found $candidates candidate crash/hang artifact(s)."
+          else
+            echo "present=false" >> "$GITHUB_OUTPUT"
+            echo "No candidate crash or hang artifacts were produced."
+          fi
+
+      - name: Upload candidate crashes and hangs
+        if: steps.findings.outputs.present == 'true'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: git-parser-fuzzing-findings-${{ github.run_id }}
+          path: |
+            ${{ runner.temp }}/git-parser-fuzz-findings/default/crashes
+            ${{ runner.temp }}/git-parser-fuzz-findings/default/hangs
+          if-no-files-found: warn
+          retention-days: 7
