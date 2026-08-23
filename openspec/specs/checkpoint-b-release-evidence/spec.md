@@ -159,7 +159,12 @@ The selected inventory SHALL bind the declaration identity and SHA-256,
 candidate version, candidate manifest digest, and source commit, list every
 required item with its live issue-tracker state, and include excluded and
 delivered-context inventories in the emitted JSON and Markdown evidence. The
-aggregator SHALL verify all of those bindings before authorization. Authorization
+aggregator SHALL reselect the unique declaration from the fixed
+`tools/release/scopes/` collection using the candidate manifest's version,
+recompute its SHA-256, and compare the declaration identity, authority story,
+and exact required/excluded/delivered inventories against the supplied evidence
+before evaluating required-item states. Evidence-supplied identity, hash, or
+inventory fields SHALL NOT act as release authority. Authorization
 SHALL be refused while any required item is not closed.
 
 Missing, malformed, duplicate, incompatible, prerelease, emergency-override,
@@ -328,4 +333,3 @@ Release attachment until that gate independently verifies every attestation.
 - **WHEN** Checkpoint B authorizes the immutable candidate
 - **THEN** the workflow re-verifies that same frozen candidate and its outer
   evidence before provenance authority can pass
-

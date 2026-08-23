@@ -45,6 +45,7 @@ _POLICY_SHAPE = {
     "declared_project_inventories": 0,
     "inline_public_api_signatures": 0,
 }
+_TRACKED_DECLARATION_PATH = Path(aggregator.__file__).resolve().with_name("scopes") / "0.6.4.json"
 
 
 @pytest.fixture(autouse=True)
@@ -71,23 +72,23 @@ def _scenarios(shell: str, platform: str, failed: dict[str, str] | None = None) 
 
 def _release_scope(digest: str, open_items: set[int] | None = None) -> dict:
     open_items = open_items or set()
+    declaration = json.loads(_TRACKED_DECLARATION_PATH.read_text())
     return {
         "schema": "checkpoint-b-release-scope/v2",
-        "declaration_id": "v0.6.4-public-api-consumer-exit",
-        "declaration_sha256": "d" * 64,
+        "declaration_id": declaration["declaration_id"],
+        "declaration_sha256": hashlib.sha256(_TRACKED_DECLARATION_PATH.read_bytes()).hexdigest(),
         "candidate_version": _VERSION,
         "release_target": _VERSION,
-        "story": 527,
+        "story": declaration["story"],
         "repository": "owner/repo",
         "source_commit": _COMMIT,
         "candidate_manifest_sha256": digest,
         "required_items": [
-            {"issue": number, "finding": f"F{index + 1}", "summary": f"Item {number}",
-             "state": "open" if number in open_items else "closed"}
-            for index, number in enumerate((525, 526))
+            {**item, "state": "open" if item["issue"] in open_items else "closed"}
+            for item in declaration["required_items"]
         ],
-        "excluded_items": [{"issue": 450, "reason": "Post-release refactoring story."}],
-        "delivered_items": [],
+        "excluded_items": declaration["excluded_items"],
+        "delivered_items": declaration["delivered_items"],
     }
 
 
@@ -442,7 +443,9 @@ def test_open_release_scope_item_blocks_publication(tmp_path: Path) -> None:
     summary = _aggregate(tmp_path, open_scope_items={526})
 
     assert summary["result"] == "failed"
-    assert summary["open_release_scope_items"] == ["#526 (F2) is open: Item 526"]
+    assert summary["open_release_scope_items"] == [
+        "#526 (gate) is open: Prove the packed-artifact v0.6.4 intentional public-API consumer exit"
+    ]
     assert summary["authorization"].startswith("FAIL")
 
 
@@ -454,16 +457,58 @@ def test_release_scope_inventory_is_emitted_in_the_evidence(tmp_path: Path) -> N
     assert [item["issue"] for item in summary["release_scope"]["required_items"]] == [525, 526]
     assert "## Release scope (story #527, target 0.6.4)" in markdown
     assert "- Declaration: `v0.6.4-public-api-consumer-exit`" in markdown
-    assert "| #525 | F1 | closed | Item 525 |" in markdown
+    assert "| #525 | selector | closed | Complete intentional type selection for public API snapshots |" in markdown
     assert "#450" in markdown
-    assert "Post-release refactoring story." in markdown
+    assert "Post-release refactoring story;" in markdown
 
 
 def test_open_release_scope_item_is_listed_in_the_markdown(tmp_path: Path) -> None:
     exit_code, _, markdown = _run_main(tmp_path, open_scope_items={526})
 
     assert exit_code == 1
-    assert "| #526 | F2 | open | Item 526 |" in markdown
+    assert "| #526 | gate | open | Prove the packed-artifact v0.6.4 intentional public-API consumer exit |" in markdown
+
+
+def test_release_scope_inventory_must_match_tracked_declaration(tmp_path: Path) -> None:
+    manifest_path, _, _, scope_path = _write_corpus(tmp_path)
+    scope = json.loads(scope_path.read_text())
+    scope["required_items"] = [{
+        "issue": 999,
+        "finding": "forged",
+        "summary": "Forged closed blocker",
+        "state": "closed",
+        "title": "Forged closed blocker",
+    }]
+    scope_path.write_text(json.dumps(scope))
+
+    manifest = _read_manifest(manifest_path)
+    digest = hashlib.sha256(manifest_path.read_bytes()).hexdigest()
+
+    with pytest.raises(ValueError, match="required inventory does not match the tracked declaration"):
+        _read_release_scope(scope_path, manifest, digest)
+
+
+@pytest.mark.parametrize(
+    ("field", "value", "message"),
+    [
+        ("declaration_sha256", "e" * 64, "hash does not match the tracked declaration"),
+        ("declaration_id", "v0.6.4-forged", "identity does not match the tracked declaration"),
+        ("story", 613, "story does not match the tracked declaration"),
+    ],
+)
+def test_release_scope_authority_metadata_must_match_tracked_declaration(
+    tmp_path: Path, field: str, value: object, message: str
+) -> None:
+    manifest_path, _, _, scope_path = _write_corpus(tmp_path)
+    scope = json.loads(scope_path.read_text())
+    scope[field] = value
+    scope_path.write_text(json.dumps(scope))
+
+    manifest = _read_manifest(manifest_path)
+    digest = hashlib.sha256(manifest_path.read_bytes()).hexdigest()
+
+    with pytest.raises(ValueError, match=message):
+        _read_release_scope(scope_path, manifest, digest)
 
 
 @pytest.mark.parametrize(

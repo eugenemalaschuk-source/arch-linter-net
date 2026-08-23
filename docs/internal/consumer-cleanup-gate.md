@@ -89,7 +89,10 @@ preview, unknown, malformed, duplicate, or incompatible mappings before it resol
 issue states. Its evidence binds the selected declaration identity and SHA-256, candidate version,
 candidate manifest digest, and source commit. The aggregator rechecks those bindings, refuses
 authorization while any required item is open, and emits required, excluded, and delivered-context
-inventories in both JSON and Markdown evidence.
+inventories in both JSON and Markdown evidence. During aggregation it independently reselects the
+tracked declaration for the manifest version, recomputes its SHA-256, and compares identity,
+authority story, and all three inventories exactly; fields supplied by a scope artifact cannot
+replace the tracked authority.
 
 Adding release-blocking work under an authority means updating that authority's declaration in the
 same reviewed change; creating a new release target requires a new explicit declaration.

@@ -12,6 +12,7 @@ from typing import Any
 
 from _release_workspace import _safe_path
 from package_manifest import _load_manifest as _load_candidate_manifest
+from create_release_scope_evidence import _declarations_directory, _select_declaration
 
 _EVIDENCE_SCHEMA = "checkpoint-b-platform-evidence/v1"
 _GATES_SCHEMA = "checkpoint-b-repository-gates/v1"
@@ -278,6 +279,15 @@ def _read_release_scope(path: Path, manifest: dict[str, Any], manifest_digest: s
         scope["declaration_sha256"]
     ):
         raise ValueError("Release scope declaration hash is invalid.")
+
+    declaration_path, declaration = _select_declaration(_declarations_directory(), manifest["version"])
+    expected_declaration_sha256 = _sha256(declaration_path)
+    if scope["declaration_sha256"] != expected_declaration_sha256:
+        raise ValueError("Release scope declaration hash does not match the tracked declaration.")
+    if scope["declaration_id"] != declaration["declaration_id"]:
+        raise ValueError("Release scope declaration identity does not match the tracked declaration.")
+    if scope.get("story") != declaration["story"]:
+        raise ValueError("Release scope authority story does not match the tracked declaration.")
     if scope.get("candidate_manifest_sha256") != manifest_digest:
         raise ValueError("Release scope is not bound to the candidate manifest.")
     if scope.get("source_commit") != manifest["source_commit"]:
@@ -316,6 +326,18 @@ def _read_release_scope(path: Path, manifest: dict[str, Any], manifest_digest: s
             ):
                 raise ValueError(f"Release scope {inventory_name.replace('_', ' ')} is malformed.")
             inventory_numbers.add(item["issue"])
+
+    required_inventory = [
+        {key: value for key, value in item.items() if key not in {"state", "title"}}
+        for item in required
+    ]
+    if required_inventory != declaration["required_items"]:
+        raise ValueError("Release scope required inventory does not match the tracked declaration.")
+    for inventory_name in ("excluded_items", "delivered_items"):
+        if scope[inventory_name] != declaration[inventory_name]:
+            raise ValueError(
+                f"Release scope {inventory_name.replace('_', ' ')} does not match the tracked declaration."
+            )
     return scope
 
 
