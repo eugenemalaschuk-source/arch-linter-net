@@ -98,7 +98,7 @@ called out with why.
 | `tests_documented_added` | Met (unchanged, barely-met per July record) | Same evidence as `test_policy`; documentation exists but is process-level rather than a dedicated testing-policy page. |
 | `warnings` | Met (unchanged) | `Directory.Build.props` enables compiler warnings solution-wide. |
 | `warnings_fixed` | Met (unchanged) | `TreatWarningsAsErrors` — a warning fails the build, so warnings cannot accumulate unaddressed. |
-| `warnings_strict` | Met (unchanged) | Same `TreatWarningsAsErrors` setting is the strictest available mode. |
+| `warnings_strict` | **Unmet (changed from Met)** | `TreatWarningsAsErrors` only escalates whatever warnings are already enabled to build failures; it does not by itself maximize *which* warnings are enabled. `Directory.Build.props` sets `Nullable=enable` and relies on the SDK's default `AnalysisLevel`/`WarningLevel`, but does not set `<AnalysisMode>All</AnalysisMode>` or an equivalent `<AnalysisLevel>latest-all</AnalysisLevel>` — the practical, low-cost knob for enabling the full built-in Roslyn analyzer rule set, which the SDK does not turn on by default. Since a practical stricter setting exists and is not enabled, this SUGGESTED criterion is recorded as genuinely `Unmet` rather than stretched from `TreatWarningsAsErrors` alone; it does not block Metal `passing`. |
 
 ## Security (16 criteria)
 
@@ -145,22 +145,32 @@ called out with why.
   analysis-cache's HMAC-SHA256/`RandomNumberGenerator` mechanism, the
   #611/#612/#627 release-provenance work) and only needed the
   corresponding questionnaire answer/evidence recorded. This does not
-  include `dynamic_analysis_enable_assertions` — see "Follow-up issues"
-  below for why that one stays genuinely `Unmet`.
+  include `dynamic_analysis_enable_assertions` or `warnings_strict` — see
+  "Follow-up issues" below for why those two stay genuinely `Unmet`.
 
 ## Follow-up issues
 
-None created. 66 of the 67 criteria above resolve to Met or N/A using
-current repository evidence or the new CONTRIBUTING.md. The one exception,
-`dynamic_analysis_enable_assertions`, is genuinely `Unmet` (no runtime
-assertions exist in production source) and is SUGGESTED-level, so it does
-not block Metal `passing`; it is not treated as a repository gap requiring
-a follow-up issue, per the issue's own "create only real follow-ups"
-guidance — adding invariant assertions purely to satisfy this SUGGESTED
-criterion would be questionnaire-driven, not requirement-driven. If a
-future live submission surfaces a criterion this re-audit misjudged, file a
-narrowly-scoped follow-up against that specific criterion rather than
-reopening #287.
+None created. 65 of the 67 criteria above resolve to Met or N/A using
+current repository evidence or the new CONTRIBUTING.md. Two exceptions are
+recorded as genuinely `Unmet`, both SUGGESTED-level so neither blocks Metal
+`passing`:
+
+- `dynamic_analysis_enable_assertions` — no runtime assertions exist in
+  production source (test-oracle assertions in NUnit do not count).
+- `warnings_strict` — `TreatWarningsAsErrors` escalates existing warnings
+  to build failures but does not maximize which warnings are enabled; the
+  SDK's full analyzer rule set (`<AnalysisMode>All</AnalysisMode>` or
+  equivalent) is not turned on.
+
+Neither is treated as a repository gap requiring a follow-up issue, per the
+issue's own "create only real follow-ups" guidance — enabling the full
+analyzer set or adding invariant assertions purely to satisfy these
+SUGGESTED criteria would be questionnaire-driven, not requirement-driven,
+and `<AnalysisMode>All</AnalysisMode>` in particular is known to surface a
+large first-time diagnostic backlog that is out of scope for this
+documentation-only task. If a future live submission surfaces a criterion
+this re-audit misjudged, file a narrowly-scoped follow-up against that
+specific criterion rather than reopening #287.
 
 ## Manual step (must be done by the maintainer, authenticated on bestpractices.dev)
 

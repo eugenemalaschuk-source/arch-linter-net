@@ -36,8 +36,10 @@ that applies to vulnerability reports specifically.
   submitting. See `architecture/dependencies.arch.yml` for the enforced
   rules.
 - **File size.** Keep files under the repository's size thresholds: C#
-  files warn at 500 lines and fail at 800; Markdown files warn at 600
-  lines and fail at 1000. `make lint-code-size` checks both.
+  files warn at 500+ lines and fail (CI-blocking) only above 800 lines —
+  exactly 800 still passes; Markdown files warn at 600+ lines and fail
+  only above 1000 — exactly 1000 still passes. `make lint-code-size`
+  checks both.
 - **Public API changes.** If a change affects a reviewed public API surface,
   see the reviewed public API lifecycle in [AGENTS.md](AGENTS.md) — snapshot
   rewrites (`make public-api-update`) are a separate, explicit step and are
