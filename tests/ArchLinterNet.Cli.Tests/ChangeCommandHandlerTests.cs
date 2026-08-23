@@ -1,3 +1,5 @@
+using System.Text;
+using ArchLinterNet.Cli.Abstractions;
 using ArchLinterNet.Core.BuildState;
 using ArchLinterNet.Core.Change;
 using ArchLinterNet.Core.Graph;
@@ -12,77 +14,27 @@ namespace ArchLinterNet.Cli.Tests;
 public sealed class ChangeCommandHandlerTests
 {
     [Test]
-    public void BuildSnapshot_CanonicalizesProjectIdentityAcrossCheckoutRoots()
+    public void CreateSnapshot_OrchestratesAnalysisAndWritesCoreProjectedArtifact()
     {
-        ArchitectureChangeSnapshot linuxSnapshot = ChangeCommandHandler.BuildSnapshot(
-            "strict",
-            Outcome("/home/agent/repository", "/home/agent/repository/src/Acme/Acme.csproj"),
-            EmptyGraph(),
-            EmptyGraph(),
-            Array.Empty<string>());
-        ArchitectureChangeSnapshot windowsSnapshot = ChangeCommandHandler.BuildSnapshot(
-            "strict",
-            Outcome("D:\\a\\repository", "D:\\a\\repository\\src\\Acme\\Acme.csproj"),
-            EmptyGraph(),
-            EmptyGraph(),
-            Array.Empty<string>());
+        var runtime = new SnapshotRuntime(Outcome("/repo", "/repo/src/Acme/Acme.csproj"));
+        var console = new CapturingConsole();
+        var fileSystem = new CapturingFileSystem();
+        var handler = new ChangeCommandHandler(runtime, console, fileSystem);
 
-        ArchitectureChangeReport report = ArchitectureChangeReports.Compare(linuxSnapshot, windowsSnapshot);
+        int exitCode = handler.CreateSnapshot(new ChangeSnapshotCommandOptions(
+            "architecture/dependencies.arch.yml", "strict", "ci", null, "snapshot.json", false));
+
+        ArchitectureChangeSnapshot snapshot = ArchitectureChangeReports.DeserializeSnapshot(fileSystem.WrittenContents!);
 
         Assert.Multiple(() =>
         {
-            Assert.That(linuxSnapshot.Entries.Single().Identity, Is.EqualTo("src/Acme/Acme.csproj"));
-            Assert.That(windowsSnapshot.Entries.Single().Identity, Is.EqualTo("src/Acme/Acme.csproj"));
-            Assert.That(report.Added, Is.Empty);
-            Assert.That(report.Removed, Is.Empty);
-        });
-    }
-
-    [Test]
-    public void BuildSnapshot_ExpandsAggregatedViolationIdentitiesBeforeComparingDrift()
-    {
-        ArchitectureViolationIdentity knownIdentity = Identity(occurrence: 0);
-        ArchitectureViolationIdentity newIdentity = Identity(occurrence: 1);
-        ArchitectureViolation aggregate = new(
-            "forbidden-call",
-            "forbidden-call",
-            "Acme.Service",
-            "System.Console",
-            new[] { "Acme.Service.Run: System.Console.WriteLine" })
-        {
-            Identity = knownIdentity,
-            Identities = new[] { knownIdentity, newIdentity },
-        };
-        string knownCanonicalIdentity = ArchitectureFindingMapper
-            .FromViolations(new[] { aggregate })
-            .Single(finding => finding.Identity?.Occurrence == knownIdentity.Occurrence)
-            .CanonicalIdentity;
-        string newCanonicalIdentity = ArchitectureFindingMapper
-            .FromViolations(new[] { aggregate })
-            .Single(finding => finding.Identity?.Occurrence == newIdentity.Occurrence)
-            .CanonicalIdentity;
-        ArchitectureChangeSnapshot current = ChangeCommandHandler.BuildSnapshot(
-            "strict",
-            Outcome("/repo", "/repo/src/Acme/Acme.csproj", aggregate),
-            EmptyGraph(),
-            EmptyGraph(),
-            Array.Empty<string>());
-        ArchitectureChangeSnapshot baseline = new(
-            ArchitectureChangeSnapshot.CurrentSchemaVersion,
-            "strict",
-            string.Empty,
-            Array.Empty<ArchitectureChangeEntry>(),
-            new[] { current.Findings.Single(finding => finding.Identity == knownCanonicalIdentity) },
-            Array.Empty<string>());
-
-        ArchitectureChangeReport report = ArchitectureChangeReports.Compare(baseline, current);
-
-        Assert.Multiple(() =>
-        {
-            Assert.That(current.Findings, Has.Count.EqualTo(2));
-            Assert.That(report.ExistingFindings, Has.Count.EqualTo(1));
-            Assert.That(report.NewFindings, Has.Count.EqualTo(1));
-            Assert.That(report.NewFindings[0].Identity, Is.EqualTo(newCanonicalIdentity));
+            Assert.That(exitCode, Is.EqualTo(CliExitCodes.Success));
+            Assert.That(runtime.ValidateCallCount, Is.EqualTo(1));
+            Assert.That(runtime.GraphLevels, Is.EqualTo(new[] { ArchitectureGraphLevel.Namespace, ArchitectureGraphLevel.Assembly }));
+            Assert.That(snapshot.ConditionSetName, Is.EqualTo("ci"));
+            Assert.That(snapshot.Entries.Single().Identity, Is.EqualTo("src/Acme/Acme.csproj"));
+            Assert.That(fileSystem.WrittenPath, Is.EqualTo("snapshot.json"));
+            Assert.That(console.ErrorText, Is.Empty);
         });
     }
 
@@ -134,28 +86,9 @@ public sealed class ChangeCommandHandlerTests
         });
     }
 
-    private static ArchitectureGraphOutcome EmptyGraph() => new(new ArchitectureDependencyGraph(
-        Array.Empty<ArchitectureGraphNode>(), Array.Empty<ArchitectureGraphEdge>()));
-
-    private static ArchitectureViolationIdentity Identity(int occurrence) => new(
-        ArchitectureViolationIdentity.CurrentVersion,
-        "method_body",
-        "call",
-        "forbidden-call",
-        "Acme",
-        "Acme.Service",
-        "Run",
-        "System.Console",
-        "System.Console",
-        "WriteLine",
-        occurrence);
-
-    private static ValidationOutcome Outcome(
-        string repositoryRoot,
-        string projectPath,
-        params ArchitectureViolation[] violations) => new(
+    private static ValidationOutcome Outcome(string repositoryRoot, string projectPath) => new(
         Passed: true,
-        Violations: violations,
+        Violations: Array.Empty<ArchitectureViolation>(),
         Cycles: Array.Empty<string>(),
         CoverageFindings: Array.Empty<ArchitectureViolation>(),
         CoverageConfig: "off",
@@ -166,8 +99,145 @@ public sealed class ChangeCommandHandlerTests
         CoverageSummaries: Array.Empty<ArchitectureCoverageSummary>(),
         ClassificationConflicts: Array.Empty<ArchitectureClassificationConflict>(),
         ClassificationMetadataFailures: Array.Empty<ArchitectureClassificationMetadataFailure>())
+    {
+        RepositoryRoot = repositoryRoot,
+        DiscoveredProjectPaths = new[] { projectPath },
+    };
+
+    private sealed class SnapshotRuntime(ValidationOutcome outcome) : ICliRuntime
+    {
+        public int ValidateCallCount { get; private set; }
+
+        public List<ArchitectureGraphLevel> GraphLevels { get; } = new();
+
+        public string Version => "1.2.3";
+
+        public ValidationOutcome Validate(ValidationRequest request, ValidationTiming? timing)
         {
-            RepositoryRoot = repositoryRoot,
-            DiscoveredProjectPaths = new[] { projectPath },
-        };
+            ValidateCallCount++;
+            return outcome;
+        }
+
+        public ArchitectureAnalysisSnapshot CreateSnapshot(AnalysisSnapshotRequest request, ValidationTiming? timing) =>
+            throw new NotSupportedException();
+
+        public string FormatResultForCiArtifacts(
+            string mode, bool passed,
+            IReadOnlyCollection<ArchitectureViolation> violations,
+            IReadOnlyCollection<string> cycles,
+            IReadOnlyCollection<ArchitectureCycleFinding> cycleFindings,
+            IReadOnlyCollection<ArchitectureViolation> coverageFindings,
+            IReadOnlyList<ArchitectureUnmatchedIgnoredViolation> unmatchedIgnoredViolations,
+            IReadOnlyCollection<PolicyConsistencyDiagnostic> policyConsistencyFindings,
+            IReadOnlyCollection<ArchitectureCoverageSummary> coverageSummaries,
+            IReadOnlyCollection<ArchitectureClassificationConflict> classificationConflicts,
+            IReadOnlyCollection<ArchitectureClassificationMetadataFailure> classificationMetadataFailures,
+            IReadOnlyCollection<ArchitectureClassificationRoleFact> classificationRoles,
+            ArchitectureClassificationPathDeferredNotice? classificationPathDeferred,
+            IReadOnlyCollection<BuildStatePreflightDiagnostic> preflightDiagnostics) => throw new NotSupportedException();
+
+        public string FormatResultAsSarif(
+            string mode,
+            IReadOnlyCollection<ArchitectureViolation> violations,
+            IReadOnlyCollection<string> cycles,
+            IReadOnlyCollection<ArchitectureCycleFinding> cycleFindings,
+            IReadOnlyCollection<BuildStatePreflightDiagnostic> preflightDiagnostics) => throw new NotSupportedException();
+
+        public string FormatBuildStatePreflightForHumans(IReadOnlyCollection<BuildStatePreflightDiagnostic> diagnostics) =>
+            throw new NotSupportedException();
+
+        public string FormatViolationsForHumans(IReadOnlyCollection<ArchitectureViolation> violations) =>
+            throw new NotSupportedException();
+
+        public string FormatCyclesForHumans(
+            IReadOnlyCollection<string> cycles,
+            IReadOnlyCollection<ArchitectureCycleFinding> cycleFindings) => throw new NotSupportedException();
+
+        public string FormatPolicyConsistencyForHumans(IReadOnlyCollection<PolicyConsistencyDiagnostic> diagnostics) =>
+            throw new NotSupportedException();
+
+        public string FormatUnmatchedForHumans(IReadOnlyList<ArchitectureUnmatchedIgnoredViolation> unmatchedViolations) =>
+            throw new NotSupportedException();
+
+        public string FormatCoverageForHumans(IReadOnlyCollection<ArchitectureViolation> coverageFindings) =>
+            throw new NotSupportedException();
+
+        public string FormatCoverageSummaryForHumans(IReadOnlyCollection<ArchitectureCoverageSummary> coverageSummaries) =>
+            throw new NotSupportedException();
+
+        public string FormatClassificationFactsForHumans(
+            IReadOnlyCollection<ArchitectureClassificationConflict> conflicts,
+            IReadOnlyCollection<ArchitectureClassificationMetadataFailure> metadataFailures,
+            ArchitectureClassificationPathDeferredNotice? classificationPathDeferred) => throw new NotSupportedException();
+
+        public bool TryParseGraphLevel(string value, out ArchitectureGraphLevel level) => throw new NotSupportedException();
+        public BaselineGenerationOutcome GenerateBaseline(BaselineGenerationRequest request) => throw new NotSupportedException();
+        public BaselineUpdateOutcome UpdateBaseline(BaselineUpdateRequest request) => throw new NotSupportedException();
+        public BaselinePruneOutcome PruneBaseline(BaselinePruneRequest request) => throw new NotSupportedException();
+        public BaselineDiffOutcome DiffBaseline(BaselineDiffRequest request) => throw new NotSupportedException();
+        public BaselineVerifyOutcome VerifyBaseline(BaselineVerifyRequest request) => throw new NotSupportedException();
+        public BaselineMigrateOutcome MigrateBaseline(BaselineMigrateRequest request) => throw new NotSupportedException();
+        public PublicApiCaptureOutcome CapturePublicApi(PublicApiCaptureRequest request) => throw new NotSupportedException();
+        public PublicApiDiffOutcome DiffPublicApi(PublicApiDiffRequest request) => throw new NotSupportedException();
+        public PublicApiUpdateOutcome UpdatePublicApi(PublicApiUpdateRequest request) => throw new NotSupportedException();
+        public PublicApiMigrateOutcome MigratePublicApi(PublicApiMigrateRequest request) => throw new NotSupportedException();
+
+        public ArchitectureGraphOutcome BuildGraph(ArchitectureGraphRequest request)
+        {
+            GraphLevels.Add(request.Level);
+            return new ArchitectureGraphOutcome(new ArchitectureDependencyGraph(
+                Array.Empty<ArchitectureGraphNode>(),
+                Array.Empty<ArchitectureGraphEdge>()));
+        }
+
+        public string FormatGraphAsJson(ArchitectureDependencyGraph graph) => throw new NotSupportedException();
+        public string FormatGraphAsDot(ArchitectureDependencyGraph graph) => throw new NotSupportedException();
+        public string FormatGraphAsMermaid(ArchitectureDependencyGraph graph) => throw new NotSupportedException();
+        public ArchitectureExplainOutcome Explain(ArchitectureExplainRequest request) => throw new NotSupportedException();
+    }
+
+    private sealed class CapturingConsole : ICliConsole
+    {
+        private readonly StringBuilder _output = new();
+        private readonly StringBuilder _error = new();
+
+        public TextWriter Out => new StringWriter(_output);
+
+        public TextWriter Error => new StringWriter(_error);
+
+        public string ErrorText => _error.ToString();
+    }
+
+    private sealed class CapturingFileSystem : IFileSystem
+    {
+        public string? WrittenPath { get; private set; }
+
+        public string? WrittenContents { get; private set; }
+
+        public bool FileExists(string path) => false;
+
+        public string ReadAllText(string path) => throw new NotSupportedException();
+
+        public void WriteAllText(string path, string contents)
+        {
+            WrittenPath = path;
+            WrittenContents = contents;
+        }
+
+        public string WriteAllTextToTemp(string targetPath, string contents) => throw new NotSupportedException();
+
+        public void RenameTempToTarget(string tempPath, string targetPath) => throw new NotSupportedException();
+
+        public bool TryRenameTempToNewTarget(string tempPath, string targetPath) => throw new NotSupportedException();
+
+        public void DeleteFile(string path) => throw new NotSupportedException();
+
+        public bool TryCreateNewFile(string path) => throw new NotSupportedException();
+
+        public bool DirectoryExists(string path) => throw new NotSupportedException();
+
+        public void DeleteDirectoryIfEmpty(string path) => throw new NotSupportedException();
+
+        public bool CanWriteToDirectory(string path) => throw new NotSupportedException();
+    }
 }
