@@ -34,6 +34,22 @@ or workaround-shaped consumer policy blocks publication. A dry-run is evidence
 for its own immutable artifact only: a later publish run creates and validates a
 new candidate artifact.
 
+### Release-scope authority
+
+The candidate's immutable manifest version selects exactly one reviewed
+declaration from `tools/release/scopes/`. Declaration filenames are storage
+only: the explicit `release_target` inside each declaration is the mapping
+authority. The generator accepts no caller-provided declaration path and never
+infers blockers from milestone membership or mutable issue text.
+
+Each supported target has its own release authority. v0.6.4/#527 remains
+available for a maintenance publication, while v0.7.0/#613 has its separate
+required, non-blocking, and delivered-context inventory. A preview, unknown,
+duplicate, malformed, or incompatible target has no authorization and fails
+before publication. Release evidence records the selected declaration identity
+and SHA-256 together with the candidate version, manifest digest, source commit,
+and resolved required issue states; it cannot authorize a different candidate.
+
 ### Pre-publication package identity
 
 The canonical candidate manifest is the one authority for project-controlled
@@ -138,6 +154,10 @@ Use `version_override` only when automatic tag-based calculation cannot be used:
 - emergency recovery from a broken/manual versioning situation.
 
 For normal preview continuation, leave `version_override` empty.
+
+An override does not create or redirect release-scope authority. Its calculated
+candidate version must still have exactly one reviewed stable declaration in
+`tools/release/scopes/`, or the release workflow fails closed.
 
 ## Public documentation boundary
 
