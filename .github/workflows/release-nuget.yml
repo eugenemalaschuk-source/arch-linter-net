@@ -502,6 +502,10 @@ jobs:
             --arg configuration_file_path ".github/release.yml" \
             '{ tag_name: $tag_name, target_commitish: $target_commitish, configuration_file_path: $configuration_file_path }' \
             | gh api --method POST repos/${{ github.repository }}/releases/generate-notes --input - --jq '.body' \
+            | {
+                cat
+                printf '\n\n## Verify release provenance\n\nVerify the project-controlled release assets, GitHub provenance, and NuGet.org repository-signature boundary: https://eugenemalaschuk-source.github.io/arch-linter-net/guides/release-provenance-verification/\n'
+              } \
             | tee artifacts/release-notes/release-notes.md
 
       - name: Upload release notes artifact

@@ -72,39 +72,21 @@ attestations are the outer signed identity. The release workflow then verifies
 every subject with the GitHub CLI in a separate job before it can upload to
 NuGet.org or attach a GitHub Release asset.
 
-To verify a downloaded GitHub Release asset, use its exact release-source commit
-and verify every package, symbol, manifest, and checksum file separately. For
-example:
+The canonical [release-provenance verification guide](../guides/release-provenance-verification.md)
+contains the consumer command sequence. It verifies `package-manifest.json` and
+`package-checksums.txt` attestations before using their package digest
+inventory, checks every GitHub Release package/symbol byte against the verified
+manifest, and independently verifies every subject's GitHub attestation.
 
-```bash
-gh attestation verify ArchLinterNet.Core.<version>.nupkg \
-  --repo eugenemalaschuk-source/arch-linter-net \
-  --signer-workflow eugenemalaschuk-source/arch-linter-net/.github/workflows/release-nuget.yml \
-  --source-digest <release-source-commit>
-```
-
-First verify `package-manifest.json` and `package-checksums.txt`, then use the
-attested manifest/checksum inventory to verify the GitHub Release package and
-symbol asset bytes. GitHub provenance binds the exact subject digest to the
-repository, workflow, and source commit; it is not a claim that the package is
-secure or that the release meets a formal SLSA level.
-
-These digests identify the exact project-controlled bytes before upload and in
-GitHub Release attachments. A later NuGet.org download of a primary package can
-have different raw bytes because NuGet.org repository-signs submissions; verify
-that package under NuGet's repository-signature/trusted-repository and expected
-package-ID/version rules rather than expecting pre-upload SHA-256 equality. This
-boundary says nothing about post-upload symbol-service behavior, which follows
-its own documented NuGet.org contract.
-
-NuGet trusted publishing, GitHub build provenance, NuGet.org repository
-signing, and optional NuGet author signing are distinct mechanisms. Trusted
-publishing authorizes this workflow to publish through short-lived OIDC-backed
-credentials; it does not attest arbitrary downloaded bytes. GitHub provenance
-authenticates the frozen project-controlled artifacts. NuGet.org repository
-signing is an external post-upload transformation, while author signing is a
-separate project-controlled certificate/key decision that is not implemented by
-this workflow.
+Those digests identify exact project-controlled bytes before upload and in
+GitHub Release attachments. A later NuGet.org primary-package download can have
+different raw bytes because NuGet.org repository-signs submissions; the guide
+uses NuGet repository-signature/trusted-repository and expected package-ID/
+version rules instead of false pre-upload SHA-256 equality. It makes no
+unverified post-upload symbol-service claim and records distinct deferred
+decisions for NuGet author signing and package-level SBOMs. GitHub provenance
+does not claim that a package is secure or that the release meets a formal SLSA
+level.
 
 Before publication, verify the generated release notes, the
 [evergreen adoption/upgrade guide](../guides/upgrading.md), and installed-schema

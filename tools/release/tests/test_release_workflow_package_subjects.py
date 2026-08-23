@@ -61,6 +61,13 @@ def test_github_release_attachment_uses_manifest_selected_subjects_without_globs
     assert "artifacts/packages/*.snupkg" not in workflow
 
 
+def test_github_release_notes_link_to_the_evergreen_provenance_guide() -> None:
+    workflow = _workflow()
+
+    assert "## Verify release provenance" in workflow
+    assert "https://eugenemalaschuk-source.github.io/arch-linter-net/guides/release-provenance-verification/" in workflow
+
+
 def test_provenance_job_attests_exact_frozen_subject_inventories_with_least_privilege() -> None:
     workflow = _workflow()
     attestation_job = workflow.split("  attest-prepublication-provenance:\n", maxsplit=1)[1].split(
