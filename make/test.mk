@@ -85,6 +85,11 @@ CORE_TESTS_CSPROJ := $(TESTS_DIR)/ArchLinterNet.Core.Tests/ArchLinterNet.Core.Te
 CEL_TESTS_CSPROJ := $(TESTS_DIR)/ArchLinterNet.CEL.Tests/ArchLinterNet.CEL.Tests.csproj
 CLI_TESTS_CSPROJ := $(TESTS_DIR)/ArchLinterNet.Cli.Tests/ArchLinterNet.Cli.Tests.csproj
 TEST_COVERAGE_DIAGNOSTICS ?=
+# ArchLinterNet.GitFuzz is non-shipping fuzzing tooling (already excluded from
+# sonar.coverage.exclusions in ci.yml); Coverlet instrumenting it means the same
+# instrumented DLL gets mounted into the bounded-replay Docker worker, where Coverlet's
+# tracker crashes on module unload trying to create a named Mutex under a read-only /tmp.
+TEST_COVERAGE_COLLECTOR_EXCLUDE := DataCollectionRunSettings.DataCollectors.DataCollector.Configuration.Exclude='[ArchLinterNet.GitFuzz]*'
 
 test-unit-core-1:  ## Run only Core unit shard 1 (heaviest fixture classes — see docs/internal/core-unit-shard-inventory.md)
 	@dotnet build "$(SLNX)" --no-restore --nologo
@@ -184,21 +189,21 @@ test-coverage:  ## Run the unit bucket with coverage collection (Cobertura + Ope
 	@dotnet build "$(SLNX)" --no-restore --nologo
 	@dotnet test "$(SLNX)" --no-restore --no-build --filter "$(TEST_UNIT_FILTER)" --logger trx --collect:"XPlat Code Coverage" \
 		--results-directory "$(RESULTS_DIR)/units" \
-		-- DataCollectionRunSettings.DataCollectors.DataCollector.Configuration.Format=cobertura,opencover
+		-- DataCollectionRunSettings.DataCollectors.DataCollector.Configuration.Format=cobertura,opencover $(TEST_COVERAGE_COLLECTOR_EXCLUDE)
 
 test-coverage-core-1:  ## CI: collect coverage for Core unit shard 1 in an isolated checkout
 	@rm -rf "$(RESULTS_DIR)/coverage/core-1"
 	@dotnet build "$(SLNX)" --no-restore --nologo
 	@dotnet test "$(CORE_TESTS_CSPROJ)" --no-restore --no-build --filter "$(TEST_CORE_UNIT_SHARD_1_FILTER)" --logger trx $(TEST_COVERAGE_DIAGNOSTICS) --collect:"XPlat Code Coverage" \
 		--results-directory "$(RESULTS_DIR)/coverage/core-1" \
-		-- DataCollectionRunSettings.DataCollectors.DataCollector.Configuration.Format=cobertura,opencover
+		-- DataCollectionRunSettings.DataCollectors.DataCollector.Configuration.Format=cobertura,opencover $(TEST_COVERAGE_COLLECTOR_EXCLUDE)
 
 test-coverage-core-2:  ## CI: collect coverage for Core unit shard 2 in an isolated checkout
 	@rm -rf "$(RESULTS_DIR)/coverage/core-2"
 	@dotnet build "$(SLNX)" --no-restore --nologo
 	@dotnet test "$(CORE_TESTS_CSPROJ)" --no-restore --no-build --filter "$(TEST_CORE_UNIT_SHARD_2_FILTER)" --logger trx $(TEST_COVERAGE_DIAGNOSTICS) --collect:"XPlat Code Coverage" \
 		--results-directory "$(RESULTS_DIR)/coverage/core-2" \
-		-- DataCollectionRunSettings.DataCollectors.DataCollector.Configuration.Format=cobertura,opencover
+		-- DataCollectionRunSettings.DataCollectors.DataCollector.Configuration.Format=cobertura,opencover $(TEST_COVERAGE_COLLECTOR_EXCLUDE)
 
 test-coverage-other:  ## CI: collect coverage for CEL/Cli unit assemblies in an isolated checkout
 	@rm -rf "$(RESULTS_DIR)/coverage/other"
@@ -215,7 +220,7 @@ test-coverage-main-ci:  ## Run unit-bucket coverage for local/main diagnostics w
 	@dotnet build "$(SLNX)" --no-restore --nologo
 	@dotnet test "$(SLNX)" --no-restore --no-build --filter "$(TEST_UNIT_FILTER)" --logger trx --blame-hang --blame-hang-timeout 5m \
 		--collect:"XPlat Code Coverage" --results-directory "$(RESULTS_DIR)/units" \
-		-- DataCollectionRunSettings.DataCollectors.DataCollector.Configuration.Format=cobertura,opencover
+		-- DataCollectionRunSettings.DataCollectors.DataCollector.Configuration.Format=cobertura,opencover $(TEST_COVERAGE_COLLECTOR_EXCLUDE)
 
 test-coverage-badge: test-coverage  ## Run tests with coverage and print a test-coverage badge Markdown line
 	@cd "$(PROJECT_ROOT)" && UV_PROJECT_ENVIRONMENT="$(PROJECT_ROOT)/.venv" "$(UV)" run --project tools/pyproject.toml \

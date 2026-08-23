@@ -211,13 +211,6 @@ internal static partial class BoundedReplayRunner
             "--read-only",
             "--tmpfs",
             $"{ContainerScratchDirectory}:rw,nosuid,nodev,noexec,size=128m",
-            // .NET's named Mutex/Semaphore support creates its lock files under a fixed,
-            // TMPDIR-independent path so unrelated processes can rendezvous on the same
-            // name; Coverlet's injected coverage tracker uses one on module unload. This
-            // stays writable purely for that runtime requirement — the application itself
-            // never reads or writes here (see ContainerScratchDirectory/TMPDIR above).
-            "--tmpfs",
-            "/tmp:rw,nosuid,nodev,noexec,size=16m",
             "--mount",
             $"type=bind,src={assemblyDirectory},dst=/harness,readonly",
             "--mount",
