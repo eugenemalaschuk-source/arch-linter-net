@@ -14,13 +14,9 @@
 
 YAML-first architecture governance for .NET repositories.
 
-The architecture-policy badge is available from the CLI as well: run
-`arch-linter-net badge architecture-policy --input architecture-strict.json`
-to project an existing strict result as a Shields endpoint payload. It never reruns analysis.
+ArchLinterNet turns architecture decisions into executable, reviewable contracts. It governs namespace and assembly boundaries, project/package metadata, semantic roles and contexts, public API surfaces, architecture coverage, migration debt, and CI change gates — with deterministic diagnostics that humans and automation can consume.
 
-ArchLinterNet turns architectural decisions into executable contracts: layered boundaries, protected internal APIs, dependency policies, baseline-aware adoption, architecture coverage, and CI-ready diagnostics. It helps teams catch architecture drift in pull requests before it becomes hidden design debt.
-
-The goal is not just to lint dependencies. ArchLinterNet makes architecture rules explicit, reviewable, enforceable, and safe to evolve as a normal part of development.
+The goal is not just to lint dependencies. ArchLinterNet makes architecture rules explicit and safe to evolve as normal repository code.
 
 ## Why ArchLinterNet?
 
@@ -35,16 +31,14 @@ ArchLinterNet CLI / test adapter
         ↓
 strict or audit architecture validation
         ↓
-human diagnostics + CI artifacts
+human diagnostics + JSON/SARIF/CI artifacts
 ```
 
 Use it when you want architecture rules to be declarative, reviewable, CI-friendly, and independent from one-off test code.
 
 ## Quick start
 
-Create a root policy. This quick start uses the recommended concise path
-`architecture/arch.yml`; the filename is configurable and has no runtime
-semantics:
+Create a root policy. This quick start uses the recommended concise path `architecture/arch.yml`; the filename is configurable and has no runtime semantics:
 
 ```yaml
 version: 1
@@ -91,26 +85,25 @@ After installing the .NET tool from NuGet.org:
 arch-linter-net --policy architecture/arch.yml --mode strict
 ```
 
+For repository/CI adoption, prefer a local tool manifest and run `dotnet arch-linter-net ...`; see [Installation](https://eugenemalaschuk-source.github.io/arch-linter-net/installation/).
+
 ## Main capabilities
 
-ArchLinterNet focuses on static architecture guardrails:
+ArchLinterNet focuses on static architecture governance:
 
-- YAML policy loading, deterministic local fragments, and schema-backed root/fragment authoring.
-- Namespace/layer dependency contracts and allow-only contracts.
-- Ordered layer contracts and reusable layer templates.
-- Dependency cycle, acyclic sibling, independence, and assembly independence checks.
-- Directional assembly dependency and assembly allow-only checks.
-- Protected surface contracts for importer restrictions.
-- External dependency leakage checks and external allow-only whitelist checks for vendor/framework namespaces.
-- Method-body forbidden API checks.
-- Unity `.asmdef` dependency validation.
-- Coverage contracts for unmapped first-party namespaces, projects, and assemblies.
-- Project/solution discovery when assemblies are not hand-listed.
-- Policy-consistency diagnostics for contradictory or unreachable policy definitions.
-- Strict gates, audit diagnostics, JSON output, timings, and migration baselines.
-- CEL-backed `when` predicates narrowing selectors on a closed set of locations — standard CEL under a safe, documented profile, not a proprietary DSL.
+- YAML root policies, deterministic local imports, packaged schemas, and reusable bounded source sets.
+- Namespace/layer dependency, allow-only, ordered-layer, protected-surface, cycle, independence, assembly, and module-container governance.
+- External dependency, NuGet package, framework-reference, project-metadata, method-body, and Unity `.asmdef` rules.
+- Type placement, source-layout conventions, attribute usage, inheritance, interface implementation, composition boundaries, and public API surface snapshots.
+- Semantic classification from implemented code facts, selector-backed layers, contextual dependency/allow-only rules, and semantic port/ACL boundaries.
+- Coverage contracts for `namespace`, `project`, `assembly`, `dependency_edge`, `rule_input`, and `semantic_role` inventory.
+- Project/solution discovery, explicit build-state preflight, opt-in `--ensure-built`, condition sets, persistent analysis cache, and bounded parallel scanning.
+- Strict gates, audit discovery, migration baselines, policy consistency, policy-context export, and policy-weakening review.
+- Architecture change snapshots/reports, history forensics, dependency graphs/path explanation, architecture-policy badge projection, and public API lifecycle commands.
+- Human, normalized JSON, SARIF where applicable, repeatable report sinks, timings, analysis profiles, and CI-oriented coverage artifacts.
+- CEL-backed `when` predicates at documented closed locations — standard CEL under a safe profile, not an open-ended scripting language.
 
-ArchLinterNet does **not** validate runtime dependency injection behavior, authorization/security correctness, code ownership, semantic data flow, or arbitrary custom YAML fields outside the documented schema.
+ArchLinterNet does **not** validate runtime dependency-injection behavior, authorization/security correctness, code ownership, arbitrary semantic data flow, or undocumented custom YAML contract families.
 
 ## Documentation
 
@@ -119,18 +112,19 @@ Public product documentation is published through MkDocs and GitHub Pages:
 - [Documentation home](https://eugenemalaschuk-source.github.io/arch-linter-net/)
 - [Getting started](https://eugenemalaschuk-source.github.io/arch-linter-net/getting-started/)
 - [Installation](https://eugenemalaschuk-source.github.io/arch-linter-net/installation/)
-- [CLI usage](https://eugenemalaschuk-source.github.io/arch-linter-net/cli/)
-- [Verify release provenance](https://eugenemalaschuk-source.github.io/arch-linter-net/guides/release-provenance-verification/)
+- [CLI reference](https://eugenemalaschuk-source.github.io/arch-linter-net/cli/)
 - [Policy format](https://eugenemalaschuk-source.github.io/arch-linter-net/policy-format/)
-- [Policy imports](https://eugenemalaschuk-source.github.io/arch-linter-net/policy-format/imports/)
-- [CEL policy expressions](https://eugenemalaschuk-source.github.io/arch-linter-net/policy-format/cel-expressions/)
 - [Contract families](https://eugenemalaschuk-source.github.io/arch-linter-net/contracts/)
 - [Coverage contracts](https://eugenemalaschuk-source.github.io/arch-linter-net/contracts/coverage/)
+- [Supported capabilities and non-goals](https://eugenemalaschuk-source.github.io/arch-linter-net/policy-format/supported-capabilities/)
+- [Real-repository workflow](https://eugenemalaschuk-source.github.io/arch-linter-net/guides/real-repository-workflow/)
 - [CI integration](https://eugenemalaschuk-source.github.io/arch-linter-net/guides/ci-integration/)
 - [Adopt or upgrade ArchLinterNet](https://eugenemalaschuk-source.github.io/arch-linter-net/guides/upgrading/)
 - [Reference entrypoints](https://eugenemalaschuk-source.github.io/arch-linter-net/guides/reference-entrypoints/)
+- [Verify release provenance](https://eugenemalaschuk-source.github.io/arch-linter-net/guides/release-provenance-verification/)
 - [AI policy authoring](https://eugenemalaschuk-source.github.io/arch-linter-net/ai/)
-- [Supported capabilities and non-goals](https://eugenemalaschuk-source.github.io/arch-linter-net/policy-format/supported-capabilities/)
+
+The public capability references are checked against runtime/schema/CLI inventories by `make lint-docs`, so a new executable capability cannot silently leave the main documentation matrix stale.
 
 Internal project documentation remains in repository Markdown files such as `docs/internal/`, `openspec/`, `.github/`, and root governance files. It is not part of the published product site.
 
@@ -141,10 +135,18 @@ make venv        # create Python virtual environment
 make docs-serve  # preview MkDocs locally
 make docs-build  # build the static documentation site
 make fmt-docs    # auto-format markdown documentation
-make lint-docs   # strict documentation validation
+make lint-docs   # strict structure + semantic documentation validation
 ```
 
 Generated `site/` output is a build artifact and should not be committed.
+
+## Architecture-policy badge
+
+Project an existing strict JSON result to a Shields endpoint payload without rerunning analysis:
+
+```bash
+arch-linter-net badge architecture-policy --input architecture-strict.json
+```
 
 ## Project health and assurance
 
@@ -161,12 +163,7 @@ Generated `site/` output is a build artifact and should not be committed.
   <a href="https://sonarcloud.io/summary/overall?id=eugenemalaschuk-source_arch-linter-net&branch=main"><img alt="Sonar Security" src="https://sonarcloud.io/api/project_badges/measure?project=eugenemalaschuk-source_arch-linter-net&metric=security_rating&branch=main"></a>
 </p>
 
-The CI badge tracks the central CI workflow. The Architecture policy badge is a
-separate dynamic status for the latest `main` run of strict ArchLinterNet
-self-policy validation; it does not claim test coverage or architecture
-coverage. SonarCloud also analyzes trusted pull requests, decorates the PR, and
-evaluates the quality gate on new code rather than forcing the entire historical
-codebase to be clean before the PR can merge:
+The CI badge tracks the central CI workflow. The Architecture policy badge is a separate dynamic status for the latest `main` run of strict ArchLinterNet self-policy validation; it does not claim test coverage or architecture coverage. SonarCloud also analyzes trusted pull requests, decorates the PR, and evaluates the quality gate on new code rather than forcing the entire historical codebase to be clean before the PR can merge:
 
 | Quality signal | Source |
 |---|---|

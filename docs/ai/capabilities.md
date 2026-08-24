@@ -1,231 +1,71 @@
-# Capabilities
+# Capabilities for AI Policy Authors
 
-This page summarizes what ArchLinterNet can and cannot validate for AI policy authors. The machine-readable version is `archlinternet.capabilities.json`.
+AI agents must use the same capability truth as human users. This page intentionally does not maintain a second contract-family matrix.
 
-For adoption, migration, output, and execution guidance, use
-[Adopt or Upgrade ArchLinterNet](../guides/upgrading.md) as the canonical user
-path. Package release history is not part of the evergreen policy-authoring
-identity.
+The machine-readable capability inventory is `archlinternet.capabilities.json`. The human inventory is [Supported capabilities and non-goals](../policy-format/supported-capabilities.md), and the exact family/group mapping is [Contract families](../contracts/index.md). Runtime validators, the CLI tree, and packaged schemas take precedence if a discrepancy is discovered.
 
-## Supported policy structure
+## Safe authoring workflow
 
-Each run uses one selected root policy; `architecture/arch.yml` is the
-recommended concise convention, not a required filename. A root may import
-focused local fragments and contains:
+Before editing a policy:
 
-- `version`: current value is `1`.
-- `name`: human-readable policy name.
-- `imports`: optional ordered relative paths to partial policy fragments.
-- `layers`: named namespace-prefix, constrained glob, or selector-backed layer definitions.
-- `external_dependencies`: named vendor/framework dependency groups.
-- `source_sets`: named reusable assembly/layer/project sets referenced by contracts.
-- `legacy_runtime_layers`: optional namespace prefixes used by dependency contracts.
-- `analysis`: target assemblies, assembly search paths, optional source roots, condition sets, and default condition set.
-- `contracts`: strict and audit contract groups.
+1. Read the selected root policy and imports.
+2. Read `archlinternet.capabilities.json`.
+3. Use the packaged/root JSON Schema instead of inventing fields.
+4. Run `policy check` for static policy validity.
+5. Export `policy context` when the change depends on effective selectors, source sets, exceptions, or semantic evidence.
+6. Run normal strict/audit validation after the edit.
+7. For base/current review, run `policy weakening`; treat `impact_not_proven` as a review requirement, not proof of safety.
 
-## Packaged schemas
+## Layer semantics
 
-Installed releases expose their immutable offline `adoption-stabilization/v1` schema registry through `arch-linter-net schema list` and `arch-linter-net schema print <logical-id>`. It identifies every implemented format: policy root/fragment v1, baseline v2 with identity v1, the line-oriented API snapshot v1, normalized finding v1, analysis build-state receipt v1, analysis-cache v1, and analysis-profile v1. Normalized diagnostic JSON retains legacy common fields while adding `schema_version`, `kind`, and typed `details`; cache entries reject unsupported envelope versions, and profiles retain deterministic counters plus optional measurements.
+A layer may be:
 
-## Policy-only checks
+- namespace-backed;
+- selector-backed;
+- both namespace- and selector-backed.
 
-`arch-linter-net policy check --policy <path>` validates policy syntax, imports, composition, static declarations, and static path/configuration references without building projects or loading target assemblies. It explicitly reports fact-dependent architecture checks as deferred; use ordinary strict validation to determine architecture compliance.
+Selector-only layers are supported. A combined layer uses AND semantics. Selector metadata uses the documented exact/operator semantics for its location; never infer regex or arbitrary expression support.
 
-`arch-linter-net policy context --policy <path> --format json|markdown` exports
-the effective policy facts an agent should inspect before editing: declared
-layers, active contracts, semantic roles and metadata, coverage scopes, narrow
-exceptions, portable provenance, and safe review guidance. It does not validate
-projects, assemblies, or architecture results; run normal strict validation
-after the change.
+## Implemented coverage scopes
 
-`arch-linter-net policy weakening --base-context <path> --current-context <path>` is a change-time guardrail, not a second architecture evaluator. It
-compares separately exported policy-context JSON artifacts from the base and
-current states. It proves only typed, explicit relaxations (such as a
-same-control strict-to-audit change, a resolved source-set reduction, or an
-added permission); selector-based changes require complete, context-bound
-membership evidence. Without that evidence the command reports a bounded
-`impact_not_proven` review finding rather than inventing affected types. It
-does not run normal validation, simulate a candidate policy, or establish a
-baseline for existing code.
+<!-- coverage-scope: namespace -->
+- `namespace`
+<!-- coverage-scope: project -->
+- `project`
+<!-- coverage-scope: assembly -->
+- `assembly`
+<!-- coverage-scope: dependency_edge -->
+- `dependency_edge`
+<!-- coverage-scope: rule_input -->
+- `rule_input`
+<!-- coverage-scope: semantic_role -->
+- `semantic_role`
 
-The same bounded rule applies to `project_include` and `project_exclude`: they
-are project-discovery globs, not literal project inventories. A changed glob
-is reviewable `impact_not_proven` unless resolved project membership is present.
-The authored `target_assemblies`, `projects`, and `source_roots` fields are
-also bounded: discovery and scanner defaults can make textual removal an
-effective expansion, so context-only comparison cannot classify it as semantic.
-In contrast, a source set or source expansion changing from required to
-optional/empty-tolerant, and an ignored violation whose typed `source_type` and
-`forbidden_reference` matchers are both `*`, are provable semantic relaxations.
-Semantic inventory comparison is restricted to explicit scalar string sets of
-exact identities; prefixes such as `forbidden_` and `allowed_only_in_` do not
-establish direction by themselves. Prefix/glob/call-pattern facts and
-cross-field location unions require containment or trusted effective membership
-before they can be semantic. Known boolean prohibitions weaken only from `true`
-to `false`; any other changed typed contract shape without a dedicated rule is
-bounded `impact_not_proven`, rather than being silently ignored or guessed.
+Do not describe any of these six scopes as reserved or unsupported. See [Coverage contracts](../contracts/coverage.md).
 
-## Supported contract families
+## Semantic governance
 
-| Family | Strict group | Audit group | Validates |
-|--------|--------------|-------------|-----------|
-| Dependency | `strict` | `audit` | Source layer must not reference forbidden layers. |
-| Layer order | `strict_layers` | `audit_layers` | Dependencies point from outer layers toward inner layers. |
-| Allow-only | `strict_allow_only` | `audit_allow_only` | Source layer references only itself and allowed first-party layers. |
-| Cycle | `strict_cycles` | `audit_cycles` | Selected layers do not form directed cycles. |
-| Acyclic sibling | `strict_acyclic_siblings` | `audit_acyclic_siblings` | Direct sibling namespaces under ancestor namespaces do not form dependency cycles. |
-| Module container | `strict_module_containers` | `audit_module_containers` | Discovers direct feature modules below a namespace container and enforces the selected profile's sibling-isolation, root-purity, segment, and dependency-direction rules. |
-| Method body | `strict_method_body` | `audit_method_body` | Source layer does not call forbidden APIs. |
-| asmdef | `strict_asmdef` | `audit_asmdef` | Unity `.asmdef` references avoid editor refs or forbidden prefixes. |
-| Independence | `strict_independence` | `audit_independence` | Selected layers do not reference each other. |
-| Assembly independence | `strict_assembly_independence` | `audit_assembly_independence` | Selected .NET assemblies do not directly reference each other. |
-| Assembly dependency | `strict_assembly_dependency` | `audit_assembly_dependency` | Source assembly does not directly reference forbidden assemblies. |
-| Assembly allow-only | `strict_assembly_allow_only` | `audit_assembly_allow_only` | Source assembly directly references only itself and explicitly allowed declared assemblies. |
-| Project metadata | `strict_project_metadata` | `audit_project_metadata` | Selected discovered projects preserve required metadata, restrict friend assemblies, and avoid forbidden project references. |
-| Protected surface | `strict_protected` | `audit_protected` | Protected layers are referenced only by explicitly allowed importers. |
-| External dependency | `strict_external` | `audit_external` | Source layer does not reference forbidden vendor/framework dependency groups. Supports `sources`/`source_sets` plus bounded `exclude_sources`/`exclude_source_sets` subtraction. |
-| External allow-only | `strict_external_allow_only` | `audit_external_allow_only` | Source layer references only explicitly allowed vendor/framework dependency groups. Supports `sources`/`source_sets` plus bounded `exclude_sources`/`exclude_source_sets` subtraction. |
-| Layer template | `strict_layer_templates` | `audit_layer_templates` | Reusable layer order applied to multiple containers, with optional `exclude_containers` subtraction before expansion. |
-| Type placement | `strict_type_placement` | `audit_type_placement` | A selected architectural role resides in a declared layer/namespace/project/assembly and/or carries a declared naming suffix/prefix, with optional subtractive `exclude_types_matching` filters. |
-| Layout conventions | `strict_layout_conventions` | `audit_layout_conventions` | Declarations in source files selected by folder/namespace segment and/or file-name prefix/suffix satisfy kind, role, abstract-class, naming, file-name, declaration-count, and/or matching-interface expectations, with optional subtractive `exclude_files_matching` filters. |
-| Public API surface | `strict_public_api_surface` | `audit_public_api_surface` | An assembly's exported public/protected/protected-internal types and members match a declared signature allowlist. |
-| Attribute usage | `strict_attribute_usage` | `audit_attribute_usage` | A declared attribute/marker type appears only in (or never in) a declared layer/namespace/project/assembly. |
-| Inheritance | `strict_inheritance` | `audit_inheritance` | Types in a declared source layer/namespace do not inherit (directly or transitively) from declared forbidden base types. |
-| Interface implementation | `strict_interface_implementation` | `audit_interface_implementation` | Implementations of declared interfaces reside only in (or never in) declared layers/namespaces/projects/assemblies. |
-| Composition | `strict_composition` | `audit_composition` | Composition-root/service-locator API calls occur only from a declared composition boundary (layers/namespaces/projects/assemblies). |
-| Coverage | `strict_coverage` | `audit_coverage` | First-party namespaces, projects, assemblies, dependency edges, rule inputs, and opt-in semantic roles are covered by a layer, template expansion, contextual selector, explicit exclusion, or a reviewed exact planned-empty input. |
-| Contextual dependency | `strict_context_dependencies` | `audit_context_dependencies` | A source `(role, metadata)` selector's type must not reference a target matching a `forbidden` selector, compared directly against discovered role/metadata (no `layers.<name>` involved). |
-| Contextual allow-only | `strict_context_allow_only` | `audit_context_allow_only` | A source `(role, metadata)` selector's type may reference only targets matching an `allowed` selector; same selector shape and operator vocabulary as contextual dependency. |
-| Semantic port boundary | `strict_port_boundaries` | `audit_port_boundaries` | A selected source may reach a target context only through an explicit port or ACL seam; compiled adapter interface bindings can be checked. |
-| Package dependency | `strict_package_dependency` | `audit_package_dependency` | Source project/assembly does not declare a `PackageReference` matching a forbidden `packages` group. |
-| Package allow-only | `strict_package_allow_only` | `audit_package_allow_only` | Source project/assembly declares only `PackageReference`s matching an allowed `packages` group. |
-| Framework dependency | `strict_framework_dependency` | `audit_framework_dependency` | Source project/assembly does not declare a `FrameworkReference` matching a forbidden `framework_references` group. |
-| Framework allow-only | `strict_framework_allow_only` | `audit_framework_allow_only` | Source project/assembly declares only `FrameworkReference`s matching an allowed `framework_references` group. |
+Implemented classification evidence includes type attributes, assembly attributes, inheritance, and namespace rules. Selector-backed layers, contextual dependency/allow-only contracts, semantic port boundaries, and semantic-role coverage consume the effective role/metadata model.
 
-## Reusable source sets
+Schema-accepted fields explicitly documented as deferred/no-op remain deferred. Presence in YAML schema alone is not proof that runtime analysis is implemented.
 
-Declare `source_sets.<name>` at document level with a `kind` (`assembly`, `layer`, or `project`),
-explicit `members`, constrained `globs`, and an optional `optional: true` plus `reason`. A set never
-widens analysis: `assembly` globs resolve only against `analysis.target_assemblies`, `layer` globs
-only against declared `layers` keys, and project members/path globs resolve only against explicit
-projects or the filtered `analysis.solution` inventory. Project globs use repository-relative
-`*`/`**` path matching, not dotted assembly/layer matching.
+## Bounded reasoning rules
 
-Package dependency, package allow-only, framework dependency, framework allow-only, external
-dependency, external allow-only, assembly dependency, and assembly allow-only contracts may declare `sources`/`source_sets` instead of
-`source`. These same families may additionally subtract `exclude_sources`/`exclude_source_sets`
-after expansion, without widening the declared universe. Each authored contract then expands into one
-instance per resolved source, with the derived id `<authored-id>/<normalized-source>` and its own
-diagnostics and baseline identity; the authored id remains valid for `--contract` selection and
-rule-input coverage `contract_ids`. Project metadata contracts use `project_sets` and composition
-contracts use `allowed_only_in_assembly_sets`, which union resolved members into the existing list
-field instead of fanning out.
+When authoring or reviewing:
 
-Expansion is deterministic, bounded at 500 instances per authored contract, and fails closed on an
-unknown set, mismatched `kind`, out-of-input member, glob with no declared universe, zero-match
-selector, or a contract declaring both `source` and `sources`/`source_sets`. Only a set declaring
-`optional: true` with a `reason` may resolve to nothing; that state is reported through `explain`,
-JSON, and SARIF rather than silently dropping the contract.
+- never assume a source-set glob widens analysis beyond declared inputs;
+- never treat a changed project discovery glob as a literal resolved project inventory without evidence;
+- never infer policy safety from absence of a finding when coverage does not govern the relevant inventory;
+- never silently broaden ignored violations or exclusions;
+- never treat `policy check` or `policy weakening` as substitutes for architecture validation;
+- never treat public API surface checks as binary/package compatibility proof;
+- never treat attribute placement checks as authorization/security correctness.
 
-## Matching semantics
+## Where to look next
 
-Layer `namespace` values match exact namespaces and child namespaces. For example, `MyCompany.Product.Domain` matches `MyCompany.Product.Domain` and `MyCompany.Product.Domain.Models`.
-
-Layer `namespace` also supports constrained glob patterns using `*` as a full namespace segment. For example, `MyCompany.Product.Features.*` matches `MyCompany.Product.Features.Audio` and descendants such as `MyCompany.Product.Features.Audio.Player`.
-
-`namespace_suffix` can narrow a layer to a suffix such as `Contracts` or `Models`. When `namespace` contains a glob, the suffix is position-fixed immediately after the resolved namespace pattern.
-
-A layer may declare a `selector` (`role` and optional `metadata` key/value constraints) instead of, or in addition to, `namespace`. Selector matching uses the per-run role index (types classified via `classification.attributes`/`classification.assembly_attributes`) and applies exact-match AND semantics: every metadata key/value constraint must match. When both `namespace` and `selector` are present, a type must satisfy both. Selector-only layers produce types resolved by role/metadata alone, with no namespace predicate.
-
-`external_dependencies.namespace_prefixes` match exact namespaces and child namespaces. `external_dependencies.type_prefixes` match full referenced type names by prefix.
-
-`ignored_violations` should be exact and narrow. Broad patterns should be treated as temporary migration debt and reviewed by a human.
-
-Type placement `types_matching` fields (`name_suffix`, `name_prefix`, `namespace`, `layer`, `base_type`, `implements_interface`, `has_attribute`) combine with AND semantics — every populated field must match. `exclude_types_matching` reuses the same matcher shape and subtracts matched types after inclusion. Effective selector evidence records the positive matcher and each exclusion as matched, stale, or evaluation-failed. There is no regex or expression-language selector. `must_reside_in_projects` resolves to assembly-name matching via project discovery (see [Type placement contracts](../contracts/type-placement.md)); it is not physical `.csproj`-membership tracking.
-
-Layout conventions `files_matching` fields (`folder_segment`, `namespace_segment`, `file_name_suffix`, `file_name_prefix`) combine with AND semantics — every populated field must match; there is no regex. `exclude_files_matching` reuses the same matcher shape and subtracts matched candidates before expectations, including its own `when` predicates. Effective selector evidence records the positive matcher and each exclusion as matched, stale, or evaluation-failed. `files_matching.when` is the one exception to the "no expression-language selector" rule elsewhere in this family: an optional CEL predicate narrowing which declared types in an already-selected file are checked (see the closed `when` location list below). `require_matching_interface` only applies to concrete (non-abstract) classes. Folder/file-name matching and record-vs-class/struct type-kind classification require `analysis.source_roots`; when that data is missing for the whole run, or for an individual declared type under partial enrichment, the contract reports a deterministic "unavailable" diagnostic rather than silently passing. See [Layout convention contracts](../contracts/layout-conventions.md).
-
-Public API surface `declared_api` entries are normalized signature strings (`<kind> <FullyQualifiedName>[(<param types>)][: <member type>]`); generic type/method parameters are rendered positionally (`!N`/`!!N`), not by their source-declared name. `forbid_public_constants_unless_declared` is an independent, stricter check layered on top of the general declaration — an exported `const` field can still be forbidden even when its full signature is already in `declared_api`, unless its fully-qualified name is also in `allowed_public_constants`. An optional `surface_selector` (reusing `type_placement.types_matching`'s matcher fields plus `role`) restricts governed types to an intentional reviewed subset instead of the whole assembly; a type selected this way keeps its existing semantic role unchanged, an empty selector is rejected at load, a selector matching nothing fails closed as a violation, and a selected member depending on an unselected first-party type also fails closed. See [Public API surface contracts](../contracts/public-api-surface.md) for the full grammar.
-
-Attribute usage `attributes` entries match an attribute type's fully-qualified name exactly (ordinal); `attribute_prefixes` entries match by ordinal `StartsWith`. Every declared member is scanned regardless of visibility (unlike public API surface), because markers such as `[SerializeField]` and `[Authorize]` commonly decorate non-public members. `allowed_only_in_*` forms an allow-list (violation if the matched attribute's enclosing type satisfies none of it); `forbidden_in_*` forms a deny-list (violation if it satisfies any of it); a contract must declare at least one attribute selector and at least one location expectation. See [Attribute usage contracts](../contracts/attribute-usage.md) — this family does not implement required-marker ("must carry attribute X") checks; those are deferred to a documented follow-up.
-
-Inheritance `forbidden_base_types` entries match a base type's fully-qualified name exactly (ordinal); `forbidden_base_type_prefixes` entries match by ordinal `StartsWith`. The full base-class chain is walked (transitive inheritance is detected), constructed generic base types are matched by their generic type definition's CLR name (arity suffix, e.g. `` App.Repository`1 ``), and interface implementations are never matched by this family. A contract must declare at least one source surface selector (`source_layers`/`source_namespaces`) and at least one base type selector. See [Inheritance contracts](../contracts/inheritance.md).
-
-Interface implementation `interfaces` entries match an interface's fully-qualified name exactly (ordinal); `interface_prefixes` entries match by ordinal `StartsWith`. A non-interface type matches through its full interface set, including interfaces inherited via base classes; interface types extending a selected interface are never violations. `allowed_only_in_*`/`forbidden_in_*` follow the same allow-list/deny-list semantics as attribute usage, and a contract must declare at least one interface selector and at least one location expectation. This is static metadata analysis, not runtime dependency-injection resolution. See [Interface implementation contracts](../contracts/interface-implementation.md).
-
-Composition `forbidden_apis` entries use the same call-pattern vocabulary as method-body contracts (member names, `Type.Member` names, fully qualified members, namespace/type prefixes). Every loaded type outside the `allowed_only_in_*` composition boundary is scanned reflection/IL-only for calls matching a `forbidden_apis` entry; a type inside the boundary is never scanned. A contract must declare at least one `forbidden_apis` entry and at least one `allowed_only_in_*` boundary entry — unlike interface implementation and attribute usage, there is no separate `forbidden_in_*` deny-list, since everything outside the allow-list is forbidden by definition. This is static reflection/IL call-site detection, not runtime dependency-injection resolution — it does not prove every service is registered correctly. See [Composition contracts](../contracts/composition.md).
-
-Project metadata contracts target discovered project paths (`projects`) rather than assemblies or layers. `required_properties` and `forbidden_properties` compare exact scalar MSBuild property values, including statically inherited values from the nearest readable `Directory.Build.props` chain. `allowed_friend_assemblies` compares exact `InternalsVisibleTo` names from project-file items and source-level assembly attributes, and `forbidden_project_references` uses project-path glob matching against declared `ProjectReference` targets. This is static project metadata analysis only — not full MSBuild evaluation or runtime/package validation. See [Project metadata contracts](../contracts/project-metadata.md).
-
-## Strict versus audit
-
-Strict contracts are blocking rules for current no-new-debt gates. Audit contracts are diagnostic rules for discovery, future-state architecture, and migration planning.
-
-Coverage findings also honor `analysis.coverage`:
-
-- `error`: findings fail validation;
-- `warn`: findings are reported but do not fail validation;
-- `off`: findings are suppressed.
-
-Current limit: `scope: namespace`, `scope: rule_input`, `scope: project`,
-`scope: assembly`, `scope: dependency_edge`, and `scope: semantic_role` are implemented for coverage
-contracts. `scope: dependency_edge` declares `between` (declared-layer-name
-pairs) and classifies observed first-party namespace-to-namespace edges per
-pair as `covered` (governed by an existing dependency, layer, independence,
-allow-only, protected, or expanded layer-template contract), `excluded`, or
-`uncovered`. Layer pairs absent from every `between` list are not evaluated.
-
-## Supported adoption helpers
-
-ArchLinterNet supports generated baselines for existing repositories:
-
-```bash
-arch-linter-net baseline generate \
-  --config architecture/dependencies.arch.yml \
-  --output architecture/baseline.arch.yml
-```
-
-Baselines are frozen debt, not a way to hide new violations.
-
-Baseline writes are reviewable, not automatic. `generate`, `update`, and `prune`
-accept `--dry-run` (report only) and print the proposed document to stdout when
-`--output` is omitted; `generate` and `migrate` refuse to replace an existing output
-file without `--force`; every write is atomic, and a no-op `prune` reproduces its
-input byte-for-byte. `update`/`prune` preserve a leading
-comment header plus each entry's `reason` and optional `issue` metadata, and
-refuse to rewrite a file whose comments sit next to entries. Newly added entries
-can take per-contract or per-family reasons via `--reason-for-contract` and
-`--reason-for-family`; carried-over entries keep their recorded reason. All
-subcommands report one entry lifecycle — `new`, `matched`, `resolved`, `stale`,
-`changed`, `ambiguous`, `configuration-error`, the vocabulary fixed by the
-`adoption-stabilization-compatibility` capability — plus a separate disposition
-(`reported`/`added`/`retained`/`removed`) in human and JSON output. Only
-`matched` suppresses a finding. `baseline verify` is the only baseline command intended for CI — never
-regenerate or update a baseline automatically.
-
-For machine consumers, `baseline diff`, `baseline verify`, and `baseline migrate`
-support `--format sarif`; each result exposes `baseline_status` and canonical
-identity fields as SARIF properties. The Testing adapter exposes the same typed
-comparison outcomes through `WithBaseline(...).DiffBaseline()`, `VerifyBaseline()`,
-and `MigrateBaseline()`.
-
-## Not supported
-
-ArchLinterNet does not currently validate:
-
-- runtime behavior or dynamic dependency injection resolution;
-- security policy, authorization, or data access permissions;
-- code ownership or review ownership;
-- semantic data-flow analysis;
-- third-party package internals;
-- CEL-backed policy expressions outside the closed set of `when` locations
-  (`layers.<name>.selector.when`; contextual dependency/allow-only
-  `source`/`forbidden`/`allowed`/`exclude` selectors; and layout convention
-  `files_matching.when` — see the
-  [policy authoring guide](policy-authoring-guide.md#cel-when-predicates));
-  `when` is never inferred from ordinary strings anywhere else;
-- unrestricted namespace pattern systems;
-- unrestricted custom contract families outside the documented YAML schema;
-- arbitrary YAML fields such as `severity`, `from`, `to`, `regex`, `owner`, or custom rule groups unless the schema documents them.
-
-Do not author YAML fields for unsupported capabilities. Track future needs in a separate proposal instead.
+- [Policy format](../policy-format/index.md)
+- [YAML schema reference](../reference/yaml-schema.md)
+- [Contract families](../contracts/index.md)
+- [CLI reference](../cli/index.md)
+- [AI policy authoring guide](policy-authoring-guide.md)
+- [Policy weakening review](policy-weakening-review.md)
