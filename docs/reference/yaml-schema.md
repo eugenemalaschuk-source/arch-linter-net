@@ -13,7 +13,7 @@ arch-linter-net schema print policy-root
 
 Persisted format schemas are versioned independently from package SemVer. Do not synthesize schema URLs from the tool package version.
 
-## Root versus fragment
+## Root and fragment schemas
 
 | Document | Repository schema | Purpose |
 | --- | --- | --- |
