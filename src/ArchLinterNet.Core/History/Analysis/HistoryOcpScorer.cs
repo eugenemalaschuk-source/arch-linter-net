@@ -8,7 +8,6 @@ namespace ArchLinterNet.Core.History.Analysis;
 
 internal sealed class HistoryOcpScorer
 {
-    private const decimal Scale = 1_000_000_000m;
     private static readonly HashSet<string> _roleTokens = new(StringComparer.Ordinal)
     {
         "dispatcher", "registry", "handler", "loader", "session", "options", "configuration",
@@ -29,7 +28,7 @@ internal sealed class HistoryOcpScorer
             static vertex => vertex.CanonicalPath,
             static vertex => vertex.File,
             StringComparer.Ordinal);
-        List<Candidate> candidates = bottleneckAnalysis.Findings
+        List<Candidate> candidates = bottleneckAnalysis.GetFindings()
             .Select(finding => CreateCandidate(finding, filesByPath[finding.CanonicalPath]))
             .ToList();
         List<HistoryOcpCategoryGroup> groups = [];

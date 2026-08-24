@@ -30,7 +30,7 @@ public sealed class HistoryBottleneckScorerTests
         string last = repository.Commit("second #2");
 
         HistoryBottleneckFinding finding = HistoryIngestionFixture.Succeed(repository, first, last)
-            .BottleneckAnalysis.Findings.Single();
+            .BottleneckAnalysis.GetFindings().Single();
         BottleneckTaskPair pair = finding.RawEvidence.IndependentTaskPairs.Single();
 
         Assert.Multiple(() =>
@@ -56,7 +56,7 @@ public sealed class HistoryBottleneckScorerTests
         string last = repository.Commit("shared #101 #102");
 
         HistoryBottleneckFinding finding = HistoryIngestionFixture.Succeed(repository, first, last)
-            .BottleneckAnalysis.Findings.Single();
+            .BottleneckAnalysis.GetFindings().Single();
 
         Assert.Multiple(() =>
         {
@@ -84,7 +84,7 @@ public sealed class HistoryBottleneckScorerTests
             Commit(secondId, "1000000000000000000000000000000", "-1200", two, "#2"),
         };
 
-        HistoryBottleneckFinding finding = Score(files, commits).Findings.Single();
+        HistoryBottleneckFinding finding = Score(files, commits).GetFindings().Single();
         BottleneckTaskPair pair = finding.RawEvidence.IndependentTaskPairs.Single();
 
         Assert.Multiple(() =>
@@ -107,7 +107,7 @@ public sealed class HistoryBottleneckScorerTests
         var files = new[] { new LogicalFile("X.cs", [], [Event(firstId), Event(secondId)]) };
         var commits = new[] { Commit(firstId, "0", "+0000", one, "#1"), Commit(secondId, "90000", "+0000", two, "#2") };
 
-        BottleneckTaskPair pair = Score(files, commits).Findings.Single().RawEvidence.IndependentTaskPairs.Single();
+        BottleneckTaskPair pair = Score(files, commits).GetFindings().Single().RawEvidence.IndependentTaskPairs.Single();
 
         Assert.Multiple(() =>
         {
@@ -140,8 +140,8 @@ public sealed class HistoryBottleneckScorerTests
         HistoryBottleneckAnalysis high = Score(files, commits, threshold: 1m);
 
         Assert.That(
-            high.Findings.Select(DescribeFinding),
-            Is.EqualTo(low.Findings.Select(DescribeFinding)));
+            high.GetFindings().Select(DescribeFinding),
+            Is.EqualTo(low.GetFindings().Select(DescribeFinding)));
     }
 
     [Test]

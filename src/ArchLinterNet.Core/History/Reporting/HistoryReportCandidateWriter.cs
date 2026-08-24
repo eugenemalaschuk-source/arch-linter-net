@@ -11,7 +11,7 @@ internal static class HistoryReportCandidateWriter
     public static void Write(CanonicalJsonWriter writer, HistoryIngestionResult result)
     {
         writer.BeginArray("candidates");
-        foreach (HotspotFinding finding in result.HotspotAnalysis.Findings.Where(static item => item.Score > 0m))
+        foreach (HotspotFinding finding in result.HotspotAnalysis.GetFindings().Where(static item => item.Score > 0m))
         {
             WriteHotspot(writer, finding);
         }
@@ -24,12 +24,12 @@ internal static class HistoryReportCandidateWriter
             }
         }
 
-        foreach (HistoryBottleneckFinding finding in result.BottleneckAnalysis.Findings.Where(static item => item.Score > 0m))
+        foreach (HistoryBottleneckFinding finding in result.BottleneckAnalysis.GetFindings().Where(static item => item.Score > 0m))
         {
             WriteBottleneck(writer, finding);
         }
 
-        foreach (HistoryOcpFinding finding in result.OcpAnalysis.Findings.Where(static item => item.Score > 0m))
+        foreach (HistoryOcpFinding finding in result.OcpAnalysis.GetFindings().Where(static item => item.Score > 0m))
         {
             WriteOcpPressure(writer, finding);
         }

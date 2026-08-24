@@ -106,39 +106,49 @@ public static class ArchitecturePolicyContextFormatter
 
         foreach (ArchitecturePolicyContextContract contract in contracts)
         {
-            string reason = string.IsNullOrWhiteSpace(contract.Reason) ? string.Empty : $" — {Inline(contract.Reason)}";
-            markdown.AppendLine(
-                $"- **{Inline(contract.Mode)} / {Inline(contract.Family)}** `{Inline(contract.Id)}`: {Inline(contract.Name)}{reason}");
-            foreach (ArchitecturePolicyContextReference reference in contract.References)
-            {
-                markdown.AppendLine($"  - {Inline(reference.Kind)}: {string.Join(", ", reference.Values.Select(value => $"`{Inline(value)}`"))}");
-            }
+            AppendContract(markdown, contract);
+        }
+    }
 
-            foreach (ArchitecturePolicyContextContractFact fact in contract.Facts.Where(fact => fact.Items.Count > 0))
-            {
-                AppendFact(markdown, fact, 2);
-            }
+    private static void AppendContract(StringBuilder markdown, ArchitecturePolicyContextContract contract)
+    {
+        string reason = string.IsNullOrWhiteSpace(contract.Reason) ? string.Empty : $" — {Inline(contract.Reason)}";
+        markdown.AppendLine(
+            $"- **{Inline(contract.Mode)} / {Inline(contract.Family)}** `{Inline(contract.Id)}`: {Inline(contract.Name)}{reason}");
+        foreach (ArchitecturePolicyContextReference reference in contract.References)
+        {
+            markdown.AppendLine($"  - {Inline(reference.Kind)}: {string.Join(", ", reference.Values.Select(value => $"`{Inline(value)}`"))}");
+        }
 
-            foreach (ArchitecturePolicyContextSelector selector in contract.Selectors)
-            {
-                markdown.AppendLine($"  - {FormatSelector(selector)}");
-            }
+        foreach (ArchitecturePolicyContextContractFact fact in contract.Facts.Where(fact => fact.Items.Count > 0))
+        {
+            AppendFact(markdown, fact, 2);
+        }
 
-            foreach (ArchitecturePolicyContextAdapterBinding binding in contract.AdapterBindings)
-            {
-                markdown.AppendLine("  - adapter binding:");
-                markdown.AppendLine($"    - {FormatSelector(binding.Adapter)}");
-                markdown.AppendLine($"    - {FormatSelector(binding.ExpectedPort)}");
-                foreach (ArchitecturePolicyContextSelector allowedContext in binding.AllowedContexts)
-                {
-                    markdown.AppendLine($"    - {FormatSelector(allowedContext)}");
-                }
-            }
+        foreach (ArchitecturePolicyContextSelector selector in contract.Selectors)
+        {
+            markdown.AppendLine($"  - {FormatSelector(selector)}");
+        }
 
-            foreach (string scope in contract.CoverageScopes)
-            {
-                markdown.AppendLine($"  - coverage scope: `{Inline(scope)}`");
-            }
+        foreach (ArchitecturePolicyContextAdapterBinding binding in contract.AdapterBindings)
+        {
+            AppendAdapterBinding(markdown, binding);
+        }
+
+        foreach (string scope in contract.CoverageScopes)
+        {
+            markdown.AppendLine($"  - coverage scope: `{Inline(scope)}`");
+        }
+    }
+
+    private static void AppendAdapterBinding(StringBuilder markdown, ArchitecturePolicyContextAdapterBinding binding)
+    {
+        markdown.AppendLine("  - adapter binding:");
+        markdown.AppendLine($"    - {FormatSelector(binding.Adapter)}");
+        markdown.AppendLine($"    - {FormatSelector(binding.ExpectedPort)}");
+        foreach (ArchitecturePolicyContextSelector allowedContext in binding.AllowedContexts)
+        {
+            markdown.AppendLine($"    - {FormatSelector(allowedContext)}");
         }
     }
 
@@ -181,42 +191,52 @@ public static class ArchitecturePolicyContextFormatter
         markdown.AppendLine("## Source-set expansions");
         foreach (ArchitecturePolicyContextSourceExpansion expansion in expansions)
         {
-            List<string> details = new() { $"kind `{Inline(expansion.Kind)}`" };
-            if (expansion.SetNames.Count > 0)
-            {
-                details.Add($"source sets {string.Join(", ", expansion.SetNames.Select(name => $"`{Inline(name)}`"))}");
-            }
-
-            if (!string.IsNullOrWhiteSpace(expansion.SelectorField)) details.Add($"field `{Inline(expansion.SelectorField)}`");
-            if (expansion.OptionalEmpty) details.Add("optional-empty");
-            if (!string.IsNullOrWhiteSpace(expansion.OptionalReason)) details.Add($"reason `{Inline(expansion.OptionalReason)}`");
-            markdown.AppendLine($"- `{Inline(expansion.Group)}` `{Inline(expansion.AuthoredContractId)}`: {string.Join("; ", details)}");
-
-            foreach (ArchitecturePolicyContextExpandedInstance instance in expansion.Instances)
-            {
-                markdown.AppendLine($"  - effective {FormatExpandedInstance(instance)}");
-            }
-
-            foreach (ArchitecturePolicyContextExpandedInstance inclusion in expansion.Inclusions)
-            {
-                markdown.AppendLine($"  - included {FormatExpandedInstance(inclusion)}");
-            }
-
-            foreach (ArchitecturePolicyContextExpandedExclusion exclusion in expansion.Exclusions)
-            {
-                string kind = exclusion.SetName is null ? "source" : "source set";
-                string state = exclusion.Matched ? "matched" : "stale";
-                string optional = exclusion.OptionalEmpty ? "; optional-empty" : string.Empty;
-                string source = exclusion.SetName is not null && !string.IsNullOrWhiteSpace(exclusion.Source)
-                    ? $"; source `{Inline(exclusion.Source)}`"
-                    : string.Empty;
-                string reason = string.IsNullOrWhiteSpace(exclusion.OptionalReason)
-                    ? string.Empty
-                    : $"; reason `{Inline(exclusion.OptionalReason)}`";
-                string provenance = FormatProvenance(exclusion.Provenance);
-                markdown.AppendLine($"  - excluded {kind} `{Inline(exclusion.SetName ?? exclusion.Source ?? string.Empty)}` ({state}{optional}){source}{reason}{provenance}");
-            }
+            AppendSourceExpansion(markdown, expansion);
         }
+    }
+
+    private static void AppendSourceExpansion(StringBuilder markdown, ArchitecturePolicyContextSourceExpansion expansion)
+    {
+        List<string> details = new() { $"kind `{Inline(expansion.Kind)}`" };
+        if (expansion.SetNames.Count > 0)
+        {
+            details.Add($"source sets {string.Join(", ", expansion.SetNames.Select(name => $"`{Inline(name)}`"))}");
+        }
+
+        if (!string.IsNullOrWhiteSpace(expansion.SelectorField)) details.Add($"field `{Inline(expansion.SelectorField)}`");
+        if (expansion.OptionalEmpty) details.Add("optional-empty");
+        if (!string.IsNullOrWhiteSpace(expansion.OptionalReason)) details.Add($"reason `{Inline(expansion.OptionalReason)}`");
+        markdown.AppendLine($"- `{Inline(expansion.Group)}` `{Inline(expansion.AuthoredContractId)}`: {string.Join("; ", details)}");
+
+        foreach (ArchitecturePolicyContextExpandedInstance instance in expansion.Instances)
+        {
+            markdown.AppendLine($"  - effective {FormatExpandedInstance(instance)}");
+        }
+
+        foreach (ArchitecturePolicyContextExpandedInstance inclusion in expansion.Inclusions)
+        {
+            markdown.AppendLine($"  - included {FormatExpandedInstance(inclusion)}");
+        }
+
+        foreach (ArchitecturePolicyContextExpandedExclusion exclusion in expansion.Exclusions)
+        {
+            AppendSourceExpansionExclusion(markdown, exclusion);
+        }
+    }
+
+    private static void AppendSourceExpansionExclusion(StringBuilder markdown, ArchitecturePolicyContextExpandedExclusion exclusion)
+    {
+        string kind = exclusion.SetName is null ? "source" : "source set";
+        string state = exclusion.Matched ? "matched" : "stale";
+        string optional = exclusion.OptionalEmpty ? "; optional-empty" : string.Empty;
+        string source = exclusion.SetName is not null && !string.IsNullOrWhiteSpace(exclusion.Source)
+            ? $"; source `{Inline(exclusion.Source)}`"
+            : string.Empty;
+        string reason = string.IsNullOrWhiteSpace(exclusion.OptionalReason)
+            ? string.Empty
+            : $"; reason `{Inline(exclusion.OptionalReason)}`";
+        string provenance = FormatProvenance(exclusion.Provenance);
+        markdown.AppendLine($"  - excluded {kind} `{Inline(exclusion.SetName ?? exclusion.Source ?? string.Empty)}` ({state}{optional}){source}{reason}{provenance}");
     }
 
     private static void AppendFact(StringBuilder markdown, ArchitecturePolicyContextContractFact fact, int indent)

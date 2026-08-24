@@ -205,10 +205,12 @@ internal sealed class HistoryHotspotScorer
         BigInteger squared = MultiplyScaled(scaledValue, scaledValue);
         BigInteger power = scaledValue;
         BigInteger sum = BigInteger.Zero;
-        for (int divisor = 1; !power.IsZero; divisor += 2)
+        int divisor = 1;
+        while (!power.IsZero)
         {
             sum += power / divisor;
             power = MultiplyScaled(power, squared);
+            divisor += 2;
         }
 
         return sum * 2;

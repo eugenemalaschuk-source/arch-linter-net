@@ -114,5 +114,5 @@ internal sealed class HistoryOcpAnalysis(IReadOnlyList<HistoryOcpCategoryGroup> 
 {
     public IReadOnlyList<HistoryOcpCategoryGroup> Groups { get; } = groups;
 
-    public IReadOnlyList<HistoryOcpFinding> Findings => Groups.SelectMany(static group => group.Findings).ToArray();
+    public IReadOnlyList<HistoryOcpFinding> GetFindings() => Groups.SelectMany(static group => group.Findings).ToArray();
 }

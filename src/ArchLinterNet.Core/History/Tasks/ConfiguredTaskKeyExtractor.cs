@@ -29,47 +29,57 @@ internal sealed class ConfiguredTaskKeyExtractor : ITaskKeyExtractor
     {
         for (int matchStart = 0; matchStart <= rawMessage.Length - _prefix.Length; matchStart++)
         {
-            if (!rawMessage.AsSpan(matchStart, _prefix.Length).SequenceEqual(_prefix)
-                || (matchStart > 0 && IsBoundaryByte(rawMessage[matchStart - 1])))
+            if (TryMatchAt(rawMessage, matchStart, out TaskKeyMatch? match))
             {
-                continue;
+                matches.Add(match!);
             }
-
-            int identifierStart = matchStart + _prefix.Length;
-            int identifierEnd = identifierStart;
-            while (identifierEnd < rawMessage.Length && IsAsciiDigit(rawMessage[identifierEnd]))
-            {
-                identifierEnd++;
-            }
-
-            if (identifierEnd == identifierStart
-                || identifierEnd + _suffix.Length > rawMessage.Length
-                || !rawMessage.AsSpan(identifierEnd, _suffix.Length).SequenceEqual(_suffix))
-            {
-                continue;
-            }
-
-            int matchEnd = identifierEnd + _suffix.Length;
-            if (matchEnd < rawMessage.Length && IsBoundaryByte(rawMessage[matchEnd]))
-            {
-                continue;
-            }
-
-            BigInteger identifier = BigInteger.Parse(
-                Encoding.ASCII.GetString(rawMessage, identifierStart, identifierEnd - identifierStart),
-                CultureInfo.InvariantCulture);
-            if (identifier <= BigInteger.Zero)
-            {
-                continue;
-            }
-
-            matches.Add(new TaskKeyMatch(
-                ExtractorId,
-                new TaskKey(_keyNamespace, identifier),
-                matchStart,
-                matchEnd,
-                Encoding.UTF8.GetString(rawMessage, matchStart, matchEnd - matchStart)));
         }
+    }
+
+    private bool TryMatchAt(byte[] rawMessage, int matchStart, out TaskKeyMatch? match)
+    {
+        match = null;
+        if (!rawMessage.AsSpan(matchStart, _prefix.Length).SequenceEqual(_prefix)
+            || (matchStart > 0 && IsBoundaryByte(rawMessage[matchStart - 1])))
+        {
+            return false;
+        }
+
+        int identifierStart = matchStart + _prefix.Length;
+        int identifierEnd = identifierStart;
+        while (identifierEnd < rawMessage.Length && IsAsciiDigit(rawMessage[identifierEnd]))
+        {
+            identifierEnd++;
+        }
+
+        if (identifierEnd == identifierStart
+            || identifierEnd + _suffix.Length > rawMessage.Length
+            || !rawMessage.AsSpan(identifierEnd, _suffix.Length).SequenceEqual(_suffix))
+        {
+            return false;
+        }
+
+        int matchEnd = identifierEnd + _suffix.Length;
+        if (matchEnd < rawMessage.Length && IsBoundaryByte(rawMessage[matchEnd]))
+        {
+            return false;
+        }
+
+        BigInteger identifier = BigInteger.Parse(
+            Encoding.ASCII.GetString(rawMessage, identifierStart, identifierEnd - identifierStart),
+            CultureInfo.InvariantCulture);
+        if (identifier <= BigInteger.Zero)
+        {
+            return false;
+        }
+
+        match = new TaskKeyMatch(
+            ExtractorId,
+            new TaskKey(_keyNamespace, identifier),
+            matchStart,
+            matchEnd,
+            Encoding.UTF8.GetString(rawMessage, matchStart, matchEnd - matchStart));
+        return true;
     }
 
     private static bool IsAsciiDigit(byte value) => value is >= (byte)'0' and <= (byte)'9';

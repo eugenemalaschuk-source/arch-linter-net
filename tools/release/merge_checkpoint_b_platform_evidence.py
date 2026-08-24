@@ -68,51 +68,78 @@ def merge_platform_shards(input_directory: Path, candidate_manifest: Path) -> di
         )
 
     records = [(path, _load(path)) for path in paths]
+    _validate_shard_inventory(records)
+
+    first_path, first = records[0]
+    for path, record in records:
+        _validate_shard_record(path, record, first_path, first, manifest, manifest_digest)
+
+    all_scenarios = [scenario for _, record in records for scenario in record["scenarios"]]
+    _validate_scenario_union(all_scenarios)
+
+    policy_shape = _extract_policy_shape(records)
+
+    return _build_merged_record(first, all_scenarios, policy_shape)
+
+
+def _validate_shard_inventory(records: list[tuple[Path, dict[str, Any]]]) -> None:
     shard_ids = [record.get("shard_id") for _, record in records]
     if len(set(shard_ids)) != len(shard_ids) or set(shard_ids) != _REQUIRED_SHARDS:
         raise ValueError(f"Checkpoint B shard inventory mismatch: {sorted(str(value) for value in shard_ids)}.")
 
-    first_path, first = records[0]
-    for path, record in records:
-        if record.get("schema") != _SHARD_SCHEMA:
-            raise ValueError(f"{path} does not use the supported shard evidence schema.")
-        if record.get("checkpoint") != "B" or record.get("result") not in {"passed", "failed"}:
-            raise ValueError(f"{path} does not report a Checkpoint B shard result.")
-        if record.get("synthetic_identities_only") is not True:
-            raise ValueError(f"{path} does not affirm synthetic identities only.")
-        if record.get("candidate_version") != manifest["version"]:
-            raise ValueError(f"{path} candidate version differs from the manifest.")
-        if record.get("source_commit") != manifest["source_commit"]:
-            raise ValueError(f"{path} source commit differs from the manifest.")
-        if record.get("candidate_manifest_sha256") != manifest_digest:
-            raise ValueError(f"{path} is not bound to the candidate manifest digest.")
-        if record.get("packages") != manifest["packages"]:
-            raise ValueError(f"{path} package inventory differs from the candidate manifest.")
-        for field in _COMMON_FIELDS:
-            if record.get(field) != first.get(field):
-                raise ValueError(
-                    f"Checkpoint B shards disagree on '{field}': '{first_path}' versus '{path}'."
-                )
 
-        scenarios = record.get("scenarios")
-        if not isinstance(scenarios, list) or not scenarios:
-            raise ValueError(f"{path} has no scenario results.")
-        ids: list[str] = []
-        for scenario in scenarios:
-            if not isinstance(scenario, dict) or not isinstance(scenario.get("id"), str):
-                raise ValueError(f"{path} contains a malformed scenario record.")
-            if scenario.get("result") not in _SCENARIO_RESULTS:
-                raise ValueError(f"{path} contains a malformed scenario result.")
-            if scenario["result"] != "passed" and not isinstance(scenario.get("reason"), str):
-                raise ValueError(f"{path} does not explain a non-passing scenario.")
-            ids.append(scenario["id"])
-        if len(ids) != len(set(ids)):
-            raise ValueError(f"{path} contains duplicate scenario IDs.")
-        declared_failed = any(scenario["result"] == "failed" for scenario in scenarios)
-        if declared_failed != (record["result"] == "failed"):
-            raise ValueError(f"{path} shard result contradicts its scenario results.")
+def _validate_shard_record(
+    path: Path,
+    record: dict[str, Any],
+    first_path: Path,
+    first: dict[str, Any],
+    manifest: dict[str, Any],
+    manifest_digest: str,
+) -> None:
+    if record.get("schema") != _SHARD_SCHEMA:
+        raise ValueError(f"{path} does not use the supported shard evidence schema.")
+    if record.get("checkpoint") != "B" or record.get("result") not in {"passed", "failed"}:
+        raise ValueError(f"{path} does not report a Checkpoint B shard result.")
+    if record.get("synthetic_identities_only") is not True:
+        raise ValueError(f"{path} does not affirm synthetic identities only.")
+    if record.get("candidate_version") != manifest["version"]:
+        raise ValueError(f"{path} candidate version differs from the manifest.")
+    if record.get("source_commit") != manifest["source_commit"]:
+        raise ValueError(f"{path} source commit differs from the manifest.")
+    if record.get("candidate_manifest_sha256") != manifest_digest:
+        raise ValueError(f"{path} is not bound to the candidate manifest digest.")
+    if record.get("packages") != manifest["packages"]:
+        raise ValueError(f"{path} package inventory differs from the candidate manifest.")
+    for field in _COMMON_FIELDS:
+        if record.get(field) != first.get(field):
+            raise ValueError(
+                f"Checkpoint B shards disagree on '{field}': '{first_path}' versus '{path}'."
+            )
 
-    all_scenarios = [scenario for _, record in records for scenario in record["scenarios"]]
+    _validate_shard_scenarios(path, record)
+
+
+def _validate_shard_scenarios(path: Path, record: dict[str, Any]) -> None:
+    scenarios = record.get("scenarios")
+    if not isinstance(scenarios, list) or not scenarios:
+        raise ValueError(f"{path} has no scenario results.")
+    ids: list[str] = []
+    for scenario in scenarios:
+        if not isinstance(scenario, dict) or not isinstance(scenario.get("id"), str):
+            raise ValueError(f"{path} contains a malformed scenario record.")
+        if scenario.get("result") not in _SCENARIO_RESULTS:
+            raise ValueError(f"{path} contains a malformed scenario result.")
+        if scenario["result"] != "passed" and not isinstance(scenario.get("reason"), str):
+            raise ValueError(f"{path} does not explain a non-passing scenario.")
+        ids.append(scenario["id"])
+    if len(ids) != len(set(ids)):
+        raise ValueError(f"{path} contains duplicate scenario IDs.")
+    declared_failed = any(scenario["result"] == "failed" for scenario in scenarios)
+    if declared_failed != (record["result"] == "failed"):
+        raise ValueError(f"{path} shard result contradicts its scenario results.")
+
+
+def _validate_scenario_union(all_scenarios: list[dict[str, Any]]) -> None:
     all_ids = [scenario["id"] for scenario in all_scenarios]
     if len(all_ids) != len(set(all_ids)):
         raise ValueError("Checkpoint B scenario IDs overlap between shards.")
@@ -123,6 +150,8 @@ def merge_platform_shards(input_directory: Path, candidate_manifest: Path) -> di
             f"Checkpoint B shard union is incomplete: missing={missing}, unexpected={unexpected}."
         )
 
+
+def _extract_policy_shape(records: list[tuple[Path, dict[str, Any]]]) -> dict[str, Any]:
     shapes = [
         (record["shard_id"], record.get("policy_shape"))
         for _, record in records
@@ -135,7 +164,14 @@ def merge_platform_shards(input_directory: Path, candidate_manifest: Path) -> di
         raise ValueError("Checkpoint B consumer-cleanup shard reports an invalid policy_shape.")
     if any(not isinstance(value, int) for value in policy_shape.values()):
         raise ValueError("Checkpoint B policy_shape contains a non-numeric counter.")
+    return policy_shape
 
+
+def _build_merged_record(
+    first: dict[str, Any],
+    all_scenarios: list[dict[str, Any]],
+    policy_shape: dict[str, Any],
+) -> dict[str, Any]:
     return {
         "schema": _PLATFORM_SCHEMA,
         "checkpoint": "B",
@@ -168,7 +204,7 @@ def main() -> int:
 
     merged = merge_platform_shards(input_dir, candidate_manifest)
     output.parent.mkdir(parents=True, exist_ok=True)
-    # NOSONAR: 'output' is already confined to the working tree or repo root by _safe_path above,
+    # 'output' is already confined to the working tree or repo root by _safe_path above,
     # and 'merged' is assembled only from shard files discovered by rglob() strictly under the
     # confined input_directory, so this write cannot escape the release workspace. Sonar's Python
     # taint tracker does not recognize a cross-module call as a sanitizer, so it still reports

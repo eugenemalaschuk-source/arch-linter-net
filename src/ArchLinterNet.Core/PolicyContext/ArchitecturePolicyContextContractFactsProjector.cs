@@ -75,14 +75,14 @@ internal static class ArchitecturePolicyContextContractFactsProjector
             Values("allowed_module_root_types", value.AllowedModuleRootTypes))),
         ArchitectureTypePlacementContract value => Create(value.Reason, value.IgnoredViolations, Facts(
             Object("types_matching", TypeMatcherFacts(value.TypesMatching)),
-            Objects("exclude_types_matching", "type_matcher", value.ExcludeTypesMatching.Select(item => Object("type_matcher", TypeMatcherFacts(item)))),
+            Objects("exclude_types_matching", value.ExcludeTypesMatching.Select(item => Object("type_matcher", TypeMatcherFacts(item)))),
             Values("must_reside_in_layers", value.MustResideInLayers), Values("must_reside_in_namespaces", value.MustResideInNamespaces),
             Values("must_reside_in_projects", value.MustResideInProjects), Values("must_reside_in_assemblies", value.MustResideInAssemblies),
             Text("required_name_suffix", value.RequiredNameSuffix), Text("required_name_prefix", value.RequiredNamePrefix),
             Text("forbidden_name_suffix", value.ForbiddenNameSuffix), Text("forbidden_name_prefix", value.ForbiddenNamePrefix))),
         ArchitectureLayoutConventionContract value => Create(value.Reason, value.IgnoredViolations, Facts(
             Object("files_matching", LayoutMatcherFacts(value.FilesMatching)),
-            Objects("exclude_files_matching", "file_matcher", value.ExcludeFilesMatching.Select(item => Object("file_matcher", LayoutMatcherFacts(item)))),
+            Objects("exclude_files_matching", value.ExcludeFilesMatching.Select(item => Object("file_matcher", LayoutMatcherFacts(item)))),
             Text("require_type_kind", value.RequireTypeKind), Text("forbid_type_kind", value.ForbidTypeKind),
             Text("required_name_suffix", value.RequiredNameSuffix), Text("required_name_prefix", value.RequiredNamePrefix),
             Text("forbidden_name_suffix", value.ForbiddenNameSuffix), Text("forbidden_name_prefix", value.ForbiddenNamePrefix),
@@ -95,7 +95,7 @@ internal static class ArchitecturePolicyContextContractFactsProjector
             Object("surface_selector", PublicApiSelectorFacts(value.SurfaceSelector)), Text("api_snapshot", value.ApiSnapshot),
             Text("api_comparison", value.ApiComparison), Flag("forbid_public_constants_unless_declared", value.ForbidPublicConstantsUnlessDeclared),
             Values("allowed_public_constants", value.AllowedPublicConstants),
-            Objects("resolved_snapshot_entries", "entry", value.ResolvedSnapshotEntries.Select(entry => Object("entry",
+            Objects("resolved_snapshot_entries", value.ResolvedSnapshotEntries.Select(entry => Object("entry",
                 Text("assembly", entry.AssemblyName), Text("signature", entry.Signature)))))),
         ArchitectureAttributeUsageContract value => Create(value.Reason, value.IgnoredViolations, Scoped(value.Attributes, value.AttributePrefixes,
             value.AllowedOnlyInLayers, value.AllowedOnlyInNamespaces, value.AllowedOnlyInProjects, value.AllowedOnlyInAssemblies,
@@ -110,20 +110,20 @@ internal static class ArchitecturePolicyContextContractFactsProjector
             Values("forbidden_apis", value.ForbiddenApis), Values("allowed_only_in_layers", value.AllowedOnlyInLayers),
             Values("allowed_only_in_namespaces", value.AllowedOnlyInNamespaces), Values("allowed_only_in_projects", value.AllowedOnlyInProjects),
             Values("allowed_only_in_assemblies", value.AllowedOnlyInAssemblies), Values("allowed_only_in_assembly_sets", value.AllowedOnlyInAssemblySets),
-            Objects("allowed_only_in_types", "type", value.AllowedOnlyInTypes.Select(item => Object("type",
+            Objects("allowed_only_in_types", value.AllowedOnlyInTypes.Select(item => Object("type",
                 Text("assembly", item.Assembly), Text("type", item.Type)))))),
         ArchitectureContextDependencyContract value => Create(value.Reason, value.IgnoredViolations, Array.Empty<ArchitecturePolicyContextContractFact>()),
         ArchitectureContextAllowOnlyContract value => Create(value.Reason, value.IgnoredViolations, Array.Empty<ArchitecturePolicyContextContractFact>()),
         ArchitectureCoverageContract value => Create(value.Reason, value.IgnoredViolations, Facts(
             Text("scope", value.Scope),
-            Objects("roots", "root", value.Roots.Select(item => Object("root", Text("namespace", item.Namespace),
+            Objects("roots", value.Roots.Select(item => Object("root", Text("namespace", item.Namespace),
                 Text("namespace_suffix", item.NamespaceSuffix), Values("include", item.Include), Values("exclude", item.Exclude)))),
-            Objects("between", "boundary", value.Between.Select(item => Object("boundary", Values("layers", item)))),
+            Objects("between", value.Between.Select(item => Object("boundary", Values("layers", item)))),
             Values("contract_ids", value.ContractIds),
-            Objects("exclude", "exclusion", value.Exclude.Select(item => Object("exclusion", Text("namespace", item.Namespace),
+            Objects("exclude", value.Exclude.Select(item => Object("exclusion", Text("namespace", item.Namespace),
                 Text("namespace_suffix", item.NamespaceSuffix), Text("project", item.Project), Text("assembly", item.Assembly),
                 Text("contract_id", item.ContractId), Text("role", item.Role), Map("metadata", item.Metadata), Values("between", item.Between), Text("reason", item.Reason)))),
-            Objects("optional_inputs", "input", value.OptionalInputs.Select(item => Object("input", Text("contract_id", item.ContractId),
+            Objects("optional_inputs", value.OptionalInputs.Select(item => Object("input", Text("contract_id", item.ContractId),
                 Text("input", item.Input), Text("layer", item.Layer), Text("reason", item.Reason)))))),
         ArchitecturePortBoundaryContract value => Create(value.Reason, value.IgnoredViolations, Facts(
             Object("target_context", Map("metadata", value.TargetContext.Metadata)))),
@@ -173,10 +173,10 @@ internal static class ArchitecturePolicyContextContractFactsProjector
         Text("file_name_suffix", matcher.FileNameSuffix), Text("file_name_prefix", matcher.FileNamePrefix), Text("when", matcher.When));
 
     private static ArchitecturePolicyContextContractFact? OrderedLayers(IEnumerable<string> layers, ISet<string>? optionalLayers = null) => Objects(
-        "layers", "layer", layers.Select(layer => Object("layer", Text("name", layer), Flag("optional", optionalLayers?.Contains(layer) ?? false))));
+        "layers", layers.Select(layer => Object("layer", Text("name", layer), Flag("optional", optionalLayers?.Contains(layer) ?? false))));
 
     private static ArchitecturePolicyContextContractFact? OrderedLayers(IEnumerable<ArchitectureTemplateLayer> layers) => Objects(
-        "layers", "layer", layers.Select(layer => Object("layer", Text("name", layer.Name), Flag("optional", layer.Optional))));
+        "layers", layers.Select(layer => Object("layer", Text("name", layer.Name), Flag("optional", layer.Optional))));
 
     private static ArchitecturePolicyContextContractFact? Text(string name, string? value) => string.IsNullOrWhiteSpace(value)
         ? null
@@ -189,9 +189,15 @@ internal static class ArchitecturePolicyContextContractFactsProjector
         ? null
         : Text(name, value.Value.ToString(CultureInfo.InvariantCulture));
 
-    private static ArchitecturePolicyContextContractFact? Flag(string name, bool? value) => value is null
-        ? null
-        : Text(name, value.Value ? "true" : "false");
+    private static ArchitecturePolicyContextContractFact? Flag(string name, bool? value)
+    {
+        if (value is null)
+        {
+            return null;
+        }
+
+        return Text(name, value.Value ? "true" : "false");
+    }
 
     private static ArchitecturePolicyContextContractFact? Values(string name, IEnumerable<string>? values)
     {
@@ -200,10 +206,10 @@ internal static class ArchitecturePolicyContextContractFactsProjector
     }
 
     private static ArchitecturePolicyContextContractFact? Map(string name, IReadOnlyDictionary<string, string> values) => Objects(
-        name, "property", values.OrderBy(item => item.Key, StringComparer.Ordinal).Select(item => Object("property", Text("name", item.Key), Text("value", item.Value))));
+        name, values.OrderBy(item => item.Key, StringComparer.Ordinal).Select(item => Object("property", Text("name", item.Key), Text("value", item.Value))));
 
     private static ArchitecturePolicyContextContractFact? Map(string name, IReadOnlyDictionary<string, object> values) => Objects(
-        name, "property", values.OrderBy(item => item.Key, StringComparer.Ordinal).Select(item => Object("property", Text("name", item.Key), Text("value", Display(item.Value)))));
+        name, values.OrderBy(item => item.Key, StringComparer.Ordinal).Select(item => Object("property", Text("name", item.Key), Text("value", Display(item.Value)))));
 
     private static ArchitecturePolicyContextContractFact? Object(string name, IReadOnlyList<ArchitecturePolicyContextContractFact> items) =>
         items.Count == 0 ? null : new ArchitecturePolicyContextContractFact(name, Array.Empty<string>(), items);
@@ -211,7 +217,7 @@ internal static class ArchitecturePolicyContextContractFactsProjector
     private static ArchitecturePolicyContextContractFact? Object(string name, params ArchitecturePolicyContextContractFact?[] items) =>
         Object(name, Facts(items));
 
-    private static ArchitecturePolicyContextContractFact? Objects(string name, string _, IEnumerable<ArchitecturePolicyContextContractFact?> items) =>
+    private static ArchitecturePolicyContextContractFact? Objects(string name, IEnumerable<ArchitecturePolicyContextContractFact?> items) =>
         Object(name, items.Where(item => item is not null).Cast<ArchitecturePolicyContextContractFact>().ToArray());
 
     private static IReadOnlyList<ArchitecturePolicyContextContractFact> Facts(IEnumerable<ArchitecturePolicyContextContractFact?> facts) =>

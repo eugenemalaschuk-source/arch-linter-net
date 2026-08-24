@@ -171,7 +171,11 @@ public static class ArchitecturePolicyWeakeningFormatter
 
     private sealed record SarifRule(string Id, SarifMessage ShortDescription);
 
-    private sealed record SarifResult(string RuleId, string Level, SarifMessage Message, SarifProperties Properties);
+    private sealed record SarifResult(
+        [property: JsonPropertyName("ruleId")] string Rule,
+        string Level,
+        SarifMessage Message,
+        SarifProperties Properties);
 
     private sealed record SarifMessage(string Text);
 

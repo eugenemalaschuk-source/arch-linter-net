@@ -10,6 +10,8 @@ namespace ArchLinterNet.Core.History.Enrichment;
 
 internal sealed class WorktreeHistoryDotNetFactProvider : IHistoryDotNetFactProvider
 {
+    private static readonly TimeSpan _regexTimeout = TimeSpan.FromSeconds(1);
+
     private const string PortableRelativePolicyPathPattern =
         @"^(?:(?!\.\.(?:[/\\]|$)|\.(?:[/\\]|$))[^<>:""|?*\u0000-\u001F])+$";
 
@@ -112,7 +114,7 @@ internal sealed class WorktreeHistoryDotNetFactProvider : IHistoryDotNetFactProv
             || relative.StartsWith($"..{Path.DirectorySeparatorChar}", StringComparison.Ordinal)
             || relative.StartsWith($"..{Path.AltDirectorySeparatorChar}", StringComparison.Ordinal);
         bool portableRelativePath = !string.Equals(relative, ".", StringComparison.Ordinal)
-            && Regex.IsMatch(relative, PortableRelativePolicyPathPattern, RegexOptions.CultureInvariant);
+            && Regex.IsMatch(relative, PortableRelativePolicyPathPattern, RegexOptions.CultureInvariant, _regexTimeout);
         if (outsideRepository || !portableRelativePath)
         {
             throw new HistoryDotNetEnrichmentUnavailableException("policy_repository_mismatch");
@@ -182,29 +184,29 @@ internal sealed class WorktreeHistoryDotNetFactProvider : IHistoryDotNetFactProv
 
     private static string RunGit(string repositoryPath, bool readHead)
     {
-        ProcessStartInfo startInfo = new("git")
-        {
-            RedirectStandardOutput = true,
-            RedirectStandardError = true,
-            UseShellExecute = false,
-            CreateNoWindow = true,
-            WorkingDirectory = repositoryPath
-        };
-        if (readHead)
-        {
-            startInfo.ArgumentList.Add("rev-parse");
-            startInfo.ArgumentList.Add("--verify");
-            startInfo.ArgumentList.Add("HEAD");
-        }
-        else
-        {
-            startInfo.ArgumentList.Add("status");
-            startInfo.ArgumentList.Add("--porcelain=v1");
-            startInfo.ArgumentList.Add("--untracked-files=all");
-        }
-
         try
         {
+            ProcessStartInfo startInfo = new(ResolveGitExecutablePath())
+            {
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                UseShellExecute = false,
+                CreateNoWindow = true,
+                WorkingDirectory = repositoryPath
+            };
+            if (readHead)
+            {
+                startInfo.ArgumentList.Add("rev-parse");
+                startInfo.ArgumentList.Add("--verify");
+                startInfo.ArgumentList.Add("HEAD");
+            }
+            else
+            {
+                startInfo.ArgumentList.Add("status");
+                startInfo.ArgumentList.Add("--porcelain=v1");
+                startInfo.ArgumentList.Add("--untracked-files=all");
+            }
+
             using Process process = Process.Start(startInfo) ?? throw new InvalidOperationException();
             string output = process.StandardOutput.ReadToEnd();
             _ = process.StandardError.ReadToEnd();
@@ -224,5 +226,29 @@ internal sealed class WorktreeHistoryDotNetFactProvider : IHistoryDotNetFactProv
         {
             throw new HistoryDotNetEnrichmentUnavailableException("worktree_verification_failed");
         }
+    }
+
+    private static string ResolveGitExecutablePath()
+    {
+        string fileName = OperatingSystem.IsWindows() ? "git.exe" : "git";
+        string? pathVariable = Environment.GetEnvironmentVariable("PATH");
+        if (!string.IsNullOrEmpty(pathVariable))
+        {
+            foreach (string directory in pathVariable.Split(Path.PathSeparator))
+            {
+                if (string.IsNullOrWhiteSpace(directory))
+                {
+                    continue;
+                }
+
+                string candidate = Path.Combine(directory, fileName);
+                if (File.Exists(candidate))
+                {
+                    return Path.GetFullPath(candidate);
+                }
+            }
+        }
+
+        throw new HistoryDotNetEnrichmentUnavailableException("worktree_verification_failed");
     }
 }

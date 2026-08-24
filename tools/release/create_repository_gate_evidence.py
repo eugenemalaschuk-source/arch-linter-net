@@ -14,7 +14,7 @@ from _release_workspace import _safe_path
 
 def _sha256(path: Path) -> str:
     digest = hashlib.sha256()
-    # NOSONAR: the only caller passes candidate_manifest, already confined by _safe_path above, so
+    # The only caller passes candidate_manifest, already confined by _safe_path above, so
     # this open cannot escape the release workspace. Sonar's Python taint tracker does not recognize
     # a cross-module call as a sanitizer; see the identical rationale in
     # merge_checkpoint_b_platform_evidence.py.

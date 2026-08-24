@@ -82,7 +82,8 @@ internal sealed class CanonicalJsonWriter
     public static string Quote(string value)
     {
         StringBuilder quoted = new("\"");
-        for (int index = 0; index < value.Length; index++)
+        int index = 0;
+        while (index < value.Length)
         {
             char character = value[index];
             if (char.IsHighSurrogate(character))
@@ -92,7 +93,8 @@ internal sealed class CanonicalJsonWriter
                     throw new CanonicalJsonUnicodeException(index);
                 }
 
-                quoted.Append(character).Append(value[++index]);
+                quoted.Append(character).Append(value[index + 1]);
+                index += 2;
                 continue;
             }
 
@@ -136,6 +138,8 @@ internal sealed class CanonicalJsonWriter
 
                     break;
             }
+
+            index++;
         }
 
         return quoted.Append('"').ToString();

@@ -73,7 +73,7 @@ def _validated_selector(value: Any, pattern: re.Pattern[str], description: str) 
 
 
 def _verify(arguments: argparse.Namespace, subject: Path) -> list[dict[str, Any]]:
-    # NOSONAR: _command uses the literal `gh` executable; all selectors and the file subject are
+    # _command uses the literal `gh` executable; all selectors and the file subject are
     # validated before they enter this argument vector, and subprocess is never run through a shell.
     completed = subprocess.run(_command(arguments, subject), check=False, capture_output=True, text=True)  # NOSONAR
     if completed.returncode != 0:
@@ -125,7 +125,7 @@ def _verify_tamper_is_rejected(subject: Path, attested_digests: set[str], direct
     subject = _safe_path(subject, "attestation subject")
     directory = _safe_path(directory, "tamper evidence directory")
     tampered = _safe_path(directory / f"tampered-{subject.name}", "tampered release subject")
-    # NOSONAR: subject and tampered are confined by _safe_path above, and tampered is created in a
+    # subject and tampered are confined by _safe_path above, and tampered is created in a
     # TemporaryDirectory rooted inside the already confined candidate packages directory.
     tampered.write_bytes(subject.read_bytes() + b"\nattestation-tamper-negative\n")  # NOSONAR
     if package_manifest._sha256(tampered) in attested_digests:

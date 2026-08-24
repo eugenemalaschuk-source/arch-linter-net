@@ -64,7 +64,7 @@ internal static class CoverageReportRenderer
             lines.Add($"- **`{Code(rule.Identifier)}`{suffix}** — {rule.Diagnostics.Count} failed {noun}");
             foreach (FailureDiagnostic diagnostic in rule.Diagnostics.Take(max ?? int.MaxValue))
             {
-                lines.Add($"  - **{diagnostic.Category}:** {diagnostic.Summary}");
+                lines.Add($"  - **{diagnostic.Category}:** {diagnostic.Message}");
             }
 
             int omitted = rule.Diagnostics.Count - (max ?? rule.Diagnostics.Count);
@@ -113,41 +113,90 @@ internal static class CoverageReportRenderer
 
     private static void RenderChangedFiles(List<string> lines, JsonElement report, IReadOnlyList<string> files, string root)
     {
-        var index = new Dictionary<(string Scope, string Item), string>();
         var scopes = new HashSet<string>(StringComparer.Ordinal);
-        foreach (JsonElement entry in ArrayElement(report, "coverage_summary").EnumerateArray())
-        {
-            string? scope = String(entry, "scope"); if (scope is not ("namespace" or "project" or "assembly")) continue; scopes.Add(scope);
-            foreach (string state in _states)
-                foreach (JsonElement item in ArrayElement(entry, state + "_items").EnumerateArray())
-                    if (String(item, "item") is { } name) index[(scope, name)] = state;
-        }
+        Dictionary<(string Scope, string Item), string> index = BuildCoverageIndex(report, scopes);
         var units = new Dictionary<(string Scope, string Item), string>();
         var attention = new List<string>();
         foreach (string file in files)
         {
-            if (file.Replace('\\', '/').Contains("AdoptionAcceptance/Fixtures", StringComparison.Ordinal)) continue;
-            string? project = FindProject(file, root);
-            if (project is not null && Path.GetFileNameWithoutExtension(project).EndsWith(".Tests", StringComparison.Ordinal)) continue;
-            bool classified = false;
-            foreach ((string scope, string? item) in DetectedUnits(file, project, root, scopes))
-            {
-                if (item is null) continue;
-                classified = true;
-                string state = index.GetValueOrDefault((scope, item), "unknown"); units[(scope, item)] = state;
-                if (state != "covered") attention.Add($"- `{file}` — `{item}` ({scope}): **{state}**");
-            }
-            if (!classified)
-            {
-                units[("unknown", file)] = "unknown";
-                attention.Add($"- `{file}` — `{file}` (unknown): **unknown**");
-            }
+            ClassifyChangedFile(file, root, scopes, index, units, attention);
         }
+
         int covered = units.Values.Count(static state => state == "covered");
         int uncovered = units.Values.Count(static state => state is "uncovered" or "stale" or "excluded");
         int unknown = units.Values.Count(static state => state == "unknown");
         lines.AddRange([string.Empty, "### New-code coverage", string.Empty, "| Metric | Count |", "| --- | --- |", $"| Changed first-party files | {files.Count} |", $"| Changed namespaces/projects/assemblies covered | {covered} |", $"| Changed namespaces/projects/assemblies uncovered | {uncovered} |", $"| Requiring policy update | {(unknown == 0 ? "none" : unknown)} |"]);
         if (attention.Count > 0) { lines.AddRange([string.Empty, "Items needing attention:", string.Empty]); lines.AddRange(attention.Distinct(StringComparer.Ordinal)); }
+    }
+
+    private static Dictionary<(string Scope, string Item), string> BuildCoverageIndex(JsonElement report, HashSet<string> scopes)
+    {
+        var index = new Dictionary<(string Scope, string Item), string>();
+        foreach (JsonElement entry in ArrayElement(report, "coverage_summary").EnumerateArray())
+        {
+            string? scope = String(entry, "scope");
+            if (scope is not ("namespace" or "project" or "assembly"))
+            {
+                continue;
+            }
+
+            scopes.Add(scope);
+            foreach (string state in _states)
+            {
+                foreach (JsonElement item in ArrayElement(entry, state + "_items").EnumerateArray())
+                {
+                    if (String(item, "item") is { } name)
+                    {
+                        index[(scope, name)] = state;
+                    }
+                }
+            }
+        }
+
+        return index;
+    }
+
+    private static void ClassifyChangedFile(
+        string file,
+        string root,
+        HashSet<string> scopes,
+        Dictionary<(string Scope, string Item), string> index,
+        Dictionary<(string Scope, string Item), string> units,
+        List<string> attention)
+    {
+        if (file.Replace('\\', '/').Contains("AdoptionAcceptance/Fixtures", StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        string? project = FindProject(file, root);
+        if (project is not null && Path.GetFileNameWithoutExtension(project).EndsWith(".Tests", StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        bool classified = false;
+        foreach ((string scope, string? item) in DetectedUnits(file, project, root, scopes))
+        {
+            if (item is null)
+            {
+                continue;
+            }
+
+            classified = true;
+            string state = index.GetValueOrDefault((scope, item), "unknown");
+            units[(scope, item)] = state;
+            if (state != "covered")
+            {
+                attention.Add($"- `{file}` — `{item}` ({scope}): **{state}**");
+            }
+        }
+
+        if (!classified)
+        {
+            units[("unknown", file)] = "unknown";
+            attention.Add($"- `{file}` — `{file}` (unknown): **unknown**");
+        }
     }
 
     private static IEnumerable<(string Scope, string? Item)> DetectedUnits(string file, string? project, string root, ISet<string> scopes)
@@ -161,7 +210,21 @@ internal static class CoverageReportRenderer
     {
         string current = Path.GetDirectoryName(Path.GetFullPath(Path.Combine(root, file))) ?? root;
         string normalizedRoot = Path.GetFullPath(root);
-        while (true) { string? project = Directory.EnumerateFiles(current, "*.csproj").FirstOrDefault(); if (project is not null) return project; if (current == normalizedRoot || current == Path.GetPathRoot(current)) return null; current = Directory.GetParent(current)?.FullName ?? normalizedRoot; }
+        while (true)
+        {
+            string? project = Directory.EnumerateFiles(current, "*.csproj").FirstOrDefault();
+            if (project is not null)
+            {
+                return project;
+            }
+
+            if (current == normalizedRoot || current == Path.GetPathRoot(current))
+            {
+                return null;
+            }
+
+            current = Directory.GetParent(current)?.FullName ?? normalizedRoot;
+        }
     }
 
     private static string? Namespace(string file, string root)
@@ -191,12 +254,27 @@ internal static class CoverageReportRenderer
         foreach (string location in new[] { "source_location", "policy_origin", "policy_location" }) if (element.TryGetProperty(location, out JsonElement value)) values[location] = Location(value);
         return values;
     }
-    private static string? Location(JsonElement value) => value.ValueKind != JsonValueKind.Object ? value.ToString() : String(value, "path") is { } path ? path + (String(value, "line") is { } line ? ":" + line : string.Empty) + (String(value, "column") is { } column ? ":" + column : string.Empty) : null;
+    private static string? Location(JsonElement value)
+    {
+        if (value.ValueKind != JsonValueKind.Object)
+        {
+            return value.ToString();
+        }
+
+        if (String(value, "path") is not { } path)
+        {
+            return null;
+        }
+
+        string line = String(value, "line") is { } lineValue ? ":" + lineValue : string.Empty;
+        string column = String(value, "column") is { } columnValue ? ":" + columnValue : string.Empty;
+        return path + line + column;
+    }
     private static string Summary(IReadOnlyDictionary<string, string?> values) => string.Join("; ", new[] { ("code", "message_code"), ("source", "source"), ("subject", "subject"), ("state", "state"), ("item", "item"), ("forbidden namespace", "forbidden_namespace"), ("forbidden references", "forbidden_references"), ("evidence", "evidence"), ("reason", "reason"), ("detail", "detail"), ("source", "source_location"), ("policy", "policy_origin"), ("policy", "policy_location") }.Where(pair => values.GetValueOrDefault(pair.Item2) is not null).Select(pair => $"{pair.Item1} `{Code(values[pair.Item2]!)}`"));
     private static string Code(string value) => Compact(value).Replace("`", "'", StringComparison.Ordinal);
     private static string Compact(string value) { string text = string.Join(' ', value.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries)); return text.Length <= 240 ? text : text[..237] + "..."; }
 
     private sealed class FailureRuleBuilder(string identifier, string name) { private readonly SortedSet<FailureDiagnostic> _diagnostics = []; public void Add(string category, string summary) => _diagnostics.Add(new(category, string.IsNullOrEmpty(summary) ? "structured diagnostic emitted without detail fields" : summary)); public FailureRule Build() => new(identifier, name, _diagnostics.ToArray()); }
     private sealed record FailureRule(string Identifier, string Name, IReadOnlyList<FailureDiagnostic> Diagnostics);
-    private sealed record FailureDiagnostic(string Category, string Summary) : IComparable<FailureDiagnostic> { public int CompareTo(FailureDiagnostic? other) => other is null ? 1 : StringComparer.Ordinal.Compare($"{Category}\0{Summary}", $"{other.Category}\0{other.Summary}"); }
+    private sealed record FailureDiagnostic(string Category, string Message) : IComparable<FailureDiagnostic> { public int CompareTo(FailureDiagnostic? other) => other is null ? 1 : StringComparer.Ordinal.Compare($"{Category}\0{Message}", $"{other.Category}\0{other.Message}"); }
 }

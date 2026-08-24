@@ -85,22 +85,40 @@ internal static class ArchitecturePolicyWeakeningContextSupport
     private static void ValidateContext(ArchitecturePolicyContextExport context, string inputName)
     {
         ArgumentNullException.ThrowIfNull(context);
+        ValidateSchemaAndKind(context, inputName);
+        ValidatePolicyIdentity(context, inputName);
+        ValidateGuardrails(context, inputName);
+        ValidateCompleteness(context, inputName);
+        ValidateEffectivePolicyEvidence(context, inputName);
+    }
+
+    private static void ValidateSchemaAndKind(ArchitecturePolicyContextExport context, string inputName)
+    {
         if (context.SchemaVersion != ArchitecturePolicyContextExport.CurrentSchemaVersion
             || !string.Equals(context.Kind, "architecture-policy-context", StringComparison.Ordinal))
         {
             throw new ArgumentException($"The {inputName} has an unsupported schema or kind.");
         }
+    }
 
+    private static void ValidatePolicyIdentity(ArchitecturePolicyContextExport context, string inputName)
+    {
         if (context.Policy is null || string.IsNullOrWhiteSpace(context.Policy.Name) || context.Policy.Version <= 0)
         {
             throw new ArgumentException($"The {inputName} is missing policy identity.");
         }
+    }
 
+    private static void ValidateGuardrails(ArchitecturePolicyContextExport context, string inputName)
+    {
         if (context.Guardrails is null || context.Guardrails.PolicyWeakening is not ("error" or "warn" or "off"))
         {
             throw new ArgumentException($"The {inputName} is missing a valid policy-weakening severity.");
         }
+    }
 
+    private static void ValidateCompleteness(ArchitecturePolicyContextExport context, string inputName)
+    {
         if (context.Analysis is null || context.Analysis.TargetAssemblies is null || context.Analysis.Projects is null
             || context.Analysis.ProjectInclude is null || context.Analysis.ProjectExclude is null || context.Analysis.SourceRoots is null
             || context.Sources is null || context.Layers is null || context.Contracts is null || context.Classification is null
@@ -109,21 +127,36 @@ internal static class ArchitecturePolicyWeakeningContextSupport
         {
             throw new ArgumentException($"The {inputName} is incomplete.");
         }
+    }
 
-        if (context.Sources.Any(source => source is null || string.IsNullOrWhiteSpace(source.Path))
-            || context.Contracts.Any(contract => contract is null || string.IsNullOrWhiteSpace(contract.Family)
-                || string.IsNullOrWhiteSpace(contract.Id) || contract.Mode is not ("strict" or "audit"))
-            || context.SourceSets.Any(sourceSet => sourceSet is null || string.IsNullOrWhiteSpace(sourceSet.Name))
-            || context.SourceExpansions.Any(expansion => expansion is null || string.IsNullOrWhiteSpace(expansion.AuthoredContractId))
-            || context.Exceptions.Any(exceptionItem => exceptionItem is null
-                || string.IsNullOrWhiteSpace(exceptionItem.Scope)
-                || string.IsNullOrWhiteSpace(exceptionItem.Subject)
-                || string.IsNullOrWhiteSpace(exceptionItem.Kind)
-                || (exceptionItem.Kind == "ignored_violation" && (exceptionItem.IgnoredViolation is null
-                    || string.IsNullOrWhiteSpace(exceptionItem.IgnoredViolation.SourceType)
-                    || string.IsNullOrWhiteSpace(exceptionItem.IgnoredViolation.ForbiddenReference)))))
+    private static void ValidateEffectivePolicyEvidence(ArchitecturePolicyContextExport context, string inputName)
+    {
+        if (HasIncompleteSources(context) || HasIncompleteContracts(context) || HasIncompleteSourceSets(context)
+            || HasIncompleteSourceExpansions(context) || HasIncompleteExceptions(context))
         {
             throw new ArgumentException($"The {inputName} contains incomplete effective-policy evidence.");
         }
     }
+
+    private static bool HasIncompleteSources(ArchitecturePolicyContextExport context) =>
+        context.Sources.Any(source => source is null || string.IsNullOrWhiteSpace(source.Path));
+
+    private static bool HasIncompleteContracts(ArchitecturePolicyContextExport context) =>
+        context.Contracts.Any(contract => contract is null || string.IsNullOrWhiteSpace(contract.Family)
+            || string.IsNullOrWhiteSpace(contract.Id) || contract.Mode is not ("strict" or "audit"));
+
+    private static bool HasIncompleteSourceSets(ArchitecturePolicyContextExport context) =>
+        context.SourceSets.Any(sourceSet => sourceSet is null || string.IsNullOrWhiteSpace(sourceSet.Name));
+
+    private static bool HasIncompleteSourceExpansions(ArchitecturePolicyContextExport context) =>
+        context.SourceExpansions.Any(expansion => expansion is null || string.IsNullOrWhiteSpace(expansion.AuthoredContractId));
+
+    private static bool HasIncompleteExceptions(ArchitecturePolicyContextExport context) =>
+        context.Exceptions.Any(exceptionItem => exceptionItem is null
+            || string.IsNullOrWhiteSpace(exceptionItem.Scope)
+            || string.IsNullOrWhiteSpace(exceptionItem.Subject)
+            || string.IsNullOrWhiteSpace(exceptionItem.Kind)
+            || (exceptionItem.Kind == "ignored_violation" && (exceptionItem.IgnoredViolation is null
+                || string.IsNullOrWhiteSpace(exceptionItem.IgnoredViolation.SourceType)
+                || string.IsNullOrWhiteSpace(exceptionItem.IgnoredViolation.ForbiddenReference))));
 }

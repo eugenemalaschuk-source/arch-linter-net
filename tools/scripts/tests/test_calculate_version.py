@@ -48,10 +48,12 @@ class TestSemVerVersion(unittest.TestCase):
         self.assertIsNone(SemVerVersion.try_parse(""))
 
     def test_str_stable(self):
-        self.assertEqual("0.1.0", str(SemVerVersion(0, 1, 0)))
+        result = str(SemVerVersion(0, 1, 0))
+        self.assertEqual("0.1.0", result)
 
     def test_str_preview(self):
-        self.assertEqual("0.1.1-preview.2", str(SemVerVersion(0, 1, 1, 2)))
+        result = str(SemVerVersion(0, 1, 1, 2))
+        self.assertEqual("0.1.1-preview.2", result)
 
     def test_increment_preview_from_preview(self):
         v = SemVerVersion(0, 1, 1, 2)

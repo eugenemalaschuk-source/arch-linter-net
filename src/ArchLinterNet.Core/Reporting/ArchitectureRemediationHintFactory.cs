@@ -85,7 +85,6 @@ internal static class ArchitectureRemediationHintFactory
             return Create(
                 ArchitectureRemediationHintCategory.FixPolicyInput,
                 "Add or correct the required architecture coverage input for the affected subject.",
-                diagnostic,
                 identity,
                 Evidence("coverage_gap", diagnostic.ForbiddenNamespace),
                 Evidence("affected_subject", diagnostic.SourceType),
@@ -98,7 +97,6 @@ internal static class ArchitectureRemediationHintFactory
             return Create(
                 ArchitectureRemediationHintCategory.MoveCode,
                 "Move the access into an already-declared allowed importer.",
-                diagnostic,
                 identity,
                 Evidence("allowed_importers", seam),
                 expectedSeamOrDirection: seam);
@@ -142,7 +140,6 @@ internal static class ArchitectureRemediationHintFactory
             : Create(
                 ArchitectureRemediationHintCategory.MoveCode,
                 "Move or rename the type to the policy-declared owner.",
-                diagnostic,
                 identity,
                 Evidence("expected_location_or_name", expected),
                 expectedSeamOrDirection: expected);
@@ -157,7 +154,6 @@ internal static class ArchitectureRemediationHintFactory
             return Create(
                 ArchitectureRemediationHintCategory.FixPolicyInput,
                 "Restore the required layout/classification evidence before changing application structure.",
-                diagnostic,
                 identity,
                 Evidence("layout_evidence", "unavailable"));
         }
@@ -168,7 +164,6 @@ internal static class ArchitectureRemediationHintFactory
             return Create(
                 ArchitectureRemediationHintCategory.MoveCode,
                 "Move or rename the declaration to the policy-declared layout owner.",
-                diagnostic,
                 identity,
                 Evidence("expected_name", expected),
                 expectedSeamOrDirection: expected);
@@ -180,7 +175,6 @@ internal static class ArchitectureRemediationHintFactory
             return Create(
                 ArchitectureRemediationHintCategory.FixClassification,
                 "Correct the declared role/classification before relocating code.",
-                diagnostic,
                 identity,
                 Evidence("expected_roles", expectedRoles),
                 expectedSeamOrDirection: expectedRoles);
@@ -194,7 +188,6 @@ internal static class ArchitectureRemediationHintFactory
         ArchitectureViolationIdentity identity) => Create(
         ArchitectureRemediationHintCategory.ReviewContract,
         "Review the declared public surface and selection evidence before changing code or snapshots.",
-        diagnostic,
         identity,
         Evidence("public_surface", diagnostic.ApiAssemblyName ?? diagnostic.SourceType),
         caveat: "Do not rewrite a reviewed API snapshot or expand selection solely to make this finding disappear.",
@@ -229,7 +222,6 @@ internal static class ArchitectureRemediationHintFactory
         : Create(
             ArchitectureRemediationHintCategory.MoveCode,
             "Move composition work to the policy-declared composition boundary.",
-            diagnostic,
             identity,
             Evidence("expected_composition_boundary", diagnostic.ExpectedCompositionBoundary),
             expectedSeamOrDirection: diagnostic.ExpectedCompositionBoundary);
@@ -239,7 +231,6 @@ internal static class ArchitectureRemediationHintFactory
         ArchitectureViolationIdentity identity) => Create(
         ArchitectureRemediationHintCategory.FixPolicyInput,
         "Correct the project metadata value required by the declared contract.",
-        diagnostic,
         identity,
         Evidence("metadata_key", diagnostic.ProjectMetadataKey ?? diagnostic.ProjectMetadataKind ?? "project_metadata"),
         Evidence("expected_value", diagnostic.ProjectMetadataExpectedValue ?? string.Empty),
@@ -266,7 +257,6 @@ internal static class ArchitectureRemediationHintFactory
             return Create(
                 ArchitectureRemediationHintCategory.FixPolicyInput,
                 "Restore complete reference-resolution input before changing the reported dependency.",
-                diagnostic,
                 identity,
                 Evidence("evidence_kind", diagnostic.EvidenceKind ?? "unsupported_evidence"));
         }
@@ -291,7 +281,6 @@ internal static class ArchitectureRemediationHintFactory
         return Create(
             category,
             summary,
-            diagnostic,
             identity,
             Evidence("evidence_kind", diagnostic.EvidenceKind ?? "port_boundary"),
             Evidence("expected_seam", diagnostic.ExpectedSeam),
@@ -307,7 +296,6 @@ internal static class ArchitectureRemediationHintFactory
         ArchitectureViolationIdentity identity) => Create(
         ArchitectureRemediationHintCategory.FixPolicyInput,
         "Restore the required project/build input before changing application structure.",
-        diagnostic,
         identity,
         Evidence("preflight_state", diagnostic.State.ToString()),
         Evidence("project_path", diagnostic.Evidence.ProjectPath));
@@ -317,7 +305,6 @@ internal static class ArchitectureRemediationHintFactory
         ArchitectureViolationIdentity identity) => Create(
         ArchitectureRemediationHintCategory.FixPolicyInput,
         "Remove the stale ignore; derive any future exception only from a current finding.",
-        diagnostic,
         identity,
         Evidence("ignored_source", diagnostic.SourceType),
         Evidence("ignored_reference", diagnostic.ForbiddenReference),
@@ -329,7 +316,6 @@ internal static class ArchitectureRemediationHintFactory
         ArchitectureViolationIdentity identity) => Create(
         ArchitectureRemediationHintCategory.FixPolicyInput,
         "Resolve the policy consistency conflict before changing application code.",
-        diagnostic,
         identity,
         Evidence("check_kind", diagnostic.CheckKind),
         caveat: "Keep policy coverage and enforcement intact while correcting the conflicting input.");
@@ -343,7 +329,6 @@ internal static class ArchitectureRemediationHintFactory
         ArchitectureViolationIdentity identity) => Create(
         ArchitectureRemediationHintCategory.FixPolicyInput,
         "Correct the reported policy input before evaluating application structure.",
-        diagnostic,
         identity,
         Evidence("diagnostic_kind", diagnostic.DiagnosticKind.ToString()));
 
@@ -369,7 +354,6 @@ internal static class ArchitectureRemediationHintFactory
         string evidenceValue) => Create(
         ArchitectureRemediationHintCategory.RemoveOrReplaceDependency,
         "Remove or replace the forbidden dependency; no approved alternative seam is evidenced.",
-        diagnostic,
         identity,
         Evidence(evidenceKind, evidenceValue),
         caveat: NoApprovedSeamCaveat);
@@ -384,7 +368,6 @@ internal static class ArchitectureRemediationHintFactory
         : Create(
             ArchitectureRemediationHintCategory.FixClassification,
             "Correct the declared classification/location before moving or changing dependencies.",
-            diagnostic,
             identity,
             Evidence($"expected_{evidenceKind}", expected),
             Evidence($"actual_{evidenceKind}", actual ?? string.Empty),
@@ -395,7 +378,6 @@ internal static class ArchitectureRemediationHintFactory
         ArchitectureViolationIdentity identity) => Create(
         ArchitectureRemediationHintCategory.ReviewContract,
         "Review the contract and existing policy evidence before choosing a structural repair.",
-        diagnostic,
         identity,
         Evidence("diagnostic_kind", ArchitectureFindingMapper.KindToken(diagnostic.Kind)),
         caveat: NoApprovedSeamCaveat,
@@ -404,7 +386,6 @@ internal static class ArchitectureRemediationHintFactory
     private static ArchitectureRemediationHint Create(
         ArchitectureRemediationHintCategory category,
         string summary,
-        ArchitectureDiagnostic diagnostic,
         ArchitectureViolationIdentity identity,
         ArchitectureRemediationHintEvidence firstEvidence,
         ArchitectureRemediationHintEvidence? secondEvidence = null,

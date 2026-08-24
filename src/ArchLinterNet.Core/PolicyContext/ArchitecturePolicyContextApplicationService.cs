@@ -404,11 +404,19 @@ public sealed class ArchitecturePolicyContextApplicationService(IArchitecturePol
         return expansion.Exclusions.Select(exclusion => new ArchitecturePolicyContextException(
             "source_expansion",
             expansion.AuthoredContractId,
-            expansion.Kind == ArchitectureContractExpansionKind.ContainerSet
-                ? "exclude_container"
-                : exclusion.SetName is null ? "exclude_source" : "exclude_source_set",
+            SourceExpansionExclusionKind(expansion, exclusion),
             JoinDistinctNonEmpty(exclusion.Source ?? string.Empty, exclusion.SetName ?? string.Empty, exclusion.Selector ?? string.Empty),
             string.IsNullOrWhiteSpace(exclusion.OptionalReason) ? null : exclusion.OptionalReason));
+    }
+
+    private static string SourceExpansionExclusionKind(ArchitectureContractExpansion expansion, ArchitectureExpandedContractExclusion exclusion)
+    {
+        if (expansion.Kind == ArchitectureContractExpansionKind.ContainerSet)
+        {
+            return "exclude_container";
+        }
+
+        return exclusion.SetName is null ? "exclude_source" : "exclude_source_set";
     }
 
     private static IReadOnlyDictionary<string, string> ProjectMetadata(IReadOnlyDictionary<string, object> metadata)
