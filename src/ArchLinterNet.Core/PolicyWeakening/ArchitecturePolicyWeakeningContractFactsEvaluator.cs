@@ -41,82 +41,140 @@ internal static class ArchitecturePolicyWeakeningContractFactsEvaluator
         {
             baseFacts.TryGetValue(factName, out ArchitecturePolicyContextContractFact? baseFact);
             currentFacts.TryGetValue(factName, out ArchitecturePolicyContextContractFact? currentFact);
-            IReadOnlyList<string> baseValues = FactValuesOrEmpty(baseFact);
-            IReadOnlyList<string> currentValues = FactValuesOrEmpty(currentFact);
-            if (IsSupportedProhibitionInventory(factName, baseFact, currentFact))
-            {
-                string[] removed = baseValues.Except(currentValues, _comparer).OrderBy(value => value, _comparer).ToArray();
-                if (removed.Length > 0)
-                {
-                    findings.Add(CreateFinding(
-                        "prohibition_removed",
-                        ControlIdentity(baseContract) + ":" + factName,
-                        "semantic",
-                        severity,
-                        removed,
-                        currentValues,
-                        baseContract.Provenance,
-                        currentContract.Provenance,
-                        Array.Empty<string>(),
-                        currentContract.Reason ?? baseContract.Reason));
-                }
-            }
+            var comparison = new FactComparison(factName, baseFact, currentFact, FactValuesOrEmpty(baseFact), FactValuesOrEmpty(currentFact));
 
-            if (IsSupportedPermissionInventory(factName, baseFact, currentFact))
-            {
-                string[] added = currentValues.Except(baseValues, _comparer).OrderBy(value => value, _comparer).ToArray();
-                if (added.Length > 0)
-                {
-                    findings.Add(CreateFinding(
-                        "permission_broadened",
-                        ControlIdentity(baseContract) + ":" + factName,
-                        "semantic",
-                        severity,
-                        baseValues,
-                        added,
-                        baseContract.Provenance,
-                        currentContract.Provenance,
-                        Array.Empty<string>(),
-                        currentContract.Reason ?? baseContract.Reason));
-                }
-            }
-
-            if (IsSupportedScopeInventory(factName, baseFact, currentFact))
-            {
-                string[] removed = baseValues.Except(currentValues, _comparer).OrderBy(value => value, _comparer).ToArray();
-                if (removed.Length > 0)
-                {
-                    findings.Add(CreateFinding(
-                        "scope_inventory_narrowed",
-                        ControlIdentity(baseContract) + ":" + factName,
-                        "semantic",
-                        severity,
-                        removed,
-                        currentValues,
-                        baseContract.Provenance,
-                        currentContract.Provenance,
-                        Array.Empty<string>(),
-                        currentContract.Reason ?? baseContract.Reason));
-                }
-            }
-
-            if (TryGetSupportedProhibitionFlag(factName, baseFact, currentFact, out bool baselineFlag, out bool currentFlag)
-                && baselineFlag && !currentFlag)
-            {
-                findings.Add(CreateFinding(
-                    "prohibition_removed",
-                    ControlIdentity(baseContract) + ":" + factName,
-                    "semantic",
-                    severity,
-                    ["true"],
-                    ["false"],
-                    baseContract.Provenance,
-                    currentContract.Provenance,
-                    Array.Empty<string>(),
-                    currentContract.Reason ?? baseContract.Reason));
-            }
+            AddProhibitionRemovedInventoryFinding(comparison, baseContract, currentContract, severity, findings);
+            AddPermissionBroadenedFinding(comparison, baseContract, currentContract, severity, findings);
+            AddScopeNarrowedFinding(comparison, baseContract, currentContract, severity, findings);
+            AddProhibitionRemovedFlagFinding(comparison, baseContract, currentContract, severity, findings);
         }
     }
+
+    private static void AddProhibitionRemovedInventoryFinding(
+        FactComparison comparison,
+        ArchitecturePolicyContextContract baseContract,
+        ArchitecturePolicyContextContract currentContract,
+        string severity,
+        ICollection<ArchitecturePolicyWeakeningFinding> findings)
+    {
+        if (!IsSupportedProhibitionInventory(comparison.FactName, comparison.BaseFact, comparison.CurrentFact))
+        {
+            return;
+        }
+
+        string[] removed = comparison.BaseValues.Except(comparison.CurrentValues, _comparer).OrderBy(value => value, _comparer).ToArray();
+        if (removed.Length == 0)
+        {
+            return;
+        }
+
+        findings.Add(CreateFinding(
+            "prohibition_removed",
+            ControlIdentity(baseContract) + ":" + comparison.FactName,
+            "semantic",
+            severity,
+            removed,
+            comparison.CurrentValues,
+            baseContract.Provenance,
+            currentContract.Provenance,
+            Array.Empty<string>(),
+            currentContract.Reason ?? baseContract.Reason));
+    }
+
+    private static void AddPermissionBroadenedFinding(
+        FactComparison comparison,
+        ArchitecturePolicyContextContract baseContract,
+        ArchitecturePolicyContextContract currentContract,
+        string severity,
+        ICollection<ArchitecturePolicyWeakeningFinding> findings)
+    {
+        if (!IsSupportedPermissionInventory(comparison.FactName, comparison.BaseFact, comparison.CurrentFact))
+        {
+            return;
+        }
+
+        string[] added = comparison.CurrentValues.Except(comparison.BaseValues, _comparer).OrderBy(value => value, _comparer).ToArray();
+        if (added.Length == 0)
+        {
+            return;
+        }
+
+        findings.Add(CreateFinding(
+            "permission_broadened",
+            ControlIdentity(baseContract) + ":" + comparison.FactName,
+            "semantic",
+            severity,
+            comparison.BaseValues,
+            added,
+            baseContract.Provenance,
+            currentContract.Provenance,
+            Array.Empty<string>(),
+            currentContract.Reason ?? baseContract.Reason));
+    }
+
+    private static void AddScopeNarrowedFinding(
+        FactComparison comparison,
+        ArchitecturePolicyContextContract baseContract,
+        ArchitecturePolicyContextContract currentContract,
+        string severity,
+        ICollection<ArchitecturePolicyWeakeningFinding> findings)
+    {
+        if (!IsSupportedScopeInventory(comparison.FactName, comparison.BaseFact, comparison.CurrentFact))
+        {
+            return;
+        }
+
+        string[] removed = comparison.BaseValues.Except(comparison.CurrentValues, _comparer).OrderBy(value => value, _comparer).ToArray();
+        if (removed.Length == 0)
+        {
+            return;
+        }
+
+        findings.Add(CreateFinding(
+            "scope_inventory_narrowed",
+            ControlIdentity(baseContract) + ":" + comparison.FactName,
+            "semantic",
+            severity,
+            removed,
+            comparison.CurrentValues,
+            baseContract.Provenance,
+            currentContract.Provenance,
+            Array.Empty<string>(),
+            currentContract.Reason ?? baseContract.Reason));
+    }
+
+    private static void AddProhibitionRemovedFlagFinding(
+        FactComparison comparison,
+        ArchitecturePolicyContextContract baseContract,
+        ArchitecturePolicyContextContract currentContract,
+        string severity,
+        ICollection<ArchitecturePolicyWeakeningFinding> findings)
+    {
+        if (!TryGetSupportedProhibitionFlag(comparison.FactName, comparison.BaseFact, comparison.CurrentFact, out bool baselineFlag, out bool currentFlag)
+            || !baselineFlag || currentFlag)
+        {
+            return;
+        }
+
+        findings.Add(CreateFinding(
+            "prohibition_removed",
+            ControlIdentity(baseContract) + ":" + comparison.FactName,
+            "semantic",
+            severity,
+            ["true"],
+            ["false"],
+            baseContract.Provenance,
+            currentContract.Provenance,
+            Array.Empty<string>(),
+            currentContract.Reason ?? baseContract.Reason));
+    }
+
+    private sealed record FactComparison(
+        string FactName,
+        ArchitecturePolicyContextContractFact? BaseFact,
+        ArchitecturePolicyContextContractFact? CurrentFact,
+        IReadOnlyList<string> BaseValues,
+        IReadOnlyList<string> CurrentValues);
 
     private static void EvaluateTypedFactEvidence(
         ArchitecturePolicyContextContract baseContract,
