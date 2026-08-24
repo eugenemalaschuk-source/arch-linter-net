@@ -125,6 +125,7 @@ test-tooling-coverage:  ## Run all Python tooling tests with coverage (coverage-
 	@cd "$(PROJECT_ROOT)" && UV_PROJECT_ENVIRONMENT="$(PROJECT_ROOT)/.venv" "$(UV)" run --project tools/pyproject.toml \
 		pytest tools/release/tests \
 		tools/scripts/tests/test_calculate_version.py \
+		tools/scripts/tests/test_check_dogfood_reference_evidence.py \
 		tools/scripts/tests/test_check_evergreen_docs.py \
 		tools/scripts/tests/test_check_evergreen_docs_edges.py \
 		tools/scripts/tests/test_test_coverage_badge.py \

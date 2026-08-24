@@ -80,11 +80,9 @@ public sealed class AnalysisCacheHmacKeyStoreTests
         }
     }
 
-    // Simulates the concurrent-first-use race the review named: two callers reach an empty cache
-    // root at "the same time". Since GetOrCreateKey is deterministic about resolving to whatever
-    // ends up on disk, sequential calls exercise the same "loser discards, re-reads winner" code
-    // path deterministically — a genuinely parallel version of this is covered by real concurrent
-    // production use, but is not reliably reproducible as a fast unit test.
+    // Regression: concurrent first use of an empty cache root must converge on one persisted key.
+    // In particular, a losing caller must not mistake another caller's short-lived file lock for
+    // corruption and self-heal a key that a different caller has already observed.
     [Test]
     public void GetOrCreateKey_ConcurrentFirstUse_BothCallersObserveTheSameKey()
     {
@@ -96,6 +94,45 @@ public sealed class AnalysisCacheHmacKeyStoreTests
 
         byte[] first = tasks[0].Result;
         Assert.That(tasks.Select(t => t.Result), Is.All.EqualTo(first));
+    }
+
+    [Test]
+    public void GetOrCreateKey_CreationMutexRemainsBusy_ThrowsAfterTheBoundedWait()
+    {
+        string mutexName = AnalysisCacheHmacKeyStore.GetCreationMutexName(
+            AnalysisCacheHmacKeyStore.GetKeyPath(_root));
+        using ManualResetEventSlim holderAcquired = new(initialState: false);
+        using ManualResetEventSlim releaseHolder = new(initialState: false);
+
+        Task holder = Task.Run(() =>
+        {
+            using Mutex mutex = new(initiallyOwned: false, mutexName);
+            if (!mutex.WaitOne(TimeSpan.FromSeconds(1)))
+            {
+                throw new InvalidOperationException("Test mutex holder could not acquire the creation mutex.");
+            }
+
+            holderAcquired.Set();
+            try
+            {
+                releaseHolder.Wait();
+            }
+            finally
+            {
+                mutex.ReleaseMutex();
+            }
+        });
+
+        Assert.That(holderAcquired.Wait(TimeSpan.FromSeconds(1)), Is.True);
+        try
+        {
+            Assert.Throws<IOException>(() => AnalysisCacheHmacKeyStore.GetOrCreateKey(_root));
+        }
+        finally
+        {
+            releaseHolder.Set();
+            holder.GetAwaiter().GetResult();
+        }
     }
 
     [Test]

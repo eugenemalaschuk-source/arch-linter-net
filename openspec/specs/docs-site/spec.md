@@ -133,3 +133,14 @@ Public MkDocs guidance SHALL document invoking the architecture-debt gate, its s
 #### Scenario: CI adopter can compose the gate safely
 - **WHEN** an adopter follows the CI integration and baseline migration guidance
 - **THEN** they can run the gate with explicit baseline and policy-context artifacts without treating warnings or policy weakening as persistent baseline debt
+
+### Requirement: Public self-dogfood reference is discoverable
+The MkDocs site SHALL include an evergreen public guide for the real-repository
+self-dogfood reference workflow in the Guides navigation. The route and
+navigation label SHALL use a durable concept name rather than an ArchLinterNet
+product release number.
+
+#### Scenario: User finds the real-repository reference
+- **WHEN** a user browses the public Guides navigation
+- **THEN** they can open the self-dogfood reference without consulting
+contributor-only documentation

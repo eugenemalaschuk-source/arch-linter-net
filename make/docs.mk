@@ -1,4 +1,4 @@
-.PHONY: venv docs-serve docs-build fmt-docs lint-docs lint-evergreen-docs
+.PHONY: venv docs-serve docs-build fmt-docs lint-docs lint-evergreen-docs lint-dogfood-reference-evidence
 
 venv:  ## Create local Python virtual environment via uv
 	@cd "$(PROJECT_ROOT)" && UV_PROJECT_ENVIRONMENT="$(PROJECT_ROOT)/.venv" "$(UV)" sync --project tools/pyproject.toml
@@ -15,5 +15,8 @@ fmt-docs:  ## Auto-format markdown documentation
 lint-evergreen-docs:  ## Reject product release SemVer as an evergreen docs identity
 	@cd "$(PROJECT_ROOT)" && UV_PROJECT_ENVIRONMENT="$(PROJECT_ROOT)/.venv" "$(UV)" run --project tools/pyproject.toml python tools/scripts/check_evergreen_docs.py
 
-lint-docs: lint-evergreen-docs  ## Verify MkDocs documentation structure and evergreen identity policy
+lint-dogfood-reference-evidence:  ## Verify the retained self-dogfood report matches its documented digest
+	@cd "$(PROJECT_ROOT)" && UV_PROJECT_ENVIRONMENT="$(PROJECT_ROOT)/.venv" "$(UV)" run --project tools/pyproject.toml python tools/scripts/check_dogfood_reference_evidence.py
+
+lint-docs: lint-evergreen-docs lint-dogfood-reference-evidence  ## Verify MkDocs documentation structure and evergreen identity policy
 	@cd "$(PROJECT_ROOT)" && UV_PROJECT_ENVIRONMENT="$(PROJECT_ROOT)/.venv" "$(UV)" run --project tools/pyproject.toml python tools/scripts/filter_mkdocs_warnings.py -- mkdocs build --strict

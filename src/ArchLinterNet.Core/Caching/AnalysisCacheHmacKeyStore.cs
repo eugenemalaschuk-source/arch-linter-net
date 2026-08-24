@@ -16,6 +16,7 @@ internal static class AnalysisCacheHmacKeyStore
     private const string KeyFileName = "hmac-v1.key";
     private const int MaxReadRetries = 40;
     private const int RetryDelayMilliseconds = 5;
+    private static readonly TimeSpan _creationMutexTimeout = TimeSpan.FromSeconds(1);
 
     // Test-only seam. It makes the external trust boundary assertable without placing test keys
     // in a developer's real profile. Production leaves this null.
@@ -46,13 +47,57 @@ internal static class AnalysisCacheHmacKeyStore
             return existing;
         }
 
-        Directory.CreateDirectory(keyDirectory);
-        EnsureSafeKeyDirectory(keyDirectory);
-        EnsureSafeKeyPath(keyPath);
-        RestrictToOwnerOnUnix(keyDirectory, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
+        // FileMode.CreateNew makes publishing a key atomic, but it alone does not serialize
+        // self-healing. Several losing callers can otherwise mistake the winner's short-lived
+        // FileShare.None lock for corruption and each replace a valid key. A named mutex covers
+        // both threads and local processes for this cache-root-specific key path.
+        using Mutex creationMutex = new(initiallyOwned: false, GetCreationMutexName(keyPath));
+        bool mutexAcquired = false;
+        try
+        {
+            try
+            {
+                mutexAcquired = creationMutex.WaitOne(_creationMutexTimeout);
+            }
+            catch (AbandonedMutexException)
+            {
+                // The prior owner exited while creating or repairing the key. Re-check and
+                // complete that work while holding ownership of the now-abandoned mutex.
+                mutexAcquired = true;
+            }
 
-        return CreateExclusiveOrAdoptWinner(keyPath, attemptSelfHealOnCorruption: true);
+            if (!mutexAcquired)
+            {
+                throw new IOException("Timed out waiting to create the cache authentication key.");
+            }
+
+            EnsureSafeKeyDirectory(keyDirectory);
+            EnsureSafeKeyPath(keyPath);
+            existing = TryReadExistingKey(keyPath);
+            if (existing is not null)
+            {
+                return existing;
+            }
+
+            Directory.CreateDirectory(keyDirectory);
+            EnsureSafeKeyDirectory(keyDirectory);
+            EnsureSafeKeyPath(keyPath);
+            RestrictToOwnerOnUnix(keyDirectory, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
+
+            return CreateExclusiveOrAdoptWinner(keyPath, attemptSelfHealOnCorruption: true);
+        }
+        finally
+        {
+            if (mutexAcquired)
+            {
+                creationMutex.ReleaseMutex();
+            }
+        }
     }
+
+    internal static string GetCreationMutexName(string keyPath) =>
+        "arch-linter-net-analysis-cache-hmac-" + Convert.ToHexStringLower(
+            SHA256.HashData(Encoding.UTF8.GetBytes(keyPath)));
 
     private static void EnsureSafeKeyDirectory(string keyDirectory)
     {
