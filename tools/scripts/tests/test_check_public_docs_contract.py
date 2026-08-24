@@ -29,7 +29,9 @@ def write_repo(root: Path) -> None:
         encoding="utf-8",
     )
     (root / "src" / "ArchLinterNet.Cli" / "Commands" / "Foo" / "Application" / "FooCommandDefinition.cs").write_text(
-        'Command command = new("foo");\nCommand child = new("bar");\n',
+        'Command command = new("foo");\n'
+        'Command child = new("bar");\n'
+        'Command scaffoldTemplate = new("{{commandToken}}");\n',
         encoding="utf-8",
     )
 
