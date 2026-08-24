@@ -145,10 +145,24 @@ public sealed class BuildStatePreparationServiceOutputSelectionTests
         Assert.That(resolved, Is.EqualTo(windows));
     }
 
+    [Test]
+    public void ResolveBuiltAssemblyPath_ExplicitPlatformBypassesPreparedOutput()
+    {
+        string debug = WriteOutput("Debug", "net10.0", "Fixture");
+        string release = WriteOutput("Release", "net10.0", "Fixture");
+        File.SetLastWriteTimeUtc(release, File.GetLastWriteTimeUtc(debug).AddMinutes(1));
+
+        string? resolved = BuildStatePreparationService.ResolveBuiltAssemblyPath(
+            CreateRequest(debug, platform: "AnyCPU"), _project, _projectDirectory);
+
+        Assert.That(resolved, Is.EqualTo(release));
+    }
+
     private BuildStatePreflightRequest CreateRequest(
         string preparedPath,
         string? configuration = null,
         string? targetFramework = null,
+        string? platform = null,
         string? runtimeIdentifier = null)
     {
         ProjectDiscoveryResult discovery = new(
@@ -173,6 +187,7 @@ public sealed class BuildStatePreparationServiceOutputSelectionTests
             BuildPreparationMode.EnsureBuilt,
             RequestedConfiguration: configuration,
             RequestedTargetFramework: targetFramework,
+            RequestedPlatform: platform,
             RequestedRuntimeIdentifier: runtimeIdentifier);
     }
 

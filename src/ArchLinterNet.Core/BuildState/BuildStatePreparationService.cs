@@ -262,6 +262,7 @@ public sealed class BuildStatePreparationService : IBuildStatePreparationService
         // to the selected Debug output and reports its receipt as stale.
         if (request.RequestedConfiguration == null
             && request.RequestedTargetFramework == null
+            && request.RequestedPlatform == null
             && request.RequestedRuntimeIdentifier == null
             && request.Resolution.ResolvedAssemblyPaths.TryGetValue(project.AssemblyName, out string? preparedPath)
             && IsProjectOutput(projectDirectory, project.AssemblyName, preparedPath))

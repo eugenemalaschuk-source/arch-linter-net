@@ -35,6 +35,7 @@ _PLATFORM_SCENARIOS = {
     "external-testing-consumer",
     "generic-ci-neutral",
     "in-flight-cancellation",
+    "installed-testing-output-ensure-built",
     "non-tty",
     "offline-schema-registry",
     "packed-package-provenance",

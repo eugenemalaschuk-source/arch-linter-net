@@ -121,6 +121,7 @@ public sealed class ArchitectureValidationApplicationService(
 
             request.CancellationToken.ThrowIfCancellationRequested();
             state.Policy = ComposeDocument(state.Document, request, modeHint);
+            request = ApplyPolicyOutputDefaults(request, state.Policy.Document.Analysis);
             state.PolicyCompositions = 1;
         }
 
@@ -139,6 +140,7 @@ public sealed class ArchitectureValidationApplicationService(
                     state.Policy.Document, request.PolicyPath, request.ConditionSetName,
                     request.PreprocessorSymbols, state.Policy.SelectedContractIds, modeHint,
                     request.CancellationToken);
+                state.Preparation = preparation;
             }
 
             state.ProjectGraphEvaluations = 1;
@@ -157,6 +159,7 @@ public sealed class ArchitectureValidationApplicationService(
                         state.Policy.Document, request.PolicyPath, request.ConditionSetName,
                         request.PreprocessorSymbols, state.Policy.SelectedContractIds, modeHint,
                         request.CancellationToken);
+                    state.Preparation = preparation;
                 }
 
                 state.ProjectGraphEvaluations++;
@@ -164,8 +167,6 @@ public sealed class ArchitectureValidationApplicationService(
                     preparedPreflight = RunBuildStatePreflight(
                         request with { PreparationMode = BuildPreparationMode.Ordinary }, preparation);
             }
-
-            state.Preparation = preparation;
 
             return new ArchitectureAnalysisSnapshot(
                 state.Policy.Document,
@@ -261,18 +262,37 @@ public sealed class ArchitectureValidationApplicationService(
                 request.BaselinePath);
     }
 
+    private static AnalysisSnapshotRequest ApplyPolicyOutputDefaults(
+        AnalysisSnapshotRequest request, ArchitectureAnalysisConfiguration analysis)
+    {
+        string configuration = string.IsNullOrWhiteSpace(analysis.Configuration) ? "Debug" : analysis.Configuration;
+        string? targetFramework = string.IsNullOrWhiteSpace(analysis.TargetFramework) ? null : analysis.TargetFramework;
+        return request with
+        {
+            RequestedConfiguration = request.RequestedConfiguration ?? configuration,
+            RequestedTargetFramework = request.RequestedTargetFramework ?? targetFramework,
+        };
+    }
+
     private static ArchitectureAnalysisSnapshotCounters BuildCancellationCounters(SnapshotConstructionState state)
     {
         ArchitectureRunnerSetup? setup = state.Setup;
+        ArchitectureRunnerPreparation? preparation = state.Preparation;
+        int preparedAssemblyCount = preparation?.SelectedAssemblyArtifactPaths.Count ?? 0;
+        int missingAssemblyCount = setup?.Runner.Session.Context.MissingAssemblyNames.Count
+            ?? preparation?.MissingAssemblyNames.Count
+            ?? 0;
         return new ArchitectureAnalysisSnapshotCounters
         {
             PolicyCompositions = state.PolicyCompositions,
             ProjectGraphEvaluations = state.ProjectGraphEvaluations,
             AssemblyLoads = state.AssemblyLoads,
-            DiscoveredProjectCount = setup?.Runner.Session.Context.ProjectDiscovery?.DiscoveredProjects.Count ?? 0,
+            DiscoveredProjectCount = setup?.Runner.Session.Context.ProjectDiscovery?.DiscoveredProjects.Count
+                ?? preparation?.ProjectDiscovery.DiscoveredProjects.Count
+                ?? 0,
             RetainedAssemblyCount = setup?.Runner.Session.Context.TargetAssemblies.Count ?? 0,
-            SelectedAssemblyCount = (setup?.Runner.Session.Context.TargetAssemblies.Count ?? 0)
-                + (setup?.Runner.Session.Context.MissingAssemblyNames.Count ?? 0),
+            SelectedAssemblyCount = (setup?.Runner.Session.Context.TargetAssemblies.Count ?? preparedAssemblyCount)
+                + missingAssemblyCount,
         };
     }
 
@@ -280,19 +300,23 @@ public sealed class ArchitectureValidationApplicationService(
         AnalysisSnapshotRequest request, SnapshotConstructionState state)
     {
         string repositoryRoot = state.Setup?.RepositoryRoot
+            ?? state.Preparation?.RepositoryRoot
             ?? Path.GetDirectoryName(Path.GetFullPath(request.PolicyPath))
             ?? Environment.CurrentDirectory;
         IEnumerable<string> policyInputPaths = state.Document?.Provenance.Sources
             .Select(source => Path.GetFullPath(Path.Combine(repositoryRoot, source.SourcePath)))
             ?? Array.Empty<string>();
-        IEnumerable<string> setupInputPaths = state.Setup is null
-            ? Array.Empty<string>()
-            : state.Setup.Runner.Session.Context.TargetAssemblies
+        IEnumerable<string> setupInputPaths = state.Setup?.Runner.Session.Context.TargetAssemblies
                 .Select(SafeAssemblyLocation)
                 .Where(path => !string.IsNullOrEmpty(path))
                 .Select(path => Path.GetFullPath(path!))
                 .SelectMany(path => new[] { path, BuildReceiptStore.ReceiptPathFor(path) })
-                .Concat(state.Setup.Runner.Session.Context.DiscoveredProjectPaths);
+                .Concat(state.Setup.Runner.Session.Context.DiscoveredProjectPaths)
+            ?? state.Preparation?.SelectedAssemblyArtifactPaths
+                .Select(Path.GetFullPath)
+                .SelectMany(path => new[] { path, BuildReceiptStore.ReceiptPathFor(path) })
+                .Concat(state.Preparation.PreparedProjectPaths)
+            ?? Array.Empty<string>();
         return policyInputPaths
             .Append(Path.GetFullPath(request.PolicyPath))
             .Concat(request.BaselinePath is null ? Array.Empty<string>() : [Path.GetFullPath(request.BaselinePath)])
@@ -305,6 +329,7 @@ public sealed class ArchitectureValidationApplicationService(
         Exception exception, AnalysisSnapshotRequest request, SnapshotConstructionState state)
     {
         string repositoryRoot = state.Setup?.RepositoryRoot
+            ?? state.Preparation?.RepositoryRoot
             ?? Path.GetDirectoryName(Path.GetFullPath(request.PolicyPath))
             ?? Environment.CurrentDirectory;
         HashSet<string> policyInputPaths = new(StringComparer.OrdinalIgnoreCase)
@@ -325,9 +350,15 @@ public sealed class ArchitectureValidationApplicationService(
             .Select(Path.GetFullPath)
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToArray()
+            ?? state.Preparation?.SelectedAssemblyArtifactPaths
+                .Select(Path.GetFullPath)
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToArray()
             ?? Array.Empty<string>();
         IReadOnlyList<string> discoveredProjectPaths =
-            state.Setup?.Runner.Session.Context.DiscoveredProjectPaths ?? Array.Empty<string>();
+            state.Setup?.Runner.Session.Context.DiscoveredProjectPaths
+            ?? state.Preparation?.PreparedProjectPaths
+            ?? Array.Empty<string>();
 
         return new ArchitectureAnalysisEvaluationException(
             exception.Message, exception, policyInputPaths.ToArray(), resolvedAssemblyPaths, discoveredProjectPaths);

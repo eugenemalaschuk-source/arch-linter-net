@@ -39,6 +39,7 @@ _POLICY_SHAPE = {
 }
 _SHARDS = [
     "package-and-entrypoints",
+    "ensure-built-replaces-testing-output",
     "adopter-runtime-core",
     "adopter-runtime-extended",
     "consumer-cleanup-policy-execution",
@@ -122,7 +123,7 @@ def test_rejects_missing_shard(tmp_path: Path) -> None:
     manifest, shards = _write_corpus(tmp_path)
     (shards / "checkpoint-b-platform-shard-adopter-runtime-core.json").unlink()
 
-    with pytest.raises(ValueError, match="Expected 11 Checkpoint B shard records"):
+    with pytest.raises(ValueError, match="Expected 12 Checkpoint B shard records"):
         merge_platform_shards(shards, manifest)
 
 

@@ -1,5 +1,6 @@
 .PHONY: test-repository _repository-acceptance-test prepare-packed-artifact-candidate \
-	test-packed-artifact-package-and-entrypoints test-packed-artifact-adopter-runtime-core \
+	test-packed-artifact-package-and-entrypoints test-packed-artifact-ensure-built-replaces-testing-output \
+	test-packed-artifact-adopter-runtime-core \
 	test-packed-artifact-adopter-runtime-extended \
 	test-packed-artifact-consumer-cleanup-policy-execution \
 	test-packed-artifact-consumer-cleanup-dependency-contract-id-parity \
@@ -15,6 +16,7 @@
 # method-specific targets exist so isolated CI workspaces can spend runner-minutes to reduce the
 # packed-artifact wall-clock while preserving the exact scenario union.
 TEST_PACKED_ARTIFACT_PACKAGE_AND_ENTRYPOINTS_FILTER := FullyQualifiedName~CheckpointBReleaseGateTests.PackedCandidate_PackageAndEntrypoints
+TEST_PACKED_ARTIFACT_ENSURE_BUILT_REPLACES_TESTING_OUTPUT_FILTER := FullyQualifiedName~CheckpointBReleaseGateTests.PackedCandidate_EnsureBuiltReplacesTestingOutput
 TEST_PACKED_ARTIFACT_ADOPTER_RUNTIME_CORE_FILTER := FullyQualifiedName~CheckpointBReleaseGateTests.PackedCandidate_AdopterRuntimeCore
 TEST_PACKED_ARTIFACT_ADOPTER_RUNTIME_EXTENDED_FILTER := FullyQualifiedName~CheckpointBReleaseGateTests.PackedCandidate_AdopterRuntimeExtended
 TEST_PACKED_ARTIFACT_CONSUMER_CLEANUP_POLICY_EXECUTION_FILTER := FullyQualifiedName~CheckpointBReleaseGateTests.PackedCandidate_ConsumerCleanupPolicyExecution
@@ -51,6 +53,10 @@ prepare-packed-artifact-candidate:  ## CI: pack one manifest-bound Checkpoint B 
 test-packed-artifact-package-and-entrypoints:  ## Run Checkpoint B package/entrypoint shard
 	@dotnet build "$(CORE_TESTS_CSPROJ)" --no-restore --nologo
 	@dotnet test "$(CORE_TESTS_CSPROJ)" --no-restore --no-build --filter "$(TEST_PACKED_ARTIFACT_PACKAGE_AND_ENTRYPOINTS_FILTER)"
+
+test-packed-artifact-ensure-built-replaces-testing-output:  ## Run Checkpoint B installed Testing-output ensure-built shard
+	@dotnet build "$(CORE_TESTS_CSPROJ)" --no-restore --nologo
+	@dotnet test "$(CORE_TESTS_CSPROJ)" --no-restore --no-build --filter "$(TEST_PACKED_ARTIFACT_ENSURE_BUILT_REPLACES_TESTING_OUTPUT_FILTER)"
 
 test-packed-artifact-adopter-runtime-core:  ## Run Checkpoint B core adopter/runtime shard
 	@dotnet build "$(CORE_TESTS_CSPROJ)" --no-restore --nologo

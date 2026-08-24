@@ -23,7 +23,7 @@ namespace ArchLinterNet.Core.Tests;
 // itself — not ArchitectureRunnerSetupService's own PE-reading internals, covered separately in
 // ArchitectureRunnerSetupServicePreparationTests — is what's under test.
 [TestFixture]
-public sealed class ArchitectureValidationApplicationServiceCacheLocationTests
+public sealed partial class ArchitectureValidationApplicationServiceCacheLocationTests
 {
     private static readonly string[] _value = { "SomethingMissing" };
     private static readonly string[] _value1 = { "Fixture" };
@@ -163,10 +163,20 @@ public sealed class ArchitectureValidationApplicationServiceCacheLocationTests
         public BuildStatePreflightResult ResultToReturn { get; set; } =
             new(Array.Empty<BuildStatePreflightDiagnostic>());
 
+        public Exception? ExceptionToThrow { get; set; }
+
+        public Func<int, Exception?>? ExceptionProvider { get; set; }
+
         public BuildStatePreflightResult Prepare(BuildStatePreflightRequest request)
         {
             PrepareCallCount++;
             LastRequest = request;
+            Exception? exception = ExceptionProvider?.Invoke(PrepareCallCount) ?? ExceptionToThrow;
+            if (exception != null)
+            {
+                throw exception;
+            }
+
             return ResultToReturn;
         }
     }
@@ -376,6 +386,48 @@ public sealed class ArchitectureValidationApplicationServiceCacheLocationTests
             Assert.That(preparationService.LastRequest.RequestedConfiguration, Is.EqualTo("Release"));
             Assert.That(preparationService.LastRequest.RequestedTargetFramework, Is.EqualTo("net10.0"));
             Assert.That(snapshot.RepositoryRoot, Is.EqualTo("/fake/repository/root"));
+        });
+    }
+
+    [Test]
+    public void CreateSnapshot_PolicyOutputDefaultsReachMetadataPreflight()
+    {
+        var document = CreateDocument();
+        document.Analysis.Configuration = "Release";
+        document.Analysis.TargetFramework = "net10.0";
+        var discovery = new ProjectDiscoveryResult(
+            _value1, Array.Empty<string>(), Array.Empty<string>(),
+            Array.Empty<ArchitectureProjectDiscoveryDiagnostic>())
+        {
+            DiscoveredProjects = [new ArchitectureDiscoveredProject("Fixture.csproj", "Fixture", _value2)],
+            ResolvedAssemblyPaths = new Dictionary<string, string>(StringComparer.Ordinal)
+            {
+                ["Fixture"] = "/fake/repository/root/bin/Release/net10.0/Fixture.dll",
+            },
+        };
+        var runnerSetupService = new FakeRunnerSetupService
+        {
+            DocumentToReturn = document,
+            PreparationProvider = _ => CreatePreparation(
+                discovery: discovery,
+                selectedPaths: ["/fake/repository/root/bin/Release/net10.0/Fixture.dll"]),
+        };
+        var preparationService = new FakeBuildStatePreparationService();
+        var applicationService = new ArchitectureValidationApplicationService(
+            runnerSetupService, new FakeContractHandlerRegistry(), new FakeContractExecutor(), preparationService);
+
+        using ArchitectureAnalysisSnapshot snapshot = applicationService.CreateSnapshot(new AnalysisSnapshotRequest
+        {
+            PolicyPath = "unused-by-fakes.arch.yml",
+            CacheLocation = new AnalysisCacheLocation("/fake/cache", AnalysisCacheMode.ExplicitPath),
+        });
+
+        Assert.That(preparationService.LastRequest, Is.Not.Null);
+        Assert.Multiple(() =>
+        {
+            Assert.That(snapshot.RepositoryRoot, Is.EqualTo("/fake/repository/root"));
+            Assert.That(preparationService.LastRequest!.RequestedConfiguration, Is.EqualTo("Release"));
+            Assert.That(preparationService.LastRequest.RequestedTargetFramework, Is.EqualTo("net10.0"));
         });
     }
 

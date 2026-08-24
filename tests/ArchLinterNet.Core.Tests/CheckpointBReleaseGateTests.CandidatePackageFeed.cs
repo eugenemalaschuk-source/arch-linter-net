@@ -267,7 +267,10 @@ public sealed partial class CheckpointBReleaseGateTests
         {
             if (!OperatingSystem.IsWindows())
             {
-                return Passed("installed-testing-output-ensure-built-windows-only");
+                return new CheckpointScenarioResult(
+                    "installed-testing-output-ensure-built",
+                    "not_applicable",
+                    "This installed-tool write-conflict oracle requires Windows file-lock semantics.");
             }
 
             string fixtureRoot = Path.Combine(_root, "installed-testing-output");

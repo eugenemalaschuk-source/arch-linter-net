@@ -58,7 +58,6 @@ public sealed partial class CheckpointBReleaseGateTests
     }
 
     [Test]
-    [Platform("Win")]
     public void PackedCandidate_EnsureBuiltReplacesTestingOutput()
     {
         CandidatePackageFeed candidate = Candidate;
