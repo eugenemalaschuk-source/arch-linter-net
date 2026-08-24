@@ -3,6 +3,7 @@ using System.IO.Compression;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using ArchLinterNet.Core.BuildState;
 using ArchLinterNet.Core.Resolution;
 using NUnit.Framework;
 
@@ -260,6 +261,98 @@ public sealed partial class CheckpointBReleaseGateTests
                 Assert.That(result.StandardOutput, Does.Contain("cancelled-in-flight-no-cache-or-output"));
             });
             return Passed("external-testing-consumer");
+        }
+
+        public CheckpointScenarioResult AssertInstalledTestingOutputEnsureBuilt()
+        {
+            if (!OperatingSystem.IsWindows())
+            {
+                return new CheckpointScenarioResult(
+                    "installed-testing-output-ensure-built",
+                    "not_applicable",
+                    "This installed-tool write-conflict oracle requires Windows file-lock semantics.");
+            }
+
+            string fixtureRoot = Path.Combine(_root, "installed-testing-output");
+            Directory.CreateDirectory(fixtureRoot);
+            File.WriteAllText(Path.Combine(fixtureRoot, "ArchLinterNet.Testing.csproj"), """
+                <Project Sdk="Microsoft.NET.Sdk">
+                  <PropertyGroup>
+                    <TargetFramework>net10.0</TargetFramework>
+                    <AssemblyName>ArchLinterNet.Testing</AssemblyName>
+                  </PropertyGroup>
+                </Project>
+                """);
+            string sourcePath = Path.Combine(fixtureRoot, "TestingOutput.cs");
+            File.WriteAllText(sourcePath, """
+                namespace Disposable.ArchLinterNet.Testing;
+
+                public sealed class SmokeType
+                {
+                }
+                """);
+            string policyPath = Path.Combine(fixtureRoot, "dependencies.arch.yml");
+            File.WriteAllText(policyPath, """
+                version: 1
+                name: Installed Testing output ensure-built smoke
+                analysis:
+                  target_assemblies: [ArchLinterNet.Testing]
+                  assembly_search_paths: [bin/Debug/net10.0]
+                  projects: [ArchLinterNet.Testing.csproj]
+                """);
+
+            string configPath = WriteIsolatedNuGetConfig(fixtureRoot);
+            CommandResult restore = RunIsolatedDotnet(fixtureRoot,
+                "restore", "ArchLinterNet.Testing.csproj", "--configfile", configPath, "--no-cache");
+            CommandResult build = RunIsolatedDotnet(fixtureRoot,
+                "build", "ArchLinterNet.Testing.csproj", "--no-restore", "--nologo", "--verbosity", "quiet");
+
+            string assemblyPath = Path.Combine(fixtureRoot, "bin", "Debug", "net10.0", "ArchLinterNet.Testing.dll");
+            string beforeDigest = BuildStateCanonicalHasher.ComputeContentDigest(assemblyPath);
+            File.AppendAllText(sourcePath, "\npublic sealed class RebuiltSmokeType { }\n");
+            File.SetLastWriteTimeUtc(sourcePath, File.GetLastWriteTimeUtc(assemblyPath).AddSeconds(2));
+            CommandResult result = RunTool(fixtureRoot,
+                "--policy", policyPath,
+                "--mode", "strict,audit",
+                "--format", "json",
+                "--ensure-built",
+                "--no-restore",
+                "--configuration", "Debug");
+
+            string afterDigest = BuildStateCanonicalHasher.ComputeContentDigest(assemblyPath);
+            string receiptPath = $"{assemblyPath}.archlinternet-receipt.json";
+            bool hasReceipt = BuildReceiptStore.TryRead(assemblyPath, out BuildReceiptV1? receipt);
+            using JsonDocument document = JsonDocument.Parse(result.StandardOutput);
+            JsonElement results = document.RootElement.GetProperty("results");
+            Assert.Multiple(() =>
+            {
+                string[] expectedModes = ["strict", "audit"];
+                Assert.That(restore.ExitCode, Is.EqualTo(0), restore.CombinedOutput);
+                Assert.That(build.ExitCode, Is.EqualTo(0), build.CombinedOutput);
+                Assert.That(result.ExitCode, Is.EqualTo(0), result.CombinedOutput);
+                Assert.That(results.ValueKind, Is.EqualTo(JsonValueKind.Array));
+                Assert.That(results.GetArrayLength(), Is.EqualTo(2), result.StandardOutput);
+                int modeIndex = 0;
+                foreach (JsonElement modeResult in results.EnumerateArray())
+                {
+                    Assert.That(modeResult.GetProperty("mode").GetString(), Is.EqualTo(expectedModes[modeIndex++]), result.StandardOutput);
+                    Assert.That(modeResult.GetProperty("passed").GetBoolean(), Is.True, result.StandardOutput);
+                    Assert.That(modeResult.GetProperty("violations").GetArrayLength(), Is.Zero, result.StandardOutput);
+                    Assert.That(modeResult.GetProperty("cycles").GetArrayLength(), Is.Zero, result.StandardOutput);
+                    JsonElement preflightDiagnostics = modeResult.GetProperty("preflight_diagnostics");
+                    Assert.That(preflightDiagnostics.GetArrayLength(), Is.EqualTo(1), result.StandardOutput);
+                    Assert.That(preflightDiagnostics[0].GetProperty("state").GetString(), Is.EqualTo("current"),
+                        result.StandardOutput);
+                }
+
+                Assert.That(File.Exists(assemblyPath), Is.True, assemblyPath);
+                Assert.That(File.Exists(receiptPath), Is.True, receiptPath);
+                Assert.That(afterDigest, Is.Not.EqualTo(beforeDigest), "The selected Debug assembly was not rebuilt.");
+                Assert.That(hasReceipt, Is.True);
+                Assert.That(receipt, Is.Not.Null);
+                Assert.That(receipt!.AssemblyContentDigest, Is.EqualTo(afterDigest));
+            });
+            return Passed("installed-testing-output-ensure-built");
         }
 
         public CheckpointScenarioResult AssertGenericCiNeutralInvocation()

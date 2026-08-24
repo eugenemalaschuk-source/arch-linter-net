@@ -15,7 +15,7 @@ namespace ArchLinterNet.Core.Tests;
 // ArchitectureValidationApplicationServiceFakeCompositionTests, scoped to the new
 // request.CacheLocation branch of BuildSnapshot: when a cache location is configured, setup goes
 // through metadata-only PrepareRunner instead of the eager BuildRunner, RunBuildStatePreflight gets
-// a new preparation-based overload, --ensure-built re-prepares from post-build metadata, and the
+// a new preparation-based overload, --ensure-built refreshes receipt-verified post-build metadata, and the
 // snapshot's lazy materializeSetup factory picks MaterializePreparedRunner or falls back to
 // BuildRunnerFor depending on whether the prepared root selection is complete. These tests fake
 // IArchitectureRunnerSetupService.PrepareRunner/MaterializePreparedRunner directly (rather than
@@ -23,7 +23,7 @@ namespace ArchLinterNet.Core.Tests;
 // itself — not ArchitectureRunnerSetupService's own PE-reading internals, covered separately in
 // ArchitectureRunnerSetupServicePreparationTests — is what's under test.
 [TestFixture]
-public sealed class ArchitectureValidationApplicationServiceCacheLocationTests
+public sealed partial class ArchitectureValidationApplicationServiceCacheLocationTests
 {
     private static readonly string[] _value = { "SomethingMissing" };
     private static readonly string[] _value1 = { "Fixture" };
@@ -36,6 +36,8 @@ public sealed class ArchitectureValidationApplicationServiceCacheLocationTests
         public int PrepareRunnerCallCount { get; private set; }
 
         public int MaterializePreparedRunnerCallCount { get; private set; }
+
+        public ArchitectureRunnerPreparation? LastMaterializedPreparation { get; private set; }
 
         public CancellationToken LastBuildRunnerCancellationToken { get; private set; }
 
@@ -101,6 +103,7 @@ public sealed class ArchitectureValidationApplicationServiceCacheLocationTests
             int? maxParallelism = null)
         {
             MaterializePreparedRunnerCallCount++;
+            LastMaterializedPreparation = preparation;
             return new ArchitectureRunnerSetup(RepositoryRootToReturn, RunnerToReturn);
         }
     }
@@ -163,10 +166,20 @@ public sealed class ArchitectureValidationApplicationServiceCacheLocationTests
         public BuildStatePreflightResult ResultToReturn { get; set; } =
             new(Array.Empty<BuildStatePreflightDiagnostic>());
 
+        public Exception? ExceptionToThrow { get; set; }
+
+        public Func<int, Exception?>? ExceptionProvider { get; set; }
+
         public BuildStatePreflightResult Prepare(BuildStatePreflightRequest request)
         {
             PrepareCallCount++;
             LastRequest = request;
+            Exception? exception = ExceptionProvider?.Invoke(PrepareCallCount) ?? ExceptionToThrow;
+            if (exception != null)
+            {
+                throw exception;
+            }
+
             return ResultToReturn;
         }
     }
@@ -305,7 +318,7 @@ public sealed class ArchitectureValidationApplicationServiceCacheLocationTests
     }
 
     [Test]
-    public void CreateSnapshot_EnsureBuiltWithNonBlockingPreflight_RePreparesFromPostBuildMetadata()
+    public void CreateSnapshot_EnsureBuiltWithNonBlockingPreflight_RefreshesPostBuildArtifactEvidence()
     {
         var document = CreateDocument();
         var runnerSetupService = new FakeRunnerSetupService
@@ -326,9 +339,63 @@ public sealed class ArchitectureValidationApplicationServiceCacheLocationTests
 
         Assert.Multiple(() =>
         {
-            Assert.That(runnerSetupService.PrepareRunnerCallCount, Is.EqualTo(2),
-                "--ensure-built must re-prepare from post-build artifacts rather than trusting the pre-build plan");
-            Assert.That(snapshot.Counters.ProjectGraphEvaluations, Is.EqualTo(2));
+            Assert.That(runnerSetupService.PrepareRunnerCallCount, Is.EqualTo(1),
+                "--ensure-built must retain the prepared graph and refresh receipt-verified artifacts without timestamp rediscovery");
+            Assert.That(snapshot.Counters.ProjectGraphEvaluations, Is.EqualTo(1));
+        });
+    }
+
+    [Test]
+    public void Evaluate_EnsureBuiltWithReceiptVerifiedOutput_RemovesOnlyItsStaleDiscoveryDiagnostic()
+    {
+        var document = CreateDocument();
+        document.Analysis.TargetAssemblies = ["Fixture"];
+        string projectPath = Path.Combine("/fake/repository/root", "fixture", "Fixture.csproj");
+        string rebuiltPath = Path.GetFullPath(Path.Combine(
+            "/fake/repository/root", "fixture", "bin", "Release", "net10.0", "Fixture.dll"));
+        var discovery = new ProjectDiscoveryResult(
+            ["Fixture"], Array.Empty<string>(), Array.Empty<string>(),
+            [new ArchitectureProjectDiscoveryDiagnostic(
+                "stale project build output", projectPath, "Timestamp heuristic marked the output stale.")])
+        {
+            DiscoveredProjects = [new ArchitectureDiscoveredProject("fixture/Fixture.csproj", "Fixture", _value2)],
+            ResolvedAssemblyPaths = new Dictionary<string, string>(StringComparer.Ordinal)
+            {
+                ["Fixture"] = Path.Combine("/fake/repository/root", "fixture", "bin", "Debug", "net10.0", "Fixture.dll"),
+            },
+        };
+        var runnerSetupService = new FakeRunnerSetupService
+        {
+            DocumentToReturn = document,
+            PreparationProvider = _ => CreatePreparation(
+                discovery: discovery, missingAssemblyNames: ["Fixture"]),
+            RunnerToReturn = new FakeContractRunner(CreateEmptySession(document)),
+        };
+        var receiptVerified = new BuildStatePreflightResult(
+            [new BuildStatePreflightDiagnostic(
+                "build-state-preflight", "fixture/Fixture.csproj", BuildStatePreflightState.Current,
+                new BuildStatePreflightEvidence("fixture/Fixture.csproj", "Fixture", ExpectedOutputPath: rebuiltPath))]);
+        var preparationService = new FakeBuildStatePreparationService { ResultToReturn = receiptVerified };
+        var applicationService = new ArchitectureValidationApplicationService(
+            runnerSetupService, new FakeContractHandlerRegistry(), new FakeContractExecutor(), preparationService);
+
+        using ArchitectureAnalysisSnapshot snapshot = applicationService.CreateSnapshot(new AnalysisSnapshotRequest
+        {
+            PolicyPath = "unused-by-fakes.arch.yml",
+            PreparationMode = BuildPreparationMode.EnsureBuilt,
+        });
+        snapshot.Evaluate("strict");
+
+        ArchitectureRunnerPreparation refreshed = runnerSetupService.LastMaterializedPreparation
+            ?? throw new AssertionException("Expected the receipt-verified preparation to materialize.");
+        Assert.Multiple(() =>
+        {
+            Assert.That(runnerSetupService.PrepareRunnerCallCount, Is.EqualTo(1));
+            Assert.That(preparationService.PrepareCallCount, Is.EqualTo(2));
+            Assert.That(refreshed.MissingAssemblyNames, Is.Empty);
+            Assert.That(refreshed.ProjectDiscovery.ResolvedAssemblyPaths["Fixture"], Is.EqualTo(rebuiltPath));
+            Assert.That(refreshed.ProjectDiscovery.Diagnostics, Is.Empty,
+                "only the receipt-verified stale-output discovery diagnostic may be removed after build");
         });
     }
 
@@ -376,6 +443,48 @@ public sealed class ArchitectureValidationApplicationServiceCacheLocationTests
             Assert.That(preparationService.LastRequest.RequestedConfiguration, Is.EqualTo("Release"));
             Assert.That(preparationService.LastRequest.RequestedTargetFramework, Is.EqualTo("net10.0"));
             Assert.That(snapshot.RepositoryRoot, Is.EqualTo("/fake/repository/root"));
+        });
+    }
+
+    [Test]
+    public void CreateSnapshot_PolicyOutputDefaultsReachMetadataPreflight()
+    {
+        var document = CreateDocument();
+        document.Analysis.Configuration = "Release";
+        document.Analysis.TargetFramework = "net10.0";
+        var discovery = new ProjectDiscoveryResult(
+            _value1, Array.Empty<string>(), Array.Empty<string>(),
+            Array.Empty<ArchitectureProjectDiscoveryDiagnostic>())
+        {
+            DiscoveredProjects = [new ArchitectureDiscoveredProject("Fixture.csproj", "Fixture", _value2)],
+            ResolvedAssemblyPaths = new Dictionary<string, string>(StringComparer.Ordinal)
+            {
+                ["Fixture"] = "/fake/repository/root/bin/Release/net10.0/Fixture.dll",
+            },
+        };
+        var runnerSetupService = new FakeRunnerSetupService
+        {
+            DocumentToReturn = document,
+            PreparationProvider = _ => CreatePreparation(
+                discovery: discovery,
+                selectedPaths: ["/fake/repository/root/bin/Release/net10.0/Fixture.dll"]),
+        };
+        var preparationService = new FakeBuildStatePreparationService();
+        var applicationService = new ArchitectureValidationApplicationService(
+            runnerSetupService, new FakeContractHandlerRegistry(), new FakeContractExecutor(), preparationService);
+
+        using ArchitectureAnalysisSnapshot snapshot = applicationService.CreateSnapshot(new AnalysisSnapshotRequest
+        {
+            PolicyPath = "unused-by-fakes.arch.yml",
+            CacheLocation = new AnalysisCacheLocation("/fake/cache", AnalysisCacheMode.ExplicitPath),
+        });
+
+        Assert.That(preparationService.LastRequest, Is.Not.Null);
+        Assert.Multiple(() =>
+        {
+            Assert.That(snapshot.RepositoryRoot, Is.EqualTo("/fake/repository/root"));
+            Assert.That(preparationService.LastRequest!.RequestedConfiguration, Is.EqualTo("Release"));
+            Assert.That(preparationService.LastRequest.RequestedTargetFramework, Is.EqualTo("net10.0"));
         });
     }
 

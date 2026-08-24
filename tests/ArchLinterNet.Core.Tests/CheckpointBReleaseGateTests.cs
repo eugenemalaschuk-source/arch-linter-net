@@ -58,6 +58,14 @@ public sealed partial class CheckpointBReleaseGateTests
     }
 
     [Test]
+    public void PackedCandidate_EnsureBuiltReplacesTestingOutput()
+    {
+        CandidatePackageFeed candidate = Candidate;
+        candidate.WriteShardEvidence("ensure-built-replaces-testing-output",
+            [candidate.AssertInstalledTestingOutputEnsureBuilt()]);
+    }
+
+    [Test]
     public void PackedCandidate_AdopterRuntimeCore()
     {
         CandidatePackageFeed candidate = Candidate;

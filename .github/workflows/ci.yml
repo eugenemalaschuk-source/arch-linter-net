@@ -623,6 +623,13 @@ jobs:
             name: Windows
             platform: windows-x64
             shell_adapter: pwsh
+            shard: ensure-built-replaces-testing-output
+            shard_name: Ensure-built replaces Testing output
+            target: test-packed-artifact-ensure-built-replaces-testing-output
+          - os: windows-latest
+            name: Windows
+            platform: windows-x64
+            shell_adapter: pwsh
             shard: adopter-runtime-core
             shard_name: Adopter runtime core
             target: test-packed-artifact-adopter-runtime-core
@@ -761,6 +768,9 @@ jobs:
           - shard: package-and-entrypoints
             shard_name: Package + entrypoints
             target: test-packed-artifact-package-and-entrypoints
+          - shard: ensure-built-replaces-testing-output
+            shard_name: Ensure-built replaces Testing output
+            target: test-packed-artifact-ensure-built-replaces-testing-output
           - shard: adopter-runtime-core
             shard_name: Adopter runtime core
             target: test-packed-artifact-adopter-runtime-core
