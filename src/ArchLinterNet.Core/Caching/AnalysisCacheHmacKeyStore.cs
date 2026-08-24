@@ -16,7 +16,7 @@ internal static class AnalysisCacheHmacKeyStore
     private const string KeyFileName = "hmac-v1.key";
     private const int MaxReadRetries = 40;
     private const int RetryDelayMilliseconds = 5;
-    private static readonly TimeSpan CreationMutexTimeout = TimeSpan.FromSeconds(5);
+    private static readonly TimeSpan _creationMutexTimeout = TimeSpan.FromSeconds(1);
 
     // Test-only seam. It makes the external trust boundary assertable without placing test keys
     // in a developer's real profile. Production leaves this null.
@@ -57,7 +57,7 @@ internal static class AnalysisCacheHmacKeyStore
         {
             try
             {
-                mutexAcquired = creationMutex.WaitOne(CreationMutexTimeout);
+                mutexAcquired = creationMutex.WaitOne(_creationMutexTimeout);
             }
             catch (AbandonedMutexException)
             {
@@ -95,7 +95,7 @@ internal static class AnalysisCacheHmacKeyStore
         }
     }
 
-    private static string GetCreationMutexName(string keyPath) =>
+    internal static string GetCreationMutexName(string keyPath) =>
         "arch-linter-net-analysis-cache-hmac-" + Convert.ToHexStringLower(
             SHA256.HashData(Encoding.UTF8.GetBytes(keyPath)));
 

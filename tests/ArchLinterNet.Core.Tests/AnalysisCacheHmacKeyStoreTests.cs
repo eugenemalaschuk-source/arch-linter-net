@@ -97,6 +97,45 @@ public sealed class AnalysisCacheHmacKeyStoreTests
     }
 
     [Test]
+    public void GetOrCreateKey_CreationMutexRemainsBusy_ThrowsAfterTheBoundedWait()
+    {
+        string mutexName = AnalysisCacheHmacKeyStore.GetCreationMutexName(
+            AnalysisCacheHmacKeyStore.GetKeyPath(_root));
+        using ManualResetEventSlim holderAcquired = new(initialState: false);
+        using ManualResetEventSlim releaseHolder = new(initialState: false);
+
+        Task holder = Task.Run(() =>
+        {
+            using Mutex mutex = new(initiallyOwned: false, mutexName);
+            if (!mutex.WaitOne(TimeSpan.FromSeconds(1)))
+            {
+                throw new InvalidOperationException("Test mutex holder could not acquire the creation mutex.");
+            }
+
+            holderAcquired.Set();
+            try
+            {
+                releaseHolder.Wait();
+            }
+            finally
+            {
+                mutex.ReleaseMutex();
+            }
+        });
+
+        Assert.That(holderAcquired.Wait(TimeSpan.FromSeconds(1)), Is.True);
+        try
+        {
+            Assert.Throws<IOException>(() => AnalysisCacheHmacKeyStore.GetOrCreateKey(_root));
+        }
+        finally
+        {
+            releaseHolder.Set();
+            holder.GetAwaiter().GetResult();
+        }
+    }
+
+    [Test]
     public void GetOrCreateKey_CorruptExistingKeyFile_SelfHealsToANewValidKey()
     {
         string keyPath = AnalysisCacheHmacKeyStore.GetKeyPath(_root);
