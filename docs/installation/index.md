@@ -1,125 +1,88 @@
 # Installation
 
-ArchLinterNet is distributed as .NET packages and a .NET tool.
-
-Package publication happens through NuGet.org. Until a package is published, use the development-from-source command shown below.
+ArchLinterNet is distributed through NuGet.org as a .NET tool and as reusable .NET packages.
 
 ## Requirements
 
 - .NET 10 SDK or later.
 - Windows, macOS, or Linux.
-- A built repository or configured assembly search paths for the assemblies you want to validate.
+- For architecture validation, either current build outputs or an analysis configuration that can discover/build the selected projects.
 
-## Development from source
+## Recommended: repository-local .NET tool
 
-From this repository:
+A local tool manifest makes the resolved CLI version part of the repository rather than a developer-machine convention.
 
 ```bash
-dotnet run --project src/ArchLinterNet.Cli -- --help
-
-dotnet run --project src/ArchLinterNet.Cli -- \
-  --policy architecture/dependencies.arch.yml \
-  --mode strict
+dotnet new tool-manifest
+dotnet tool install ArchLinterNet.Cli
+dotnet tool restore
+dotnet arch-linter-net --help
 ```
 
-## .NET global tool
+Commit `.config/dotnet-tools.json`. When upgrading:
 
-After the CLI package is available on NuGet.org:
+```bash
+dotnet tool update ArchLinterNet.Cli
+dotnet tool restore
+```
+
+Review the manifest diff and run the repository acceptance gate before merging the upgrade.
+
+Documentation intentionally does not hard-code the current product package version. The local manifest is the version authority for a repository.
+
+## Global .NET tool
+
+For interactive use:
 
 ```bash
 dotnet tool install --global ArchLinterNet.Cli
 arch-linter-net --help
 ```
 
-For reproducible repository/CI use, prefer a local tool manifest below. A global
-install follows the package source selected by the caller and should not be used
-as an implicit repository version policy.
+A global install follows the package source and version resolution selected by the caller, so do not treat a developer's global tool as an implicit CI version policy.
 
-Run validation:
+## Run from source
 
-```bash
-arch-linter-net --policy architecture/dependencies.arch.yml --mode strict
-```
-
-## .NET local tool
-
-For repository-pinned usage, create or update a tool manifest:
+Inside this repository:
 
 ```bash
-dotnet new tool-manifest
+dotnet run --project src/ArchLinterNet.Cli -- --help
 
-dotnet tool install ArchLinterNet.Cli
-
-dotnet tool restore
-
-dotnet arch-linter-net --policy architecture/dependencies.arch.yml --mode strict
+dotnet run --project src/ArchLinterNet.Cli -- \
+  --policy architecture/arch.yml \
+  --mode strict
 ```
 
-The install records the exact resolved package version in
-`.config/dotnet-tools.json`. Review and commit that manifest. When upgrading,
-run `dotnet tool update ArchLinterNet.Cli`, review the manifest diff, and run the
-repository acceptance gate before merging it.
+## Library packages
 
-Local tools are recommended for CI because the selected tool version is pinned
-in the repository rather than in evergreen documentation.
-
-## NuGet packages for test integration
-
-Use the testing package when architecture validation should run from a test project:
+Use the testing adapter when architecture validation should run from a test project:
 
 ```bash
 dotnet add package ArchLinterNet.Testing
 ```
 
-Use the core package when building a custom host or calling the asmdef-only validation API:
+Use the core package when building a custom host or using the core application APIs:
 
 ```bash
 dotnet add package ArchLinterNet.Core
 ```
 
-Unity `.asmdef` validation is part of `ArchLinterNet.Core`; no separate Unity package is required:
+Unity `.asmdef` validation is part of `ArchLinterNet.Core`; no separate Unity package is required.
 
-```csharp
-using ArchLinterNet.Core.Asmdef;
+## CI
 
-bool passed = AsmdefValidator.Validate(
-    "architecture/dependencies.arch.yml",
-    out var violations);
-```
-
-## CI installation
-
-A minimal GitHub Actions step for a published global tool:
-
-```yaml
-- name: Install ArchLinterNet
-  run: dotnet tool install --global ArchLinterNet.Cli
-
-- name: Validate architecture
-  run: arch-linter-net --mode strict
-```
-
-For local tools, prefer:
+For a repository-local tool:
 
 ```yaml
 - name: Restore local tools
   run: dotnet tool restore
 
 - name: Validate architecture
-  run: dotnet arch-linter-net --mode strict
+  run: dotnet arch-linter-net --policy architecture/arch.yml --mode strict --ensure-built
 ```
 
-See [CI integration](../guides/ci-integration.md) for strict + audit workflows.
-For greenfield adoption, upgrades, and prepared/offline environments, see
-[Adopt or Upgrade ArchLinterNet](../guides/upgrading.md).
+`--ensure-built` is opt-in. Without it, ArchLinterNet validates the available project/assembly state and fails closed on missing, stale, or ambiguous inputs instead of silently rebuilding.
 
-## NuGet.org links
+The Apple Silicon self-dogfood defect previously tracked in issue #639 is fixed on current `main` by #648. Current documentation describes the fixed `--ensure-built` behavior; release-qualified historical reproduction belongs in the provenance workflow, not in evergreen install commands.
 
-NuGet package metadata should expose only public product links:
-
-- project URL: the GitHub Pages documentation site;
-- repository URL: the GitHub repository;
-- package README: the concise product README;
-- license expression: the repository license.
-
-See [NuGet package metadata](../reference/nuget-metadata.md) for the expected link model.
+See [Getting Started](../getting-started/index.md), [CI integration](../guides/ci-integration.md), and [Adopt or Upgrade ArchLinterNet](../guides/upgrading.md).

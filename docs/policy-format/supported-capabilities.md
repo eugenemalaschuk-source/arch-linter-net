@@ -1,155 +1,119 @@
-# Supported Capabilities and Non-Goals
+# Supported Capabilities and Non-goals
 
-This page is the public product boundary for what ArchLinterNet can and cannot validate.
+This page is the concise human capability boundary. The machine-readable inventory is `archlinternet.capabilities.json`; detailed syntax belongs in the policy schema and contract reference.
 
-Use it before authoring policies, reviewing AI-generated YAML, or linking documentation from NuGet.org.
+`make lint-docs` checks this page, the contract index, CLI reference, navigation, and selected schema invariants against executable/machine sources so a newly implemented or removed capability cannot silently leave stale public guidance behind.
 
-## Supported today
+## Capability authority
 
-ArchLinterNet supports static architecture validation through documented YAML policy fields:
+Use this precedence when reviewing a discrepancy:
 
-- namespace/layer dependency contracts;
-- ordered layer contracts;
-- allow-only whitelist contracts;
-- dependency cycle contracts;
-- acyclic sibling namespace contracts;
-- module-container contracts that discover direct feature modules dynamically and enforce a
-  profile-specific module topology;
-- independence contracts;
-- assembly independence contracts (direct .NET assembly reference detection);
-- project metadata governance contracts (exact required/forbidden MSBuild property values, friend-assembly allowlists, forbidden project-reference path matches, driven from discovered `.csproj` metadata);
-- protected surface contracts;
-- external dependency contracts;
-- external allow-only whitelist contracts;
-- method-body forbidden API contracts;
-- Unity `.asmdef` contracts;
-- reusable layer templates;
-- type placement and naming governance contracts (name suffix/prefix, namespace, layer, base type, interface, and attribute selectors; layer/namespace/project/assembly residency; required/forbidden naming);
-- layout convention contracts with declaration-kind, semantic-role, and abstract-class folder
-  purity checks;
-- public API surface governance contracts (per-assembly declared exported public/protected/protected-internal type and member allowlist, undeclared-surface detection, optional forbid-public-constants-unless-declared lever);
-- attribute usage governance contracts (declared attribute/marker types restricted to, or forbidden from, declared layers/namespaces/projects/assemblies; exact and prefix attribute-name matching; type and member scanning regardless of visibility);
-- inheritance boundary contracts (types in declared source layers/namespaces forbidden from inheriting, directly or transitively, from declared base types; exact and prefix base-type-name matching; generic base types matched by generic type definition);
-- interface implementation boundary contracts (implementations of declared interfaces restricted to, or forbidden from, declared layers/namespaces/projects/assemblies; exact and prefix interface-name matching, including interfaces inherited through base classes);
-- composition contracts (composition-root/service-locator API calls restricted to a declared allowed layers/namespaces/projects/assemblies boundary; same call-pattern vocabulary as method-body contracts — member names, `Type.Member`, fully qualified members, namespace/type prefixes; static reflection/IL-based call-site detection only, does not validate runtime dependency-injection resolution or prove every service is registered correctly);
-- coverage contracts (`scope: namespace`, `scope: rule_input`, `scope: project`, `scope: assembly`);
-- contextual dependency contracts (`strict_context_dependencies`/`audit_context_dependencies`: a source `(role, metadata)` selector's type must not reference a target matching a `forbidden` selector, compared directly against discovered role/metadata without an intermediate declared layer; `exact`/`in`/`any`/`not-equal-to-source` metadata operators; `exclude` selector pre-filtering);
-- contextual allow-only contracts (`strict_context_allow_only`/`audit_context_allow_only`: a source `(role, metadata)` selector's type may reference only targets matching an `allowed` selector, using the same selector shape and operator vocabulary as contextual dependency contracts);
-- semantic port-boundary contracts (`strict_port_boundaries`/`audit_port_boundaries`: direct compiled references into a metadata-selected target context must use an explicit port or anti-corruption seam; optional adapter bindings compare compiled interface implementation facts only);
+1. runtime/CLI implementation and packaged JSON Schema;
+2. `archlinternet.capabilities.json`;
+3. mechanically verified reference pages;
+4. task guides and examples.
+
+## Policy model
+
+Supported policy features include:
+
+- one selected root policy plus deterministic local imports;
+- namespace/glob layers and selector-only semantic layers;
+- exact role/metadata selectors, with namespace + selector using AND semantics;
+- explicit external dependency, NuGet package, and framework-reference groups;
+- reusable bounded `source_sets` for layers, assemblies, and projects;
+- project/solution discovery, source roots, condition sets, and build selectors;
 - strict and audit contract groups;
-- constrained namespace glob patterns;
-- external dependency groups;
-- condition sets for source-level analysis;
-- ignored violations and generated baselines;
-- human and JSON diagnostics;
-- CLI and test-adapter execution;
-- CEL-backed `when` predicates on a closed set of selector locations (standard
-  CEL under ArchLinter CEL Profile v1, a safe subset — not a proprietary DSL
-  and not full CEL conformance; see the [CEL policy expressions guide](cel-expressions.md)).
+- narrow ignored violations and reviewed migration baselines;
+- CEL-backed `when` predicates only at the documented closed locations.
 
-## Not supported
+## Contract governance
 
-ArchLinterNet does not currently validate:
+The current machine inventory is rendered as the reviewed [Contract family index](../contracts/index.md). Major capabilities include:
 
-- runtime behavior or dynamic dependency injection resolution;
-- security policy, authorization, or data access permissions;
-- code ownership or review ownership;
-- semantic data-flow analysis;
-- third-party package internals;
-- full MSBuild evaluation, target execution, or arbitrary imported-property semantics;
-- CEL-backed policy expressions outside the closed set of `when` locations
-  documented in the [CEL policy expressions guide](cel-expressions.md#locations-that-accept-when);
-  `when` is never inferred from ordinary strings anywhere else;
-- unrestricted custom contract families outside the documented YAML schema;
-- unrestricted namespace pattern systems;
-- arbitrary YAML fields such as `severity`, `from`, `to`, `regex`, `owner`, or custom rule groups unless the schema documents them.
+- namespace/layer and assembly dependency governance;
+- cycles, independence, protected surfaces, reusable layer templates, and module containers;
+- project metadata, packages, framework references, and external dependencies;
+- method-body forbidden calls and Unity `.asmdef` references;
+- type placement, layout conventions, attributes, inheritance, interfaces, and composition roots;
+- public API snapshots/surfaces;
+- semantic contextual dependency/allow-only rules and port/ACL boundaries;
+- architecture coverage.
 
-Coverage support currently excludes `scope: dependency_edge`, which remains reserved
-and fails validation with an actionable error.
+Do not infer a family from a YAML-looking field that is absent from the machine inventory/schema.
 
-`classification.attributes`/`classification.assembly_attributes`/`classification.inheritance`/
-`classification.namespace` are **implemented**: type-level and assembly-level attributes
-mapped by full type name, transitive base-type/interface inheritance mappings, and
-namespace glob/suffix mappings are all extracted into role/metadata facts, combined by the
-fixed precedence order `type_attribute > assembly_attribute > inheritance > namespace`,
-cached per validation run in a role index, and `validate` surfaces resulting
-role/conflict/evidence-extraction-failure facts as informational output.
-Selector-backed layers (`layers.<name>.selector`) consume the role index to resolve types
-by exact role/metadata match; those layers produce violations through existing contract
-families exactly as namespace-based layers do. Empty non-external selector-only layers are
-surfaced as configuration diagnostics. `classification.path` remains unimplemented but
-declaring a non-empty `path` section produces a non-blocking, informational diagnostic
-(does not fail `validate`) explaining that path-convention classification is deferred
-pending [issue #171](https://github.com/eugenemalaschuk-source/arch-linter-net/issues/171).
-`yaml_override`, `overrides`, and `exclusions` remain schema-accepted no-ops with no runtime
-effect and no diagnostic. See [Semantic classification](semantic-classification.md).
+## Implemented coverage scopes
 
-Assembly independence contracts detect only **direct** assembly references; transitive
-reference paths between two listed assemblies are not resolved.
+<!-- coverage-scope: namespace -->
+- `namespace` — first-party namespace inventory.
+<!-- coverage-scope: project -->
+- `project` — discovered project inventory.
+<!-- coverage-scope: assembly -->
+- `assembly` — first-party assembly inventory.
+<!-- coverage-scope: dependency_edge -->
+- `dependency_edge` — observed layer-to-layer dependency edges that must be governed.
+<!-- coverage-scope: rule_input -->
+- `rule_input` — declared rule inputs that must resolve and stay non-stale, with exact reviewed optional-empty support.
+<!-- coverage-scope: semantic_role -->
+- `semantic_role` — discovered semantic roles/metadata that must be governed or explicitly excluded.
 
-Assembly dependency and assembly allow-only contracts also detect only **direct**
-assembly references, and their optional `dependency_depth` field only accepts `direct`
-(the default) — declaring `dependency_depth: transitive` fails policy loading with an
-actionable error rather than being silently ignored, since transitive assembly-reference-path
-resolution is not implemented yet. Ordered assembly/project layer contracts and
-assembly/project cycle detection are not yet supported either; these are deferred to a
-follow-up contract family.
+All six scopes are runtime-supported. See [Coverage contracts](../contracts/coverage.md).
 
-External allow-only contracts detect forbidden references only through **type-level**
-reference metadata (base types, interfaces, fields, properties, method signatures, generic
-arguments) — unlike `strict_external`/`audit_external`, they do not yet scan method bodies
-via IL. This is a deliberate scope decision, not an oversight, and may be added as a
-follow-up.
+## Semantic classification and selectors
 
-Type placement contracts' `must_reside_in_projects` resolves a configured project name to
-its assembly name via project discovery and checks it identically to
-`must_reside_in_assemblies` — there is no true type-to-`.csproj` mapping in this tool, so
-"must reside in project X" means "must reside in the assembly project X produces," not
-physical file placement within a project. Type placement contracts also do not scan method
-bodies; types are matched structurally (name, namespace, base type, interfaces, attributes).
+Implemented classification evidence includes:
 
-Public API surface contracts only detect **undeclared** exported surface (a new `public`/
-`protected`/`protected internal` type or member not present in `declared_api`) — they do not
-detect *removed* or *changed* declared signatures and are not a substitute for full .NET
-binary/package compatibility validation. They are reflection-based, like protected surface
-and type placement contracts, not project-aware Roslyn compilation.
+- type attributes;
+- assembly attributes;
+- inheritance;
+- namespace rules.
 
-Attribute usage contracts are static marker **placement** validation only, not runtime
-authorization/security correctness validation — they cannot evaluate an attribute's
-constructor arguments or named properties (e.g. whether `[Authorize(Roles = "Admin")]`
-grants the right roles). They also do not detect the *absence* of a required marker (a
-"required attribute" rule such as "every controller action must carry `[Authorize]` or
-`[AllowAnonymous]`") — required-marker enforcement is deferred to a documented follow-up
-and is not implemented by this contract family.
+The normal precedence is `type_attribute > assembly_attribute > inheritance > namespace`. A layer may use `namespace`, `selector`, or both. Selector-only layers are supported; a combined layer requires both predicates.
 
-Inheritance contracts only walk the compiled base-class chain; they do not match interface
-implementations, do not support required-inheritance rules ("every X must derive from Y"),
-and stop the chain walk at the last resolvable base type when an assembly cannot be loaded.
-Interface implementation contracts are static metadata checks over each type's implemented
-interface set — they do not resolve runtime dependency-injection registrations and do not
-support required-implementation rules ("interface X must have an implementation in layer Y").
+Contextual dependency/allow-only and semantic port-boundary contracts use discovered role/metadata evidence directly rather than routing through a named layer.
 
-## Important distinctions
+Fields documented as deferred or reserved are not silently promoted to support just because a schema accepts them.
 
-### Static references, not runtime behavior
+## CLI and governance workflows
 
-ArchLinterNet checks static dependency surfaces visible from assemblies, source analysis, and supported project files. It does not prove what happens at runtime through dependency injection, reflection, configuration, or plugin loading.
+The CLI supports normal validation plus:
 
-### Architecture guardrails, not security validation
+- `policy check`, `policy context`, and `policy weakening`;
+- baseline generate/update/prune/diff/verify/migrate;
+- `gate` for no-new-debt and policy-weakening CI enforcement;
+- `change snapshot` / `change report`;
+- `coverage report` / `coverage extract`;
+- `history analyze`;
+- `public-api` capture/diff/update/migrate;
+- `graph` and `explain`;
+- persistent cache inspect/clear;
+- packaged schema list/print;
+- architecture-policy badge payload generation;
+- CLI-command scaffolding for repository development.
 
-A policy can prevent a domain layer from referencing an infrastructure SDK. It cannot prove that authorization, data access permissions, or tenant isolation are correct.
+See [CLI reference](../cli/index.md) for the executable command map.
 
-### Baselines freeze debt, they do not hide new debt
+## Build-state behavior
 
-A baseline should capture known current violations so teams can block new ones. Broad baseline patterns should be treated as temporary migration debt and reviewed carefully.
+Validation can consume current build outputs or explicitly opt in to `--ensure-built`. Build-state preflight fails closed on missing, stale, or ambiguous inputs. `--no-restore` prevents implicit restore in the ensure-built workflow. Configuration/framework/platform/runtime selectors are explicit.
 
-### AI agents must not invent fields
+## Outputs
 
-AI-authored policies must use only fields supported by the YAML schema and documented contract families. Plausible-looking YAML that the runtime loader ignores creates false confidence.
+Supported output includes human, normalized JSON, SARIF where applicable, repeatable report sinks, timing diagnostics, analysis-profile JSON, architecture coverage summaries, and cache/build-state evidence.
 
-## Where to look next
+See [Output formats](../usage/output-formats.md) and [Exit codes](../usage/exit-codes.md).
 
-- [Policy format](index.md)
-- [Contract overview](../contracts/index.md)
-- [AI capabilities](../ai/capabilities.md)
-- [Policy review checklist](../ai/policy-review-checklist.md)
+## Non-goals
+
+ArchLinterNet does not claim to provide:
+
+- runtime dependency-injection correctness;
+- authorization/security-policy correctness;
+- ownership/CODEOWNERS enforcement;
+- arbitrary semantic data-flow or taint analysis;
+- regex-based arbitrary layer definitions;
+- arbitrary user-defined contract families outside the packaged schema;
+- runtime behavior verification of third-party packages;
+- automatic architectural design decisions.
+
+Use the tool to encode reviewed static architecture decisions, not to replace security testing, runtime integration testing, or design review.

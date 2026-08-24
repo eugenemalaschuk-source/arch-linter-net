@@ -1,29 +1,28 @@
 # Getting Started
 
-This guide shows the shortest path from a .NET repository to an executable architecture policy.
+This guide follows the normal adoption path from an existing .NET repository to a blocking architecture gate.
 
-## 1. Install or run the tool
+## 1. Install the CLI
 
-During ArchLinterNet development, run the CLI from source:
-
-```bash
-dotnet run --project src/ArchLinterNet.Cli -- --policy architecture/arch.yml --mode strict
-```
-
-After the .NET tool is installed from NuGet.org, run:
+For repository and CI use, prefer a local .NET tool manifest:
 
 ```bash
-arch-linter-net --policy architecture/arch.yml --mode strict
+dotnet new tool-manifest
+dotnet tool install ArchLinterNet.Cli
+dotnet tool restore
 ```
 
-See [Installation](../installation/index.md) for global tool, local tool, and package usage.
+Then invoke the pinned repository tool with:
 
-## 2. Create a policy
+```bash
+dotnet arch-linter-net --help
+```
 
-Create one root policy. This guide uses the recommended concise path
-`architecture/arch.yml`, but the selected filename is configurable and has no
-runtime semantics. Start with a small rule that maps to real namespaces and
-passes or fails for a known reason.
+A global install is also supported for interactive use. See [Installation](../installation/index.md).
+
+## 2. Create a minimal root policy
+
+`architecture/arch.yml` is the recommended concise convention in these guides. The filename itself has no runtime semantics. The CLI's compatibility default remains `architecture/dependencies.arch.yml`, so pass `--policy` when using another path.
 
 ```yaml
 version: 1
@@ -38,10 +37,7 @@ layers:
     namespace: MyApp.Infrastructure
 
 analysis:
-  target_assemblies:
-    - MyApp.Application
-    - MyApp.Domain
-    - MyApp.Infrastructure
+  solution: MyApp.sln
 
 contracts:
   strict:
@@ -49,69 +45,122 @@ contracts:
       name: application-must-not-depend-on-infrastructure
       source: application
       forbidden: [infrastructure]
-      reason: Application code must depend on abstractions, not concrete infrastructure.
+      reason: Application code depends on abstractions, not concrete infrastructure.
 
   strict_layers:
     - id: clean-architecture-layering
       name: clean-architecture-layering
-      layers:
-        - infrastructure
-        - application
-        - domain
-      reason: Dependencies must point inward toward the domain.
+      layers: [infrastructure, application, domain]
+      reason: Dependencies point inward.
 ```
 
-See [First policy](first-policy.md) for a walkthrough.
+A policy may instead declare explicit projects or target assemblies. See [Policy format](../policy-format/index.md).
 
-## 3. Choose strict or audit
-
-Use **strict** contracts for boundaries that should block CI today.
-
-Use **audit** contracts for migration discovery, future-state architecture, and known debt that should be visible before it becomes a gate.
+## 3. Check the policy before analyzing code
 
 ```bash
-arch-linter-net --mode strict
-arch-linter-net --mode audit
+dotnet arch-linter-net policy check \
+  --policy architecture/arch.yml
 ```
 
-## 4. Add CI
+`policy check` validates syntax, imports, composition, contract references, and static configuration. Architecture checks that need project, assembly, or source facts are reported as deferred; a successful policy check is not an architecture-compliance result.
 
-A common CI setup runs strict validation as a blocking step and audit validation as a non-blocking artifact:
+## 4. Produce trustworthy build inputs
+
+ArchLinterNet validates compiled architecture facts. You can build normally:
+
+```bash
+dotnet build MyApp.sln
+dotnet arch-linter-net --policy architecture/arch.yml --mode strict
+```
+
+or opt in to the build-state workflow:
+
+```bash
+dotnet arch-linter-net \
+  --policy architecture/arch.yml \
+  --mode strict \
+  --ensure-built
+```
+
+`--ensure-built` builds the selected project graph once, records/verifies the build receipt, and then validates. It is never implicit. Use `--no-restore` when CI must fail closed instead of restoring.
+
+## 5. Make strict validation the CI gate
+
+A minimal job is:
 
 ```yaml
-- name: Validate architecture (strict)
-  run: arch-linter-net --mode strict
+- name: Restore local tools
+  run: dotnet tool restore
 
-- name: Architecture audit report
-  if: always()
-  continue-on-error: true
-  run: arch-linter-net --mode audit --json > architecture-audit.json
+- name: Validate architecture
+  run: dotnet arch-linter-net --policy architecture/arch.yml --mode strict --ensure-built
 ```
 
-See [CI integration](../guides/ci-integration.md) for full workflows.
+Use audit contracts for discovery and future-state governance that should be visible without blocking merges.
 
-## 5. Handle existing debt
+For JSON/SARIF reports, additional sinks, caching, and build selectors, see [CLI reference](../cli/index.md) and [CI integration](../guides/ci-integration.md).
 
-When adopting ArchLinterNet in an existing repository, generate a baseline for current violations instead of weakening the rule:
+## 6. Baseline existing debt instead of weakening policy
+
+If a strict rule describes the desired boundary but the repository already violates it, capture the current violations:
 
 ```bash
-arch-linter-net baseline generate \
-  --config architecture/dependencies.arch.yml \
+dotnet arch-linter-net baseline generate \
+  --config architecture/arch.yml \
   --output architecture/baseline.arch.yml \
   --reason "Initial migration baseline"
 ```
 
-Then validate with:
+Then validate with the baseline:
 
 ```bash
-arch-linter-net --policy architecture/dependencies.arch.yml --baseline architecture/baseline.arch.yml --mode strict
+dotnet arch-linter-net \
+  --policy architecture/arch.yml \
+  --baseline architecture/baseline.arch.yml \
+  --mode strict
 ```
 
-See [Migration baselines](../guides/migration-baselines.md) for the lifecycle.
+Review baseline entries like code. Use `baseline update`, `prune`, `diff`, `verify`, and `migrate` for its lifecycle. See [Migration baselines](../guides/migration-baselines.md).
 
-## Next steps
+## 7. Add architecture coverage
 
-- [Policy format](../policy-format/index.md)
-- [Contract families](../contracts/index.md)
-- [Supported capabilities and non-goals](../policy-format/supported-capabilities.md)
-- [AI policy authoring](../ai/index.md)
+A dependency rule can pass while new architecture falls outside every rule. Coverage contracts detect that drift.
+
+Implemented coverage scopes are:
+
+- `namespace`
+- `project`
+- `assembly`
+- `dependency_edge`
+- `rule_input`
+- `semantic_role`
+
+Example:
+
+```yaml
+contracts:
+  strict_coverage:
+    - id: first-party-namespace-coverage
+      name: first-party-namespace-coverage
+      scope: namespace
+      roots:
+        - namespace: MyApp
+      reason: Every first-party namespace must be mapped or explicitly excluded.
+```
+
+See [Coverage contracts](../contracts/coverage.md).
+
+## 8. Add advanced governance only where needed
+
+Common next steps are:
+
+- [project/package/framework governance](../contracts/package-dependencies.md);
+- [public API surface governance](../contracts/public-api-surface.md);
+- [semantic classification](../policy-format/semantic-classification.md), contextual rules, and [port boundaries](../contracts/port-boundary.md);
+- reusable `source_sets` for repeated project/assembly/layer selectors;
+- `policy context` + `policy weakening` for policy-change review;
+- `change snapshot` + `change report` and `gate` for CI change governance;
+- `graph`, `explain`, and `history analyze` for investigation.
+
+For a worked adoption against a real repository, continue with [Real-repository workflow](../guides/real-repository-workflow.md).

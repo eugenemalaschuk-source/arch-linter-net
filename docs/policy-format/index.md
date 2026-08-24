@@ -1,263 +1,136 @@
 # Policy Format
 
-ArchLinterNet executes one selected root policy. The recommended concise root
-convention is:
+An ArchLinterNet policy is repository-owned YAML that declares the architecture facts and contracts a validation run should enforce.
 
-```text
-architecture/arch.yml
-```
+The packaged JSON Schema is the syntax authority. Runtime validators and the executable contract-family registry are the behavior authority. `archlinternet.capabilities.json` is the machine-readable public capability inventory. `make lint-docs` checks the public reference against those sources.
 
-The CLI path is configurable with `--policy <path>`. The filename has no runtime
-semantics: existing `architecture/dependencies.arch.yml` files and arbitrary
-names remain valid. Large policies can use ordered local fragments; see
-[Policy imports](imports.md).
+## Root policy
 
-For migration from an existing root/fragment policy, including explicit
-baseline identity review and offline schema discovery, see
-[Adopt or Upgrade ArchLinterNet](../guides/upgrading.md).
-
-## Top-level structure
+A selected root policy uses `version: 1` and normally contains:
 
 ```yaml
 version: 1
 name: My Architecture Contract
 
+imports: []
+
 layers: {}
+
 external_dependencies: {}
-legacy_runtime_layers: []
+packages: {}
+framework_references: {}
+source_sets: {}
+
+classification: {}
+
 analysis: {}
+
 contracts: {}
 ```
 
-| Section | Purpose |
-|---------|---------|
-| `version` | Policy schema version. Current value is `1`. |
-| `name` | Human-readable policy name. |
-| `imports` | Optional ordered local fragments composed into this root policy. |
-| `layers` | Named first-party or external namespace surfaces used by contracts. |
-| `external_dependencies` | Named vendor/framework dependency groups. |
-| `legacy_runtime_layers` | Optional compatibility namespace groups for runtime-only assemblies. |
-| `analysis` | Assembly resolution, source roots, condition sets, and validation behavior. |
-| `contracts` | Strict and audit contract families. |
+`imports`, external/package/framework groups, source sets, and classification are optional. The root schema requires the root identity and the core `layers`, `analysis`, and `contracts` containers; imported fragments can contribute entries during composition.
 
-## Minimal policy
+See [YAML schema reference](../reference/yaml-schema.md) and [Policy imports](imports.md).
+
+## Layers: namespaces and semantic selectors
+
+A layer can be namespace-backed, selector-backed, or both.
 
 ```yaml
-version: 1
-name: Minimal Architecture Contract
-
 layers:
-  application:
-    namespace: MyApp.Application
   domain:
     namespace: MyApp.Domain
-  infrastructure:
-    namespace: MyApp.Infrastructure
 
-analysis:
-  target_assemblies:
-    - MyApp.Application
-    - MyApp.Domain
-    - MyApp.Infrastructure
+  commands:
+    selector:
+      role: command
+      metadata:
+        bounded_context: Sales
 
-contracts:
-  strict:
-    - id: application-not-infrastructure
-      name: application-must-not-depend-on-infrastructure
-      source: application
-      forbidden: [infrastructure]
-      reason: Application must not depend on Infrastructure directly.
+  sales_commands:
+    namespace: MyApp.Sales
+    selector:
+      role: command
 ```
 
-See [First policy](../getting-started/first-policy.md) for a walkthrough.
+Selector-only layers are supported. When both `namespace` and `selector` are present, a type must satisfy both. `namespace_suffix`, `exclude`, `overlaps_with`, and CEL-backed selector `when` predicates have the constraints documented in [Layers and namespace patterns](layers-and-namespaces.md) and [Semantic classification](semantic-classification.md).
 
-## Policy imports
+## Analysis inputs
 
-Use `imports` to split one selected root into focused local fragments while
-keeping inline root sections:
-
-```yaml
-imports:
-  - policy/layers.arch.yml
-  - policy/sales-domain.arch.yml
-```
-
-`arch.yml` and `*.arch.yml` are recommended naming conventions only. Runtime
-roles come from the selected root path and import graph. Read
-[Policy imports](imports.md) for fragment shape, deterministic ordering,
-composition conflicts, path boundaries, schemas, migration, and examples.
-
-## Layers
-
-Layers map short policy names to namespace patterns. They can represent application layers, modules, slices, or external namespace surfaces.
-
-Read [Layers and namespace patterns](layers-and-namespaces.md) for literal prefix matching, constrained `*` globs, `namespace_suffix`, and `external: true`.
-
-## External dependencies
-
-Use `external_dependencies` for vendor/framework leakage checks such as Unity, Entity Framework Core, cloud SDKs, database clients, or payment SDKs.
-
-Read [External dependencies](external-dependencies.md) for the YAML shape and matching rules.
-
-## Analysis configuration
+Policies can analyze explicit target assemblies, discovered projects, or a solution:
 
 ```yaml
 analysis:
-  target_assemblies:
-    - MyApp.Application
-    - MyApp.Domain
-  assembly_search_paths: []
-  source_roots: []
-  condition_sets: {}
-  default_condition_set: ''
-  unmatched_ignored_violations: error
-  policy_consistency: error
+  solution: MyApp.sln
+  project_exclude:
+    - "**/*.Tests/**"
+  configuration: Debug
   coverage: error
 ```
 
-`target_assemblies` tells the runner which assemblies to inspect. `assembly_search_paths` and `source_roots` make standalone CLI and method-body scanning reliable in real repositories.
+Other analysis controls include assembly search paths, source roots, target framework/build selectors, condition sets, ignored-violation behavior, policy-consistency severity, and coverage severity.
 
-`policy_consistency` controls a separate pass that checks the policy document itself for internal contradictions (duplicate contract IDs, allow/forbid conflicts, independence conflicts, protected-importer conflicts, layer overlaps, unreachable contracts) — independent of code scanning. See [YAML schema reference](../reference/yaml-schema.md#policy_consistency) for details.
+Normal validation does not silently build. Use `--ensure-built` when the CLI should build the selected project graph and verify its build-state receipt before validation.
 
-`coverage` controls whether declared namespace coverage findings fail validation
-(`error`), are reported without failing (`warn`), or are suppressed (`off`).
+## Contract modes
 
-See [Coverage contracts](../contracts/coverage.md) for authoring guidance, exclusion rules, and current limits.
+Each contract family has strict and audit groups.
 
-Read [Condition sets](condition-sets.md) for conditional compilation behavior.
+- **Strict** contracts are blocking architecture requirements.
+- **Audit** contracts report migration/future-state findings without turning every discovered rule into an immediate blocking policy.
 
-## Contracts
+The complete current inventory is in [Contract families](../contracts/index.md).
 
-Contracts are split into strict and audit groups. Strict contracts block the run when they fail. Audit contracts are diagnostic and should be used for migration discovery or future-state rules.
+## Architecture coverage
 
-```yaml
-contracts:
-  strict: []
-  strict_layers: []
-  strict_allow_only: []
-  strict_cycles: []
-  strict_method_body: []
-  strict_asmdef: []
-  strict_independence: []
-  strict_assembly_independence: []
-  strict_assembly_dependency: []
-  strict_assembly_allow_only: []
-  strict_project_metadata: []
-  strict_external: []
-  strict_external_allow_only: []
-  strict_acyclic_siblings: []
-  strict_protected: []
-  strict_layer_templates: []
-  strict_type_placement: []
-  strict_public_api_surface: []
-  strict_attribute_usage: []
-  strict_inheritance: []
-  strict_interface_implementation: []
-  strict_composition: []
-  strict_coverage: []
+Coverage is a normal contract family (`strict_coverage` / `audit_coverage`) with six implemented scopes:
 
-  audit: []
-  audit_layers: []
-  audit_allow_only: []
-  audit_cycles: []
-  audit_method_body: []
-  audit_asmdef: []
-  audit_independence: []
-  audit_assembly_independence: []
-  audit_assembly_dependency: []
-  audit_assembly_allow_only: []
-  audit_project_metadata: []
-  audit_external: []
-  audit_external_allow_only: []
-  audit_acyclic_siblings: []
-  audit_protected: []
-  audit_layer_templates: []
-  audit_type_placement: []
-  audit_public_api_surface: []
-  audit_attribute_usage: []
-  audit_inheritance: []
-  audit_interface_implementation: []
-  audit_composition: []
-  audit_coverage: []
-```
+<!-- coverage-scope: namespace -->
+- `namespace`
+<!-- coverage-scope: project -->
+- `project`
+<!-- coverage-scope: assembly -->
+- `assembly`
+<!-- coverage-scope: dependency_edge -->
+- `dependency_edge`
+<!-- coverage-scope: rule_input -->
+- `rule_input`
+<!-- coverage-scope: semantic_role -->
+- `semantic_role`
 
-Read [Contracts](../contracts/index.md) for the supported contract families.
+Use coverage to make policy omissions visible: unmapped first-party namespaces/projects/assemblies, ungoverned observed dependency edges, stale or unresolved rule inputs, and semantic roles not covered by selector-backed/contextual governance.
 
-## Namespace and rule-input coverage
-
-ArchLinterNet supports coverage contracts for namespace scope and rule-input
-scope. Namespace coverage (`scope: namespace`) detects first-party namespaces
-under a configured root that are not represented by any declared layer,
-namespace glob, expanded layer template, or explicit exclusion. Rule-input
-coverage (`scope: rule_input`) detects referenced contracts whose
-source/target layer references are dangling or currently match no first-party
-code.
-
-```yaml
-analysis:
-  coverage: error
-
-contracts:
-  strict_coverage:
-    - id: feature-namespace-coverage
-      name: feature-namespace-coverage
-      scope: namespace
-      roots:
-        - namespace: MyApp.Features
-      exclude:
-        - namespace: MyApp.Features.*
-          namespace_suffix: Generated
-          reason: Generated code is excluded from manual architecture coverage.
-      reason: Every feature namespace must be declared as a layer or explicitly excluded.
-```
-
-Coverage contracts also support `ignored_violations`, allowing existing
-coverage debt to be baselined the same way ordinary dependency violations are.
-See [migration baselines](../guides/migration-baselines.md#coverage-baselines).
-
-Current limits:
-
-- `scope: namespace` and `scope: rule_input` are implemented.
-- `project`, `assembly`, and `dependency_edge` coverage scopes remain
-  unsupported and fail validation.
-- Every `exclude` entry must include a non-empty `reason`.
-
-For user-facing examples and behavior, see [Coverage contracts](../contracts/coverage.md).
-
-## Baselines and ignored violations
-
-Use `ignored_violations` or a generated baseline only to freeze known existing debt. New violations should still be detected.
-
-Read [Migration baselines](../guides/migration-baselines.md) for the full lifecycle.
+See [Coverage contracts](../contracts/coverage.md).
 
 ## Semantic classification
 
-`classification.attributes`/`classification.assembly_attributes` extract role and
-metadata facts from type-level and assembly-level attributes mapped by full type
-name, cached per run in a role index and surfaced as explainable `classification_roles`
-output (role, metadata, source, and the specific attribute evidence behind it). The
-rest of the `classification` section and `layers.<name>.selector` remain
-reserved by the YAML schema for a future semantic-role-discovery capability —
-schema-accepted today but with no effect on validation. See
-[Semantic classification](semantic-classification.md) before using any of these
-fields.
+Implemented classification inputs include attribute, assembly-attribute, inheritance, and namespace facts. Selector-backed layers consume the per-run role/metadata index. Contextual dependency/allow-only and port-boundary contracts consume the same semantic evidence directly.
 
-The reviewed vocabulary for future role discovery is in the [semantic role
-catalog](semantic-role-catalog.md). It defines first-wave roles, metadata keys,
-support tiers, and YAML-first examples; it does not make the reserved fields
-active.
+Schema-accepted future classification fields are documented explicitly as deferred/no-op where applicable; do not infer support from schema presence alone. See [Semantic classification](semantic-classification.md).
 
-## CEL policy expressions
+## Reusable source sets
 
-A closed set of selector fields (`layers.<name>.selector.when`, contextual
-dependency/allow-only selectors, and `files_matching.when` on layout
-convention contracts) accepts an optional CEL `when` predicate that narrows an
-already-scoped literal selector.
+`source_sets` can describe bounded reusable assembly, layer, or project inputs. Supported contract families can fan out over `sources`/`source_sets`, while selected list-shaped fields can union resolved sets. Set expansion never widens beyond the policy's declared analysis universe and fails closed on unknown, mismatched, or unreviewed empty inputs.
 
-Read [CEL policy expressions](cel-expressions.md) for the full authoring
-reference, the ArchLinter CEL Profile v1 support matrix, worked examples, and
-diagnostics.
+## Policy authoring workflow
 
-## Supported capabilities and non-goals
+Before opening a policy change:
 
-Before adding fields, check [Supported capabilities and non-goals](supported-capabilities.md). ArchLinterNet intentionally does not validate runtime dependency injection behavior, security/authorization correctness, code ownership, or semantic data flow.
+```bash
+arch-linter-net policy check --policy architecture/arch.yml
+arch-linter-net policy context --policy architecture/arch.yml --format json > policy-context.json
+arch-linter-net --policy architecture/arch.yml --mode strict
+```
+
+For base/current review, compare exported contexts with `policy weakening`. For repository change review, use `change snapshot`, `change report`, and `gate`.
+
+## Sources of truth
+
+When two descriptions disagree, use this precedence:
+
+1. executable CLI/runtime validators and policy schema;
+2. `archlinternet.capabilities.json`;
+3. mechanically checked public references;
+4. handwritten guides and examples.
+
+A public documentation discrepancy is a defect; it should not be resolved by changing runtime behavior merely to preserve stale prose.

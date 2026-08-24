@@ -43,18 +43,16 @@ nav:
   - Contracts:
       - Overview: contracts/index.md
       - Dependency contracts: contracts/dependency.md
-      - Contextual dependency contracts: contracts/context-dependency.md
-      - Semantic port boundary contracts: contracts/port-boundary.md
       - Layer contracts: contracts/layers.md
       - Allow-only contracts: contracts/allow-only.md
-      - Contextual allow-only contracts: contracts/context-allow-only.md
       - Cycle contracts: contracts/cycles.md
       - Acyclic sibling contracts: contracts/acyclic-siblings.md
+      - Module container contracts: contracts/module-container.md
       - Independence contracts: contracts/independence.md
       - Assembly independence contracts: contracts/assembly-independence.md
       - Assembly dependency contracts: contracts/assembly-dependency.md
-      - Package dependency contracts: contracts/package-dependencies.md
       - Project metadata contracts: contracts/project-metadata.md
+      - Package and framework contracts: contracts/package-dependencies.md
       - Protected surface contracts: contracts/protected-surface.md
       - External dependency contracts: contracts/external-dependencies.md
       - External allow-only contracts: contracts/external-allow-only.md
@@ -63,12 +61,20 @@ nav:
       - Layer templates: contracts/layer-templates.md
       - Type placement contracts: contracts/type-placement.md
       - Layout convention contracts: contracts/layout-conventions.md
+      - Public API surface contracts: contracts/public-api-surface.md
+      - Attribute usage contracts: contracts/attribute-usage.md
+      - Inheritance contracts: contracts/inheritance.md
+      - Interface implementation contracts: contracts/interface-implementation.md
+      - Composition contracts: contracts/composition.md
       - Coverage contracts: contracts/coverage.md
+      - Contextual dependency contracts: contracts/context-dependency.md
+      - Contextual allow-only contracts: contracts/context-allow-only.md
+      - Semantic port boundary contracts: contracts/port-boundary.md
   - Guides:
       - Adopt in an existing repository: guides/adoption.md
+      - Real-repository workflow: guides/real-repository-workflow.md
       - Adopt or upgrade: guides/upgrading.md
       - Reference entrypoints: guides/reference-entrypoints.md
-      - Real-repository workflow: guides/real-repository-workflow.md
       - Verify release provenance: guides/release-provenance-verification.md
       - Clean architecture policy: guides/clean-architecture.md
       - Unity boundaries: guides/unity-boundaries.md

@@ -1,109 +1,41 @@
-# Semantic Classification (Partially Implemented)
+# Semantic Classification
 
-**`classification.attributes`, `classification.assembly_attributes`,
-`classification.inheritance`, `classification.namespace`, and
-`layers.<name>.selector` are implemented**
-(see [issue #109](https://github.com/eugenemalaschuk-source/arch-linter-net/issues/109),
-[issue #113](https://github.com/eugenemalaschuk-source/arch-linter-net/issues/113),
-`openspec/specs/attribute-role-extraction`, and
-`openspec/specs/semantic-classification-model`): type-level and assembly-level
-attributes mapped by full type name, base-type/interface inheritance mappings, and
-namespace glob/suffix mappings are all extracted and canonicalized into
-role/metadata facts, combined by the fixed precedence order
-`type_attribute > assembly_attribute > inheritance > namespace`. Selector-backed
-layers resolve types by exact role/metadata match and produce violations through
-existing contract families (dependency, layer-order, allow-only, etc.) exactly as
-namespace-based layers do. Empty non-external selector-only layers surface as
-configuration diagnostics. **`precedence` beyond the four implemented sources,
-`path`, `overrides`, and `exclusions` remain reserved by the YAML schema only.**
-A policy declaring `overrides`/`exclusions` today is schema-valid, but they have
-**no effect** on validation — no role is assigned from them and no diagnostic is
-produced from them. Declaring `classification.path`, however, produces a visible,
-non-blocking diagnostic explaining that path-convention classification is deferred
-pending [issue #171](https://github.com/eugenemalaschuk-source/arch-linter-net/issues/171)
-— see [Current limits](#current-limits). This page documents the reviewed shape so
-policy authors and AI agents do not treat the unimplemented parts as a working
-feature before their own implementation issues land. See
-[Supported capabilities and non-goals](supported-capabilities.md) for the
-authoritative list of what is enforced today.
+Semantic classification lets ArchLinterNet derive a single architectural role plus metadata for each analyzed type and use those facts in selectors, contextual contracts, diagnostics, and semantic-role coverage.
 
-**Attribute-based classification produces facts consumed by selector-backed
-layers.** Extraction records role, metadata, and `conflict`/evidence-extraction-failure
-facts. Selector-backed layers consume the role index to match types, and contract
-violations from those layers affect pass/fail evaluation and the command's exit code.
-`validate` also surfaces classification facts in human, JSON, and CI-artifact output
-as informational "Classification findings."
+This page distinguishes implemented behavior from schema-reserved/deferred fields. The machine-readable capability boundary is `archlinternet.capabilities.json`; runtime validators and the packaged schema remain authoritative.
 
-To audit semantic blind spots, declare a coverage contract with
-`scope: semantic_role`. It reuses the role index produced for the validation run:
-selector-backed layers and contextual selectors govern discovered facts, while
-unclassified types, ungoverned roles, and stale selectors are reported as
-coverage evidence. This is additive to namespace/project/assembly/dependency
-coverage and does not change policies that do not declare semantic coverage.
+## Support status
 
-**Discovered roles are indexed once per validation run** (see
-[issue #110](https://github.com/eugenemalaschuk-source/arch-linter-net/issues/110)
-and `openspec/specs/semantic-role-index`): every scanned type's resolved role,
-metadata, classification source, and evidence is computed in a single pass and
-cached for the run, rather than recomputed on every lookup. `validate --format json`/CI-artifact output includes a `classification_roles` array alongside
-`classification_conflicts`/`classification_metadata_failures`, one entry per
-classified type:
+| Feature | Status | Notes |
+| --- | --- | --- |
+| `classification.attributes` | Implemented | Maps type-level attributes by full type name to role/metadata facts. |
+| `classification.assembly_attributes` | Implemented | Maps assembly-level attributes to role/metadata facts. |
+| `classification.inheritance` | Implemented | Matches configured base classes/interfaces transitively. |
+| `classification.namespace` | Implemented | Uses the documented namespace/glob/suffix matching model. |
+| `layers.<name>.selector` | Implemented | Supports selector-only layers or namespace + selector with AND semantics. |
+| Contextual dependency / allow-only selectors | Implemented | Match role/metadata directly without declaring a layer. |
+| Semantic port-boundary selectors | Implemented | Govern selected context crossings through a port/ACL seam. |
+| `scope: semantic_role` coverage | Implemented | Reports unclassified, ungoverned, stale, conflicting, or failed semantic evidence. |
+| `classification.path` | Deferred | Accepted only where documented; produces no role assignment. |
+| `classification.overrides` / `classification.exclusions` | Deferred | Schema-reserved; do not change runtime classification today. |
 
-```json
-{
-  "classification_roles": [
-    {
-      "subject": "MyApp.Sales.Order",
-      "role": "DomainLayer",
-      "source": "TypeAttribute",
-      "evidence": "Acme.Architecture.DomainLayerAttribute",
-      "metadata": { "domain": "Sales" }
-    }
-  ]
-}
+The effective precedence of implemented classification facts is:
+
+```text
+type_attribute > assembly_attribute > inheritance > namespace
 ```
 
-`source` names the classification *mechanism* (`TypeAttribute` or
-`AssemblyAttribute`); `evidence` names the specific attribute type whose
-mapping produced the role, so the two together answer both "how" and
-"which fact" a role assignment came from. `evidence` is `null` when no role
-was resolved. This index is consumed by selector-backed layer resolution;
-classification findings are also surfaced as informational output in
-human/JSON/CI-artifact formats.
+Deferred sources do not contribute role facts merely because their YAML shape exists.
 
-## Why this section exists
-
-ArchLinterNet's `layers` map namespaces to layer names by glob pattern only. The
-semantic classification design ([issue #107](https://github.com/eugenemalaschuk-source/arch-linter-net/issues/107))
-reviews a YAML shape that will let code itself — attributes, assembly metadata,
-inheritance, and namespace/path conventions — imply an architectural role and
-metadata, so a layer can eventually be selected by discovered role instead of
-(or in addition to) namespace. The full design record lives at
-`openspec/changes/archive/2026-07-10-design-semantic-classification-model/design.md`
-in the repository.
-
-## Reviewed shape
+## Basic example
 
 ```yaml
 classification:
-  precedence:            # optional; a non-empty, ordered, duplicate-free
-                          # subsequence of the six fixed sources below.
-                          # default: all six, in this order.
-    - yaml_override
-    - type_attribute
-    - assembly_attribute
-    - inheritance
-    - namespace
-    - path
-
   attributes:
-    - attribute: Acme.Architecture.DomainLayerAttribute   # full type name
+    - attribute: Acme.Architecture.DomainLayerAttribute
       role: DomainLayer
       metadata:
-        domain: constructor[0]        # positional constructor argument
-        module: property:Module       # named property/field
-        tier: const:Acme.Architecture.Tiers.CORE   # compile-time const only
-        owner: platform-team          # literal scalar
+        domain: constructor[0]
 
   assembly_attributes:
     - attribute: Acme.Architecture.BoundedContextAttribute
@@ -111,373 +43,215 @@ classification:
       metadata:
         boundedContext: constructor[0]
 
-  inheritance:                        # implemented — matches transitively (base class or interface)
+  inheritance:
     - base_type: Acme.Domain.AggregateRootBase
-      role: DomainLayer
+      role: AggregateRoot
       metadata:
-        domain: Sales                 # literal or const: only - no ctor/property evidence
+        domain: Sales
 
-  namespace:                          # implemented — reuses layers.<name>.namespace glob syntax
+  namespace:
     - namespace: MyApp.Sales.Domain
       role: DomainLayer
       metadata:
         domain: Sales
-    - namespace_suffix: Repositories
-      role: Repository
-
-  path:                               # reserved — declaring this produces a deferred-support
-                                       # diagnostic, not a role assignment (see #171)
-    - path_prefix: src/Sales/Domain
-      role: DomainLayer
-      metadata:
-        domain: Sales
-
-  overrides:
-    - type: MyApp.Legacy.OrderProcessor    # narrow: reason optional
-      role: ApplicationLayer
-    - namespace: MyApp.Legacy               # broad: reason required
-      role: Unclassified
-      reason: Legacy area predates attribute adoption; reviewed quarterly.
-
-  exclusions:
-    - namespace_suffix: Generated
-      reason: Source-generated code is not hand-authored and is exempt from classification.
 
 layers:
-  domain:
-    namespace: MyApp.Sales.Domain   # optional when selector is present
+  sales_domain:
     selector:
       role: DomainLayer
       metadata:
         domain: Sales
-  infrastructure:              # existing namespace-only layers are unaffected
-    namespace: MyApp.Infrastructure
+
+  sales_application:
+    namespace: MyApp.Sales
+    selector:
+      role: ApplicationLayer
 ```
 
-## Precedence
+`namespace` is optional when `selector` is present. When both are declared, a type must satisfy both predicates.
 
-Source precedence is fixed, highest first:
+Existing namespace-only layers continue to work unchanged.
 
-1. `yaml_override` — reserved, no runtime effect yet
-1. `type_attribute` — implemented
-1. `assembly_attribute` — implemented
-1. `inheritance` — implemented
-1. `namespace` — implemented
-1. `path` — reserved, no runtime effect yet (deferred-support diagnostic only)
+## Classification output
 
-`classification.precedence`, when declared, must be a subsequence of this
-order — the schema rejects a reordered list (e.g. `[namespace, type_attribute]`),
-a repeated entry (e.g. `[namespace, namespace]`), and an empty list. Sources the
-list omits are disabled; omit `precedence` entirely to use all six sources in
-the fixed order. Disabling an unimplemented source (`yaml_override`, `path`) has
-no observable effect, since neither contributes a role assignment regardless.
+Role resolution is performed once per validation run. JSON/CI output exposes the effective role index together with classification conflicts and metadata-extraction failures.
+
+A classified entry contains the subject, role, source mechanism, evidence, and canonical metadata, for example:
+
+```json
+{
+  "subject": "MyApp.Sales.Order",
+  "role": "DomainLayer",
+  "source": "TypeAttribute",
+  "evidence": "Acme.Architecture.DomainLayerAttribute",
+  "metadata": { "domain": "Sales" }
+}
+```
+
+The classification index is input to selector-backed layers and contextual/semantic contract families; it is not merely informational output.
 
 ## Metadata extraction syntax
 
-Each `metadata.<key>` value is interpreted by exactly one of four fixed forms,
-checked in this order:
+Attribute/assembly-attribute mappings support four bounded metadata forms:
 
 | Form | Meaning |
-|---|---|
-| `constructor[<index>]` | The attribute's zero-indexed positional constructor argument, from the fully compiler-resolved argument list (including substituted defaults for omitted optional parameters). Not applicable to `inheritance`/`namespace`/`path`, which carry no constructor evidence — using this form on those sources is an extraction failure. |
-| `property:<Name>` | A named argument called `<Name>` explicitly present in that specific attribute usage's own recorded metadata — never a property/field the attribute *type* merely declares. `attributes`/`assembly_attributes` only; an extraction failure on `inheritance`/`namespace`/`path`. |
-| `const:<Full.Type.NAME>` | The value of a **compile-time `const` field**, resolved statically by full type-qualified name. |
-| anything else | A literal YAML scalar, used verbatim. |
+| --- | --- |
+| `constructor[<index>]` | Positional constructor argument from the statically resolved attribute usage. |
+| `property:<Name>` | Named argument explicitly present in that attribute usage. |
+| `const:<Full.Type.NAME>` | Compile-time `const` field resolved statically. |
+| any other scalar | Literal YAML scalar. |
 
-`const:` deliberately resolves **only compile-time `const` fields**, never
-`static readonly`. A `static readonly` field's initializer can run arbitrary
-code — a method call, an environment-variable read, I/O, or any other
-runtime-computed expression — and evaluating it would require either executing
-that code (which a static-analysis-only tool must not do) or a much narrower
-literal-initializer detection that does not exist yet.
+Inheritance and namespace mappings have no attribute constructor/property evidence, so use literal or supported static values there.
 
-`property:<Name>` reads only what a specific attribute usage's own metadata
-records as an explicitly-supplied named argument — it never falls back to a
-property's declared default or initializer value. `[Domain("Sales")]` against
-`DomainAttribute { public string? Module { get; set; } }` records zero named
-arguments even though `Module` exists as a settable property: reading
-`Module`'s default would require instantiating the attribute and running its
-initializer, which the static-analysis-only boundary forbids. A property that
-exists on the type but was not supplied in that usage is therefore the same
-extraction failure as a property that does not exist at all.
+Metadata is canonicalized into comparable string, boolean, or numeric domains. CLR type values are represented by full type name; enum values use their unambiguous member name. Unsupported/ambiguous values, unresolved references, missing constructor arguments, and missing named arguments are recorded as extraction failures rather than guessed.
 
-**Metadata values are canonicalized into exactly three comparable domains
-before matching**: **string** (CLR `string`; `System.Type` values as
-`Type.FullName`; enum values as their declared member name, not the
-underlying integer — but only when the underlying value maps to exactly one
-declared member; an aliased enum value, e.g. `enum Tier { Core = 1, Domain = 1 }`, has no single correct name to canonicalize to and is an extraction
-failure rather than a guess); **boolean**; and **decimal** (every CLR numeric
-primitive — `byte`/`sbyte`/`short`/`ushort`/`int`/`uint`/`long`/`ulong`/
-`float`/`double`/`decimal` — and every YAML/JSON numeric literal), so a CLR
-`int` `1` and a YAML `1.0` canonicalize to the same value and compare equal.
-A `const decimal` field canonicalizes trivially, since `decimal` is already
-the canonical domain's own representation. Arrays, other attribute-typed
-values, `null`, unmapped/aliased enum values, and non-`decimal`-representable
-numbers (`NaN`, `Infinity`) have no representation in any of the three
-domains and are an extraction failure, the same as an unresolved reference.
+An extraction failure does **not** fabricate metadata and does not erase an otherwise valid role assignment. The affected metadata key is omitted and the failure remains visible in diagnostics/evidence.
 
-**Evidence-extraction failure is uniform across all three evidence-referencing
-forms and every canonicalization failure above, and never blocks role
-assignment.** An out-of-range `constructor[N]`, a missing or unsupplied
-`property:Name`, an unresolved `const:` reference, or an unsupported value
-shape all resolve the same way: that metadata key is **omitted** from the
-type's assigned metadata — not fabricated, not defaulted — and the type still
-receives its role from the matching source, since role assignment does not
-depend on every metadata key resolving. Every extraction failure is recorded
-as an explainable fact so a policy author can see why an expected metadata key
-is missing, rather than the omission looking like an unrelated authoring
-mistake.
-
-**Repeated instances of one mapped attribute** (a repeatable custom attribute
-applied more than once, e.g. `[Domain("Sales")] [Domain("Inventory")]`)
-resolve by the attributes' metadata order (first instance wins) rather than by
-YAML declaration order, since there is only one `classification.attributes`
-entry mapping `Domain` in that example, not two. Identical repeated instances
-(same role, same metadata) are not treated as a conflict.
-
-## Overrides and exclusions
-
-Every `overrides`/`exclusions` entry declares **exactly one** scope field —
-`type`, `namespace`, or `namespace_suffix`. Combining more than one scope field
-on a single entry is rejected by the schema; author two separate entries
-instead.
-
-- A `type`-scoped override is narrow (the type name is the scope) and does not
-  require `reason`.
-- A `namespace`/`namespace_suffix`-scoped override is broad (affects every type
-  currently or later matching that pattern) and **requires** `reason`.
-- Every `exclusions` entry requires `reason`, regardless of scope.
-
-**An override does not by itself exempt a type from coverage.** `overrides` is
-a classification *source* — the highest-precedence one — not a
-coverage-exemption mechanism. A type whose role came from an override still
-needs a `selector` (or a future contextual contract) to actually consume that
-fact, or it remains an `uncovered semantic fact` exactly like a role assigned
-by any other source. Only `exclusions` removes a type from coverage
-consideration entirely.
+`const:` is deliberately static-analysis-only: it never evaluates `static readonly` initializers or executes user code.
 
 ## `layers.<name>.selector`
 
-`selector` is an optional exact-match selector. `selector.role` matches the
-resolved role string and `selector.metadata` is an optional set of exact-match,
-AND-combined key/value constraints. A layer may declare only `selector`, only
-`namespace`, or both; when both are present, both constraints must match. No
-wildcard or regex value matching is supported. Declaring only `namespace` (as
-every layer did before this feature) remains unaffected.
+A layer selector matches the resolved role plus optional metadata constraints:
+
+```yaml
+layers:
+  sales_commands:
+    selector:
+      role: Command
+      metadata:
+        boundedContext: Sales
+```
+
+Rules:
+
+- `role` is exact-match;
+- metadata constraints are exact and AND-combined;
+- selector-only layers are valid;
+- namespace + selector is an intersection (AND), not a union;
+- wildcard/regex matching is not implied by ordinary layer selector metadata;
+- an empty non-external selector-only layer is surfaced as a configuration/coverage concern rather than silently widening to everything.
+
+A selector-backed layer can be referenced by the ordinary dependency, allow-only, layer-order, cycle, independence, protected-surface, and other layer-based families just like a namespace-backed layer.
 
 ## Contextual selectors (`context_dependencies`, `context_allow_only`)
 
-The `strict_context_dependencies`/`audit_context_dependencies` and
-`strict_context_allow_only`/`audit_context_allow_only` contract families (see
-[Contextual dependency contracts](../contracts/context-dependency.md) and
-[Contextual allow-only contracts](../contracts/context-allow-only.md)) compare
-discovered role/metadata directly between a `source` selector and
-`forbidden`/`allowed`/`exclude` selectors, without an intermediate
-`layers.<name>` declaration. Their selector shape (`role` + `metadata`) looks
-like `layers.<name>.selector` but supports a broader, closed operator
-vocabulary instead of exact/AND-only matching:
+Contextual dependency/allow-only contracts compare semantic facts directly. They do not require an intermediate `layers.<name>` declaration.
+
+Example:
+
+```yaml
+contracts:
+  strict_context_dependencies:
+    - id: no-cross-domain-dependency
+      name: no-cross-domain-dependency
+      source:
+        role: DomainLayer
+      forbidden:
+        - role: DomainLayer
+          metadata:
+            domain: "!{source.metadata.domain}"
+      reason: Domain types must not cross bounded-context boundaries directly.
+```
+
+Contextual metadata values use a closed operator vocabulary:
 
 | Form | Operator | Meaning |
-|---|---|---|
-| YAML sequence | `in` | Matches if the type's resolved value equals any listed entry. |
-| `"*"` | `any` | Matches any resolved value, provided the key is present. |
-| `"!{source.metadata.<key>}"` | `not-equal-to-source` | Matches when the candidate's resolved value for `<key>` differs from the *current match's source type's own* resolved value for `<key>`. Only valid on `forbidden`/`allowed`/`exclude` — a `source` selector has no other source to reference. |
-| anything else | `exact` | Literal scalar match (same string/boolean/decimal cross-representation equality as `layers.<name>.selector`). |
+| --- | --- | --- |
+| YAML sequence | `in` | Candidate value equals any listed value. |
+| `"*"` | `any` | Any resolved value, provided the key exists. |
+| `"!{source.metadata.<key>}"` | `not-equal-to-source` | Candidate value differs from the current source type's value. |
+| other scalar | `exact` | Exact canonical value. |
 
-These four forms are checked in the fixed order above and are the only forms
-supported — no regex or open-ended expression syntax.
+`source`, target (`forbidden`/`allowed`), and exclusions may also use the documented CEL `when` predicate locations. CEL is additive to literal role/metadata constraints and is evaluated under the closed context documented in [CEL policy expressions](cel-expressions.md).
 
-### Comparison with `layers.<name>.selector`
+Per-edge `dependency.*` CEL facts remain reserved until the runtime supplies real edge data. A policy must not infer availability from schema shape alone.
 
-| | `layers.<name>.selector` | Contextual selector (`source`/`forbidden`/`allowed`/`exclude`) |
-|---|---|---|
-| Matching | Exact literal, AND-combined across declared keys. | Exact, `in`, `any`, or `not-equal-to-source`, per metadata key. |
-| Cross-referencing another type's own metadata | Not supported. | `not-equal-to-source` compares against the *current source type's* resolved metadata. |
-| Requires a declared `layers.<name>`? | Yes — a layer is the unit contracts reference. | No — selectors are declared inline on the contextual contract itself. |
-| Used by | Every existing contract family (`dependency`, `allow_only`, `layers`, `cycles`, etc.) via a named layer. | Only `context_dependencies`/`context_allow_only`, referenced inline. |
-| Coverage-participating consumption | Registered as a marker; no coverage contract reads it yet (see [Current limits](#current-limits)). | Same: a contextual selector's `(role, metadata key)` reference is recorded in the same marker collection as a `layers.<name>.selector` match, for a future coverage variant to consume — it does not itself affect any coverage finding today. |
+Use a named layer selector when a stable semantic group is reused by many ordinary contracts. Use a contextual selector when the rule is naturally about role/metadata relationships between the current source and target.
 
-Use `layers.<name>.selector` when the boundary is a small, fixed, named set of
-layers referenced by many contracts. Use a contextual selector when the
-boundary is a business-context distinction (e.g. "no domain type in one
-bounded context may depend on a domain type in another") that would otherwise
-require enumerating every concrete layer pair, or when `not-equal-to-source`'s
-cross-referencing comparison is what the rule actually needs to express.
+## Semantic port boundaries
 
-## Current limits
+Port-boundary contracts use the same semantic evidence to require selected cross-context dependencies to pass through an explicit port/anti-corruption seam. This is distinct from simply forbidding a dependency.
 
-- Extraction: **implemented** for `attributes`/`assembly_attributes` (type-level
-  and assembly-level attributes, matched by full type name), `inheritance`
-  (transitive base-class/interface matching by full type name), and `namespace`
-  (glob/suffix matching, reusing `layers.<name>.namespace` syntax). Path
-  conventions are still never read from scanned code — `classification.path`
-  requires deterministic source-file and declared-type facts that do not exist
-  yet ([issue #171](https://github.com/eugenemalaschuk-source/arch-linter-net/issues/171)).
-- Role assignment: **implemented** for `type_attribute`/`assembly_attribute`/
-  `inheritance`/`namespace`, combined by the fixed precedence order
-  `type_attribute > assembly_attribute > inheritance > namespace`, and the
-  `classification.precedence` subset that enables/disables these four sources.
-  `yaml_override` and `path` never assign a role yet.
-- `classification.path`: declaring a non-empty `path` section does **not**
-  throw and does **not** assign any role, but produces a non-blocking,
-  informational diagnostic (surfaced alongside classification conflicts/
-  metadata failures in human, JSON, and CI-artifact `validate` output) stating
-  that path-convention classification is deferred pending #171. This is
-  visibility only — it does not fail `validate`'s exit code, and it is
-  distinct from the fully silent `overrides`/`exclusions` reserved sections.
-- Inheritance/namespace metadata: restricted to literal scalars and
-  `const:<Full.Type.NAME>` references only — neither source has an attribute
-  instance to extract `constructor[]`/`property:` evidence from. Using either
-  form on an `inheritance`/`namespace` entry resolves as an extraction failure,
-  same as any other unresolved metadata reference.
-- `inheritance.base_type` matching compares against each scanned type's own
-  reflected base-class chain and transitive interface set — **not** by first
-  resolving `base_type` to a `Type` through the scanned target-assembly type
-  universe. This matters for the framework-base-type examples above
-  (`ControllerBase`, `DbContext`, `MonoBehaviour`): those base types are
-  declared in framework/package assemblies, not in the target assembly being
-  scanned, so a target-assembly-only lookup would never find them and every
-  framework-derived type would silently fail to match. Walking the candidate
-  type's own chain works regardless of which assembly declares the base type,
-  as long as it's loadable. An unresolved `inheritance.base_type` (a full type
-  name that matches none of a scanned type's base classes or interfaces, e.g.
-  a typo) silently matches no type for that run, with no diagnostic recorded.
-- Generic base types/interfaces: a `base_type` naming an open generic
-  definition (e.g. `MyApp.IRepository\`1`) matches every closed instantiation a scanned type derives from or implements (e.g. `IRepository<Order>`) — each candidate ancestor/interface is normalized to its own generic type definition before comparing full names, since a closed instantiation's `FullName`embeds the assembly-qualified closed type argument and never equals the open definition's`FullName\` directly.
-- The public `ArchitectureAttributeRoleExtractor(configuration, typeUniverse)`
-  two-argument constructor has no namespace-glob matcher available — only
-  session/role-index construction (`ArchitectureAnalysisSession`/
-  `ArchitectureRoleIndex`) supplies one. Declaring a non-empty
-  `classification.namespace` with the `namespace` source enabled and
-  constructing the extractor directly through this constructor throws
-  `InvalidOperationException` at construction time, rather than silently
-  never matching any `classification.namespace` entry.
-- Selector matching: **implemented** — uses the per-run role index and exact
-  role/metadata predicates; a layer may declare only `selector`, only
-  `namespace`, or both. Empty non-external selector matches are surfaced as
-  configuration diagnostics. Selector-backed layers produce violations through
-  existing contract families exactly as namespace-based layers do.
-- Role index: **implemented** as a per-run, lazily-computed cache
-  (`ArchitectureRoleIndex`) of every classified type's role/metadata/source/
-  evidence, surfaced as `classification_roles` in JSON/CI-artifact output. It
-  is consumed by selector-backed layers, contextual selectors, and
-  `scope: semantic_role` coverage. Semantic coverage reports unclassified
-  types, uncovered semantic facts, stale selectors, and classification
-  conflicts as coverage evidence.
-- Classification findings (roles, conflicts, metadata failures) are surfaced
-  as informational output in human, JSON, and CI-artifact formats. They are not
-  wired into SARIF diagnostics.
-- No annotation package: this design does not ship, and does not require, a
-  binary ArchLinterNet annotation assembly — see
-  [Annotation strategy](#annotation-strategy) below for the full adoption
-  decision.
+See [Semantic port boundary contracts](../contracts/port-boundary.md).
+
+## Semantic-role coverage
+
+`scope: semantic_role` is implemented and is the guardrail that prevents semantic governance from silently becoming partial.
+
+```yaml
+contracts:
+  strict_coverage:
+    - id: semantic-role-coverage
+      name: semantic-role-coverage
+      scope: semantic_role
+      exclude:
+        - role: GeneratedRole
+          reason: Generated types are governed outside this policy.
+      reason: Every discovered semantic fact must be intentionally governed.
+```
+
+A semantic fact is governed when it is consumed by a matching selector-backed layer or an implemented contextual/semantic contract selector. Coverage can report, among other evidence:
+
+- first-party types with no resolved role;
+- classified facts with no governing selector;
+- valid selectors that currently match no classified type;
+- classification conflicts;
+- metadata extraction failures.
+
+This is additive to `namespace`, `project`, `assembly`, `dependency_edge`, and `rule_input` coverage. See [Coverage contracts](../contracts/coverage.md).
+
+## Precedence
+
+When several implemented sources classify the same type, the higher-precedence implemented source wins:
+
+1. type attribute;
+2. assembly attribute;
+3. inheritance;
+4. namespace.
+
+The winning source contributes the role and its metadata; roles from lower-precedence sources are not accumulated as tags. A type therefore has one effective role in the current model.
+
+Do not model orthogonal concerns by inventing multiple simultaneous roles. Use metadata, namespace/layer membership, public-API surface selectors, or another purpose-built contract when the concern is independent of the primary semantic role.
 
 ## Annotation strategy
 
-**Decision ([issue #108](https://github.com/eugenemalaschuk-source/arch-linter-net/issues/108)):**
-ArchLinterNet ships no binary annotation package and no source-only
-annotation package. **User-defined attributes mapped by full type name in
-YAML are the sole supported adoption path.** A project that wants
-`classification.attributes` evidence defines its own attribute — commonly a
-handful of lines, as in the [reviewed shape](#reviewed-shape) example above —
-and maps it by full type name. No package reference, and no dependency on any
-ArchLinterNet-provided assembly, is required or offered.
+ArchLinterNet does not require or ship a mandatory architecture-annotation package. Repositories define their own attributes and map them by full type name in YAML:
 
-This is a first-wave decision, not a permanent restriction: an optional
-package remains possible as a future, separately-decided convenience if
-concrete adoption need emerges. It is not the default path today.
-
-### Trade-offs considered
-
-| Path | Dependency footprint | Setup cost | Versioning | Status |
-|---|---|---|---|---|
-| User-owned attribute | None — the attribute lives in the adopting project's own code | One small attribute class, written once | No annotation-package version coupling; YAML and extraction compatibility still follow ArchLinterNet's own compatibility policy | **Recommended adoption path** — runtime extraction implemented for `attributes`/`assembly_attributes` ([Current limits](#current-limits)) |
-| Source-only annotation package | No runtime assembly reference, but still a versioned artifact ArchLinterNet must design, ship, and support | Add a package reference; attribute ships pre-written | Coupled to ArchLinterNet's release/compatibility policy | Not shipped; possible future convenience |
-| Binary annotation package | Adds a compile-time (and possibly runtime/dependency-graph) reference to `ArchLinterNet.Annotations` in every consuming project | Add a package reference; attribute ships pre-written | Coupled to ArchLinterNet's release/compatibility policy | Not shipped; explicitly ruled out as a default or required path |
-
-A binary package was rejected as the default because it would add exactly the
-kind of mandatory runtime/dependency-graph reference ArchLinterNet's
-non-invasive positioning is meant to avoid. A source-only package has not been
-shipped, since no consumer need has been demonstrated — adding one now would
-be speculative packaging work with no current user. User-owned attributes need
-neither: the reviewed mapping shape in [Reviewed shape](#reviewed-shape)
-accepts any full attribute type name, regardless of which assembly declares
-it, and — for `attributes`/`assembly_attributes` — is now actually evaluated
-against scanned code; see [Current limits](#current-limits) for what remains
-unimplemented.
-
-## Convention examples by project style
-
-`inheritance` and `namespace` conventions let a policy infer role/metadata from
-code that already exists, before adding any explicit attribute. A few common
-shapes:
-
-**Clean architecture / modular monolith** — infer `DomainLayer` from a shared
-domain base type, and mark a module's public surface by namespace suffix:
-
-```yaml
-classification:
-  inheritance:
-    - base_type: MyApp.Domain.Entity
-      role: DomainLayer
-  namespace:
-    - namespace_suffix: Contracts
-      role: PublicContract
+```csharp
+[DomainLayer("Sales")]
+public sealed class Order { }
 ```
-
-**ASP.NET-like** — infer `PresentationLayer` from the framework's own
-controller base type, with no ArchLinterNet-specific attribute required:
-
-```yaml
-classification:
-  inheritance:
-    - base_type: Microsoft.AspNetCore.Mvc.ControllerBase
-      role: PresentationLayer
-```
-
-**EF-like** — infer `PersistenceLayer` from the framework's `DbContext` base
-type:
-
-```yaml
-classification:
-  inheritance:
-    - base_type: Microsoft.EntityFrameworkCore.DbContext
-      role: PersistenceLayer
-```
-
-**Unity/client-like** — infer `PresentationLayer` from `MonoBehaviour`:
-
-```yaml
-classification:
-  inheritance:
-    - base_type: UnityEngine.MonoBehaviour
-      role: PresentationLayer
-```
-
-**Legacy gradual adoption** — start with one broad `namespace` convention
-covering an entire legacy area, then let per-type `type_attribute` entries
-override it as individual types are migrated. `type_attribute` outranks
-`namespace` in the fixed precedence order, so an attribute on a specific type
-always wins over the broad namespace default without editing the namespace
-rule itself:
 
 ```yaml
 classification:
   attributes:
-    - attribute: Acme.Architecture.DomainLayerAttribute
+    - attribute: MyCompany.Architecture.DomainLayerAttribute
       role: DomainLayer
-  namespace:
-    - namespace: MyApp.Legacy
-      role: Unclassified   # gradually narrowed as types are migrated and attributed
+      metadata:
+        domain: constructor[0]
 ```
 
-None of these examples require an ArchLinterNet-provided annotation package —
-`base_type`/`namespace` conventions match code that already exists, and
-`type_attribute` mappings work against any user-owned attribute (see
-[Annotation strategy](#annotation-strategy)).
+This keeps ArchLinterNet decoupled from application binaries. Attributes are one evidence source, not a requirement: inheritance and namespace mappings remain supported alternatives.
 
-## Where to look next
+The [Semantic role catalog](semantic-role-catalog.md) is vocabulary guidance, not a list of framework types that ArchLinterNet automatically injects or discovers by name.
 
-- [Supported capabilities and non-goals](supported-capabilities.md)
-- [Layers and namespace patterns](layers-and-namespaces.md)
-- [Coverage contracts](../contracts/coverage.md)
+## Current limits
+
+The current semantic model is intentionally bounded:
+
+- one winning role per type; no accumulated multi-role/tag model;
+- exact layer-selector role/metadata matching; contextual selectors have only the documented closed operators;
+- no arbitrary regex or scripting language in selector values;
+- `classification.path` does not assign roles;
+- schema-reserved `overrides`/`exclusions` do not currently alter role resolution;
+- no runtime DI graph, authorization decision, ownership, or arbitrary data-flow inference;
+- CEL works only at documented locations and cannot be used to invent new fact sources;
+- reserved per-edge dependency CEL facts must not be treated as populated runtime evidence.
+
+If a field is described here as deferred, use an implemented source/contract instead of relying on silent no-op behavior.
+
+## Choosing between namespace and semantics
+
+Prefer namespace-backed layers when repository layout already expresses the boundary clearly and stably. Prefer semantic classification when the architecture decision is expressed by code facts such as an attribute, inheritance/interface relationship, or role/metadata context that cuts across namespaces.
+
+The two models can be combined: `namespace + selector` narrows a semantic role to a specific structural area while preserving deterministic layer-based contracts.
