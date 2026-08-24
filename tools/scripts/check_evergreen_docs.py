@@ -137,6 +137,9 @@ README_EXCLUDED_PREFIXES = (
     ("docs", "internal"),
     ("openspec", "changes", "archive"),
 )
+HISTORICAL_EVIDENCE_TOOL_PIN_FILES = {
+    "docs/guides/real-repository-workflow.md",
+}
 FALLBACK_IGNORED_PARTS = {
     ".git",
     ".venv",
@@ -277,10 +280,10 @@ def content_violations(root: Path, paths: list[Path]) -> list[str]:
 
         if relative != "docs/reference/release-process.md":
             command_text = re.sub(r"[\\`]\r?\n[ \t]*", " ", text)
-            for pattern in (
-                HARDCODED_TOOL_PACKAGE_PIN,
-                HARDCODED_LIBRARY_PACKAGE_PIN,
-            ):
+            package_pin_patterns = [HARDCODED_LIBRARY_PACKAGE_PIN]
+            if relative not in HISTORICAL_EVIDENCE_TOOL_PIN_FILES:
+                package_pin_patterns.insert(0, HARDCODED_TOOL_PACKAGE_PIN)
+            for pattern in package_pin_patterns:
                 for match in pattern.finditer(command_text):
                     snippet = " ".join(match.group(0).split())
                     violations.append(
