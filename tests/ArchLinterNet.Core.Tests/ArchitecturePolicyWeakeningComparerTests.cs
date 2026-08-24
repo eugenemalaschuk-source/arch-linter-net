@@ -501,6 +501,50 @@ public sealed class ArchitecturePolicyWeakeningComparerTests
     }
 
     [Test]
+    public void Compare_CrossFamilyFindings_AreDeduplicatedOrderedAndProjected()
+    {
+        ArchitecturePolicyContextSourceExpansion baselineExpansion = new(
+            "strict_assembly_dependency", "expansion-control", "expansion-control", "fan_out", null, [], false, "", null,
+            [], [], []);
+        ArchitecturePolicyContextExpandedExclusion duplicateExclusion = new(
+            "Sample.B", null, null, true, false, "", _importedProvenance);
+        ArchitecturePolicyContextExport baseline = Context(
+            contracts: [Contract("strict", "dependency", "control")],
+            sourceSets: [new ArchitecturePolicyContextSourceSet("hosts", "explicit", ["Sample.A", "Sample.B"], false, "", null)],
+            expansions: [baselineExpansion]);
+        ArchitecturePolicyContextExport current = Context(
+            contracts: [Contract("audit", "dependency", "control")],
+            sourceSets: [new ArchitecturePolicyContextSourceSet("hosts", "explicit", ["Sample.A"], false, "", null)],
+            expansions: [baselineExpansion with { Exclusions = [duplicateExclusion, duplicateExclusion] }],
+            analysis: Analysis(projects: ["src/current"]));
+
+        ArchitecturePolicyWeakeningResult result = ArchitecturePolicyWeakeningComparer.Compare(new(baseline, current));
+        ArchitecturePolicyWeakeningFinding exclusionFinding = result.Findings.Single(finding => finding.Kind == "source_exclusion_added");
+        string human = ArchitecturePolicyWeakeningFormatter.FormatAsHuman(result);
+        using JsonDocument json = JsonDocument.Parse(ArchitecturePolicyWeakeningFormatter.FormatAsJson(result));
+        using JsonDocument sarif = JsonDocument.Parse(ArchitecturePolicyWeakeningFormatter.FormatAsSarif(result));
+        JsonElement jsonFinding = json.RootElement.GetProperty("findings").EnumerateArray()
+            .Single(finding => finding.GetProperty("identity").GetString() == exclusionFinding.Identity);
+        JsonElement sarifFinding = sarif.RootElement.GetProperty("runs")[0].GetProperty("results").EnumerateArray()
+            .Single(finding => finding.GetProperty("properties").GetProperty("identity").GetString() == exclusionFinding.Identity);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(result.Findings.Select(finding => finding.Kind), Is.EqualTo(new[]
+            {
+                "analysis_projects_impact_not_proven",
+                "source_exclusion_added",
+                "source_set_member_removed",
+                "strict_to_audit",
+            }));
+            Assert.That(result.Findings.Count(finding => finding.Identity == exclusionFinding.Identity), Is.EqualTo(1));
+            Assert.That(human, Does.Contain("[source_exclusion_added] source_expansion:expansion-control"));
+            Assert.That(jsonFinding.GetProperty("identity").GetString(), Is.EqualTo(exclusionFinding.Identity));
+            Assert.That(sarifFinding.GetProperty("properties").GetProperty("identity").GetString(), Is.EqualTo(exclusionFinding.Identity));
+        });
+    }
+
+    [Test]
     public void DeserializeContext_IncompleteArtifactFailsClosed()
     {
         Assert.That(() => ArchitecturePolicyWeakeningFormatter.DeserializeContext("{}"), Throws.ArgumentException);
