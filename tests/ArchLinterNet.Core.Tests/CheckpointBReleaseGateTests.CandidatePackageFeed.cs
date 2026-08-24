@@ -262,6 +262,78 @@ public sealed partial class CheckpointBReleaseGateTests
             return Passed("external-testing-consumer");
         }
 
+        public CheckpointScenarioResult AssertInstalledTestingOutputEnsureBuilt()
+        {
+            string fixtureRoot = Path.Combine(_root, "installed-testing-output");
+            Directory.CreateDirectory(fixtureRoot);
+            File.WriteAllText(Path.Combine(fixtureRoot, "ArchLinterNet.Testing.csproj"), """
+                <Project Sdk="Microsoft.NET.Sdk">
+                  <PropertyGroup>
+                    <TargetFramework>net10.0</TargetFramework>
+                    <AssemblyName>ArchLinterNet.Testing</AssemblyName>
+                  </PropertyGroup>
+                </Project>
+                """);
+            File.WriteAllText(Path.Combine(fixtureRoot, "TestingOutput.cs"), """
+                namespace Disposable.ArchLinterNet.Testing;
+
+                public sealed class SmokeType
+                {
+                }
+                """);
+            string policyPath = Path.Combine(fixtureRoot, "dependencies.arch.yml");
+            File.WriteAllText(policyPath, """
+                version: 1
+                name: Installed Testing output ensure-built smoke
+                analysis:
+                  target_assemblies: [ArchLinterNet.Testing]
+                  projects: [ArchLinterNet.Testing.csproj]
+                """);
+
+            string configPath = WriteIsolatedNuGetConfig(fixtureRoot);
+            CommandResult restore = RunIsolatedDotnet(fixtureRoot,
+                "restore", "ArchLinterNet.Testing.csproj", "--configfile", configPath, "--no-cache");
+            CommandResult build = RunIsolatedDotnet(fixtureRoot,
+                "build", "ArchLinterNet.Testing.csproj", "--no-restore", "--nologo", "--verbosity", "quiet");
+            CommandResult result = RunTool(fixtureRoot,
+                "--policy", policyPath,
+                "--mode", "strict,audit",
+                "--format", "json",
+                "--ensure-built",
+                "--no-restore",
+                "--configuration", "Debug");
+
+            string assemblyPath = Path.Combine(fixtureRoot, "bin", "Debug", "net10.0", "ArchLinterNet.Testing.dll");
+            string receiptPath = $"{assemblyPath}.archlinternet-receipt.json";
+            using JsonDocument document = JsonDocument.Parse(result.StandardOutput);
+            JsonElement results = document.RootElement.GetProperty("results");
+            Assert.Multiple(() =>
+            {
+                string[] expectedModes = ["strict", "audit"];
+                Assert.That(restore.ExitCode, Is.EqualTo(0), restore.CombinedOutput);
+                Assert.That(build.ExitCode, Is.EqualTo(0), build.CombinedOutput);
+                Assert.That(result.ExitCode, Is.EqualTo(0), result.CombinedOutput);
+                Assert.That(results.ValueKind, Is.EqualTo(JsonValueKind.Array));
+                Assert.That(results.GetArrayLength(), Is.EqualTo(2), result.StandardOutput);
+                int modeIndex = 0;
+                foreach (JsonElement modeResult in results.EnumerateArray())
+                {
+                    Assert.That(modeResult.GetProperty("mode").GetString(), Is.EqualTo(expectedModes[modeIndex++]), result.StandardOutput);
+                    Assert.That(modeResult.GetProperty("passed").GetBoolean(), Is.True, result.StandardOutput);
+                    Assert.That(modeResult.GetProperty("violations").GetArrayLength(), Is.Zero, result.StandardOutput);
+                    Assert.That(modeResult.GetProperty("cycles").GetArrayLength(), Is.Zero, result.StandardOutput);
+                    JsonElement preflightDiagnostics = modeResult.GetProperty("preflight_diagnostics");
+                    Assert.That(preflightDiagnostics.GetArrayLength(), Is.EqualTo(1), result.StandardOutput);
+                    Assert.That(preflightDiagnostics[0].GetProperty("state").GetString(), Is.EqualTo("current"),
+                        result.StandardOutput);
+                }
+
+                Assert.That(File.Exists(assemblyPath), Is.True, assemblyPath);
+                Assert.That(File.Exists(receiptPath), Is.True, receiptPath);
+            });
+            return Passed("installed-testing-output-ensure-built");
+        }
+
         public CheckpointScenarioResult AssertGenericCiNeutralInvocation()
         {
             using AdoptionAcceptanceFixture fixture = AdoptionAcceptanceFixture.Create("small");

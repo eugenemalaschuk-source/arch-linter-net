@@ -47,6 +47,7 @@ public sealed partial class CheckpointBReleaseGateTests
             candidate.AssertPackageProvenance(),
             candidate.AssertOfflineSchemaRegistry(),
             candidate.AssertExternalTestingConsumer(),
+            candidate.AssertInstalledTestingOutputEnsureBuilt(),
             AssertCleanCheckoutOracle(candidate),
             candidate.AssertGenericCiNeutralInvocation(),
             candidate.AssertDocumentedEntrypoint(),

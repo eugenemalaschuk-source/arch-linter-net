@@ -64,11 +64,25 @@ The system SHALL NOT invoke restore or build during ordinary validation. When ar
 - **THEN** the system performs no restore, build, or network access and only inspects existing state
 
 ### Requirement: Explicit ensure-built preparation mode
-The system SHALL provide an opt-in preparation mode (CLI `--ensure-built` flag; Testing API `ArchitectureValidationBuilder.WithEnsureBuilt()`) that evaluates the selected graph, invokes the supported `dotnet build` path once for the whole graph using a structured executable and argument list (never a shell command string, never sourced from policy YAML, baseline, receipt, or cache content), stops distinctly on restore or build failure, and analyzes only artifacts verified after that build completes. Preparation and subsequent project-aware analysis SHALL leave the verified selected primary outputs continuously coherent and consumable; a successful no-op verification SHALL NOT delete, rewrite, or temporarily make unavailable the selected assembly, PDB, or other verified primary artifact.
+The system SHALL provide an opt-in preparation mode (CLI `--ensure-built` flag; Testing API `ArchitectureValidationBuilder.WithEnsureBuilt()`) that evaluates the selected graph without loading any selected target artifact that the graph build may replace, invokes the supported `dotnet build` path once for the whole graph using a structured executable and argument list (never a shell command string, never sourced from policy YAML, baseline, receipt, or cache content), stops distinctly on restore or build failure, and analyzes only artifacts verified after that build completes. This metadata-only-before-build ordering SHALL apply whether or not analysis caching is enabled. Preparation and subsequent project-aware analysis SHALL leave the verified selected primary outputs continuously coherent and consumable; a successful no-op verification SHALL NOT delete, rewrite, or temporarily make unavailable the selected assembly, PDB, or other verified primary artifact.
 
 #### Scenario: Ensure-built succeeds and validates
 - **WHEN** `--ensure-built` is passed against a project graph with valid sources but no prior build output
 - **THEN** the system builds the graph once, emits a build receipt, verifies the resulting artifacts, and proceeds to contract execution
+
+#### Scenario: Ensure-built prepares target metadata before loading selected artifacts
+- **WHEN** `--ensure-built` targets an output that the temporary graph build may replace
+- **THEN** the validating process completes metadata selection and build preparation before it loads that target artifact for analysis
+
+#### Scenario: Ensure-built preserves the prepared output selection
+- **WHEN** `--ensure-built` has no explicit configuration, framework, or runtime identifier and
+  metadata preparation selects a Debug output while a newer Release output exists
+- **THEN** receipt refresh verifies and records the selected Debug output rather than substituting
+  the newer Release artifact
+
+#### Scenario: Installed self-analysis can rebuild ArchLinterNet.Testing
+- **WHEN** an installed CLI runs `--ensure-built` against a self-analysis policy selecting `ArchLinterNet.Testing`
+- **THEN** the temporary graph build can replace the selected output and preparation completes with verified current receipts
 
 #### Scenario: Ensure-built preserves verified primary outputs
 - **WHEN** a selected project has been built and its primary output bytes are recorded before a successful `--ensure-built` validation

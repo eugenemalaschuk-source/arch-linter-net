@@ -125,7 +125,12 @@ public sealed class ArchitectureValidationApplicationService(
         }
 
         request.CancellationToken.ThrowIfCancellationRequested();
-        if (request.CacheLocation is not null)
+        // EnsureBuilt must use the metadata-only preparation path even without a cache. The
+        // temporary graph build can replace selected outputs, so loading them during the initial
+        // setup would lock those files on Windows before the build gets a chance to run. A cache
+        // request still takes this path for lazy materialization; ordinary uncached validation
+        // stays on the existing load-and-setup path below.
+        if (request.CacheLocation is not null || request.PreparationMode == BuildPreparationMode.EnsureBuilt)
         {
             ArchitectureRunnerPreparation preparation;
             using (timing?.Measure("metadata_preparation"))
