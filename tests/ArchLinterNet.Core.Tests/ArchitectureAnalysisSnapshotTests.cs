@@ -510,17 +510,15 @@ public sealed partial class ArchitectureAnalysisSnapshotTests
         Assert.That(snapshot.Counters.AssemblyLoads, Is.EqualTo(0));
     }
 
-    // Regression test for a PR #390 review defect: --ensure-built triggers a second BuildRunner
-    // pass to pick up freshly built assemblies (see CreateSnapshotCore), but the snapshot's
-    // counters unconditionally reported PolicyCompositions=1/ProjectGraphEvaluations=1 regardless
-    // of whether that second pass actually happened. This asserts both halves of the fix: policy
-    // composition (LoadDocument) genuinely happens only once even when the reload triggers, and
-    // ProjectGraphEvaluations reports the real pass count (2) rather than a hardcoded 1.
+    // --ensure-built prepares the project graph once, then refreshes receipt-verified artifact
+    // evidence without materializing an assembly during snapshot construction. This proves policy
+    // composition remains once-only and the selected output stays unlocked until a caller evaluates
+    // the snapshot.
     [Test]
-    public void CreateSnapshot_EnsureBuiltTriggersReload_ComposesPolicyOnceButCountsTwoProjectGraphEvaluations()
+    public void CreateSnapshot_EnsureBuiltRefreshesArtifactsWithoutLoadingAssemblies()
     {
         ArchitectureContractDocument document = CreateDocument();
-        var runnerSetupService = new CountingRunnerSetupService { DocumentToReturn = document };
+        var runnerSetupService = new EnsureBuiltMetadataRunnerSetupService { DocumentToReturn = document };
 
         var discovery = new Discovery.ProjectDiscoveryResult(
             _value3, Array.Empty<string>(), Array.Empty<string>(),
@@ -560,12 +558,14 @@ public sealed partial class ArchitectureAnalysisSnapshotTests
         Assert.Multiple(() =>
         {
             Assert.That(runnerSetupService.LoadDocumentCallCount, Is.EqualTo(1),
-                "policy document should be composed exactly once, reused across the ensure-built reload");
-            Assert.That(runnerSetupService.BuildRunnerCallCount, Is.EqualTo(2),
-                "ensure-built triggers a genuine second project-graph/assembly-resolution pass");
+                "policy document should be composed exactly once, reused across post-build receipt verification");
+            Assert.That(runnerSetupService.PrepareRunnerCallCount, Is.EqualTo(1),
+                "ensure-built must not rediscover outputs after the graph build");
+            Assert.That(runnerSetupService.BuildRunnerCallCount, Is.Zero,
+                "snapshot construction must not load a selected assembly before ensure-built finishes");
             Assert.That(snapshot.Counters.PolicyCompositions, Is.EqualTo(1));
-            Assert.That(snapshot.Counters.ProjectGraphEvaluations, Is.EqualTo(2),
-                "counters must reflect the real pass count, not a hardcoded 1");
+            Assert.That(snapshot.Counters.ProjectGraphEvaluations, Is.EqualTo(1),
+                "counters must reflect the single metadata graph preparation");
         });
     }
 

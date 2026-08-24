@@ -80,8 +80,8 @@ public sealed class PostOptimizationAnalysisProfileBenchmarkHarness
         SampleSeries combined = RunSeries(fixture, "strict,audit", ["--ensure-built", "--max-parallelism", "1"], RunsPerScenario, prime: false);
         scenarios.Add(Summarize("4-combined-strict-audit-one-snapshot", "Combined strict and audit from one snapshot", combined));
         Assert.That(combined.MeasuredSamples.All(static sample =>
-            Counter(sample, "PolicyCompositions") == 1 && Counter(sample, "ProjectGraphEvaluations") == 2), Is.True,
-            "Combined execution must compose policy once; --ensure-built records initial evaluation plus its required post-build preparation.");
+            Counter(sample, "PolicyCompositions") == 1 && Counter(sample, "ProjectGraphEvaluations") == 1), Is.True,
+            "Combined execution must compose policy once; --ensure-built refreshes receipt-verified artifacts without another graph evaluation.");
 
         SampleSeries oneSink = RunSeries(fixture, "strict", ["--ensure-built", "--report", "json=one.json", "--max-parallelism", "1"], RunsPerScenario, prime: false);
         SampleSeries threeSinks = RunSeries(fixture, "strict", [

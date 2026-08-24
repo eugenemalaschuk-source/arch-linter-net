@@ -21,6 +21,7 @@ _SHARD_SCHEMA = "checkpoint-b-platform-shard-evidence/v1"
 _PLATFORM_SCHEMA = "checkpoint-b-platform-evidence/v1"
 _REQUIRED_SHARDS = {
     "package-and-entrypoints",
+    "ensure-built-replaces-testing-output",
     "adopter-runtime-core",
     "adopter-runtime-extended",
     "consumer-cleanup-policy-execution",

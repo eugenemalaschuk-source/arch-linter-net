@@ -225,11 +225,7 @@ public sealed class BuildStatePreparationService : IBuildStatePreparationService
         {
             string? projectDirectory = Path.GetDirectoryName(
                 BuildStatePathResolution.ResolveAbsoluteProjectPath(request.RepositoryRoot, project.Path));
-            string? assemblyPath = projectDirectory == null
-                ? null
-                : FindBuiltAssembly(
-                    projectDirectory, project.AssemblyName, request.RequestedConfiguration, request.RequestedTargetFramework,
-                    request.RequestedRuntimeIdentifier);
+            string? assemblyPath = ResolveBuiltAssemblyPath(request, project, projectDirectory);
 
             if (assemblyPath == null)
             {
@@ -247,6 +243,45 @@ public sealed class BuildStatePreparationService : IBuildStatePreparationService
         {
             ResolvedAssemblyPaths = resolvedPaths
         };
+    }
+
+    internal static string? ResolveBuiltAssemblyPath(
+        BuildStatePreflightRequest request,
+        ArchitectureDiscoveredProject project,
+        string? projectDirectory)
+    {
+        if (projectDirectory == null)
+        {
+            return null;
+        }
+
+        // With no explicit output constraint, preparation has already selected the physical
+        // artifact the policy intends to analyse. Preserve that choice after the build instead
+        // of falling back to the newest file anywhere under bin/: an unrelated, newer Release
+        // output could otherwise receive the fresh receipt while post-build preparation returns
+        // to the selected Debug output and reports its receipt as stale.
+        if (request.RequestedConfiguration == null
+            && request.RequestedTargetFramework == null
+            && request.RequestedPlatform == null
+            && request.RequestedRuntimeIdentifier == null
+            && request.Resolution.ResolvedAssemblyPaths.TryGetValue(project.AssemblyName, out string? preparedPath)
+            && IsProjectOutput(projectDirectory, project.AssemblyName, preparedPath))
+        {
+            return Path.GetFullPath(preparedPath);
+        }
+
+        return FindBuiltAssembly(
+            projectDirectory, project.AssemblyName, request.RequestedConfiguration, request.RequestedTargetFramework,
+            request.RequestedRuntimeIdentifier);
+    }
+
+    internal static bool IsProjectOutput(string projectDirectory, string assemblyName, string path)
+    {
+        string outputDirectory = Path.GetFullPath(Path.Combine(projectDirectory, "bin"));
+        string outputPrefix = Path.TrimEndingDirectorySeparator(outputDirectory) + Path.DirectorySeparatorChar;
+        return File.Exists(path)
+            && string.Equals(Path.GetFileNameWithoutExtension(path), assemblyName, StringComparison.Ordinal)
+            && Path.GetFullPath(path).StartsWith(outputPrefix, StringComparison.OrdinalIgnoreCase);
     }
 
     // Standard SDK-style output layout is bin/<Configuration>/<TFM>/<AssemblyName>.dll. When the

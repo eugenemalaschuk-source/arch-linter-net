@@ -33,6 +33,8 @@ public sealed class ArchitectureValidationApplicationServiceFakeCompositionTests
 
         public int BuildRunnerCallCount { get; private set; }
 
+        public int PrepareRunnerCallCount { get; private set; }
+
         public ArchitectureContractDocument DocumentToReturn { get; set; } = new() { Version = 1, Name = "Fake" };
 
         public IArchitectureContractRunner RunnerToReturn { get; set; } = null!;
@@ -75,6 +77,45 @@ public sealed class ArchitectureValidationApplicationServiceFakeCompositionTests
         {
             return BuildRunner(document, policyPath, conditionSetName, preprocessorSymbols, selectedContractIds,
                 enableUnmatchedIgnoreTracking, timing, mode, cancellationToken, maxParallelism);
+        }
+
+        public ArchitectureRunnerPreparation PrepareRunner(
+            ArchitectureContractDocument document,
+            string policyPath,
+            string? conditionSetName = null,
+            IReadOnlyList<string>? preprocessorSymbols = null,
+            HashSet<string>? selectedContractIds = null,
+            string? mode = null,
+            CancellationToken cancellationToken = default)
+        {
+            PrepareRunnerCallCount++;
+            ArchitectureAnalysisContext context = RunnerToReturn.Session.Context;
+            return new ArchitectureRunnerPreparation(
+                context.RepositoryRoot,
+                preprocessorSymbols,
+                context.ProjectDiscovery ?? new ProjectDiscoveryResult(
+                    Array.Empty<string>(), Array.Empty<string>(), Array.Empty<string>(),
+                    Array.Empty<ArchitectureProjectDiscoveryDiagnostic>()),
+                ResolveAssemblyOutputs: true,
+                context.SelectedAssemblyArtifactPaths,
+                new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase),
+                context.MissingAssemblyNames.ToArray(),
+                IsMetadataReferenceClosureComplete: false);
+        }
+
+        public ArchitectureRunnerSetup MaterializePreparedRunner(
+            ArchitectureContractDocument document,
+            ArchitectureRunnerPreparation preparation,
+            HashSet<string>? selectedContractIds = null,
+            bool enableUnmatchedIgnoreTracking = true,
+            ValidationTiming? timing = null,
+            string? mode = null,
+            CancellationToken cancellationToken = default,
+            int? maxParallelism = null)
+        {
+            return BuildRunner(document, "prepared-by-fake", selectedContractIds: selectedContractIds,
+                enableUnmatchedIgnoreTracking: enableUnmatchedIgnoreTracking, timing: timing, mode: mode,
+                cancellationToken: cancellationToken, maxParallelism: maxParallelism);
         }
     }
 
@@ -255,7 +296,7 @@ public sealed class ArchitectureValidationApplicationServiceFakeCompositionTests
     }
 
     [Test]
-    public void Validate_EnsureBuiltWithNonBlockingPreflight_ReReadsRunnerSetupBeforeContractExecution()
+    public void Validate_EnsureBuiltWithNonBlockingPreflight_RefreshesArtifactsBeforeContractExecution()
     {
         var document = new ArchitectureContractDocument
         {
@@ -288,10 +329,11 @@ public sealed class ArchitectureValidationApplicationServiceFakeCompositionTests
 
         Assert.Multiple(() =>
         {
-            // Post-ensure-built, setup runs a second time (once during the initial LoadAndSetup,
-            // once more after a non-blocking preflight) so contract execution sees any assembly
-            // the build just produced rather than the stale pre-build resolution snapshot.
-            Assert.That(runnerSetupService.BuildRunnerCallCount, Is.EqualTo(2));
+            // The metadata-only plan retains its graph and refreshes artifact evidence after the
+            // build. The runner materializes only when contract execution begins, so its selected
+            // assembly was never loaded before the graph build was allowed to replace it.
+            Assert.That(runnerSetupService.PrepareRunnerCallCount, Is.EqualTo(1));
+            Assert.That(runnerSetupService.BuildRunnerCallCount, Is.EqualTo(1));
             Assert.That(contractExecutor.WasCalled, Is.True);
             Assert.That(outcome.PreflightBlocked, Is.False);
         });

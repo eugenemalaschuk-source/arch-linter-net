@@ -1,5 +1,3 @@
-using System.Reflection.Metadata;
-using System.Reflection.PortableExecutable;
 using ArchLinterNet.Core.BuildState;
 using ArchLinterNet.Core.Contracts;
 using ArchLinterNet.Core.Contracts.Abstractions;
@@ -133,9 +131,9 @@ public sealed class ArchitectureRunnerSetupService(
             }
         }
 
-        (IReadOnlyList<string> closure, bool closureComplete) = BuildMetadataReferenceClosure(
+        (IReadOnlyList<string> closure, bool closureComplete) = PreparedArtifactEvidence.BuildMetadataReferenceClosure(
             selectedPaths, discovery, cancellationToken);
-        IReadOnlyDictionary<string, string> capturedDigests = CaptureArtifactDigests(closure, cancellationToken);
+        IReadOnlyDictionary<string, string> capturedDigests = PreparedArtifactEvidence.CaptureDigests(closure, cancellationToken);
         return new ArchitectureRunnerPreparation(
             repositoryRoot, symbols, discovery, resolveAssemblyOutputs,
             closure, capturedDigests, missing, closureComplete);
@@ -255,93 +253,6 @@ public sealed class ArchitectureRunnerSetupService(
         }
 
         return symbols;
-    }
-
-    private static (IReadOnlyList<string> Paths, bool Complete) BuildMetadataReferenceClosure(
-        List<string> roots, ProjectDiscoveryResult discovery, CancellationToken cancellationToken)
-    {
-        Dictionary<string, string> candidates = new(StringComparer.OrdinalIgnoreCase);
-        foreach (string path in roots.Concat(discovery.ResolvedAssemblyPaths.Values).Where(File.Exists))
-        {
-            candidates[Path.GetFileNameWithoutExtension(path)] = Path.GetFullPath(path);
-        }
-
-        if (AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES") is string trustedPlatformAssemblies)
-        {
-            foreach (string path in trustedPlatformAssemblies.Split(Path.PathSeparator, StringSplitOptions.RemoveEmptyEntries).Where(File.Exists))
-            {
-                candidates.TryAdd(Path.GetFileNameWithoutExtension(path), Path.GetFullPath(path));
-            }
-        }
-
-        Queue<string> pending = new(roots.Select(Path.GetFullPath));
-        HashSet<string> closure = new(StringComparer.OrdinalIgnoreCase);
-        // A project-only metadata contract has no exact PE/PDB root inventory. Do not make it
-        // reusable merely because its reference walk is vacuously empty.
-        bool complete = roots.Count > 0;
-        while (pending.Count > 0)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            string path = pending.Dequeue();
-            if (!closure.Add(path))
-            {
-                continue;
-            }
-
-            try
-            {
-                using FileStream stream = File.OpenRead(path);
-                using PEReader reader = new(stream, PEStreamOptions.LeaveOpen);
-                if (!reader.HasMetadata)
-                {
-                    complete = false;
-                    continue;
-                }
-
-                MetadataReader metadata = reader.GetMetadataReader();
-                foreach (AssemblyReferenceHandle handle in metadata.AssemblyReferences)
-                {
-                    string name = metadata.GetString(metadata.GetAssemblyReference(handle).Name);
-                    if (string.IsNullOrWhiteSpace(name) || !candidates.TryGetValue(name, out string? referencePath))
-                    {
-                        complete = false;
-                        continue;
-                    }
-
-                    pending.Enqueue(referencePath);
-                }
-            }
-            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or BadImageFormatException)
-            {
-                complete = false;
-            }
-        }
-
-        return (closure.OrderBy(path => path, StringComparer.OrdinalIgnoreCase).ToArray(), complete);
-    }
-
-    private static Dictionary<string, string> CaptureArtifactDigests(
-        IReadOnlyList<string> artifactPaths,
-        CancellationToken cancellationToken)
-    {
-        Dictionary<string, string> digests = new(StringComparer.OrdinalIgnoreCase);
-        foreach (string artifactPath in artifactPaths)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            Add(artifactPath);
-            Add(Path.ChangeExtension(artifactPath, ".pdb"));
-            Add(BuildReceiptStore.ReceiptPathFor(artifactPath));
-        }
-
-        return digests;
-
-        void Add(string path)
-        {
-            string fullPath = Path.GetFullPath(path);
-            digests[fullPath] = File.Exists(fullPath)
-                ? BuildStateCanonicalHasher.ComputeContentDigest(fullPath, cancellationToken)
-                : "missing";
-        }
     }
 
     private static void VerifyPreparedArtifacts(

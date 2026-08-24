@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using ArchLinterNet.Core.BuildState;
 using ArchLinterNet.Core.Resolution;
 using ArchLinterNet.Testing;
 using NUnit.Framework;
@@ -29,10 +30,15 @@ public sealed class EnsureBuiltNonDestructiveIntegrationTests
 
     [Test]
     [CancelAfter(180_000)]
-    public void CliEnsureBuilt_PreservesCompiledPrimaryOutputs()
+    public void CliEnsureBuilt_ReplacesPreparedOutputWhenAlternateConfigurationIsNewer()
     {
-        CompiledFixture fixture = CreateAndBuildFixture();
-        ArtifactBytes before = fixture.ReadPrimaryOutputs();
+        CompiledFixture fixture = CreateAndBuildFixture("ArchLinterNet.Testing");
+        CommandResult releaseBuild = RunDotnet(fixture.Root,
+            "build", fixture.ProjectPath, "--nologo", "--configuration", "Release");
+        Assert.That(releaseBuild.ExitCode, Is.Zero, releaseBuild.CombinedOutput);
+
+        string beforeDigest = BuildStateCanonicalHasher.ComputeContentDigest(fixture.PrimaryAssemblyPath);
+        fixture.MakePrimaryOutputStale();
         string repositoryRoot = new ArchitectureRepositoryRootResolver().Resolve();
         string cliProjectPath = Path.Combine(repositoryRoot, "src", "ArchLinterNet.Cli", "ArchLinterNet.Cli.csproj");
 
@@ -41,12 +47,47 @@ public sealed class EnsureBuiltNonDestructiveIntegrationTests
             "--policy", fixture.PolicyPath,
             "--mode", "strict",
             "--ensure-built",
-            "--configuration", "Debug");
+            "--no-restore");
 
+        string afterDigest = BuildStateCanonicalHasher.ComputeContentDigest(fixture.PrimaryAssemblyPath);
+        bool hasReceipt = BuildReceiptStore.TryRead(fixture.PrimaryAssemblyPath, out BuildReceiptV1? receipt);
         Assert.Multiple(() =>
         {
             Assert.That(result.ExitCode, Is.Zero, result.CombinedOutput);
-            AssertPrimaryOutputsUnchanged(before, fixture.ReadPrimaryOutputs());
+            Assert.That(afterDigest, Is.Not.EqualTo(beforeDigest), "The selected Debug assembly was not rebuilt.");
+            Assert.That(hasReceipt, Is.True);
+            Assert.That(receipt, Is.Not.Null);
+            Assert.That(receipt!.AssemblyContentDigest, Is.EqualTo(afterDigest));
+        });
+    }
+
+    [Test]
+    [CancelAfter(180_000)]
+    public void CliEnsureBuilt_ReplacesPolicySelectedReleaseOutputWithoutCliConfiguration()
+    {
+        CompiledFixture fixture = CreateAndBuildFixture(configuration: "Release");
+        string beforeDigest = BuildStateCanonicalHasher.ComputeContentDigest(fixture.PrimaryAssemblyPath);
+        fixture.MakePrimaryOutputStale();
+        string repositoryRoot = new ArchitectureRepositoryRootResolver().Resolve();
+        string cliProjectPath = Path.Combine(repositoryRoot, "src", "ArchLinterNet.Cli", "ArchLinterNet.Cli.csproj");
+
+        CommandResult result = RunDotnet(fixture.Root,
+            "run", "--project", cliProjectPath, "--no-build", "--",
+            "--policy", fixture.PolicyPath,
+            "--mode", "strict",
+            "--ensure-built",
+            "--no-restore");
+
+        string afterDigest = BuildStateCanonicalHasher.ComputeContentDigest(fixture.PrimaryAssemblyPath);
+        bool hasReceipt = BuildReceiptStore.TryRead(fixture.PrimaryAssemblyPath, out BuildReceiptV1? receipt);
+        Assert.Multiple(() =>
+        {
+            Assert.That(result.ExitCode, Is.Zero, result.CombinedOutput);
+            Assert.That(afterDigest, Is.Not.EqualTo(beforeDigest), "The policy-selected Release assembly was not rebuilt.");
+            Assert.That(hasReceipt, Is.True);
+            Assert.That(receipt, Is.Not.Null);
+            Assert.That(receipt!.Configuration, Is.EqualTo("Release"));
+            Assert.That(receipt.AssemblyContentDigest, Is.EqualTo(afterDigest));
         });
     }
 
@@ -70,21 +111,44 @@ public sealed class EnsureBuiltNonDestructiveIntegrationTests
         });
     }
 
-    private CompiledFixture CreateAndBuildFixture()
+    [Test]
+    [CancelAfter(180_000)]
+    public void TestingApiEnsureBuiltNoRestore_AfterPriorBuildPreservesCompiledPrimaryOutputs()
     {
-        const string AssemblyName = "EnsureBuiltFixture";
-        string projectDirectory = Path.Combine(_fixtureRoot, "src", AssemblyName);
+        // The fixture is restored and built before the validation process begins. WithNoRestore
+        // therefore exercises the same post-restore graph-build route while keeping the selected
+        // output disposable and independent of any assembly referenced by the NUnit host.
+        CompiledFixture fixture = CreateAndBuildFixture();
+        ArtifactBytes before = fixture.ReadPrimaryOutputs();
+        ArchitectureValidationResult result = ArchitectureAssertions.FromPolicy(fixture.PolicyPath)
+            .WithEnsureBuilt(configuration: "Debug")
+            .WithNoRestore()
+            .ValidateStrict();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(result.Passed, Is.True, string.Join("; ", result.Violations));
+            AssertPrimaryOutputsUnchanged(before, fixture.ReadPrimaryOutputs());
+        });
+    }
+
+    private CompiledFixture CreateAndBuildFixture(string assemblyName = "EnsureBuiltFixture", string configuration = "Debug")
+    {
+        const string ProjectName = "EnsureBuiltFixture";
+        string projectDirectory = Path.Combine(_fixtureRoot, "fixture");
         Directory.CreateDirectory(projectDirectory);
-        string projectPath = Path.Combine(projectDirectory, $"{AssemblyName}.csproj");
-        File.WriteAllText(projectPath, """
+        string projectPath = Path.Combine(projectDirectory, $"{ProjectName}.csproj");
+        File.WriteAllText(projectPath, $"""
             <Project Sdk="Microsoft.NET.Sdk">
               <PropertyGroup>
                 <TargetFramework>net10.0</TargetFramework>
                 <Nullable>enable</Nullable>
+                <AssemblyName>{assemblyName}</AssemblyName>
               </PropertyGroup>
             </Project>
             """);
-        File.WriteAllText(Path.Combine(projectDirectory, "Marker.cs"), """
+        string sourcePath = Path.Combine(projectDirectory, "Marker.cs");
+        File.WriteAllText(sourcePath, """
             namespace EnsureBuiltFixture;
 
             public sealed class Marker
@@ -96,7 +160,7 @@ public sealed class EnsureBuiltNonDestructiveIntegrationTests
         string architectureDirectory = Path.Combine(_fixtureRoot, "architecture");
         Directory.CreateDirectory(architectureDirectory);
         string policyPath = Path.Combine(architectureDirectory, "dependencies.arch.yml");
-        File.WriteAllText(policyPath, """
+        File.WriteAllText(policyPath, $"""
             version: 1
             name: Ensure-built output preservation
 
@@ -105,8 +169,10 @@ public sealed class EnsureBuiltNonDestructiveIntegrationTests
                 namespace: EnsureBuiltFixture
 
             analysis:
-              target_assemblies: [EnsureBuiltFixture]
-              projects: ["src/EnsureBuiltFixture/EnsureBuiltFixture.csproj"]
+              target_assemblies: [{assemblyName}]
+              configuration: {configuration}
+              assembly_search_paths: ["fixture/bin/{configuration}/net10.0"]
+              projects: ["fixture/{ProjectName}.csproj"]
 
             contracts:
               strict_method_body:
@@ -115,9 +181,9 @@ public sealed class EnsureBuiltNonDestructiveIntegrationTests
                   forbidden_calls: [System.Console.WriteLine]
             """);
 
-        CommandResult build = RunDotnet(_fixtureRoot, "build", projectPath, "--nologo");
+        CommandResult build = RunDotnet(_fixtureRoot, "build", projectPath, "--nologo", "--configuration", configuration);
         Assert.That(build.ExitCode, Is.Zero, build.CombinedOutput);
-        return new CompiledFixture(_fixtureRoot, policyPath, projectDirectory, AssemblyName);
+        return new CompiledFixture(_fixtureRoot, policyPath, projectPath, projectDirectory, sourcePath, assemblyName, configuration);
     }
 
     private static CommandResult RunDotnet(string workingDirectory, params string[] arguments)
@@ -148,11 +214,26 @@ public sealed class EnsureBuiltNonDestructiveIntegrationTests
         Assert.That(after.Pdb, Is.EqualTo(before.Pdb), "The selected PDB bytes changed.");
     }
 
-    private sealed record CompiledFixture(string Root, string PolicyPath, string ProjectDirectory, string AssemblyName)
+    private sealed record CompiledFixture(
+        string Root,
+        string PolicyPath,
+        string ProjectPath,
+        string ProjectDirectory,
+        string SourcePath,
+        string AssemblyName,
+        string Configuration)
     {
+        public string PrimaryAssemblyPath => Path.Combine(ProjectDirectory, "bin", Configuration, "net10.0", $"{AssemblyName}.dll");
+
+        public void MakePrimaryOutputStale()
+        {
+            File.AppendAllText(SourcePath, "\npublic sealed class RebuiltMarker { }\n");
+            File.SetLastWriteTimeUtc(SourcePath, File.GetLastWriteTimeUtc(PrimaryAssemblyPath).AddSeconds(2));
+        }
+
         public ArtifactBytes ReadPrimaryOutputs()
         {
-            string outputDirectory = Path.Combine(ProjectDirectory, "bin", "Debug", "net10.0");
+            string outputDirectory = Path.Combine(ProjectDirectory, "bin", Configuration, "net10.0");
             string assemblyPath = Path.Combine(outputDirectory, $"{AssemblyName}.dll");
             string pdbPath = Path.Combine(outputDirectory, $"{AssemblyName}.pdb");
             return new ArtifactBytes(File.ReadAllBytes(assemblyPath), File.ReadAllBytes(pdbPath));
