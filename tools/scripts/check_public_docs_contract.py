@@ -24,6 +24,7 @@ COMMAND_DECLARATION = re.compile(
 MODULE_COMMAND_NAME = re.compile(
     r'public\s+string\s+CommandName\s*=>\s*"([^"]+)"'
 )
+COMMAND_TOKEN = re.compile(r"^[a-z][a-z0-9-]*$")
 
 
 def repository_root() -> Path:
@@ -110,10 +111,17 @@ def cli_command_paths(root: Path) -> set[str]:
         for path in area.rglob("*.cs"):
             text = path.read_text(encoding="utf-8")
             for child in MODULE_COMMAND_NAME.findall(text):
-                if child != top:
+                if child != top and COMMAND_TOKEN.fullmatch(child):
                     result.add(f"{top} {child}")
             for child in COMMAND_DECLARATION.findall(text):
-                if child != top and child != "arch-linter-net":
+                # Scaffold templates contain source snippets such as
+                # new("{{commandToken}}"). They are generated-code placeholders,
+                # not executable commands in the current binary.
+                if (
+                    child != top
+                    and child != "arch-linter-net"
+                    and COMMAND_TOKEN.fullmatch(child)
+                ):
                     result.add(f"{top} {child}")
 
     return result
