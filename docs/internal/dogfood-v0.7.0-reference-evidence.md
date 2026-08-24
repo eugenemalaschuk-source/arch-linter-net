@@ -14,12 +14,13 @@ release authority.
 
 | Input | Identity |
 | --- | --- |
-| Tool | `ArchLinterNet.Cli` 0.7.0, installed as a .NET tool |
+| Tool | `ArchLinterNet.Cli` 0.7.0, installed with `dotnet tool install --tool-path` in an isolated consumer-owned directory |
 | Repository object format | `sha1` |
 | Base tag | `v0.6.5` → `ff64174c2de750e5d18cb7072387173bffc26bd0` |
 | Target tag | `v0.7.0` → `e381f12b58b7f91e680e54ed57a20906ee99f057` |
 | Root policy blob | `e36701aaa99d9f21ea14c623a7c6749ed600f89d` |
 | Imported policy blobs | `ff0ad7ba71aa88fc720862a8d52007810952b63c`, `58f643bea55724786ced6bf0990a6735e1a885b3`, `57a82fcf7faa28a85e91315d74650e770688e069`, `43fe933dac5f439018644302a72015739d5ce05c`, `df3a8667d28adae4939f408fd1ef3e09298bdabf`, `4d9e0d660cba816bcb96eac31224af8439d53282` |
+| Canonical artifact | [`dogfood-v0.7.0-release-forensics.json`](dogfood-v0.7.0-release-forensics.json), 34,666,178 bytes |
 
 The recorded forensics command was:
 
@@ -29,23 +30,32 @@ arch-linter-net history analyze \
   --to v0.7.0 \
   --repository . \
   --policy architecture/dependencies.arch.yml \
-  --enrich-dotnet \
   --format json
 ```
 
 `--from` and `--to` are separate canonical operands. The command did not use
 `v0.6.5...v0.7.0` as a revision expression.
 
-The canonical JSON stream was regenerated twice with unchanged repository
-objects and policy. Both byte streams have SHA-256:
+The command ran from a clean detached checkout at `v0.7.0`, with the isolated
+tool executable invoked directly rather than through a repository tool
+manifest. It deliberately omits `--enrich-dotnet`, so the retained JSON has the
+deterministic enrichment status `not_requested`.
 
-```text
-adfda105c0f125319f5e5d8e71050268c39b4eac6750e4005b2790dd3c8e6d0e
-```
+Canonical artifact SHA-256: `adfda105c0f125319f5e5d8e71050268c39b4eac6750e4005b2790dd3c8e6d0e`
 
-The report identity is therefore the tool version, repository object format,
+The raw JSON stream was regenerated into a separate file from the same clean
+checkout and had the identical digest. `make lint-docs` runs
+`tools/scripts/check_dogfood_reference_evidence.py`, which streams the retained
+artifact and fails when its bytes no longer match this documented value. The
+canonical report identity is the tool version, repository object format,
 authored and resolved operands, effective policy identity above, and this
-digest. It intentionally excludes checkout paths and machine state.
+digest; it intentionally excludes checkout paths and machine state.
+
+An earlier separately requested `--enrich-dotnet` observation was
+`unavailable` with reason `worktree_verification_failed`. It is retained below
+as advisory product evidence only: enrichment status and reason are serialized
+into an enriched report, so that environment-specific result does not define
+the canonical JSON or its digest.
 
 ## Release-forensics result
 
@@ -62,7 +72,8 @@ threshold.
 | `HistoryIngestionResult.cs` and `HistoryIngestionService.cs` bottlenecks | They bridge ingestion, finalized evidence, and report projection. | Useful confirmed technical pressure. Existing History ingestion/evidence/reporting seams already protect this stable boundary; no duplicate task is warranted. |
 | `Gtheta` clusters | No qualifying cluster. | Insufficiently actionable signal. The policy did not configure a significance threshold, so the run exposes pair evidence but makes no cluster claim. |
 | Highest OCP signals: theory guide (0.748991507), release-forensics spec (0.733125174), `HistoryIngestionService.cs` (0.713775629) | Repeated edits reflect one feature wave and stable ingestion composition. | The document signals are intentional; the service signal is retained as a future investigation prompt only, not a refactoring mandate. |
-| Optional .NET enrichment | `unavailable`, reason `worktree_verification_failed`. Git-only report completed normally. | Expected runtime-optional behavior. The result confirms enrichment did not become Git-level correctness authority; the terse reason is advisory evidence, not a semantic failure. |
+| Canonical .NET enrichment projection | `not_requested`; the retained Git-only report completed normally. | Canonical report identity remains independent of local worktree and build state. |
+| Separately requested .NET enrichment | `unavailable`, reason `worktree_verification_failed`. | Expected runtime-optional behavior. This advisory observation confirms enrichment is not Git-level correctness authority; it is not the canonical digest-bearing result. |
 
 The findings contain no measured performance regression, security issue, or
 stable production boundary that justifies a new refactoring task.

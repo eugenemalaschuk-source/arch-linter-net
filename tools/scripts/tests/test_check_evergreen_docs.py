@@ -179,6 +179,17 @@ def test_rejects_tool_package_pins_in_supported_argument_forms(tmp_path: Path) -
         )
 
 
+def test_allows_exact_tool_pin_only_for_the_historical_reference_workflow(tmp_path: Path) -> None:
+    write_repo(tmp_path)
+    reference = tmp_path / "docs" / "guides" / "real-repository-workflow.md"
+    reference.write_text(
+        "dotnet tool install --tool-path .tools ArchLinterNet.Cli --version 0.7.0\n",
+        encoding="utf-8",
+    )
+
+    assert evergreen.find_violations(tmp_path) == []
+
+
 def test_rejects_library_package_pins_in_supported_command_forms(tmp_path: Path) -> None:
     commands = (
         "dotnet add package ArchLinterNet.Testing --version 9.8.7",
