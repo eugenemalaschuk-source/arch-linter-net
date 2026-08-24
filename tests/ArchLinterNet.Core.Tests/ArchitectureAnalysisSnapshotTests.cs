@@ -510,12 +510,12 @@ public sealed partial class ArchitectureAnalysisSnapshotTests
         Assert.That(snapshot.Counters.AssemblyLoads, Is.EqualTo(0));
     }
 
-    // --ensure-built prepares the project graph twice (before and after the build) without
-    // materializing an assembly during snapshot construction. This proves policy composition is
-    // still once-only while counters report the two metadata preparations and the selected output
-    // remains unlocked until a caller evaluates the snapshot.
+    // --ensure-built prepares the project graph once, then refreshes receipt-verified artifact
+    // evidence without materializing an assembly during snapshot construction. This proves policy
+    // composition remains once-only and the selected output stays unlocked until a caller evaluates
+    // the snapshot.
     [Test]
-    public void CreateSnapshot_EnsureBuiltPreparesTwiceWithoutLoadingAssemblies()
+    public void CreateSnapshot_EnsureBuiltRefreshesArtifactsWithoutLoadingAssemblies()
     {
         ArchitectureContractDocument document = CreateDocument();
         var runnerSetupService = new EnsureBuiltMetadataRunnerSetupService { DocumentToReturn = document };
@@ -558,14 +558,14 @@ public sealed partial class ArchitectureAnalysisSnapshotTests
         Assert.Multiple(() =>
         {
             Assert.That(runnerSetupService.LoadDocumentCallCount, Is.EqualTo(1),
-                "policy document should be composed exactly once, reused across the ensure-built reload");
-            Assert.That(runnerSetupService.PrepareRunnerCallCount, Is.EqualTo(2),
-                "ensure-built must prepare before and after the graph build");
+                "policy document should be composed exactly once, reused across post-build receipt verification");
+            Assert.That(runnerSetupService.PrepareRunnerCallCount, Is.EqualTo(1),
+                "ensure-built must not rediscover outputs after the graph build");
             Assert.That(runnerSetupService.BuildRunnerCallCount, Is.Zero,
                 "snapshot construction must not load a selected assembly before ensure-built finishes");
             Assert.That(snapshot.Counters.PolicyCompositions, Is.EqualTo(1));
-            Assert.That(snapshot.Counters.ProjectGraphEvaluations, Is.EqualTo(2),
-                "counters must reflect both metadata preparations");
+            Assert.That(snapshot.Counters.ProjectGraphEvaluations, Is.EqualTo(1),
+                "counters must reflect the single metadata graph preparation");
         });
     }
 

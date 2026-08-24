@@ -296,7 +296,7 @@ public sealed class ArchitectureValidationApplicationServiceFakeCompositionTests
     }
 
     [Test]
-    public void Validate_EnsureBuiltWithNonBlockingPreflight_PreparesTwiceBeforeContractExecution()
+    public void Validate_EnsureBuiltWithNonBlockingPreflight_RefreshesArtifactsBeforeContractExecution()
     {
         var document = new ArchitectureContractDocument
         {
@@ -329,10 +329,10 @@ public sealed class ArchitectureValidationApplicationServiceFakeCompositionTests
 
         Assert.Multiple(() =>
         {
-            // The metadata-only plan is refreshed after the build. The runner materializes only
-            // when contract execution begins, so its selected assembly was never loaded before
-            // the graph build was allowed to replace it.
-            Assert.That(runnerSetupService.PrepareRunnerCallCount, Is.EqualTo(2));
+            // The metadata-only plan retains its graph and refreshes artifact evidence after the
+            // build. The runner materializes only when contract execution begins, so its selected
+            // assembly was never loaded before the graph build was allowed to replace it.
+            Assert.That(runnerSetupService.PrepareRunnerCallCount, Is.EqualTo(1));
             Assert.That(runnerSetupService.BuildRunnerCallCount, Is.EqualTo(1));
             Assert.That(contractExecutor.WasCalled, Is.True);
             Assert.That(outcome.PreflightBlocked, Is.False);

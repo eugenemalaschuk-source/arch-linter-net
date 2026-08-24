@@ -42,19 +42,18 @@ public sealed partial class ArchitectureValidationApplicationServiceCacheLocatio
     }
 
     [Test]
-    public void CreateSnapshot_PostBuildMetadataPreflightFailureRetainsPostBuildPreparedPaths()
+    public void CreateSnapshot_PostBuildPreflightFailureRetainsPreparedPaths()
     {
         PreparedProvenanceFixture initial = CreatePreparedProvenanceFixture();
-        PreparedProvenanceFixture postBuild = CreatePreparedProvenanceFixture();
         var runnerSetupService = new FakeRunnerSetupService
         {
             DocumentToReturn = CreateDocument(),
-            PreparationProvider = call => call == 1 ? initial.Preparation : postBuild.Preparation,
+            PreparationProvider = _ => initial.Preparation,
         };
         var preparationService = new FakeBuildStatePreparationService
         {
             ExceptionProvider = call => call == 2
-                ? new InvalidOperationException("The post-build metadata preflight failed.")
+                ? new InvalidOperationException("The post-build receipt preflight failed.")
                 : null,
         };
         var applicationService = new ArchitectureValidationApplicationService(
@@ -70,10 +69,10 @@ public sealed partial class ArchitectureValidationApplicationServiceCacheLocatio
 
         Assert.Multiple(() =>
         {
-            Assert.That(runnerSetupService.PrepareRunnerCallCount, Is.EqualTo(2));
+            Assert.That(runnerSetupService.PrepareRunnerCallCount, Is.EqualTo(1));
             Assert.That(preparationService.PrepareCallCount, Is.EqualTo(2));
-            Assert.That(exception.ResolvedAssemblyPaths, Is.EqualTo(new[] { postBuild.AssemblyPath }));
-            Assert.That(exception.DiscoveredProjectPaths, Is.EqualTo(new[] { postBuild.ProjectPath }));
+            Assert.That(exception.ResolvedAssemblyPaths, Is.EqualTo(new[] { initial.AssemblyPath }));
+            Assert.That(exception.DiscoveredProjectPaths, Is.EqualTo(new[] { initial.ProjectPath }));
         });
     }
 
