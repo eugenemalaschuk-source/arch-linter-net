@@ -242,7 +242,7 @@ arch-linter-net explain \
 
 Use `history analyze` when the question is how architecture evidence changed over repository history rather than how the current graph is connected.
 
-## Public API governance
+## Public API
 
 The `public-api` command family supports capture, diff, update, and migration of reviewed public API snapshots used by public API surface contracts. See [Public API surface contracts](../contracts/public-api-surface.md).
 
