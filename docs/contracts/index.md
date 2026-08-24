@@ -1,66 +1,85 @@
-# Contracts
+# Contract Families
 
-ArchLinterNet contracts define executable architecture rules.
+This index is the reviewed human projection of `archlinternet.capabilities.json`. The hidden `contract-family` markers are checked by `make lint-docs`; adding or removing a machine capability without updating this page fails the documentation gate.
 
-Most contract families have two variants:
+Strict groups are blocking. Audit groups use the same family semantics for non-blocking migration/discovery.
 
-- **strict** — blocking rules for the current architecture gate;
-- **audit** — diagnostic rules for migration discovery and future-state visibility.
+| Family | Strict / audit groups | Purpose |
+| --- | --- | --- |
+<!-- contract-family: dependency -->
+| [Dependency](dependency.md) | `strict` / `audit` | Forbid dependencies from one layer to selected target layers. |
+<!-- contract-family: layer-order -->
+| [Layer order](layers.md) | `strict_layers` / `audit_layers` | Enforce an ordered inward dependency direction. |
+<!-- contract-family: allow-only -->
+| [Allow-only](allow-only.md) | `strict_allow_only` / `audit_allow_only` | Restrict a layer to itself plus explicitly allowed first-party layers. |
+<!-- contract-family: cycle -->
+| [Cycle](cycles.md) | `strict_cycles` / `audit_cycles` | Detect directed cycles among selected layers. |
+<!-- contract-family: acyclic-sibling -->
+| [Acyclic sibling](acyclic-siblings.md) | `strict_acyclic_siblings` / `audit_acyclic_siblings` | Keep direct sibling namespaces below selected ancestors acyclic. |
+<!-- contract-family: module-container -->
+| [Module container](module-container.md) | `strict_module_containers` / `audit_module_containers` | Discover direct feature modules and enforce a reviewed module profile. |
+<!-- contract-family: method-body -->
+| [Method body](method-body.md) | `strict_method_body` / `audit_method_body` | Forbid selected API calls using source/IL analysis. |
+<!-- contract-family: asmdef -->
+| [Unity asmdef](asmdef.md) | `strict_asmdef` / `audit_asmdef` | Govern Unity `.asmdef` references. |
+<!-- contract-family: independence -->
+| [Independence](independence.md) | `strict_independence` / `audit_independence` | Keep selected layers mutually independent. |
+<!-- contract-family: assembly-independence -->
+| [Assembly independence](assembly-independence.md) | `strict_assembly_independence` / `audit_assembly_independence` | Keep selected .NET assemblies mutually independent. |
+<!-- contract-family: assembly-dependency -->
+| [Assembly dependency](assembly-dependency.md) | `strict_assembly_dependency` / `audit_assembly_dependency` | Forbid direct first-party assembly references. |
+<!-- contract-family: assembly-allow-only -->
+| [Assembly allow-only](assembly-dependency.md) | `strict_assembly_allow_only` / `audit_assembly_allow_only` | Restrict direct first-party assembly references to an allow-list. |
+<!-- contract-family: project-metadata -->
+| [Project metadata](project-metadata.md) | `strict_project_metadata` / `audit_project_metadata` | Govern project properties, friend assemblies, and project references. |
+<!-- contract-family: protected-surface -->
+| [Protected surface](protected-surface.md) | `strict_protected` / `audit_protected` | Restrict which layers may import a protected layer. |
+<!-- contract-family: external-dependency -->
+| [External dependency](external-dependencies.md) | `strict_external` / `audit_external` | Forbid vendor/framework namespace/type dependency groups. |
+<!-- contract-family: external-allow-only -->
+| [External allow-only](external-allow-only.md) | `strict_external_allow_only` / `audit_external_allow_only` | Restrict external dependencies to reviewed groups. |
+<!-- contract-family: layer-template -->
+| [Layer template](layer-templates.md) | `strict_layer_templates` / `audit_layer_templates` | Apply reusable layer order to multiple namespace containers. |
+<!-- contract-family: type-placement -->
+| [Type placement](type-placement.md) | `strict_type_placement` / `audit_type_placement` | Constrain matching types by location and naming. |
+<!-- contract-family: layout-conventions -->
+| [Layout conventions](layout-conventions.md) | `strict_layout_conventions` / `audit_layout_conventions` | Govern source-file/declaration layout conventions. |
+<!-- contract-family: public-api-surface -->
+| [Public API surface](public-api-surface.md) | `strict_public_api_surface` / `audit_public_api_surface` | Govern exported API signatures and reviewed snapshots. |
+<!-- contract-family: attribute-usage -->
+| [Attribute usage](attribute-usage.md) | `strict_attribute_usage` / `audit_attribute_usage` | Restrict where selected attributes may appear. |
+<!-- contract-family: inheritance -->
+| [Inheritance](inheritance.md) | `strict_inheritance` / `audit_inheritance` | Forbid selected base classes in selected source surfaces. |
+<!-- contract-family: interface-implementation -->
+| [Interface implementation](interface-implementation.md) | `strict_interface_implementation` / `audit_interface_implementation` | Restrict where implementations of selected interfaces may live. |
+<!-- contract-family: composition -->
+| [Composition](composition.md) | `strict_composition` / `audit_composition` | Restrict composition/service-locator calls to reviewed boundaries. |
+<!-- contract-family: coverage -->
+| [Coverage](coverage.md) | `strict_coverage` / `audit_coverage` | Govern namespace, project, assembly, dependency-edge, rule-input, and semantic-role coverage. |
+<!-- contract-family: context-dependency -->
+| [Contextual dependency](context-dependency.md) | `strict_context_dependencies` / `audit_context_dependencies` | Forbid dependencies between semantic role/metadata contexts. |
+<!-- contract-family: context-allow-only -->
+| [Contextual allow-only](context-allow-only.md) | `strict_context_allow_only` / `audit_context_allow_only` | Allow semantic-context dependencies only to selected contexts. |
+<!-- contract-family: port-boundary -->
+| [Semantic port boundary](port-boundary.md) | `strict_port_boundaries` / `audit_port_boundaries` | Require selected context crossings to pass through a port/ACL seam. |
+<!-- contract-family: package-dependency -->
+| [Package dependency](package-dependencies.md) | `strict_package_dependency` / `audit_package_dependency` | Forbid selected NuGet package groups from project/assembly sources. |
+<!-- contract-family: package-allow-only -->
+| [Package allow-only](package-dependencies.md) | `strict_package_allow_only` / `audit_package_allow_only` | Restrict NuGet references to reviewed package groups. |
+<!-- contract-family: framework-dependency -->
+| [Framework dependency](package-dependencies.md) | `strict_framework_dependency` / `audit_framework_dependency` | Forbid selected MSBuild `FrameworkReference` groups. |
+<!-- contract-family: framework-allow-only -->
+| [Framework allow-only](package-dependencies.md) | `strict_framework_allow_only` / `audit_framework_allow_only` | Restrict framework references to reviewed groups. |
 
-## Contract family map
+## Choosing a family
 
-| Family | Strict group | Audit group | Use when |
-|--------|--------------|-------------|----------|
-| [Dependency](dependency.md) | `strict` | `audit` | A source layer must not reference forbidden layers. |
-| [Layer order](layers.md) | `strict_layers` | `audit_layers` | Dependencies must point inward through an ordered layer stack. |
-| [Allow-only](allow-only.md) | `strict_allow_only` | `audit_allow_only` | A source layer may reference only explicitly allowed layers. |
-| [Cycle](cycles.md) | `strict_cycles` | `audit_cycles` | Selected layers must not form directed dependency cycles. |
-| [Acyclic sibling](acyclic-siblings.md) | `strict_acyclic_siblings` | `audit_acyclic_siblings` | Direct sibling namespaces under an ancestor must remain acyclic. |
-| [Independence](independence.md) | `strict_independence` | `audit_independence` | A set of modules/layers must not reference each other. |
-| [Assembly independence](assembly-independence.md) | `strict_assembly_independence` | `audit_assembly_independence` | A set of compiled .NET assemblies must not directly reference each other. |
-| [Assembly dependency](assembly-dependency.md) | `strict_assembly_dependency` | `audit_assembly_dependency` | A source assembly must not directly reference forbidden assemblies. |
-| [Assembly allow-only](assembly-dependency.md) | `strict_assembly_allow_only` | `audit_assembly_allow_only` | A source assembly may only directly reference explicitly allowed assemblies. |
-| [Project metadata](project-metadata.md) | `strict_project_metadata` | `audit_project_metadata` | Selected discovered projects must preserve required metadata, restrict friend assemblies, and avoid forbidden project references. |
-| [Protected surface](protected-surface.md) | `strict_protected` | `audit_protected` | A target layer may only be imported by approved layers. |
-| [External dependency](external-dependencies.md) | `strict_external` | `audit_external` | Source code must not leak forbidden vendor/framework dependencies. |
-| [External allow-only](external-allow-only.md) | `strict_external_allow_only` | `audit_external_allow_only` | A source layer may reference only explicitly allowed vendor/framework dependency groups. |
-| [Method body](method-body.md) | `strict_method_body` | `audit_method_body` | Source code must not call forbidden APIs inside executable bodies. |
-| [Unity asmdef](asmdef.md) | `strict_asmdef` | `audit_asmdef` | Unity assembly definition references must follow architecture rules. |
-| [Layer template](layer-templates.md) | `strict_layer_templates` | `audit_layer_templates` | The same ordered layer shape applies to multiple namespace containers. |
-| [Type placement](type-placement.md) | `strict_type_placement` | `audit_type_placement` | An architectural role must live in a declared layer/namespace/project/assembly and/or carry a declared naming suffix/prefix. |
-| [Layout conventions](layout-conventions.md) | `strict_layout_conventions` | `audit_layout_conventions` | A folder/namespace/file-name convention must hold: type kind, naming, file/type-name matching, and matching-interface counterparts. |
-| [Public API surface](public-api-surface.md) | `strict_public_api_surface` | `audit_public_api_surface` | An assembly's exported public/protected types and members must match a declared allowlist. |
-| [Attribute usage](attribute-usage.md) | `strict_attribute_usage` | `audit_attribute_usage` | A declared attribute/marker type must (or must not) appear in a declared layer/namespace/project/assembly. |
-| [Inheritance](inheritance.md) | `strict_inheritance` | `audit_inheritance` | Types in a declared source layer/namespace must not inherit (directly or transitively) from declared base types. |
-| [Interface implementation](interface-implementation.md) | `strict_interface_implementation` | `audit_interface_implementation` | Implementations of declared interfaces must reside only in (or never in) declared layers/namespaces/projects/assemblies. |
-| [Composition](composition.md) | `strict_composition` | `audit_composition` | Composition-root/service-locator API calls must be confined to a declared composition boundary. |
-| [Coverage contracts](coverage.md) | `strict_coverage` | `audit_coverage` | First-party namespaces, discovered projects, and resolved assemblies must be modeled by layers, templates, or explicit exclusions. |
-| [Semantic port boundary](port-boundary.md) | `strict_port_boundaries` | `audit_port_boundaries` | Cross-context dependencies must use an approved port or anti-corruption seam. |
+Use the narrowest contract that expresses the architectural decision:
 
-## Strict or audit?
+- Choose dependency/allow-only contracts for named layer relationships.
+- Choose contextual contracts when the rule is naturally role/metadata based.
+- Choose a port boundary when a cross-context dependency is allowed only through an explicit seam.
+- Choose package/framework/project families for MSBuild/project governance rather than approximating those facts with namespaces.
+- Choose coverage in addition to behavioral rules so newly discovered architecture cannot remain ungoverned.
+- Use audit mode for migration discovery; promote to strict only when the rule is ready to block.
 
-Use strict contracts for rules that should be green on every pull request.
-
-Use audit contracts when you are discovering existing coupling, preparing a future architecture, or migrating an existing codebase. Audit output should be visible, but it should not be confused with a passing architecture gate.
-
-## Contract identity
-
-Add an explicit `id` when a contract will be referenced by CI, baseline files, documentation, or issue discussions:
-
-```yaml
-contracts:
-  strict:
-    - id: domain-not-infrastructure
-      name: domain-must-not-depend-on-infrastructure
-      source: domain
-      forbidden: [infrastructure]
-      reason: Domain code must remain independent of infrastructure.
-```
-
-When `id` is omitted, ArchLinterNet derives one from `name`, but explicit IDs are more stable for long-lived policies.
-
-## Unsupported rule types
-
-Do not invent YAML fields or contract families. ArchLinterNet validates only the contract families documented in this section and in the YAML schema.
-
-See [Supported capabilities and non-goals](../policy-format/supported-capabilities.md) before adding new policy concepts.
+For reusable inputs across many contracts, see `source_sets` in the [Policy format](../policy-format/index.md).
