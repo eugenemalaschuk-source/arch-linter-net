@@ -128,6 +128,7 @@ test-tooling-coverage:  ## Run all Python tooling tests with coverage (coverage-
 		tools/scripts/tests/test_check_dogfood_reference_evidence.py \
 		tools/scripts/tests/test_check_evergreen_docs.py \
 		tools/scripts/tests/test_check_evergreen_docs_edges.py \
+		tools/scripts/tests/test_check_public_docs_contract.py \
 		tools/scripts/tests/test_test_coverage_badge.py \
 		tools/scripts/tests/test_verify_core_unit_shards.py \
 		--cov=tools/release --cov=tools/scripts \
