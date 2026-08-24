@@ -64,7 +64,7 @@ The system SHALL NOT invoke restore or build during ordinary validation. When ar
 - **THEN** the system performs no restore, build, or network access and only inspects existing state
 
 ### Requirement: Explicit ensure-built preparation mode
-The system SHALL provide an opt-in preparation mode (CLI `--ensure-built` flag; Testing API `ArchitectureValidationBuilder.WithEnsureBuilt()`) that evaluates the selected graph without loading any selected target artifact that the graph build may replace, invokes the supported `dotnet build` path once for the whole graph using a structured executable and argument list (never a shell command string, never sourced from policy YAML, baseline, receipt, or cache content), stops distinctly on restore or build failure, and analyzes only artifacts verified after that build completes. This metadata-only-before-build ordering SHALL apply whether or not analysis caching is enabled. Preparation and subsequent project-aware analysis SHALL leave the verified selected primary outputs continuously coherent and consumable; a successful no-op verification SHALL NOT delete, rewrite, or temporarily make unavailable the selected assembly, PDB, or other verified primary artifact.
+The system SHALL provide an opt-in preparation mode (CLI `--ensure-built` flag; Testing API `ArchitectureValidationBuilder.WithEnsureBuilt()`) that evaluates the selected graph without loading any selected target artifact that the graph build may replace, invokes the supported `dotnet build` path once for the whole graph using a structured executable and argument list (never a shell command string, never sourced from policy YAML, baseline, receipt, or cache content), stops distinctly on restore or build failure, and analyzes only artifacts verified after that build completes. This metadata-only-before-build ordering SHALL apply whether or not analysis caching is enabled. Preparation and subsequent project-aware analysis SHALL leave the verified selected primary outputs continuously coherent and consumable; a successful no-op verification SHALL NOT delete, rewrite, or temporarily make unavailable the selected assembly, PDB, or other verified primary artifact. When a selected build input changes, preparation SHALL verify the replacement artifact and publish a receipt whose assembly digest equals that replacement artifact's content digest.
 
 #### Scenario: Ensure-built succeeds and validates
 - **WHEN** `--ensure-built` is passed against a project graph with valid sources but no prior build output
@@ -79,6 +79,12 @@ The system SHALL provide an opt-in preparation mode (CLI `--ensure-built` flag; 
   metadata preparation selects a Debug output while a newer Release output exists
 - **THEN** receipt refresh verifies and records the selected Debug output rather than substituting
   the newer Release artifact
+
+#### Scenario: Ensure-built replaces a stale selected output and binds its receipt
+- **WHEN** a selected output exists, a compiled input changes after it was built, and
+  `--ensure-built --no-restore` runs with restored prerequisites
+- **THEN** the graph build replaces the selected output, its content digest changes, and the
+  published receipt records that new content digest
 
 #### Scenario: Installed self-analysis can rebuild ArchLinterNet.Testing
 - **WHEN** an installed CLI runs `--ensure-built` against a self-analysis policy selecting `ArchLinterNet.Testing`

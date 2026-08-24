@@ -3,6 +3,7 @@ using System.IO.Compression;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using ArchLinterNet.Core.BuildState;
 using ArchLinterNet.Core.Resolution;
 using NUnit.Framework;
 
@@ -264,6 +265,11 @@ public sealed partial class CheckpointBReleaseGateTests
 
         public CheckpointScenarioResult AssertInstalledTestingOutputEnsureBuilt()
         {
+            if (!OperatingSystem.IsWindows())
+            {
+                return Passed("installed-testing-output-ensure-built-windows-only");
+            }
+
             string fixtureRoot = Path.Combine(_root, "installed-testing-output");
             Directory.CreateDirectory(fixtureRoot);
             File.WriteAllText(Path.Combine(fixtureRoot, "ArchLinterNet.Testing.csproj"), """
@@ -274,7 +280,8 @@ public sealed partial class CheckpointBReleaseGateTests
                   </PropertyGroup>
                 </Project>
                 """);
-            File.WriteAllText(Path.Combine(fixtureRoot, "TestingOutput.cs"), """
+            string sourcePath = Path.Combine(fixtureRoot, "TestingOutput.cs");
+            File.WriteAllText(sourcePath, """
                 namespace Disposable.ArchLinterNet.Testing;
 
                 public sealed class SmokeType
@@ -287,6 +294,7 @@ public sealed partial class CheckpointBReleaseGateTests
                 name: Installed Testing output ensure-built smoke
                 analysis:
                   target_assemblies: [ArchLinterNet.Testing]
+                  assembly_search_paths: [bin/Debug/net10.0]
                   projects: [ArchLinterNet.Testing.csproj]
                 """);
 
@@ -295,6 +303,11 @@ public sealed partial class CheckpointBReleaseGateTests
                 "restore", "ArchLinterNet.Testing.csproj", "--configfile", configPath, "--no-cache");
             CommandResult build = RunIsolatedDotnet(fixtureRoot,
                 "build", "ArchLinterNet.Testing.csproj", "--no-restore", "--nologo", "--verbosity", "quiet");
+
+            string assemblyPath = Path.Combine(fixtureRoot, "bin", "Debug", "net10.0", "ArchLinterNet.Testing.dll");
+            string beforeDigest = BuildStateCanonicalHasher.ComputeContentDigest(assemblyPath);
+            File.AppendAllText(sourcePath, "\npublic sealed class RebuiltSmokeType { }\n");
+            File.SetLastWriteTimeUtc(sourcePath, File.GetLastWriteTimeUtc(assemblyPath).AddSeconds(2));
             CommandResult result = RunTool(fixtureRoot,
                 "--policy", policyPath,
                 "--mode", "strict,audit",
@@ -303,8 +316,9 @@ public sealed partial class CheckpointBReleaseGateTests
                 "--no-restore",
                 "--configuration", "Debug");
 
-            string assemblyPath = Path.Combine(fixtureRoot, "bin", "Debug", "net10.0", "ArchLinterNet.Testing.dll");
+            string afterDigest = BuildStateCanonicalHasher.ComputeContentDigest(assemblyPath);
             string receiptPath = $"{assemblyPath}.archlinternet-receipt.json";
+            bool hasReceipt = BuildReceiptStore.TryRead(assemblyPath, out BuildReceiptV1? receipt);
             using JsonDocument document = JsonDocument.Parse(result.StandardOutput);
             JsonElement results = document.RootElement.GetProperty("results");
             Assert.Multiple(() =>
@@ -330,6 +344,10 @@ public sealed partial class CheckpointBReleaseGateTests
 
                 Assert.That(File.Exists(assemblyPath), Is.True, assemblyPath);
                 Assert.That(File.Exists(receiptPath), Is.True, receiptPath);
+                Assert.That(afterDigest, Is.Not.EqualTo(beforeDigest), "The selected Debug assembly was not rebuilt.");
+                Assert.That(hasReceipt, Is.True);
+                Assert.That(receipt, Is.Not.Null);
+                Assert.That(receipt!.AssemblyContentDigest, Is.EqualTo(afterDigest));
             });
             return Passed("installed-testing-output-ensure-built");
         }

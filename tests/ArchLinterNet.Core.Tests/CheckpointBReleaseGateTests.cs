@@ -47,7 +47,6 @@ public sealed partial class CheckpointBReleaseGateTests
             candidate.AssertPackageProvenance(),
             candidate.AssertOfflineSchemaRegistry(),
             candidate.AssertExternalTestingConsumer(),
-            candidate.AssertInstalledTestingOutputEnsureBuilt(),
             AssertCleanCheckoutOracle(candidate),
             candidate.AssertGenericCiNeutralInvocation(),
             candidate.AssertDocumentedEntrypoint(),
@@ -56,6 +55,15 @@ public sealed partial class CheckpointBReleaseGateTests
         scenarios.AddRange(candidate.ShellScenarios());
         scenarios.Add(candidate.AssertCliInFlightCancellation());
         candidate.WriteShardEvidence("package-and-entrypoints", scenarios);
+    }
+
+    [Test]
+    [Platform("Win")]
+    public void PackedCandidate_EnsureBuiltReplacesTestingOutput()
+    {
+        CandidatePackageFeed candidate = Candidate;
+        candidate.WriteShardEvidence("ensure-built-replaces-testing-output",
+            [candidate.AssertInstalledTestingOutputEnsureBuilt()]);
     }
 
     [Test]

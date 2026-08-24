@@ -245,7 +245,7 @@ public sealed class BuildStatePreparationService : IBuildStatePreparationService
         };
     }
 
-    private static string? ResolveBuiltAssemblyPath(
+    internal static string? ResolveBuiltAssemblyPath(
         BuildStatePreflightRequest request,
         ArchitectureDiscoveredProject project,
         string? projectDirectory)
@@ -274,12 +274,10 @@ public sealed class BuildStatePreparationService : IBuildStatePreparationService
             request.RequestedRuntimeIdentifier);
     }
 
-    private static bool IsProjectOutput(string projectDirectory, string assemblyName, string path)
+    internal static bool IsProjectOutput(string projectDirectory, string assemblyName, string path)
     {
         string outputDirectory = Path.GetFullPath(Path.Combine(projectDirectory, "bin"));
-        string outputPrefix = Path.EndsInDirectorySeparator(outputDirectory)
-            ? outputDirectory
-            : outputDirectory + Path.DirectorySeparatorChar;
+        string outputPrefix = Path.TrimEndingDirectorySeparator(outputDirectory) + Path.DirectorySeparatorChar;
         return File.Exists(path)
             && string.Equals(Path.GetFileNameWithoutExtension(path), assemblyName, StringComparison.Ordinal)
             && Path.GetFullPath(path).StartsWith(outputPrefix, StringComparison.OrdinalIgnoreCase);
