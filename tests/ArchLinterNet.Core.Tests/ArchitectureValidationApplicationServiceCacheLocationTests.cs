@@ -351,7 +351,8 @@ public sealed partial class ArchitectureValidationApplicationServiceCacheLocatio
         var document = CreateDocument();
         document.Analysis.TargetAssemblies = ["Fixture"];
         string projectPath = Path.Combine("/fake/repository/root", "fixture", "Fixture.csproj");
-        string rebuiltPath = Path.Combine("/fake/repository/root", "fixture", "bin", "Release", "net10.0", "Fixture.dll");
+        string rebuiltPath = Path.GetFullPath(Path.Combine(
+            "/fake/repository/root", "fixture", "bin", "Release", "net10.0", "Fixture.dll"));
         var discovery = new ProjectDiscoveryResult(
             ["Fixture"], Array.Empty<string>(), Array.Empty<string>(),
             [new ArchitectureProjectDiscoveryDiagnostic(
