@@ -1,4 +1,6 @@
 using System.Globalization;
+using System.Reflection;
+using System.Security.Cryptography;
 using System.Text;
 using ArchLinterNet.Core.Contracts;
 using ArchLinterNet.Core.History;
@@ -295,6 +297,82 @@ public sealed class HistoryCanonicalJsonTests
             Assert.That(candidates, Does.Contain("\"qualifyingEdges\""));
             Assert.That(candidates, Does.Contain("\"significanceThreshold\": 0.000000000"));
         });
+    }
+
+    [Test]
+    public void SectionedProjectionRetainsTheRepresentativeV1ByteGolden()
+    {
+        using GitTestRepository repository = GitTestRepository.Create();
+        repository.Write("src/A.cs", "one\n");
+        repository.Write("src/B.cs", "one\n");
+        string first = repository.Commit("base");
+        repository.Write("src/A.cs", "one\ntwo\n");
+        repository.Write("src/B.cs", "one\ntwo\n");
+        repository.Commit("co-change #11");
+        repository.Move("src/A.cs", "src/RenamedA.cs");
+        repository.Write("src/B.cs", "one\ntwo\nthree\n");
+        string last = repository.Commit("rename and co-change #22");
+        var configuration = new HistoryAnalysisConfiguration
+        {
+            Thresholds = new HistoryAnalysisThresholds { CoChangeSignificance = 0m },
+        };
+        HistoryIngestionResult result = WithEnrichment(
+            HistoryIngestionFixture.Succeed(repository, first, last, configuration),
+            new HistoryEnrichmentProjection(
+                HistoryEnrichmentStatus.Available,
+                context: [new HistoryEnrichmentContext("project", "ArchLinterNet")]));
+
+        string json = HistoryIngestionJsonWriter.Write(result);
+        string digest = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(json)));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(json, Does.Contain("\"historyAnalysisConfiguration\""));
+            Assert.That(json, Does.Contain("\"commits\": ["));
+            Assert.That(json, Does.Contain("\"status\": \"accepted\""));
+            Assert.That(json, Does.Contain("\"logicalFiles\": ["));
+            Assert.That(json, Does.Contain("\"hotspotGroups\": ["));
+            Assert.That(json, Does.Contain("\"coChangeGraph\": {"));
+            Assert.That(json, Does.Contain("\"bottleneckGroups\": ["));
+            Assert.That(json, Does.Contain("\"ocpGroups\": ["));
+            Assert.That(json, Does.Contain("\"status\": \"available\""));
+            Assert.That(json, Does.Contain("\"kind\": \"co_change_cluster\""));
+            Assert.That(json, Does.Contain("\"kind\": \"bottleneck\""));
+            Assert.That(json, Does.Contain("\"kind\": \"ocp_pressure\""));
+            Assert.That(digest, Is.EqualTo("90801472717A67A055E6CBB6263E7A3F59FFB38E7D67344CF5C5A50E91694883"));
+        });
+    }
+
+    [Test]
+    public void CanonicalJsonCompositionRetainsTheV1SectionOrderAndSmallMethodSurface()
+    {
+        using GitTestRepository repository = GitTestRepository.Create();
+        repository.Write("a.txt", "one\n");
+        string first = repository.Commit("first");
+        repository.Write("a.txt", "one\ntwo\n");
+        string last = repository.Commit("second #1");
+
+        string json = HistoryIngestionJsonWriter.Write(HistoryIngestionFixture.Succeed(repository, first, last));
+        int previousIndex = -1;
+        foreach (string propertyName in new[]
+        {
+            "schemaVersion", "kind", "historySemanticsVersion", "toolVersion", "analysis", "commits",
+            "renameCandidates", "renameComponents", "logicalFiles", "hotspotGroups", "coChangeGraph",
+            "bottleneckGroups", "ocpGroups", "enrichment", "candidates",
+        })
+        {
+            int currentIndex = json.IndexOf($"\"{propertyName}\"", StringComparison.Ordinal);
+            Assert.That(currentIndex, Is.GreaterThan(previousIndex), propertyName);
+            previousIndex = currentIndex;
+        }
+
+        string[] methodNames = typeof(HistoryIngestionJsonWriter)
+            .GetMethods(BindingFlags.DeclaredOnly | BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Static)
+            .Select(static method => method.Name)
+            .OrderBy(static name => name, StringComparer.Ordinal)
+            .ToArray();
+
+        Assert.That(methodNames, Is.EqualTo(new[] { "ToolVersion", nameof(HistoryIngestionJsonWriter.Write) }));
     }
 
     [Test]
