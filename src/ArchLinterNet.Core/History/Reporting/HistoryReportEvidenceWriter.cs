@@ -97,7 +97,7 @@ internal static class HistoryReportEvidenceWriter
             writer.BeginArray("candidateIndexes");
             foreach (RenameCandidate candidate in component.Candidates)
             {
-                writer.WriteNumberElement(IndexOf(result.RenameCandidates, candidate));
+                writer.WriteNumberElement(HistoryReportProjectionHelpers.IndexOfReference(result.RenameCandidates, candidate));
             }
 
             writer.EndArray();
@@ -145,16 +145,4 @@ internal static class HistoryReportEvidenceWriter
         writer.EndArray();
     }
 
-    private static int IndexOf(IReadOnlyList<RenameCandidate> candidates, RenameCandidate candidate)
-    {
-        for (int index = 0; index < candidates.Count; index++)
-        {
-            if (ReferenceEquals(candidates[index], candidate))
-            {
-                return index;
-            }
-        }
-
-        return -1;
-    }
 }

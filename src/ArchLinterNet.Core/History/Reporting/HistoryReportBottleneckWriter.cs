@@ -26,23 +26,6 @@ internal static class HistoryReportBottleneckWriter
         writer.EndArray();
     }
 
-    internal static void WriteTaskPair(CanonicalJsonWriter writer, BottleneckTaskPair pair)
-    {
-        writer.BeginObject();
-        HistoryReportProjectionHelpers.WriteTaskKey(writer, "firstTask", pair.First);
-        HistoryReportProjectionHelpers.WriteTaskKey(writer, "secondTask", pair.Second);
-        WriteInterval(writer, "firstInterval", pair.FirstInterval);
-        WriteInterval(writer, "secondInterval", pair.SecondInterval);
-        writer.WriteIntegerText("gapSeconds", pair.GapSeconds.ToString(System.Globalization.CultureInfo.InvariantCulture));
-        writer.WriteIntegerText("daysBetween", pair.DaysBetween.ToString(System.Globalization.CultureInfo.InvariantCulture));
-        writer.WriteCanonicalDecimal("temporalProximity", pair.TemporalProximity);
-        HistoryReportProjectionHelpers.WriteStringArray(writer, "firstExclusiveCommitIds", pair.FirstExclusiveCommitIds);
-        HistoryReportProjectionHelpers.WriteStringArray(writer, "secondExclusiveCommitIds", pair.SecondExclusiveCommitIds);
-        WriteProvenance(writer, "firstProvenance", pair.FirstProvenance);
-        WriteProvenance(writer, "secondProvenance", pair.SecondProvenance);
-        writer.EndObject();
-    }
-
     private static void WriteFinding(CanonicalJsonWriter writer, HistoryBottleneckFinding finding)
     {
         writer.BeginObject();
@@ -70,7 +53,7 @@ internal static class HistoryReportBottleneckWriter
         writer.BeginArray("independentTaskPairs");
         foreach (BottleneckTaskPair pair in finding.RawEvidence.IndependentTaskPairs)
         {
-            WriteTaskPair(writer, pair);
+            HistoryReportProjectionHelpers.WriteTaskPair(writer, pair);
         }
 
         writer.EndArray();
@@ -101,28 +84,4 @@ internal static class HistoryReportBottleneckWriter
         writer.EndObject();
     }
 
-    private static void WriteInterval(CanonicalJsonWriter writer, string propertyName, BottleneckTaskInterval interval)
-    {
-        writer.BeginObject(propertyName);
-        writer.WriteIntegerText("startEpochSecond", interval.StartEpochSecond.ToString(System.Globalization.CultureInfo.InvariantCulture));
-        writer.WriteIntegerText("endEpochSecond", interval.EndEpochSecond.ToString(System.Globalization.CultureInfo.InvariantCulture));
-        writer.EndObject();
-    }
-
-    private static void WriteProvenance(CanonicalJsonWriter writer, string propertyName, IReadOnlyList<BottleneckTaskProvenance> provenance)
-    {
-        writer.BeginArray(propertyName);
-        foreach (BottleneckTaskProvenance item in provenance)
-        {
-            writer.BeginObject();
-            writer.WriteString("commitId", item.CommitId);
-            writer.WriteString("extractorId", item.Match.ExtractorId);
-            writer.WriteNumber("spanStart", item.Match.SpanStart);
-            writer.WriteNumber("spanEnd", item.Match.SpanEnd);
-            writer.WriteString("text", item.Match.MatchedText);
-            writer.EndObject();
-        }
-
-        writer.EndArray();
-    }
 }

@@ -31,7 +31,7 @@ internal static class HistoryReportCoChangeWriter
             writer.BeginArray("renameComponentIndexes");
             foreach (RenameComponent component in vertex.RenameComponents)
             {
-                writer.WriteNumberElement(IndexOf(result.RenameComponents, component));
+                writer.WriteNumberElement(HistoryReportProjectionHelpers.IndexOfReference(result.RenameComponents, component));
             }
 
             writer.EndArray();
@@ -112,16 +112,4 @@ internal static class HistoryReportCoChangeWriter
         writer.EndObject();
     }
 
-    private static int IndexOf(IReadOnlyList<RenameComponent> components, RenameComponent component)
-    {
-        for (int index = 0; index < components.Count; index++)
-        {
-            if (ReferenceEquals(components[index], component))
-            {
-                return index;
-            }
-        }
-
-        return -1;
-    }
 }

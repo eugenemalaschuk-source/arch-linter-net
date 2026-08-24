@@ -61,7 +61,7 @@ internal static class HistoryReportOcpWriter
         writer.BeginArray("independentTaskPairs");
         foreach (BottleneckTaskPair pair in finding.RawEvidence.IndependentTaskPairs)
         {
-            HistoryReportBottleneckWriter.WriteTaskPair(writer, pair);
+            HistoryReportProjectionHelpers.WriteTaskPair(writer, pair);
         }
 
         writer.EndArray();
