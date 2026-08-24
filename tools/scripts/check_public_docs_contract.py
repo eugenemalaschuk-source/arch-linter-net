@@ -169,22 +169,19 @@ def nav_contract_pages(root: Path) -> set[str]:
 
 
 def indexed_contract_pages(root: Path) -> set[str]:
+    """Return contract-reference pages linked from the family table.
+
+    The index also links to policy-format guidance outside docs/contracts. Only
+    basename Markdown targets are contract family reference pages and therefore
+    belong in the Contracts navigation section.
+    """
     text = read_text(root, CONTRACT_INDEX)
     pages: set[str] = set()
-    for target in re.findall(r"\]\(([^)]+\.md)\)", text):
-        if "://" in target or target.startswith("/"):
-            continue
-        resolved = (root / "docs" / "contracts" / target).resolve()
-        contracts_root = (root / "docs" / "contracts").resolve()
-        try:
-            relative = resolved.relative_to(contracts_root)
-        except ValueError as exc:
-            raise ValueError(
-                f"{CONTRACT_INDEX}: contract reference escapes docs/contracts: {target}"
-            ) from exc
+    for target in re.findall(r"\]\(([A-Za-z0-9_-]+\.md)\)", text):
+        resolved = root / "docs" / "contracts" / target
         if not resolved.is_file():
             raise ValueError(f"{CONTRACT_INDEX}: linked contract page is missing: {target}")
-        pages.add(f"contracts/{relative.as_posix()}")
+        pages.add(f"contracts/{target}")
     return pages
 
 
