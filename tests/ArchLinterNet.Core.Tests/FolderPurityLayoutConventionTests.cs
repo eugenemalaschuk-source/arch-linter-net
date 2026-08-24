@@ -12,6 +12,18 @@ public sealed class FolderPurityLayoutConventionTests
 {
     private string _tempDir = null!;
 
+    private static readonly string[] _expectedAbstractionsPurityViolationSourceTypes =
+    {
+        "LayoutConventionContractTestFixtures.FolderPurity.Abstractions.ConcreteOrderPort",
+        "LayoutConventionContractTestFixtures.FolderPurity.Abstractions.ValueOrderPort",
+    };
+
+    private static readonly string[] _expectedExceptionsPurityViolationSourceTypes =
+    {
+        "LayoutConventionContractTestFixtures.FolderPurity.Exceptions.IncorrectExceptionRecord",
+        "LayoutConventionContractTestFixtures.FolderPurity.Exceptions.IIncorrectException",
+    };
+
     [SetUp]
     public void SetUp()
     {
@@ -52,11 +64,7 @@ public sealed class FolderPurityLayoutConventionTests
 
         List<ArchitectureViolation> violations = Check(contract);
 
-        Assert.That(violations.Select(violation => violation.SourceType), Is.EquivalentTo(new[]
-        {
-            "LayoutConventionContractTestFixtures.FolderPurity.Abstractions.ConcreteOrderPort",
-            "LayoutConventionContractTestFixtures.FolderPurity.Abstractions.ValueOrderPort",
-        }));
+        Assert.That(violations.Select(violation => violation.SourceType), Is.EquivalentTo(_expectedAbstractionsPurityViolationSourceTypes));
         LayoutConventionPayload payload = (LayoutConventionPayload)violations.Single(
             violation => violation.SourceType.EndsWith("ConcreteOrderPort", StringComparison.Ordinal)).Payload!;
         Assert.Multiple(() =>
@@ -84,11 +92,7 @@ public sealed class FolderPurityLayoutConventionTests
 
         List<ArchitectureViolation> violations = Check(contract);
 
-        Assert.That(violations.Select(violation => violation.SourceType), Is.EquivalentTo(new[]
-        {
-            "LayoutConventionContractTestFixtures.FolderPurity.Exceptions.IncorrectExceptionRecord",
-            "LayoutConventionContractTestFixtures.FolderPurity.Exceptions.IIncorrectException",
-        }));
+        Assert.That(violations.Select(violation => violation.SourceType), Is.EquivalentTo(_expectedExceptionsPurityViolationSourceTypes));
         Assert.That(violations.All(violation => violation.Payload is LayoutConventionPayload
         {
             ActualRole: "unclassified",

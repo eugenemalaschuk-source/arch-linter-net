@@ -8,6 +8,9 @@ namespace ArchLinterNet.Core.Tests.History;
 [TestFixture]
 public sealed class HistoryRangeAndFileEventTests
 {
+    private static readonly string[] _aTxtAndBTxtCanonicalPaths = { "a.txt", "b.txt" };
+    private static readonly string[] _modifyDeleteAddKinds = { "modify", "delete", "add" };
+
     [Test]
     public void AnEmptyRangeSucceedsWithExplicitEmptyEvidence()
     {
@@ -41,7 +44,7 @@ public sealed class HistoryRangeAndFileEventTests
 
         Assert.That(result.Commits.Count, Is.EqualTo(3));
         Assert.That(result.ExcludedMergeCount, Is.EqualTo(1));
-        Assert.That(result.LogicalFiles.Select(static file => file.CanonicalPath), Is.EqualTo(new[] { "a.txt", "b.txt" }));
+        Assert.That(result.LogicalFiles.Select(static file => file.CanonicalPath), Is.EqualTo(_aTxtAndBTxtCanonicalPaths));
         Assert.That(HistoryIngestionFixture.File(result, "b.txt").CommitCount, Is.EqualTo(1));
     }
 
@@ -100,7 +103,7 @@ public sealed class HistoryRangeAndFileEventTests
         LogicalFile file = HistoryIngestionFixture.File(result, "src/X.cs");
         Assert.That(result.LogicalFiles.Count, Is.EqualTo(1));
         Assert.That(file.CommitCount, Is.EqualTo(3));
-        Assert.That(file.Events.Select(static fileEvent => fileEvent.KindText), Is.EqualTo(new[] { "modify", "delete", "add" }));
+        Assert.That(file.Events.Select(static fileEvent => fileEvent.KindText), Is.EqualTo(_modifyDeleteAddKinds));
     }
 
     [Test]

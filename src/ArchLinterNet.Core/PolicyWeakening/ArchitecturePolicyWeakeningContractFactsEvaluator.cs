@@ -68,17 +68,8 @@ internal static class ArchitecturePolicyWeakeningContractFactsEvaluator
             return;
         }
 
-        findings.Add(CreateFinding(
-            "prohibition_removed",
-            ControlIdentity(baseContract) + ":" + comparison.FactName,
-            "semantic",
-            severity,
-            removed,
-            comparison.CurrentValues,
-            baseContract.Provenance,
-            currentContract.Provenance,
-            Array.Empty<string>(),
-            currentContract.Reason ?? baseContract.Reason));
+        findings.Add(CreateSemanticFinding(
+            "prohibition_removed", comparison.FactName, severity, baseContract, currentContract, removed, comparison.CurrentValues));
     }
 
     private static void AddPermissionBroadenedFinding(
@@ -99,17 +90,8 @@ internal static class ArchitecturePolicyWeakeningContractFactsEvaluator
             return;
         }
 
-        findings.Add(CreateFinding(
-            "permission_broadened",
-            ControlIdentity(baseContract) + ":" + comparison.FactName,
-            "semantic",
-            severity,
-            comparison.BaseValues,
-            added,
-            baseContract.Provenance,
-            currentContract.Provenance,
-            Array.Empty<string>(),
-            currentContract.Reason ?? baseContract.Reason));
+        findings.Add(CreateSemanticFinding(
+            "permission_broadened", comparison.FactName, severity, baseContract, currentContract, comparison.BaseValues, added));
     }
 
     private static void AddScopeNarrowedFinding(
@@ -130,17 +112,8 @@ internal static class ArchitecturePolicyWeakeningContractFactsEvaluator
             return;
         }
 
-        findings.Add(CreateFinding(
-            "scope_inventory_narrowed",
-            ControlIdentity(baseContract) + ":" + comparison.FactName,
-            "semantic",
-            severity,
-            removed,
-            comparison.CurrentValues,
-            baseContract.Provenance,
-            currentContract.Provenance,
-            Array.Empty<string>(),
-            currentContract.Reason ?? baseContract.Reason));
+        findings.Add(CreateSemanticFinding(
+            "scope_inventory_narrowed", comparison.FactName, severity, baseContract, currentContract, removed, comparison.CurrentValues));
     }
 
     private static void AddProhibitionRemovedFlagFinding(
@@ -156,18 +129,28 @@ internal static class ArchitecturePolicyWeakeningContractFactsEvaluator
             return;
         }
 
-        findings.Add(CreateFinding(
-            "prohibition_removed",
-            ControlIdentity(baseContract) + ":" + comparison.FactName,
-            "semantic",
-            severity,
-            ["true"],
-            ["false"],
-            baseContract.Provenance,
-            currentContract.Provenance,
-            Array.Empty<string>(),
-            currentContract.Reason ?? baseContract.Reason));
+        findings.Add(CreateSemanticFinding(
+            "prohibition_removed", comparison.FactName, severity, baseContract, currentContract, ["true"], ["false"]));
     }
+
+    private static ArchitecturePolicyWeakeningFinding CreateSemanticFinding(
+        string kind,
+        string identitySuffix,
+        string severity,
+        ArchitecturePolicyContextContract baseContract,
+        ArchitecturePolicyContextContract currentContract,
+        IReadOnlyList<string> baseValues,
+        IReadOnlyList<string> currentValues) => CreateFinding(
+        kind,
+        ControlIdentity(baseContract) + ":" + identitySuffix,
+        "semantic",
+        severity,
+        baseValues,
+        currentValues,
+        baseContract.Provenance,
+        currentContract.Provenance,
+        Array.Empty<string>(),
+        currentContract.Reason ?? baseContract.Reason);
 
     private sealed record FactComparison(
         string FactName,

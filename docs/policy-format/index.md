@@ -86,16 +86,27 @@ The complete current inventory is in [Contract families](../contracts/index.md).
 Coverage is a normal contract family (`strict_coverage` / `audit_coverage`) with six implemented scopes:
 
 <!-- coverage-scope: namespace -->
+
 - `namespace`
+
 <!-- coverage-scope: project -->
+
 - `project`
+
 <!-- coverage-scope: assembly -->
+
 - `assembly`
+
 <!-- coverage-scope: dependency_edge -->
+
 - `dependency_edge`
+
 <!-- coverage-scope: rule_input -->
+
 - `rule_input`
+
 <!-- coverage-scope: semantic_role -->
+
 - `semantic_role`
 
 Use coverage to make policy omissions visible: unmapped first-party namespaces/projects/assemblies, ungoverned observed dependency edges, stale or unresolved rule inputs, and semantic roles not covered by selector-backed/contextual governance.
@@ -129,8 +140,8 @@ For base/current review, compare exported contexts with `policy weakening`. For 
 When two descriptions disagree, use this precedence:
 
 1. executable CLI/runtime validators and policy schema;
-2. `archlinternet.capabilities.json`;
-3. mechanically checked public references;
-4. handwritten guides and examples.
+1. `archlinternet.capabilities.json`;
+1. mechanically checked public references;
+1. handwritten guides and examples.
 
 A public documentation discrepancy is a defect; it should not be resolved by changing runtime behavior merely to preserve stale prose.

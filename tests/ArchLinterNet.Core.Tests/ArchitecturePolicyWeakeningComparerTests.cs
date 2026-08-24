@@ -89,15 +89,7 @@ public sealed class ArchitecturePolicyWeakeningComparerTests
 
         ArchitecturePolicyWeakeningResult result = ArchitecturePolicyWeakeningComparer.Compare(new(baseline, current));
 
-        Assert.That(result.Findings.Select(finding => finding.Kind), Is.EquivalentTo(new[]
-        {
-            "analysis_project_exclude_impact_not_proven",
-            "analysis_projects_impact_not_proven",
-            "scope_inventory_narrowed",
-            "source_set_member_removed",
-            "typed_fact_impact_not_proven",
-            "typed_fact_impact_not_proven",
-        }));
+        Assert.That(result.Findings.Select(finding => finding.Kind), Is.EquivalentTo(_staticScopeAndPredicateChangeFindingKinds));
     }
 
     [Test]
@@ -126,12 +118,7 @@ public sealed class ArchitecturePolicyWeakeningComparerTests
 
         ArchitecturePolicyWeakeningResult result = ArchitecturePolicyWeakeningComparer.Compare(new(baseline, current));
 
-        Assert.That(result.Findings.Select(finding => finding.Kind), Is.EquivalentTo(new[]
-        {
-            "effective_source_removed",
-            "source_exclusion_added",
-            "universal_exception_added",
-        }));
+        Assert.That(result.Findings.Select(finding => finding.Kind), Is.EquivalentTo(_matchedSubtractionAndUniversalIgnoreFindingKinds));
         Assert.That(result.Findings.All(finding => finding.Classification == "semantic"), Is.True);
     }
 
@@ -171,8 +158,8 @@ public sealed class ArchitecturePolicyWeakeningComparerTests
         {
             Assert.That(finding.Kind, Is.EqualTo("source_set_made_optional"));
             Assert.That(finding.Classification, Is.EqualTo("semantic"));
-            Assert.That(finding.BaseValues, Is.EqualTo(new[] { "required" }));
-            Assert.That(finding.CurrentValues, Is.EqualTo(new[] { "optional" }));
+            Assert.That(finding.BaseValues, Is.EqualTo(_requiredValue));
+            Assert.That(finding.CurrentValues, Is.EqualTo(_optionalValue));
         });
     }
 
@@ -192,8 +179,8 @@ public sealed class ArchitecturePolicyWeakeningComparerTests
         {
             Assert.That(finding.Kind, Is.EqualTo("source_expansion_made_empty_tolerant"));
             Assert.That(finding.Classification, Is.EqualTo("semantic"));
-            Assert.That(finding.BaseValues, Is.EqualTo(new[] { "required" }));
-            Assert.That(finding.CurrentValues, Is.EqualTo(new[] { "optional_empty" }));
+            Assert.That(finding.BaseValues, Is.EqualTo(_requiredValue));
+            Assert.That(finding.CurrentValues, Is.EqualTo(_optionalEmptyValue));
         });
     }
 
@@ -206,11 +193,7 @@ public sealed class ArchitecturePolicyWeakeningComparerTests
 
         Assert.Multiple(() =>
         {
-            Assert.That(result.Findings.Select(finding => finding.Kind), Is.EquivalentTo(new[]
-            {
-                "analysis_project_exclude_impact_not_proven",
-                "analysis_project_include_impact_not_proven",
-            }));
+            Assert.That(result.Findings.Select(finding => finding.Kind), Is.EquivalentTo(_projectGlobChangeFindingKinds));
             Assert.That(result.Findings.All(finding => finding.Classification == "impact_not_proven"), Is.True);
         });
     }
@@ -261,11 +244,7 @@ public sealed class ArchitecturePolicyWeakeningComparerTests
             Context(contracts: [baseline]),
             Context(contracts: [current])));
 
-        Assert.That(result.Findings.Select(finding => finding.Kind), Is.EquivalentTo(new[]
-        {
-            "required_input_made_optional",
-            "required_layer_made_optional",
-        }));
+        Assert.That(result.Findings.Select(finding => finding.Kind), Is.EquivalentTo(_requiredTemplateLayerAndCoverageInputFindingKinds));
     }
 
     [Test]
@@ -307,8 +286,8 @@ public sealed class ArchitecturePolicyWeakeningComparerTests
         {
             Assert.That(finding.Kind, Is.EqualTo("prohibition_removed"));
             Assert.That(finding.Classification, Is.EqualTo("semantic"));
-            Assert.That(finding.BaseValues, Is.EqualTo(new[] { "true" }));
-            Assert.That(finding.CurrentValues, Is.EqualTo(new[] { "false" }));
+            Assert.That(finding.BaseValues, Is.EqualTo(_trueValue));
+            Assert.That(finding.CurrentValues, Is.EqualTo(_falseValue));
         });
     }
 
@@ -474,7 +453,7 @@ public sealed class ArchitecturePolicyWeakeningComparerTests
         {
             Assert.That(finding.Kind, Is.EqualTo("selector_scope_reduced"));
             Assert.That(finding.Classification, Is.EqualTo("semantic"));
-            Assert.That(finding.AffectedSubjects, Is.EqualTo(new[] { "Sample.Api:Sample.Api.LegacyContract" }));
+            Assert.That(finding.AffectedSubjects, Is.EqualTo(_legacyContractSubject));
         });
     }
 
@@ -530,13 +509,7 @@ public sealed class ArchitecturePolicyWeakeningComparerTests
 
         Assert.Multiple(() =>
         {
-            Assert.That(result.Findings.Select(finding => finding.Kind), Is.EqualTo(new[]
-            {
-                "analysis_projects_impact_not_proven",
-                "source_exclusion_added",
-                "source_set_member_removed",
-                "strict_to_audit",
-            }));
+            Assert.That(result.Findings.Select(finding => finding.Kind), Is.EqualTo(_crossFamilyFindingKinds));
             Assert.That(result.Findings.Count(finding => finding.Identity == exclusionFinding.Identity), Is.EqualTo(1));
             Assert.That(human, Does.Contain("[source_exclusion_added] source_expansion:expansion-control"));
             Assert.That(jsonFinding.GetProperty("identity").GetString(), Is.EqualTo(exclusionFinding.Identity));
@@ -625,4 +598,53 @@ public sealed class ArchitecturePolicyWeakeningComparerTests
 
     private static readonly ArchitecturePolicyContextProvenance _importedProvenance = new(
         "architecture/policy/contracts.yml", "architecture/policy.yml", "fragment", "contracts.strict[0]", 1);
+
+    private static readonly string[] _staticScopeAndPredicateChangeFindingKinds =
+    [
+        "analysis_project_exclude_impact_not_proven",
+        "analysis_projects_impact_not_proven",
+        "scope_inventory_narrowed",
+        "source_set_member_removed",
+        "typed_fact_impact_not_proven",
+        "typed_fact_impact_not_proven",
+    ];
+
+    private static readonly string[] _matchedSubtractionAndUniversalIgnoreFindingKinds =
+    [
+        "effective_source_removed",
+        "source_exclusion_added",
+        "universal_exception_added",
+    ];
+
+    private static readonly string[] _requiredValue = ["required"];
+
+    private static readonly string[] _optionalValue = ["optional"];
+
+    private static readonly string[] _optionalEmptyValue = ["optional_empty"];
+
+    private static readonly string[] _projectGlobChangeFindingKinds =
+    [
+        "analysis_project_exclude_impact_not_proven",
+        "analysis_project_include_impact_not_proven",
+    ];
+
+    private static readonly string[] _requiredTemplateLayerAndCoverageInputFindingKinds =
+    [
+        "required_input_made_optional",
+        "required_layer_made_optional",
+    ];
+
+    private static readonly string[] _trueValue = ["true"];
+
+    private static readonly string[] _falseValue = ["false"];
+
+    private static readonly string[] _legacyContractSubject = ["Sample.Api:Sample.Api.LegacyContract"];
+
+    private static readonly string[] _crossFamilyFindingKinds =
+    [
+        "analysis_projects_impact_not_proven",
+        "source_exclusion_added",
+        "source_set_member_removed",
+        "strict_to_audit",
+    ];
 }
