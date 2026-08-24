@@ -39,7 +39,7 @@ internal static class HistoryReportCandidateWriter
 
     private static void WriteHotspot(CanonicalJsonWriter writer, HotspotFinding finding)
     {
-        string sourceId = HistoryIngestionJsonWriter.FindingId("hotspot", finding.Category, finding.CanonicalPath);
+        string sourceId = HistoryReportProjectionHelpers.FindingId("hotspot", finding.Category, finding.CanonicalPath);
         Start(writer, "hotspot", sourceId, [finding.CanonicalPath]);
         writer.BeginObject("qualification");
         writer.WriteCanonicalDecimal("score", finding.Score);
@@ -58,7 +58,7 @@ internal static class HistoryReportCandidateWriter
 
     private static void WriteCluster(CanonicalJsonWriter writer, CoChangeCluster cluster, decimal threshold)
     {
-        string sourceId = HistoryIngestionJsonWriter.ClusterId(cluster);
+        string sourceId = HistoryReportProjectionHelpers.ClusterId(cluster);
         string[] members = [.. cluster.Members.Select(static item => item.CanonicalPath)];
         Start(writer, "co_change_cluster", sourceId, members);
         writer.BeginObject("qualification");
@@ -83,7 +83,7 @@ internal static class HistoryReportCandidateWriter
 
     private static void WriteBottleneck(CanonicalJsonWriter writer, HistoryBottleneckFinding finding)
     {
-        string sourceId = HistoryIngestionJsonWriter.FindingId("bottleneck", finding.Category, finding.CanonicalPath);
+        string sourceId = HistoryReportProjectionHelpers.FindingId("bottleneck", finding.Category, finding.CanonicalPath);
         Start(writer, "bottleneck", sourceId, [finding.CanonicalPath]);
         writer.BeginObject("qualification");
         writer.WriteCanonicalDecimal("score", finding.Score);
@@ -102,7 +102,7 @@ internal static class HistoryReportCandidateWriter
 
     private static void WriteOcpPressure(CanonicalJsonWriter writer, HistoryOcpFinding finding)
     {
-        string sourceId = HistoryIngestionJsonWriter.FindingId("ocp-pressure", finding.Category, finding.CanonicalPath);
+        string sourceId = HistoryReportProjectionHelpers.FindingId("ocp-pressure", finding.Category, finding.CanonicalPath);
         Start(writer, "ocp_pressure", sourceId, [finding.CanonicalPath]);
         writer.BeginObject("qualification");
         writer.WriteCanonicalDecimal("score", finding.Score);
