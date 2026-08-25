@@ -72,6 +72,27 @@ When `OutputFailed` is true after analysis completed, `CompletionStatus` still d
 
 Every phase also records `ProcessorTimeMs`, the process CPU-time delta measured during that phase. It is an environment-dependent measurement and can overlap for nested phases.
 
+## Deterministic consumer-shaped regression evidence (issue #654)
+
+[`RepeatedWorkRegressionEvidenceTests`](../../tests/ArchLinterNet.Core.Tests/RepeatedWorkRegressionEvidenceTests.cs)
+is the focused Core fixture for issue #654. It is synthetic and anonymized: one
+in-memory session represents 24 discovered projects, 16 repeated metadata-family
+contract checks, and two public-API checks against one already-loaded test
+assembly. The test asserts one project-metadata index, one assembly-name index,
+and one exported public-API surface materialization, together with the ordered
+canonical finding projection and strict/audit pass/fail outcomes. These internal
+session materialization counters and projections are the normative regression
+evidence for the consumer shape; they complement `analysis-profile/v1` and do
+not extend or alter its versioned schema. No `analysis-profile/v1` field exposes
+these internal counters.
+
+The fixture intentionally has no wall-clock or allocation thresholds. Timing and
+allocation observations are hardware-sensitive and are not a release contract.
+It is separate from the manually run `analysis-profile/v1` benchmark harnesses
+and from the broad large-solution benchmark program reserved for issue #502: it
+adds no benchmark scenarios, timing loops, generated artifacts, or performance
+baselines.
+
 ## Benchmark scenario IDs (see `docs/internal/analysis-profile-pre-optimization-baseline.md`)
 
 | Scenario ID | Measures |
