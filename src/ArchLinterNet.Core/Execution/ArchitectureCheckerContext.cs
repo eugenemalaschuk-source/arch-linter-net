@@ -60,8 +60,6 @@ internal sealed class ArchitectureCheckerContext
     public IEnumerable<string> ResolveProjectAssemblyNames(List<string> projectNames) =>
         _session.Facts.ResolveProjectAssemblyNames(projectNames);
 
-    public IReadOnlyDictionary<string, Assembly> BuildAssemblyLookup() => _session.Facts.BuildAssemblyLookup();
-
     public bool TryGetAssembly(string assemblyName, out Assembly assembly) =>
         _session.Facts.TryGetAssembly(assemblyName, out assembly!);
 

@@ -36,6 +36,41 @@ public sealed class ArchitectureSessionMetadataIndexesTests
         foreach (int index in Enumerable.Range(0, ContractCount))
         {
             string assemblyName = ProjectName(index);
+            List<ArchitectureViolation> frameworkViolations = session.CheckFrameworkDependencyContract(
+                new ArchitectureFrameworkReferenceContract
+                {
+                    Name = $"{assemblyName} framework check",
+                    Source = $"Missing{assemblyName}",
+                    Forbidden = new List<string> { "forbidden-framework" },
+                });
+
+            Assert.That(frameworkViolations, Is.Empty);
+        }
+
+        // Framework contracts are the first users of the project metadata facts. Keep this
+        // assertion before package and project-metadata checks so this test fails if the framework
+        // lookup regresses to a per-contract discovery scan instead of using the session index.
+        Assert.That(context.ProfilingCounters.SessionProjectMetadataIndexMaterializations, Is.EqualTo(1));
+
+        string testAssemblyName = typeof(ArchitectureSessionMetadataIndexesTests).Assembly.GetName().Name!;
+        foreach (int index in Enumerable.Range(0, ContractCount))
+        {
+            List<ArchitectureViolation> assemblyViolations = session.CheckAssemblyDependencyContract(
+                new ArchitectureAssemblyDependencyContract
+                {
+                    Name = $"assembly check {index:D2}",
+                    Source = testAssemblyName,
+                    Forbidden = new List<string> { testAssemblyName },
+                });
+
+            Assert.That(assemblyViolations, Is.Empty);
+        }
+
+        Assert.That(context.ProfilingCounters.SessionAssemblyIndexMaterializations, Is.EqualTo(1));
+
+        foreach (int index in Enumerable.Range(0, ContractCount))
+        {
+            string assemblyName = ProjectName(index);
             List<ArchitectureViolation> packageViolations = session.CheckPackageDependencyContract(
                 new ArchitecturePackageDependencyContract
                 {
@@ -66,17 +101,6 @@ public sealed class ArchitectureSessionMetadataIndexesTests
                 out ArchitectureDiscoveredProject? firstPathOwner),
             Is.True);
         Assert.That(firstPathOwner!.PackageReferences.Single().PackageId, Is.EqualTo("Forbidden.Package"));
-
-        string testAssemblyName = typeof(ArchitectureSessionMetadataIndexesTests).Assembly.GetName().Name!;
-        List<ArchitectureViolation> assemblyViolations = session.CheckAssemblyDependencyContract(
-            new ArchitectureAssemblyDependencyContract
-            {
-                Name = "self-reference is ignored",
-                Source = testAssemblyName,
-                Forbidden = new List<string> { testAssemblyName },
-            });
-
-        Assert.That(assemblyViolations, Is.Empty);
         Assert.That(context.ProfilingCounters.SessionProjectMetadataIndexMaterializations, Is.EqualTo(1));
         Assert.That(context.ProfilingCounters.SessionAssemblyIndexMaterializations, Is.EqualTo(1));
     }
@@ -111,6 +135,10 @@ public sealed class ArchitectureSessionMetadataIndexesTests
             Packages = new Dictionary<string, ArchitecturePackageGroup>
             {
                 ["forbidden"] = new ArchitecturePackageGroup { PackageIds = { "Forbidden.Package" } },
+            },
+            FrameworkReferences = new Dictionary<string, ArchitectureFrameworkReferenceGroup>
+            {
+                ["forbidden-framework"] = new ArchitectureFrameworkReferenceGroup(),
             },
             Contracts = new ArchitectureContractGroups(),
         };

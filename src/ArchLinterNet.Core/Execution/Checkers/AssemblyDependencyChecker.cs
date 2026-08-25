@@ -33,9 +33,7 @@ internal static class AssemblyDependencyChecker
     {
         List<ArchitectureViolation> violations = new();
 
-        IReadOnlyDictionary<string, Assembly> resolvedAssemblies = context.BuildAssemblyLookup();
-
-        if (!resolvedAssemblies.TryGetValue(contract.Source, out Assembly? sourceAssembly))
+        if (!context.TryGetAssembly(contract.Source, out Assembly? sourceAssembly))
         {
             return violations;
         }
@@ -85,9 +83,7 @@ internal static class AssemblyDependencyChecker
     {
         List<ArchitectureViolation> violations = new();
 
-        IReadOnlyDictionary<string, Assembly> resolvedAssemblies = context.BuildAssemblyLookup();
-
-        if (!resolvedAssemblies.TryGetValue(contract.Source, out Assembly? sourceAssembly))
+        if (!context.TryGetAssembly(contract.Source, out Assembly? sourceAssembly))
         {
             return violations;
         }
@@ -97,7 +93,7 @@ internal static class AssemblyDependencyChecker
         string[] disallowedReferences = sourceAssembly.GetReferencedAssemblies()
             .Select(name => name.Name ?? string.Empty)
             .Where(name => !string.IsNullOrEmpty(name))
-            .Where(resolvedAssemblies.ContainsKey)
+            .Where(name => context.TryGetAssembly(name, out _))
             .Where(name => !allowedNames.Contains(name))
             .Where(name => !executionContext.IsIgnored(
                 contract.Source,
