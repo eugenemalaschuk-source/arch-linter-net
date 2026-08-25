@@ -92,6 +92,39 @@ public sealed class ArchitectureRemediationHintTests
     }
 
     [Test]
+    public void FromViolation_PortBoundaryUnsupportedEvidence_RequestsPolicyInputRestoration()
+    {
+        ArchitectureRemediationHint hint = ArchitectureFindingMapper.FromViolation(
+            PortViolation("unsupported_evidence")).RemediationHint!;
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(hint.Category, Is.EqualTo(ArchitectureRemediationHintCategory.FixPolicyInput));
+            Assert.That(hint.Evidence.Single().Kind, Is.EqualTo("evidence_kind"));
+        });
+    }
+
+    [Test]
+    public void ForLayoutConvention_WithExpectedRolesOnly_CorrectsDeclaredClassification()
+    {
+        var diagnostic = new LayoutConventionDiagnostic(
+            "layout-roles", "layout-roles-id", "App.Feature.Widget", "App.Feature", ["App.Feature.WidgetFactory"])
+        {
+            ExpectedRoles = ["Factory", "Builder"],
+        };
+        var identity = Identity("layout-roles-id", "App.Feature.Widget");
+
+        ArchitectureRemediationHint hint = ArchitectureRemediationHintFactory.ForLayoutConvention(diagnostic, identity);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(hint.Category, Is.EqualTo(ArchitectureRemediationHintCategory.FixClassification));
+            Assert.That(hint.ExpectedSeamOrDirection, Is.EqualTo("Builder, Factory"));
+            Assert.That(hint.Evidence.Single().Kind, Is.EqualTo("expected_roles"));
+        });
+    }
+
+    [Test]
     public void FromDiagnostic_WithoutKnownDependencySeam_RequiresContractReviewInsteadOfInventingOne()
     {
         var diagnostic = new DependencyDiagnostic(

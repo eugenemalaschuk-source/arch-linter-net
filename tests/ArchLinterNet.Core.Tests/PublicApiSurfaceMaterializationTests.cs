@@ -71,7 +71,7 @@ public sealed class PublicApiSurfaceMaterializationTests
     {
         ArchitectureAnalysisSession session = CreateSession(CreateDocument(
             new ArchitecturePublicApiSurfaceContract(), new ArchitecturePublicApiSurfaceContract()));
-        Assembly syntheticAssembly = BuildSyntheticAssembly();
+        AssemblyBuilder syntheticAssembly = BuildSyntheticAssembly();
 
         session.GetPublicApiSurface(typeof(PublicApiSurfaceMaterializationTests).Assembly);
         session.GetPublicApiSurface(syntheticAssembly);
@@ -112,7 +112,7 @@ public sealed class PublicApiSurfaceMaterializationTests
         };
     }
 
-    private static Assembly BuildSyntheticAssembly()
+    private static AssemblyBuilder BuildSyntheticAssembly()
     {
         AssemblyBuilder assemblyBuilder = AssemblyBuilder.DefineDynamicAssembly(
             new AssemblyName($"PublicApiSurfaceMaterialization-{Guid.NewGuid():N}"), AssemblyBuilderAccess.Run);

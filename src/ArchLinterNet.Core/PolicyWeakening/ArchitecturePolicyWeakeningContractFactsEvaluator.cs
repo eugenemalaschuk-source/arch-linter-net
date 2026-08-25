@@ -141,10 +141,7 @@ internal static class ArchitecturePolicyWeakeningContractFactsEvaluator
         ArchitecturePolicyContextContract currentContract,
         IReadOnlyList<string> baseValues,
         IReadOnlyList<string> currentValues) => CreateFinding(
-        kind,
-        ControlIdentity(baseContract) + ":" + identitySuffix,
-        "semantic",
-        severity,
+        new PolicyWeakeningControlContext(kind, ControlIdentity(baseContract) + ":" + identitySuffix, "semantic", severity),
         baseValues,
         currentValues,
         baseContract.Provenance,
@@ -182,10 +179,8 @@ internal static class ArchitecturePolicyWeakeningContractFactsEvaluator
             }
 
             findings.Add(CreateFinding(
-                "typed_fact_impact_not_proven",
-                ControlIdentity(baseContract) + ":" + factName,
-                "impact_not_proven",
-                severity,
+                new PolicyWeakeningControlContext(
+                    "typed_fact_impact_not_proven", ControlIdentity(baseContract) + ":" + factName, "impact_not_proven", severity),
                 baseEvidence is null ? Array.Empty<string>() : [baseEvidence],
                 currentEvidence is null ? Array.Empty<string>() : [currentEvidence],
                 baseContract.Provenance,
@@ -208,10 +203,8 @@ internal static class ArchitecturePolicyWeakeningContractFactsEvaluator
             if (!wasOptional && currentLayers.TryGetValue(layer, out bool isOptional) && isOptional)
             {
                 findings.Add(CreateFinding(
-                    "required_layer_made_optional",
-                    ControlIdentity(baseline) + ":layer:" + layer,
-                    "semantic",
-                    severity,
+                    new PolicyWeakeningControlContext(
+                        "required_layer_made_optional", ControlIdentity(baseline) + ":layer:" + layer, "semantic", severity),
                     ["optional=false"],
                     ["optional=true"],
                     baseline.Provenance,
@@ -224,10 +217,8 @@ internal static class ArchitecturePolicyWeakeningContractFactsEvaluator
         foreach (string optionalInput in OptionalInputKeys(current).Except(OptionalInputKeys(baseline), _comparer))
         {
             findings.Add(CreateFinding(
-                "required_input_made_optional",
-                ControlIdentity(baseline) + ":optional_input:" + optionalInput,
-                "semantic",
-                severity,
+                new PolicyWeakeningControlContext(
+                    "required_input_made_optional", ControlIdentity(baseline) + ":optional_input:" + optionalInput, "semantic", severity),
                 Array.Empty<string>(),
                 [optionalInput],
                 baseline.Provenance,

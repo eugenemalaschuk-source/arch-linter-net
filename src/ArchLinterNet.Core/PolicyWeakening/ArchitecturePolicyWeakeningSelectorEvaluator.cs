@@ -37,10 +37,8 @@ internal static class ArchitecturePolicyWeakeningSelectorEvaluator
                 }
 
                 findings.Add(CreateFinding(
-                    "selector_scope_reduced",
-                    ControlIdentity(baseContract),
-                    "semantic",
-                    request.CurrentContext.Guardrails.PolicyWeakening,
+                    new PolicyWeakeningControlContext(
+                        "selector_scope_reduced", ControlIdentity(baseContract), "semantic", request.CurrentContext.Guardrails.PolicyWeakening),
                     baseValues,
                     currentValues,
                     baseContract.Provenance,
@@ -51,10 +49,8 @@ internal static class ArchitecturePolicyWeakeningSelectorEvaluator
             }
 
             findings.Add(CreateFinding(
-                "selector_impact_not_proven",
-                ControlIdentity(baseContract),
-                "impact_not_proven",
-                request.CurrentContext.Guardrails.PolicyWeakening,
+                new PolicyWeakeningControlContext(
+                    "selector_impact_not_proven", ControlIdentity(baseContract), "impact_not_proven", request.CurrentContext.Guardrails.PolicyWeakening),
                 baseValues,
                 currentValues,
                 baseContract.Provenance,

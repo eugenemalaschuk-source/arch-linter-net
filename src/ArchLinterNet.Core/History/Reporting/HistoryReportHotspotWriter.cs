@@ -32,7 +32,7 @@ internal static class HistoryReportHotspotWriter
         writer.WriteString("id", HistoryReportProjectionHelpers.FindingId("hotspot", finding.Category, finding.CanonicalPath));
         writer.WriteString("canonicalPath", finding.CanonicalPath);
         HistoryReportProjectionHelpers.WriteStringArray(writer, "aliases", finding.Aliases);
-        writer.WriteBoolean("pathnameReuseMayConflateGenerations", finding.RawEvidence.PathnameReuseMayConflateGenerations);
+        writer.WriteBoolean("pathnameReuseMayConflateGenerations", HotspotRawEvidence.PathnameReuseMayConflateGenerations);
         writer.WriteNumber("commitCount", finding.RawEvidence.CommitCount);
         writer.WriteNumber("churn", finding.RawEvidence.Churn);
         writer.WriteNumber("taskSpread", finding.RawEvidence.TaskSpread);

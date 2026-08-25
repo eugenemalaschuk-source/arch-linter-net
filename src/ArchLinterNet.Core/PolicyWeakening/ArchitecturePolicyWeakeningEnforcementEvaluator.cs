@@ -22,10 +22,7 @@ internal static class ArchitecturePolicyWeakeningEnforcementEvaluator
             if (currentAudit.TryGetValue(ControlKey(baseContract), out ArchitecturePolicyContextContract? auditContract))
             {
                 findings.Add(CreateFinding(
-                    "strict_to_audit",
-                    ControlIdentity(baseContract),
-                    "semantic",
-                    severity,
+                    new PolicyWeakeningControlContext("strict_to_audit", ControlIdentity(baseContract), "semantic", severity),
                     ["strict"],
                     ["audit"],
                     baseContract.Provenance,
@@ -36,10 +33,7 @@ internal static class ArchitecturePolicyWeakeningEnforcementEvaluator
             }
 
             findings.Add(CreateFinding(
-                "strict_control_removed",
-                ControlIdentity(baseContract),
-                "semantic",
-                severity,
+                new PolicyWeakeningControlContext("strict_control_removed", ControlIdentity(baseContract), "semantic", severity),
                 ["strict"],
                 Array.Empty<string>(),
                 baseContract.Provenance,

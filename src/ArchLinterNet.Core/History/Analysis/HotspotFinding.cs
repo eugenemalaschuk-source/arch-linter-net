@@ -5,37 +5,27 @@ using ArchLinterNet.Core.History.Tasks;
 
 namespace ArchLinterNet.Core.History.Analysis;
 
-internal sealed class HotspotRawEvidence(
-    int commitCount,
-    long churn,
-    int taskSpread,
-    int authorSpread,
-    BigInteger temporalSpanSeconds,
-    IReadOnlyList<LineCountStatus> lineCountStatuses,
-    IReadOnlyList<TaskKey> taskKeys,
-    IReadOnlyList<HotspotTaskKeyProvenance> taskKeyProvenance,
-    IReadOnlyList<string> canonicalAuthors,
-    IReadOnlyList<HotspotAuthorProvenance> authorProvenance)
+internal sealed class HotspotRawEvidence
 {
-    public int CommitCount { get; } = commitCount;
+    public required int CommitCount { get; init; }
 
-    public long Churn { get; } = churn;
+    public required long Churn { get; init; }
 
-    public int TaskSpread { get; } = taskSpread;
+    public required int TaskSpread { get; init; }
 
-    public int AuthorSpread { get; } = authorSpread;
+    public required int AuthorSpread { get; init; }
 
-    public BigInteger TemporalSpanSeconds { get; } = temporalSpanSeconds;
+    public required BigInteger TemporalSpanSeconds { get; init; }
 
-    public IReadOnlyList<LineCountStatus> LineCountStatuses { get; } = lineCountStatuses;
+    public required IReadOnlyList<LineCountStatus> LineCountStatuses { get; init; }
 
-    public IReadOnlyList<TaskKey> TaskKeys { get; } = taskKeys;
+    public required IReadOnlyList<TaskKey> TaskKeys { get; init; }
 
-    public IReadOnlyList<HotspotTaskKeyProvenance> TaskKeyProvenance { get; } = taskKeyProvenance;
+    public required IReadOnlyList<HotspotTaskKeyProvenance> TaskKeyProvenance { get; init; }
 
-    public IReadOnlyList<string> CanonicalAuthors { get; } = canonicalAuthors;
+    public required IReadOnlyList<string> CanonicalAuthors { get; init; }
 
-    public IReadOnlyList<HotspotAuthorProvenance> AuthorProvenance { get; } = authorProvenance;
+    public required IReadOnlyList<HotspotAuthorProvenance> AuthorProvenance { get; init; }
 
     public bool HasBinaryOrUnavailableEvidence => LineCountStatuses.Contains(LineCountStatus.BinaryOrUnavailable);
 
@@ -43,7 +33,7 @@ internal sealed class HotspotRawEvidence(
 
     // V1 creates one baseline identity per exact pathname, so every logical-file finding carries
     // this inherited limitation even where a particular range did not happen to reuse a path.
-    public bool PathnameReuseMayConflateGenerations => true;
+    public static bool PathnameReuseMayConflateGenerations => true;
 }
 
 // Each provenance item stays anchored to the canonical file-evidence commit that contributed it.
@@ -87,31 +77,23 @@ internal sealed class HotspotWeights(decimal commit, decimal churn, decimal task
     public decimal Temporal { get; } = temporal;
 }
 
-internal sealed class HotspotFinding(
-    string canonicalPath,
-    IReadOnlyList<string> aliases,
-    IReadOnlyList<FileEvent> pathEvents,
-    HistoryPathCategory category,
-    HotspotRawEvidence rawEvidence,
-    HotspotComponents components,
-    HotspotWeights weights,
-    decimal score)
+internal sealed class HotspotFinding
 {
-    public string CanonicalPath { get; } = canonicalPath;
+    public required string CanonicalPath { get; init; }
 
-    public IReadOnlyList<string> Aliases { get; } = aliases;
+    public required IReadOnlyList<string> Aliases { get; init; }
 
-    public IReadOnlyList<FileEvent> PathEvents { get; } = pathEvents;
+    public required IReadOnlyList<FileEvent> PathEvents { get; init; }
 
-    public HistoryPathCategory Category { get; } = category;
+    public required HistoryPathCategory Category { get; init; }
 
-    public HotspotRawEvidence RawEvidence { get; } = rawEvidence;
+    public required HotspotRawEvidence RawEvidence { get; init; }
 
-    public HotspotComponents Components { get; } = components;
+    public required HotspotComponents Components { get; init; }
 
-    public HotspotWeights Weights { get; } = weights;
+    public required HotspotWeights Weights { get; init; }
 
-    public decimal Score { get; } = score;
+    public required decimal Score { get; init; }
 }
 
 internal sealed class HotspotCategoryGroup(HistoryPathCategory category, IReadOnlyList<HotspotFinding> findings)

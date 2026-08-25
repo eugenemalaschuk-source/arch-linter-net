@@ -20,7 +20,7 @@ namespace ModuleContainerFixtures.Clean.First.Application
 {
     public sealed class FirstCommand
     {
-        public Models.FirstModel Execute(Abstractions.IFirstFactory factory)
+        public static Models.FirstModel Execute(Abstractions.IFirstFactory factory)
         {
             return factory.Create();
         }
@@ -44,7 +44,7 @@ namespace ModuleContainerFixtures.Clean.Second.Application
 {
     public sealed class SecondCommand
     {
-        public Models.SecondModel Execute()
+        public static Models.SecondModel Execute()
         {
             return new Models.SecondModel();
         }

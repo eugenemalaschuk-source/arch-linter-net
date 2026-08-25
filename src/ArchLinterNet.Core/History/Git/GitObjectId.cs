@@ -61,6 +61,14 @@ internal readonly struct GitObjectId : IEquatable<GitObjectId>, IComparable<GitO
 
     public int CompareTo(GitObjectId other) => string.CompareOrdinal(Hex, other.Hex);
 
+    public static bool operator <(GitObjectId left, GitObjectId right) => left.CompareTo(right) < 0;
+
+    public static bool operator <=(GitObjectId left, GitObjectId right) => left.CompareTo(right) <= 0;
+
+    public static bool operator >(GitObjectId left, GitObjectId right) => left.CompareTo(right) > 0;
+
+    public static bool operator >=(GitObjectId left, GitObjectId right) => left.CompareTo(right) >= 0;
+
     public override string ToString() => Hex;
 
     private static string ToHex(byte[] bytes)

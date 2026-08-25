@@ -21,10 +21,7 @@ internal static class ArchitecturePolicyWeakeningExceptionEvaluator
             if (IsUniversalException(exceptionItem))
             {
                 findings.Add(CreateFinding(
-                    "universal_exception_added",
-                    ExceptionControl(exceptionItem),
-                    "semantic",
-                    severity,
+                    new PolicyWeakeningControlContext("universal_exception_added", ExceptionControl(exceptionItem), "semantic", severity),
                     Array.Empty<string>(),
                     [exceptionItem.Details],
                     null,
@@ -35,10 +32,8 @@ internal static class ArchitecturePolicyWeakeningExceptionEvaluator
             else if (IsBroadExceptionName(exceptionItem))
             {
                 findings.Add(CreateFinding(
-                    "broad_exception_impact_not_proven",
-                    ExceptionControl(exceptionItem),
-                    "impact_not_proven",
-                    severity,
+                    new PolicyWeakeningControlContext(
+                        "broad_exception_impact_not_proven", ExceptionControl(exceptionItem), "impact_not_proven", severity),
                     Array.Empty<string>(),
                     [exceptionItem.Details],
                     null,

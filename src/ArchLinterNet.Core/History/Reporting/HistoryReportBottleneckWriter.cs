@@ -32,7 +32,7 @@ internal static class HistoryReportBottleneckWriter
         writer.WriteString("id", HistoryReportProjectionHelpers.FindingId("bottleneck", finding.Category, finding.CanonicalPath));
         writer.WriteString("canonicalPath", finding.CanonicalPath);
         HistoryReportProjectionHelpers.WriteStringArray(writer, "aliases", finding.Aliases);
-        writer.WriteBoolean("pathnameReuseMayConflateGenerations", finding.RawEvidence.PathnameReuseMayConflateGenerations);
+        writer.WriteBoolean("pathnameReuseMayConflateGenerations", BottleneckRawEvidence.PathnameReuseMayConflateGenerations);
         writer.WriteNumber("independentTaskSpread", finding.RawEvidence.IndependentTaskSpread);
         writer.WriteNumber("distinctAuthorCount", finding.RawEvidence.DistinctAuthorCount);
         writer.WriteCanonicalDecimal("independentTemporalProximity", finding.RawEvidence.IndependentTemporalProximity);

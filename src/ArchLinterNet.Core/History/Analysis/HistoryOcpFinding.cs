@@ -16,45 +16,33 @@ internal sealed class OcpTaskRepeatedEdit(
     public int RepeatedEditCount => Math.Max(QualifyingCommitIds.Count - 1, 0);
 }
 
-internal sealed class OcpRawEvidence(
-    int independentTaskSpread,
-    int ordinaryTaskKeySpread,
-    long churn,
-    int commitCount,
-    int incidentCommitDegree,
-    int incidentTaskDegree,
-    int repeatedEditTotal,
-    decimal roleHint,
-    IReadOnlyList<TaskKey> taskKeys,
-    IReadOnlyList<BottleneckTaskPair> independentTaskPairs,
-    IReadOnlyList<OcpTaskRepeatedEdit> repeatedEdits,
-    IReadOnlyList<string> roleTokens)
+internal sealed class OcpRawEvidence
 {
-    public int IndependentTaskSpread { get; } = independentTaskSpread;
+    public required int IndependentTaskSpread { get; init; }
 
-    public int OrdinaryTaskKeySpread { get; } = ordinaryTaskKeySpread;
+    public required int OrdinaryTaskKeySpread { get; init; }
 
-    public long Churn { get; } = churn;
+    public required long Churn { get; init; }
 
-    public int CommitCount { get; } = commitCount;
+    public required int CommitCount { get; init; }
 
-    public int IncidentCommitDegree { get; } = incidentCommitDegree;
+    public required int IncidentCommitDegree { get; init; }
 
-    public int IncidentTaskDegree { get; } = incidentTaskDegree;
+    public required int IncidentTaskDegree { get; init; }
 
-    public int RepeatedEditTotal { get; } = repeatedEditTotal;
+    public required int RepeatedEditTotal { get; init; }
 
-    public decimal RoleHint { get; } = roleHint;
+    public required decimal RoleHint { get; init; }
 
-    public IReadOnlyList<TaskKey> TaskKeys { get; } = taskKeys;
+    public required IReadOnlyList<TaskKey> TaskKeys { get; init; }
 
-    public IReadOnlyList<BottleneckTaskPair> IndependentTaskPairs { get; } = independentTaskPairs;
+    public required IReadOnlyList<BottleneckTaskPair> IndependentTaskPairs { get; init; }
 
-    public IReadOnlyList<OcpTaskRepeatedEdit> RepeatedEdits { get; } = repeatedEdits;
+    public required IReadOnlyList<OcpTaskRepeatedEdit> RepeatedEdits { get; init; }
 
-    public IReadOnlyList<string> RoleTokens { get; } = roleTokens;
+    public required IReadOnlyList<string> RoleTokens { get; init; }
 
-    public bool PathnameReuseMayConflateGenerations => true;
+    public static bool PathnameReuseMayConflateGenerations => true;
 }
 
 internal sealed class OcpComponents(decimal independentTask, decimal centrality, decimal repeatedEdit, decimal roleHint)

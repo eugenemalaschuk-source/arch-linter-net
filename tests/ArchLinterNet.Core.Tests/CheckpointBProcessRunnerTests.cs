@@ -15,6 +15,7 @@ public sealed class CheckpointBProcessRunnerTests
         string childPidPath = Path.Combine(root, "child.pid");
         using var cancellation = new CancellationTokenSource();
         Task<Exception?>? runner = null;
+        bool cleanupTimedOut = false;
         try
         {
             ProcessStartInfo startInfo = CreateProcessTree(childPidPath);
@@ -51,10 +52,15 @@ public sealed class CheckpointBProcessRunnerTests
             cancellation.Cancel();
             if (runner is not null && !runner.IsCompleted && !runner.Wait(TimeSpan.FromSeconds(5)))
             {
-                throw new TimeoutException("The process-tree probe did not stop during test cleanup.");
+                cleanupTimedOut = true;
             }
 
             DeleteDirectoryEventually(root);
+        }
+
+        if (cleanupTimedOut)
+        {
+            throw new TimeoutException("The process-tree probe did not stop during test cleanup.");
         }
     }
 

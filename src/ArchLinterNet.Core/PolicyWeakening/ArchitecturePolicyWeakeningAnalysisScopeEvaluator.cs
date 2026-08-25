@@ -26,10 +26,8 @@ internal static class ArchitecturePolicyWeakeningAnalysisScopeEvaluator
             }
 
             findings.Add(CreateFinding(
-                "analysis_" + name + "_impact_not_proven",
-                "analysis:" + name,
-                "impact_not_proven",
-                current.Guardrails.PolicyWeakening,
+                new PolicyWeakeningControlContext(
+                    "analysis_" + name + "_impact_not_proven", "analysis:" + name, "impact_not_proven", current.Guardrails.PolicyWeakening),
                 baseValues,
                 currentValues,
                 null,
@@ -46,10 +44,8 @@ internal static class ArchitecturePolicyWeakeningAnalysisScopeEvaluator
             }
 
             findings.Add(CreateFinding(
-                "analysis_" + name + "_impact_not_proven",
-                "analysis:" + name,
-                "impact_not_proven",
-                current.Guardrails.PolicyWeakening,
+                new PolicyWeakeningControlContext(
+                    "analysis_" + name + "_impact_not_proven", "analysis:" + name, "impact_not_proven", current.Guardrails.PolicyWeakening),
                 baseValues,
                 currentValues,
                 null,

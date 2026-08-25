@@ -82,6 +82,44 @@ def runtime_coverage_scopes(root: Path) -> set[str]:
     return scopes
 
 
+def _top_level_command(area: Path, root: Path) -> str | None:
+    """Return the area's top-level command token, or None if it has no CLI module."""
+    entrypoint = area / "EntryPoint"
+    if not entrypoint.is_dir():
+        return None
+
+    top_module = entrypoint / f"{area.name}CommandModule.cs"
+    if not top_module.is_file():
+        return None
+
+    top_text = top_module.read_text(encoding="utf-8")
+    top_match = MODULE_COMMAND_NAME.search(top_text)
+    if top_match is not None:
+        return top_match.group(1)
+
+    # Validate owns the root command and therefore has no top-level subcommand name.
+    if area.name == "Validate":
+        return None
+    raise ValueError(f"{top_module.relative_to(root)}: CommandName was not found")
+
+
+def _child_command_names(area: Path, top: str) -> set[str]:
+    """Return `<top> <child>` tokens declared anywhere under `area`."""
+    names: set[str] = set()
+    for path in area.rglob("*.cs"):
+        text = path.read_text(encoding="utf-8")
+        for child in MODULE_COMMAND_NAME.findall(text):
+            if child != top and COMMAND_TOKEN.fullmatch(child):
+                names.add(f"{top} {child}")
+        for child in COMMAND_DECLARATION.findall(text):
+            # Scaffold templates contain source snippets such as
+            # new("{{commandToken}}"). They are generated-code placeholders,
+            # not executable commands in the current binary.
+            if child != top and child != "arch-linter-net" and COMMAND_TOKEN.fullmatch(child):
+                names.add(f"{top} {child}")
+    return names
+
+
 def cli_command_paths(root: Path) -> set[str]:
     commands_root = root / "src" / "ArchLinterNet.Cli" / "Commands"
     if not commands_root.is_dir():
@@ -89,46 +127,16 @@ def cli_command_paths(root: Path) -> set[str]:
 
     result = {"validate"}
     for area in sorted(path for path in commands_root.iterdir() if path.is_dir()):
-        entrypoint = area / "EntryPoint"
-        if not entrypoint.is_dir():
+        top = _top_level_command(area, root)
+        if top is None:
             continue
-
-        top_module = entrypoint / f"{area.name}CommandModule.cs"
-        if not top_module.is_file():
-            continue
-
-        top_text = top_module.read_text(encoding="utf-8")
-        top_match = MODULE_COMMAND_NAME.search(top_text)
-        if top_match is None:
-            # Validate owns the root command and therefore has no top-level subcommand name.
-            if area.name == "Validate":
-                continue
-            raise ValueError(f"{top_module.relative_to(root)}: CommandName was not found")
-
-        top = top_match.group(1)
         result.add(top)
-
-        for path in area.rglob("*.cs"):
-            text = path.read_text(encoding="utf-8")
-            for child in MODULE_COMMAND_NAME.findall(text):
-                if child != top and COMMAND_TOKEN.fullmatch(child):
-                    result.add(f"{top} {child}")
-            for child in COMMAND_DECLARATION.findall(text):
-                # Scaffold templates contain source snippets such as
-                # new("{{commandToken}}"). They are generated-code placeholders,
-                # not executable commands in the current binary.
-                if (
-                    child != top
-                    and child != "arch-linter-net"
-                    and COMMAND_TOKEN.fullmatch(child)
-                ):
-                    result.add(f"{top} {child}")
+        result.update(_child_command_names(area, top))
 
     return result
 
 
-def assert_schema_allows_selector_only_layer(root: Path) -> None:
-    schema = json.loads(read_text(root, "schema/dependencies.arch.schema.json"))
+def _layer_definition_candidates(schema: object) -> list[dict[str, object]]:
     candidates: list[dict[str, object]] = []
 
     def visit(node: object) -> None:
@@ -147,27 +155,36 @@ def assert_schema_allows_selector_only_layer(root: Path) -> None:
                 visit(value)
 
     visit(schema)
+    return candidates
+
+
+def _branch_requires_selector(branch: object) -> bool:
+    if not isinstance(branch, dict):
+        return False
+    branch_required = branch.get("required", [])
+    return isinstance(branch_required, list) and "selector" in branch_required
+
+
+def _permits_selector_only(node: dict[str, object]) -> bool:
+    required = node.get("required", [])
+    if isinstance(required, list) and "namespace" in required:
+        return False
+    for keyword in ("allOf", "oneOf", "anyOf"):
+        branches = node.get(keyword)
+        if isinstance(branches, list) and any(_branch_requires_selector(branch) for branch in branches):
+            return True
+    # With neither a direct namespace requirement nor a branch that forces it,
+    # the selector property is independently legal.
+    return True
+
+
+def assert_schema_allows_selector_only_layer(root: Path) -> None:
+    schema = json.loads(read_text(root, "schema/dependencies.arch.schema.json"))
+    candidates = _layer_definition_candidates(schema)
     if not candidates:
         raise ValueError("policy schema: no layer definition with namespace + selector was found")
 
-    def permits_selector_only(node: dict[str, object]) -> bool:
-        required = node.get("required", [])
-        if isinstance(required, list) and "namespace" in required:
-            return False
-        for keyword in ("allOf", "oneOf", "anyOf"):
-            branches = node.get(keyword)
-            if isinstance(branches, list):
-                for branch in branches:
-                    if not isinstance(branch, dict):
-                        continue
-                    branch_required = branch.get("required", [])
-                    if isinstance(branch_required, list) and "selector" in branch_required:
-                        return True
-        # With neither a direct namespace requirement nor a branch that forces it,
-        # the selector property is independently legal.
-        return True
-
-    if not any(permits_selector_only(node) for node in candidates):
+    if not any(_permits_selector_only(node) for node in candidates):
         raise ValueError("policy schema: selector-only layers are no longer accepted")
 
 
@@ -270,7 +287,7 @@ def find_violations(root: Path) -> list[str]:
                 "mkdocs.yml: public contract pages missing from navigation: "
                 + ", ".join(missing_nav)
             )
-    except (OSError, ValueError, json.JSONDecodeError) as exc:
+    except (OSError, ValueError) as exc:
         violations.append(str(exc))
 
     violations.extend(stale_claims(root))

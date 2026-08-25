@@ -91,7 +91,7 @@ public sealed class HistoryHotspotScorerTests
             Assert.That(finding.RawEvidence.CommitCount, Is.EqualTo(1));
             Assert.That(finding.RawEvidence.Churn, Is.Zero);
             Assert.That(finding.RawEvidence.HasExactRenameEvidence, Is.True);
-            Assert.That(finding.RawEvidence.PathnameReuseMayConflateGenerations, Is.True);
+            Assert.That(HotspotRawEvidence.PathnameReuseMayConflateGenerations, Is.True);
         });
     }
 

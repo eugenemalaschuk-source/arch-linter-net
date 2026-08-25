@@ -22,10 +22,8 @@ internal static class ArchitecturePolicyWeakeningStaticScopeEvaluator
             if (!baseSet.Optional && currentSet?.Optional == true)
             {
                 findings.Add(CreateFinding(
-                    "source_set_made_optional",
-                    "source_set:" + baseSet.Name,
-                    SemanticClassification,
-                    current.Guardrails.PolicyWeakening,
+                    new PolicyWeakeningControlContext(
+                        "source_set_made_optional", "source_set:" + baseSet.Name, SemanticClassification, current.Guardrails.PolicyWeakening),
                     ["required"],
                     ["optional"],
                     baseSet.Provenance,
@@ -38,10 +36,8 @@ internal static class ArchitecturePolicyWeakeningStaticScopeEvaluator
             foreach (string source in baseSet.ResolvedSources.Except(currentSources, _comparer).OrderBy(value => value, _comparer))
             {
                 findings.Add(CreateFinding(
-                    "source_set_member_removed",
-                    "source_set:" + baseSet.Name,
-                    SemanticClassification,
-                    current.Guardrails.PolicyWeakening,
+                    new PolicyWeakeningControlContext(
+                        "source_set_member_removed", "source_set:" + baseSet.Name, SemanticClassification, current.Guardrails.PolicyWeakening),
                     [source],
                     Array.Empty<string>(),
                     baseSet.Provenance,
@@ -64,10 +60,11 @@ internal static class ArchitecturePolicyWeakeningStaticScopeEvaluator
             if (!baseExpansion.OptionalEmpty && currentExpansion.OptionalEmpty)
             {
                 findings.Add(CreateFinding(
-                    "source_expansion_made_empty_tolerant",
-                    "source_expansion:" + baseExpansion.AuthoredContractId,
-                    SemanticClassification,
-                    current.Guardrails.PolicyWeakening,
+                    new PolicyWeakeningControlContext(
+                        "source_expansion_made_empty_tolerant",
+                        "source_expansion:" + baseExpansion.AuthoredContractId,
+                        SemanticClassification,
+                        current.Guardrails.PolicyWeakening),
                     ["required"],
                     ["optional_empty"],
                     baseExpansion.Provenance,
@@ -86,10 +83,11 @@ internal static class ArchitecturePolicyWeakeningStaticScopeEvaluator
             {
                 currentContracts.TryGetValue(ContractKeyFromExpansion(currentExpansion), out ArchitecturePolicyContextContract? contract);
                 findings.Add(CreateFinding(
-                    "source_exclusion_added",
-                    "source_expansion:" + currentExpansion.AuthoredContractId,
-                    SemanticClassification,
-                    current.Guardrails.PolicyWeakening,
+                    new PolicyWeakeningControlContext(
+                        "source_exclusion_added",
+                        "source_expansion:" + currentExpansion.AuthoredContractId,
+                        SemanticClassification,
+                        current.Guardrails.PolicyWeakening),
                     Array.Empty<string>(),
                     [ExpansionExclusionKey(exclusion)],
                     null,
@@ -104,10 +102,11 @@ internal static class ArchitecturePolicyWeakeningStaticScopeEvaluator
                          .OrderBy(ExpandedInstanceKey, _comparer))
             {
                 findings.Add(CreateFinding(
-                    "effective_source_removed",
-                    "source_expansion:" + baseExpansion.AuthoredContractId,
-                    SemanticClassification,
-                    current.Guardrails.PolicyWeakening,
+                    new PolicyWeakeningControlContext(
+                        "effective_source_removed",
+                        "source_expansion:" + baseExpansion.AuthoredContractId,
+                        SemanticClassification,
+                        current.Guardrails.PolicyWeakening),
                     [ExpandedInstanceKey(instance)],
                     Array.Empty<string>(),
                     instance.Provenance ?? baseExpansion.Provenance,

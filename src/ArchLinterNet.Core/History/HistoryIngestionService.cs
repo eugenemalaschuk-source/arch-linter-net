@@ -70,23 +70,24 @@ internal sealed class HistoryIngestionService(
         HistoryOcpAnalysis ocpAnalysis = HistoryOcpScorer.Score(bottleneckAnalysis, coChangeGraph, configuration);
         HistoryHotspotAnalysis hotspotAnalysis = HistoryHotspotScorer.Score(commits, files, configuration);
         candidates.Sort(RenameCandidate.CompareCanonical);
-        return new HistoryIngestionResult(
-            layout.ObjectFormatName,
-            request.AuthoredFrom,
-            request.AuthoredTo,
-            from.Hex,
-            to.Hex,
-            commits,
-            range.Count(static commit => commit.IsMerge),
-            candidates,
-            components,
-            files,
-            coChangeGraph,
-            bottleneckAnalysis,
-            ocpAnalysis,
-            configuration,
-            hotspotAnalysis,
-            HistoryEnrichmentProjection.NotRequested);
+        return new HistoryIngestionResult
+        {
+            ObjectFormatName = layout.ObjectFormatName,
+            AuthoredFrom = request.AuthoredFrom,
+            AuthoredTo = request.AuthoredTo,
+            ResolvedFrom = from.Hex,
+            ResolvedTo = to.Hex,
+            Commits = commits,
+            ExcludedMergeCount = range.Count(static commit => commit.IsMerge),
+            RenameCandidates = candidates,
+            RenameComponents = components,
+            LogicalFiles = files,
+            CoChangeGraph = coChangeGraph,
+            BottleneckAnalysis = bottleneckAnalysis,
+            OcpAnalysis = ocpAnalysis,
+            Configuration = configuration,
+            HotspotAnalysis = hotspotAnalysis,
+        };
     }
 
     private CommitEvidence BuildCommitEvidence(GitCommit commit)

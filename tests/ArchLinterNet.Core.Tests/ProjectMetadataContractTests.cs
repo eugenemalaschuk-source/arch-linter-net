@@ -24,6 +24,7 @@ public sealed class ProjectMetadataContractTests
             "required_property"
         };
     private static readonly string[] _value3 = { "MyApp.Tests", "MyApp.Tools" };
+    private static readonly string[] _value4 = { "nullable-project-metadata", "packable-project-metadata" };
     private static ArchitectureAnalysisContext CreateContext(params ArchitectureDiscoveredProject[] discoveredProjects)
     {
         ProjectDiscoveryResult discovery = new(
@@ -128,7 +129,7 @@ public sealed class ProjectMetadataContractTests
         {
             Assert.That(result.Violations, Has.Count.EqualTo(2));
             Assert.That(result.Violations.Select(violation => violation.ContractId),
-                Is.EquivalentTo(new[] { "nullable-project-metadata", "packable-project-metadata" }));
+                Is.EquivalentTo(_value4));
             Assert.That(context.ProfilingCounters.SessionProjectMetadataIndexMaterializations, Is.EqualTo(1));
         });
     }

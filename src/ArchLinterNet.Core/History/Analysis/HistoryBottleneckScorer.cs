@@ -100,16 +100,18 @@ internal sealed class HistoryBottleneckScorer
         decimal temporal = pairs.Count == 0 ? 0m : pairs.Max(static pair => pair.TemporalProximity);
         return new Candidate(
             vertex,
-            new BottleneckRawEvidence(
-                independentKeys.Count,
-                authors.Length,
-                temporal,
-                graphEvidence.DistinctNeighborDegree,
-                graphEvidence.IncidentCommitDegree,
-                graphEvidence.IncidentTaskDegree,
-                taskKeys,
-                pairs,
-                authors));
+            new BottleneckRawEvidence
+            {
+                IndependentTaskSpread = independentKeys.Count,
+                DistinctAuthorCount = authors.Length,
+                IndependentTemporalProximity = temporal,
+                DistinctNeighborDegree = graphEvidence.DistinctNeighborDegree,
+                IncidentCommitDegree = graphEvidence.IncidentCommitDegree,
+                IncidentTaskDegree = graphEvidence.IncidentTaskDegree,
+                TaskKeys = taskKeys,
+                IndependentTaskPairs = pairs,
+                CanonicalAuthors = authors,
+            });
     }
 
     private static List<BottleneckTaskPair> BuildIndependentPairs(TaskKey[] taskKeys, IReadOnlyList<CommitEvidence> fileCommits)
@@ -148,18 +150,20 @@ internal sealed class HistoryBottleneckScorer
             : (secondInterval, firstInterval);
         BigInteger gap = later.StartEpochSecond - earlier.EndEpochSecond;
         BigInteger days = gap <= BigInteger.Zero ? BigInteger.Zero : (gap + 86_399) / 86_400;
-        return new BottleneckTaskPair(
-            first,
-            second,
-            firstExclusive.Select(static evidence => evidence.Commit.Id.Hex).ToArray(),
-            secondExclusive.Select(static evidence => evidence.Commit.Id.Hex).ToArray(),
-            Provenance(firstExclusive, first),
-            Provenance(secondExclusive, second),
-            firstInterval,
-            secondInterval,
-            gap,
-            days,
-            QuantizedRatio(BigInteger.One, BigInteger.One + days));
+        return new BottleneckTaskPair
+        {
+            First = first,
+            Second = second,
+            FirstExclusiveCommitIds = firstExclusive.Select(static evidence => evidence.Commit.Id.Hex).ToArray(),
+            SecondExclusiveCommitIds = secondExclusive.Select(static evidence => evidence.Commit.Id.Hex).ToArray(),
+            FirstProvenance = Provenance(firstExclusive, first),
+            SecondProvenance = Provenance(secondExclusive, second),
+            FirstInterval = firstInterval,
+            SecondInterval = secondInterval,
+            GapSeconds = gap,
+            DaysBetween = days,
+            TemporalProximity = QuantizedRatio(BigInteger.One, BigInteger.One + days),
+        };
     }
 
     private static int CompareIntervals(BottleneckTaskInterval left, BottleneckTaskInterval right)

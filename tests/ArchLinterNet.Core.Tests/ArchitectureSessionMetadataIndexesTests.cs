@@ -12,6 +12,8 @@ namespace ArchLinterNet.Core.Tests;
 [TestFixture]
 public sealed class ArchitectureSessionMetadataIndexesTests
 {
+    private static readonly string[] _targetFrameworks = { "net10.0" };
+
     [Test]
     public void ManyProjectsAndContracts_MaterializeEachSessionMetadataIndexOnce()
     {
@@ -22,7 +24,7 @@ public sealed class ArchitectureSessionMetadataIndexesTests
             .Append(new ArchitectureDiscoveredProject(
                 "src/Project00/Project00.csproj",
                 "Project00",
-                new[] { "net10.0" },
+                _targetFrameworks,
                 new[] { new ArchitectureDiscoveredPackageReference("Second.Entry", "1.0.0") }))
             .ToArray();
         ArchitectureAnalysisContext context = CreateContext(projects);
@@ -150,7 +152,7 @@ public sealed class ArchitectureSessionMetadataIndexesTests
         return new ArchitectureDiscoveredProject(
             $"src/{name}/{name}.csproj",
             name,
-            new[] { "net10.0" },
+            _targetFrameworks,
             new[] { new ArchitectureDiscoveredPackageReference(packageId, "1.0.0") })
         {
             Properties = new Dictionary<string, ArchitectureDiscoveredProjectProperty>(StringComparer.OrdinalIgnoreCase)
