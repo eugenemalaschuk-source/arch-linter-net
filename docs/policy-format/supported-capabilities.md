@@ -9,9 +9,9 @@ This page is the concise human capability boundary. The machine-readable invento
 Use this precedence when reviewing a discrepancy:
 
 1. runtime/CLI implementation and packaged JSON Schema;
-2. `archlinternet.capabilities.json`;
-3. mechanically verified reference pages;
-4. task guides and examples.
+1. `archlinternet.capabilities.json`;
+1. mechanically verified reference pages;
+1. task guides and examples.
 
 ## Policy model
 
@@ -45,16 +45,27 @@ Do not infer a family from a YAML-looking field that is absent from the machine 
 ## Implemented coverage scopes
 
 <!-- coverage-scope: namespace -->
+
 - `namespace` — first-party namespace inventory.
+
 <!-- coverage-scope: project -->
+
 - `project` — discovered project inventory.
+
 <!-- coverage-scope: assembly -->
+
 - `assembly` — first-party assembly inventory.
+
 <!-- coverage-scope: dependency_edge -->
+
 - `dependency_edge` — observed layer-to-layer dependency edges that must be governed.
+
 <!-- coverage-scope: rule_input -->
+
 - `rule_input` — declared rule inputs that must resolve and stay non-stale, with exact reviewed optional-empty support.
+
 <!-- coverage-scope: semantic_role -->
+
 - `semantic_role` — discovered semantic roles/metadata that must be governed or explicitly excluded.
 
 All six scopes are runtime-supported. See [Coverage contracts](../contracts/coverage.md).

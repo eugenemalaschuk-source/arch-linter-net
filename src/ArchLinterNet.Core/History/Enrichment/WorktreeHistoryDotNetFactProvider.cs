@@ -8,10 +8,15 @@ using ArchLinterNet.Core.Model;
 
 namespace ArchLinterNet.Core.History.Enrichment;
 
-internal sealed class WorktreeHistoryDotNetFactProvider : IHistoryDotNetFactProvider
+internal sealed partial class WorktreeHistoryDotNetFactProvider : IHistoryDotNetFactProvider
 {
+    private const string BuildStateUnavailableReason = "build_state_unavailable";
+
     private const string PortableRelativePolicyPathPattern =
         @"^(?:(?!\.\.(?:[/\\]|$)|\.(?:[/\\]|$))[^<>:""|?*\u0000-\u001F])+$";
+
+    [GeneratedRegex(PortableRelativePolicyPathPattern, RegexOptions.CultureInvariant, matchTimeoutMilliseconds: 1000)]
+    private static partial Regex PortableRelativePolicyPathRegex();
 
     public HistoryDotNetFactMaterialization Materialize(string repositoryPath, string resolvedTo, string policyPath)
     {
@@ -62,7 +67,7 @@ internal sealed class WorktreeHistoryDotNetFactProvider : IHistoryDotNetFactProv
             RequestedTargetFramework: requestedTargetFramework));
         if (preflight.Blocked)
         {
-            throw new HistoryDotNetEnrichmentUnavailableException("build_state_unavailable");
+            throw new HistoryDotNetEnrichmentUnavailableException(BuildStateUnavailableReason);
         }
 
         IReadOnlyDictionary<string, string> verifiedArtifactDigests = RequireVerifiedArtifactDigests(preflight, discovery);
@@ -76,13 +81,13 @@ internal sealed class WorktreeHistoryDotNetFactProvider : IHistoryDotNetFactProv
         }
         catch (Exception)
         {
-            throw new HistoryDotNetEnrichmentUnavailableException("build_state_unavailable");
+            throw new HistoryDotNetEnrichmentUnavailableException(BuildStateUnavailableReason);
         }
 
         if (resolution.MissingAssemblyNames.Count > 0 || resolution.ResolvedAssemblies.Count == 0)
         {
             resolution.IsolatedLoadScope?.Dispose();
-            throw new HistoryDotNetEnrichmentUnavailableException("build_state_unavailable");
+            throw new HistoryDotNetEnrichmentUnavailableException(BuildStateUnavailableReason);
         }
 
         using ArchitectureAnalysisContext context = new(
@@ -112,7 +117,7 @@ internal sealed class WorktreeHistoryDotNetFactProvider : IHistoryDotNetFactProv
             || relative.StartsWith($"..{Path.DirectorySeparatorChar}", StringComparison.Ordinal)
             || relative.StartsWith($"..{Path.AltDirectorySeparatorChar}", StringComparison.Ordinal);
         bool portableRelativePath = !string.Equals(relative, ".", StringComparison.Ordinal)
-            && Regex.IsMatch(relative, PortableRelativePolicyPathPattern, RegexOptions.CultureInvariant);
+            && PortableRelativePolicyPathRegex().IsMatch(relative);
         if (outsideRepository || !portableRelativePath)
         {
             throw new HistoryDotNetEnrichmentUnavailableException("policy_repository_mismatch");
@@ -130,14 +135,14 @@ internal sealed class WorktreeHistoryDotNetFactProvider : IHistoryDotNetFactProv
             string fullPath = Path.GetFullPath(path);
             if (!preflight.VerifiedArtifactContentDigests.ContainsKey(fullPath))
             {
-                throw new HistoryDotNetEnrichmentUnavailableException("build_state_unavailable");
+                throw new HistoryDotNetEnrichmentUnavailableException(BuildStateUnavailableReason);
             }
         }
 
         return preflight.VerifiedArtifactContentDigests;
     }
 
-    private static IReadOnlyDictionary<string, IReadOnlyList<HistoryDotNetTypeContext>> BuildPathIndex(
+    private static Dictionary<string, IReadOnlyList<HistoryDotNetTypeContext>> BuildPathIndex(
         IReadOnlyList<ArchitectureDeclaredTypeFact> facts,
         ProjectDiscoveryResult discovery)
     {
@@ -182,29 +187,29 @@ internal sealed class WorktreeHistoryDotNetFactProvider : IHistoryDotNetFactProv
 
     private static string RunGit(string repositoryPath, bool readHead)
     {
-        ProcessStartInfo startInfo = new("git")
-        {
-            RedirectStandardOutput = true,
-            RedirectStandardError = true,
-            UseShellExecute = false,
-            CreateNoWindow = true,
-            WorkingDirectory = repositoryPath
-        };
-        if (readHead)
-        {
-            startInfo.ArgumentList.Add("rev-parse");
-            startInfo.ArgumentList.Add("--verify");
-            startInfo.ArgumentList.Add("HEAD");
-        }
-        else
-        {
-            startInfo.ArgumentList.Add("status");
-            startInfo.ArgumentList.Add("--porcelain=v1");
-            startInfo.ArgumentList.Add("--untracked-files=all");
-        }
-
         try
         {
+            ProcessStartInfo startInfo = new(ResolveGitExecutablePath())
+            {
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                UseShellExecute = false,
+                CreateNoWindow = true,
+                WorkingDirectory = repositoryPath
+            };
+            if (readHead)
+            {
+                startInfo.ArgumentList.Add("rev-parse");
+                startInfo.ArgumentList.Add("--verify");
+                startInfo.ArgumentList.Add("HEAD");
+            }
+            else
+            {
+                startInfo.ArgumentList.Add("status");
+                startInfo.ArgumentList.Add("--porcelain=v1");
+                startInfo.ArgumentList.Add("--untracked-files=all");
+            }
+
             using Process process = Process.Start(startInfo) ?? throw new InvalidOperationException();
             string output = process.StandardOutput.ReadToEnd();
             _ = process.StandardError.ReadToEnd();
@@ -224,5 +229,29 @@ internal sealed class WorktreeHistoryDotNetFactProvider : IHistoryDotNetFactProv
         {
             throw new HistoryDotNetEnrichmentUnavailableException("worktree_verification_failed");
         }
+    }
+
+    private static string ResolveGitExecutablePath()
+    {
+        string fileName = OperatingSystem.IsWindows() ? "git.exe" : "git";
+        string? pathVariable = Environment.GetEnvironmentVariable("PATH");
+        if (!string.IsNullOrEmpty(pathVariable))
+        {
+            foreach (string directory in pathVariable.Split(Path.PathSeparator))
+            {
+                if (string.IsNullOrWhiteSpace(directory))
+                {
+                    continue;
+                }
+
+                string candidate = Path.Combine(directory, fileName);
+                if (File.Exists(candidate))
+                {
+                    return Path.GetFullPath(candidate);
+                }
+            }
+        }
+
+        throw new HistoryDotNetEnrichmentUnavailableException("worktree_verification_failed");
     }
 }

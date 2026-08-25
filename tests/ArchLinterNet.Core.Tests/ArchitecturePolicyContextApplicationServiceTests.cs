@@ -13,6 +13,23 @@ public sealed class ArchitecturePolicyContextApplicationServiceTests
     private string _repositoryRoot = null!;
     private ArchitectureEngine _engine = null!;
 
+    private static readonly string[] _salesToCatalogPortSelectorRoles = { "ApplicationLayer", "Port", "DomainLayer", "Adapter" };
+    private static readonly string[] _sampleHostProjectPaths = { "src/Sample.Host/Sample.Host.csproj" };
+    private static readonly string[] _testsProjectExcludeGlobs = { "tests/**" };
+    private static readonly string[] _unitySemanticRoles = { "System", "UnityEditor" };
+    private static readonly string[] _unityRuntimeContextValues = { "editor", "player" };
+    private static readonly string[] _allowedContextRoles = { "ApplicationLayer", "DomainLayer" };
+    private static readonly string[] _transportContextValues = { "http" };
+    private static readonly string[] _moduleShapeContainers = { "Sample.Modules.Sales", "Sample.Modules.Legacy" };
+    private static readonly string[] _moduleShapeExcludeContainers = { "Sample.Modules.Legacy" };
+    private static readonly string[] _moduleShapeLayerNames = { "Api", "Application", "Domain" };
+    private static readonly string[] _moduleShapeLayerOptionalFlags = { "false", "true", "false" };
+    private static readonly string[] _moduleShapeExhaustiveValues = { "true" };
+    private static readonly string[] _compositionForbiddenApis = { "Legacy.ServiceLocator.Get", "Legacy.Container.Register" };
+    private static readonly string[] _compositionAllowedAssemblySets = { "host_assemblies" };
+    private static readonly string[] _hostsAvoidForbiddenSetNames = { "host_assemblies", "legacy_assemblies", "future_assemblies" };
+    private static readonly string[] _hostsAvoidForbiddenInstanceSources = { "Sample.Host.Api" };
+
     [OneTimeSetUp]
     public void OneTimeSetUp()
     {
@@ -41,7 +58,7 @@ public sealed class ArchitecturePolicyContextApplicationServiceTests
             Assert.That(context.Contracts.Select(contract => contract.Id), Does.Contain("sales-to-catalog-through-port"));
             Assert.That(context.Contracts.Single(contract => contract.Id == "sales-to-catalog-through-port")
                 .Selectors.Where(selector => !string.IsNullOrWhiteSpace(selector.Role)).Select(selector => selector.Role),
-                Is.EquivalentTo(new[] { "ApplicationLayer", "Port", "DomainLayer", "Adapter" }));
+                Is.EquivalentTo(_salesToCatalogPortSelectorRoles));
             Assert.That(context.SemanticRoles, Does.Contain("DomainLayer").And.Contain("ApplicationLayer"));
             Assert.That(context.Contexts.Single(value => value.Key == "module").Values,
                 Does.Contain("Sales").And.Contain("Catalog"));
@@ -96,8 +113,8 @@ public sealed class ArchitecturePolicyContextApplicationServiceTests
             Assert.Multiple(() =>
             {
                 Assert.That(context.Guardrails.PolicyWeakening, Is.EqualTo("warn"));
-                Assert.That(context.Analysis.Projects, Is.EqualTo(new[] { "src/Sample.Host/Sample.Host.csproj" }));
-                Assert.That(context.Analysis.ProjectExclude, Is.EqualTo(new[] { "tests/**" }));
+                Assert.That(context.Analysis.Projects, Is.EqualTo(_sampleHostProjectPaths));
+                Assert.That(context.Analysis.ProjectExclude, Is.EqualTo(_testsProjectExcludeGlobs));
                 Assert.That(ArchitecturePolicyContextFormatter.FormatAsJson(context),
                     Does.Contain("\"policy_weakening\": \"warn\""));
                 Assert.That(ArchitecturePolicyContextFormatter.FormatAsMarkdown(context),
@@ -230,9 +247,9 @@ public sealed class ArchitecturePolicyContextApplicationServiceTests
 
             Assert.Multiple(() =>
             {
-                Assert.That(context.SemanticRoles, Is.EqualTo(new[] { "System", "UnityEditor" }));
+                Assert.That(context.SemanticRoles, Is.EqualTo(_unitySemanticRoles));
                 Assert.That(context.Contexts.Single(value => value.Key == "runtime").Values,
-                    Is.EqualTo(new[] { "editor", "player" }));
+                    Is.EqualTo(_unityRuntimeContextValues));
                 Assert.That(context.Contracts.Single().Id, Is.EqualTo("player-no-editor"));
                 Assert.That(context.Sources.Single().Path, Is.EqualTo("policy.yml"));
             });
@@ -302,10 +319,10 @@ public sealed class ArchitecturePolicyContextApplicationServiceTests
                 Assert.That(binding.ExpectedPort.Role, Is.EqualTo("Port"));
                 Assert.That(binding.ExpectedPort.Metadata["direction"], Is.EqualTo("inbound"));
                 Assert.That(binding.AllowedContexts.Select(selector => selector.Role),
-                    Is.EqualTo(new[] { "ApplicationLayer", "DomainLayer" }));
+                    Is.EqualTo(_allowedContextRoles));
                 Assert.That(context.SemanticRoles,
                     Does.Contain("Adapter").And.Contain("Port").And.Contain("DomainLayer"));
-                Assert.That(context.Contexts.Single(value => value.Key == "transport").Values, Is.EqualTo(new[] { "http" }));
+                Assert.That(context.Contexts.Single(value => value.Key == "transport").Values, Is.EqualTo(_transportContextValues));
                 Assert.That(json, Does.Contain("\"adapter_bindings\""));
                 Assert.That(json, Does.Contain("\"expected_port\""));
                 Assert.That(json, Does.Contain("\"allowed_contexts\""));
@@ -378,18 +395,18 @@ public sealed class ArchitecturePolicyContextApplicationServiceTests
             Assert.Multiple(() =>
             {
                 Assert.That(template.Facts.Single(fact => fact.Name == "containers").Values,
-                    Is.EqualTo(new[] { "Sample.Modules.Sales", "Sample.Modules.Legacy" }));
+                    Is.EqualTo(_moduleShapeContainers));
                 Assert.That(template.Facts.Single(fact => fact.Name == "exclude_containers").Values,
-                    Is.EqualTo(new[] { "Sample.Modules.Legacy" }));
+                    Is.EqualTo(_moduleShapeExcludeContainers));
                 Assert.That(layers.Items.Select(item => item.Items.Single(field => field.Name == "name").Values.Single()),
-                    Is.EqualTo(new[] { "Api", "Application", "Domain" }));
+                    Is.EqualTo(_moduleShapeLayerNames));
                 Assert.That(layers.Items.Select(item => item.Items.Single(field => field.Name == "optional").Values.Single()),
-                    Is.EqualTo(new[] { "false", "true", "false" }));
-                Assert.That(template.Facts.Single(fact => fact.Name == "exhaustive").Values, Is.EqualTo(new[] { "true" }));
+                    Is.EqualTo(_moduleShapeLayerOptionalFlags));
+                Assert.That(template.Facts.Single(fact => fact.Name == "exhaustive").Values, Is.EqualTo(_moduleShapeExhaustiveValues));
                 Assert.That(composition.Facts.Single(fact => fact.Name == "forbidden_apis").Values,
-                    Is.EqualTo(new[] { "Legacy.ServiceLocator.Get", "Legacy.Container.Register" }));
+                    Is.EqualTo(_compositionForbiddenApis));
                 Assert.That(composition.Facts.Single(fact => fact.Name == "allowed_only_in_assembly_sets").Values,
-                    Is.EqualTo(new[] { "host_assemblies" }));
+                    Is.EqualTo(_compositionAllowedAssemblySets));
                 Assert.That(allowedType.Items.Single(field => field.Name == "assembly").Values.Single(), Is.EqualTo("Sample.Host"));
                 Assert.That(allowedType.Items.Single(field => field.Name == "type").Values.Single(), Is.EqualTo("Sample.Program"));
                 Assert.That(json, Does.Contain("\"facts\"").And.Contain("\"allowed_only_in_types\""));
@@ -452,8 +469,8 @@ public sealed class ArchitecturePolicyContextApplicationServiceTests
             {
                 Assert.That(expansion.Kind, Is.EqualTo("fan_out"));
                 Assert.That(expansion.SetNames,
-                    Is.EqualTo(new[] { "host_assemblies", "legacy_assemblies", "future_assemblies" }));
-                Assert.That(expansion.Instances.Select(item => item.Source), Is.EqualTo(new[] { "Sample.Host.Api" }));
+                    Is.EqualTo(_hostsAvoidForbiddenSetNames));
+                Assert.That(expansion.Instances.Select(item => item.Source), Is.EqualTo(_hostsAvoidForbiddenInstanceSources));
                 Assert.That(expansion.Inclusions.Select(item => item.Source),
                     Does.Contain("Sample.Host.Worker").And.Contain("Sample.Legacy.Host"));
                 Assert.That(optionalInclusion.OptionalEmpty, Is.True);

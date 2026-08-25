@@ -16,6 +16,8 @@ namespace ArchLinterNet.Cli.Tests;
 [TestFixture]
 public sealed class ScaffoldCliCommandHandlerTests
 {
+    private static readonly string[] _expectedGeneratedCommandNames = { "inspect", "repair" };
+
     [Test]
     public void Execute_DryRun_ListsOnlyTheMinimalFeatureOwnedFiles()
     {
@@ -341,7 +343,7 @@ public sealed class ScaffoldCliCommandHandlerTests
             Assert.Multiple(() =>
             {
                 Assert.That(violations, Is.Empty);
-                Assert.That(modules.Select(module => module.CommandName), Is.EqualTo(new[] { "inspect", "repair" }));
+                Assert.That(modules.Select(module => module.CommandName), Is.EqualTo(_expectedGeneratedCommandNames));
                 Assert.That(console.StdOut, Does.Not.Contain("Program.cs"));
                 Assert.That(console.StdOut, Does.Not.Contain("registry"));
             });
@@ -355,8 +357,7 @@ public sealed class ScaffoldCliCommandHandlerTests
     [Test]
     public void CreatePlan_GeneratedFixtureChecksTheEntryPointCommandName()
     {
-        IReadOnlyList<ScaffoldCliCommandHandler.ScaffoldFile> files = new ScaffoldCliCommandHandler(
-            new RecordingConsole(), new ScaffoldTestFileSystem()).CreatePlan(Options());
+        IReadOnlyList<ScaffoldCliCommandHandler.ScaffoldFile> files = ScaffoldCliCommandHandler.CreatePlan(Options());
 
         string fixture = files.Single(file => file.Path.EndsWith("InspectCommandScaffoldTests.cs", StringComparison.Ordinal)).Contents;
 

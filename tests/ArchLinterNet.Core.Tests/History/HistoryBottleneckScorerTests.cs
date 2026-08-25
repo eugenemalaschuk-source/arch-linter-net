@@ -16,6 +16,9 @@ namespace ArchLinterNet.Core.Tests.History;
 [TestFixture]
 public sealed class HistoryBottleneckScorerTests
 {
+    private static readonly string[] _issue1Issue2TaskKeys = ["issue#1", "issue#2"];
+    private static readonly string[] _issue101Issue102TaskKeys = ["issue#101", "issue#102"];
+
     [Test]
     public void LeadingZeroSpellingsShareOneTaskWhilePairExclusiveEvidenceEstablishesIndependence()
     {
@@ -30,12 +33,12 @@ public sealed class HistoryBottleneckScorerTests
         string last = repository.Commit("second #2");
 
         HistoryBottleneckFinding finding = HistoryIngestionFixture.Succeed(repository, first, last)
-            .BottleneckAnalysis.Findings.Single();
+            .BottleneckAnalysis.GetFindings().Single();
         BottleneckTaskPair pair = finding.RawEvidence.IndependentTaskPairs.Single();
 
         Assert.Multiple(() =>
         {
-            Assert.That(finding.RawEvidence.TaskKeys.Select(static key => key.ToString()), Is.EqualTo(new[] { "issue#1", "issue#2" }));
+            Assert.That(finding.RawEvidence.TaskKeys.Select(static key => key.ToString()), Is.EqualTo(_issue1Issue2TaskKeys));
             Assert.That(finding.RawEvidence.IndependentTaskSpread, Is.EqualTo(2));
             Assert.That(pair.First.ToString(), Is.EqualTo("issue#1"));
             Assert.That(pair.Second.ToString(), Is.EqualTo("issue#2"));
@@ -56,11 +59,11 @@ public sealed class HistoryBottleneckScorerTests
         string last = repository.Commit("shared #101 #102");
 
         HistoryBottleneckFinding finding = HistoryIngestionFixture.Succeed(repository, first, last)
-            .BottleneckAnalysis.Findings.Single();
+            .BottleneckAnalysis.GetFindings().Single();
 
         Assert.Multiple(() =>
         {
-            Assert.That(finding.RawEvidence.TaskKeys.Select(static key => key.ToString()), Is.EqualTo(new[] { "issue#101", "issue#102" }));
+            Assert.That(finding.RawEvidence.TaskKeys.Select(static key => key.ToString()), Is.EqualTo(_issue101Issue102TaskKeys));
             Assert.That(finding.RawEvidence.IndependentTaskSpread, Is.Zero);
             Assert.That(finding.RawEvidence.IndependentTemporalProximity, Is.Zero);
             Assert.That(finding.RawEvidence.IndependentTaskPairs, Is.Empty);
@@ -84,7 +87,7 @@ public sealed class HistoryBottleneckScorerTests
             Commit(secondId, "1000000000000000000000000000000", "-1200", two, "#2"),
         };
 
-        HistoryBottleneckFinding finding = Score(files, commits).Findings.Single();
+        HistoryBottleneckFinding finding = Score(files, commits).GetFindings().Single();
         BottleneckTaskPair pair = finding.RawEvidence.IndependentTaskPairs.Single();
 
         Assert.Multiple(() =>
@@ -107,7 +110,7 @@ public sealed class HistoryBottleneckScorerTests
         var files = new[] { new LogicalFile("X.cs", [], [Event(firstId), Event(secondId)]) };
         var commits = new[] { Commit(firstId, "0", "+0000", one, "#1"), Commit(secondId, "90000", "+0000", two, "#2") };
 
-        BottleneckTaskPair pair = Score(files, commits).Findings.Single().RawEvidence.IndependentTaskPairs.Single();
+        BottleneckTaskPair pair = Score(files, commits).GetFindings().Single().RawEvidence.IndependentTaskPairs.Single();
 
         Assert.Multiple(() =>
         {
@@ -140,8 +143,8 @@ public sealed class HistoryBottleneckScorerTests
         HistoryBottleneckAnalysis high = Score(files, commits, threshold: 1m);
 
         Assert.That(
-            high.Findings.Select(DescribeFinding),
-            Is.EqualTo(low.Findings.Select(DescribeFinding)));
+            high.GetFindings().Select(DescribeFinding),
+            Is.EqualTo(low.GetFindings().Select(DescribeFinding)));
     }
 
     [Test]
@@ -180,7 +183,7 @@ public sealed class HistoryBottleneckScorerTests
         CoChangeGraph graph = new CoChangeGraphBuilder(configuration).Build(files, commits, []);
         var result = new HistoryIngestionResult(
             "sha1", "from", "to", "from", "to", commits, 0, [], [], files, graph, new HistoryBottleneckAnalysis([]), new HistoryOcpAnalysis([]));
-        return new HistoryBottleneckScorer().Score(result, configuration);
+        return HistoryBottleneckScorer.Score(result, configuration);
     }
 
     private static CommitEvidence Commit(string id, string epoch, string timezone, params object[] taskParts)

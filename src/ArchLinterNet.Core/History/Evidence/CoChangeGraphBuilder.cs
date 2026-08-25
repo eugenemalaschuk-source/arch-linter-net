@@ -90,7 +90,7 @@ internal sealed class CoChangeGraphBuilder(HistoryAnalysisConfiguration configur
 
     private static void AddCommitEvidence(
         Dictionary<CoChangePairKey, CoChangePairAccumulator> pairs,
-        IReadOnlyDictionary<string, List<CoChangeVertex>> verticesByCommit,
+        Dictionary<string, List<CoChangeVertex>> verticesByCommit,
         IReadOnlyList<CommitEvidence> commits)
     {
         foreach (CommitEvidence commit in commits)
@@ -106,7 +106,7 @@ internal sealed class CoChangeGraphBuilder(HistoryAnalysisConfiguration configur
 
     private static void AddTaskEvidence(
         Dictionary<CoChangePairKey, CoChangePairAccumulator> pairs,
-        IReadOnlyDictionary<string, List<CoChangeVertex>> verticesByCommit,
+        Dictionary<string, List<CoChangeVertex>> verticesByCommit,
         IReadOnlyList<CommitEvidence> commits)
     {
         Dictionary<TaskKey, HashSet<CoChangeVertex>> verticesByTask = [];
@@ -141,7 +141,7 @@ internal sealed class CoChangeGraphBuilder(HistoryAnalysisConfiguration configur
     }
 
     private static void AddPairs(
-        IReadOnlyList<CoChangeVertex> vertices,
+        List<CoChangeVertex> vertices,
         Action<CoChangePairAccumulator> addEvidence,
         Dictionary<CoChangePairKey, CoChangePairAccumulator> pairs)
     {
@@ -236,7 +236,7 @@ internal sealed class CoChangeGraphBuilder(HistoryAnalysisConfiguration configur
         return ranks;
     }
 
-    private IReadOnlyList<CoChangeCluster> BuildClusters(IReadOnlyList<CoChangePair> baseEdges)
+    private List<CoChangeCluster> BuildClusters(IReadOnlyList<CoChangePair> baseEdges)
     {
         decimal? threshold = configuration.Thresholds.CoChangeSignificance;
         if (threshold is null)
@@ -258,13 +258,7 @@ internal sealed class CoChangeGraphBuilder(HistoryAnalysisConfiguration configur
 
     private static IEnumerable<CoChangeCluster> BuildCohortClusters(CoChangeCohort cohort, IReadOnlyList<CoChangePair> edges)
     {
-        Dictionary<CoChangeVertex, List<CoChangePair>> adjacency = [];
-        foreach (CoChangePair edge in edges)
-        {
-            AddAdjacent(adjacency, edge.First, edge);
-            AddAdjacent(adjacency, edge.Second, edge);
-        }
-
+        Dictionary<CoChangeVertex, List<CoChangePair>> adjacency = BuildAdjacency(edges);
         HashSet<CoChangeVertex> visited = [];
         List<CoChangeVertex> startVertices = [.. adjacency.Keys];
         startVertices.Sort(CompareVertices);
@@ -275,38 +269,64 @@ internal sealed class CoChangeGraphBuilder(HistoryAnalysisConfiguration configur
                 continue;
             }
 
-            List<CoChangeVertex> members = [];
-            Stack<CoChangeVertex> pending = new();
-            pending.Push(start);
-            while (pending.Count > 0)
-            {
-                CoChangeVertex current = pending.Pop();
-                members.Add(current);
-                foreach (CoChangePair edge in adjacency[current])
-                {
-                    CoChangeVertex neighbor = ReferenceEquals(edge.First, current) ? edge.Second : edge.First;
-                    if (visited.Add(neighbor))
-                    {
-                        pending.Push(neighbor);
-                    }
-                }
-            }
-
+            List<CoChangeVertex> members = CollectComponent(start, adjacency, visited);
             if (members.Count < 2)
             {
                 continue;
             }
 
-            members.Sort(CompareVertices);
-            HashSet<CoChangeVertex> memberSet = [.. members];
-            List<CoChangePair> clusterEdges = edges
-                .Where(edge => memberSet.Contains(edge.First) && memberSet.Contains(edge.Second))
-                .OrderBy(static edge => edge, Comparer<CoChangePair>.Create(ComparePairs))
-                .ToList();
-            decimal maximum = clusterEdges.Max(static edge => edge.CombinedCoChange!.Value);
-            decimal aggregate = Quantize(clusterEdges.Sum(static edge => edge.CombinedCoChange!.Value));
-            yield return new CoChangeCluster(cohort, members, clusterEdges, maximum, aggregate);
+            yield return BuildCluster(cohort, members, edges);
         }
+    }
+
+    private static Dictionary<CoChangeVertex, List<CoChangePair>> BuildAdjacency(IReadOnlyList<CoChangePair> edges)
+    {
+        Dictionary<CoChangeVertex, List<CoChangePair>> adjacency = [];
+        foreach (CoChangePair edge in edges)
+        {
+            AddAdjacent(adjacency, edge.First, edge);
+            AddAdjacent(adjacency, edge.Second, edge);
+        }
+
+        return adjacency;
+    }
+
+    private static List<CoChangeVertex> CollectComponent(
+        CoChangeVertex start,
+        Dictionary<CoChangeVertex, List<CoChangePair>> adjacency,
+        HashSet<CoChangeVertex> visited)
+    {
+        List<CoChangeVertex> members = [];
+        Stack<CoChangeVertex> pending = new();
+        pending.Push(start);
+        while (pending.Count > 0)
+        {
+            CoChangeVertex current = pending.Pop();
+            members.Add(current);
+            foreach (CoChangePair edge in adjacency[current])
+            {
+                CoChangeVertex neighbor = ReferenceEquals(edge.First, current) ? edge.Second : edge.First;
+                if (visited.Add(neighbor))
+                {
+                    pending.Push(neighbor);
+                }
+            }
+        }
+
+        members.Sort(CompareVertices);
+        return members;
+    }
+
+    private static CoChangeCluster BuildCluster(CoChangeCohort cohort, List<CoChangeVertex> members, IReadOnlyList<CoChangePair> edges)
+    {
+        HashSet<CoChangeVertex> memberSet = [.. members];
+        List<CoChangePair> clusterEdges = edges
+            .Where(edge => memberSet.Contains(edge.First) && memberSet.Contains(edge.Second))
+            .OrderBy(static edge => edge, Comparer<CoChangePair>.Create(ComparePairs))
+            .ToList();
+        decimal maximum = clusterEdges.Max(static edge => edge.CombinedCoChange!.Value);
+        decimal aggregate = Quantize(clusterEdges.Sum(static edge => edge.CombinedCoChange!.Value));
+        return new CoChangeCluster(cohort, members, clusterEdges, maximum, aggregate);
     }
 
     private static void AddAdjacent(

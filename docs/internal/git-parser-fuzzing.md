@@ -133,12 +133,12 @@ operations in order:
 1. publishes the harness self-contained for `linux-x64`;
 1. instruments the published `ArchLinterNet.Core.dll` with SharpFuzz 2.3.0;
 1. runs the pinned AFL++ image with `-t 100 -m none -V 300` and
-    `AFL_HANG_TMOUT=100` inside the Docker 512 MiB memory envelope as the host
-    runner UID/GID; and
+   `AFL_HANG_TMOUT=100` inside the Docker 512 MiB memory envelope as the host
+   runner UID/GID; and
 1. reports the candidate count, encrypts the crash/hang files with the
-     `GIT_PARSER_FUZZ_TRIAGE_KEY` secret, uploads only the encrypted bundle and
-     its HMAC for 14 days, then removes the raw findings from the ephemeral
-     runner.
+   `GIT_PARSER_FUZZ_TRIAGE_KEY` secret, uploads only the encrypted bundle and
+   its HMAC for 14 days, then removes the raw findings from the ephemeral
+   runner.
 
 The container mounts the corpus and published harness read-only. It mounts
 only the temporary findings directory read-write, runs as the host runner UID/GID
@@ -199,8 +199,8 @@ For each candidate:
    100 ms/512 MiB limits. Confirm whether the behavior is deterministic.
 
 1. Minimize it with `afl-tmin` from the same pinned AFL++ image, with the same
-    no-network, one-CPU, read-only-root, Docker 512 MiB memory envelope, `-t 100`,
-    `AFL_HANG_TMOUT=100`, and `-m none` .NET virtual-memory handling. For a file mounted at
+   no-network, one-CPU, read-only-root, Docker 512 MiB memory envelope, `-t 100`,
+   `AFL_HANG_TMOUT=100`, and `-m none` .NET virtual-memory handling. For a file mounted at
    `/findings/default/crashes/id:...`, the target shape is:
 
    ```bash

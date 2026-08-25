@@ -52,6 +52,6 @@ internal sealed class HistoryPathClassifier
         return new HistoryPathClassification(IsIgnored: false, HistoryPathCategory.Unknown);
     }
 
-    private static IReadOnlyList<HistoryPathGlob> Compile(IEnumerable<string> patterns) =>
+    private static HistoryPathGlob[] Compile(IEnumerable<string> patterns) =>
         patterns.Select(HistoryPathGlob.Parse).ToArray();
 }

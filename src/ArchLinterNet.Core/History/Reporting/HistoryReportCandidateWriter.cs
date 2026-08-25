@@ -8,10 +8,14 @@ namespace ArchLinterNet.Core.History.Reporting;
 // back into canonical scores, ranks, or graph construction.
 internal static class HistoryReportCandidateWriter
 {
+    private const string Qualification = "qualification";
+    private const string Caveats = "caveats";
+    private const string HeuristicInvestigation = "heuristic_investigation";
+
     public static void Write(CanonicalJsonWriter writer, HistoryIngestionResult result)
     {
         writer.BeginArray("candidates");
-        foreach (HotspotFinding finding in result.HotspotAnalysis.Findings.Where(static item => item.Score > 0m))
+        foreach (HotspotFinding finding in result.HotspotAnalysis.GetFindings().Where(static item => item.Score > 0m))
         {
             WriteHotspot(writer, finding);
         }
@@ -24,12 +28,12 @@ internal static class HistoryReportCandidateWriter
             }
         }
 
-        foreach (HistoryBottleneckFinding finding in result.BottleneckAnalysis.Findings.Where(static item => item.Score > 0m))
+        foreach (HistoryBottleneckFinding finding in result.BottleneckAnalysis.GetFindings().Where(static item => item.Score > 0m))
         {
             WriteBottleneck(writer, finding);
         }
 
-        foreach (HistoryOcpFinding finding in result.OcpAnalysis.Findings.Where(static item => item.Score > 0m))
+        foreach (HistoryOcpFinding finding in result.OcpAnalysis.GetFindings().Where(static item => item.Score > 0m))
         {
             WriteOcpPressure(writer, finding);
         }
@@ -41,7 +45,7 @@ internal static class HistoryReportCandidateWriter
     {
         string sourceId = HistoryReportProjectionHelpers.FindingId("hotspot", finding.Category, finding.CanonicalPath);
         Start(writer, "hotspot", sourceId, [finding.CanonicalPath]);
-        writer.BeginObject("qualification");
+        writer.BeginObject(Qualification);
         writer.WriteCanonicalDecimal("score", finding.Score);
         writer.WriteCanonicalDecimal("minimumScoreExclusive", 0m);
         writer.BeginObject("components");
@@ -52,7 +56,7 @@ internal static class HistoryReportCandidateWriter
         writer.WriteCanonicalDecimal("temporal", finding.Components.Temporal);
         writer.EndObject();
         writer.EndObject();
-        WriteStrings(writer, "caveats", ["heuristic_investigation", "pathname_reuse_may_conflate_generations", "score_is_category_local"]);
+        WriteStrings(writer, Caveats, [HeuristicInvestigation, "pathname_reuse_may_conflate_generations", "score_is_category_local"]);
         writer.EndObject();
     }
 
@@ -61,7 +65,7 @@ internal static class HistoryReportCandidateWriter
         string sourceId = HistoryReportProjectionHelpers.ClusterId(cluster);
         string[] members = [.. cluster.Members.Select(static item => item.CanonicalPath)];
         Start(writer, "co_change_cluster", sourceId, members);
-        writer.BeginObject("qualification");
+        writer.BeginObject(Qualification);
         writer.WriteCanonicalDecimal("significanceThreshold", threshold);
         writer.WriteCanonicalDecimal("maximum", cluster.Maximum);
         writer.WriteCanonicalDecimal("aggregate", cluster.Aggregate);
@@ -77,7 +81,7 @@ internal static class HistoryReportCandidateWriter
 
         writer.EndArray();
         writer.EndObject();
-        WriteStrings(writer, "caveats", ["heuristic_investigation", "co_change_is_not_ownership_proof", "threshold_does_not_rescore_files"]);
+        WriteStrings(writer, Caveats, [HeuristicInvestigation, "co_change_is_not_ownership_proof", "threshold_does_not_rescore_files"]);
         writer.EndObject();
     }
 
@@ -85,7 +89,7 @@ internal static class HistoryReportCandidateWriter
     {
         string sourceId = HistoryReportProjectionHelpers.FindingId("bottleneck", finding.Category, finding.CanonicalPath);
         Start(writer, "bottleneck", sourceId, [finding.CanonicalPath]);
-        writer.BeginObject("qualification");
+        writer.BeginObject(Qualification);
         writer.WriteCanonicalDecimal("score", finding.Score);
         writer.WriteCanonicalDecimal("minimumScoreExclusive", 0m);
         writer.BeginObject("components");
@@ -96,7 +100,7 @@ internal static class HistoryReportCandidateWriter
         writer.WriteCanonicalDecimal("centrality", finding.Components.Centrality);
         writer.EndObject();
         writer.EndObject();
-        WriteStrings(writer, "caveats", ["heuristic_investigation", "does_not_prove_merge_conflict", "pathname_reuse_may_conflate_generations"]);
+        WriteStrings(writer, Caveats, [HeuristicInvestigation, "does_not_prove_merge_conflict", "pathname_reuse_may_conflate_generations"]);
         writer.EndObject();
     }
 
@@ -104,7 +108,7 @@ internal static class HistoryReportCandidateWriter
     {
         string sourceId = HistoryReportProjectionHelpers.FindingId("ocp-pressure", finding.Category, finding.CanonicalPath);
         Start(writer, "ocp_pressure", sourceId, [finding.CanonicalPath]);
-        writer.BeginObject("qualification");
+        writer.BeginObject(Qualification);
         writer.WriteCanonicalDecimal("score", finding.Score);
         writer.WriteCanonicalDecimal("minimumScoreExclusive", 0m);
         writer.BeginObject("components");
@@ -114,7 +118,7 @@ internal static class HistoryReportCandidateWriter
         writer.WriteCanonicalDecimal("roleHint", finding.Components.RoleHint);
         writer.EndObject();
         writer.EndObject();
-        WriteStrings(writer, "caveats", ["heuristic_investigation", "does_not_prove_ocp_violation", "pathname_reuse_may_conflate_generations"]);
+        WriteStrings(writer, Caveats, [HeuristicInvestigation, "does_not_prove_ocp_violation", "pathname_reuse_may_conflate_generations"]);
         writer.EndObject();
     }
 

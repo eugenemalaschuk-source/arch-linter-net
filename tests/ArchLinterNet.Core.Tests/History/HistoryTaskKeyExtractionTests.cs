@@ -10,13 +10,17 @@ namespace ArchLinterNet.Core.Tests.History;
 [TestFixture]
 public sealed class HistoryTaskKeyExtractionTests
 {
+    private static readonly string[] _lexicalBoundaryExpectedKeys = { "issue#1", "issue#14", "issue#15", "issue#16" };
+    private static readonly string[] _lexicalBoundaryExpectedMatchedText = { "#14", "#001", "#15", "#16" };
+    private static readonly string[] _issueAndJiraKeys = { "issue#42", "jira#42" };
+
     [Test]
     public void DefaultExtractorLexicalBoundaryVectors()
     {
         (IReadOnlyList<TaskKeyMatch> matches, IReadOnlyList<TaskKey> keys) = Extract("abc#12 #12foo ##12 #12#13 (#14) #001 #0 fix #15, #16.");
 
-        Assert.That(keys.Select(static key => key.ToString()), Is.EqualTo(new[] { "issue#1", "issue#14", "issue#15", "issue#16" }));
-        Assert.That(matches.Select(static match => match.MatchedText), Is.EqualTo(new[] { "#14", "#001", "#15", "#16" }));
+        Assert.That(keys.Select(static key => key.ToString()), Is.EqualTo(_lexicalBoundaryExpectedKeys));
+        Assert.That(matches.Select(static match => match.MatchedText), Is.EqualTo(_lexicalBoundaryExpectedMatchedText));
     }
 
     [Test]
@@ -69,7 +73,7 @@ public sealed class HistoryTaskKeyExtractionTests
 
         (_, IReadOnlyList<TaskKey> keys) = extraction.Extract(Encoding.UTF8.GetBytes("JIRA see #42"), "c1");
 
-        Assert.That(keys.Select(static key => key.ToString()), Is.EqualTo(new[] { "issue#42", "jira#42" }));
+        Assert.That(keys.Select(static key => key.ToString()), Is.EqualTo(_issueAndJiraKeys));
     }
 
     [Test]

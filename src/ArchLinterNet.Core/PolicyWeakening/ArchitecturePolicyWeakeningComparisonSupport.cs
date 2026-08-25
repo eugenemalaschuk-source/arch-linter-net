@@ -274,7 +274,7 @@ internal static class ArchitecturePolicyWeakeningComparisonSupport
                 && FactValue(item, "contract_id") is { Length: > 0 }
                 && FactValue(item, "input") is { Length: > 0 }));
 
-    private static IReadOnlyDictionary<string, bool> OptionalLayerMap(ArchitecturePolicyContextContractFact fact) => fact.Items
+    private static Dictionary<string, bool> OptionalLayerMap(ArchitecturePolicyContextContractFact fact) => fact.Items
         .Select(layer => new
         {
             Name = FactValue(layer, "name"),

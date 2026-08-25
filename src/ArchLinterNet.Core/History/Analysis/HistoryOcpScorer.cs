@@ -8,14 +8,13 @@ namespace ArchLinterNet.Core.History.Analysis;
 
 internal sealed class HistoryOcpScorer
 {
-    private const decimal Scale = 1_000_000_000m;
     private static readonly HashSet<string> _roleTokens = new(StringComparer.Ordinal)
     {
         "dispatcher", "registry", "handler", "loader", "session", "options", "configuration",
         "command", "diagnostic", "mapper", "dto", "model", "service", "orchestrator",
     };
 
-    public HistoryOcpAnalysis Score(
+    public static HistoryOcpAnalysis Score(
         HistoryBottleneckAnalysis bottleneckAnalysis,
         CoChangeGraph coChangeGraph,
         HistoryAnalysisConfiguration configuration)
@@ -25,11 +24,11 @@ internal sealed class HistoryOcpScorer
         ArgumentNullException.ThrowIfNull(configuration);
 
         OcpWeights weights = Weights(configuration.Weights.Ocp);
-        IReadOnlyDictionary<string, LogicalFile> filesByPath = coChangeGraph.Vertices.ToDictionary(
+        Dictionary<string, LogicalFile> filesByPath = coChangeGraph.Vertices.ToDictionary(
             static vertex => vertex.CanonicalPath,
             static vertex => vertex.File,
             StringComparer.Ordinal);
-        List<Candidate> candidates = bottleneckAnalysis.Findings
+        List<Candidate> candidates = bottleneckAnalysis.GetFindings()
             .Select(finding => CreateCandidate(finding, filesByPath[finding.CanonicalPath]))
             .ToList();
         List<HistoryOcpCategoryGroup> groups = [];

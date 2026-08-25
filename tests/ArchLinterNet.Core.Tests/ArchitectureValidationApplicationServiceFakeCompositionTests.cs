@@ -37,7 +37,7 @@ public sealed class ArchitectureValidationApplicationServiceFakeCompositionTests
 
         public ArchitectureContractDocument DocumentToReturn { get; set; } = new() { Version = 1, Name = "Fake" };
 
-        public IArchitectureContractRunner RunnerToReturn { get; set; } = null!;
+        public FakeContractRunner RunnerToReturn { get; set; } = null!;
 
         public ArchitecturePolicyImportException? ExceptionToThrowFromLoadDocument { get; set; }
 

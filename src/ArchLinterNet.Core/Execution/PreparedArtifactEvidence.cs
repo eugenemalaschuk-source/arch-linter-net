@@ -15,6 +15,29 @@ internal static class PreparedArtifactEvidence
         ProjectDiscoveryResult discovery,
         CancellationToken cancellationToken)
     {
+        Dictionary<string, string> candidates = BuildCandidateIndex(roots, discovery);
+        Queue<string> pending = new(roots.Select(Path.GetFullPath));
+        HashSet<string> closure = new(StringComparer.OrdinalIgnoreCase);
+        // A project-only metadata contract has no exact PE/PDB root inventory. Do not make it
+        // reusable merely because its reference walk is vacuously empty.
+        bool complete = roots.Count > 0;
+        while (pending.Count > 0)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            string path = pending.Dequeue();
+            if (!closure.Add(path))
+            {
+                continue;
+            }
+
+            complete &= ProcessReferenceClosureEntry(path, candidates, pending);
+        }
+
+        return (closure.OrderBy(path => path, StringComparer.OrdinalIgnoreCase).ToArray(), complete);
+    }
+
+    private static Dictionary<string, string> BuildCandidateIndex(IReadOnlyList<string> roots, ProjectDiscoveryResult discovery)
+    {
         Dictionary<string, string> candidates = new(StringComparer.OrdinalIgnoreCase);
         foreach (string path in roots.Concat(discovery.ResolvedAssemblyPaths.Values).Where(File.Exists))
         {
@@ -30,50 +53,40 @@ internal static class PreparedArtifactEvidence
             }
         }
 
-        Queue<string> pending = new(roots.Select(Path.GetFullPath));
-        HashSet<string> closure = new(StringComparer.OrdinalIgnoreCase);
-        // A project-only metadata contract has no exact PE/PDB root inventory. Do not make it
-        // reusable merely because its reference walk is vacuously empty.
-        bool complete = roots.Count > 0;
-        while (pending.Count > 0)
+        return candidates;
+    }
+
+    private static bool ProcessReferenceClosureEntry(string path, Dictionary<string, string> candidates, Queue<string> pending)
+    {
+        try
         {
-            cancellationToken.ThrowIfCancellationRequested();
-            string path = pending.Dequeue();
-            if (!closure.Add(path))
+            using FileStream stream = File.OpenRead(path);
+            using PEReader reader = new(stream, PEStreamOptions.LeaveOpen);
+            if (!reader.HasMetadata)
             {
-                continue;
+                return false;
             }
 
-            try
+            MetadataReader metadata = reader.GetMetadataReader();
+            bool complete = true;
+            foreach (AssemblyReferenceHandle handle in metadata.AssemblyReferences)
             {
-                using FileStream stream = File.OpenRead(path);
-                using PEReader reader = new(stream, PEStreamOptions.LeaveOpen);
-                if (!reader.HasMetadata)
+                string name = metadata.GetString(metadata.GetAssemblyReference(handle).Name);
+                if (string.IsNullOrWhiteSpace(name) || !candidates.TryGetValue(name, out string? referencePath))
                 {
                     complete = false;
                     continue;
                 }
 
-                MetadataReader metadata = reader.GetMetadataReader();
-                foreach (AssemblyReferenceHandle handle in metadata.AssemblyReferences)
-                {
-                    string name = metadata.GetString(metadata.GetAssemblyReference(handle).Name);
-                    if (string.IsNullOrWhiteSpace(name) || !candidates.TryGetValue(name, out string? referencePath))
-                    {
-                        complete = false;
-                        continue;
-                    }
+                pending.Enqueue(referencePath);
+            }
 
-                    pending.Enqueue(referencePath);
-                }
-            }
-            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or BadImageFormatException)
-            {
-                complete = false;
-            }
+            return complete;
         }
-
-        return (closure.OrderBy(path => path, StringComparer.OrdinalIgnoreCase).ToArray(), complete);
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or BadImageFormatException)
+        {
+            return false;
+        }
     }
 
     internal static IReadOnlyDictionary<string, string> CaptureDigests(

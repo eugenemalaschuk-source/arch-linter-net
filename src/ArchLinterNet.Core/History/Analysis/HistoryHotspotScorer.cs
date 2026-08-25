@@ -15,13 +15,13 @@ internal sealed class HistoryHotspotScorer
     private static readonly BigInteger _fixedPointScale = BigInteger.Pow(10, 60);
     private static readonly BigInteger _naturalLogOfTwo = AtanhScaled(BigInteger.One, new BigInteger(3));
 
-    public HistoryHotspotAnalysis Score(HistoryIngestionResult result, HistoryAnalysisConfiguration configuration)
+    public static HistoryHotspotAnalysis Score(HistoryIngestionResult result, HistoryAnalysisConfiguration configuration)
     {
         ArgumentNullException.ThrowIfNull(result);
         return Score(result.Commits, result.LogicalFiles, configuration);
     }
 
-    public HistoryHotspotAnalysis Score(
+    public static HistoryHotspotAnalysis Score(
         IReadOnlyList<CommitEvidence> commitEvidence,
         IReadOnlyList<LogicalFile> logicalFiles,
         HistoryAnalysisConfiguration configuration)
@@ -60,7 +60,7 @@ internal sealed class HistoryHotspotScorer
     private static Candidate CreateCandidate(
         LogicalFile file,
         HistoryPathCategory category,
-        IReadOnlyDictionary<string, CommitEvidence> commits)
+        Dictionary<string, CommitEvidence> commits)
     {
         var taskKeys = new HashSet<Tasks.TaskKey>();
         var taskKeyProvenance = new List<HotspotTaskKeyProvenance>();
@@ -205,10 +205,12 @@ internal sealed class HistoryHotspotScorer
         BigInteger squared = MultiplyScaled(scaledValue, scaledValue);
         BigInteger power = scaledValue;
         BigInteger sum = BigInteger.Zero;
-        for (int divisor = 1; !power.IsZero; divisor += 2)
+        int divisor = 1;
+        while (!power.IsZero)
         {
             sum += power / divisor;
             power = MultiplyScaled(power, squared);
+            divisor += 2;
         }
 
         return sum * 2;

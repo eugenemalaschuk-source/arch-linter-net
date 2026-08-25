@@ -11,6 +11,13 @@ namespace ArchLinterNet.Core.Tests.History;
 [TestFixture]
 public sealed class HistoryAnalysisConfigurationTests
 {
+    private static readonly string[] _extractedTaskKeys = { "issue#2", "jira#1" };
+    private static readonly string[] _extractedMatchedTexts = { "JIRA-001", "#2" };
+    private static readonly string[] _importedExtractorIds = { "jira" };
+    private static readonly string[] _importedProductionPaths = { "src/**" };
+    private static readonly string[] _importedDocsPaths = { "docs/**" };
+    private static readonly string[] _importedIgnorePaths = { "src/generated/**" };
+
     private string _temporaryDirectory = null!;
 
     [SetUp]
@@ -65,8 +72,8 @@ public sealed class HistoryAnalysisConfigurationTests
 
         Assert.Multiple(() =>
         {
-            Assert.That(keys.Select(static key => key.ToString()), Is.EqualTo(new[] { "issue#2", "jira#1" }));
-            Assert.That(matches.Select(static match => match.MatchedText), Is.EqualTo(new[] { "JIRA-001", "#2" }));
+            Assert.That(keys.Select(static key => key.ToString()), Is.EqualTo(_extractedTaskKeys));
+            Assert.That(matches.Select(static match => match.MatchedText), Is.EqualTo(_extractedMatchedTexts));
             Assert.That(matches[0].SpanStart, Is.EqualTo(4));
             Assert.That(matches[0].SpanEnd, Is.EqualTo(12));
         });
@@ -137,14 +144,14 @@ public sealed class HistoryAnalysisConfigurationTests
 
         Assert.Multiple(() =>
         {
-            Assert.That(document.HistoryAnalysis.Extractors.Select(static extractor => extractor.Id), Is.EqualTo(new[] { "jira" }));
-            Assert.That(document.HistoryAnalysis.Paths.Production, Is.EqualTo(new[] { "src/**" }));
-            Assert.That(document.HistoryAnalysis.Paths.Docs, Is.EqualTo(new[] { "docs/**" }));
-            Assert.That(document.HistoryAnalysis.Ignore, Is.EqualTo(new[] { "src/generated/**" }));
+            Assert.That(document.HistoryAnalysis.Extractors.Select(static extractor => extractor.Id), Is.EqualTo(_importedExtractorIds));
+            Assert.That(document.HistoryAnalysis.Paths.Production, Is.EqualTo(_importedProductionPaths));
+            Assert.That(document.HistoryAnalysis.Paths.Docs, Is.EqualTo(_importedDocsPaths));
+            Assert.That(document.HistoryAnalysis.Ignore, Is.EqualTo(_importedIgnorePaths));
             Assert.That(document.HistoryAnalysis.Weights.CoChange.Commit, Is.EqualTo(0.75m));
             Assert.That(document.HistoryAnalysis.Thresholds.CoChangeSignificance, Is.EqualTo(0.750000000m));
-            Assert.That(matches.Select(static match => match.MatchedText), Is.EqualTo(new[] { "JIRA-001", "#2" }));
-            Assert.That(keys.Select(static key => key.ToString()), Is.EqualTo(new[] { "issue#2", "jira#1" }));
+            Assert.That(matches.Select(static match => match.MatchedText), Is.EqualTo(_extractedMatchedTexts));
+            Assert.That(keys.Select(static key => key.ToString()), Is.EqualTo(_extractedTaskKeys));
             Assert.That(classifier.Classify("src/service.cs").Category, Is.EqualTo(HistoryPathCategory.Production));
             Assert.That(classifier.Classify("docs/guide.md").Category, Is.EqualTo(HistoryPathCategory.Docs));
             Assert.That(classifier.Classify("src/generated/code.cs").IsIgnored, Is.True);

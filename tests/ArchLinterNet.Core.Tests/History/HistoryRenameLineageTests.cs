@@ -8,6 +8,11 @@ namespace ArchLinterNet.Core.Tests.History;
 [TestFixture]
 public sealed class HistoryRenameLineageTests
 {
+    private static readonly string[] _oldCsAlias = { "src/Old.cs" };
+    private static readonly string[] _aThenBAliases = { "A.cs", "B.cs" };
+    private static readonly string[] _bCsAliasOnly = { "B.cs" };
+    private static readonly string[] _abcCanonicalPaths = { "A.cs", "B.cs", "C.cs" };
+
     [Test]
     public void APureExactRenameIsOneTouchWithZeroChurn()
     {
@@ -21,7 +26,7 @@ public sealed class HistoryRenameLineageTests
 
         LogicalFile file = HistoryIngestionFixture.File(result, "tests/New.cs");
         Assert.That(result.LogicalFiles.Count, Is.EqualTo(1));
-        Assert.That(file.Aliases, Is.EqualTo(new[] { "src/Old.cs" }));
+        Assert.That(file.Aliases, Is.EqualTo(_oldCsAlias));
         Assert.That(file.CommitCount, Is.EqualTo(1));
         Assert.That(file.Churn, Is.Zero);
         Assert.That(file.Events.Single().LineCountStatusText, Is.EqualTo("exact_rename"));
@@ -43,7 +48,7 @@ public sealed class HistoryRenameLineageTests
 
         LogicalFile file = HistoryIngestionFixture.File(result, "C.cs");
         Assert.That(result.LogicalFiles.Count, Is.EqualTo(1));
-        Assert.That(file.Aliases, Is.EqualTo(new[] { "A.cs", "B.cs" }));
+        Assert.That(file.Aliases, Is.EqualTo(_aThenBAliases));
         Assert.That(result.RenameComponents.Single().StatusText, Is.EqualTo("accepted"));
     }
 
@@ -61,7 +66,7 @@ public sealed class HistoryRenameLineageTests
         HistoryIngestionResult result = HistoryIngestionFixture.Succeed(repository, first, last);
 
         LogicalFile file = HistoryIngestionFixture.File(result, "A.cs");
-        Assert.That(file.Aliases, Is.EqualTo(new[] { "B.cs" }));
+        Assert.That(file.Aliases, Is.EqualTo(_bCsAliasOnly));
         Assert.That(result.RenameComponents.Single().StatusText, Is.EqualTo("accepted"));
     }
 
@@ -89,7 +94,7 @@ public sealed class HistoryRenameLineageTests
         Assert.That(result.RenameCandidates.All(static candidate => !candidate.Accepted), Is.True);
         Assert.That(
             result.LogicalFiles.Select(static file => file.CanonicalPath),
-            Is.EqualTo(new[] { "A.cs", "B.cs", "C.cs" }));
+            Is.EqualTo(_abcCanonicalPaths));
         Assert.That(HistoryIngestionFixture.File(result, "B.cs").Events.Single().KindText, Is.EqualTo("add"));
         Assert.That(HistoryIngestionFixture.File(result, "A.cs").Events.All(static fileEvent => fileEvent.KindText == "delete"), Is.True);
     }
@@ -114,7 +119,7 @@ public sealed class HistoryRenameLineageTests
         Assert.That(result.RenameComponents.Single().StatusText, Is.EqualTo("ambiguous_dag"));
         Assert.That(
             result.LogicalFiles.Select(static file => file.CanonicalPath),
-            Is.EqualTo(new[] { "A.cs", "B.cs", "C.cs" }));
+            Is.EqualTo(_abcCanonicalPaths));
     }
 
     [Test]
@@ -133,7 +138,7 @@ public sealed class HistoryRenameLineageTests
         Assert.That(result.RenameCandidates, Is.Empty);
         Assert.That(
             result.LogicalFiles.Select(static file => file.CanonicalPath),
-            Is.EqualTo(new[] { "A.cs", "B.cs", "C.cs" }));
+            Is.EqualTo(_abcCanonicalPaths));
     }
 
     [Test]
