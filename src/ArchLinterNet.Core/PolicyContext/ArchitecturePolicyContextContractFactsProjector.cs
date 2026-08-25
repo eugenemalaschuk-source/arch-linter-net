@@ -253,7 +253,7 @@ internal static class ArchitecturePolicyContextContractFactsProjector
         items.Count == 0 ? null : new ArchitecturePolicyContextContractFact(name, Array.Empty<string>(), items);
 
     private static ArchitecturePolicyContextContractFact? Object(string name, params ArchitecturePolicyContextContractFact?[] items) =>
-        Object(name, Facts(items));
+        Object(name, (IReadOnlyList<ArchitecturePolicyContextContractFact>)Facts(items));
 
     private static ArchitecturePolicyContextContractFact? Objects(string name, IEnumerable<ArchitecturePolicyContextContractFact?> items) =>
         Object(name, items.Where(item => item is not null).Cast<ArchitecturePolicyContextContractFact>().ToArray());
@@ -261,7 +261,7 @@ internal static class ArchitecturePolicyContextContractFactsProjector
     private static ArchitecturePolicyContextContractFact[] Facts(IEnumerable<ArchitecturePolicyContextContractFact?> facts) =>
         facts.Where(fact => fact is not null).Cast<ArchitecturePolicyContextContractFact>().ToArray();
 
-    private static IReadOnlyList<ArchitecturePolicyContextContractFact> Facts(params ArchitecturePolicyContextContractFact?[] facts) => Facts((IEnumerable<ArchitecturePolicyContextContractFact?>)facts);
+    private static ArchitecturePolicyContextContractFact[] Facts(params ArchitecturePolicyContextContractFact?[] facts) => Facts((IEnumerable<ArchitecturePolicyContextContractFact?>)facts);
 
     private static string Display(object? value) => value switch
     {
