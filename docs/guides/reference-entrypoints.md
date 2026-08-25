@@ -2,7 +2,9 @@
 
 These are thin consumer-owned templates for ArchLinterNet. They pin or restore
 the tool, pass structured arguments, invoke one validation command per
-requested session, and preserve stdout/stderr. POSIX, PowerShell, Task with
+requested session, and preserve stdout/stderr. When one session requires both
+strict and audit over the same build state, that command is the combined
+`--mode strict,audit --ensure-built` path. POSIX, PowerShell, Task with
 `--exit-code`, and direct CI invocations propagate the exact product exit code.
 GNU Make cannot do so for a failing recipe, so its template writes that exact
 code to an artifact for the outer shell/CI caller to propagate. The templates
@@ -25,6 +27,22 @@ dotnet tool install ArchLinterNet.Cli
 dotnet tool restore
 dotnet arch-linter-net --policy architecture/arch.yml --mode strict --ensure-built
 ```
+
+For a workflow that requires both mode results from one build state, use the
+canonical combined invocation and route product reports directly:
+
+```bash
+dotnet arch-linter-net --policy architecture/arch.yml \
+  --mode strict,audit --ensure-built \
+  --report json=artifacts/architecture-results.json \
+  --report sarif=artifacts/architecture-results.sarif
+```
+
+This performs one snapshot-owned build/preflight preparation (including
+post-build receipt verification) and evaluates strict and audit from one
+immutable analysis snapshot. The command fails if either requested mode fails;
+the JSON and SARIF sinks reuse those completed outcomes. Single-mode commands
+remain supported when only one mode is needed.
 
 When upgrading, use `dotnet tool update ArchLinterNet.Cli`, review the manifest
 diff, and run the repository acceptance gate before merging the new pin.
@@ -164,15 +182,17 @@ snapshot, cache, or report semantics.
 ## Generic CI contract
 
 Every CI provider needs the same sequence: restore the pinned tool, restore and
-build the solution as appropriate, invoke strict validation once, preserve its
-exit code, and retain configured report files as artifacts. The provider does
-not parse display prose to decide success.
+build the solution as appropriate, invoke either strict validation once or the
+combined strict-and-audit validation once when both modes are required from the
+same build state, preserve the product exit code, and retain configured report
+files as artifacts. The provider does not parse display prose to decide
+success.
 
 ```text
 dotnet tool restore
 dotnet restore
 dotnet build --no-restore
-dotnet arch-linter-net --policy architecture/arch.yml --mode strict --ensure-built \
+dotnet arch-linter-net --policy architecture/arch.yml --mode strict,audit --ensure-built \
   --report json=artifacts/architecture.json \
   --report sarif=artifacts/architecture.sarif
 status=$?
@@ -230,9 +250,9 @@ jobs:
       - run: dotnet tool restore
       - run: dotnet restore
       - run: dotnet build --no-restore
-      - name: Strict validation
+      - name: Combined strict + audit validation
         run: >-
-          dotnet arch-linter-net --policy architecture/arch.yml --mode strict --ensure-built
+          dotnet arch-linter-net --policy architecture/arch.yml --mode strict,audit --ensure-built
           --report json=artifacts/architecture.json
           --report sarif=artifacts/architecture.sarif
       - name: Upload diagnostics
@@ -244,8 +264,11 @@ jobs:
 ```
 
 An audit run is a visibility decision, not a replacement for strict validation.
-If it is non-blocking, configure that policy in the CI provider while retaining
-the tool's real exit code in logs and artifacts.
+If audit is intentionally advisory, keep separate strict-blocking and
+non-blocking-audit steps while retaining each tool exit code in logs and
+artifacts. Those are independent CLI processes and do not reuse prepared state
+across processes. The combined command is the choice when both modes must
+contribute to one required CI decision.
 
 ## Testing API
 

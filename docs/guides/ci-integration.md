@@ -1,6 +1,14 @@
 # CI Integration
 
-A good CI setup separates blocking strict validation from non-blocking audit visibility.
+A CI workflow should choose its mode boundary deliberately. When one workflow requires
+both strict and audit results from the same build state, use the combined
+`--mode strict,audit --ensure-built` invocation: it owns one immutable analysis
+snapshot and one snapshot-owned build/preflight preparation (including any
+post-build receipt verification), then evaluates both modes from that snapshot.
+The combined command fails when either requested mode fails. When audit is
+intentionally advisory, retain separate strict-blocking and non-blocking-audit
+steps instead; those independent CLI processes do not reuse one another's
+prepared state.
 
 The provider-neutral 0.5.1 contract, offline schema commands, sequential mode,
 and safe POSIX/PowerShell/Make/Task/Tilt templates are in [0.5.1 reference
@@ -34,30 +42,19 @@ jobs:
       - name: Restore dependencies
         run: dotnet restore
 
-      - name: Build
-        run: dotnet build --no-restore
+      - name: Validate architecture (strict + audit)
+        run: dotnet arch-linter-net --mode strict,audit --ensure-built \
+          --report json=architecture-results.json \
+          --report sarif=architecture-results.sarif
 
-      - name: Validate architecture (strict)
-        run: dotnet arch-linter-net --mode strict --json > architecture-strict.json
-
-      - name: Upload strict diagnostics
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: architecture-strict
-          path: architecture-strict.json
-
-      - name: Architecture audit report
-        if: always()
-        continue-on-error: true
-        run: dotnet arch-linter-net --mode audit --json > architecture-audit.json
-
-      - name: Upload audit diagnostics
+      - name: Upload architecture diagnostics
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: architecture-audit
-          path: architecture-audit.json
+          name: architecture-results
+          path: |
+            architecture-results.json
+            architecture-results.sarif
 ```
 
 Use `dotnet tool restore` with a local tool manifest when the repository should pin the ArchLinterNet version. Use `dotnet tool install --global ArchLinterNet.Cli` only when global installation is acceptable for your pipeline.
@@ -69,6 +66,11 @@ Use `dotnet tool restore` with a local tool manifest when the repository should 
 | `0` | No selected contract violations | Pass |
 | `1` | Validation completed and violations were found | Fail strict jobs; expected when manually inspecting failing audit rules |
 | `2` | Invalid arguments, invalid configuration, missing files, or other runtime error | Fail closed |
+
+For a combined `strict,audit` command, code `1` is the aggregate result: either
+requested mode failing makes the command fail. The JSON and SARIF files above
+contain the completed result for each mode; report routing renders those
+outcomes and does not run analysis again.
 
 See [Exit codes](../usage/exit-codes.md) for details.
 
@@ -90,6 +92,26 @@ Use `--max-failure-diagnostics 3` for the compact comment and pass `--changed-fi
 Strict validation is the no-new-debt gate. It should fail a pull request when an enforced architecture boundary is violated.
 
 Audit validation is visibility for migration work. It can be uploaded as an artifact, posted to a dashboard, or inspected periodically, but it should not accidentally become the strict gate unless the team intentionally promotes the audit rule.
+
+If audit is intentionally advisory, keep the backward-compatible two-step
+workflow and make only the audit step non-blocking:
+
+```yaml
+- name: Validate architecture (strict)
+  run: dotnet arch-linter-net --mode strict --ensure-built \
+    --report json=architecture-strict.json
+
+- name: Architecture audit report
+  if: always()
+  continue-on-error: true
+  run: dotnet arch-linter-net --mode audit --ensure-built \
+    --report json=architecture-audit.json
+```
+
+Each step is a separate CLI process with its own preparation. Choose this
+alternative when audit findings should remain visible without contributing to
+the blocking decision; choose the combined invocation when both mode results
+must be required from one build-state snapshot.
 
 ## Baseline in CI
 
