@@ -9,12 +9,15 @@ namespace ArchLinterNet.Core.Execution.Checkers;
 
 internal static class ModuleContainerChecker
 {
-    private static readonly IReadOnlySet<string> _cliCommandSegments = new HashSet<string>(StringComparer.Ordinal)
+    private const string AbstractionsSegment = "Abstractions";
+    private const string ModelsSegment = "Models";
+
+    private static readonly HashSet<string> _cliCommandSegments = new(StringComparer.Ordinal)
     {
-        "EntryPoint", "Application", "Abstractions", "Models", "Exceptions",
+        "EntryPoint", "Application", AbstractionsSegment, ModelsSegment, "Exceptions",
     };
 
-    private static readonly IReadOnlySet<string> _genericModuleNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+    private static readonly HashSet<string> _genericModuleNames = new(StringComparer.OrdinalIgnoreCase)
     {
         "Common", "Shared", "Utils",
     };
@@ -28,15 +31,14 @@ internal static class ModuleContainerChecker
             context.AnalysisContext.TargetAssemblies, contract.Container);
         var violations = new List<ArchitectureViolation>();
 
-        CheckStructure(contract, inventory, context, executionContext, violations);
-        CheckDependencies(contract, inventory, context, executionContext, violations);
+        CheckStructure(contract, inventory, executionContext, violations);
+        CheckDependencies(contract, inventory, executionContext, violations);
         return violations;
     }
 
     private static void CheckStructure(
         ArchitectureModuleContainerContract contract,
         ArchitectureModuleContainerDiscovery.Inventory inventory,
-        ArchitectureCheckerContext context,
         ArchitectureContractExecutionContext executionContext,
         List<ArchitectureViolation> violations)
     {
@@ -46,7 +48,7 @@ internal static class ModuleContainerChecker
             string typeName = ArchitectureTypeNames.SafeFullName(type);
             if (location.IsContainerRoot && !contract.AllowedContainerRootTypes.Contains(typeName, StringComparer.Ordinal))
             {
-                AddStructuralViolation(contract, type, "<container-root>", context, executionContext, violations);
+                AddStructuralViolation(contract, type, "<container-root>", executionContext, violations);
                 continue;
             }
 
@@ -57,19 +59,19 @@ internal static class ModuleContainerChecker
 
             if (_genericModuleNames.Contains(location.ModuleName))
             {
-                AddStructuralViolation(contract, type, $"<generic-module:{location.ModuleName}>", context, executionContext, violations);
+                AddStructuralViolation(contract, type, $"<generic-module:{location.ModuleName}>", executionContext, violations);
                 continue;
             }
 
             if (location.Segment == null && !contract.AllowedModuleRootTypes.Contains(typeName, StringComparer.Ordinal))
             {
-                AddStructuralViolation(contract, type, $"<module-root:{location.ModuleName}>", context, executionContext, violations);
+                AddStructuralViolation(contract, type, $"<module-root:{location.ModuleName}>", executionContext, violations);
                 continue;
             }
 
             if (location.Segment != null && !_cliCommandSegments.Contains(location.Segment))
             {
-                AddStructuralViolation(contract, type, $"<undeclared-segment:{location.Segment}>", context, executionContext, violations);
+                AddStructuralViolation(contract, type, $"<undeclared-segment:{location.Segment}>", executionContext, violations);
             }
         }
     }
@@ -77,7 +79,6 @@ internal static class ModuleContainerChecker
     private static void CheckDependencies(
         ArchitectureModuleContainerContract contract,
         ArchitectureModuleContainerDiscovery.Inventory inventory,
-        ArchitectureCheckerContext context,
         ArchitectureContractExecutionContext executionContext,
         List<ArchitectureViolation> violations)
     {
@@ -99,7 +100,7 @@ internal static class ModuleContainerChecker
                 {
                     AddDependencyViolation(
                         contract, sourceType, target, $"{contract.Container}.{targetLocation.ModuleName}",
-                        context, executionContext, violations);
+                        executionContext, violations);
                     continue;
                 }
 
@@ -110,7 +111,7 @@ internal static class ModuleContainerChecker
                     AddDependencyViolation(
                         contract, sourceType, target,
                         $"{contract.Container}.{source.ModuleName}.{targetLocation.Segment}",
-                        context, executionContext, violations);
+                        executionContext, violations);
                 }
             }
         }
@@ -125,9 +126,9 @@ internal static class ModuleContainerChecker
 
         return sourceSegment switch
         {
-            "EntryPoint" => targetSegment is "Application" or "Abstractions" or "Models" or "Exceptions",
-            "Application" => targetSegment is "Abstractions" or "Models" or "Exceptions",
-            "Abstractions" => targetSegment == "Models",
+            "EntryPoint" => targetSegment is "Application" or AbstractionsSegment or ModelsSegment or "Exceptions",
+            "Application" => targetSegment is AbstractionsSegment or ModelsSegment or "Exceptions",
+            AbstractionsSegment => targetSegment == ModelsSegment,
             _ => false,
         };
     }
@@ -136,11 +137,10 @@ internal static class ModuleContainerChecker
         ArchitectureModuleContainerContract contract,
         Type source,
         string marker,
-        ArchitectureCheckerContext context,
         ArchitectureContractExecutionContext executionContext,
         List<ArchitectureViolation> violations)
     {
-        AddViolation(contract, source, target: null, marker, context, executionContext, violations);
+        AddViolation(contract, source, target: null, marker, executionContext, violations);
     }
 
     private static void AddDependencyViolation(
@@ -148,11 +148,10 @@ internal static class ModuleContainerChecker
         Type source,
         Type target,
         string forbiddenNamespace,
-        ArchitectureCheckerContext context,
         ArchitectureContractExecutionContext executionContext,
         List<ArchitectureViolation> violations)
     {
-        AddViolation(contract, source, target, forbiddenNamespace, context, executionContext, violations);
+        AddViolation(contract, source, target, forbiddenNamespace, executionContext, violations);
     }
 
     private static void AddViolation(
@@ -160,7 +159,6 @@ internal static class ModuleContainerChecker
         Type source,
         Type? target,
         string forbiddenNamespace,
-        ArchitectureCheckerContext context,
         ArchitectureContractExecutionContext executionContext,
         List<ArchitectureViolation> violations)
     {

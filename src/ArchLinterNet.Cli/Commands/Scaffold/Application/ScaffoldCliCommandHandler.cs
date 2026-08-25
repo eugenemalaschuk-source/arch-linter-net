@@ -53,7 +53,7 @@ internal sealed class ScaffoldCliCommandHandler(ICliConsole console, IFileSystem
         }
     }
 
-    internal IReadOnlyList<ScaffoldFile> CreatePlan(ScaffoldCliCommandOptions options)
+    internal static IReadOnlyList<ScaffoldFile> CreatePlan(ScaffoldCliCommandOptions options)
     {
         if (!string.Equals(options.Profile, "cli-command", StringComparison.Ordinal))
         {
@@ -179,7 +179,7 @@ internal sealed class ScaffoldCliCommandHandler(ICliConsole console, IFileSystem
         }
     }
 
-    private void RecordMissingParentDirectories(string path, ISet<string> createdDirectories)
+    private void RecordMissingParentDirectories(string path, HashSet<string> createdDirectories)
     {
         for (string? directory = Path.GetDirectoryName(path);
              !string.IsNullOrEmpty(directory) && !fileSystem.DirectoryExists(directory);
@@ -260,7 +260,7 @@ internal sealed class ScaffoldCliCommandHandler(ICliConsole console, IFileSystem
     }
 
     private static void AddOptionalModel(
-        ICollection<ScaffoldFile> files, string? modelName, string modulePath, string moduleNamespace)
+        List<ScaffoldFile> files, string? modelName, string modulePath, string moduleNamespace)
     {
         if (string.IsNullOrEmpty(modelName))
         {
@@ -275,7 +275,7 @@ internal sealed class ScaffoldCliCommandHandler(ICliConsole console, IFileSystem
     }
 
     private static void AddOptionalAbstraction(
-        ICollection<ScaffoldFile> files, string? abstractionName, string modulePath, string moduleNamespace)
+        List<ScaffoldFile> files, string? abstractionName, string modulePath, string moduleNamespace)
     {
         if (string.IsNullOrEmpty(abstractionName))
         {
@@ -295,7 +295,7 @@ internal sealed class ScaffoldCliCommandHandler(ICliConsole console, IFileSystem
     }
 
     private static void AddOptionalException(
-        ICollection<ScaffoldFile> files, string? exceptionName, string modulePath, string moduleNamespace)
+        List<ScaffoldFile> files, string? exceptionName, string modulePath, string moduleNamespace)
     {
         if (string.IsNullOrEmpty(exceptionName))
         {

@@ -15,6 +15,18 @@ namespace ArchLinterNet.Core.Tests.History;
 [TestFixture]
 public sealed class HistoryCoChangeGraphTests
 {
+    private static readonly string[] _issue1Jira1TaskKeys = ["issue#1", "jira#1"];
+    private static readonly string[] _srcXCsCanonicalPaths = ["src/X.cs"];
+    private static readonly string[] _abcCanonicalPaths = ["A.cs", "B.cs", "C.cs"];
+    private static readonly string[] _aToBAToCEdgePairs = ["A.cs:B.cs", "A.cs:C.cs"];
+    private static readonly string[] _rankedEdgeDescriptions =
+    [
+        "B.cs:C.cs:0.700000000:1",
+        "A.cs:B.cs:0.600000000:2",
+        "A.cs:C.cs:0.590000000:3",
+    ];
+    private static readonly string[] _aToBBToCEdgePairs = ["A.cs:B.cs", "B.cs:C.cs"];
+
     [Test]
     public void DefaultLeadingZeroTaskSpellingsProduceOneTaskCoChange()
     {
@@ -68,7 +80,7 @@ public sealed class HistoryCoChangeGraphTests
         {
             Assert.That(pair.CommitCoChange, Is.EqualTo(2));
             Assert.That(pair.TaskCoChange, Is.EqualTo(2));
-            Assert.That(pair.TaskKeys.Select(static key => key.ToString()), Is.EqualTo(new[] { "issue#1", "jira#1" }));
+            Assert.That(pair.TaskKeys.Select(static key => key.ToString()), Is.EqualTo(_issue1Jira1TaskKeys));
             Assert.That(pair.CommitComponent, Is.EqualTo(1m));
             Assert.That(pair.TaskComponent, Is.EqualTo(1m));
             Assert.That(pair.CombinedCoChange, Is.EqualTo(1m));
@@ -113,7 +125,7 @@ public sealed class HistoryCoChangeGraphTests
 
         Assert.Multiple(() =>
         {
-            Assert.That(result.CoChangeGraph.Vertices.Select(static vertex => vertex.CanonicalPath), Is.EqualTo(new[] { "src/X.cs" }));
+            Assert.That(result.CoChangeGraph.Vertices.Select(static vertex => vertex.CanonicalPath), Is.EqualTo(_srcXCsCanonicalPaths));
             Assert.That(result.CoChangeGraph.Pairs, Is.Empty);
             Assert.That(result.CoChangeGraph.BaseEdges, Is.Empty);
         });
@@ -138,9 +150,9 @@ public sealed class HistoryCoChangeGraphTests
 
         Assert.Multiple(() =>
         {
-            Assert.That(graph.Vertices.Select(static vertex => vertex.CanonicalPath), Is.EqualTo(new[] { "A.cs", "B.cs", "C.cs" }));
+            Assert.That(graph.Vertices.Select(static vertex => vertex.CanonicalPath), Is.EqualTo(_abcCanonicalPaths));
             Assert.That(graph.Vertices.All(static vertex => vertex.RenameComponents.Single().StatusText == "ambiguous_dag"), Is.True);
-            Assert.That(graph.BaseEdges.Select(DescribePair), Is.EqualTo(new[] { "A.cs:B.cs", "A.cs:C.cs" }));
+            Assert.That(graph.BaseEdges.Select(DescribePair), Is.EqualTo(_aToBAToCEdgePairs));
         });
     }
 
@@ -161,14 +173,9 @@ public sealed class HistoryCoChangeGraphTests
 
         Assert.Multiple(() =>
         {
-            Assert.That(forward.BaseEdges.Select(DescribeRankedEdge), Is.EqualTo(new[]
-            {
-                "B.cs:C.cs:0.700000000:1",
-                "A.cs:B.cs:0.600000000:2",
-                "A.cs:C.cs:0.590000000:3",
-            }));
-            Assert.That(cluster.Members.Select(static member => member.CanonicalPath), Is.EqualTo(new[] { "A.cs", "B.cs", "C.cs" }));
-            Assert.That(cluster.Edges.Select(DescribePair), Is.EqualTo(new[] { "A.cs:B.cs", "B.cs:C.cs" }));
+            Assert.That(forward.BaseEdges.Select(DescribeRankedEdge), Is.EqualTo(_rankedEdgeDescriptions));
+            Assert.That(cluster.Members.Select(static member => member.CanonicalPath), Is.EqualTo(_abcCanonicalPaths));
+            Assert.That(cluster.Edges.Select(DescribePair), Is.EqualTo(_aToBBToCEdgePairs));
             Assert.That(cluster.Maximum, Is.EqualTo(0.700000000m));
             Assert.That(cluster.Aggregate, Is.EqualTo(1.300000000m));
             Assert.That(reverse.Pairs.Select(DescribeEdge), Is.EqualTo(forward.Pairs.Select(DescribeEdge)));

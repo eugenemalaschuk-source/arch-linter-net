@@ -10,6 +10,15 @@ namespace ArchLinterNet.Core.Tests.History;
 [TestFixture]
 public sealed class HistoryOcpScorerTests
 {
+    private static readonly string[] _issue1Issue2TaskKeys = ["issue#1", "issue#2"];
+    private static readonly string[] _serviceRoleTokens = ["service"];
+    private static readonly string[] _issue1Jira1TaskKeys = ["issue#1", "jira#1"];
+    private static readonly string[] _diagnosticMapperRoleTokens = ["diagnostic", "mapper"];
+    private static readonly string[] _modelRoleTokens = ["model"];
+    private static readonly string[] _dispatcherRoleTokens = ["dispatcher"];
+    private static readonly string[] _dcbaCanonicalPaths = ["D.cs", "C.cs", "B.cs", "A.cs"];
+    private static readonly string[] _yCsCanonicalPaths = ["Y.cs"];
+
     [Test]
     public void CanonicalTaskKeysAndPairExclusiveCommitsProduceDeduplicatedRepeatedEditEvidence()
     {
@@ -25,16 +34,16 @@ public sealed class HistoryOcpScorerTests
         repository.Write("OrderService.cs", "five\n");
         string last = repository.Commit("other #2");
 
-        HistoryOcpFinding finding = HistoryIngestionFixture.Succeed(repository, first, last).OcpAnalysis.Findings.Single();
+        HistoryOcpFinding finding = HistoryIngestionFixture.Succeed(repository, first, last).OcpAnalysis.GetFindings().Single();
         OcpTaskRepeatedEdit repeated = finding.RawEvidence.RepeatedEdits.Single(static item => item.TaskKey.ToString() == "issue#1");
 
         Assert.Multiple(() =>
         {
-            Assert.That(finding.RawEvidence.TaskKeys.Select(static key => key.ToString()), Is.EqualTo(new[] { "issue#1", "issue#2" }));
+            Assert.That(finding.RawEvidence.TaskKeys.Select(static key => key.ToString()), Is.EqualTo(_issue1Issue2TaskKeys));
             Assert.That(repeated.QualifyingCommitIds, Has.Count.EqualTo(2));
             Assert.That(repeated.RepeatedEditCount, Is.EqualTo(1));
             Assert.That(finding.RawEvidence.RepeatedEditTotal, Is.EqualTo(1));
-            Assert.That(finding.RawEvidence.RoleTokens, Is.EqualTo(new[] { "service" }));
+            Assert.That(finding.RawEvidence.RoleTokens, Is.EqualTo(_serviceRoleTokens));
             Assert.That(finding.RawEvidence.RoleHint, Is.EqualTo(1.000000000m));
         });
     }
@@ -54,7 +63,7 @@ public sealed class HistoryOcpScorerTests
         repository.Write("X.cs", "five\n");
         string last = repository.Commit("partner three #3");
 
-        HistoryOcpFinding finding = HistoryIngestionFixture.Succeed(repository, first, last).OcpAnalysis.Findings.Single();
+        HistoryOcpFinding finding = HistoryIngestionFixture.Succeed(repository, first, last).OcpAnalysis.GetFindings().Single();
         OcpTaskRepeatedEdit repeated = finding.RawEvidence.RepeatedEdits.Single(static item => item.TaskKey.ToString() == "issue#1");
 
         Assert.Multiple(() =>
@@ -75,7 +84,7 @@ public sealed class HistoryOcpScorerTests
         repository.Write("X.cs", "two\n");
         string last = repository.Commit("shared #101 #102");
 
-        HistoryOcpFinding finding = HistoryIngestionFixture.Succeed(repository, first, last).OcpAnalysis.Findings.Single();
+        HistoryOcpFinding finding = HistoryIngestionFixture.Succeed(repository, first, last).OcpAnalysis.GetFindings().Single();
 
         Assert.Multiple(() =>
         {
@@ -106,9 +115,9 @@ public sealed class HistoryOcpScorerTests
             }],
         };
 
-        HistoryOcpFinding finding = HistoryIngestionFixture.Succeed(repository, first, last, configuration).OcpAnalysis.Findings.Single();
+        HistoryOcpFinding finding = HistoryIngestionFixture.Succeed(repository, first, last, configuration).OcpAnalysis.GetFindings().Single();
 
-        Assert.That(finding.RawEvidence.TaskKeys.Select(static key => key.ToString()), Is.EqualTo(new[] { "issue#1", "jira#1" }));
+        Assert.That(finding.RawEvidence.TaskKeys.Select(static key => key.ToString()), Is.EqualTo(_issue1Jira1TaskKeys));
     }
 
     [Test]
@@ -116,12 +125,12 @@ public sealed class HistoryOcpScorerTests
     {
         Assert.Multiple(() =>
         {
-            Assert.That(HistoryOcpScorer.RoleTokens("OrderService.cs"), Is.EqualTo(new[] { "service" }));
-            Assert.That(HistoryOcpScorer.RoleTokens("DiagnosticMapper.cs"), Is.EqualTo(new[] { "diagnostic", "mapper" }));
-            Assert.That(HistoryOcpScorer.RoleTokens("ViewModel.cs"), Is.EqualTo(new[] { "model" }));
+            Assert.That(HistoryOcpScorer.RoleTokens("OrderService.cs"), Is.EqualTo(_serviceRoleTokens));
+            Assert.That(HistoryOcpScorer.RoleTokens("DiagnosticMapper.cs"), Is.EqualTo(_diagnosticMapperRoleTokens));
+            Assert.That(HistoryOcpScorer.RoleTokens("ViewModel.cs"), Is.EqualTo(_modelRoleTokens));
             Assert.That(HistoryOcpScorer.RoleTokens("XMLParser2.cs"), Is.Empty);
             Assert.That(HistoryOcpScorer.RoleTokens("Serviceable.cs"), Is.Empty);
-            Assert.That(HistoryOcpScorer.RoleTokens("MyDispatcherFactory.cs"), Is.EqualTo(new[] { "dispatcher" }));
+            Assert.That(HistoryOcpScorer.RoleTokens("MyDispatcherFactory.cs"), Is.EqualTo(_dispatcherRoleTokens));
         });
     }
 
@@ -141,7 +150,7 @@ public sealed class HistoryOcpScorerTests
         HistoryOcpAnalysis low = HistoryIngestionFixture.Succeed(repository, first, last, Configuration(0m)).OcpAnalysis;
         HistoryOcpAnalysis high = HistoryIngestionFixture.Succeed(repository, first, last, Configuration(1m)).OcpAnalysis;
 
-        Assert.That(high.Findings.Select(Describe), Is.EqualTo(low.Findings.Select(Describe)));
+        Assert.That(high.GetFindings().Select(Describe), Is.EqualTo(low.GetFindings().Select(Describe)));
     }
 
     [Test]
@@ -187,7 +196,7 @@ public sealed class HistoryOcpScorerTests
 
         HistoryOcpAnalysis analysis = HistoryIngestionFixture.Succeed(repository, first, last, configuration).OcpAnalysis;
 
-        Assert.That(analysis.Findings.Select(static finding => finding.CanonicalPath), Is.EqualTo(new[] { "D.cs", "C.cs", "B.cs", "A.cs" }));
+        Assert.That(analysis.GetFindings().Select(static finding => finding.CanonicalPath), Is.EqualTo(_dcbaCanonicalPaths));
     }
 
     [Test]
@@ -204,7 +213,7 @@ public sealed class HistoryOcpScorerTests
 
         HistoryOcpAnalysis analysis = HistoryIngestionFixture.Succeed(repository, first, last, configuration).OcpAnalysis;
 
-        Assert.That(analysis.Findings.Select(static finding => finding.CanonicalPath), Is.EqualTo(new[] { "Y.cs" }));
+        Assert.That(analysis.GetFindings().Select(static finding => finding.CanonicalPath), Is.EqualTo(_yCsCanonicalPaths));
     }
 
     [Test]

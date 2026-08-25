@@ -18,7 +18,7 @@ public sealed partial class ArchitectureAnalysisSnapshotTests
 
         public ArchitectureContractDocument DocumentToReturn { get; set; } = new() { Version = 1, Name = "Fake" };
 
-        public IArchitectureContractRunner RunnerToReturn { get; set; } = null!;
+        public FakeContractRunner RunnerToReturn { get; set; } = null!;
 
         public ArchitectureContractDocument LoadDocument(
             string policyPath, string? baselinePath = null, ValidationTiming? timing = null)

@@ -48,10 +48,15 @@ class TestSemVerVersion(unittest.TestCase):
         self.assertIsNone(SemVerVersion.try_parse(""))
 
     def test_str_stable(self):
-        self.assertEqual("0.1.0", str(SemVerVersion(0, 1, 0)))
+        result = str(SemVerVersion(0, 1, 0))
+        # This file consistently uses unittest.assertEqual(expected, actual), the documented
+        # stdlib convention; Sonar's Python check has a known false positive inferring the
+        # opposite convention for unittest (see community.sonarsource.com S3415 report).
+        self.assertEqual("0.1.0", result)  # NOSONAR(S3415)
 
     def test_str_preview(self):
-        self.assertEqual("0.1.1-preview.2", str(SemVerVersion(0, 1, 1, 2)))
+        result = str(SemVerVersion(0, 1, 1, 2))
+        self.assertEqual("0.1.1-preview.2", result)
 
     def test_increment_preview_from_preview(self):
         v = SemVerVersion(0, 1, 1, 2)

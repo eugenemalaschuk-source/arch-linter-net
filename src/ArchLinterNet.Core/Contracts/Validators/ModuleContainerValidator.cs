@@ -37,7 +37,7 @@ internal sealed class ModuleContainerValidator : IArchitecturePolicyDocumentVali
 
     private static void ValidateTypeNames(
         ArchitectureModuleContainerContract contract,
-        IReadOnlyList<string> typeNames,
+        List<string> typeNames,
         string field)
     {
         for (int index = 0; index < typeNames.Count; index++)

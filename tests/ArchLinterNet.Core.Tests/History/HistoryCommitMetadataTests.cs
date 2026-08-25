@@ -9,6 +9,8 @@ namespace ArchLinterNet.Core.Tests.History;
 [TestFixture]
 public sealed class HistoryCommitMetadataTests
 {
+    private static readonly string[] _iso88591EncodingHeaderHex = { "49534f2d383835392d31" };
+
     [Test]
     public void AuthorIdentityUsesTheEmailLowercasedByAsciiOnly()
     {
@@ -76,7 +78,7 @@ public sealed class HistoryCommitMetadataTests
 
         CommitEvidence commit = HistoryIngestionFixture.Succeed(repository, first, second).Commits.Single();
 
-        Assert.That(commit.Commit.EncodingHeaderHex, Is.EqualTo(new[] { "49534f2d383835392d31" }));
+        Assert.That(commit.Commit.EncodingHeaderHex, Is.EqualTo(_iso88591EncodingHeaderHex));
     }
 
     [Test]

@@ -19,7 +19,7 @@ internal sealed partial class HistoryAnalysisConfigurationValidator : IArchitect
 
     private static void ValidateExtractors(
         ArchitectureContractDocument document,
-        IReadOnlyList<HistoryTaskExtractorConfiguration> extractors)
+        List<HistoryTaskExtractorConfiguration> extractors)
     {
         var ids = new HashSet<string>(StringComparer.Ordinal);
         for (int index = 0; index < extractors.Count; index++)

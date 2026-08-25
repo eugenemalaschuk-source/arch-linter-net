@@ -11,6 +11,10 @@ namespace ArchLinterNet.Core.Tests;
 [TestFixture]
 public sealed class ArchitectureRemediationHintTests
 {
+    private static readonly string[] _evidenceKindAndExpectedSeam = ["evidence_kind", "expected_seam"];
+
+    private static readonly string[] _layerTemplateDependencyPath = ["App.Feature.Api", "App.Feature.Domain.Entity"];
+
     [Test]
     public void ProviderRegistry_CoversEverySealedDiagnosticSubtype()
     {
@@ -57,7 +61,7 @@ public sealed class ArchitectureRemediationHintTests
             Assert.That(hint.ExpectedSeamOrDirection, Is.EqualTo("role:Port, name: Orders"));
             Assert.That(hint.FindingIdentity.SourceAssembly, Is.EqualTo("Assembly.One"));
             Assert.That(hint.FindingIdentity.TargetAssembly, Is.EqualTo("Ports"));
-            Assert.That(hint.Evidence.Select(evidence => evidence.Kind), Is.EqualTo(new[] { "evidence_kind", "expected_seam" }));
+            Assert.That(hint.Evidence.Select(evidence => evidence.Kind), Is.EqualTo(_evidenceKindAndExpectedSeam));
         });
     }
 
@@ -161,7 +165,7 @@ public sealed class ArchitectureRemediationHintTests
             Payload = new ConfigurationPayload(
                 TemplateName: "feature-clean-architecture",
                 ContainerNamespace: "App.Feature",
-                DependencyPaths: [new[] { "App.Feature.Api", "App.Feature.Domain.Entity" }]),
+                DependencyPaths: [_layerTemplateDependencyPath]),
         };
 
         ArchitectureRemediationHint hint = ArchitectureFindingMapper.FromViolation(violation).RemediationHint!;

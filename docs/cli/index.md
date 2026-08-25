@@ -8,81 +8,157 @@ Run `arch-linter-net --help` or `arch-linter-net <command> --help` for the exact
 
 | Command | Purpose |
 | --- | --- |
+
 <!-- cli-command: validate -->
+
 | `arch-linter-net [options]` | Normal architecture validation. |
+
 <!-- cli-command: badge -->
+
 | `arch-linter-net badge` | Badge payload workflows. |
+
 <!-- cli-command: badge architecture-policy -->
+
 | `arch-linter-net badge architecture-policy --input <strict-result.json>` | Project an existing strict JSON result to a Shields endpoint payload; does not rerun analysis. |
+
 <!-- cli-command: baseline -->
+
 | `arch-linter-net baseline` | Migration-baseline lifecycle. |
+
 <!-- cli-command: baseline generate -->
+
 | `arch-linter-net baseline generate ...` | Capture current violations into a reviewed baseline. |
+
 <!-- cli-command: baseline migrate -->
+
 | `arch-linter-net baseline migrate ...` | Migrate supported baseline formats/identity. |
+
 <!-- cli-command: baseline update -->
+
 | `arch-linter-net baseline update ...` | Refresh a baseline from current findings under the requested policy. |
+
 <!-- cli-command: baseline prune -->
+
 | `arch-linter-net baseline prune ...` | Remove baseline entries that are no longer current. |
+
 <!-- cli-command: baseline diff -->
+
 | `arch-linter-net baseline diff ...` | Compare current findings with a baseline. |
+
 <!-- cli-command: baseline verify -->
+
 | `arch-linter-net baseline verify ...` | Verify baseline integrity/current applicability. |
+
 <!-- cli-command: cache -->
+
 | `arch-linter-net cache` | Persistent analysis-cache operations. |
+
 <!-- cli-command: cache inspect -->
+
 | `arch-linter-net cache inspect --cache <auto|path>` | Inspect the selected cache. |
+
 <!-- cli-command: cache clear -->
+
 | `arch-linter-net cache clear --cache <auto|path>` | Clear the selected cache with containment checks. |
+
 <!-- cli-command: change -->
+
 | `arch-linter-net change` | Complete architecture change snapshots/reports. |
+
 <!-- cli-command: change snapshot -->
+
 | `arch-linter-net change snapshot --policy <path> --output <path>` | Write a complete architecture change snapshot. |
+
 <!-- cli-command: change report -->
+
 | `arch-linter-net change report --base <path> --current <path>` | Compare two architecture snapshots. |
+
 <!-- cli-command: coverage -->
+
 | `arch-linter-net coverage` | Architecture coverage artifact utilities. |
+
 <!-- cli-command: coverage report -->
+
 | `arch-linter-net coverage report --input <validation.json> ...` | Render a Markdown coverage report from strict validation JSON. |
+
 <!-- cli-command: coverage extract -->
+
 | `arch-linter-net coverage extract --input <combined.json> --mode <mode> --output <path>` | Extract one validation mode from combined JSON. |
+
 <!-- cli-command: explain -->
+
 | `arch-linter-net explain --source <id> --target <id> ...` | Explain a dependency path at namespace/type granularity. |
+
 <!-- cli-command: gate -->
+
 | `arch-linter-net gate ...` | Fail CI on new architecture debt and error-severity policy weakening. |
+
 <!-- cli-command: graph -->
+
 | `arch-linter-net graph ...` | Export dependency graphs as JSON, DOT, or Mermaid at supported granularities. |
+
 <!-- cli-command: history -->
+
 | `arch-linter-net history` | Architecture history forensics. |
+
 <!-- cli-command: history analyze -->
+
 | `arch-linter-net history analyze ...` | Analyze architecture evidence/history for the requested repository range. |
+
 <!-- cli-command: policy -->
+
 | `arch-linter-net policy` | Policy-only inspection/review workflows. |
+
 <!-- cli-command: policy check -->
+
 | `arch-linter-net policy check --policy <path>` | Validate policy/static configuration without claiming architecture compliance. |
+
 <!-- cli-command: policy context -->
+
 | `arch-linter-net policy context --policy <path> --format <json|markdown>` | Export effective policy facts for humans/agents. |
+
 <!-- cli-command: policy weakening -->
+
 | `arch-linter-net policy weakening --base-context <path> --current-context <path>` | Compare exported contexts for typed policy relaxations. |
+
 <!-- cli-command: public-api -->
+
 | `arch-linter-net public-api` | Public API snapshot lifecycle. |
+
 <!-- cli-command: public-api capture -->
+
 | `arch-linter-net public-api capture ...` | Capture a reviewed public API snapshot. |
+
 <!-- cli-command: public-api diff -->
+
 | `arch-linter-net public-api diff ...` | Compare public API snapshots/current surface. |
+
 <!-- cli-command: public-api migrate -->
+
 | `arch-linter-net public-api migrate ...` | Migrate supported snapshot grammar/identity. |
+
 <!-- cli-command: public-api update -->
+
 | `arch-linter-net public-api update ...` | Update a reviewed public API snapshot. |
+
 <!-- cli-command: scaffold -->
+
 | `arch-linter-net scaffold` | Repository-development scaffolding. |
+
 <!-- cli-command: scaffold cli-command -->
+
 | `arch-linter-net scaffold cli-command --module <name> --command <name> ...` | Scaffold a CLI command module in this codebase. |
+
 <!-- cli-command: schema -->
+
 | `arch-linter-net schema` | Installed schema-registry discovery. |
+
 <!-- cli-command: schema list -->
+
 | `arch-linter-net schema list` | List packaged logical schemas. |
+
 <!-- cli-command: schema print -->
+
 | `arch-linter-net schema print <logical-id>` | Print one packaged schema for offline tooling/editors. |
 
 ## Normal validation

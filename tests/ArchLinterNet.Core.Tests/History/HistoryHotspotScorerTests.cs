@@ -61,7 +61,7 @@ public sealed class HistoryHotspotScorerTests
         string to = repository.Commit("binary change without task");
 
         HotspotFinding finding = Score(repository, from, to, configuration => configuration.Paths.Production.Add("src/**"))
-            .Findings.Single();
+            .GetFindings().Single();
 
         Assert.Multiple(() =>
         {
@@ -83,7 +83,7 @@ public sealed class HistoryHotspotScorerTests
         string to = repository.Commit("rename");
 
         HotspotFinding finding = Score(repository, from, to, configuration => configuration.Paths.Production.Add("src/**"))
-            .Findings.Single();
+            .GetFindings().Single();
 
         Assert.Multiple(() =>
         {
@@ -103,6 +103,6 @@ public sealed class HistoryHotspotScorerTests
     {
         var configuration = new HistoryAnalysisConfiguration();
         configure(configuration);
-        return new HistoryHotspotScorer().Score(HistoryIngestionFixture.Succeed(repository, from, to), configuration);
+        return HistoryHotspotScorer.Score(HistoryIngestionFixture.Succeed(repository, from, to), configuration);
     }
 }

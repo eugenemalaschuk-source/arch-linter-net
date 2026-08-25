@@ -7,6 +7,9 @@ internal sealed class PolicyCommandDefinition(
     PolicyContextCommandHandler contextHandler,
     PolicyWeakeningCommandHandler weakeningHandler)
 {
+    private const string DefaultPolicyPath = "architecture/dependencies.arch.yml";
+    private const string HumanFormat = "human";
+
     public const string HelpText =
         """
         arch-linter-net policy — inspect or validate policy configuration
@@ -30,10 +33,10 @@ internal sealed class PolicyCommandDefinition(
         Command check = new("check");
         Option<string> policyOption = new("--policy");
         policyOption.Aliases.Add("-p");
-        policyOption.DefaultValueFactory = _ => "architecture/dependencies.arch.yml";
+        policyOption.DefaultValueFactory = _ => DefaultPolicyPath;
         Option<string> formatOption = new("--format");
         formatOption.Aliases.Add("-f");
-        formatOption.DefaultValueFactory = _ => "human";
+        formatOption.DefaultValueFactory = _ => HumanFormat;
         Option<bool> helpOption = new("--help");
         helpOption.Aliases.Add("-h");
 
@@ -41,14 +44,14 @@ internal sealed class PolicyCommandDefinition(
         check.Options.Add(formatOption);
         check.Options.Add(helpOption);
         check.SetAction(parseResult => checkHandler.Execute(new PolicyCheckCommandOptions(
-            parseResult.GetValue(policyOption) ?? "architecture/dependencies.arch.yml",
-            parseResult.GetValue(formatOption) ?? "human",
+            parseResult.GetValue(policyOption) ?? DefaultPolicyPath,
+            parseResult.GetValue(formatOption) ?? HumanFormat,
             parseResult.GetValue(helpOption))));
 
         Command context = new("context");
         Option<string> contextPolicyOption = new("--policy");
         contextPolicyOption.Aliases.Add("-p");
-        contextPolicyOption.DefaultValueFactory = _ => "architecture/dependencies.arch.yml";
+        contextPolicyOption.DefaultValueFactory = _ => DefaultPolicyPath;
         Option<string> contextFormatOption = new("--format");
         contextFormatOption.Aliases.Add("-f");
         contextFormatOption.DefaultValueFactory = _ => "markdown";
@@ -59,7 +62,7 @@ internal sealed class PolicyCommandDefinition(
         context.Options.Add(contextFormatOption);
         context.Options.Add(contextHelpOption);
         context.SetAction(parseResult => contextHandler.Execute(new PolicyContextCommandOptions(
-            parseResult.GetValue(contextPolicyOption) ?? "architecture/dependencies.arch.yml",
+            parseResult.GetValue(contextPolicyOption) ?? DefaultPolicyPath,
             parseResult.GetValue(contextFormatOption) ?? "markdown",
             parseResult.GetValue(contextHelpOption))));
 
@@ -68,7 +71,7 @@ internal sealed class PolicyCommandDefinition(
         Option<string> currentContextOption = new("--current-context");
         Option<string> weakeningFormatOption = new("--format");
         weakeningFormatOption.Aliases.Add("-f");
-        weakeningFormatOption.DefaultValueFactory = _ => "human";
+        weakeningFormatOption.DefaultValueFactory = _ => HumanFormat;
         Option<bool> weakeningHelpOption = new("--help");
         weakeningHelpOption.Aliases.Add("-h");
 
@@ -79,7 +82,7 @@ internal sealed class PolicyCommandDefinition(
         weakening.SetAction(parseResult => weakeningHandler.Execute(new PolicyWeakeningCommandOptions(
             parseResult.GetValue(baseContextOption) ?? string.Empty,
             parseResult.GetValue(currentContextOption) ?? string.Empty,
-            parseResult.GetValue(weakeningFormatOption) ?? "human",
+            parseResult.GetValue(weakeningFormatOption) ?? HumanFormat,
             parseResult.GetValue(weakeningHelpOption))));
 
         policy.Subcommands.Add(check);

@@ -10,6 +10,7 @@ internal sealed class ExplainCommandHandler(ICliRuntime runtime, ICliConsole con
 {
     private const string PolicyLocationKey = "policyLocation";
     private const string MatchedKey = "matched";
+    private const string MatchedStatus = "matched";
     private const string SourceKey = "source";
     private const string ContractIdKey = "contractId";
 
@@ -176,7 +177,7 @@ internal sealed class ExplainCommandHandler(ICliRuntime runtime, ICliConsole con
                         ["yamlPath"] = p.YamlPath,
                         ["result"] = p.Result switch
                         {
-                            ExpressionParticipationResult.Matched => "matched",
+                            ExpressionParticipationResult.Matched => MatchedStatus,
                             ExpressionParticipationResult.NotMatched => "not_matched",
                             _ => "evaluation_failed",
                         },
@@ -201,7 +202,7 @@ internal sealed class ExplainCommandHandler(ICliRuntime runtime, ICliConsole con
                 {
                     string result = participation.Result switch
                     {
-                        ExpressionParticipationResult.Matched => "matched",
+                        ExpressionParticipationResult.Matched => MatchedStatus,
                         ExpressionParticipationResult.NotMatched => "not matched",
                         _ => "evaluation failed",
                     };
@@ -281,7 +282,7 @@ internal sealed class ExplainCommandHandler(ICliRuntime runtime, ICliConsole con
                             continue;
                         }
 
-                        string state = exclusion.Matched ? "matched" : "stale";
+                        string state = exclusion.Matched ? MatchedStatus : "stale";
                         console.Out.WriteLine(
                             $"Source expansion exclusion: [{expansion.AuthoredContractId}] {state} {set} -> {exclusion.Source} " +
                             $"(selector: {exclusion.Selector}){exclusionPolicy}");
@@ -348,7 +349,7 @@ internal sealed class ExplainCommandHandler(ICliRuntime runtime, ICliConsole con
 
         if (participation.Matched)
         {
-            return "matched";
+            return MatchedStatus;
         }
 
         return participation.IsStaleExclusion ? "stale" : "not matched";

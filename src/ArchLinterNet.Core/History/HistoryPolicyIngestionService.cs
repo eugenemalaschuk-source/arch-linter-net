@@ -8,11 +8,9 @@ namespace ArchLinterNet.Core.History;
 // Keeping it in Core prevents the CLI from reaching into Core.Contracts or inventing a parallel
 // configuration reader, while the constructed ingestion service retains the ordinary fail-closed
 // result/diagnostic boundary.
-internal sealed class HistoryPolicyIngestionService
+internal static class HistoryPolicyIngestionService
 {
-    public static HistoryPolicyIngestionService Default { get; } = new();
-
-    public HistoryIngestionOutcome Ingest(HistoryIngestionRequest request, string? policyPath)
+    public static HistoryIngestionOutcome Ingest(HistoryIngestionRequest request, string? policyPath)
     {
         TaskKeyExtraction taskExtraction;
         HistoryAnalysisConfiguration configuration;

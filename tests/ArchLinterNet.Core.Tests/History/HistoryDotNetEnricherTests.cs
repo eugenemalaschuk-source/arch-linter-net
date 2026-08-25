@@ -9,6 +9,8 @@ namespace ArchLinterNet.Core.Tests.History;
 [TestFixture]
 public sealed class HistoryDotNetEnricherTests
 {
+    private static readonly string[] _abcCanonicalPaths = ["A.cs", "B.cs", "C.cs"];
+
     [Test]
     public void NotRequestedLeavesTheGitOnlyProjectionExplicit()
     {
@@ -195,7 +197,7 @@ public sealed class HistoryDotNetEnricherTests
         Assert.Multiple(() =>
         {
             Assert.That(result.RenameComponents.Single().StatusText, Is.EqualTo("ambiguous_dag"));
-            Assert.That(enrichment.Files.Select(file => file.CanonicalPath), Is.EqualTo(new[] { "A.cs", "B.cs", "C.cs" }));
+            Assert.That(enrichment.Files.Select(file => file.CanonicalPath), Is.EqualTo(_abcCanonicalPaths));
             Assert.That(enrichment.Files.All(file => file.Status == HistoryDotNetFileEnrichmentStatus.NotApplicable), Is.True);
         });
     }

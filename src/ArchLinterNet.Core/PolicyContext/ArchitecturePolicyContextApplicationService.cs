@@ -13,6 +13,8 @@ namespace ArchLinterNet.Core.PolicyContext;
 public sealed class ArchitecturePolicyContextApplicationService(IArchitecturePolicyDocumentLoader policyDocumentLoader)
     : IArchitecturePolicyContextApplicationService
 {
+    private const string ExcludeSelectorKind = "exclude";
+
     private const string ContextKind = "architecture-policy-context";
     private static readonly string[] _guidance =
     [
@@ -103,7 +105,7 @@ public sealed class ArchitecturePolicyContextApplicationService(IArchitecturePol
         PortablePathOrNull(source.AuthoredImportPath),
         source.ImportChain.Select(PortablePath).ToArray());
 
-    private static IReadOnlyList<ArchitecturePolicyContextLayer> ProjectLayers(ArchitectureContractDocument document)
+    private static ArchitecturePolicyContextLayer[] ProjectLayers(ArchitectureContractDocument document)
     {
         return document.Layers
             .OrderBy(item => item.Key, StringComparer.Ordinal)
@@ -117,7 +119,7 @@ public sealed class ArchitecturePolicyContextApplicationService(IArchitecturePol
                     .Select(exclusion => new ArchitecturePolicyContextException(
                         "layer",
                         item.Key,
-                        "exclude",
+                        ExcludeSelectorKind,
                         JoinNonEmpty(exclusion.Namespace, exclusion.NamespaceSuffix),
                         null))
                     .OrderBy(exclusion => exclusion.Details, StringComparer.Ordinal)
@@ -126,7 +128,7 @@ public sealed class ArchitecturePolicyContextApplicationService(IArchitecturePol
             .ToArray();
     }
 
-    private static IReadOnlyList<ArchitecturePolicyContextContract> ProjectContracts(
+    private static ArchitecturePolicyContextContract[] ProjectContracts(
         ArchitectureContractCatalog catalog,
         ArchitectureContractDocument document)
     {
@@ -166,7 +168,7 @@ public sealed class ArchitecturePolicyContextApplicationService(IArchitecturePol
             ProjectProvenance(provenance.LocationFor(contract)));
     }
 
-    private static IReadOnlyList<ArchitecturePolicyContextClassification> ProjectClassification(
+    private static ArchitecturePolicyContextClassification[] ProjectClassification(
         ArchitectureClassificationConfiguration classification)
     {
         List<ArchitecturePolicyContextClassification> projected = new();
@@ -181,7 +183,7 @@ public sealed class ArchitecturePolicyContextApplicationService(IArchitecturePol
         return projected.ToArray();
     }
 
-    private static IReadOnlyList<ArchitecturePolicyContextSourceExpansion> ProjectSourceExpansions(
+    private static ArchitecturePolicyContextSourceExpansion[] ProjectSourceExpansions(
         IReadOnlyList<ArchitectureContractExpansion> expansions)
     {
         return expansions
@@ -214,7 +216,7 @@ public sealed class ArchitecturePolicyContextApplicationService(IArchitecturePol
             .ToArray();
     }
 
-    private static IReadOnlyList<ArchitecturePolicyContextExpandedInstance> ProjectExpandedInstances(
+    private static ArchitecturePolicyContextExpandedInstance[] ProjectExpandedInstances(
         IReadOnlyList<ArchitectureExpandedContractInstance> instances)
     {
         return instances
@@ -234,13 +236,13 @@ public sealed class ArchitecturePolicyContextApplicationService(IArchitecturePol
             .ToArray();
     }
 
-    private static IReadOnlyList<ArchitecturePolicyContextReference> ProjectReferences(
+    private static ArchitecturePolicyContextReference[] ProjectReferences(
         IReadOnlyList<ArchitecturePolicyContextContractFact> facts) => facts
         .Where(fact => fact.Values.Count > 0)
         .Select(fact => new ArchitecturePolicyContextReference(fact.Name, fact.Values))
         .ToArray();
 
-    private static IReadOnlyList<ArchitecturePolicyContextSelector> ProjectSelectors(IArchitectureContract contract)
+    private static ArchitecturePolicyContextSelector[] ProjectSelectors(IArchitectureContract contract)
     {
         return contract switch
         {
@@ -265,7 +267,7 @@ public sealed class ArchitecturePolicyContextApplicationService(IArchitecturePol
         };
     }
 
-    private static IReadOnlyList<ArchitecturePolicyContextAdapterBinding> ProjectAdapterBindings(
+    private static ArchitecturePolicyContextAdapterBinding[] ProjectAdapterBindings(
         IArchitectureContract contract)
     {
         return contract is ArchitecturePortBoundaryContract value
@@ -277,13 +279,13 @@ public sealed class ArchitecturePolicyContextApplicationService(IArchitecturePol
             : Array.Empty<ArchitecturePolicyContextAdapterBinding>();
     }
 
-    private static IReadOnlyList<ArchitecturePolicyContextSelector> ProjectExclusionSelectors(IArchitectureContract contract)
+    private static ArchitecturePolicyContextSelector[] ProjectExclusionSelectors(IArchitectureContract contract)
     {
         return contract switch
         {
-            ArchitectureContextDependencyContract value => value.Exclude.Select(selector => ProjectSelector("exclude", selector)).ToArray(),
-            ArchitectureContextAllowOnlyContract value => value.Exclude.Select(selector => ProjectSelector("exclude", selector)).ToArray(),
-            ArchitecturePortBoundaryContract value => value.Exclude.Select(selector => ProjectSelector("exclude", selector)).ToArray(),
+            ArchitectureContextDependencyContract value => value.Exclude.Select(selector => ProjectSelector(ExcludeSelectorKind, selector)).ToArray(),
+            ArchitectureContextAllowOnlyContract value => value.Exclude.Select(selector => ProjectSelector(ExcludeSelectorKind, selector)).ToArray(),
+            ArchitecturePortBoundaryContract value => value.Exclude.Select(selector => ProjectSelector(ExcludeSelectorKind, selector)).ToArray(),
             _ => Array.Empty<ArchitecturePolicyContextSelector>(),
         };
     }
@@ -300,7 +302,7 @@ public sealed class ArchitecturePolicyContextApplicationService(IArchitecturePol
         ProjectMetadata(selector.Metadata),
         selector.When);
 
-    private static IReadOnlyList<string> CollectRoles(
+    private static string[] CollectRoles(
         IReadOnlyList<ArchitecturePolicyContextLayer> layers,
         IReadOnlyList<ArchitecturePolicyContextClassification> classification,
         IReadOnlyList<ArchitecturePolicyContextContract> contracts)
@@ -315,7 +317,7 @@ public sealed class ArchitecturePolicyContextApplicationService(IArchitecturePol
             .ToArray();
     }
 
-    private static IReadOnlyList<ArchitecturePolicyContextValue> CollectContexts(
+    private static ArchitecturePolicyContextValue[] CollectContexts(
         IReadOnlyList<ArchitecturePolicyContextLayer> layers,
         IReadOnlyList<ArchitecturePolicyContextClassification> classification,
         IReadOnlyList<ArchitecturePolicyContextContract> contracts)
@@ -344,14 +346,14 @@ public sealed class ArchitecturePolicyContextApplicationService(IArchitecturePol
             .Concat(contract.AdapterBindings.SelectMany(binding => binding.AllowedContexts));
     }
 
-    private static IReadOnlyList<ArchitecturePolicyContextException> ProjectExceptions(
+    private static ArchitecturePolicyContextException[] ProjectExceptions(
         ArchitectureContractDocument document,
         ArchitectureContractCatalog catalog,
         IReadOnlyList<ArchitecturePolicyContextContract> contracts)
     {
         List<ArchitecturePolicyContextException> exceptions = document.Layers
             .SelectMany(layer => layer.Value.Exclude.Select(exclusion => new ArchitecturePolicyContextException(
-                "layer", layer.Key, "exclude", JoinNonEmpty(exclusion.Namespace, exclusion.NamespaceSuffix), null)))
+                "layer", layer.Key, ExcludeSelectorKind, JoinNonEmpty(exclusion.Namespace, exclusion.NamespaceSuffix), null)))
             .ToList();
 
         exceptions.AddRange(document.SourceExpansion.Contracts
@@ -360,7 +362,7 @@ public sealed class ArchitecturePolicyContextApplicationService(IArchitecturePol
         foreach (ArchitecturePolicyContextContract contract in contracts)
         {
             exceptions.AddRange(contract.Exclusions.Select(selector => new ArchitecturePolicyContextException(
-                "contract", contract.Id, "exclude", DescribeSelector(selector), contract.Reason)));
+                "contract", contract.Id, ExcludeSelectorKind, DescribeSelector(selector), contract.Reason)));
         }
 
         foreach (ArchitectureContractDescriptor descriptor in catalog.Descriptors)
@@ -383,7 +385,7 @@ public sealed class ArchitecturePolicyContextApplicationService(IArchitecturePol
                 exceptions.AddRange(coverage.Exclude.Select(exclusion => new ArchitecturePolicyContextException(
                     "coverage",
                     subject,
-                    "exclude",
+                    ExcludeSelectorKind,
                     JoinNonEmpty(exclusion.Namespace, exclusion.NamespaceSuffix, exclusion.Project, exclusion.Assembly, exclusion.ContractId,
                         exclusion.Role),
                     exclusion.Reason)));
@@ -404,14 +406,22 @@ public sealed class ArchitecturePolicyContextApplicationService(IArchitecturePol
         return expansion.Exclusions.Select(exclusion => new ArchitecturePolicyContextException(
             "source_expansion",
             expansion.AuthoredContractId,
-            expansion.Kind == ArchitectureContractExpansionKind.ContainerSet
-                ? "exclude_container"
-                : exclusion.SetName is null ? "exclude_source" : "exclude_source_set",
+            SourceExpansionExclusionKind(expansion, exclusion),
             JoinDistinctNonEmpty(exclusion.Source ?? string.Empty, exclusion.SetName ?? string.Empty, exclusion.Selector ?? string.Empty),
             string.IsNullOrWhiteSpace(exclusion.OptionalReason) ? null : exclusion.OptionalReason));
     }
 
-    private static IReadOnlyDictionary<string, string> ProjectMetadata(IReadOnlyDictionary<string, object> metadata)
+    private static string SourceExpansionExclusionKind(ArchitectureContractExpansion expansion, ArchitectureExpandedContractExclusion exclusion)
+    {
+        if (expansion.Kind == ArchitectureContractExpansionKind.ContainerSet)
+        {
+            return "exclude_container";
+        }
+
+        return exclusion.SetName is null ? "exclude_source" : "exclude_source_set";
+    }
+
+    private static Dictionary<string, string> ProjectMetadata(IReadOnlyDictionary<string, object> metadata)
     {
         return metadata.OrderBy(item => item.Key, StringComparer.Ordinal)
             .ToDictionary(item => item.Key, item => DisplayValue(item.Value), StringComparer.Ordinal);

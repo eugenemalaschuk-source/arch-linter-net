@@ -115,7 +115,7 @@ internal static class HistoryIngestionTextWriter
     {
         Append(text, "## Refactoring candidates");
         int count = 0;
-        foreach (HotspotFinding finding in result.HotspotAnalysis.Findings.Where(static item => item.Score > 0m))
+        foreach (HotspotFinding finding in result.HotspotAnalysis.GetFindings().Where(static item => item.Score > 0m))
         {
             Append(text, $"- Hotspot investigation: `{finding.CanonicalPath}` (score {Decimal(finding.Score)})");
             count++;
@@ -127,13 +127,13 @@ internal static class HistoryIngestionTextWriter
             count++;
         }
 
-        foreach (HistoryBottleneckFinding finding in result.BottleneckAnalysis.Findings.Where(static item => item.Score > 0m))
+        foreach (HistoryBottleneckFinding finding in result.BottleneckAnalysis.GetFindings().Where(static item => item.Score > 0m))
         {
             Append(text, $"- Bottleneck investigation: `{finding.CanonicalPath}` (score {Decimal(finding.Score)})");
             count++;
         }
 
-        foreach (HistoryOcpFinding finding in result.OcpAnalysis.Findings.Where(static item => item.Score > 0m))
+        foreach (HistoryOcpFinding finding in result.OcpAnalysis.GetFindings().Where(static item => item.Score > 0m))
         {
             Append(text, $"- OCP-pressure investigation: `{finding.CanonicalPath}` (score {Decimal(finding.Score)})");
             count++;

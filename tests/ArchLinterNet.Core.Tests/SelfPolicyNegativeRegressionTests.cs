@@ -26,6 +26,9 @@ namespace ArchLinterNet.Core.Tests;
 [CancelAfter(120_000)]
 public sealed class SelfPolicyNegativeRegressionTests
 {
+    private static readonly JsonSerializerOptions _renderedFindingJsonOptions =
+        new() { Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping };
+
     private string _repositoryRoot = string.Empty;
     private string _policy = string.Empty;
 
@@ -408,7 +411,7 @@ public sealed class SelfPolicyNegativeRegressionTests
             "\n",
             result.Findings.Select(finding => JsonSerializer.Serialize(
                 ArchitectureDiagnosticFormatter.FormatNormalizedFindingForJson(finding),
-                new JsonSerializerOptions { Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping })));
+                _renderedFindingJsonOptions)));
         Assert.That(rendered, Does.Contain(expectedEvidence));
     }
 }

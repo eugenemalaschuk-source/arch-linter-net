@@ -14,6 +14,14 @@ public sealed class ModuleContainerContractTests
 {
     private string _tempDir = null!;
 
+    private static readonly string[] _expectedInvalidModuleLayoutForbiddenNamespaces =
+    {
+        "<module-root:Orders>",
+        "<generic-module:Common>",
+        "<generic-module:common>",
+        "<undeclared-segment:Infrastructure>",
+    };
+
     [SetUp]
     public void SetUp()
     {
@@ -100,13 +108,7 @@ public sealed class ModuleContainerContractTests
     {
         List<ArchitectureViolation> violations = Check("ModuleContainerFixtures.Structure");
 
-        Assert.That(violations.Select(violation => violation.ForbiddenNamespace), Is.EquivalentTo(new[]
-        {
-            "<module-root:Orders>",
-            "<generic-module:Common>",
-            "<generic-module:common>",
-            "<undeclared-segment:Infrastructure>",
-        }));
+        Assert.That(violations.Select(violation => violation.ForbiddenNamespace), Is.EquivalentTo(_expectedInvalidModuleLayoutForbiddenNamespaces));
     }
 
     [Test]

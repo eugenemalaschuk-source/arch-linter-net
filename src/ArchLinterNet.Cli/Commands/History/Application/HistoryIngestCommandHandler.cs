@@ -30,7 +30,7 @@ internal sealed class HistoryIngestCommandHandler(ICliConsole console)
             return CliExitCodes.InvalidArgumentsOrRuntimeError;
         }
 
-        HistoryIngestionOutcome outcome = HistoryPolicyIngestionService.Default.Ingest(
+        HistoryIngestionOutcome outcome = HistoryPolicyIngestionService.Ingest(
             new HistoryIngestionRequest(
                 options.Repository,
                 options.From,

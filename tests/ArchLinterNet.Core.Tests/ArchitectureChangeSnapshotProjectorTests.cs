@@ -10,6 +10,8 @@ namespace ArchLinterNet.Core.Tests;
 [TestFixture]
 public sealed class ArchitectureChangeSnapshotProjectorTests
 {
+    private static readonly string[] _violationEvidence = ["Acme.Service.Run: System.Console.WriteLine"];
+
     [Test]
     public void Project_CanonicalizesProjectIdentityAcrossCheckoutRoots()
     {
@@ -158,7 +160,7 @@ public sealed class ArchitectureChangeSnapshotProjectorTests
         "forbidden-call",
         "Acme.Service",
         "System.Console",
-        new[] { "Acme.Service.Run: System.Console.WriteLine" })
+        _violationEvidence)
     {
         Identity = identity,
     };

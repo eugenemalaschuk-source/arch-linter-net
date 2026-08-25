@@ -125,5 +125,5 @@ internal sealed class HistoryHotspotAnalysis(IReadOnlyList<HotspotCategoryGroup>
 {
     public IReadOnlyList<HotspotCategoryGroup> Groups { get; } = groups;
 
-    public IReadOnlyList<HotspotFinding> Findings => Groups.SelectMany(static group => group.Findings).ToArray();
+    public IReadOnlyList<HotspotFinding> GetFindings() => Groups.SelectMany(static group => group.Findings).ToArray();
 }

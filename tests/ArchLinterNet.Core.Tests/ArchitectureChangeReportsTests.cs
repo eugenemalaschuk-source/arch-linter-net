@@ -6,6 +6,23 @@ namespace ArchLinterNet.Core.Tests;
 [TestFixture]
 public sealed class ArchitectureChangeReportsTests
 {
+    private static readonly string[] _knownDebtIdentities = { "known" };
+    private static readonly string[] _frozenDebtIdentities = { "frozen-debt" };
+    private static readonly string[] _newFindingIdentities = { "new" };
+    private static readonly string[] _addedEntryIdentities =
+    {
+        "coverage|namespace|uncovered|Acme.New",
+        "namespace:Acme.New->Acme.B",
+        "Acme.New",
+        "Order|bounded_context|Sales",
+    };
+    private static readonly string[] _removedEntryIdentities =
+    {
+        "namespace:Acme.A->Acme.B",
+        "Acme.Legacy",
+    };
+    private static readonly string[] _sortedNamespaceIdentities = { "Alpha", "Zeta" };
+
     [Test]
     public void Compare_SeparatesNewSurfacesFindingsAndExistingDebtInDeterministicOrder()
     {
@@ -13,7 +30,7 @@ public sealed class ArchitectureChangeReportsTests
             new ArchitectureChangeEntry("namespace", "Acme.Legacy", "Acme.Legacy"),
             new ArchitectureChangeEntry("dependency_edge", "namespace:Acme.A->Acme.B", "Acme.A -> Acme.B"),
             findings: new[] { new ArchitectureChangeFinding("known", "dependency", "known finding") },
-            debt: new[] { "known" });
+            debt: _knownDebtIdentities);
         ArchitectureChangeSnapshot current = Snapshot(
             new ArchitectureChangeEntry("semantic_context", "Order|bounded_context|Sales", "Order: bounded_context=Sales"),
             new ArchitectureChangeEntry("namespace", "Acme.New", "Acme.New"),
@@ -24,27 +41,17 @@ public sealed class ArchitectureChangeReportsTests
                 new ArchitectureChangeFinding("new", "dependency", "new finding"),
                 new ArchitectureChangeFinding("known", "dependency", "known finding"),
             },
-            debt: new[] { "known" });
+            debt: _knownDebtIdentities);
 
         ArchitectureChangeReport report = ArchitectureChangeReports.Compare(baseline, current);
 
         Assert.Multiple(() =>
         {
-            Assert.That(report.Added.Select(static entry => entry.Identity), Is.EqualTo(new[]
-            {
-                "coverage|namespace|uncovered|Acme.New",
-                "namespace:Acme.New->Acme.B",
-                "Acme.New",
-                "Order|bounded_context|Sales",
-            }));
-            Assert.That(report.Removed.Select(static entry => entry.Identity), Is.EqualTo(new[]
-            {
-                "namespace:Acme.A->Acme.B",
-                "Acme.Legacy",
-            }));
-            Assert.That(report.NewFindings.Select(static finding => finding.Identity), Is.EqualTo(new[] { "new" }));
-            Assert.That(report.ExistingFindings.Select(static finding => finding.Identity), Is.EqualTo(new[] { "known" }));
-            Assert.That(report.BaselineDebt, Is.EqualTo(new[] { "known" }));
+            Assert.That(report.Added.Select(static entry => entry.Identity), Is.EqualTo(_addedEntryIdentities));
+            Assert.That(report.Removed.Select(static entry => entry.Identity), Is.EqualTo(_removedEntryIdentities));
+            Assert.That(report.NewFindings.Select(static finding => finding.Identity), Is.EqualTo(_newFindingIdentities));
+            Assert.That(report.ExistingFindings.Select(static finding => finding.Identity), Is.EqualTo(_knownDebtIdentities));
+            Assert.That(report.BaselineDebt, Is.EqualTo(_knownDebtIdentities));
         });
     }
 
@@ -62,7 +69,7 @@ public sealed class ArchitectureChangeReportsTests
         Assert.Multiple(() =>
         {
             Assert.That(restored.SchemaVersion, Is.EqualTo(ArchitectureChangeSnapshot.CurrentSchemaVersion));
-            Assert.That(restored.Entries.Select(static entry => entry.Identity), Is.EqualTo(new[] { "Alpha", "Zeta" }));
+            Assert.That(restored.Entries.Select(static entry => entry.Identity), Is.EqualTo(_sortedNamespaceIdentities));
             Assert.That(ArchitectureChangeReports.FormatJson(ArchitectureChangeReports.Compare(restored, restored)), Does.Contain("new_findings"));
         });
     }
@@ -100,7 +107,7 @@ public sealed class ArchitectureChangeReportsTests
     [Test]
     public void Compare_BaseBaselineDebtMakesCurrentFindingExisting()
     {
-        ArchitectureChangeSnapshot baseline = Snapshot(debt: new[] { "frozen-debt" });
+        ArchitectureChangeSnapshot baseline = Snapshot(debt: _frozenDebtIdentities);
         ArchitectureChangeSnapshot current = Snapshot(
             findings: new[] { new ArchitectureChangeFinding("frozen-debt", "dependency", "known debt") });
 
@@ -109,7 +116,7 @@ public sealed class ArchitectureChangeReportsTests
         Assert.Multiple(() =>
         {
             Assert.That(report.NewFindings, Is.Empty);
-            Assert.That(report.ExistingFindings.Select(static finding => finding.Identity), Is.EqualTo(new[] { "frozen-debt" }));
+            Assert.That(report.ExistingFindings.Select(static finding => finding.Identity), Is.EqualTo(_frozenDebtIdentities));
         });
     }
 

@@ -376,60 +376,84 @@ internal static partial class LayoutConventionChecker
             return;
         }
 
-        IReadOnlySet<ArchitectureTypeKind> allowedKinds = shape.AllowedTypeKinds
+        HashSet<ArchitectureTypeKind> allowedKinds = shape.AllowedTypeKinds
             .Select(ParseTypeKind)
             .ToHashSet();
-        IReadOnlySet<string> allowedRoles = shape.AllowedRoles.ToHashSet(StringComparer.Ordinal);
+        HashSet<string> allowedRoles = shape.AllowedRoles.ToHashSet(StringComparer.Ordinal);
 
         foreach (ArchitectureDeclaredTypeFact fact in group.Facts
                      .OrderBy(candidate => candidate.FullTypeName, StringComparer.Ordinal)
                      .ThenBy(candidate => candidate.AssemblyName, StringComparer.Ordinal))
         {
             typesByIdentity!.TryGetValue((fact.AssemblyName, fact.FullTypeName), out Type? type);
-            string? actualRole = type != null && context.RoleIndex.TryGetRole(type, out ArchitectureTypeClassificationResult descriptor)
-                ? descriptor.Role
-                : null;
-            bool isAllowedKind = allowedKinds.Count == 0 || allowedKinds.Contains(fact.TypeKind);
-            bool isAllowedRole = allowedRoles.Count == 0 || (actualRole != null && allowedRoles.Contains(actualRole));
-            bool isAllowedAbstractness = !shape.RequireAbstractClasses
-                || fact.TypeKind != ArchitectureTypeKind.Class
-                || fact.IsAbstract;
-
-            if (isAllowedKind && isAllowedRole && isAllowedAbstractness)
+            string? actualRole = ResolveDeclaredRole(context, type);
+            if (MatchesDeclarationShape(shape, allowedKinds, allowedRoles, fact, actualRole))
             {
                 continue;
             }
 
-            string expectedKinds = shape.AllowedTypeKinds.Count == 0
-                ? "any"
-                : string.Join(", ", shape.AllowedTypeKinds);
-            string expectedRoles = shape.AllowedRoles.Count == 0
-                ? "any"
-                : string.Join(", ", shape.AllowedRoles);
-            string actualRoleDisplay = actualRole ?? "unclassified";
-            string abstractnessRequirement = shape.RequireAbstractClasses ? ", abstract classes required" : string.Empty;
-
-            AddViolation(
-                contract,
-                executionContext,
-                violations,
-                sourceType: fact.FullTypeName,
-                identitySourceType: fact.FullTypeName,
-                forbiddenReference:
-                $"all declarations must use kinds [{expectedKinds}] and roles [{expectedRoles}]{abstractnessRequirement}; " +
-                $"actual kind '{fact.TypeKind}', role '{actualRoleDisplay}', abstract '{fact.IsAbstract}'",
-                payload: new LayoutConventionPayload(
-                    MatchedFilePath: group.SourceFilePath,
-                    ExpectedTypeKind: shape.AllowedTypeKinds.Count == 0 ? null : string.Join(", ", shape.AllowedTypeKinds),
-                    ActualTypeKind: fact.TypeKind.ToString())
-                {
-                    ExpectedRoles = shape.AllowedRoles,
-                    ActualRole = actualRoleDisplay,
-                    ExpectedAbstractClass = shape.RequireAbstractClasses ? true : null,
-                    ActualIsAbstract = fact.IsAbstract,
-                    WhenExpressions = BuildLayoutWhenExpressions(contract),
-                });
+            AddAllDeclarationShapeViolation(contract, executionContext, violations, group, shape, fact, actualRole);
         }
+    }
+
+    private static string? ResolveDeclaredRole(ArchitectureCheckerContext context, Type? type) =>
+        type != null && context.RoleIndex.TryGetRole(type, out ArchitectureTypeClassificationResult descriptor)
+            ? descriptor.Role
+            : null;
+
+    private static bool MatchesDeclarationShape(
+        ArchitectureLayoutDeclarationShape shape,
+        HashSet<ArchitectureTypeKind> allowedKinds,
+        HashSet<string> allowedRoles,
+        ArchitectureDeclaredTypeFact fact,
+        string? actualRole)
+    {
+        bool isAllowedKind = allowedKinds.Count == 0 || allowedKinds.Contains(fact.TypeKind);
+        bool isAllowedRole = allowedRoles.Count == 0 || (actualRole != null && allowedRoles.Contains(actualRole));
+        bool isAllowedAbstractness = !shape.RequireAbstractClasses
+            || fact.TypeKind != ArchitectureTypeKind.Class
+            || fact.IsAbstract;
+        return isAllowedKind && isAllowedRole && isAllowedAbstractness;
+    }
+
+    private static void AddAllDeclarationShapeViolation(
+        ArchitectureLayoutConventionContract contract,
+        ArchitectureContractExecutionContext executionContext,
+        List<ArchitectureViolation> violations,
+        LayoutFileGroup group,
+        ArchitectureLayoutDeclarationShape shape,
+        ArchitectureDeclaredTypeFact fact,
+        string? actualRole)
+    {
+        string expectedKinds = shape.AllowedTypeKinds.Count == 0
+            ? "any"
+            : string.Join(", ", shape.AllowedTypeKinds);
+        string expectedRoles = shape.AllowedRoles.Count == 0
+            ? "any"
+            : string.Join(", ", shape.AllowedRoles);
+        string actualRoleDisplay = actualRole ?? "unclassified";
+        string abstractnessRequirement = shape.RequireAbstractClasses ? ", abstract classes required" : string.Empty;
+
+        AddViolation(
+            contract,
+            executionContext,
+            violations,
+            sourceType: fact.FullTypeName,
+            identitySourceType: fact.FullTypeName,
+            forbiddenReference:
+            $"all declarations must use kinds [{expectedKinds}] and roles [{expectedRoles}]{abstractnessRequirement}; " +
+            $"actual kind '{fact.TypeKind}', role '{actualRoleDisplay}', abstract '{fact.IsAbstract}'",
+            payload: new LayoutConventionPayload(
+                MatchedFilePath: group.SourceFilePath,
+                ExpectedTypeKind: shape.AllowedTypeKinds.Count == 0 ? null : string.Join(", ", shape.AllowedTypeKinds),
+                ActualTypeKind: fact.TypeKind.ToString())
+            {
+                ExpectedRoles = shape.AllowedRoles,
+                ActualRole = actualRoleDisplay,
+                ExpectedAbstractClass = shape.RequireAbstractClasses ? true : null,
+                ActualIsAbstract = fact.IsAbstract,
+                WhenExpressions = BuildLayoutWhenExpressions(contract),
+            });
     }
 
     private static void EvaluateForbidTypeKind(

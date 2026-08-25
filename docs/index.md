@@ -9,14 +9,14 @@ The public documentation describes the behavior of the current supported tool li
 For a first adoption, follow this path:
 
 1. [Install ArchLinterNet](installation/index.md), preferably as a repository-local .NET tool.
-2. Create a minimal root policy such as `architecture/arch.yml`.
-3. Run `arch-linter-net policy check --policy architecture/arch.yml`.
-4. Build the selected projects, or opt in to `--ensure-built`.
-5. Run strict validation.
-6. Add the same strict command to CI.
-7. If the repository has existing debt, capture a reviewed migration baseline instead of weakening rules.
-8. Add coverage contracts so new namespaces, projects, assemblies, dependency edges, rule inputs, and semantic roles cannot silently escape governance.
-9. Add advanced contracts only where they express a real architectural decision.
+1. Create a minimal root policy such as `architecture/arch.yml`.
+1. Run `arch-linter-net policy check --policy architecture/arch.yml`.
+1. Build the selected projects, or opt in to `--ensure-built`.
+1. Run strict validation.
+1. Add the same strict command to CI.
+1. If the repository has existing debt, capture a reviewed migration baseline instead of weakening rules.
+1. Add coverage contracts so new namespaces, projects, assemblies, dependency edges, rule inputs, and semantic roles cannot silently escape governance.
+1. Add advanced contracts only where they express a real architectural decision.
 
 The [Getting Started](getting-started/index.md) guide walks through the complete flow. For an existing production repository, use the [real-repository workflow](guides/real-repository-workflow.md).
 

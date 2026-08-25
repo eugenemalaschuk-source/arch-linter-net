@@ -9,12 +9,12 @@ The machine-readable capability inventory is `archlinternet.capabilities.json`. 
 Before editing a policy:
 
 1. Read the selected root policy and imports.
-2. Read `archlinternet.capabilities.json`.
-3. Use the packaged/root JSON Schema instead of inventing fields.
-4. Run `policy check` for static policy validity.
-5. Export `policy context` when the change depends on effective selectors, source sets, exceptions, or semantic evidence.
-6. Run normal strict/audit validation after the edit.
-7. For base/current review, run `policy weakening`; treat `impact_not_proven` as a review requirement, not proof of safety.
+1. Read `archlinternet.capabilities.json`.
+1. Use the packaged/root JSON Schema instead of inventing fields.
+1. Run `policy check` for static policy validity.
+1. Export `policy context` when the change depends on effective selectors, source sets, exceptions, or semantic evidence.
+1. Run normal strict/audit validation after the edit.
+1. For base/current review, run `policy weakening`; treat `impact_not_proven` as a review requirement, not proof of safety.
 
 ## Layer semantics
 
@@ -29,16 +29,27 @@ Selector-only layers are supported. A combined layer uses AND semantics. Selecto
 ## Implemented coverage scopes
 
 <!-- coverage-scope: namespace -->
+
 - `namespace`
+
 <!-- coverage-scope: project -->
+
 - `project`
+
 <!-- coverage-scope: assembly -->
+
 - `assembly`
+
 <!-- coverage-scope: dependency_edge -->
+
 - `dependency_edge`
+
 <!-- coverage-scope: rule_input -->
+
 - `rule_input`
+
 <!-- coverage-scope: semantic_role -->
+
 - `semantic_role`
 
 Do not describe any of these six scopes as reserved or unsupported. See [Coverage contracts](../contracts/coverage.md).

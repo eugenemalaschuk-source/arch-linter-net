@@ -91,9 +91,12 @@ internal sealed class GateCommandHandler(ICliRuntime runtime, ICliConsole consol
                 "sarif" => runtime.FormatDebtGateAsSarif(outcome),
                 _ => runtime.FormatDebtGateAsHuman(outcome),
             });
-            return outcome.Succeeded
-                ? outcome.Passed ? CliExitCodes.Success : CliExitCodes.ValidationFailure
-                : CliExitCodes.InvalidArgumentsOrRuntimeError;
+            if (!outcome.Succeeded)
+            {
+                return CliExitCodes.InvalidArgumentsOrRuntimeError;
+            }
+
+            return outcome.Passed ? CliExitCodes.Success : CliExitCodes.ValidationFailure;
         }
         catch (OperationCanceledException)
         {

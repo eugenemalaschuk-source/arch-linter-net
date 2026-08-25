@@ -11,6 +11,8 @@ namespace ArchLinterNet.Core.Tests;
 [TestFixture]
 public sealed class ArchitectureDebtGateApplicationServiceTests
 {
+    private static readonly string[] _persistentDebtAndPolicyWeakeningSections = ["persistent_debt", "policy_weakening"];
+
     [Test]
     public void Evaluate_ErrorSeverityWeakeningFailsGateWhileMatchedDebtRemainsSeparate()
     {
@@ -120,7 +122,7 @@ public sealed class ArchitectureDebtGateApplicationServiceTests
                 .GetProperty("classification").GetString(), Is.EqualTo("semantic"));
             Assert.That(sarif.RootElement.GetProperty("runs")[0].GetProperty("results")
                 .EnumerateArray().Select(result => result.GetProperty("properties").GetProperty("gate_section").GetString()),
-                Is.EquivalentTo(new[] { "persistent_debt", "policy_weakening" }));
+                Is.EquivalentTo(_persistentDebtAndPolicyWeakeningSections));
             Assert.That(persistentProperties.GetProperty("identity_version").GetInt32(), Is.EqualTo(1));
             Assert.That(persistentProperties.GetProperty("source_assembly").GetString(), Is.EqualTo("Sample.Application"));
             Assert.That(persistentProperties.GetProperty("target_assembly").GetString(), Is.EqualTo("Sample.Infrastructure"));

@@ -106,7 +106,7 @@ internal sealed class LayoutConventionsValidator : IArchitecturePolicyDocumentVa
         ValidateDistinctNonBlankRoles(contract.Name, shape.AllowedRoles);
     }
 
-    private static void ValidateDistinctNonBlankTypeKinds(string contractName, IReadOnlyList<string> values)
+    private static void ValidateDistinctNonBlankTypeKinds(string contractName, List<string> values)
     {
         var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         for (int index = 0; index < values.Count; index++)
@@ -121,7 +121,7 @@ internal sealed class LayoutConventionsValidator : IArchitecturePolicyDocumentVa
         }
     }
 
-    private static void ValidateDistinctNonBlankRoles(string contractName, IReadOnlyList<string> values)
+    private static void ValidateDistinctNonBlankRoles(string contractName, List<string> values)
     {
         var seen = new HashSet<string>(StringComparer.Ordinal);
         for (int index = 0; index < values.Count; index++)

@@ -149,8 +149,9 @@ def test_build_evidence_rejects_a_manifest_from_another_commit(tmp_path: Path, m
     _declaration(scopes)
     _stub_gh(monkeypatch, {})
 
+    manifest = _manifest(tmp_path, commit="c" * 40)
     with pytest.raises(ValueError, match="source commit does not match"):
-        build_evidence(scopes, _manifest(tmp_path, commit="c" * 40), _COMMIT, _REPOSITORY)
+        build_evidence(scopes, manifest, _COMMIT, _REPOSITORY)
 
 
 @pytest.mark.parametrize("version", ["0.7.0-preview.1", "0.6.5", "0.7.1"])
@@ -162,8 +163,9 @@ def test_unsupported_preview_or_unmapped_candidate_target_fails_closed(
     _declaration(scopes, name="not-semantic.json")
     _stub_gh(monkeypatch, {})
 
+    manifest = _manifest(tmp_path, version)
     with pytest.raises(ValueError, match="exact stable release target|No reviewed release-scope declaration"):
-        build_evidence(scopes, _manifest(tmp_path, version), _COMMIT, _REPOSITORY)
+        build_evidence(scopes, manifest, _COMMIT, _REPOSITORY)
 
 
 def test_filename_cannot_redirect_target_selection(tmp_path: Path, monkeypatch) -> None:
@@ -172,8 +174,9 @@ def test_filename_cannot_redirect_target_selection(tmp_path: Path, monkeypatch) 
     _declaration(scopes, "0.6.4", name="0.7.0.json")
     _stub_gh(monkeypatch, {})
 
+    manifest = _manifest(tmp_path, "0.7.0")
     with pytest.raises(ValueError, match="No reviewed release-scope declaration matches candidate target 0.7.0"):
-        build_evidence(scopes, _manifest(tmp_path, "0.7.0"), _COMMIT, _REPOSITORY)
+        build_evidence(scopes, manifest, _COMMIT, _REPOSITORY)
 
 
 def test_duplicate_declarations_for_one_target_fail_closed(tmp_path: Path, monkeypatch) -> None:
@@ -183,8 +186,9 @@ def test_duplicate_declarations_for_one_target_fail_closed(tmp_path: Path, monke
     _declaration(scopes, name="second.json")
     _stub_gh(monkeypatch, {})
 
+    manifest = _manifest(tmp_path)
     with pytest.raises(ValueError, match="Multiple release-scope declarations"):
-        build_evidence(scopes, _manifest(tmp_path), _COMMIT, _REPOSITORY)
+        build_evidence(scopes, manifest, _COMMIT, _REPOSITORY)
 
 
 def test_unresolvable_required_issue_is_fatal(tmp_path: Path, monkeypatch) -> None:
@@ -193,8 +197,9 @@ def test_unresolvable_required_issue_is_fatal(tmp_path: Path, monkeypatch) -> No
     _declaration(scopes)
     _stub_gh(monkeypatch, {}, returncode=1, stderr="not found")
 
+    manifest = _manifest(tmp_path)
     with pytest.raises(ValueError, match="Cannot resolve issue #525"):
-        build_evidence(scopes, _manifest(tmp_path), _COMMIT, _REPOSITORY)
+        build_evidence(scopes, manifest, _COMMIT, _REPOSITORY)
 
 
 def test_malformed_required_issue_response_is_fatal(tmp_path: Path, monkeypatch) -> None:
@@ -207,8 +212,9 @@ def test_malformed_required_issue_response_is_fatal(tmp_path: Path, monkeypatch)
 
     monkeypatch.setattr(generator.subprocess, "run", fake_run)
 
+    manifest = _manifest(tmp_path)
     with pytest.raises(ValueError, match="Cannot resolve issue #525: invalid GitHub response"):
-        build_evidence(scopes, _manifest(tmp_path), _COMMIT, _REPOSITORY)
+        build_evidence(scopes, manifest, _COMMIT, _REPOSITORY)
 
 
 @pytest.mark.parametrize(

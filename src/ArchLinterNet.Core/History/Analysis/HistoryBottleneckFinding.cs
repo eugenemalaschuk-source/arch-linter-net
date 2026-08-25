@@ -160,5 +160,5 @@ internal sealed class HistoryBottleneckAnalysis(IReadOnlyList<HistoryBottleneckC
 {
     public IReadOnlyList<HistoryBottleneckCategoryGroup> Groups { get; } = groups;
 
-    public IReadOnlyList<HistoryBottleneckFinding> Findings => Groups.SelectMany(static group => group.Findings).ToArray();
+    public IReadOnlyList<HistoryBottleneckFinding> GetFindings() => Groups.SelectMany(static group => group.Findings).ToArray();
 }

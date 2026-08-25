@@ -99,11 +99,11 @@ _POLICY_SHAPE_FIELDS = {
 
 def _sha256(path: Path) -> str:
     digest = hashlib.sha256()
-    # NOSONAR: every caller passes a path already confined by _safe_path (the candidate manifest)
+    # Every caller passes a path already confined by _safe_path (the candidate manifest)
     # or discovered via rglob() strictly under a _safe_path-confined directory, so this open cannot
     # escape the release workspace. Sonar's Python taint tracker does not recognize a cross-module
     # call as a sanitizer; see the identical rationale in merge_checkpoint_b_platform_evidence.py.
-    with path.open("rb") as source:  # NOSONAR
+    with path.open("rb") as source:  # NOSONAR(S2083,S8707)
         for block in iter(lambda: source.read(1024 * 1024), b""):
             digest.update(block)
     return digest.hexdigest()
@@ -111,10 +111,10 @@ def _sha256(path: Path) -> str:
 
 def _load_json(path: Path, description: str) -> dict[str, Any]:
     try:
-        # NOSONAR: every caller passes a path already confined by _safe_path or discovered via
+        # Every caller passes a path already confined by _safe_path or discovered via
         # rglob() strictly under a _safe_path-confined directory; see the identical rationale in
         # merge_checkpoint_b_platform_evidence.py.
-        value = json.loads(path.read_text(encoding="utf-8"))  # NOSONAR
+        value = json.loads(path.read_text(encoding="utf-8"))  # NOSONAR(S2083,S8707)
     except (OSError, json.JSONDecodeError) as error:
         raise ValueError(f"Cannot read {description} '{path}': {error}") from error
     if not isinstance(value, dict):
@@ -266,6 +266,19 @@ def _read_gates(path: Path, manifest: dict[str, Any], manifest_digest: str) -> d
 def _read_release_scope(path: Path, manifest: dict[str, Any], manifest_digest: str) -> dict[str, Any]:
     """Read the candidate-selected release-scope inventory and verify every binding."""
     scope = _load_json(path, "release-scope inventory")
+    _validate_release_scope_identity(scope, manifest)
+
+    declaration_path, declaration = _select_declaration(_declarations_directory(), manifest["version"])
+    _validate_release_scope_against_declaration(scope, manifest, manifest_digest, declaration_path, declaration)
+
+    required = scope.get("required_items")
+    inventory_numbers = _validate_required_items(required)
+    _validate_optional_inventories(scope, inventory_numbers)
+    _validate_scope_matches_declaration(scope, required, declaration)
+    return scope
+
+
+def _validate_release_scope_identity(scope: dict[str, Any], manifest: dict[str, Any]) -> None:
     if scope.get("schema") != _RELEASE_SCOPE_SCHEMA:
         raise ValueError("Release-scope schema is invalid.")
     if scope.get("candidate_version") != manifest["version"]:
@@ -281,7 +294,14 @@ def _read_release_scope(path: Path, manifest: dict[str, Any], manifest_digest: s
     ):
         raise ValueError("Release scope declaration hash is invalid.")
 
-    declaration_path, declaration = _select_declaration(_declarations_directory(), manifest["version"])
+
+def _validate_release_scope_against_declaration(
+    scope: dict[str, Any],
+    manifest: dict[str, Any],
+    manifest_digest: str,
+    declaration_path: Path,
+    declaration: dict[str, Any],
+) -> None:
     expected_declaration_sha256 = _sha256(declaration_path)
     if scope["declaration_sha256"] != expected_declaration_sha256:
         raise ValueError("Release scope declaration hash does not match the tracked declaration.")
@@ -295,7 +315,9 @@ def _read_release_scope(path: Path, manifest: dict[str, Any], manifest_digest: s
         raise ValueError("Release scope source commit differs from the candidate manifest.")
     if not isinstance(scope.get("story"), int) or isinstance(scope["story"], bool) or scope["story"] <= 0:
         raise ValueError("Release scope authority story is invalid.")
-    required = scope.get("required_items")
+
+
+def _validate_required_items(required: Any) -> set[int]:
     if not isinstance(required, list) or not required:
         raise ValueError("Release scope declares no required items.")
     for item in required:
@@ -311,6 +333,10 @@ def _read_release_scope(path: Path, manifest: dict[str, Any], manifest_digest: s
     inventory_numbers = {item["issue"] for item in required}
     if len(inventory_numbers) != len(required):
         raise ValueError("Release scope repeats a required item.")
+    return inventory_numbers
+
+
+def _validate_optional_inventories(scope: dict[str, Any], inventory_numbers: set[int]) -> None:
     for inventory_name in ("excluded_items", "delivered_items"):
         inventory = scope.get(inventory_name)
         if not isinstance(inventory, list):
@@ -328,6 +354,12 @@ def _read_release_scope(path: Path, manifest: dict[str, Any], manifest_digest: s
                 raise ValueError(f"Release scope {inventory_name.replace('_', ' ')} is malformed.")
             inventory_numbers.add(item["issue"])
 
+
+def _validate_scope_matches_declaration(
+    scope: dict[str, Any],
+    required: list[dict[str, Any]],
+    declaration: dict[str, Any],
+) -> None:
     required_inventory = [
         {key: value for key, value in item.items() if key not in {"state", "title"}}
         for item in required
@@ -339,7 +371,6 @@ def _read_release_scope(path: Path, manifest: dict[str, Any], manifest_digest: s
             raise ValueError(
                 f"Release scope {inventory_name.replace('_', ' ')} does not match the tracked declaration."
             )
-    return scope
 
 
 def _release_scope_defects(scope: dict[str, Any]) -> list[str]:

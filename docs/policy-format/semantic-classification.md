@@ -205,9 +205,9 @@ This is additive to `namespace`, `project`, `assembly`, `dependency_edge`, and `
 When several implemented sources classify the same type, the higher-precedence implemented source wins:
 
 1. type attribute;
-2. assembly attribute;
-3. inheritance;
-4. namespace.
+1. assembly attribute;
+1. inheritance;
+1. namespace.
 
 The winning source contributes the role and its metadata; roles from lower-precedence sources are not accumulated as tags. A type therefore has one effective role in the current model.
 
