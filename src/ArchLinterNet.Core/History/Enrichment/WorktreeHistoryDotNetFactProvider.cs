@@ -10,6 +10,8 @@ namespace ArchLinterNet.Core.History.Enrichment;
 
 internal sealed class WorktreeHistoryDotNetFactProvider : IHistoryDotNetFactProvider
 {
+    private const string BuildStateUnavailableReason = "build_state_unavailable";
+
     private static readonly TimeSpan _regexTimeout = TimeSpan.FromSeconds(1);
 
     private const string PortableRelativePolicyPathPattern =
@@ -64,7 +66,7 @@ internal sealed class WorktreeHistoryDotNetFactProvider : IHistoryDotNetFactProv
             RequestedTargetFramework: requestedTargetFramework));
         if (preflight.Blocked)
         {
-            throw new HistoryDotNetEnrichmentUnavailableException("build_state_unavailable");
+            throw new HistoryDotNetEnrichmentUnavailableException(BuildStateUnavailableReason);
         }
 
         IReadOnlyDictionary<string, string> verifiedArtifactDigests = RequireVerifiedArtifactDigests(preflight, discovery);
@@ -78,13 +80,13 @@ internal sealed class WorktreeHistoryDotNetFactProvider : IHistoryDotNetFactProv
         }
         catch (Exception)
         {
-            throw new HistoryDotNetEnrichmentUnavailableException("build_state_unavailable");
+            throw new HistoryDotNetEnrichmentUnavailableException(BuildStateUnavailableReason);
         }
 
         if (resolution.MissingAssemblyNames.Count > 0 || resolution.ResolvedAssemblies.Count == 0)
         {
             resolution.IsolatedLoadScope?.Dispose();
-            throw new HistoryDotNetEnrichmentUnavailableException("build_state_unavailable");
+            throw new HistoryDotNetEnrichmentUnavailableException(BuildStateUnavailableReason);
         }
 
         using ArchitectureAnalysisContext context = new(
@@ -132,7 +134,7 @@ internal sealed class WorktreeHistoryDotNetFactProvider : IHistoryDotNetFactProv
             string fullPath = Path.GetFullPath(path);
             if (!preflight.VerifiedArtifactContentDigests.ContainsKey(fullPath))
             {
-                throw new HistoryDotNetEnrichmentUnavailableException("build_state_unavailable");
+                throw new HistoryDotNetEnrichmentUnavailableException(BuildStateUnavailableReason);
             }
         }
 

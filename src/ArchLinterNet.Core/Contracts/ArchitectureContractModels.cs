@@ -69,6 +69,8 @@ public sealed class ArchitectureContractDocument
 
 public sealed class ArchitectureAnalysisConfiguration
 {
+    private const string DefaultSeverity = "error";
+
     [YamlMember(Alias = "target_assemblies")]
     public List<string> TargetAssemblies { get; set; } = new();
 
@@ -102,16 +104,16 @@ public sealed class ArchitectureAnalysisConfiguration
     public string TargetFramework { get; set; } = string.Empty;
 
     [YamlMember(Alias = "unmatched_ignored_violations")]
-    public string UnmatchedIgnoredViolations { get; set; } = "error";
+    public string UnmatchedIgnoredViolations { get; set; } = DefaultSeverity;
 
     [YamlMember(Alias = "policy_consistency")]
-    public string PolicyConsistency { get; set; } = "error";
+    public string PolicyConsistency { get; set; } = DefaultSeverity;
 
     [YamlMember(Alias = "coverage")]
-    public string Coverage { get; set; } = "error";
+    public string Coverage { get; set; } = DefaultSeverity;
 
     [YamlMember(Alias = "policy_weakening")]
-    public string PolicyWeakening { get; set; } = "error";
+    public string PolicyWeakening { get; set; } = DefaultSeverity;
 
     [YamlMember(Alias = "condition_sets")]
     public Dictionary<string, List<string>> ConditionSets { get; set; } = new();

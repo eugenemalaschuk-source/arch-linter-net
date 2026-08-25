@@ -5,7 +5,15 @@ namespace ArchLinterNet.Cli.Commands.Coverage.Application;
 
 internal static class CoverageReportRenderer
 {
-    private static readonly string[] _states = ["covered", "excluded", "uncovered", "stale", "unknown"];
+    private const string CoveredState = "covered";
+    private const string UncoveredState = "uncovered";
+    private const string StaleState = "stale";
+    private const string UnknownState = "unknown";
+    private const string StateKey = "state";
+    private const string ContractKey = "contract";
+    private const string EvidenceKey = "evidence";
+
+    private static readonly string[] _states = [CoveredState, "excluded", UncoveredState, StaleState, UnknownState];
 
     public static string Render(JsonElement report, IReadOnlyList<string>? changedFiles, string repositoryRoot, bool diffFailed, int? maxFailures)
     {
@@ -29,7 +37,7 @@ internal static class CoverageReportRenderer
         }
 
         lines.AddRange(["| Metric | Count |", "| --- | --- |", $"| Failed rules | {failures.Count} |", $"| Failed diagnostics | {failures.Sum(static rule => rule.Diagnostics.Count)} |",
-            $"| Covered | {totals["covered"]} |", $"| Excluded | {totals["excluded"]} |", $"| Uncovered | {totals["uncovered"]} |", $"| Stale | {totals["stale"]} |", $"| Unknown | {totals["unknown"]} |"]);
+            $"| Covered | {totals[CoveredState]} |", $"| Excluded | {totals["excluded"]} |", $"| Uncovered | {totals[UncoveredState]} |", $"| Stale | {totals[StaleState]} |", $"| Unknown | {totals[UnknownState]} |"]);
         if (coverage.GetArrayLength() == 0)
         {
             lines.AddRange([string.Empty, "> **Note:** the policy defines no coverage contracts (`strict_coverage`/`audit_coverage`). These zeros mean coverage is unconfigured, not that everything is covered."]);
@@ -83,17 +91,17 @@ internal static class CoverageReportRenderer
         {
             foreach (JsonElement finding in ArrayElement(report, property).EnumerateArray())
             {
-                if (property == "preflight_diagnostics" && String(finding, "state") == "current") continue;
+                if (property == "preflight_diagnostics" && String(finding, StateKey) == "current") continue;
                 AddFailure(result, finding, category);
             }
         }
         if (ArrayElement(report, "coverage_findings").GetArrayLength() == 0)
         {
             foreach (JsonElement entry in ArrayElement(report, "coverage_summary").EnumerateArray())
-                foreach ((string bucket, string state) in new[] { ("uncovered_items", "uncovered"), ("stale_items", "stale"), ("unknown_items", "unknown") })
+                foreach ((string bucket, string state) in new[] { ("uncovered_items", UncoveredState), ("stale_items", StaleState), ("unknown_items", UnknownState) })
                     foreach (JsonElement item in ArrayElement(entry, bucket).EnumerateArray())
                     {
-                        var fallback = new Dictionary<string, string?> { ["contract_id"] = String(entry, "contract_id"), ["contract"] = String(entry, "contract"), ["scope"] = String(entry, "scope"), ["state"] = state, ["item"] = String(item, "item"), ["evidence"] = String(item, "evidence") ?? String(item, "reason") };
+                        var fallback = new Dictionary<string, string?> { ["contract_id"] = String(entry, "contract_id"), [ContractKey] = String(entry, ContractKey), ["scope"] = String(entry, "scope"), [StateKey] = state, ["item"] = String(item, "item"), [EvidenceKey] = String(item, EvidenceKey) ?? String(item, "reason") };
                         AddFailure(result, fallback, "Coverage summary");
                     }
         }
@@ -105,8 +113,8 @@ internal static class CoverageReportRenderer
 
     private static void AddFailure(Dictionary<string, FailureRuleBuilder> target, IReadOnlyDictionary<string, string?> finding, string category)
     {
-        string identifier = finding.GetValueOrDefault("contract_id") ?? finding.GetValueOrDefault("contract") ?? category.ToLowerInvariant().Replace(' ', '-');
-        string name = finding.GetValueOrDefault("contract") ?? identifier;
+        string identifier = finding.GetValueOrDefault("contract_id") ?? finding.GetValueOrDefault(ContractKey) ?? category.ToLowerInvariant().Replace(' ', '-');
+        string name = finding.GetValueOrDefault(ContractKey) ?? identifier;
         if (!target.TryGetValue(identifier, out FailureRuleBuilder? builder)) target[identifier] = builder = new(identifier, name);
         builder.Add(category, Summary(finding));
     }
@@ -122,9 +130,9 @@ internal static class CoverageReportRenderer
             ClassifyChangedFile(file, root, scopes, index, units, attention);
         }
 
-        int covered = units.Values.Count(static state => state == "covered");
-        int uncovered = units.Values.Count(static state => state is "uncovered" or "stale" or "excluded");
-        int unknown = units.Values.Count(static state => state == "unknown");
+        int covered = units.Values.Count(static state => state == CoveredState);
+        int uncovered = units.Values.Count(static state => state is UncoveredState or StaleState or "excluded");
+        int unknown = units.Values.Count(static state => state == UnknownState);
         lines.AddRange([string.Empty, "### New-code coverage", string.Empty, "| Metric | Count |", "| --- | --- |", $"| Changed first-party files | {files.Count} |", $"| Changed namespaces/projects/assemblies covered | {covered} |", $"| Changed namespaces/projects/assemblies uncovered | {uncovered} |", $"| Requiring policy update | {(unknown == 0 ? "none" : unknown)} |"]);
         if (attention.Count > 0) { lines.AddRange([string.Empty, "Items needing attention:", string.Empty]); lines.AddRange(attention.Distinct(StringComparer.Ordinal)); }
     }
@@ -184,9 +192,9 @@ internal static class CoverageReportRenderer
             }
 
             classified = true;
-            string state = index.GetValueOrDefault((scope, item), "unknown");
+            string state = index.GetValueOrDefault((scope, item), UnknownState);
             units[(scope, item)] = state;
-            if (state != "covered")
+            if (state != CoveredState)
             {
                 attention.Add($"- `{file}` — `{item}` ({scope}): **{state}**");
             }
@@ -194,7 +202,7 @@ internal static class CoverageReportRenderer
 
         if (!classified)
         {
-            units[("unknown", file)] = "unknown";
+            units[(UnknownState, file)] = UnknownState;
             attention.Add($"- `{file}` — `{file}` (unknown): **unknown**");
         }
     }
@@ -270,7 +278,7 @@ internal static class CoverageReportRenderer
         string column = String(value, "column") is { } columnValue ? ":" + columnValue : string.Empty;
         return path + line + column;
     }
-    private static string Summary(IReadOnlyDictionary<string, string?> values) => string.Join("; ", new[] { ("code", "message_code"), ("source", "source"), ("subject", "subject"), ("state", "state"), ("item", "item"), ("forbidden namespace", "forbidden_namespace"), ("forbidden references", "forbidden_references"), ("evidence", "evidence"), ("reason", "reason"), ("detail", "detail"), ("source", "source_location"), ("policy", "policy_origin"), ("policy", "policy_location") }.Where(pair => values.GetValueOrDefault(pair.Item2) is not null).Select(pair => $"{pair.Item1} `{Code(values[pair.Item2]!)}`"));
+    private static string Summary(IReadOnlyDictionary<string, string?> values) => string.Join("; ", new[] { ("code", "message_code"), ("source", "source"), ("subject", "subject"), ("state", StateKey), ("item", "item"), ("forbidden namespace", "forbidden_namespace"), ("forbidden references", "forbidden_references"), ("evidence", EvidenceKey), ("reason", "reason"), ("detail", "detail"), ("source", "source_location"), ("policy", "policy_origin"), ("policy", "policy_location") }.Where(pair => values.GetValueOrDefault(pair.Item2) is not null).Select(pair => $"{pair.Item1} `{Code(values[pair.Item2]!)}`"));
     private static string Code(string value) => Compact(value).Replace("`", "'", StringComparison.Ordinal);
     private static string Compact(string value) { string text = string.Join(' ', value.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries)); return text.Length <= 240 ? text : text[..237] + "..."; }
 

@@ -9,9 +9,12 @@ namespace ArchLinterNet.Core.Execution.Checkers;
 
 internal static class ModuleContainerChecker
 {
+    private const string AbstractionsSegment = "Abstractions";
+    private const string ModelsSegment = "Models";
+
     private static readonly HashSet<string> _cliCommandSegments = new(StringComparer.Ordinal)
     {
-        "EntryPoint", "Application", "Abstractions", "Models", "Exceptions",
+        "EntryPoint", "Application", AbstractionsSegment, ModelsSegment, "Exceptions",
     };
 
     private static readonly HashSet<string> _genericModuleNames = new(StringComparer.OrdinalIgnoreCase)
@@ -123,9 +126,9 @@ internal static class ModuleContainerChecker
 
         return sourceSegment switch
         {
-            "EntryPoint" => targetSegment is "Application" or "Abstractions" or "Models" or "Exceptions",
-            "Application" => targetSegment is "Abstractions" or "Models" or "Exceptions",
-            "Abstractions" => targetSegment == "Models",
+            "EntryPoint" => targetSegment is "Application" or AbstractionsSegment or ModelsSegment or "Exceptions",
+            "Application" => targetSegment is AbstractionsSegment or ModelsSegment or "Exceptions",
+            AbstractionsSegment => targetSegment == ModelsSegment,
             _ => false,
         };
     }

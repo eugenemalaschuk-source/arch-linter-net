@@ -13,6 +13,8 @@ namespace ArchLinterNet.Core.PolicyContext;
 public sealed class ArchitecturePolicyContextApplicationService(IArchitecturePolicyDocumentLoader policyDocumentLoader)
     : IArchitecturePolicyContextApplicationService
 {
+    private const string ExcludeSelectorKind = "exclude";
+
     private const string ContextKind = "architecture-policy-context";
     private static readonly string[] _guidance =
     [
@@ -117,7 +119,7 @@ public sealed class ArchitecturePolicyContextApplicationService(IArchitecturePol
                     .Select(exclusion => new ArchitecturePolicyContextException(
                         "layer",
                         item.Key,
-                        "exclude",
+                        ExcludeSelectorKind,
                         JoinNonEmpty(exclusion.Namespace, exclusion.NamespaceSuffix),
                         null))
                     .OrderBy(exclusion => exclusion.Details, StringComparer.Ordinal)
@@ -281,9 +283,9 @@ public sealed class ArchitecturePolicyContextApplicationService(IArchitecturePol
     {
         return contract switch
         {
-            ArchitectureContextDependencyContract value => value.Exclude.Select(selector => ProjectSelector("exclude", selector)).ToArray(),
-            ArchitectureContextAllowOnlyContract value => value.Exclude.Select(selector => ProjectSelector("exclude", selector)).ToArray(),
-            ArchitecturePortBoundaryContract value => value.Exclude.Select(selector => ProjectSelector("exclude", selector)).ToArray(),
+            ArchitectureContextDependencyContract value => value.Exclude.Select(selector => ProjectSelector(ExcludeSelectorKind, selector)).ToArray(),
+            ArchitectureContextAllowOnlyContract value => value.Exclude.Select(selector => ProjectSelector(ExcludeSelectorKind, selector)).ToArray(),
+            ArchitecturePortBoundaryContract value => value.Exclude.Select(selector => ProjectSelector(ExcludeSelectorKind, selector)).ToArray(),
             _ => Array.Empty<ArchitecturePolicyContextSelector>(),
         };
     }
@@ -351,7 +353,7 @@ public sealed class ArchitecturePolicyContextApplicationService(IArchitecturePol
     {
         List<ArchitecturePolicyContextException> exceptions = document.Layers
             .SelectMany(layer => layer.Value.Exclude.Select(exclusion => new ArchitecturePolicyContextException(
-                "layer", layer.Key, "exclude", JoinNonEmpty(exclusion.Namespace, exclusion.NamespaceSuffix), null)))
+                "layer", layer.Key, ExcludeSelectorKind, JoinNonEmpty(exclusion.Namespace, exclusion.NamespaceSuffix), null)))
             .ToList();
 
         exceptions.AddRange(document.SourceExpansion.Contracts
@@ -360,7 +362,7 @@ public sealed class ArchitecturePolicyContextApplicationService(IArchitecturePol
         foreach (ArchitecturePolicyContextContract contract in contracts)
         {
             exceptions.AddRange(contract.Exclusions.Select(selector => new ArchitecturePolicyContextException(
-                "contract", contract.Id, "exclude", DescribeSelector(selector), contract.Reason)));
+                "contract", contract.Id, ExcludeSelectorKind, DescribeSelector(selector), contract.Reason)));
         }
 
         foreach (ArchitectureContractDescriptor descriptor in catalog.Descriptors)
@@ -383,7 +385,7 @@ public sealed class ArchitecturePolicyContextApplicationService(IArchitecturePol
                 exceptions.AddRange(coverage.Exclude.Select(exclusion => new ArchitecturePolicyContextException(
                     "coverage",
                     subject,
-                    "exclude",
+                    ExcludeSelectorKind,
                     JoinNonEmpty(exclusion.Namespace, exclusion.NamespaceSuffix, exclusion.Project, exclusion.Assembly, exclusion.ContractId,
                         exclusion.Role),
                     exclusion.Reason)));

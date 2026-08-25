@@ -403,8 +403,8 @@ internal static partial class LayoutConventionChecker
 
     private static bool MatchesDeclarationShape(
         ArchitectureLayoutDeclarationShape shape,
-        IReadOnlySet<ArchitectureTypeKind> allowedKinds,
-        IReadOnlySet<string> allowedRoles,
+        HashSet<ArchitectureTypeKind> allowedKinds,
+        HashSet<string> allowedRoles,
         ArchitectureDeclaredTypeFact fact,
         string? actualRole)
     {

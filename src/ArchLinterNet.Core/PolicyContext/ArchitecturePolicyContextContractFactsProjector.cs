@@ -12,6 +12,15 @@ namespace ArchLinterNet.Core.PolicyContext;
 // composition selectors), so an explicit projection makes newly added policy semantics reviewable.
 internal static class ArchitecturePolicyContextContractFactsProjector
 {
+    private const string SourceFact = "source";
+    private const string ForbiddenFact = "forbidden";
+    private const string AllowedTypesFact = "allowed_types";
+    private const string DependencyDepthFact = "dependency_depth";
+    private const string AllowedFact = "allowed";
+    private const string NamespaceFact = "namespace";
+    private const string LayerFact = "layer";
+    private const string PropertyFact = "property";
+
     internal static IReadOnlyCollection<Type> SupportedContractTypes { get; } =
     [
         typeof(ArchitectureDependencyContract), typeof(ArchitectureLayerContract),
@@ -35,8 +44,8 @@ internal static class ArchitecturePolicyContextContractFactsProjector
     internal static ArchitecturePolicyContextContractProjection Project(IArchitectureContract contract) => contract switch
     {
         ArchitectureDependencyContract value => Create(value.Reason, value.IgnoredViolations, Facts(
-            Text("source", value.Source), Values("forbidden", value.Forbidden), Values("allowed_types", value.AllowedTypes),
-            Flag("forbidden_legacy_runtime", value.ForbiddenLegacyRuntime), EnumValue("dependency_depth", value.DependencyDepth))),
+            Text(SourceFact, value.Source), Values(ForbiddenFact, value.Forbidden), Values(AllowedTypesFact, value.AllowedTypes),
+            Flag("forbidden_legacy_runtime", value.ForbiddenLegacyRuntime), EnumValue(DependencyDepthFact, value.DependencyDepth))),
         ArchitectureLayerContract value => Create(value.Reason, value.IgnoredViolations, Facts(
             OrderedLayers(value.Layers, value.OptionalLayers), Text("template_name", value.TemplateName),
             Text("template_owner_id", value.TemplateOwnerId), Text("container_namespace", value.ContainerNamespace),
@@ -45,29 +54,29 @@ internal static class ArchitecturePolicyContextContractFactsProjector
             Values("containers", value.Containers), Values("exclude_containers", value.ExcludeContainers),
             OrderedLayers(value.Layers), Flag("exhaustive", value.Exhaustive))),
         ArchitectureAllowOnlyContract value => Create(value.Reason, value.IgnoredViolations, Facts(
-            Text("source", value.Source), Values("allowed", value.Allowed), Values("allowed_types", value.AllowedTypes))),
+            Text(SourceFact, value.Source), Values(AllowedFact, value.Allowed), Values(AllowedTypesFact, value.AllowedTypes))),
         ArchitectureCycleContract value => Create(value.Reason, value.IgnoredViolations, Facts(Values("layers", value.Layers))),
         ArchitectureMethodBodyContract value => Create(value.Reason, value.IgnoredViolations, Facts(
-            Text("source", value.Source), Values("forbidden_calls", value.ForbiddenCalls))),
+            Text(SourceFact, value.Source), Values("forbidden_calls", value.ForbiddenCalls))),
         ArchitectureAsmdefContract value => Create(value.Reason, Array.Empty<ArchitectureIgnoredViolation>(), Facts(
             Values("source_assemblies", value.SourceAssemblies), Flag("forbidden_editor_refs", value.ForbiddenEditorRefs),
             Values("forbidden_asmdef_prefixes", value.ForbiddenAsmdefPrefixes))),
         ArchitectureIndependenceContract value => Create(value.Reason, value.IgnoredViolations, Facts(Values("layers", value.Layers))),
         ArchitectureAssemblyIndependenceContract value => Create(value.Reason, value.IgnoredViolations, Facts(Values("assemblies", value.Assemblies))),
-        ArchitectureAssemblyDependencyContract value => Source(value, Values("forbidden", value.Forbidden), EnumValue("dependency_depth", value.DependencyDepth)),
-        ArchitectureAssemblyAllowOnlyContract value => Source(value, Values("allowed", value.Allowed), EnumValue("dependency_depth", value.DependencyDepth)),
-        ArchitecturePackageDependencyContract value => Source(value, Values("forbidden", value.Forbidden), EnumValue("dependency_depth", value.DependencyDepth)),
-        ArchitecturePackageAllowOnlyContract value => Source(value, Values("allowed", value.Allowed), EnumValue("dependency_depth", value.DependencyDepth)),
-        ArchitectureFrameworkReferenceContract value => Source(value, Values("forbidden", value.Forbidden)),
-        ArchitectureFrameworkReferenceAllowOnlyContract value => Source(value, Values("allowed", value.Allowed)),
+        ArchitectureAssemblyDependencyContract value => Source(value, Values(ForbiddenFact, value.Forbidden), EnumValue(DependencyDepthFact, value.DependencyDepth)),
+        ArchitectureAssemblyAllowOnlyContract value => Source(value, Values(AllowedFact, value.Allowed), EnumValue(DependencyDepthFact, value.DependencyDepth)),
+        ArchitecturePackageDependencyContract value => Source(value, Values(ForbiddenFact, value.Forbidden), EnumValue(DependencyDepthFact, value.DependencyDepth)),
+        ArchitecturePackageAllowOnlyContract value => Source(value, Values(AllowedFact, value.Allowed), EnumValue(DependencyDepthFact, value.DependencyDepth)),
+        ArchitectureFrameworkReferenceContract value => Source(value, Values(ForbiddenFact, value.Forbidden)),
+        ArchitectureFrameworkReferenceAllowOnlyContract value => Source(value, Values(AllowedFact, value.Allowed)),
         ArchitectureProjectMetadataContract value => Create(value.Reason, value.IgnoredViolations, Facts(
             Values("projects", value.Projects), Values("project_sets", value.ProjectSets), Map("required_properties", value.RequiredProperties),
             Map("forbidden_properties", value.ForbiddenProperties), Values("allowed_friend_assemblies", value.AllowedFriendAssemblies),
             Values("forbidden_project_references", value.ForbiddenProjectReferences))),
         ArchitectureProtectedContract value => Create(value.Reason, value.IgnoredViolations, Facts(
-            Values("protected", value.Protected), Values("allowed_importers", value.AllowedImporters), Values("allowed_types", value.AllowedTypes))),
-        ArchitectureExternalDependencyContract value => Source(value, Values("forbidden", value.Forbidden)),
-        ArchitectureExternalAllowOnlyContract value => Source(value, Values("allowed", value.Allowed), Values("allowed_types", value.AllowedTypes)),
+            Values("protected", value.Protected), Values("allowed_importers", value.AllowedImporters), Values(AllowedTypesFact, value.AllowedTypes))),
+        ArchitectureExternalDependencyContract value => Source(value, Values(ForbiddenFact, value.Forbidden)),
+        ArchitectureExternalAllowOnlyContract value => Source(value, Values(AllowedFact, value.Allowed), Values(AllowedTypesFact, value.AllowedTypes)),
         ArchitectureAcyclicSiblingContract value => Create(value.Reason, value.IgnoredViolations, Facts(Values("ancestors", value.Ancestors))),
         ArchitectureModuleContainerContract value => Create(value.Reason, value.IgnoredViolations, Facts(
             Text("container", value.Container), Text("profile", value.Profile),
@@ -116,15 +125,15 @@ internal static class ArchitecturePolicyContextContractFactsProjector
         ArchitectureContextAllowOnlyContract value => Create(value.Reason, value.IgnoredViolations, Array.Empty<ArchitecturePolicyContextContractFact>()),
         ArchitectureCoverageContract value => Create(value.Reason, value.IgnoredViolations, Facts(
             Text("scope", value.Scope),
-            Objects("roots", value.Roots.Select(item => Object("root", Text("namespace", item.Namespace),
+            Objects("roots", value.Roots.Select(item => Object("root", Text(NamespaceFact, item.Namespace),
                 Text("namespace_suffix", item.NamespaceSuffix), Values("include", item.Include), Values("exclude", item.Exclude)))),
             Objects("between", value.Between.Select(item => Object("boundary", Values("layers", item)))),
             Values("contract_ids", value.ContractIds),
-            Objects("exclude", value.Exclude.Select(item => Object("exclusion", Text("namespace", item.Namespace),
+            Objects("exclude", value.Exclude.Select(item => Object("exclusion", Text(NamespaceFact, item.Namespace),
                 Text("namespace_suffix", item.NamespaceSuffix), Text("project", item.Project), Text("assembly", item.Assembly),
                 Text("contract_id", item.ContractId), Text("role", item.Role), Map("metadata", item.Metadata), Values("between", item.Between), Text("reason", item.Reason)))),
             Objects("optional_inputs", value.OptionalInputs.Select(item => Object("input", Text("contract_id", item.ContractId),
-                Text("input", item.Input), Text("layer", item.Layer), Text("reason", item.Reason)))))),
+                Text("input", item.Input), Text(LayerFact, item.Layer), Text("reason", item.Reason)))))),
         ArchitecturePortBoundaryContract value => Create(value.Reason, value.IgnoredViolations, Facts(
             Object("target_context", Map("metadata", value.TargetContext.Metadata)))),
         _ => throw new InvalidOperationException($"Policy-context projection does not support contract type '{contract.GetType().FullName}'."),
@@ -134,7 +143,7 @@ internal static class ArchitecturePolicyContextContractFactsProjector
     {
         List<ArchitecturePolicyContextContractFact?> facts =
         [
-            Text("source", contract.Source), Values("sources", contract.Sources), Values("source_sets", contract.SourceSets),
+            Text(SourceFact, contract.Source), Values("sources", contract.Sources), Values("source_sets", contract.SourceSets),
             Values("exclude_sources", contract.ExcludedSources), Values("exclude_source_sets", contract.ExcludedSourceSets),
         ];
         facts.AddRange(additional);
@@ -158,14 +167,14 @@ internal static class ArchitecturePolicyContextContractFactsProjector
         IReadOnlyList<ArchitecturePolicyContextContractFact> facts) => new(reason, ignoredViolations, facts);
 
     private static IReadOnlyList<ArchitecturePolicyContextContractFact> TypeMatcherFacts(ArchitectureTypeMatcher matcher) => Facts(
-        Text("name_suffix", matcher.NameSuffix), Text("name_prefix", matcher.NamePrefix), Text("namespace", matcher.Namespace),
-        Text("layer", matcher.Layer), Text("base_type", matcher.BaseType), Text("implements_interface", matcher.ImplementsInterface),
+        Text("name_suffix", matcher.NameSuffix), Text("name_prefix", matcher.NamePrefix), Text(NamespaceFact, matcher.Namespace),
+        Text(LayerFact, matcher.Layer), Text("base_type", matcher.BaseType), Text("implements_interface", matcher.ImplementsInterface),
         Text("has_attribute", matcher.HasAttribute));
 
     private static IReadOnlyList<ArchitecturePolicyContextContractFact> PublicApiSelectorFacts(ArchitecturePublicApiSurfaceSelector? selector) => selector is null
         ? Array.Empty<ArchitecturePolicyContextContractFact>()
-        : Facts(Text("name_suffix", selector.NameSuffix), Text("name_prefix", selector.NamePrefix), Text("namespace", selector.Namespace),
-            Text("layer", selector.Layer), Text("base_type", selector.BaseType), Text("implements_interface", selector.ImplementsInterface),
+        : Facts(Text("name_suffix", selector.NameSuffix), Text("name_prefix", selector.NamePrefix), Text(NamespaceFact, selector.Namespace),
+            Text(LayerFact, selector.Layer), Text("base_type", selector.BaseType), Text("implements_interface", selector.ImplementsInterface),
             Text("has_attribute", selector.HasAttribute), Text("role", selector.Role));
 
     private static IReadOnlyList<ArchitecturePolicyContextContractFact> LayoutMatcherFacts(ArchitectureLayoutFileMatcher matcher) => Facts(
@@ -173,10 +182,10 @@ internal static class ArchitecturePolicyContextContractFactsProjector
         Text("file_name_suffix", matcher.FileNameSuffix), Text("file_name_prefix", matcher.FileNamePrefix), Text("when", matcher.When));
 
     private static ArchitecturePolicyContextContractFact? OrderedLayers(IEnumerable<string> layers, ISet<string>? optionalLayers = null) => Objects(
-        "layers", layers.Select(layer => Object("layer", Text("name", layer), Flag("optional", optionalLayers?.Contains(layer) ?? false))));
+        "layers", layers.Select(layer => Object(LayerFact, Text("name", layer), Flag("optional", optionalLayers?.Contains(layer) ?? false))));
 
     private static ArchitecturePolicyContextContractFact? OrderedLayers(IEnumerable<ArchitectureTemplateLayer> layers) => Objects(
-        "layers", layers.Select(layer => Object("layer", Text("name", layer.Name), Flag("optional", layer.Optional))));
+        "layers", layers.Select(layer => Object(LayerFact, Text("name", layer.Name), Flag("optional", layer.Optional))));
 
     private static ArchitecturePolicyContextContractFact? Text(string name, string? value) => string.IsNullOrWhiteSpace(value)
         ? null
@@ -206,10 +215,10 @@ internal static class ArchitecturePolicyContextContractFactsProjector
     }
 
     private static ArchitecturePolicyContextContractFact? Map(string name, IReadOnlyDictionary<string, string> values) => Objects(
-        name, values.OrderBy(item => item.Key, StringComparer.Ordinal).Select(item => Object("property", Text("name", item.Key), Text("value", item.Value))));
+        name, values.OrderBy(item => item.Key, StringComparer.Ordinal).Select(item => Object(PropertyFact, Text("name", item.Key), Text("value", item.Value))));
 
     private static ArchitecturePolicyContextContractFact? Map(string name, IReadOnlyDictionary<string, object> values) => Objects(
-        name, values.OrderBy(item => item.Key, StringComparer.Ordinal).Select(item => Object("property", Text("name", item.Key), Text("value", Display(item.Value)))));
+        name, values.OrderBy(item => item.Key, StringComparer.Ordinal).Select(item => Object(PropertyFact, Text("name", item.Key), Text("value", Display(item.Value)))));
 
     private static ArchitecturePolicyContextContractFact? Object(string name, IReadOnlyList<ArchitecturePolicyContextContractFact> items) =>
         items.Count == 0 ? null : new ArchitecturePolicyContextContractFact(name, Array.Empty<string>(), items);

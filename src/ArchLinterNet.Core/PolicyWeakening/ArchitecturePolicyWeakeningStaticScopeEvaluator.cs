@@ -5,6 +5,8 @@ namespace ArchLinterNet.Core.PolicyWeakening;
 
 internal static class ArchitecturePolicyWeakeningStaticScopeEvaluator
 {
+    private const string SemanticClassification = "semantic";
+
     private static readonly StringComparer _comparer = StringComparer.Ordinal;
 
     internal static void Evaluate(
@@ -22,7 +24,7 @@ internal static class ArchitecturePolicyWeakeningStaticScopeEvaluator
                 findings.Add(CreateFinding(
                     "source_set_made_optional",
                     "source_set:" + baseSet.Name,
-                    "semantic",
+                    SemanticClassification,
                     current.Guardrails.PolicyWeakening,
                     ["required"],
                     ["optional"],
@@ -38,7 +40,7 @@ internal static class ArchitecturePolicyWeakeningStaticScopeEvaluator
                 findings.Add(CreateFinding(
                     "source_set_member_removed",
                     "source_set:" + baseSet.Name,
-                    "semantic",
+                    SemanticClassification,
                     current.Guardrails.PolicyWeakening,
                     [source],
                     Array.Empty<string>(),
@@ -64,7 +66,7 @@ internal static class ArchitecturePolicyWeakeningStaticScopeEvaluator
                 findings.Add(CreateFinding(
                     "source_expansion_made_empty_tolerant",
                     "source_expansion:" + baseExpansion.AuthoredContractId,
-                    "semantic",
+                    SemanticClassification,
                     current.Guardrails.PolicyWeakening,
                     ["required"],
                     ["optional_empty"],
@@ -86,7 +88,7 @@ internal static class ArchitecturePolicyWeakeningStaticScopeEvaluator
                 findings.Add(CreateFinding(
                     "source_exclusion_added",
                     "source_expansion:" + currentExpansion.AuthoredContractId,
-                    "semantic",
+                    SemanticClassification,
                     current.Guardrails.PolicyWeakening,
                     Array.Empty<string>(),
                     [ExpansionExclusionKey(exclusion)],
@@ -104,7 +106,7 @@ internal static class ArchitecturePolicyWeakeningStaticScopeEvaluator
                 findings.Add(CreateFinding(
                     "effective_source_removed",
                     "source_expansion:" + baseExpansion.AuthoredContractId,
-                    "semantic",
+                    SemanticClassification,
                     current.Guardrails.PolicyWeakening,
                     [ExpandedInstanceKey(instance)],
                     Array.Empty<string>(),
