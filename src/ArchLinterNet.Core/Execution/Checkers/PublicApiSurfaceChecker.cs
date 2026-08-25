@@ -1,6 +1,7 @@
 using System.Reflection;
 using ArchLinterNet.Core.Contracts;
 using ArchLinterNet.Core.Contracts.Families;
+using ArchLinterNet.Core.Execution;
 using ArchLinterNet.Core.Model;
 using ArchLinterNet.Core.Resolution;
 using ArchLinterNet.Core.Scanning;
@@ -43,8 +44,11 @@ internal static class PublicApiSurfaceChecker
         ArchitecturePublicApiSurfaceContract contract,
         IReadOnlyDictionary<string, Assembly> resolvedAssemblies,
         ArchitectureContractExecutionContext executionContext,
-        Func<Type, bool>? surfaceSelectorPredicate)
+        Func<Type, bool>? surfaceSelectorPredicate,
+        Func<Assembly, ArchitecturePublicApiSurfaceMaterialization>? surfaceResolver = null)
     {
+        surfaceResolver ??= MaterializeSurface;
+
         // A missing, unparsable, or foreign snapshot is deliberately not a policy-load failure (see
         // PublicApiSnapshotResolver), so validation is where it has to become loud. Reporting the
         // whole surface as undeclared instead would bury the actual cause in noise.
@@ -55,7 +59,7 @@ internal static class PublicApiSurfaceChecker
 
         (Dictionary<string, List<ArchitectureExportedApiEntry>> scannedByAssembly,
                 Dictionary<string, List<ArchitectureExportedApiEntry>> governedByAssembly) =
-            ScanAndFilter(contract, resolvedAssemblies, surfaceSelectorPredicate);
+            ScanAndFilter(contract, resolvedAssemblies, surfaceSelectorPredicate, surfaceResolver);
 
         List<ArchitectureViolation> selectorSafetyViolations =
             CheckSelectorSafety(contract, scannedByAssembly, governedByAssembly, executionContext);
@@ -90,9 +94,20 @@ internal static class PublicApiSurfaceChecker
         ArchitectureContractExecutionContext executionContext,
         Func<Type, bool>? surfaceSelectorPredicate)
     {
+        return CheckSelectorSafety(
+            contract, resolvedAssemblies, executionContext, surfaceSelectorPredicate, MaterializeSurface);
+    }
+
+    internal static List<ArchitectureViolation> CheckSelectorSafety(
+        ArchitecturePublicApiSurfaceContract contract,
+        IReadOnlyDictionary<string, Assembly> resolvedAssemblies,
+        ArchitectureContractExecutionContext executionContext,
+        Func<Type, bool>? surfaceSelectorPredicate,
+        Func<Assembly, ArchitecturePublicApiSurfaceMaterialization> surfaceResolver)
+    {
         (Dictionary<string, List<ArchitectureExportedApiEntry>> scannedByAssembly,
                 Dictionary<string, List<ArchitectureExportedApiEntry>> governedByAssembly) =
-            ScanAndFilter(contract, resolvedAssemblies, surfaceSelectorPredicate);
+            ScanAndFilter(contract, resolvedAssemblies, surfaceSelectorPredicate, surfaceResolver);
 
         return CheckSelectorSafety(contract, scannedByAssembly, governedByAssembly, executionContext);
     }
@@ -129,10 +144,13 @@ internal static class PublicApiSurfaceChecker
         Dictionary<string, List<ArchitectureExportedApiEntry>> GovernedByAssembly) ScanAndFilter(
         ArchitecturePublicApiSurfaceContract contract,
         IReadOnlyDictionary<string, Assembly> resolvedAssemblies,
-        Func<Type, bool>? surfaceSelectorPredicate)
+        Func<Type, bool>? surfaceSelectorPredicate,
+        Func<Assembly, ArchitecturePublicApiSurfaceMaterialization> surfaceResolver)
     {
+        Dictionary<string, ArchitecturePublicApiSurfaceMaterialization> surfacesByAssembly =
+            new(StringComparer.Ordinal);
         Dictionary<string, List<ArchitectureExportedApiEntry>> scannedByAssembly =
-            ScanContractAssemblies(contract, resolvedAssemblies);
+            ScanContractAssemblies(contract, resolvedAssemblies, surfaceResolver, surfacesByAssembly);
 
         // scannedByAssembly stays the full, unfiltered first-party universe (used by the escape
         // check); governedByAssembly is what a selector, when configured, actually governs — every
@@ -140,7 +158,7 @@ internal static class PublicApiSurfaceChecker
         // selected surface is never enumerated or reported at all.
         Dictionary<string, List<ArchitectureExportedApiEntry>> governedByAssembly = surfaceSelectorPredicate == null
             ? scannedByAssembly
-            : FilterToSelected(scannedByAssembly, resolvedAssemblies, surfaceSelectorPredicate);
+            : FilterToSelected(scannedByAssembly, surfacesByAssembly, surfaceSelectorPredicate);
 
         return (scannedByAssembly, governedByAssembly);
     }
@@ -188,20 +206,22 @@ internal static class PublicApiSurfaceChecker
     // check above looks for.
     private static Dictionary<string, List<ArchitectureExportedApiEntry>> FilterToSelected(
         Dictionary<string, List<ArchitectureExportedApiEntry>> scannedByAssembly,
-        IReadOnlyDictionary<string, Assembly> resolvedAssemblies,
+        IReadOnlyDictionary<string, ArchitecturePublicApiSurfaceMaterialization> surfacesByAssembly,
         Func<Type, bool> surfaceSelectorPredicate)
     {
         Dictionary<string, List<ArchitectureExportedApiEntry>> governed = new(StringComparer.Ordinal);
 
         foreach ((string assemblyName, List<ArchitectureExportedApiEntry> entries) in scannedByAssembly)
         {
-            if (!resolvedAssemblies.TryGetValue(assemblyName, out Assembly? assembly))
+            if (!surfacesByAssembly.TryGetValue(assemblyName, out ArchitecturePublicApiSurfaceMaterialization? surface))
             {
                 continue;
             }
 
-            HashSet<string> selectedTypeNames =
-                ArchitecturePublicApiSurfaceScanner.SelectedTypeFullNames(assembly, surfaceSelectorPredicate);
+            HashSet<string> selectedTypeNames = surface.ExportedTypes
+                .Where(surfaceSelectorPredicate)
+                .Select(ArchitectureTypeNames.SafeFullName)
+                .ToHashSet(StringComparer.Ordinal);
             governed[assemblyName] = entries.Where(entry => selectedTypeNames.Contains(entry.DeclaringTypeName)).ToList();
         }
 
@@ -448,7 +468,9 @@ internal static class PublicApiSurfaceChecker
 
     private static Dictionary<string, List<ArchitectureExportedApiEntry>> ScanContractAssemblies(
         ArchitecturePublicApiSurfaceContract contract,
-        IReadOnlyDictionary<string, Assembly> resolvedAssemblies)
+        IReadOnlyDictionary<string, Assembly> resolvedAssemblies,
+        Func<Assembly, ArchitecturePublicApiSurfaceMaterialization> surfaceResolver,
+        Dictionary<string, ArchitecturePublicApiSurfaceMaterialization> surfacesByAssembly)
     {
         Dictionary<string, List<ArchitectureExportedApiEntry>> scanned = new(StringComparer.Ordinal);
 
@@ -460,10 +482,19 @@ internal static class PublicApiSurfaceChecker
                 continue;
             }
 
-            scanned[assemblyName] = ArchitecturePublicApiSurfaceScanner.GetExportedSurface(targetAssembly).ToList();
+            ArchitecturePublicApiSurfaceMaterialization surface = surfaceResolver(targetAssembly);
+            surfacesByAssembly[assemblyName] = surface;
+            scanned[assemblyName] = surface.Entries.ToList();
         }
 
         return scanned;
+    }
+
+    private static ArchitecturePublicApiSurfaceMaterialization MaterializeSurface(Assembly assembly)
+    {
+        (IReadOnlyList<ArchitectureExportedApiEntry> entries, IReadOnlyList<Type> exportedTypes) =
+            ArchitecturePublicApiSurfaceScanner.MaterializeExportedSurface(assembly);
+        return new ArchitecturePublicApiSurfaceMaterialization(entries, exportedTypes);
     }
 
     // Inline `declared_api` entries carry no assembly attribution, so they enter the differ as

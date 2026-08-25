@@ -38,10 +38,25 @@ internal static class ArchitecturePublicApiSurfaceScanner
 
     public static IEnumerable<ArchitectureExportedApiEntry> GetExportedSurface(Assembly assembly)
     {
+        foreach (ArchitectureExportedApiEntry entry in MaterializeExportedSurface(assembly).Entries)
+        {
+            yield return entry;
+        }
+    }
+
+    // Materializes the exported type universe and its complete normalized surface in one traversal.
+    // The session-scoped public API index retains both read-only collections so selectors can match
+    // the exact types that produced the entries without repeating the exported-type reflection pass.
+    internal static (IReadOnlyList<ArchitectureExportedApiEntry> Entries, IReadOnlyList<Type> ExportedTypes)
+        MaterializeExportedSurface(Assembly assembly)
+    {
         string assemblyName = assembly.GetName().Name ?? string.Empty;
+        List<ArchitectureExportedApiEntry> entries = new();
+        List<Type> exportedTypes = new();
 
         foreach (Type type in GetExportedTypes(assembly))
         {
+            exportedTypes.Add(type);
             string typeName = ArchitectureTypeNames.SafeFullName(type);
             string typeSignature = NormalizeType(type);
             string typeVisibility = TypeVisibility(type);
@@ -50,17 +65,16 @@ internal static class ArchitecturePublicApiSurfaceScanner
             (string, string)[] typeReferenced = type.IsGenericTypeDefinition
                 ? ReferencedTypes(Array.Empty<Type>(), type.GetGenericArguments())
                 : Array.Empty<(string, string)>();
-            yield return new ArchitectureExportedApiEntry(
+            entries.Add(new ArchitectureExportedApiEntry(
                 typeSignature,
                 ArchitecturePublicApiSignatureDetails.Compose(
                     typeSignature, ArchitecturePublicApiSignatureDetails.ForType(type, typeVisibility)),
-                typeName, assemblyName, typeVisibility, false, null, typeReferenced);
+                typeName, assemblyName, typeVisibility, false, null, typeReferenced));
 
-            foreach (ArchitectureExportedApiEntry member in GetExportedMembers(type, assemblyName))
-            {
-                yield return member;
-            }
+            entries.AddRange(GetExportedMembers(type, assemblyName));
         }
+
+        return (entries.AsReadOnly(), exportedTypes.AsReadOnly());
     }
 
     // The exported type universe GetExportedSurface enumerates, factored out so a surface_selector

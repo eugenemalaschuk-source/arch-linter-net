@@ -1,3 +1,4 @@
+using System.Reflection;
 using ArchLinterNet.Core.Contracts;
 using ArchLinterNet.Core.Contracts.Families;
 using ArchLinterNet.Core.Contracts.PolicyImports;
@@ -40,6 +41,8 @@ public sealed class ArchitectureAnalysisSession
     private readonly ArchitectureContextualConsumerRegistry _contextualConsumerRegistry;
 
     private readonly ArchitecturePublicApiSurfaceAnalysisService _publicApiSurfaceAnalysisService;
+
+    private readonly ArchitecturePublicApiSurfaceIndex _publicApiSurfaceIndex = new();
 
     private readonly ArchitectureCycleBaselineCandidateRecorder _cycleBaselineCandidateRecorder = new();
 
@@ -143,6 +146,13 @@ public sealed class ArchitectureAnalysisSession
     public ArchitectureSourceFileFactIndex SourceFileFactIndex { get; }
 
     internal ArchitectureExpressionFactService ExpressionFacts { get; }
+
+    internal ArchitecturePublicApiSurfaceMaterialization GetPublicApiSurface(Assembly assembly) =>
+        _publicApiSurfaceIndex.GetOrMaterialize(assembly);
+
+    // Friend-test evidence only; the index remains private to this session and no counter enters
+    // the public analysis profile or schema.
+    internal int PublicApiSurfaceMaterializationCount => _publicApiSurfaceIndex.MaterializationCount;
 
     internal ArchitectureCheckerContext CheckerContext => _checkerContext ??= new ArchitectureCheckerContext(this);
 
