@@ -93,14 +93,14 @@ internal sealed class CoChangeGraphBuilder(HistoryAnalysisConfiguration configur
         Dictionary<string, List<CoChangeVertex>> verticesByCommit,
         IReadOnlyList<CommitEvidence> commits)
     {
-        foreach (GitCommit commit in commits.Select(static evidence => evidence.Commit))
+        foreach (GitObjectId commitId in commits.Select(static evidence => evidence.Commit.Id))
         {
-            if (!verticesByCommit.TryGetValue(commit.Id.Hex, out List<CoChangeVertex>? touching))
+            if (!verticesByCommit.TryGetValue(commitId.Hex, out List<CoChangeVertex>? touching))
             {
                 continue;
             }
 
-            AddPairs(touching, pair => pair.CommitIds.Add(commit.Id.Hex), pairs);
+            AddPairs(touching, pair => pair.CommitIds.Add(commitId.Hex), pairs);
         }
     }
 
