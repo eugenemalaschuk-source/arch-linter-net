@@ -96,15 +96,15 @@ internal static class ArchitecturePolicyContextContractFactsProjector
             Text("required_name_suffix", value.RequiredNameSuffix), Text("required_name_prefix", value.RequiredNamePrefix),
             Text("forbidden_name_suffix", value.ForbiddenNameSuffix), Text("forbidden_name_prefix", value.ForbiddenNamePrefix),
             Flag("require_type_name_matches_file_name", value.RequireTypeNameMatchesFileName), Number("max_declarations_per_type", value.MaxDeclarationsPerType),
-            Object("require_matching_interface", Text("name_prefix", value.RequireMatchingInterface?.NamePrefix)),
-            Object("all_declarations", Values("allowed_type_kinds", value.AllDeclarations?.AllowedTypeKinds),
+            ObjectFromItems("require_matching_interface", Text("name_prefix", value.RequireMatchingInterface?.NamePrefix)),
+            ObjectFromItems("all_declarations", Values("allowed_type_kinds", value.AllDeclarations?.AllowedTypeKinds),
                 Values("allowed_roles", value.AllDeclarations?.AllowedRoles), Flag("require_abstract_classes", value.AllDeclarations?.RequireAbstractClasses)))),
         ArchitecturePublicApiSurfaceContract value => Create(value.Reason, value.IgnoredViolations, Facts(
             Values("assemblies", value.Assemblies), Values("declared_api", value.DeclaredApi),
             Object("surface_selector", PublicApiSelectorFacts(value.SurfaceSelector)), Text("api_snapshot", value.ApiSnapshot),
             Text("api_comparison", value.ApiComparison), Flag("forbid_public_constants_unless_declared", value.ForbidPublicConstantsUnlessDeclared),
             Values("allowed_public_constants", value.AllowedPublicConstants),
-            Objects("resolved_snapshot_entries", value.ResolvedSnapshotEntries.Select(entry => Object("entry",
+            Objects("resolved_snapshot_entries", value.ResolvedSnapshotEntries.Select(entry => ObjectFromItems("entry",
                 Text("assembly", entry.AssemblyName), Text("signature", entry.Signature)))))),
         ArchitectureAttributeUsageContract value => Create(value.Reason, value.IgnoredViolations, Scoped(value.Attributes, value.AttributePrefixes,
             new ScopeRestrictions(
@@ -123,23 +123,23 @@ internal static class ArchitecturePolicyContextContractFactsProjector
             Values("forbidden_apis", value.ForbiddenApis), Values("allowed_only_in_layers", value.AllowedOnlyInLayers),
             Values("allowed_only_in_namespaces", value.AllowedOnlyInNamespaces), Values("allowed_only_in_projects", value.AllowedOnlyInProjects),
             Values("allowed_only_in_assemblies", value.AllowedOnlyInAssemblies), Values("allowed_only_in_assembly_sets", value.AllowedOnlyInAssemblySets),
-            Objects("allowed_only_in_types", value.AllowedOnlyInTypes.Select(item => Object("type",
+            Objects("allowed_only_in_types", value.AllowedOnlyInTypes.Select(item => ObjectFromItems("type",
                 Text("assembly", item.Assembly), Text("type", item.Type)))))),
         ArchitectureContextDependencyContract value => Create(value.Reason, value.IgnoredViolations, Array.Empty<ArchitecturePolicyContextContractFact>()),
         ArchitectureContextAllowOnlyContract value => Create(value.Reason, value.IgnoredViolations, Array.Empty<ArchitecturePolicyContextContractFact>()),
         ArchitectureCoverageContract value => Create(value.Reason, value.IgnoredViolations, Facts(
             Text("scope", value.Scope),
-            Objects("roots", value.Roots.Select(item => Object("root", Text(NamespaceFact, item.Namespace),
+            Objects("roots", value.Roots.Select(item => ObjectFromItems("root", Text(NamespaceFact, item.Namespace),
                 Text("namespace_suffix", item.NamespaceSuffix), Values("include", item.Include), Values("exclude", item.Exclude)))),
-            Objects("between", value.Between.Select(item => Object("boundary", Values("layers", item)))),
+            Objects("between", value.Between.Select(item => ObjectFromItems("boundary", Values("layers", item)))),
             Values("contract_ids", value.ContractIds),
-            Objects("exclude", value.Exclude.Select(item => Object("exclusion", Text(NamespaceFact, item.Namespace),
+            Objects("exclude", value.Exclude.Select(item => ObjectFromItems("exclusion", Text(NamespaceFact, item.Namespace),
                 Text("namespace_suffix", item.NamespaceSuffix), Text("project", item.Project), Text("assembly", item.Assembly),
                 Text("contract_id", item.ContractId), Text("role", item.Role), Map("metadata", item.Metadata), Values("between", item.Between), Text("reason", item.Reason)))),
-            Objects("optional_inputs", value.OptionalInputs.Select(item => Object("input", Text("contract_id", item.ContractId),
+            Objects("optional_inputs", value.OptionalInputs.Select(item => ObjectFromItems("input", Text("contract_id", item.ContractId),
                 Text("input", item.Input), Text(LayerFact, item.Layer), Text("reason", item.Reason)))))),
         ArchitecturePortBoundaryContract value => Create(value.Reason, value.IgnoredViolations, Facts(
-            Object("target_context", Map("metadata", value.TargetContext.Metadata)))),
+            ObjectFromItems("target_context", Map("metadata", value.TargetContext.Metadata)))),
         _ => throw new InvalidOperationException($"Policy-context projection does not support contract type '{contract.GetType().FullName}'."),
     };
 
@@ -211,10 +211,10 @@ internal static class ArchitecturePolicyContextContractFactsProjector
         Text("file_name_suffix", matcher.FileNameSuffix), Text("file_name_prefix", matcher.FileNamePrefix), Text("when", matcher.When));
 
     private static ArchitecturePolicyContextContractFact? OrderedLayers(IEnumerable<string> layers, HashSet<string>? optionalLayers = null) => Objects(
-        "layers", layers.Select(layer => Object(LayerFact, Text("name", layer), Flag("optional", optionalLayers?.Contains(layer) ?? false))));
+        "layers", layers.Select(layer => ObjectFromItems(LayerFact, Text("name", layer), Flag("optional", optionalLayers?.Contains(layer) ?? false))));
 
     private static ArchitecturePolicyContextContractFact? OrderedLayers(IEnumerable<ArchitectureTemplateLayer> layers) => Objects(
-        "layers", layers.Select(layer => Object(LayerFact, Text("name", layer.Name), Flag("optional", layer.Optional))));
+        "layers", layers.Select(layer => ObjectFromItems(LayerFact, Text("name", layer.Name), Flag("optional", layer.Optional))));
 
     private static ArchitecturePolicyContextContractFact? Text(string name, string? value) => string.IsNullOrWhiteSpace(value)
         ? null
@@ -244,16 +244,16 @@ internal static class ArchitecturePolicyContextContractFactsProjector
     }
 
     private static ArchitecturePolicyContextContractFact? Map(string name, IReadOnlyDictionary<string, string> values) => Objects(
-        name, values.OrderBy(item => item.Key, StringComparer.Ordinal).Select(item => Object(PropertyFact, Text("name", item.Key), Text("value", item.Value))));
+        name, values.OrderBy(item => item.Key, StringComparer.Ordinal).Select(item => ObjectFromItems(PropertyFact, Text("name", item.Key), Text("value", item.Value))));
 
     private static ArchitecturePolicyContextContractFact? Map(string name, IReadOnlyDictionary<string, object> values) => Objects(
-        name, values.OrderBy(item => item.Key, StringComparer.Ordinal).Select(item => Object(PropertyFact, Text("name", item.Key), Text("value", Display(item.Value)))));
+        name, values.OrderBy(item => item.Key, StringComparer.Ordinal).Select(item => ObjectFromItems(PropertyFact, Text("name", item.Key), Text("value", Display(item.Value)))));
 
-    private static ArchitecturePolicyContextContractFact? Object(string name, IReadOnlyList<ArchitecturePolicyContextContractFact> items) =>
-        items.Count == 0 ? null : new ArchitecturePolicyContextContractFact(name, Array.Empty<string>(), items);
+    private static ArchitecturePolicyContextContractFact? Object(string name, ArchitecturePolicyContextContractFact[] items) =>
+        items.Length == 0 ? null : new ArchitecturePolicyContextContractFact(name, Array.Empty<string>(), items);
 
-    private static ArchitecturePolicyContextContractFact? Object(string name, params ArchitecturePolicyContextContractFact?[] items) =>
-        Object(name, (IReadOnlyList<ArchitecturePolicyContextContractFact>)Facts(items));
+    private static ArchitecturePolicyContextContractFact? ObjectFromItems(string name, params ArchitecturePolicyContextContractFact?[] items) =>
+        Object(name, Facts(items));
 
     private static ArchitecturePolicyContextContractFact? Objects(string name, IEnumerable<ArchitecturePolicyContextContractFact?> items) =>
         Object(name, items.Where(item => item is not null).Cast<ArchitecturePolicyContextContractFact>().ToArray());
