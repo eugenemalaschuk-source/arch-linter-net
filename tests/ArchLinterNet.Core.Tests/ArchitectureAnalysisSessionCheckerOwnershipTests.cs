@@ -59,15 +59,12 @@ public sealed class ArchitectureAnalysisSessionCheckerOwnershipTests
     //   IsDanglingButCoveredByRuleInputCoverage  rule-input-coverage deferral (lifecycle)
     //   CreateExecutionContext                   per-contract execution context (lifecycle)
     //   AddCycleBaselineCandidates               baseline-candidate publication (session-owned state)
-    //   BuildAssemblyLookup                      fact access, for the checkers that take primitives
-    //                                            rather than ArchitectureCheckerContext
     private static readonly HashSet<string> _allowedSessionCalls = new(StringComparer.Ordinal)
     {
         "IsContractSelected",
         "IsDanglingButCoveredByRuleInputCoverage",
         "CreateExecutionContext",
         "AddCycleBaselineCandidates",
-        "BuildAssemblyLookup",
     };
 
     [Test]

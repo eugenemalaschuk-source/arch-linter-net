@@ -118,6 +118,57 @@ public sealed class PackageDependencyContractTests
     }
 
     [Test]
+    public void MultiplePackageContractFamilies_ReuseSessionProjectMetadataIndex()
+    {
+        const string PackageId = "Microsoft.EntityFrameworkCore";
+        var packages = new Dictionary<string, ArchitecturePackageGroup>
+        {
+            ["forbidden_infra"] = new() { PackageIds = { PackageId } },
+            ["allowed_app"] = new() { PackageIds = { "Newtonsoft.Json" } }
+        };
+        var dependencyContract = new ArchitecturePackageDependencyContract
+        {
+            Name = "Domain must not reference EF Core",
+            Id = "domain-no-ef",
+            Source = SourceAssemblyName,
+            Forbidden = new List<string> { "forbidden_infra" }
+        };
+        var allowOnlyContract = new ArchitecturePackageAllowOnlyContract
+        {
+            Name = "Domain may reference only app packages",
+            Id = "domain-allow-only-app",
+            Source = SourceAssemblyName,
+            Allowed = new List<string> { "allowed_app" }
+        };
+        ArchitectureContractDocument document = new()
+        {
+            Version = 1,
+            Name = "Test",
+            Layers = new Dictionary<string, ArchitectureLayer>(),
+            Packages = packages,
+            Analysis = new ArchitectureAnalysisConfiguration { TargetAssemblies = new List<string> { SourceAssemblyName } },
+            Contracts = new ArchitectureContractGroups
+            {
+                StrictPackageDependency = new List<ArchitecturePackageDependencyContract> { dependencyContract },
+                StrictPackageAllowOnly = new List<ArchitecturePackageAllowOnlyContract> { allowOnlyContract }
+            }
+        };
+        ArchitectureAnalysisContext context = CreateContext(Project(SourceAssemblyName, (PackageId, "8.0.0")));
+        ArchitectureContractRunner runner = new(context, document);
+
+        ArchitectureContractExecutionResult result = new ArchitectureContractExecutor()
+            .Execute(runner.Session, "strict", new ArchitectureContractHandlerRegistry());
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(result.Violations, Has.Count.EqualTo(2));
+            Assert.That(result.Violations.Select(violation => violation.ContractId),
+                Is.EquivalentTo(new[] { "domain-no-ef", "domain-allow-only-app" }));
+            Assert.That(context.ProfilingCounters.SessionProjectMetadataIndexMaterializations, Is.EqualTo(1));
+        });
+    }
+
+    [Test]
     public void Executor_PackageReferences_RetainOneAuthoritativeIdentityPerFormattedReference()
     {
         var packages = new Dictionary<string, ArchitecturePackageGroup>

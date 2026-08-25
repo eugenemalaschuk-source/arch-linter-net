@@ -16,8 +16,8 @@ internal static class PackageDependencyChecker
     {
         List<ArchitectureViolation> violations = new();
 
-        if (!TryGetPackageReferences(
-                context, contract.Source, out IReadOnlyList<ArchitectureDiscoveredPackageReference> references))
+        if (!context.TryGetPackageReferences(
+                contract.Source, out IReadOnlyList<ArchitectureDiscoveredPackageReference> references))
         {
             return violations;
         }
@@ -68,8 +68,8 @@ internal static class PackageDependencyChecker
     {
         List<ArchitectureViolation> violations = new();
 
-        if (!TryGetPackageReferences(
-                context, contract.Source, out IReadOnlyList<ArchitectureDiscoveredPackageReference> references))
+        if (!context.TryGetPackageReferences(
+                contract.Source, out IReadOnlyList<ArchitectureDiscoveredPackageReference> references))
         {
             return violations;
         }
@@ -107,24 +107,6 @@ internal static class PackageDependencyChecker
         }
 
         return violations;
-    }
-
-    private static bool TryGetPackageReferences(
-        ArchitectureCheckerContext context,
-        string source,
-        out IReadOnlyList<ArchitectureDiscoveredPackageReference> references)
-    {
-        IReadOnlyCollection<ArchitectureDiscoveredProject> discoveredProjects =
-            context.AnalysisContext.ProjectDiscovery?.DiscoveredProjects ?? Array.Empty<ArchitectureDiscoveredProject>();
-
-        Dictionary<string, IReadOnlyList<ArchitectureDiscoveredPackageReference>> packagesByProject = discoveredProjects
-            .GroupBy(project => project.AssemblyName, StringComparer.Ordinal)
-            .ToDictionary(
-                group => group.Key,
-                group => group.First().PackageReferences,
-                StringComparer.Ordinal);
-
-        return packagesByProject.TryGetValue(source, out references!);
     }
 
     private static string FormatPackageReference(ArchitectureDiscoveredPackageReference reference)

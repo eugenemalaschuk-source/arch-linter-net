@@ -82,8 +82,10 @@ internal sealed class ArchitectureFrameworkReferenceAnalysisService
 
     private ArchitectureDiscoveredProject? FindDiscoveredProject(string assemblyName)
     {
-        return _session.Context.ProjectDiscovery?.DiscoveredProjects
-            .FirstOrDefault(project => string.Equals(project.AssemblyName, assemblyName, StringComparison.Ordinal));
+        return _session.Facts.TryGetProjectByAssemblyName(
+            assemblyName, out ArchitectureDiscoveredProject project)
+            ? project
+            : null;
     }
 
     // Matches analysis.configuration, defaulting to "Debug" exactly like project discovery's own
