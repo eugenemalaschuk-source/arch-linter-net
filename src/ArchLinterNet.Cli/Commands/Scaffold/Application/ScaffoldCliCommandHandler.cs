@@ -53,7 +53,7 @@ internal sealed class ScaffoldCliCommandHandler(ICliConsole console, IFileSystem
         }
     }
 
-    internal IReadOnlyList<ScaffoldFile> CreatePlan(ScaffoldCliCommandOptions options)
+    internal static IReadOnlyList<ScaffoldFile> CreatePlan(ScaffoldCliCommandOptions options)
     {
         if (!string.Equals(options.Profile, "cli-command", StringComparison.Ordinal))
         {

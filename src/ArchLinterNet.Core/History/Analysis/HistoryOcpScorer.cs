@@ -14,7 +14,7 @@ internal sealed class HistoryOcpScorer
         "command", "diagnostic", "mapper", "dto", "model", "service", "orchestrator",
     };
 
-    public HistoryOcpAnalysis Score(
+    public static HistoryOcpAnalysis Score(
         HistoryBottleneckAnalysis bottleneckAnalysis,
         CoChangeGraph coChangeGraph,
         HistoryAnalysisConfiguration configuration)

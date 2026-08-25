@@ -66,9 +66,9 @@ internal sealed class HistoryIngestionService(
 
         IReadOnlyList<LogicalFile> files = new FileEvidenceBuilder(objects, identity).Build(deltas, components);
         CoChangeGraph coChangeGraph = new CoChangeGraphBuilder(configuration).Build(files, commits, components);
-        HistoryBottleneckAnalysis bottleneckAnalysis = new HistoryBottleneckScorer().Score(commits, coChangeGraph, configuration);
-        HistoryOcpAnalysis ocpAnalysis = new HistoryOcpScorer().Score(bottleneckAnalysis, coChangeGraph, configuration);
-        HistoryHotspotAnalysis hotspotAnalysis = new HistoryHotspotScorer().Score(commits, files, configuration);
+        HistoryBottleneckAnalysis bottleneckAnalysis = HistoryBottleneckScorer.Score(commits, coChangeGraph, configuration);
+        HistoryOcpAnalysis ocpAnalysis = HistoryOcpScorer.Score(bottleneckAnalysis, coChangeGraph, configuration);
+        HistoryHotspotAnalysis hotspotAnalysis = HistoryHotspotScorer.Score(commits, files, configuration);
         candidates.Sort(RenameCandidate.CompareCanonical);
         return new HistoryIngestionResult(
             layout.ObjectFormatName,

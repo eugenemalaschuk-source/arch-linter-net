@@ -14,13 +14,13 @@ internal sealed class HistoryBottleneckScorer
     private const decimal Scale = 1_000_000_000m;
     private static readonly BigInteger _integerScale = new(1_000_000_000);
 
-    public HistoryBottleneckAnalysis Score(HistoryIngestionResult result, HistoryAnalysisConfiguration configuration)
+    public static HistoryBottleneckAnalysis Score(HistoryIngestionResult result, HistoryAnalysisConfiguration configuration)
     {
         ArgumentNullException.ThrowIfNull(result);
         return Score(result.Commits, result.CoChangeGraph, configuration);
     }
 
-    public HistoryBottleneckAnalysis Score(
+    public static HistoryBottleneckAnalysis Score(
         IReadOnlyList<CommitEvidence> commits,
         CoChangeGraph coChangeGraph,
         HistoryAnalysisConfiguration configuration)

@@ -183,7 +183,7 @@ public sealed class HistoryBottleneckScorerTests
         CoChangeGraph graph = new CoChangeGraphBuilder(configuration).Build(files, commits, []);
         var result = new HistoryIngestionResult(
             "sha1", "from", "to", "from", "to", commits, 0, [], [], files, graph, new HistoryBottleneckAnalysis([]), new HistoryOcpAnalysis([]));
-        return new HistoryBottleneckScorer().Score(result, configuration);
+        return HistoryBottleneckScorer.Score(result, configuration);
     }
 
     private static CommitEvidence Commit(string id, string epoch, string timezone, params object[] taskParts)

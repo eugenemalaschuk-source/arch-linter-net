@@ -357,8 +357,7 @@ public sealed class ScaffoldCliCommandHandlerTests
     [Test]
     public void CreatePlan_GeneratedFixtureChecksTheEntryPointCommandName()
     {
-        IReadOnlyList<ScaffoldCliCommandHandler.ScaffoldFile> files = new ScaffoldCliCommandHandler(
-            new RecordingConsole(), new ScaffoldTestFileSystem()).CreatePlan(Options());
+        IReadOnlyList<ScaffoldCliCommandHandler.ScaffoldFile> files = ScaffoldCliCommandHandler.CreatePlan(Options());
 
         string fixture = files.Single(file => file.Path.EndsWith("InspectCommandScaffoldTests.cs", StringComparison.Ordinal)).Contents;
 

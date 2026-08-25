@@ -15,13 +15,13 @@ internal sealed class HistoryHotspotScorer
     private static readonly BigInteger _fixedPointScale = BigInteger.Pow(10, 60);
     private static readonly BigInteger _naturalLogOfTwo = AtanhScaled(BigInteger.One, new BigInteger(3));
 
-    public HistoryHotspotAnalysis Score(HistoryIngestionResult result, HistoryAnalysisConfiguration configuration)
+    public static HistoryHotspotAnalysis Score(HistoryIngestionResult result, HistoryAnalysisConfiguration configuration)
     {
         ArgumentNullException.ThrowIfNull(result);
         return Score(result.Commits, result.LogicalFiles, configuration);
     }
 
-    public HistoryHotspotAnalysis Score(
+    public static HistoryHotspotAnalysis Score(
         IReadOnlyList<CommitEvidence> commitEvidence,
         IReadOnlyList<LogicalFile> logicalFiles,
         HistoryAnalysisConfiguration configuration)
