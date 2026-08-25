@@ -17,7 +17,7 @@ internal sealed class RenameLineageResolver(CommitGraph graph, IReadOnlyDictiona
         for (int index = 0; index < groups.Count; index++)
         {
             List<RenameCandidate> group = groups[index];
-            IReadOnlyList<RenameCandidate> sequence = TryCanonicalize(group);
+            List<RenameCandidate> sequence = TryCanonicalize(group);
             bool accepted = sequence.Count > 0;
             foreach (RenameCandidate candidate in group)
             {
