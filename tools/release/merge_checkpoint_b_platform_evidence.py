@@ -210,7 +210,7 @@ def main() -> int:
     # taint tracker does not recognize a cross-module call as a sanitizer, so it still reports
     # pythonsecurity:S2083/S8707 here; the same _safe_path-guarded shape carries the identical
     # rationale in aggregate_checkpoint_b_evidence.py and create_repository_gate_evidence.py.
-    output.write_text(json.dumps(merged, indent=2, sort_keys=True) + "\n", encoding="utf-8")  # NOSONAR(S2083)
+    output.write_text(json.dumps(merged, indent=2, sort_keys=True) + "\n", encoding="utf-8")  # NOSONAR(S2083,S8707)
     return 0
 
 

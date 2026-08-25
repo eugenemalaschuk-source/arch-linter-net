@@ -103,7 +103,7 @@ def _sha256(path: Path) -> str:
     # or discovered via rglob() strictly under a _safe_path-confined directory, so this open cannot
     # escape the release workspace. Sonar's Python taint tracker does not recognize a cross-module
     # call as a sanitizer; see the identical rationale in merge_checkpoint_b_platform_evidence.py.
-    with path.open("rb") as source:  # NOSONAR(S2083)
+    with path.open("rb") as source:  # NOSONAR(S2083,S8707)
         for block in iter(lambda: source.read(1024 * 1024), b""):
             digest.update(block)
     return digest.hexdigest()
@@ -114,7 +114,7 @@ def _load_json(path: Path, description: str) -> dict[str, Any]:
         # Every caller passes a path already confined by _safe_path or discovered via
         # rglob() strictly under a _safe_path-confined directory; see the identical rationale in
         # merge_checkpoint_b_platform_evidence.py.
-        value = json.loads(path.read_text(encoding="utf-8"))  # NOSONAR(S2083)
+        value = json.loads(path.read_text(encoding="utf-8"))  # NOSONAR(S2083,S8707)
     except (OSError, json.JSONDecodeError) as error:
         raise ValueError(f"Cannot read {description} '{path}': {error}") from error
     if not isinstance(value, dict):

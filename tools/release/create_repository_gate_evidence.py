@@ -18,7 +18,7 @@ def _sha256(path: Path) -> str:
     # this open cannot escape the release workspace. Sonar's Python taint tracker does not recognize
     # a cross-module call as a sanitizer; see the identical rationale in
     # merge_checkpoint_b_platform_evidence.py.
-    with path.open("rb") as source:  # NOSONAR(S2083)
+    with path.open("rb") as source:  # NOSONAR(S2083,S8707)
         for block in iter(lambda: source.read(1024 * 1024), b""):
             digest.update(block)
     return digest.hexdigest()

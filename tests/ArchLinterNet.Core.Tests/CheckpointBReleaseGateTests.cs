@@ -330,8 +330,10 @@ public sealed partial class CheckpointBReleaseGateTests
         // the killed process's natural stream EOF below, not fault with their own cancellation — the
         // catch block depends on Task.WaitAll completing cleanly so the bare `throw;` re-surfaces a
         // plain OperationCanceledException instead of an AggregateException.
-        Task<string> standardOutput = process.StandardOutput.ReadToEndAsync(); // NOSONAR: see comment above
-        Task<string> standardError = process.StandardError.ReadToEndAsync(); // NOSONAR: see comment above
+#pragma warning disable CA2016
+        Task<string> standardOutput = process.StandardOutput.ReadToEndAsync();
+        Task<string> standardError = process.StandardError.ReadToEndAsync();
+#pragma warning restore CA2016
         try
         {
             process.WaitForExitAsync(cancellationToken).GetAwaiter().GetResult();
