@@ -24,7 +24,7 @@ internal sealed class HistoryOcpScorer
         ArgumentNullException.ThrowIfNull(configuration);
 
         OcpWeights weights = Weights(configuration.Weights.Ocp);
-        IReadOnlyDictionary<string, LogicalFile> filesByPath = coChangeGraph.Vertices.ToDictionary(
+        Dictionary<string, LogicalFile> filesByPath = coChangeGraph.Vertices.ToDictionary(
             static vertex => vertex.CanonicalPath,
             static vertex => vertex.File,
             StringComparer.Ordinal);

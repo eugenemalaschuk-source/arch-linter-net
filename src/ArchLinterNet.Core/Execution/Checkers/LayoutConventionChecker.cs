@@ -376,10 +376,10 @@ internal static partial class LayoutConventionChecker
             return;
         }
 
-        IReadOnlySet<ArchitectureTypeKind> allowedKinds = shape.AllowedTypeKinds
+        HashSet<ArchitectureTypeKind> allowedKinds = shape.AllowedTypeKinds
             .Select(ParseTypeKind)
             .ToHashSet();
-        IReadOnlySet<string> allowedRoles = shape.AllowedRoles.ToHashSet(StringComparer.Ordinal);
+        HashSet<string> allowedRoles = shape.AllowedRoles.ToHashSet(StringComparer.Ordinal);
 
         foreach (ArchitectureDeclaredTypeFact fact in group.Facts
                      .OrderBy(candidate => candidate.FullTypeName, StringComparer.Ordinal)

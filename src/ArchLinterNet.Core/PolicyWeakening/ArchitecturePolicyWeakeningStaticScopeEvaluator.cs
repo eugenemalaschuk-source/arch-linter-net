@@ -12,7 +12,7 @@ internal static class ArchitecturePolicyWeakeningStaticScopeEvaluator
         ArchitecturePolicyContextExport current,
         ICollection<ArchitecturePolicyWeakeningFinding> findings)
     {
-        IReadOnlyDictionary<string, ArchitecturePolicyContextSourceSet> currentSets = current.SourceSets
+        Dictionary<string, ArchitecturePolicyContextSourceSet> currentSets = current.SourceSets
             .ToDictionary(sourceSet => sourceSet.Name, _comparer);
         foreach (ArchitecturePolicyContextSourceSet baseSet in baseline.SourceSets)
         {

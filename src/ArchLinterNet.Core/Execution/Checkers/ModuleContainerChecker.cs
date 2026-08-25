@@ -9,12 +9,12 @@ namespace ArchLinterNet.Core.Execution.Checkers;
 
 internal static class ModuleContainerChecker
 {
-    private static readonly IReadOnlySet<string> _cliCommandSegments = new HashSet<string>(StringComparer.Ordinal)
+    private static readonly HashSet<string> _cliCommandSegments = new(StringComparer.Ordinal)
     {
         "EntryPoint", "Application", "Abstractions", "Models", "Exceptions",
     };
 
-    private static readonly IReadOnlySet<string> _genericModuleNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+    private static readonly HashSet<string> _genericModuleNames = new(StringComparer.OrdinalIgnoreCase)
     {
         "Common", "Shared", "Utils",
     };
