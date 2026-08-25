@@ -108,16 +108,16 @@ internal static class ArchitecturePolicyContextContractFactsProjector
                 Text("assembly", entry.AssemblyName), Text("signature", entry.Signature)))))),
         ArchitectureAttributeUsageContract value => Create(value.Reason, value.IgnoredViolations, Scoped(value.Attributes, value.AttributePrefixes,
             new ScopeRestrictions(
-                value.AllowedOnlyInLayers, value.AllowedOnlyInNamespaces, value.AllowedOnlyInProjects, value.AllowedOnlyInAssemblies,
-                value.ForbiddenInLayers, value.ForbiddenInNamespaces, value.ForbiddenInProjects, value.ForbiddenInAssemblies),
+                new ScopeRestrictionSet(value.AllowedOnlyInLayers, value.AllowedOnlyInNamespaces, value.AllowedOnlyInProjects, value.AllowedOnlyInAssemblies),
+                new ScopeRestrictionSet(value.ForbiddenInLayers, value.ForbiddenInNamespaces, value.ForbiddenInProjects, value.ForbiddenInAssemblies)),
             "attributes", "attribute_prefixes")),
         ArchitectureInheritanceContract value => Create(value.Reason, value.IgnoredViolations, Facts(
             Values("source_layers", value.SourceLayers), Values("source_namespaces", value.SourceNamespaces),
             Values("forbidden_base_types", value.ForbiddenBaseTypes), Values("forbidden_base_type_prefixes", value.ForbiddenBaseTypePrefixes))),
         ArchitectureInterfaceImplementationContract value => Create(value.Reason, value.IgnoredViolations, Scoped(value.Interfaces, value.InterfacePrefixes,
             new ScopeRestrictions(
-                value.AllowedOnlyInLayers, value.AllowedOnlyInNamespaces, value.AllowedOnlyInProjects, value.AllowedOnlyInAssemblies,
-                value.ForbiddenInLayers, value.ForbiddenInNamespaces, value.ForbiddenInProjects, value.ForbiddenInAssemblies),
+                new ScopeRestrictionSet(value.AllowedOnlyInLayers, value.AllowedOnlyInNamespaces, value.AllowedOnlyInProjects, value.AllowedOnlyInAssemblies),
+                new ScopeRestrictionSet(value.ForbiddenInLayers, value.ForbiddenInNamespaces, value.ForbiddenInProjects, value.ForbiddenInAssemblies)),
             "interfaces", "interface_prefixes")),
         ArchitectureCompositionContract value => Create(value.Reason, value.IgnoredViolations, Facts(
             Values("forbidden_apis", value.ForbiddenApis), Values("allowed_only_in_layers", value.AllowedOnlyInLayers),
@@ -154,15 +154,13 @@ internal static class ArchitecturePolicyContextContractFactsProjector
         return Create(contract.Reason, contract.IgnoredViolations, Facts(facts));
     }
 
-    private readonly record struct ScopeRestrictions(
-        IEnumerable<string> AllowedLayers,
-        IEnumerable<string> AllowedNamespaces,
-        IEnumerable<string> AllowedProjects,
-        IEnumerable<string> AllowedAssemblies,
-        IEnumerable<string> ForbiddenLayers,
-        IEnumerable<string> ForbiddenNamespaces,
-        IEnumerable<string> ForbiddenProjects,
-        IEnumerable<string> ForbiddenAssemblies);
+    private readonly record struct ScopeRestrictionSet(
+        IEnumerable<string> Layers,
+        IEnumerable<string> Namespaces,
+        IEnumerable<string> Projects,
+        IEnumerable<string> Assemblies);
+
+    private readonly record struct ScopeRestrictions(ScopeRestrictionSet Allowed, ScopeRestrictionSet Forbidden);
 
     private static IReadOnlyList<ArchitecturePolicyContextContractFact> Scoped(
         IEnumerable<string> subjects,
@@ -170,11 +168,11 @@ internal static class ArchitecturePolicyContextContractFactsProjector
         ScopeRestrictions restrictions,
         string subjectsName,
         string prefixesName) => Facts(
-        Values(subjectsName, subjects), Values(prefixesName, subjectPrefixes), Values("allowed_only_in_layers", restrictions.AllowedLayers),
-        Values("allowed_only_in_namespaces", restrictions.AllowedNamespaces), Values("allowed_only_in_projects", restrictions.AllowedProjects),
-        Values("allowed_only_in_assemblies", restrictions.AllowedAssemblies), Values("forbidden_in_layers", restrictions.ForbiddenLayers),
-        Values("forbidden_in_namespaces", restrictions.ForbiddenNamespaces), Values("forbidden_in_projects", restrictions.ForbiddenProjects),
-        Values("forbidden_in_assemblies", restrictions.ForbiddenAssemblies));
+        Values(subjectsName, subjects), Values(prefixesName, subjectPrefixes), Values("allowed_only_in_layers", restrictions.Allowed.Layers),
+        Values("allowed_only_in_namespaces", restrictions.Allowed.Namespaces), Values("allowed_only_in_projects", restrictions.Allowed.Projects),
+        Values("allowed_only_in_assemblies", restrictions.Allowed.Assemblies), Values("forbidden_in_layers", restrictions.Forbidden.Layers),
+        Values("forbidden_in_namespaces", restrictions.Forbidden.Namespaces), Values("forbidden_in_projects", restrictions.Forbidden.Projects),
+        Values("forbidden_in_assemblies", restrictions.Forbidden.Assemblies));
 
     private static ArchitecturePolicyContextContractProjection Create(
         string reason,
