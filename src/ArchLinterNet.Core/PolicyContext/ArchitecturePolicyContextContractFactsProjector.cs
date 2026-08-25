@@ -178,7 +178,7 @@ internal static class ArchitecturePolicyContextContractFactsProjector
         public ScopeRestrictionSet Forbidden { get; } = forbidden;
     }
 
-    private static IReadOnlyList<ArchitecturePolicyContextContractFact> Scoped(
+    private static ArchitecturePolicyContextContractFact[] Scoped(
         IEnumerable<string> subjects,
         IEnumerable<string> subjectPrefixes,
         ScopeRestrictions restrictions,
@@ -195,18 +195,18 @@ internal static class ArchitecturePolicyContextContractFactsProjector
         IReadOnlyList<ArchitectureIgnoredViolation> ignoredViolations,
         IReadOnlyList<ArchitecturePolicyContextContractFact> facts) => new(reason, ignoredViolations, facts);
 
-    private static IReadOnlyList<ArchitecturePolicyContextContractFact> TypeMatcherFacts(ArchitectureTypeMatcher matcher) => Facts(
+    private static ArchitecturePolicyContextContractFact[] TypeMatcherFacts(ArchitectureTypeMatcher matcher) => Facts(
         Text("name_suffix", matcher.NameSuffix), Text("name_prefix", matcher.NamePrefix), Text(NamespaceFact, matcher.Namespace),
         Text(LayerFact, matcher.Layer), Text("base_type", matcher.BaseType), Text("implements_interface", matcher.ImplementsInterface),
         Text("has_attribute", matcher.HasAttribute));
 
-    private static IReadOnlyList<ArchitecturePolicyContextContractFact> PublicApiSelectorFacts(ArchitecturePublicApiSurfaceSelector? selector) => selector is null
+    private static ArchitecturePolicyContextContractFact[] PublicApiSelectorFacts(ArchitecturePublicApiSurfaceSelector? selector) => selector is null
         ? Array.Empty<ArchitecturePolicyContextContractFact>()
         : Facts(Text("name_suffix", selector.NameSuffix), Text("name_prefix", selector.NamePrefix), Text(NamespaceFact, selector.Namespace),
             Text(LayerFact, selector.Layer), Text("base_type", selector.BaseType), Text("implements_interface", selector.ImplementsInterface),
             Text("has_attribute", selector.HasAttribute), Text("role", selector.Role));
 
-    private static IReadOnlyList<ArchitecturePolicyContextContractFact> LayoutMatcherFacts(ArchitectureLayoutFileMatcher matcher) => Facts(
+    private static ArchitecturePolicyContextContractFact[] LayoutMatcherFacts(ArchitectureLayoutFileMatcher matcher) => Facts(
         Text("folder_segment", matcher.FolderSegment), Text("namespace_segment", matcher.NamespaceSegment),
         Text("file_name_suffix", matcher.FileNameSuffix), Text("file_name_prefix", matcher.FileNamePrefix), Text("when", matcher.When));
 
