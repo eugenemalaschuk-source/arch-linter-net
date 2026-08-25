@@ -33,7 +33,7 @@ internal static class AssemblyDependencyChecker
     {
         List<ArchitectureViolation> violations = new();
 
-        Dictionary<string, Assembly> resolvedAssemblies = context.BuildAssemblyLookup();
+        IReadOnlyDictionary<string, Assembly> resolvedAssemblies = context.BuildAssemblyLookup();
 
         if (!resolvedAssemblies.TryGetValue(contract.Source, out Assembly? sourceAssembly))
         {
@@ -85,7 +85,7 @@ internal static class AssemblyDependencyChecker
     {
         List<ArchitectureViolation> violations = new();
 
-        Dictionary<string, Assembly> resolvedAssemblies = context.BuildAssemblyLookup();
+        IReadOnlyDictionary<string, Assembly> resolvedAssemblies = context.BuildAssemblyLookup();
 
         if (!resolvedAssemblies.TryGetValue(contract.Source, out Assembly? sourceAssembly))
         {
