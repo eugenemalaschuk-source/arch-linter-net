@@ -28,7 +28,8 @@ internal sealed class ArchitecturePublicApiSurfaceAnalysisService
         Dictionary<string, Assembly> resolvedAssemblies = _session.Facts.BuildAssemblyLookup();
         List<ArchitectureViolation> violations = PublicApiSurfaceChecker.Check(
             contract, resolvedAssemblies, executionContext,
-            PublicApiSurfaceChecker.BuildSurfaceSelectorPredicate(contract, _session.Document, _session.RoleIndex));
+            PublicApiSurfaceChecker.BuildSurfaceSelectorPredicate(contract, _session.Document, _session.RoleIndex),
+            _session.GetPublicApiSurface);
         _session.CollectUnmatchedIgnores(executionContext);
         return violations;
     }
@@ -69,6 +70,7 @@ internal sealed class ArchitecturePublicApiSurfaceAnalysisService
         Dictionary<string, Assembly> resolvedAssemblies = _session.Facts.BuildAssemblyLookup();
         Func<Type, bool>? selectorPredicate =
             PublicApiSurfaceChecker.BuildSurfaceSelectorPredicate(contract, _session.Document, _session.RoleIndex);
+        Func<Assembly, ArchitecturePublicApiSurfaceMaterialization> surfaceResolver = _session.GetPublicApiSurface;
         List<PublicApiSnapshotEntry> entries = new();
         List<string> missing = new();
 
@@ -81,12 +83,14 @@ internal sealed class ArchitecturePublicApiSurfaceAnalysisService
                 continue;
             }
 
-            IEnumerable<ArchitectureExportedApiEntry> exported =
-                ArchitecturePublicApiSurfaceScanner.GetExportedSurface(targetAssembly);
+            ArchitecturePublicApiSurfaceMaterialization surface = surfaceResolver(targetAssembly);
+            IEnumerable<ArchitectureExportedApiEntry> exported = surface.Entries;
             if (selectorPredicate != null)
             {
-                HashSet<string> selectedTypeNames =
-                    ArchitecturePublicApiSurfaceScanner.SelectedTypeFullNames(targetAssembly, selectorPredicate);
+                HashSet<string> selectedTypeNames = surface.ExportedTypes
+                    .Where(selectorPredicate)
+                    .Select(ArchitectureTypeNames.SafeFullName)
+                    .ToHashSet(StringComparer.Ordinal);
                 exported = exported.Where(entry => selectedTypeNames.Contains(entry.DeclaringTypeName));
             }
 
@@ -103,7 +107,11 @@ internal sealed class ArchitecturePublicApiSurfaceAnalysisService
         // types that simply never resolved, mirroring how exact-diff mode guards the same condition.
         selectorSafetyViolations = missing.Count == 0
             ? PublicApiSurfaceChecker.CheckSelectorSafety(
-                contract, resolvedAssemblies, _session.CreateExecutionContext(contract, contract.IgnoredViolations), selectorPredicate)
+                contract,
+                resolvedAssemblies,
+                _session.CreateExecutionContext(contract, contract.IgnoredViolations),
+                selectorPredicate,
+                surfaceResolver)
             : Array.Empty<ArchitectureViolation>();
 
         return entries;
