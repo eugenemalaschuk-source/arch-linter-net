@@ -174,12 +174,12 @@ public static class ArchitectureChangeReports
 
     private static string Key(ArchitectureChangeEntry entry) => entry.Kind + "\u001f" + entry.Identity;
 
-    private static IReadOnlyList<ArchitectureChangeEntry> Order(IEnumerable<ArchitectureChangeEntry> entries) => entries
+    private static ArchitectureChangeEntry[] Order(IEnumerable<ArchitectureChangeEntry> entries) => entries
         .OrderBy(static entry => entry.Kind, StringComparer.Ordinal)
         .ThenBy(static entry => entry.Identity, StringComparer.Ordinal)
         .ToArray();
 
-    private static IReadOnlyList<ArchitectureChangeFinding> Order(IEnumerable<ArchitectureChangeFinding> findings) => findings
+    private static ArchitectureChangeFinding[] Order(IEnumerable<ArchitectureChangeFinding> findings) => findings
         .OrderBy(static finding => finding.Kind, StringComparer.Ordinal)
         .ThenBy(static finding => finding.Identity, StringComparer.Ordinal)
         .ToArray();

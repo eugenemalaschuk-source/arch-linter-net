@@ -88,7 +88,7 @@ internal sealed class RenameLineageResolver(CommitGraph graph, IReadOnlyDictiona
     }
 
     // Returns the accepted sequence, or an empty list when the component is `ambiguous_dag`.
-    private IReadOnlyList<RenameCandidate> TryCanonicalize(List<RenameCandidate> group)
+    private List<RenameCandidate> TryCanonicalize(List<RenameCandidate> group)
     {
         if (group.Count == 1)
         {

@@ -90,7 +90,7 @@ internal sealed class CoChangeGraphBuilder(HistoryAnalysisConfiguration configur
 
     private static void AddCommitEvidence(
         Dictionary<CoChangePairKey, CoChangePairAccumulator> pairs,
-        IReadOnlyDictionary<string, List<CoChangeVertex>> verticesByCommit,
+        Dictionary<string, List<CoChangeVertex>> verticesByCommit,
         IReadOnlyList<CommitEvidence> commits)
     {
         foreach (CommitEvidence commit in commits)
@@ -106,7 +106,7 @@ internal sealed class CoChangeGraphBuilder(HistoryAnalysisConfiguration configur
 
     private static void AddTaskEvidence(
         Dictionary<CoChangePairKey, CoChangePairAccumulator> pairs,
-        IReadOnlyDictionary<string, List<CoChangeVertex>> verticesByCommit,
+        Dictionary<string, List<CoChangeVertex>> verticesByCommit,
         IReadOnlyList<CommitEvidence> commits)
     {
         Dictionary<TaskKey, HashSet<CoChangeVertex>> verticesByTask = [];
@@ -141,7 +141,7 @@ internal sealed class CoChangeGraphBuilder(HistoryAnalysisConfiguration configur
     }
 
     private static void AddPairs(
-        IReadOnlyList<CoChangeVertex> vertices,
+        List<CoChangeVertex> vertices,
         Action<CoChangePairAccumulator> addEvidence,
         Dictionary<CoChangePairKey, CoChangePairAccumulator> pairs)
     {
@@ -236,7 +236,7 @@ internal sealed class CoChangeGraphBuilder(HistoryAnalysisConfiguration configur
         return ranks;
     }
 
-    private IReadOnlyList<CoChangeCluster> BuildClusters(IReadOnlyList<CoChangePair> baseEdges)
+    private List<CoChangeCluster> BuildClusters(IReadOnlyList<CoChangePair> baseEdges)
     {
         decimal? threshold = configuration.Thresholds.CoChangeSignificance;
         if (threshold is null)

@@ -60,7 +60,7 @@ internal sealed class HistoryHotspotScorer
     private static Candidate CreateCandidate(
         LogicalFile file,
         HistoryPathCategory category,
-        IReadOnlyDictionary<string, CommitEvidence> commits)
+        Dictionary<string, CommitEvidence> commits)
     {
         var taskKeys = new HashSet<Tasks.TaskKey>();
         var taskKeyProvenance = new List<HotspotTaskKeyProvenance>();

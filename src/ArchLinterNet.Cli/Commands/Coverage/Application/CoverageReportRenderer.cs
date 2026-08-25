@@ -83,7 +83,7 @@ internal static class CoverageReportRenderer
         }
     }
 
-    private static IReadOnlyList<FailureRule> CollectFailures(JsonElement report)
+    private static FailureRule[] CollectFailures(JsonElement report)
     {
         (string Property, string Category)[] collections = [("violations", "Violation"), ("coverage_findings", "Coverage"), ("cycle_diagnostics", "Cycle"), ("unmatched_ignored_violations", "Stale baseline ignore"), ("policy_consistency_findings", "Policy consistency"), ("preflight_diagnostics", "Build-state preflight"), ("classification_conflicts", "Classification conflict"), ("classification_metadata_failures", "Classification metadata")];
         var result = new Dictionary<string, FailureRuleBuilder>(StringComparer.Ordinal);
@@ -207,7 +207,7 @@ internal static class CoverageReportRenderer
         }
     }
 
-    private static IEnumerable<(string Scope, string? Item)> DetectedUnits(string file, string? project, string root, ISet<string> scopes)
+    private static IEnumerable<(string Scope, string? Item)> DetectedUnits(string file, string? project, string root, HashSet<string> scopes)
     {
         if (scopes.Contains("namespace")) yield return ("namespace", Namespace(file, root));
         if (scopes.Contains("project")) yield return ("project", project is null ? null : Path.GetRelativePath(root, project).Replace('\\', '/'));

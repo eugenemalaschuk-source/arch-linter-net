@@ -181,7 +181,7 @@ internal static class ArchitecturePolicyContextContractFactsProjector
         Text("folder_segment", matcher.FolderSegment), Text("namespace_segment", matcher.NamespaceSegment),
         Text("file_name_suffix", matcher.FileNameSuffix), Text("file_name_prefix", matcher.FileNamePrefix), Text("when", matcher.When));
 
-    private static ArchitecturePolicyContextContractFact? OrderedLayers(IEnumerable<string> layers, ISet<string>? optionalLayers = null) => Objects(
+    private static ArchitecturePolicyContextContractFact? OrderedLayers(IEnumerable<string> layers, HashSet<string>? optionalLayers = null) => Objects(
         "layers", layers.Select(layer => Object(LayerFact, Text("name", layer), Flag("optional", optionalLayers?.Contains(layer) ?? false))));
 
     private static ArchitecturePolicyContextContractFact? OrderedLayers(IEnumerable<ArchitectureTemplateLayer> layers) => Objects(

@@ -68,7 +68,7 @@ internal sealed class GitObjectDatabase : IDisposable
         _packs.Clear();
     }
 
-    private IReadOnlyList<GitPackFile> Packs()
+    private List<GitPackFile> Packs()
     {
         if (_packsLoaded)
         {

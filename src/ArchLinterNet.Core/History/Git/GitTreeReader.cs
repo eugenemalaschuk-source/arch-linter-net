@@ -25,7 +25,7 @@ internal sealed class GitTreeReader(GitObjectDatabase objects, int digestLength)
         return entries;
     }
 
-    private IReadOnlyList<GitTreeEntry> Parse(GitObjectId treeId, byte[] payload)
+    private List<GitTreeEntry> Parse(GitObjectId treeId, byte[] payload)
     {
         List<GitTreeEntry> entries = [];
         int position = 0;

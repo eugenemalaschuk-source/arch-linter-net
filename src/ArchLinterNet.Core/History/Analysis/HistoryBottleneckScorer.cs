@@ -52,7 +52,7 @@ internal sealed class HistoryBottleneckScorer
         return new HistoryBottleneckAnalysis(groups);
     }
 
-    private static IReadOnlyDictionary<CoChangeVertex, GraphEvidence> BuildGraphEvidence(CoChangeGraph graph)
+    private static Dictionary<CoChangeVertex, GraphEvidence> BuildGraphEvidence(CoChangeGraph graph)
     {
         Dictionary<CoChangeVertex, GraphEvidenceAccumulator> accumulators = graph.Vertices.ToDictionary(
             static vertex => vertex,
@@ -112,12 +112,12 @@ internal sealed class HistoryBottleneckScorer
                 authors));
     }
 
-    private static List<BottleneckTaskPair> BuildIndependentPairs(IReadOnlyList<TaskKey> taskKeys, IReadOnlyList<CommitEvidence> fileCommits)
+    private static List<BottleneckTaskPair> BuildIndependentPairs(TaskKey[] taskKeys, IReadOnlyList<CommitEvidence> fileCommits)
     {
         List<BottleneckTaskPair> pairs = [];
-        for (int first = 0; first < taskKeys.Count; first++)
+        for (int first = 0; first < taskKeys.Length; first++)
         {
-            for (int second = first + 1; second < taskKeys.Count; second++)
+            for (int second = first + 1; second < taskKeys.Length; second++)
             {
                 TaskKey firstKey = taskKeys[first];
                 TaskKey secondKey = taskKeys[second];
@@ -175,7 +175,7 @@ internal sealed class HistoryBottleneckScorer
         return new BottleneckTaskInterval(start, end);
     }
 
-    private static IReadOnlyList<BottleneckTaskProvenance> Provenance(IReadOnlyList<CommitEvidence> commits, TaskKey key)
+    private static BottleneckTaskProvenance[] Provenance(IReadOnlyList<CommitEvidence> commits, TaskKey key)
         => commits.SelectMany(evidence => evidence.TaskKeyMatches
                 .Where(match => match.Key.Equals(key))
                 .Select(match => new BottleneckTaskProvenance(evidence.Commit.Id.Hex, match)))

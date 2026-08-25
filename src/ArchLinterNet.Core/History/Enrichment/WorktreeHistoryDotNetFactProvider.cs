@@ -141,7 +141,7 @@ internal sealed class WorktreeHistoryDotNetFactProvider : IHistoryDotNetFactProv
         return preflight.VerifiedArtifactContentDigests;
     }
 
-    private static IReadOnlyDictionary<string, IReadOnlyList<HistoryDotNetTypeContext>> BuildPathIndex(
+    private static Dictionary<string, IReadOnlyList<HistoryDotNetTypeContext>> BuildPathIndex(
         IReadOnlyList<ArchitectureDeclaredTypeFact> facts,
         ProjectDiscoveryResult discovery)
     {

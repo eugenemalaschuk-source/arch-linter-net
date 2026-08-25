@@ -105,7 +105,7 @@ public sealed class ArchitecturePolicyContextApplicationService(IArchitecturePol
         PortablePathOrNull(source.AuthoredImportPath),
         source.ImportChain.Select(PortablePath).ToArray());
 
-    private static IReadOnlyList<ArchitecturePolicyContextLayer> ProjectLayers(ArchitectureContractDocument document)
+    private static ArchitecturePolicyContextLayer[] ProjectLayers(ArchitectureContractDocument document)
     {
         return document.Layers
             .OrderBy(item => item.Key, StringComparer.Ordinal)
@@ -128,7 +128,7 @@ public sealed class ArchitecturePolicyContextApplicationService(IArchitecturePol
             .ToArray();
     }
 
-    private static IReadOnlyList<ArchitecturePolicyContextContract> ProjectContracts(
+    private static ArchitecturePolicyContextContract[] ProjectContracts(
         ArchitectureContractCatalog catalog,
         ArchitectureContractDocument document)
     {
@@ -168,7 +168,7 @@ public sealed class ArchitecturePolicyContextApplicationService(IArchitecturePol
             ProjectProvenance(provenance.LocationFor(contract)));
     }
 
-    private static IReadOnlyList<ArchitecturePolicyContextClassification> ProjectClassification(
+    private static ArchitecturePolicyContextClassification[] ProjectClassification(
         ArchitectureClassificationConfiguration classification)
     {
         List<ArchitecturePolicyContextClassification> projected = new();
@@ -183,7 +183,7 @@ public sealed class ArchitecturePolicyContextApplicationService(IArchitecturePol
         return projected.ToArray();
     }
 
-    private static IReadOnlyList<ArchitecturePolicyContextSourceExpansion> ProjectSourceExpansions(
+    private static ArchitecturePolicyContextSourceExpansion[] ProjectSourceExpansions(
         IReadOnlyList<ArchitectureContractExpansion> expansions)
     {
         return expansions
@@ -216,7 +216,7 @@ public sealed class ArchitecturePolicyContextApplicationService(IArchitecturePol
             .ToArray();
     }
 
-    private static IReadOnlyList<ArchitecturePolicyContextExpandedInstance> ProjectExpandedInstances(
+    private static ArchitecturePolicyContextExpandedInstance[] ProjectExpandedInstances(
         IReadOnlyList<ArchitectureExpandedContractInstance> instances)
     {
         return instances
@@ -236,13 +236,13 @@ public sealed class ArchitecturePolicyContextApplicationService(IArchitecturePol
             .ToArray();
     }
 
-    private static IReadOnlyList<ArchitecturePolicyContextReference> ProjectReferences(
+    private static ArchitecturePolicyContextReference[] ProjectReferences(
         IReadOnlyList<ArchitecturePolicyContextContractFact> facts) => facts
         .Where(fact => fact.Values.Count > 0)
         .Select(fact => new ArchitecturePolicyContextReference(fact.Name, fact.Values))
         .ToArray();
 
-    private static IReadOnlyList<ArchitecturePolicyContextSelector> ProjectSelectors(IArchitectureContract contract)
+    private static ArchitecturePolicyContextSelector[] ProjectSelectors(IArchitectureContract contract)
     {
         return contract switch
         {
@@ -267,7 +267,7 @@ public sealed class ArchitecturePolicyContextApplicationService(IArchitecturePol
         };
     }
 
-    private static IReadOnlyList<ArchitecturePolicyContextAdapterBinding> ProjectAdapterBindings(
+    private static ArchitecturePolicyContextAdapterBinding[] ProjectAdapterBindings(
         IArchitectureContract contract)
     {
         return contract is ArchitecturePortBoundaryContract value
@@ -279,7 +279,7 @@ public sealed class ArchitecturePolicyContextApplicationService(IArchitecturePol
             : Array.Empty<ArchitecturePolicyContextAdapterBinding>();
     }
 
-    private static IReadOnlyList<ArchitecturePolicyContextSelector> ProjectExclusionSelectors(IArchitectureContract contract)
+    private static ArchitecturePolicyContextSelector[] ProjectExclusionSelectors(IArchitectureContract contract)
     {
         return contract switch
         {
@@ -302,7 +302,7 @@ public sealed class ArchitecturePolicyContextApplicationService(IArchitecturePol
         ProjectMetadata(selector.Metadata),
         selector.When);
 
-    private static IReadOnlyList<string> CollectRoles(
+    private static string[] CollectRoles(
         IReadOnlyList<ArchitecturePolicyContextLayer> layers,
         IReadOnlyList<ArchitecturePolicyContextClassification> classification,
         IReadOnlyList<ArchitecturePolicyContextContract> contracts)
@@ -317,7 +317,7 @@ public sealed class ArchitecturePolicyContextApplicationService(IArchitecturePol
             .ToArray();
     }
 
-    private static IReadOnlyList<ArchitecturePolicyContextValue> CollectContexts(
+    private static ArchitecturePolicyContextValue[] CollectContexts(
         IReadOnlyList<ArchitecturePolicyContextLayer> layers,
         IReadOnlyList<ArchitecturePolicyContextClassification> classification,
         IReadOnlyList<ArchitecturePolicyContextContract> contracts)
@@ -346,7 +346,7 @@ public sealed class ArchitecturePolicyContextApplicationService(IArchitecturePol
             .Concat(contract.AdapterBindings.SelectMany(binding => binding.AllowedContexts));
     }
 
-    private static IReadOnlyList<ArchitecturePolicyContextException> ProjectExceptions(
+    private static ArchitecturePolicyContextException[] ProjectExceptions(
         ArchitectureContractDocument document,
         ArchitectureContractCatalog catalog,
         IReadOnlyList<ArchitecturePolicyContextContract> contracts)
@@ -421,7 +421,7 @@ public sealed class ArchitecturePolicyContextApplicationService(IArchitecturePol
         return exclusion.SetName is null ? "exclude_source" : "exclude_source_set";
     }
 
-    private static IReadOnlyDictionary<string, string> ProjectMetadata(IReadOnlyDictionary<string, object> metadata)
+    private static Dictionary<string, string> ProjectMetadata(IReadOnlyDictionary<string, object> metadata)
     {
         return metadata.OrderBy(item => item.Key, StringComparer.Ordinal)
             .ToDictionary(item => item.Key, item => DisplayValue(item.Value), StringComparer.Ordinal);

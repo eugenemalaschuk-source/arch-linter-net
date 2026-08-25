@@ -95,7 +95,7 @@ public static class ArchitectureDebtGateFormatter
         });
     }
 
-    private static object BuildJsonPayload(ArchitectureDebtGateOutcome outcome) => new Dictionary<string, object?>
+    private static Dictionary<string, object?> BuildJsonPayload(ArchitectureDebtGateOutcome outcome) => new()
     {
         ["schema_version"] = 1,
         ["kind"] = "architecture-debt-gate",

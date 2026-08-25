@@ -38,7 +38,7 @@ internal sealed class FileEvidenceBuilder(GitObjectDatabase objects, LogicalFile
     private void CollectCommit(
         CommitDelta delta,
         int order,
-        IReadOnlyDictionary<string, List<RenameCandidate>> acceptedByCommit,
+        Dictionary<string, List<RenameCandidate>> acceptedByCommit,
         Dictionary<string, int> firstOccurrence,
         Dictionary<int, List<FileEvent>> eventsByGroup)
     {
