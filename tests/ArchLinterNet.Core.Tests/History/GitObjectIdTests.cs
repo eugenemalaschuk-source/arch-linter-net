@@ -16,6 +16,10 @@ public sealed class GitObjectIdTests
 
         Assert.Multiple(() =>
         {
+            Assert.That(lower == lowerCopy, Is.True);
+            Assert.That(lower != lowerCopy, Is.False);
+            Assert.That(lower == higher, Is.False);
+            Assert.That(lower != higher, Is.True);
             Assert.That(lower < higher, Is.True);
             Assert.That(higher < lower, Is.False);
             Assert.That(lower <= lowerCopy, Is.True);
