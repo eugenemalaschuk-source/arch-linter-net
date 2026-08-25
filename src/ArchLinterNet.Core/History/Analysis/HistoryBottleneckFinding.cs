@@ -20,72 +20,52 @@ internal sealed class BottleneckTaskProvenance(string commitId, TaskKeyMatch mat
     public TaskKeyMatch Match { get; } = match;
 }
 
-internal sealed class BottleneckTaskPair(
-    TaskKey first,
-    TaskKey second,
-    IReadOnlyList<string> firstExclusiveCommitIds,
-    IReadOnlyList<string> secondExclusiveCommitIds,
-    IReadOnlyList<BottleneckTaskProvenance> firstProvenance,
-    IReadOnlyList<BottleneckTaskProvenance> secondProvenance,
-    BottleneckTaskInterval firstInterval,
-    BottleneckTaskInterval secondInterval,
-    BigInteger gapSeconds,
-    BigInteger daysBetween,
-    decimal temporalProximity)
+internal sealed class BottleneckTaskPair
 {
-    public TaskKey First { get; } = first;
+    public required TaskKey First { get; init; }
 
-    public TaskKey Second { get; } = second;
+    public required TaskKey Second { get; init; }
 
-    public IReadOnlyList<string> FirstExclusiveCommitIds { get; } = firstExclusiveCommitIds;
+    public required IReadOnlyList<string> FirstExclusiveCommitIds { get; init; }
 
-    public IReadOnlyList<string> SecondExclusiveCommitIds { get; } = secondExclusiveCommitIds;
+    public required IReadOnlyList<string> SecondExclusiveCommitIds { get; init; }
 
-    public IReadOnlyList<BottleneckTaskProvenance> FirstProvenance { get; } = firstProvenance;
+    public required IReadOnlyList<BottleneckTaskProvenance> FirstProvenance { get; init; }
 
-    public IReadOnlyList<BottleneckTaskProvenance> SecondProvenance { get; } = secondProvenance;
+    public required IReadOnlyList<BottleneckTaskProvenance> SecondProvenance { get; init; }
 
-    public BottleneckTaskInterval FirstInterval { get; } = firstInterval;
+    public required BottleneckTaskInterval FirstInterval { get; init; }
 
-    public BottleneckTaskInterval SecondInterval { get; } = secondInterval;
+    public required BottleneckTaskInterval SecondInterval { get; init; }
 
-    public BigInteger GapSeconds { get; } = gapSeconds;
+    public required BigInteger GapSeconds { get; init; }
 
-    public BigInteger DaysBetween { get; } = daysBetween;
+    public required BigInteger DaysBetween { get; init; }
 
-    public decimal TemporalProximity { get; } = temporalProximity;
+    public required decimal TemporalProximity { get; init; }
 }
 
-internal sealed class BottleneckRawEvidence(
-    int independentTaskSpread,
-    int distinctAuthorCount,
-    decimal independentTemporalProximity,
-    int distinctNeighborDegree,
-    int incidentCommitDegree,
-    int incidentTaskDegree,
-    IReadOnlyList<TaskKey> taskKeys,
-    IReadOnlyList<BottleneckTaskPair> independentTaskPairs,
-    IReadOnlyList<string> canonicalAuthors)
+internal sealed class BottleneckRawEvidence
 {
-    public int IndependentTaskSpread { get; } = independentTaskSpread;
+    public required int IndependentTaskSpread { get; init; }
 
-    public int DistinctAuthorCount { get; } = distinctAuthorCount;
+    public required int DistinctAuthorCount { get; init; }
 
-    public decimal IndependentTemporalProximity { get; } = independentTemporalProximity;
+    public required decimal IndependentTemporalProximity { get; init; }
 
-    public int DistinctNeighborDegree { get; } = distinctNeighborDegree;
+    public required int DistinctNeighborDegree { get; init; }
 
-    public int IncidentCommitDegree { get; } = incidentCommitDegree;
+    public required int IncidentCommitDegree { get; init; }
 
-    public int IncidentTaskDegree { get; } = incidentTaskDegree;
+    public required int IncidentTaskDegree { get; init; }
 
-    public IReadOnlyList<TaskKey> TaskKeys { get; } = taskKeys;
+    public required IReadOnlyList<TaskKey> TaskKeys { get; init; }
 
-    public IReadOnlyList<BottleneckTaskPair> IndependentTaskPairs { get; } = independentTaskPairs;
+    public required IReadOnlyList<BottleneckTaskPair> IndependentTaskPairs { get; init; }
 
-    public IReadOnlyList<string> CanonicalAuthors { get; } = canonicalAuthors;
+    public required IReadOnlyList<string> CanonicalAuthors { get; init; }
 
-    public bool PathnameReuseMayConflateGenerations => true;
+    public static bool PathnameReuseMayConflateGenerations => true;
 }
 
 internal sealed class BottleneckComponents(

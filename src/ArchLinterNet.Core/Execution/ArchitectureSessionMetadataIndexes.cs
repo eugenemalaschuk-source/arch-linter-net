@@ -42,7 +42,7 @@ internal sealed class ArchitectureSessionMetadataIndexes
         out IReadOnlyList<ArchitectureDiscoveredPackageReference> references) =>
         _projectMetadata.Value.PackageReferencesByAssemblyName.TryGetValue(assemblyName, out references!);
 
-    private IReadOnlyDictionary<string, Assembly> BuildAssembliesByName()
+    private Dictionary<string, Assembly> BuildAssembliesByName()
     {
         _profilingCounters.RecordSessionAssemblyIndexMaterialization();
         Dictionary<string, Assembly> assembliesByName = new(StringComparer.Ordinal);

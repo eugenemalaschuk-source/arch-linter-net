@@ -86,8 +86,10 @@ internal static class ArchitectureRemediationHintFactory
                 ArchitectureRemediationHintCategory.FixPolicyInput,
                 "Add or correct the required architecture coverage input for the affected subject.",
                 identity,
-                Evidence("coverage_gap", diagnostic.ForbiddenNamespace),
-                Evidence("affected_subject", diagnostic.SourceType),
+                [
+                    Evidence("coverage_gap", diagnostic.ForbiddenNamespace),
+                    Evidence("affected_subject", diagnostic.SourceType),
+                ],
                 caveat: "Preserve governed scope; do not resolve coverage by excluding the subject broadly.");
         }
 
@@ -98,7 +100,7 @@ internal static class ArchitectureRemediationHintFactory
                 ArchitectureRemediationHintCategory.MoveCode,
                 "Move the access into an already-declared allowed importer.",
                 identity,
-                Evidence("allowed_importers", seam),
+                [Evidence("allowed_importers", seam)],
                 expectedSeamOrDirection: seam);
         }
 
@@ -108,27 +110,27 @@ internal static class ArchitectureRemediationHintFactory
     internal static ArchitectureRemediationHint ForExternalDependency(
         ExternalDependencyDiagnostic diagnostic,
         ArchitectureViolationIdentity identity) => RemoveOrReplace(
-        diagnostic, identity, "external_group", diagnostic.ForbiddenExternalGroup);
+        identity, "external_group", diagnostic.ForbiddenExternalGroup);
 
     internal static ArchitectureRemediationHint ForPackageDependency(
         PackageDependencyDiagnostic diagnostic,
         ArchitectureViolationIdentity identity) => RemoveOrReplace(
-        diagnostic, identity, "package_group", diagnostic.ForbiddenPackageGroup);
+        identity, "package_group", diagnostic.ForbiddenPackageGroup);
 
     internal static ArchitectureRemediationHint ForPackageAllowOnly(
         PackageAllowOnlyDiagnostic diagnostic,
         ArchitectureViolationIdentity identity) => RemoveOrReplace(
-        diagnostic, identity, "allowed_package_groups", string.Join(", ", diagnostic.AllowedPackageGroups));
+        identity, "allowed_package_groups", string.Join(", ", diagnostic.AllowedPackageGroups));
 
     internal static ArchitectureRemediationHint ForFrameworkDependency(
         FrameworkReferenceDiagnostic diagnostic,
         ArchitectureViolationIdentity identity) => RemoveOrReplace(
-        diagnostic, identity, "framework_group", diagnostic.ForbiddenFrameworkGroup);
+        identity, "framework_group", diagnostic.ForbiddenFrameworkGroup);
 
     internal static ArchitectureRemediationHint ForFrameworkAllowOnly(
         FrameworkReferenceAllowOnlyDiagnostic diagnostic,
         ArchitectureViolationIdentity identity) => RemoveOrReplace(
-        diagnostic, identity, "allowed_framework_groups", string.Join(", ", diagnostic.AllowedFrameworkGroups));
+        identity, "allowed_framework_groups", string.Join(", ", diagnostic.AllowedFrameworkGroups));
 
     internal static ArchitectureRemediationHint ForTypePlacement(
         TypePlacementDiagnostic diagnostic,
@@ -141,7 +143,7 @@ internal static class ArchitectureRemediationHintFactory
                 ArchitectureRemediationHintCategory.MoveCode,
                 "Move or rename the type to the policy-declared owner.",
                 identity,
-                Evidence("expected_location_or_name", expected),
+                [Evidence("expected_location_or_name", expected)],
                 expectedSeamOrDirection: expected);
     }
 
@@ -155,7 +157,7 @@ internal static class ArchitectureRemediationHintFactory
                 ArchitectureRemediationHintCategory.FixPolicyInput,
                 "Restore the required layout/classification evidence before changing application structure.",
                 identity,
-                Evidence("layout_evidence", "unavailable"));
+                [Evidence("layout_evidence", "unavailable")]);
         }
 
         string? expected = diagnostic.ExpectedTypeName ?? diagnostic.ExpectedCounterpartName;
@@ -165,7 +167,7 @@ internal static class ArchitectureRemediationHintFactory
                 ArchitectureRemediationHintCategory.MoveCode,
                 "Move or rename the declaration to the policy-declared layout owner.",
                 identity,
-                Evidence("expected_name", expected),
+                [Evidence("expected_name", expected)],
                 expectedSeamOrDirection: expected);
         }
 
@@ -176,7 +178,7 @@ internal static class ArchitectureRemediationHintFactory
                 ArchitectureRemediationHintCategory.FixClassification,
                 "Correct the declared role/classification before relocating code.",
                 identity,
-                Evidence("expected_roles", expectedRoles),
+                [Evidence("expected_roles", expectedRoles)],
                 expectedSeamOrDirection: expectedRoles);
         }
 
@@ -189,7 +191,7 @@ internal static class ArchitectureRemediationHintFactory
         ArchitectureRemediationHintCategory.ReviewContract,
         "Review the declared public surface and selection evidence before changing code or snapshots.",
         identity,
-        Evidence("public_surface", diagnostic.ApiAssemblyName ?? diagnostic.SourceType),
+        [Evidence("public_surface", diagnostic.ApiAssemblyName ?? diagnostic.SourceType)],
         caveat: "Do not rewrite a reviewed API snapshot or expand selection solely to make this finding disappear.",
         requiresReview: true);
 
@@ -223,7 +225,7 @@ internal static class ArchitectureRemediationHintFactory
             ArchitectureRemediationHintCategory.MoveCode,
             "Move composition work to the policy-declared composition boundary.",
             identity,
-            Evidence("expected_composition_boundary", diagnostic.ExpectedCompositionBoundary),
+            [Evidence("expected_composition_boundary", diagnostic.ExpectedCompositionBoundary)],
             expectedSeamOrDirection: diagnostic.ExpectedCompositionBoundary);
 
     internal static ArchitectureRemediationHint ForProjectMetadata(
@@ -232,8 +234,10 @@ internal static class ArchitectureRemediationHintFactory
         ArchitectureRemediationHintCategory.FixPolicyInput,
         "Correct the project metadata value required by the declared contract.",
         identity,
-        Evidence("metadata_key", diagnostic.ProjectMetadataKey ?? diagnostic.ProjectMetadataKind ?? "project_metadata"),
-        Evidence("expected_value", diagnostic.ProjectMetadataExpectedValue ?? string.Empty),
+        [
+            Evidence("metadata_key", diagnostic.ProjectMetadataKey ?? diagnostic.ProjectMetadataKind ?? "project_metadata"),
+            Evidence("expected_value", diagnostic.ProjectMetadataExpectedValue ?? string.Empty),
+        ],
         caveat: "Keep the governed project metadata boundary intact while correcting the input.");
 
     internal static ArchitectureRemediationHint ForConfiguration(
@@ -258,7 +262,7 @@ internal static class ArchitectureRemediationHintFactory
                 ArchitectureRemediationHintCategory.FixPolicyInput,
                 "Restore complete reference-resolution input before changing the reported dependency.",
                 identity,
-                Evidence("evidence_kind", diagnostic.EvidenceKind ?? "unsupported_evidence"));
+                [Evidence("evidence_kind", diagnostic.EvidenceKind ?? "unsupported_evidence")]);
         }
 
         if (string.IsNullOrWhiteSpace(diagnostic.ExpectedSeam))
@@ -282,8 +286,10 @@ internal static class ArchitectureRemediationHintFactory
             category,
             summary,
             identity,
-            Evidence("evidence_kind", diagnostic.EvidenceKind ?? "port_boundary"),
-            Evidence("expected_seam", diagnostic.ExpectedSeam),
+            [
+                Evidence("evidence_kind", diagnostic.EvidenceKind ?? "port_boundary"),
+                Evidence("expected_seam", diagnostic.ExpectedSeam),
+            ],
             expectedSeamOrDirection: diagnostic.ExpectedSeam,
             caveat: "The declared seam is the only supported alternative; do not add a broad exception.");
     }
@@ -297,8 +303,10 @@ internal static class ArchitectureRemediationHintFactory
         ArchitectureRemediationHintCategory.FixPolicyInput,
         "Restore the required project/build input before changing application structure.",
         identity,
-        Evidence("preflight_state", diagnostic.State.ToString()),
-        Evidence("project_path", diagnostic.Evidence.ProjectPath));
+        [
+            Evidence("preflight_state", diagnostic.State.ToString()),
+            Evidence("project_path", diagnostic.Evidence.ProjectPath),
+        ]);
 
     internal static ArchitectureRemediationHint ForUnmatchedIgnore(
         UnmatchedIgnoreDiagnostic diagnostic,
@@ -306,8 +314,10 @@ internal static class ArchitectureRemediationHintFactory
         ArchitectureRemediationHintCategory.FixPolicyInput,
         "Remove the stale ignore; derive any future exception only from a current finding.",
         identity,
-        Evidence("ignored_source", diagnostic.SourceType),
-        Evidence("ignored_reference", diagnostic.ForbiddenReference),
+        [
+            Evidence("ignored_source", diagnostic.SourceType),
+            Evidence("ignored_reference", diagnostic.ForbiddenReference),
+        ],
         caveat: "This unmatched ignore is a pattern, not a current edge; do not add wildcard or broad exceptions.",
         requiresReview: true);
 
@@ -317,7 +327,7 @@ internal static class ArchitectureRemediationHintFactory
         ArchitectureRemediationHintCategory.FixPolicyInput,
         "Resolve the policy consistency conflict before changing application code.",
         identity,
-        Evidence("check_kind", diagnostic.CheckKind),
+        [Evidence("check_kind", diagnostic.CheckKind)],
         caveat: "Keep policy coverage and enforcement intact while correcting the conflicting input.");
 
     internal static ArchitectureRemediationHint? ForBaseline(
@@ -330,7 +340,7 @@ internal static class ArchitectureRemediationHintFactory
         ArchitectureRemediationHintCategory.FixPolicyInput,
         "Correct the reported policy input before evaluating application structure.",
         identity,
-        Evidence("diagnostic_kind", diagnostic.DiagnosticKind.ToString()));
+        [Evidence("diagnostic_kind", diagnostic.DiagnosticKind.ToString())]);
 
     internal static string CategoryToken(ArchitectureRemediationHintCategory category) => category switch
     {
@@ -348,14 +358,13 @@ internal static class ArchitectureRemediationHintFactory
     };
 
     private static ArchitectureRemediationHint RemoveOrReplace(
-        ArchitectureDiagnostic diagnostic,
         ArchitectureViolationIdentity identity,
         string evidenceKind,
         string evidenceValue) => Create(
         ArchitectureRemediationHintCategory.RemoveOrReplaceDependency,
         "Remove or replace the forbidden dependency; no approved alternative seam is evidenced.",
         identity,
-        Evidence(evidenceKind, evidenceValue),
+        [Evidence(evidenceKind, evidenceValue)],
         caveat: NoApprovedSeamCaveat);
 
     private static ArchitectureRemediationHint ClassificationHint(
@@ -369,8 +378,10 @@ internal static class ArchitectureRemediationHintFactory
             ArchitectureRemediationHintCategory.FixClassification,
             "Correct the declared classification/location before moving or changing dependencies.",
             identity,
-            Evidence($"expected_{evidenceKind}", expected),
-            Evidence($"actual_{evidenceKind}", actual ?? string.Empty),
+            [
+                Evidence($"expected_{evidenceKind}", expected),
+                Evidence($"actual_{evidenceKind}", actual ?? string.Empty),
+            ],
             expectedSeamOrDirection: expected);
 
     private static ArchitectureRemediationHint Review(
@@ -379,7 +390,7 @@ internal static class ArchitectureRemediationHintFactory
         ArchitectureRemediationHintCategory.ReviewContract,
         "Review the contract and existing policy evidence before choosing a structural repair.",
         identity,
-        Evidence("diagnostic_kind", ArchitectureFindingMapper.KindToken(diagnostic.Kind)),
+        [Evidence("diagnostic_kind", ArchitectureFindingMapper.KindToken(diagnostic.Kind))],
         caveat: NoApprovedSeamCaveat,
         requiresReview: true);
 
@@ -387,18 +398,11 @@ internal static class ArchitectureRemediationHintFactory
         ArchitectureRemediationHintCategory category,
         string summary,
         ArchitectureViolationIdentity identity,
-        ArchitectureRemediationHintEvidence firstEvidence,
-        ArchitectureRemediationHintEvidence? secondEvidence = null,
+        IReadOnlyList<ArchitectureRemediationHintEvidence> evidence,
         string? expectedSeamOrDirection = null,
         string? caveat = null,
         bool requiresReview = false)
     {
-        var evidence = new List<ArchitectureRemediationHintEvidence> { firstEvidence };
-        if (secondEvidence is not null)
-        {
-            evidence.Add(secondEvidence);
-        }
-
         return new ArchitectureRemediationHint(category, summary, identity.ContractId, identity, evidence)
         {
             ExpectedSeamOrDirection = expectedSeamOrDirection,

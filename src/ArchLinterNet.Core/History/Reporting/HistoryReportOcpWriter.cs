@@ -32,7 +32,7 @@ internal static class HistoryReportOcpWriter
         writer.WriteString("id", HistoryReportProjectionHelpers.FindingId("ocp-pressure", finding.Category, finding.CanonicalPath));
         writer.WriteString("canonicalPath", finding.CanonicalPath);
         HistoryReportProjectionHelpers.WriteStringArray(writer, "aliases", finding.Aliases);
-        writer.WriteBoolean("pathnameReuseMayConflateGenerations", finding.RawEvidence.PathnameReuseMayConflateGenerations);
+        writer.WriteBoolean("pathnameReuseMayConflateGenerations", OcpRawEvidence.PathnameReuseMayConflateGenerations);
         writer.WriteNumber("independentTaskSpread", finding.RawEvidence.IndependentTaskSpread);
         writer.WriteNumber("incidentCommitDegree", finding.RawEvidence.IncidentCommitDegree);
         writer.WriteNumber("incidentTaskDegree", finding.RawEvidence.IncidentTaskDegree);

@@ -107,14 +107,18 @@ internal static class ArchitecturePolicyContextContractFactsProjector
             Objects("resolved_snapshot_entries", value.ResolvedSnapshotEntries.Select(entry => Object("entry",
                 Text("assembly", entry.AssemblyName), Text("signature", entry.Signature)))))),
         ArchitectureAttributeUsageContract value => Create(value.Reason, value.IgnoredViolations, Scoped(value.Attributes, value.AttributePrefixes,
-            value.AllowedOnlyInLayers, value.AllowedOnlyInNamespaces, value.AllowedOnlyInProjects, value.AllowedOnlyInAssemblies,
-            value.ForbiddenInLayers, value.ForbiddenInNamespaces, value.ForbiddenInProjects, value.ForbiddenInAssemblies, "attributes", "attribute_prefixes")),
+            new ScopeRestrictions(
+                value.AllowedOnlyInLayers, value.AllowedOnlyInNamespaces, value.AllowedOnlyInProjects, value.AllowedOnlyInAssemblies,
+                value.ForbiddenInLayers, value.ForbiddenInNamespaces, value.ForbiddenInProjects, value.ForbiddenInAssemblies),
+            "attributes", "attribute_prefixes")),
         ArchitectureInheritanceContract value => Create(value.Reason, value.IgnoredViolations, Facts(
             Values("source_layers", value.SourceLayers), Values("source_namespaces", value.SourceNamespaces),
             Values("forbidden_base_types", value.ForbiddenBaseTypes), Values("forbidden_base_type_prefixes", value.ForbiddenBaseTypePrefixes))),
         ArchitectureInterfaceImplementationContract value => Create(value.Reason, value.IgnoredViolations, Scoped(value.Interfaces, value.InterfacePrefixes,
-            value.AllowedOnlyInLayers, value.AllowedOnlyInNamespaces, value.AllowedOnlyInProjects, value.AllowedOnlyInAssemblies,
-            value.ForbiddenInLayers, value.ForbiddenInNamespaces, value.ForbiddenInProjects, value.ForbiddenInAssemblies, "interfaces", "interface_prefixes")),
+            new ScopeRestrictions(
+                value.AllowedOnlyInLayers, value.AllowedOnlyInNamespaces, value.AllowedOnlyInProjects, value.AllowedOnlyInAssemblies,
+                value.ForbiddenInLayers, value.ForbiddenInNamespaces, value.ForbiddenInProjects, value.ForbiddenInAssemblies),
+            "interfaces", "interface_prefixes")),
         ArchitectureCompositionContract value => Create(value.Reason, value.IgnoredViolations, Facts(
             Values("forbidden_apis", value.ForbiddenApis), Values("allowed_only_in_layers", value.AllowedOnlyInLayers),
             Values("allowed_only_in_namespaces", value.AllowedOnlyInNamespaces), Values("allowed_only_in_projects", value.AllowedOnlyInProjects),
@@ -150,16 +154,27 @@ internal static class ArchitecturePolicyContextContractFactsProjector
         return Create(contract.Reason, contract.IgnoredViolations, Facts(facts));
     }
 
+    private readonly record struct ScopeRestrictions(
+        IEnumerable<string> AllowedLayers,
+        IEnumerable<string> AllowedNamespaces,
+        IEnumerable<string> AllowedProjects,
+        IEnumerable<string> AllowedAssemblies,
+        IEnumerable<string> ForbiddenLayers,
+        IEnumerable<string> ForbiddenNamespaces,
+        IEnumerable<string> ForbiddenProjects,
+        IEnumerable<string> ForbiddenAssemblies);
+
     private static IReadOnlyList<ArchitecturePolicyContextContractFact> Scoped(
-        IEnumerable<string> subjects, IEnumerable<string> subjectPrefixes,
-        IEnumerable<string> allowedLayers, IEnumerable<string> allowedNamespaces, IEnumerable<string> allowedProjects, IEnumerable<string> allowedAssemblies,
-        IEnumerable<string> forbiddenLayers, IEnumerable<string> forbiddenNamespaces, IEnumerable<string> forbiddenProjects, IEnumerable<string> forbiddenAssemblies,
-        string subjectsName, string prefixesName) => Facts(
-        Values(subjectsName, subjects), Values(prefixesName, subjectPrefixes), Values("allowed_only_in_layers", allowedLayers),
-        Values("allowed_only_in_namespaces", allowedNamespaces), Values("allowed_only_in_projects", allowedProjects),
-        Values("allowed_only_in_assemblies", allowedAssemblies), Values("forbidden_in_layers", forbiddenLayers),
-        Values("forbidden_in_namespaces", forbiddenNamespaces), Values("forbidden_in_projects", forbiddenProjects),
-        Values("forbidden_in_assemblies", forbiddenAssemblies));
+        IEnumerable<string> subjects,
+        IEnumerable<string> subjectPrefixes,
+        ScopeRestrictions restrictions,
+        string subjectsName,
+        string prefixesName) => Facts(
+        Values(subjectsName, subjects), Values(prefixesName, subjectPrefixes), Values("allowed_only_in_layers", restrictions.AllowedLayers),
+        Values("allowed_only_in_namespaces", restrictions.AllowedNamespaces), Values("allowed_only_in_projects", restrictions.AllowedProjects),
+        Values("allowed_only_in_assemblies", restrictions.AllowedAssemblies), Values("forbidden_in_layers", restrictions.ForbiddenLayers),
+        Values("forbidden_in_namespaces", restrictions.ForbiddenNamespaces), Values("forbidden_in_projects", restrictions.ForbiddenProjects),
+        Values("forbidden_in_assemblies", restrictions.ForbiddenAssemblies));
 
     private static ArchitecturePolicyContextContractProjection Create(
         string reason,
@@ -229,7 +244,7 @@ internal static class ArchitecturePolicyContextContractFactsProjector
     private static ArchitecturePolicyContextContractFact? Objects(string name, IEnumerable<ArchitecturePolicyContextContractFact?> items) =>
         Object(name, items.Where(item => item is not null).Cast<ArchitecturePolicyContextContractFact>().ToArray());
 
-    private static IReadOnlyList<ArchitecturePolicyContextContractFact> Facts(IEnumerable<ArchitecturePolicyContextContractFact?> facts) =>
+    private static ArchitecturePolicyContextContractFact[] Facts(IEnumerable<ArchitecturePolicyContextContractFact?> facts) =>
         facts.Where(fact => fact is not null).Cast<ArchitecturePolicyContextContractFact>().ToArray();
 
     private static IReadOnlyList<ArchitecturePolicyContextContractFact> Facts(params ArchitecturePolicyContextContractFact?[] facts) => Facts((IEnumerable<ArchitecturePolicyContextContractFact?>)facts);

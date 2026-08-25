@@ -2,6 +2,8 @@ using ArchLinterNet.Core.PolicyContext;
 
 namespace ArchLinterNet.Core.PolicyWeakening;
 
+internal readonly record struct PolicyWeakeningControlContext(string Kind, string ControlIdentity, string Classification, string Severity);
+
 internal static class ArchitecturePolicyWeakeningComparisonSupport
 {
     private static readonly StringComparer _comparer = StringComparer.Ordinal;
@@ -98,7 +100,7 @@ internal static class ArchitecturePolicyWeakeningComparisonSupport
             Optional = FactValue(layer, "optional"),
         })
         .Where(layer => !string.IsNullOrWhiteSpace(layer.Name) && layer.Optional is "true" or "false")
-        .ToDictionary(layer => layer.Name!, layer => layer.Optional == "true", _comparer);
+        .ToDictionary(layer => layer.Name, layer => layer.Optional == "true", _comparer);
 
     internal static IReadOnlySet<string> OptionalInputKeys(ArchitecturePolicyContextContract contract) => contract.Facts
         .Where(fact => fact.Name == "optional_inputs")
@@ -127,10 +129,7 @@ internal static class ArchitecturePolicyWeakeningComparisonSupport
     }
 
     internal static ArchitecturePolicyWeakeningFinding CreateFinding(
-        string kind,
-        string controlIdentity,
-        string classification,
-        string severity,
+        PolicyWeakeningControlContext context,
         IReadOnlyList<string> baseValues,
         IReadOnlyList<string> currentValues,
         ArchitecturePolicyContextProvenance? baseProvenance,
@@ -140,13 +139,14 @@ internal static class ArchitecturePolicyWeakeningComparisonSupport
     {
         string[] orderedBase = baseValues.OrderBy(value => value, _comparer).ToArray();
         string[] orderedCurrent = currentValues.OrderBy(value => value, _comparer).ToArray();
-        string identity = string.Join("\u001f", kind, controlIdentity, string.Join("\u001e", orderedBase), string.Join("\u001e", orderedCurrent));
+        string identity = string.Join(
+            "\u001f", context.Kind, context.ControlIdentity, string.Join("\u001e", orderedBase), string.Join("\u001e", orderedCurrent));
         return new ArchitecturePolicyWeakeningFinding(
             identity,
-            kind,
-            controlIdentity,
-            classification,
-            severity,
+            context.Kind,
+            context.ControlIdentity,
+            context.Classification,
+            context.Severity,
             orderedBase,
             orderedCurrent,
             baseProvenance,
@@ -281,5 +281,5 @@ internal static class ArchitecturePolicyWeakeningComparisonSupport
             Optional = FactValue(layer, "optional"),
         })
         .Where(layer => !string.IsNullOrWhiteSpace(layer.Name) && layer.Optional is "true" or "false")
-        .ToDictionary(layer => layer.Name!, layer => layer.Optional == "true", _comparer);
+        .ToDictionary(layer => layer.Name, layer => layer.Optional == "true", _comparer);
 }

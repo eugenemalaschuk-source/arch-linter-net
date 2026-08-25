@@ -399,23 +399,28 @@ public sealed class HistoryCanonicalJsonTests
     }
 
     private static HistoryIngestionResult WithEnrichment(HistoryIngestionResult original, HistoryEnrichmentProjection enrichment)
-        => new(
-            original.ObjectFormatName,
-            original.AuthoredFrom,
-            original.AuthoredTo,
-            original.ResolvedFrom,
-            original.ResolvedTo,
-            original.Commits,
-            original.ExcludedMergeCount,
-            original.RenameCandidates,
-            original.RenameComponents,
-            original.LogicalFiles,
-            original.CoChangeGraph,
-            original.BottleneckAnalysis,
-            original.OcpAnalysis,
-            original.Configuration,
-            original.HotspotAnalysis,
-            enrichment);
+    {
+        var projected = new HistoryIngestionResult
+        {
+            ObjectFormatName = original.ObjectFormatName,
+            AuthoredFrom = original.AuthoredFrom,
+            AuthoredTo = original.AuthoredTo,
+            ResolvedFrom = original.ResolvedFrom,
+            ResolvedTo = original.ResolvedTo,
+            Commits = original.Commits,
+            ExcludedMergeCount = original.ExcludedMergeCount,
+            RenameCandidates = original.RenameCandidates,
+            RenameComponents = original.RenameComponents,
+            LogicalFiles = original.LogicalFiles,
+            CoChangeGraph = original.CoChangeGraph,
+            BottleneckAnalysis = original.BottleneckAnalysis,
+            OcpAnalysis = original.OcpAnalysis,
+            Configuration = original.Configuration,
+            HotspotAnalysis = original.HotspotAnalysis,
+        };
+        projected.ApplyEnrichment(enrichment);
+        return projected;
+    }
 
     private static bool Contains(byte[] value, byte[] subsequence) => value.AsSpan().IndexOf(subsequence) >= 0;
 }

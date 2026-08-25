@@ -51,6 +51,14 @@ internal readonly record struct CoChangeCohort(HistoryPathCategory First, Histor
     public static CoChangeCohort Of(HistoryPathCategory first, HistoryPathCategory second)
         => first <= second ? new CoChangeCohort(first, second) : new CoChangeCohort(second, first);
 
+    public static bool operator <(CoChangeCohort left, CoChangeCohort right) => left.CompareTo(right) < 0;
+
+    public static bool operator <=(CoChangeCohort left, CoChangeCohort right) => left.CompareTo(right) <= 0;
+
+    public static bool operator >(CoChangeCohort left, CoChangeCohort right) => left.CompareTo(right) > 0;
+
+    public static bool operator >=(CoChangeCohort left, CoChangeCohort right) => left.CompareTo(right) >= 0;
+
     public int CompareTo(CoChangeCohort other)
     {
         int byFirst = First.CompareTo(other.First);
@@ -58,26 +66,17 @@ internal readonly record struct CoChangeCohort(HistoryPathCategory First, Histor
     }
 }
 
-internal sealed class CoChangePair(
-    CoChangeVertex first,
-    CoChangeVertex second,
-    CoChangeCohort cohort,
-    IReadOnlyList<string> commitIds,
-    IReadOnlyList<TaskKey> taskKeys,
-    decimal? commitComponent,
-    decimal? taskComponent,
-    decimal? combinedCoChange,
-    int? cohortRank)
+internal sealed class CoChangePair
 {
-    public CoChangeVertex First { get; } = first;
+    public required CoChangeVertex First { get; init; }
 
-    public CoChangeVertex Second { get; } = second;
+    public required CoChangeVertex Second { get; init; }
 
-    public CoChangeCohort Cohort { get; } = cohort;
+    public required CoChangeCohort Cohort { get; init; }
 
-    public IReadOnlyList<string> CommitIds { get; } = commitIds;
+    public required IReadOnlyList<string> CommitIds { get; init; }
 
-    public IReadOnlyList<TaskKey> TaskKeys { get; } = taskKeys;
+    public required IReadOnlyList<TaskKey> TaskKeys { get; init; }
 
     public int CommitCoChange => CommitIds.Count;
 
@@ -87,14 +86,14 @@ internal sealed class CoChangePair(
 
     // Components apply only to G0 edges. Null prevents task-only associations from masquerading as
     // normalized edges while their raw task count remains inspectable.
-    public decimal? CommitComponent { get; } = commitComponent;
+    public required decimal? CommitComponent { get; init; }
 
-    public decimal? TaskComponent { get; } = taskComponent;
+    public required decimal? TaskComponent { get; init; }
 
-    public decimal? CombinedCoChange { get; } = combinedCoChange;
+    public required decimal? CombinedCoChange { get; init; }
 
     // G0 pair ranks begin at one and are meaningful only inside an endpoint-category cohort.
-    public int? CohortRank { get; } = cohortRank;
+    public required int? CohortRank { get; init; }
 }
 
 internal sealed class CoChangeCluster(

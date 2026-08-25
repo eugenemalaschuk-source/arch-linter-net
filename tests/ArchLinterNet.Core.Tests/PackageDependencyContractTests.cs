@@ -21,6 +21,7 @@ public sealed class PackageDependencyContractTests
                     "Microsoft.EntityFrameworkCore.SqlServer",
                 };
     private static readonly string[] _value3 = { "Microsoft.EntityFrameworkCore" };
+    private static readonly string[] _value4 = { "domain-no-ef", "domain-allow-only-app" };
     private const string SourceAssemblyName = "MyApp.Domain";
 
     private static ArchitectureAnalysisContext CreateContext(
@@ -163,7 +164,7 @@ public sealed class PackageDependencyContractTests
         {
             Assert.That(result.Violations, Has.Count.EqualTo(2));
             Assert.That(result.Violations.Select(violation => violation.ContractId),
-                Is.EquivalentTo(new[] { "domain-no-ef", "domain-allow-only-app" }));
+                Is.EquivalentTo(_value4));
             Assert.That(context.ProfilingCounters.SessionProjectMetadataIndexMaterializations, Is.EqualTo(1));
         });
     }
