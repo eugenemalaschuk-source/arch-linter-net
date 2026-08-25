@@ -18,6 +18,7 @@ namespace ArchLinterNet.Core.Tests;
 // Consumer-shaped deterministic evidence for #652/#653. Each family below uses its own fresh
 // session so another family cannot seed the materialization counter and mask a local bypass.
 [TestFixture]
+[Category("E2E")]
 public sealed class RepeatedWorkRegressionEvidenceTests
 {
     private const int DiscoveredProjectCount = 24;
@@ -27,6 +28,7 @@ public sealed class RepeatedWorkRegressionEvidenceTests
     private const string ExpectedAuditProjectionChecksum = "9259819F5A173F5B054D99D3A0F7334DEF3154F1E30B5E954D0B46E688C161BE";
     private const int ExpectedStrictProjectionCount = 48;
     private const int ExpectedAuditProjectionCount = 3;
+    private const int CliTimeoutMilliseconds = 30_000;
     private static readonly string[] _targetFrameworks = { "net10.0" };
 
     [Test]
@@ -65,6 +67,7 @@ public sealed class RepeatedWorkRegressionEvidenceTests
     }
 
     [Test]
+    [CancelAfter(CliTimeoutMilliseconds * 3)]
     public void TemporaryPolicy_PreservesTestingApiOutcomesAndCliExitSemantics()
     {
         using TemporaryPolicyFixture fixture = TemporaryPolicyFixture.Create();
@@ -341,11 +344,39 @@ public sealed class RepeatedWorkRegressionEvidenceTests
         startInfo.ArgumentList.Add("json");
 
         using Process process = Process.Start(startInfo)!;
-        string stdout = process.StandardOutput.ReadToEnd();
-        string stderr = process.StandardError.ReadToEnd();
-        process.WaitForExit();
-        Assert.That(stdout, Is.Not.Empty, stderr);
-        return process.ExitCode;
+        using CancellationTokenSource timeout = new(TimeSpan.FromMilliseconds(CliTimeoutMilliseconds));
+        Task<string> stdout = process.StandardOutput.ReadToEndAsync(timeout.Token);
+        Task<string> stderr = process.StandardError.ReadToEndAsync(timeout.Token);
+
+        try
+        {
+            process.WaitForExitAsync(timeout.Token).GetAwaiter().GetResult();
+            string standardOutput = stdout.GetAwaiter().GetResult();
+            string standardError = stderr.GetAwaiter().GetResult();
+            Assert.That(standardOutput, Is.Not.Empty, standardError);
+            return process.ExitCode;
+        }
+        catch (OperationCanceledException)
+        {
+            TerminateProcessTree(process);
+            throw new AssertionException($"CLI {mode} execution exceeded {CliTimeoutMilliseconds} ms.");
+        }
+    }
+
+    private static void TerminateProcessTree(Process process)
+    {
+        try
+        {
+            if (!process.HasExited)
+            {
+                process.Kill(entireProcessTree: true);
+                process.WaitForExit(CliTimeoutMilliseconds);
+            }
+        }
+        catch (InvalidOperationException)
+        {
+            // The process exited between the observation and the attempted kill.
+        }
     }
 
     private sealed class TemporaryPolicyFixture : IDisposable

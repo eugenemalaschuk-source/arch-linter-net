@@ -11,3 +11,5 @@
 ## 3. Integration validation
 
 - [x] 3.1 Run the focused fixture, changed Core test family, formatting, architecture lint, public-API review, and strict OpenSpec validation; verify all required local checks pass and inspect the final diff for no production or profile-schema change.
+- [x] 3.2 Classify the temporary-project and CLI-subprocess fixture as E2E in both positive and unit-exclusion filters; add its NUnit category and a bounded, cancelling child-process lifetime.
+- [x] 3.3 Run shard-membership validation plus the Core unit-shard and E2E buckets; repeat focused, formatting, and strict OpenSpec validation and inspect the final diff.

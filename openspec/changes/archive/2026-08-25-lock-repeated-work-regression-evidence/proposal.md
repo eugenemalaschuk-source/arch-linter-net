@@ -14,6 +14,8 @@ broader large-solution benchmark framework reserved for #502.
   remains bounded by immutable session facts rather than contract fan-out.
 - Lock a non-empty ordered canonical findings projection with a checked-in
   checksum and assert strict/audit results through the Testing API and CLI.
+- Route the temporary-project and CLI-subprocess fixture to the E2E bucket and
+  bound its child-process lifetime.
 - Record the fixture's purpose, scope boundary, and optional
   hardware-sensitive measurement guidance in internal performance evidence.
 

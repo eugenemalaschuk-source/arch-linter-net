@@ -73,6 +73,17 @@ The internal analysis-profile dictionary will point readers to the focused
 deterministic fixture and explain that it complements, rather than expands,
 the existing manually-run `analysis-profile/v1` harnesses.
 
+### 5. Route real host execution to the E2E bucket
+
+The temporary-policy assertion creates a project on disk and launches the CLI
+as a child process. It therefore belongs in the ordinary E2E bucket, even
+though the other assertions in its fixture are in-memory Core checks. The
+fixture will be listed in both the positive E2E filter and the explicit unit
+exclusions, and carry NUnit's human-readable `E2E` category. The process
+helper will enforce a bounded timeout, cancel its redirected stream reads, and
+kill the entire process tree on timeout so a stalled child cannot poison later
+test work.
+
 ## Risks / Trade-offs
 
 - **[Risk]** Direct session construction could omit a consumer-visible result
