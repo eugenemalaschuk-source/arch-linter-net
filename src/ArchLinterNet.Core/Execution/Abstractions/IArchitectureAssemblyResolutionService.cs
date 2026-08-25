@@ -16,7 +16,7 @@ public interface IArchitectureAssemblyResolutionService
         CancellationToken cancellationToken = default);
 
     // The post-ensure-built pass must not reuse a same-simple-name assembly from the process.
-    ResolutionResult ResolvePostBuild(
+    ResolutionResult ResolvePostBuild( // NOSONAR: preserves the reviewed public adapter contract; each parameter represents an independently meaningful post-build resolution concern.
         ArchitectureContractDocument document,
         string repositoryRoot,
         ProjectDiscoveryResult discovery,
