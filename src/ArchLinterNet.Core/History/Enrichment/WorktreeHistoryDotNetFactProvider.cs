@@ -8,14 +8,15 @@ using ArchLinterNet.Core.Model;
 
 namespace ArchLinterNet.Core.History.Enrichment;
 
-internal sealed class WorktreeHistoryDotNetFactProvider : IHistoryDotNetFactProvider
+internal sealed partial class WorktreeHistoryDotNetFactProvider : IHistoryDotNetFactProvider
 {
     private const string BuildStateUnavailableReason = "build_state_unavailable";
 
-    private static readonly TimeSpan _regexTimeout = TimeSpan.FromSeconds(1);
-
     private const string PortableRelativePolicyPathPattern =
         @"^(?:(?!\.\.(?:[/\\]|$)|\.(?:[/\\]|$))[^<>:""|?*\u0000-\u001F])+$";
+
+    [GeneratedRegex(PortableRelativePolicyPathPattern, RegexOptions.CultureInvariant, matchTimeoutMilliseconds: 1000)]
+    private static partial Regex PortableRelativePolicyPathRegex();
 
     public HistoryDotNetFactMaterialization Materialize(string repositoryPath, string resolvedTo, string policyPath)
     {
@@ -116,7 +117,7 @@ internal sealed class WorktreeHistoryDotNetFactProvider : IHistoryDotNetFactProv
             || relative.StartsWith($"..{Path.DirectorySeparatorChar}", StringComparison.Ordinal)
             || relative.StartsWith($"..{Path.AltDirectorySeparatorChar}", StringComparison.Ordinal);
         bool portableRelativePath = !string.Equals(relative, ".", StringComparison.Ordinal)
-            && Regex.IsMatch(relative, PortableRelativePolicyPathPattern, RegexOptions.CultureInvariant, _regexTimeout);
+            && PortableRelativePolicyPathRegex().IsMatch(relative);
         if (outsideRepository || !portableRelativePath)
         {
             throw new HistoryDotNetEnrichmentUnavailableException("policy_repository_mismatch");

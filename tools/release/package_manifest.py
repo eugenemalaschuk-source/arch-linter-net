@@ -32,7 +32,7 @@ def _sha256(path: Path) -> str:
     path = _safe_path(path, "release subject")
     digest = hashlib.sha256()
     # The subject is confined by _safe_path above before it is read.
-    with path.open("rb") as source:  # NOSONAR
+    with path.open("rb") as source:  # NOSONAR(S2083)
         for block in iter(lambda: source.read(1024 * 1024), b""):
             digest.update(block)
     return digest.hexdigest()
@@ -271,7 +271,7 @@ def _verify_release_evidence(
     _verify_inventory(packages_directory, manifest)
     checksums_path = _safe_path(checksums_path, "candidate checksum evidence")
     # The checksum evidence path is confined by _safe_path above before it is read.
-    if not checksums_path.is_file() or checksums_path.read_text(encoding="utf-8") != _checksum_text(manifest):  # NOSONAR
+    if not checksums_path.is_file() or checksums_path.read_text(encoding="utf-8") != _checksum_text(manifest):  # NOSONAR(S2083)
         raise ValueError("Canonical candidate checksum evidence differs from the manifest rendering.")
 
     expected = {subject["file"] for subject in _subjects(manifest)} | {

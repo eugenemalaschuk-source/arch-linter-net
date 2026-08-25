@@ -326,8 +326,12 @@ public sealed partial class CheckpointBReleaseGateTests
     {
         using Process process = Process.Start(startInfo)
             ?? throw new InvalidOperationException($"Failed to start '{startInfo.FileName}'.");
-        Task<string> standardOutput = process.StandardOutput.ReadToEndAsync();
-        Task<string> standardError = process.StandardError.ReadToEndAsync();
+        // Deliberately not forwarding cancellationToken: on cancellation these must keep reading to
+        // the killed process's natural stream EOF below, not fault with their own cancellation — the
+        // catch block depends on Task.WaitAll completing cleanly so the bare `throw;` re-surfaces a
+        // plain OperationCanceledException instead of an AggregateException.
+        Task<string> standardOutput = process.StandardOutput.ReadToEndAsync(); // NOSONAR: see comment above
+        Task<string> standardError = process.StandardError.ReadToEndAsync(); // NOSONAR: see comment above
         try
         {
             process.WaitForExitAsync(cancellationToken).GetAwaiter().GetResult();
