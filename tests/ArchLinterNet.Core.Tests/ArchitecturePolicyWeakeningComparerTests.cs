@@ -123,6 +123,33 @@ public sealed class ArchitecturePolicyWeakeningComparerTests
     }
 
     [Test]
+    public void Compare_NewBroadNamedIgnoredViolation_IsImpactNotProvenWeakening()
+    {
+        ArchitecturePolicyContextContract contract = Contract("strict", "dependency", "bounded-boundary");
+        ArchitecturePolicyContextExport current = Context(
+            contracts: [contract],
+            exceptions:
+            [
+                new ArchitecturePolicyContextException(
+                    "contract", "bounded-boundary", "ignored_violation", "Sample.SharedUtils.Type; Sample.Infrastructure.LegacyGateway", "Tracked in #120")
+                {
+                    IgnoredViolation = new ArchitecturePolicyContextIgnoredViolation(
+                        "Sample.SharedUtils.Type",
+                        "Sample.Infrastructure.LegacyGateway"),
+                },
+            ]);
+
+        ArchitecturePolicyWeakeningResult result = ArchitecturePolicyWeakeningComparer.Compare(new(Context(contracts: [contract]), current));
+
+        ArchitecturePolicyWeakeningFinding finding = result.Findings.Single();
+        Assert.Multiple(() =>
+        {
+            Assert.That(finding.Kind, Is.EqualTo("broad_exception_impact_not_proven"));
+            Assert.That(finding.Classification, Is.EqualTo("impact_not_proven"));
+        });
+    }
+
+    [Test]
     public void Compare_NewNarrowIgnoredViolation_IsNotClassifiedAsBroadWeakening()
     {
         ArchitecturePolicyContextContract contract = Contract("strict", "dependency", "bounded-boundary");

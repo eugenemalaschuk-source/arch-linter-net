@@ -154,13 +154,29 @@ internal static class ArchitecturePolicyContextContractFactsProjector
         return Create(contract.Reason, contract.IgnoredViolations, Facts(facts));
     }
 
-    private readonly record struct ScopeRestrictionSet(
-        IEnumerable<string> Layers,
-        IEnumerable<string> Namespaces,
-        IEnumerable<string> Projects,
-        IEnumerable<string> Assemblies);
+    // Plain (non-record) structs: these exist only to bundle constructor arguments for Scoped
+    // below, so they deliberately carry no synthesized equality/ToString/Deconstruct members.
+    private readonly struct ScopeRestrictionSet(
+        IEnumerable<string> layers,
+        IEnumerable<string> namespaces,
+        IEnumerable<string> projects,
+        IEnumerable<string> assemblies)
+    {
+        public IEnumerable<string> Layers { get; } = layers;
 
-    private readonly record struct ScopeRestrictions(ScopeRestrictionSet Allowed, ScopeRestrictionSet Forbidden);
+        public IEnumerable<string> Namespaces { get; } = namespaces;
+
+        public IEnumerable<string> Projects { get; } = projects;
+
+        public IEnumerable<string> Assemblies { get; } = assemblies;
+    }
+
+    private readonly struct ScopeRestrictions(ScopeRestrictionSet allowed, ScopeRestrictionSet forbidden)
+    {
+        public ScopeRestrictionSet Allowed { get; } = allowed;
+
+        public ScopeRestrictionSet Forbidden { get; } = forbidden;
+    }
 
     private static IReadOnlyList<ArchitecturePolicyContextContractFact> Scoped(
         IEnumerable<string> subjects,
