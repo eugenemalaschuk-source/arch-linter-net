@@ -10,9 +10,10 @@ broader large-solution benchmark framework reserved for #502.
 - Add one deterministic, synthetic multi-project and repeated-contract Core
   regression fixture that exercises the metadata-index and public-API reuse
   paths together.
-- Assert that index/surface materializations remain bounded by immutable
-  session facts rather than contract fan-out, and that the canonical findings
-  projection and strict/audit result semantics remain stable.
+- Assert each covered lookup family's own index/surface materialization path
+  remains bounded by immutable session facts rather than contract fan-out.
+- Lock a non-empty ordered canonical findings projection with a checked-in
+  checksum and assert strict/audit results through the Testing API and CLI.
 - Record the fixture's purpose, scope boundary, and optional
   hardware-sensitive measurement guidance in internal performance evidence.
 

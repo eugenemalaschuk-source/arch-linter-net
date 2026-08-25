@@ -1,10 +1,12 @@
-## 1. Deterministic consumer-shaped evidence
+## 1. Path-specific deterministic consumer-shaped evidence
 
-- [x] 1.1 Add a focused synthetic Core fixture with 24 discovered projects, 16 repeated metadata-family contracts, and two public-API contracts for one assembly; verify each covered session materialization count is one and the repeated results retain their ordered canonical projection and strict/audit pass-fail semantics.
+- [x] 1.1 Run every covered metadata and public-API fan-out in a fresh session; verify the relevant materialization counter transitions `0 -> 1 -> 1` for that path alone across 24 projects and 16 contracts.
+- [x] 1.2 Add a literal golden checksum and count for a non-empty ordered canonical result projection; verify the fixture no longer derives expected results from a second optimized execution.
+- [x] 1.3 Add temporary-policy Testing API and CLI assertions proving strict/audit outcome and exit semantics; verify strict succeeds and audit returns the validation-failure exit code.
 
 ## 2. Evidence documentation
 
-- [x] 2.1 Document the fixture as deterministic regression evidence alongside `analysis-profile/v1`, explicitly excluding wall-clock/allocation thresholds and the #502 large-solution benchmark scope; verify documentation formatting and links.
+- [x] 2.1 Update the evidence documentation to describe path-isolated counters, the literal canonical checksum, and host-level outcomes; retain the explicit wall-clock/allocation and #502 exclusions.
 
 ## 3. Integration validation
 

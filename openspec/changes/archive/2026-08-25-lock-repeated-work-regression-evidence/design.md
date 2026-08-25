@@ -11,11 +11,13 @@ See `proposal.md` for motivation.
 **Goals:**
 
 - Combine all four metadata-family paths and repeated public-API evaluation in
-  one small, anonymized, immutable-session fixture.
+  one small, anonymized fixture while isolating each materialization path in a
+  fresh immutable session.
 - Make the fan-out explicit (24 projects and 16 repeated contract checks), so
   a return to per-contract reconstruction fails deterministically.
-- Lock the consumer-visible result projection independently of unstable timing
-  or allocation measurements.
+- Lock a non-empty consumer-visible result projection with a checked-in
+  checksum, plus actual Testing API outcomes and CLI exit semantics,
+  independently of unstable timing or allocation measurements.
 
 **Non-Goals:**
 
@@ -40,19 +42,32 @@ harness. Rejected because its process timing and profile outputs intentionally
 do not expose the internal counters needed for a release-blocking regression
 assertion, and it would duplicate #502's broad benchmark scope.
 
-### 2. Assert work counts and canonical projection, not elapsed time
+### 2. Assert each family's transition from untouched to reused
 
-The test will assert one project-metadata index, one assembly-name index, and
-one exported public-API surface materialization for the session. It will also
-compare the ordered canonical finding projection and pass/fail mode outcomes
-from two equivalent executions. This proves result stability without making
-machine-specific speed a contract.
+Each package-dependency, framework-reference, assembly-dependency,
+project-metadata, and public-API fan-out will run in its own fresh session.
+The fixture will assert the relevant counter is zero before that family's first
+contract, one immediately after it, and still one after the remaining fan-out.
+No other family may seed the counter. This detects a path that entirely bypasses
+the session projection as well as a return to repeated session materialization.
+
+### 3. Use a checked-in canonical checksum and host-level outcome assertions
+
+The failing consumer-shaped fixture will produce an ordered, non-empty
+canonical projection whose SHA-256 checksum and finding count are literal test
+constants. The test must not derive an expected result from another execution
+of the current implementation. A second temporary-policy scenario will assert
+the actual `ArchitectureValidationBuilder` strict/audit outcomes and the CLI's
+corresponding exit codes.
+
+**Alternative considered:** compare two optimized sessions. Rejected because
+that proves only determinism and permits a stable behavior regression.
 
 **Alternative considered:** write a wall-clock or allocation assertion.
 Rejected because those are useful only as optional, environment-sensitive
 observations and are explicitly not a release contract for #654.
 
-### 3. Record the evidence boundary in internal documentation
+### 4. Record the evidence boundary in internal documentation
 
 The internal analysis-profile dictionary will point readers to the focused
 deterministic fixture and explain that it complements, rather than expands,
@@ -61,8 +76,10 @@ the existing manually-run `analysis-profile/v1` harnesses.
 ## Risks / Trade-offs
 
 - **[Risk]** Direct session construction could omit a consumer-visible result
-  surface. **Mitigation:** assert the same ordered canonical projection and
-  strict/audit pass/fail outputs through the existing runner/testing seam.
+  surface. **Mitigation:** use a literal canonical checksum for its complete
+  non-empty projection and independently assert Testing API/CLI outcomes.
+- **[Risk]** An aggregate counter masks a family bypass. **Mitigation:** use a
+  fresh session and an explicit `0 -> 1 -> 1` transition for every family.
 - **[Risk]** The fixture becomes a second benchmark framework. **Mitigation:**
   keep one fixed fan-out shape, no timing loop, generated artifacts, or
   performance baselines.

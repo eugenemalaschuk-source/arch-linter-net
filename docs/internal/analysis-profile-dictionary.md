@@ -75,16 +75,18 @@ Every phase also records `ProcessorTimeMs`, the process CPU-time delta measured 
 ## Deterministic consumer-shaped regression evidence (issue #654)
 
 [`RepeatedWorkRegressionEvidenceTests`](../../tests/ArchLinterNet.Core.Tests/RepeatedWorkRegressionEvidenceTests.cs)
-is the focused Core fixture for issue #654. It is synthetic and anonymized: one
-in-memory session represents 24 discovered projects, 16 repeated metadata-family
-contract checks, and two public-API checks against one already-loaded test
-assembly. The test asserts one project-metadata index, one assembly-name index,
-and one exported public-API surface materialization, together with the ordered
-canonical finding projection and strict/audit pass/fail outcomes. These internal
-session materialization counters and projections are the normative regression
-evidence for the consumer shape; they complement `analysis-profile/v1` and do
-not extend or alter its versioned schema. No `analysis-profile/v1` field exposes
-these internal counters.
+is the focused Core fixture for issue #654. It is synthetic and anonymized: 24
+discovered projects, 16 repeated metadata-family contracts, and two public-API
+contracts against one already-loaded test assembly. Each covered family runs in
+its own fresh session and must transition its own counter from `0` before the
+first contract to `1` after it, then remain at `1` through the rest of the
+fan-out. This prevents one family from seeding a shared counter and masking a
+bypass in another. A literal count and SHA-256 checksum lock a non-empty,
+ordered canonical projection; a temporary policy also asserts actual Testing
+API strict/audit outcomes and CLI exit codes. These internal counters and
+goldens are the normative regression evidence for the consumer shape; they
+complement `analysis-profile/v1` and do not extend or alter its versioned
+schema. No `analysis-profile/v1` field exposes these internal counters.
 
 The fixture intentionally has no wall-clock or allocation thresholds. Timing and
 allocation observations are hardware-sensitive and are not a release contract.
