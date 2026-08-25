@@ -131,19 +131,21 @@ internal sealed class HistoryOcpScorer
         IReadOnlyList<string> roleTokens = RoleTokens(bottleneck.CanonicalPath);
         return new Candidate(
             bottleneck,
-            new OcpRawEvidence(
-                bottleneck.RawEvidence.IndependentTaskSpread,
-                bottleneck.RawEvidence.TaskKeys.Count,
-                file.Churn,
-                file.CommitCount,
-                bottleneck.RawEvidence.IncidentCommitDegree,
-                bottleneck.RawEvidence.IncidentTaskDegree,
-                repeatedTotal,
-                roleTokens.Count == 0 ? 0m : 1m,
-                bottleneck.RawEvidence.TaskKeys,
-                bottleneck.RawEvidence.IndependentTaskPairs,
-                repeatedEdits,
-                roleTokens));
+            new OcpRawEvidence
+            {
+                IndependentTaskSpread = bottleneck.RawEvidence.IndependentTaskSpread,
+                OrdinaryTaskKeySpread = bottleneck.RawEvidence.TaskKeys.Count,
+                Churn = file.Churn,
+                CommitCount = file.CommitCount,
+                IncidentCommitDegree = bottleneck.RawEvidence.IncidentCommitDegree,
+                IncidentTaskDegree = bottleneck.RawEvidence.IncidentTaskDegree,
+                RepeatedEditTotal = repeatedTotal,
+                RoleHint = roleTokens.Count == 0 ? 0m : 1m,
+                TaskKeys = bottleneck.RawEvidence.TaskKeys,
+                IndependentTaskPairs = bottleneck.RawEvidence.IndependentTaskPairs,
+                RepeatedEdits = repeatedEdits,
+                RoleTokens = roleTokens,
+            });
     }
 
     private static void AddQualifying(Dictionary<TaskKey, HashSet<string>> byTask, TaskKey task, IReadOnlyList<string> commitIds)

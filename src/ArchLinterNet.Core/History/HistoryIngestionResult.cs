@@ -6,55 +6,39 @@ namespace ArchLinterNet.Core.History;
 
 // The successful ingestion result. It exists only after every fail-closed check has passed, which is
 // what makes "no partial report" structural rather than a discipline the caller has to remember.
-internal sealed class HistoryIngestionResult(
-    string objectFormatName,
-    string authoredFrom,
-    string authoredTo,
-    string resolvedFrom,
-    string resolvedTo,
-    IReadOnlyList<CommitEvidence> commits,
-    int excludedMergeCount,
-    IReadOnlyList<RenameCandidate> renameCandidates,
-    IReadOnlyList<RenameComponent> renameComponents,
-    IReadOnlyList<LogicalFile> logicalFiles,
-    CoChangeGraph coChangeGraph,
-    HistoryBottleneckAnalysis bottleneckAnalysis,
-    HistoryOcpAnalysis ocpAnalysis,
-    HistoryAnalysisConfiguration? configuration = null,
-    HistoryHotspotAnalysis? hotspotAnalysis = null,
-    HistoryEnrichmentProjection? enrichment = null)
+internal sealed class HistoryIngestionResult
 {
-    public string ObjectFormatName { get; } = objectFormatName;
+    public required string ObjectFormatName { get; init; }
 
-    public string AuthoredFrom { get; } = authoredFrom;
+    public required string AuthoredFrom { get; init; }
 
-    public string AuthoredTo { get; } = authoredTo;
+    public required string AuthoredTo { get; init; }
 
-    public string ResolvedFrom { get; } = resolvedFrom;
+    public required string ResolvedFrom { get; init; }
 
-    public string ResolvedTo { get; } = resolvedTo;
+    public required string ResolvedTo { get; init; }
 
-    public IReadOnlyList<CommitEvidence> Commits { get; } = commits;
+    public required IReadOnlyList<CommitEvidence> Commits { get; init; }
 
-    public int ExcludedMergeCount { get; } = excludedMergeCount;
+    public required int ExcludedMergeCount { get; init; }
 
-    public IReadOnlyList<RenameCandidate> RenameCandidates { get; } = renameCandidates;
+    public required IReadOnlyList<RenameCandidate> RenameCandidates { get; init; }
 
-    public IReadOnlyList<RenameComponent> RenameComponents { get; } = renameComponents;
+    public required IReadOnlyList<RenameComponent> RenameComponents { get; init; }
 
-    public IReadOnlyList<LogicalFile> LogicalFiles { get; } = logicalFiles;
+    public required IReadOnlyList<LogicalFile> LogicalFiles { get; init; }
 
-    public CoChangeGraph CoChangeGraph { get; } = coChangeGraph;
+    public required CoChangeGraph CoChangeGraph { get; init; }
 
-    public HistoryBottleneckAnalysis BottleneckAnalysis { get; } = bottleneckAnalysis;
+    public required HistoryBottleneckAnalysis BottleneckAnalysis { get; init; }
 
-    public HistoryOcpAnalysis OcpAnalysis { get; } = ocpAnalysis;
+    public required HistoryOcpAnalysis OcpAnalysis { get; init; }
 
-    public HistoryAnalysisConfiguration Configuration { get; } = configuration ?? new HistoryAnalysisConfiguration();
+    public HistoryAnalysisConfiguration Configuration { get; init; } = new HistoryAnalysisConfiguration();
 
-    public HistoryHotspotAnalysis HotspotAnalysis { get; } = hotspotAnalysis ?? new HistoryHotspotAnalysis([]);
+    public HistoryHotspotAnalysis HotspotAnalysis { get; init; } = new HistoryHotspotAnalysis([]);
 
-    public HistoryEnrichmentProjection Enrichment { get; private set; } = enrichment ?? HistoryEnrichmentProjection.NotRequested;
+    public HistoryEnrichmentProjection Enrichment { get; private set; } = HistoryEnrichmentProjection.NotRequested;
 
     internal void ApplyEnrichment(HistoryEnrichmentProjection enrichmentProjection)
     {

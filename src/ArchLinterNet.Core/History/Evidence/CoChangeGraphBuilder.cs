@@ -68,12 +68,12 @@ internal sealed class CoChangeGraphBuilder(HistoryAnalysisConfiguration configur
         Dictionary<string, List<CoChangeVertex>> indexed = new(StringComparer.Ordinal);
         foreach (CoChangeVertex vertex in vertices)
         {
-            foreach (FileEvent fileEvent in vertex.File.Events)
+            foreach (string commitId in vertex.File.Events.Select(static fileEvent => fileEvent.CommitId))
             {
-                if (!indexed.TryGetValue(fileEvent.CommitId, out List<CoChangeVertex>? touching))
+                if (!indexed.TryGetValue(commitId, out List<CoChangeVertex>? touching))
                 {
                     touching = [];
-                    indexed[fileEvent.CommitId] = touching;
+                    indexed[commitId] = touching;
                 }
 
                 touching.Add(vertex);
@@ -93,14 +93,14 @@ internal sealed class CoChangeGraphBuilder(HistoryAnalysisConfiguration configur
         Dictionary<string, List<CoChangeVertex>> verticesByCommit,
         IReadOnlyList<CommitEvidence> commits)
     {
-        foreach (CommitEvidence commit in commits)
+        foreach (GitCommit commit in commits.Select(static evidence => evidence.Commit))
         {
-            if (!verticesByCommit.TryGetValue(commit.Commit.Id.Hex, out List<CoChangeVertex>? touching))
+            if (!verticesByCommit.TryGetValue(commit.Id.Hex, out List<CoChangeVertex>? touching))
             {
                 continue;
             }
 
-            AddPairs(touching, pair => pair.CommitIds.Add(commit.Commit.Id.Hex), pairs);
+            AddPairs(touching, pair => pair.CommitIds.Add(commit.Id.Hex), pairs);
         }
     }
 
@@ -173,16 +173,18 @@ internal sealed class CoChangeGraphBuilder(HistoryAnalysisConfiguration configur
                 ? value
                 : null;
             int? cohortRank = ranks.TryGetValue(accumulator, out int rank) ? rank : null;
-            pairs.Add(new CoChangePair(
-                accumulator.First,
-                accumulator.Second,
-                accumulator.Cohort,
-                accumulator.CommitIds,
-                accumulator.TaskKeys,
-                normalized?.Commit,
-                normalized?.Task,
-                normalized?.Combined,
-                cohortRank));
+            pairs.Add(new CoChangePair
+            {
+                First = accumulator.First,
+                Second = accumulator.Second,
+                Cohort = accumulator.Cohort,
+                CommitIds = accumulator.CommitIds,
+                TaskKeys = accumulator.TaskKeys,
+                CommitComponent = normalized?.Commit,
+                TaskComponent = normalized?.Task,
+                CombinedCoChange = normalized?.Combined,
+                CohortRank = cohortRank,
+            });
         }
 
         pairs.Sort(ComparePairs);

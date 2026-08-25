@@ -181,8 +181,22 @@ public sealed class HistoryBottleneckScorerTests
             Thresholds = new HistoryAnalysisThresholds { CoChangeSignificance = threshold },
         };
         CoChangeGraph graph = new CoChangeGraphBuilder(configuration).Build(files, commits, []);
-        var result = new HistoryIngestionResult(
-            "sha1", "from", "to", "from", "to", commits, 0, [], [], files, graph, new HistoryBottleneckAnalysis([]), new HistoryOcpAnalysis([]));
+        var result = new HistoryIngestionResult
+        {
+            ObjectFormatName = "sha1",
+            AuthoredFrom = "from",
+            AuthoredTo = "to",
+            ResolvedFrom = "from",
+            ResolvedTo = "to",
+            Commits = commits,
+            ExcludedMergeCount = 0,
+            RenameCandidates = [],
+            RenameComponents = [],
+            LogicalFiles = files,
+            CoChangeGraph = graph,
+            BottleneckAnalysis = new HistoryBottleneckAnalysis([]),
+            OcpAnalysis = new HistoryOcpAnalysis([]),
+        };
         return HistoryBottleneckScorer.Score(result, configuration);
     }
 

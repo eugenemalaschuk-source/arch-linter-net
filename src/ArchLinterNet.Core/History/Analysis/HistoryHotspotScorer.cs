@@ -68,17 +68,17 @@ internal sealed class HistoryHotspotScorer
         var authorProvenance = new List<HotspotAuthorProvenance>();
         BigInteger? earliest = null;
         BigInteger? latest = null;
-        foreach (FileEvent fileEvent in file.Events)
+        foreach (string commitId in file.Events.Select(static fileEvent => fileEvent.CommitId))
         {
-            if (!commits.TryGetValue(fileEvent.CommitId, out CommitEvidence? evidence))
+            if (!commits.TryGetValue(commitId, out CommitEvidence? evidence))
             {
-                throw new InvalidOperationException($"Canonical file event references unknown commit '{fileEvent.CommitId}'.");
+                throw new InvalidOperationException($"Canonical file event references unknown commit '{commitId}'.");
             }
 
             taskKeys.UnionWith(evidence.TaskKeys);
-            taskKeyProvenance.AddRange(evidence.TaskKeyMatches.Select(match => new HotspotTaskKeyProvenance(fileEvent.CommitId, match)));
+            taskKeyProvenance.AddRange(evidence.TaskKeyMatches.Select(match => new HotspotTaskKeyProvenance(commitId, match)));
             authors.Add(evidence.CanonicalAuthor);
-            authorProvenance.Add(new HotspotAuthorProvenance(fileEvent.CommitId, evidence.CanonicalAuthor));
+            authorProvenance.Add(new HotspotAuthorProvenance(commitId, evidence.CanonicalAuthor));
             BigInteger epoch = evidence.Commit.CommitterEpochSecond;
             earliest = earliest is null || epoch < earliest ? epoch : earliest;
             latest = latest is null || epoch > latest ? epoch : latest;
@@ -94,17 +94,19 @@ internal sealed class HistoryHotspotScorer
             file.Aliases,
             file.Events,
             category,
-            new HotspotRawEvidence(
-                file.CommitCount,
-                file.Churn,
-                taskKeys.Count,
-                authors.Count,
-                span,
-                statuses,
-                canonicalTaskKeys,
-                taskKeyProvenance,
-                canonicalAuthors,
-                authorProvenance));
+            new HotspotRawEvidence
+            {
+                CommitCount = file.CommitCount,
+                Churn = file.Churn,
+                TaskSpread = taskKeys.Count,
+                AuthorSpread = authors.Count,
+                TemporalSpanSeconds = span,
+                LineCountStatuses = statuses,
+                TaskKeys = canonicalTaskKeys,
+                TaskKeyProvenance = taskKeyProvenance,
+                CanonicalAuthors = canonicalAuthors,
+                AuthorProvenance = authorProvenance,
+            });
     }
 
     private static List<HotspotFinding> ScoreCohort(IReadOnlyList<Candidate> candidates, HotspotWeights weights)
@@ -130,15 +132,17 @@ internal sealed class HistoryHotspotScorer
                 (weights.Task * components.Task) +
                 (weights.Author * components.Author) +
                 (weights.Temporal * components.Temporal));
-            findings.Add(new HotspotFinding(
-                candidate.CanonicalPath,
-                candidate.Aliases,
-                candidate.PathEvents,
-                candidate.Category,
-                raw,
-                components,
-                weights,
-                score));
+            findings.Add(new HotspotFinding
+            {
+                CanonicalPath = candidate.CanonicalPath,
+                Aliases = candidate.Aliases,
+                PathEvents = candidate.PathEvents,
+                Category = candidate.Category,
+                RawEvidence = raw,
+                Components = components,
+                Weights = weights,
+                Score = score,
+            });
         }
 
         return findings;

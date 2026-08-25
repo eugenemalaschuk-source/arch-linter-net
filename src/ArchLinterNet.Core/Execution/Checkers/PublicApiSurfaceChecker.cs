@@ -206,7 +206,7 @@ internal static class PublicApiSurfaceChecker
     // check above looks for.
     private static Dictionary<string, List<ArchitectureExportedApiEntry>> FilterToSelected(
         Dictionary<string, List<ArchitectureExportedApiEntry>> scannedByAssembly,
-        IReadOnlyDictionary<string, ArchitecturePublicApiSurfaceMaterialization> surfacesByAssembly,
+        Dictionary<string, ArchitecturePublicApiSurfaceMaterialization> surfacesByAssembly,
         Func<Type, bool> surfaceSelectorPredicate)
     {
         Dictionary<string, List<ArchitectureExportedApiEntry>> governed = new(StringComparer.Ordinal);

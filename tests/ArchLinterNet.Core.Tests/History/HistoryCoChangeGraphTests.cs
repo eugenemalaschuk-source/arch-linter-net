@@ -28,6 +28,25 @@ public sealed class HistoryCoChangeGraphTests
     private static readonly string[] _aToBBToCEdgePairs = ["A.cs:B.cs", "B.cs:C.cs"];
 
     [Test]
+    public void CohortComparisonOperatorsOrderByFirstThenSecondCategory()
+    {
+        CoChangeCohort lower = CoChangeCohort.Of(HistoryPathCategory.Production, HistoryPathCategory.Production);
+        CoChangeCohort lowerCopy = CoChangeCohort.Of(HistoryPathCategory.Production, HistoryPathCategory.Production);
+        CoChangeCohort higher = CoChangeCohort.Of(HistoryPathCategory.Production, HistoryPathCategory.Tests);
+        CoChangeCohort higherCopy = CoChangeCohort.Of(HistoryPathCategory.Production, HistoryPathCategory.Tests);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(lower < higher, Is.True);
+            Assert.That(higher < lower, Is.False);
+            Assert.That(lower <= lowerCopy, Is.True);
+            Assert.That(higher > lower, Is.True);
+            Assert.That(lower > higher, Is.False);
+            Assert.That(higher >= higherCopy, Is.True);
+        });
+    }
+
+    [Test]
     public void DefaultLeadingZeroTaskSpellingsProduceOneTaskCoChange()
     {
         using GitTestRepository repository = GitTestRepository.Create();

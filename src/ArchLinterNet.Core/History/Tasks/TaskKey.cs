@@ -28,5 +28,17 @@ internal readonly struct TaskKey(string keyNamespace, BigInteger id) : IEquatabl
         return byNamespace != 0 ? byNamespace : Id.CompareTo(other.Id);
     }
 
+    public static bool operator ==(TaskKey left, TaskKey right) => left.Equals(right);
+
+    public static bool operator !=(TaskKey left, TaskKey right) => !left.Equals(right);
+
+    public static bool operator <(TaskKey left, TaskKey right) => left.CompareTo(right) < 0;
+
+    public static bool operator <=(TaskKey left, TaskKey right) => left.CompareTo(right) <= 0;
+
+    public static bool operator >(TaskKey left, TaskKey right) => left.CompareTo(right) > 0;
+
+    public static bool operator >=(TaskKey left, TaskKey right) => left.CompareTo(right) >= 0;
+
     public override string ToString() => $"{Namespace}#{IdText}";
 }
