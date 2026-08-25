@@ -17,19 +17,22 @@ internal sealed class ArchitectureAnalysisFactService
     private readonly ArchitectureTypeIndex _typeIndex;
     private readonly ArchitectureRoleIndex _roleIndex;
     private readonly ArchitectureExpressionFactService _expressionFacts;
+    private readonly ArchitectureSessionMetadataIndexes _metadataIndexes;
 
     public ArchitectureAnalysisFactService(
         ArchitectureAnalysisContext context,
         ArchitectureContractDocument document,
         ArchitectureTypeIndex typeIndex,
         ArchitectureRoleIndex roleIndex,
-        ArchitectureExpressionFactService expressionFacts)
+        ArchitectureExpressionFactService expressionFacts,
+        ArchitectureSessionMetadataIndexes metadataIndexes)
     {
         _context = context ?? throw new ArgumentNullException(nameof(context));
         _document = document ?? throw new ArgumentNullException(nameof(document));
         _typeIndex = typeIndex ?? throw new ArgumentNullException(nameof(typeIndex));
         _roleIndex = roleIndex ?? throw new ArgumentNullException(nameof(roleIndex));
         _expressionFacts = expressionFacts ?? throw new ArgumentNullException(nameof(expressionFacts));
+        _metadataIndexes = metadataIndexes ?? throw new ArgumentNullException(nameof(metadataIndexes));
     }
 
     public Type[] FindTypesInLayer(ArchitectureLayer layer)
@@ -82,12 +85,21 @@ internal sealed class ArchitectureAnalysisFactService
             .FirstOrDefault();
     }
 
-    public Dictionary<string, Assembly> BuildAssemblyLookup()
-    {
-        return _context.TargetAssemblies
-            .GroupBy(assembly => assembly.GetName().Name ?? string.Empty)
-            .ToDictionary(group => group.Key, group => group.First(), StringComparer.Ordinal);
-    }
+    public IReadOnlyDictionary<string, Assembly> BuildAssemblyLookup() => _metadataIndexes.AssembliesByName;
+
+    public bool TryGetAssembly(string assemblyName, out Assembly assembly) =>
+        _metadataIndexes.TryGetAssembly(assemblyName, out assembly!);
+
+    public bool TryGetProjectByAssemblyName(string assemblyName, out ArchitectureDiscoveredProject project) =>
+        _metadataIndexes.TryGetProjectByAssemblyName(assemblyName, out project!);
+
+    public bool TryGetProjectByNormalizedPath(string normalizedProjectPath, out ArchitectureDiscoveredProject project) =>
+        _metadataIndexes.TryGetProjectByNormalizedPath(normalizedProjectPath, out project!);
+
+    public bool TryGetPackageReferences(
+        string assemblyName,
+        out IReadOnlyList<ArchitectureDiscoveredPackageReference> references) =>
+        _metadataIndexes.TryGetPackageReferences(assemblyName, out references!);
 
     public IEnumerable<string> ResolveProjectAssemblyNames(List<string> projectNames)
     {

@@ -66,7 +66,16 @@ public sealed class ProjectMetadataContractTests
             });
     }
 
-    private static ArchitectureContractDocument CreateDocument(ArchitectureProjectMetadataContract contract, bool audit = false)
+    private static ArchitectureContractDocument CreateDocument(
+        ArchitectureProjectMetadataContract contract,
+        bool audit = false)
+    {
+        return CreateDocument(new[] { contract }, audit);
+    }
+
+    private static ArchitectureContractDocument CreateDocument(
+        IReadOnlyList<ArchitectureProjectMetadataContract> contracts,
+        bool audit = false)
     {
         return new ArchitectureContractDocument
         {
@@ -74,10 +83,54 @@ public sealed class ProjectMetadataContractTests
             Name = "Test",
             Contracts = new ArchitectureContractGroups
             {
-                StrictProjectMetadata = audit ? new List<ArchitectureProjectMetadataContract>() : new List<ArchitectureProjectMetadataContract> { contract },
-                AuditProjectMetadata = audit ? new List<ArchitectureProjectMetadataContract> { contract } : new List<ArchitectureProjectMetadataContract>()
+                StrictProjectMetadata = audit ? new List<ArchitectureProjectMetadataContract>() : contracts.ToList(),
+                AuditProjectMetadata = audit ? contracts.ToList() : new List<ArchitectureProjectMetadataContract>()
             }
         };
+    }
+
+    [Test]
+    public void MultipleProjectMetadataContracts_ReuseSessionProjectMetadataIndex()
+    {
+        const string ProjectPath = "src/MyApp/MyApp.csproj";
+        ArchitectureProjectMetadataContract nullableContract = new()
+        {
+            Name = "nullable-project-metadata",
+            Id = "nullable-project-metadata",
+            Projects = new List<string> { ProjectPath },
+            RequiredProperties = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["Nullable"] = "enable"
+            }
+        };
+        ArchitectureProjectMetadataContract packableContract = new()
+        {
+            Name = "packable-project-metadata",
+            Id = "packable-project-metadata",
+            Projects = new List<string> { ProjectPath },
+            RequiredProperties = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["IsPackable"] = "true"
+            }
+        };
+        ArchitectureAnalysisContext context = CreateContext(Project(
+            ProjectPath,
+            ("Nullable", "disable", ProjectPath),
+            ("IsPackable", "false", ProjectPath)));
+        ArchitectureContractRunner runner = new(
+            context,
+            CreateDocument(new[] { nullableContract, packableContract }));
+
+        ArchitectureContractExecutionResult result = new ArchitectureContractExecutor()
+            .Execute(runner.Session, "strict", new ArchitectureContractHandlerRegistry());
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(result.Violations, Has.Count.EqualTo(2));
+            Assert.That(result.Violations.Select(violation => violation.ContractId),
+                Is.EquivalentTo(new[] { "nullable-project-metadata", "packable-project-metadata" }));
+            Assert.That(context.ProfilingCounters.SessionProjectMetadataIndexMaterializations, Is.EqualTo(1));
+        });
     }
 
     [Test]

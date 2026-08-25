@@ -12,7 +12,6 @@ internal static class ProjectMetadataChecker
         ArchitectureCheckerContext context,
         ArchitectureContractExecutionContext executionContext)
     {
-        Dictionary<string, ArchitectureDiscoveredProject> projectsByPath = BuildProjectMetadataLookup(context);
         List<ArchitectureViolation> violations = new();
 
         foreach (string configuredProjectPath in contract.Projects
@@ -20,7 +19,8 @@ internal static class ProjectMetadataChecker
                      .Distinct(StringComparer.OrdinalIgnoreCase)
                      .OrderBy(path => path, StringComparer.OrdinalIgnoreCase))
         {
-            if (!projectsByPath.TryGetValue(configuredProjectPath, out ArchitectureDiscoveredProject? project))
+            if (!context.TryGetProjectByNormalizedPath(
+                    configuredProjectPath, out ArchitectureDiscoveredProject? project))
             {
                 continue;
             }
@@ -254,17 +254,4 @@ internal static class ProjectMetadataChecker
         return $"project_reference:{projectPath}";
     }
 
-    private static Dictionary<string, ArchitectureDiscoveredProject> BuildProjectMetadataLookup(
-        ArchitectureCheckerContext context)
-    {
-        IReadOnlyCollection<ArchitectureDiscoveredProject> discoveredProjects =
-            context.AnalysisContext.ProjectDiscovery?.DiscoveredProjects ?? Array.Empty<ArchitectureDiscoveredProject>();
-
-        return discoveredProjects
-            .GroupBy(project => ProjectPathNormalizer.Normalize(project.Path), StringComparer.OrdinalIgnoreCase)
-            .ToDictionary(
-                group => group.Key,
-                group => group.First(),
-                StringComparer.OrdinalIgnoreCase);
-    }
 }

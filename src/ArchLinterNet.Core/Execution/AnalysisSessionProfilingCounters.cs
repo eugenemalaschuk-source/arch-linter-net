@@ -10,6 +10,8 @@ internal sealed class AnalysisSessionProfilingCounters
     private readonly object _gate = new();
     private readonly Dictionary<string, int> _contractFamilyResultCounts = new(StringComparer.Ordinal);
     private int _factIndexMaterializations;
+    private int _sessionAssemblyIndexMaterializations;
+    private int _sessionProjectMetadataIndexMaterializations;
     private int _sourceScanPasses;
     private int _sourceFilesScanned;
     private int _parallelScheduledWorkItems;
@@ -19,6 +21,10 @@ internal sealed class AnalysisSessionProfilingCounters
     private int _contractExecutions;
 
     public int FactIndexMaterializations => Volatile.Read(ref _factIndexMaterializations);
+
+    public int SessionAssemblyIndexMaterializations => Volatile.Read(ref _sessionAssemblyIndexMaterializations);
+
+    public int SessionProjectMetadataIndexMaterializations => Volatile.Read(ref _sessionProjectMetadataIndexMaterializations);
 
     public int SourceScanPasses => Volatile.Read(ref _sourceScanPasses);
 
@@ -46,6 +52,12 @@ internal sealed class AnalysisSessionProfilingCounters
     }
 
     public void RecordFactIndexMaterialization() => Interlocked.Increment(ref _factIndexMaterializations);
+
+    public void RecordSessionAssemblyIndexMaterialization() =>
+        Interlocked.Increment(ref _sessionAssemblyIndexMaterializations);
+
+    public void RecordSessionProjectMetadataIndexMaterialization() =>
+        Interlocked.Increment(ref _sessionProjectMetadataIndexMaterializations);
 
     public void RecordSourceScanPass() => Interlocked.Increment(ref _sourceScanPasses);
 

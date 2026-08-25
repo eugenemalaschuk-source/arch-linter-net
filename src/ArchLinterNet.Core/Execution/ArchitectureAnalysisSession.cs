@@ -88,7 +88,13 @@ public sealed class ArchitectureAnalysisSession
             new ArchitectureSourceFileFactIndex.ConstructionOptions(
                 context.ProfilingCounters, context.CancellationToken, context.MaxParallelism));
         ExpressionFacts = new ArchitectureExpressionFactService(RoleIndex, SourceFileFactIndex, context.ProjectDiscovery);
-        Facts = new ArchitectureAnalysisFactService(context, document, TypeIndex, RoleIndex, ExpressionFacts);
+        Facts = new ArchitectureAnalysisFactService(
+            context,
+            document,
+            TypeIndex,
+            RoleIndex,
+            ExpressionFacts,
+            new ArchitectureSessionMetadataIndexes(context));
         _contextualConsumerRegistry = new ArchitectureContextualConsumerRegistry();
         RegisterAllContextualConsumersFromDocument();
         _configurationValidationService = new ArchitectureConfigurationValidationService(this);

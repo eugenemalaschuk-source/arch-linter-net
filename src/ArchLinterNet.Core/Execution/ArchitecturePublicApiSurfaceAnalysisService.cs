@@ -25,7 +25,7 @@ internal sealed class ArchitecturePublicApiSurfaceAnalysisService
         }
 
         ArchitectureContractExecutionContext executionContext = _session.CreateExecutionContext(contract, contract.IgnoredViolations);
-        Dictionary<string, Assembly> resolvedAssemblies = _session.Facts.BuildAssemblyLookup();
+        IReadOnlyDictionary<string, Assembly> resolvedAssemblies = _session.Facts.BuildAssemblyLookup();
         List<ArchitectureViolation> violations = PublicApiSurfaceChecker.Check(
             contract, resolvedAssemblies, executionContext,
             PublicApiSurfaceChecker.BuildSurfaceSelectorPredicate(contract, _session.Document, _session.RoleIndex),
@@ -67,7 +67,7 @@ internal sealed class ArchitecturePublicApiSurfaceAnalysisService
         out IReadOnlyList<string> missingAssemblies,
         out IReadOnlyList<ArchitectureViolation> selectorSafetyViolations)
     {
-        Dictionary<string, Assembly> resolvedAssemblies = _session.Facts.BuildAssemblyLookup();
+        IReadOnlyDictionary<string, Assembly> resolvedAssemblies = _session.Facts.BuildAssemblyLookup();
         Func<Type, bool>? selectorPredicate =
             PublicApiSurfaceChecker.BuildSurfaceSelectorPredicate(contract, _session.Document, _session.RoleIndex);
         Func<Assembly, ArchitecturePublicApiSurfaceMaterialization> surfaceResolver = _session.GetPublicApiSurface;

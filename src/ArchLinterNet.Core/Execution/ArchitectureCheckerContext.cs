@@ -60,7 +60,16 @@ internal sealed class ArchitectureCheckerContext
     public IEnumerable<string> ResolveProjectAssemblyNames(List<string> projectNames) =>
         _session.Facts.ResolveProjectAssemblyNames(projectNames);
 
-    public Dictionary<string, Assembly> BuildAssemblyLookup() => _session.Facts.BuildAssemblyLookup();
+    public bool TryGetAssembly(string assemblyName, out Assembly assembly) =>
+        _session.Facts.TryGetAssembly(assemblyName, out assembly!);
+
+    public bool TryGetProjectByNormalizedPath(string normalizedProjectPath, out ArchitectureDiscoveredProject project) =>
+        _session.Facts.TryGetProjectByNormalizedPath(normalizedProjectPath, out project!);
+
+    public bool TryGetPackageReferences(
+        string assemblyName,
+        out IReadOnlyList<ArchitectureDiscoveredPackageReference> references) =>
+        _session.Facts.TryGetPackageReferences(assemblyName, out references!);
 
     public IEnumerable<Type> FindContextSelectorMatchingTypes(ArchitectureContextSelector selector) =>
         _session.Facts.FindContextSelectorMatchingTypes(selector);
