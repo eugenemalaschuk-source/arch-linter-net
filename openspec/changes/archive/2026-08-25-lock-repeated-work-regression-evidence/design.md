@@ -56,9 +56,13 @@ the session projection as well as a return to repeated session materialization.
 The failing consumer-shaped fixture will produce an ordered, non-empty
 canonical projection whose SHA-256 checksum and finding count are literal test
 constants. The test must not derive an expected result from another execution
-of the current implementation. A second temporary-policy scenario will assert
-the actual `ArchitectureValidationBuilder` strict/audit outcomes and the CLI's
-corresponding exit codes.
+of the current implementation. Before accepting those literals, the same
+document shape and projection calculation will run against detached baseline
+`ef78023f420a6b2670b0c4fc6ad426df799c0dc4`, before #653/#652; its strict and
+audit count/checksum output must exactly match the literals. The internal
+evidence document will record the baseline revision and both values. A second
+temporary-policy scenario will assert the actual `ArchitectureValidationBuilder`
+strict/audit outcomes and the CLI's corresponding exit codes.
 
 **Alternative considered:** compare two optimized sessions. Rejected because
 that proves only determinism and permits a stable behavior regression.
@@ -87,8 +91,10 @@ test work.
 ## Risks / Trade-offs
 
 - **[Risk]** Direct session construction could omit a consumer-visible result
-  surface. **Mitigation:** use a literal canonical checksum for its complete
-  non-empty projection and independently assert Testing API/CLI outcomes.
+  surface or capture a post-optimization-only golden. **Mitigation:** use a
+  literal canonical checksum for its complete non-empty projection, record its
+  independent pre-#653/#652 baseline provenance, and assert Testing API/CLI
+  outcomes.
 - **[Risk]** An aggregate counter masks a family bypass. **Mitigation:** use a
   fresh session and an explicit `0 -> 1 -> 1` transition for every family.
 - **[Risk]** The fixture becomes a second benchmark framework. **Mitigation:**

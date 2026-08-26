@@ -24,6 +24,8 @@ public sealed class RepeatedWorkRegressionEvidenceTests
     private const int DiscoveredProjectCount = 24;
     private const int ContractFanOut = 16;
     private const string ForbiddenPackage = "Synthetic.Forbidden.Package";
+    // Independently measured from the same projection on pre-#653/#652 commit
+    // ef78023f420a6b2670b0c4fc6ad426df799c0dc4; see analysis-profile-dictionary.md.
     private const string ExpectedStrictProjectionChecksum = "925FD7BAB41B0F638A3C0ED73C3D09E50018FC1AB70E8C539E39FB8207581849";
     private const string ExpectedAuditProjectionChecksum = "9259819F5A173F5B054D99D3A0F7334DEF3154F1E30B5E954D0B46E688C161BE";
     private const int ExpectedStrictProjectionCount = 48;
@@ -42,7 +44,7 @@ public sealed class RepeatedWorkRegressionEvidenceTests
     }
 
     [Test]
-    public void ConsumerShapedFailures_MatchCheckedInCanonicalGolden()
+    public void ConsumerShapedFailures_MatchPreOptimizationCanonicalGolden()
     {
         ArchitectureAnalysisSession session = CreateSession(CreateDocument(failingMetadataContracts: true), out _);
         ArchitectureContractExecutor executor = new();
