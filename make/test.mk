@@ -42,10 +42,10 @@
 # ASCII, backslash-free name via `TestCaseData(...).SetName(...)` instead of a bare
 # `[TestCase(...)]` — the arguments passed to the test body are unaffected, only the generated
 # identity used for filtering and reporting.
-TEST_E2E_FIXTURES := FullyQualifiedName~ExternalDependencyContractAuditE2eTests|FullyQualifiedName~BuildStatePreflightTests|FullyQualifiedName~BuildStatePreflightAssemblyReloadTests|FullyQualifiedName~CheckpointAAdoptionAcceptanceTests|FullyQualifiedName~ArchitectureBaselineIntegrationTests|FullyQualifiedName~SelfArchitecturePolicyTests|FullyQualifiedName~SelfPolicyNegativeRegressionTests
+TEST_E2E_FIXTURES := FullyQualifiedName~ExternalDependencyContractAuditE2eTests|FullyQualifiedName~BuildStatePreflightTests|FullyQualifiedName~BuildStatePreflightAssemblyReloadTests|FullyQualifiedName~CheckpointAAdoptionAcceptanceTests|FullyQualifiedName~ArchitectureBaselineIntegrationTests|FullyQualifiedName~SelfArchitecturePolicyTests|FullyQualifiedName~SelfPolicyNegativeRegressionTests|FullyQualifiedName~RepeatedWorkRegressionEvidenceTests
 TEST_E2E_FILTER := $(TEST_E2E_FIXTURES)
 TEST_PACKED_ARTIFACT_FILTER := FullyQualifiedName~CheckpointBReleaseGateTests
-TEST_UNIT_FILTER := FullyQualifiedName!~ExternalDependencyContractAuditE2eTests&FullyQualifiedName!~BuildStatePreflightTests&FullyQualifiedName!~BuildStatePreflightAssemblyReloadTests&FullyQualifiedName!~CheckpointAAdoptionAcceptanceTests&FullyQualifiedName!~ArchitectureBaselineIntegrationTests&FullyQualifiedName!~SelfArchitecturePolicyTests&FullyQualifiedName!~SelfPolicyNegativeRegressionTests&FullyQualifiedName!~CheckpointBReleaseGateTests
+TEST_UNIT_FILTER := FullyQualifiedName!~ExternalDependencyContractAuditE2eTests&FullyQualifiedName!~BuildStatePreflightTests&FullyQualifiedName!~BuildStatePreflightAssemblyReloadTests&FullyQualifiedName!~CheckpointAAdoptionAcceptanceTests&FullyQualifiedName!~ArchitectureBaselineIntegrationTests&FullyQualifiedName!~SelfArchitecturePolicyTests&FullyQualifiedName!~SelfPolicyNegativeRegressionTests&FullyQualifiedName!~RepeatedWorkRegressionEvidenceTests&FullyQualifiedName!~CheckpointBReleaseGateTests
 
 # ArchLinterNet.Core.Tests carries no [assembly: Parallelizable] (unlike ArchLinterNet.Cli.Tests),
 # runs strictly serially, and is the dominant cost inside the unit bucket (~2600 of the bucket's

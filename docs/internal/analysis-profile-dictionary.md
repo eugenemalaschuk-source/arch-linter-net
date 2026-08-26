@@ -72,6 +72,49 @@ When `OutputFailed` is true after analysis completed, `CompletionStatus` still d
 
 Every phase also records `ProcessorTimeMs`, the process CPU-time delta measured during that phase. It is an environment-dependent measurement and can overlap for nested phases.
 
+## Deterministic consumer-shaped regression evidence (issue #654)
+
+[`RepeatedWorkRegressionEvidenceTests`](../../tests/ArchLinterNet.Core.Tests/RepeatedWorkRegressionEvidenceTests.cs)
+is the focused Core fixture for issue #654. It is synthetic and anonymized: 24
+discovered projects, 16 repeated metadata-family contracts, and two public-API
+contracts against one already-loaded test assembly. Each covered family runs in
+its own fresh session and must transition its own counter from `0` before the
+first contract to `1` after it, then remain at `1` through the rest of the
+fan-out. This prevents one family from seeding a shared counter and masking a
+bypass in another. A literal count and SHA-256 checksum lock a non-empty,
+ordered canonical projection; a temporary policy also asserts actual Testing
+API strict/audit outcomes and CLI exit codes. These internal counters and
+goldens are the normative regression evidence for the consumer shape; they
+complement `analysis-profile/v1` and do not extend or alter its versioned
+schema. No `analysis-profile/v1` field exposes these internal counters.
+
+### Canonical golden provenance
+
+The canonical constants were independently measured before either optimization,
+from detached baseline commit `ef78023f420a6b2670b0c4fc6ad426df799c0dc4`.
+That commit is the direct parent of #653 (`c00c49cd`) and therefore also
+precedes #652 (`040779f2`). A temporary probe reproduced this fixture's
+contracts, 24 project facts, test-assembly selector, execution modes, and
+`ArchitectureFindingMapper`, while compiling and running only baseline source.
+It passed with the following output:
+
+| Revision | Strict projection | Audit projection |
+|---|---|---|
+| `ef78023f` baseline | `48` / `925FD7BAB41B0F638A3C0ED73C3D09E50018FC1AB70E8C539E39FB8207581849` | `3` / `9259819F5A173F5B054D99D3A0F7334DEF3154F1E30B5E954D0B46E688C161BE` |
+| Current #654 fixture | `48` / `925FD7BAB41B0F638A3C0ED73C3D09E50018FC1AB70E8C539E39FB8207581849` | `3` / `9259819F5A173F5B054D99D3A0F7334DEF3154F1E30B5E954D0B46E688C161BE` |
+
+Thus the golden is a pre-optimization oracle, not a value derived from a
+second optimized execution. The current test keeps that baseline projection
+locked against future changes to finding count, order, kind, or canonical
+identity.
+
+The fixture intentionally has no wall-clock or allocation thresholds. Timing and
+allocation observations are hardware-sensitive and are not a release contract.
+It is separate from the manually run `analysis-profile/v1` benchmark harnesses
+and from the broad large-solution benchmark program reserved for issue #502: it
+adds no benchmark scenarios, timing loops, generated artifacts, or performance
+baselines.
+
 ## Benchmark scenario IDs (see `docs/internal/analysis-profile-pre-optimization-baseline.md`)
 
 | Scenario ID | Measures |
