@@ -43,9 +43,10 @@ jobs:
         run: dotnet restore
 
       - name: Validate architecture (strict + audit)
-        run: dotnet arch-linter-net --mode strict,audit --ensure-built \
-          --report json=architecture-results.json \
-          --report sarif=architecture-results.sarif
+        run: |
+          dotnet arch-linter-net --mode strict,audit --ensure-built --no-restore \
+            --report json=architecture-results.json \
+            --report sarif=architecture-results.sarif
 
       - name: Upload architecture diagnostics
         if: always()
@@ -98,14 +99,16 @@ workflow and make only the audit step non-blocking:
 
 ```yaml
 - name: Validate architecture (strict)
-  run: dotnet arch-linter-net --mode strict --ensure-built \
-    --report json=architecture-strict.json
+  run: |
+    dotnet arch-linter-net --mode strict --ensure-built --no-restore \
+      --report json=architecture-strict.json
 
 - name: Architecture audit report
   if: always()
   continue-on-error: true
-  run: dotnet arch-linter-net --mode audit --ensure-built \
-    --report json=architecture-audit.json
+  run: |
+    dotnet arch-linter-net --mode audit --ensure-built --no-restore \
+      --report json=architecture-audit.json
 ```
 
 Each step is a separate CLI process with its own preparation. Choose this
