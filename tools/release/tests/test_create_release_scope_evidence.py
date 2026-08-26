@@ -398,8 +398,8 @@ def test_shipped_declarations_preserve_both_reviewed_release_authorities() -> No
     ]
 
     by_target = {declaration["release_target"]: declaration for declaration in declarations}
-    assert len(declarations) == len(by_target) == 2
-    assert set(by_target) == {"0.6.4", "0.7.0"}
+    assert len(declarations) == len(by_target) == 3
+    assert set(by_target) == {"0.6.4", "0.7.0", "0.7.1"}
     assert by_target["0.6.4"]["story"] == 527
     assert {item["issue"] for item in by_target["0.6.4"]["required_items"]} == {525, 526}
     assert by_target["0.7.0"]["story"] == 613
@@ -416,3 +416,7 @@ def test_shipped_declarations_preserve_both_reviewed_release_authorities() -> No
             "reason": "Architecture policy badge is completed release context and is not an open v0.7 publication blocker.",
         }
     ]
+    assert by_target["0.7.1"]["story"] == 668
+    assert {item["issue"] for item in by_target["0.7.1"]["required_items"]} == {665}
+    assert by_target["0.7.1"]["excluded_items"] == []
+    assert by_target["0.7.1"]["delivered_items"] == []

@@ -1,0 +1,17 @@
+{
+  "schema": "checkpoint-b-release-scope-declaration/v2",
+  "declaration_id": "v0.7.1-release-pipeline-maintenance",
+  "release_target": "0.7.1",
+  "story": 668,
+  "_comment": [
+    "The reviewed v0.7.1 release authority owned by #668. This is a maintenance release: it ships",
+    "release-pipeline fixes merged since v0.7.0 with no new feature scope. Required and excluded",
+    "items are reviewed release intent; they are not inferred from milestone membership or mutable",
+    "issue text. #667 (OS-patch merge equality fix) has no linked issue and is not listed here."
+  ],
+  "required_items": [
+    { "issue": 665, "finding": "checkpoint-b-shard", "summary": "Restore the required ensure-built Checkpoint B shard to the release matrix" }
+  ],
+  "excluded_items": [],
+  "delivered_items": []
+}
