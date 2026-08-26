@@ -36,17 +36,26 @@ public sealed partial class ArchitectureAnalysisSnapshotTests
         runnerSetupService.RunnerToReturn = new FakeContractRunner(session);
 
         var contractExecutor = new CountingContractExecutor();
+        var buildStatePreparationService = new FakeBuildStatePreparationService();
         var applicationService = new ArchitectureValidationApplicationService(
             runnerSetupService,
             new FakeContractHandlerRegistry(),
             contractExecutor,
-            new FakeBuildStatePreparationService());
+            buildStatePreparationService);
 
         using ArchitectureAnalysisSnapshot snapshot = applicationService.CreateSnapshot(new AnalysisSnapshotRequest
         {
             PolicyPath = "unused-by-fakes.arch.yml",
             PreparationMode = BuildPreparationMode.EnsureBuilt,
         });
+
+        // The fixture's non-empty MissingAssemblyNames (_value5) keeps BuildStatePreflightRunner.Run
+        // from short-circuiting before reaching IBuildStatePreparationService.Prepare, the real seam
+        // CreateSnapshot uses for build/preflight preparation (see BuildSnapshot in
+        // ArchitectureValidationApplicationService). Capture the count here, before either mode is
+        // evaluated, so the asserts below prove preparation happens once for the whole snapshot
+        // rather than once per Evaluate call.
+        int prepareCallCountAfterSnapshot = buildStatePreparationService.PrepareCallCount;
 
         ValidationOutcome strict = snapshot.Evaluate("strict");
         ValidationOutcome audit = snapshot.Evaluate("audit");
@@ -60,6 +69,12 @@ public sealed partial class ArchitectureAnalysisSnapshotTests
                 "ensure-built preparation must be shared by both mode evaluations");
             Assert.That(runnerSetupService.BuildRunnerCallCount, Is.EqualTo(1),
                 "the prepared runner may materialize once, but never once per mode");
+            Assert.That(prepareCallCountAfterSnapshot, Is.GreaterThan(0),
+                "the fixture's MissingAssemblyNames must be non-empty so this actually exercises " +
+                "IBuildStatePreparationService.Prepare instead of the no-op short-circuit path");
+            Assert.That(buildStatePreparationService.PrepareCallCount, Is.EqualTo(prepareCallCountAfterSnapshot),
+                "build-state preparation must complete during CreateSnapshot; evaluating additional " +
+                "modes must not trigger another build/preflight preparation");
             Assert.That(contractExecutor.CallCountByMode, Has.Count.EqualTo(2));
             Assert.That(snapshot.Counters.PolicyCompositions, Is.EqualTo(1));
             Assert.That(snapshot.Counters.ProjectGraphEvaluations, Is.EqualTo(1));

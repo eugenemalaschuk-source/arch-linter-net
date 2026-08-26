@@ -31,6 +31,7 @@ public partial class CliIntegrationTests
         Assert.Multiple(() =>
         {
             Assert.That(combinedExit, Is.EqualTo(standaloneStrictExit), $"stderr: {combinedErr}");
+            Assert.That(combinedExit, Is.EqualTo(standaloneAuditExit), $"stderr: {combinedErr}");
             Assert.That(combinedResults.GetArrayLength(), Is.EqualTo(2));
 
             // Order: the combined document lists results in requested-mode order (strict, audit).
@@ -49,6 +50,53 @@ public partial class CliIntegrationTests
                     JsonNode.Parse(standaloneAuditJson)),
                 Is.True,
                 "Combined-mode audit result must match a standalone audit run exactly (findings, identities, and order).");
+        });
+    }
+
+    // Same #656 acceptance criterion as the JSON test above, but for --format sarif: a standalone
+    // single-mode SARIF document always has exactly one entry in "runs", and FormatCombinedSarif
+    // (ReportCoordinator) builds the combined document by concatenating each mode's "runs" entries,
+    // so combined runs[0]/runs[1] must be exactly the standalone strict/audit run.
+    [Test]
+    public void CombinedMode_StrictAndAuditSarifRuns_MatchStandaloneRunsExactly()
+    {
+        (int standaloneStrictExit, string standaloneStrictSarif, string standaloneStrictErr) = RunCli(
+            "--policy", _combinedEquivalencePolicy, "--mode", "strict", "--format", "sarif");
+        (int standaloneAuditExit, string standaloneAuditSarif, string standaloneAuditErr) = RunCli(
+            "--policy", _combinedEquivalencePolicy, "--mode", "audit", "--format", "sarif");
+        (int combinedExit, string combinedSarif, string combinedErr) = RunCli(
+            "--policy", _combinedEquivalencePolicy, "--mode", "strict,audit", "--format", "sarif");
+
+        Assert.That(standaloneStrictExit, Is.Not.EqualTo(0), $"stderr: {standaloneStrictErr}");
+        Assert.That(standaloneAuditExit, Is.Not.EqualTo(0), $"stderr: {standaloneAuditErr}");
+        Assert.That(combinedExit, Is.EqualTo(standaloneStrictExit), $"stderr: {combinedErr}");
+        Assert.That(combinedExit, Is.EqualTo(standaloneAuditExit), $"stderr: {combinedErr}");
+
+        using JsonDocument combinedDocument = JsonDocument.Parse(combinedSarif);
+        JsonElement combinedRuns = combinedDocument.RootElement.GetProperty("runs");
+        using JsonDocument standaloneStrictDocument = JsonDocument.Parse(standaloneStrictSarif);
+        JsonElement standaloneStrictRuns = standaloneStrictDocument.RootElement.GetProperty("runs");
+        using JsonDocument standaloneAuditDocument = JsonDocument.Parse(standaloneAuditSarif);
+        JsonElement standaloneAuditRuns = standaloneAuditDocument.RootElement.GetProperty("runs");
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(combinedRuns.GetArrayLength(), Is.EqualTo(2));
+            Assert.That(standaloneStrictRuns.GetArrayLength(), Is.EqualTo(1));
+            Assert.That(standaloneAuditRuns.GetArrayLength(), Is.EqualTo(1));
+
+            Assert.That(
+                JsonNode.DeepEquals(
+                    JsonNode.Parse(combinedRuns[0].GetRawText()),
+                    JsonNode.Parse(standaloneStrictRuns[0].GetRawText())),
+                Is.True,
+                "Combined-mode strict SARIF run must match a standalone strict run exactly.");
+            Assert.That(
+                JsonNode.DeepEquals(
+                    JsonNode.Parse(combinedRuns[1].GetRawText()),
+                    JsonNode.Parse(standaloneAuditRuns[0].GetRawText())),
+                Is.True,
+                "Combined-mode audit SARIF run must match a standalone audit run exactly.");
         });
     }
 
