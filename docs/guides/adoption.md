@@ -67,7 +67,26 @@ Commit the baseline only after reviewing it. Each entry should represent known d
 
 ## 5. Add CI
 
-Use strict validation as the blocking gate and audit validation as a non-blocking artifact. See [CI integration](ci-integration.md).
+If the repository requires both strict and audit results from the same build
+state, make the one-process combined command the canonical CI entrypoint:
+
+```bash
+arch-linter-net --policy architecture/dependencies.arch.yml \
+  --mode strict,audit --ensure-built \
+  --report json=artifacts/architecture-results.json \
+  --report sarif=artifacts/architecture-results.sarif
+```
+
+This command creates one immutable analysis snapshot and one snapshot-owned
+build/preflight preparation, including post-build receipt verification, then
+evaluates both modes from that snapshot. Its exit code is aggregate: validation
+fails when either mode fails. JSON and SARIF reports reuse the completed mode
+outcomes and do not trigger another analysis.
+
+If audit is intentionally advisory, keep strict as the blocking gate and run a
+separate non-blocking audit step. Those independent CLI processes retain the
+backward-compatible single-mode paths and do not reuse prepared state across
+processes. See [CI integration](ci-integration.md) for both workflow shapes.
 
 ## 6. Tighten over time
 

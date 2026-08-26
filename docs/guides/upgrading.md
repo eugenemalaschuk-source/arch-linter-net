@@ -140,14 +140,36 @@ dotnet arch-linter-net --policy architecture/arch.yml --mode strict \
   --ensure-built --no-restore
 ```
 
+When adoption or CI requires both strict and audit results from this same build
+state, use one combined invocation:
+
+```bash
+dotnet arch-linter-net --policy architecture/arch.yml \
+  --mode strict,audit --ensure-built \
+  --report json=artifacts/architecture-results.json \
+  --report sarif=artifacts/architecture-results.sarif
+```
+
+`--ensure-built` preparation is owned by one immutable analysis snapshot,
+including any post-build receipt verification, and both requested modes are
+evaluated from that snapshot. The command fails if either mode fails. The JSON
+and SARIF report sinks render the completed outcomes without re-running
+analysis. This is the canonical dual-mode path; the single-mode commands above
+remain the compatible choice when only one mode is needed.
+
+If audit is intentionally advisory, keep separate strict-blocking and
+non-blocking-audit commands instead. They are independent CLI processes and do
+not reuse prepared state across processes.
+
 ### 5. Add only the features you need
 
 - [Baselines](migration-baselines.md) record reviewed current debt. They never
   approve a future violation automatically.
 - [Public API snapshots](../contracts/public-api-surface.md) give exported APIs
   a reviewed file contract.
-- [`--report`](../usage/output-formats.md) routes one validation result to human,
-  JSON, and SARIF sinks without repeating analysis.
+- [`--report`](../usage/output-formats.md) routes one validation result (or both
+  completed results from a combined run) to human, JSON, and SARIF sinks without
+  repeating analysis.
 - `--cache` is an opt-in performance feature; the default is disabled.
 - `--profile` writes a machine-readable `analysis-profile/v1` artifact only when
   requested.
@@ -297,6 +319,22 @@ dotnet arch-linter-net --policy architecture/arch.yml --mode strict \
   --report json=artifacts/architecture.json \
   --report sarif=artifacts/architecture.sarif
 ```
+
+When one workflow requires strict and audit from the same build state, route
+both artifacts from the canonical combined invocation:
+
+```bash
+dotnet arch-linter-net --policy architecture/arch.yml \
+  --mode strict,audit --ensure-built \
+  --report json=artifacts/architecture-results.json \
+  --report sarif=artifacts/architecture-results.sarif
+```
+
+The two report files contain the completed mode outcomes from one immutable
+analysis snapshot; rendering additional sinks does not re-run analysis. The
+combined exit status is failing when either requested mode fails. For an
+advisory audit, use separate strict-blocking and non-blocking-audit commands as
+described above; separate processes do not share prepared state.
 
 Command `--output` options belong to their commands: baseline and public-API
 operations use them for candidate artifacts, not report routing. A later report

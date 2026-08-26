@@ -1,0 +1,28 @@
+version: 1
+name: Combined Equivalence Policy
+
+layers:
+  core:
+    namespace: ArchLinterNet.Core
+  cel:
+    namespace: ArchLinterNet.CEL
+
+analysis:
+  target_assemblies:
+    - ArchLinterNet.Core
+    - ArchLinterNet.CEL
+
+contracts:
+  strict:
+    - id: combined-equivalence-strict-core-forbids-cel
+      name: Strict — Core must not reference CEL
+      source: core
+      forbidden: [cel]
+      reason: Deliberately violated so combined-mode strict output can be compared against a standalone strict run.
+
+  audit:
+    - id: combined-equivalence-audit-core-forbids-cel
+      name: Audit — Core must not reference CEL
+      source: core
+      forbidden: [cel]
+      reason: Deliberately violated so combined-mode audit output can be compared against a standalone audit run.

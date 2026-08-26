@@ -333,7 +333,7 @@ For combined strict + audit with multi-sink output:
 
 ```yaml
 - name: Validate architecture (strict + audit)
-  run: arch-linter-net --mode strict,audit \
+  run: arch-linter-net --mode strict,audit --ensure-built \
     --report json=architecture-results.json \
     --report sarif=architecture-results.sarif
 
@@ -346,3 +346,14 @@ For combined strict + audit with multi-sink output:
       architecture-results.json
       architecture-results.sarif
 ```
+
+Use this combined invocation when the workflow requires both strict and audit
+results from the same build state. `--ensure-built` preparation belongs to one
+immutable analysis snapshot, including any post-build receipt verification,
+and both modes are evaluated from that snapshot. The command fails when either
+requested mode fails. JSON and SARIF report sinks render the completed mode
+outcomes; adding sinks does not run analysis again.
+
+If audit is intentionally advisory, retain separate strict-blocking and
+non-blocking-audit steps instead. Those are independent CLI processes and do
+not reuse prepared state across processes.

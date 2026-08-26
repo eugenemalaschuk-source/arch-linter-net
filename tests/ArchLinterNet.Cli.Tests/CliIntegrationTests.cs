@@ -15,6 +15,7 @@ public partial class CliIntegrationTests
     private static string _allCoverageScopesPolicy = null!;
     private static string _graphPolicy = null!;
     private static string _passingWithIdsPolicy = null!;
+    private static string _combinedEquivalencePolicy = null!;
 
     [OneTimeSetUp]
     public void OneTimeSetUp()
@@ -33,6 +34,8 @@ public partial class CliIntegrationTests
             _repoRoot, "tests", "ArchLinterNet.Cli.Tests", "TestPolicies", "graph-policy.yml");
         _passingWithIdsPolicy = Path.Combine(
             _repoRoot, "tests", "ArchLinterNet.Cli.Tests", "TestPolicies", "passing-with-ids.yml");
+        _combinedEquivalencePolicy = Path.Combine(
+            _repoRoot, "tests", "ArchLinterNet.Cli.Tests", "TestPolicies", "combined-equivalence-policy.yml");
 
         if (!File.Exists(_cliDllPath))
         {

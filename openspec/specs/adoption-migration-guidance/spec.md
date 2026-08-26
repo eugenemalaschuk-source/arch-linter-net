@@ -6,9 +6,7 @@ Define canonical evergreen adoption and migration guidance, thin status-correct
 reference entrypoints, and documentation checks that keep compatibility behavior
 discoverable without making a product package release part of the documentation
 identity.
-
 ## Requirements
-
 ### Requirement: Adoption and upgrade guidance is canonical and release-neutral
 
 The documentation SHALL publish one searchable evergreen guide that distinguishes
@@ -140,3 +138,14 @@ it remains in the repository.
 - **WHEN** a maintainer changes an affected public reference page
 - **THEN** navigation and structural validation retain a reachable canonical
   version-neutral adoption/upgrade path
+
+### Requirement: Dual-mode CI and adoption guidance uses one combined invocation
+
+The evergreen CI, adoption, upgrade, reference-entrypoint, and output guidance SHALL recommend one `--mode strict,audit --ensure-built` invocation when a workflow requires strict and audit results from the same build state. The guidance SHALL show combined JSON and SARIF report routing where artifacts are needed, state that the command fails when either requested mode fails, and explain that additional report sinks reuse the completed analysis. It SHALL retain separate strict and non-blocking audit examples for workflows that intentionally treat audit as advisory, and SHALL NOT claim prepared-state reuse across independent CLI processes.
+
+#### Scenario: A team needs strict and audit as one required CI decision
+
+- **WHEN** a maintainer follows the documented dual-mode CI path
+- **THEN** the workflow invokes the CLI once with `--mode strict,audit
+  --ensure-built`, preserves both result views in its artifacts, and receives
+  the aggregate command exit category

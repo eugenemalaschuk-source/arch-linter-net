@@ -180,7 +180,13 @@ public sealed partial class ArchitectureAnalysisSnapshotTests
         public BuildStatePreflightResult ResultToReturn { get; set; } =
             new(Array.Empty<BuildStatePreflightDiagnostic>());
 
-        public BuildStatePreflightResult Prepare(BuildStatePreflightRequest request) => ResultToReturn;
+        public int PrepareCallCount { get; private set; }
+
+        public BuildStatePreflightResult Prepare(BuildStatePreflightRequest request)
+        {
+            PrepareCallCount++;
+            return ResultToReturn;
+        }
     }
 
     private static ArchitectureAnalysisSession CreateEmptySession(ArchitectureContractDocument document)
