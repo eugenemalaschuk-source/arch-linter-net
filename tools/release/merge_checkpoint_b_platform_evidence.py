@@ -33,12 +33,15 @@ _REQUIRED_SHARDS = {
     "public-api-surface-selector-delta-and-membership",
     "public-api-surface-selector-enforcement",
 }
+# 'platform' (RuntimeInformation.OSDescription, e.g. "macOS 15.7.7" vs "macOS 15.7.9") is
+# intentionally excluded: shards for the same platform_id run on separate ephemeral runner
+# VMs whose OS patch level can differ even under one workflow run. platform_id is the
+# canonical grouping key and is enforced below.
 _COMMON_FIELDS = (
     "checkpoint",
     "candidate_version",
     "source_commit",
     "platform_id",
-    "platform",
     "runtime",
     "architecture",
     "shell",
