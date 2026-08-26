@@ -51,6 +51,9 @@ jobs:
           - id: package-and-entrypoints
             name: Package + entrypoints
             target: test-packed-artifact-package-and-entrypoints
+          - id: ensure-built-replaces-testing-output
+            name: Ensure-built replaces Testing output
+            target: test-packed-artifact-ensure-built-replaces-testing-output
           - id: adopter-runtime-core
             name: Adopter runtime core
             target: test-packed-artifact-adopter-runtime-core
