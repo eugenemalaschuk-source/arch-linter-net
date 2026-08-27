@@ -38,16 +38,25 @@ public sealed partial class ArchitectureGraphApplicationService(
             out List<ArchitectureViolation> violations,
             out IReadOnlyCollection<Reporting.ArchitectureCoverageSummary> coverageSummaries);
 
-        ArchitectureDependencyGraph graph = ArchitectureDependencyGraphBuilder.Build(
-            session, request.Level, violations,
-            out IReadOnlyDictionary<(string Source, string Target), IReadOnlyList<ArchitectureViolation>> edgeViolations);
-        return new ArchitectureGraphOutcome(graph)
+        try
         {
-            EdgeViolations = edgeViolations,
-            CoverageSummaries = coverageSummaries,
-            SourceExpansion = session.Document.SourceExpansion,
-            SelectorParticipation = session.SubtractiveMatcherParticipation
-        };
+            ArchitectureDependencyGraph graph = ArchitectureDependencyGraphBuilder.Build(
+                session, request.Level, violations,
+                out IReadOnlyDictionary<(string Source, string Target), IReadOnlyList<ArchitectureViolation>> edgeViolations);
+            return new ArchitectureGraphOutcome(graph)
+            {
+                EdgeViolations = edgeViolations,
+                CoverageSummaries = coverageSummaries,
+                SourceExpansion = session.Document.SourceExpansion,
+                SelectorParticipation = session.SubtractiveMatcherParticipation
+            };
+        }
+        finally
+        {
+            // BuildGraph materializes the entire public outcome before returning. The session and
+            // its isolated post-build load scope do not escape, so this method owns disposal.
+            session.Context.Dispose();
+        }
     }
 
     internal ArchitectureAnalysisSession BuildSession(

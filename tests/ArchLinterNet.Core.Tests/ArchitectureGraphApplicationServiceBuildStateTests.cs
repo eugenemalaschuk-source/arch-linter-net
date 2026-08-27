@@ -4,6 +4,7 @@ using ArchLinterNet.Core.Discovery;
 using ArchLinterNet.Core.Execution;
 using ArchLinterNet.Core.Execution.Abstractions;
 using ArchLinterNet.Core.Graph;
+using ArchLinterNet.Core.IO.Abstractions;
 using ArchLinterNet.Core.Model;
 using NUnit.Framework;
 
@@ -24,7 +25,8 @@ public sealed class ArchitectureGraphApplicationServiceBuildStateTests
             DiscoveredProjects = new[] { new ArchitectureDiscoveredProject("Fixture.csproj", "Fixture", ["net10.0"]) },
         };
         FakeContractRunner firstRunner = new(CreateSession(document, discovery));
-        FakeContractRunner secondRunner = new(CreateSession(document, discovery));
+        var postBuildScope = new TrackingAssemblyLoadScope();
+        FakeContractRunner secondRunner = new(CreateSession(document, discovery, postBuildScope));
         var setupService = new FakeRunnerSetupService
         {
             DocumentToReturn = document,
@@ -63,6 +65,7 @@ public sealed class ArchitectureGraphApplicationServiceBuildStateTests
             Assert.That(firstRunner.StrictArgumentsReceived, Is.Empty);
             Assert.That(secondRunner.StrictArgumentsReceived, Is.Not.Empty);
             Assert.That(executor.ModesReceived, Is.EqualTo(["strict"]));
+            Assert.That(postBuildScope.DisposeCallCount, Is.EqualTo(1));
         });
     }
 
@@ -74,7 +77,8 @@ public sealed class ArchitectureGraphApplicationServiceBuildStateTests
         {
             DiscoveredProjects = new[] { new ArchitectureDiscoveredProject("Fixture.csproj", "Fixture", ["net10.0"]) },
         };
-        FakeContractRunner preparedRunner = new(CreateSession(document, discovery));
+        var preparedScope = new TrackingAssemblyLoadScope();
+        FakeContractRunner preparedRunner = new(CreateSession(document, discovery, preparedScope));
         var setupService = new FakeRunnerSetupService
         {
             DocumentToReturn = document,
@@ -107,6 +111,7 @@ public sealed class ArchitectureGraphApplicationServiceBuildStateTests
                     request.PreparationMode == BuildPreparationMode.Ordinary));
             Assert.That(preparedRunner.StrictArgumentsReceived, Is.Not.Empty);
             Assert.That(executor.ModesReceived, Is.EqualTo(["strict"]));
+            Assert.That(preparedScope.DisposeCallCount, Is.EqualTo(1));
         });
     }
 
@@ -301,14 +306,17 @@ public sealed class ArchitectureGraphApplicationServiceBuildStateTests
     ]);
 
     private static ArchitectureAnalysisSession CreateSession(
-        ArchitectureContractDocument document, ProjectDiscoveryResult discovery)
+        ArchitectureContractDocument document,
+        ProjectDiscoveryResult discovery,
+        IArchitectureAssemblyLoadScope? isolatedLoadScope = null)
     {
         var context = new ArchitectureAnalysisContext(
             "/fake/repository/root",
             Array.Empty<System.Reflection.Assembly>(),
             ["Fixture"],
             Array.Empty<string>(),
-            projectDiscovery: discovery);
+            projectDiscovery: discovery,
+            isolatedLoadScope: isolatedLoadScope);
         return new ArchitectureAnalysisSession(
             context, document, selectedContractIds: null, enableUnmatchedIgnoreTracking: false,
             preprocessorSymbols: null);
@@ -328,5 +336,15 @@ public sealed class ArchitectureGraphApplicationServiceBuildStateTests
             RequestsReceived.Add(request);
             return ResultsToReturn is { Count: > 0 } ? ResultsToReturn.Dequeue() : ResultToReturn;
         }
+    }
+
+    private sealed class TrackingAssemblyLoadScope : IArchitectureAssemblyLoadScope
+    {
+        public int DisposeCallCount { get; private set; }
+
+        public System.Reflection.Assembly LoadFrom(string path) =>
+            throw new InvalidOperationException("The graph test never loads an assembly from its tracking scope.");
+
+        public void Dispose() => DisposeCallCount++;
     }
 }
