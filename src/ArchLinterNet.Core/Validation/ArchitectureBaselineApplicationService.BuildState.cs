@@ -63,7 +63,8 @@ public sealed partial class ArchitectureBaselineApplicationService
             return new BuildStatePreflightResult(Array.Empty<BuildStatePreflightDiagnostic>());
         }
 
-        bool hasGraphDrivenRoots = preparation.GraphDrivenRootAssemblyNames.Count > 0;
+        bool hasGraphDrivenRoots = options.PreparationMode == BuildPreparationMode.EnsureBuilt
+            && preparation.GraphDrivenRootAssemblyNames.Count > 0;
         Dictionary<string, string> paths = preparation.ProjectDiscovery.ResolvedAssemblyPaths
             .Where(pair => hasGraphDrivenRoots
                 ? preparation.GraphDrivenRootAssemblyNames.Contains(pair.Key, StringComparer.Ordinal)
