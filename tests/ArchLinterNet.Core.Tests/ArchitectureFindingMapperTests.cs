@@ -218,6 +218,61 @@ public sealed class ArchitectureFindingMapperTests
     }
 
     [Test]
+    public void FromDiagnostic_PolicyConsistency_DistinctOccurrencesOfSameCheckKindGetDistinctIdentities()
+    {
+        // #683 PR review, P1/root cause: the identity fallback for PolicyConsistencyDiagnostic used
+        // to be RepresentativeType ?? CheckKind. Only "layer-overlap" sets RepresentativeType, so
+        // every other check kind collapsed every occurrence under one contract into one identity.
+        // Layers is exactly what the analysis service populates to describe which occurrence a
+        // finding is for those check kinds.
+        var first = new PolicyConsistencyDiagnostic(
+            "contracts", "contracts", "independence-conflict", "reason", ["a"], ["A"], ["core", "web"]);
+        var second = new PolicyConsistencyDiagnostic(
+            "contracts", "contracts", "independence-conflict", "reason", ["a"], ["A"], ["core", "infra"]);
+
+        ArchitectureFinding firstFinding = ArchitectureFindingMapper.FromDiagnostic(first);
+        ArchitectureFinding secondFinding = ArchitectureFindingMapper.FromDiagnostic(second);
+
+        Assert.That(firstFinding.CanonicalIdentity, Is.Not.EqualTo(secondFinding.CanonicalIdentity));
+    }
+
+    [Test]
+    public void FromDiagnostic_PolicyConsistency_RepresentativeTypeMakesIdentityIndependentOfPolicyLocation()
+    {
+        // #683 PR review, P2: once a check kind sets RepresentativeType (its own semantic content,
+        // not a list position), identity must not depend on PolicyLocation.YamlPath — otherwise
+        // reordering exclude entries in YAML would silently change a finding's identity even though
+        // the same semantic finding is still being reported, producing false removed/new drift in
+        // change report.
+        var atExcludeIndexZero = new PolicyConsistencyDiagnostic(
+            "<policy-consistency>", null, "unmatched-layer-exclusion", "reason",
+            Array.Empty<string>(), Array.Empty<string>(), new[] { "contracts" })
+        {
+            RepresentativeType = "contracts|Acme.Legacy",
+            PolicyLocation = PolicyLocationAt("layers.contracts.exclude[0]"),
+        };
+        PolicyConsistencyDiagnostic atExcludeIndexOne = atExcludeIndexZero with
+        {
+            PolicyLocation = PolicyLocationAt("layers.contracts.exclude[1]"),
+        };
+
+        ArchitectureFinding beforeReorder = ArchitectureFindingMapper.FromDiagnostic(atExcludeIndexZero);
+        ArchitectureFinding afterReorder = ArchitectureFindingMapper.FromDiagnostic(atExcludeIndexOne);
+
+        Assert.That(beforeReorder.CanonicalIdentity, Is.EqualTo(afterReorder.CanonicalIdentity));
+    }
+
+    private static ArchitecturePolicySourceLocation PolicyLocationAt(string yamlPath) => new(
+        new ArchitecturePolicySourceDescriptor(
+            "/repo", "/repo/architecture/dependencies.arch.yml", ArchitecturePolicyDocumentRole.Root,
+            0, null, null, Array.Empty<string>()),
+        yamlPath,
+        1,
+        1,
+        null,
+        null);
+
+    [Test]
     public void FromPolicyError_LocationlessMessageWordingDoesNotAffectIdentity()
     {
         var diagnostic = new ArchitecturePolicyDiagnostic(

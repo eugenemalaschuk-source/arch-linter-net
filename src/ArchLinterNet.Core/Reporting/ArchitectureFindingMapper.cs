@@ -247,6 +247,27 @@ public static class ArchitectureFindingMapper
 
     private static ArchitectureViolationIdentity BuildIdentity(ArchitectureDiagnostic diagnostic)
     {
+        // PolicyConsistencyDiagnostic is special-cased ahead of the generic IdentityParts/
+        // SourceTypeOf switches below so PolicyConsistencyDistinguisher (an OrderBy+Join) runs once
+        // per diagnostic instead of once per field.
+        if (diagnostic is PolicyConsistencyDiagnostic policy)
+        {
+            string distinguisher = PolicyConsistencyDistinguisher(policy);
+            return new ArchitectureViolationIdentity(
+                ArchitectureViolationIdentity.CurrentVersion,
+                KindToken(diagnostic.Kind),
+                ArchitectureViolationIdentity.ResolveKind(KindToken(diagnostic.Kind)),
+                diagnostic.ContractId ?? diagnostic.ContractName,
+                null,
+                distinguisher,
+                null,
+                null,
+                null,
+                distinguisher,
+                0,
+                policy.CheckKind);
+        }
+
         (string? sourceAssembly, string? sourceMember, string? targetAssembly, string? targetType, string? targetMember,
             string? configuration) = IdentityParts(diagnostic);
         return new ArchitectureViolationIdentity(
@@ -305,8 +326,7 @@ public static class ArchitectureFindingMapper
                 (null, null, null, null, preflight.Evidence.ProjectPath, preflight.State.ToString()),
             UnmatchedIgnoreDiagnostic unmatched =>
                 (null, null, null, null, unmatched.ForbiddenReference, unmatched.IgnoreIndex.ToString()),
-            PolicyConsistencyDiagnostic policy =>
-                (null, null, null, null, PolicyConsistencyDistinguisher(policy), policy.CheckKind),
+            // PolicyConsistencyDiagnostic is handled directly in BuildIdentity, ahead of this switch.
             BaselineLifecycleDiagnostic baseline =>
                 (null, null, null, null, baseline.ForbiddenReference, baseline.ContractGroup),
             ArchitecturePolicyErrorDiagnostic policyError =>
@@ -487,7 +507,7 @@ public static class ArchitectureFindingMapper
         CycleDiagnostic cycle => cycle.Path,
         BuildStatePreflightDiagnostic preflight => preflight.Evidence.ProjectPath,
         UnmatchedIgnoreDiagnostic unmatched => unmatched.SourceType,
-        PolicyConsistencyDiagnostic policy => PolicyConsistencyDistinguisher(policy),
+        // PolicyConsistencyDiagnostic is handled directly in BuildIdentity, ahead of this switch.
         BaselineLifecycleDiagnostic baseline => baseline.SourceType,
         ArchitecturePolicyErrorDiagnostic policyError => policyError.PolicyLocation?.SourcePath ?? "<policy>",
         _ => SourceIdentifier(diagnostic),
@@ -515,7 +535,7 @@ public static class ArchitectureFindingMapper
         PortBoundaryDiagnostic d => d.SourceType,
         CycleDiagnostic d => d.Path,
         UnmatchedIgnoreDiagnostic d => $"{d.SourceType}:{d.IgnoreIndex}:{d.ForbiddenReference}",
-        PolicyConsistencyDiagnostic d => $"{d.CheckKind}:{d.RepresentativeType}",
+        // PolicyConsistencyDiagnostic is handled directly in BuildIdentity, ahead of SourceTypeOf.
         BuildStatePreflightDiagnostic d => $"{d.State}:{d.Evidence.ProjectPath}",
         BaselineLifecycleDiagnostic d => d.SourceType,
         ArchitecturePolicyErrorDiagnostic d => d.PolicyLocation?.SourcePath ?? "<policy>",

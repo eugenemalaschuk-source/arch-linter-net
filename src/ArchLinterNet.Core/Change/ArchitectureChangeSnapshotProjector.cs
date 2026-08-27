@@ -109,12 +109,22 @@ internal static class ArchitectureChangeSnapshotProjector
 
     private static IEnumerable<ArchitectureChangeEntry> CoverageBlindSpots(ValidationOutcome validation) => validation.CoverageSummaries
         .SelectMany(summary => summary.UncoveredItems.Select(item => Coverage("uncovered", summary, item.Item)))
-        .Concat(validation.CoverageSummaries.SelectMany(summary => summary.StaleItems.Select(item => Coverage("stale", summary, item.Item))))
-        .Concat(validation.CoverageSummaries.SelectMany(summary => summary.UnknownItems.Select(item => Coverage("unknown", summary, item.Item))));
+        .Concat(validation.CoverageSummaries.SelectMany(summary => summary.StaleItems.Select(item => Coverage("stale", summary, item))))
+        .Concat(validation.CoverageSummaries.SelectMany(summary => summary.UnknownItems.Select(item => Coverage("unknown", summary, item))));
 
     private static ArchitectureChangeEntry Coverage(string state, ArchitectureCoverageSummary summary, string item) => new(
         "coverage_blind_spot", (summary.ContractId ?? summary.ContractName) + "|" + summary.Scope + "|" + state + "|" + item,
         state + " " + summary.Scope + ": " + item);
+
+    // Stale/unknown rule-input coverage items key Item on the referenced contract id alone
+    // (BuildRuleInputSummary); a contract with two problematic rule inputs/layers produces two
+    // items with the same Item. Evidence carries "<input role>:<layer>", so folding it into the
+    // entry identity keeps those two items from colliding into one entry (#683).
+    private static ArchitectureChangeEntry Coverage(
+        string state, ArchitectureCoverageSummary summary, ArchitectureCoverageSummaryEvidenceItem item) => new(
+        "coverage_blind_spot",
+        (summary.ContractId ?? summary.ContractName) + "|" + summary.Scope + "|" + state + "|" + item.Item + "|" + item.Evidence,
+        state + " " + summary.Scope + ": " + item.Item);
 
     private static string BaselineIdentity(ArchitectureBaselineComparisonEntry entry)
     {
