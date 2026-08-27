@@ -32,6 +32,7 @@ internal static class ArchitectureChangeSnapshotProjector
 
         List<ArchitectureChangeFinding> findings = ArchitectureFindingMapper
             .FromViolations(validation.Violations.Concat(validation.CoverageFindings), mode)
+            .Concat(PolicyLevelFindings(validation, mode))
             .Select(static finding => new ArchitectureChangeFinding(
                 finding.CanonicalIdentity,
                 finding.Kind,
@@ -80,6 +81,31 @@ internal static class ArchitectureChangeSnapshotProjector
         .Select(entry => new ArchitectureChangeEntry(
             "semantic_context", role.Subject + "|" + entry.Key + "|" + Value(entry.Value),
             role.Subject + ": " + entry.Key + "=" + Value(entry.Value)));
+
+    // Aggregate, policy-level contracts (policy_consistency, unmatched_ignored_violations) report
+    // findings with no per-violation source/target edge; they still need to appear here so their
+    // drift is tracked like any other contract's. Gated on config the same way the human/JSON
+    // reporting paths already are (see ReportCoordinator), so a contract family the caller turned
+    // off does not leak permanently "new" findings into every future snapshot.
+    private static IEnumerable<ArchitectureFinding> PolicyLevelFindings(ValidationOutcome validation, string mode)
+    {
+        if (validation.PolicyConsistencyConfig != "off")
+        {
+            foreach (PolicyConsistencyDiagnostic finding in validation.PolicyConsistencyFindings)
+            {
+                yield return ArchitectureFindingMapper.FromDiagnostic(finding, mode);
+            }
+        }
+
+        if (validation.UnmatchedIgnoredViolationsConfig != "off")
+        {
+            foreach (ArchitectureUnmatchedIgnoredViolation unmatched in validation.UnmatchedIgnoredViolations)
+            {
+                yield return ArchitectureFindingMapper.FromDiagnostic(
+                    ArchitectureDiagnosticMapper.FromUnmatchedIgnore(unmatched), mode);
+            }
+        }
+    }
 
     private static IEnumerable<ArchitectureChangeEntry> CoverageBlindSpots(ValidationOutcome validation) => validation.CoverageSummaries
         .SelectMany(summary => summary.UncoveredItems.Select(item => Coverage("uncovered", summary, item.Item)))

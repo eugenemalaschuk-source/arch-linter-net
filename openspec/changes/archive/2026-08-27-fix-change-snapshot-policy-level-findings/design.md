@@ -1,0 +1,41 @@
+## Context
+
+`ArchitectureChangeSnapshotProjector.Project` builds an `architecture-change-snapshot/v2` artifact from a `ValidationOutcome`. Every finding in the snapshot carries a canonical `ArchitectureViolationIdentity`, produced by `ArchitectureFindingMapper`. `ArchitectureChangeReports.SerializeSnapshot` rejects the snapshot (`ArgumentException`, CLI exit code 2) if any two findings (or entries) share an identity, or if any identity is blank.
+
+Two independent gaps combined to produce issue #683:
+
+1. **Completeness gap.** `Project` only fed `validation.Violations` and `validation.CoverageFindings` into `ArchitectureFindingMapper.FromViolations`. `validation.PolicyConsistencyFindings` (`PolicyConsistencyDiagnostic`, already an `ArchitectureDiagnostic`) and `validation.UnmatchedIgnoredViolations` (`ArchitectureUnmatchedIgnoredViolation`, converted via `ArchitectureDiagnosticMapper.FromUnmatchedIgnore`) were never included.
+2. **Identity-collision gap.** Once those are wired in, `ArchitectureFindingMapper.IdentityParts`/`SourceTypeOf` computed the `PolicyConsistencyDiagnostic` distinguishing field as `RepresentativeType ?? CheckKind`. Only the `layer-overlap` check kind ever sets `RepresentativeType` (to the representative type that triggered it). Every other check kind — `duplicate-id`, `allow-forbid-conflict`, `independence-conflict`, `unreachable-contract`, `unmatched-layer-exclusion` — leaves it null, so the identity's distinguishing field collapses to the literal `CheckKind` string, identical across every occurrence of that check under one contract. `PolicyConsistencyDiagnostic` already carries `Layers` and `ConflictingContractIds`/`ConflictingContractNames`, populated per-occurrence by `ArchitecturePolicyConsistencyAnalysisService` specifically to describe which occurrence a finding is (e.g. `Layers = [source, target]` for an allow/forbid conflict, `Layers = [layerName]` for an unmatched exclusion) — but nothing read them for identity.
+
+`ArchitectureUnmatchedIgnoredViolation` (via `UnmatchedIgnoreDiagnostic`) already folds `IgnoreIndex` into its identity and was not at risk of colliding; it only needed to be wired into the projector.
+
+## Goals / Non-Goals
+
+**Goals:**
+- `change snapshot` succeeds for any policy that produces `policy_consistency`, `unmatched_ignored_violations`, or coverage findings, including multiple findings of the same check kind.
+- Drift in policy-consistency and unmatched-ignore findings is visible in `change report` like any other finding.
+- No change to the snapshot schema version, entry/finding envelope shape, or CLI surface.
+
+**Non-Goals:**
+- Touching the coverage (`CoverageFindings`) identity path. Direct code reading confirmed `ArchitectureDependencyEdgeCoverageService`/`AddRuleInputCoverageFindingsForContract` already key coverage violations on a specific edge/layer (`SourceType = edgeKey`, live identity via `layerName`), which does not collide under normal operation; the issue's mention of "coverage" contracts is covered by the general completeness/identity fix, not a separate coverage-specific change.
+- Changing the `Occurrence` field's hardcoded `0` in `ArchitectureFindingMapper.BuildIdentity`'s fallback path. That fallback is shared by every diagnostic kind that reaches it (not just policy-consistency); changing it would be a much broader, unrelated change to identity/baseline compatibility across the whole mapper, with no evidence any current check kind still collides after the `Layers`/`ConflictingContractIds`/`PolicyLocation` fix.
+- Any change to `ArchitectureValidator.ToViolation` (a separate, older, lossy legacy adapter used only by the deprecated `Validate(string, out violations, out cycles)` overload) — out of scope for this issue.
+
+## Decisions
+
+- **Fold `Layers` + `ConflictingContractIds`/`ConflictingContractNames` + `PolicyLocation.YamlPath` into the identity's distinguishing field, ordinal-sorted, instead of introducing a new identity shape.** These fields are already populated per-occurrence by the analysis service for exactly this purpose (they're what a human-readable message is built from); reusing them keeps the fix local to `ArchitectureFindingMapper` and avoids widening `ArchitectureViolationIdentity`'s schema. `PolicyLocation.YamlPath` is added as a last-resort tail disambiguator because it's the only field that distinguishes two unmatched-exclusion findings on the *same* layer (both share `Layers = [layerName]`); it's already asserted as provenance in existing CLI tests (`UnmatchedLayerExclusion_JsonOutput_IncludesTypedExclusionElementProvenance`), so relying on it here doesn't introduce a new fragile dependency.
+- **Gate the newly-included findings on `PolicyConsistencyConfig`/`UnmatchedIgnoredViolationsConfig != "off"`**, mirroring the existing gating in `ReportCoordinator.cs` (human/JSON reporting) and the legacy `ArchitectureValidator.ToViolation` path. Without this, a contract family a caller explicitly disabled would still appear as permanent "new" drift in every snapshot comparison.
+- **Reuse `ArchitectureFindingMapper.FromDiagnostic` directly for `PolicyConsistencyDiagnostic`** (it already extends `ArchitectureDiagnostic`) and **`ArchitectureDiagnosticMapper.FromUnmatchedIgnore` + `FromDiagnostic`** for `ArchitectureUnmatchedIgnoredViolation`, rather than building a parallel mapping path — this is the same conversion `ArchitectureFindingMapper.FromViolations` already performs for ordinary violations via `ArchitectureDiagnosticMapper.FromViolation`.
+
+## Risks / Trade-offs
+
+- **[Risk] A caller's existing frozen baseline entries for policy-consistency findings, if any exist, are keyed by the old (colliding) identity shape.** → Mitigation: baseline debt for these findings could not previously have been frozen correctly (the old identity was ambiguous across occurrences of one check kind, and these findings weren't reaching the change-snapshot baseline-debt path at all), so there is no known-good frozen baseline for this shape to invalidate. Ordinary validate-mode identity for `PolicyConsistencyDiagnostic` outside change-snapshot (SARIF, JSON, human output, ignore matching) also picks up the more specific identity, which is a strict improvement (still uses `ContractId ?? ContractName` + `CheckKind` as the primary key) rather than a behavior change callers depend on.
+- **[Risk] Two findings could still coincide if a check kind reports the exact same `Layers`/`ConflictingContractIds` twice for the same contract with no `PolicyLocation`.** → Mitigation: reviewed every current call site in `ArchitecturePolicyConsistencyAnalysisService` — each either de-duplicates before emitting (`layer-overlap`'s `reportedPairs`, `unmatched-layer-exclusion`'s per-index loop) or the reported fields are guaranteed unique per occurrence (`allow-forbid-conflict`'s per-pair `Layers`, `independence-conflict`'s per-conflict `Layers`, `duplicate-id`'s per-group `ConflictingContractIds`). Two identical facts is arguably a genuine duplicate that should collapse to one identity, consistent with how the mapper already treats identical facts elsewhere.
+
+## Migration Plan
+
+No migration needed: schema version, CLI surface, and finding envelope are unchanged. Existing snapshot artifacts remain readable and comparable as-is; `change report` between an old (pre-fix) snapshot and a new one will show policy-consistency/unmatched-ignore findings as "new" the first time a snapshot is regenerated with this fix, since they were previously absent — this is the intended completeness fix, not a regression.
+
+## Open Questions
+
+None.

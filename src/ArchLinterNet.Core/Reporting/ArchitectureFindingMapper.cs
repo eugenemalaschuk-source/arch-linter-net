@@ -306,7 +306,7 @@ public static class ArchitectureFindingMapper
             UnmatchedIgnoreDiagnostic unmatched =>
                 (null, null, null, null, unmatched.ForbiddenReference, unmatched.IgnoreIndex.ToString()),
             PolicyConsistencyDiagnostic policy =>
-                (null, null, null, null, policy.RepresentativeType ?? policy.CheckKind, policy.CheckKind),
+                (null, null, null, null, PolicyConsistencyDistinguisher(policy), policy.CheckKind),
             BaselineLifecycleDiagnostic baseline =>
                 (null, null, null, null, baseline.ForbiddenReference, baseline.ContractGroup),
             ArchitecturePolicyErrorDiagnostic policyError =>
@@ -487,7 +487,7 @@ public static class ArchitectureFindingMapper
         CycleDiagnostic cycle => cycle.Path,
         BuildStatePreflightDiagnostic preflight => preflight.Evidence.ProjectPath,
         UnmatchedIgnoreDiagnostic unmatched => unmatched.SourceType,
-        PolicyConsistencyDiagnostic policy => policy.RepresentativeType ?? policy.CheckKind,
+        PolicyConsistencyDiagnostic policy => PolicyConsistencyDistinguisher(policy),
         BaselineLifecycleDiagnostic baseline => baseline.SourceType,
         ArchitecturePolicyErrorDiagnostic policyError => policyError.PolicyLocation?.SourcePath ?? "<policy>",
         _ => SourceIdentifier(diagnostic),
@@ -521,4 +521,31 @@ public static class ArchitectureFindingMapper
         ArchitecturePolicyErrorDiagnostic d => d.PolicyLocation?.SourcePath ?? "<policy>",
         _ => string.Empty,
     };
+
+    // Only "layer-overlap" sets RepresentativeType. Every other check kind (duplicate-id,
+    // allow-forbid-conflict, independence-conflict, unreachable-contract, unmatched-layer-exclusion)
+    // reports one finding per occurrence but shares the same ContractName/ContractId and CheckKind
+    // across occurrences, so falling back to CheckKind alone collapses every occurrence of a check
+    // kind under one contract into a single identity. Layers and ConflictingContractIds/Names are
+    // exactly the fields each check populates to describe *which* occurrence this is; folding them
+    // in (plus the policy source location, which is the only thing that distinguishes two unmatched
+    // exclude entries on the same layer) keeps distinct occurrences from colliding into one identity.
+    private static string PolicyConsistencyDistinguisher(PolicyConsistencyDiagnostic policy)
+    {
+        if (policy.RepresentativeType is { Length: > 0 } representativeType)
+        {
+            return representativeType;
+        }
+
+        IEnumerable<string> conflicting = policy.ConflictingContractIds.Count > 0
+            ? policy.ConflictingContractIds
+            : policy.ConflictingContractNames;
+        string parts = string.Join("|", policy.Layers
+            .Concat(conflicting)
+            .OrderBy(static value => value, StringComparer.Ordinal));
+        string? yamlPath = policy.PolicyLocation?.YamlPath;
+        return yamlPath is { Length: > 0 }
+            ? parts.Length > 0 ? parts + "|" + yamlPath : yamlPath
+            : parts.Length > 0 ? parts : policy.CheckKind;
+    }
 }

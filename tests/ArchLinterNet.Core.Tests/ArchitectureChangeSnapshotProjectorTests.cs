@@ -136,6 +136,102 @@ public sealed class ArchitectureChangeSnapshotProjectorTests
         });
     }
 
+    [Test]
+    public void Project_DistinguishesPolicyConsistencyOccurrencesOfTheSameCheckKind()
+    {
+        // Regression for #683: two "unmatched-layer-exclusion" findings share ContractName
+        // ("<policy-consistency>"), ContractId (null), CheckKind, and no RepresentativeType — only
+        // Layers (and, when they also collide, PolicyLocation) tell them apart. Before the fix both
+        // collapsed to the same canonical identity and SerializeSnapshot rejected the snapshot as
+        // "duplicate or empty finding identities".
+        PolicyConsistencyDiagnostic first = UnmatchedLayerExclusion("contracts", "exclude[0]");
+        PolicyConsistencyDiagnostic second = UnmatchedLayerExclusion("services", "exclude[0]");
+        PolicyConsistencyDiagnostic sameLayerDifferentExclusion = UnmatchedLayerExclusion("contracts", "exclude[1]");
+
+        ArchitectureChangeSnapshot snapshot = ArchitectureChangeSnapshotProjector.Project(
+            "strict",
+            Outcome(
+                "/repo",
+                "/repo/src/Acme/Acme.csproj",
+                policyConsistencyFindings: new[] { first, second, sameLayerDifferentExclusion }),
+            EmptyGraph(),
+            EmptyGraph(),
+            Array.Empty<ArchitectureBaselineComparisonEntry>());
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(snapshot.Findings, Has.Count.EqualTo(3));
+            Assert.That(snapshot.Findings.Select(static finding => finding.Identity).Distinct().Count(), Is.EqualTo(3));
+            Assert.DoesNotThrow(() => ArchitectureChangeReports.SerializeSnapshot(snapshot));
+        });
+    }
+
+    [Test]
+    public void Project_IncludesUnmatchedIgnoredViolationsAsFindings()
+    {
+        ArchitectureUnmatchedIgnoredViolation unmatched = new(
+            "contracts-no-forbidden", "contracts-no-forbidden", 0, "Acme.Service", "System.Console", "unused ignore");
+
+        ArchitectureChangeSnapshot snapshot = ArchitectureChangeSnapshotProjector.Project(
+            "strict",
+            Outcome(
+                "/repo",
+                "/repo/src/Acme/Acme.csproj",
+                unmatchedIgnoredViolations: new[] { unmatched }),
+            EmptyGraph(),
+            EmptyGraph(),
+            Array.Empty<ArchitectureBaselineComparisonEntry>());
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(snapshot.Findings.Single().Kind, Is.EqualTo("unmatched_ignore"));
+            Assert.DoesNotThrow(() => ArchitectureChangeReports.SerializeSnapshot(snapshot));
+        });
+    }
+
+    [Test]
+    public void Project_ExcludesPolicyLevelFindingsWhenTheirContractFamilyIsOff()
+    {
+        ArchitectureChangeSnapshot snapshot = ArchitectureChangeSnapshotProjector.Project(
+            "strict",
+            Outcome(
+                "/repo",
+                "/repo/src/Acme/Acme.csproj",
+                policyConsistencyFindings: new[] { UnmatchedLayerExclusion("contracts", "exclude[0]") },
+                policyConsistencyConfig: "off",
+                unmatchedIgnoredViolations: new[]
+                {
+                    new ArchitectureUnmatchedIgnoredViolation(
+                        "contracts-no-forbidden", "contracts-no-forbidden", 0, "Acme.Service", "System.Console", "unused ignore"),
+                },
+                unmatchedIgnoredViolationsConfig: "off"),
+            EmptyGraph(),
+            EmptyGraph(),
+            Array.Empty<ArchitectureBaselineComparisonEntry>());
+
+        Assert.That(snapshot.Findings, Is.Empty);
+    }
+
+    private static PolicyConsistencyDiagnostic UnmatchedLayerExclusion(string layerName, string yamlPath) => new(
+        "<policy-consistency>",
+        null,
+        "unmatched-layer-exclusion",
+        $"Layer '{layerName}' declares an exclude entry which matches no namespace within the layer's included scope.",
+        Array.Empty<string>(),
+        Array.Empty<string>(),
+        new[] { layerName })
+    {
+        PolicyLocation = new ArchitecturePolicySourceLocation(
+            new ArchitecturePolicySourceDescriptor(
+                "/repo", "/repo/architecture/dependencies.arch.yml", ArchitecturePolicyDocumentRole.Root,
+                0, null, null, Array.Empty<string>()),
+            $"layers.{layerName}.{yamlPath}",
+            1,
+            1,
+            null,
+            null),
+    };
+
     private static ArchitectureGraphOutcome EmptyGraph() => new(new ArchitectureDependencyGraph(
         Array.Empty<ArchitectureGraphNode>(), Array.Empty<ArchitectureGraphEdge>()));
 
@@ -170,16 +266,20 @@ public sealed class ArchitectureChangeSnapshotProjectorTests
         string projectPath,
         IReadOnlyCollection<ArchitectureViolation>? violations = null,
         IReadOnlyCollection<ArchitectureCoverageSummary>? coverageSummaries = null,
-        IReadOnlyCollection<ArchitectureClassificationRoleFact>? roles = null) => new(
+        IReadOnlyCollection<ArchitectureClassificationRoleFact>? roles = null,
+        IReadOnlyCollection<PolicyConsistencyDiagnostic>? policyConsistencyFindings = null,
+        string policyConsistencyConfig = "error",
+        IReadOnlyList<ArchitectureUnmatchedIgnoredViolation>? unmatchedIgnoredViolations = null,
+        string unmatchedIgnoredViolationsConfig = "error") => new(
         Passed: true,
         Violations: violations ?? Array.Empty<ArchitectureViolation>(),
         Cycles: Array.Empty<string>(),
         CoverageFindings: Array.Empty<ArchitectureViolation>(),
         CoverageConfig: "off",
-        UnmatchedIgnoredViolations: Array.Empty<ArchitectureUnmatchedIgnoredViolation>(),
-        UnmatchedIgnoredViolationsConfig: "off",
-        PolicyConsistencyFindings: Array.Empty<PolicyConsistencyDiagnostic>(),
-        PolicyConsistencyConfig: "off",
+        UnmatchedIgnoredViolations: unmatchedIgnoredViolations ?? Array.Empty<ArchitectureUnmatchedIgnoredViolation>(),
+        UnmatchedIgnoredViolationsConfig: unmatchedIgnoredViolations is null ? "off" : unmatchedIgnoredViolationsConfig,
+        PolicyConsistencyFindings: policyConsistencyFindings ?? Array.Empty<PolicyConsistencyDiagnostic>(),
+        PolicyConsistencyConfig: policyConsistencyFindings is null ? "off" : policyConsistencyConfig,
         CoverageSummaries: coverageSummaries ?? Array.Empty<ArchitectureCoverageSummary>(),
         ClassificationConflicts: Array.Empty<ArchitectureClassificationConflict>(),
         ClassificationMetadataFailures: Array.Empty<ArchitectureClassificationMetadataFailure>())
