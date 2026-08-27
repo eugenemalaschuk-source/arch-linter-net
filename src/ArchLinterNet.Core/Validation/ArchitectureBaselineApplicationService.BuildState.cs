@@ -73,35 +73,10 @@ public sealed partial class ArchitectureBaselineApplicationService
         BaselineBuildStateOptions options,
         CancellationToken cancellationToken)
     {
-        // Metadata-only preparation has no Assembly instances to pass through. Retain only the
-        // selected closure's discovery paths: preparation resolves every discovered project for
-        // metadata, while ensure-built must build only the assemblies selected for analysis.
-        if (preparation.ProjectDiscovery.DiscoveredProjects.Count == 0)
-        {
-            return new BuildStatePreflightResult(Array.Empty<BuildStatePreflightDiagnostic>());
-        }
-
-        bool hasGraphDrivenRoots = options.PreparationMode == BuildPreparationMode.EnsureBuilt
-            && preparation.GraphDrivenRootAssemblyNames.Count > 0;
-        Dictionary<string, string> paths = preparation.ProjectDiscovery.ResolvedAssemblyPaths
-            .Where(pair => hasGraphDrivenRoots
-                ? preparation.GraphDrivenRootAssemblyNames.Contains(pair.Key, StringComparer.Ordinal)
-                : preparation.SelectedAssemblyArtifactPaths.Contains(pair.Value, StringComparer.OrdinalIgnoreCase))
-            .ToDictionary(pair => pair.Key, pair => pair.Value, StringComparer.Ordinal);
-        IReadOnlyList<string> missingAssemblyNames = hasGraphDrivenRoots
-            ? preparation.GraphDrivenRootAssemblyNames
-                .Where(name => !paths.ContainsKey(name))
-                .Concat(preparation.MissingAssemblyNames)
-                .Distinct(StringComparer.Ordinal)
-                .ToArray()
-            : preparation.MissingAssemblyNames;
-        BuildStateResolvedAssemblies resolution = new(
-            Array.Empty<System.Reflection.Assembly>(), missingAssemblyNames)
-        {
-            ResolvedAssemblyPaths = paths,
-        };
-
-        if (resolution.ResolvedAssemblyPaths.Count == 0 && resolution.MissingAssemblyNames.Count == 0)
+        BuildStateResolvedAssemblies? resolution = BuildStatePreflightRunner.CreatePreparationResolution(
+            preparation, options.PreparationMode);
+        if (resolution is null
+            || (resolution.ResolvedAssemblyPaths.Count == 0 && resolution.MissingAssemblyNames.Count == 0))
         {
             return new BuildStatePreflightResult(Array.Empty<BuildStatePreflightDiagnostic>());
         }
