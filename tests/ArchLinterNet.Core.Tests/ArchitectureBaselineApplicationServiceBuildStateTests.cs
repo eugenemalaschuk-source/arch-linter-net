@@ -292,6 +292,7 @@ public sealed class ArchitectureBaselineApplicationServiceBuildStateTests
 
         var runnerSetupService = new FakeRunnerSetupService
         {
+            DocumentToReturn = document,
             RunnerToReturn = firstRunner,
             RunnersToReturn = new Queue<IArchitectureContractRunner>(new IArchitectureContractRunner[] { secondRunner }),
             PreparationToReturn = new ArchitectureRunnerPreparation(
