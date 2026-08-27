@@ -1,0 +1,17 @@
+{
+  "schema": "checkpoint-b-release-scope-declaration/v2",
+  "declaration_id": "v0.7.3-release-pipeline-maintenance",
+  "release_target": "0.7.3",
+  "story": 688,
+  "_comment": [
+    "The reviewed v0.7.3 release authority owned by #688. This is a corrective maintenance",
+    "release: it ships the change-snapshot canonical-identity correctness fix merged since",
+    "v0.7.2 with no new feature scope. Required items are reviewed release intent; they are",
+    "not inferred from milestone membership or mutable issue text."
+  ],
+  "required_items": [
+    { "issue": 683, "finding": "change-snapshot-entry-identity", "summary": "Fix duplicate/empty canonical identities for coverage and policy-level change-snapshot entries and findings" }
+  ],
+  "excluded_items": [],
+  "delivered_items": []
+}
