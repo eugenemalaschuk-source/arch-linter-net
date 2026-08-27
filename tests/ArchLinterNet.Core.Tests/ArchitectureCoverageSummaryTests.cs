@@ -151,11 +151,11 @@ public sealed partial class ArchitectureCoverageSummaryTests
         Assert.That(summary.UncoveredItems, Is.Empty);
         Assert.That(summary.StaleItems.Select(i => (i.Item, i.Evidence)), Is.EquivalentTo(new[]
         {
-            ("video-to-ghost-rule", "ghost")
+            ("video-to-ghost-rule", "forbidden:ghost")
         }));
         Assert.That(summary.UnknownItems.Select(i => (i.Item, i.Evidence)), Is.EquivalentTo(new[]
         {
-            ("typo-rule", "does_not_exist_layer")
+            ("typo-rule", "source:does_not_exist_layer")
         }));
     }
 

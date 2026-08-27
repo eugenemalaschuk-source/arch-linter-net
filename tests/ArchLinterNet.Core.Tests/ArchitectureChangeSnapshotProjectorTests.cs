@@ -136,6 +136,188 @@ public sealed class ArchitectureChangeSnapshotProjectorTests
         });
     }
 
+    [Test]
+    public void Project_DistinguishesPolicyConsistencyOccurrencesOfTheSameCheckKind()
+    {
+        // Regression for #683: two "unmatched-layer-exclusion" findings share ContractName
+        // ("<policy-consistency>"), ContractId (null), CheckKind, and no RepresentativeType — only
+        // Layers (and, when they also collide, PolicyLocation) tell them apart. Before the fix both
+        // collapsed to the same canonical identity and SerializeSnapshot rejected the snapshot as
+        // "duplicate or empty finding identities".
+        PolicyConsistencyDiagnostic first = UnmatchedLayerExclusion("contracts", "Acme.Legacy", "exclude[0]");
+        PolicyConsistencyDiagnostic second = UnmatchedLayerExclusion("services", "Acme.Old", "exclude[0]");
+        PolicyConsistencyDiagnostic sameLayerDifferentExclusion = UnmatchedLayerExclusion("contracts", "Acme.Deprecated", "exclude[1]");
+
+        ArchitectureChangeSnapshot snapshot = ArchitectureChangeSnapshotProjector.Project(
+            "strict",
+            Outcome(
+                "/repo",
+                "/repo/src/Acme/Acme.csproj",
+                policyConsistencyFindings: new[] { first, second, sameLayerDifferentExclusion }),
+            EmptyGraph(),
+            EmptyGraph(),
+            Array.Empty<ArchitectureBaselineComparisonEntry>());
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(snapshot.Findings, Has.Count.EqualTo(3));
+            Assert.That(snapshot.Findings.Select(static finding => finding.Identity).Distinct().Count(), Is.EqualTo(3));
+            Assert.DoesNotThrow(() => ArchitectureChangeReports.SerializeSnapshot(snapshot));
+        });
+    }
+
+    [Test]
+    public void Project_IncludesUnmatchedIgnoredViolationsAsFindings()
+    {
+        ArchitectureUnmatchedIgnoredViolation unmatched = new(
+            "contracts-no-forbidden", "contracts-no-forbidden", 0, "Acme.Service", "System.Console", "unused ignore");
+
+        ArchitectureChangeSnapshot snapshot = ArchitectureChangeSnapshotProjector.Project(
+            "strict",
+            Outcome(
+                "/repo",
+                "/repo/src/Acme/Acme.csproj",
+                unmatchedIgnoredViolations: new[] { unmatched }),
+            EmptyGraph(),
+            EmptyGraph(),
+            Array.Empty<ArchitectureBaselineComparisonEntry>());
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(snapshot.Findings.Single().Kind, Is.EqualTo("unmatched_ignore"));
+            Assert.DoesNotThrow(() => ArchitectureChangeReports.SerializeSnapshot(snapshot));
+        });
+    }
+
+    [Test]
+    public void Project_ExcludesPolicyLevelFindingsWhenTheirContractFamilyIsOff()
+    {
+        ArchitectureChangeSnapshot snapshot = ArchitectureChangeSnapshotProjector.Project(
+            "strict",
+            Outcome(
+                "/repo",
+                "/repo/src/Acme/Acme.csproj",
+                policyConsistencyFindings: new[] { UnmatchedLayerExclusion("contracts", "Acme.Legacy", "exclude[0]") },
+                policyConsistencyConfig: "off",
+                unmatchedIgnoredViolations: new[]
+                {
+                    new ArchitectureUnmatchedIgnoredViolation(
+                        "contracts-no-forbidden", "contracts-no-forbidden", 0, "Acme.Service", "System.Console", "unused ignore"),
+                },
+                unmatchedIgnoredViolationsConfig: "off"),
+            EmptyGraph(),
+            EmptyGraph(),
+            Array.Empty<ArchitectureBaselineComparisonEntry>());
+
+        Assert.That(snapshot.Findings, Is.Empty);
+    }
+
+    // Mirrors ArchitecturePolicyConsistencyAnalysisService.CreateUnmatchedExclusionFinding: real
+    // findings of this check kind set RepresentativeType to "<layer>|<namespace pattern>" (#683 PR
+    // review, P2) — PolicyLocation/yamlPath is passed through for realism but is no longer what
+    // makes the identity unique.
+    private static PolicyConsistencyDiagnostic UnmatchedLayerExclusion(
+        string layerName, string namespacePattern, string yamlPath) => new(
+        "<policy-consistency>",
+        null,
+        "unmatched-layer-exclusion",
+        $"Layer '{layerName}' declares an exclude entry which matches no namespace within the layer's included scope.",
+        Array.Empty<string>(),
+        Array.Empty<string>(),
+        new[] { layerName })
+        {
+            PolicyLocation = new ArchitecturePolicySourceLocation(
+            new ArchitecturePolicySourceDescriptor(
+                "/repo", "/repo/architecture/dependencies.arch.yml", ArchitecturePolicyDocumentRole.Root,
+                0, null, null, Array.Empty<string>()),
+            $"layers.{layerName}.{yamlPath}",
+            1,
+            1,
+            null,
+            null),
+            RepresentativeType = layerName + "|" + namespacePattern,
+        };
+
+    [Test]
+    public void Project_DistinguishesCoverageBlindSpotEntriesForDifferentRuleInputsOnSameContract()
+    {
+        // Regression for #683's actual root cause: BuildRuleInputSummary keys stale/unknown Item on
+        // the referenced contract id alone, so a contract with two problematic rule inputs (e.g. its
+        // "source" layer and one of its "forbidden" layers) reported two summary items sharing the
+        // same Item. The entry identity here only used Item, so both collapsed to one
+        // coverage_blind_spot entry and ArchitectureChangeReports.Validate rejected the snapshot with
+        // "duplicate or empty entry identities" — the exact wording reported in #683.
+        ArchitectureCoverageSummary summary = new(
+            "rule-input-coverage",
+            "rule-input-coverage",
+            "rule_input",
+            new ArchitectureCoverageSummaryCounts(0, 0, 0, 2, 0),
+            Array.Empty<ArchitectureCoverageSummaryExcludedItem>(),
+            Array.Empty<ArchitectureCoverageSummaryEvidenceItem>(),
+            new[]
+            {
+                new ArchitectureCoverageSummaryEvidenceItem("ghost-rule", "source:ghost"),
+                new ArchitectureCoverageSummaryEvidenceItem("ghost-rule", "forbidden:ghost"),
+            },
+            Array.Empty<ArchitectureCoverageSummaryEvidenceItem>(),
+            Array.Empty<ArchitectureCoverageSummaryEvidenceItem>());
+
+        ArchitectureChangeSnapshot snapshot = ArchitectureChangeSnapshotProjector.Project(
+            "strict",
+            Outcome("/repo", "/repo/src/Acme/Acme.csproj", coverageSummaries: new[] { summary }),
+            EmptyGraph(),
+            EmptyGraph(),
+            Array.Empty<ArchitectureBaselineComparisonEntry>());
+
+        ArchitectureChangeEntry[] blindSpots = snapshot.Entries
+            .Where(static entry => entry.Kind == "coverage_blind_spot")
+            .ToArray();
+        Assert.Multiple(() =>
+        {
+            Assert.That(blindSpots, Has.Length.EqualTo(2));
+            Assert.That(blindSpots.Select(static entry => entry.Identity).Distinct().Count(), Is.EqualTo(2));
+            Assert.DoesNotThrow(() => ArchitectureChangeReports.SerializeSnapshot(snapshot));
+        });
+    }
+
+    [Test]
+    public void Project_NonRuleInputCoverageBlindSpotIdentitiesAreUnchangedByEvidence()
+    {
+        // #686 PR review round 4: only the rule_input scope needs Evidence to identify a stale or
+        // unknown blind spot. Every other scope already keys Item uniquely per fact (project
+        // coverage: Item = project path, Evidence = assembly name), so folding Evidence into their
+        // identity would change the identity of existing, unchanged coverage facts and make the
+        // next change report show each of them as a spurious removed+new pair. Their identity must
+        // stay exactly "<contract>|<scope>|<state>|<item>".
+        ArchitectureCoverageSummary projectCoverage = new(
+            "project-coverage",
+            "project-coverage",
+            "project",
+            new ArchitectureCoverageSummaryCounts(0, 0, 0, 1, 1),
+            Array.Empty<ArchitectureCoverageSummaryExcludedItem>(),
+            Array.Empty<ArchitectureCoverageSummaryEvidenceItem>(),
+            new[] { new ArchitectureCoverageSummaryEvidenceItem("/src/Stale.csproj", "Stale") },
+            new[] { new ArchitectureCoverageSummaryEvidenceItem("/src/Foo.csproj", "Foo") },
+            Array.Empty<ArchitectureCoverageSummaryEvidenceItem>());
+
+        ArchitectureChangeSnapshot snapshot = ArchitectureChangeSnapshotProjector.Project(
+            "strict",
+            Outcome("/repo", "/repo/src/Acme/Acme.csproj", coverageSummaries: new[] { projectCoverage }),
+            EmptyGraph(),
+            EmptyGraph(),
+            Array.Empty<ArchitectureBaselineComparisonEntry>());
+
+        string[] identities = snapshot.Entries
+            .Where(static entry => entry.Kind == "coverage_blind_spot")
+            .Select(static entry => entry.Identity)
+            .ToArray();
+        Assert.That(identities, Is.EquivalentTo(new[]
+        {
+            "project-coverage|project|stale|/src/Stale.csproj",
+            "project-coverage|project|unknown|/src/Foo.csproj",
+        }));
+    }
+
     private static ArchitectureGraphOutcome EmptyGraph() => new(new ArchitectureDependencyGraph(
         Array.Empty<ArchitectureGraphNode>(), Array.Empty<ArchitectureGraphEdge>()));
 
@@ -170,16 +352,20 @@ public sealed class ArchitectureChangeSnapshotProjectorTests
         string projectPath,
         IReadOnlyCollection<ArchitectureViolation>? violations = null,
         IReadOnlyCollection<ArchitectureCoverageSummary>? coverageSummaries = null,
-        IReadOnlyCollection<ArchitectureClassificationRoleFact>? roles = null) => new(
+        IReadOnlyCollection<ArchitectureClassificationRoleFact>? roles = null,
+        IReadOnlyCollection<PolicyConsistencyDiagnostic>? policyConsistencyFindings = null,
+        string policyConsistencyConfig = "error",
+        IReadOnlyList<ArchitectureUnmatchedIgnoredViolation>? unmatchedIgnoredViolations = null,
+        string unmatchedIgnoredViolationsConfig = "error") => new(
         Passed: true,
         Violations: violations ?? Array.Empty<ArchitectureViolation>(),
         Cycles: Array.Empty<string>(),
         CoverageFindings: Array.Empty<ArchitectureViolation>(),
         CoverageConfig: "off",
-        UnmatchedIgnoredViolations: Array.Empty<ArchitectureUnmatchedIgnoredViolation>(),
-        UnmatchedIgnoredViolationsConfig: "off",
-        PolicyConsistencyFindings: Array.Empty<PolicyConsistencyDiagnostic>(),
-        PolicyConsistencyConfig: "off",
+        UnmatchedIgnoredViolations: unmatchedIgnoredViolations ?? Array.Empty<ArchitectureUnmatchedIgnoredViolation>(),
+        UnmatchedIgnoredViolationsConfig: unmatchedIgnoredViolations is null ? "off" : unmatchedIgnoredViolationsConfig,
+        PolicyConsistencyFindings: policyConsistencyFindings ?? Array.Empty<PolicyConsistencyDiagnostic>(),
+        PolicyConsistencyConfig: policyConsistencyFindings is null ? "off" : policyConsistencyConfig,
         CoverageSummaries: coverageSummaries ?? Array.Empty<ArchitectureCoverageSummary>(),
         ClassificationConflicts: Array.Empty<ArchitectureClassificationConflict>(),
         ClassificationMetadataFailures: Array.Empty<ArchitectureClassificationMetadataFailure>())

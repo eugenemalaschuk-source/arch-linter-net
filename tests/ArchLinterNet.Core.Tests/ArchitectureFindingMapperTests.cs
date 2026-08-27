@@ -218,6 +218,111 @@ public sealed class ArchitectureFindingMapperTests
     }
 
     [Test]
+    public void FromDiagnostic_PolicyConsistency_DistinctOccurrencesOfSameCheckKindGetDistinctIdentities()
+    {
+        // #683 PR review, P1/root cause: the identity fallback for PolicyConsistencyDiagnostic used
+        // to be RepresentativeType ?? CheckKind. Only "layer-overlap" sets RepresentativeType, so
+        // every other check kind collapsed every occurrence under one contract into one identity.
+        // Layers is exactly what the analysis service populates to describe which occurrence a
+        // finding is for those check kinds.
+        var first = new PolicyConsistencyDiagnostic(
+            "contracts", "contracts", "independence-conflict", "reason", ["a"], ["A"], ["core", "web"]);
+        var second = new PolicyConsistencyDiagnostic(
+            "contracts", "contracts", "independence-conflict", "reason", ["a"], ["A"], ["core", "infra"]);
+
+        ArchitectureFinding firstFinding = ArchitectureFindingMapper.FromDiagnostic(first);
+        ArchitectureFinding secondFinding = ArchitectureFindingMapper.FromDiagnostic(second);
+
+        Assert.That(firstFinding.CanonicalIdentity, Is.Not.EqualTo(secondFinding.CanonicalIdentity));
+    }
+
+    [Test]
+    public void FromDiagnostic_PolicyConsistency_SharedConflictingIdWithDistinctNamesGetsDistinctIdentities()
+    {
+        // #686 PR review round 2: the distinguisher used to pick ConflictingContractIds *or*
+        // ConflictingContractNames (ids winning whenever any were present), so two independence
+        // conflicts against contracts that share a duplicate contract id — a policy state
+        // FindDuplicateContractIds explicitly anticipates as a valid analyzer input — had identical
+        // Layers and identical ConflictingContractIds, and lost the only field (Names) that still
+        // distinguished them.
+        var conflictWithA = new PolicyConsistencyDiagnostic(
+            "independence", "independence-id", "independence-conflict", "reason",
+            ["independence-id", "duplicate"], ["independence", "A"], ["core", "web"]);
+        var conflictWithB = new PolicyConsistencyDiagnostic(
+            "independence", "independence-id", "independence-conflict", "reason",
+            ["independence-id", "duplicate"], ["independence", "B"], ["core", "web"]);
+
+        ArchitectureFinding findingA = ArchitectureFindingMapper.FromDiagnostic(conflictWithA);
+        ArchitectureFinding findingB = ArchitectureFindingMapper.FromDiagnostic(conflictWithB);
+
+        Assert.That(findingA.CanonicalIdentity, Is.Not.EqualTo(findingB.CanonicalIdentity));
+    }
+
+    [Test]
+    public void FromDiagnostic_PolicyConsistency_SemanticIdentityDoesNotChangeWhenPolicyLocationMoves()
+    {
+        // #686 PR review round 3: ArchitecturePolicyProvenanceIndex.Enrich attaches a PolicyLocation
+        // (derived from the participating contract's position in its declaring YAML list) to
+        // essentially every policy-consistency diagnostic, not just unmatched-layer-exclusion. The
+        // distinguisher used to fold PolicyLocation.YamlPath in unconditionally whenever it was
+        // present, even when Layers/ConflictingContractIds/ConflictingContractNames already fully
+        // identify the finding — so reordering an unrelated contract earlier in its declaring list
+        // (moving this finding's own PolicyLocation from index 0 to index 1) would change identity
+        // for a finding whose semantic content never changed, producing false removed/new drift.
+        var atContractIndexZero = new PolicyConsistencyDiagnostic(
+            "independence", "independence-id", "independence-conflict", "reason",
+            ["independence-id", "dep-id"], ["independence", "dep"], ["core", "web"])
+        {
+            PolicyLocation = PolicyLocationAt("contracts.strict_independence[0]"),
+        };
+        PolicyConsistencyDiagnostic atContractIndexOne = atContractIndexZero with
+        {
+            PolicyLocation = PolicyLocationAt("contracts.strict_independence[1]"),
+        };
+
+        ArchitectureFinding beforeReorder = ArchitectureFindingMapper.FromDiagnostic(atContractIndexZero);
+        ArchitectureFinding afterReorder = ArchitectureFindingMapper.FromDiagnostic(atContractIndexOne);
+
+        Assert.That(beforeReorder.CanonicalIdentity, Is.EqualTo(afterReorder.CanonicalIdentity));
+    }
+
+    [Test]
+    public void FromDiagnostic_PolicyConsistency_RepresentativeTypeMakesIdentityIndependentOfPolicyLocation()
+    {
+        // #683 PR review, P2: once a check kind sets RepresentativeType (its own semantic content,
+        // not a list position), identity must not depend on PolicyLocation.YamlPath — otherwise
+        // reordering exclude entries in YAML would silently change a finding's identity even though
+        // the same semantic finding is still being reported, producing false removed/new drift in
+        // change report.
+        var atExcludeIndexZero = new PolicyConsistencyDiagnostic(
+            "<policy-consistency>", null, "unmatched-layer-exclusion", "reason",
+            Array.Empty<string>(), Array.Empty<string>(), new[] { "contracts" })
+        {
+            RepresentativeType = "contracts|Acme.Legacy",
+            PolicyLocation = PolicyLocationAt("layers.contracts.exclude[0]"),
+        };
+        PolicyConsistencyDiagnostic atExcludeIndexOne = atExcludeIndexZero with
+        {
+            PolicyLocation = PolicyLocationAt("layers.contracts.exclude[1]"),
+        };
+
+        ArchitectureFinding beforeReorder = ArchitectureFindingMapper.FromDiagnostic(atExcludeIndexZero);
+        ArchitectureFinding afterReorder = ArchitectureFindingMapper.FromDiagnostic(atExcludeIndexOne);
+
+        Assert.That(beforeReorder.CanonicalIdentity, Is.EqualTo(afterReorder.CanonicalIdentity));
+    }
+
+    private static ArchitecturePolicySourceLocation PolicyLocationAt(string yamlPath) => new(
+        new ArchitecturePolicySourceDescriptor(
+            "/repo", "/repo/architecture/dependencies.arch.yml", ArchitecturePolicyDocumentRole.Root,
+            0, null, null, Array.Empty<string>()),
+        yamlPath,
+        1,
+        1,
+        null,
+        null);
+
+    [Test]
     public void FromPolicyError_LocationlessMessageWordingDoesNotAffectIdentity()
     {
         var diagnostic = new ArchitecturePolicyDiagnostic(

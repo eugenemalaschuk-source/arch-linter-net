@@ -678,7 +678,13 @@ internal sealed class ArchitecturePolicyConsistencyAnalysisService
             Array.Empty<string>(),
             new[] { layerName })
         {
-            PolicyLocation = exclusion.PolicyLocation
+            PolicyLocation = exclusion.PolicyLocation,
+            // The exclusion's own pattern, not its list position: two exclude entries on one layer
+            // otherwise share identical Layers/ContractName/ContractId, and a YAML-position-derived
+            // identity (exclude[0] vs exclude[1]) would silently change if entries are reordered,
+            // even though the same semantic finding is being reported (#683 PR review).
+            RepresentativeType = layerName + "|" + exclusion.Namespace
+                + (string.IsNullOrEmpty(exclusion.NamespaceSuffix) ? string.Empty : "#" + exclusion.NamespaceSuffix),
         };
     }
 

@@ -97,12 +97,12 @@ public partial class CliIntegrationTests
             JsonElement staleItems = entry.GetProperty("stale_items");
             Assert.That(staleItems.GetArrayLength(), Is.EqualTo(1));
             Assert.That(staleItems[0].GetProperty("item").GetString(), Is.EqualTo("ghost-rule"));
-            Assert.That(staleItems[0].GetProperty("evidence").GetString(), Is.EqualTo("ghost"));
+            Assert.That(staleItems[0].GetProperty("evidence").GetString(), Is.EqualTo("forbidden:ghost"));
 
             JsonElement unknownItems = entry.GetProperty("unknown_items");
             Assert.That(unknownItems.GetArrayLength(), Is.EqualTo(1));
             Assert.That(unknownItems[0].GetProperty("item").GetString(), Is.EqualTo("typo-rule"));
-            Assert.That(unknownItems[0].GetProperty("evidence").GetString(), Is.EqualTo("does_not_exist_layer"));
+            Assert.That(unknownItems[0].GetProperty("evidence").GetString(), Is.EqualTo("source:does_not_exist_layer"));
         });
     }
 
@@ -112,8 +112,8 @@ public partial class CliIntegrationTests
         var (exitCode, stdout, _) = RunCli("--policy", RuleInputCoveragePolicy, "--format", "human");
 
         Assert.That(exitCode, Is.EqualTo(0));
-        Assert.That(stdout, Does.Contain("stale: ghost-rule (ghost)"));
-        Assert.That(stdout, Does.Contain("unknown: typo-rule (does_not_exist_layer)"));
+        Assert.That(stdout, Does.Contain("stale: ghost-rule (forbidden:ghost)"));
+        Assert.That(stdout, Does.Contain("unknown: typo-rule (source:does_not_exist_layer)"));
         Assert.That(stdout, Does.Not.Contain("uncovered: ghost-rule"));
         Assert.That(stdout, Does.Not.Contain("uncovered: typo-rule"));
     }

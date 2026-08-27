@@ -2,6 +2,7 @@ using ArchLinterNet.Core.Contracts;
 using ArchLinterNet.Core.Contracts.Families;
 using ArchLinterNet.Core.Execution;
 using ArchLinterNet.Core.Model;
+using ArchLinterNet.Core.Reporting;
 using AttributeRoleExtractionTestFixtures;
 using NUnit.Framework;
 using ArchitectureContractGroups = ArchLinterNet.Core.Contracts.Families.ArchitectureContractGroups;
@@ -9,7 +10,7 @@ using ArchitectureContractGroups = ArchLinterNet.Core.Contracts.Families.Archite
 namespace ArchLinterNet.Core.Tests;
 
 [TestFixture]
-public sealed class PolicyConsistencyCheckTests
+public sealed partial class PolicyConsistencyCheckTests
 {
     private static readonly string[] _value = { "first", "second" };
     private static readonly string[] _value1 = { "shared-id" };

@@ -1,0 +1,67 @@
+## 1. Identity computation fix
+
+- [x] 1.1 In `ArchitectureFindingMapper.IdentityParts`, replace the `PolicyConsistencyDiagnostic` case's `RepresentativeType ?? CheckKind` fallback with a call to a new `PolicyConsistencyDistinguisher` helper.
+- [x] 1.2 In `ArchitectureFindingMapper.SourceTypeOf`, do the same for its `PolicyConsistencyDiagnostic` case.
+- [x] 1.3 Implement `PolicyConsistencyDistinguisher`: return `RepresentativeType` when set; otherwise join `Layers` + `ConflictingContractIds` (falling back to `ConflictingContractNames`), ordinal-sorted, plus `PolicyLocation.YamlPath` as a tail disambiguator when present.
+
+## 2. Snapshot projection completeness
+
+- [x] 2.1 Add a `PolicyLevelFindings` helper to `ArchitectureChangeSnapshotProjector` that yields `ArchitectureFinding`s for `PolicyConsistencyFindings` (via `ArchitectureFindingMapper.FromDiagnostic`) and `UnmatchedIgnoredViolations` (via `ArchitectureDiagnosticMapper.FromUnmatchedIgnore` + `FromDiagnostic`), each gated on its contract family's config not being `"off"`.
+- [x] 2.2 Concat `PolicyLevelFindings` into `Project`'s findings list alongside the existing `Violations`/`CoverageFindings` mapping.
+
+## 3. Tests
+
+- [x] 3.1 Add `Project_DistinguishesPolicyConsistencyOccurrencesOfTheSameCheckKind` — two `unmatched-layer-exclusion` findings on different layers plus one more on the same layer as one of them (different `PolicyLocation`); assert 3 distinct identities and that `SerializeSnapshot` does not throw.
+- [x] 3.2 Add `Project_IncludesUnmatchedIgnoredViolationsAsFindings` — assert an `ArchitectureUnmatchedIgnoredViolation` appears in the snapshot's findings with kind `unmatched_ignore`.
+- [x] 3.3 Add `Project_ExcludesPolicyLevelFindingsWhenTheirContractFamilyIsOff` — assert findings are empty when both configs are `"off"` even though the outcome carries findings.
+- [x] 3.4 Verify all three new tests fail against the pre-fix code (confirmed via `git stash` of the two source files) and pass with the fix applied.
+
+## 4. Validation
+
+- [x] 4.1 `dotnet build` on `ArchLinterNet.Core` and `ArchLinterNet.Core.Tests` — clean, no warnings.
+- [x] 4.2 `dotnet test tests/ArchLinterNet.Core.Tests --filter "FullyQualifiedName~ArchitectureChangeSnapshotProjectorTests"` — pass.
+- [x] 4.3 Full `dotnet test tests/ArchLinterNet.Core.Tests` run for the cross-cutting risk tier — 3027 passed, 0 failed, 13 pre-existing skips.
+- [x] 4.4 `make fmt` on changed files — `dotnet format --include` on the three changed files reported no changes needed.
+- [x] 4.5 `openspec validate --all` after archiving.
+
+## 5. Post-review fixes (P1, P2, P3)
+
+- [x] 5.1 P1: `ArchitectureCoverageAnalysisService.BuildRuleInputSummary` — fold `input.Input` into stale/unknown items' `Evidence` (`"<input role>:<layer>"`).
+- [x] 5.2 P1: `ArchitectureChangeSnapshotProjector.Coverage` — add an overload for stale/unknown items that folds `Evidence` into the entry identity; update `CoverageBlindSpots` to use it.
+- [x] 5.3 P2: `ArchitecturePolicyConsistencyAnalysisService.CreateUnmatchedExclusionFinding` — set `RepresentativeType` to `layerName + "|" + exclusion.Namespace [+ "#" + NamespaceSuffix]` so identity no longer depends on `PolicyLocation.YamlPath`'s list-position index.
+- [x] 5.4 P3: `ArchitectureFindingMapper.BuildIdentity` — special-case `PolicyConsistencyDiagnostic` ahead of `IdentityParts`/`SourceTypeOf` so `PolicyConsistencyDistinguisher` runs once, not twice; remove the now-unreachable `PolicyConsistencyDiagnostic` cases from `IdentityParts`, `SourceTypeOf`, `SourceIdentifier`.
+- [x] 5.5 Add `Project_DistinguishesCoverageBlindSpotEntriesForDifferentRuleInputsOnSameContract` (P1) — reproduces the exact `EnsureUnique(..., "entry")` throw pre-fix.
+- [x] 5.6 Add `FromDiagnostic_PolicyConsistency_DistinctOccurrencesOfSameCheckKindGetDistinctIdentities` and `FromDiagnostic_PolicyConsistency_RepresentativeTypeMakesIdentityIndependentOfPolicyLocation` (P2, mapper-level).
+- [x] 5.7 Add `UnmatchedLayerExclusion_TwoTypoedEntriesOnSameLayer_GetDistinctIdentities` and `UnmatchedLayerExclusion_ReorderingExcludeEntries_DoesNotChangeEitherIdentity` (P2, end-to-end through the real analysis service).
+- [x] 5.8 Update pre-existing tests pinning the old stale/unknown `Evidence` text: `ArchitectureCoverageSummaryTests.cs`, `CliIntegrationTests.CoverageSummary.cs`.
+- [x] 5.9 Verify all four new/changed regression tests fail against pre-addendum code via `git stash` and pass with the fix.
+- [x] 5.10 Full `dotnet test tests/ArchLinterNet.Core.Tests` — 3032 passed, 0 failed, 13 pre-existing skips. Full `dotnet test tests/ArchLinterNet.Cli.Tests` — 573 passed, 0 failed.
+- [x] 5.11 `make lint-architecture` and `make public-api-check` — both clean.
+- [x] 5.12 Update `openspec/specs/architecture-change-report/spec.md` and this change's archived delta spec/design/proposal to reflect the corrected root cause.
+
+## 6. Second post-review fix (P1 round 2)
+
+- [x] 6.1 `ArchitectureFindingMapper.PolicyConsistencyDistinguisher` — replace the `ConflictingContractIds.Count > 0 ? ids : names` either-or choice with three separately-labeled segments (`layers:...|ids:...|names:...`), so contracts sharing a duplicate id no longer lose the only field (names) that still distinguished them.
+- [x] 6.2 Add `FromDiagnostic_PolicyConsistency_SharedConflictingIdWithDistinctNamesGetsDistinctIdentities` (mapper-level, hand-constructed diagnostics matching the exact collision shape).
+- [x] 6.3 Add `IndependenceConflict_TwoConflictingContractsSharingDuplicateId_GetDistinctIdentities` (end-to-end: real independence contract + two allow-only contracts sharing a duplicate id, through the real `ArchitecturePolicyConsistencyAnalysisService`).
+- [x] 6.4 Verify both new tests fail against the pre-round-2 distinguisher via `git stash` and pass with the fix.
+- [x] 6.5 Full `dotnet test tests/ArchLinterNet.Core.Tests` — 3034 passed, 0 failed, 13 pre-existing skips. Full `dotnet test tests/ArchLinterNet.Cli.Tests` — 573 passed, 0 failed.
+- [x] 6.6 `make lint-architecture`, `make public-api-check`, `dotnet format --include` on changed files — all clean.
+- [x] 6.7 Add a spec scenario for the duplicate-id case to `openspec/specs/architecture-change-report/spec.md` and this change's archived delta spec; add a second addendum to `design.md`.
+
+## 7. Third post-review fix (P1 round 3 — positional YamlPath)
+
+- [x] 7.1 `PolicyConsistencyDistinguisher` — consult `PolicyLocation.YamlPath` only when `layers`/`ids`/`names` are all empty, instead of always appending it.
+- [x] 7.2 Add `FromDiagnostic_PolicyConsistency_SemanticIdentityDoesNotChangeWhenPolicyLocationMoves` (mapper-level).
+- [x] 7.3 Add `IndependenceConflict_ReorderingIndependenceContractsInRealYaml_DoesNotChangeEitherIdentity` — goes through the real `ArchitecturePolicyDocumentLoader` because `Document.Provenance` is `Empty` for hand-built documents and a `BaseDocument()`-based test could not exercise the defect.
+- [x] 7.4 Verify both fail against the pre-round-3 distinguisher via `git stash` and pass with the fix.
+
+## 8. Fourth post-review fix (P1 round 4 — over-broad coverage scoping + lint)
+
+- [x] 8.1 `ArchitectureChangeSnapshotProjector` — add `RuleInputCoverageIdentityItem` so `Evidence` is folded into the entry identity only for `summary.Scope == "rule_input"`; every other coverage scope keeps its pre-existing `Item`-only identity.
+- [x] 8.2 Add `Project_NonRuleInputCoverageBlindSpotIdentitiesAreUnchangedByEvidence` pinning project-scope stale/unknown identities to their exact unchanged strings; revert the namespace-scope assertions in `Project_MapsGraphSemanticCoverageFindingAndBaselineFacts` to the pre-round-1 (no `|evidence`) form.
+- [x] 8.3 Verify the new test fails against the blanket-`Evidence` version via `git stash` and passes with the scoped fix.
+- [x] 8.4 Split the four identity-regression tests out of `PolicyConsistencyCheckTests.cs` (832 lines, over the >800 hard error) into a new `PolicyConsistencyCheckTests.Identity.cs` partial — 719 and 190 lines respectively.
+- [x] 8.5 `make lint-code-size` — exit 0 (warnings only, no errors).
+- [x] 8.6 Full `dotnet test` for Core and Cli, `make lint-architecture`, `make public-api-check`, `dotnet format`, `openspec validate --all` — all clean.
+- [x] 8.7 Add a spec scenario pinning non-rule-input coverage identity stability; add a third and fourth addendum to `design.md`.
