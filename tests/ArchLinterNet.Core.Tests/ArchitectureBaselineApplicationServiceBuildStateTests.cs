@@ -24,6 +24,11 @@ public sealed class ArchitectureBaselineApplicationServiceBuildStateTests
     private static readonly string[] _value5 = { "Fixture" };
     private static readonly string[] _value6 = { "Fixture" };
     private static readonly string[] _value7 = { "Fixture" };
+    private static readonly string[] _fixtureAssemblyNames = { "Fixture" };
+    private static readonly string[] _materializationCallOrder =
+        { "PrepareRunner", "PrepareBuild", "VerifyPostBuild", "MaterializePreparedRunner" };
+    private static readonly string[] _fallbackCallOrder = { "PrepareRunner", "BuildRunner" };
+
     private sealed class FakeBuildStatePreparationService : IBuildStatePreparationService
     {
         public int PrepareCallCount { get; private set; }
@@ -32,7 +37,7 @@ public sealed class ArchitectureBaselineApplicationServiceBuildStateTests
 
         public Queue<BuildStatePreflightResult>? ResultsToReturn { get; init; }
 
-        public ICollection<string>? CallOrder { get; set; }
+        public List<string>? CallOrder { get; set; }
 
         public BuildStatePreflightResult ResultToReturn { get; set; } =
             new(Array.Empty<BuildStatePreflightDiagnostic>());
@@ -344,18 +349,15 @@ public sealed class ArchitectureBaselineApplicationServiceBuildStateTests
             Assert.That(preparationService.RequestsReceived[1].Resolution.ResolvedAssemblyPaths["Fixture"],
                 Is.EqualTo(fixturePath));
             Assert.That(preparationService.RequestsReceived[0].Resolution.ResolvedAssemblyPaths.Keys,
-                Is.EquivalentTo(new[] { "Fixture" }));
+                Is.EquivalentTo(_fixtureAssemblyNames));
             Assert.That(preparationService.RequestsReceived[1].Resolution.ResolvedAssemblyPaths.Keys,
-                Is.EquivalentTo(new[] { "Fixture" }));
+                Is.EquivalentTo(_fixtureAssemblyNames));
             // Contract execution must run against the materialized post-build runner, not anything
             // used only to discover what needed building.
             Assert.That(firstRunner.StrictArgumentsReceived, Is.Empty);
             Assert.That(secondRunner.StrictArgumentsReceived, Is.Not.Empty);
             Assert.That(outcome.New.Single().SourceType, Is.EqualTo("SrcFromPostBuild"));
-            Assert.That(callOrder, Is.EqualTo(new[]
-            {
-                "PrepareRunner", "PrepareBuild", "VerifyPostBuild", "MaterializePreparedRunner",
-            }));
+            Assert.That(callOrder, Is.EqualTo(_materializationCallOrder));
         });
     }
 
@@ -389,7 +391,7 @@ public sealed class ArchitectureBaselineApplicationServiceBuildStateTests
                 MissingAssemblyNames: Array.Empty<string>(),
                 IsMetadataReferenceClosureComplete: false)
             {
-                GraphDrivenRootAssemblyNames = ["Fixture"],
+                GraphDrivenRootAssemblyNames = _fixtureAssemblyNames,
             },
         };
         var preparationService = new FakeBuildStatePreparationService
@@ -417,10 +419,10 @@ public sealed class ArchitectureBaselineApplicationServiceBuildStateTests
             Assert.That(outcome.Succeeded, Is.True);
             Assert.That(preparationService.PrepareCallCount, Is.EqualTo(2));
             Assert.That(preparationService.RequestsReceived[0].Resolution.ResolvedAssemblyPaths.Keys,
-                Is.EquivalentTo(new[] { "Fixture" }));
+                Is.EquivalentTo(_fixtureAssemblyNames));
             Assert.That(preparationService.RequestsReceived[1].Resolution.ResolvedAssemblyPaths.Keys,
-                Is.EquivalentTo(new[] { "Fixture" }));
-            Assert.That(document.Analysis.TargetAssemblies, Is.EquivalentTo(new[] { "Fixture" }));
+                Is.EquivalentTo(_fixtureAssemblyNames));
+            Assert.That(document.Analysis.TargetAssemblies, Is.EquivalentTo(_fixtureAssemblyNames));
             Assert.That(runnerSetupService.MaterializePreparedRunnerCallCount, Is.EqualTo(1));
         });
     }
@@ -516,7 +518,7 @@ public sealed class ArchitectureBaselineApplicationServiceBuildStateTests
             Assert.That(runnerSetupService.MaterializePreparedRunnerCallCount, Is.EqualTo(0));
             Assert.That(runnerSetupService.BuildRunnerCallCount, Is.EqualTo(1));
             Assert.That(preparationService.PrepareCallCount, Is.Zero);
-            Assert.That(callOrder, Is.EqualTo(new[] { "PrepareRunner", "BuildRunner" }));
+            Assert.That(callOrder, Is.EqualTo(_fallbackCallOrder));
         });
     }
 }
