@@ -43,51 +43,6 @@ public sealed class ArchitectureBaselineApplicationServiceBuildStateTests
         }
     }
 
-    [Test]
-    public void Diff_PreparedPostBuildState_RerunsIsolatedRunnerWithoutAnotherEnsureBuiltRequest()
-    {
-        var document = CreateDocument();
-        var discovery = ProjectDiscoveryResult.Empty with { DiscoveredProjects = new[] { FixtureProject() } };
-        var firstRunner = new FakeContractRunner(CreateSession(document, discovery, missingAssemblyNames: ["Fixture"]));
-        var secondRunner = new FakeContractRunner(CreateSession(document, discovery, missingAssemblyNames: ["Fixture"]))
-        {
-            BaselineCandidates = new List<ArchitectureBaselineCandidate>
-            {
-                new("strict", "known-rule", "SrcFromPreparedState", "RefFromPreparedState"),
-            },
-        };
-        var runnerSetupService = new FakeRunnerSetupService
-        {
-            RunnersToReturn = new Queue<IArchitectureContractRunner>(new IArchitectureContractRunner[] { firstRunner, secondRunner }),
-        };
-        var preparationService = new FakeBuildStatePreparationService();
-        var applicationService = new ArchitectureBaselineApplicationService(
-            runnerSetupService, new FakeContractHandlerRegistry(), new FakeContractExecutor(),
-            new FakeBaselineGenerator(), new FakeBaselineLoadingService(), preparationService);
-
-        BaselineDiffOutcome outcome = applicationService.Diff(new BaselineDiffRequest
-        {
-            PolicyPath = "unused-by-fakes.arch.yml",
-            BaselinePath = "unused-by-fakes.baseline.yml",
-            Mode = "strict",
-            PreparationMode = BuildPreparationMode.Ordinary,
-            UsePreparedPostBuildState = true,
-        });
-
-        Assert.Multiple(() =>
-        {
-            Assert.That(outcome.Succeeded, Is.True);
-            Assert.That(runnerSetupService.BuildRunnerForPostBuildCallCount, Is.EqualTo(1));
-            Assert.That(preparationService.PrepareCallCount, Is.EqualTo(2));
-            Assert.That(preparationService.RequestsReceived,
-                Has.All.Matches<BuildStatePreflightRequest>(request =>
-                    request.PreparationMode == BuildPreparationMode.Ordinary));
-            Assert.That(firstRunner.StrictArgumentsReceived, Is.Empty);
-            Assert.That(secondRunner.StrictArgumentsReceived, Is.Not.Empty);
-            Assert.That(outcome.New.Single().SourceType, Is.EqualTo("SrcFromPreparedState"));
-        });
-    }
-
     private static ArchitectureContractDocument CreateDocument() => new() { Version = 1, Name = "Fake" };
 
     private static ArchitectureDiscoveredProject FixtureProject() =>

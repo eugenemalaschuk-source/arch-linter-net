@@ -426,8 +426,7 @@ public sealed partial class ArchitectureBaselineApplicationService(
                     return BaselineCandidateCollection.PreflightBlocked(document, preflight.Diagnostics);
                 }
 
-                if ((buildState.PreparationMode == BuildPreparationMode.EnsureBuilt
-                        || buildState.UsePreparedPostBuildState)
+                if (buildState.PreparationMode == BuildPreparationMode.EnsureBuilt
                     && setup.Runner.Session.Context.ProjectDiscovery is { DiscoveredProjects.Count: > 0 })
                 {
                     // The initial runner only identifies what must be built. Candidate collection
