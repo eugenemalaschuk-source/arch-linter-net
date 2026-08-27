@@ -38,3 +38,13 @@
 - [x] 5.10 Full `dotnet test tests/ArchLinterNet.Core.Tests` — 3032 passed, 0 failed, 13 pre-existing skips. Full `dotnet test tests/ArchLinterNet.Cli.Tests` — 573 passed, 0 failed.
 - [x] 5.11 `make lint-architecture` and `make public-api-check` — both clean.
 - [x] 5.12 Update `openspec/specs/architecture-change-report/spec.md` and this change's archived delta spec/design/proposal to reflect the corrected root cause.
+
+## 6. Second post-review fix (P1 round 2)
+
+- [x] 6.1 `ArchitectureFindingMapper.PolicyConsistencyDistinguisher` — replace the `ConflictingContractIds.Count > 0 ? ids : names` either-or choice with three separately-labeled segments (`layers:...|ids:...|names:...`), so contracts sharing a duplicate id no longer lose the only field (names) that still distinguished them.
+- [x] 6.2 Add `FromDiagnostic_PolicyConsistency_SharedConflictingIdWithDistinctNamesGetsDistinctIdentities` (mapper-level, hand-constructed diagnostics matching the exact collision shape).
+- [x] 6.3 Add `IndependenceConflict_TwoConflictingContractsSharingDuplicateId_GetDistinctIdentities` (end-to-end: real independence contract + two allow-only contracts sharing a duplicate id, through the real `ArchitecturePolicyConsistencyAnalysisService`).
+- [x] 6.4 Verify both new tests fail against the pre-round-2 distinguisher via `git stash` and pass with the fix.
+- [x] 6.5 Full `dotnet test tests/ArchLinterNet.Core.Tests` — 3034 passed, 0 failed, 13 pre-existing skips. Full `dotnet test tests/ArchLinterNet.Cli.Tests` — 573 passed, 0 failed.
+- [x] 6.6 `make lint-architecture`, `make public-api-check`, `dotnet format --include` on changed files — all clean.
+- [x] 6.7 Add a spec scenario for the duplicate-id case to `openspec/specs/architecture-change-report/spec.md` and this change's archived delta spec; add a second addendum to `design.md`.

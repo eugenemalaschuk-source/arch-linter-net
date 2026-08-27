@@ -26,6 +26,11 @@ The system SHALL provide a versioned `architecture-change-snapshot/v2` artifact 
 - **THEN** each finding is assigned a distinct, non-empty identity
 - **AND THEN** snapshot creation succeeds rather than being rejected for duplicate or empty finding identities
 
+#### Scenario: Policy-consistency findings against contracts sharing a duplicate id get distinct identities
+- **WHEN** two policy-consistency findings of the same check kind share identical layers and identical conflicting-contract ids because the conflicting contracts have a duplicate id, but differ in their conflicting-contract names
+- **THEN** each finding is assigned a distinct identity
+- **AND THEN** the conflicting-contract names are not discarded merely because conflicting-contract ids are also present
+
 #### Scenario: Disabled contract family is excluded from the snapshot
 - **WHEN** a contract family's configuration is set to disabled ("off")
 - **THEN** that family's findings do not appear in the snapshot's findings

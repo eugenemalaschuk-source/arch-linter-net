@@ -550,6 +550,12 @@ public static class ArchitectureFindingMapper
     // exactly the fields each check populates to describe *which* occurrence this is; folding them
     // in (plus the policy source location, which is the only thing that distinguishes two unmatched
     // exclude entries on the same layer) keeps distinct occurrences from colliding into one identity.
+    //
+    // Ids and Names are kept as separate labeled segments, not one merged/either-or set: two
+    // independence-conflict findings against contracts that share a duplicate id (a policy state
+    // FindDuplicateContractIds explicitly anticipates) have identical ConflictingContractIds but
+    // distinct ConflictingContractNames — discarding Names whenever an id is present (as an
+    // either-or choice would) collapses that case (#686 PR review round 2).
     private static string PolicyConsistencyDistinguisher(PolicyConsistencyDiagnostic policy)
     {
         if (policy.RepresentativeType is { Length: > 0 } representativeType)
@@ -557,15 +563,19 @@ public static class ArchitectureFindingMapper
             return representativeType;
         }
 
-        IEnumerable<string> conflicting = policy.ConflictingContractIds.Count > 0
-            ? policy.ConflictingContractIds
-            : policy.ConflictingContractNames;
-        string parts = string.Join("|", policy.Layers
-            .Concat(conflicting)
-            .OrderBy(static value => value, StringComparer.Ordinal));
+        string layers = Sorted(policy.Layers);
+        string ids = Sorted(policy.ConflictingContractIds);
+        string names = Sorted(policy.ConflictingContractNames);
         string? yamlPath = policy.PolicyLocation?.YamlPath;
-        return yamlPath is { Length: > 0 }
-            ? parts.Length > 0 ? parts + "|" + yamlPath : yamlPath
-            : parts.Length > 0 ? parts : policy.CheckKind;
+        if (layers.Length == 0 && ids.Length == 0 && names.Length == 0 && yamlPath is not { Length: > 0 })
+        {
+            return policy.CheckKind;
+        }
+
+        string parts = $"layers:{layers}|ids:{ids}|names:{names}";
+        return yamlPath is { Length: > 0 } ? parts + "|location:" + yamlPath : parts;
     }
+
+    private static string Sorted(IEnumerable<string> values) =>
+        string.Join(",", values.OrderBy(static value => value, StringComparer.Ordinal));
 }

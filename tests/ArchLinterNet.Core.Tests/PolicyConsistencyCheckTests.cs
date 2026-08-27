@@ -718,6 +718,43 @@ public sealed class PolicyConsistencyCheckTests
     }
 
     [Test]
+    public void IndependenceConflict_TwoConflictingContractsSharingDuplicateId_GetDistinctIdentities()
+    {
+        // #686 PR review round 2: two independence-conflict findings against the same independence
+        // contract, over the same layer pair, from two allow-only contracts that happen to share a
+        // duplicate id (FindDuplicateContractIds treats this as a valid, expected analyzer input —
+        // it is itself a check for exactly this policy state). Both findings end up with identical
+        // Layers and identical ConflictingContractIds; only ConflictingContractNames differs.
+        var document = BaseDocument();
+        document.Contracts.StrictIndependence = new List<ArchitectureIndependenceContract>
+        {
+            new() { Name = "domain-app-independent", Id = "independence-id", Layers = new List<string> { "domain", "application" } }
+        };
+        document.Contracts.StrictAllowOnly = new List<ArchitectureAllowOnlyContract>
+        {
+            new() { Name = "allow-a", Id = "duplicate", Source = "domain", Allowed = new List<string> { "application" } }
+        };
+        document.Contracts.AuditAllowOnly = new List<ArchitectureAllowOnlyContract>
+        {
+            new() { Name = "allow-b", Id = "duplicate", Source = "domain", Allowed = new List<string> { "application" } }
+        };
+
+        var runner = new ArchitectureContractRunner(CreateContext(), document);
+        var findings = runner.CheckPolicyConsistency()
+            .Where(f => f.CheckKind == "independence-conflict")
+            .ToList();
+
+        Assert.That(findings, Has.Count.EqualTo(2));
+        Assert.That(findings.Select(f => f.ConflictingContractIds), Has.All.EquivalentTo(new[] { "independence-id", "duplicate" }));
+        Assert.That(findings.Select(f => string.Join(",", f.ConflictingContractNames)).Distinct().Count(), Is.EqualTo(2));
+
+        string[] identities = findings
+            .Select(finding => ArchitectureFindingMapper.FromDiagnostic(finding).CanonicalIdentity)
+            .ToArray();
+        Assert.That(identities.Distinct().Count(), Is.EqualTo(2));
+    }
+
+    [Test]
     public void UnmatchedLayerExclusion_TwoTypoedEntriesOnSameLayer_GetDistinctIdentities()
     {
         // #683 PR review, P1: two unmatched-exclusion findings on the same layer share

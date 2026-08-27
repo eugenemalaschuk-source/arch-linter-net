@@ -237,6 +237,28 @@ public sealed class ArchitectureFindingMapperTests
     }
 
     [Test]
+    public void FromDiagnostic_PolicyConsistency_SharedConflictingIdWithDistinctNamesGetsDistinctIdentities()
+    {
+        // #686 PR review round 2: the distinguisher used to pick ConflictingContractIds *or*
+        // ConflictingContractNames (ids winning whenever any were present), so two independence
+        // conflicts against contracts that share a duplicate contract id — a policy state
+        // FindDuplicateContractIds explicitly anticipates as a valid analyzer input — had identical
+        // Layers and identical ConflictingContractIds, and lost the only field (Names) that still
+        // distinguished them.
+        var conflictWithA = new PolicyConsistencyDiagnostic(
+            "independence", "independence-id", "independence-conflict", "reason",
+            ["independence-id", "duplicate"], ["independence", "A"], ["core", "web"]);
+        var conflictWithB = new PolicyConsistencyDiagnostic(
+            "independence", "independence-id", "independence-conflict", "reason",
+            ["independence-id", "duplicate"], ["independence", "B"], ["core", "web"]);
+
+        ArchitectureFinding findingA = ArchitectureFindingMapper.FromDiagnostic(conflictWithA);
+        ArchitectureFinding findingB = ArchitectureFindingMapper.FromDiagnostic(conflictWithB);
+
+        Assert.That(findingA.CanonicalIdentity, Is.Not.EqualTo(findingB.CanonicalIdentity));
+    }
+
+    [Test]
     public void FromDiagnostic_PolicyConsistency_RepresentativeTypeMakesIdentityIndependentOfPolicyLocation()
     {
         // #683 PR review, P2: once a check kind sets RepresentativeType (its own semantic content,
