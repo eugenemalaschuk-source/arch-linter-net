@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Reflection;
+using System.Runtime.InteropServices;
 using System.Text.Json;
 using ArchLinterNet.Core.Change;
 using ArchLinterNet.Core.Contracts;
@@ -227,6 +228,54 @@ public sealed class AspNetSharedFrameworkAcceptanceTests
         Assert.That(snapshot.Mode, Is.EqualTo("strict"));
     }
 
+    [Test]
+    public void ChangeSnapshotEnsureBuiltPackagedEntrypoint_PreservesReleaseAndRuntimeOutputContext()
+    {
+        string cliDllPath = Path.Combine(
+            new ArchitectureRepositoryRootResolver().Resolve(),
+            "src", "ArchLinterNet.Cli", "bin", "Debug", "net10.0", "ArchLinterNet.Cli.dll");
+        Assert.That(File.Exists(cliDllPath), Is.True, cliDllPath);
+
+        string baselinePath = Path.Combine(_fixture.Root, "release-runtime.baseline.arch.yml");
+        string snapshotPath = Path.Combine(_fixture.Root, "release-runtime-snapshot.json");
+        File.WriteAllText(baselinePath, "version: 2\nbaseline: {}\n");
+
+        var startInfo = new ProcessStartInfo("dotnet")
+        {
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            UseShellExecute = false,
+            WorkingDirectory = _fixture.Root,
+        };
+        startInfo.Environment["DOTNET_CLI_DISABLE_COLOR"] = "1";
+        startInfo.ArgumentList.Add(cliDllPath);
+        startInfo.ArgumentList.Add("change");
+        startInfo.ArgumentList.Add("snapshot");
+        startInfo.ArgumentList.Add("--policy");
+        startInfo.ArgumentList.Add(_fixture.PolicyPath);
+        startInfo.ArgumentList.Add("--baseline");
+        startInfo.ArgumentList.Add(baselinePath);
+        startInfo.ArgumentList.Add("--mode");
+        startInfo.ArgumentList.Add("strict");
+        startInfo.ArgumentList.Add("--output");
+        startInfo.ArgumentList.Add(snapshotPath);
+        startInfo.ArgumentList.Add("--ensure-built");
+        startInfo.ArgumentList.Add("--configuration");
+        startInfo.ArgumentList.Add("Release");
+        startInfo.ArgumentList.Add("--runtime");
+        startInfo.ArgumentList.Add(CurrentRuntimeIdentifier());
+
+        using var process = Process.Start(startInfo)!;
+        string stdout = process.StandardOutput.ReadToEnd();
+        string stderr = process.StandardError.ReadToEnd();
+        process.WaitForExit();
+
+        Assert.That(process.ExitCode, Is.EqualTo(0), () => $"stdout: {stdout}{Environment.NewLine}stderr: {stderr}");
+        Assert.That(File.Exists(snapshotPath), Is.True, snapshotPath);
+        ArchitectureChangeSnapshot snapshot = ArchitectureChangeReports.DeserializeSnapshot(File.ReadAllText(snapshotPath));
+        Assert.That(snapshot.Mode, Is.EqualTo("strict"));
+    }
+
     private ArchitectureRunnerSetup MaterializeFixture(List<string> sharedFrameworks)
     {
         var discovery = new FixedDiscoveryService
@@ -251,6 +300,24 @@ public sealed class AspNetSharedFrameworkAcceptanceTests
         Assembly assembly = setup.Runner.Session.Context.TargetAssemblies
             .Single(a => a.GetName().Name == "Synthetic.AspNetHost");
         return assembly.GetType("Synthetic.AspNetHost.GreetingsController", throwOnError: true)!;
+    }
+
+    private static string CurrentRuntimeIdentifier()
+    {
+        string operatingSystem = OperatingSystem.IsWindows()
+            ? "win"
+            : OperatingSystem.IsMacOS()
+                ? "osx"
+                : "linux";
+        string architecture = RuntimeInformation.ProcessArchitecture switch
+        {
+            Architecture.X64 => "x64",
+            Architecture.Arm64 => "arm64",
+            _ => throw new PlatformNotSupportedException(
+                $"The packaged output-context regression does not define a runtime identifier for {RuntimeInformation.ProcessArchitecture}."),
+        };
+
+        return $"{operatingSystem}-{architecture}";
     }
 
     private static ArchitectureContractDocument CreateDocument(List<string> sharedFrameworks) => new()

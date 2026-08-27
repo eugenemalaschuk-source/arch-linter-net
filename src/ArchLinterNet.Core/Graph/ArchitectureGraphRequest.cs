@@ -1,4 +1,5 @@
 using ArchLinterNet.Core.BuildState;
+using ArchLinterNet.Core.Execution;
 using ArchLinterNet.Core.Model;
 
 namespace ArchLinterNet.Core.Graph;
@@ -33,4 +34,8 @@ public sealed record ArchitectureGraphRequest
     // Graph analysis must still re-verify its receipt, but then loads an isolated post-build
     // runner without invoking another graph build.
     public bool UsePreparedPostBuildState { get; init; }
+
+    // The exact receipt-backed selection produced by an enclosing successful preparation. This
+    // takes precedence over rediscovery when UsePreparedPostBuildState is set.
+    public ArchitectureRunnerPreparation? PreparedPostBuildRunner { get; init; }
 }

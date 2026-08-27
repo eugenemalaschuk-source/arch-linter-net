@@ -398,11 +398,19 @@ public sealed partial class ArchitectureBaselineApplicationService(
             }
         }
 
+        if (buildState?.UsePreparedPostBuildState == true
+            && buildState.RequestedTargetFramework is not null)
+        {
+            // The preparation carries the exact selected artifact paths. The effective framework
+            // is retained here solely for the isolated shared-framework probing path.
+            document.Analysis.TargetFramework = buildState.RequestedTargetFramework;
+        }
+
         ArchitectureRunnerSetup setup = buildState?.UsePreparedPostBuildState == true
-            ? runnerSetupService.BuildRunnerForPostBuild(
+            ? runnerSetupService.MaterializePreparedRunner(
                 document,
-                policyPath,
-                conditionSetName,
+                buildState.PreparedPostBuildRunner
+                    ?? throw new InvalidOperationException("Prepared baseline analysis requires validation's receipt-backed artifact selection."),
                 selectedContractIds: selectedContractIds,
                 enableUnmatchedIgnoreTracking: true,
                 mode: mode == "all" ? null : mode,

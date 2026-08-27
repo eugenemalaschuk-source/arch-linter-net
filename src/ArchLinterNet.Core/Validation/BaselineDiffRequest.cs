@@ -1,4 +1,5 @@
 using ArchLinterNet.Core.BuildState;
+using ArchLinterNet.Core.Execution;
 
 namespace ArchLinterNet.Core.Validation;
 
@@ -32,6 +33,10 @@ public sealed record BaselineDiffRequest
     // fails closed on receipt verification, then uses an isolated post-build runner without
     // rebuilding the graph.
     public bool UsePreparedPostBuildState { get; init; }
+
+    // The exact receipt-backed selection produced by an enclosing successful preparation. This
+    // takes precedence over rediscovery when UsePreparedPostBuildState is set.
+    public ArchitectureRunnerPreparation? PreparedPostBuildRunner { get; init; }
 
     public CancellationToken CancellationToken { get; init; } = default;
 }

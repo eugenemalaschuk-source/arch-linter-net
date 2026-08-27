@@ -18,7 +18,8 @@ public sealed partial class ArchitectureBaselineApplicationService
             request.RequestedTargetFramework,
             request.RequestedPlatform,
             request.RequestedRuntimeIdentifier,
-            request.UsePreparedPostBuildState);
+            request.UsePreparedPostBuildState,
+            request.PreparedPostBuildRunner);
 
         return CollectCandidatesCore(
             request.PolicyPath, request.Mode, request.ConditionSetName, request.ContractIds, request.CancellationToken, buildState);
@@ -33,7 +34,8 @@ public sealed partial class ArchitectureBaselineApplicationService
             request.RequestedTargetFramework,
             request.RequestedPlatform,
             request.RequestedRuntimeIdentifier,
-            usePreparedPostBuildState: false);
+            usePreparedPostBuildState: false,
+            preparedPostBuildRunner: null);
 
         return CollectCandidatesCore(
             request.PolicyPath, request.Mode, request.ConditionSetName, request.ContractIds, request.CancellationToken, buildState);
@@ -71,7 +73,8 @@ public sealed partial class ArchitectureBaselineApplicationService
         string? RequestedTargetFramework,
         string? RequestedPlatform,
         string? RequestedRuntimeIdentifier,
-        bool UsePreparedPostBuildState)
+        bool UsePreparedPostBuildState,
+        ArchitectureRunnerPreparation? PreparedPostBuildRunner)
     {
         public static BaselineBuildStateOptions? From(
             BuildPreparationMode preparationMode,
@@ -80,7 +83,8 @@ public sealed partial class ArchitectureBaselineApplicationService
             string? requestedTargetFramework,
             string? requestedPlatform,
             string? requestedRuntimeIdentifier,
-            bool usePreparedPostBuildState)
+            bool usePreparedPostBuildState,
+            ArchitectureRunnerPreparation? preparedPostBuildRunner)
         {
             return preparationMode == BuildPreparationMode.EnsureBuilt
                 || noRestore
@@ -96,7 +100,8 @@ public sealed partial class ArchitectureBaselineApplicationService
                     requestedTargetFramework,
                     requestedPlatform,
                     requestedRuntimeIdentifier,
-                    usePreparedPostBuildState)
+                    usePreparedPostBuildState,
+                    preparedPostBuildRunner)
                 : null;
         }
     }

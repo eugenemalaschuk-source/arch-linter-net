@@ -51,8 +51,13 @@ internal sealed class ChangeCommandHandler(ICliRuntime runtime, ICliConsole cons
                 return FailIncompleteSnapshot("validation", validation.PreflightDiagnostics);
             }
 
-            ArchitectureGraphOutcome namespaces = runtime.BuildGraph(Request(options, ArchitectureGraphLevel.Namespace));
-            ArchitectureGraphOutcome assemblies = runtime.BuildGraph(Request(options, ArchitectureGraphLevel.Assembly));
+            if (options.EnsureBuilt && validation.PreparedPostBuildRunner is null)
+            {
+                return FailIncompleteSnapshot("validation", validation.PreflightDiagnostics);
+            }
+
+            ArchitectureGraphOutcome namespaces = runtime.BuildGraph(Request(options, validation, ArchitectureGraphLevel.Namespace));
+            ArchitectureGraphOutcome assemblies = runtime.BuildGraph(Request(options, validation, ArchitectureGraphLevel.Assembly));
             IReadOnlyList<ArchitectureBaselineComparisonEntry> baselineDebt = Array.Empty<ArchitectureBaselineComparisonEntry>();
             if (options.BaselinePath is not null)
             {
@@ -69,6 +74,7 @@ internal sealed class ChangeCommandHandler(ICliRuntime runtime, ICliConsole cons
                     RequestedPlatform = options.Platform,
                     RequestedRuntimeIdentifier = options.RuntimeIdentifier,
                     UsePreparedPostBuildState = options.EnsureBuilt,
+                    PreparedPostBuildRunner = validation.PreparedPostBuildRunner,
                 });
                 if (!baseline.Succeeded)
                 {
@@ -141,20 +147,24 @@ internal sealed class ChangeCommandHandler(ICliRuntime runtime, ICliConsole cons
         }
     }
 
-    private static ArchitectureGraphRequest Request(ChangeSnapshotCommandOptions options, ArchitectureGraphLevel level) => new()
-    {
-        PolicyPath = options.PolicyPath,
-        Mode = options.Mode,
-        Level = level,
-        ConditionSetName = options.ConditionSetName,
-        PreparationMode = BuildPreparationMode.Ordinary,
-        NoRestore = options.NoRestore,
-        RequestedConfiguration = options.Configuration,
-        RequestedTargetFramework = options.TargetFramework,
-        RequestedPlatform = options.Platform,
-        RequestedRuntimeIdentifier = options.RuntimeIdentifier,
-        UsePreparedPostBuildState = options.EnsureBuilt,
-    };
+    private static ArchitectureGraphRequest Request(
+        ChangeSnapshotCommandOptions options,
+        ValidationOutcome validation,
+        ArchitectureGraphLevel level) => new()
+        {
+            PolicyPath = options.PolicyPath,
+            Mode = options.Mode,
+            Level = level,
+            ConditionSetName = options.ConditionSetName,
+            PreparationMode = BuildPreparationMode.Ordinary,
+            NoRestore = options.NoRestore,
+            RequestedConfiguration = options.Configuration,
+            RequestedTargetFramework = options.TargetFramework,
+            RequestedPlatform = options.Platform,
+            RequestedRuntimeIdentifier = options.RuntimeIdentifier,
+            UsePreparedPostBuildState = options.EnsureBuilt,
+            PreparedPostBuildRunner = validation.PreparedPostBuildRunner,
+        };
 
     private int FailIncompleteSnapshot(
         string contributor,

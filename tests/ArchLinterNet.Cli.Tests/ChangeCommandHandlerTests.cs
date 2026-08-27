@@ -2,6 +2,8 @@ using System.Text;
 using ArchLinterNet.Cli.Abstractions;
 using ArchLinterNet.Core.BuildState;
 using ArchLinterNet.Core.Change;
+using ArchLinterNet.Core.Discovery;
+using ArchLinterNet.Core.Execution;
 using ArchLinterNet.Core.Graph;
 using ArchLinterNet.Core.Model;
 using ArchLinterNet.Core.Reporting;
@@ -41,7 +43,11 @@ public sealed class ChangeCommandHandlerTests
     [Test]
     public void CreateSnapshot_ForwardsBuildStateToEveryContributor()
     {
-        var runtime = new SnapshotRuntime(Outcome("/repo", "/repo/src/Acme/Acme.csproj"));
+        ArchitectureRunnerPreparation preparedRunner = PreparedRunner();
+        var runtime = new SnapshotRuntime(Outcome("/repo", "/repo/src/Acme/Acme.csproj") with
+        {
+            PreparedPostBuildRunner = preparedRunner,
+        });
         var handler = new ChangeCommandHandler(runtime, new CapturingConsole(), new CapturingFileSystem());
 
         int exitCode = handler.CreateSnapshot(new ChangeSnapshotCommandOptions(
@@ -67,7 +73,8 @@ public sealed class ChangeCommandHandlerTests
                 && request.RequestedConfiguration == "Release"
                 && request.RequestedTargetFramework == "net10.0"
                 && request.RequestedPlatform == "AnyCPU"
-                && request.RequestedRuntimeIdentifier == "win-x64"));
+                && request.RequestedRuntimeIdentifier == "win-x64"
+                && ReferenceEquals(request.PreparedPostBuildRunner, preparedRunner)));
             Assert.That(runtime.BaselineDiffRequest, Is.Not.Null);
             Assert.That(runtime.BaselineDiffRequest!.PreparationMode, Is.EqualTo(BuildPreparationMode.Ordinary));
             Assert.That(runtime.BaselineDiffRequest.UsePreparedPostBuildState, Is.True);
@@ -76,6 +83,28 @@ public sealed class ChangeCommandHandlerTests
             Assert.That(runtime.BaselineDiffRequest.RequestedTargetFramework, Is.EqualTo("net10.0"));
             Assert.That(runtime.BaselineDiffRequest.RequestedPlatform, Is.EqualTo("AnyCPU"));
             Assert.That(runtime.BaselineDiffRequest.RequestedRuntimeIdentifier, Is.EqualTo("win-x64"));
+            Assert.That(runtime.BaselineDiffRequest.PreparedPostBuildRunner, Is.SameAs(preparedRunner));
+        });
+    }
+
+    [Test]
+    public void CreateSnapshot_EnsureBuiltWithoutPreparedSelection_FailsWithoutWritingSnapshot()
+    {
+        var runtime = new SnapshotRuntime(Outcome("/repo", "/repo/src/Acme/Acme.csproj"));
+        var console = new CapturingConsole();
+        var fileSystem = new CapturingFileSystem();
+        var handler = new ChangeCommandHandler(runtime, console, fileSystem);
+
+        int exitCode = handler.CreateSnapshot(new ChangeSnapshotCommandOptions(
+            "architecture/dependencies.arch.yml", "strict", null, null, "snapshot.json", false,
+            EnsureBuilt: true));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(exitCode, Is.EqualTo(CliExitCodes.InvalidArgumentsOrRuntimeError));
+            Assert.That(runtime.GraphRequests, Is.Empty);
+            Assert.That(fileSystem.WrittenContents, Is.Null);
+            Assert.That(console.ErrorText, Does.Contain("validation did not produce complete analysis facts"));
         });
     }
 
@@ -211,6 +240,19 @@ public sealed class ChangeCommandHandlerTests
         RepositoryRoot = repositoryRoot,
         DiscoveredProjectPaths = new[] { projectPath },
     };
+
+    private static ArchitectureRunnerPreparation PreparedRunner() => new(
+        "/repo",
+        null,
+        ProjectDiscoveryResult.Empty,
+        ResolveAssemblyOutputs: true,
+        SelectedAssemblyArtifactPaths: ["/repo/bin/Release/net10.0/win-x64/Acme.dll"],
+        CapturedArtifactContentDigests: new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["/repo/bin/Release/net10.0/win-x64/Acme.dll"] = "digest",
+        },
+        MissingAssemblyNames: Array.Empty<string>(),
+        IsMetadataReferenceClosureComplete: true);
 
     private sealed class SnapshotRuntime(ValidationOutcome outcome) : ICliRuntime
     {

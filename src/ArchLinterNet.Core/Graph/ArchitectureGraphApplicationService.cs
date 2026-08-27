@@ -82,11 +82,20 @@ public sealed partial class ArchitectureGraphApplicationService(
             }
         }
 
+        if (request.UsePreparedPostBuildState
+            && request.RequestedTargetFramework is not null)
+        {
+            // MaterializePreparedRunner uses the supplied exact artifact paths; retain the
+            // effective framework only for shared-framework probing, which must follow the
+            // same caller-selected context rather than the policy default.
+            document.Analysis.TargetFramework = request.RequestedTargetFramework;
+        }
+
         ArchitectureRunnerSetup setup = request.UsePreparedPostBuildState
-            ? runnerSetupService.BuildRunnerForPostBuild(
+            ? runnerSetupService.MaterializePreparedRunner(
                 document,
-                request.PolicyPath,
-                request.ConditionSetName,
+                request.PreparedPostBuildRunner
+                    ?? throw new InvalidOperationException("Prepared graph analysis requires validation's receipt-backed artifact selection."),
                 selectedContractIds: selectedIds,
                 enableUnmatchedIgnoreTracking: false,
                 mode: request.Mode == "all" ? null : request.Mode)

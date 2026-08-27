@@ -47,7 +47,7 @@ The report SHALL classify current normalized findings and coverage blind spots i
 - **THEN** the report lists it as a new coverage blind spot
 
 ### Requirement: CLI emits human and JSON architecture change reports
-The CLI SHALL expose `change snapshot` to write a complete snapshot and `change report` to compare `--base` and `--current` snapshots. `change snapshot` SHALL accept `--ensure-built`, `--no-restore`, `--configuration`, `--framework`, `--platform`, and `--runtime` as explicit build-state options. When a build-state option is selected, the CLI SHALL apply one effective output context to validation, namespace and assembly graph projection, and optional baseline-debt comparison before persisting the snapshot. When `--ensure-built` is selected, the snapshot SHALL prepare its selected project graph exactly once and every later contributor SHALL consume that receipt-backed prepared output using the supported isolated post-build analysis path. A snapshot SHALL be written only when every requested contributor succeeds; it SHALL preserve canonical finding identity, requested mode, condition-set scope, deterministic ordering, and complete-result semantics. Ordinary snapshot invocation without those options SHALL remain non-building. `change report` SHALL support deterministic `human` and `json` output, leave existing validation behavior unchanged when it is not invoked, and return success for a completed report regardless of whether the report contains drift.
+The CLI SHALL expose `change snapshot` to write a complete snapshot and `change report` to compare `--base` and `--current` snapshots. `change snapshot` SHALL accept `--ensure-built`, `--no-restore`, `--configuration`, `--framework`, `--platform`, and `--runtime` as explicit build-state options. When a build-state option is selected, the CLI SHALL apply one effective output context to validation, namespace and assembly graph projection, and optional baseline-debt comparison before persisting the snapshot. When `--ensure-built` is selected, validation SHALL prepare its selected project graph exactly once and every later contributor SHALL consume validation's exact receipt-backed artifact selection through the supported fresh isolated post-build analysis path. A snapshot SHALL be written only when every requested contributor succeeds; it SHALL preserve canonical finding identity, requested mode, condition-set scope, deterministic ordering, and complete-result semantics. Ordinary snapshot invocation without those options SHALL remain non-building. `change report` SHALL support deterministic `human` and `json` output, leave existing validation behavior unchanged when it is not invoked, and return success for a completed report regardless of whether the report contains drift.
 
 #### Scenario: Snapshot accepts a complete post-build analysis request
 - **WHEN** a policy opts into `Microsoft.AspNetCore.App` and a user runs `change snapshot --ensure-built --configuration Debug --framework net10.0`
@@ -58,6 +58,11 @@ The CLI SHALL expose `change snapshot` to write a complete snapshot and `change 
 - **WHEN** a user creates an ensure-built snapshot with namespace, assembly, and baseline contributors
 - **THEN** the snapshot invokes the graph build exactly once
 - **AND THEN** each later contributor re-verifies and consumes that prepared output without invoking another restore or build
+
+#### Scenario: CLI output overrides win over policy output defaults
+- **WHEN** a policy defaults to Debug output and a user runs an ensure-built snapshot with `--configuration Release`, a framework override, or a runtime identifier
+- **THEN** validation, graph projections, and baseline-debt collection consume the same receipt-verified Release/framework/RID artifact selection
+- **AND THEN** no contributor rediscovers an artifact from the policy-default output path
 
 #### Scenario: A required baseline contributor is blocked
 - **WHEN** a snapshot requests `--baseline` and baseline-debt collection returns a blocked preflight result

@@ -1893,6 +1893,7 @@ sealed class ArchLinterNet.Core.Graph.ArchitectureGraphRequest : System.IEquatab
   operator !=(ArchLinterNet.Core.Graph.ArchitectureGraphRequest? left, ArchLinterNet.Core.Graph.ArchitectureGraphRequest? right)
   operator ==(ArchLinterNet.Core.Graph.ArchitectureGraphRequest? left, ArchLinterNet.Core.Graph.ArchitectureGraphRequest? right)
   property ArchLinterNet.Core.BuildState.BuildPreparationMode PreparationMode {get;init;}
+  property ArchLinterNet.Core.Execution.ArchitectureRunnerPreparation? PreparedPostBuildRunner {get;init;}
   property ArchLinterNet.Core.Model.ArchitectureGraphLevel Level {get;init;}
   property System.Collections.Generic.IReadOnlyCollection<string>? ContractIds {get;init;}
   property bool NoRestore {get;init;}
@@ -4584,6 +4585,7 @@ sealed class ArchLinterNet.Core.Validation.BaselineDiffRequest : System.IEquatab
   operator !=(ArchLinterNet.Core.Validation.BaselineDiffRequest? left, ArchLinterNet.Core.Validation.BaselineDiffRequest? right)
   operator ==(ArchLinterNet.Core.Validation.BaselineDiffRequest? left, ArchLinterNet.Core.Validation.BaselineDiffRequest? right)
   property ArchLinterNet.Core.BuildState.BuildPreparationMode PreparationMode {get;init;}
+  property ArchLinterNet.Core.Execution.ArchitectureRunnerPreparation? PreparedPostBuildRunner {get;init;}
   property System.Collections.Generic.IReadOnlyCollection<string>? ContractIds {get;init;}
   property System.Threading.CancellationToken CancellationToken {get;init;}
   property bool NoRestore {get;init;}
@@ -5002,6 +5004,7 @@ sealed class ArchLinterNet.Core.Validation.ValidationOutcome : System.IEquatable
   method void Deconstruct(out bool Passed, out System.Collections.Generic.IReadOnlyCollection<ArchLinterNet.Core.Model.ArchitectureViolation> Violations, out System.Collections.Generic.IReadOnlyCollection<string> Cycles, out System.Collections.Generic.IReadOnlyCollection<ArchLinterNet.Core.Model.ArchitectureViolation> CoverageFindings, out string CoverageConfig, out System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Model.ArchitectureUnmatchedIgnoredViolation> UnmatchedIgnoredViolations, out string UnmatchedIgnoredViolationsConfig, out System.Collections.Generic.IReadOnlyCollection<ArchLinterNet.Core.Model.PolicyConsistencyDiagnostic> PolicyConsistencyFindings, out string PolicyConsistencyConfig, out System.Collections.Generic.IReadOnlyCollection<ArchLinterNet.Core.Reporting.ArchitectureCoverageSummary> CoverageSummaries, out System.Collections.Generic.IReadOnlyCollection<ArchLinterNet.Core.Model.ArchitectureClassificationConflict> ClassificationConflicts, out System.Collections.Generic.IReadOnlyCollection<ArchLinterNet.Core.Model.ArchitectureClassificationMetadataFailure> ClassificationMetadataFailures)
   operator !=(ArchLinterNet.Core.Validation.ValidationOutcome? left, ArchLinterNet.Core.Validation.ValidationOutcome? right)
   operator ==(ArchLinterNet.Core.Validation.ValidationOutcome? left, ArchLinterNet.Core.Validation.ValidationOutcome? right)
+  property ArchLinterNet.Core.Execution.ArchitectureRunnerPreparation? PreparedPostBuildRunner {get;init;}
   property ArchLinterNet.Core.Model.ArchitectureClassificationPathDeferredNotice? ClassificationPathDeferred {get;init;}
   property ArchLinterNet.Core.Model.ArchitectureSourceExpansionInventory SourceExpansion {get;init;}
   property System.Collections.Generic.IReadOnlyCollection<ArchLinterNet.Core.Model.ArchitectureClassificationConflict> ClassificationConflicts {get;init;}

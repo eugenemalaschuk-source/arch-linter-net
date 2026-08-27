@@ -91,13 +91,15 @@ public sealed class ArchitectureGraphApplicationServiceBuildStateTests
             Mode = "strict",
             PreparationMode = BuildPreparationMode.Ordinary,
             UsePreparedPostBuildState = true,
+            PreparedPostBuildRunner = CreatePreparedRunner(discovery),
         });
 
         Assert.Multiple(() =>
         {
             Assert.That(outcome.Graph, Is.Not.Null);
             Assert.That(setupService.BuildRunnerCallCount, Is.EqualTo(0));
-            Assert.That(setupService.BuildRunnerForPostBuildCallCount, Is.EqualTo(1));
+            Assert.That(setupService.BuildRunnerForPostBuildCallCount, Is.EqualTo(0));
+            Assert.That(setupService.MaterializePreparedRunnerCallCount, Is.EqualTo(1));
             Assert.That(preparation.RequestsReceived, Has.Count.EqualTo(1));
             Assert.That(preparation.RequestsReceived,
                 Has.All.Matches<BuildStatePreflightRequest>(request =>
@@ -150,6 +152,19 @@ public sealed class ArchitectureGraphApplicationServiceBuildStateTests
             Assert.That(executor.ModesReceived, Is.Empty);
         });
     }
+
+    private static ArchitectureRunnerPreparation CreatePreparedRunner(ProjectDiscoveryResult discovery) => new(
+        "/fake/repository/root",
+        null,
+        discovery,
+        ResolveAssemblyOutputs: true,
+        SelectedAssemblyArtifactPaths: ["/fake/repository/root/bin/Release/net10.0/win-x64/Fixture.dll"],
+        CapturedArtifactContentDigests: new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["/fake/repository/root/bin/Release/net10.0/win-x64/Fixture.dll"] = "digest",
+        },
+        MissingAssemblyNames: Array.Empty<string>(),
+        IsMetadataReferenceClosureComplete: true);
 
     private static ArchitectureAnalysisSession CreateSession(
         ArchitectureContractDocument document, ProjectDiscoveryResult discovery)

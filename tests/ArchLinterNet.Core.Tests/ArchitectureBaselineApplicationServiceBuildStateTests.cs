@@ -48,6 +48,19 @@ public sealed class ArchitectureBaselineApplicationServiceBuildStateTests
     private static ArchitectureDiscoveredProject FixtureProject() =>
         new("Fixture.csproj", "Fixture", _value);
 
+    private static ArchitectureRunnerPreparation CreatePreparedRunner(ProjectDiscoveryResult discovery) => new(
+        "/fake/repository/root",
+        null,
+        discovery,
+        ResolveAssemblyOutputs: true,
+        SelectedAssemblyArtifactPaths: ["/fake/repository/root/bin/Release/net10.0/win-x64/Fixture.dll"],
+        CapturedArtifactContentDigests: new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["/fake/repository/root/bin/Release/net10.0/win-x64/Fixture.dll"] = "digest",
+        },
+        MissingAssemblyNames: Array.Empty<string>(),
+        IsMetadataReferenceClosureComplete: true);
+
     private static ArchitectureAnalysisSession CreateSession(
         ArchitectureContractDocument document,
         ProjectDiscoveryResult? projectDiscovery = null,
@@ -429,13 +442,15 @@ public sealed class ArchitectureBaselineApplicationServiceBuildStateTests
             Mode = "strict",
             PreparationMode = BuildPreparationMode.Ordinary,
             UsePreparedPostBuildState = true,
+            PreparedPostBuildRunner = CreatePreparedRunner(discovery),
         });
 
         Assert.Multiple(() =>
         {
             Assert.That(outcome.Succeeded, Is.True);
             Assert.That(runnerSetupService.BuildRunnerCallCount, Is.EqualTo(0));
-            Assert.That(runnerSetupService.BuildRunnerForPostBuildCallCount, Is.EqualTo(1));
+            Assert.That(runnerSetupService.BuildRunnerForPostBuildCallCount, Is.EqualTo(0));
+            Assert.That(runnerSetupService.MaterializePreparedRunnerCallCount, Is.EqualTo(1));
             Assert.That(preparationService.PrepareCallCount, Is.EqualTo(1));
             Assert.That(preparationService.RequestsReceived,
                 Has.All.Matches<BuildStatePreflightRequest>(request =>
