@@ -50,6 +50,45 @@ public sealed partial class ArchitectureBaselineApplicationService
             cancellationToken);
     }
 
+    private BuildStatePreflightResult RunBuildStatePreflight(
+        ArchitectureRunnerPreparation preparation,
+        BaselineBuildStateOptions options,
+        CancellationToken cancellationToken)
+    {
+        // Metadata-only preparation has no Assembly instances to pass through. Discovery still
+        // owns the exact project output paths, so baseline verification must retain those paths as
+        // receipt evidence in both its build-capable and ordinary post-build preflight passes.
+        if (preparation.ProjectDiscovery.DiscoveredProjects.Count == 0)
+        {
+            return new BuildStatePreflightResult(Array.Empty<BuildStatePreflightDiagnostic>());
+        }
+
+        BuildStateResolvedAssemblies resolution = new(
+            Array.Empty<System.Reflection.Assembly>(), preparation.MissingAssemblyNames)
+        {
+            ResolvedAssemblyPaths = preparation.ProjectDiscovery.ResolvedAssemblyPaths,
+        };
+
+        if (resolution.ResolvedAssemblyPaths.Count == 0 && resolution.MissingAssemblyNames.Count == 0)
+        {
+            return new BuildStatePreflightResult(Array.Empty<BuildStatePreflightDiagnostic>());
+        }
+
+        IBuildStatePreparationService preparationService = buildStatePreparationService
+            ?? throw new InvalidOperationException("Build-state preparation is unavailable for baseline verification.");
+        return preparationService.Prepare(new BuildStatePreflightRequest(
+            preparation.RepositoryRoot,
+            preparation.ProjectDiscovery,
+            resolution,
+            options.PreparationMode,
+            options.NoRestore,
+            options.RequestedConfiguration,
+            options.RequestedTargetFramework,
+            options.RequestedPlatform,
+            options.RequestedRuntimeIdentifier,
+            cancellationToken));
+    }
+
     private sealed record BaselineBuildStateOptions(
         BuildPreparationMode PreparationMode,
         bool NoRestore,

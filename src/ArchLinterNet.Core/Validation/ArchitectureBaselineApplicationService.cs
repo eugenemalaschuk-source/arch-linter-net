@@ -396,44 +396,77 @@ public sealed partial class ArchitectureBaselineApplicationService(
             }
         }
 
-        ArchitectureRunnerSetup setup = runnerSetupService.BuildRunner(
-            document,
-            policyPath,
-            conditionSetName,
-            selectedContractIds: selectedContractIds,
-            enableUnmatchedIgnoreTracking: true,
-            mode: mode == "all" ? null : mode,
-            cancellationToken: cancellationToken);
+        ArchitectureRunnerSetup? setup = null;
 
         try
         {
-            if (buildState != null)
+            if (buildState?.PreparationMode == BuildPreparationMode.EnsureBuilt)
             {
-                BuildStatePreflightResult preflight = RunBuildStatePreflight(setup.Runner, buildState, cancellationToken);
+                ArchitectureRunnerPreparation preparation = runnerSetupService.PrepareRunner(
+                    document,
+                    policyPath,
+                    conditionSetName,
+                    selectedContractIds: selectedContractIds,
+                    mode: mode == "all" ? null : mode,
+                    cancellationToken: cancellationToken);
+
+                BuildStatePreflightResult preflight = RunBuildStatePreflight(preparation, buildState, cancellationToken);
                 if (preflight.Blocked)
                 {
                     return BaselineCandidateCollection.PreflightBlocked(document, preflight.Diagnostics);
                 }
 
-                if (buildState.PreparationMode == BuildPreparationMode.EnsureBuilt
-                    && setup.Runner.Session.Context.ProjectDiscovery is { DiscoveredProjects.Count: > 0 })
+                preparation = PostBuildArtifactEvidenceRefresher.Refresh(
+                    document, preparation, preflight, cancellationToken);
+                preflight = RunBuildStatePreflight(
+                    preparation,
+                    buildState with { PreparationMode = BuildPreparationMode.Ordinary },
+                    cancellationToken);
+                if (preflight.Blocked)
                 {
-                    // The initial runner only identifies what must be built. Candidate collection
-                    // must execute against a fresh isolated post-build runner: it is the only
-                    // supported path that supplies an opted-in shared-framework closure.
-                    ArchitectureRunnerSetup postBuildSetup = runnerSetupService.BuildRunnerForPostBuild(
-                        document, policyPath, conditionSetName,
+                    return BaselineCandidateCollection.PreflightBlocked(document, preflight.Diagnostics);
+                }
+
+                if (preparation.HasCompleteRootSelection)
+                {
+                    setup = runnerSetupService.MaterializePreparedRunner(
+                        document,
+                        preparation,
                         selectedContractIds: selectedContractIds,
                         enableUnmatchedIgnoreTracking: true,
                         mode: mode == "all" ? null : mode,
                         cancellationToken: cancellationToken);
-                    setup.Runner.Session.Context.Dispose();
-                    setup = postBuildSetup;
+                }
+                else
+                {
+                    // An incomplete metadata selection cannot be materialized. Preserve the
+                    // existing ordinary resolution fallback, but only after metadata preparation
+                    // and both preflight decisions have established that no build result is being
+                    // consumed by the prepared path.
+                    setup = runnerSetupService.BuildRunner(
+                        document,
+                        policyPath,
+                        conditionSetName,
+                        selectedContractIds: selectedContractIds,
+                        enableUnmatchedIgnoreTracking: true,
+                        mode: mode == "all" ? null : mode,
+                        cancellationToken: cancellationToken);
+                }
+            }
+            else
+            {
+                setup = runnerSetupService.BuildRunner(
+                    document,
+                    policyPath,
+                    conditionSetName,
+                    selectedContractIds: selectedContractIds,
+                    enableUnmatchedIgnoreTracking: true,
+                    mode: mode == "all" ? null : mode,
+                    cancellationToken: cancellationToken);
 
-                    preflight = RunBuildStatePreflight(
-                        setup.Runner,
-                        buildState with { PreparationMode = BuildPreparationMode.Ordinary },
-                        cancellationToken);
+                if (buildState != null)
+                {
+                    BuildStatePreflightResult preflight = RunBuildStatePreflight(setup.Runner, buildState, cancellationToken);
                     if (preflight.Blocked)
                     {
                         return BaselineCandidateCollection.PreflightBlocked(document, preflight.Diagnostics);
@@ -441,7 +474,9 @@ public sealed partial class ArchitectureBaselineApplicationService(
                 }
             }
 
-            IArchitectureContractRunner runner = setup.Runner;
+            IArchitectureContractRunner runner = setup is null
+                ? throw new InvalidOperationException("Architecture runner materialization did not produce a runner.")
+                : setup.Runner;
             List<ArchitectureViolation> configViolations = mode switch
             {
                 ModeStrict => runner.CheckConfiguration(strict: true),
@@ -479,7 +514,7 @@ public sealed partial class ArchitectureBaselineApplicationService(
         {
             // Candidate identities are plain value records, so the runner's ordinary or isolated
             // load context is no longer needed once collection returns.
-            setup.Runner.Session.Context.Dispose();
+            setup?.Runner.Session.Context.Dispose();
         }
     }
 
