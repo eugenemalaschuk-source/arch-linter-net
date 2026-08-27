@@ -101,6 +101,7 @@ public sealed class ArchitectureRunnerSetupService(
         cancellationToken.ThrowIfCancellationRequested();
         string repositoryRoot = repositoryRootResolver.ResolveFrom(policyPath);
         IReadOnlyList<string>? symbols = ResolveSymbols(document, conditionSetName, preprocessorSymbols);
+        bool usesGraphDrivenAssemblySelection = document.Analysis.TargetAssemblies.Count == 0;
         // Preparation must independently select the current project's output artifacts even when
         // an authored target_assemblies list would let ordinary execution use probing. This is
         // metadata-only and does not alter normal cache-disabled resolution precedence.
@@ -136,7 +137,16 @@ public sealed class ArchitectureRunnerSetupService(
         IReadOnlyDictionary<string, string> capturedDigests = PreparedArtifactEvidence.CaptureDigests(closure, cancellationToken);
         return new ArchitectureRunnerPreparation(
             repositoryRoot, symbols, discovery, resolveAssemblyOutputs,
-            closure, capturedDigests, missing, closureComplete);
+            closure, capturedDigests, missing, closureComplete)
+        {
+            GraphDrivenRootAssemblyNames = usesGraphDrivenAssemblySelection
+                ? discovery.DiscoveredProjects
+                    .Select(project => project.AssemblyName)
+                    .Where(static name => !string.IsNullOrWhiteSpace(name))
+                    .Distinct(StringComparer.Ordinal)
+                    .ToArray()
+                : Array.Empty<string>(),
+        };
     }
 
     public ArchitectureRunnerSetup MaterializePreparedRunner(

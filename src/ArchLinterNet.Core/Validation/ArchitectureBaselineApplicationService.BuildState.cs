@@ -63,11 +63,21 @@ public sealed partial class ArchitectureBaselineApplicationService
             return new BuildStatePreflightResult(Array.Empty<BuildStatePreflightDiagnostic>());
         }
 
+        bool hasGraphDrivenRoots = preparation.GraphDrivenRootAssemblyNames.Count > 0;
         Dictionary<string, string> paths = preparation.ProjectDiscovery.ResolvedAssemblyPaths
-            .Where(pair => preparation.SelectedAssemblyArtifactPaths.Contains(pair.Value, StringComparer.OrdinalIgnoreCase))
+            .Where(pair => hasGraphDrivenRoots
+                ? preparation.GraphDrivenRootAssemblyNames.Contains(pair.Key, StringComparer.Ordinal)
+                : preparation.SelectedAssemblyArtifactPaths.Contains(pair.Value, StringComparer.OrdinalIgnoreCase))
             .ToDictionary(pair => pair.Key, pair => pair.Value, StringComparer.Ordinal);
+        IReadOnlyList<string> missingAssemblyNames = hasGraphDrivenRoots
+            ? preparation.GraphDrivenRootAssemblyNames
+                .Where(name => !paths.ContainsKey(name))
+                .Concat(preparation.MissingAssemblyNames)
+                .Distinct(StringComparer.Ordinal)
+                .ToArray()
+            : preparation.MissingAssemblyNames;
         BuildStateResolvedAssemblies resolution = new(
-            Array.Empty<System.Reflection.Assembly>(), preparation.MissingAssemblyNames)
+            Array.Empty<System.Reflection.Assembly>(), missingAssemblyNames)
         {
             ResolvedAssemblyPaths = paths,
         };

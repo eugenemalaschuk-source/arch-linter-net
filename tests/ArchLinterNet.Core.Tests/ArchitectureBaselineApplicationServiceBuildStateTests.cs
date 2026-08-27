@@ -360,6 +360,72 @@ public sealed class ArchitectureBaselineApplicationServiceBuildStateTests
     }
 
     [Test]
+    public void Verify_EnsureBuiltWithGraphDrivenStaleOutput_UsesDiscoveredRootForBothPreflights()
+    {
+        var document = CreateDocument();
+        string fixturePath = Path.GetFullPath(Path.Combine("/fake/repository/root", "bin", "Fixture.dll"));
+        var discovery = ProjectDiscoveryResult.Empty with
+        {
+            DiscoveredProjects = new[] { FixtureProject() },
+            ResolvedAssemblyPaths = new Dictionary<string, string>(StringComparer.Ordinal)
+            {
+                ["Fixture"] = fixturePath,
+            },
+        };
+        var firstRunner = new FakeContractRunner(CreateSession(document, discovery));
+        var secondRunner = new FakeContractRunner(CreateSession(document, discovery));
+        var runnerSetupService = new FakeRunnerSetupService
+        {
+            DocumentToReturn = document,
+            RunnerToReturn = firstRunner,
+            RunnersToReturn = new Queue<IArchitectureContractRunner>(new IArchitectureContractRunner[] { secondRunner }),
+            PreparationToReturn = new ArchitectureRunnerPreparation(
+                "/fake/repository/root",
+                PreprocessorSymbols: null,
+                ProjectDiscovery: discovery,
+                ResolveAssemblyOutputs: true,
+                SelectedAssemblyArtifactPaths: Array.Empty<string>(),
+                CapturedArtifactContentDigests: new Dictionary<string, string>(),
+                MissingAssemblyNames: Array.Empty<string>(),
+                IsMetadataReferenceClosureComplete: false)
+            {
+                GraphDrivenRootAssemblyNames = ["Fixture"],
+            },
+        };
+        var preparationService = new FakeBuildStatePreparationService
+        {
+            ResultsToReturn = new Queue<BuildStatePreflightResult>(new[]
+            {
+                new BuildStatePreflightResult(new[] { CurrentDiagnostic() }),
+                new BuildStatePreflightResult(new[] { CurrentDiagnostic() }),
+            }),
+        };
+        var applicationService = new ArchitectureBaselineApplicationService(
+            runnerSetupService, new FakeContractHandlerRegistry(), new FakeContractExecutor(),
+            new FakeBaselineGenerator(), new FakeBaselineLoadingService(), preparationService);
+
+        BaselineVerifyOutcome outcome = applicationService.Verify(new BaselineVerifyRequest
+        {
+            PolicyPath = "unused-by-fakes.arch.yml",
+            BaselinePath = "unused-by-fakes.baseline.yml",
+            Mode = "all",
+            PreparationMode = BuildPreparationMode.EnsureBuilt,
+        });
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(outcome.Succeeded, Is.True);
+            Assert.That(preparationService.PrepareCallCount, Is.EqualTo(2));
+            Assert.That(preparationService.RequestsReceived[0].Resolution.ResolvedAssemblyPaths.Keys,
+                Is.EquivalentTo(new[] { "Fixture" }));
+            Assert.That(preparationService.RequestsReceived[1].Resolution.ResolvedAssemblyPaths.Keys,
+                Is.EquivalentTo(new[] { "Fixture" }));
+            Assert.That(document.Analysis.TargetAssemblies, Is.EquivalentTo(new[] { "Fixture" }));
+            Assert.That(runnerSetupService.MaterializePreparedRunnerCallCount, Is.EqualTo(1));
+        });
+    }
+
+    [Test]
     public void Verify_EnsureBuiltWithSecondPreflightBlocked_ReturnsPreflightBlockedBeforeMaterialization()
     {
         var document = CreateDocument();
