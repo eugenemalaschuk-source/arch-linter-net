@@ -320,7 +320,7 @@ public sealed class ArchitectureBaselineApplicationServiceBuildStateTests
             // a second EnsureBuilt attempt would be redundant.
             Assert.That(preparationService.RequestsReceived[1].PreparationMode, Is.EqualTo(BuildPreparationMode.Ordinary));
             Assert.That(preparationService.RequestsReceived[1].Resolution.ResolvedAssemblyPaths["Fixture"],
-                Is.EqualTo("/fake/repository/root/bin/Fixture.dll"));
+                Is.EqualTo(Path.GetFullPath("/fake/repository/root/bin/Fixture.dll")));
             // Contract execution must run against the materialized post-build runner, not anything
             // used only to discover what needed building.
             Assert.That(firstRunner.StrictArgumentsReceived, Is.Empty);
