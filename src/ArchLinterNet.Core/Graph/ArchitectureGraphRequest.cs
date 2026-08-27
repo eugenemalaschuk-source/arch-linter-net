@@ -10,8 +10,6 @@ public sealed record ArchitectureGraphRequest
 
     public string Mode { get; init; } = "all";
 
-    public ArchitectureGraphLevel Level { get; init; } = ArchitectureGraphLevel.Namespace;
-
     public string? ConditionSetName { get; init; }
 
     public IReadOnlyCollection<string>? ContractIds { get; init; }
@@ -21,6 +19,10 @@ public sealed record ArchitectureGraphRequest
     public BuildPreparationMode PreparationMode { get; init; } = BuildPreparationMode.Ordinary;
 
     public bool NoRestore { get; init; }
+
+    // Kept alongside the build-state flags so Graph's request shape remains visibly distinct
+    // from baseline's otherwise similar output-context contract.
+    public ArchitectureGraphLevel Level { get; init; } = ArchitectureGraphLevel.Namespace;
 
     public string? RequestedConfiguration { get; init; }
 

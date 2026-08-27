@@ -9,7 +9,17 @@ public sealed partial class BuildStatePreparationService
     // same build process while applying the runtime only to projects, where the SDK supports it.
     // Selecting graph roots preserves the complete relevant ProjectReference closure without
     // independently rebuilding every dependency.
-    private static string WriteTemporaryRuntimeGraphBuildProject(BuildStatePreflightRequest request)
+    internal static string WriteTemporaryRuntimeGraphBuildProject(BuildStatePreflightRequest request)
+    {
+        string path = Path.Combine(Path.GetTempPath(), $"archlinternet-ensure-built-{Guid.NewGuid():N}.proj");
+        File.WriteAllText(path, CreateRuntimeGraphBuildProjectContent(request));
+        return path;
+    }
+
+    // Kept separate from the temporary-file boundary so the graph-root selection and MSBuild
+    // property handoff can be verified without starting a child `dotnet` process. The process
+    // boundary itself remains covered by the packaged acceptance regression.
+    internal static string CreateRuntimeGraphBuildProjectContent(BuildStatePreflightRequest request)
     {
         IReadOnlyCollection<ArchitectureDiscoveredProject> selected =
             SelectRelevantProjectsWithTransitiveReferences(request);
@@ -44,10 +54,7 @@ public sealed partial class BuildStatePreparationService
             + $"    <MSBuild Projects=\"@(BuildStateProject)\" Targets=\"Build\" BuildInParallel=\"false\" Properties=\"{buildProperties}\" />" + Environment.NewLine
             + "  </Target>" + Environment.NewLine
             + "</Project>" + Environment.NewLine;
-
-        string path = Path.Combine(Path.GetTempPath(), $"archlinternet-ensure-built-{Guid.NewGuid():N}.proj");
-        File.WriteAllText(path, content);
-        return path;
+        return content;
     }
 
     private static string BuildProjectProperties(BuildStatePreflightRequest request, bool noRestore)

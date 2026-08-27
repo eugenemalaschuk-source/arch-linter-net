@@ -90,6 +90,7 @@ public sealed class ArchitectureGraphApplicationServiceBuildStateTests
             PolicyPath = "unused.yml",
             Mode = "strict",
             PreparationMode = BuildPreparationMode.Ordinary,
+            RequestedTargetFramework = "net10.0",
             UsePreparedPostBuildState = true,
             PreparedPostBuildRunner = CreatePreparedRunner(discovery),
         });
@@ -106,6 +107,128 @@ public sealed class ArchitectureGraphApplicationServiceBuildStateTests
                     request.PreparationMode == BuildPreparationMode.Ordinary));
             Assert.That(preparedRunner.StrictArgumentsReceived, Is.Not.Empty);
             Assert.That(executor.ModesReceived, Is.EqualTo(["strict"]));
+        });
+    }
+
+    [Test]
+    public void BuildGraph_WithoutBuildStateOptions_UsesOrdinaryRunnerWithoutAPreparationService()
+    {
+        ArchitectureContractDocument document = new() { Version = 1, Name = "Fake" };
+        FakeContractRunner runner = new(CreateSession(document, ProjectDiscoveryResult.Empty));
+        var setupService = new FakeRunnerSetupService { DocumentToReturn = document, RunnerToReturn = runner };
+        var executor = new FakeContractExecutor();
+        var service = new ArchitectureGraphApplicationService(
+            setupService, new FakeContractHandlerRegistry(), executor);
+
+        ArchitectureGraphOutcome outcome = service.BuildGraph(new ArchitectureGraphRequest
+        {
+            PolicyPath = "unused.yml",
+            Mode = "strict",
+        });
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(outcome.Graph, Is.Not.Null);
+            Assert.That(setupService.BuildRunnerForPostBuildCallCount, Is.EqualTo(0));
+            Assert.That(executor.ModesReceived, Is.EqualTo(["strict"]));
+        });
+    }
+
+    [Test]
+    public void BuildGraph_PreparedPostBuildStateWithBlockedReceiptVerification_FailsClosed()
+    {
+        ArchitectureContractDocument document = new() { Version = 1, Name = "Fake" };
+        ProjectDiscoveryResult discovery = DiscoveryWithFixtureProject();
+        FakeContractRunner runner = new(CreateSession(document, discovery));
+        var setupService = new FakeRunnerSetupService
+        {
+            DocumentToReturn = document,
+            RunnerToReturn = runner,
+        };
+        var preparation = new RecordingBuildStatePreparationService { ResultToReturn = BlockingPreflight() };
+        var executor = new FakeContractExecutor();
+        var service = new ArchitectureGraphApplicationService(
+            setupService, new FakeContractHandlerRegistry(), executor, preparation);
+
+        Assert.That(
+            () => service.BuildGraph(new ArchitectureGraphRequest
+            {
+                PolicyPath = "unused.yml",
+                Mode = "strict",
+                UsePreparedPostBuildState = true,
+                PreparedPostBuildRunner = CreatePreparedRunner(discovery),
+            }),
+            Throws.InvalidOperationException.With.Message.Contains("Graph build-state preflight is blocked"));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(setupService.MaterializePreparedRunnerCallCount, Is.EqualTo(1));
+            Assert.That(setupService.BuildRunnerForPostBuildCallCount, Is.EqualTo(0));
+            Assert.That(executor.ModesReceived, Is.Empty);
+        });
+    }
+
+    [Test]
+    public void BuildGraph_EnsureBuiltWithoutDiscoveredProjects_DoesNotCreatePostBuildRunner()
+    {
+        ArchitectureContractDocument document = new() { Version = 1, Name = "Fake" };
+        FakeContractRunner runner = new(CreateSession(document, ProjectDiscoveryResult.Empty));
+        var setupService = new FakeRunnerSetupService { DocumentToReturn = document, RunnerToReturn = runner };
+        var executor = new FakeContractExecutor();
+        var service = new ArchitectureGraphApplicationService(
+            setupService, new FakeContractHandlerRegistry(), executor, new RecordingBuildStatePreparationService());
+
+        ArchitectureGraphOutcome outcome = service.BuildGraph(new ArchitectureGraphRequest
+        {
+            PolicyPath = "unused.yml",
+            Mode = "strict",
+            PreparationMode = BuildPreparationMode.EnsureBuilt,
+        });
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(outcome.Graph, Is.Not.Null);
+            Assert.That(setupService.BuildRunnerForPostBuildCallCount, Is.EqualTo(0));
+            Assert.That(executor.ModesReceived, Is.EqualTo(["strict"]));
+        });
+    }
+
+    [Test]
+    public void BuildGraph_EnsureBuiltWithBlockedPostBuildReceiptVerification_FailsClosed()
+    {
+        ArchitectureContractDocument document = new() { Version = 1, Name = "Fake" };
+        ProjectDiscoveryResult discovery = DiscoveryWithFixtureProject();
+        FakeContractRunner initialRunner = new(CreateSession(document, discovery));
+        FakeContractRunner postBuildRunner = new(CreateSession(document, discovery));
+        var setupService = new FakeRunnerSetupService
+        {
+            DocumentToReturn = document,
+            RunnersToReturn = new Queue<IArchitectureContractRunner>([initialRunner, postBuildRunner]),
+        };
+        var preparation = new RecordingBuildStatePreparationService
+        {
+            ResultsToReturn = new Queue<BuildStatePreflightResult>([
+                new BuildStatePreflightResult(Array.Empty<BuildStatePreflightDiagnostic>()),
+                BlockingPreflight(),
+            ]),
+        };
+        var executor = new FakeContractExecutor();
+        var service = new ArchitectureGraphApplicationService(
+            setupService, new FakeContractHandlerRegistry(), executor, preparation);
+
+        Assert.That(
+            () => service.BuildGraph(new ArchitectureGraphRequest
+            {
+                PolicyPath = "unused.yml",
+                Mode = "strict",
+                PreparationMode = BuildPreparationMode.EnsureBuilt,
+            }),
+            Throws.InvalidOperationException.With.Message.Contains("Graph build-state preflight is blocked"));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(setupService.BuildRunnerForPostBuildCallCount, Is.EqualTo(1));
+            Assert.That(executor.ModesReceived, Is.Empty);
         });
     }
 
@@ -166,6 +289,17 @@ public sealed class ArchitectureGraphApplicationServiceBuildStateTests
         MissingAssemblyNames: Array.Empty<string>(),
         IsMetadataReferenceClosureComplete: true);
 
+    private static ProjectDiscoveryResult DiscoveryWithFixtureProject() => ProjectDiscoveryResult.Empty with
+    {
+        DiscoveredProjects = [new ArchitectureDiscoveredProject("Fixture.csproj", "Fixture", ["net10.0"])],
+    };
+
+    private static BuildStatePreflightResult BlockingPreflight() => new([
+        new BuildStatePreflightDiagnostic(
+            "build-state-preflight", "Fixture.csproj", BuildStatePreflightState.MissingArtifact,
+            new BuildStatePreflightEvidence("Fixture.csproj", "Fixture")),
+    ]);
+
     private static ArchitectureAnalysisSession CreateSession(
         ArchitectureContractDocument document, ProjectDiscoveryResult discovery)
     {
@@ -187,10 +321,12 @@ public sealed class ArchitectureGraphApplicationServiceBuildStateTests
         public BuildStatePreflightResult ResultToReturn { get; init; } =
             new(Array.Empty<BuildStatePreflightDiagnostic>());
 
+        public Queue<BuildStatePreflightResult>? ResultsToReturn { get; init; }
+
         public BuildStatePreflightResult Prepare(BuildStatePreflightRequest request)
         {
             RequestsReceived.Add(request);
-            return ResultToReturn;
+            return ResultsToReturn is { Count: > 0 } ? ResultsToReturn.Dequeue() : ResultToReturn;
         }
     }
 }
