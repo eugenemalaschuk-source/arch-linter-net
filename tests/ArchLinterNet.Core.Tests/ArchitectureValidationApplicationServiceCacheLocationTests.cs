@@ -265,7 +265,9 @@ public sealed partial class ArchitectureValidationApplicationServiceCacheLocatio
         var runnerSetupService = new FakeRunnerSetupService
         {
             DocumentToReturn = document,
-            PreparationProvider = _ => CreatePreparation(missingAssemblyNames: Array.Empty<string>()),
+            PreparationProvider = _ => CreatePreparation(
+                selectedPaths: ["/fake/repository/root/Fixture.dll"],
+                missingAssemblyNames: Array.Empty<string>()),
             RunnerToReturn = new FakeContractRunner(CreateEmptySession(document)),
         };
         var applicationService = new ArchitectureValidationApplicationService(
