@@ -18,6 +18,8 @@ internal sealed class FakeRunnerSetupService : IArchitectureRunnerSetupService
 
     public int BuildRunnerForPostBuildCallCount { get; private set; }
 
+    public int MaterializePreparedRunnerCallCount { get; private set; }
+
     public Queue<IArchitectureContractRunner>? RunnersToReturn { get; init; }
 
     public HashSet<string>? SelectedContractIdsReceived { get; private set; }
@@ -61,6 +63,22 @@ internal sealed class FakeRunnerSetupService : IArchitectureRunnerSetupService
         CancellationToken cancellationToken = default, int? maxParallelism = null)
     {
         BuildRunnerForPostBuildCallCount++;
+        SelectedContractIdsReceived = selectedContractIds;
+        ModeReceived = mode;
+        return CreateSetup();
+    }
+
+    public ArchitectureRunnerSetup MaterializePreparedRunner(
+        ArchitectureContractDocument document,
+        ArchitectureRunnerPreparation preparation,
+        HashSet<string>? selectedContractIds = null,
+        bool enableUnmatchedIgnoreTracking = true,
+        ValidationTiming? timing = null,
+        string? mode = null,
+        CancellationToken cancellationToken = default,
+        int? maxParallelism = null)
+    {
+        MaterializePreparedRunnerCallCount++;
         SelectedContractIdsReceived = selectedContractIds;
         ModeReceived = mode;
         return CreateSetup();

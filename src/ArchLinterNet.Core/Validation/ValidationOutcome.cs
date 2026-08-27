@@ -1,3 +1,4 @@
+using ArchLinterNet.Core.Execution;
 using ArchLinterNet.Core.Model;
 using ArchLinterNet.Core.Reporting;
 
@@ -38,6 +39,11 @@ public sealed record ValidationOutcome(
         Array.Empty<BuildStatePreflightDiagnostic>();
 
     public bool PreflightBlocked { get; init; }
+
+    // Present for a successful explicit preparation. Snapshot orchestration can hand this
+    // immutable, receipt-backed selection to later contributors so they materialize the exact
+    // post-build artifacts rather than rediscovering policy-default output paths.
+    public ArchitectureRunnerPreparation? PreparedPostBuildRunner { get; init; }
 
     // The authoritative repository root this analysis resolved (ArchitectureAnalysisSnapshot's own
     // RepositoryRoot, itself produced by IArchitectureRepositoryRootResolver) — never re-derived by

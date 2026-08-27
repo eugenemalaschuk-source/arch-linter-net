@@ -11,7 +11,7 @@ namespace ArchLinterNet.Core.BuildState;
 // constructs the `dotnet build` invocation — see the security/trust boundary in
 // docs/internal/analysis-build-state-blueprint.md: structured argv only, never a shell string,
 // never sourced from policy/baseline/receipt/cache content.
-public sealed class BuildStatePreparationService : IBuildStatePreparationService
+public sealed partial class BuildStatePreparationService : IBuildStatePreparationService
 {
     private const string ContractName = "build-state-preflight";
 
@@ -384,7 +384,10 @@ public sealed class BuildStatePreparationService : IBuildStatePreparationService
 
     private static BuildStatePreflightDiagnostic? InvokeGraphBuild(BuildStatePreflightRequest request)
     {
-        string solutionPath = WriteTemporaryGraphSolution(request);
+        bool buildsRuntimeSpecificOutput = request.RequestedRuntimeIdentifier != null;
+        string buildTargetPath = buildsRuntimeSpecificOutput
+            ? WriteTemporaryRuntimeGraphBuildProject(request)
+            : WriteTemporaryGraphSolution(request);
         try
         {
             // Restore the solution once, up front, before building with --no-restore. Letting
@@ -407,7 +410,7 @@ public sealed class BuildStatePreparationService : IBuildStatePreparationService
                 // itself isn't framework-scoped anyway; it always resolves for every TFM the
                 // project(s) declare, regardless of which one is later requested for the build.
                 List<string> restoreArguments =
-                    new() { "restore", solutionPath, "--nologo", "-m:1", "--disable-parallel" };
+                    new() { "restore", buildTargetPath, "--nologo", "-m:1", "--disable-parallel" };
                 BuildStatePreflightDiagnostic? restoreFailure = RunDotnetCommand(
                     request, restoreArguments, "restore", BuildStatePreflightState.RestoreFailed);
                 if (restoreFailure != null)
@@ -419,8 +422,8 @@ public sealed class BuildStatePreparationService : IBuildStatePreparationService
             // A project can be both a solution entry and a ProjectReference. Keep that shared
             // project from being built by two MSBuild nodes concurrently, which races on its obj
             // files on macOS (for example, GraphLib.csproj.FileListAbsolute.txt).
-            List<string> arguments = new() { "build", solutionPath, "--nologo", "--no-restore", "-m:1" };
-            if (request.RequestedConfiguration != null)
+            List<string> arguments = new() { "build", buildTargetPath, "--nologo", "--no-restore", "-m:1" };
+            if (!buildsRuntimeSpecificOutput && request.RequestedConfiguration != null)
             {
                 arguments.Add("-c");
                 arguments.Add(request.RequestedConfiguration);
@@ -430,22 +433,20 @@ public sealed class BuildStatePreparationService : IBuildStatePreparationService
             // TFM in that list (e.g. a Windows-only target on a non-Windows CI runner) can fail
             // the whole graph build even though the caller only asked to validate one specific
             // framework.
-            AddFrameworkArgument(arguments, request.RequestedTargetFramework);
-            if (request.RequestedPlatform != null)
+            if (!buildsRuntimeSpecificOutput)
             {
-                arguments.Add($"-p:Platform={request.RequestedPlatform}");
-            }
-            if (request.RequestedRuntimeIdentifier != null)
-            {
-                arguments.Add("-r");
-                arguments.Add(request.RequestedRuntimeIdentifier);
+                AddFrameworkArgument(arguments, request.RequestedTargetFramework);
+                if (request.RequestedPlatform != null)
+                {
+                    arguments.Add($"-p:Platform={request.RequestedPlatform}");
+                }
             }
 
             return RunDotnetCommand(request, arguments, "build", BuildStatePreflightState.BuildFailed);
         }
         finally
         {
-            File.Delete(solutionPath);
+            File.Delete(buildTargetPath);
         }
     }
 

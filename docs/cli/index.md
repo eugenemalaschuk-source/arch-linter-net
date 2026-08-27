@@ -67,7 +67,7 @@ Run `arch-linter-net --help` or `arch-linter-net <command> --help` for the exact
 
 <!-- cli-command: change snapshot -->
 
-| `arch-linter-net change snapshot --policy <path> --output <path>` | Write a complete architecture change snapshot. |
+| `arch-linter-net change snapshot --policy <path> --output <path>` | Write a complete architecture change snapshot; use build-state options when a consumer requires post-build analysis. |
 
 <!-- cli-command: change report -->
 
@@ -263,11 +263,13 @@ arch-linter-net gate \
 arch-linter-net change snapshot \
   --policy architecture/arch.yml \
   --mode strict \
+  --ensure-built --configuration Debug --framework net10.0 \
   --output base-snapshot.json
 
 arch-linter-net change snapshot \
   --policy architecture/arch.yml \
   --mode strict \
+  --ensure-built --configuration Debug --framework net10.0 \
   --output current-snapshot.json
 
 arch-linter-net change report \
@@ -275,6 +277,11 @@ arch-linter-net change report \
   --current current-snapshot.json \
   --format human
 ```
+
+When the policy opts into a shared framework, use `--ensure-built` for both
+snapshots and keep `--configuration`, `--framework`, `--platform`, and `--runtime`
+consistent across them. `--no-restore` preserves an offline, fail-closed build
+when the consumer has already restored its prerequisites.
 
 Snapshots are architecture evidence; reports compare two complete snapshots rather than reparsing arbitrary prose.
 
