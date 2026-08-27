@@ -55,18 +55,21 @@ public sealed partial class ArchitectureBaselineApplicationService
         BaselineBuildStateOptions options,
         CancellationToken cancellationToken)
     {
-        // Metadata-only preparation has no Assembly instances to pass through. Discovery still
-        // owns the exact project output paths, so baseline verification must retain those paths as
-        // receipt evidence in both its build-capable and ordinary post-build preflight passes.
+        // Metadata-only preparation has no Assembly instances to pass through. Retain only the
+        // selected closure's discovery paths: preparation resolves every discovered project for
+        // metadata, while ensure-built must build only the assemblies selected for analysis.
         if (preparation.ProjectDiscovery.DiscoveredProjects.Count == 0)
         {
             return new BuildStatePreflightResult(Array.Empty<BuildStatePreflightDiagnostic>());
         }
 
+        Dictionary<string, string> paths = preparation.ProjectDiscovery.ResolvedAssemblyPaths
+            .Where(pair => preparation.SelectedAssemblyArtifactPaths.Contains(pair.Value, StringComparer.OrdinalIgnoreCase))
+            .ToDictionary(pair => pair.Key, pair => pair.Value, StringComparer.Ordinal);
         BuildStateResolvedAssemblies resolution = new(
             Array.Empty<System.Reflection.Assembly>(), preparation.MissingAssemblyNames)
         {
-            ResolvedAssemblyPaths = preparation.ProjectDiscovery.ResolvedAssemblyPaths,
+            ResolvedAssemblyPaths = paths,
         };
 
         if (resolution.ResolvedAssemblyPaths.Count == 0 && resolution.MissingAssemblyNames.Count == 0)

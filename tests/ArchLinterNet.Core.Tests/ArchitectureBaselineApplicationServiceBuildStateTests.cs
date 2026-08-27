@@ -78,7 +78,8 @@ public sealed class ArchitectureBaselineApplicationServiceBuildStateTests
         new(assemblyName, null, BuildStatePreflightState.Current,
             new BuildStatePreflightEvidence(
                 $"{assemblyName}.csproj", assemblyName,
-                ExpectedOutputPath: $"/fake/repository/root/bin/{assemblyName}.dll"));
+                ExpectedOutputPath: Path.GetFullPath(Path.Combine(
+                    "/fake/repository/root", "bin", $"{assemblyName}.dll"))));
 
     [Test]
     public void Verify_NoDiscovery_SkipsPreparationServiceAndProceedsNormally()
@@ -267,7 +268,18 @@ public sealed class ArchitectureBaselineApplicationServiceBuildStateTests
     public void Verify_EnsureBuiltWithNonBlockingFirstPreflight_MaterializesPreparedPostBuildRunner()
     {
         var document = CreateDocument();
-        var discovery = ProjectDiscoveryResult.Empty with { DiscoveredProjects = new[] { FixtureProject() } };
+        document.Analysis.TargetAssemblies = ["Fixture"];
+        string fixturePath = Path.GetFullPath(Path.Combine("/fake/repository/root", "bin", "Fixture.dll"));
+        string unselectedPath = Path.GetFullPath(Path.Combine("/fake/repository/root", "bin", "Unselected.dll"));
+        var discovery = ProjectDiscoveryResult.Empty with
+        {
+            DiscoveredProjects = new[] { FixtureProject() },
+            ResolvedAssemblyPaths = new Dictionary<string, string>(StringComparer.Ordinal)
+            {
+                ["Fixture"] = fixturePath,
+                ["Unselected"] = unselectedPath,
+            },
+        };
 
         var firstRunner = new FakeContractRunner(CreateSession(document, discovery, missingAssemblyNames: _value4));
         var secondRunner = new FakeContractRunner(CreateSession(document, discovery, missingAssemblyNames: _value5))
@@ -282,6 +294,15 @@ public sealed class ArchitectureBaselineApplicationServiceBuildStateTests
         {
             RunnerToReturn = firstRunner,
             RunnersToReturn = new Queue<IArchitectureContractRunner>(new IArchitectureContractRunner[] { secondRunner }),
+            PreparationToReturn = new ArchitectureRunnerPreparation(
+                "/fake/repository/root",
+                PreprocessorSymbols: null,
+                ProjectDiscovery: discovery,
+                ResolveAssemblyOutputs: true,
+                SelectedAssemblyArtifactPaths: new[] { fixturePath },
+                CapturedArtifactContentDigests: new Dictionary<string, string>(),
+                MissingAssemblyNames: _value4,
+                IsMetadataReferenceClosureComplete: false),
         };
         var callOrder = new List<string>();
         runnerSetupService.CallOrder = callOrder;
@@ -320,7 +341,11 @@ public sealed class ArchitectureBaselineApplicationServiceBuildStateTests
             // a second EnsureBuilt attempt would be redundant.
             Assert.That(preparationService.RequestsReceived[1].PreparationMode, Is.EqualTo(BuildPreparationMode.Ordinary));
             Assert.That(preparationService.RequestsReceived[1].Resolution.ResolvedAssemblyPaths["Fixture"],
-                Is.EqualTo(Path.GetFullPath("/fake/repository/root/bin/Fixture.dll")));
+                Is.EqualTo(fixturePath));
+            Assert.That(preparationService.RequestsReceived[0].Resolution.ResolvedAssemblyPaths.Keys,
+                Is.EquivalentTo(new[] { "Fixture" }));
+            Assert.That(preparationService.RequestsReceived[1].Resolution.ResolvedAssemblyPaths.Keys,
+                Is.EquivalentTo(new[] { "Fixture" }));
             // Contract execution must run against the materialized post-build runner, not anything
             // used only to discover what needed building.
             Assert.That(firstRunner.StrictArgumentsReceived, Is.Empty);
