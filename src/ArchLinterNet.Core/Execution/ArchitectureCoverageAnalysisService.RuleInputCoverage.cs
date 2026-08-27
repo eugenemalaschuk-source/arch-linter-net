@@ -46,13 +46,18 @@ internal sealed partial class ArchitectureCoverageAnalysisService
                 .ThenBy(reference => reference.Layer, StringComparer.Ordinal)
                 .ToList();
 
+            // Evidence carries "<input role>:<layer>" (not just the layer) for stale/unknown items:
+            // Item is only the referenced contract id, so two different rule inputs on the same
+            // contract (e.g. its "source" and one of its "forbidden" layers) would otherwise report
+            // indistinguishable evidence, and downstream consumers that key off Item+Evidence (the
+            // change-snapshot coverage-blind-spot entry identity) would collide (#683).
             foreach (ArchitectureRuleInputReference input in referencedInputs)
             {
                 string layerName = input.Layer;
                 ArchitectureLayer? layer = null;
                 if (input.IsLayerReference && !Document.Layers.TryGetValue(layerName, out layer))
                 {
-                    unknownItems.Add(new ArchitectureCoverageSummaryEvidenceItem(referencedContractId, layerName));
+                    unknownItems.Add(new ArchitectureCoverageSummaryEvidenceItem(referencedContractId, input.Input + ":" + layerName));
                     continue;
                 }
 
@@ -76,7 +81,7 @@ internal sealed partial class ArchitectureCoverageAnalysisService
                         continue;
                     }
 
-                    staleItems.Add(new ArchitectureCoverageSummaryEvidenceItem(referencedContractId, layerName));
+                    staleItems.Add(new ArchitectureCoverageSummaryEvidenceItem(referencedContractId, input.Input + ":" + layerName));
                     continue;
                 }
 

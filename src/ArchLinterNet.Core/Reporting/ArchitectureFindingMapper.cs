@@ -247,6 +247,27 @@ public static class ArchitectureFindingMapper
 
     private static ArchitectureViolationIdentity BuildIdentity(ArchitectureDiagnostic diagnostic)
     {
+        // PolicyConsistencyDiagnostic is special-cased ahead of the generic IdentityParts/
+        // SourceTypeOf switches below so PolicyConsistencyDistinguisher (an OrderBy+Join) runs once
+        // per diagnostic instead of once per field.
+        if (diagnostic is PolicyConsistencyDiagnostic policy)
+        {
+            string distinguisher = PolicyConsistencyDistinguisher(policy);
+            return new ArchitectureViolationIdentity(
+                ArchitectureViolationIdentity.CurrentVersion,
+                KindToken(diagnostic.Kind),
+                ArchitectureViolationIdentity.ResolveKind(KindToken(diagnostic.Kind)),
+                diagnostic.ContractId ?? diagnostic.ContractName,
+                null,
+                distinguisher,
+                null,
+                null,
+                null,
+                distinguisher,
+                0,
+                policy.CheckKind);
+        }
+
         (string? sourceAssembly, string? sourceMember, string? targetAssembly, string? targetType, string? targetMember,
             string? configuration) = IdentityParts(diagnostic);
         return new ArchitectureViolationIdentity(
@@ -305,8 +326,7 @@ public static class ArchitectureFindingMapper
                 (null, null, null, null, preflight.Evidence.ProjectPath, preflight.State.ToString()),
             UnmatchedIgnoreDiagnostic unmatched =>
                 (null, null, null, null, unmatched.ForbiddenReference, unmatched.IgnoreIndex.ToString()),
-            PolicyConsistencyDiagnostic policy =>
-                (null, null, null, null, policy.RepresentativeType ?? policy.CheckKind, policy.CheckKind),
+            // PolicyConsistencyDiagnostic is handled directly in BuildIdentity, ahead of this switch.
             BaselineLifecycleDiagnostic baseline =>
                 (null, null, null, null, baseline.ForbiddenReference, baseline.ContractGroup),
             ArchitecturePolicyErrorDiagnostic policyError =>
@@ -487,7 +507,7 @@ public static class ArchitectureFindingMapper
         CycleDiagnostic cycle => cycle.Path,
         BuildStatePreflightDiagnostic preflight => preflight.Evidence.ProjectPath,
         UnmatchedIgnoreDiagnostic unmatched => unmatched.SourceType,
-        PolicyConsistencyDiagnostic policy => policy.RepresentativeType ?? policy.CheckKind,
+        // PolicyConsistencyDiagnostic is handled directly in BuildIdentity, ahead of this switch.
         BaselineLifecycleDiagnostic baseline => baseline.SourceType,
         ArchitecturePolicyErrorDiagnostic policyError => policyError.PolicyLocation?.SourcePath ?? "<policy>",
         _ => SourceIdentifier(diagnostic),
@@ -515,10 +535,55 @@ public static class ArchitectureFindingMapper
         PortBoundaryDiagnostic d => d.SourceType,
         CycleDiagnostic d => d.Path,
         UnmatchedIgnoreDiagnostic d => $"{d.SourceType}:{d.IgnoreIndex}:{d.ForbiddenReference}",
-        PolicyConsistencyDiagnostic d => $"{d.CheckKind}:{d.RepresentativeType}",
+        // PolicyConsistencyDiagnostic is handled directly in BuildIdentity, ahead of SourceTypeOf.
         BuildStatePreflightDiagnostic d => $"{d.State}:{d.Evidence.ProjectPath}",
         BaselineLifecycleDiagnostic d => d.SourceType,
         ArchitecturePolicyErrorDiagnostic d => d.PolicyLocation?.SourcePath ?? "<policy>",
         _ => string.Empty,
     };
+
+    // Only "layer-overlap" sets RepresentativeType. Every other check kind (duplicate-id,
+    // allow-forbid-conflict, independence-conflict, unreachable-contract, unmatched-layer-exclusion)
+    // reports one finding per occurrence but shares the same ContractName/ContractId and CheckKind
+    // across occurrences, so falling back to CheckKind alone collapses every occurrence of a check
+    // kind under one contract into a single identity. Layers and ConflictingContractIds/Names are
+    // exactly the fields each check populates to describe *which* occurrence this is; folding them
+    // in keeps distinct occurrences from colliding into one identity.
+    //
+    // Ids and Names are kept as separate labeled segments, not one merged/either-or set: two
+    // independence-conflict findings against contracts that share a duplicate id (a policy state
+    // FindDuplicateContractIds explicitly anticipates) have identical ConflictingContractIds but
+    // distinct ConflictingContractNames — discarding Names whenever an id is present (as an
+    // either-or choice would) collapses that case (#686 PR review round 2).
+    //
+    // PolicyLocation.YamlPath is used only when layers/ids/names are ALL empty — it is a true last
+    // resort, not an always-appended tiebreaker. ArchitecturePolicyProvenanceIndex.Enrich attaches
+    // a PolicyLocation to essentially every policy-consistency diagnostic (derived from the
+    // participating contract's position in its declaring YAML list), so unconditionally folding it
+    // in would make identity depend on list position for every check kind: reordering an unrelated
+    // contract earlier in `contracts.strict_independence` (etc.) would change an otherwise-unrelated
+    // finding's identity even though layers/ids/names — its actual semantic content — are unchanged
+    // (#686 PR review round 3). No currently-reachable check kind leaves layers/ids/names all empty
+    // (unmatched-layer-exclusion, the one case that used to, now sets RepresentativeType instead),
+    // so this fallback is defensive for future check kinds, not something today's callers rely on.
+    private static string PolicyConsistencyDistinguisher(PolicyConsistencyDiagnostic policy)
+    {
+        if (policy.RepresentativeType is { Length: > 0 } representativeType)
+        {
+            return representativeType;
+        }
+
+        string layers = Sorted(policy.Layers);
+        string ids = Sorted(policy.ConflictingContractIds);
+        string names = Sorted(policy.ConflictingContractNames);
+        if (layers.Length > 0 || ids.Length > 0 || names.Length > 0)
+        {
+            return $"layers:{layers}|ids:{ids}|names:{names}";
+        }
+
+        return policy.PolicyLocation?.YamlPath is { Length: > 0 } yamlPath ? yamlPath : policy.CheckKind;
+    }
+
+    private static string Sorted(IEnumerable<string> values) =>
+        string.Join(",", values.OrderBy(static value => value, StringComparer.Ordinal));
 }

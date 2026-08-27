@@ -32,6 +32,7 @@ internal static class ArchitectureChangeSnapshotProjector
 
         List<ArchitectureChangeFinding> findings = ArchitectureFindingMapper
             .FromViolations(validation.Violations.Concat(validation.CoverageFindings), mode)
+            .Concat(PolicyLevelFindings(validation, mode))
             .Select(static finding => new ArchitectureChangeFinding(
                 finding.CanonicalIdentity,
                 finding.Kind,
@@ -81,14 +82,57 @@ internal static class ArchitectureChangeSnapshotProjector
             "semantic_context", role.Subject + "|" + entry.Key + "|" + Value(entry.Value),
             role.Subject + ": " + entry.Key + "=" + Value(entry.Value)));
 
+    // Aggregate, policy-level contracts (policy_consistency, unmatched_ignored_violations) report
+    // findings with no per-violation source/target edge; they still need to appear here so their
+    // drift is tracked like any other contract's. Gated on config the same way the human/JSON
+    // reporting paths already are (see ReportCoordinator), so a contract family the caller turned
+    // off does not leak permanently "new" findings into every future snapshot.
+    private static IEnumerable<ArchitectureFinding> PolicyLevelFindings(ValidationOutcome validation, string mode)
+    {
+        if (validation.PolicyConsistencyConfig != "off")
+        {
+            foreach (PolicyConsistencyDiagnostic finding in validation.PolicyConsistencyFindings)
+            {
+                yield return ArchitectureFindingMapper.FromDiagnostic(finding, mode);
+            }
+        }
+
+        if (validation.UnmatchedIgnoredViolationsConfig != "off")
+        {
+            foreach (ArchitectureUnmatchedIgnoredViolation unmatched in validation.UnmatchedIgnoredViolations)
+            {
+                yield return ArchitectureFindingMapper.FromDiagnostic(
+                    ArchitectureDiagnosticMapper.FromUnmatchedIgnore(unmatched), mode);
+            }
+        }
+    }
+
     private static IEnumerable<ArchitectureChangeEntry> CoverageBlindSpots(ValidationOutcome validation) => validation.CoverageSummaries
         .SelectMany(summary => summary.UncoveredItems.Select(item => Coverage("uncovered", summary, item.Item)))
-        .Concat(validation.CoverageSummaries.SelectMany(summary => summary.StaleItems.Select(item => Coverage("stale", summary, item.Item))))
-        .Concat(validation.CoverageSummaries.SelectMany(summary => summary.UnknownItems.Select(item => Coverage("unknown", summary, item.Item))));
+        .Concat(validation.CoverageSummaries.SelectMany(summary => summary.StaleItems.Select(item => Coverage("stale", summary, item))))
+        .Concat(validation.CoverageSummaries.SelectMany(summary => summary.UnknownItems.Select(item => Coverage("unknown", summary, item))));
 
     private static ArchitectureChangeEntry Coverage(string state, ArchitectureCoverageSummary summary, string item) => new(
         "coverage_blind_spot", (summary.ContractId ?? summary.ContractName) + "|" + summary.Scope + "|" + state + "|" + item,
         state + " " + summary.Scope + ": " + item);
+
+    private static ArchitectureChangeEntry Coverage(
+        string state, ArchitectureCoverageSummary summary, ArchitectureCoverageSummaryEvidenceItem item) =>
+        Coverage(state, summary, RuleInputCoverageIdentityItem(summary, item));
+
+    // Only the rule_input scope needs more than Item to identify a stale/unknown blind spot:
+    // BuildRuleInputSummary keys Item on the referenced contract id alone, so a contract with two
+    // problematic rule inputs produces two items sharing one Item, and both collapsed into one
+    // entry (#683). Its Evidence carries the semantic discriminator "<input role>:<layer>".
+    //
+    // Every other scope already keys Item uniquely per fact (project coverage uses project.Path
+    // with Evidence = the assembly name, semantic coverage uses the type/selector), so they are
+    // deliberately left on the Item-only identity: folding Evidence in for them would change the
+    // identity of existing, unchanged coverage facts and make the next change report show every
+    // one of them as a spurious removed+new pair (#686 PR review round 4).
+    private static string RuleInputCoverageIdentityItem(
+        ArchitectureCoverageSummary summary, ArchitectureCoverageSummaryEvidenceItem item) =>
+        summary.Scope == "rule_input" ? item.Item + "|" + item.Evidence : item.Item;
 
     private static string BaselineIdentity(ArchitectureBaselineComparisonEntry entry)
     {
