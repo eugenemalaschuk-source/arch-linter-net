@@ -67,19 +67,18 @@ public sealed class ArchitectureGraphApplicationServiceBuildStateTests
     }
 
     [Test]
-    public void BuildGraph_PreparedPostBuildState_RerunsIsolatedRunnerWithoutAnotherEnsureBuiltRequest()
+    public void BuildGraph_PreparedPostBuildState_UsesIsolatedRunnerWithoutAnotherEnsureBuiltRequest()
     {
         ArchitectureContractDocument document = new() { Version = 1, Name = "Fake" };
         ProjectDiscoveryResult discovery = ProjectDiscoveryResult.Empty with
         {
             DiscoveredProjects = new[] { new ArchitectureDiscoveredProject("Fixture.csproj", "Fixture", ["net10.0"]) },
         };
-        FakeContractRunner firstRunner = new(CreateSession(document, discovery));
-        FakeContractRunner secondRunner = new(CreateSession(document, discovery));
+        FakeContractRunner preparedRunner = new(CreateSession(document, discovery));
         var setupService = new FakeRunnerSetupService
         {
             DocumentToReturn = document,
-            RunnersToReturn = new Queue<IArchitectureContractRunner>([firstRunner, secondRunner]),
+            RunnersToReturn = new Queue<IArchitectureContractRunner>([preparedRunner]),
         };
         var preparation = new RecordingBuildStatePreparationService();
         var executor = new FakeContractExecutor();
@@ -97,13 +96,13 @@ public sealed class ArchitectureGraphApplicationServiceBuildStateTests
         Assert.Multiple(() =>
         {
             Assert.That(outcome.Graph, Is.Not.Null);
+            Assert.That(setupService.BuildRunnerCallCount, Is.EqualTo(0));
             Assert.That(setupService.BuildRunnerForPostBuildCallCount, Is.EqualTo(1));
-            Assert.That(preparation.RequestsReceived, Has.Count.EqualTo(2));
+            Assert.That(preparation.RequestsReceived, Has.Count.EqualTo(1));
             Assert.That(preparation.RequestsReceived,
                 Has.All.Matches<BuildStatePreflightRequest>(request =>
                     request.PreparationMode == BuildPreparationMode.Ordinary));
-            Assert.That(firstRunner.StrictArgumentsReceived, Is.Empty);
-            Assert.That(secondRunner.StrictArgumentsReceived, Is.Not.Empty);
+            Assert.That(preparedRunner.StrictArgumentsReceived, Is.Not.Empty);
             Assert.That(executor.ModesReceived, Is.EqualTo(["strict"]));
         });
     }

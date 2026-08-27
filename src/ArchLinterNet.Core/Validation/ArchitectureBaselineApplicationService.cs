@@ -398,14 +398,23 @@ public sealed partial class ArchitectureBaselineApplicationService(
             }
         }
 
-        ArchitectureRunnerSetup setup = runnerSetupService.BuildRunner(
-            document,
-            policyPath,
-            conditionSetName,
-            selectedContractIds: selectedContractIds,
-            enableUnmatchedIgnoreTracking: true,
-            mode: mode == "all" ? null : mode,
-            cancellationToken: cancellationToken);
+        ArchitectureRunnerSetup setup = buildState?.UsePreparedPostBuildState == true
+            ? runnerSetupService.BuildRunnerForPostBuild(
+                document,
+                policyPath,
+                conditionSetName,
+                selectedContractIds: selectedContractIds,
+                enableUnmatchedIgnoreTracking: true,
+                mode: mode == "all" ? null : mode,
+                cancellationToken: cancellationToken)
+            : runnerSetupService.BuildRunner(
+                document,
+                policyPath,
+                conditionSetName,
+                selectedContractIds: selectedContractIds,
+                enableUnmatchedIgnoreTracking: true,
+                mode: mode == "all" ? null : mode,
+                cancellationToken: cancellationToken);
 
         try
         {

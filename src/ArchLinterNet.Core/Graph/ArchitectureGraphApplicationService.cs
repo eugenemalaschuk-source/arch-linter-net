@@ -82,13 +82,21 @@ public sealed partial class ArchitectureGraphApplicationService(
             }
         }
 
-        ArchitectureRunnerSetup setup = runnerSetupService.BuildRunner(
-            document,
-            request.PolicyPath,
-            request.ConditionSetName,
-            selectedContractIds: selectedIds,
-            enableUnmatchedIgnoreTracking: false,
-            mode: request.Mode == "all" ? null : request.Mode);
+        ArchitectureRunnerSetup setup = request.UsePreparedPostBuildState
+            ? runnerSetupService.BuildRunnerForPostBuild(
+                document,
+                request.PolicyPath,
+                request.ConditionSetName,
+                selectedContractIds: selectedIds,
+                enableUnmatchedIgnoreTracking: false,
+                mode: request.Mode == "all" ? null : request.Mode)
+            : runnerSetupService.BuildRunner(
+                document,
+                request.PolicyPath,
+                request.ConditionSetName,
+                selectedContractIds: selectedIds,
+                enableUnmatchedIgnoreTracking: false,
+                mode: request.Mode == "all" ? null : request.Mode);
 
         setup = PrepareBuildStateRunner(request, document, selectedIds, setup);
 

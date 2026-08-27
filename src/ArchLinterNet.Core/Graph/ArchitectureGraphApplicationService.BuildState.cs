@@ -20,6 +20,22 @@ public sealed partial class ArchitectureGraphApplicationService
             return setup;
         }
 
+        // An enclosing orchestration already built this exact project graph. Start straight from
+        // a fresh isolated post-build runner (created by BuildSession) so receipt verification
+        // observes its authoritative artifact closure; ordinary resolution can still report the
+        // pre-build missing artifact even though the build just succeeded.
+        if (buildState.UsePreparedPostBuildState)
+        {
+            BuildStatePreflightResult preparedPreflight = RunBuildStatePreflight(setup.Runner, buildState);
+            if (preparedPreflight.Blocked)
+            {
+                setup.Runner.Session.Context.Dispose();
+                throw new InvalidOperationException(DescribePreflightFailure(preparedPreflight));
+            }
+
+            return setup;
+        }
+
         BuildStatePreflightResult preflight = RunBuildStatePreflight(setup.Runner, buildState);
         if (preflight.Blocked)
         {
