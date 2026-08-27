@@ -116,15 +116,23 @@ internal static class ArchitectureChangeSnapshotProjector
         "coverage_blind_spot", (summary.ContractId ?? summary.ContractName) + "|" + summary.Scope + "|" + state + "|" + item,
         state + " " + summary.Scope + ": " + item);
 
-    // Stale/unknown rule-input coverage items key Item on the referenced contract id alone
-    // (BuildRuleInputSummary); a contract with two problematic rule inputs/layers produces two
-    // items with the same Item. Evidence carries "<input role>:<layer>", so folding it into the
-    // entry identity keeps those two items from colliding into one entry (#683).
     private static ArchitectureChangeEntry Coverage(
-        string state, ArchitectureCoverageSummary summary, ArchitectureCoverageSummaryEvidenceItem item) => new(
-        "coverage_blind_spot",
-        (summary.ContractId ?? summary.ContractName) + "|" + summary.Scope + "|" + state + "|" + item.Item + "|" + item.Evidence,
-        state + " " + summary.Scope + ": " + item.Item);
+        string state, ArchitectureCoverageSummary summary, ArchitectureCoverageSummaryEvidenceItem item) =>
+        Coverage(state, summary, RuleInputCoverageIdentityItem(summary, item));
+
+    // Only the rule_input scope needs more than Item to identify a stale/unknown blind spot:
+    // BuildRuleInputSummary keys Item on the referenced contract id alone, so a contract with two
+    // problematic rule inputs produces two items sharing one Item, and both collapsed into one
+    // entry (#683). Its Evidence carries the semantic discriminator "<input role>:<layer>".
+    //
+    // Every other scope already keys Item uniquely per fact (project coverage uses project.Path
+    // with Evidence = the assembly name, semantic coverage uses the type/selector), so they are
+    // deliberately left on the Item-only identity: folding Evidence in for them would change the
+    // identity of existing, unchanged coverage facts and make the next change report show every
+    // one of them as a spurious removed+new pair (#686 PR review round 4).
+    private static string RuleInputCoverageIdentityItem(
+        ArchitectureCoverageSummary summary, ArchitectureCoverageSummaryEvidenceItem item) =>
+        summary.Scope == "rule_input" ? item.Item + "|" + item.Evidence : item.Item;
 
     private static string BaselineIdentity(ArchitectureBaselineComparisonEntry entry)
     {

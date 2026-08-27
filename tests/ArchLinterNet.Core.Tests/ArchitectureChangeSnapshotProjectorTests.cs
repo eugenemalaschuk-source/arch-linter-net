@@ -90,8 +90,8 @@ public sealed class ArchitectureChangeSnapshotProjectorTests
             Assert.That(snapshot.Entries.Select(static entry => entry.Identity), Does.Contain("Acme.Order|aggregate|bounded_context=Sales;rank=2.5"));
             Assert.That(snapshot.Entries.Select(static entry => entry.Identity), Does.Contain("Acme.Order|bounded_context|Sales"));
             Assert.That(snapshot.Entries.Select(static entry => entry.Identity), Does.Contain("coverage-id|namespace|uncovered|Acme.Uncovered"));
-            Assert.That(snapshot.Entries.Select(static entry => entry.Identity), Does.Contain("coverage-id|namespace|stale|Acme.Stale|evidence"));
-            Assert.That(snapshot.Entries.Select(static entry => entry.Identity), Does.Contain("coverage-id|namespace|unknown|Acme.Unknown|evidence"));
+            Assert.That(snapshot.Entries.Select(static entry => entry.Identity), Does.Contain("coverage-id|namespace|stale|Acme.Stale"));
+            Assert.That(snapshot.Entries.Select(static entry => entry.Identity), Does.Contain("coverage-id|namespace|unknown|Acme.Unknown"));
             Assert.That(snapshot.Findings.Single().Identity, Is.EqualTo(canonicalIdentity));
             Assert.That(snapshot.BaselineDebt, Is.EqualTo(new[] { canonicalIdentity }));
         });
@@ -278,6 +278,44 @@ public sealed class ArchitectureChangeSnapshotProjectorTests
             Assert.That(blindSpots.Select(static entry => entry.Identity).Distinct().Count(), Is.EqualTo(2));
             Assert.DoesNotThrow(() => ArchitectureChangeReports.SerializeSnapshot(snapshot));
         });
+    }
+
+    [Test]
+    public void Project_NonRuleInputCoverageBlindSpotIdentitiesAreUnchangedByEvidence()
+    {
+        // #686 PR review round 4: only the rule_input scope needs Evidence to identify a stale or
+        // unknown blind spot. Every other scope already keys Item uniquely per fact (project
+        // coverage: Item = project path, Evidence = assembly name), so folding Evidence into their
+        // identity would change the identity of existing, unchanged coverage facts and make the
+        // next change report show each of them as a spurious removed+new pair. Their identity must
+        // stay exactly "<contract>|<scope>|<state>|<item>".
+        ArchitectureCoverageSummary projectCoverage = new(
+            "project-coverage",
+            "project-coverage",
+            "project",
+            new ArchitectureCoverageSummaryCounts(0, 0, 0, 1, 1),
+            Array.Empty<ArchitectureCoverageSummaryExcludedItem>(),
+            Array.Empty<ArchitectureCoverageSummaryEvidenceItem>(),
+            new[] { new ArchitectureCoverageSummaryEvidenceItem("/src/Stale.csproj", "Stale") },
+            new[] { new ArchitectureCoverageSummaryEvidenceItem("/src/Foo.csproj", "Foo") },
+            Array.Empty<ArchitectureCoverageSummaryEvidenceItem>());
+
+        ArchitectureChangeSnapshot snapshot = ArchitectureChangeSnapshotProjector.Project(
+            "strict",
+            Outcome("/repo", "/repo/src/Acme/Acme.csproj", coverageSummaries: new[] { projectCoverage }),
+            EmptyGraph(),
+            EmptyGraph(),
+            Array.Empty<ArchitectureBaselineComparisonEntry>());
+
+        string[] identities = snapshot.Entries
+            .Where(static entry => entry.Kind == "coverage_blind_spot")
+            .Select(static entry => entry.Identity)
+            .ToArray();
+        Assert.That(identities, Is.EquivalentTo(new[]
+        {
+            "project-coverage|project|stale|/src/Stale.csproj",
+            "project-coverage|project|unknown|/src/Foo.csproj",
+        }));
     }
 
     private static ArchitectureGraphOutcome EmptyGraph() => new(new ArchitectureDependencyGraph(

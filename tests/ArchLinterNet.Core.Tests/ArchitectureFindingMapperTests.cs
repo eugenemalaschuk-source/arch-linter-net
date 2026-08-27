@@ -259,6 +259,34 @@ public sealed class ArchitectureFindingMapperTests
     }
 
     [Test]
+    public void FromDiagnostic_PolicyConsistency_SemanticIdentityDoesNotChangeWhenPolicyLocationMoves()
+    {
+        // #686 PR review round 3: ArchitecturePolicyProvenanceIndex.Enrich attaches a PolicyLocation
+        // (derived from the participating contract's position in its declaring YAML list) to
+        // essentially every policy-consistency diagnostic, not just unmatched-layer-exclusion. The
+        // distinguisher used to fold PolicyLocation.YamlPath in unconditionally whenever it was
+        // present, even when Layers/ConflictingContractIds/ConflictingContractNames already fully
+        // identify the finding — so reordering an unrelated contract earlier in its declaring list
+        // (moving this finding's own PolicyLocation from index 0 to index 1) would change identity
+        // for a finding whose semantic content never changed, producing false removed/new drift.
+        var atContractIndexZero = new PolicyConsistencyDiagnostic(
+            "independence", "independence-id", "independence-conflict", "reason",
+            ["independence-id", "dep-id"], ["independence", "dep"], ["core", "web"])
+        {
+            PolicyLocation = PolicyLocationAt("contracts.strict_independence[0]"),
+        };
+        PolicyConsistencyDiagnostic atContractIndexOne = atContractIndexZero with
+        {
+            PolicyLocation = PolicyLocationAt("contracts.strict_independence[1]"),
+        };
+
+        ArchitectureFinding beforeReorder = ArchitectureFindingMapper.FromDiagnostic(atContractIndexZero);
+        ArchitectureFinding afterReorder = ArchitectureFindingMapper.FromDiagnostic(atContractIndexOne);
+
+        Assert.That(beforeReorder.CanonicalIdentity, Is.EqualTo(afterReorder.CanonicalIdentity));
+    }
+
+    [Test]
     public void FromDiagnostic_PolicyConsistency_RepresentativeTypeMakesIdentityIndependentOfPolicyLocation()
     {
         // #683 PR review, P2: once a check kind sets RepresentativeType (its own semantic content,

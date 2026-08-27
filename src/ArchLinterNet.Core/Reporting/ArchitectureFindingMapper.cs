@@ -548,14 +548,24 @@ public static class ArchitectureFindingMapper
     // across occurrences, so falling back to CheckKind alone collapses every occurrence of a check
     // kind under one contract into a single identity. Layers and ConflictingContractIds/Names are
     // exactly the fields each check populates to describe *which* occurrence this is; folding them
-    // in (plus the policy source location, which is the only thing that distinguishes two unmatched
-    // exclude entries on the same layer) keeps distinct occurrences from colliding into one identity.
+    // in keeps distinct occurrences from colliding into one identity.
     //
     // Ids and Names are kept as separate labeled segments, not one merged/either-or set: two
     // independence-conflict findings against contracts that share a duplicate id (a policy state
     // FindDuplicateContractIds explicitly anticipates) have identical ConflictingContractIds but
     // distinct ConflictingContractNames — discarding Names whenever an id is present (as an
     // either-or choice would) collapses that case (#686 PR review round 2).
+    //
+    // PolicyLocation.YamlPath is used only when layers/ids/names are ALL empty — it is a true last
+    // resort, not an always-appended tiebreaker. ArchitecturePolicyProvenanceIndex.Enrich attaches
+    // a PolicyLocation to essentially every policy-consistency diagnostic (derived from the
+    // participating contract's position in its declaring YAML list), so unconditionally folding it
+    // in would make identity depend on list position for every check kind: reordering an unrelated
+    // contract earlier in `contracts.strict_independence` (etc.) would change an otherwise-unrelated
+    // finding's identity even though layers/ids/names — its actual semantic content — are unchanged
+    // (#686 PR review round 3). No currently-reachable check kind leaves layers/ids/names all empty
+    // (unmatched-layer-exclusion, the one case that used to, now sets RepresentativeType instead),
+    // so this fallback is defensive for future check kinds, not something today's callers rely on.
     private static string PolicyConsistencyDistinguisher(PolicyConsistencyDiagnostic policy)
     {
         if (policy.RepresentativeType is { Length: > 0 } representativeType)
@@ -566,14 +576,12 @@ public static class ArchitectureFindingMapper
         string layers = Sorted(policy.Layers);
         string ids = Sorted(policy.ConflictingContractIds);
         string names = Sorted(policy.ConflictingContractNames);
-        string? yamlPath = policy.PolicyLocation?.YamlPath;
-        if (layers.Length == 0 && ids.Length == 0 && names.Length == 0 && yamlPath is not { Length: > 0 })
+        if (layers.Length > 0 || ids.Length > 0 || names.Length > 0)
         {
-            return policy.CheckKind;
+            return $"layers:{layers}|ids:{ids}|names:{names}";
         }
 
-        string parts = $"layers:{layers}|ids:{ids}|names:{names}";
-        return yamlPath is { Length: > 0 } ? parts + "|location:" + yamlPath : parts;
+        return policy.PolicyLocation?.YamlPath is { Length: > 0 } yamlPath ? yamlPath : policy.CheckKind;
     }
 
     private static string Sorted(IEnumerable<string> values) =>

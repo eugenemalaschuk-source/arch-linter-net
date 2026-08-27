@@ -48,3 +48,20 @@
 - [x] 6.5 Full `dotnet test tests/ArchLinterNet.Core.Tests` — 3034 passed, 0 failed, 13 pre-existing skips. Full `dotnet test tests/ArchLinterNet.Cli.Tests` — 573 passed, 0 failed.
 - [x] 6.6 `make lint-architecture`, `make public-api-check`, `dotnet format --include` on changed files — all clean.
 - [x] 6.7 Add a spec scenario for the duplicate-id case to `openspec/specs/architecture-change-report/spec.md` and this change's archived delta spec; add a second addendum to `design.md`.
+
+## 7. Third post-review fix (P1 round 3 — positional YamlPath)
+
+- [x] 7.1 `PolicyConsistencyDistinguisher` — consult `PolicyLocation.YamlPath` only when `layers`/`ids`/`names` are all empty, instead of always appending it.
+- [x] 7.2 Add `FromDiagnostic_PolicyConsistency_SemanticIdentityDoesNotChangeWhenPolicyLocationMoves` (mapper-level).
+- [x] 7.3 Add `IndependenceConflict_ReorderingIndependenceContractsInRealYaml_DoesNotChangeEitherIdentity` — goes through the real `ArchitecturePolicyDocumentLoader` because `Document.Provenance` is `Empty` for hand-built documents and a `BaseDocument()`-based test could not exercise the defect.
+- [x] 7.4 Verify both fail against the pre-round-3 distinguisher via `git stash` and pass with the fix.
+
+## 8. Fourth post-review fix (P1 round 4 — over-broad coverage scoping + lint)
+
+- [x] 8.1 `ArchitectureChangeSnapshotProjector` — add `RuleInputCoverageIdentityItem` so `Evidence` is folded into the entry identity only for `summary.Scope == "rule_input"`; every other coverage scope keeps its pre-existing `Item`-only identity.
+- [x] 8.2 Add `Project_NonRuleInputCoverageBlindSpotIdentitiesAreUnchangedByEvidence` pinning project-scope stale/unknown identities to their exact unchanged strings; revert the namespace-scope assertions in `Project_MapsGraphSemanticCoverageFindingAndBaselineFacts` to the pre-round-1 (no `|evidence`) form.
+- [x] 8.3 Verify the new test fails against the blanket-`Evidence` version via `git stash` and passes with the scoped fix.
+- [x] 8.4 Split the four identity-regression tests out of `PolicyConsistencyCheckTests.cs` (832 lines, over the >800 hard error) into a new `PolicyConsistencyCheckTests.Identity.cs` partial — 719 and 190 lines respectively.
+- [x] 8.5 `make lint-code-size` — exit 0 (warnings only, no errors).
+- [x] 8.6 Full `dotnet test` for Core and Cli, `make lint-architecture`, `make public-api-check`, `dotnet format`, `openspec validate --all` — all clean.
+- [x] 8.7 Add a spec scenario pinning non-rule-input coverage identity stability; add a third and fourth addendum to `design.md`.

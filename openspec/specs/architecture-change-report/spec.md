@@ -43,6 +43,11 @@ The system SHALL provide a versioned `architecture-change-snapshot/v2` artifact 
 - **THEN** each is assigned a distinct, non-empty coverage blind-spot entry identity
 - **AND THEN** snapshot creation succeeds rather than being rejected for duplicate or empty entry identities
 
+#### Scenario: Coverage scopes whose item already identifies the fact keep their existing identity
+- **WHEN** a coverage scope other than rule input (for example project or semantic coverage) reports a stale or unknown item whose item value already identifies the fact uniquely
+- **THEN** that entry's identity is derived from the item value alone and is unchanged from previous snapshots
+- **AND THEN** an unchanged coverage fact is not reported as both removed and new
+
 #### Scenario: Identity is independent of list position
 - **WHEN** a policy author reorders elements of a list a finding's identity is derived from (for example a layer's exclude entries) without changing what any element means
 - **THEN** the finding produced for a given element keeps the same identity it had before the reorder
