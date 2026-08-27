@@ -15,6 +15,12 @@ public sealed record ArchitectureRunnerPreparation(
     IReadOnlyList<string> MissingAssemblyNames,
     bool IsMetadataReferenceClosureComplete)
 {
+    // When the policy selects a project/solution graph without authored target_assemblies,
+    // discovery owns the root identities even if an output is stale and cannot be scanned yet.
+    // Keep that metadata separate from the loadable artifact closure so --ensure-built can build
+    // those roots without making every discovered project relevant to an explicit target list.
+    internal IReadOnlyList<string> GraphDrivenRootAssemblyNames { get; init; } = Array.Empty<string>();
+
     public IReadOnlyList<string> PreparedProjectPaths => ProjectDiscovery.DiscoveredProjects
         .Select(project => Path.GetFullPath(Path.Combine(RepositoryRoot, project.Path)))
         .ToArray();

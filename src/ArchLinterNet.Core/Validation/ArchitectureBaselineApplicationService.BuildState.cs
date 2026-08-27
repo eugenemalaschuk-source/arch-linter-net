@@ -19,7 +19,8 @@ public sealed partial class ArchitectureBaselineApplicationService
             request.RequestedPlatform,
             request.RequestedRuntimeIdentifier,
             request.UsePreparedPostBuildState,
-            request.PreparedPostBuildRunner);
+            request.PreparedPostBuildRunner,
+            useMetadataFirstEnsureBuilt: false);
 
         return CollectCandidatesCore(
             request.PolicyPath, request.Mode, request.ConditionSetName, request.ContractIds, request.CancellationToken, buildState);
@@ -35,7 +36,8 @@ public sealed partial class ArchitectureBaselineApplicationService
             request.RequestedPlatform,
             request.RequestedRuntimeIdentifier,
             usePreparedPostBuildState: false,
-            preparedPostBuildRunner: null);
+            preparedPostBuildRunner: null,
+            useMetadataFirstEnsureBuilt: true);
 
         return CollectCandidatesCore(
             request.PolicyPath, request.Mode, request.ConditionSetName, request.ContractIds, request.CancellationToken, buildState);
@@ -66,6 +68,34 @@ public sealed partial class ArchitectureBaselineApplicationService
             cancellationToken);
     }
 
+    private BuildStatePreflightResult RunBuildStatePreflight(
+        ArchitectureRunnerPreparation preparation,
+        BaselineBuildStateOptions options,
+        CancellationToken cancellationToken)
+    {
+        BuildStateResolvedAssemblies? resolution = BuildStatePreflightRunner.CreatePreparationResolution(
+            preparation, options.PreparationMode);
+        if (resolution is null
+            || (resolution.ResolvedAssemblyPaths.Count == 0 && resolution.MissingAssemblyNames.Count == 0))
+        {
+            return new BuildStatePreflightResult(Array.Empty<BuildStatePreflightDiagnostic>());
+        }
+
+        IBuildStatePreparationService preparationService = buildStatePreparationService
+            ?? throw new InvalidOperationException("Build-state preparation is unavailable for baseline verification.");
+        return preparationService.Prepare(new BuildStatePreflightRequest(
+            preparation.RepositoryRoot,
+            preparation.ProjectDiscovery,
+            resolution,
+            options.PreparationMode,
+            options.NoRestore,
+            options.RequestedConfiguration,
+            options.RequestedTargetFramework,
+            options.RequestedPlatform,
+            options.RequestedRuntimeIdentifier,
+            cancellationToken));
+    }
+
     private sealed record BaselineBuildStateOptions(
         BuildPreparationMode PreparationMode,
         bool NoRestore,
@@ -74,7 +104,8 @@ public sealed partial class ArchitectureBaselineApplicationService
         string? RequestedPlatform,
         string? RequestedRuntimeIdentifier,
         bool UsePreparedPostBuildState,
-        ArchitectureRunnerPreparation? PreparedPostBuildRunner)
+        ArchitectureRunnerPreparation? PreparedPostBuildRunner,
+        bool UseMetadataFirstEnsureBuilt)
     {
         public static BaselineBuildStateOptions? From(
             BuildPreparationMode preparationMode,
@@ -84,7 +115,8 @@ public sealed partial class ArchitectureBaselineApplicationService
             string? requestedPlatform,
             string? requestedRuntimeIdentifier,
             bool usePreparedPostBuildState,
-            ArchitectureRunnerPreparation? preparedPostBuildRunner)
+            ArchitectureRunnerPreparation? preparedPostBuildRunner,
+            bool useMetadataFirstEnsureBuilt)
         {
             return preparationMode == BuildPreparationMode.EnsureBuilt
                 || noRestore
@@ -101,7 +133,8 @@ public sealed partial class ArchitectureBaselineApplicationService
                     requestedPlatform,
                     requestedRuntimeIdentifier,
                     usePreparedPostBuildState,
-                    preparedPostBuildRunner)
+                    preparedPostBuildRunner,
+                    useMetadataFirstEnsureBuilt)
                 : null;
         }
     }

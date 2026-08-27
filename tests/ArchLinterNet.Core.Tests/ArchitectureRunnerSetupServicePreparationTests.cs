@@ -1,5 +1,6 @@
 using ArchLinterNet.Core.BuildState;
 using ArchLinterNet.Core.Contracts;
+using ArchLinterNet.Core.Contracts.Families;
 using ArchLinterNet.Core.Discovery;
 using ArchLinterNet.Core.Discovery.Abstractions;
 using ArchLinterNet.Core.Execution;
@@ -26,9 +27,15 @@ public sealed class ArchitectureRunnerSetupServicePreparationTests
     {
         public ProjectDiscoveryResult Result { get; set; } = ProjectDiscoveryResult.Empty;
 
+        public bool? ResolveAssemblyOutputsReceived { get; private set; }
+
         public ProjectDiscoveryResult ResolveAndApply(
             ArchitectureContractDocument document, string repositoryRoot, bool resolveAssemblyOutputs,
-            CancellationToken cancellationToken = default) => Result;
+            CancellationToken cancellationToken = default)
+        {
+            ResolveAssemblyOutputsReceived = resolveAssemblyOutputs;
+            return Result;
+        }
     }
 
     private string _repoRoot = null!;
@@ -127,6 +134,56 @@ public sealed class ArchitectureRunnerSetupServicePreparationTests
             Assert.That(preparation.HasCompleteRootSelection, Is.False);
             Assert.That(preparation.IsMetadataReferenceClosureComplete, Is.False);
             Assert.That(preparation.HasCompleteArtifactSelection, Is.False);
+        });
+    }
+
+    [Test]
+    public void PrepareRunner_ProjectOnlyContracts_DoNotResolveAssemblyOutputsOrCreateGraphRoots()
+    {
+        var discovery = new FixedDiscoveryService
+        {
+            Result = ProjectDiscoveryResult.Empty with
+            {
+                DiscoveredProjects = new[]
+                {
+                    new ArchitectureDiscoveredProject("Fixture.csproj", "Fixture", new[] { "net10.0" }),
+                },
+                ResolvedAssemblyPaths = new Dictionary<string, string>(StringComparer.Ordinal)
+                {
+                    ["Fixture"] = Path.Combine(_repoRoot, "Fixture.dll"),
+                },
+            },
+        };
+        var service = CreateService(discovery);
+        var document = new ArchitectureContractDocument
+        {
+            Version = 1,
+            Name = "Project-only test",
+            Analysis = new ArchitectureAnalysisConfiguration
+            {
+                Projects = new List<string> { "Fixture.csproj" },
+            },
+            Contracts = new ArchitectureContractGroups
+            {
+                StrictProjectMetadata = new List<ArchitectureProjectMetadataContract>
+                {
+                    new() { Name = "Project metadata" },
+                },
+                StrictCoverage = new List<ArchitectureCoverageContract>
+                {
+                    new() { Name = "Project coverage", Scope = "project" },
+                },
+            },
+        };
+
+        ArchitectureRunnerPreparation preparation = service.PrepareRunner(document, _policyPath, mode: "strict");
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(discovery.ResolveAssemblyOutputsReceived, Is.False);
+            Assert.That(preparation.GraphDrivenRootAssemblyNames, Is.Empty);
+            Assert.That(preparation.SelectedAssemblyArtifactPaths, Is.Empty);
+            Assert.That(preparation.MissingAssemblyNames, Is.Empty);
         });
     }
 
