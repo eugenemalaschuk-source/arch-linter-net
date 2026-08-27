@@ -9,17 +9,35 @@ namespace ArchLinterNet.Core.Validation;
 
 public sealed partial class ArchitectureBaselineApplicationService
 {
+    private BaselineCandidateCollection CollectDiffCandidates(BaselineDiffRequest request)
+    {
+        BaselineBuildStateOptions? buildState = BaselineBuildStateOptions.From(
+            request.PreparationMode,
+            request.NoRestore,
+            request.RequestedConfiguration,
+            request.RequestedTargetFramework,
+            request.RequestedPlatform,
+            request.RequestedRuntimeIdentifier,
+            request.UsePreparedPostBuildState,
+            request.PreparedPostBuildRunner,
+            useMetadataFirstEnsureBuilt: false);
+
+        return CollectCandidatesCore(
+            request.PolicyPath, request.Mode, request.ConditionSetName, request.ContractIds, request.CancellationToken, buildState);
+    }
+
     private BaselineCandidateCollection CollectVerifyCandidates(BaselineVerifyRequest request)
     {
-        BaselineBuildStateOptions? buildState = request.PreparationMode == BuildPreparationMode.EnsureBuilt || request.NoRestore
-            ? new BaselineBuildStateOptions(
-                request.PreparationMode,
-                request.NoRestore,
-                request.RequestedConfiguration,
-                request.RequestedTargetFramework,
-                request.RequestedPlatform,
-                request.RequestedRuntimeIdentifier)
-            : null;
+        BaselineBuildStateOptions? buildState = BaselineBuildStateOptions.From(
+            request.PreparationMode,
+            request.NoRestore,
+            request.RequestedConfiguration,
+            request.RequestedTargetFramework,
+            request.RequestedPlatform,
+            request.RequestedRuntimeIdentifier,
+            usePreparedPostBuildState: false,
+            preparedPostBuildRunner: null,
+            useMetadataFirstEnsureBuilt: true);
 
         return CollectCandidatesCore(
             request.PolicyPath, request.Mode, request.ConditionSetName, request.ContractIds, request.CancellationToken, buildState);
@@ -50,13 +68,76 @@ public sealed partial class ArchitectureBaselineApplicationService
             cancellationToken);
     }
 
+    private BuildStatePreflightResult RunBuildStatePreflight(
+        ArchitectureRunnerPreparation preparation,
+        BaselineBuildStateOptions options,
+        CancellationToken cancellationToken)
+    {
+        BuildStateResolvedAssemblies? resolution = BuildStatePreflightRunner.CreatePreparationResolution(
+            preparation, options.PreparationMode);
+        if (resolution is null
+            || (resolution.ResolvedAssemblyPaths.Count == 0 && resolution.MissingAssemblyNames.Count == 0))
+        {
+            return new BuildStatePreflightResult(Array.Empty<BuildStatePreflightDiagnostic>());
+        }
+
+        IBuildStatePreparationService preparationService = buildStatePreparationService
+            ?? throw new InvalidOperationException("Build-state preparation is unavailable for baseline verification.");
+        return preparationService.Prepare(new BuildStatePreflightRequest(
+            preparation.RepositoryRoot,
+            preparation.ProjectDiscovery,
+            resolution,
+            options.PreparationMode,
+            options.NoRestore,
+            options.RequestedConfiguration,
+            options.RequestedTargetFramework,
+            options.RequestedPlatform,
+            options.RequestedRuntimeIdentifier,
+            cancellationToken));
+    }
+
     private sealed record BaselineBuildStateOptions(
         BuildPreparationMode PreparationMode,
         bool NoRestore,
         string? RequestedConfiguration,
         string? RequestedTargetFramework,
         string? RequestedPlatform,
-        string? RequestedRuntimeIdentifier);
+        string? RequestedRuntimeIdentifier,
+        bool UsePreparedPostBuildState,
+        ArchitectureRunnerPreparation? PreparedPostBuildRunner,
+        bool UseMetadataFirstEnsureBuilt)
+    {
+        public static BaselineBuildStateOptions? From(
+            BuildPreparationMode preparationMode,
+            bool noRestore,
+            string? requestedConfiguration,
+            string? requestedTargetFramework,
+            string? requestedPlatform,
+            string? requestedRuntimeIdentifier,
+            bool usePreparedPostBuildState,
+            ArchitectureRunnerPreparation? preparedPostBuildRunner,
+            bool useMetadataFirstEnsureBuilt)
+        {
+            return preparationMode == BuildPreparationMode.EnsureBuilt
+                || noRestore
+                || requestedConfiguration is not null
+                || requestedTargetFramework is not null
+                || requestedPlatform is not null
+                || requestedRuntimeIdentifier is not null
+                || usePreparedPostBuildState
+                ? new(
+                    preparationMode,
+                    noRestore,
+                    requestedConfiguration,
+                    requestedTargetFramework,
+                    requestedPlatform,
+                    requestedRuntimeIdentifier,
+                    usePreparedPostBuildState,
+                    preparedPostBuildRunner,
+                    useMetadataFirstEnsureBuilt)
+                : null;
+        }
+    }
 
     private sealed record BaselineCandidateCollection(
         ArchitectureContractDocument Document,

@@ -398,8 +398,8 @@ def test_shipped_declarations_preserve_both_reviewed_release_authorities() -> No
     ]
 
     by_target = {declaration["release_target"]: declaration for declaration in declarations}
-    assert len(declarations) == len(by_target) == 3
-    assert set(by_target) == {"0.6.4", "0.7.0", "0.7.1"}
+    assert len(declarations) == len(by_target) == 4
+    assert set(by_target) == {"0.6.4", "0.7.0", "0.7.1", "0.7.2"}
     assert by_target["0.6.4"]["story"] == 527
     assert {item["issue"] for item in by_target["0.6.4"]["required_items"]} == {525, 526}
     assert by_target["0.7.0"]["story"] == 613
@@ -420,3 +420,7 @@ def test_shipped_declarations_preserve_both_reviewed_release_authorities() -> No
     assert {item["issue"] for item in by_target["0.7.1"]["required_items"]} == {665}
     assert by_target["0.7.1"]["excluded_items"] == []
     assert by_target["0.7.1"]["delivered_items"] == []
+    assert by_target["0.7.2"]["story"] == 674
+    assert {item["issue"] for item in by_target["0.7.2"]["required_items"]} == {670, 671}
+    assert by_target["0.7.2"]["excluded_items"] == []
+    assert by_target["0.7.2"]["delivered_items"] == []

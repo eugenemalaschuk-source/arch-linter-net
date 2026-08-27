@@ -32,6 +32,22 @@ internal static class PostBuildArtifactEvidenceRefresher
             };
         }
 
+        IReadOnlyList<string> rootAssemblyNames = preparation.GraphDrivenRootAssemblyNames.Count > 0
+            ? preparation.GraphDrivenRootAssemblyNames
+            : document.Analysis.TargetAssemblies
+                .Where(static name => !string.IsNullOrWhiteSpace(name))
+                .Select(static name => name.Trim())
+                .Distinct(StringComparer.Ordinal)
+                .ToArray();
+
+        // Discovery intentionally does not seed stale outputs into analysis.target_assemblies:
+        // ordinary resolution must never load stale bytes. Once ensure-built has receipt-verified
+        // the graph roots, they become the exact post-build assemblies to materialize instead.
+        if (preparation.GraphDrivenRootAssemblyNames.Count > 0)
+        {
+            document.Analysis.TargetAssemblies = rootAssemblyNames.ToList();
+        }
+
         Dictionary<string, string> resolvedPaths = new(
             preparation.ProjectDiscovery.ResolvedAssemblyPaths, StringComparer.Ordinal);
         foreach ((string assemblyName, string path) in receiptVerifiedPaths)
@@ -51,16 +67,15 @@ internal static class PostBuildArtifactEvidenceRefresher
                     || !receiptVerifiedProjectPaths.Contains(Path.GetFullPath(diagnostic.Subject)))
                 .ToArray()
         };
-        IReadOnlyList<string> roots = document.Analysis.TargetAssemblies
-            .Where(static name => !string.IsNullOrWhiteSpace(name))
-            .Select(static name => name.Trim())
-            .Distinct(StringComparer.Ordinal)
+        IReadOnlyList<string> roots = rootAssemblyNames
             .Where(resolvedPaths.ContainsKey)
             .Select(name => resolvedPaths[name])
             .ToArray();
-        IReadOnlyList<string> missing = preparation.MissingAssemblyNames
-            .Where(name => !receiptVerifiedPaths.ContainsKey(name))
-            .ToArray();
+        IReadOnlyList<string> missing = preparation.GraphDrivenRootAssemblyNames.Count > 0
+            ? rootAssemblyNames.Where(name => !receiptVerifiedPaths.ContainsKey(name)).ToArray()
+            : preparation.MissingAssemblyNames
+                .Where(name => !receiptVerifiedPaths.ContainsKey(name))
+                .ToArray();
         (IReadOnlyList<string> closure, bool closureComplete) =
             PreparedArtifactEvidence.BuildMetadataReferenceClosure(roots, postBuildDiscovery, cancellationToken);
 

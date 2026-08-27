@@ -1,0 +1,18 @@
+{
+  "schema": "checkpoint-b-release-scope-declaration/v2",
+  "declaration_id": "v0.7.2-release-pipeline-maintenance",
+  "release_target": "0.7.2",
+  "story": 674,
+  "_comment": [
+    "The reviewed v0.7.2 release authority owned by #674. This is a corrective maintenance",
+    "release: it ships the two externally discovered v0.7.1 correctness/regression fixes with no",
+    "new feature scope. Required items are reviewed release intent; they are not inferred from",
+    "milestone membership or mutable issue text."
+  ],
+  "required_items": [
+    { "issue": 670, "finding": "change-snapshot-shared-framework", "summary": "Support post-build change snapshot execution for opted-in ASP.NET Core shared-framework consumers" },
+    { "issue": 671, "finding": "gate-ensure-built-self-lock", "summary": "Remove the gate --ensure-built self-lock when a rebuild must overwrite target assemblies" }
+  ],
+  "excluded_items": [],
+  "delivered_items": []
+}

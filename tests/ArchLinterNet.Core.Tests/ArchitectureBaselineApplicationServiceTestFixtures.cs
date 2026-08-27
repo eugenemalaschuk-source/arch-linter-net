@@ -1,5 +1,6 @@
 using ArchLinterNet.Core.Contracts;
 using ArchLinterNet.Core.Contracts.Abstractions;
+using ArchLinterNet.Core.Discovery;
 using ArchLinterNet.Core.Execution;
 using ArchLinterNet.Core.Execution.Abstractions;
 using ArchLinterNet.Core.Model;
@@ -18,7 +19,16 @@ internal sealed class FakeRunnerSetupService : IArchitectureRunnerSetupService
 
     public int BuildRunnerForPostBuildCallCount { get; private set; }
 
+    public int PrepareRunnerCallCount { get; private set; }
+    public int MaterializePreparedRunnerCallCount { get; private set; }
+
     public Queue<IArchitectureContractRunner>? RunnersToReturn { get; init; }
+
+    public Queue<ArchitectureRunnerPreparation>? PreparationsToReturn { get; init; }
+
+    public ArchitectureRunnerPreparation? PreparationToReturn { get; set; }
+
+    public ICollection<string>? CallOrder { get; set; }
 
     public HashSet<string>? SelectedContractIdsReceived { get; private set; }
 
@@ -47,6 +57,7 @@ internal sealed class FakeRunnerSetupService : IArchitectureRunnerSetupService
         CancellationToken cancellationToken = default,
         int? maxParallelism = null)
     {
+        CallOrder?.Add(nameof(BuildRunner));
         BuildRunnerCalled = true;
         BuildRunnerCallCount++;
         SelectedContractIdsReceived = selectedContractIds;
@@ -60,7 +71,61 @@ internal sealed class FakeRunnerSetupService : IArchitectureRunnerSetupService
         bool enableUnmatchedIgnoreTracking = true, ValidationTiming? timing = null, string? mode = null,
         CancellationToken cancellationToken = default, int? maxParallelism = null)
     {
+        CallOrder?.Add(nameof(BuildRunnerForPostBuild));
         BuildRunnerForPostBuildCallCount++;
+        SelectedContractIdsReceived = selectedContractIds;
+        ModeReceived = mode;
+        return CreateSetup();
+    }
+
+    public ArchitectureRunnerPreparation PrepareRunner(
+        ArchitectureContractDocument document,
+        string policyPath,
+        string? conditionSetName = null,
+        IReadOnlyList<string>? preprocessorSymbols = null,
+        HashSet<string>? selectedContractIds = null,
+        string? mode = null,
+        CancellationToken cancellationToken = default)
+    {
+        CallOrder?.Add(nameof(PrepareRunner));
+        PrepareRunnerCallCount++;
+        SelectedContractIdsReceived = selectedContractIds;
+        ModeReceived = mode;
+        if (PreparationsToReturn is { Count: > 0 })
+        {
+            return PreparationsToReturn.Dequeue();
+        }
+
+        if (PreparationToReturn is { } preparation)
+        {
+            return preparation;
+        }
+
+        ArchitectureAnalysisContext context = RunnerToReturn.Session.Context;
+        ProjectDiscoveryResult discovery = context.ProjectDiscovery
+            ?? ProjectDiscoveryResult.Empty;
+        return new ArchitectureRunnerPreparation(
+            context.RepositoryRoot,
+            preprocessorSymbols,
+            discovery,
+            ResolveAssemblyOutputs: true,
+            context.SelectedAssemblyArtifactPaths,
+            new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase),
+            context.MissingAssemblyNames.ToArray(),
+            IsMetadataReferenceClosureComplete: false);
+    }
+    public ArchitectureRunnerSetup MaterializePreparedRunner(
+        ArchitectureContractDocument document,
+        ArchitectureRunnerPreparation preparation,
+        HashSet<string>? selectedContractIds = null,
+        bool enableUnmatchedIgnoreTracking = true,
+        ValidationTiming? timing = null,
+        string? mode = null,
+        CancellationToken cancellationToken = default,
+        int? maxParallelism = null)
+    {
+        CallOrder?.Add(nameof(MaterializePreparedRunner));
+        MaterializePreparedRunnerCallCount++;
         SelectedContractIdsReceived = selectedContractIds;
         ModeReceived = mode;
         return CreateSetup();

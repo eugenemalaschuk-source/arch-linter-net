@@ -12,9 +12,9 @@ namespace ArchLinterNet.Core.Tests;
 // Fake-composition tests for the baseline verify build-state preflight path added alongside
 // --ensure-built/--no-restore support (#486): CollectVerifyCandidates' build-state option
 // construction, RunBuildStatePreflight's short-circuit branches, and CollectCandidatesCore's
-// post-build rerun against a fresh isolated runner.
+// post-build preflight and prepared-runner materialization.
 [TestFixture]
-public sealed class ArchitectureBaselineApplicationServiceBuildStateTests
+public sealed partial class ArchitectureBaselineApplicationServiceBuildStateTests
 {
     private static readonly string[] _value = { "net10.0" };
     private static readonly string[] _value1 = { "Fixture" };
@@ -24,6 +24,11 @@ public sealed class ArchitectureBaselineApplicationServiceBuildStateTests
     private static readonly string[] _value5 = { "Fixture" };
     private static readonly string[] _value6 = { "Fixture" };
     private static readonly string[] _value7 = { "Fixture" };
+    private static readonly string[] _fixtureAssemblyNames = { "Fixture" };
+    private static readonly string[] _materializationCallOrder =
+        { "PrepareRunner", "PrepareBuild", "VerifyPostBuild", "MaterializePreparedRunner" };
+    private static readonly string[] _fallbackCallOrder = { "PrepareRunner", "BuildRunner" };
+
     private sealed class FakeBuildStatePreparationService : IBuildStatePreparationService
     {
         public int PrepareCallCount { get; private set; }
@@ -32,11 +37,16 @@ public sealed class ArchitectureBaselineApplicationServiceBuildStateTests
 
         public Queue<BuildStatePreflightResult>? ResultsToReturn { get; init; }
 
+        public List<string>? CallOrder { get; set; }
+
         public BuildStatePreflightResult ResultToReturn { get; set; } =
             new(Array.Empty<BuildStatePreflightDiagnostic>());
 
         public BuildStatePreflightResult Prepare(BuildStatePreflightRequest request)
         {
+            CallOrder?.Add(request.PreparationMode == BuildPreparationMode.EnsureBuilt
+                ? "PrepareBuild"
+                : "VerifyPostBuild");
             PrepareCallCount++;
             RequestsReceived.Add(request);
             return ResultsToReturn is { Count: > 0 } ? ResultsToReturn.Dequeue() : ResultToReturn;
@@ -47,6 +57,19 @@ public sealed class ArchitectureBaselineApplicationServiceBuildStateTests
 
     private static ArchitectureDiscoveredProject FixtureProject() =>
         new("Fixture.csproj", "Fixture", _value);
+
+    private static ArchitectureRunnerPreparation CreatePreparedRunner(ProjectDiscoveryResult discovery) => new(
+        "/fake/repository/root",
+        null,
+        discovery,
+        ResolveAssemblyOutputs: true,
+        SelectedAssemblyArtifactPaths: ["/fake/repository/root/bin/Release/net10.0/win-x64/Fixture.dll"],
+        CapturedArtifactContentDigests: new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["/fake/repository/root/bin/Release/net10.0/win-x64/Fixture.dll"] = "digest",
+        },
+        MissingAssemblyNames: Array.Empty<string>(),
+        IsMetadataReferenceClosureComplete: true);
 
     private static ArchitectureAnalysisSession CreateSession(
         ArchitectureContractDocument document,
@@ -68,6 +91,13 @@ public sealed class ArchitectureBaselineApplicationServiceBuildStateTests
     private static BuildStatePreflightDiagnostic BlockingDiagnostic(string contractName = "Acme.Module") =>
         new(contractName, null, BuildStatePreflightState.MissingArtifact,
             new BuildStatePreflightEvidence($"{contractName}.csproj", contractName));
+
+    private static BuildStatePreflightDiagnostic CurrentDiagnostic(string assemblyName = "Fixture") =>
+        new(assemblyName, null, BuildStatePreflightState.Current,
+            new BuildStatePreflightEvidence(
+                $"{assemblyName}.csproj", assemblyName,
+                ExpectedOutputPath: Path.GetFullPath(Path.Combine(
+                    "/fake/repository/root", "bin", $"{assemblyName}.dll"))));
 
     [Test]
     public void Verify_NoDiscovery_SkipsPreparationServiceAndProceedsNormally()
@@ -253,10 +283,21 @@ public sealed class ArchitectureBaselineApplicationServiceBuildStateTests
     }
 
     [Test]
-    public void Verify_EnsureBuiltWithNonBlockingFirstPreflight_RerunsAgainstFreshPostBuildRunner()
+    public void Verify_EnsureBuiltWithNonBlockingFirstPreflight_MaterializesPreparedPostBuildRunner()
     {
         var document = CreateDocument();
-        var discovery = ProjectDiscoveryResult.Empty with { DiscoveredProjects = new[] { FixtureProject() } };
+        document.Analysis.TargetAssemblies = ["Fixture"];
+        string fixturePath = Path.GetFullPath(Path.Combine("/fake/repository/root", "bin", "Fixture.dll"));
+        string unselectedPath = Path.GetFullPath(Path.Combine("/fake/repository/root", "bin", "Unselected.dll"));
+        var discovery = ProjectDiscoveryResult.Empty with
+        {
+            DiscoveredProjects = new[] { FixtureProject() },
+            ResolvedAssemblyPaths = new Dictionary<string, string>(StringComparer.Ordinal)
+            {
+                ["Fixture"] = fixturePath,
+                ["Unselected"] = unselectedPath,
+            },
+        };
 
         var firstRunner = new FakeContractRunner(CreateSession(document, discovery, missingAssemblyNames: _value4));
         var secondRunner = new FakeContractRunner(CreateSession(document, discovery, missingAssemblyNames: _value5))
@@ -269,9 +310,30 @@ public sealed class ArchitectureBaselineApplicationServiceBuildStateTests
 
         var runnerSetupService = new FakeRunnerSetupService
         {
-            RunnersToReturn = new Queue<IArchitectureContractRunner>(new IArchitectureContractRunner[] { firstRunner, secondRunner }),
+            DocumentToReturn = document,
+            RunnerToReturn = firstRunner,
+            RunnersToReturn = new Queue<IArchitectureContractRunner>(new IArchitectureContractRunner[] { secondRunner }),
+            PreparationToReturn = new ArchitectureRunnerPreparation(
+                "/fake/repository/root",
+                PreprocessorSymbols: null,
+                ProjectDiscovery: discovery,
+                ResolveAssemblyOutputs: true,
+                SelectedAssemblyArtifactPaths: new[] { fixturePath },
+                CapturedArtifactContentDigests: new Dictionary<string, string>(),
+                MissingAssemblyNames: _value4,
+                IsMetadataReferenceClosureComplete: false),
         };
-        var preparationService = new FakeBuildStatePreparationService();
+        var callOrder = new List<string>();
+        runnerSetupService.CallOrder = callOrder;
+        var preparationService = new FakeBuildStatePreparationService
+        {
+            CallOrder = callOrder,
+            ResultsToReturn = new Queue<BuildStatePreflightResult>(new[]
+            {
+                new BuildStatePreflightResult(new[] { CurrentDiagnostic() }),
+                new BuildStatePreflightResult(Array.Empty<BuildStatePreflightDiagnostic>()),
+            }),
+        };
 
         var applicationService = new ArchitectureBaselineApplicationService(
             runnerSetupService, new FakeContractHandlerRegistry(), new FakeContractExecutor(),
@@ -288,22 +350,98 @@ public sealed class ArchitectureBaselineApplicationServiceBuildStateTests
         Assert.Multiple(() =>
         {
             Assert.That(outcome.Succeeded, Is.True);
-            Assert.That(runnerSetupService.BuildRunnerForPostBuildCallCount, Is.EqualTo(1));
+            Assert.That(runnerSetupService.BuildRunnerCallCount, Is.EqualTo(0));
+            Assert.That(runnerSetupService.BuildRunnerForPostBuildCallCount, Is.EqualTo(0));
+            Assert.That(runnerSetupService.PrepareRunnerCallCount, Is.EqualTo(1));
+            Assert.That(runnerSetupService.MaterializePreparedRunnerCallCount, Is.EqualTo(1));
             Assert.That(preparationService.PrepareCallCount, Is.EqualTo(2));
             Assert.That(preparationService.RequestsReceived[0].PreparationMode, Is.EqualTo(BuildPreparationMode.EnsureBuilt));
-            // The rerun against the post-build runner always re-verifies as Ordinary: the build
-            // already ran once, so a second EnsureBuilt attempt would be redundant.
+            // The post-build verification always runs as Ordinary: the build already ran once, so
+            // a second EnsureBuilt attempt would be redundant.
             Assert.That(preparationService.RequestsReceived[1].PreparationMode, Is.EqualTo(BuildPreparationMode.Ordinary));
-            // Contract execution must run against the fresh post-build runner, not the one used
-            // only to discover what needed building.
+            Assert.That(preparationService.RequestsReceived[1].Resolution.ResolvedAssemblyPaths["Fixture"],
+                Is.EqualTo(fixturePath));
+            Assert.That(preparationService.RequestsReceived[0].Resolution.ResolvedAssemblyPaths.Keys,
+                Is.EquivalentTo(_fixtureAssemblyNames));
+            Assert.That(preparationService.RequestsReceived[1].Resolution.ResolvedAssemblyPaths.Keys,
+                Is.EquivalentTo(_fixtureAssemblyNames));
+            // Contract execution must run against the materialized post-build runner, not anything
+            // used only to discover what needed building.
             Assert.That(firstRunner.StrictArgumentsReceived, Is.Empty);
             Assert.That(secondRunner.StrictArgumentsReceived, Is.Not.Empty);
             Assert.That(outcome.New.Single().SourceType, Is.EqualTo("SrcFromPostBuild"));
+            Assert.That(callOrder, Is.EqualTo(_materializationCallOrder));
         });
     }
 
     [Test]
-    public void Verify_EnsureBuiltWithSecondPreflightBlocked_ReturnsPreflightBlockedFromPostBuildRerun()
+    public void Verify_EnsureBuiltWithGraphDrivenStaleOutput_UsesDiscoveredRootForBothPreflights()
+    {
+        var document = CreateDocument();
+        string fixturePath = Path.GetFullPath(Path.Combine("/fake/repository/root", "bin", "Fixture.dll"));
+        var discovery = ProjectDiscoveryResult.Empty with
+        {
+            DiscoveredProjects = new[] { FixtureProject() },
+            ResolvedAssemblyPaths = new Dictionary<string, string>(StringComparer.Ordinal)
+            {
+                ["Fixture"] = fixturePath,
+            },
+        };
+        var firstRunner = new FakeContractRunner(CreateSession(document, discovery));
+        var secondRunner = new FakeContractRunner(CreateSession(document, discovery));
+        var runnerSetupService = new FakeRunnerSetupService
+        {
+            DocumentToReturn = document,
+            RunnerToReturn = firstRunner,
+            RunnersToReturn = new Queue<IArchitectureContractRunner>(new IArchitectureContractRunner[] { secondRunner }),
+            PreparationToReturn = new ArchitectureRunnerPreparation(
+                "/fake/repository/root",
+                PreprocessorSymbols: null,
+                ProjectDiscovery: discovery,
+                ResolveAssemblyOutputs: true,
+                SelectedAssemblyArtifactPaths: Array.Empty<string>(),
+                CapturedArtifactContentDigests: new Dictionary<string, string>(),
+                MissingAssemblyNames: Array.Empty<string>(),
+                IsMetadataReferenceClosureComplete: false)
+            {
+                GraphDrivenRootAssemblyNames = _fixtureAssemblyNames,
+            },
+        };
+        var preparationService = new FakeBuildStatePreparationService
+        {
+            ResultsToReturn = new Queue<BuildStatePreflightResult>(new[]
+            {
+                new BuildStatePreflightResult(new[] { CurrentDiagnostic() }),
+                new BuildStatePreflightResult(new[] { CurrentDiagnostic() }),
+            }),
+        };
+        var applicationService = new ArchitectureBaselineApplicationService(
+            runnerSetupService, new FakeContractHandlerRegistry(), new FakeContractExecutor(),
+            new FakeBaselineGenerator(), new FakeBaselineLoadingService(), preparationService);
+
+        BaselineVerifyOutcome outcome = applicationService.Verify(new BaselineVerifyRequest
+        {
+            PolicyPath = "unused-by-fakes.arch.yml",
+            BaselinePath = "unused-by-fakes.baseline.yml",
+            Mode = "all",
+            PreparationMode = BuildPreparationMode.EnsureBuilt,
+        });
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(outcome.Succeeded, Is.True);
+            Assert.That(preparationService.PrepareCallCount, Is.EqualTo(2));
+            Assert.That(preparationService.RequestsReceived[0].Resolution.ResolvedAssemblyPaths.Keys,
+                Is.EquivalentTo(_fixtureAssemblyNames));
+            Assert.That(preparationService.RequestsReceived[1].Resolution.ResolvedAssemblyPaths.Keys,
+                Is.EquivalentTo(_fixtureAssemblyNames));
+            Assert.That(document.Analysis.TargetAssemblies, Is.EquivalentTo(_fixtureAssemblyNames));
+            Assert.That(runnerSetupService.MaterializePreparedRunnerCallCount, Is.EqualTo(1));
+        });
+    }
+
+    [Test]
+    public void Verify_EnsureBuiltWithSecondPreflightBlocked_ReturnsPreflightBlockedBeforeMaterialization()
     {
         var document = CreateDocument();
         var discovery = ProjectDiscoveryResult.Empty with { DiscoveredProjects = new[] { FixtureProject() } };
@@ -313,7 +451,8 @@ public sealed class ArchitectureBaselineApplicationServiceBuildStateTests
 
         var runnerSetupService = new FakeRunnerSetupService
         {
-            RunnersToReturn = new Queue<IArchitectureContractRunner>(new IArchitectureContractRunner[] { firstRunner, secondRunner }),
+            RunnerToReturn = firstRunner,
+            RunnersToReturn = new Queue<IArchitectureContractRunner>(new IArchitectureContractRunner[] { secondRunner }),
         };
         var postBuildBlockingDiagnostic = BlockingDiagnostic("PostBuild.Module");
         var preparationService = new FakeBuildStatePreparationService
@@ -344,6 +483,193 @@ public sealed class ArchitectureBaselineApplicationServiceBuildStateTests
             Assert.That(outcome.PreflightDiagnostics.Single().ContractName, Is.EqualTo("PostBuild.Module"));
             Assert.That(firstRunner.StrictArgumentsReceived, Is.Empty);
             Assert.That(secondRunner.StrictArgumentsReceived, Is.Empty);
+            Assert.That(runnerSetupService.PrepareRunnerCallCount, Is.EqualTo(1));
+            Assert.That(runnerSetupService.MaterializePreparedRunnerCallCount, Is.EqualTo(0));
+            Assert.That(runnerSetupService.BuildRunnerCallCount, Is.EqualTo(0));
+        });
+    }
+
+    [Test]
+    public void Verify_EnsureBuiltWithoutProjectGraph_FallsBackAfterMetadataPreflight()
+    {
+        var document = CreateDocument();
+        var runner = new FakeContractRunner(CreateSession(document));
+        var callOrder = new List<string>();
+        var runnerSetupService = new FakeRunnerSetupService
+        {
+            DocumentToReturn = document,
+            RunnerToReturn = runner,
+            CallOrder = callOrder,
+            PreparationToReturn = new ArchitectureRunnerPreparation(
+                "/fake/repository/root",
+                PreprocessorSymbols: null,
+                ProjectDiscoveryResult.Empty,
+                ResolveAssemblyOutputs: true,
+                SelectedAssemblyArtifactPaths: Array.Empty<string>(),
+                CapturedArtifactContentDigests: new Dictionary<string, string>(),
+                MissingAssemblyNames: new[] { "Direct" },
+                IsMetadataReferenceClosureComplete: false),
+        };
+        var preparationService = new FakeBuildStatePreparationService { CallOrder = callOrder };
+
+        var applicationService = new ArchitectureBaselineApplicationService(
+            runnerSetupService, new FakeContractHandlerRegistry(), new FakeContractExecutor(),
+            new FakeBaselineGenerator(), new FakeBaselineLoadingService(), preparationService);
+
+        BaselineVerifyOutcome outcome = applicationService.Verify(new BaselineVerifyRequest
+        {
+            PolicyPath = "unused-by-fakes.arch.yml",
+            BaselinePath = "unused-by-fakes.baseline.yml",
+            Mode = "all",
+            PreparationMode = BuildPreparationMode.EnsureBuilt,
+        });
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(outcome.Succeeded, Is.True);
+            Assert.That(runnerSetupService.PrepareRunnerCallCount, Is.EqualTo(1));
+            Assert.That(runnerSetupService.MaterializePreparedRunnerCallCount, Is.EqualTo(0));
+            Assert.That(runnerSetupService.BuildRunnerCallCount, Is.EqualTo(1));
+            Assert.That(preparationService.PrepareCallCount, Is.Zero);
+            Assert.That(callOrder, Is.EqualTo(_fallbackCallOrder));
+        });
+    }
+
+    [Test]
+    public void Diff_EnsureBuilt_RerunsAgainstFreshPostBuildRunnerAndForwardsOutputContext()
+    {
+        var document = CreateDocument();
+        var discovery = ProjectDiscoveryResult.Empty with { DiscoveredProjects = new[] { FixtureProject() } };
+        var firstRunner = new FakeContractRunner(CreateSession(document, discovery, missingAssemblyNames: ["Fixture"]));
+        var secondRunner = new FakeContractRunner(CreateSession(document, discovery, missingAssemblyNames: ["Fixture"]))
+        {
+            BaselineCandidates = new List<ArchitectureBaselineCandidate>
+            {
+                new("strict", "known-rule", "SrcFromPostBuild", "RefFromPostBuild"),
+            },
+        };
+        var runnerSetupService = new FakeRunnerSetupService
+        {
+            RunnersToReturn = new Queue<IArchitectureContractRunner>(new IArchitectureContractRunner[] { firstRunner, secondRunner }),
+        };
+        var preparationService = new FakeBuildStatePreparationService();
+        var applicationService = new ArchitectureBaselineApplicationService(
+            runnerSetupService, new FakeContractHandlerRegistry(), new FakeContractExecutor(),
+            new FakeBaselineGenerator(), new FakeBaselineLoadingService(), preparationService);
+
+        BaselineDiffOutcome outcome = applicationService.Diff(new BaselineDiffRequest
+        {
+            PolicyPath = "unused-by-fakes.arch.yml",
+            BaselinePath = "unused-by-fakes.baseline.yml",
+            Mode = "strict",
+            PreparationMode = BuildPreparationMode.EnsureBuilt,
+            NoRestore = true,
+            RequestedConfiguration = "Release",
+            RequestedTargetFramework = "net10.0",
+            RequestedPlatform = "AnyCPU",
+            RequestedRuntimeIdentifier = "win-x64",
+        });
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(outcome.Succeeded, Is.True);
+            Assert.That(runnerSetupService.BuildRunnerForPostBuildCallCount, Is.EqualTo(1));
+            Assert.That(preparationService.PrepareCallCount, Is.EqualTo(2));
+            Assert.That(preparationService.RequestsReceived[0].PreparationMode, Is.EqualTo(BuildPreparationMode.EnsureBuilt));
+            Assert.That(preparationService.RequestsReceived[1].PreparationMode, Is.EqualTo(BuildPreparationMode.Ordinary));
+            Assert.That(preparationService.RequestsReceived, Has.All.Matches<BuildStatePreflightRequest>(request =>
+                request.NoRestore
+                && request.RequestedConfiguration == "Release"
+                && request.RequestedTargetFramework == "net10.0"
+                && request.RequestedPlatform == "AnyCPU"
+                && request.RequestedRuntimeIdentifier == "win-x64"));
+            Assert.That(firstRunner.StrictArgumentsReceived, Is.Empty);
+            Assert.That(secondRunner.StrictArgumentsReceived, Is.Not.Empty);
+            Assert.That(outcome.New.Single().SourceType, Is.EqualTo("SrcFromPostBuild"));
+        });
+    }
+
+    [Test]
+    public void Diff_PreparedPostBuildState_UsesIsolatedRunnerWithoutAnotherEnsureBuiltRequest()
+    {
+        var document = CreateDocument();
+        var discovery = ProjectDiscoveryResult.Empty with { DiscoveredProjects = new[] { FixtureProject() } };
+        var preparedRunner = new FakeContractRunner(CreateSession(document, discovery, missingAssemblyNames: ["Fixture"]))
+        {
+            BaselineCandidates = new List<ArchitectureBaselineCandidate>
+            {
+                new("strict", "known-rule", "SrcFromPreparedState", "RefFromPreparedState"),
+            },
+        };
+        var runnerSetupService = new FakeRunnerSetupService
+        {
+            RunnersToReturn = new Queue<IArchitectureContractRunner>([preparedRunner]),
+        };
+        var preparationService = new FakeBuildStatePreparationService();
+        var applicationService = new ArchitectureBaselineApplicationService(
+            runnerSetupService, new FakeContractHandlerRegistry(), new FakeContractExecutor(),
+            new FakeBaselineGenerator(), new FakeBaselineLoadingService(), preparationService);
+
+        BaselineDiffOutcome outcome = applicationService.Diff(new BaselineDiffRequest
+        {
+            PolicyPath = "unused-by-fakes.arch.yml",
+            BaselinePath = "unused-by-fakes.baseline.yml",
+            Mode = "strict",
+            PreparationMode = BuildPreparationMode.Ordinary,
+            UsePreparedPostBuildState = true,
+            PreparedPostBuildRunner = CreatePreparedRunner(discovery),
+        });
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(outcome.Succeeded, Is.True);
+            Assert.That(runnerSetupService.BuildRunnerCallCount, Is.EqualTo(0));
+            Assert.That(runnerSetupService.BuildRunnerForPostBuildCallCount, Is.EqualTo(0));
+            Assert.That(runnerSetupService.MaterializePreparedRunnerCallCount, Is.EqualTo(1));
+            Assert.That(preparationService.PrepareCallCount, Is.EqualTo(1));
+            Assert.That(preparationService.RequestsReceived,
+                Has.All.Matches<BuildStatePreflightRequest>(request =>
+                    request.PreparationMode == BuildPreparationMode.Ordinary));
+            Assert.That(preparedRunner.StrictArgumentsReceived, Is.Not.Empty);
+            Assert.That(outcome.New.Single().SourceType, Is.EqualTo("SrcFromPreparedState"));
+        });
+    }
+
+    [Test]
+    public void Diff_BlockedPreflight_ReturnsFailClosedResultWithoutCollectingCandidates()
+    {
+        var document = CreateDocument();
+        var discovery = ProjectDiscoveryResult.Empty with { DiscoveredProjects = new[] { FixtureProject() } };
+        var runner = new FakeContractRunner(CreateSession(document, discovery, missingAssemblyNames: ["Fixture"]));
+        var runnerSetupService = new FakeRunnerSetupService
+        {
+            RunnerToReturn = runner,
+        };
+        var preparationService = new FakeBuildStatePreparationService
+        {
+            ResultToReturn = new BuildStatePreflightResult(new[] { BlockingDiagnostic() }),
+        };
+        var executor = new FakeContractExecutor();
+        var applicationService = new ArchitectureBaselineApplicationService(
+            runnerSetupService, new FakeContractHandlerRegistry(), executor,
+            new FakeBaselineGenerator(), new FakeBaselineLoadingService(), preparationService);
+
+        BaselineDiffOutcome outcome = applicationService.Diff(new BaselineDiffRequest
+        {
+            PolicyPath = "unused-by-fakes.arch.yml",
+            BaselinePath = "unused-by-fakes.baseline.yml",
+            Mode = "strict",
+            NoRestore = true,
+        });
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(outcome.Succeeded, Is.False);
+            Assert.That(outcome.New, Is.Empty);
+            Assert.That(outcome.Frozen, Is.Empty);
+            Assert.That(outcome.PreflightDiagnostics, Has.Count.EqualTo(1));
+            Assert.That(executor.ModesReceived, Is.Empty);
+            Assert.That(runnerSetupService.BuildRunnerForPostBuildCallCount, Is.EqualTo(0));
         });
     }
 }

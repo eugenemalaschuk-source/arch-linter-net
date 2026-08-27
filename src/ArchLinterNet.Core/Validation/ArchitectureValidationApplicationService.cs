@@ -187,6 +187,7 @@ public sealed class ArchitectureValidationApplicationService(
                 preparedArtifactContentDigests: preparation.CapturedArtifactContentDigests,
                 preparedProjectPaths: preparation.PreparedProjectPaths,
                 preparedArtifactClosureComplete: preparation.HasCompleteArtifactSelection,
+                preparedPostBuildRunner: request.PreparationMode == BuildPreparationMode.EnsureBuilt ? preparation : null,
                 materializeSetup: () => preparation.HasCompleteRootSelection
                     ? runnerSetupService.MaterializePreparedRunner(
                         state.Policy.Document, preparation, state.Policy.SelectedContractIds,
@@ -393,21 +394,10 @@ public sealed class ArchitectureValidationApplicationService(
     private BuildStatePreflightResult RunBuildStatePreflight(
         AnalysisSnapshotRequest request, ArchitectureRunnerPreparation preparation)
     {
-        if (preparation.ProjectDiscovery.DiscoveredProjects.Count == 0)
-        {
-            return new BuildStatePreflightResult(Array.Empty<BuildStatePreflightDiagnostic>());
-        }
-
-        Dictionary<string, string> paths = preparation.ProjectDiscovery.ResolvedAssemblyPaths
-            .Where(pair => preparation.SelectedAssemblyArtifactPaths.Contains(pair.Value, StringComparer.OrdinalIgnoreCase))
-            .ToDictionary(pair => pair.Key, pair => pair.Value, StringComparer.Ordinal);
-        BuildStateResolvedAssemblies resolution = new(
-            Array.Empty<System.Reflection.Assembly>(), preparation.MissingAssemblyNames)
-        {
-            ResolvedAssemblyPaths = paths
-        };
-
-        if (resolution.ResolvedAssemblyPaths.Count == 0 && resolution.MissingAssemblyNames.Count == 0)
+        BuildStateResolvedAssemblies? resolution = BuildStatePreflightRunner.CreatePreparationResolution(
+            preparation, request.PreparationMode);
+        if (resolution is null
+            || (resolution.ResolvedAssemblyPaths.Count == 0 && resolution.MissingAssemblyNames.Count == 0))
         {
             return new BuildStatePreflightResult(Array.Empty<BuildStatePreflightDiagnostic>());
         }

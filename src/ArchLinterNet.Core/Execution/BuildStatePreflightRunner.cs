@@ -12,6 +12,36 @@ namespace ArchLinterNet.Core.Execution;
 // application-internals).
 internal static class BuildStatePreflightRunner
 {
+    public static BuildStateResolvedAssemblies? CreatePreparationResolution(
+        ArchitectureRunnerPreparation preparation,
+        BuildPreparationMode preparationMode)
+    {
+        if (preparation.ProjectDiscovery.DiscoveredProjects.Count == 0)
+        {
+            return null;
+        }
+
+        bool hasGraphDrivenRoots = preparationMode == BuildPreparationMode.EnsureBuilt
+            && preparation.GraphDrivenRootAssemblyNames.Count > 0;
+        Dictionary<string, string> paths = preparation.ProjectDiscovery.ResolvedAssemblyPaths
+            .Where(pair => hasGraphDrivenRoots
+                ? preparation.GraphDrivenRootAssemblyNames.Contains(pair.Key, StringComparer.Ordinal)
+                : preparation.SelectedAssemblyArtifactPaths.Contains(pair.Value, StringComparer.OrdinalIgnoreCase))
+            .ToDictionary(pair => pair.Key, pair => pair.Value, StringComparer.Ordinal);
+        IReadOnlyList<string> missingAssemblyNames = hasGraphDrivenRoots
+            ? preparation.GraphDrivenRootAssemblyNames
+                .Where(name => !paths.ContainsKey(name))
+                .Concat(preparation.MissingAssemblyNames)
+                .Distinct(StringComparer.Ordinal)
+                .ToArray()
+            : preparation.MissingAssemblyNames;
+
+        return new BuildStateResolvedAssemblies(Array.Empty<System.Reflection.Assembly>(), missingAssemblyNames)
+        {
+            ResolvedAssemblyPaths = paths,
+        };
+    }
+
     public static BuildStatePreflightResult Run(
         string repositoryRoot,
         ProjectDiscoveryResult? discovery,
