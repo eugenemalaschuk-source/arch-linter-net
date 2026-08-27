@@ -187,6 +187,7 @@ public sealed class ArchitectureValidationApplicationService(
                 preparedArtifactContentDigests: preparation.CapturedArtifactContentDigests,
                 preparedProjectPaths: preparation.PreparedProjectPaths,
                 preparedArtifactClosureComplete: preparation.HasCompleteArtifactSelection,
+                preparedPostBuildRunner: request.PreparationMode == BuildPreparationMode.EnsureBuilt ? preparation : null,
                 materializeSetup: () => preparation.HasCompleteRootSelection
                     ? runnerSetupService.MaterializePreparedRunner(
                         state.Policy.Document, preparation, state.Policy.SelectedContractIds,

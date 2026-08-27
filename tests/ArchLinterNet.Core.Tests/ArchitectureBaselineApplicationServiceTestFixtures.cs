@@ -20,7 +20,6 @@ internal sealed class FakeRunnerSetupService : IArchitectureRunnerSetupService
     public int BuildRunnerForPostBuildCallCount { get; private set; }
 
     public int PrepareRunnerCallCount { get; private set; }
-
     public int MaterializePreparedRunnerCallCount { get; private set; }
 
     public Queue<IArchitectureContractRunner>? RunnersToReturn { get; init; }
@@ -115,7 +114,6 @@ internal sealed class FakeRunnerSetupService : IArchitectureRunnerSetupService
             context.MissingAssemblyNames.ToArray(),
             IsMetadataReferenceClosureComplete: false);
     }
-
     public ArchitectureRunnerSetup MaterializePreparedRunner(
         ArchitectureContractDocument document,
         ArchitectureRunnerPreparation preparation,

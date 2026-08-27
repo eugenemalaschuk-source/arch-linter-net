@@ -152,10 +152,9 @@ public sealed partial class ArchitectureBaselineApplicationService(
 
     public BaselineDiffOutcome Diff(BaselineDiffRequest request)
     {
-        (ArchitectureContractDocument document, IReadOnlyList<ArchitectureBaselineCandidate>? candidates, List<ArchitectureViolation> configViolations) =
-            CollectCandidates(request.PolicyPath, request.Mode, request.ConditionSetName, request.ContractIds, request.CancellationToken);
+        BaselineCandidateCollection collection = CollectDiffCandidates(request);
 
-        if (candidates == null)
+        if (collection.Candidates == null)
         {
             return new BaselineDiffOutcome(
                 Succeeded: false,
@@ -163,12 +162,15 @@ public sealed partial class ArchitectureBaselineApplicationService(
                 Frozen: Array.Empty<ArchitectureBaselineComparisonEntry>(),
                 Resolved: Array.Empty<ArchitectureBaselineComparisonEntry>(),
                 ConfigurationErrors: Array.Empty<ArchitectureBaselineComparisonEntry>(),
-                ConfigurationViolations: configViolations);
+                ConfigurationViolations: collection.ConfigurationViolations)
+            {
+                PreflightDiagnostics = collection.PreflightDiagnostics,
+            };
         }
 
         ArchitectureBaselineDocument existingBaseline = baselineLoadingService.Load(request.BaselinePath);
         ArchitectureBaselineComparisonResult comparison = ArchitectureBaselineComparer.Compare(
-            document, existingBaseline, candidates, request.Mode, request.ContractIds);
+            collection.Document, existingBaseline, collection.Candidates, request.Mode, request.ContractIds);
 
         return new BaselineDiffOutcome(
             Succeeded: true,
@@ -396,11 +398,37 @@ public sealed partial class ArchitectureBaselineApplicationService(
             }
         }
 
+        if (buildState?.UsePreparedPostBuildState == true
+            && buildState.RequestedTargetFramework is not null)
+        {
+            // The preparation carries the exact selected artifact paths. The effective framework
+            // is retained here solely for the isolated shared-framework probing path.
+            document.Analysis.TargetFramework = buildState.RequestedTargetFramework;
+        }
+
         ArchitectureRunnerSetup? setup = null;
 
         try
         {
-            if (buildState?.PreparationMode == BuildPreparationMode.EnsureBuilt)
+            if (buildState?.UsePreparedPostBuildState == true)
+            {
+                setup = runnerSetupService.MaterializePreparedRunner(
+                    document,
+                    buildState.PreparedPostBuildRunner
+                        ?? throw new InvalidOperationException("Prepared baseline analysis requires validation's receipt-backed artifact selection."),
+                    selectedContractIds: selectedContractIds,
+                    enableUnmatchedIgnoreTracking: true,
+                    mode: mode == "all" ? null : mode,
+                    cancellationToken: cancellationToken);
+
+                BuildStatePreflightResult preflight = RunBuildStatePreflight(setup.Runner, buildState, cancellationToken);
+                if (preflight.Blocked)
+                {
+                    return BaselineCandidateCollection.PreflightBlocked(document, preflight.Diagnostics);
+                }
+            }
+            else if (buildState?.PreparationMode == BuildPreparationMode.EnsureBuilt
+                && buildState.UseMetadataFirstEnsureBuilt)
             {
                 ArchitectureRunnerPreparation preparation = runnerSetupService.PrepareRunner(
                     document,
@@ -470,6 +498,34 @@ public sealed partial class ArchitectureBaselineApplicationService(
                     if (preflight.Blocked)
                     {
                         return BaselineCandidateCollection.PreflightBlocked(document, preflight.Diagnostics);
+                    }
+
+                    if (buildState.PreparationMode == BuildPreparationMode.EnsureBuilt
+                        && setup.Runner.Session.Context.ProjectDiscovery is { DiscoveredProjects.Count: > 0 })
+                    {
+                        // Baseline diff keeps its established isolated post-build path. Baseline
+                        // verify takes the metadata-first branch above to avoid locking outputs.
+                        ArchitectureRunnerSetup postBuildSetup = runnerSetupService.BuildRunnerForPostBuild(
+                            document, policyPath, conditionSetName,
+                            selectedContractIds: selectedContractIds,
+                            enableUnmatchedIgnoreTracking: true,
+                            mode: mode == "all" ? null : mode,
+                            cancellationToken: cancellationToken);
+                        setup.Runner.Session.Context.Dispose();
+                        setup = postBuildSetup;
+
+                        preflight = RunBuildStatePreflight(
+                            setup.Runner,
+                            buildState with
+                            {
+                                PreparationMode = BuildPreparationMode.Ordinary,
+                                UsePreparedPostBuildState = false,
+                            },
+                            cancellationToken);
+                        if (preflight.Blocked)
+                        {
+                            return BaselineCandidateCollection.PreflightBlocked(document, preflight.Diagnostics);
+                        }
                     }
                 }
             }

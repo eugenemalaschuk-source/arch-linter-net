@@ -1,3 +1,4 @@
+using ArchLinterNet.Core.BuildState;
 using ArchLinterNet.Core.Contracts;
 using ArchLinterNet.Core.Execution;
 using ArchLinterNet.Core.Execution.Abstractions;
@@ -7,14 +8,23 @@ using ArchLinterNet.Core.Model;
 
 namespace ArchLinterNet.Core.Graph;
 
-public sealed class ArchitectureGraphApplicationService(
+public sealed partial class ArchitectureGraphApplicationService(
     IArchitectureRunnerSetupService runnerSetupService,
     IArchitectureContractHandlerRegistry handlerRegistry,
-    IArchitectureContractExecutor contractExecutor)
+    IArchitectureContractExecutor contractExecutor,
+    IBuildStatePreparationService? buildStatePreparationService)
     : IArchitectureGraphApplicationService
 {
     private const string ModeStrict = "strict";
     private const string ModeAudit = "audit";
+
+    public ArchitectureGraphApplicationService(
+        IArchitectureRunnerSetupService runnerSetupService,
+        IArchitectureContractHandlerRegistry handlerRegistry,
+        IArchitectureContractExecutor contractExecutor)
+        : this(runnerSetupService, handlerRegistry, contractExecutor, buildStatePreparationService: null)
+    {
+    }
 
     public ArchitectureGraphOutcome BuildGraph(ArchitectureGraphRequest request)
     {
@@ -28,16 +38,25 @@ public sealed class ArchitectureGraphApplicationService(
             out List<ArchitectureViolation> violations,
             out IReadOnlyCollection<Reporting.ArchitectureCoverageSummary> coverageSummaries);
 
-        ArchitectureDependencyGraph graph = ArchitectureDependencyGraphBuilder.Build(
-            session, request.Level, violations,
-            out IReadOnlyDictionary<(string Source, string Target), IReadOnlyList<ArchitectureViolation>> edgeViolations);
-        return new ArchitectureGraphOutcome(graph)
+        try
         {
-            EdgeViolations = edgeViolations,
-            CoverageSummaries = coverageSummaries,
-            SourceExpansion = session.Document.SourceExpansion,
-            SelectorParticipation = session.SubtractiveMatcherParticipation
-        };
+            ArchitectureDependencyGraph graph = ArchitectureDependencyGraphBuilder.Build(
+                session, request.Level, violations,
+                out IReadOnlyDictionary<(string Source, string Target), IReadOnlyList<ArchitectureViolation>> edgeViolations);
+            return new ArchitectureGraphOutcome(graph)
+            {
+                EdgeViolations = edgeViolations,
+                CoverageSummaries = coverageSummaries,
+                SourceExpansion = session.Document.SourceExpansion,
+                SelectorParticipation = session.SubtractiveMatcherParticipation
+            };
+        }
+        finally
+        {
+            // BuildGraph materializes the entire public outcome before returning. The session and
+            // its isolated post-build load scope do not escape, so this method owns disposal.
+            session.Context.Dispose();
+        }
     }
 
     internal ArchitectureAnalysisSession BuildSession(
@@ -72,12 +91,32 @@ public sealed class ArchitectureGraphApplicationService(
             }
         }
 
-        ArchitectureRunnerSetup setup = runnerSetupService.BuildRunner(
-            document,
-            request.PolicyPath,
-            request.ConditionSetName,
-            selectedContractIds: selectedIds,
-            enableUnmatchedIgnoreTracking: false);
+        if (request.UsePreparedPostBuildState
+            && request.RequestedTargetFramework is not null)
+        {
+            // MaterializePreparedRunner uses the supplied exact artifact paths; retain the
+            // effective framework only for shared-framework probing, which must follow the
+            // same caller-selected context rather than the policy default.
+            document.Analysis.TargetFramework = request.RequestedTargetFramework;
+        }
+
+        ArchitectureRunnerSetup setup = request.UsePreparedPostBuildState
+            ? runnerSetupService.MaterializePreparedRunner(
+                document,
+                request.PreparedPostBuildRunner
+                    ?? throw new InvalidOperationException("Prepared graph analysis requires validation's receipt-backed artifact selection."),
+                selectedContractIds: selectedIds,
+                enableUnmatchedIgnoreTracking: false,
+                mode: request.Mode == "all" ? null : request.Mode)
+            : runnerSetupService.BuildRunner(
+                document,
+                request.PolicyPath,
+                request.ConditionSetName,
+                selectedContractIds: selectedIds,
+                enableUnmatchedIgnoreTracking: false,
+                mode: request.Mode == "all" ? null : request.Mode);
+
+        setup = PrepareBuildStateRunner(request, document, selectedIds, setup);
 
         IArchitectureContractRunner runner = setup.Runner;
 

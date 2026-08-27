@@ -2,6 +2,8 @@ using System.Text;
 using ArchLinterNet.Cli.Abstractions;
 using ArchLinterNet.Core.BuildState;
 using ArchLinterNet.Core.Change;
+using ArchLinterNet.Core.Discovery;
+using ArchLinterNet.Core.Execution;
 using ArchLinterNet.Core.Graph;
 using ArchLinterNet.Core.Model;
 using ArchLinterNet.Core.Reporting;
@@ -35,6 +37,141 @@ public sealed class ChangeCommandHandlerTests
             Assert.That(snapshot.Entries.Single().Identity, Is.EqualTo("src/Acme/Acme.csproj"));
             Assert.That(fileSystem.WrittenPath, Is.EqualTo("snapshot.json"));
             Assert.That(console.ErrorText, Is.Empty);
+        });
+    }
+
+    [Test]
+    public void CreateSnapshot_ForwardsBuildStateToEveryContributor()
+    {
+        ArchitectureRunnerPreparation preparedRunner = PreparedRunner();
+        var runtime = new SnapshotRuntime(Outcome("/repo", "/repo/src/Acme/Acme.csproj") with
+        {
+            PreparedPostBuildRunner = preparedRunner,
+        });
+        var handler = new ChangeCommandHandler(runtime, new CapturingConsole(), new CapturingFileSystem());
+
+        int exitCode = handler.CreateSnapshot(new ChangeSnapshotCommandOptions(
+            "architecture/dependencies.arch.yml", "strict", "ci", "baseline.yml", "snapshot.json", false,
+            EnsureBuilt: true, NoRestore: true, Configuration: "Release", TargetFramework: "net10.0",
+            Platform: "AnyCPU", RuntimeIdentifier: "win-x64"));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(exitCode, Is.EqualTo(CliExitCodes.Success));
+            Assert.That(runtime.ValidationRequest, Is.Not.Null);
+            Assert.That(runtime.ValidationRequest!.PreparationMode, Is.EqualTo(BuildPreparationMode.EnsureBuilt));
+            Assert.That(runtime.ValidationRequest.NoRestore, Is.True);
+            Assert.That(runtime.ValidationRequest.RequestedConfiguration, Is.EqualTo("Release"));
+            Assert.That(runtime.ValidationRequest.RequestedTargetFramework, Is.EqualTo("net10.0"));
+            Assert.That(runtime.ValidationRequest.RequestedPlatform, Is.EqualTo("AnyCPU"));
+            Assert.That(runtime.ValidationRequest.RequestedRuntimeIdentifier, Is.EqualTo("win-x64"));
+            Assert.That(runtime.GraphRequests, Has.Count.EqualTo(2));
+            Assert.That(runtime.GraphRequests, Has.All.Matches<ArchitectureGraphRequest>(request =>
+                request.PreparationMode == BuildPreparationMode.Ordinary
+                && request.UsePreparedPostBuildState
+                && request.NoRestore
+                && request.RequestedConfiguration == "Release"
+                && request.RequestedTargetFramework == "net10.0"
+                && request.RequestedPlatform == "AnyCPU"
+                && request.RequestedRuntimeIdentifier == "win-x64"
+                && ReferenceEquals(request.PreparedPostBuildRunner, preparedRunner)));
+            Assert.That(runtime.BaselineDiffRequest, Is.Not.Null);
+            Assert.That(runtime.BaselineDiffRequest!.PreparationMode, Is.EqualTo(BuildPreparationMode.Ordinary));
+            Assert.That(runtime.BaselineDiffRequest.UsePreparedPostBuildState, Is.True);
+            Assert.That(runtime.BaselineDiffRequest.NoRestore, Is.True);
+            Assert.That(runtime.BaselineDiffRequest.RequestedConfiguration, Is.EqualTo("Release"));
+            Assert.That(runtime.BaselineDiffRequest.RequestedTargetFramework, Is.EqualTo("net10.0"));
+            Assert.That(runtime.BaselineDiffRequest.RequestedPlatform, Is.EqualTo("AnyCPU"));
+            Assert.That(runtime.BaselineDiffRequest.RequestedRuntimeIdentifier, Is.EqualTo("win-x64"));
+            Assert.That(runtime.BaselineDiffRequest.PreparedPostBuildRunner, Is.SameAs(preparedRunner));
+        });
+    }
+
+    [Test]
+    public void CreateSnapshot_EnsureBuiltWithoutPreparedSelection_FailsWithoutWritingSnapshot()
+    {
+        var runtime = new SnapshotRuntime(Outcome("/repo", "/repo/src/Acme/Acme.csproj"));
+        var console = new CapturingConsole();
+        var fileSystem = new CapturingFileSystem();
+        var handler = new ChangeCommandHandler(runtime, console, fileSystem);
+
+        int exitCode = handler.CreateSnapshot(new ChangeSnapshotCommandOptions(
+            "architecture/dependencies.arch.yml", "strict", null, null, "snapshot.json", false,
+            EnsureBuilt: true));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(exitCode, Is.EqualTo(CliExitCodes.InvalidArgumentsOrRuntimeError));
+            Assert.That(runtime.GraphRequests, Is.Empty);
+            Assert.That(fileSystem.WrittenContents, Is.Null);
+            Assert.That(console.ErrorText, Does.Contain("validation did not produce complete analysis facts"));
+        });
+    }
+
+    [Test]
+    public void CreateSnapshot_BlockedBaselineDebt_FailsWithoutWritingPartialSnapshot()
+    {
+        var runtime = new SnapshotRuntime(Outcome("/repo", "/repo/src/Acme/Acme.csproj"))
+        {
+            DiffOutcome = new BaselineDiffOutcome(
+                Succeeded: false,
+                New: Array.Empty<ArchitectureBaselineComparisonEntry>(),
+                Frozen: Array.Empty<ArchitectureBaselineComparisonEntry>(),
+                Resolved: Array.Empty<ArchitectureBaselineComparisonEntry>(),
+                ConfigurationErrors: Array.Empty<ArchitectureBaselineComparisonEntry>(),
+                ConfigurationViolations: Array.Empty<ArchitectureViolation>())
+            {
+                PreflightDiagnostics = new[]
+                {
+                    new BuildStatePreflightDiagnostic(
+                        "baseline", "Acme.csproj", BuildStatePreflightState.MissingArtifact,
+                        new BuildStatePreflightEvidence("Acme.csproj", "Acme")),
+                },
+            },
+        };
+        var console = new CapturingConsole();
+        var fileSystem = new CapturingFileSystem();
+        var handler = new ChangeCommandHandler(runtime, console, fileSystem);
+
+        int exitCode = handler.CreateSnapshot(new ChangeSnapshotCommandOptions(
+            "architecture/dependencies.arch.yml", "strict", null, "baseline.yml", "snapshot.json", false));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(exitCode, Is.EqualTo(CliExitCodes.InvalidArgumentsOrRuntimeError));
+            Assert.That(fileSystem.WrittenContents, Is.Null);
+            Assert.That(console.ErrorText, Does.Contain("baseline debt did not produce complete analysis facts"));
+            Assert.That(console.ErrorText, Does.Contain("preflight diagnostic"));
+        });
+    }
+
+    [Test]
+    public void CreateSnapshot_BlockedValidation_FailsBeforeGraphProjectionOrWriting()
+    {
+        ValidationOutcome blocked = Outcome("/repo", "/repo/src/Acme/Acme.csproj") with
+        {
+            PreflightBlocked = true,
+            PreflightDiagnostics = new[]
+            {
+                new BuildStatePreflightDiagnostic(
+                    "validation", "Acme.csproj", BuildStatePreflightState.MissingArtifact,
+                    new BuildStatePreflightEvidence("Acme.csproj", "Acme")),
+            },
+        };
+        var runtime = new SnapshotRuntime(blocked);
+        var console = new CapturingConsole();
+        var fileSystem = new CapturingFileSystem();
+        var handler = new ChangeCommandHandler(runtime, console, fileSystem);
+
+        int exitCode = handler.CreateSnapshot(new ChangeSnapshotCommandOptions(
+            "architecture/dependencies.arch.yml", "strict", null, null, "snapshot.json", false));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(exitCode, Is.EqualTo(CliExitCodes.InvalidArgumentsOrRuntimeError));
+            Assert.That(runtime.GraphRequests, Is.Empty);
+            Assert.That(fileSystem.WrittenContents, Is.Null);
+            Assert.That(console.ErrorText, Does.Contain("validation did not produce complete analysis facts"));
         });
     }
 
@@ -104,17 +241,39 @@ public sealed class ChangeCommandHandlerTests
         DiscoveredProjectPaths = new[] { projectPath },
     };
 
+    private static ArchitectureRunnerPreparation PreparedRunner() => new(
+        "/repo",
+        null,
+        ProjectDiscoveryResult.Empty,
+        ResolveAssemblyOutputs: true,
+        SelectedAssemblyArtifactPaths: ["/repo/bin/Release/net10.0/win-x64/Acme.dll"],
+        CapturedArtifactContentDigests: new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["/repo/bin/Release/net10.0/win-x64/Acme.dll"] = "digest",
+        },
+        MissingAssemblyNames: Array.Empty<string>(),
+        IsMetadataReferenceClosureComplete: true);
+
     private sealed class SnapshotRuntime(ValidationOutcome outcome) : ICliRuntime
     {
         public int ValidateCallCount { get; private set; }
 
         public List<ArchitectureGraphLevel> GraphLevels { get; } = new();
 
+        public List<ArchitectureGraphRequest> GraphRequests { get; } = new();
+
+        public ValidationRequest? ValidationRequest { get; private set; }
+
+        public BaselineDiffRequest? BaselineDiffRequest { get; private set; }
+
+        public BaselineDiffOutcome? DiffOutcome { get; init; }
+
         public string Version => "1.2.3";
 
         public ValidationOutcome Validate(ValidationRequest request, ValidationTiming? timing)
         {
             ValidateCallCount++;
+            ValidationRequest = request;
             return outcome;
         }
 
@@ -144,7 +303,7 @@ public sealed class ChangeCommandHandlerTests
             IReadOnlyCollection<BuildStatePreflightDiagnostic> preflightDiagnostics) => throw new NotSupportedException();
 
         public string FormatBuildStatePreflightForHumans(IReadOnlyCollection<BuildStatePreflightDiagnostic> diagnostics) =>
-            throw new NotSupportedException();
+            "preflight diagnostic";
 
         public string FormatViolationsForHumans(IReadOnlyCollection<ArchitectureViolation> violations) =>
             throw new NotSupportedException();
@@ -174,7 +333,17 @@ public sealed class ChangeCommandHandlerTests
         public BaselineGenerationOutcome GenerateBaseline(BaselineGenerationRequest request) => throw new NotSupportedException();
         public BaselineUpdateOutcome UpdateBaseline(BaselineUpdateRequest request) => throw new NotSupportedException();
         public BaselinePruneOutcome PruneBaseline(BaselinePruneRequest request) => throw new NotSupportedException();
-        public BaselineDiffOutcome DiffBaseline(BaselineDiffRequest request) => throw new NotSupportedException();
+        public BaselineDiffOutcome DiffBaseline(BaselineDiffRequest request)
+        {
+            BaselineDiffRequest = request;
+            return DiffOutcome ?? new BaselineDiffOutcome(
+                Succeeded: true,
+                New: Array.Empty<ArchitectureBaselineComparisonEntry>(),
+                Frozen: Array.Empty<ArchitectureBaselineComparisonEntry>(),
+                Resolved: Array.Empty<ArchitectureBaselineComparisonEntry>(),
+                ConfigurationErrors: Array.Empty<ArchitectureBaselineComparisonEntry>(),
+                ConfigurationViolations: Array.Empty<ArchitectureViolation>());
+        }
         public BaselineVerifyOutcome VerifyBaseline(BaselineVerifyRequest request) => throw new NotSupportedException();
         public BaselineMigrateOutcome MigrateBaseline(BaselineMigrateRequest request) => throw new NotSupportedException();
         public PublicApiCaptureOutcome CapturePublicApi(PublicApiCaptureRequest request) => throw new NotSupportedException();
@@ -185,6 +354,7 @@ public sealed class ChangeCommandHandlerTests
         public ArchitectureGraphOutcome BuildGraph(ArchitectureGraphRequest request)
         {
             GraphLevels.Add(request.Level);
+            GraphRequests.Add(request);
             return new ArchitectureGraphOutcome(new ArchitectureDependencyGraph(
                 Array.Empty<ArchitectureGraphNode>(),
                 Array.Empty<ArchitectureGraphEdge>()));
