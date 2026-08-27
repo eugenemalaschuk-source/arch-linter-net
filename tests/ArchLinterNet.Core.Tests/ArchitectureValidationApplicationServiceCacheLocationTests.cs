@@ -1,6 +1,7 @@
 using ArchLinterNet.Core.BuildState;
 using ArchLinterNet.Core.Caching;
 using ArchLinterNet.Core.Contracts;
+using ArchLinterNet.Core.Contracts.Families;
 using ArchLinterNet.Core.Discovery;
 using ArchLinterNet.Core.Execution;
 using ArchLinterNet.Core.Execution.Abstractions;
@@ -286,6 +287,54 @@ public sealed partial class ArchitectureValidationApplicationServiceCacheLocatio
         {
             Assert.That(runnerSetupService.MaterializePreparedRunnerCallCount, Is.EqualTo(1));
             Assert.That(runnerSetupService.BuildRunnerCallCount, Is.Zero);
+        });
+    }
+
+    [Test]
+    public void Evaluate_ProjectOnlyZeroArtifactPreparation_MaterializesWithoutRediscovering()
+    {
+        var document = CreateDocument();
+        document.Contracts = new ArchitectureContractGroups
+        {
+            StrictProjectMetadata = [new ArchitectureProjectMetadataContract { Name = "Project metadata" }],
+        };
+        ProjectDiscoveryResult discovery = ProjectDiscoveryResult.Empty with
+        {
+            DiscoveredProjects = [new ArchitectureDiscoveredProject("Fixture.csproj", "Fixture", ["net10.0"])],
+        };
+        ArchitectureRunnerPreparation preparation = new(
+            "/fake/repository/root",
+            PreprocessorSymbols: null,
+            ProjectDiscovery: discovery,
+            ResolveAssemblyOutputs: false,
+            SelectedAssemblyArtifactPaths: Array.Empty<string>(),
+            CapturedArtifactContentDigests: new Dictionary<string, string>(),
+            MissingAssemblyNames: Array.Empty<string>(),
+            IsMetadataReferenceClosureComplete: false);
+        var runnerSetupService = new FakeRunnerSetupService
+        {
+            DocumentToReturn = document,
+            PreparationProvider = _ => preparation,
+            RunnerToReturn = new FakeContractRunner(CreateEmptySession(document)),
+        };
+        var applicationService = new ArchitectureValidationApplicationService(
+            runnerSetupService, new FakeContractHandlerRegistry(), new FakeContractExecutor(),
+            new FakeBuildStatePreparationService());
+
+        using ArchitectureAnalysisSnapshot snapshot = applicationService.CreateSnapshot(new AnalysisSnapshotRequest
+        {
+            PolicyPath = "unused-by-fakes.arch.yml",
+            CacheLocation = new AnalysisCacheLocation("/fake/cache", AnalysisCacheMode.ExplicitPath),
+        });
+
+        snapshot.Evaluate("strict");
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(runnerSetupService.MaterializePreparedRunnerCallCount, Is.EqualTo(1));
+            Assert.That(runnerSetupService.BuildRunnerCallCount, Is.Zero,
+                "a complete zero-artifact preparation must not rediscover the project graph");
+            Assert.That(snapshot.Counters.ProjectGraphEvaluations, Is.EqualTo(1));
         });
     }
 
