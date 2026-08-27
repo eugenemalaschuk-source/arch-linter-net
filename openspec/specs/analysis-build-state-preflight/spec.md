@@ -2,7 +2,9 @@
 
 ## Purpose
 TBD - created by archiving change analysis-build-state-preflight. Update Purpose after archive.
+
 ## Requirements
+
 ### Requirement: Build-state preflight applies only to projects assembly resolution actually attempted
 Build-state preflight SHALL evaluate a discovered project only when assembly resolution actually attempted to resolve it — i.e. its assembly name appears in either the resolved-assemblies set or the missing-assemblies set produced by that resolution attempt. This applies uniformly whether resolution was driven by `analysis.target_assemblies` or by the discovered project graph itself; it is not gated on which one configured it. A policy may declare a project list solely to feed project-scope coverage contracts, independently of which assemblies get resolved — such projects have no necessary correspondence to a resolved/missing assembly and SHALL NOT be preflight-blocked merely for being discovered. Separately, when assembly resolution was not attempted at all (neither set populated — the project-scope-coverage-tolerant path deliberately defers to the coverage engine), preflight SHALL NOT run for that request.
 
@@ -64,7 +66,7 @@ The system SHALL NOT invoke restore or build during ordinary validation. When ar
 - **THEN** the system performs no restore, build, or network access and only inspects existing state
 
 ### Requirement: Explicit ensure-built preparation mode
-The system SHALL provide an opt-in preparation mode (CLI `--ensure-built` flag; Testing API `ArchitectureValidationBuilder.WithEnsureBuilt()`) that evaluates the selected graph without loading any selected target artifact that the graph build may replace, invokes the supported `dotnet build` path once for the whole graph using a structured executable and argument list (never a shell command string, never sourced from policy YAML, baseline, receipt, or cache content), stops distinctly on restore or build failure, and analyzes only artifacts verified after that build completes. This metadata-only-before-build ordering SHALL apply whether or not analysis caching is enabled. Preparation and subsequent project-aware analysis SHALL leave the verified selected primary outputs continuously coherent and consumable; a successful no-op verification SHALL NOT delete, rewrite, or temporarily make unavailable the selected assembly, PDB, or other verified primary artifact. When a selected build input changes, preparation SHALL verify the replacement artifact and publish a receipt whose assembly digest equals that replacement artifact's content digest. After a successful graph build, post-build authorization SHALL refresh the already selected artifact closure and verify its receipts and content digests without relying on a second timestamp-based project-output discovery; ordinary validation that has not just completed that build SHALL retain its timestamp-based stale-output detection.
+The system SHALL provide an opt-in preparation mode (CLI `--ensure-built` flag; Testing API `ArchitectureValidationBuilder.WithEnsureBuilt()`) that evaluates the selected graph without loading any selected target artifact that the graph build may replace, invokes the supported `dotnet build` path once for the whole graph using a structured executable and argument list (never a shell command string, never sourced from policy YAML, baseline, receipt, or cache content), stops distinctly on restore or build failure, and analyzes only artifacts verified after that build completes. This metadata-only-before-build ordering SHALL apply to standalone validation, shared snapshots, baseline verification, and architecture debt-gate candidate collection, whether or not analysis caching is enabled. Preparation and subsequent project-aware analysis SHALL leave the verified selected primary outputs continuously coherent and consumable; a successful no-op verification SHALL NOT delete, rewrite, or temporarily make unavailable the selected assembly, PDB, or other verified primary artifact. When a selected build input changes, preparation SHALL verify the replacement artifact and publish a receipt whose assembly digest equals that replacement artifact's content digest. After a successful graph build, post-build authorization SHALL refresh the already selected artifact closure and verify its receipts and content digests without relying on a second timestamp-based project-output discovery; ordinary validation that has not just completed that build SHALL retain its timestamp-based stale-output detection.
 
 #### Scenario: Ensure-built succeeds and validates
 - **WHEN** `--ensure-built` is passed against a project graph with valid sources but no prior build output
@@ -73,6 +75,10 @@ The system SHALL provide an opt-in preparation mode (CLI `--ensure-built` flag; 
 #### Scenario: Ensure-built prepares target metadata before loading selected artifacts
 - **WHEN** `--ensure-built` targets an output that the temporary graph build may replace
 - **THEN** the validating process completes metadata selection and build preparation before it loads that target artifact for analysis
+
+#### Scenario: Architecture debt gate rebuilds stale candidates before loading them
+- **WHEN** `gate --ensure-built` evaluates a baseline against a stale selected project output
+- **THEN** it completes metadata selection and its graph build before loading the output for candidate collection, then compares the receipt-verified rebuilt candidates against the baseline
 
 #### Scenario: Ensure-built preserves the prepared output selection
 - **WHEN** `--ensure-built` has no explicit configuration, framework, or runtime identifier and
