@@ -46,23 +46,37 @@ internal sealed class ChangeCommandHandler(ICliRuntime runtime, ICliConsole cons
                 RequestedPlatform = options.Platform,
                 RequestedRuntimeIdentifier = options.RuntimeIdentifier,
             }, null);
+            if (validation.PreflightBlocked)
+            {
+                return FailIncompleteSnapshot("validation", validation.PreflightDiagnostics);
+            }
+
             ArchitectureGraphOutcome namespaces = runtime.BuildGraph(Request(options, ArchitectureGraphLevel.Namespace));
             ArchitectureGraphOutcome assemblies = runtime.BuildGraph(Request(options, ArchitectureGraphLevel.Assembly));
-            IReadOnlyList<ArchitectureBaselineComparisonEntry> baselineDebt = options.BaselinePath is null
-                ? Array.Empty<ArchitectureBaselineComparisonEntry>()
-                : runtime.DiffBaseline(new BaselineDiffRequest
+            IReadOnlyList<ArchitectureBaselineComparisonEntry> baselineDebt = Array.Empty<ArchitectureBaselineComparisonEntry>();
+            if (options.BaselinePath is not null)
+            {
+                BaselineDiffOutcome baseline = runtime.DiffBaseline(new BaselineDiffRequest
                 {
                     PolicyPath = options.PolicyPath,
                     BaselinePath = options.BaselinePath,
                     Mode = options.Mode,
                     ConditionSetName = options.ConditionSetName,
-                    PreparationMode = options.EnsureBuilt ? BuildPreparationMode.EnsureBuilt : BuildPreparationMode.Ordinary,
+                    PreparationMode = BuildPreparationMode.Ordinary,
                     NoRestore = options.NoRestore,
                     RequestedConfiguration = options.Configuration,
                     RequestedTargetFramework = options.TargetFramework,
                     RequestedPlatform = options.Platform,
                     RequestedRuntimeIdentifier = options.RuntimeIdentifier,
-                }).Frozen;
+                    UsePreparedPostBuildState = options.EnsureBuilt,
+                });
+                if (!baseline.Succeeded)
+                {
+                    return FailIncompleteSnapshot("baseline debt", baseline.PreflightDiagnostics);
+                }
+
+                baselineDebt = baseline.Frozen;
+            }
             string? consumedInputCollision = FindSnapshotConsumedInputCollision(options.OutputPath, validation);
             if (consumedInputCollision is not null)
             {
@@ -133,13 +147,27 @@ internal sealed class ChangeCommandHandler(ICliRuntime runtime, ICliConsole cons
         Mode = options.Mode,
         Level = level,
         ConditionSetName = options.ConditionSetName,
-        PreparationMode = options.EnsureBuilt ? BuildPreparationMode.EnsureBuilt : BuildPreparationMode.Ordinary,
+        PreparationMode = BuildPreparationMode.Ordinary,
         NoRestore = options.NoRestore,
         RequestedConfiguration = options.Configuration,
         RequestedTargetFramework = options.TargetFramework,
         RequestedPlatform = options.Platform,
         RequestedRuntimeIdentifier = options.RuntimeIdentifier,
+        UsePreparedPostBuildState = options.EnsureBuilt,
     };
+
+    private int FailIncompleteSnapshot(
+        string contributor,
+        IReadOnlyCollection<BuildStatePreflightDiagnostic> diagnostics)
+    {
+        console.Error.WriteLine($"Could not create architecture change snapshot: {contributor} did not produce complete analysis facts.");
+        if (diagnostics.Count > 0)
+        {
+            console.Error.Write(runtime.FormatBuildStatePreflightForHumans(diagnostics));
+        }
+
+        return CliExitCodes.InvalidArgumentsOrRuntimeError;
+    }
 
     internal static string? FindSnapshotOutputCollision(ChangeSnapshotCommandOptions options) =>
         FindOutputCollision(options.OutputPath,

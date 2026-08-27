@@ -17,7 +17,8 @@ public sealed partial class ArchitectureBaselineApplicationService
             request.RequestedConfiguration,
             request.RequestedTargetFramework,
             request.RequestedPlatform,
-            request.RequestedRuntimeIdentifier);
+            request.RequestedRuntimeIdentifier,
+            request.UsePreparedPostBuildState);
 
         return CollectCandidatesCore(
             request.PolicyPath, request.Mode, request.ConditionSetName, request.ContractIds, request.CancellationToken, buildState);
@@ -31,7 +32,8 @@ public sealed partial class ArchitectureBaselineApplicationService
             request.RequestedConfiguration,
             request.RequestedTargetFramework,
             request.RequestedPlatform,
-            request.RequestedRuntimeIdentifier);
+            request.RequestedRuntimeIdentifier,
+            usePreparedPostBuildState: false);
 
         return CollectCandidatesCore(
             request.PolicyPath, request.Mode, request.ConditionSetName, request.ContractIds, request.CancellationToken, buildState);
@@ -68,7 +70,8 @@ public sealed partial class ArchitectureBaselineApplicationService
         string? RequestedConfiguration,
         string? RequestedTargetFramework,
         string? RequestedPlatform,
-        string? RequestedRuntimeIdentifier)
+        string? RequestedRuntimeIdentifier,
+        bool UsePreparedPostBuildState)
     {
         public static BaselineBuildStateOptions? From(
             BuildPreparationMode preparationMode,
@@ -76,7 +79,8 @@ public sealed partial class ArchitectureBaselineApplicationService
             string? requestedConfiguration,
             string? requestedTargetFramework,
             string? requestedPlatform,
-            string? requestedRuntimeIdentifier)
+            string? requestedRuntimeIdentifier,
+            bool usePreparedPostBuildState)
         {
             return preparationMode == BuildPreparationMode.EnsureBuilt
                 || noRestore
@@ -84,13 +88,15 @@ public sealed partial class ArchitectureBaselineApplicationService
                 || requestedTargetFramework is not null
                 || requestedPlatform is not null
                 || requestedRuntimeIdentifier is not null
+                || usePreparedPostBuildState
                 ? new(
                     preparationMode,
                     noRestore,
                     requestedConfiguration,
                     requestedTargetFramework,
                     requestedPlatform,
-                    requestedRuntimeIdentifier)
+                    requestedRuntimeIdentifier,
+                    usePreparedPostBuildState)
                 : null;
         }
     }

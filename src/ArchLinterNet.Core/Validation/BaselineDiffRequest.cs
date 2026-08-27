@@ -28,5 +28,10 @@ public sealed record BaselineDiffRequest
 
     public string? RequestedRuntimeIdentifier { get; init; }
 
+    // Set only when an enclosing operation already prepared the selected output. Diff still
+    // fails closed on receipt verification, then uses an isolated post-build runner without
+    // rebuilding the graph.
+    public bool UsePreparedPostBuildState { get; init; }
+
     public CancellationToken CancellationToken { get; init; } = default;
 }

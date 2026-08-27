@@ -28,4 +28,9 @@ public sealed record ArchitectureGraphRequest
     public string? RequestedPlatform { get; init; }
 
     public string? RequestedRuntimeIdentifier { get; init; }
+
+    // The orchestrator has already completed ensure-built preparation for this output context.
+    // Graph analysis must still re-verify its receipt, but then loads an isolated post-build
+    // runner without invoking another graph build.
+    public bool UsePreparedPostBuildState { get; init; }
 }

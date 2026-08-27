@@ -162,7 +162,10 @@ public sealed partial class ArchitectureBaselineApplicationService(
                 Frozen: Array.Empty<ArchitectureBaselineComparisonEntry>(),
                 Resolved: Array.Empty<ArchitectureBaselineComparisonEntry>(),
                 ConfigurationErrors: Array.Empty<ArchitectureBaselineComparisonEntry>(),
-                ConfigurationViolations: collection.ConfigurationViolations);
+                ConfigurationViolations: collection.ConfigurationViolations)
+            {
+                PreflightDiagnostics = collection.PreflightDiagnostics,
+            };
         }
 
         ArchitectureBaselineDocument existingBaseline = baselineLoadingService.Load(request.BaselinePath);
@@ -414,7 +417,8 @@ public sealed partial class ArchitectureBaselineApplicationService(
                     return BaselineCandidateCollection.PreflightBlocked(document, preflight.Diagnostics);
                 }
 
-                if (buildState.PreparationMode == BuildPreparationMode.EnsureBuilt
+                if ((buildState.PreparationMode == BuildPreparationMode.EnsureBuilt
+                        || buildState.UsePreparedPostBuildState)
                     && setup.Runner.Session.Context.ProjectDiscovery is { DiscoveredProjects.Count: > 0 })
                 {
                     // The initial runner only identifies what must be built. Candidate collection
@@ -431,7 +435,11 @@ public sealed partial class ArchitectureBaselineApplicationService(
 
                     preflight = RunBuildStatePreflight(
                         setup.Runner,
-                        buildState with { PreparationMode = BuildPreparationMode.Ordinary },
+                        buildState with
+                        {
+                            PreparationMode = BuildPreparationMode.Ordinary,
+                            UsePreparedPostBuildState = false,
+                        },
                         cancellationToken);
                     if (preflight.Blocked)
                     {

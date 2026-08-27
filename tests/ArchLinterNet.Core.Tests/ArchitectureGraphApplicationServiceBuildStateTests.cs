@@ -67,6 +67,48 @@ public sealed class ArchitectureGraphApplicationServiceBuildStateTests
     }
 
     [Test]
+    public void BuildGraph_PreparedPostBuildState_RerunsIsolatedRunnerWithoutAnotherEnsureBuiltRequest()
+    {
+        ArchitectureContractDocument document = new() { Version = 1, Name = "Fake" };
+        ProjectDiscoveryResult discovery = ProjectDiscoveryResult.Empty with
+        {
+            DiscoveredProjects = new[] { new ArchitectureDiscoveredProject("Fixture.csproj", "Fixture", ["net10.0"]) },
+        };
+        FakeContractRunner firstRunner = new(CreateSession(document, discovery));
+        FakeContractRunner secondRunner = new(CreateSession(document, discovery));
+        var setupService = new FakeRunnerSetupService
+        {
+            DocumentToReturn = document,
+            RunnersToReturn = new Queue<IArchitectureContractRunner>([firstRunner, secondRunner]),
+        };
+        var preparation = new RecordingBuildStatePreparationService();
+        var executor = new FakeContractExecutor();
+        var service = new ArchitectureGraphApplicationService(
+            setupService, new FakeContractHandlerRegistry(), executor, preparation);
+
+        ArchitectureGraphOutcome outcome = service.BuildGraph(new ArchitectureGraphRequest
+        {
+            PolicyPath = "unused.yml",
+            Mode = "strict",
+            PreparationMode = BuildPreparationMode.Ordinary,
+            UsePreparedPostBuildState = true,
+        });
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(outcome.Graph, Is.Not.Null);
+            Assert.That(setupService.BuildRunnerForPostBuildCallCount, Is.EqualTo(1));
+            Assert.That(preparation.RequestsReceived, Has.Count.EqualTo(2));
+            Assert.That(preparation.RequestsReceived,
+                Has.All.Matches<BuildStatePreflightRequest>(request =>
+                    request.PreparationMode == BuildPreparationMode.Ordinary));
+            Assert.That(firstRunner.StrictArgumentsReceived, Is.Empty);
+            Assert.That(secondRunner.StrictArgumentsReceived, Is.Not.Empty);
+            Assert.That(executor.ModesReceived, Is.EqualTo(["strict"]));
+        });
+    }
+
+    [Test]
     public void BuildGraph_BlockedPreflight_DoesNotContinueWithOrdinaryFacts()
     {
         ArchitectureContractDocument document = new() { Version = 1, Name = "Fake" };

@@ -1865,6 +1865,7 @@ sealed class ArchLinterNet.Core.Graph.ArchitectureExplainRequest : System.IEquat
   property string? ConditionSetName {get;init;}
 sealed class ArchLinterNet.Core.Graph.ArchitectureGraphApplicationService : ArchLinterNet.Core.Graph.Abstractions.IArchitectureGraphApplicationService
   ctor(ArchLinterNet.Core.Execution.Abstractions.IArchitectureRunnerSetupService runnerSetupService, ArchLinterNet.Core.Execution.Abstractions.IArchitectureContractHandlerRegistry handlerRegistry, ArchLinterNet.Core.Execution.Abstractions.IArchitectureContractExecutor contractExecutor)
+  ctor(ArchLinterNet.Core.Execution.Abstractions.IArchitectureRunnerSetupService runnerSetupService, ArchLinterNet.Core.Execution.Abstractions.IArchitectureContractHandlerRegistry handlerRegistry, ArchLinterNet.Core.Execution.Abstractions.IArchitectureContractExecutor contractExecutor, ArchLinterNet.Core.BuildState.IBuildStatePreparationService? buildStatePreparationService)
   method ArchLinterNet.Core.Graph.ArchitectureGraphOutcome BuildGraph(ArchLinterNet.Core.Graph.ArchitectureGraphRequest request)
 sealed class ArchLinterNet.Core.Graph.ArchitectureGraphFormatter : ArchLinterNet.Core.Graph.IArchitectureGraphFormatter
   ctor()
@@ -1891,11 +1892,18 @@ sealed class ArchLinterNet.Core.Graph.ArchitectureGraphRequest : System.IEquatab
   method string ToString()
   operator !=(ArchLinterNet.Core.Graph.ArchitectureGraphRequest? left, ArchLinterNet.Core.Graph.ArchitectureGraphRequest? right)
   operator ==(ArchLinterNet.Core.Graph.ArchitectureGraphRequest? left, ArchLinterNet.Core.Graph.ArchitectureGraphRequest? right)
+  property ArchLinterNet.Core.BuildState.BuildPreparationMode PreparationMode {get;init;}
   property ArchLinterNet.Core.Model.ArchitectureGraphLevel Level {get;init;}
   property System.Collections.Generic.IReadOnlyCollection<string>? ContractIds {get;init;}
+  property bool NoRestore {get;init;}
+  property bool UsePreparedPostBuildState {get;init;}
   property string Mode {get;init;}
   property string PolicyPath {get;init;}
   property string? ConditionSetName {get;init;}
+  property string? RequestedConfiguration {get;init;}
+  property string? RequestedPlatform {get;init;}
+  property string? RequestedRuntimeIdentifier {get;init;}
+  property string? RequestedTargetFramework {get;init;}
 sealed class ArchLinterNet.Core.Graph.ExplainExpressionParticipation : System.IEquatable<ArchLinterNet.Core.Graph.ExplainExpressionParticipation>
   ctor(string ContractId, string Source, string? YamlPath, ArchLinterNet.Core.Model.ExpressionParticipationResult Result)
   method ArchLinterNet.Core.Graph.ExplainExpressionParticipation <Clone>$()
@@ -4557,6 +4565,7 @@ sealed class ArchLinterNet.Core.Validation.BaselineDiffOutcome : System.IEquatab
   operator !=(ArchLinterNet.Core.Validation.BaselineDiffOutcome? left, ArchLinterNet.Core.Validation.BaselineDiffOutcome? right)
   operator ==(ArchLinterNet.Core.Validation.BaselineDiffOutcome? left, ArchLinterNet.Core.Validation.BaselineDiffOutcome? right)
   property System.Collections.Generic.IReadOnlyCollection<ArchLinterNet.Core.Model.ArchitectureViolation> ConfigurationViolations {get;init;}
+  property System.Collections.Generic.IReadOnlyCollection<ArchLinterNet.Core.Model.BuildStatePreflightDiagnostic> PreflightDiagnostics {get;init;}
   property System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Model.ArchitectureBaselineComparisonEntry> Ambiguous {get;init;}
   property System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Model.ArchitectureBaselineComparisonEntry> ConfigurationErrors {get;init;}
   property System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Model.ArchitectureBaselineComparisonEntry> Frozen {get;init;}
@@ -4574,12 +4583,19 @@ sealed class ArchLinterNet.Core.Validation.BaselineDiffRequest : System.IEquatab
   method string ToString()
   operator !=(ArchLinterNet.Core.Validation.BaselineDiffRequest? left, ArchLinterNet.Core.Validation.BaselineDiffRequest? right)
   operator ==(ArchLinterNet.Core.Validation.BaselineDiffRequest? left, ArchLinterNet.Core.Validation.BaselineDiffRequest? right)
+  property ArchLinterNet.Core.BuildState.BuildPreparationMode PreparationMode {get;init;}
   property System.Collections.Generic.IReadOnlyCollection<string>? ContractIds {get;init;}
   property System.Threading.CancellationToken CancellationToken {get;init;}
+  property bool NoRestore {get;init;}
+  property bool UsePreparedPostBuildState {get;init;}
   property string BaselinePath {get;init;}
   property string Mode {get;init;}
   property string PolicyPath {get;init;}
   property string? ConditionSetName {get;init;}
+  property string? RequestedConfiguration {get;init;}
+  property string? RequestedPlatform {get;init;}
+  property string? RequestedRuntimeIdentifier {get;init;}
+  property string? RequestedTargetFramework {get;init;}
 sealed class ArchLinterNet.Core.Validation.BaselineGenerationOutcome : System.IEquatable<ArchLinterNet.Core.Validation.BaselineGenerationOutcome>
   ctor(bool Succeeded, string? Yaml, int CandidateCount, System.Collections.Generic.IReadOnlyCollection<ArchLinterNet.Core.Model.ArchitectureViolation> ConfigurationViolations)
   method ArchLinterNet.Core.Validation.BaselineGenerationOutcome <Clone>$()

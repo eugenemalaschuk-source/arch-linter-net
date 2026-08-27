@@ -27,7 +27,9 @@ public sealed partial class ArchitectureGraphApplicationService
             throw new InvalidOperationException(DescribePreflightFailure(preflight));
         }
 
-        if (buildState.PreparationMode != BuildPreparationMode.EnsureBuilt
+        bool usePostBuildRunner = buildState.PreparationMode == BuildPreparationMode.EnsureBuilt
+            || buildState.UsePreparedPostBuildState;
+        if (!usePostBuildRunner
             || setup.Runner.Session.Context.ProjectDiscovery is not { DiscoveredProjects.Count: > 0 })
         {
             return setup;
@@ -47,7 +49,11 @@ public sealed partial class ArchitectureGraphApplicationService
 
         preflight = RunBuildStatePreflight(
             postBuildSetup.Runner,
-            buildState with { PreparationMode = BuildPreparationMode.Ordinary });
+            buildState with
+            {
+                PreparationMode = BuildPreparationMode.Ordinary,
+                UsePreparedPostBuildState = false,
+            });
         if (preflight.Blocked)
         {
             postBuildSetup.Runner.Session.Context.Dispose();
@@ -98,7 +104,8 @@ public sealed partial class ArchitectureGraphApplicationService
         string? RequestedConfiguration,
         string? RequestedTargetFramework,
         string? RequestedPlatform,
-        string? RequestedRuntimeIdentifier)
+        string? RequestedRuntimeIdentifier,
+        bool UsePreparedPostBuildState)
     {
         public static BuildStateGraphOptions? From(ArchitectureGraphRequest request)
         {
@@ -108,13 +115,15 @@ public sealed partial class ArchitectureGraphApplicationService
                 || request.RequestedTargetFramework is not null
                 || request.RequestedPlatform is not null
                 || request.RequestedRuntimeIdentifier is not null
+                || request.UsePreparedPostBuildState
                 ? new(
                     request.PreparationMode,
                     request.NoRestore,
                     request.RequestedConfiguration,
                     request.RequestedTargetFramework,
                     request.RequestedPlatform,
-                    request.RequestedRuntimeIdentifier)
+                    request.RequestedRuntimeIdentifier,
+                    request.UsePreparedPostBuildState)
                 : null;
         }
     }

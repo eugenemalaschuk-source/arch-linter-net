@@ -61,19 +61,88 @@ public sealed class ChangeCommandHandlerTests
             Assert.That(runtime.ValidationRequest.RequestedRuntimeIdentifier, Is.EqualTo("win-x64"));
             Assert.That(runtime.GraphRequests, Has.Count.EqualTo(2));
             Assert.That(runtime.GraphRequests, Has.All.Matches<ArchitectureGraphRequest>(request =>
-                request.PreparationMode == BuildPreparationMode.EnsureBuilt
+                request.PreparationMode == BuildPreparationMode.Ordinary
+                && request.UsePreparedPostBuildState
                 && request.NoRestore
                 && request.RequestedConfiguration == "Release"
                 && request.RequestedTargetFramework == "net10.0"
                 && request.RequestedPlatform == "AnyCPU"
                 && request.RequestedRuntimeIdentifier == "win-x64"));
             Assert.That(runtime.BaselineDiffRequest, Is.Not.Null);
-            Assert.That(runtime.BaselineDiffRequest!.PreparationMode, Is.EqualTo(BuildPreparationMode.EnsureBuilt));
+            Assert.That(runtime.BaselineDiffRequest!.PreparationMode, Is.EqualTo(BuildPreparationMode.Ordinary));
+            Assert.That(runtime.BaselineDiffRequest.UsePreparedPostBuildState, Is.True);
             Assert.That(runtime.BaselineDiffRequest.NoRestore, Is.True);
             Assert.That(runtime.BaselineDiffRequest.RequestedConfiguration, Is.EqualTo("Release"));
             Assert.That(runtime.BaselineDiffRequest.RequestedTargetFramework, Is.EqualTo("net10.0"));
             Assert.That(runtime.BaselineDiffRequest.RequestedPlatform, Is.EqualTo("AnyCPU"));
             Assert.That(runtime.BaselineDiffRequest.RequestedRuntimeIdentifier, Is.EqualTo("win-x64"));
+        });
+    }
+
+    [Test]
+    public void CreateSnapshot_BlockedBaselineDebt_FailsWithoutWritingPartialSnapshot()
+    {
+        var runtime = new SnapshotRuntime(Outcome("/repo", "/repo/src/Acme/Acme.csproj"))
+        {
+            DiffOutcome = new BaselineDiffOutcome(
+                Succeeded: false,
+                New: Array.Empty<ArchitectureBaselineComparisonEntry>(),
+                Frozen: Array.Empty<ArchitectureBaselineComparisonEntry>(),
+                Resolved: Array.Empty<ArchitectureBaselineComparisonEntry>(),
+                ConfigurationErrors: Array.Empty<ArchitectureBaselineComparisonEntry>(),
+                ConfigurationViolations: Array.Empty<ArchitectureViolation>())
+            {
+                PreflightDiagnostics = new[]
+                {
+                    new BuildStatePreflightDiagnostic(
+                        "baseline", "Acme.csproj", BuildStatePreflightState.MissingArtifact,
+                        new BuildStatePreflightEvidence("Acme.csproj", "Acme")),
+                },
+            },
+        };
+        var console = new CapturingConsole();
+        var fileSystem = new CapturingFileSystem();
+        var handler = new ChangeCommandHandler(runtime, console, fileSystem);
+
+        int exitCode = handler.CreateSnapshot(new ChangeSnapshotCommandOptions(
+            "architecture/dependencies.arch.yml", "strict", null, "baseline.yml", "snapshot.json", false));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(exitCode, Is.EqualTo(CliExitCodes.InvalidArgumentsOrRuntimeError));
+            Assert.That(fileSystem.WrittenContents, Is.Null);
+            Assert.That(console.ErrorText, Does.Contain("baseline debt did not produce complete analysis facts"));
+            Assert.That(console.ErrorText, Does.Contain("preflight diagnostic"));
+        });
+    }
+
+    [Test]
+    public void CreateSnapshot_BlockedValidation_FailsBeforeGraphProjectionOrWriting()
+    {
+        ValidationOutcome blocked = Outcome("/repo", "/repo/src/Acme/Acme.csproj") with
+        {
+            PreflightBlocked = true,
+            PreflightDiagnostics = new[]
+            {
+                new BuildStatePreflightDiagnostic(
+                    "validation", "Acme.csproj", BuildStatePreflightState.MissingArtifact,
+                    new BuildStatePreflightEvidence("Acme.csproj", "Acme")),
+            },
+        };
+        var runtime = new SnapshotRuntime(blocked);
+        var console = new CapturingConsole();
+        var fileSystem = new CapturingFileSystem();
+        var handler = new ChangeCommandHandler(runtime, console, fileSystem);
+
+        int exitCode = handler.CreateSnapshot(new ChangeSnapshotCommandOptions(
+            "architecture/dependencies.arch.yml", "strict", null, null, "snapshot.json", false));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(exitCode, Is.EqualTo(CliExitCodes.InvalidArgumentsOrRuntimeError));
+            Assert.That(runtime.GraphRequests, Is.Empty);
+            Assert.That(fileSystem.WrittenContents, Is.Null);
+            Assert.That(console.ErrorText, Does.Contain("validation did not produce complete analysis facts"));
         });
     }
 
@@ -155,6 +224,8 @@ public sealed class ChangeCommandHandlerTests
 
         public BaselineDiffRequest? BaselineDiffRequest { get; private set; }
 
+        public BaselineDiffOutcome? DiffOutcome { get; init; }
+
         public string Version => "1.2.3";
 
         public ValidationOutcome Validate(ValidationRequest request, ValidationTiming? timing)
@@ -190,7 +261,7 @@ public sealed class ChangeCommandHandlerTests
             IReadOnlyCollection<BuildStatePreflightDiagnostic> preflightDiagnostics) => throw new NotSupportedException();
 
         public string FormatBuildStatePreflightForHumans(IReadOnlyCollection<BuildStatePreflightDiagnostic> diagnostics) =>
-            throw new NotSupportedException();
+            "preflight diagnostic";
 
         public string FormatViolationsForHumans(IReadOnlyCollection<ArchitectureViolation> violations) =>
             throw new NotSupportedException();
@@ -223,7 +294,7 @@ public sealed class ChangeCommandHandlerTests
         public BaselineDiffOutcome DiffBaseline(BaselineDiffRequest request)
         {
             BaselineDiffRequest = request;
-            return new BaselineDiffOutcome(
+            return DiffOutcome ?? new BaselineDiffOutcome(
                 Succeeded: true,
                 New: Array.Empty<ArchitectureBaselineComparisonEntry>(),
                 Frozen: Array.Empty<ArchitectureBaselineComparisonEntry>(),
