@@ -455,7 +455,7 @@ public sealed partial class ArchitectureBaselineApplicationService(
                     return BaselineCandidateCollection.PreflightBlocked(document, preflight.Diagnostics);
                 }
 
-                if (preparation.HasCompleteRootSelection)
+                if (preparation.HasCompleteRootSelection && preparation.SelectedAssemblyArtifactPaths.Count > 0)
                 {
                     setup = runnerSetupService.MaterializePreparedRunner(
                         document,

@@ -101,11 +101,15 @@ public sealed class ArchitectureRunnerSetupService(
         cancellationToken.ThrowIfCancellationRequested();
         string repositoryRoot = repositoryRootResolver.ResolveFrom(policyPath);
         IReadOnlyList<string>? symbols = ResolveSymbols(document, conditionSetName, preprocessorSymbols);
-        bool usesGraphDrivenAssemblySelection = document.Analysis.TargetAssemblies.Count == 0;
-        // Preparation must independently select the current project's output artifacts even when
-        // an authored target_assemblies list would let ordinary execution use probing. This is
-        // metadata-only and does not alter normal cache-disabled resolution precedence.
-        bool resolveAssemblyOutputs = true;
+        bool canRunWithoutResolvedAssemblies = CanRunWithoutResolvedAssemblies(document, mode, selectedContractIds);
+        bool usesGraphDrivenAssemblySelection = document.Analysis.TargetAssemblies.Count == 0
+            && !canRunWithoutResolvedAssemblies;
+        // Preparation must independently select the current project's output artifacts when
+        // assembly analysis is required, even if an authored target_assemblies list would let
+        // ordinary execution use probing. Project-only policies deliberately retain ordinary
+        // no-assembly semantics so --ensure-built does not manufacture a build graph for them.
+        bool resolveAssemblyOutputs = document.Analysis.TargetAssemblies.Count > 0
+            || usesGraphDrivenAssemblySelection;
         ProjectDiscoveryResult discovery = projectDiscoveryService.ResolveAndApply(
             document, repositoryRoot, resolveAssemblyOutputs, cancellationToken);
         ArchitectureSourceSetExpander.BindProjectSets(document, discovery);
@@ -312,7 +316,8 @@ public sealed class ArchitectureRunnerSetupService(
             .ToList();
 
         return selectedContracts.Count > 0
-            && selectedContracts.All(static contract => contract is ArchitectureProjectMetadataContract);
+            && selectedContracts.All(static contract => contract is ArchitectureProjectMetadataContract
+                || contract is ArchitectureCoverageContract { Scope: "project" });
     }
 
     private static ArchitectureAnalysisContext CreateAnalysisContext(

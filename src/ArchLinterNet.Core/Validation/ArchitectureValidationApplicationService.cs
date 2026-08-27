@@ -189,6 +189,7 @@ public sealed class ArchitectureValidationApplicationService(
                 preparedArtifactClosureComplete: preparation.HasCompleteArtifactSelection,
                 preparedPostBuildRunner: request.PreparationMode == BuildPreparationMode.EnsureBuilt ? preparation : null,
                 materializeSetup: () => preparation.HasCompleteRootSelection
+                    && preparation.SelectedAssemblyArtifactPaths.Count > 0
                     ? runnerSetupService.MaterializePreparedRunner(
                         state.Policy.Document, preparation, state.Policy.SelectedContractIds,
                         state.Policy.EnableUnmatchedIgnoreTracking, timing, modeHint,

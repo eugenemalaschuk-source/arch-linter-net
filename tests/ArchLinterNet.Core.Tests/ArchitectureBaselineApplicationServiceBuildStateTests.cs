@@ -14,7 +14,7 @@ namespace ArchLinterNet.Core.Tests;
 // construction, RunBuildStatePreflight's short-circuit branches, and CollectCandidatesCore's
 // post-build preflight and prepared-runner materialization.
 [TestFixture]
-public sealed class ArchitectureBaselineApplicationServiceBuildStateTests
+public sealed partial class ArchitectureBaselineApplicationServiceBuildStateTests
 {
     private static readonly string[] _value = { "net10.0" };
     private static readonly string[] _value1 = { "Fixture" };
