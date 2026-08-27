@@ -1,3 +1,4 @@
+using ArchLinterNet.Core.BuildState;
 using ArchLinterNet.Core.Contracts;
 using ArchLinterNet.Core.Execution;
 using ArchLinterNet.Core.Execution.Abstractions;
@@ -7,14 +8,23 @@ using ArchLinterNet.Core.Model;
 
 namespace ArchLinterNet.Core.Graph;
 
-public sealed class ArchitectureGraphApplicationService(
+public sealed partial class ArchitectureGraphApplicationService(
     IArchitectureRunnerSetupService runnerSetupService,
     IArchitectureContractHandlerRegistry handlerRegistry,
-    IArchitectureContractExecutor contractExecutor)
+    IArchitectureContractExecutor contractExecutor,
+    IBuildStatePreparationService? buildStatePreparationService)
     : IArchitectureGraphApplicationService
 {
     private const string ModeStrict = "strict";
     private const string ModeAudit = "audit";
+
+    public ArchitectureGraphApplicationService(
+        IArchitectureRunnerSetupService runnerSetupService,
+        IArchitectureContractHandlerRegistry handlerRegistry,
+        IArchitectureContractExecutor contractExecutor)
+        : this(runnerSetupService, handlerRegistry, contractExecutor, buildStatePreparationService: null)
+    {
+    }
 
     public ArchitectureGraphOutcome BuildGraph(ArchitectureGraphRequest request)
     {
@@ -77,7 +87,10 @@ public sealed class ArchitectureGraphApplicationService(
             request.PolicyPath,
             request.ConditionSetName,
             selectedContractIds: selectedIds,
-            enableUnmatchedIgnoreTracking: false);
+            enableUnmatchedIgnoreTracking: false,
+            mode: request.Mode == "all" ? null : request.Mode);
+
+        setup = PrepareBuildStateRunner(request, document, selectedIds, setup);
 
         IArchitectureContractRunner runner = setup.Runner;
 

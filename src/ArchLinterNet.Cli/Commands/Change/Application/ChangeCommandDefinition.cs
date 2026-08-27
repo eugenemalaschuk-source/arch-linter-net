@@ -21,6 +21,12 @@ internal sealed class ChangeCommandDefinition(ChangeCommandHandler handler)
         Option<string> conditionSet = new("--condition-set");
         Option<string> baseline = new("--baseline");
         Option<string> output = new("--output");
+        Option<bool> ensureBuilt = new("--ensure-built");
+        Option<bool> noRestore = new("--no-restore");
+        Option<string> configuration = new("--configuration");
+        Option<string> framework = new("--framework");
+        Option<string> platform = new("--platform");
+        Option<string> runtime = new("--runtime");
         Option<bool> help = new("--help");
         help.Aliases.Add("-h");
         command.Options.Add(policy);
@@ -28,6 +34,12 @@ internal sealed class ChangeCommandDefinition(ChangeCommandHandler handler)
         command.Options.Add(conditionSet);
         command.Options.Add(baseline);
         command.Options.Add(output);
+        command.Options.Add(ensureBuilt);
+        command.Options.Add(noRestore);
+        command.Options.Add(configuration);
+        command.Options.Add(framework);
+        command.Options.Add(platform);
+        command.Options.Add(runtime);
         command.Options.Add(help);
         command.SetAction(result => handler.CreateSnapshot(new ChangeSnapshotCommandOptions(
             result.GetValue(policy) ?? "architecture/dependencies.arch.yml",
@@ -35,7 +47,13 @@ internal sealed class ChangeCommandDefinition(ChangeCommandHandler handler)
             result.GetValue(conditionSet),
             result.GetValue(baseline),
             result.GetValue(output) ?? string.Empty,
-            result.GetValue(help))));
+            result.GetValue(help),
+            result.GetValue(ensureBuilt),
+            result.GetValue(noRestore),
+            result.GetValue(configuration),
+            result.GetValue(framework),
+            result.GetValue(platform),
+            result.GetValue(runtime))));
         return command;
     }
 

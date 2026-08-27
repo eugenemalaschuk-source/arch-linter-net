@@ -39,6 +39,45 @@ public sealed class ChangeCommandHandlerTests
     }
 
     [Test]
+    public void CreateSnapshot_ForwardsBuildStateToEveryContributor()
+    {
+        var runtime = new SnapshotRuntime(Outcome("/repo", "/repo/src/Acme/Acme.csproj"));
+        var handler = new ChangeCommandHandler(runtime, new CapturingConsole(), new CapturingFileSystem());
+
+        int exitCode = handler.CreateSnapshot(new ChangeSnapshotCommandOptions(
+            "architecture/dependencies.arch.yml", "strict", "ci", "baseline.yml", "snapshot.json", false,
+            EnsureBuilt: true, NoRestore: true, Configuration: "Release", TargetFramework: "net10.0",
+            Platform: "AnyCPU", RuntimeIdentifier: "win-x64"));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(exitCode, Is.EqualTo(CliExitCodes.Success));
+            Assert.That(runtime.ValidationRequest, Is.Not.Null);
+            Assert.That(runtime.ValidationRequest!.PreparationMode, Is.EqualTo(BuildPreparationMode.EnsureBuilt));
+            Assert.That(runtime.ValidationRequest.NoRestore, Is.True);
+            Assert.That(runtime.ValidationRequest.RequestedConfiguration, Is.EqualTo("Release"));
+            Assert.That(runtime.ValidationRequest.RequestedTargetFramework, Is.EqualTo("net10.0"));
+            Assert.That(runtime.ValidationRequest.RequestedPlatform, Is.EqualTo("AnyCPU"));
+            Assert.That(runtime.ValidationRequest.RequestedRuntimeIdentifier, Is.EqualTo("win-x64"));
+            Assert.That(runtime.GraphRequests, Has.Count.EqualTo(2));
+            Assert.That(runtime.GraphRequests, Has.All.Matches<ArchitectureGraphRequest>(request =>
+                request.PreparationMode == BuildPreparationMode.EnsureBuilt
+                && request.NoRestore
+                && request.RequestedConfiguration == "Release"
+                && request.RequestedTargetFramework == "net10.0"
+                && request.RequestedPlatform == "AnyCPU"
+                && request.RequestedRuntimeIdentifier == "win-x64"));
+            Assert.That(runtime.BaselineDiffRequest, Is.Not.Null);
+            Assert.That(runtime.BaselineDiffRequest!.PreparationMode, Is.EqualTo(BuildPreparationMode.EnsureBuilt));
+            Assert.That(runtime.BaselineDiffRequest.NoRestore, Is.True);
+            Assert.That(runtime.BaselineDiffRequest.RequestedConfiguration, Is.EqualTo("Release"));
+            Assert.That(runtime.BaselineDiffRequest.RequestedTargetFramework, Is.EqualTo("net10.0"));
+            Assert.That(runtime.BaselineDiffRequest.RequestedPlatform, Is.EqualTo("AnyCPU"));
+            Assert.That(runtime.BaselineDiffRequest.RequestedRuntimeIdentifier, Is.EqualTo("win-x64"));
+        });
+    }
+
+    [Test]
     public void OutputCollisionGuards_RejectEveryChangeCommandInput()
     {
         ChangeSnapshotCommandOptions snapshotWithPolicyCollision = new(
@@ -110,11 +149,18 @@ public sealed class ChangeCommandHandlerTests
 
         public List<ArchitectureGraphLevel> GraphLevels { get; } = new();
 
+        public List<ArchitectureGraphRequest> GraphRequests { get; } = new();
+
+        public ValidationRequest? ValidationRequest { get; private set; }
+
+        public BaselineDiffRequest? BaselineDiffRequest { get; private set; }
+
         public string Version => "1.2.3";
 
         public ValidationOutcome Validate(ValidationRequest request, ValidationTiming? timing)
         {
             ValidateCallCount++;
+            ValidationRequest = request;
             return outcome;
         }
 
@@ -174,7 +220,17 @@ public sealed class ChangeCommandHandlerTests
         public BaselineGenerationOutcome GenerateBaseline(BaselineGenerationRequest request) => throw new NotSupportedException();
         public BaselineUpdateOutcome UpdateBaseline(BaselineUpdateRequest request) => throw new NotSupportedException();
         public BaselinePruneOutcome PruneBaseline(BaselinePruneRequest request) => throw new NotSupportedException();
-        public BaselineDiffOutcome DiffBaseline(BaselineDiffRequest request) => throw new NotSupportedException();
+        public BaselineDiffOutcome DiffBaseline(BaselineDiffRequest request)
+        {
+            BaselineDiffRequest = request;
+            return new BaselineDiffOutcome(
+                Succeeded: true,
+                New: Array.Empty<ArchitectureBaselineComparisonEntry>(),
+                Frozen: Array.Empty<ArchitectureBaselineComparisonEntry>(),
+                Resolved: Array.Empty<ArchitectureBaselineComparisonEntry>(),
+                ConfigurationErrors: Array.Empty<ArchitectureBaselineComparisonEntry>(),
+                ConfigurationViolations: Array.Empty<ArchitectureViolation>());
+        }
         public BaselineVerifyOutcome VerifyBaseline(BaselineVerifyRequest request) => throw new NotSupportedException();
         public BaselineMigrateOutcome MigrateBaseline(BaselineMigrateRequest request) => throw new NotSupportedException();
         public PublicApiCaptureOutcome CapturePublicApi(PublicApiCaptureRequest request) => throw new NotSupportedException();
@@ -185,6 +241,7 @@ public sealed class ChangeCommandHandlerTests
         public ArchitectureGraphOutcome BuildGraph(ArchitectureGraphRequest request)
         {
             GraphLevels.Add(request.Level);
+            GraphRequests.Add(request);
             return new ArchitectureGraphOutcome(new ArchitectureDependencyGraph(
                 Array.Empty<ArchitectureGraphNode>(),
                 Array.Empty<ArchitectureGraphEdge>()));

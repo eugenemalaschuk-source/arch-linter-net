@@ -14,7 +14,7 @@ internal sealed class ChangeCommandHandler(ICliRuntime runtime, ICliConsole cons
     {
         if (options.ShowHelp)
         {
-            console.Out.WriteLine("arch-linter-net change snapshot --policy <path> --output <path> [--mode strict|audit] [--baseline <path>] [--condition-set <name>]");
+            console.Out.WriteLine("arch-linter-net change snapshot --policy <path> --output <path> [--mode strict|audit] [--baseline <path>] [--condition-set <name>] [--ensure-built] [--no-restore] [--configuration <name>] [--framework <tfm>] [--platform <platform>] [--runtime <rid>]");
             return CliExitCodes.Success;
         }
 
@@ -39,6 +39,12 @@ internal sealed class ChangeCommandHandler(ICliRuntime runtime, ICliConsole cons
                 Mode = options.Mode,
                 ConditionSetName = options.ConditionSetName,
                 BaselinePath = options.BaselinePath,
+                PreparationMode = options.EnsureBuilt ? BuildPreparationMode.EnsureBuilt : BuildPreparationMode.Ordinary,
+                NoRestore = options.NoRestore,
+                RequestedConfiguration = options.Configuration,
+                RequestedTargetFramework = options.TargetFramework,
+                RequestedPlatform = options.Platform,
+                RequestedRuntimeIdentifier = options.RuntimeIdentifier,
             }, null);
             ArchitectureGraphOutcome namespaces = runtime.BuildGraph(Request(options, ArchitectureGraphLevel.Namespace));
             ArchitectureGraphOutcome assemblies = runtime.BuildGraph(Request(options, ArchitectureGraphLevel.Assembly));
@@ -50,6 +56,12 @@ internal sealed class ChangeCommandHandler(ICliRuntime runtime, ICliConsole cons
                     BaselinePath = options.BaselinePath,
                     Mode = options.Mode,
                     ConditionSetName = options.ConditionSetName,
+                    PreparationMode = options.EnsureBuilt ? BuildPreparationMode.EnsureBuilt : BuildPreparationMode.Ordinary,
+                    NoRestore = options.NoRestore,
+                    RequestedConfiguration = options.Configuration,
+                    RequestedTargetFramework = options.TargetFramework,
+                    RequestedPlatform = options.Platform,
+                    RequestedRuntimeIdentifier = options.RuntimeIdentifier,
                 }).Frozen;
             string? consumedInputCollision = FindSnapshotConsumedInputCollision(options.OutputPath, validation);
             if (consumedInputCollision is not null)
@@ -121,6 +133,12 @@ internal sealed class ChangeCommandHandler(ICliRuntime runtime, ICliConsole cons
         Mode = options.Mode,
         Level = level,
         ConditionSetName = options.ConditionSetName,
+        PreparationMode = options.EnsureBuilt ? BuildPreparationMode.EnsureBuilt : BuildPreparationMode.Ordinary,
+        NoRestore = options.NoRestore,
+        RequestedConfiguration = options.Configuration,
+        RequestedTargetFramework = options.TargetFramework,
+        RequestedPlatform = options.Platform,
+        RequestedRuntimeIdentifier = options.RuntimeIdentifier,
     };
 
     internal static string? FindSnapshotOutputCollision(ChangeSnapshotCommandOptions options) =>
