@@ -154,12 +154,14 @@ Changed files are useful for triage, but architecture compliance is a whole-anal
 arch-linter-net change snapshot \
   --policy architecture/arch.yml \
   --mode strict \
+  --ensure-built --configuration Debug --framework net10.0 \
   --output ../base.architecture-change.json
 
 # Candidate checkout
 arch-linter-net change snapshot \
   --policy architecture/arch.yml \
   --mode strict \
+  --ensure-built --configuration Debug --framework net10.0 \
   --output current.architecture-change.json
 
 arch-linter-net change report \
@@ -167,6 +169,11 @@ arch-linter-net change report \
   --current current.architecture-change.json \
   --format json
 ```
+
+For consumers that opt into a shared framework, the supported snapshot path is
+`--ensure-built`. Use identical build-state selection for the base and candidate
+snapshots; add `--no-restore` when the consumer has already restored its build
+prerequisites and the workflow must remain offline.
 
 A change report answers what changed between two complete results. It does not decide whether existing debt is accepted or whether a policy relaxation is appropriate.
 

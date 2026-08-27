@@ -7,7 +7,7 @@ using ArchLinterNet.Core.IO.Abstractions;
 
 namespace ArchLinterNet.Core.Execution;
 
-public sealed class ArchitectureAssemblyResolutionService : IArchitectureAssemblyResolutionService
+public sealed partial class ArchitectureAssemblyResolutionService : IArchitectureAssemblyResolutionService
 {
     private const string AssemblySearchPathsEnvVar = "ARCHITECTURE_ASSEMBLY_SEARCH_PATHS";
 
@@ -412,7 +412,7 @@ public sealed class ArchitectureAssemblyResolutionService : IArchitectureAssembl
     }
 
     // Derives the target framework(s) actually selected for this run's target assemblies from their
-    // resolved build output paths (".../bin/{configuration}/{targetFramework}/{assemblyName}.dll"),
+    // resolved build output paths (".../bin/{configuration}/{targetFramework}/[runtime/]assembly.dll"),
     // rather than the ArchLinterNet CLI's own runtime — see ArchitectureSharedFrameworkResolver's
     // anchor-priority note for why the CLI's runtime major is not a safe substitute for this.
     private static IReadOnlyCollection<string> ExtractDiscoveredTargetFrameworks(
@@ -431,8 +431,7 @@ public sealed class ArchitectureAssemblyResolutionService : IArchitectureAssembl
                 continue;
             }
 
-            string? directory = Path.GetDirectoryName(path);
-            string? framework = string.IsNullOrEmpty(directory) ? null : Path.GetFileName(directory);
+            string? framework = ExtractTargetFrameworkFromBuildOutputPath(path);
             if (!string.IsNullOrWhiteSpace(framework))
             {
                 frameworks.Add(framework);

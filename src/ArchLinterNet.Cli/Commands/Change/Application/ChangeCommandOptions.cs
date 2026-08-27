@@ -6,7 +6,13 @@ internal sealed record ChangeSnapshotCommandOptions(
     string? ConditionSetName,
     string? BaselinePath,
     string OutputPath,
-    bool ShowHelp);
+    bool ShowHelp,
+    bool EnsureBuilt = false,
+    bool NoRestore = false,
+    string? Configuration = null,
+    string? TargetFramework = null,
+    string? Platform = null,
+    string? RuntimeIdentifier = null);
 
 internal sealed record ChangeReportCommandOptions(
     string BasePath,

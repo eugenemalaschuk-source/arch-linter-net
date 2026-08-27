@@ -40,6 +40,7 @@ public sealed partial class ArchitectureAnalysisSnapshot : IDisposable
     private readonly IReadOnlyDictionary<string, string> _preparedArtifactContentDigests;
     private readonly IReadOnlyList<string> _preparedProjectPaths;
     private readonly bool _preparedArtifactClosureComplete;
+    private readonly ArchitectureRunnerPreparation? _preparedPostBuildRunner;
     private readonly object _gate = new();
     private readonly Dictionary<string, ValidationOutcome> _evaluatedModes = new(StringComparer.Ordinal);
     private readonly Dictionary<string, AnalysisCachePopulation.PreparedAuthorization> _cacheAuthorizations =
@@ -70,6 +71,7 @@ public sealed partial class ArchitectureAnalysisSnapshot : IDisposable
         IReadOnlyDictionary<string, string>? preparedArtifactContentDigests = null,
         IReadOnlyList<string>? preparedProjectPaths = null,
         bool preparedArtifactClosureComplete = true,
+        ArchitectureRunnerPreparation? preparedPostBuildRunner = null,
         Func<ArchitectureRunnerSetup>? materializeSetup = null,
         CancellationToken cancellationToken = default)
     {
@@ -96,6 +98,7 @@ public sealed partial class ArchitectureAnalysisSnapshot : IDisposable
         _preparedProjectPaths = preparedProjectPaths ?? Array.Empty<string>();
         _preparedArtifactClosureComplete = preparedArtifactClosureComplete
             && (setup is null || setup.Runner.Session.Context.SelectedAssemblyArtifactPaths.Count > 0);
+        _preparedPostBuildRunner = preparedPostBuildRunner;
 
         _counters = new ArchitectureAnalysisSnapshotCounters
         {
@@ -230,6 +233,10 @@ public sealed partial class ArchitectureAnalysisSnapshot : IDisposable
                     : null;
                 ValidationOutcome outcome = cachedOutcome
                     ?? (_preflight.Blocked ? BuildBlockedOutcome() : EvaluateCore(mode, timing));
+                if (_preparedPostBuildRunner is not null)
+                {
+                    outcome = outcome with { PreparedPostBuildRunner = _preparedPostBuildRunner };
+                }
 
                 if (cachedOutcome is null
                     && !outcome.PreflightBlocked

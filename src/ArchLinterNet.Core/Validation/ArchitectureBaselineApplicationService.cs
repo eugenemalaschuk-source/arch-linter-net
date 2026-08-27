@@ -152,10 +152,9 @@ public sealed partial class ArchitectureBaselineApplicationService(
 
     public BaselineDiffOutcome Diff(BaselineDiffRequest request)
     {
-        (ArchitectureContractDocument document, IReadOnlyList<ArchitectureBaselineCandidate>? candidates, List<ArchitectureViolation> configViolations) =
-            CollectCandidates(request.PolicyPath, request.Mode, request.ConditionSetName, request.ContractIds, request.CancellationToken);
+        BaselineCandidateCollection collection = CollectDiffCandidates(request);
 
-        if (candidates == null)
+        if (collection.Candidates == null)
         {
             return new BaselineDiffOutcome(
                 Succeeded: false,
@@ -163,12 +162,15 @@ public sealed partial class ArchitectureBaselineApplicationService(
                 Frozen: Array.Empty<ArchitectureBaselineComparisonEntry>(),
                 Resolved: Array.Empty<ArchitectureBaselineComparisonEntry>(),
                 ConfigurationErrors: Array.Empty<ArchitectureBaselineComparisonEntry>(),
-                ConfigurationViolations: configViolations);
+                ConfigurationViolations: collection.ConfigurationViolations)
+            {
+                PreflightDiagnostics = collection.PreflightDiagnostics,
+            };
         }
 
         ArchitectureBaselineDocument existingBaseline = baselineLoadingService.Load(request.BaselinePath);
         ArchitectureBaselineComparisonResult comparison = ArchitectureBaselineComparer.Compare(
-            document, existingBaseline, candidates, request.Mode, request.ContractIds);
+            collection.Document, existingBaseline, collection.Candidates, request.Mode, request.ContractIds);
 
         return new BaselineDiffOutcome(
             Succeeded: true,
@@ -396,14 +398,31 @@ public sealed partial class ArchitectureBaselineApplicationService(
             }
         }
 
-        ArchitectureRunnerSetup setup = runnerSetupService.BuildRunner(
-            document,
-            policyPath,
-            conditionSetName,
-            selectedContractIds: selectedContractIds,
-            enableUnmatchedIgnoreTracking: true,
-            mode: mode == "all" ? null : mode,
-            cancellationToken: cancellationToken);
+        if (buildState?.UsePreparedPostBuildState == true
+            && buildState.RequestedTargetFramework is not null)
+        {
+            // The preparation carries the exact selected artifact paths. The effective framework
+            // is retained here solely for the isolated shared-framework probing path.
+            document.Analysis.TargetFramework = buildState.RequestedTargetFramework;
+        }
+
+        ArchitectureRunnerSetup setup = buildState?.UsePreparedPostBuildState == true
+            ? runnerSetupService.MaterializePreparedRunner(
+                document,
+                buildState.PreparedPostBuildRunner
+                    ?? throw new InvalidOperationException("Prepared baseline analysis requires validation's receipt-backed artifact selection."),
+                selectedContractIds: selectedContractIds,
+                enableUnmatchedIgnoreTracking: true,
+                mode: mode == "all" ? null : mode,
+                cancellationToken: cancellationToken)
+            : runnerSetupService.BuildRunner(
+                document,
+                policyPath,
+                conditionSetName,
+                selectedContractIds: selectedContractIds,
+                enableUnmatchedIgnoreTracking: true,
+                mode: mode == "all" ? null : mode,
+                cancellationToken: cancellationToken);
 
         try
         {
@@ -432,7 +451,11 @@ public sealed partial class ArchitectureBaselineApplicationService(
 
                     preflight = RunBuildStatePreflight(
                         setup.Runner,
-                        buildState with { PreparationMode = BuildPreparationMode.Ordinary },
+                        buildState with
+                        {
+                            PreparationMode = BuildPreparationMode.Ordinary,
+                            UsePreparedPostBuildState = false,
+                        },
                         cancellationToken);
                     if (preflight.Blocked)
                     {

@@ -1,3 +1,4 @@
+using ArchLinterNet.Core.BuildState;
 using ArchLinterNet.Core.Contracts;
 using ArchLinterNet.Core.Model;
 using ArchLinterNet.Core.Reporting;
@@ -14,6 +15,11 @@ public sealed record BaselineDiffOutcome(
 {
     public IReadOnlyList<ArchitectureBaselineComparisonEntry> Ambiguous { get; init; } =
         Array.Empty<ArchitectureBaselineComparisonEntry>();
+
+    // Populated when build-state preflight blocks baseline collection, so callers that require
+    // a complete result can present the exact failure rather than treating debt as empty.
+    public IReadOnlyCollection<BuildStatePreflightDiagnostic> PreflightDiagnostics { get; init; } =
+        Array.Empty<BuildStatePreflightDiagnostic>();
 
     /// <summary>Every entry in the shared lifecycle vocabulary, for one-shape reporting.</summary>
     public IReadOnlyList<BaselineLifecycleEntry> Entries { get; init; } =
