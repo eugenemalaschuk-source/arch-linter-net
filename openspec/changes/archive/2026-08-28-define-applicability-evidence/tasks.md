@@ -1,0 +1,20 @@
+## 1. Shared applicability-evidence vocabulary
+
+- [x] 1.1 Review and lock the canonical effective-control identity and one-record-per-effective-control rule, including the rule that source-set expansion, display text, YAML location, and finding identity are provenance rather than identity; verify the requirement and design decision agree and contain no competing applicability key.
+- [x] 1.2 Review and lock the independent applicability membership values (`required`, `optional`, `not_applicable`) and assessability states (`evaluable`, `not_applicable`, `unassessable`), including their permitted combinations and the prohibition on using `not_applicable` to mask missing required evidence; verify each combination and prohibition is stated in the delta spec and reflected by its scenarios.
+- [x] 1.3 Review and lock non-inferential evaluability, requiring complete declared evidence for `evaluable` and treating zero findings, zero measurements, empty results, configured-control counts, and missing records as insufficient proof; verify the empty-result and missing-record scenarios explicitly enforce these rules.
+- [x] 1.4 Review and lock stable machine-readable reason classes, canonical provenance, and native evidence units, including separate family dimensions and the prohibition on a cross-family score or percentage; verify the reason-class and cross-family evidence requirements cover the design's topology, exposure, metric, and external-evidence examples.
+- [x] 1.5 Review and lock ownership and compatibility boundaries: #685 remains the effective-policy inventory authority, #506 owns fail-closed enforcement, #507 owns normalized/output projection, and existing behavior remains unchanged until a family opts in; verify the proposal, design, and final delta requirement state these boundaries without adding schema, model, API, CLI, finding, baseline, or runtime changes.
+
+## 2. v0.8 family applicability matrices
+
+- [x] 2.1 Review the declared-topology (#91) matrix row for required evidence, complete evaluability, and unmapped/ambiguous/stale failure reasons; verify the row and its semantics match the shared vocabulary and preserve declared-node and observed-subject units.
+- [x] 2.2 Review the contract-surface exposure (#92) matrix row for selected-surface, signature/metadata, and source/target classification evidence, including missing, unresolved, empty-selector, and stale cases; verify the row names each required input and uses no generic coverage total.
+- [x] 2.3 Review the metrics-and-budgets (#93) matrix row for metric definition, target universe, and measurement facts, including incomplete/unmapped scope, ambiguous component, missing fact, and unexpected-empty cases; verify native counting-universe semantics remain explicit and are not conflated with control inventory.
+- [x] 2.4 Review the external static diagnostics (#95) matrix row for logical evidence requirement, bounded SARIF run, and trust binding, including missing, malformed, failed, stale, wrong-key, repository, revision, and scope cases; verify a valid current zero-finding run is evaluable while optional absent evidence is `not_applicable`.
+- [x] 2.5 Review the matrix adoption rule requiring each owning family to define exact subject/declaration semantics while reusing the shared record vocabulary and native evidence units; verify the four matrix rows are complete, mutually consistent, and do not introduce a second coverage or result envelope.
+
+## 3. Strict validation and archive readiness
+
+- [x] 3.1 Validate that the change remains design-only and archive-shaped, with proposal, delta spec, design, and tasks present, no production or unrelated file changes, and no unresolved design questions; verify with `rtk openspec status --change define-applicability-evidence --json`, a scoped `rtk git status --short`, and a review of the four change artifacts.
+- [x] 3.2 Run strict OpenSpec validation for the completed change and resolve any artifact or requirement errors without changing the agreed contract; verify `rtk openspec validate define-applicability-evidence --strict` exits successfully.
