@@ -162,7 +162,7 @@ contracts:
     public void CheckPolicy_MonolithicUnsupportedVersion_ReturnsTypedFailure()
     {
         string policyPath = Path.Combine(_tempDir, "policy.yml");
-        File.WriteAllText(policyPath, "version: 2\nname: Invalid\nlayers: {}\nanalysis:\n  target_assemblies: []\ncontracts: {}\n");
+        File.WriteAllText(policyPath, "version: 3\nname: Invalid\nlayers: {}\nanalysis:\n  target_assemblies: []\ncontracts: {}\n");
 
         PolicyCheckOutcome outcome = ArchitectureAssertions.CheckPolicy(policyPath);
 
