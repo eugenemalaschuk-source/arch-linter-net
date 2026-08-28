@@ -140,5 +140,12 @@ load and follow the `feature-implementation` skill. Treat the URL as the workflo
 
 Do not ask the user to repeat the workflow or confirm that implementation should begin. This routing rule does not apply to pull request URLs. Do not merge the resulting pull request unless explicitly requested.
 
+## Release preparation routing
+When the current user asks to prepare, ready, close, or otherwise assemble repository-side content/authority for a concrete ArchLinterNet release, load and follow the `release-preparation` skill.
+
+Treat an explicit version as the release target. A request for the next patch/minor/major/preview release may derive the target only through the repository's release-process rules and current release/tag facts.
+
+This routing rule prepares release content and reviewed scope; it does not silently authorize package publication, tag/Release creation, or docs deployment. Publication remains the separate maintainer procedure in `docs/reference/release-process.md`.
+
 ## State of the repo
 - Early extraction / preview. Docs under `docs/` built with MkDocs. CI in `.github/workflows/`.
