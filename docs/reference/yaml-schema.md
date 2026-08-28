@@ -204,7 +204,11 @@ ignored_violations:
 Use `ArchitectureWaiverTargetFingerprint.Create` from the Core API to create a
 target value from the exact violation identity. The linter does not treat the
 display matchers as the target: the fingerprint prevents the waiver from
-silently covering another occurrence that happens to have the same text.
+silently covering another occurrence that happens to have the same text. A
+fingerprint is `sha256:` followed by 64 lowercase hexadecimal characters;
+uppercase hexadecimal is rejected as non-canonical. An incomplete manual
+waiver is reported as fail-closed `invalid` lifecycle evidence and does not
+suppress a finding.
 
 ## Contracts
 

@@ -6,7 +6,7 @@ namespace ArchLinterNet.Core.PolicyWeakening;
 /// <summary>Compares static structured waiver declarations without evaluating live findings.</summary>
 internal static class ArchitecturePolicyWeakeningWaiverEvaluator
 {
-    private static readonly StringComparer Comparer = StringComparer.Ordinal;
+    private static readonly StringComparer _comparer = StringComparer.Ordinal;
 
     internal static void Evaluate(
         ArchitecturePolicyContextExport baseline,
@@ -15,12 +15,12 @@ internal static class ArchitecturePolicyWeakeningWaiverEvaluator
         ICollection<ArchitecturePolicyWeakeningFinding> findings)
     {
         Dictionary<string, ArchitecturePolicyContextWaiver> baseById = baseline.Waivers
-            .ToDictionary(WaiverKey, Comparer);
+            .ToDictionary(WaiverKey, _comparer);
 
         foreach (ArchitecturePolicyContextWaiver waiver in current.Waivers
                      .Where(item => !baseById.TryGetValue(WaiverKey(item), out ArchitecturePolicyContextWaiver? previous)
                          || !string.Equals(previous.TargetFingerprint, item.TargetFingerprint, StringComparison.Ordinal))
-                     .OrderBy(WaiverKey, Comparer))
+                     .OrderBy(WaiverKey, _comparer))
         {
             bool changedTarget = baseById.TryGetValue(WaiverKey(waiver), out ArchitecturePolicyContextWaiver? previous);
             string kind = changedTarget ? "structured_waiver_target_changed" : "structured_waiver_added";

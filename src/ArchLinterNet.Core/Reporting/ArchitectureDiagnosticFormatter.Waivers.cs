@@ -21,6 +21,7 @@ public sealed partial class ArchitectureDiagnosticFormatter
                 .Select(waiver =>
                     $"  [{waiver.State}] {waiver.Id}: {waiver.ContractName} " +
                     $"({waiver.SourceType} -> {waiver.ForbiddenReference})" +
+                    $"; target: {waiver.TargetFingerprint ?? "?"}; reason: {waiver.Reason}" +
                     $"; owner: {waiver.Owner ?? "?"}; issue: {waiver.Issue ?? "?"}" +
                     $"; introduced: {FormatDate(waiver.Introduced)}; expires: {FormatDate(waiver.Expires)}" +
                     (waiver.PolicyLocation is null

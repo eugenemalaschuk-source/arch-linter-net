@@ -411,8 +411,9 @@ public sealed partial class ArchitectureAnalysisSnapshot : IDisposable
 
         IReadOnlyList<ArchitectureWaiverLifecycleRecord> waivers = ArchitectureWaiverLifecycleEvaluator.Evaluate(
             _document, mode, rawUnmatched, _waiverEvaluationDate, _requestedContractIds);
-        bool hasBlockingWaiver = ArchitectureWaiverProfile.Resolve(_document) == ArchitectureWaiverProfile.Strict
-            && waivers.Any(waiver => waiver.State is "expired" or "stale");
+        bool hasBlockingWaiver = waivers.Any(waiver => waiver.State == "invalid")
+            || (ArchitectureWaiverProfile.Resolve(_document) == ArchitectureWaiverProfile.Strict
+                && waivers.Any(waiver => waiver.State is "expired" or "stale"));
 
         bool passed = allViolations.Count == 0 && execution.Cycles.Count == 0
             && !hasBlockingUnmatched && !hasBlockingPolicyConsistency && !hasBlockingCoverage && !hasBlockingWaiver;

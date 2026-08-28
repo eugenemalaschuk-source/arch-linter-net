@@ -19,10 +19,19 @@ internal sealed class ArchitectureWaiverValidator : IArchitecturePolicyDocumentV
         }
 
         var declaredIds = new Dictionary<string, ArchitectureIgnoredViolation>(StringComparer.Ordinal);
+        var seenDeclarations = new HashSet<ArchitectureIgnoredViolation>(ReferenceEqualityComparer.Instance);
         foreach (IArchitectureContract contract in document.Contracts.AllStrict.Concat(document.Contracts.AllAudit))
         {
             foreach (ArchitectureIgnoredViolation ignore in GetIgnoredViolations(contract))
             {
+                // Source-set expansion gives each resolved contract a new list, but preserves the
+                // authored ignore object in that list. Validate it once: aliases are execution
+                // instances, not duplicate policy declarations.
+                if (!seenDeclarations.Add(ignore))
+                {
+                    continue;
+                }
+
                 ValidateEntry(document, contract, ignore, profile, declaredIds);
             }
         }
@@ -40,12 +49,15 @@ internal sealed class ArchitectureWaiverValidator : IArchitecturePolicyDocumentV
             return;
         }
 
+        ignore.WaiverValidationError = null;
+
         if (!ignore.HasStructuredWaiverFields)
         {
             if (profile == ArchitectureWaiverProfile.Strict)
             {
-                document.Provenance.SetValidationSubject(ignore);
-                throw new InvalidOperationException(
+                MarkInvalid(
+                    document,
+                    ignore,
                     $"Strict waiver profile requires structured metadata for ignored violation in contract '{contract.Id ?? contract.Name}'.");
             }
 
@@ -55,21 +67,29 @@ internal sealed class ArchitectureWaiverValidator : IArchitecturePolicyDocumentV
         document.Provenance.SetValidationSubject(ignore);
         if (string.IsNullOrWhiteSpace(ignore.WaiverId)
             || ignore.Target is null
-            || !ArchitectureWaiverTargetFingerprint.IsSupported(ignore.Target.Fingerprint)
             || string.IsNullOrWhiteSpace(ignore.Reason)
             || string.IsNullOrWhiteSpace(ignore.Owner)
             || string.IsNullOrWhiteSpace(ignore.Issue)
             || !TryParseDate(ignore.Introduced, out DateOnly introduced)
             || !TryParseDate(ignore.Expires, out DateOnly expires))
         {
-            throw new InvalidOperationException(
+            MarkInvalid(document, ignore,
                 $"Structured waiver in contract '{contract.Id ?? contract.Name}' requires id, target.fingerprint, reason, owner, issue, introduced, and expires (dates use {DateFormat}).");
+            return;
+        }
+
+        if (!ArchitectureWaiverTargetFingerprint.IsSupported(ignore.Target.Fingerprint))
+        {
+            MarkInvalid(document, ignore,
+                $"Structured waiver '{ignore.WaiverId}' target.fingerprint must be a canonical lowercase sha256 fingerprint.");
+            return;
         }
 
         if (expires < introduced)
         {
-            throw new InvalidOperationException(
+            MarkInvalid(document, ignore,
                 $"Structured waiver '{ignore.WaiverId}' expires before it was introduced.");
+            return;
         }
 
         if (declaredIds.TryGetValue(ignore.WaiverId, out ArchitectureIgnoredViolation? first))
@@ -81,6 +101,15 @@ internal sealed class ArchitectureWaiverValidator : IArchitecturePolicyDocumentV
         }
 
         declaredIds.Add(ignore.WaiverId, ignore);
+    }
+
+    private static void MarkInvalid(
+        ArchitectureContractDocument document,
+        ArchitectureIgnoredViolation ignore,
+        string error)
+    {
+        document.Provenance.SetValidationSubject(ignore);
+        ignore.WaiverValidationError = error;
     }
 
     private static bool TryParseDate(string? value, out DateOnly date) => DateOnly.TryParseExact(

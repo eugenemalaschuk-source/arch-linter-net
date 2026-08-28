@@ -464,6 +464,57 @@ contracts:
         });
     }
 
+    [Test]
+    public void ValidateStrict_InvalidStructuredWaiver_FailsClosedWithCanonicalEvidence()
+    {
+        string legacyPolicy = WriteSelfForbiddenPolicy();
+        ArchitectureViolation original = ArchitectureAssertions.FromPolicy(legacyPolicy)
+            .WithContracts("self-forbidden")
+            .ValidateStrict()
+            .Violations
+            .First();
+        string fingerprint = ArchitectureWaiverTargetFingerprint.Create(original.Identity!);
+
+        string contractPath = Path.Combine(_tempDir, "architecture", "invalid-structured-waiver.arch.yml");
+        File.WriteAllText(contractPath, $"""
+            version: 2
+            name: Invalid structured waiver test
+            layers:
+              core:
+                namespace: ArchLinterNet.Core
+            analysis:
+              target_assemblies: [ArchLinterNet.Core]
+            contracts:
+              strict:
+                - id: self-forbidden
+                  name: core-must-not-depend-on-itself
+                  source: core
+                  forbidden: [core]
+                  ignored_violations:
+                    - id: ARCH-IGN-001
+                      source_type: ArchLinterNet.Core
+                      forbidden_reference: ArchLinterNet.Core
+                      target:
+                        fingerprint: {fingerprint}
+                      reason: Temporary migration
+                      issue: ARCH-231
+                      introduced: 2026-07-01
+                      expires: 2026-10-01
+            """);
+
+        ArchitectureValidationResult result = ArchitectureAssertions.FromPolicy(contractPath)
+            .WithWaiverEvaluationDate(new DateOnly(2026, 8, 2))
+            .ValidateStrict();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(result.Passed, Is.False);
+            Assert.That(result.Waivers.Single().State, Is.EqualTo("invalid"));
+            Assert.That(result.Violations, Is.Not.Empty, "An invalid waiver must not suppress its finding.");
+            Assert.That(() => result.ShouldPass(), Throws.InvalidOperationException.With.Message.Contain("[invalid] ARCH-IGN-001"));
+        });
+    }
+
     private string WriteSelfForbiddenAuditPolicy()
     {
         string contractDir = Path.Combine(_tempDir, "architecture");

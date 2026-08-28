@@ -78,6 +78,50 @@ public sealed class ArchitectureWaiverLifecycleEvaluatorTests
     }
 
     [Test]
+    public void Evaluate_SourceSetAliases_AggregatesMatchingStateForTheAuthoredWaiver()
+    {
+        ArchitectureIgnoredViolation waiver = CreateStructuredWaiver(expires: "2026-10-01");
+        ArchitectureContractDocument document = CreateDocument(waiver);
+        document.Contracts.Strict.Add(new ArchitectureDependencyContract
+        {
+            Id = "boundary-domain",
+            Name = "boundary-domain",
+            Source = "domain",
+            Forbidden = new List<string> { "infrastructure" },
+            IgnoredViolations = new List<ArchitectureIgnoredViolation> { waiver },
+        });
+        var unmatched = new ArchitectureUnmatchedIgnoredViolation(
+            "boundary", "boundary", 0, waiver.SourceType, waiver.ForbiddenReference, waiver.Reason)
+        {
+            ContractGroup = "strict",
+        };
+
+        ArchitectureWaiverLifecycleRecord record = ArchitectureWaiverLifecycleEvaluator.Evaluate(
+            document, "strict", [unmatched], new DateOnly(2026, 8, 2)).Single();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(record.State, Is.EqualTo("active"));
+            Assert.That(record.MatchesGovernedFinding, Is.True);
+        });
+    }
+
+    [Test]
+    public void Evaluate_InvalidWaiver_TakesPrecedence()
+    {
+        ArchitectureIgnoredViolation waiver = CreateStructuredWaiver(expires: "2026-08-01");
+        waiver.WaiverValidationError = "target.fingerprint must be canonical";
+
+        ArchitectureWaiverLifecycleRecord record = ArchitectureWaiverLifecycleEvaluator.Evaluate(
+            CreateDocument(waiver), "strict", [], new DateOnly(2026, 8, 2)).Single();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(record.State, Is.EqualTo("invalid"));
+        });
+    }
+
+    [Test]
     public void Formatters_RenderCanonicalLifecycleFieldsForHumanAndJsonConsumers()
     {
         ArchitectureWaiverLifecycleRecord waiver = new(
@@ -94,6 +138,8 @@ public sealed class ArchitectureWaiverLifecycleEvaluatorTests
         Assert.Multiple(() =>
         {
             Assert.That(human, Does.Contain("[expired] ARCH-IGN-001"));
+            Assert.That(human, Does.Contain("target: sha256:"));
+            Assert.That(human, Does.Contain("reason: Legacy extraction"));
             Assert.That(human, Does.Contain("expires: 2026-08-01"));
             Assert.That(serialized.GetProperty("state").GetString(), Is.EqualTo("expired"));
             Assert.That(serialized.GetProperty("evaluation_date").GetString(), Is.EqualTo("2026-08-02"));

@@ -288,6 +288,12 @@ public sealed class ArchitectureIgnoredViolation
         || !string.IsNullOrWhiteSpace(Introduced)
         || !string.IsNullOrWhiteSpace(Expires);
 
+    // Set by ArchitectureWaiverValidator after the complete composed policy is available. Keeping
+    // the diagnostic on the authored declaration lets validation publish fail-closed lifecycle
+    // evidence without treating a source-set-expanded alias as another declaration.
+    [YamlIgnore]
+    internal string? WaiverValidationError { get; set; }
+
     // Populated only when this entry was merged in from a `version: 2` baseline document (see
     // ArchitectureBaselineLoadingService.ContractGroupMerger). When IdentityVersion is set,
     // ArchitectureIgnoreMatcher matches this entry against the live structured identity instead of

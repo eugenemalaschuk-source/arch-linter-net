@@ -38,6 +38,8 @@ public sealed partial class ReportCoordinatorTests
             Assert.That(json.Status, Is.EqualTo(ReportRouteStatus.AllSucceeded));
             Assert.That(humanConsole.OutputText, Does.Contain("Architecture waivers:"));
             Assert.That(humanConsole.OutputText, Does.Contain("[expired] ARCH-IGN-001"));
+            Assert.That(humanConsole.OutputText, Does.Contain("target: sha256:"));
+            Assert.That(humanConsole.OutputText, Does.Contain("reason: Legacy extraction"));
             Assert.That(document.RootElement.GetProperty("waivers")[0]!.GetProperty("id").GetString(), Is.EqualTo("ARCH-IGN-001"));
         });
     }

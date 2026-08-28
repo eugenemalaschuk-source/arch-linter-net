@@ -1,6 +1,7 @@
 using ArchLinterNet.Core.Contracts;
 using ArchLinterNet.Core.Contracts.Families;
 using ArchLinterNet.Core.Model;
+using ArchLinterNet.Core.Validation;
 using NUnit.Framework;
 using ArchitectureContractGroups = ArchLinterNet.Core.Contracts.Families.ArchitectureContractGroups;
 
@@ -29,7 +30,7 @@ public sealed class ArchitectureWaiverValidatorTests
     }
 
     [Test]
-    public void Load_StrictProfileRejectsLegacyIgnore()
+    public void Load_StrictProfileLegacyIgnore_RetainsFailClosedInvalidEvidence()
     {
         var loader = new ArchitecturePolicyDocumentLoader();
         string path = CreatePolicyFile("""
@@ -49,9 +50,16 @@ public sealed class ArchitectureWaiverValidatorTests
                       reason: Legacy extraction
             """);
 
-        InvalidOperationException exception = Assert.Throws<InvalidOperationException>(() => loader.Load(path))!;
+        ArchitectureContractDocument document = loader.Load(path);
+        ArchitectureIgnoredViolation waiver = document.Contracts.Strict.Single().IgnoredViolations.Single();
+        ArchitectureWaiverLifecycleRecord record = ArchitectureWaiverLifecycleEvaluator.Evaluate(
+            document, "strict", [], new DateOnly(2026, 8, 28)).Single();
 
-        Assert.That(exception.Message, Does.Contain("Strict waiver profile"));
+        Assert.Multiple(() =>
+        {
+            Assert.That(waiver.WaiverValidationError, Does.Contain("Strict waiver profile"));
+            Assert.That(record.State, Is.EqualTo("invalid"));
+        });
     }
 
     [Test]
@@ -106,6 +114,16 @@ public sealed class ArchitectureWaiverValidatorTests
     }
 
     [Test]
+    public void TargetFingerprint_RejectsUppercaseHexadecimal()
+    {
+        Assert.Multiple(() =>
+        {
+            Assert.That(ArchitectureWaiverTargetFingerprint.IsSupported("sha256:" + new string('a', 64)), Is.True);
+            Assert.That(ArchitectureWaiverTargetFingerprint.IsSupported("sha256:" + new string('A', 64)), Is.False);
+        });
+    }
+
+    [Test]
     public void Load_DuplicateStructuredWaiverIds_FailsClosed()
     {
         var loader = new ArchitecturePolicyDocumentLoader();
@@ -155,7 +173,7 @@ public sealed class ArchitectureWaiverValidatorTests
     }
 
     [Test]
-    public void Load_StructuredWaiverWithInvalidExpiry_FailsClosed()
+    public void Load_StructuredWaiverWithInvalidMetadata_RetainsInvalidLifecycleEvidence()
     {
         var loader = new ArchitecturePolicyDocumentLoader();
         string path = CreatePolicyFile("""
@@ -182,9 +200,86 @@ public sealed class ArchitectureWaiverValidatorTests
                       expires: 2026-07-01
             """);
 
-        InvalidOperationException exception = Assert.Throws<InvalidOperationException>(() => loader.Load(path))!;
+        ArchitectureContractDocument document = loader.Load(path);
+        ArchitectureIgnoredViolation waiver = document.Contracts.Strict.Single().IgnoredViolations.Single();
+        ArchitectureWaiverLifecycleRecord record = ArchitectureWaiverLifecycleEvaluator.Evaluate(
+            document, "strict", [], new DateOnly(2026, 8, 2)).Single();
 
-        Assert.That(exception.Message, Does.Contain("requires id, target.fingerprint"));
+        Assert.Multiple(() =>
+        {
+            Assert.That(waiver.WaiverValidationError, Does.Contain("canonical lowercase"));
+            Assert.That(record.State, Is.EqualTo("invalid"));
+        });
+    }
+
+    [Test]
+    public void Load_SourceSetExpandedStructuredWaiver_ValidatesAuthoredDeclarationOnce()
+    {
+        var loader = new ArchitecturePolicyDocumentLoader();
+        string fingerprint = "sha256:" + new string('a', 64);
+        string path = CreatePolicyFile($"""
+            version: 2
+            name: Source-expanded waiver
+            layers:
+              application:
+                namespace: App
+              domain:
+                namespace: Domain
+            source_sets:
+              inner_layers:
+                kind: layer
+                members: [application, domain]
+            external_dependencies:
+              vendor:
+                namespace_prefixes: [Vendor]
+            analysis:
+              target_assemblies: []
+            contracts:
+              strict_external:
+                - id: no-vendor
+                  name: no vendor
+                  source_sets: [inner_layers]
+                  forbidden: [vendor]
+                  ignored_violations:
+                    - id: ARCH-IGN-001
+                      source_type: App.Legacy
+                      forbidden_reference: Vendor.Client
+                      target:
+                        fingerprint: {fingerprint}
+                      reason: Temporary migration
+                      owner: architecture-team
+                      issue: ARCH-231
+                      introduced: 2026-08-01
+                      expires: 2026-10-01
+            """);
+
+        ArchitectureContractDocument document = loader.Load(path);
+        ArchitectureIgnoredViolation[] aliases = document.Contracts.StrictExternal
+            .Select(contract => contract.IgnoredViolations.Single())
+            .ToArray();
+        ArchitectureExternalDependencyContract unmatchedAlias = document.Contracts.StrictExternal
+            .Single(contract => contract.Source == "application");
+        var unmatched = new ArchitectureUnmatchedIgnoredViolation(
+            unmatchedAlias.Name,
+            unmatchedAlias.Id,
+            0,
+            aliases[0].SourceType,
+            aliases[0].ForbiddenReference,
+            aliases[0].Reason)
+        {
+            ContractGroup = "strict_external",
+        };
+        ArchitectureWaiverLifecycleRecord record = ArchitectureWaiverLifecycleEvaluator.Evaluate(
+            document, "strict", [unmatched], new DateOnly(2026, 8, 28)).Single();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(aliases, Has.Length.EqualTo(2));
+            Assert.That(ReferenceEquals(aliases[0], aliases[1]), Is.True);
+            Assert.That(aliases[0].WaiverValidationError, Is.Null);
+            Assert.That(record.State, Is.EqualTo("active"));
+            Assert.That(record.MatchesGovernedFinding, Is.True);
+        });
     }
 
     private static ArchitectureContractDocument CreateDocument(int version, ArchitectureIgnoredViolation ignore) => new()

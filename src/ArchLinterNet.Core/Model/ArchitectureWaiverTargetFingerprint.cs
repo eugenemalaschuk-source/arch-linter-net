@@ -46,5 +46,5 @@ public static class ArchitectureWaiverTargetFingerprint
     /// <summary>Gets whether a supplied target fingerprint has the supported stable shape.</summary>
     public static bool IsSupported(string? value) => value is { Length: 71 }
         && value.StartsWith(Prefix, StringComparison.Ordinal)
-        && value[Prefix.Length..].All(character => char.IsAsciiHexDigit(character));
+        && value[Prefix.Length..].All(character => character is >= '0' and <= '9' or >= 'a' and <= 'f');
 }
