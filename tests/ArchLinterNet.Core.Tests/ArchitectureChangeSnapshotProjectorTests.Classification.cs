@@ -155,8 +155,10 @@ public sealed partial class ArchitectureChangeSnapshotProjectorTests
         TypeBuilder typeBuilder = moduleBuilder.DefineType(
             "LinkedMarkerEquivalent.Domain.Order",
             TypeAttributes.Public | TypeAttributes.Class);
-        ConstructorInfo markerConstructor = typeof(DomainMarkerAttribute).GetConstructor(new[] { typeof(string) })!;
-        typeBuilder.SetCustomAttribute(new CustomAttributeBuilder(markerConstructor, new object[] { "Sales" }));
+        ConstructorInfo markerConstructor = typeof(DomainMarkerAttribute).GetConstructor(
+            new[] { typeof(string), typeof(string) })!;
+        typeBuilder.SetCustomAttribute(
+            new CustomAttributeBuilder(markerConstructor, new object[] { "Sales", "UnknownModule" }));
         return typeBuilder.CreateType()!;
     }
 }
