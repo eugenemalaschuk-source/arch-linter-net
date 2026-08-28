@@ -212,6 +212,53 @@ public sealed class ArchitectureChangeSnapshotProjectorTests
         Assert.That(snapshot.Findings, Is.Empty);
     }
 
+    [Test]
+    public void Project_DeduplicatesEquivalentClassificationFactsWithoutMutatingInputs()
+    {
+        Dictionary<string, object> firstMetadata = new() { ["bounded_context"] = "Sales" };
+        Dictionary<string, object> secondMetadata = new() { ["bounded_context"] = "Sales" };
+        ArchitectureClassificationRoleFact[] roles =
+        [
+            new("Acme.Order", "aggregate", ArchitectureClassificationSource.TypeAttribute, "Acme.Marker", firstMetadata),
+            new("Acme.Order", "aggregate", ArchitectureClassificationSource.TypeAttribute, "Acme.Marker", secondMetadata),
+            new("Acme.Order", "aggregate", ArchitectureClassificationSource.TypeAttribute, "Acme.Marker", new Dictionary<string, object>
+            {
+                ["bounded_context"] = "Support",
+            }),
+            new("Acme.Order", "entity", ArchitectureClassificationSource.TypeAttribute, "Acme.Marker", new Dictionary<string, object>
+            {
+                ["bounded_context"] = "Sales",
+            }),
+        ];
+        string[] subjectsBefore = roles.Select(static role => role.Subject).ToArray();
+        string[] rolesBefore = roles.Select(static role => role.Role).ToArray();
+        string[] metadataBefore = roles
+            .Select(static role => string.Join(";", role.Metadata.Select(entry => entry.Key + "=" + entry.Value)))
+            .ToArray();
+
+        ArchitectureChangeSnapshot snapshot = ArchitectureChangeSnapshotProjector.Project(
+            "strict",
+            Outcome("/repo", "/repo/src/Acme/Acme.csproj", roles: roles),
+            EmptyGraph(),
+            EmptyGraph(),
+            Array.Empty<ArchitectureBaselineComparisonEntry>());
+
+        ArchitectureChangeEntry[] semanticEntries = snapshot.Entries
+            .Where(static entry => entry.Kind is "semantic_role" or "semantic_context")
+            .ToArray();
+
+        Assert.Multiple(() =>
+        {
+            Assert.DoesNotThrow(() => ArchitectureChangeReports.SerializeSnapshot(snapshot));
+            Assert.That(semanticEntries.Count(static entry => entry.Kind == "semantic_role"), Is.EqualTo(3));
+            Assert.That(semanticEntries.Count(static entry => entry.Kind == "semantic_context"), Is.EqualTo(2));
+            Assert.That(semanticEntries.Select(static entry => (entry.Kind, entry.Identity)).Distinct().Count(), Is.EqualTo(5));
+            Assert.That(roles.Select(static role => role.Subject), Is.EqualTo(subjectsBefore));
+            Assert.That(roles.Select(static role => role.Role), Is.EqualTo(rolesBefore));
+            Assert.That(roles.Select(static role => string.Join(";", role.Metadata.Select(entry => entry.Key + "=" + entry.Value))), Is.EqualTo(metadataBefore));
+        });
+    }
+
     // Mirrors ArchitecturePolicyConsistencyAnalysisService.CreateUnmatchedExclusionFinding: real
     // findings of this check kind set RepresentativeType to "<layer>|<namespace pattern>" (#683 PR
     // review, P2) — PolicyLocation/yamlPath is passed through for realism but is no longer what

@@ -29,6 +29,12 @@ internal static class ArchitectureChangeSnapshotProjector
         entries.AddRange(validation.ClassificationRoles.Select(Role));
         entries.AddRange(validation.ClassificationRoles.SelectMany(ContextEntries));
         entries.AddRange(CoverageBlindSpots(validation));
+        // Classification analysis deliberately retains facts per assembly, so linked marker
+        // sources can produce equivalent semantic entries more than once. Deduplicate only at the
+        // snapshot boundary, using the same composite key as ArchitectureChangeReports.Validate.
+        entries = entries
+            .DistinctBy(static entry => (entry.Kind, entry.Identity))
+            .ToList();
 
         List<ArchitectureChangeFinding> findings = ArchitectureFindingMapper
             .FromViolations(validation.Violations.Concat(validation.CoverageFindings), mode)
