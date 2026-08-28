@@ -8,7 +8,7 @@ using NUnit.Framework;
 namespace ArchLinterNet.Core.Tests;
 
 [TestFixture]
-public sealed class ArchitectureChangeSnapshotProjectorTests
+public sealed partial class ArchitectureChangeSnapshotProjectorTests
 {
     private static readonly string[] _violationEvidence = ["Acme.Service.Run: System.Console.WriteLine"];
 

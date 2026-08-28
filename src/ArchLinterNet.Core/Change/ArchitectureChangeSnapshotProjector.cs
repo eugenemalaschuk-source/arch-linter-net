@@ -26,15 +26,8 @@ internal static class ArchitectureChangeSnapshotProjector
         entries.AddRange(validation.DiscoveredProjectPaths.Select(path => Project(validation.RepositoryRoot, path)));
         entries.AddRange(namespaceGraph.Graph.Edges.Select(static edge => Edge("namespace", edge)));
         entries.AddRange(assemblyGraph.Graph.Edges.Select(static edge => Edge("assembly", edge)));
-        entries.AddRange(validation.ClassificationRoles.Select(Role));
-        entries.AddRange(validation.ClassificationRoles.SelectMany(ContextEntries));
+        entries.AddRange(SemanticEntries(validation.ClassificationRoles));
         entries.AddRange(CoverageBlindSpots(validation));
-        // Classification analysis deliberately retains facts per assembly, so linked marker
-        // sources can produce equivalent semantic entries more than once. Deduplicate only at the
-        // snapshot boundary, using the same composite key as ArchitectureChangeReports.Validate.
-        entries = entries
-            .DistinctBy(static entry => (entry.Kind, entry.Identity))
-            .ToList();
 
         List<ArchitectureChangeFinding> findings = ArchitectureFindingMapper
             .FromViolations(validation.Violations.Concat(validation.CoverageFindings), mode)
@@ -82,11 +75,86 @@ internal static class ArchitectureChangeSnapshotProjector
         "semantic_role", role.Subject + "|" + role.Role + "|" + Metadata(role.Metadata),
         role.Subject + " = " + role.Role);
 
-    private static IEnumerable<ArchitectureChangeEntry> ContextEntries(ArchitectureClassificationRoleFact role) => role.Metadata
+    // Classification facts remain per CLR type/assembly through analysis. Linked marker sources
+    // can therefore produce equivalent role and context observations, which are collapsed only in
+    // this snapshot projection. Structural keys deliberately retain typed metadata and avoid the
+    // snapshot identity encoding so delimiter/type collisions still reach final validation.
+    private static IEnumerable<ArchitectureChangeEntry> SemanticEntries(
+        IReadOnlyCollection<ArchitectureClassificationRoleFact> roles)
+    {
+        HashSet<SemanticRoleKey> roleKeys = new();
+        HashSet<SemanticContextKey> contextKeys = new();
+
+        foreach (ArchitectureClassificationRoleFact role in roles)
+        {
+            if (roleKeys.Add(new SemanticRoleKey(role)))
+            {
+                yield return Role(role);
+            }
+
+            foreach (SemanticMetadataEntry metadata in MetadataEntries(role.Metadata))
+            {
+                if (contextKeys.Add(new SemanticContextKey(role.Subject, metadata)))
+                {
+                    yield return new ArchitectureChangeEntry(
+                        "semantic_context",
+                        role.Subject + "|" + metadata.Key + "|" + Value(metadata.Value.Value),
+                        role.Subject + ": " + metadata.Key + "=" + Value(metadata.Value.Value));
+                }
+            }
+        }
+    }
+
+    private static SemanticMetadataEntry[] MetadataEntries(IReadOnlyDictionary<string, object> metadata) => metadata
         .OrderBy(static entry => entry.Key, StringComparer.Ordinal)
-        .Select(entry => new ArchitectureChangeEntry(
-            "semantic_context", role.Subject + "|" + entry.Key + "|" + Value(entry.Value),
-            role.Subject + ": " + entry.Key + "=" + Value(entry.Value)));
+        .Select(static entry => new SemanticMetadataEntry(
+            entry.Key,
+            new SemanticMetadataValue(entry.Value?.GetType(), entry.Value)))
+        .ToArray();
+
+    private readonly record struct SemanticMetadataValue(Type? Type, object? Value);
+
+    private readonly record struct SemanticMetadataEntry(string Key, SemanticMetadataValue Value);
+
+    private readonly record struct SemanticContextKey(string Subject, SemanticMetadataEntry Metadata);
+
+    private sealed class SemanticRoleKey : IEquatable<SemanticRoleKey>
+    {
+        private readonly string _subject;
+        private readonly string _role;
+        private readonly SemanticMetadataEntry[] _metadata;
+
+        internal SemanticRoleKey(ArchitectureClassificationRoleFact role)
+        {
+            _subject = role.Subject;
+            _role = role.Role;
+            _metadata = MetadataEntries(role.Metadata);
+        }
+
+        public bool Equals(SemanticRoleKey? other)
+        {
+            return other is not null
+                && string.Equals(_subject, other._subject, StringComparison.Ordinal)
+                && string.Equals(_role, other._role, StringComparison.Ordinal)
+                && _metadata.SequenceEqual(other._metadata);
+        }
+
+        public override bool Equals(object? obj) => obj is SemanticRoleKey other && Equals(other);
+
+        public override int GetHashCode()
+        {
+            HashCode hash = new();
+            hash.Add(_subject, StringComparer.Ordinal);
+            hash.Add(_role, StringComparer.Ordinal);
+            foreach (SemanticMetadataEntry metadata in _metadata)
+            {
+                hash.Add(metadata.Key, StringComparer.Ordinal);
+                hash.Add(metadata.Value);
+            }
+
+            return hash.ToHashCode();
+        }
+    }
 
     // Aggregate, policy-level contracts (policy_consistency, unmatched_ignored_violations) report
     // findings with no per-violation source/target edge; they still need to appear here so their
