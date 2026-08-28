@@ -220,7 +220,7 @@ internal static class ArchitectureChangeSnapshotProjector
         .OrderBy(static entry => entry.Key, StringComparer.Ordinal)
         .Select(entry => entry.Key + "=" + Value(entry.Value)));
 
-    private static string Value(object value) => Convert.ToString(value, CultureInfo.InvariantCulture) ?? string.Empty;
+    private static string Value(object? value) => Convert.ToString(value, CultureInfo.InvariantCulture) ?? string.Empty;
 
     private static string NormalizePath(string path) => path.Replace('\\', '/');
 }
