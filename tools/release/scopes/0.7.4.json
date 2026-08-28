@@ -1,0 +1,21 @@
+{
+  "schema": "checkpoint-b-release-scope-declaration/v2",
+  "declaration_id": "v0.7.4-change-snapshot-semantic-entry-maintenance",
+  "release_target": "0.7.4",
+  "story": 702,
+  "_comment": [
+    "The reviewed v0.7.4 release authority owned by #702. This is a corrective maintenance",
+    "release: it ships #697, the change-snapshot semantic-role/context deduplication fix",
+    "merged since v0.7.3, with no new product feature scope. #699 is recorded only as",
+    "delivered repository-side release-preparation context; it changes no package bytes or",
+    "product behavior. Required and delivered items are reviewed release intent, not inferred",
+    "from milestone membership or mutable issue text."
+  ],
+  "required_items": [
+    { "issue": 697, "finding": "change-snapshot-semantic-entry-deduplication", "summary": "Deduplicate structurally equivalent semantic-role/context snapshot observations for linked internal marker types" }
+  ],
+  "excluded_items": [],
+  "delivered_items": [
+    { "issue": 699, "reason": "Repository-agent release-preparation workflow delivered after v0.7.3; explicitly no product behavior, release-pipeline semantics, package bytes, public API or OpenSpec capability change." }
+  ]
+}
