@@ -2,9 +2,11 @@
 
 ## Purpose
 Provide a deterministic, machine-readable architecture delta between complete analysis snapshots for branch and pull-request workflows.
+
 ## Requirements
+
 ### Requirement: Complete architecture analysis can be persisted as a change snapshot
-The system SHALL provide a versioned `architecture-change-snapshot/v2` artifact that is built from a complete authoritative architecture analysis and contains stable entries for observed namespaces, projects, assemblies, semantic roles and contexts, dependency edges, coverage blind spots, normalized findings, and baseline-debt identities. Normalized findings SHALL include every applicable contract family's findings whose configuration is not disabled, including dependency, coverage, policy-consistency, and unmatched-ignored-violation findings; a finding from a contract family whose configuration is not disabled SHALL NOT be silently omitted from the snapshot. Every entry's and every finding's identity SHALL be stable and unique: two distinct entries or findings (including two coverage blind-spot entries for different rule inputs on the same contract, and two findings of the same policy-consistency check kind under one contract) SHALL never be assigned the same identity, no identity SHALL be empty, and an identity SHALL depend only on the entry's or finding's own semantic content, never on its position within a list the policy author could reorder without changing meaning. Core SHALL own the deterministic projection of those authoritative analysis facts and canonical identities into the snapshot contract; CLI hosts SHALL delegate that projection while retaining command orchestration and I/O responsibilities. The artifact SHALL identify its analysis mode and condition-set scope and SHALL use deterministic ordering. A snapshot document missing any required authority metadata or a required entries, findings, or baseline-debt collection SHALL be rejected rather than treated as an empty collection.
+The system SHALL provide a versioned `architecture-change-snapshot/v2` artifact that is built from a complete authoritative architecture analysis and contains stable entries for observed namespaces, projects, assemblies, semantic roles and contexts, dependency edges, coverage blind spots, normalized findings, and baseline-debt identities. Normalized findings SHALL include every applicable contract family's findings whose configuration is not disabled, including dependency, coverage, policy-consistency, and unmatched-ignored-violation findings; a finding from a contract family whose configuration is not disabled SHALL NOT be silently omitted from the snapshot. Every entry's and every finding's identity SHALL be stable and unique: two distinct entries or findings (including two coverage blind-spot entries for different rule inputs on the same contract, and two findings of the same policy-consistency check kind under one contract) SHALL never be assigned the same identity, no identity SHALL be empty, and an identity SHALL depend only on the entry's or finding's own semantic content, never on its position within a list the policy author could reorder without changing meaning. Repeated observations of the same logical entry, including semantic-role or semantic-context facts produced for equivalent types in separate assemblies, SHALL be represented by one entry before snapshot validation; this projection SHALL NOT change the per-assembly classification facts available to analysis/runtime consumers. Core SHALL own the deterministic projection of those authoritative analysis facts and canonical identities into the snapshot contract; CLI hosts SHALL delegate that projection while retaining command orchestration and I/O responsibilities. The artifact SHALL identify its analysis mode and condition-set scope and SHALL use deterministic ordering. A snapshot document missing any required authority metadata or a required entries, findings, or baseline-debt collection SHALL be rejected rather than treated as an empty collection.
 
 #### Scenario: Snapshot retains complete analysis facts
 - **WHEN** a user creates a snapshot for a policy in the supported analysis mode
@@ -51,6 +53,15 @@ The system SHALL provide a versioned `architecture-change-snapshot/v2` artifact 
 #### Scenario: Identity is independent of list position
 - **WHEN** a policy author reorders elements of a list a finding's identity is derived from (for example a layer's exclude entries) without changing what any element means
 - **THEN** the finding produced for a given element keeps the same identity it had before the reorder
+
+#### Scenario: Equivalent semantic facts across assemblies are collapsed in a snapshot
+- **WHEN** multiple distinct CLR type instances from separate assemblies produce semantic-role facts with the same stable subject, role, and metadata, including context metadata
+- **THEN** the snapshot contains one `semantic_role` entry and one entry for each distinct `semantic_context` identity
+- **AND THEN** snapshot creation succeeds without changing the original per-assembly classification facts
+
+#### Scenario: Different logical entries remain distinct
+- **WHEN** observed surfaces differ in kind or stable identity
+- **THEN** the snapshot retains a separate entry for each surface
 
 ### Requirement: Architecture snapshots are compared by stable identity
 The system SHALL compare a base and current `architecture-change-snapshot/v2` artifact by typed, stable identity and SHALL report added and removed namespaces, projects, assemblies, semantic roles, contexts, dependency edges, and coverage blind spots. The result SHALL be deterministically ordered and SHALL reject incompatible, incomplete, or unsupported snapshot inputs.
@@ -113,3 +124,19 @@ The CLI SHALL expose `change snapshot` to write a complete snapshot and `change 
 - **THEN** the command compares only the supplied complete snapshot artifacts
 - **AND THEN** it does not select or analyze a changed-file or changed-project subset
 
+### Requirement: Semantic snapshot observations are deduplicated without suppressing identity collisions
+The system SHALL collapse repeated semantic-role observations only when their subject, role, and complete metadata key/value set are structurally equivalent, independent of metadata enumeration order. It SHALL collapse repeated semantic-context observations only when their subject, metadata key, and typed metadata value are structurally equivalent. This projection SHALL occur before snapshot validation and SHALL NOT suppress, rewrite, or merge any remaining duplicate `(Kind, Identity)` pair produced by structurally different entries; such an identity collision SHALL continue to be rejected as an invalid snapshot.
+
+#### Scenario: Equivalent linked-type observations are collapsed
+- **WHEN** distinct CLR type instances from separate assemblies produce semantic-role observations with the same subject, role, and metadata values
+- **THEN** the snapshot contains one semantic-role entry and one entry for each structurally distinct semantic context
+- **AND THEN** the classification result still contains the per-assembly observations
+
+#### Scenario: Metadata enumeration order does not create an extra semantic role surface
+- **WHEN** two semantic-role observations have the same subject, role, and metadata key/value pairs in different enumeration orders
+- **THEN** the snapshot contains one semantic-role entry for those observations
+
+#### Scenario: Structurally different facts with a serialized identity collision fail closed
+- **WHEN** two structurally different semantic-role observations serialize to the same `(Kind, Identity)` pair because their legacy identity encoding is ambiguous
+- **THEN** snapshot serialization rejects the snapshot with the duplicate-or-empty entry-identity error
+- **AND THEN** neither observation is silently removed or merged
