@@ -1,11 +1,4 @@
-# governance-applicability-evidence Specification
-
-## Purpose
-Define deterministic control-level applicability evidence for v0.8 governance
-families without conflating proven evaluability with policy configuration or
-architecture quality.
-
-## Requirements
+## MODIFIED Requirements
 
 ### Requirement: Effective controls have explicit applicability membership
 The effective-policy/control projection SHALL materialize one canonical expected
@@ -18,14 +11,11 @@ complete and independent from produced applicability records.
 
 Every produced applicability record SHALL reference exactly one expected entry
 by canonical effective-control identity. Membership belongs to the expected
-entry; a record SHALL NOT define a competing membership value. For every
-expected entry, the produced-record collection SHALL contain zero or exactly
-one record with that identity; duplicate records are invalid
-contract-integrity evidence. The expected membership collection SHALL remain
-available even when evaluation fails to produce a record. The collection is an
-applicability authority, not a second effective-policy inventory or counting
-engine; #685 may consume the same canonical control identity but does not
-derive membership or a denominator.
+entry; a record SHALL NOT define a competing membership value. The expected
+membership collection SHALL remain available even when evaluation fails to
+produce a record. The collection is an applicability authority, not a second
+effective-policy inventory or counting engine; #685 may consume the same
+canonical control identity but does not derive membership or a denominator.
 
 One effective control has one expected entry regardless of source-set
 expansion, match/finding count, display name, YAML position, or runtime
@@ -46,13 +36,6 @@ as `optional` or `not_applicable`; they SHALL NOT be silently omitted.
   and B in the required denominator, and represents B as `unassessable` with a
   `missing_applicability_record` reason rather than inferring membership from
   family semantics or omitting B
-
-#### Scenario: Duplicate record is unassessable
-- **WHEN** two produced applicability records reference the same expected
-  required control identity
-- **THEN** consumers preserve the control once in the required denominator,
-  do not count either duplicate as evaluable, and represent the control as
-  unassessable contract-integrity evidence with duplicate-record provenance
 
 #### Scenario: Optional control is visible without inflating the denominator
 - **WHEN** explicit policy semantics make configured control C optional
@@ -128,68 +111,6 @@ text as the machine-readable reason.
 - **THEN** their results expose distinct stable reason classes and provenance
   rather than a shared zero-result status
 
-### Requirement: Family evidence retains its native units
-Applicability records SHALL retain family-specific evidence as drill-down
-authority. For every evidence category meaningful to the family, evidence SHALL
-identify its unit and contain deterministic counts with canonical
-item/provenance references for subjects in scope, matched subjects, unmapped
-subjects, ambiguous subjects, stale declarations, and external input or run
-presence. A family SHALL record an evidence category as not applicable only
-when that category has no semantic meaning for the configured control.
-
-The model SHALL NOT combine types, topology nodes, dependency edges, files,
-projects, assemblies, metrics, controls, or external runs into a generic score
-or cross-family percentage. Counts SHALL be derived from the record's canonical
-evidence collection and preserve the unit they count.
-
-#### Scenario: Cross-family evidence is not arithmetically merged
-- **WHEN** topology has unmapped observed subjects and external diagnostics has
-  a missing required SARIF run
-- **THEN** the resulting evidence retains the topology-subject and
-  external-run units separately and does not add them into one completeness
-  percentage or count
-
-### Requirement: Applicability records have deterministic ordering and provenance
-The canonical applicability collection SHALL order records by canonical
-effective-control identity. Each record's evidence categories and item
-references SHALL use their stable semantic identities and deterministic order.
-Canonical equality SHALL not depend on display text, runtime enumeration order,
-local timestamps, absolute paths, or random identifiers. Provenance SHALL be
-sufficient to drill into the canonical control and its family evidence without
-becoming a second control or finding identity.
-
-#### Scenario: Equivalent analysis repeats identically
-- **WHEN** the same effective policy and family evidence are evaluated twice
-- **THEN** the control records, native evidence ordering, and provenance
-  references are canonically equivalent across the two results
-
-### Requirement: Family applicability matrices are explicit
-The shared design SHALL define the following v0.8 applicability matrices for
-the families that opt in:
-
-| Family | Required evidence | Evaluable condition | Unassessable examples |
-| --- | --- | --- | --- |
-| Declared topology (#91) | declared topology control, observed subject universe, mapping and declaration evidence | every required observed subject is deterministically mapped or explicitly reviewed out of scope and declarations are current | missing subject universe, unmapped or ambiguous required subject, stale declaration |
-| Contract-surface exposure (#92) | selected contract surface, visible signature/metadata facts, source and target classification evidence | the selected surface and required facts resolve completely for the configured control | missing selected surface, unresolved required fact, unexpected empty selector, stale declaration |
-| Metrics and budgets (#93) | metric definition, target subject universe, and the measurement facts required by that metric | the metric's native counting universe and contributors are complete enough to trust its value | incomplete or unmapped target scope, ambiguous component, missing required measurement fact, unexpected empty input |
-| External static diagnostics (#95) | logical evidence requirement, bounded SARIF artifact/run, and required trust binding | a successful matching run satisfies configured repository, revision, scope, producer, and logical-evidence binding | missing, malformed, failed, stale, wrong-key, wrong-repository, wrong-revision, or wrong-scope required input |
-
-Each family SHALL make its own exact subject and declaration semantics explicit
-when it implements a control; it SHALL use this matrix rather than inventing a
-parallel result envelope.
-
-#### Scenario: Valid current SARIF with no selected findings
-- **WHEN** an external-diagnostics control receives a valid, successful,
-  current-context SARIF run with zero selected diagnostics
-- **THEN** its record is `evaluable` and distinguishes that state from a missing
-  or stale required run
-
-#### Scenario: Optional external evidence is not a failed required run
-- **WHEN** an explicitly optional external-evidence control has no supplied
-  artifact
-- **THEN** its record is `not_applicable` with optional-policy provenance, not
-  `unassessable` and not a successful zero-result run
-
 ### Requirement: Summaries derive from canonical membership and states
 Downstream consumers SHALL derive applicability transparency summaries by left
 joining the canonical expected applicability-membership collection with
@@ -225,16 +146,3 @@ while preserving the fact that inventory/counting is owned by #685.
   `38/38 evaluable` only after the expected/record join proves every required
   entry evaluable, without recalculating either authority or presenting the two
   counts as interchangeable
-
-### Requirement: Existing governance behavior remains unchanged until opt-in
-The shared applicability contract SHALL not by itself add policy fields, alter
-existing coverage classification, change strict/audit outcomes, create
-normalized findings, change baseline identity, or affect existing policy
-behavior. #506 owns fail-closed enforcement and #507 owns normalized
-Human/JSON/SARIF/Testing projection; later family implementations opt in using
-this contract.
-
-#### Scenario: Existing policy has no v0.8 applicability control
-- **WHEN** a policy contains only currently supported, pre-v0.8 contracts
-- **THEN** it has identical loading, validation, finding, baseline, and output
-behavior after this applicability contract is introduced
