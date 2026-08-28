@@ -893,15 +893,24 @@ dotnet test tests/ArchLinterNet.Cli.Tests --no-restore
 
 ## Keep Ignores Narrow
 
-`ignored_violations` is a frozen-debt baseline. Each entry should identify a
-specific source type and forbidden reference, with a reason or issue link.
+`ignored_violations` is a frozen-debt baseline. Version-1 policies retain the
+legacy matcher during migration; version 2 defaults to strict lifecycle governance.
 
 ```yaml
 ignored_violations:
-  - source_type: MyCompany.Product.Application.Legacy.LegacyUseCase
+  - id: ARCH-IGN-042
+    source_type: MyCompany.Product.Application.Legacy.LegacyUseCase
     forbidden_reference: MyCompany.Product.Infrastructure.LegacyGateway
-    reason: Existing migration debt tracked in #1234.
+    target:
+      fingerprint: sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+    reason: Existing migration debt tracked in ARCH-1234.
+    owner: application-architecture
+    issue: ARCH-1234
+    introduced: 2026-08-01
+    expires: 2026-10-01
 ```
+
+Create `target.fingerprint` with `ArchitectureWaiverTargetFingerprint.Create`; never reuse it for another occurrence. A version-2 policy can explicitly set `analysis.waiver_lifecycle_profile: compatibility` for a reviewed temporary migration.
 
 Avoid broad patterns such as `source_type: "*"` or
 `forbidden_reference: "MyCompany.Product.Infrastructure.*"` unless a human has
@@ -911,6 +920,7 @@ When `analysis.unmatched_ignored_violations` is enabled (default `error`), the
 linter warns about `ignored_violations` entries that match no current violation.
 Remove stale entries proactively to keep the baseline trustworthy and avoid CI
 failures. Use `warn` during migration cleanup, then switch to `error`.
+Strict lifecycle policies fail closed for expired or stale structured waivers. Human and JSON reports list `active`, `stale`, `expired`, or `metadata_incomplete`; invalid metadata is a policy-load error.
 
 ## Review Policy Weakening Explicitly
 

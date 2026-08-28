@@ -660,6 +660,9 @@ internal sealed partial class ReportCoordinator
         AppendSection(sb, outcome.UnmatchedIgnoredViolations.Count > 0 && outcome.UnmatchedIgnoredViolationsConfig != "off",
             () => _runtime.FormatUnmatchedForHumans(outcome.UnmatchedIgnoredViolations));
         cancellationToken.ThrowIfCancellationRequested();
+        AppendSection(sb, outcome.Waivers.Count > 0,
+            () => _runtime.FormatWaiversForHumans(outcome.Waivers));
+        cancellationToken.ThrowIfCancellationRequested();
         AppendSection(sb, outcome.CoverageConfig != "off" && outcome.CoverageFindings.Count > 0,
             () => _runtime.FormatCoverageForHumans(outcome.CoverageFindings, cancellationToken));
         cancellationToken.ThrowIfCancellationRequested();
@@ -751,13 +754,17 @@ internal sealed partial class ReportCoordinator
     // report's size, not just before/after this call.
     private string FormatJsonContent(string mode, ValidationOutcome outcome, CancellationToken cancellationToken = default)
     {
-        return _runtime.FormatResultForCiArtifacts(
+        string result = _runtime.FormatResultForCiArtifacts(
             mode, outcome.Passed, outcome.Violations, outcome.Cycles, outcome.CycleFindings, outcome.CoverageFindings,
             outcome.UnmatchedIgnoredViolations,
             outcome.PolicyConsistencyConfig == "off" ? Array.Empty<PolicyConsistencyDiagnostic>() : outcome.PolicyConsistencyFindings,
             outcome.CoverageSummaries, outcome.ClassificationConflicts, outcome.ClassificationMetadataFailures,
             outcome.ClassificationRoles, outcome.ClassificationPathDeferred, outcome.PreflightDiagnostics,
             outcome.SourceExpansion, outcome.SubtractiveMatcherParticipation, cancellationToken);
+
+        return outcome.Waivers.Count == 0
+            ? result
+            : ArchitectureDiagnosticFormatter.AddWaiversToCiArtifacts(result, outcome.Waivers);
     }
 
     private string FormatSarifContent(string mode, ValidationOutcome outcome, CancellationToken cancellationToken = default)

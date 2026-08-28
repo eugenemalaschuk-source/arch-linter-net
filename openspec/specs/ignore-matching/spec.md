@@ -2,9 +2,7 @@
 
 ## Purpose
 Matches ignored-violation entries against actual violations by exact source/forbidden-reference pairs and wildcard patterns.
-
 ## Requirements
-
 ### Requirement: Match exact source type and forbidden reference
 The system SHALL match violations where both `source_type` and `forbidden_reference` exactly equal the ignore pattern values.
 
@@ -39,3 +37,16 @@ The system SHALL not ignore violations when the pattern does not match.
 #### Scenario: No match
 - **WHEN** ignore entry has `source_type: "Other"`
 - **THEN** a violation with source `"MyApp.Foo"` is not ignored
+
+### Requirement: Structured waiver matching uses canonical finding identity
+The system SHALL match a complete structured waiver only when its declared
+target fingerprint equals the versioned canonical identity assigned to a live
+finding before suppression. It SHALL retain existing legacy glob matching for
+entries without structured waiver fields and existing baseline identity
+matching for baseline-imported entries.
+
+#### Scenario: Similar display text does not satisfy a structured waiver
+- **WHEN** two findings have the same source and forbidden-reference display
+  text but different canonical assembly, member, or occurrence identity
+- **THEN** a structured waiver fingerprint for one finding SHALL NOT suppress
+  the other finding

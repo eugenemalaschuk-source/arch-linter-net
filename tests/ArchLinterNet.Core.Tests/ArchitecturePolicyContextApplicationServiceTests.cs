@@ -51,7 +51,7 @@ public sealed class ArchitecturePolicyContextApplicationServiceTests
 
         Assert.Multiple(() =>
         {
-            Assert.That(context.SchemaVersion, Is.EqualTo(3));
+            Assert.That(context.SchemaVersion, Is.EqualTo(4));
             Assert.That(context.Kind, Is.EqualTo("architecture-policy-context"));
             Assert.That(context.Guardrails.PolicyWeakening, Is.EqualTo("error"));
             Assert.That(context.Policy.HasImports, Is.True);
@@ -82,7 +82,7 @@ public sealed class ArchitecturePolicyContextApplicationServiceTests
         {
             Assert.That(secondJson, Is.EqualTo(firstJson));
             Assert.That(secondMarkdown, Is.EqualTo(firstMarkdown));
-            Assert.That(document.RootElement.GetProperty("schema_version").GetInt32(), Is.EqualTo(3));
+            Assert.That(document.RootElement.GetProperty("schema_version").GetInt32(), Is.EqualTo(4));
             Assert.That(document.RootElement.GetProperty("kind").GetString(), Is.EqualTo("architecture-policy-context"));
             Assert.That(firstMarkdown, Does.Contain("# Architecture policy context"));
             Assert.That(firstMarkdown, Does.Contain("Policy weakening severity: `error`"));
@@ -189,6 +189,64 @@ public sealed class ArchitecturePolicyContextApplicationServiceTests
                 Assert.That(ignored.IgnoredViolation, Is.EqualTo(new ArchitecturePolicyContextIgnoredViolation("*", "*")));
                 Assert.That(ArchitecturePolicyContextFormatter.FormatAsJson(context),
                     Does.Contain("\"ignored_violation\": {").And.Contain("\"source_type\": \"*\""));
+            });
+        }
+        finally
+        {
+            Directory.Delete(temporaryDirectory, recursive: true);
+        }
+    }
+
+    [Test]
+    public void Export_StructuredWaiver_ProjectsLifecycleProfileAndCanonicalDeclaration()
+    {
+        string temporaryDirectory = Path.Combine(Path.GetTempPath(), $"arch-linter-policy-context-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(temporaryDirectory);
+        string policyPath = Path.Combine(temporaryDirectory, "policy.yml");
+        try
+        {
+            File.WriteAllText(policyPath, $"""
+                version: 2
+                name: Structured waiver context
+                layers:
+                  application:
+                    namespace: Sample.Application
+                  infrastructure:
+                    namespace: Sample.Infrastructure
+                analysis:
+                  waiver_lifecycle_profile: strict
+                contracts:
+                  strict:
+                    - id: application-no-infrastructure
+                      name: application-no-infrastructure
+                      source: application
+                      forbidden: [infrastructure]
+                      ignored_violations:
+                        - id: ARCH-IGN-001
+                          source_type: Sample.Application.Legacy
+                          forbidden_reference: Sample.Infrastructure.LegacyGateway
+                          target:
+                            fingerprint: sha256:{new string('a', 64)}
+                          reason: Temporary migration
+                          owner: architecture-team
+                          issue: ARCH-231
+                          introduced: 2026-08-01
+                          expires: 2026-10-01
+                """);
+
+            ArchitecturePolicyContextExport context = _engine.ExportPolicyContext(
+                new ArchitecturePolicyContextRequest { PolicyPath = policyPath });
+            ArchitecturePolicyContextWaiver waiver = context.Waivers.Single();
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(context.SchemaVersion, Is.EqualTo(4));
+                Assert.That(context.WaiverLifecycleProfile, Is.EqualTo("strict"));
+                Assert.That(waiver.WaiverId, Is.EqualTo("ARCH-IGN-001"));
+                Assert.That(waiver.TargetFingerprint, Is.EqualTo("sha256:" + new string('a', 64)));
+                Assert.That(waiver.Provenance, Is.Not.Null);
+                Assert.That(ArchitecturePolicyContextFormatter.FormatAsJson(context), Does.Contain("\"waivers\""));
+                Assert.That(ArchitecturePolicyContextFormatter.FormatAsMarkdown(context), Does.Contain("Structured architecture waivers"));
             });
         }
         finally

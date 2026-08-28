@@ -21,6 +21,10 @@ public sealed record ValidationRequest
 
     public bool EnforceUnmatchedIgnoredViolationsPolicy { get; init; }
 
+    // An explicit date makes waiver expiry evaluation deterministic across local and CI runs.
+    // Null resolves through the one UTC clock boundary in ArchitectureAnalysisSnapshot.
+    public DateOnly? WaiverEvaluationDate { get; init; }
+
     // Ordinary (default): never restores/builds. EnsureBuilt: explicit opt-in that builds the
     // graph once and verifies it via a build receipt. See BuildPreparationMode.
     public BuildPreparationMode PreparationMode { get; init; } = BuildPreparationMode.Ordinary;

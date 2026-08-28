@@ -151,6 +151,23 @@ public sealed class ValidateCommandDefinitionTests
     }
 
     [Test]
+    public void CreateRootCommand_WaiverEvaluationDate_IsPropagatedAsAnExactDate()
+    {
+        (RecordingRuntime runtime, _) = Run(["--waiver-evaluation-date", "2026-08-02"]);
+
+        Assert.That(runtime.LastRequest!.WaiverEvaluationDate, Is.EqualTo(new DateOnly(2026, 8, 2)));
+    }
+
+    [Test]
+    public void CreateRootCommand_InvalidWaiverEvaluationDate_FailsBeforeValidation()
+    {
+        (RecordingRuntime runtime, RecordingConsole console) = Run(["--waiver-evaluation-date", "02-08-2026"]);
+
+        Assert.That(runtime.LastRequest, Is.Null);
+        Assert.That(console.ErrorText, Does.Contain("Invalid --waiver-evaluation-date value"));
+    }
+
+    [Test]
     public void CreateRootCommand_ReportOption_AcceptsValidReportSink()
     {
         (RecordingRuntime runtime, RecordingConsole console) = Run(["--report", "json=results.json"]);

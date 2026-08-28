@@ -85,4 +85,9 @@ public sealed record ValidationOutcome(
     // blocked execution (BuildBlockedOutcome) or no contract declared these matchers.
     public IReadOnlyList<ArchitectureSubtractiveMatcherParticipation> SubtractiveMatcherParticipation { get; init; } =
         Array.Empty<ArchitectureSubtractiveMatcherParticipation>();
+
+    // One record per current manual architecture waiver. Baseline-imported ignore entries retain
+    // the independently governed baseline lifecycle and are intentionally absent here.
+    public IReadOnlyList<ArchitectureWaiverLifecycleRecord> Waivers { get; init; } =
+        Array.Empty<ArchitectureWaiverLifecycleRecord>();
 }

@@ -189,6 +189,7 @@ The CLI compatibility default for `--policy` is `architecture/dependencies.arch.
 | `--platform <name>` | Platform selector. |
 | `--runtime <rid>` | Runtime identifier selector. |
 | `--max-parallelism <n>` | Bound parallel assembly/fact scanning; `1` is supported sequential execution. |
+| `--waiver-evaluation-date <yyyy-MM-dd>` | Use a fixed UTC calendar date for waiver expiry evaluation. |
 | `--cache <auto|path>` | Opt into persistent analysis-cache/v1; disabled by default. |
 | `--timings` | Print phase timing information to stderr. |
 | `--profile <stdout|stderr|path>` | Emit analysis-profile/v1 JSON independently from normal reports. |

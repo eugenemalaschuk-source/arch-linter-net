@@ -550,12 +550,45 @@ public sealed class ArchitecturePolicyWeakeningComparerTests
         Assert.That(() => ArchitecturePolicyWeakeningFormatter.DeserializeContext("{}"), Throws.ArgumentException);
     }
 
+    [Test]
+    public void Compare_AddedStructuredWaiver_IsSemanticWeakening()
+    {
+        ArchitecturePolicyContextWaiver waiver = Waiver("ARCH-IGN-001", "sha256:" + new string('a', 64));
+
+        ArchitecturePolicyWeakeningFinding finding = ArchitecturePolicyWeakeningComparer.Compare(new(
+            Context(),
+            Context(waivers: [waiver]))).Findings.Single();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(finding.Kind, Is.EqualTo("structured_waiver_added"));
+            Assert.That(finding.Classification, Is.EqualTo("semantic"));
+            Assert.That(finding.ControlIdentity, Is.EqualTo("dependency:boundary:ARCH-IGN-001"));
+            Assert.That(finding.CurrentProvenance, Is.EqualTo(waiver.Provenance));
+        });
+    }
+
+    [Test]
+    public void Compare_ChangedStructuredWaiverTarget_IsImpactNotProven()
+    {
+        ArchitecturePolicyWeakeningFinding finding = ArchitecturePolicyWeakeningComparer.Compare(new(
+            Context(waivers: [Waiver("ARCH-IGN-001", "sha256:" + new string('a', 64))]),
+            Context(waivers: [Waiver("ARCH-IGN-001", "sha256:" + new string('b', 64))]))).Findings.Single();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(finding.Kind, Is.EqualTo("structured_waiver_target_changed"));
+            Assert.That(finding.Classification, Is.EqualTo("impact_not_proven"));
+        });
+    }
+
     private static ArchitecturePolicyContextExport Context(
         IReadOnlyList<ArchitecturePolicyContextContract>? contracts = null,
         IReadOnlyList<ArchitecturePolicyContextSourceSet>? sourceSets = null,
         IReadOnlyList<ArchitecturePolicyContextSourceExpansion>? expansions = null,
         IReadOnlyList<ArchitecturePolicyContextException>? exceptions = null,
         ArchitecturePolicyContextAnalysis? analysis = null,
+        IReadOnlyList<ArchitecturePolicyContextWaiver>? waivers = null,
         string severity = "error") => new(
         ArchitecturePolicyContextExport.CurrentSchemaVersion,
         "architecture-policy-context",
@@ -571,7 +604,24 @@ public sealed class ArchitecturePolicyWeakeningComparerTests
         sourceSets ?? [],
         expansions ?? [],
         exceptions ?? [],
-        []);
+        [])
+        {
+            Waivers = waivers ?? [],
+        };
+
+    private static ArchitecturePolicyContextWaiver Waiver(string id, string targetFingerprint) => new(
+        "strict",
+        "dependency",
+        "boundary",
+        "boundary",
+        id,
+        targetFingerprint,
+        "architecture-team",
+        "ARCH-231",
+        "2026-08-01",
+        "2026-10-01",
+        "Temporary extraction waiver",
+        _importedProvenance);
 
     private static ArchitecturePolicyContextAnalysis Analysis(
         IReadOnlyList<string>? targetAssemblies = null,

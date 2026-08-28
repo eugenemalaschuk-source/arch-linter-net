@@ -34,4 +34,8 @@ internal sealed record ValidateCommandOptions(
     // null = --max-parallelism not requested (resolves to the default degree). See
     // openspec/specs/bounded-parallel-scanning/spec.md.
     public int? MaxParallelism { get; init; }
+
+    // null uses the current UTC calendar date once for the whole validation. Supplying an ISO
+    // date makes expiry-boundary runs reproducible in CI and tests.
+    public string? WaiverEvaluationDate { get; init; }
 }

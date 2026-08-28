@@ -115,6 +115,12 @@ public sealed class ArchitectureAnalysisConfiguration
     [YamlMember(Alias = "policy_weakening")]
     public string PolicyWeakening { get; set; } = DefaultSeverity;
 
+    // Version-1 policies retain their existing matcher behavior under the implicit compatibility
+    // profile. Version-2 policies default to strict waiver hygiene; an explicit value lets a
+    // migration policy make that choice reviewable in the effective policy itself.
+    [YamlMember(Alias = "waiver_lifecycle_profile")]
+    public string WaiverLifecycleProfile { get; set; } = string.Empty;
+
     [YamlMember(Alias = "condition_sets")]
     public Dictionary<string, List<string>> ConditionSets { get; set; } = new();
 
@@ -256,6 +262,32 @@ public sealed class ArchitectureIgnoredViolation
 
     [YamlMember(Alias = "reason")] public string Reason { get; set; } = string.Empty;
 
+    // Manual structured-waiver fields. A manually authored entry remains a legacy glob matcher
+    // until any one of these is present; the policy validator then requires the complete shape.
+    // Baseline-imported versioned identity fields below are deliberately not waiver metadata.
+    [YamlMember(Alias = "id")] public string? WaiverId { get; set; }
+
+    [YamlMember(Alias = "target")] public ArchitectureWaiverTarget? Target { get; set; }
+
+    [YamlMember(Alias = "owner")] public string? Owner { get; set; }
+
+    [YamlMember(Alias = "issue")] public string? Issue { get; set; }
+
+    [YamlMember(Alias = "introduced")] public string? Introduced { get; set; }
+
+    [YamlMember(Alias = "expires")] public string? Expires { get; set; }
+
+    [YamlIgnore]
+    public bool IsBaselineImported => IdentityVersion.HasValue;
+
+    [YamlIgnore]
+    public bool HasStructuredWaiverFields => !string.IsNullOrWhiteSpace(WaiverId)
+        || Target is not null
+        || !string.IsNullOrWhiteSpace(Owner)
+        || !string.IsNullOrWhiteSpace(Issue)
+        || !string.IsNullOrWhiteSpace(Introduced)
+        || !string.IsNullOrWhiteSpace(Expires);
+
     // Populated only when this entry was merged in from a `version: 2` baseline document (see
     // ArchitectureBaselineLoadingService.ContractGroupMerger). When IdentityVersion is set,
     // ArchitectureIgnoreMatcher matches this entry against the live structured identity instead of
@@ -281,4 +313,10 @@ public sealed class ArchitectureIgnoredViolation
     [YamlMember(Alias = "occurrence")] public int? Occurrence { get; set; }
 
     [YamlMember(Alias = "configuration")] public string? Configuration { get; set; }
+}
+
+/// <summary>Exact canonical target selected by a structured manual architecture waiver.</summary>
+public sealed class ArchitectureWaiverTarget
+{
+    [YamlMember(Alias = "fingerprint")] public string Fingerprint { get; set; } = string.Empty;
 }

@@ -23,16 +23,16 @@ diagnostic and no partial report, ranking, or candidate set.
 ## Policy context output
 
 `arch-linter-net policy context --format json` writes one deterministic
-`architecture-policy-context` document with `schema_version: 3`. It is a
+`architecture-policy-context` document with `schema_version: 4`. It is a
 policy-only artifact for coding-agent context: it describes effective declared
 policy facts and portable provenance, and does not report an architecture
 validation result. `--format markdown` renders the same model as a compact
 prompt-ready summary. Neither format includes local absolute paths, build
 receipts, target-assembly results, or runtime environment values.
 
-Version 3 additionally records typed ignored-violation matchers alongside the
-typed declared analysis inputs and explicit `analysis.policy_weakening`
-severity. It is not backward-compatible as a
+Version 4 additionally records the resolved waiver-lifecycle profile and every
+structured waiver's exact target fingerprint, lifecycle metadata, and portable
+provenance alongside typed ignored-violation matchers. It is not backward-compatible as a
 weakening-comparison input: regenerate base and current contexts with the same
 supported CLI version rather than treating a missing section as empty.
 
@@ -54,6 +54,8 @@ semantic finding.
 Changes to authored analysis `target_assemblies`, `projects`, and `source_roots`
 are likewise `impact_not_proven` until effective discovery/scanner scope is
 available as trusted evidence.
+Adding a structured waiver is a semantic weakening; changing its target
+fingerprint is `impact_not_proven`, never silently accepted as equivalent.
 
 Human, JSON, and SARIF project that same result. JSON is suitable for CI and
 SARIF uses one `ArchLinterNet.PolicyWeakening.<kind>` rule for each weakening
@@ -202,8 +204,16 @@ Current JSON output is a single top-level object with these arrays:
 - `cycles`
 - `coverage_findings`
 - `unmatched_ignored_violations`
+- `waivers`
 - `policy_consistency_findings`
 - `coverage_summary`
+
+`waivers` is present when the policy has manual ignores. Each entry has an ID,
+lifecycle `state`, exact `target_fingerprint` when structured, owner, issue,
+lifecycle dates, the single `evaluation_date` used for the run, matching status,
+and policy provenance. Structured waivers are `active`, `stale`, or `expired`;
+legacy compatibility entries are `metadata_incomplete`. Invalid metadata fails
+policy loading instead of producing a potentially trusted record.
 
 Example shape:
 
@@ -230,6 +240,19 @@ Example shape:
     }
   ],
   "unmatched_ignored_violations": [],
+  "waivers": [
+    {
+      "id": "ARCH-IGN-042",
+      "state": "active",
+      "target_fingerprint": "sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+      "owner": "architecture-team",
+      "issue": "ARCH-231",
+      "introduced": "2026-08-01",
+      "expires": "2026-10-01",
+      "evaluation_date": "2026-08-02",
+      "matches_governed_finding": true
+    }
+  ],
   "policy_consistency_findings": [
     {
       "kind": "policy_consistency",
@@ -288,6 +311,7 @@ Behavior for non-violation finding families is controlled separately:
 - `analysis.coverage: error|warn|off` controls whether `coverage_findings` fail the run, report without failing, or are suppressed — this applies uniformly across every implemented coverage scope (`namespace`, `rule_input`, `project`, `assembly`, `dependency_edge`), not just namespace/rule-input coverage.
 - `analysis.policy_consistency: error|warn|off` controls whether `policy_consistency_findings` fail the run, report without failing, or are suppressed.
 - `analysis.unmatched_ignored_violations: error|warn|off` controls whether stale ignore entries fail the run, report without failing, or are suppressed.
+- Strict waiver-lifecycle policies fail for stale or expired structured waivers. Supply `--waiver-evaluation-date yyyy-MM-dd` to make an expiry-boundary run reproducible; otherwise the CLI captures one UTC date for the full invocation.
 
 ## SARIF output
 

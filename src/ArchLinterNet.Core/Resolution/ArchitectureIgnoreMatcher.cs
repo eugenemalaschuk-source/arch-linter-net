@@ -54,6 +54,16 @@ internal static class ArchitectureIgnoreMatcher
     private static bool Matches(
         string sourceType, string forbiddenReference, ArchitectureViolationIdentity? liveIdentity, ArchitectureIgnoredViolation ignore)
     {
+        if (ignore.HasStructuredWaiverFields)
+        {
+            return liveIdentity is not null
+                && ignore.Target is not null
+                && string.Equals(
+                    ignore.Target.Fingerprint,
+                    ArchitectureWaiverTargetFingerprint.Create(liveIdentity),
+                    StringComparison.Ordinal);
+        }
+
         if (ignore.IdentityVersion == ArchitectureViolationIdentity.CurrentVersion && liveIdentity != null)
         {
             return MatchesIdentity(liveIdentity, ignore);
