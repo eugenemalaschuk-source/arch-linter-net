@@ -398,8 +398,8 @@ def test_shipped_declarations_preserve_both_reviewed_release_authorities() -> No
     ]
 
     by_target = {declaration["release_target"]: declaration for declaration in declarations}
-    assert len(declarations) == len(by_target) == 5
-    assert set(by_target) == {"0.6.4", "0.7.0", "0.7.1", "0.7.2", "0.7.3"}
+    assert len(declarations) == len(by_target) == 6
+    assert set(by_target) == {"0.6.4", "0.7.0", "0.7.1", "0.7.2", "0.7.3", "0.7.4"}
     assert by_target["0.6.4"]["story"] == 527
     assert {item["issue"] for item in by_target["0.6.4"]["required_items"]} == {525, 526}
     assert by_target["0.7.0"]["story"] == 613
@@ -428,3 +428,12 @@ def test_shipped_declarations_preserve_both_reviewed_release_authorities() -> No
     assert {item["issue"] for item in by_target["0.7.3"]["required_items"]} == {683}
     assert by_target["0.7.3"]["excluded_items"] == []
     assert by_target["0.7.3"]["delivered_items"] == []
+    assert by_target["0.7.4"]["story"] == 702
+    assert {item["issue"] for item in by_target["0.7.4"]["required_items"]} == {697}
+    assert by_target["0.7.4"]["excluded_items"] == []
+    assert by_target["0.7.4"]["delivered_items"] == [
+        {
+            "issue": 699,
+            "reason": "Repository-agent release-preparation workflow delivered after v0.7.3; explicitly no product behavior, release-pipeline semantics, package bytes, public API or OpenSpec capability change.",
+        }
+    ]
