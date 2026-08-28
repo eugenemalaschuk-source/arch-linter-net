@@ -138,7 +138,9 @@ public sealed partial class ArchitectureChangeSnapshotProjectorTests
             Assert.That(classifiedTypes, Does.Contain(firstType));
             Assert.That(classifiedTypes, Does.Contain(secondType));
             Assert.That(roles, Has.Count.EqualTo(2));
-            Assert.That(roles.Select(static role => role.Subject).Distinct(StringComparer.Ordinal), Has.Length.EqualTo(1));
+            Assert.That(
+                roles.Select(static role => role.Subject).Distinct(StringComparer.Ordinal).ToArray(),
+                Has.Length.EqualTo(1));
             Assert.That(roles.Select(static role => role.Role), Is.All.EqualTo("DomainLayer"));
             Assert.That(roles.Select(static role => role.Metadata["domain"]), Is.All.EqualTo("Sales"));
             Assert.That(snapshot.Entries.Count(static entry => entry.Kind == "semantic_role"), Is.EqualTo(1));
