@@ -79,4 +79,29 @@ public sealed partial class ArchitectureDiagnosticFormatter
         obj["import_chain"] = policyError.ImportChain;
         obj["message"] = policyError.Message;
     }
+
+    private static void ApplyArchitectureApplicabilityCiFields(
+        ArchitectureApplicabilityDiagnostic applicability,
+        Dictionary<string, object?> obj)
+    {
+        obj["control_identity"] = applicability.ControlIdentity;
+        obj["family"] = applicability.Family;
+        obj["membership"] = applicability.Membership is { } membership
+            ? ArchitectureApplicabilityWireNames.MembershipToken(membership)
+            : null;
+        obj["state"] = applicability.State is { } state
+            ? ArchitectureApplicabilityWireNames.StateToken(state)
+            : null;
+        obj["validated_state"] = applicability.ValidatedState is { } validatedState
+            ? ArchitectureApplicabilityWireNames.StateToken(validatedState)
+            : null;
+        obj["reason_code"] = applicability.ReasonCode;
+        obj["policy_identity"] = applicability.PolicyIdentity;
+        obj["provenance"] = new Dictionary<string, object?>
+        {
+            ["family"] = applicability.Provenance.Family,
+            ["control_identity"] = applicability.Provenance.ControlIdentity,
+            ["policy_identity"] = applicability.Provenance.PolicyIdentity,
+        };
+    }
 }

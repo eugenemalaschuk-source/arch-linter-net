@@ -44,6 +44,7 @@ internal static class ArchitectureRemediationHintProviderRegistry
             new(typeof(PolicyConsistencyDiagnostic), (d, i) => ArchitectureRemediationHintFactory.ForPolicyConsistency((PolicyConsistencyDiagnostic)d, i)),
             new(typeof(BaselineLifecycleDiagnostic), (d, i) => ArchitectureRemediationHintFactory.ForBaseline((BaselineLifecycleDiagnostic)d, i)),
             new(typeof(ArchitecturePolicyErrorDiagnostic), (d, i) => ArchitectureRemediationHintFactory.ForPolicyError((ArchitecturePolicyErrorDiagnostic)d, i)),
+            new(typeof(ArchitectureApplicabilityDiagnostic), (d, i) => ArchitectureRemediationHintFactory.ForApplicability((ArchitectureApplicabilityDiagnostic)d, i)),
         };
 
     internal static IReadOnlyDictionary<Type, ArchitectureRemediationHintProvider> ByType { get; } =
@@ -341,6 +342,10 @@ internal static class ArchitectureRemediationHintFactory
         "Correct the reported policy input before evaluating application structure.",
         identity,
         [Evidence("diagnostic_kind", diagnostic.DiagnosticKind.ToString())]);
+
+    internal static ArchitectureRemediationHint? ForApplicability(
+        ArchitectureApplicabilityDiagnostic diagnostic,
+        ArchitectureViolationIdentity identity) => null;
 
     internal static string CategoryToken(ArchitectureRemediationHintCategory category) => category switch
     {

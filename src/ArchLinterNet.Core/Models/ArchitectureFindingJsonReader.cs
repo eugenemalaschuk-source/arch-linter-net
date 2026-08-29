@@ -48,7 +48,7 @@ public static class ArchitectureFindingJsonReader
         "project_metadata", "context_dependency", "context_allow_only", "port_boundary",
         "layout_convention", "package_allow_only", "framework_reference",
         "framework_reference_allow_only", "build_state_preflight", "baseline",
-        "architecture_policy_error",
+        "architecture_policy_error", "applicability",
     };
 
     public static ArchitectureFindingReadEnvelope Read(string json, bool strict)

@@ -29,6 +29,12 @@ public sealed class ArchitectureValidationResult
     public IReadOnlyCollection<ArchitectureSubtractiveMatcherParticipation> SubtractiveMatcherParticipation { get; }
     public IReadOnlyCollection<ArchitectureWaiverLifecycleRecord> Waivers { get; }
     public ArchitectureAssessmentCompletionEvidence? AssessmentCompletionEvidence { get; }
+    /// <summary>
+    /// The Core-owned applicability projection, when the policy supplied applicability evidence.
+    /// This is the typed source for both the control summary and normalized applicability findings;
+    /// formatted output is never parsed to reconstruct it.
+    /// </summary>
+    public ArchitectureApplicabilityProjection? ApplicabilityProjection { get; }
 
     // Null unless the builder called WithProfile() — see
     // openspec/specs/analysis-profile/spec.md, "Testing API exposes the same profile semantics as
@@ -57,6 +63,7 @@ public sealed class ArchitectureValidationResult
             ?? Array.Empty<ArchitectureSubtractiveMatcherParticipation>();
         Waivers = @params.Waivers ?? Array.Empty<ArchitectureWaiverLifecycleRecord>();
         AssessmentCompletionEvidence = @params.AssessmentCompletionEvidence;
+        ApplicabilityProjection = @params.ApplicabilityProjection;
         Profile = @params.Profile;
         Findings = ArchitectureFindingMapper.Order(AllDiagnostics());
     }
@@ -102,6 +109,17 @@ public sealed class ArchitectureValidationResult
         foreach (BuildStatePreflightDiagnostic preflight in PreflightDiagnostics)
         {
             yield return ArchitectureFindingMapper.FromDiagnostic(preflight, Mode);
+        }
+
+        // Applicability findings are already projected and ordered by Core. They are additive
+        // evidence, not ordinary architecture violations, but belong to the same normalized
+        // finding collection exposed by the adapter.
+        if (ApplicabilityProjection is { Findings.Count: > 0 } applicability)
+        {
+            foreach (ArchitectureFinding finding in applicability.Findings)
+            {
+                yield return finding;
+            }
         }
 
         foreach (BaselineLifecycleEntry baseline in BaselineLifecycleEntries)
@@ -208,4 +226,5 @@ public sealed record ArchitectureValidationResultParams(
     public IReadOnlyCollection<ArchitectureWaiverLifecycleRecord>? Waivers { get; init; }
     public AnalysisProfile? Profile { get; init; }
     public ArchitectureAssessmentCompletionEvidence? AssessmentCompletionEvidence { get; init; }
+    public ArchitectureApplicabilityProjection? ApplicabilityProjection { get; init; }
 }

@@ -42,6 +42,7 @@ method ArchLinterNet.Testing.ArchitectureValidationResult.ShouldPass(): System.V
 method ArchLinterNet.Testing.ArchitectureValidationSnapshotSession.Dispose(): System.Void [virtual]
 method ArchLinterNet.Testing.ArchitectureValidationSnapshotSession.ValidateAudit(): ArchLinterNet.Testing.ArchitectureValidationResult
 method ArchLinterNet.Testing.ArchitectureValidationSnapshotSession.ValidateStrict(): ArchLinterNet.Testing.ArchitectureValidationResult
+property ArchLinterNet.Testing.ArchitectureValidationResult.ApplicabilityProjection: ArchLinterNet.Core.Model.ArchitectureApplicabilityProjection [get]
 property ArchLinterNet.Testing.ArchitectureValidationResult.AssessmentCompletionEvidence: ArchLinterNet.Core.Model.ArchitectureAssessmentCompletionEvidence [get]
 property ArchLinterNet.Testing.ArchitectureValidationResult.BaselineLifecycleEntries: System.Collections.Generic.IReadOnlyCollection`1[ArchLinterNet.Core.Model.BaselineLifecycleEntry] [get]
 property ArchLinterNet.Testing.ArchitectureValidationResult.CoverageConfig: System.String [get]
@@ -63,6 +64,7 @@ property ArchLinterNet.Testing.ArchitectureValidationResult.UnmatchedIgnoredViol
 property ArchLinterNet.Testing.ArchitectureValidationResult.UnmatchedIgnoredViolationsConfig: System.String [get]
 property ArchLinterNet.Testing.ArchitectureValidationResult.Violations: System.Collections.Generic.IReadOnlyCollection`1[ArchLinterNet.Core.Model.ArchitectureViolation] [get]
 property ArchLinterNet.Testing.ArchitectureValidationResult.Waivers: System.Collections.Generic.IReadOnlyCollection`1[ArchLinterNet.Core.Model.ArchitectureWaiverLifecycleRecord] [get]
+property ArchLinterNet.Testing.ArchitectureValidationResultParams.ApplicabilityProjection: ArchLinterNet.Core.Model.ArchitectureApplicabilityProjection [get, init]
 property ArchLinterNet.Testing.ArchitectureValidationResultParams.AssessmentCompletionEvidence: ArchLinterNet.Core.Model.ArchitectureAssessmentCompletionEvidence [get, init]
 property ArchLinterNet.Testing.ArchitectureValidationResultParams.BaselineLifecycleEntries: System.Collections.Generic.IReadOnlyCollection`1[ArchLinterNet.Core.Model.BaselineLifecycleEntry] [get, init]
 property ArchLinterNet.Testing.ArchitectureValidationResultParams.CoverageConfig: System.String [get, init]

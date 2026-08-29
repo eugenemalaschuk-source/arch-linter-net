@@ -188,11 +188,15 @@ class ArchLinterNet.Core.IO.ArchitectureFileSystem [sealed]
 class ArchLinterNet.Core.IO.RoslynCompilationFactory [sealed]
 class ArchLinterNet.Core.Model.ArchitectureAnalysisEvaluationException [sealed]
 class ArchLinterNet.Core.Model.ArchitectureApplicabilityAssessment [sealed]
+class ArchLinterNet.Core.Model.ArchitectureApplicabilityDiagnostic [sealed]
 class ArchLinterNet.Core.Model.ArchitectureApplicabilityExpectedEntry [sealed]
+class ArchLinterNet.Core.Model.ArchitectureApplicabilityProjection [sealed]
 class ArchLinterNet.Core.Model.ArchitectureApplicabilityProvenance [sealed]
 class ArchLinterNet.Core.Model.ArchitectureApplicabilityReason [sealed]
 class ArchLinterNet.Core.Model.ArchitectureApplicabilityReasonCodes [static]
 class ArchLinterNet.Core.Model.ArchitectureApplicabilityRecord [sealed]
+class ArchLinterNet.Core.Model.ArchitectureApplicabilitySummary [sealed]
+class ArchLinterNet.Core.Model.ArchitectureApplicabilityWireNames [static]
 class ArchLinterNet.Core.Model.ArchitectureAssessmentCompletionEvidence [sealed]
 class ArchLinterNet.Core.Model.ArchitectureBaselineComparisonEntry [sealed]
 class ArchLinterNet.Core.Model.ArchitectureBaselineComparisonResult [sealed]
@@ -334,6 +338,7 @@ class ArchLinterNet.Core.Profiling.AnalysisProfileJsonWriter [static]
 class ArchLinterNet.Core.Profiling.AnalysisProfileMeasurements [sealed]
 class ArchLinterNet.Core.Profiling.AnalysisProfileOutput [sealed]
 class ArchLinterNet.Core.Profiling.AnalysisProfilePhaseMeasurement [sealed]
+class ArchLinterNet.Core.Reporting.ArchitectureApplicabilityProjector [static]
 class ArchLinterNet.Core.Reporting.ArchitectureBaselineSarifFormatter [static]
 class ArchLinterNet.Core.Reporting.ArchitectureCoverageSummary [sealed]
 class ArchLinterNet.Core.Reporting.ArchitectureCoverageSummaryCounts [sealed]
@@ -490,6 +495,7 @@ const ArchLinterNet.Core.Model.ArchitectureClassificationSource.TypeAttribute: A
 const ArchLinterNet.Core.Model.ArchitectureContractExpansionKind.ContainerSet: ArchLinterNet.Core.Model.ArchitectureContractExpansionKind [value:2]
 const ArchLinterNet.Core.Model.ArchitectureContractExpansionKind.FanOut: ArchLinterNet.Core.Model.ArchitectureContractExpansionKind [value:0]
 const ArchLinterNet.Core.Model.ArchitectureContractExpansionKind.InlineUnion: ArchLinterNet.Core.Model.ArchitectureContractExpansionKind [value:1]
+const ArchLinterNet.Core.Model.ArchitectureDiagnosticKind.Applicability: ArchLinterNet.Core.Model.ArchitectureDiagnosticKind [value:24]
 const ArchLinterNet.Core.Model.ArchitectureDiagnosticKind.ArchitecturePolicyError: ArchLinterNet.Core.Model.ArchitectureDiagnosticKind [value:23]
 const ArchLinterNet.Core.Model.ArchitectureDiagnosticKind.AttributeUsage: ArchLinterNet.Core.Model.ArchitectureDiagnosticKind [value:9]
 const ArchLinterNet.Core.Model.ArchitectureDiagnosticKind.Baseline: ArchLinterNet.Core.Model.ArchitectureDiagnosticKind [value:22]
@@ -631,6 +637,7 @@ ctor ArchLinterNet.Core.Caching.AnalysisCacheLookupResult(ArchLinterNet.Core.Cac
 ctor ArchLinterNet.Core.Caching.AnalysisCacheLookupStats()
 ctor ArchLinterNet.Core.Caching.AnalysisCacheOptions(ArchLinterNet.Core.Caching.AnalysisCacheMode, System.String)
 ctor ArchLinterNet.Core.Caching.AnalysisCacheOutcomeV1(System.Boolean, System.Collections.Generic.IReadOnlyList`1[ArchLinterNet.Core.Model.ArchitectureViolation], System.Collections.Generic.IReadOnlyList`1[System.String], System.Collections.Generic.IReadOnlyList`1[ArchLinterNet.Core.Model.ArchitectureViolation], System.String, System.Collections.Generic.IReadOnlyList`1[ArchLinterNet.Core.Model.ArchitectureUnmatchedIgnoredViolation], System.String, System.Collections.Generic.IReadOnlyList`1[ArchLinterNet.Core.Model.PolicyConsistencyDiagnostic], System.String, System.Collections.Generic.IReadOnlyList`1[ArchLinterNet.Core.Model.ArchitectureClassificationConflict], System.Collections.Generic.IReadOnlyList`1[ArchLinterNet.Core.Model.ArchitectureClassificationMetadataFailure], System.Collections.Generic.IReadOnlyList`1[ArchLinterNet.Core.Model.ArchitectureClassificationRoleFact], ArchLinterNet.Core.Model.ArchitectureClassificationPathDeferredNotice, System.Collections.Generic.IReadOnlyList`1[ArchLinterNet.Core.Model.ArchitectureCycleFinding], System.Collections.Generic.IReadOnlyList`1[ArchLinterNet.Core.Reporting.ArchitectureCoverageSummary], System.Collections.Generic.IReadOnlyList`1[ArchLinterNet.Core.Model.ArchitectureSubtractiveMatcherParticipation])
+ctor ArchLinterNet.Core.Caching.AnalysisCacheOutcomeV1(System.Boolean, System.Collections.Generic.IReadOnlyList`1[ArchLinterNet.Core.Model.ArchitectureViolation], System.Collections.Generic.IReadOnlyList`1[System.String], System.Collections.Generic.IReadOnlyList`1[ArchLinterNet.Core.Model.ArchitectureViolation], System.String, System.Collections.Generic.IReadOnlyList`1[ArchLinterNet.Core.Model.ArchitectureUnmatchedIgnoredViolation], System.String, System.Collections.Generic.IReadOnlyList`1[ArchLinterNet.Core.Model.PolicyConsistencyDiagnostic], System.String, System.Collections.Generic.IReadOnlyList`1[ArchLinterNet.Core.Model.ArchitectureClassificationConflict], System.Collections.Generic.IReadOnlyList`1[ArchLinterNet.Core.Model.ArchitectureClassificationMetadataFailure], System.Collections.Generic.IReadOnlyList`1[ArchLinterNet.Core.Model.ArchitectureClassificationRoleFact], ArchLinterNet.Core.Model.ArchitectureClassificationPathDeferredNotice, System.Collections.Generic.IReadOnlyList`1[ArchLinterNet.Core.Model.ArchitectureCycleFinding], System.Collections.Generic.IReadOnlyList`1[ArchLinterNet.Core.Reporting.ArchitectureCoverageSummary], System.Collections.Generic.IReadOnlyList`1[ArchLinterNet.Core.Model.ArchitectureSubtractiveMatcherParticipation], System.Collections.Generic.IReadOnlyList`1[ArchLinterNet.Core.Model.ArchitectureApplicabilityExpectedEntry], System.Collections.Generic.IReadOnlyList`1[ArchLinterNet.Core.Model.ArchitectureApplicabilityRecord])
 ctor ArchLinterNet.Core.Caching.AnalysisCachePopulation+Outcome(System.Nullable`1[ArchLinterNet.Core.Caching.AnalysisCacheRejectReason], System.Int32, System.Int32, System.Int64, System.Boolean)
 ctor ArchLinterNet.Core.Caching.AnalysisCacheProjectManifest(System.String, System.String, ArchLinterNet.Core.BuildState.CacheEligibility)
 ctor ArchLinterNet.Core.Caching.AnalysisCacheStore+PutResult(System.Nullable`1[ArchLinterNet.Core.Caching.AnalysisCacheRejectReason], System.Int64)
@@ -777,8 +784,11 @@ ctor ArchLinterNet.Core.IO.ArchitectureFileSystem()
 ctor ArchLinterNet.Core.IO.RoslynCompilationFactory()
 ctor ArchLinterNet.Core.Model.ArchitectureAnalysisEvaluationException(System.String, System.Exception, System.Collections.Generic.IReadOnlyList`1[System.String], System.Collections.Generic.IReadOnlyList`1[System.String], System.Collections.Generic.IReadOnlyList`1[System.String])
 ctor ArchLinterNet.Core.Model.ArchitectureApplicabilityAssessment(ArchLinterNet.Core.Model.ArchitectureApplicabilityExpectedEntry, ArchLinterNet.Core.Model.ArchitectureApplicabilityRecord, System.Collections.Generic.IReadOnlyList`1[ArchLinterNet.Core.Model.ArchitectureApplicabilityReason])
+ctor ArchLinterNet.Core.Model.ArchitectureApplicabilityDiagnostic(System.String, System.String, System.Nullable`1[ArchLinterNet.Core.Model.ArchitectureApplicabilityMembership], System.Nullable`1[ArchLinterNet.Core.Model.ArchitectureApplicabilityRecordState], System.Nullable`1[ArchLinterNet.Core.Model.ArchitectureApplicabilityRecordState], ArchLinterNet.Core.Model.ArchitectureApplicabilityReason)
+ctor ArchLinterNet.Core.Model.ArchitectureApplicabilityDiagnostic(System.String, System.String, System.String, System.String, System.Nullable`1[ArchLinterNet.Core.Model.ArchitectureApplicabilityMembership], System.Nullable`1[ArchLinterNet.Core.Model.ArchitectureApplicabilityRecordState], System.Nullable`1[ArchLinterNet.Core.Model.ArchitectureApplicabilityRecordState], ArchLinterNet.Core.Model.ArchitectureApplicabilityReason, ArchLinterNet.Core.Model.ArchitectureApplicabilityProvenance)
 ctor ArchLinterNet.Core.Model.ArchitectureApplicabilityExpectedEntry(System.String, System.String, ArchLinterNet.Core.Model.ArchitectureApplicabilityMembership)
 ctor ArchLinterNet.Core.Model.ArchitectureApplicabilityExpectedEntry(System.String, System.String, ArchLinterNet.Core.Model.ArchitectureApplicabilityMembership, ArchLinterNet.Core.Model.ArchitectureApplicabilityProvenance)
+ctor ArchLinterNet.Core.Model.ArchitectureApplicabilityProjection(ArchLinterNet.Core.Model.ArchitectureAssessmentCompletionEvidence, ArchLinterNet.Core.Model.ArchitectureApplicabilitySummary, System.Collections.Generic.IReadOnlyList`1[ArchLinterNet.Core.Model.ArchitectureFinding])
 ctor ArchLinterNet.Core.Model.ArchitectureApplicabilityProvenance(System.String, System.String, System.String)
 ctor ArchLinterNet.Core.Model.ArchitectureApplicabilityReason(System.String, ArchLinterNet.Core.Model.ArchitectureApplicabilityProvenance)
 ctor ArchLinterNet.Core.Model.ArchitectureApplicabilityReason(System.String, System.String, System.String, System.String)
@@ -786,6 +796,7 @@ ctor ArchLinterNet.Core.Model.ArchitectureApplicabilityRecord(System.String, Sys
 ctor ArchLinterNet.Core.Model.ArchitectureApplicabilityRecord(System.String, System.String, ArchLinterNet.Core.Model.ArchitectureApplicabilityRecordState, ArchLinterNet.Core.Model.ArchitectureApplicabilityProvenance)
 ctor ArchLinterNet.Core.Model.ArchitectureApplicabilityRecord(System.String, System.String, ArchLinterNet.Core.Model.ArchitectureApplicabilityRecordState, System.Collections.Generic.IReadOnlyList`1[ArchLinterNet.Core.Model.ArchitectureApplicabilityReason])
 ctor ArchLinterNet.Core.Model.ArchitectureApplicabilityRecord(System.String, System.String, ArchLinterNet.Core.Model.ArchitectureApplicabilityRecordState, System.Collections.Generic.IReadOnlyList`1[ArchLinterNet.Core.Model.ArchitectureApplicabilityReason], ArchLinterNet.Core.Model.ArchitectureApplicabilityProvenance)
+ctor ArchLinterNet.Core.Model.ArchitectureApplicabilitySummary(System.Int32, System.Int32, System.Int32, System.Int32, System.Int32, System.Int32, System.Int32)
 ctor ArchLinterNet.Core.Model.ArchitectureAssessmentCompletionEvidence(ArchLinterNet.Core.Model.ArchitectureAssessmentCompletionState, System.Collections.Generic.IReadOnlyList`1[ArchLinterNet.Core.Model.ArchitectureApplicabilityAssessment], System.Collections.Generic.IReadOnlyList`1[ArchLinterNet.Core.Model.ArchitectureApplicabilityReason])
 ctor ArchLinterNet.Core.Model.ArchitectureBaselineComparisonEntry(System.String, System.String, System.String, System.String, System.String, ArchLinterNet.Core.Model.ArchitectureViolationIdentity)
 ctor ArchLinterNet.Core.Model.ArchitectureBaselineComparisonResult(System.Collections.Generic.IReadOnlyList`1[ArchLinterNet.Core.Model.ArchitectureBaselineComparisonEntry], System.Collections.Generic.IReadOnlyList`1[ArchLinterNet.Core.Model.ArchitectureBaselineComparisonEntry], System.Collections.Generic.IReadOnlyList`1[ArchLinterNet.Core.Model.ArchitectureBaselineComparisonEntry], System.Collections.Generic.IReadOnlyList`1[ArchLinterNet.Core.Model.ArchitectureBaselineComparisonEntry], System.Collections.Generic.IReadOnlyList`1[ArchLinterNet.Core.Model.ArchitectureBaselineComparisonEntry])
@@ -1089,6 +1100,7 @@ method ArchLinterNet.Core.Caching.AnalysisCacheLookupStats.RecordLookup(ArchLint
 method ArchLinterNet.Core.Caching.AnalysisCacheLookupStats.Snapshot(): ArchLinterNet.Core.Caching.AnalysisCacheLookupStats
 method ArchLinterNet.Core.Caching.AnalysisCacheOptions.AtPath(System.String): ArchLinterNet.Core.Caching.AnalysisCacheOptions [static]
 method ArchLinterNet.Core.Caching.AnalysisCacheOutcomeMapper.FromCacheOutcome(ArchLinterNet.Core.Caching.AnalysisCacheOutcomeV1, System.String, System.Collections.Generic.IReadOnlyList`1[System.String], System.Collections.Generic.IReadOnlyList`1[System.String], System.Collections.Generic.IReadOnlyList`1[System.String], ArchLinterNet.Core.Model.ArchitectureSourceExpansionInventory): ArchLinterNet.Core.Validation.ValidationOutcome [static]
+method ArchLinterNet.Core.Caching.AnalysisCacheOutcomeMapper.FromCacheOutcome(ArchLinterNet.Core.Caching.AnalysisCacheOutcomeV1, System.String, System.Collections.Generic.IReadOnlyList`1[System.String], System.Collections.Generic.IReadOnlyList`1[System.String], System.Collections.Generic.IReadOnlyList`1[System.String], ArchLinterNet.Core.Model.ArchitectureSourceExpansionInventory, System.String): ArchLinterNet.Core.Validation.ValidationOutcome [static]
 method ArchLinterNet.Core.Caching.AnalysisCacheOutcomeMapper.ToCacheOutcome(ArchLinterNet.Core.Validation.ValidationOutcome): ArchLinterNet.Core.Caching.AnalysisCacheOutcomeV1 [static]
 method ArchLinterNet.Core.Caching.AnalysisCachePopulation.TryLookup(ArchLinterNet.Core.Caching.AnalysisCacheLocation, ArchLinterNet.Core.Caching.AnalysisCacheKey, System.Collections.Generic.IReadOnlyList`1[System.String], System.String, System.String, System.String, System.String, System.String, System.Threading.CancellationToken): ArchLinterNet.Core.Caching.AnalysisCacheLookupResult [static]
 method ArchLinterNet.Core.Caching.AnalysisCachePopulation.TryPopulate(ArchLinterNet.Core.Caching.AnalysisCacheLocation, ArchLinterNet.Core.Caching.AnalysisCacheKey, System.Collections.Generic.IReadOnlyList`1[System.String], System.String, System.String, System.String, System.String, System.String, ArchLinterNet.Core.Caching.AnalysisCacheOutcomeV1, System.Threading.CancellationToken): ArchLinterNet.Core.Caching.AnalysisCachePopulation+Outcome [static]
@@ -1376,6 +1388,8 @@ method ArchLinterNet.Core.IO.ArchitectureFileSystem.GetLastWriteTimeUtc(System.S
 method ArchLinterNet.Core.IO.ArchitectureFileSystem.ReadAllText(System.String): System.String [virtual]
 method ArchLinterNet.Core.IO.ArchitectureFileSystem.ReadLines(System.String): System.Collections.Generic.IEnumerable`1[System.String] [virtual]
 method ArchLinterNet.Core.IO.RoslynCompilationFactory.Create(System.String, System.Collections.Generic.IReadOnlyList`1[System.String], System.Collections.Generic.IReadOnlyList`1[System.String], ArchLinterNet.Core.IO.Abstractions.IArchitectureFileSystem, ArchLinterNet.Core.IO.Abstractions.IArchitectureAssemblyLoader, System.Collections.Generic.IReadOnlyList`1[System.String]): Microsoft.CodeAnalysis.CSharp.CSharpCompilation [virtual]
+method ArchLinterNet.Core.Model.ArchitectureApplicabilityWireNames.MembershipToken(ArchLinterNet.Core.Model.ArchitectureApplicabilityMembership): System.String [static]
+method ArchLinterNet.Core.Model.ArchitectureApplicabilityWireNames.StateToken(ArchLinterNet.Core.Model.ArchitectureApplicabilityRecordState): System.String [static]
 method ArchLinterNet.Core.Model.ArchitectureFindingJsonReader.Read(System.String, System.Boolean): ArchLinterNet.Core.Model.ArchitectureFindingReadEnvelope [static]
 method ArchLinterNet.Core.Model.ArchitectureFindingReadEnvelope.ToJson(): System.String
 method ArchLinterNet.Core.Model.ArchitectureModuleNamespaceMembershipResolver.TryResolve(System.String, System.String, ArchLinterNet.Core.Model.ArchitectureModuleNamespaceMembership&): System.Boolean [static, param2:out]
@@ -1443,8 +1457,12 @@ method ArchLinterNet.Core.Reporting.Abstractions.IArchitectureDiagnosticFormatte
 method ArchLinterNet.Core.Reporting.Abstractions.IArchitectureDiagnosticFormatter.FormatViolationsForHumans(System.Collections.Generic.IReadOnlyCollection`1[ArchLinterNet.Core.Model.ArchitectureViolation], System.Threading.CancellationToken): System.String [virtual]
 method ArchLinterNet.Core.Reporting.Abstractions.IArchitectureSarifFormatter.FormatResultAsSarif(System.String, System.Collections.Generic.IReadOnlyCollection`1[ArchLinterNet.Core.Model.ArchitectureViolation], System.Collections.Generic.IReadOnlyCollection`1[System.String], System.Collections.Generic.IReadOnlyCollection`1[ArchLinterNet.Core.Model.BuildStatePreflightDiagnostic], System.String): System.String [abstract]
 method ArchLinterNet.Core.Reporting.Abstractions.IArchitectureSarifFormatter.FormatResultAsSarif(System.String, System.Collections.Generic.IReadOnlyCollection`1[ArchLinterNet.Core.Model.ArchitectureViolation], System.Collections.Generic.IReadOnlyCollection`1[System.String], System.String): System.String [abstract]
+method ArchLinterNet.Core.Reporting.ArchitectureApplicabilityProjector.Project(ArchLinterNet.Core.Model.ArchitectureAssessmentCompletionEvidence, System.String): ArchLinterNet.Core.Model.ArchitectureApplicabilityProjection [static]
+method ArchLinterNet.Core.Reporting.ArchitectureApplicabilityProjector.Summarize(ArchLinterNet.Core.Model.ArchitectureAssessmentCompletionEvidence): ArchLinterNet.Core.Model.ArchitectureApplicabilitySummary [static]
+method ArchLinterNet.Core.Reporting.ArchitectureApplicabilityProjector.ToFindings(ArchLinterNet.Core.Model.ArchitectureAssessmentCompletionEvidence, System.String): System.Collections.Generic.IReadOnlyList`1[ArchLinterNet.Core.Model.ArchitectureFinding] [static]
 method ArchLinterNet.Core.Reporting.ArchitectureBaselineSarifFormatter.Format(System.Collections.Generic.IReadOnlyList`1[ArchLinterNet.Core.Model.BaselineLifecycleEntry], System.String): System.String [static]
 method ArchLinterNet.Core.Reporting.ArchitectureDiagnosticFormatter.AddWaiversToCiArtifacts(System.String, System.Collections.Generic.IReadOnlyCollection`1[ArchLinterNet.Core.Model.ArchitectureWaiverLifecycleRecord]): System.String [static]
+method ArchLinterNet.Core.Reporting.ArchitectureDiagnosticFormatter.FormatApplicabilityProjectionForHumans(ArchLinterNet.Core.Model.ArchitectureApplicabilityProjection): System.String [static]
 method ArchLinterNet.Core.Reporting.ArchitectureDiagnosticFormatter.FormatAssessmentCompletionForHumans(ArchLinterNet.Core.Model.ArchitectureAssessmentCompletionEvidence): System.String [static]
 method ArchLinterNet.Core.Reporting.ArchitectureDiagnosticFormatter.FormatBuildStatePreflightForHumans(System.Collections.Generic.IReadOnlyCollection`1[ArchLinterNet.Core.Model.BuildStatePreflightDiagnostic]): System.String [virtual]
 method ArchLinterNet.Core.Reporting.ArchitectureDiagnosticFormatter.FormatClassificationFactsForHumans(System.Collections.Generic.IReadOnlyCollection`1[ArchLinterNet.Core.Model.ArchitectureClassificationConflict], System.Collections.Generic.IReadOnlyCollection`1[ArchLinterNet.Core.Model.ArchitectureClassificationMetadataFailure]): System.String [virtual]
@@ -1479,6 +1497,7 @@ method ArchLinterNet.Core.Reporting.ArchitectureDiagnosticMapper.FromCycle(ArchL
 method ArchLinterNet.Core.Reporting.ArchitectureDiagnosticMapper.FromCycle(System.String, System.String, System.String): ArchLinterNet.Core.Model.CycleDiagnostic [static]
 method ArchLinterNet.Core.Reporting.ArchitectureDiagnosticMapper.FromUnmatchedIgnore(ArchLinterNet.Core.Model.ArchitectureUnmatchedIgnoredViolation): ArchLinterNet.Core.Model.UnmatchedIgnoreDiagnostic [static]
 method ArchLinterNet.Core.Reporting.ArchitectureDiagnosticMapper.FromViolation(ArchLinterNet.Core.Model.ArchitectureViolation): ArchLinterNet.Core.Model.ArchitectureDiagnostic [static]
+method ArchLinterNet.Core.Reporting.ArchitectureFindingMapper.FromApplicabilityDiagnostic(ArchLinterNet.Core.Model.ArchitectureApplicabilityDiagnostic, System.String): ArchLinterNet.Core.Model.ArchitectureFinding [static]
 method ArchLinterNet.Core.Reporting.ArchitectureFindingMapper.FromBaseline(ArchLinterNet.Core.Model.BaselineLifecycleEntry): ArchLinterNet.Core.Model.ArchitectureFinding [static]
 method ArchLinterNet.Core.Reporting.ArchitectureFindingMapper.FromDiagnostic(ArchLinterNet.Core.Model.ArchitectureDiagnostic): ArchLinterNet.Core.Model.ArchitectureFinding [static]
 method ArchLinterNet.Core.Reporting.ArchitectureFindingMapper.FromDiagnostic(ArchLinterNet.Core.Model.ArchitectureDiagnostic, System.String): ArchLinterNet.Core.Model.ArchitectureFinding [static]
@@ -1651,6 +1670,8 @@ property ArchLinterNet.Core.Caching.AnalysisCacheOptions.Disabled: ArchLinterNet
 property ArchLinterNet.Core.Caching.AnalysisCacheOptions.ExplicitPath: System.String [get, init]
 property ArchLinterNet.Core.Caching.AnalysisCacheOptions.Mode: ArchLinterNet.Core.Caching.AnalysisCacheMode [get, init]
 property ArchLinterNet.Core.Caching.AnalysisCacheOptions.ModeCategory: System.String [get]
+property ArchLinterNet.Core.Caching.AnalysisCacheOutcomeV1.ApplicabilityExpectedEntries: System.Collections.Generic.IReadOnlyList`1[ArchLinterNet.Core.Model.ArchitectureApplicabilityExpectedEntry] [get, init]
+property ArchLinterNet.Core.Caching.AnalysisCacheOutcomeV1.ApplicabilityRecords: System.Collections.Generic.IReadOnlyList`1[ArchLinterNet.Core.Model.ArchitectureApplicabilityRecord] [get, init]
 property ArchLinterNet.Core.Caching.AnalysisCacheOutcomeV1.ClassificationConflicts: System.Collections.Generic.IReadOnlyList`1[ArchLinterNet.Core.Model.ArchitectureClassificationConflict] [get, init]
 property ArchLinterNet.Core.Caching.AnalysisCacheOutcomeV1.ClassificationMetadataFailures: System.Collections.Generic.IReadOnlyList`1[ArchLinterNet.Core.Model.ArchitectureClassificationMetadataFailure] [get, init]
 property ArchLinterNet.Core.Caching.AnalysisCacheOutcomeV1.ClassificationPathDeferred: ArchLinterNet.Core.Model.ArchitectureClassificationPathDeferredNotice [get, init]
@@ -2485,11 +2506,28 @@ property ArchLinterNet.Core.Model.ArchitectureApplicabilityAssessment.IsIntegrit
 property ArchLinterNet.Core.Model.ArchitectureApplicabilityAssessment.Membership: System.Nullable`1[ArchLinterNet.Core.Model.ArchitectureApplicabilityMembership] [get]
 property ArchLinterNet.Core.Model.ArchitectureApplicabilityAssessment.Record: ArchLinterNet.Core.Model.ArchitectureApplicabilityRecord [get]
 property ArchLinterNet.Core.Model.ArchitectureApplicabilityAssessment.State: System.Nullable`1[ArchLinterNet.Core.Model.ArchitectureApplicabilityRecordState] [get]
+property ArchLinterNet.Core.Model.ArchitectureApplicabilityDiagnostic.ControlIdentity: System.String [get]
+property ArchLinterNet.Core.Model.ArchitectureApplicabilityDiagnostic.EffectiveControlId: System.String [get]
+property ArchLinterNet.Core.Model.ArchitectureApplicabilityDiagnostic.Family: System.String [get]
+property ArchLinterNet.Core.Model.ArchitectureApplicabilityDiagnostic.Kind: ArchLinterNet.Core.Model.ArchitectureDiagnosticKind [override, get]
+property ArchLinterNet.Core.Model.ArchitectureApplicabilityDiagnostic.Membership: System.Nullable`1[ArchLinterNet.Core.Model.ArchitectureApplicabilityMembership] [get]
+property ArchLinterNet.Core.Model.ArchitectureApplicabilityDiagnostic.PolicyIdentity: System.String [get]
+property ArchLinterNet.Core.Model.ArchitectureApplicabilityDiagnostic.Provenance: ArchLinterNet.Core.Model.ArchitectureApplicabilityProvenance [get]
+property ArchLinterNet.Core.Model.ArchitectureApplicabilityDiagnostic.Reason: ArchLinterNet.Core.Model.ArchitectureApplicabilityReason [get]
+property ArchLinterNet.Core.Model.ArchitectureApplicabilityDiagnostic.ReasonCode: System.String [get]
+property ArchLinterNet.Core.Model.ArchitectureApplicabilityDiagnostic.State: System.Nullable`1[ArchLinterNet.Core.Model.ArchitectureApplicabilityRecordState] [get]
+property ArchLinterNet.Core.Model.ArchitectureApplicabilityDiagnostic.ValidatedState: System.Nullable`1[ArchLinterNet.Core.Model.ArchitectureApplicabilityRecordState] [get]
 property ArchLinterNet.Core.Model.ArchitectureApplicabilityExpectedEntry.ControlIdentity: System.String [get]
 property ArchLinterNet.Core.Model.ArchitectureApplicabilityExpectedEntry.EffectiveControlId: System.String [get]
 property ArchLinterNet.Core.Model.ArchitectureApplicabilityExpectedEntry.Family: System.String [get]
 property ArchLinterNet.Core.Model.ArchitectureApplicabilityExpectedEntry.Membership: ArchLinterNet.Core.Model.ArchitectureApplicabilityMembership [get]
 property ArchLinterNet.Core.Model.ArchitectureApplicabilityExpectedEntry.Provenance: ArchLinterNet.Core.Model.ArchitectureApplicabilityProvenance [get]
+property ArchLinterNet.Core.Model.ArchitectureApplicabilityProjection.Completion: ArchLinterNet.Core.Model.ArchitectureAssessmentCompletionEvidence [get]
+property ArchLinterNet.Core.Model.ArchitectureApplicabilityProjection.CompletionEvidence: ArchLinterNet.Core.Model.ArchitectureAssessmentCompletionEvidence [get]
+property ArchLinterNet.Core.Model.ArchitectureApplicabilityProjection.Controls: System.Collections.Generic.IReadOnlyList`1[ArchLinterNet.Core.Model.ArchitectureApplicabilityAssessment] [get]
+property ArchLinterNet.Core.Model.ArchitectureApplicabilityProjection.Findings: System.Collections.Generic.IReadOnlyList`1[ArchLinterNet.Core.Model.ArchitectureFinding] [get]
+property ArchLinterNet.Core.Model.ArchitectureApplicabilityProjection.Reasons: System.Collections.Generic.IReadOnlyList`1[ArchLinterNet.Core.Model.ArchitectureApplicabilityReason] [get]
+property ArchLinterNet.Core.Model.ArchitectureApplicabilityProjection.Summary: ArchLinterNet.Core.Model.ArchitectureApplicabilitySummary [get]
 property ArchLinterNet.Core.Model.ArchitectureApplicabilityProvenance.ControlIdentity: System.String [get]
 property ArchLinterNet.Core.Model.ArchitectureApplicabilityProvenance.EffectiveControlId: System.String [get]
 property ArchLinterNet.Core.Model.ArchitectureApplicabilityProvenance.Family: System.String [get]
@@ -2503,6 +2541,18 @@ property ArchLinterNet.Core.Model.ArchitectureApplicabilityRecord.Family: System
 property ArchLinterNet.Core.Model.ArchitectureApplicabilityRecord.Provenance: ArchLinterNet.Core.Model.ArchitectureApplicabilityProvenance [get]
 property ArchLinterNet.Core.Model.ArchitectureApplicabilityRecord.Reasons: System.Collections.Generic.IReadOnlyList`1[ArchLinterNet.Core.Model.ArchitectureApplicabilityReason] [get]
 property ArchLinterNet.Core.Model.ArchitectureApplicabilityRecord.State: ArchLinterNet.Core.Model.ArchitectureApplicabilityRecordState [get]
+property ArchLinterNet.Core.Model.ArchitectureApplicabilitySummary.EvaluableControlCount: System.Int32 [get]
+property ArchLinterNet.Core.Model.ArchitectureApplicabilitySummary.EvaluableCount: System.Int32 [get]
+property ArchLinterNet.Core.Model.ArchitectureApplicabilitySummary.NotApplicableControlCount: System.Int32 [get]
+property ArchLinterNet.Core.Model.ArchitectureApplicabilitySummary.NotApplicableCount: System.Int32 [get]
+property ArchLinterNet.Core.Model.ArchitectureApplicabilitySummary.OptionalControlCount: System.Int32 [get]
+property ArchLinterNet.Core.Model.ArchitectureApplicabilitySummary.OptionalCount: System.Int32 [get]
+property ArchLinterNet.Core.Model.ArchitectureApplicabilitySummary.RequiredControlCount: System.Int32 [get]
+property ArchLinterNet.Core.Model.ArchitectureApplicabilitySummary.RequiredCount: System.Int32 [get]
+property ArchLinterNet.Core.Model.ArchitectureApplicabilitySummary.RequiredEvaluableCount: System.Int32 [get]
+property ArchLinterNet.Core.Model.ArchitectureApplicabilitySummary.RequiredUnassessableCount: System.Int32 [get]
+property ArchLinterNet.Core.Model.ArchitectureApplicabilitySummary.UnassessableControlCount: System.Int32 [get]
+property ArchLinterNet.Core.Model.ArchitectureApplicabilitySummary.UnassessableCount: System.Int32 [get]
 property ArchLinterNet.Core.Model.ArchitectureAssessmentCompletionEvidence.Completion: ArchLinterNet.Core.Model.ArchitectureAssessmentCompletionState [get]
 property ArchLinterNet.Core.Model.ArchitectureAssessmentCompletionEvidence.Controls: System.Collections.Generic.IReadOnlyList`1[ArchLinterNet.Core.Model.ArchitectureApplicabilityAssessment] [get]
 property ArchLinterNet.Core.Model.ArchitectureAssessmentCompletionEvidence.IsUnassessable: System.Boolean [get]
@@ -3638,6 +3688,8 @@ property ArchLinterNet.Core.Validation.PublicApiUpdateRequest.PolicyPath: System
 property ArchLinterNet.Core.Validation.PublicApiUpdateRequest.PreparationMode: ArchLinterNet.Core.BuildState.BuildPreparationMode [get, init]
 property ArchLinterNet.Core.Validation.PublicApiUpdateRequest.SnapshotPath: System.String [get, init]
 property ArchLinterNet.Core.Validation.ValidationOutcome.ApplicabilityExpectedEntries: System.Collections.Generic.IReadOnlyList`1[ArchLinterNet.Core.Model.ArchitectureApplicabilityExpectedEntry] [get, init]
+property ArchLinterNet.Core.Validation.ValidationOutcome.ApplicabilityFindings: System.Collections.Generic.IReadOnlyList`1[ArchLinterNet.Core.Model.ArchitectureFinding] [get]
+property ArchLinterNet.Core.Validation.ValidationOutcome.ApplicabilityProjection: ArchLinterNet.Core.Model.ArchitectureApplicabilityProjection [get, init]
 property ArchLinterNet.Core.Validation.ValidationOutcome.ApplicabilityRecords: System.Collections.Generic.IReadOnlyList`1[ArchLinterNet.Core.Model.ArchitectureApplicabilityRecord] [get, init]
 property ArchLinterNet.Core.Validation.ValidationOutcome.AssessmentCompletionEvidence: ArchLinterNet.Core.Model.ArchitectureAssessmentCompletionEvidence [get, init]
 property ArchLinterNet.Core.Validation.ValidationOutcome.ClassificationConflicts: System.Collections.Generic.IReadOnlyCollection`1[ArchLinterNet.Core.Model.ArchitectureClassificationConflict] [get, init]

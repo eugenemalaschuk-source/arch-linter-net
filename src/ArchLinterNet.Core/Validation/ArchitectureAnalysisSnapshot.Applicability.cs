@@ -1,5 +1,6 @@
 using ArchLinterNet.Core.Execution.Results;
 using ArchLinterNet.Core.Model;
+using ArchLinterNet.Core.Reporting;
 
 namespace ArchLinterNet.Core.Validation;
 
@@ -27,4 +28,9 @@ public sealed partial class ArchitectureAnalysisSnapshot
             && assessmentCompletion?.State is not (ArchitectureAssessmentCompletionState.Fail
                 or ArchitectureAssessmentCompletionState.Unassessable);
     }
+
+    private static ArchitectureApplicabilityProjection? ProjectApplicability(
+        ArchitectureAssessmentCompletionEvidence? assessmentCompletion,
+        string mode) =>
+        ArchitectureApplicabilityProjector.Project(assessmentCompletion, mode);
 }

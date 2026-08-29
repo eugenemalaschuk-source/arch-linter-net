@@ -1,3 +1,4 @@
+using System.Text.Json;
 using System.Text.Json.Nodes;
 using ArchLinterNet.Core.Model;
 using ArchLinterNet.Core.Reporting;
@@ -25,8 +26,13 @@ internal sealed partial class ReportCoordinator
 
     private static string AddAssessmentCompletionToJson(
         string json,
-        ArchitectureAssessmentCompletionEvidence? completion)
+        ArchitectureAssessmentCompletionEvidence? completion,
+        ArchitectureApplicabilityProjection? projection = null)
     {
+        // Once the Core projection is present it is the sole applicability output authority. The
+        // completion parameter is retained only for byte-compatible rendering of legacy,
+        // hand-built outcomes that carry completion evidence without a projection.
+        completion = projection?.Completion ?? completion;
         if (completion is null)
         {
             return json;
@@ -39,12 +45,17 @@ internal sealed partial class ReportCoordinator
             throw new InvalidOperationException("The validation JSON report was not an object.");
         }
 
-        payload["assessment_completion"] = BuildAssessmentCompletionJson(completion);
+        payload["assessment_completion"] = BuildAssessmentCompletionJson(completion, projection);
+        if (projection is not null)
+        {
+            payload["applicability_findings"] = BuildApplicabilityFindingsJson(projection);
+        }
         return payload.ToJsonString();
     }
 
     private static JsonObject BuildAssessmentCompletionJson(
-        ArchitectureAssessmentCompletionEvidence completion)
+        ArchitectureAssessmentCompletionEvidence completion,
+        ArchitectureApplicabilityProjection? projection = null)
     {
         JsonArray reasons = new();
         foreach (ArchitectureApplicabilityReason reason in completion.Reasons)
@@ -62,17 +73,151 @@ internal sealed partial class ReportCoordinator
             });
         }
 
-        return new JsonObject
+        var result = new JsonObject
         {
             ["state"] = CompletionStateToken(completion.State),
             ["reasons"] = reasons,
         };
+
+        if (projection is not null)
+        {
+            result["summary"] = BuildApplicabilitySummaryJson(projection.Summary);
+            result["controls"] = BuildApplicabilityControlsJson(projection.Controls);
+        }
+
+        return result;
+    }
+
+    private static JsonObject BuildApplicabilitySummaryJson(ArchitectureApplicabilitySummary summary)
+    {
+        return new JsonObject
+        {
+            ["interpretation"] = "completeness transparency; not an architecture quality score",
+            ["required_count"] = summary.RequiredCount,
+            ["required_evaluable_count"] = summary.RequiredEvaluableCount,
+            ["required_unassessable_count"] = summary.RequiredUnassessableCount,
+            ["evaluable_count"] = summary.EvaluableCount,
+            ["unassessable_count"] = summary.UnassessableCount,
+            ["optional_count"] = summary.OptionalCount,
+            ["not_applicable_count"] = summary.NotApplicableCount,
+        };
+    }
+
+    private static JsonArray BuildApplicabilityControlsJson(
+        IReadOnlyList<ArchitectureApplicabilityAssessment> controls)
+    {
+        JsonArray result = new();
+        foreach (ArchitectureApplicabilityAssessment control in controls)
+        {
+            string? family = control.Expected?.Family ?? control.Record?.Family;
+            var value = new JsonObject
+            {
+                ["control_identity"] = control.ControlIdentity,
+                ["family"] = family,
+                ["membership"] = control.Membership is { } membership
+                    ? ArchitectureApplicabilityWireNames.MembershipToken(membership)
+                    : null,
+                ["state"] = control.State is { } state
+                    ? ArchitectureApplicabilityWireNames.StateToken(state)
+                    : null,
+                ["validated_state"] = control.State is { } validatedState
+                    ? ArchitectureApplicabilityWireNames.StateToken(validatedState)
+                    : null,
+                ["record_state"] = control.Record?.State is { } recordState
+                    ? ArchitectureApplicabilityWireNames.StateToken(recordState)
+                    : null,
+                ["is_integrity_valid"] = control.IsIntegrityValid,
+                ["integrity_reasons"] = BuildApplicabilityReasonsJson(control.IntegrityReasons),
+                ["expected"] = BuildApplicabilityExpectedEntryJson(control.Expected),
+                ["record"] = BuildApplicabilityRecordJson(control.Record),
+            };
+            result.Add(value);
+        }
+
+        return result;
+    }
+
+    private static JsonObject? BuildApplicabilityExpectedEntryJson(
+        ArchitectureApplicabilityExpectedEntry? expected)
+    {
+        if (expected is null)
+        {
+            return null;
+        }
+
+        return new JsonObject
+        {
+            ["control_identity"] = expected.ControlIdentity,
+            ["family"] = expected.Family,
+            ["membership"] = ArchitectureApplicabilityWireNames.MembershipToken(expected.Membership),
+            ["provenance"] = BuildApplicabilityProvenanceJson(expected.Provenance),
+        };
+    }
+
+    private static JsonObject? BuildApplicabilityRecordJson(
+        ArchitectureApplicabilityRecord? record)
+    {
+        if (record is null)
+        {
+            return null;
+        }
+
+        return new JsonObject
+        {
+            ["control_identity"] = record.ControlIdentity,
+            ["family"] = record.Family,
+            ["state"] = ArchitectureApplicabilityWireNames.StateToken(record.State),
+            ["reasons"] = BuildApplicabilityReasonsJson(record.Reasons),
+            ["provenance"] = BuildApplicabilityProvenanceJson(record.Provenance),
+        };
+    }
+
+    private static JsonArray BuildApplicabilityReasonsJson(
+        IReadOnlyList<ArchitectureApplicabilityReason> reasons)
+    {
+        JsonArray result = new();
+        foreach (ArchitectureApplicabilityReason reason in reasons)
+        {
+            result.Add(new JsonObject
+            {
+                ["code"] = reason.Code,
+                ["provenance"] = BuildApplicabilityProvenanceJson(reason.Provenance),
+            });
+        }
+
+        return result;
+    }
+
+    private static JsonObject BuildApplicabilityProvenanceJson(
+        ArchitectureApplicabilityProvenance provenance)
+    {
+        return new JsonObject
+        {
+            ["family"] = provenance.Family,
+            ["control_identity"] = provenance.ControlIdentity,
+            ["policy_identity"] = provenance.PolicyIdentity,
+        };
+    }
+
+    private static JsonArray BuildApplicabilityFindingsJson(
+        ArchitectureApplicabilityProjection projection)
+    {
+        JsonArray result = new();
+        foreach (ArchitectureFinding finding in projection.Findings)
+        {
+            result.Add(JsonSerializer.SerializeToNode(
+                ArchitectureDiagnosticFormatter.FormatNormalizedFindingForJson(finding)));
+        }
+
+        return result;
     }
 
     private static string AddAssessmentCompletionToSarif(
         string json,
-        ArchitectureAssessmentCompletionEvidence? completion)
+        ArchitectureAssessmentCompletionEvidence? completion,
+        ArchitectureApplicabilityProjection? projection = null)
     {
+        completion = projection?.Completion ?? completion;
         if (completion is null)
         {
             return json;
@@ -93,9 +238,36 @@ internal sealed partial class ReportCoordinator
 
         if (runs.Count == 0)
         {
-            JsonObject properties = payload[PropertiesPropertyName] as JsonObject ?? new JsonObject();
-            payload[PropertiesPropertyName] = properties;
-            properties["arch_linter_net.assessment_completion"] = BuildAssessmentCompletionJson(completion);
+            if (projection is null)
+            {
+                JsonObject properties = payload[PropertiesPropertyName] as JsonObject ?? new JsonObject();
+                payload[PropertiesPropertyName] = properties;
+                properties["arch_linter_net.assessment_completion"] = BuildAssessmentCompletionJson(completion);
+            }
+            else
+            {
+                // A valid SARIF document normally has at least one run. Keep malformed/minimal
+                // formatter fakes and future hosts useful by materializing the smallest valid run
+                // when the projected findings need a result container.
+                var run = new JsonObject
+                {
+                    ["tool"] = new JsonObject
+                    {
+                        ["driver"] = new JsonObject
+                        {
+                            ["name"] = "arch-linter-net",
+                            ["rules"] = new JsonArray(),
+                        },
+                    },
+                    ["results"] = new JsonArray(),
+                    [PropertiesPropertyName] = new JsonObject
+                    {
+                        ["arch_linter_net.assessment_completion"] = BuildAssessmentCompletionJson(completion, projection),
+                    },
+                };
+                runs.Add(run);
+                AddApplicabilityFindingsToSarifRun(run, projection);
+            }
         }
         else
         {
@@ -108,11 +280,104 @@ internal sealed partial class ReportCoordinator
 
                 JsonObject properties = runObject[PropertiesPropertyName] as JsonObject ?? new JsonObject();
                 runObject[PropertiesPropertyName] = properties;
-                properties["arch_linter_net.assessment_completion"] = BuildAssessmentCompletionJson(completion);
+                properties["arch_linter_net.assessment_completion"] = BuildAssessmentCompletionJson(completion, projection);
+                if (projection is not null)
+                {
+                    AddApplicabilityFindingsToSarifRun(runObject, projection);
+                }
             }
         }
 
         return payload.ToJsonString();
+    }
+
+    private static void AddApplicabilityFindingsToSarifRun(
+        JsonObject run,
+        ArchitectureApplicabilityProjection projection)
+    {
+        JsonArray results = run["results"] as JsonArray ?? new JsonArray();
+        run["results"] = results;
+
+        JsonObject driver = ((run["tool"] as JsonObject)?["driver"] as JsonObject) ?? new JsonObject();
+        JsonObject tool = run["tool"] as JsonObject ?? new JsonObject();
+        tool["driver"] = driver;
+        run["tool"] = tool;
+        JsonArray rules = driver["rules"] as JsonArray ?? new JsonArray();
+        driver["rules"] = rules;
+
+        foreach (ArchitectureFinding finding in projection.Findings)
+        {
+            if (finding.Details is not ArchitectureApplicabilityDiagnostic diagnostic)
+            {
+                throw new InvalidOperationException(
+                    "The applicability projection contained a non-applicability normalized finding.");
+            }
+
+            string ruleId = finding.ContractId ?? finding.ContractName;
+            if (!rules.Any(rule => rule is JsonObject ruleObject
+                && string.Equals(ruleObject["id"]?.GetValue<string>(), ruleId, StringComparison.Ordinal)))
+            {
+                rules.Add(new JsonObject
+                {
+                    ["id"] = ruleId,
+                    ["shortDescription"] = new JsonObject { ["text"] = diagnostic.Family },
+                });
+            }
+
+            results.Add(BuildApplicabilitySarifResult(finding, diagnostic, ruleId));
+        }
+
+        // The Core SARIF formatter orders rules by rule id. Reapply that ordering after adding
+        // projected rules while retaining the existing result order and its normal finding
+        // property envelope.
+        JsonArray orderedRules = new();
+        foreach (JsonNode? rule in rules
+            .OfType<JsonObject>()
+            .OrderBy(rule => rule["id"]?.GetValue<string>(), StringComparer.Ordinal))
+        {
+            // JsonNode instances may have only one parent. Preserve their canonical contents
+            // while producing the ordered replacement array.
+            orderedRules.Add(rule.DeepClone());
+        }
+
+        driver["rules"] = orderedRules;
+    }
+
+    private static JsonObject BuildApplicabilitySarifResult(
+        ArchitectureFinding finding,
+        ArchitectureApplicabilityDiagnostic diagnostic,
+        string ruleId)
+    {
+        string membership = diagnostic.Membership is { } membershipValue
+            ? ArchitectureApplicabilityWireNames.MembershipToken(membershipValue)
+            : "unknown";
+        string state = diagnostic.State is { } stateValue
+            ? ArchitectureApplicabilityWireNames.StateToken(stateValue)
+            : "missing";
+
+        return new JsonObject
+        {
+            ["ruleId"] = ruleId,
+            ["level"] = finding.Severity,
+            ["message"] = new JsonObject
+            {
+                ["text"] = $"[applicability] control={diagnostic.ControlIdentity}, family={diagnostic.Family}, "
+                    + $"membership={membership}, state={state}, reason={diagnostic.ReasonCode}",
+            },
+            ["logicalLocations"] = new JsonArray
+            {
+                new JsonObject
+                {
+                    ["fullyQualifiedName"] = diagnostic.ControlIdentity,
+                    ["kind"] = "applicability",
+                },
+            },
+            [PropertiesPropertyName] = new JsonObject
+            {
+                ["arch_linter_net"] = JsonSerializer.SerializeToNode(
+                    ArchitectureDiagnosticFormatter.FormatNormalizedFindingForSarif(finding)),
+            },
+        };
     }
 
     // cancellationToken defaults to None so RenderReportContent (which must always complete a
@@ -134,7 +399,8 @@ internal sealed partial class ReportCoordinator
             ? result
             : ArchitectureDiagnosticFormatter.AddWaiversToCiArtifacts(result, outcome.Waivers);
 
-        return AddAssessmentCompletionToJson(result, outcome.AssessmentCompletionEvidence);
+        return AddAssessmentCompletionToJson(
+            result, outcome.AssessmentCompletionEvidence, outcome.ApplicabilityProjection);
     }
 
     private string FormatSarifContent(string mode, ValidationOutcome outcome, CancellationToken cancellationToken = default)
@@ -143,7 +409,8 @@ internal sealed partial class ReportCoordinator
             mode, outcome.Violations, outcome.Cycles, outcome.CycleFindings, outcome.PreflightDiagnostics,
             outcome.CoverageSummaries, outcome.SourceExpansion, outcome.SubtractiveMatcherParticipation, cancellationToken);
 
-        return AddAssessmentCompletionToSarif(result, outcome.AssessmentCompletionEvidence);
+        return AddAssessmentCompletionToSarif(
+            result, outcome.AssessmentCompletionEvidence, outcome.ApplicabilityProjection);
     }
 
     private static string? RenderContent(

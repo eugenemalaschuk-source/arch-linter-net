@@ -10,6 +10,22 @@ namespace ArchLinterNet.Core.Caching;
 // (reconstruction).
 public static class AnalysisCacheOutcomeMapper
 {
+    public static ValidationOutcome FromCacheOutcome(
+        AnalysisCacheOutcomeV1 cached,
+        string repositoryRoot,
+        IReadOnlyList<string> policyImportPaths,
+        IReadOnlyList<string> resolvedAssemblyPaths,
+        IReadOnlyList<string> discoveredProjectPaths,
+        ArchitectureSourceExpansionInventory sourceExpansion) =>
+        FromCacheOutcome(
+            cached,
+            repositoryRoot,
+            policyImportPaths,
+            resolvedAssemblyPaths,
+            discoveredProjectPaths,
+            sourceExpansion,
+            mode: null);
+
     public static AnalysisCacheOutcomeV1 ToCacheOutcome(ValidationOutcome outcome)
     {
         ArgumentNullException.ThrowIfNull(outcome);
@@ -29,7 +45,9 @@ public static class AnalysisCacheOutcomeMapper
             outcome.ClassificationPathDeferred,
             outcome.CycleFindings.ToArray(),
             outcome.CoverageSummaries.ToArray(),
-            outcome.SubtractiveMatcherParticipation.ToArray())
+            outcome.SubtractiveMatcherParticipation.ToArray(),
+            outcome.ApplicabilityExpectedEntries.ToArray(),
+            outcome.ApplicabilityRecords.ToArray())
         {
             Waivers = outcome.Waivers.ToArray(),
         };
@@ -49,9 +67,15 @@ public static class AnalysisCacheOutcomeMapper
         IReadOnlyList<string> policyImportPaths,
         IReadOnlyList<string> resolvedAssemblyPaths,
         IReadOnlyList<string> discoveredProjectPaths,
-        ArchitectureSourceExpansionInventory sourceExpansion)
+        ArchitectureSourceExpansionInventory sourceExpansion,
+        string? mode)
     {
         ArgumentNullException.ThrowIfNull(cached);
+
+        ArchitectureAssessmentCompletionEvidence? completion = ArchitectureApplicabilityEvaluator.Evaluate(
+            cached.ApplicabilityExpectedEntries,
+            cached.ApplicabilityRecords,
+            cached.Passed);
 
         return new ValidationOutcome(
             cached.Passed,
@@ -77,7 +101,13 @@ public static class AnalysisCacheOutcomeMapper
             ClassificationPathDeferred = cached.ClassificationPathDeferred,
             CycleFindings = cached.CycleFindings.ToArray(),
             SubtractiveMatcherParticipation = cached.SubtractiveMatcherParticipation.ToArray(),
+            ApplicabilityExpectedEntries = cached.ApplicabilityExpectedEntries.ToArray(),
+            ApplicabilityRecords = cached.ApplicabilityRecords.ToArray(),
+            AssessmentCompletionEvidence = completion,
             Waivers = cached.Waivers.ToArray(),
+            ApplicabilityProjection = completion is null
+                ? null
+                : ArchitectureApplicabilityProjector.Project(completion, mode),
         };
     }
 }
