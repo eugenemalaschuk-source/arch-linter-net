@@ -60,6 +60,12 @@ jobs:
 
 Use `dotnet tool restore` with a local tool manifest when the repository should pin the ArchLinterNet version. Use `dotnet tool install --global ArchLinterNet.Cli` only when global installation is acceptable for your pipeline.
 
+The example above is provider-neutral guidance, not a requirement to rerun the
+same validation twice. ArchLinterNet's own repository uses a stricter protected
+PR gate and does **not** repeat its full lint/architecture/cross-platform matrix
+after merge. Its `main` push is reserved for fresh coverage/Sonar/Codecov
+telemetry plus an independent installable `main.N` package build.
+
 ## Exit code behavior
 
 | Code | Meaning | CI action |
@@ -191,7 +197,7 @@ uploaded as an artifact — neither writes a file.
 
 ## Baseline debt semantics in the coverage gate
 
-When architecture coverage is wired into CI as a quality gate (see the `architecture-coverage` steps in this repository's `.github/workflows/ci.yml`, which run after the existing acceptance gate against the same already-built solution), baseline entries change how findings are reported, not whether they exist:
+When architecture coverage is wired into CI as a quality gate (see the `architecture-coverage` steps in this repository's `.github/workflows/ci.yml`, which run on the protected pull-request candidate), baseline entries change how findings are reported, not whether they exist:
 
 - **Existing accepted debt** lives in the baseline file and does not fail the pull request. The strict run still reports it in `coverage_findings`/`coverage_summary`, but a finding matched by a baseline entry is treated as known debt rather than a regression.
 - **New coverage findings** — anything not matched by an existing baseline entry — fail the pull request. This is what keeps the gate "no new debt" instead of "no debt."
@@ -202,39 +208,45 @@ To inspect the same full-solution coverage report locally before pushing, run `m
 
 **All-zero counts can mean two different things.** If `coverage_summary` is an empty list, the policy defines no coverage contracts at all (`strict_coverage`/`audit_coverage` are absent) — the report's note line calls this out explicitly. That is different from a policy that *does* define coverage contracts and reports zero uncovered/stale/unknown items, which means real coverage contracts exist and nothing is currently failing them. This repository's own `architecture/dependencies.arch.yml` defines `assembly`-, `project`-, `namespace`-, and `rule_input`-scope `strict_coverage` contracts covering all four first-party assemblies, every discovered production project, their root namespaces, and the rule inputs of its source-sensitive strict rules, so the gate reflects real coverage rather than an empty, trivially-passing policy.
 
-## Architecture policy badge
+## Repository badge policy
 
-The README's **Architecture policy** badge is a dynamic GitHub Actions status
-badge for the latest `main` run of
-[Architecture Policy](https://github.com/eugenemalaschuk-source/arch-linter-net/actions/workflows/architecture-policy.yml).
-That workflow runs the repository's authoritative read-only strict self-policy
-gate:
+ArchLinterNet's README deliberately distinguishes merge authority from
+post-merge telemetry:
 
-```bash
-make restore
-make lint-architecture
-```
+- **Main quality** is the GitHub Actions badge for `main-quality.yml` on the
+  merged `main` branch. It means the current merged revision completed the
+  Linux coverage telemetry pipeline and successfully refreshed the external
+  quality services.
+- **Test coverage** is the Codecov badge explicitly scoped to `branch=main`.
+  It is refreshed by the same post-merge coverage reports.
+- **Sonar Quality Gate / Maintainability / Reliability / Security** are direct
+  SonarCloud project badges for `branch=main`; the main telemetry workflow sends
+  OpenCover/TRX plus Python coverage before ending the scanner.
+- The old README **Architecture policy** image was only another label over a
+  generic workflow-status badge. It is not used as architecture evidence. A
+  first-class Architecture Health badge must be generated from canonical
+  ArchLinterNet outputs rather than inferred from generic CI success.
 
-It is intentionally a status signal, not an architecture-coverage percentage or
-a unit-test coverage metric. Architecture coverage remains the strict/audit
-JSON and Markdown report described above; test coverage remains the separate
-Codecov signal below. The workflow has read-only contents permission, writes no
-badge files or README commits, and does not publish packages, releases, or
-GitHub Pages content.
-
-After a merge, GitHub refreshes the badge from the next `main` workflow run. If
-the badge is failing or stale, inspect that run's **Strict Self-Policy** job:
-the `make lint-architecture` output names the violated policy rule. Run the two
-commands above locally after restoring dependencies to reproduce the result.
+The repository's full self-policy and architecture-coverage validation remain
+required PR checks. They are not repeated after merge merely to refresh generic
+quality badges.
 
 ## Test coverage with Codecov and SonarCloud
 
 This repository treats line test coverage and architecture coverage as two separate CI signals:
 
-- `make test-coverage` runs the NUnit test projects with `XPlat Code Coverage`, writes Cobertura XML for Codecov, writes OpenCover XML for SonarCloud, and emits TRX test result files under `test-results/`.
+- `make test-coverage` runs the NUnit unit bucket with `XPlat Code Coverage`, writes Cobertura XML for Codecov, writes OpenCover XML for SonarCloud, and emits TRX test result files under `test-results/`.
 - `make architecture-coverage-report` evaluates ArchLinterNet coverage contracts and prints architecture-specific Markdown + JSON diagnostics.
 
-The CI workflow runs `make test-coverage` after the acceptance gate, resolves the generated `coverage.cobertura.xml` files, uploads them with `codecov/codecov-action@v5`, and points SonarScanner for .NET at the generated `coverage.opencover.xml` and `.trx` files before ending the SonarCloud analysis. The chosen Codecov authentication mode for this repository is the repository secret `CODECOV_TOKEN`, not OIDC.
+The required PR workflow uses three isolated Linux coverage shards and aggregates
+them into the PR Sonar/Codecov path. After merge, `main-quality.yml` runs the
+same coverage shard targets independently of the full PR validation matrix,
+downloads the reports, collects Python tooling coverage, uploads Cobertura to
+Codecov, and ends a SonarCloud `main` analysis that imports the OpenCover/TRX and
+Python coverage data.
+
+That post-merge run is what keeps the README's `Main quality`, Codecov, and
+SonarCloud main-branch badges current for the merged revision.
 
 To inspect the same test-coverage input locally before pushing, run:
 
@@ -247,38 +259,73 @@ The first command regenerates the raw Cobertura XML reports, OpenCover XML repor
 
 ### Codecov auth and fork behavior
 
-The upload step uses `CODECOV_TOKEN` from GitHub Actions secrets. Secrets are available for pushes to this repository and for pull requests whose head branch also lives in this repository, but not for untrusted fork pull requests.
+The upload steps use `CODECOV_TOKEN` from GitHub Actions secrets.
 
-That is why the workflow gates upload with:
+- Trusted same-repository PRs may upload PR coverage; fork PRs still run the
+  coverage tests but skip secret-backed uploads because GitHub does not expose
+  repository secrets to untrusted forks.
+- The `main-quality.yml` push runs on the protected repository branch and has
+  access to the existing repository secret, so it uploads the authoritative
+  merged-main coverage.
 
-```yaml
-if: github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository
-```
-
-Fork PRs still run the normal acceptance and architecture checks, but they skip the Codecov upload because GitHub does not expose repository secrets to untrusted fork workflows.
+No additional secret is required by the `main.N` package workflow; GitHub
+Packages uses its job-scoped built-in `GITHUB_TOKEN` instead.
 
 ### Failure mode expectations
 
-Codecov upload is intentionally configured with `fail_ci_if_error: false`. Test execution remains required, but transient Codecov or network issues should not make an otherwise healthy pull request flaky.
+The two coverage contexts deliberately have different external-service failure
+semantics:
 
-## SonarCloud pull request analysis
+- PR coverage execution remains required; the existing PR Codecov upload is
+  best-effort so a transient Codecov outage does not make an otherwise valid PR
+  flaky.
+- The post-merge `Main Quality Telemetry` upload is fail-closed for Codecov and
+  SonarCloud. If either external refresh cannot complete, the `Main quality`
+  workflow badge is red instead of falsely implying that the external badges
+  were updated for the merged revision.
 
-The same `ci.yml` `validate` job also runs SonarCloud analysis for `main` pushes and trusted pull requests from branches in this repository:
+## SonarCloud analysis
+
+SonarCloud has separate PR and merged-main roles.
+
+### Pull requests
+
+The `ci.yml` coverage/Sonar job runs SonarCloud analysis for trusted pull
+requests from branches in this repository:
 
 - The workflow checks out the repository with `fetch-depth: 0` so SonarCloud can compare a pull request branch against its base branch.
 - The scanner waits for the SonarCloud quality gate result, so the workflow fails when the Sonar quality gate fails.
-- For pull requests, the workflow publishes a job summary link to `https://sonarcloud.io/summary/new_code?id=<project-key>&pullRequest=<number>` so reviewers have a direct path to the SonarCloud PR analysis in addition to the GitHub PR decoration/check created by SonarCloud.
+- The workflow publishes a job summary link to `https://sonarcloud.io/summary/new_code?id=<project-key>&pullRequest=<number>` so reviewers have a direct path to the SonarCloud PR analysis in addition to the GitHub PR decoration/check created by SonarCloud.
 - The gate is evaluated on new code introduced by the PR, as configured by SonarCloud for pull-request analysis.
+
+### Merged `main`
+
+`main-quality.yml` is the only ordinary post-merge Sonar path. It does not rerun
+repository lint, architecture validation, Windows/macOS test matrices, E2E, or
+packed-artifact acceptance. It runs the Linux coverage shards needed to produce
+fresh coverage evidence, performs the Sonar build inside the scanner context,
+imports .NET/Python coverage, and ends the scanner on the merged `main` commit.
+
+The main scan is fail-closed in that workflow: a missing token, failed coverage
+shard, failed Codecov upload, scanner failure, or failed Sonar quality gate makes
+the `Main quality` workflow red. That failure is telemetry about an already
+merged revision; it does not retroactively weaken or bypass the PR merge gate.
 
 ### Required GitHub configuration
 
 The repository workflow expects:
 
 - `SONAR_TOKEN` GitHub Actions secret for SonarCloud authentication.
+- `CODECOV_TOKEN` GitHub Actions secret for Codecov authentication.
 - Optional `SONAR_PROJECT_KEY` repository variable. If unset, the workflow uses the public project key `eugenemalaschuk-source_arch-linter-net`.
 - Optional `SONAR_ORGANIZATION` repository variable. If unset, the workflow uses the public organization key `eugenemalaschuk-source`.
 
-If a trusted push or same-repository pull request is missing required SonarCloud configuration, the workflow fails with an explicit diagnostic instead of silently skipping analysis.
+These are the existing quality-service credentials; #707 does not introduce a
+new repository secret for main package publication.
+
+If a trusted same-repository PR or `main` telemetry run is missing required
+SonarCloud configuration, the relevant workflow fails with an explicit
+diagnostic instead of silently claiming a completed scan.
 
 ### Fork pull requests
 
@@ -294,12 +341,15 @@ After the first successful decorated pull request run, configure GitHub branch p
 
 ### Post-merge verification
 
-After merging the workflow change:
+After merging a CI topology change:
 
-- open or update a same-repository test pull request;
-- confirm GitHub shows the SonarCloud PR status/check and decoration;
-- confirm the workflow summary link opens the SonarCloud PR analysis page;
-- confirm the `main` project page updates at `https://sonarcloud.io/summary/overall?id=eugenemalaschuk-source_arch-linter-net&branch=main`.
+- confirm `Main Quality Telemetry` ran for the merged `main` SHA;
+- confirm its three Linux coverage shards completed and the aggregate job is green;
+- confirm the Codecov repository page and README coverage badge show `main` data from the merged revision;
+- confirm the SonarCloud `main` page and project badges refresh for the merged revision;
+- confirm the ordinary `CI` workflow, CodeQL push job, Windows/macOS matrices,
+  architecture coverage and packed-artifact acceptance did not rerun merely
+  because of the merge.
 
 ## Azure Pipelines example
 
@@ -317,4 +367,7 @@ After merging the workflow change:
 
 ## Documentation publication note
 
-Repository release automation may publish MkDocs to GitHub Pages, but PR CI should only validate docs and code. It must not publish packages, create releases, or deploy documentation.
+PR CI and both ordinary `main` workflows may validate or reference documentation
+sources, but they never deploy MkDocs. GitHub Pages deployment remains owned by
+`release-nuget.yml` and runs only when the maintainer explicitly starts a real
+public release with `publish: true`.

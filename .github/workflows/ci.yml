@@ -2,9 +2,6 @@ name: CI
 
 on:
   pull_request:
-  push:
-    branches:
-      - main
 
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
@@ -114,8 +111,6 @@ jobs:
             target: test-coverage-other
     permissions:
       contents: read
-    env:
-      TEST_COVERAGE_DIAGNOSTICS: ${{ github.event_name == 'push' && '--blame-hang --blame-hang-timeout 5m' || '' }}
 
     steps:
       - name: Checkout
@@ -956,141 +951,3 @@ jobs:
           path: artifacts/checkpoint-b-platform
           if-no-files-found: error
           retention-days: 1
-
-  main_badge_refresh:
-    name: Main Badge Refresh
-    needs: dotnet_coverage
-    if: always() && github.event_name == 'push'
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    permissions:
-      contents: read
-
-    steps:
-      - name: Require successful .NET coverage shards
-        if: needs.dotnet_coverage.result != 'success'
-        run: |
-          echo ".NET coverage shard matrix result: ${{ needs.dotnet_coverage.result }}" >&2
-          echo "Main Badge Refresh requires every coverage shard to succeed; refusing a partial aggregate." >&2
-          exit 1
-
-      - name: Checkout
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
-        with:
-          fetch-depth: 0
-          persist-credentials: false
-
-      - name: Download .NET coverage shards
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
-        with:
-          pattern: dotnet-coverage-*
-          path: test-results/coverage-shards
-
-      - name: Setup .NET
-        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68
-        with:
-          dotnet-version: 10.0.x
-
-      - name: Setup Java
-        uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961
-        with:
-          distribution: temurin
-          java-version: "21"
-
-      - name: Cache NuGet packages
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
-        with:
-          path: ~/.nuget/packages
-          key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj') }}
-          restore-keys: |
-            ${{ runner.os }}-nuget-
-
-      - name: Setup uv
-        uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
-
-      - name: Restore
-        run: make restore
-
-      - name: Cache SonarQube packages
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
-        with:
-          path: ~/.sonar/cache
-          key: ${{ runner.os }}-sonar
-          restore-keys: |
-            ${{ runner.os }}-sonar
-
-      - name: Install SonarScanner for .NET
-        run: |
-          mkdir -p ./.sonar/scanner
-          dotnet tool update dotnet-sonarscanner --tool-path ./.sonar/scanner
-
-      - name: Validate SonarCloud configuration
-        env:
-          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-        shell: bash
-        run: |
-          missing=()
-          [[ -n "$SONAR_TOKEN" ]] || missing+=("SONAR_TOKEN secret")
-          [[ -n "$SONAR_PROJECT_KEY" ]] || missing+=("SONAR_PROJECT_KEY repository variable or committed default")
-          [[ -n "$SONAR_ORGANIZATION" ]] || missing+=("SONAR_ORGANIZATION repository variable or committed default")
-
-          if [ ${#missing[@]} -gt 0 ]; then
-            printf 'Missing SonarCloud configuration: %s\n' "${missing[*]}" >&2
-            echo "Configure GitHub secret SONAR_TOKEN and, if overriding defaults, repository variables SONAR_PROJECT_KEY / SONAR_ORGANIZATION." >&2
-            exit 1
-          fi
-
-      - name: Begin SonarCloud analysis
-        id: sonar_begin
-        env:
-          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-        shell: bash
-        run: |
-          ./.sonar/scanner/dotnet-sonarscanner begin \
-            /k:"$SONAR_PROJECT_KEY" \
-            /o:"$SONAR_ORGANIZATION" \
-            /d:sonar.token="$SONAR_TOKEN" \
-            /d:sonar.host.url="$SONAR_HOST_URL" \
-            /d:sonar.qualitygate.wait=true \
-            /d:sonar.qualitygate.timeout=300 \
-            /d:sonar.cs.opencover.reportsPaths="test-results/**/coverage.opencover.xml" \
-            /d:sonar.cs.vstest.reportsPaths="test-results/**/*.trx" \
-            /d:sonar.python.coverage.reportPaths="coverage-python.xml" \
-            /d:sonar.exclusions="**/AdoptionAcceptance/Fixtures/**" \
-            /d:sonar.coverage.exclusions="tools/ArchLinterNet.GitFuzz/**,tools/**/tests/**,**/CheckpointBReleaseGateTests*.cs"
-
-      - name: Build for SonarCloud analysis
-        run: dotnet build ArchLinterNet.slnx --no-restore --nologo
-
-      - name: Collect main branch Python tooling coverage
-        run: make test-tooling-coverage
-
-      - name: Resolve coverage report paths
-        id: coverage_reports
-        shell: bash
-        run: |
-          files="$(find test-results -name 'coverage.cobertura.xml' -print | sed 's#^#./#' | paste -sd, -)"
-          echo "files=$files" >> "$GITHUB_OUTPUT"
-          if [ -z "$files" ]; then
-            echo "No .NET Cobertura coverage reports were downloaded." >&2
-            exit 1
-          fi
-
-      - name: Upload test coverage to Codecov
-        if: steps.coverage_reports.outputs.files != ''
-        uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f # v7.0.0
-        with:
-          token: ${{ secrets.CODECOV_TOKEN }}
-          files: ${{ steps.coverage_reports.outputs.files }}
-          disable_search: true
-          fail_ci_if_error: false
-
-      - name: End SonarCloud analysis
-        id: sonar_end
-        if: success() && steps.sonar_begin.outcome == 'success'
-        continue-on-error: true
-        env:
-          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-        shell: bash
-        run: |
-          ./.sonar/scanner/dotnet-sonarscanner end /d:sonar.token="$SONAR_TOKEN"
