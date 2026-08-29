@@ -1,0 +1,256 @@
+name: Main NuGet Builds
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    name: Publish installable main build
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      packages: write
+
+    outputs:
+      package_version: ${{ steps.version.outputs.package_version }}
+
+    env:
+      PACKAGE_OUTPUT: artifacts/main-packages
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Cache NuGet packages
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
+        with:
+          path: ~/.nuget/packages
+          key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj') }}
+          restore-keys: |
+            ${{ runner.os }}-nuget-
+
+      - name: Resolve main build version
+        id: version
+        shell: bash
+        run: |
+          python3 tools/release/main_build.py version \
+            --props Directory.Build.props \
+            --build-number "$GITHUB_RUN_NUMBER" \
+            --github-env "$GITHUB_ENV" \
+            --github-output "$GITHUB_OUTPUT"
+
+      - name: Restore
+        run: make restore
+
+      - name: Build main package candidate
+        shell: bash
+        run: |
+          rm -rf "$PACKAGE_OUTPUT"
+          mkdir -p "$PACKAGE_OUTPUT"
+          dotnet build ArchLinterNet.slnx \
+            --configuration Release \
+            --no-restore \
+            --nologo \
+            -p:Version="$PACKAGE_VERSION"
+
+      - name: Prepare development package release notes
+        shell: bash
+        run: |
+          echo "PACKAGE_RELEASE_NOTES=Development build from main commit $GITHUB_SHA. Not a public release." >> "$GITHUB_ENV"
+
+      - name: Pack CEL
+        run: dotnet pack src/ArchLinterNet.CEL/ArchLinterNet.CEL.csproj --configuration Release --no-build --output "$PACKAGE_OUTPUT" -p:PackageVersion="$PACKAGE_VERSION" -p:Version="$PACKAGE_VERSION" -p:PackageReleaseNotes="$PACKAGE_RELEASE_NOTES"
+
+      - name: Pack Core
+        run: dotnet pack src/ArchLinterNet.Core/ArchLinterNet.Core.csproj --configuration Release --no-build --output "$PACKAGE_OUTPUT" -p:PackageVersion="$PACKAGE_VERSION" -p:Version="$PACKAGE_VERSION" -p:PackageReleaseNotes="$PACKAGE_RELEASE_NOTES"
+
+      - name: Pack CLI
+        run: dotnet pack src/ArchLinterNet.Cli/ArchLinterNet.Cli.csproj --configuration Release --no-build --output "$PACKAGE_OUTPUT" -p:PackageVersion="$PACKAGE_VERSION" -p:Version="$PACKAGE_VERSION" -p:PackageReleaseNotes="$PACKAGE_RELEASE_NOTES"
+
+      - name: Pack Testing
+        run: dotnet pack src/ArchLinterNet.Testing/ArchLinterNet.Testing.csproj --configuration Release --no-build --output "$PACKAGE_OUTPUT" -p:PackageVersion="$PACKAGE_VERSION" -p:Version="$PACKAGE_VERSION" -p:PackageReleaseNotes="$PACKAGE_RELEASE_NOTES"
+
+      - name: Create and verify package manifest
+        shell: bash
+        run: |
+          python3 tools/release/package_manifest.py create \
+            --packages-dir "$PACKAGE_OUTPUT" \
+            --version "$PACKAGE_VERSION" \
+            --source-commit "$GITHUB_SHA" \
+            --output "$PACKAGE_OUTPUT/package-manifest.json"
+          python3 tools/release/package_manifest.py verify \
+            --packages-dir "$PACKAGE_OUTPUT" \
+            --manifest "$PACKAGE_OUTPUT/package-manifest.json" \
+            --version "$PACKAGE_VERSION" \
+            --source-commit "$GITHUB_SHA"
+
+      - name: Configure GitHub Packages NuGet source
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          dotnet nuget add source \
+            --username "$GITHUB_ACTOR" \
+            --password "$GITHUB_TOKEN" \
+            --store-password-in-clear-text \
+            --name github \
+            "https://nuget.pkg.github.com/$GITHUB_REPOSITORY_OWNER/index.json"
+
+      - name: Publish verified package set to GitHub Packages
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          mapfile -t packages < <(
+            python3 tools/release/package_manifest.py paths \
+              --packages-dir "$PACKAGE_OUTPUT" \
+              --manifest "$PACKAGE_OUTPUT/package-manifest.json" \
+              --kind package
+          )
+          test "${#packages[@]}" -eq 4
+          for package in "${packages[@]}"; do
+            dotnet nuget push "$PACKAGE_OUTPUT/$package" \
+              --source github \
+              --api-key "$GITHUB_TOKEN" \
+              --no-symbols
+          done
+
+      - name: Publish main build summary
+        shell: bash
+        run: |
+          {
+            echo "### Installable ArchLinterNet main build"
+            echo
+            echo "- Version: \`$PACKAGE_VERSION\`"
+            echo "- Source SHA: \`$GITHUB_SHA\`"
+            echo "- Feed: \`https://nuget.pkg.github.com/$GITHUB_REPOSITORY_OWNER/index.json\`"
+            echo "- Packages: ArchLinterNet.CEL, ArchLinterNet.Core, ArchLinterNet.Cli, ArchLinterNet.Testing"
+            echo "- Symbols were manifest-verified locally; GitHub Packages receives the four primary .nupkg packages only."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  retention:
+    name: Retain latest five complete main builds
+    needs: publish
+    if: needs.publish.result == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      packages: write
+    concurrency:
+      group: arch-linter-main-package-retention
+      cancel-in-progress: false
+    env:
+      PACKAGE_VERSION: ${{ needs.publish.outputs.package_version }}
+      GH_TOKEN: ${{ github.token }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+
+      - name: Resolve package owner API scope
+        shell: bash
+        run: |
+          owner_type="$(gh api "repos/$GITHUB_REPOSITORY" --jq '.owner.type')"
+          case "$owner_type" in
+            User) package_scope="users/$GITHUB_REPOSITORY_OWNER" ;;
+            Organization) package_scope="orgs/$GITHUB_REPOSITORY_OWNER" ;;
+            *)
+              echo "Unsupported repository owner type: $owner_type" >&2
+              exit 2
+              ;;
+          esac
+          echo "PACKAGE_API_SCOPE=$package_scope" >> "$GITHUB_ENV"
+
+      - name: Build retention plan from complete package sets
+        shell: bash
+        run: |
+          set -euo pipefail
+          package_ids=(
+            ArchLinterNet.CEL
+            ArchLinterNet.Cli
+            ArchLinterNet.Core
+            ArchLinterNet.Testing
+          )
+          ready=false
+          for attempt in 1 2 3 4 5 6; do
+            rm -rf artifacts/main-package-inventory
+            mkdir -p artifacts/main-package-inventory
+            inventory_ok=true
+            for package_id in "${package_ids[@]}"; do
+              if ! gh api --paginate --slurp \
+                -H "Accept: application/vnd.github+json" \
+                "$PACKAGE_API_SCOPE/packages/nuget/$package_id/versions?per_page=100" \
+                > "artifacts/main-package-inventory/$package_id.json"; then
+                inventory_ok=false
+                break
+              fi
+            done
+
+            if [ "$inventory_ok" = true ] && python3 tools/release/main_build.py retention-plan \
+              --inventory-dir artifacts/main-package-inventory \
+              --current-version "$PACKAGE_VERSION" \
+              --keep 5 \
+              --output artifacts/main-package-retention.json; then
+              ready=true
+              break
+            fi
+
+            echo "GitHub Packages inventory is not complete for $PACKAGE_VERSION yet; retrying ($attempt/6)." >&2
+            sleep 10
+          done
+
+          if [ "$ready" != true ]; then
+            echo "Could not observe a complete package set for $PACKAGE_VERSION after retries." >&2
+            exit 1
+          fi
+
+      - name: Delete expired complete main build sets
+        shell: bash
+        run: |
+          set -euo pipefail
+          jq -r '.delete[] | [.package_id, (.version_id | tostring), .version] | @tsv' \
+            artifacts/main-package-retention.json |
+          while IFS=$'\t' read -r package_id version_id version; do
+            endpoint="$PACKAGE_API_SCOPE/packages/nuget/$package_id/versions/$version_id"
+            if response="$(gh api --method DELETE -H "Accept: application/vnd.github+json" "$endpoint" 2>&1)"; then
+              echo "Deleted $package_id $version"
+            elif grep -q "HTTP 404" <<< "$response"; then
+              echo "$package_id $version was already deleted by another retention run."
+            else
+              echo "$response" >&2
+              exit 1
+            fi
+          done
+
+      - name: Publish retention summary
+        if: always() && hashFiles('artifacts/main-package-retention.json') != ''
+        shell: bash
+        run: |
+          retained="$(jq -r '.retained_versions | join(", ")' artifacts/main-package-retention.json)"
+          partial="$(jq -r 'if (.partial_versions | length) == 0 then "none" else (.partial_versions | join(", ")) end' artifacts/main-package-retention.json)"
+          deferred="$(jq -r '.current_retention_deferred' artifacts/main-package-retention.json)"
+          {
+            echo "### Main package retention"
+            echo
+            echo "- Retained complete builds: $retained"
+            echo "- Partial/orphan main versions left diagnosable: $partial"
+            echo "- Current-build safety deferred exact five-version convergence: $deferred"
+          } >> "$GITHUB_STEP_SUMMARY"
