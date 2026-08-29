@@ -163,7 +163,7 @@ public sealed class CliHandlerCoverageTests
         Assert.Multiple(() =>
         {
             Assert.That(result, Is.EqualTo(CliExitCodes.InvalidArgumentsOrRuntimeError));
-            Assert.That(console.ErrorText, Does.Contain("debt"));
+            Assert.That(console.ErrorText, Does.Contain("Unknown command or argument: debt"));
             Assert.That(console.ErrorText, Does.Contain("--help"));
             Assert.That(console.OutputText, Is.Empty);
         });
@@ -179,7 +179,7 @@ public sealed class CliHandlerCoverageTests
         Assert.Multiple(() =>
         {
             Assert.That(result, Is.EqualTo(CliExitCodes.InvalidArgumentsOrRuntimeError));
-            Assert.That(console.ErrorText, Does.Contain("debt"));
+            Assert.That(console.ErrorText, Does.Contain("Unknown command or argument: debt"));
             Assert.That(console.ErrorText, Does.Contain("graph --help"));
             Assert.That(console.OutputText, Is.Empty);
         });
@@ -195,11 +195,11 @@ public sealed class CliHandlerCoverageTests
         Assert.That(console.OutputText, Does.Contain("arch-linter-net 1.0.0"));
     }
 
-    [TestCase("--help", "debt", "debt")]
-    [TestCase("-h", "debt", "debt")]
-    [TestCase("--version", "debt", "debt")]
-    [TestCase("-v", "debt", "debt")]
-    [TestCase("--help", "--bogus-flag", "--bogus-flag")]
+    [TestCase("--help", "debt", "Unknown command or argument: debt")]
+    [TestCase("-h", "debt", "Unknown command or argument: debt")]
+    [TestCase("--version", "debt", "Unknown command or argument: debt")]
+    [TestCase("-v", "debt", "Unknown command or argument: debt")]
+    [TestCase("--help", "--bogus-flag", "Unknown option: --bogus-flag")]
     public void Host_LegacyHelpOrVersionWithInvalidInput_FailsClosed(
         string legacyOption,
         string invalidInput,
@@ -229,7 +229,7 @@ public sealed class CliHandlerCoverageTests
         {
             Assert.That(result, Is.EqualTo(CliExitCodes.InvalidArgumentsOrRuntimeError));
             Assert.That(console.OutputText, Is.Empty);
-            Assert.That(console.ErrorText, Does.Contain("debt"));
+            Assert.That(console.ErrorText, Does.Contain("Unknown command or argument: debt"));
             Assert.That(console.ErrorText, Does.Contain("--help"));
         });
     }

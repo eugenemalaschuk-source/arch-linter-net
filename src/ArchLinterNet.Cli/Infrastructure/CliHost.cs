@@ -117,7 +117,7 @@ internal sealed class CliHost(ICliRootCommandFactory rootCommandFactory, ICliCon
             int end = message.IndexOf('\'', start);
             if (end > start)
             {
-                return $"Unknown option: {message[start..end]}";
+                return $"Unknown command or argument: {message[start..end]}";
             }
         }
 

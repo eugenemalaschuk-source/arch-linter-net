@@ -112,11 +112,11 @@ public partial class CliIntegrationTests
         });
     }
 
-    [TestCase("--help", "debt", "debt")]
-    [TestCase("-h", "debt", "debt")]
-    [TestCase("--version", "debt", "debt")]
-    [TestCase("-v", "debt", "debt")]
-    [TestCase("--help", "--bogus-flag", "--bogus-flag")]
+    [TestCase("--help", "debt", "Unknown command or argument: debt")]
+    [TestCase("-h", "debt", "Unknown command or argument: debt")]
+    [TestCase("--version", "debt", "Unknown command or argument: debt")]
+    [TestCase("-v", "debt", "Unknown command or argument: debt")]
+    [TestCase("--help", "--bogus-flag", "Unknown option: --bogus-flag")]
     public void HelpOrVersionFollowedByInvalidInput_FailsClosed(
         string legacyOption,
         string invalidInput,
@@ -142,7 +142,7 @@ public partial class CliIntegrationTests
         {
             Assert.That(exitCode, Is.EqualTo(2));
             Assert.That(stdout, Is.Empty);
-            Assert.That(stderr, Does.Contain("debt"));
+            Assert.That(stderr, Does.Contain("Unknown command or argument: debt"));
             Assert.That(stderr, Does.Contain("--help"));
         });
     }
@@ -156,7 +156,7 @@ public partial class CliIntegrationTests
         {
             Assert.That(exitCode, Is.EqualTo(2));
             Assert.That(stdout, Is.Empty);
-            Assert.That(stderr, Does.Contain("debt"));
+            Assert.That(stderr, Does.Contain("Unknown command or argument: debt"));
             Assert.That(stderr, Does.Contain("--help"));
         });
     }
@@ -170,7 +170,7 @@ public partial class CliIntegrationTests
         {
             Assert.That(exitCode, Is.EqualTo(2));
             Assert.That(stdout, Is.Empty);
-            Assert.That(stderr, Does.Contain("debt"));
+            Assert.That(stderr, Does.Contain("Unknown command or argument: debt"));
             Assert.That(stderr, Does.Contain("--help"));
         });
     }
@@ -184,7 +184,7 @@ public partial class CliIntegrationTests
         {
             Assert.That(exitCode, Is.EqualTo(2));
             Assert.That(stdout, Is.Empty);
-            Assert.That(stderr, Does.Contain("debt"));
+            Assert.That(stderr, Does.Contain("Unknown command or argument: debt"));
             Assert.That(stderr, Does.Contain("--help"));
         });
     }
