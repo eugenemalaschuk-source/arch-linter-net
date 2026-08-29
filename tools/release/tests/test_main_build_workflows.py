@@ -35,7 +35,7 @@ def test_codeql_keeps_pr_schedule_and_manual_without_main_push() -> None:
     assert "push:" not in trigger
 
 
-def test_main_quality_is_coverage_telemetry_only() -> None:
+def test_main_quality_is_coverage_telemetry_only_and_fail_closed() -> None:
     workflow = _read("main-quality.yml")
     trigger = _trigger_block(workflow, "\nconcurrency:")
 
@@ -45,6 +45,8 @@ def test_main_quality_is_coverage_telemetry_only() -> None:
     assert "test-coverage-other" in workflow
     assert "dotnet-sonarscanner" in workflow
     assert "codecov/codecov-action@" in workflow
+    assert "fail_ci_if_error: true" in workflow
+    assert "continue-on-error: true" not in workflow
     assert "Architecture Coverage" not in workflow
     assert "windows-latest" not in workflow
     assert "macos-" not in workflow
@@ -84,3 +86,27 @@ def test_main_package_retention_is_complete_set_and_current_build_safe() -> None
     assert "ArchLinterNet.Testing" in workflow
     assert "--current-version \"$PACKAGE_VERSION\"" in workflow
     assert "--keep 5" in workflow
+
+
+def test_main_workflows_never_publish_mkdocs_or_pages() -> None:
+    for name in ("main-quality.yml", "main-packages.yml"):
+        workflow = _read(name)
+        assert "pages: write" not in workflow
+        assert "actions/configure-pages" not in workflow
+        assert "actions/deploy-pages" not in workflow
+        assert "make docs-build" not in workflow
+
+    release = _read("release-nuget.yml")
+    assert "deploy-docs:" in release
+    assert "if: ${{ inputs.publish == true }}" in release
+    assert "pages: write" in release
+
+
+def test_readme_main_badges_are_driven_by_post_merge_telemetry() -> None:
+    readme = (_REPOSITORY_ROOT / "README.md").read_text(encoding="utf-8")
+
+    assert "actions/workflows/main-quality.yml/badge.svg?branch=main" in readme
+    assert "codecov.io/github/eugenemalaschuk-source/arch-linter-net/graph/badge.svg?branch=main" in readme
+    assert "sonarcloud.io/api/project_badges/measure?project=eugenemalaschuk-source_arch-linter-net" in readme
+    assert 'alt="Architecture policy"' not in readme
+    assert "GitHub Pages is deployed only by the public release workflow" in readme
