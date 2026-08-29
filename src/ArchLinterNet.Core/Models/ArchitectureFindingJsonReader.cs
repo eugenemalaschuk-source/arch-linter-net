@@ -40,7 +40,7 @@ public sealed record ArchitectureFindingReadEnvelope(
 /// </summary>
 public static class ArchitectureFindingJsonReader
 {
-    private static readonly HashSet<string> _knownKinds = new(StringComparer.Ordinal)
+    private static readonly HashSet<string> _v1KnownKinds = new(StringComparer.Ordinal)
     {
         "dependency", "cycle", "unmatched_ignore", "configuration", "external_dependency",
         "policy_consistency", "package_dependency", "type_placement", "public_api_surface",
@@ -48,7 +48,12 @@ public static class ArchitectureFindingJsonReader
         "project_metadata", "context_dependency", "context_allow_only", "port_boundary",
         "layout_convention", "package_allow_only", "framework_reference",
         "framework_reference_allow_only", "build_state_preflight", "baseline",
-        "architecture_policy_error", "applicability",
+        "architecture_policy_error",
+    };
+
+    private static readonly HashSet<string> _v2KnownKinds = new(_v1KnownKinds, StringComparer.Ordinal)
+    {
+        "applicability",
     };
 
     public static ArchitectureFindingReadEnvelope Read(string json, bool strict)
@@ -57,7 +62,13 @@ public static class ArchitectureFindingJsonReader
         using JsonDocument document = JsonDocument.Parse(json);
         JsonElement root = document.RootElement;
         int version = root.GetProperty("schema_version").GetInt32();
-        if (version != ArchitectureFinding.CurrentSchemaVersion)
+        HashSet<string>? knownKinds = version switch
+        {
+            1 => _v1KnownKinds,
+            ArchitectureFinding.CurrentSchemaVersion => _v2KnownKinds,
+            _ => null,
+        };
+        if (knownKinds is null)
         {
             throw new ArchitectureFindingFormatException(
                 $"Unsupported normalized finding schema version '{version}'.");
@@ -65,7 +76,7 @@ public static class ArchitectureFindingJsonReader
 
         string kind = root.GetProperty("kind").GetString()
             ?? throw new ArchitectureFindingFormatException("Normalized finding kind is null.");
-        bool opaque = !_knownKinds.Contains(kind);
+        bool opaque = !knownKinds.Contains(kind);
         if (strict && opaque)
         {
             throw new ArchitectureFindingFormatException(

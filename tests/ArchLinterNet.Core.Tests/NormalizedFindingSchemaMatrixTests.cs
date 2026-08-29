@@ -11,7 +11,7 @@ namespace ArchLinterNet.Core.Tests;
 public sealed class NormalizedFindingSchemaMatrixTests
 {
     [Test]
-    public void EveryFindingFamily_CentralProjectionValidatesAgainstPackagedV1Schema()
+    public void EveryFindingFamily_CentralProjectionValidatesAgainstPackagedV2Schema()
     {
         PackagedSchemaRegistry registry = new();
         Assert.That(registry.TryRead("normalized-finding", out string schemaText), Is.True);

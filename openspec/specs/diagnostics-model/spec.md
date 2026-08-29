@@ -194,11 +194,15 @@ The system SHALL expose a typed details record for every supported finding famil
 - **THEN** the normalized findings carry different typed delta detail records identifying the respective change kinds
 
 ### Requirement: Forward compatibility is explicit
-The system SHALL reject unsupported schema versions and SHALL preserve the envelope and raw details for an unknown kind in non-strict consumption while strict contract validation fails deterministically.
+The system SHALL write the current normalized finding schema version, read both the retained v1 and current v2 envelopes, reject unsupported schema versions, and preserve the envelope and raw details for an unknown kind in non-strict consumption while strict contract validation fails deterministically.
 
 #### Scenario: Unknown kind has a defined outcome
 - **WHEN** a v1 finding has an unrecognized kind
 - **THEN** a non-strict reader exposes an opaque finding and a strict reader reports an unsupported-kind error without interpreting display text
+
+#### Scenario: Applicability advances the finding document version
+- **WHEN** applicability is introduced as a typed normalized finding discriminator
+- **THEN** writers emit `schema_version: 2`, the v2 packaged schema accepts the typed applicability details, and the immutable v1 schema bytes remain available for legacy v1 input
 
 ### Requirement: Normalization fixes identity and ordering before projection
 The normalized finding mapper SHALL use canonical identity and ordinal ordering independent of serialization format and SHALL NOT recompute identity from formatted messages.

@@ -2509,7 +2509,7 @@ sealed class ArchLinterNet.Core.Model.ArchitectureExpandedContractInstance : Sys
   property string? Source {get;init;}
 sealed class ArchLinterNet.Core.Model.ArchitectureFinding : System.IEquatable<ArchLinterNet.Core.Model.ArchitectureFinding>
   ctor(int SchemaVersion, string Kind, string ContractName, string? ContractId, string CanonicalIdentity, ArchLinterNet.Core.Model.ArchitectureDiagnostic Details)
-  field const int CurrentSchemaVersion = 1
+  field const int CurrentSchemaVersion = 2
   method ArchLinterNet.Core.Model.ArchitectureFinding <Clone>$()
   method bool Equals(ArchLinterNet.Core.Model.ArchitectureFinding? other)
   method bool Equals(object? obj)

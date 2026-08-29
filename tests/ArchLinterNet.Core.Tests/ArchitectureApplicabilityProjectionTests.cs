@@ -149,9 +149,12 @@ public sealed class ArchitectureApplicabilityProjectionTests
             ArchitectureApplicabilityRecordState.Unassessable, reason);
         ArchitectureFinding finding = ArchitectureFindingMapper.FromDiagnostic(diagnostic, "strict");
         Dictionary<string, object?> json = ArchitectureDiagnosticFormatter.FormatNormalizedFindingForJson(finding);
+        ArchitectureFindingReadEnvelope rehydrated = ArchitectureFindingJsonReader.Read(
+            JsonSerializer.Serialize(json), strict: true);
 
         Assert.Multiple(() =>
         {
+            Assert.That(finding.SchemaVersion, Is.EqualTo(ArchitectureFinding.CurrentSchemaVersion));
             Assert.That(finding.Kind, Is.EqualTo("applicability"));
             Assert.That(finding.Identity!.ContractFamily, Is.EqualTo("exposure"));
             Assert.That(finding.Identity.SourceType, Is.EqualTo("control/a"));
@@ -163,6 +166,8 @@ public sealed class ArchitectureApplicabilityProjectionTests
             Assert.That(json["message_code"], Is.EqualTo("applicability"));
             Assert.That(((Dictionary<string, object?>)json["details"]!)["reason_code"],
                 Is.EqualTo(ArchitectureApplicabilityReasonCodes.AmbiguousSubject));
+            Assert.That(rehydrated.SchemaVersion, Is.EqualTo(ArchitectureFinding.CurrentSchemaVersion));
+            Assert.That(rehydrated.IsOpaque, Is.False);
         });
     }
 

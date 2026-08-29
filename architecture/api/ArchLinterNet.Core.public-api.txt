@@ -520,7 +520,7 @@ const ArchLinterNet.Core.Model.ArchitectureDiagnosticKind.ProjectMetadata: ArchL
 const ArchLinterNet.Core.Model.ArchitectureDiagnosticKind.PublicApiSurface: ArchLinterNet.Core.Model.ArchitectureDiagnosticKind [value:8]
 const ArchLinterNet.Core.Model.ArchitectureDiagnosticKind.TypePlacement: ArchLinterNet.Core.Model.ArchitectureDiagnosticKind [value:7]
 const ArchLinterNet.Core.Model.ArchitectureDiagnosticKind.UnmatchedIgnore: ArchLinterNet.Core.Model.ArchitectureDiagnosticKind [value:2]
-const ArchLinterNet.Core.Model.ArchitectureFinding.CurrentSchemaVersion: System.Int32 [value:1]
+const ArchLinterNet.Core.Model.ArchitectureFinding.CurrentSchemaVersion: System.Int32 [value:2]
 const ArchLinterNet.Core.Model.ArchitectureGraphLevel.Assembly: ArchLinterNet.Core.Model.ArchitectureGraphLevel [value:2]
 const ArchLinterNet.Core.Model.ArchitectureGraphLevel.Namespace: ArchLinterNet.Core.Model.ArchitectureGraphLevel [value:0]
 const ArchLinterNet.Core.Model.ArchitectureGraphLevel.Type: ArchLinterNet.Core.Model.ArchitectureGraphLevel [value:1]

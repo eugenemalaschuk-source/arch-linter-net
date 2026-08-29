@@ -1,14 +1,14 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://archlinternet.dev/schema/0.5.1/normalized-finding.schema.json",
-  "title": "ArchLinterNet normalized finding v1",
+  "$id": "https://archlinternet.dev/schema/0.6.1/normalized-finding.schema.json",
+  "title": "ArchLinterNet normalized finding v2",
   "type": "object",
   "required": [
     "schema_version", "kind", "canonical_identity", "mode", "severity",
     "message_code", "policy_origin", "source_location", "baseline_state", "details"
   ],
   "properties": {
-    "schema_version": { "const": 1 },
+    "schema_version": { "const": 2 },
     "kind": {
       "enum": [
         "dependency", "cycle", "unmatched_ignore", "configuration", "external_dependency",
@@ -17,7 +17,7 @@
         "project_metadata", "context_dependency", "context_allow_only", "port_boundary",
         "layout_convention", "package_allow_only", "framework_reference",
         "framework_reference_allow_only", "build_state_preflight", "baseline",
-        "architecture_policy_error"
+        "architecture_policy_error", "applicability"
       ]
     },
     "contract": { "type": ["string", "null"] },
@@ -33,7 +33,7 @@
         "project_metadata", "context_dependency", "context_allow_only", "port_boundary",
         "layout_convention", "package_allow_only", "framework_reference",
         "framework_reference_allow_only", "build_state_preflight", "baseline",
-        "architecture_policy_error"
+        "architecture_policy_error", "applicability"
       ]
     },
     "policy_origin": {
@@ -80,7 +80,8 @@
     { "$ref": "#/$defs/frameworkReferenceAllowOnly" },
     { "$ref": "#/$defs/buildStatePreflight" },
     { "$ref": "#/$defs/baseline" },
-    { "$ref": "#/$defs/architecturePolicyError" }
+    { "$ref": "#/$defs/architecturePolicyError" },
+    { "$ref": "#/$defs/applicability" }
   ],
   "$defs": {
     "policyOrigin": {
@@ -520,6 +521,42 @@
             "error_category": { "type": ["string", "null"] },
             "import_chain": { "type": "array", "items": { "type": "string" } },
             "message": { "type": "string" }
+          }
+        }
+      }
+    },
+    "applicability": {
+      "type": "object",
+      "required": ["kind", "details"],
+      "properties": {
+        "kind": { "const": "applicability" },
+        "details": { "$ref": "#/$defs/applicabilityDetails" }
+      }
+    },
+    "applicabilityDetails": {
+      "type": "object",
+      "required": [
+        "detail_kind", "contract", "contract_id", "control_identity", "family",
+        "membership", "state", "validated_state", "reason_code", "policy_identity", "provenance"
+      ],
+      "properties": {
+        "detail_kind": { "const": "applicability" },
+        "contract": { "type": "string" },
+        "contract_id": { "type": ["string", "null"] },
+        "control_identity": { "type": "string", "minLength": 1 },
+        "family": { "type": "string", "minLength": 1 },
+        "membership": { "enum": ["required", "optional", "not_applicable", null] },
+        "state": { "enum": ["evaluable", "not_applicable", "unassessable", null] },
+        "validated_state": { "enum": ["evaluable", "not_applicable", "unassessable", null] },
+        "reason_code": { "type": "string", "minLength": 1 },
+        "policy_identity": { "type": "string" },
+        "provenance": {
+          "type": "object",
+          "required": ["family", "control_identity", "policy_identity"],
+          "properties": {
+            "family": { "type": "string", "minLength": 1 },
+            "control_identity": { "type": "string", "minLength": 1 },
+            "policy_identity": { "type": "string" }
           }
         }
       }
