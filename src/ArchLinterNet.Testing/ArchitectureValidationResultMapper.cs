@@ -30,6 +30,7 @@ internal static class ArchitectureValidationResultMapper
             PreflightBlocked = outcome.PreflightBlocked,
             Mode = mode,
             SubtractiveMatcherParticipation = outcome.SubtractiveMatcherParticipation,
+            Waivers = outcome.Waivers,
             Profile = profile,
         });
     }

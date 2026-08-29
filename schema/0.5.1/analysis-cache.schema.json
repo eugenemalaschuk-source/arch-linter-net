@@ -62,7 +62,8 @@
         "ClassificationPathDeferred": { "type": ["object", "null"] },
         "CycleFindings": { "type": "array", "items": { "type": "object" } },
         "CoverageSummaries": { "type": "array", "items": { "type": "object" } },
-        "SubtractiveMatcherParticipation": { "type": "array", "items": { "type": "object" } }
+        "SubtractiveMatcherParticipation": { "type": "array", "items": { "type": "object" } },
+        "Waivers": { "type": "array", "items": { "type": "object" } }
       },
       "additionalProperties": false
     },

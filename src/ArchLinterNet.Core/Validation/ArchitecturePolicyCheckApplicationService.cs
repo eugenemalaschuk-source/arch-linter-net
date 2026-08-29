@@ -1,3 +1,4 @@
+using System.Reflection;
 using ArchLinterNet.Core.Contracts;
 using ArchLinterNet.Core.Contracts.Abstractions;
 using ArchLinterNet.Core.Contracts.Families;
@@ -47,6 +48,21 @@ internal sealed class ArchitecturePolicyCheckApplicationService(
 
     private static PolicyCheckFailure? FindSnapshotFailure(ArchitectureContractDocument document)
     {
+        ArchitectureIgnoredViolation? invalidWaiver = document.Contracts.AllStrict
+            .Concat(document.Contracts.AllAudit)
+            .SelectMany(GetIgnoredViolations)
+            .FirstOrDefault(ignore => ignore.WaiverValidationError is not null);
+        if (invalidWaiver is not null)
+        {
+            ArchitecturePolicySourceLocation? waiverLocation = document.Provenance.LocationFor(invalidWaiver);
+            ArchitecturePolicyDiagnostic? waiverDiagnostic = waiverLocation is null ? null : new ArchitecturePolicyDiagnostic(
+                ArchitecturePolicyDiagnosticKind.SemanticValidation,
+                waiverLocation,
+                Array.Empty<ArchitecturePolicySourceLocation>(),
+                waiverLocation.Source.ImportChain);
+            return new PolicyCheckFailure(invalidWaiver.WaiverValidationError!, "SemanticValidation", waiverDiagnostic);
+        }
+
         ArchitecturePublicApiSurfaceContract? contract = document.Contracts.StrictPublicApiSurface
             .Concat(document.Contracts.AuditPublicApiSurface)
             .FirstOrDefault(contract => contract.ApiSnapshotErrorKind
@@ -64,6 +80,13 @@ internal sealed class ArchitecturePolicyCheckApplicationService(
             Array.Empty<ArchitecturePolicySourceLocation>(),
             location.Source.ImportChain);
         return new PolicyCheckFailure(contract.ApiSnapshotError!, contract.ApiSnapshotErrorKind.ToString(), diagnostic);
+    }
+
+    private static IEnumerable<ArchitectureIgnoredViolation> GetIgnoredViolations(IArchitectureContract contract)
+    {
+        PropertyInfo? property = contract.GetType().GetProperty("IgnoredViolations");
+        return property?.GetValue(contract) as IEnumerable<ArchitectureIgnoredViolation>
+            ?? Array.Empty<ArchitectureIgnoredViolation>();
     }
 
     private static List<PolicyCheckDeferredCheck> BuildDeferredChecks(

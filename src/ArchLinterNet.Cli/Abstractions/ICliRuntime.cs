@@ -184,6 +184,13 @@ internal interface ICliRuntime
 
     string FormatUnmatchedForHumans(IReadOnlyList<ArchitectureUnmatchedIgnoredViolation> unmatchedViolations);
 
+    /// <summary>
+    /// Renders lifecycle evidence for manual waivers. The default keeps existing host fakes
+    /// source-compatible while the real CLI uses the canonical Core formatter.
+    /// </summary>
+    string FormatWaiversForHumans(IReadOnlyCollection<ArchitectureWaiverLifecycleRecord> waivers) =>
+        new ArchitectureDiagnosticFormatter().FormatWaiversForHumans(waivers);
+
     string FormatCoverageForHumans(IReadOnlyCollection<ArchitectureViolation> coverageFindings);
 
     /// <summary>

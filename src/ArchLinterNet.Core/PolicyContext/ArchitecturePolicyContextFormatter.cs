@@ -35,6 +35,7 @@ public static class ArchitecturePolicyContextFormatter
         markdown.AppendLine();
         markdown.AppendLine("## Change-time guardrails");
         markdown.AppendLine($"- Policy weakening severity: `{Inline(context.Guardrails.PolicyWeakening)}`");
+        markdown.AppendLine($"- Waiver lifecycle profile: `{Inline(context.WaiverLifecycleProfile)}`");
 
         AppendAnalysisInputs(markdown, context.Analysis);
 
@@ -43,6 +44,7 @@ public static class ArchitecturePolicyContextFormatter
         AppendSourceExpansions(markdown, context.SourceExpansions);
         AppendClassification(markdown, context.Classification, context.Contexts);
         AppendExceptions(markdown, context.Exceptions);
+        AppendWaivers(markdown, context.Waivers);
 
         markdown.AppendLine();
         markdown.AppendLine("## Safe agent guidance");
@@ -266,6 +268,30 @@ public static class ArchitecturePolicyContextFormatter
             string reason = string.IsNullOrWhiteSpace(exception.Reason) ? string.Empty : $" — {Inline(exception.Reason)}";
             markdown.AppendLine(
                 $"- `{Inline(exception.Scope)}` `{Inline(exception.Subject)}` {Inline(exception.Kind)}: {Inline(exception.Details)}{reason}");
+        }
+    }
+
+    private static void AppendWaivers(StringBuilder markdown, IReadOnlyList<ArchitecturePolicyContextWaiver> waivers)
+    {
+        markdown.AppendLine();
+        markdown.AppendLine("## Structured architecture waivers");
+        if (waivers.Count == 0)
+        {
+            markdown.AppendLine("- No structured waivers declared.");
+            return;
+        }
+
+        foreach (ArchitecturePolicyContextWaiver waiver in waivers)
+        {
+            string metadata = string.Join(
+                "; ",
+                $"target `{Inline(waiver.TargetFingerprint)}`",
+                $"contract `{Inline(waiver.ContractFamily)}:{Inline(waiver.ContractId)}`",
+                waiver.Owner is null ? string.Empty : $"owner `{Inline(waiver.Owner)}`",
+                waiver.Issue is null ? string.Empty : $"issue `{Inline(waiver.Issue)}`",
+                waiver.Expires is null ? string.Empty : $"expires `{Inline(waiver.Expires)}`",
+                FormatProvenance(waiver.Provenance)).Trim(';', ' ');
+            markdown.AppendLine($"- `{Inline(waiver.WaiverId)}` ({Inline(waiver.Mode)}): {metadata}");
         }
     }
 

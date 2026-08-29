@@ -123,7 +123,8 @@ internal static class ArchitecturePolicyWeakeningContextSupport
             || context.Analysis.ProjectInclude is null || context.Analysis.ProjectExclude is null || context.Analysis.SourceRoots is null
             || context.Sources is null || context.Layers is null || context.Contracts is null || context.Classification is null
             || context.SemanticRoles is null || context.Contexts is null || context.SourceSets is null
-            || context.SourceExpansions is null || context.Exceptions is null || context.Guidance is null)
+            || context.SourceExpansions is null || context.Exceptions is null || context.Guidance is null
+            || context.Waivers is null || string.IsNullOrWhiteSpace(context.WaiverLifecycleProfile))
         {
             throw new ArgumentException($"The {inputName} is incomplete.");
         }
@@ -132,7 +133,7 @@ internal static class ArchitecturePolicyWeakeningContextSupport
     private static void ValidateEffectivePolicyEvidence(ArchitecturePolicyContextExport context, string inputName)
     {
         if (HasIncompleteSources(context) || HasIncompleteContracts(context) || HasIncompleteSourceSets(context)
-            || HasIncompleteSourceExpansions(context) || HasIncompleteExceptions(context))
+            || HasIncompleteSourceExpansions(context) || HasIncompleteExceptions(context) || HasIncompleteWaivers(context))
         {
             throw new ArgumentException($"The {inputName} contains incomplete effective-policy evidence.");
         }
@@ -159,4 +160,9 @@ internal static class ArchitecturePolicyWeakeningContextSupport
             || (exceptionItem.Kind == "ignored_violation" && (exceptionItem.IgnoredViolation is null
                 || string.IsNullOrWhiteSpace(exceptionItem.IgnoredViolation.SourceType)
                 || string.IsNullOrWhiteSpace(exceptionItem.IgnoredViolation.ForbiddenReference))));
+
+    private static bool HasIncompleteWaivers(ArchitecturePolicyContextExport context) => context.Waivers.Any(waiver =>
+        waiver is null || string.IsNullOrWhiteSpace(waiver.Mode) || string.IsNullOrWhiteSpace(waiver.ContractFamily)
+        || string.IsNullOrWhiteSpace(waiver.ContractId) || string.IsNullOrWhiteSpace(waiver.WaiverId)
+        || string.IsNullOrWhiteSpace(waiver.TargetFingerprint));
 }

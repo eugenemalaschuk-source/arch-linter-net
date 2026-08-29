@@ -222,6 +222,7 @@ public static class AnalysisCacheStore
         && outcome.CycleFindings is not null
         && outcome.CoverageSummaries is not null
         && outcome.SubtractiveMatcherParticipation is not null
+        && outcome.Waivers is not null
         && outcome.CoverageConfig is not null
         && outcome.UnmatchedIgnoredViolationsConfig is not null
         && outcome.PolicyConsistencyConfig is not null;

@@ -37,6 +37,7 @@ method ArchLinterNet.Testing.ArchitectureValidationBuilder.WithProfile(): ArchLi
 method ArchLinterNet.Testing.ArchitectureValidationBuilder.WithTimings(): ArchLinterNet.Testing.ArchitectureValidationBuilder
 method ArchLinterNet.Testing.ArchitectureValidationBuilder.WithUnmatchedIgnoredViolationsPolicy(System.Boolean): ArchLinterNet.Testing.ArchitectureValidationBuilder
 method ArchLinterNet.Testing.ArchitectureValidationBuilder.WithValidationEntryBarrier(System.Action): ArchLinterNet.Testing.ArchitectureValidationBuilder
+method ArchLinterNet.Testing.ArchitectureValidationBuilder.WithWaiverEvaluationDate(System.DateOnly): ArchLinterNet.Testing.ArchitectureValidationBuilder
 method ArchLinterNet.Testing.ArchitectureValidationResult.ShouldPass(): System.Void
 method ArchLinterNet.Testing.ArchitectureValidationSnapshotSession.Dispose(): System.Void [virtual]
 method ArchLinterNet.Testing.ArchitectureValidationSnapshotSession.ValidateAudit(): ArchLinterNet.Testing.ArchitectureValidationResult
@@ -60,6 +61,7 @@ property ArchLinterNet.Testing.ArchitectureValidationResult.Timing: ArchLinterNe
 property ArchLinterNet.Testing.ArchitectureValidationResult.UnmatchedIgnoredViolations: System.Collections.Generic.IReadOnlyCollection`1[ArchLinterNet.Core.Model.ArchitectureUnmatchedIgnoredViolation] [get]
 property ArchLinterNet.Testing.ArchitectureValidationResult.UnmatchedIgnoredViolationsConfig: System.String [get]
 property ArchLinterNet.Testing.ArchitectureValidationResult.Violations: System.Collections.Generic.IReadOnlyCollection`1[ArchLinterNet.Core.Model.ArchitectureViolation] [get]
+property ArchLinterNet.Testing.ArchitectureValidationResult.Waivers: System.Collections.Generic.IReadOnlyCollection`1[ArchLinterNet.Core.Model.ArchitectureWaiverLifecycleRecord] [get]
 property ArchLinterNet.Testing.ArchitectureValidationResultParams.BaselineLifecycleEntries: System.Collections.Generic.IReadOnlyCollection`1[ArchLinterNet.Core.Model.BaselineLifecycleEntry] [get, init]
 property ArchLinterNet.Testing.ArchitectureValidationResultParams.CoverageConfig: System.String [get, init]
 property ArchLinterNet.Testing.ArchitectureValidationResultParams.CoverageFindings: System.Collections.Generic.IReadOnlyCollection`1[ArchLinterNet.Core.Model.ArchitectureViolation] [get, init]
@@ -78,4 +80,5 @@ property ArchLinterNet.Testing.ArchitectureValidationResultParams.Timing: ArchLi
 property ArchLinterNet.Testing.ArchitectureValidationResultParams.UnmatchedIgnoredViolations: System.Collections.Generic.IReadOnlyCollection`1[ArchLinterNet.Core.Model.ArchitectureUnmatchedIgnoredViolation] [get, init]
 property ArchLinterNet.Testing.ArchitectureValidationResultParams.UnmatchedIgnoredViolationsConfig: System.String [get, init]
 property ArchLinterNet.Testing.ArchitectureValidationResultParams.Violations: System.Collections.Generic.IReadOnlyCollection`1[ArchLinterNet.Core.Model.ArchitectureViolation] [get, init]
+property ArchLinterNet.Testing.ArchitectureValidationResultParams.Waivers: System.Collections.Generic.IReadOnlyCollection`1[ArchLinterNet.Core.Model.ArchitectureWaiverLifecycleRecord] [get, init]
 property ArchLinterNet.Testing.ArchitectureValidationSnapshotSession.Counters: ArchLinterNet.Core.Validation.ArchitectureAnalysisSnapshotCounters [get]

@@ -29,7 +29,10 @@ public static class AnalysisCacheOutcomeMapper
             outcome.ClassificationPathDeferred,
             outcome.CycleFindings.ToArray(),
             outcome.CoverageSummaries.ToArray(),
-            outcome.SubtractiveMatcherParticipation.ToArray());
+            outcome.SubtractiveMatcherParticipation.ToArray())
+        {
+            Waivers = outcome.Waivers.ToArray(),
+        };
     }
 
     // Reconstructs a ValidationOutcome from a cache hit. PolicyImportPaths/ResolvedAssemblyPaths/
@@ -74,6 +77,7 @@ public static class AnalysisCacheOutcomeMapper
             ClassificationPathDeferred = cached.ClassificationPathDeferred,
             CycleFindings = cached.CycleFindings.ToArray(),
             SubtractiveMatcherParticipation = cached.SubtractiveMatcherParticipation.ToArray(),
+            Waivers = cached.Waivers.ToArray(),
         };
     }
 }

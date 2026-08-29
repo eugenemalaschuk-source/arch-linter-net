@@ -15,6 +15,7 @@ internal static class ArchitecturePolicyDocumentValidatorPipeline
     [
         new HistoryAnalysisConfigurationValidator(),
         new PolicyWeakeningSeverityValidator(),
+        new ArchitectureWaiverValidator(),
         new DuplicateIdValidator(),
         new AcyclicSiblingValidator(),
         new ModuleContainerValidator(),

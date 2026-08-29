@@ -192,7 +192,8 @@ static class ArchLinterNet.Core.Caching.AnalysisCacheEnvelope
   field const string SchemaId = "analysis-cache/v1"
   property static string ToolVersion {get;}
 sealed class ArchLinterNet.Core.Caching.AnalysisCacheKey : System.IEquatable<ArchLinterNet.Core.Caching.AnalysisCacheKey>
-  ctor(string PolicyDigest, string Mode, string? ConditionSetName, string ContractIdsDigest, string WorkspaceDigest, string? Configuration, string? TargetFramework, string? Platform, string? RuntimeIdentifier, string PreprocessorSymbolsDigest = "", string BaselineDigest = "", bool IncludeAsmdefContracts = true, bool EnforceUnmatchedIgnoredViolationsPolicy = false)
+  ctor(string PolicyDigest, string Mode, string? ConditionSetName, string ContractIdsDigest, string WorkspaceDigest, string? Configuration, string? TargetFramework, string? Platform, string? RuntimeIdentifier, string PreprocessorSymbolsDigest = "", string BaselineDigest = "", bool IncludeAsmdefContracts = true, bool EnforceUnmatchedIgnoredViolationsPolicy = false, string WaiverEvaluationDate = "")
+  ctor(string policyDigest, string mode, string? conditionSetName, string contractIdsDigest, string workspaceDigest, string? configuration, string? targetFramework, string? platform, string? runtimeIdentifier, string preprocessorSymbolsDigest, string baselineDigest, bool includeAsmdefContracts, bool enforceUnmatchedIgnoredViolationsPolicy)
   method ArchLinterNet.Core.Caching.AnalysisCacheKey <Clone>$()
   method bool Equals(ArchLinterNet.Core.Caching.AnalysisCacheKey? other)
   method bool Equals(object? obj)
@@ -204,7 +205,7 @@ sealed class ArchLinterNet.Core.Caching.AnalysisCacheKey : System.IEquatable<Arc
   method static string ComputeWorkspaceDigest(System.Collections.Generic.IEnumerable<string> discoveredProjectPaths, string repositoryRoot)
   method static string NormalizeMode(string mode)
   method string ToString()
-  method void Deconstruct(out string PolicyDigest, out string Mode, out string? ConditionSetName, out string ContractIdsDigest, out string WorkspaceDigest, out string? Configuration, out string? TargetFramework, out string? Platform, out string? RuntimeIdentifier, out string PreprocessorSymbolsDigest, out string BaselineDigest, out bool IncludeAsmdefContracts, out bool EnforceUnmatchedIgnoredViolationsPolicy)
+  method void Deconstruct(out string PolicyDigest, out string Mode, out string? ConditionSetName, out string ContractIdsDigest, out string WorkspaceDigest, out string? Configuration, out string? TargetFramework, out string? Platform, out string? RuntimeIdentifier, out string PreprocessorSymbolsDigest, out string BaselineDigest, out bool IncludeAsmdefContracts, out bool EnforceUnmatchedIgnoredViolationsPolicy, out string WaiverEvaluationDate)
   operator !=(ArchLinterNet.Core.Caching.AnalysisCacheKey? left, ArchLinterNet.Core.Caching.AnalysisCacheKey? right)
   operator ==(ArchLinterNet.Core.Caching.AnalysisCacheKey? left, ArchLinterNet.Core.Caching.AnalysisCacheKey? right)
   property bool EnforceUnmatchedIgnoredViolationsPolicy {get;init;}
@@ -215,6 +216,7 @@ sealed class ArchLinterNet.Core.Caching.AnalysisCacheKey : System.IEquatable<Arc
   property string Mode {get;init;}
   property string PolicyDigest {get;init;}
   property string PreprocessorSymbolsDigest {get;init;}
+  property string WaiverEvaluationDate {get;init;}
   property string WorkspaceDigest {get;init;}
   property string? ConditionSetName {get;init;}
   property string? Configuration {get;init;}
@@ -312,6 +314,7 @@ sealed class ArchLinterNet.Core.Caching.AnalysisCacheOutcomeV1 : System.IEquatab
   property System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Model.ArchitectureUnmatchedIgnoredViolation> UnmatchedIgnoredViolations {get;init;}
   property System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Model.ArchitectureViolation> CoverageFindings {get;init;}
   property System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Model.ArchitectureViolation> Violations {get;init;}
+  property System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Model.ArchitectureWaiverLifecycleRecord> Waivers {get;init;}
   property System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Model.PolicyConsistencyDiagnostic> PolicyConsistencyFindings {get;init;}
   property System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Reporting.ArchitectureCoverageSummary> CoverageSummaries {get;init;}
   property System.Collections.Generic.IReadOnlyList<string> Cycles {get;init;}
@@ -536,6 +539,7 @@ sealed class ArchLinterNet.Core.Contracts.ArchitectureAnalysisConfiguration
   property string Solution {get;set;}
   property string TargetFramework {get;set;}
   property string UnmatchedIgnoredViolations {get;set;}
+  property string WaiverLifecycleProfile {get;set;}
 sealed class ArchLinterNet.Core.Contracts.ArchitectureAttributeClassificationMapping
   ctor()
   property System.Collections.Generic.Dictionary<string,object> Metadata {get;set;}
@@ -695,6 +699,9 @@ sealed class ArchLinterNet.Core.Contracts.ArchitectureFrameworkReferenceGroup
   property System.Collections.Generic.List<string> FrameworkNames {get;set;}
 sealed class ArchLinterNet.Core.Contracts.ArchitectureIgnoredViolation
   ctor()
+  property ArchLinterNet.Core.Contracts.ArchitectureWaiverTarget? Target {get;set;}
+  property bool HasStructuredWaiverFields {get;}
+  property bool IsBaselineImported {get;}
   property int? IdentityVersion {get;set;}
   property int? Occurrence {get;set;}
   property string ForbiddenReference {get;set;}
@@ -702,12 +709,17 @@ sealed class ArchLinterNet.Core.Contracts.ArchitectureIgnoredViolation
   property string SourceType {get;set;}
   property string? Configuration {get;set;}
   property string? ContractFamily {get;set;}
+  property string? Expires {get;set;}
+  property string? Introduced {get;set;}
+  property string? Issue {get;set;}
   property string? Kind {get;set;}
+  property string? Owner {get;set;}
   property string? SourceAssembly {get;set;}
   property string? SourceMember {get;set;}
   property string? TargetAssembly {get;set;}
   property string? TargetMember {get;set;}
   property string? TargetType {get;set;}
+  property string? WaiverId {get;set;}
 sealed class ArchLinterNet.Core.Contracts.ArchitectureInheritanceClassificationMapping
   ctor()
   property System.Collections.Generic.Dictionary<string,object> Metadata {get;set;}
@@ -790,6 +802,13 @@ sealed class ArchLinterNet.Core.Contracts.ArchitectureSourceSet
   property System.Collections.Generic.List<string> Members {get;set;}
   property bool Optional {get;set;}
   property string Reason {get;set;}
+static class ArchLinterNet.Core.Contracts.ArchitectureWaiverProfile
+  field const string Compatibility = "compatibility"
+  field const string Strict = "strict"
+  method static string Resolve(ArchLinterNet.Core.Contracts.ArchitectureContractDocument document)
+sealed class ArchLinterNet.Core.Contracts.ArchitectureWaiverTarget
+  ctor()
+  property string Fingerprint {get;set;}
 sealed class ArchLinterNet.Core.Contracts.ConditionSetResolutionService : ArchLinterNet.Core.Contracts.Abstractions.IConditionSetResolutionService
   ctor()
   method bool TryResolve(ArchLinterNet.Core.Contracts.ArchitectureContractDocument document, string? explicitName, out System.Collections.Generic.IReadOnlyList<string> symbols, out string? error)
@@ -2656,6 +2675,35 @@ sealed class ArchLinterNet.Core.Model.ArchitectureViolationIdentity : System.IEq
 static class ArchLinterNet.Core.Model.ArchitectureViolationIdentityJson
   method static System.Collections.Generic.IReadOnlyDictionary<string,object?> ToWireObject(ArchLinterNet.Core.Model.ArchitectureViolationIdentity identity)
   method static string Serialize(ArchLinterNet.Core.Model.ArchitectureViolationIdentity identity)
+sealed class ArchLinterNet.Core.Model.ArchitectureWaiverLifecycleRecord : System.IEquatable<ArchLinterNet.Core.Model.ArchitectureWaiverLifecycleRecord>
+  ctor(string Id, string State, string ContractName, string? ContractId, string ContractGroup, string SourceType, string ForbiddenReference, string? TargetFingerprint, string Reason, string? Owner, string? Issue, System.DateOnly? Introduced, System.DateOnly? Expires, System.DateOnly EvaluationDate, bool MatchesGovernedFinding)
+  method ArchLinterNet.Core.Model.ArchitectureWaiverLifecycleRecord <Clone>$()
+  method bool Equals(ArchLinterNet.Core.Model.ArchitectureWaiverLifecycleRecord? other)
+  method bool Equals(object? obj)
+  method int GetHashCode()
+  method string ToString()
+  method void Deconstruct(out string Id, out string State, out string ContractName, out string? ContractId, out string ContractGroup, out string SourceType, out string ForbiddenReference, out string? TargetFingerprint, out string Reason, out string? Owner, out string? Issue, out System.DateOnly? Introduced, out System.DateOnly? Expires, out System.DateOnly EvaluationDate, out bool MatchesGovernedFinding)
+  operator !=(ArchLinterNet.Core.Model.ArchitectureWaiverLifecycleRecord? left, ArchLinterNet.Core.Model.ArchitectureWaiverLifecycleRecord? right)
+  operator ==(ArchLinterNet.Core.Model.ArchitectureWaiverLifecycleRecord? left, ArchLinterNet.Core.Model.ArchitectureWaiverLifecycleRecord? right)
+  property ArchLinterNet.Core.Model.ArchitecturePolicySourceLocation? PolicyLocation {get;init;}
+  property System.DateOnly EvaluationDate {get;init;}
+  property System.DateOnly? Expires {get;init;}
+  property System.DateOnly? Introduced {get;init;}
+  property bool MatchesGovernedFinding {get;init;}
+  property string ContractGroup {get;init;}
+  property string ContractName {get;init;}
+  property string ForbiddenReference {get;init;}
+  property string Id {get;init;}
+  property string Reason {get;init;}
+  property string SourceType {get;init;}
+  property string State {get;init;}
+  property string? ContractId {get;init;}
+  property string? Issue {get;init;}
+  property string? Owner {get;init;}
+  property string? TargetFingerprint {get;init;}
+static class ArchLinterNet.Core.Model.ArchitectureWaiverTargetFingerprint
+  method static bool IsSupported(string? value)
+  method static string Create(ArchLinterNet.Core.Model.ArchitectureViolationIdentity identity)
 sealed class ArchLinterNet.Core.Model.AttributeUsageDiagnostic : ArchLinterNet.Core.Model.ArchitectureDiagnostic, System.IEquatable<ArchLinterNet.Core.Model.AttributeUsageDiagnostic>
   ctor(string ContractName, string? ContractId, string SourceType, string ForbiddenNamespace, System.Collections.Generic.IReadOnlyCollection<string> ForbiddenReferences)
   method ArchLinterNet.Core.Model.AttributeUsageDiagnostic <Clone>$()
@@ -3673,7 +3721,7 @@ sealed class ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextExpandedI
   property string? Source {get;init;}
 sealed class ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextExport : System.IEquatable<ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextExport>
   ctor(int SchemaVersion, string Kind, ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextPolicy Policy, ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextGuardrails Guardrails, ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextAnalysis Analysis, System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextSource> Sources, System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextLayer> Layers, System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextContract> Contracts, System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextClassification> Classification, System.Collections.Generic.IReadOnlyList<string> SemanticRoles, System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextValue> Contexts, System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextSourceSet> SourceSets, System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextSourceExpansion> SourceExpansions, System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextException> Exceptions, System.Collections.Generic.IReadOnlyList<string> Guidance)
-  field const int CurrentSchemaVersion = 3
+  field const int CurrentSchemaVersion = 4
   method ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextExport <Clone>$()
   method bool Equals(ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextExport? other)
   method bool Equals(object? obj)
@@ -3693,10 +3741,12 @@ sealed class ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextExport : 
   property System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextSourceExpansion> SourceExpansions {get;init;}
   property System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextSourceSet> SourceSets {get;init;}
   property System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextValue> Contexts {get;init;}
+  property System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextWaiver> Waivers {get;init;}
   property System.Collections.Generic.IReadOnlyList<string> Guidance {get;init;}
   property System.Collections.Generic.IReadOnlyList<string> SemanticRoles {get;init;}
   property int SchemaVersion {get;init;}
   property string Kind {get;init;}
+  property string WaiverLifecycleProfile {get;init;}
 static class ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextFormatter
   method static string FormatAsJson(ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextExport context)
   method static string FormatAsMarkdown(ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextExport context)
@@ -3864,6 +3914,28 @@ sealed class ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextValue : S
   operator ==(ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextValue? left, ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextValue? right)
   property System.Collections.Generic.IReadOnlyList<string> Values {get;init;}
   property string Key {get;init;}
+sealed class ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextWaiver : System.IEquatable<ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextWaiver>
+  ctor(string Mode, string ContractFamily, string ContractId, string ContractName, string WaiverId, string TargetFingerprint, string? Owner, string? Issue, string? Introduced, string? Expires, string Reason, ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextProvenance? Provenance)
+  method ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextWaiver <Clone>$()
+  method bool Equals(ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextWaiver? other)
+  method bool Equals(object? obj)
+  method int GetHashCode()
+  method string ToString()
+  method void Deconstruct(out string Mode, out string ContractFamily, out string ContractId, out string ContractName, out string WaiverId, out string TargetFingerprint, out string? Owner, out string? Issue, out string? Introduced, out string? Expires, out string Reason, out ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextProvenance? Provenance)
+  operator !=(ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextWaiver? left, ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextWaiver? right)
+  operator ==(ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextWaiver? left, ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextWaiver? right)
+  property ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextProvenance? Provenance {get;init;}
+  property string ContractFamily {get;init;}
+  property string ContractId {get;init;}
+  property string ContractName {get;init;}
+  property string Mode {get;init;}
+  property string Reason {get;init;}
+  property string TargetFingerprint {get;init;}
+  property string WaiverId {get;init;}
+  property string? Expires {get;init;}
+  property string? Introduced {get;init;}
+  property string? Issue {get;init;}
+  property string? Owner {get;init;}
 sealed class ArchLinterNet.Core.PolicyWeakening.ArchitecturePolicyContractMembership : System.IEquatable<ArchLinterNet.Core.PolicyWeakening.ArchitecturePolicyContractMembership>
   ctor(string Family, string Id, System.Collections.Generic.IReadOnlyList<string> Subjects)
   method ArchLinterNet.Core.PolicyWeakening.ArchitecturePolicyContractMembership <Clone>$()
@@ -4217,6 +4289,7 @@ sealed class ArchLinterNet.Core.Reporting.ArchitectureDiagnosticFormatter : Arch
   ctor()
   method static System.Collections.Generic.Dictionary<string,object?> FormatNormalizedFindingForJson(ArchLinterNet.Core.Model.ArchitectureFinding finding)
   method static System.Collections.Generic.Dictionary<string,object?> FormatPolicyLocationForJson(ArchLinterNet.Core.Model.ArchitecturePolicySourceLocation location)
+  method static string AddWaiversToCiArtifacts(string ciArtifacts, System.Collections.Generic.IReadOnlyCollection<ArchLinterNet.Core.Model.ArchitectureWaiverLifecycleRecord> waivers)
   method static string FormatCyclesForCiArtifacts(string contractName, string? contractId, System.Collections.Generic.IReadOnlyCollection<ArchLinterNet.Core.Model.ArchitectureCycleFinding> cycles)
   method static string FormatCyclesForHumans(System.Collections.Generic.IReadOnlyCollection<ArchLinterNet.Core.Model.ArchitectureCycleFinding> cycles)
   method static string FormatResultForCiArtifacts(string mode, bool passed, System.Collections.Generic.IReadOnlyCollection<ArchLinterNet.Core.Model.ArchitectureViolation> violations, System.Collections.Generic.IReadOnlyCollection<string> cycles, System.Collections.Generic.IReadOnlyCollection<ArchLinterNet.Core.Model.ArchitectureCycleFinding> cycleFindings, System.Collections.Generic.IReadOnlyCollection<ArchLinterNet.Core.Model.ArchitectureClassificationRoleFact> classificationRoles, ArchLinterNet.Core.Model.ArchitectureClassificationPathDeferredNotice? classificationPathDeferred, System.Collections.Generic.IReadOnlyCollection<ArchLinterNet.Core.Model.ArchitectureViolation>? coverageFindings = null, System.Collections.Generic.IReadOnlyCollection<ArchLinterNet.Core.Model.ArchitectureUnmatchedIgnoredViolation>? unmatched = null, System.Collections.Generic.IReadOnlyCollection<ArchLinterNet.Core.Model.PolicyConsistencyDiagnostic>? policyConsistencyFindings = null, System.Collections.Generic.IReadOnlyCollection<ArchLinterNet.Core.Reporting.ArchitectureCoverageSummary>? coverageSummaries = null, System.Collections.Generic.IReadOnlyCollection<ArchLinterNet.Core.Model.ArchitectureClassificationConflict>? classificationConflicts = null, System.Collections.Generic.IReadOnlyCollection<ArchLinterNet.Core.Model.ArchitectureClassificationMetadataFailure>? classificationMetadataFailures = null)
@@ -4243,6 +4316,7 @@ sealed class ArchLinterNet.Core.Reporting.ArchitectureDiagnosticFormatter : Arch
   method string FormatViolationsForCiArtifacts(string contractName, string? contractId, System.Collections.Generic.IReadOnlyCollection<ArchLinterNet.Core.Model.ArchitectureViolation> violations, System.Threading.CancellationToken cancellationToken)
   method string FormatViolationsForHumans(System.Collections.Generic.IReadOnlyCollection<ArchLinterNet.Core.Model.ArchitectureViolation> violations)
   method string FormatViolationsForHumans(System.Collections.Generic.IReadOnlyCollection<ArchLinterNet.Core.Model.ArchitectureViolation> violations, System.Threading.CancellationToken cancellationToken)
+  method string FormatWaiversForHumans(System.Collections.Generic.IReadOnlyCollection<ArchLinterNet.Core.Model.ArchitectureWaiverLifecycleRecord> waivers)
 static class ArchLinterNet.Core.Reporting.ArchitectureDiagnosticMapper
   method static ArchLinterNet.Core.Model.ArchitectureDiagnostic FromViolation(ArchLinterNet.Core.Model.ArchitectureViolation violation)
   method static ArchLinterNet.Core.Model.CycleDiagnostic FromCycle(ArchLinterNet.Core.Model.ArchitectureCycleFinding cycle)
@@ -4401,6 +4475,7 @@ sealed class ArchLinterNet.Core.Validation.AnalysisSnapshotRequest : System.IEqu
   property ArchLinterNet.Core.Caching.AnalysisCacheLocation? CacheLocation {get;init;}
   property System.Collections.Generic.IReadOnlyCollection<string>? ContractIds {get;init;}
   property System.Collections.Generic.IReadOnlyList<string>? PreprocessorSymbols {get;init;}
+  property System.DateOnly? WaiverEvaluationDate {get;init;}
   property System.Threading.CancellationToken CancellationToken {get;init;}
   property bool EnforceUnmatchedIgnoredViolationsPolicy {get;init;}
   property bool IncludeAsmdefContracts {get;init;}
@@ -5019,6 +5094,7 @@ sealed class ArchLinterNet.Core.Validation.ValidationOutcome : System.IEquatable
   property System.Collections.Generic.IReadOnlyCollection<string> Cycles {get;init;}
   property System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Model.ArchitectureSubtractiveMatcherParticipation> SubtractiveMatcherParticipation {get;init;}
   property System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Model.ArchitectureUnmatchedIgnoredViolation> UnmatchedIgnoredViolations {get;init;}
+  property System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Model.ArchitectureWaiverLifecycleRecord> Waivers {get;init;}
   property System.Collections.Generic.IReadOnlyList<string> DiscoveredProjectPaths {get;init;}
   property System.Collections.Generic.IReadOnlyList<string> PolicyImportPaths {get;init;}
   property System.Collections.Generic.IReadOnlyList<string> ResolvedAssemblyPaths {get;init;}
@@ -5041,6 +5117,7 @@ sealed class ArchLinterNet.Core.Validation.ValidationRequest : System.IEquatable
   property ArchLinterNet.Core.Caching.AnalysisCacheLocation? CacheLocation {get;init;}
   property System.Collections.Generic.IReadOnlyCollection<string>? ContractIds {get;init;}
   property System.Collections.Generic.IReadOnlyList<string>? PreprocessorSymbols {get;init;}
+  property System.DateOnly? WaiverEvaluationDate {get;init;}
   property System.Threading.CancellationToken CancellationToken {get;init;}
   property bool EnforceUnmatchedIgnoredViolationsPolicy {get;init;}
   property bool IncludeAsmdefContracts {get;init;}

@@ -107,6 +107,11 @@ public sealed class ArchitectureValidationApplicationService(
         string? modeHint,
         ValidationTiming? timing)
     {
+        request = request with
+        {
+            WaiverEvaluationDate = request.WaiverEvaluationDate ?? DateOnly.FromDateTime(DateTime.UtcNow)
+        };
+
         using (timing?.Measure("policy_composition"))
         {
             try
@@ -180,7 +185,7 @@ public sealed class ArchitectureValidationApplicationService(
                 policyCompositions: state.PolicyCompositions,
                 projectGraphEvaluations: state.ProjectGraphEvaluations,
                 assemblyLoads: 0,
-                requestedContractIds: modeHint == null ? request.ContractIds : null,
+                requestedContractIds: request.ContractIds,
                 cacheContext: BuildCacheContext(request),
                 preparedRepositoryRoot: preparation.RepositoryRoot,
                 preparedArtifactPaths: preparation.SelectedAssemblyArtifactPaths,
@@ -194,7 +199,8 @@ public sealed class ArchitectureValidationApplicationService(
                         state.Policy.EnableUnmatchedIgnoreTracking, timing, modeHint,
                         request.CancellationToken, request.MaxParallelism)
                     : BuildRunnerFor(state.Policy, request, modeHint, timing),
-                cancellationToken: request.CancellationToken);
+                cancellationToken: request.CancellationToken,
+                waiverEvaluationDate: request.WaiverEvaluationDate);
         }
 
         using (timing?.Measure("load_and_setup"))
@@ -237,9 +243,10 @@ public sealed class ArchitectureValidationApplicationService(
             policyCompositions: state.PolicyCompositions,
             projectGraphEvaluations: state.ProjectGraphEvaluations,
             assemblyLoads: state.AssemblyLoads,
-            requestedContractIds: modeHint == null ? request.ContractIds : null,
+            requestedContractIds: request.ContractIds,
             cacheContext: BuildCacheContext(request),
-            cancellationToken: request.CancellationToken);
+            cancellationToken: request.CancellationToken,
+            waiverEvaluationDate: request.WaiverEvaluationDate);
     }
 
     // Null whenever the caller did not configure a cache location (ValidationRequest.CacheLocation /
@@ -463,7 +470,8 @@ public sealed class ArchitectureValidationApplicationService(
         HashSet<string>? selectedIds = ResolveSelectedContractIds(document, request, modeHint);
 
         bool enableUnmatchedIgnoreTracking = !request.EnforceUnmatchedIgnoredViolationsPolicy
-            || unmatchedConfig != "off";
+            || unmatchedConfig != "off"
+            || ArchitectureWaiverLifecycleEvaluator.HasManualWaivers(document);
 
         return new ComposedPolicy(
             document, unmatchedConfig, policyConsistencyConfig, coverageConfig, selectedIds, enableUnmatchedIgnoreTracking);

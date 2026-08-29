@@ -31,6 +31,7 @@ public sealed class ArchitectureValidationBuilder
     private string? _requestedPlatform;
     private string? _requestedRuntimeIdentifier;
     private int? _maxParallelism;
+    private DateOnly? _waiverEvaluationDate;
     private CancellationToken _cancellationToken;
     private Action? _validationEntryBarrier;
 
@@ -130,6 +131,13 @@ public sealed class ArchitectureValidationBuilder
     public ArchitectureValidationBuilder WithMaxParallelism(int? maxDegreeOfParallelism)
     {
         _maxParallelism = maxDegreeOfParallelism;
+        return this;
+    }
+
+    /// <summary>Uses a fixed UTC calendar date when evaluating waiver expiry during this run.</summary>
+    public ArchitectureValidationBuilder WithWaiverEvaluationDate(DateOnly evaluationDate)
+    {
+        _waiverEvaluationDate = evaluationDate;
         return this;
     }
 
@@ -250,6 +258,7 @@ public sealed class ArchitectureValidationBuilder
             RequestedRuntimeIdentifier = _requestedRuntimeIdentifier,
             CacheLocation = ResolveCacheLocationForExecution(),
             MaxParallelism = _maxParallelism,
+            WaiverEvaluationDate = _waiverEvaluationDate,
             CancellationToken = _cancellationToken,
         };
 
@@ -298,6 +307,7 @@ public sealed class ArchitectureValidationBuilder
             RequestedRuntimeIdentifier = _requestedRuntimeIdentifier,
             CacheLocation = ResolveCacheLocationForExecution(),
             MaxParallelism = _maxParallelism,
+            WaiverEvaluationDate = _waiverEvaluationDate,
             CancellationToken = _cancellationToken,
         };
 

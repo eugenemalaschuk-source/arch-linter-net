@@ -194,4 +194,13 @@ public sealed class AnalysisCacheKeyTests
         AnalysisCacheKey b = CreateKey() with { EnforceUnmatchedIgnoredViolationsPolicy = false };
         Assert.That(a.Digest, Is.Not.EqualTo(b.Digest));
     }
+
+    [Test]
+    public void Digest_ChangesWhenWaiverEvaluationDateChanges()
+    {
+        AnalysisCacheKey a = CreateKey() with { WaiverEvaluationDate = "2026-08-28" };
+        AnalysisCacheKey b = CreateKey() with { WaiverEvaluationDate = "2026-08-29" };
+
+        Assert.That(a.Digest, Is.Not.EqualTo(b.Digest));
+    }
 }

@@ -175,6 +175,7 @@ internal sealed partial class ValidateCommandHandler
             RequestedRuntimeIdentifier = options.RuntimeIdentifier,
             CacheLocation = ResolveCacheLocationForExecution(options),
             MaxParallelism = options.MaxParallelism,
+            WaiverEvaluationDate = GetWaiverEvaluationDate(options),
             CancellationToken = _cancellationToken,
         };
 
@@ -315,7 +316,42 @@ internal sealed partial class ValidateCommandHandler
             RequestedRuntimeIdentifier = options.RuntimeIdentifier,
             CacheLocation = ResolveCacheLocationForExecution(options),
             MaxParallelism = options.MaxParallelism,
+            WaiverEvaluationDate = GetWaiverEvaluationDate(options),
             CancellationToken = _cancellationToken,
         };
+    }
+
+    private static DateOnly? GetWaiverEvaluationDate(ValidateCommandOptions options)
+    {
+        return TryGetWaiverEvaluationDate(options, out DateOnly? evaluationDate, out _)
+            ? evaluationDate
+            : throw new InvalidOperationException("The waiver evaluation date was not validated.");
+    }
+
+    private static bool TryGetWaiverEvaluationDate(
+        ValidateCommandOptions options, out DateOnly? evaluationDate, out string? error)
+    {
+        if (string.IsNullOrWhiteSpace(options.WaiverEvaluationDate))
+        {
+            evaluationDate = null;
+            error = null;
+            return true;
+        }
+
+        if (DateOnly.TryParseExact(
+                options.WaiverEvaluationDate,
+                "yyyy-MM-dd",
+                System.Globalization.CultureInfo.InvariantCulture,
+                System.Globalization.DateTimeStyles.None,
+                out DateOnly parsed))
+        {
+            evaluationDate = parsed;
+            error = null;
+            return true;
+        }
+
+        evaluationDate = null;
+        error = "Invalid --waiver-evaluation-date value. Use an ISO calendar date in yyyy-MM-dd format.";
+        return false;
     }
 }

@@ -174,9 +174,41 @@ analysis:
   unmatched_ignored_violations: error
   policy_consistency: error
   coverage: error
+  waiver_lifecycle_profile: strict # strict or compatibility; v2 defaults to strict
 ```
 
 Policies may use explicit target assemblies or project/solution discovery. Normal validation does not silently build. `--ensure-built` is an explicit CLI workflow that builds the selected project graph, verifies the build receipt, then validates.
+
+### Architecture-waiver lifecycle
+
+`ignored_violations` retains its legacy matcher shape for version-1 policies. A
+version-2 policy defaults to the `strict` waiver-lifecycle profile: every
+manually authored waiver must name an immutable target fingerprint, owner,
+tracking issue, introduced date, and expiry date. Use `compatibility`
+explicitly only while migrating existing legacy entries.
+
+```yaml
+ignored_violations:
+  - id: ARCH-IGN-042
+    source_type: MyApp.Application.Legacy.LegacyUseCase
+    forbidden_reference: MyApp.Infrastructure.LegacyGateway
+    target:
+      fingerprint: sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+    reason: Temporary migration seam while the gateway is extracted.
+    owner: architecture-team
+    issue: ARCH-231
+    introduced: 2026-08-01
+    expires: 2026-10-01
+```
+
+Use `ArchitectureWaiverTargetFingerprint.Create` from the Core API to create a
+target value from the exact violation identity. The linter does not treat the
+display matchers as the target: the fingerprint prevents the waiver from
+silently covering another occurrence that happens to have the same text. A
+fingerprint is `sha256:` followed by 64 lowercase hexadecimal characters;
+uppercase hexadecimal is rejected as non-canonical. An incomplete manual
+waiver is reported as fail-closed `invalid` lifecycle evidence and does not
+suppress a finding.
 
 ## Contracts
 

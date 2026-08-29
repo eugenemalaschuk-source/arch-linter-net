@@ -9,8 +9,8 @@
   "properties": {
     "version": {
       "type": "integer",
-      "const": 1,
-      "description": "Policy schema version. Current supported version is 1."
+      "enum": [1, 2],
+      "description": "Policy schema version. Version 1 uses compatibility waiver defaults; version 2 uses strict waiver defaults."
     },
     "name": {
       "type": "string",
@@ -915,6 +915,11 @@
           "default": "error",
           "description": "Severity used only by the explicit policy weakening comparison workflow. 'error' fails that comparison when weakening is found; 'warn' and 'off' retain evidence without a failing comparison exit code. Ordinary strict/audit validation is unaffected."
         },
+        "waiver_lifecycle_profile": {
+          "type": "string",
+          "enum": ["strict", "compatibility"],
+          "description": "Explicit architecture-waiver governance profile. Version 1 defaults to compatibility; version 2 defaults to strict."
+        },
         "condition_sets": {
           "type": "object",
           "description": "Named preprocessor symbol sets for conditional compilation analysis. Each key is a condition set name (e.g. 'runtime', 'editor'), each value is an array of preprocessor symbols (e.g. ['UNITY_EDITOR']). Only affects Roslyn source/method-body scanning.",
@@ -1284,6 +1289,41 @@
           "type": "string",
           "minLength": 1,
           "description": "Human-readable migration reason or issue reference."
+        },
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Stable identifier for a structured manual architecture waiver."
+        },
+        "target": {
+          "$ref": "#/$defs/waiverTarget"
+        },
+        "owner": {
+          "type": "string",
+          "minLength": 1
+        },
+        "issue": {
+          "type": "string",
+          "minLength": 1
+        },
+        "introduced": {
+          "type": "string",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+        },
+        "expires": {
+          "type": "string",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+        }
+      }
+    },
+    "waiverTarget": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["fingerprint"],
+      "properties": {
+        "fingerprint": {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$"
         }
       }
     },

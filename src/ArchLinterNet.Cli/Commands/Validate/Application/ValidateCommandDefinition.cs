@@ -45,6 +45,9 @@ internal sealed class ValidateCommandDefinition(ValidateCommandHandler handler)
                                 (default: max(1, min(processor count, 4))). Must be
                                 a positive integer; 1 is a fully supported
                                 sequential mode.
+              --waiver-evaluation-date <yyyy-MM-dd>
+                                Evaluate waiver expiry against this UTC calendar date;
+                                useful for reproducible CI boundary checks.
               --ensure-built    Build the selected project graph once, verify it via an
                                 ArchLinterNet build receipt, then validate (never implicit;
                                 opt-in only)
@@ -103,6 +106,7 @@ internal sealed class ValidateCommandDefinition(ValidateCommandHandler handler)
         Option<string> profileOption = new("--profile");
         Option<string> cacheOption = new("--cache");
         Option<int?> maxParallelismOption = new("--max-parallelism");
+        Option<string> waiverEvaluationDateOption = new("--waiver-evaluation-date");
         Option<bool> ensureBuiltOption = new("--ensure-built");
         Option<bool> noRestoreOption = new("--no-restore");
         Option<string> configurationOption = new("--configuration");
@@ -128,6 +132,7 @@ internal sealed class ValidateCommandDefinition(ValidateCommandHandler handler)
         command.Options.Add(profileOption);
         command.Options.Add(cacheOption);
         command.Options.Add(maxParallelismOption);
+        command.Options.Add(waiverEvaluationDateOption);
         command.Options.Add(ensureBuiltOption);
         command.Options.Add(noRestoreOption);
         command.Options.Add(configurationOption);
@@ -148,6 +153,7 @@ internal sealed class ValidateCommandDefinition(ValidateCommandHandler handler)
             profileOption,
             cacheOption,
             maxParallelismOption,
+            waiverEvaluationDateOption,
             ensureBuiltOption,
             noRestoreOption,
             configurationOption,
@@ -186,6 +192,7 @@ internal sealed class ValidateCommandDefinition(ValidateCommandHandler handler)
         Option<string> profileOption,
         Option<string> cacheOption,
         Option<int?> maxParallelismOption,
+        Option<string> waiverEvaluationDateOption,
         Option<bool> ensureBuiltOption,
         Option<bool> noRestoreOption,
         Option<string> configurationOption,
@@ -232,6 +239,7 @@ internal sealed class ValidateCommandDefinition(ValidateCommandHandler handler)
             ProfileDestination = parseResult.GetValue(profileOption),
             CacheDestination = parseResult.GetValue(cacheOption),
             MaxParallelism = parseResult.GetValue(maxParallelismOption),
+            WaiverEvaluationDate = parseResult.GetValue(waiverEvaluationDateOption),
         };
     }
 

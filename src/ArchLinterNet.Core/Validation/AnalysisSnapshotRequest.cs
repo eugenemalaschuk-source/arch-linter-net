@@ -23,6 +23,8 @@ public sealed record AnalysisSnapshotRequest
 
     public bool EnforceUnmatchedIgnoredViolationsPolicy { get; init; }
 
+    public DateOnly? WaiverEvaluationDate { get; init; }
+
     public BuildPreparationMode PreparationMode { get; init; } = BuildPreparationMode.Ordinary;
 
     public bool NoRestore { get; init; }
@@ -55,6 +57,7 @@ public sealed record AnalysisSnapshotRequest
             BaselinePath = BaselinePath,
             IncludeAsmdefContracts = IncludeAsmdefContracts,
             EnforceUnmatchedIgnoredViolationsPolicy = EnforceUnmatchedIgnoredViolationsPolicy,
+            WaiverEvaluationDate = WaiverEvaluationDate,
             PreparationMode = PreparationMode,
             NoRestore = NoRestore,
             RequestedConfiguration = RequestedConfiguration,
@@ -78,6 +81,7 @@ public sealed record AnalysisSnapshotRequest
             BaselinePath = request.BaselinePath,
             IncludeAsmdefContracts = request.IncludeAsmdefContracts,
             EnforceUnmatchedIgnoredViolationsPolicy = request.EnforceUnmatchedIgnoredViolationsPolicy,
+            WaiverEvaluationDate = request.WaiverEvaluationDate,
             PreparationMode = request.PreparationMode,
             NoRestore = request.NoRestore,
             RequestedConfiguration = request.RequestedConfiguration,

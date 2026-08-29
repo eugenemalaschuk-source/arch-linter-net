@@ -120,6 +120,14 @@ public sealed class AnalysisCacheHitReconstructionTests
                 new ArchitectureSubtractiveMatcherParticipation(
                     "no_infra_from_domain", "no_infra_from_domain", "exclude_types_matching", 0, Matched: true),
             },
+            Waivers = new[]
+            {
+                new ArchitectureWaiverLifecycleRecord(
+                    "legacy-0123456789abcdef", "active", "no_infra_from_domain", "R001", "layers",
+                    "MyApp.Domain.Order", "MyApp.Infrastructure", "sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+                    "Temporary migration waiver", "architecture-team", "#687",
+                    new DateOnly(2026, 8, 1), new DateOnly(2026, 9, 1), new DateOnly(2026, 8, 28), true),
+            },
         };
     }
 
@@ -132,6 +140,10 @@ public sealed class AnalysisCacheHitReconstructionTests
         {
             ValidationOutcome original = BuildOriginalOutcome();
             AnalysisCacheOutcomeV1 cacheOutcome = AnalysisCacheOutcomeMapper.ToCacheOutcome(original);
+            string serializedCacheOutcome = System.Text.Json.JsonSerializer.Serialize(cacheOutcome, AnalysisCacheJson.Options);
+            Assert.That(
+                System.Text.Json.JsonSerializer.Deserialize<AnalysisCacheOutcomeV1>(serializedCacheOutcome, AnalysisCacheJson.Options),
+                Is.Not.Null);
 
             AnalysisCacheKey key = new("policy-digest", "strict", null, "contracts-digest", "workspace-digest", null, null, null, null);
             AnalysisCacheProjectManifest[] manifests =
@@ -143,7 +155,7 @@ public sealed class AnalysisCacheHitReconstructionTests
             Assert.That(putResult.RejectReason, Is.Null);
 
             AnalysisCacheLookupResult lookup = AnalysisCacheStore.TryGet(location, key, manifests);
-            Assert.That(lookup.Outcome, Is.EqualTo(AnalysisCacheLookupOutcome.Hit));
+            Assert.That(lookup.Outcome, Is.EqualTo(AnalysisCacheLookupOutcome.Hit), $"reason: {lookup.Reason}");
 
             ValidationOutcome reconstructed = AnalysisCacheOutcomeMapper.FromCacheOutcome(
                 lookup.Entry!.Outcome, "/repo", Array.Empty<string>(), Array.Empty<string>(), Array.Empty<string>(),
@@ -192,6 +204,7 @@ public sealed class AnalysisCacheHitReconstructionTests
             Assert.That(reconstructed.CoverageSummaries.Single().Counts.Covered, Is.EqualTo(1));
             Assert.That(reconstructed.SubtractiveMatcherParticipation.Count, Is.EqualTo(1));
             Assert.That(reconstructed.SubtractiveMatcherParticipation.Single().Field, Is.EqualTo("exclude_types_matching"));
+            Assert.That(reconstructed.Waivers, Is.EqualTo(original.Waivers));
 
             // Byte-identical, using the product's own definition of identity: re-mapping the
             // reconstructed outcome back to AnalysisCacheOutcomeV1 and comparing its canonical JSON

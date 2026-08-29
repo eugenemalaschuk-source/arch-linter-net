@@ -49,8 +49,34 @@ public sealed record AnalysisCacheKey(
     // so only a changed baseline's content invalidates reuse, not where it happens to live on disk.
     string BaselineDigest = "",
     bool IncludeAsmdefContracts = true,
-    bool EnforceUnmatchedIgnoredViolationsPolicy = false)
+    bool EnforceUnmatchedIgnoredViolationsPolicy = false,
+    // Waiver lifecycle states are date-sensitive. A dated key prevents a result evaluated today
+    // from being reused after a waiver expires tomorrow.
+    string WaiverEvaluationDate = "")
 {
+    // Keep the previously published primary-constructor shape binary-compatible while adding the
+    // date-sensitive lifecycle dimension above.
+    public AnalysisCacheKey(
+        string policyDigest,
+        string mode,
+        string? conditionSetName,
+        string contractIdsDigest,
+        string workspaceDigest,
+        string? configuration,
+        string? targetFramework,
+        string? platform,
+        string? runtimeIdentifier,
+        string preprocessorSymbolsDigest,
+        string baselineDigest,
+        bool includeAsmdefContracts,
+        bool enforceUnmatchedIgnoredViolationsPolicy)
+        : this(
+            policyDigest, mode, conditionSetName, contractIdsDigest, workspaceDigest, configuration, targetFramework,
+            platform, runtimeIdentifier, preprocessorSymbolsDigest, baselineDigest, includeAsmdefContracts,
+            enforceUnmatchedIgnoredViolationsPolicy, "")
+    {
+    }
+
     public string Digest
     {
         get
@@ -72,7 +98,8 @@ public sealed record AnalysisCacheKey(
                 $"symbols:{PreprocessorSymbolsDigest}",
                 $"baseline:{BaselineDigest}",
                 $"asmdef:{IncludeAsmdefContracts}",
-                $"enforceunmatched:{EnforceUnmatchedIgnoredViolationsPolicy}");
+                $"enforceunmatched:{EnforceUnmatchedIgnoredViolationsPolicy}",
+                $"waiverevaluationdate:{WaiverEvaluationDate}");
             return HashHex(canonical);
         }
     }

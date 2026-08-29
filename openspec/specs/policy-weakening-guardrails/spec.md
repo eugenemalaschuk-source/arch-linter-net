@@ -226,3 +226,23 @@ not load YAML, inspect live repository state, or reanalyse a candidate policy.
 - **THEN** the public façade returns the same de-duplicated, ordinally ordered
   normalized findings and all output projections preserve their established
   identities and evidence
+
+### Requirement: Structured waiver changes remain normalized weakening evidence
+The policy-weakening comparer SHALL recognize added structured waivers, changed
+exact targets, and extensions of an existing waiver's expiry from typed
+policy-context waiver evidence. It SHALL emit existing normalized change-time
+findings with the configured policy-weakening severity and provenance, and
+SHALL NOT create baseline debt or independently compose a gate result.
+
+#### Scenario: New structured waiver is visible to the existing guardrail
+- **WHEN** current context adds a complete structured waiver absent from base
+  context under the strict v0.8 profile
+- **THEN** comparison emits a deterministic configured-severity weakening
+  finding identifying the waiver ID, governed contract, target, and provenance
+
+#### Scenario: Extending a structured waiver expiry is visible to the existing guardrail
+- **WHEN** current context retains a strict v0.8 structured waiver's ID,
+  contract, and exact target but moves its expiry to a later date
+- **THEN** comparison emits a deterministic configured-severity semantic
+  weakening finding identifying the waiver ID, target, previous expiry, and
+  current expiry

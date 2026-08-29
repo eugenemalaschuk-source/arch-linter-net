@@ -26,7 +26,13 @@ public sealed record ArchitecturePolicyContextExport(
     IReadOnlyList<string> Guidance)
 {
     /// <summary>Current supported policy-context schema version.</summary>
-    public const int CurrentSchemaVersion = 3;
+    public const int CurrentSchemaVersion = 4;
+
+    /// <summary>Gets the resolved static waiver-lifecycle profile.</summary>
+    public string WaiverLifecycleProfile { get; init; } = "compatibility";
+
+    /// <summary>Gets the structured waiver declarations present in the effective policy.</summary>
+    public IReadOnlyList<ArchitecturePolicyContextWaiver> Waivers { get; init; } = Array.Empty<ArchitecturePolicyContextWaiver>();
 }
 
 /// <summary>Identifies the effective policy that produced a context export.</summary>
@@ -170,6 +176,21 @@ public sealed record ArchitecturePolicyContextException(
 
 /// <summary>Typed source and forbidden-reference matchers for an ignored violation.</summary>
 public sealed record ArchitecturePolicyContextIgnoredViolation(string SourceType, string ForbiddenReference);
+
+/// <summary>Static evidence for one structured architecture-waiver declaration.</summary>
+public sealed record ArchitecturePolicyContextWaiver(
+    string Mode,
+    string ContractFamily,
+    string ContractId,
+    string ContractName,
+    string WaiverId,
+    string TargetFingerprint,
+    string? Owner,
+    string? Issue,
+    string? Introduced,
+    string? Expires,
+    string Reason,
+    ArchitecturePolicyContextProvenance? Provenance);
 
 /// <summary>Describes a portable location in the effective policy graph.</summary>
 public sealed record ArchitecturePolicyContextProvenance(
