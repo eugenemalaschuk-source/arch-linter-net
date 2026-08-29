@@ -54,8 +54,9 @@ semantic finding.
 Changes to authored analysis `target_assemblies`, `projects`, and `source_roots`
 are likewise `impact_not_proven` until effective discovery/scanner scope is
 available as trusted evidence.
-Adding a structured waiver is a semantic weakening; changing its target
-fingerprint is `impact_not_proven`, never silently accepted as equivalent.
+Adding a structured waiver or extending its expiry is semantic weakening;
+changing its target fingerprint is `impact_not_proven`, never silently accepted
+as equivalent.
 
 Human, JSON, and SARIF project that same result. JSON is suitable for CI and
 SARIF uses one `ArchLinterNet.PolicyWeakening.<kind>` rule for each weakening
