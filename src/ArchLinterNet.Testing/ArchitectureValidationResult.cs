@@ -28,6 +28,7 @@ public sealed class ArchitectureValidationResult
     public IReadOnlyCollection<BaselineLifecycleEntry> BaselineLifecycleEntries { get; }
     public IReadOnlyCollection<ArchitectureSubtractiveMatcherParticipation> SubtractiveMatcherParticipation { get; }
     public IReadOnlyCollection<ArchitectureWaiverLifecycleRecord> Waivers { get; }
+    public ArchitectureAssessmentCompletionEvidence? AssessmentCompletionEvidence { get; }
 
     // Null unless the builder called WithProfile() — see
     // openspec/specs/analysis-profile/spec.md, "Testing API exposes the same profile semantics as
@@ -55,6 +56,7 @@ public sealed class ArchitectureValidationResult
         SubtractiveMatcherParticipation = @params.SubtractiveMatcherParticipation
             ?? Array.Empty<ArchitectureSubtractiveMatcherParticipation>();
         Waivers = @params.Waivers ?? Array.Empty<ArchitectureWaiverLifecycleRecord>();
+        AssessmentCompletionEvidence = @params.AssessmentCompletionEvidence;
         Profile = @params.Profile;
         Findings = ArchitectureFindingMapper.Order(AllDiagnostics());
     }
@@ -152,8 +154,41 @@ public sealed class ArchitectureValidationResult
             null,
             Waivers.Count > 0 ? _formatter.FormatWaiversForHumans(Waivers) : string.Empty);
 
+        message += FormatFailureSection(
+            null,
+            AssessmentCompletionEvidence?.State == ArchitectureAssessmentCompletionState.Unassessable
+                ? FormatAssessmentCompletionForHumans(AssessmentCompletionEvidence)
+                : string.Empty);
+
         return message;
     }
+
+    private static string FormatAssessmentCompletionForHumans(
+        ArchitectureAssessmentCompletionEvidence? completion)
+    {
+        if (completion is null)
+        {
+            return string.Empty;
+        }
+
+        string reasons = completion.Reasons.Count == 0
+            ? "none"
+            : string.Join(
+                "; ",
+                completion.Reasons.Select(reason =>
+                {
+                    ArchitectureApplicabilityProvenance provenance = reason.Provenance;
+                    string policy = string.IsNullOrEmpty(provenance.PolicyIdentity)
+                        ? string.Empty
+                        : $", policy={provenance.PolicyIdentity}";
+                    return $"{reason.Code} (family={provenance.Family}, control={provenance.ControlIdentity}{policy})";
+                }));
+
+        return $"Assessment completion: {CompletionStateToken(completion.State)}; reasons: {reasons}";
+    }
+
+    private static string CompletionStateToken(ArchitectureAssessmentCompletionState state) =>
+        state.ToString().ToLowerInvariant();
 
     private static string FormatFailureSection(string? label, string details)
     {
@@ -199,4 +234,5 @@ public sealed record ArchitectureValidationResultParams(
     public IReadOnlyCollection<ArchitectureSubtractiveMatcherParticipation>? SubtractiveMatcherParticipation { get; init; }
     public IReadOnlyCollection<ArchitectureWaiverLifecycleRecord>? Waivers { get; init; }
     public AnalysisProfile? Profile { get; init; }
+    public ArchitectureAssessmentCompletionEvidence? AssessmentCompletionEvidence { get; init; }
 }

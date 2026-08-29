@@ -7,7 +7,7 @@ using NUnit.Framework;
 namespace ArchLinterNet.Core.Tests;
 
 [TestFixture]
-public sealed class TestingAdapterTests
+public sealed partial class TestingAdapterTests
 {
     private static readonly string[] _rulesFragmentPaths = { "architecture/rules.yml" };
     private static readonly string[] _selfForbiddenIds = { "self-forbidden" };

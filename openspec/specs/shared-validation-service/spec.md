@@ -2,7 +2,9 @@
 
 ## Purpose
 TBD - created by archiving change split-diagnostics-model. Update Purpose after archive.
+
 ## Requirements
+
 ### Requirement: One service drives CLI validation, the public API, and the Testing adapter
 `ArchLinterNet.Core.Validation.Abstractions.IArchitectureValidationApplicationService.Validate`, reached through a composed `ArchLinterNet.Core.Composition.ArchitectureEngine`, SHALL be the single implementation of the policy-load → condition-set-resolution → repository-root-resolution → assembly-resolution → runner-creation → contract-execution → result-aggregation pipeline. The CLI `validate` command, the public `ArchitectureValidator` API, and the `ArchitectureAssertions` Testing adapter SHALL each build (and reuse) their own `ArchitectureEngine` via `new ArchitectureEngineBuilder().AddArchLinterNetCore().Build()` and call `engine.Validate(...)` rather than re-implementing the pipeline or calling the static `ArchitectureValidationService.Validate` facade directly. The static facade SHALL remain available as a compatibility entry point for other callers and SHALL continue to produce identical outcomes.
 
@@ -114,3 +116,23 @@ When `ValidationRequest.EnforceUnmatchedIgnoredViolationsPolicy` is `true`, the 
 - **WHEN** any of the three pre-existing `ArchitectureValidator.Validate(...)` overloads (positional `policyPath`, `out violations`, or `out violations`/`out cycles` with optional `preprocessorSymbols`) is called
 - **THEN** behavior SHALL be identical to before this requirement was added: `Mode = "strict"` and `EnforceUnmatchedIgnoredViolationsPolicy = false` are still used internally, and violations continue to be folded (coverage findings and policy-consistency findings included) into the `out` collection as before
 
+### Requirement: ValidationOutcome carries assessment completion separately from findings
+The shared validation pipeline SHALL expose typed assessment completion and its
+ordered reason/provenance evidence on `ValidationOutcome`, independently of
+ordinary violations, cycles, coverage, and configuration failures. A trusted
+`pass` or `fail` SHALL retain existing conformance behavior. A valid-but-
+unassessable authoritative assessment SHALL not be flattened into an ordinary
+architecture violation merely to make `Passed` false. The Testing adapter SHALL
+carry equivalent completion evidence for a result it maps from the shared
+outcome.
+
+#### Scenario: Testing observes an unassessable shared outcome
+- **WHEN** the validation service returns an authoritative outcome with
+  `unassessable` completion and a missing-required-input reason
+- **THEN** the Testing adapter exposes the same completion state and reason
+  without fabricating a violation or treating the outcome as a trusted pass
+
+#### Scenario: Existing policy remains compatible
+- **WHEN** a policy has no effective v0.8 applicability control
+- **THEN** its shared validation outcome retains the existing pass/fail
+  behavior and has no unassessable completion evidence
