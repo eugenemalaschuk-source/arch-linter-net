@@ -148,6 +148,20 @@ public partial class CliIntegrationTests
     }
 
     [Test]
+    public void PolicyArgumentThenHelpFollowedByInvalidInput_FailsClosed()
+    {
+        var (exitCode, stdout, stderr) = RunCli("--policy", "x", "--help", "debt");
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(exitCode, Is.EqualTo(2));
+            Assert.That(stdout, Is.Empty);
+            Assert.That(stderr, Does.Contain("debt"));
+            Assert.That(stderr, Does.Contain("--help"));
+        });
+    }
+
+    [Test]
     public void UnknownTopLevelCommand_FailsClosedWithoutRootHelp()
     {
         var (exitCode, stdout, stderr) = RunCli("debt", "--help");
