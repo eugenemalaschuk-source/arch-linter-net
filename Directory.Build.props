@@ -9,13 +9,14 @@
     <Nullable>enable</Nullable>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <!--
-      Explicit next development release line. Main-build packaging reads this value and appends
-      `-main.N`; the public release workflow remains tag/scenario driven and overrides Version.
-      Advance this in a normal PR after a stable release instead of inferring minor/patch intent.
+      Explicit next development release line for installable `main.N` packages only. The main-build
+      workflow reads this value and overrides Version/PackageVersion; ordinary source-tree builds
+      keep their existing version identity so advancing the next release line cannot silently alter
+      product output/golden evidence. The public release workflow remains tag/scenario driven.
     -->
     <ArchLinterDevelopmentVersion>0.8.0</ArchLinterDevelopmentVersion>
-    <VersionPrefix>$(ArchLinterDevelopmentVersion)</VersionPrefix>
-    <VersionSuffix>dev</VersionSuffix>
+    <VersionPrefix>0.1.0</VersionPrefix>
+    <VersionSuffix>preview.658</VersionSuffix>
     <Authors>Eugene Malashchuk</Authors>
     <Company>Eugene Malashchuk</Company>
     <Copyright>Copyright (c) 2026 Eugene Malashchuk</Copyright>
