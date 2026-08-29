@@ -653,7 +653,8 @@ internal sealed partial class ReportCoordinator
             }
         }
 
-        string assessmentCompletion = FormatAssessmentCompletionForHumans(outcome.AssessmentCompletionEvidence);
+        string assessmentCompletion = ArchitectureDiagnosticFormatter.FormatAssessmentCompletionForHumans(
+            outcome.AssessmentCompletionEvidence);
         if (!string.IsNullOrEmpty(assessmentCompletion))
         {
             sb.AppendLine(assessmentCompletion);

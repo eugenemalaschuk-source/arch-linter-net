@@ -20,30 +20,6 @@ internal sealed partial class ReportCoordinator
             : FormatCombinedHuman(outcomesByMode, cancellationToken);
     }
 
-    private static string FormatAssessmentCompletionForHumans(
-        ArchitectureAssessmentCompletionEvidence? completion)
-    {
-        if (completion is null)
-        {
-            return string.Empty;
-        }
-
-        string reasons = completion.Reasons.Count == 0
-            ? "none"
-            : string.Join(
-                "; ",
-                completion.Reasons.Select(reason =>
-                {
-                    ArchitectureApplicabilityProvenance provenance = reason.Provenance;
-                    string policy = string.IsNullOrEmpty(provenance.PolicyIdentity)
-                        ? string.Empty
-                        : $", policy={provenance.PolicyIdentity}";
-                    return $"{reason.Code} (family={provenance.Family}, control={provenance.ControlIdentity}{policy})";
-                }));
-
-        return $"Assessment completion: {CompletionStateToken(completion.State)}; reasons: {reasons}";
-    }
-
     private static string CompletionStateToken(ArchitectureAssessmentCompletionState state) =>
         state.ToString().ToLowerInvariant();
 
