@@ -75,23 +75,15 @@ jobs:
           if-no-files-found: error
           retention-days: 1
 
-  telemetry:
-    name: Main Coverage + Sonar + Codecov
+  sonar:
+    name: Main SonarCloud
     needs: dotnet_coverage
-    if: always()
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
       contents: read
 
     steps:
-      - name: Require successful .NET coverage shards
-        if: needs.dotnet_coverage.result != 'success'
-        run: |
-          echo ".NET coverage shard matrix result: ${{ needs.dotnet_coverage.result }}" >&2
-          echo "Main quality telemetry requires every coverage shard to succeed; refusing a partial aggregate." >&2
-          exit 1
-
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
@@ -131,17 +123,6 @@ jobs:
 
       - name: Collect Python tooling coverage
         run: make test-tooling-coverage
-
-      - name: Resolve coverage report paths
-        id: coverage_reports
-        shell: bash
-        run: |
-          files="$(find test-results -name 'coverage.cobertura.xml' -print | sed 's#^#./#' | paste -sd, -)"
-          echo "files=$files" >> "$GITHUB_OUTPUT"
-          if [ -z "$files" ]; then
-            echo "No .NET Cobertura coverage reports were downloaded." >&2
-            exit 1
-          fi
 
       - name: Cache SonarQube packages
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
@@ -192,16 +173,44 @@ jobs:
       - name: Build for SonarCloud analysis
         run: dotnet build ArchLinterNet.slnx --no-restore --nologo
 
-      - name: End SonarCloud analysis
-        id: sonar_end
-        if: success() && steps.sonar_begin.outcome == 'success'
+      - name: End SonarCloud analysis and require quality gate
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
         shell: bash
         run: ./.sonar/scanner/dotnet-sonarscanner end /d:sonar.token="$SONAR_TOKEN"
 
-      - name: Upload test coverage to Codecov
-        if: always() && steps.coverage_reports.outputs.files != ''
+  codecov:
+    name: Main Codecov
+    needs: dotnet_coverage
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+
+      - name: Download .NET coverage shards
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+        with:
+          pattern: main-dotnet-coverage-*
+          path: test-results/coverage-shards
+
+      - name: Resolve coverage report paths
+        id: coverage_reports
+        shell: bash
+        run: |
+          files="$(find test-results -name 'coverage.cobertura.xml' -print | sed 's#^#./#' | paste -sd, -)"
+          echo "files=$files" >> "$GITHUB_OUTPUT"
+          if [ -z "$files" ]; then
+            echo "No .NET Cobertura coverage reports were downloaded." >&2
+            exit 1
+          fi
+
+      - name: Upload merged-main coverage to Codecov
         uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f # v7.0.0
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
@@ -209,8 +218,16 @@ jobs:
           disable_search: true
           fail_ci_if_error: true
 
+  summary:
+    name: Main Quality Summary
+    needs: [dotnet_coverage, sonar, codecov]
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    permissions: {}
+
+    steps:
       - name: Publish main telemetry summary
-        if: always()
         shell: bash
         run: |
           {
@@ -218,8 +235,12 @@ jobs:
             echo
             echo "- Source: \`$GITHUB_SHA\`"
             echo "- .NET coverage shards: ${{ needs.dotnet_coverage.result }}"
-            echo "- Sonar scanner completion: ${{ steps.sonar_end.outcome || 'skipped' }}"
-            echo "- Codecov upload: ${{ steps.coverage_reports.outputs.files != '' && 'attempted' || 'not attempted' }}"
-            echo "- Sonar and Codecov refreshes are independent: one service failure does not suppress the other refresh attempt."
-            echo "- README main-quality, Sonar and Codecov badges are expected to represent this merged revision after successful uploads."
+            echo "- SonarCloud main refresh: ${{ needs.sonar.result }}"
+            echo "- Codecov main refresh: ${{ needs.codecov.result }}"
+            echo "- SonarCloud and Codecov run as independent fan-out jobs from the same merged-main coverage evidence."
+            echo "- README main-quality, Sonar and Codecov badges are expected to represent this merged revision after successful jobs."
           } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Require complete main telemetry
+        if: needs.dotnet_coverage.result != 'success' || needs.sonar.result != 'success' || needs.codecov.result != 'success'
+        run: exit 1
