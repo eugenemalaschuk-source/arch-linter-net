@@ -103,6 +103,16 @@ def test_main_packages_uses_github_token_and_never_runs_validation_matrix() -> N
     assert "Codecov" not in workflow
 
 
+def test_main_packages_require_private_visibility_before_continuing() -> None:
+    workflow = _read("main-packages.yml")
+
+    assert "Publish verified private package set to GitHub Packages" in workflow
+    assert "existing GitHub Package visibility" in workflow
+    assert "expected 'private'" in workflow
+    assert "visibility=\"$(gh api" in workflow
+    assert "Visibility: private (verified through GitHub Packages metadata after publication)" in workflow
+
+
 def test_main_package_retention_is_complete_set_and_current_build_safe() -> None:
     workflow = _read("main-packages.yml")
 
