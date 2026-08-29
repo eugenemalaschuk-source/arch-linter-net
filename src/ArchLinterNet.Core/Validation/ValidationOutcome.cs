@@ -101,4 +101,17 @@ public sealed record ValidationOutcome(
         Array.Empty<ArchitectureApplicabilityRecord>();
 
     public ArchitectureAssessmentCompletionEvidence? AssessmentCompletionEvidence { get; init; }
+
+    /// <summary>
+    /// The single Core-owned applicability projection consumed by output and adapter layers. It is
+    /// null for policies without applicability opt-in, just like completion evidence.
+    /// </summary>
+    public ArchitectureApplicabilityProjection? ApplicabilityProjection { get; init; }
+
+    /// <summary>Normalized applicability insufficiency findings, when the projection is present.</summary>
+    public IReadOnlyList<ArchitectureFinding> ApplicabilityFindings =>
+        ApplicabilityProjection?.Findings
+        ?? (AssessmentCompletionEvidence is null
+            ? Array.Empty<ArchitectureFinding>()
+            : ArchitectureApplicabilityProjector.ToFindings(AssessmentCompletionEvidence));
 }

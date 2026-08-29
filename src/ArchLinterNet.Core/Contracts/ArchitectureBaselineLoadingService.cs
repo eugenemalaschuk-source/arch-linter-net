@@ -238,6 +238,17 @@ public sealed class ArchitectureBaselineLoadingService : IArchitectureBaselineLo
                 var ignores = GetIgnoredViolations(contract);
                 foreach (var baselineIgnore in baselineEntry.IgnoredViolations)
                 {
+                    // Applicability findings are evidence of an assessment boundary, not
+                    // ordinary conformance violations. Validate their owning entry above, but do
+                    // not feed them into ArchitectureIgnoreMatcher: doing so would let a matching
+                    // baseline entry turn an unassessable assessment into a pass (and would also
+                    // create a spurious unmatched-ignore result).
+                    if (isStructured
+                        && string.Equals(baselineIgnore.Kind, "applicability", StringComparison.Ordinal))
+                    {
+                        continue;
+                    }
+
                     // Version-1 entries dedup by the legacy display pair, exactly as before. Version-2
                     // entries dedup by the full structured identity — two entries can legitimately
                     // share (source_type, forbidden_reference) display text while being distinct

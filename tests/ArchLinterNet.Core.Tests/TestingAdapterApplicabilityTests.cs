@@ -1,4 +1,6 @@
 using ArchLinterNet.Core.Model;
+using ArchLinterNet.Core.Reporting;
+using ArchLinterNet.Core.Validation;
 using ArchLinterNet.Testing;
 using NUnit.Framework;
 
@@ -36,6 +38,47 @@ public sealed partial class TestingAdapterTests
             Assert.That(exception.Message, Does.Contain("topology-control"));
             Assert.That(exception.Message, Does.Contain("policy-v08"));
             Assert.That(exception.Message, Does.Not.Contain("ArchitectureViolation"));
+        });
+    }
+
+    [Test]
+    public void Result_MapsProjectionAndAddsOnlyProjectedFindingsToNormalizedCollection()
+    {
+        ArchitectureApplicabilityReason reason = new(
+            ArchitectureApplicabilityReasonCodes.MissingRequiredInput,
+            new ArchitectureApplicabilityProvenance("topology", "topology-control", "policy-v08"));
+        ArchitectureApplicabilityExpectedEntry expected = new(
+            "topology-control", "topology", ArchitectureApplicabilityMembership.Required,
+            new ArchitectureApplicabilityProvenance("topology", "topology-control", "policy-v08"));
+        ArchitectureApplicabilityRecord record = new(
+            "topology-control", "topology", ArchitectureApplicabilityRecordState.Unassessable, [reason],
+            new ArchitectureApplicabilityProvenance("topology", "topology-control", "policy-v08"));
+        ArchitectureAssessmentCompletionEvidence completion = ArchitectureApplicabilityEvaluator.Evaluate(
+            [expected], [record], conformancePassed: true)!;
+        ArchitectureApplicabilityProjection projection = ArchitectureApplicabilityProjector.Project(completion, "strict")!;
+
+        var result = new ArchitectureValidationResult(new ArchitectureValidationResultParams(
+            Passed: false,
+            Violations: Array.Empty<ArchitectureViolation>(),
+            Cycles: Array.Empty<string>())
+        {
+            Mode = "strict",
+            AssessmentCompletionEvidence = completion,
+            ApplicabilityProjection = projection,
+        });
+
+        InvalidOperationException exception = Assert.Throws<InvalidOperationException>(() => result.ShouldPass())!;
+        ArchitectureFinding finding = result.Findings.Single();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(result.ApplicabilityProjection, Is.SameAs(projection));
+            Assert.That(result.AssessmentCompletionEvidence, Is.SameAs(completion));
+            Assert.That(projection.Summary.RequiredCount, Is.EqualTo(1));
+            Assert.That(finding, Is.SameAs(projection.Findings.Single()));
+            Assert.That(finding.Identity!.SourceType, Is.EqualTo("topology-control"));
+            Assert.That(exception.Message, Does.Contain("Assessment completion: unassessable"));
+            Assert.That(exception.Message, Does.Contain(ArchitectureApplicabilityReasonCodes.MissingRequiredInput));
         });
     }
 }

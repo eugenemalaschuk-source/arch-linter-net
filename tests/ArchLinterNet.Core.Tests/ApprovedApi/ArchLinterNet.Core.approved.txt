@@ -295,17 +295,22 @@ sealed class ArchLinterNet.Core.Caching.AnalysisCacheOptions : System.IEquatable
 static class ArchLinterNet.Core.Caching.AnalysisCacheOutcomeMapper
   method static ArchLinterNet.Core.Caching.AnalysisCacheOutcomeV1 ToCacheOutcome(ArchLinterNet.Core.Validation.ValidationOutcome outcome)
   method static ArchLinterNet.Core.Validation.ValidationOutcome FromCacheOutcome(ArchLinterNet.Core.Caching.AnalysisCacheOutcomeV1 cached, string repositoryRoot, System.Collections.Generic.IReadOnlyList<string> policyImportPaths, System.Collections.Generic.IReadOnlyList<string> resolvedAssemblyPaths, System.Collections.Generic.IReadOnlyList<string> discoveredProjectPaths, ArchLinterNet.Core.Model.ArchitectureSourceExpansionInventory sourceExpansion)
+  method static ArchLinterNet.Core.Validation.ValidationOutcome FromCacheOutcome(ArchLinterNet.Core.Caching.AnalysisCacheOutcomeV1 cached, string repositoryRoot, System.Collections.Generic.IReadOnlyList<string> policyImportPaths, System.Collections.Generic.IReadOnlyList<string> resolvedAssemblyPaths, System.Collections.Generic.IReadOnlyList<string> discoveredProjectPaths, ArchLinterNet.Core.Model.ArchitectureSourceExpansionInventory sourceExpansion, string? mode)
 sealed class ArchLinterNet.Core.Caching.AnalysisCacheOutcomeV1 : System.IEquatable<ArchLinterNet.Core.Caching.AnalysisCacheOutcomeV1>
   ctor(bool Passed, System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Model.ArchitectureViolation> Violations, System.Collections.Generic.IReadOnlyList<string> Cycles, System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Model.ArchitectureViolation> CoverageFindings, string CoverageConfig, System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Model.ArchitectureUnmatchedIgnoredViolation> UnmatchedIgnoredViolations, string UnmatchedIgnoredViolationsConfig, System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Model.PolicyConsistencyDiagnostic> PolicyConsistencyFindings, string PolicyConsistencyConfig, System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Model.ArchitectureClassificationConflict> ClassificationConflicts, System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Model.ArchitectureClassificationMetadataFailure> ClassificationMetadataFailures, System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Model.ArchitectureClassificationRoleFact>? ClassificationRoles = null, ArchLinterNet.Core.Model.ArchitectureClassificationPathDeferredNotice? ClassificationPathDeferred = null, System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Model.ArchitectureCycleFinding>? CycleFindings = null, System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Reporting.ArchitectureCoverageSummary>? CoverageSummaries = null, System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Model.ArchitectureSubtractiveMatcherParticipation>? SubtractiveMatcherParticipation = null)
+  ctor(bool Passed, System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Model.ArchitectureViolation> Violations, System.Collections.Generic.IReadOnlyList<string> Cycles, System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Model.ArchitectureViolation> CoverageFindings, string CoverageConfig, System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Model.ArchitectureUnmatchedIgnoredViolation> UnmatchedIgnoredViolations, string UnmatchedIgnoredViolationsConfig, System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Model.PolicyConsistencyDiagnostic> PolicyConsistencyFindings, string PolicyConsistencyConfig, System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Model.ArchitectureClassificationConflict> ClassificationConflicts, System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Model.ArchitectureClassificationMetadataFailure> ClassificationMetadataFailures, System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Model.ArchitectureClassificationRoleFact>? ClassificationRoles, ArchLinterNet.Core.Model.ArchitectureClassificationPathDeferredNotice? ClassificationPathDeferred, System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Model.ArchitectureCycleFinding>? CycleFindings, System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Reporting.ArchitectureCoverageSummary>? CoverageSummaries, System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Model.ArchitectureSubtractiveMatcherParticipation>? SubtractiveMatcherParticipation, System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Model.ArchitectureApplicabilityExpectedEntry>? ApplicabilityExpectedEntries, System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Model.ArchitectureApplicabilityRecord>? ApplicabilityRecords)
   method ArchLinterNet.Core.Caching.AnalysisCacheOutcomeV1 <Clone>$()
   method bool Equals(ArchLinterNet.Core.Caching.AnalysisCacheOutcomeV1? other)
   method bool Equals(object? obj)
   method int GetHashCode()
   method string ToString()
   method void Deconstruct(out bool Passed, out System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Model.ArchitectureViolation> Violations, out System.Collections.Generic.IReadOnlyList<string> Cycles, out System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Model.ArchitectureViolation> CoverageFindings, out string CoverageConfig, out System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Model.ArchitectureUnmatchedIgnoredViolation> UnmatchedIgnoredViolations, out string UnmatchedIgnoredViolationsConfig, out System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Model.PolicyConsistencyDiagnostic> PolicyConsistencyFindings, out string PolicyConsistencyConfig, out System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Model.ArchitectureClassificationConflict> ClassificationConflicts, out System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Model.ArchitectureClassificationMetadataFailure> ClassificationMetadataFailures, out System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Model.ArchitectureClassificationRoleFact>? ClassificationRoles, out ArchLinterNet.Core.Model.ArchitectureClassificationPathDeferredNotice? ClassificationPathDeferred, out System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Model.ArchitectureCycleFinding>? CycleFindings, out System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Reporting.ArchitectureCoverageSummary>? CoverageSummaries, out System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Model.ArchitectureSubtractiveMatcherParticipation>? SubtractiveMatcherParticipation)
+  method void Deconstruct(out bool Passed, out System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Model.ArchitectureViolation> Violations, out System.Collections.Generic.IReadOnlyList<string> Cycles, out System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Model.ArchitectureViolation> CoverageFindings, out string CoverageConfig, out System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Model.ArchitectureUnmatchedIgnoredViolation> UnmatchedIgnoredViolations, out string UnmatchedIgnoredViolationsConfig, out System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Model.PolicyConsistencyDiagnostic> PolicyConsistencyFindings, out string PolicyConsistencyConfig, out System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Model.ArchitectureClassificationConflict> ClassificationConflicts, out System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Model.ArchitectureClassificationMetadataFailure> ClassificationMetadataFailures, out System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Model.ArchitectureClassificationRoleFact>? ClassificationRoles, out ArchLinterNet.Core.Model.ArchitectureClassificationPathDeferredNotice? ClassificationPathDeferred, out System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Model.ArchitectureCycleFinding>? CycleFindings, out System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Reporting.ArchitectureCoverageSummary>? CoverageSummaries, out System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Model.ArchitectureSubtractiveMatcherParticipation>? SubtractiveMatcherParticipation, out System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Model.ArchitectureApplicabilityExpectedEntry>? ApplicabilityExpectedEntries, out System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Model.ArchitectureApplicabilityRecord>? ApplicabilityRecords)
   operator !=(ArchLinterNet.Core.Caching.AnalysisCacheOutcomeV1? left, ArchLinterNet.Core.Caching.AnalysisCacheOutcomeV1? right)
   operator ==(ArchLinterNet.Core.Caching.AnalysisCacheOutcomeV1? left, ArchLinterNet.Core.Caching.AnalysisCacheOutcomeV1? right)
   property ArchLinterNet.Core.Model.ArchitectureClassificationPathDeferredNotice? ClassificationPathDeferred {get;init;}
+  property System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Model.ArchitectureApplicabilityExpectedEntry> ApplicabilityExpectedEntries {get;init;}
+  property System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Model.ArchitectureApplicabilityRecord> ApplicabilityRecords {get;init;}
   property System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Model.ArchitectureClassificationConflict> ClassificationConflicts {get;init;}
   property System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Model.ArchitectureClassificationMetadataFailure> ClassificationMetadataFailures {get;init;}
   property System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Model.ArchitectureClassificationRoleFact> ClassificationRoles {get;init;}
@@ -2053,6 +2058,28 @@ sealed class ArchLinterNet.Core.Model.ArchitectureApplicabilityAssessment : Syst
   property bool IsIntegrityValid {get;}
   property string ControlIdentity {get;}
   property string EffectiveControlId {get;}
+sealed class ArchLinterNet.Core.Model.ArchitectureApplicabilityDiagnostic : ArchLinterNet.Core.Model.ArchitectureDiagnostic, System.IEquatable<ArchLinterNet.Core.Model.ArchitectureApplicabilityDiagnostic>
+  ctor(string contractName, string? contractId, string controlIdentity, string family, ArchLinterNet.Core.Model.ArchitectureApplicabilityMembership? membership, ArchLinterNet.Core.Model.ArchitectureApplicabilityRecordState? state, ArchLinterNet.Core.Model.ArchitectureApplicabilityRecordState? validatedState, ArchLinterNet.Core.Model.ArchitectureApplicabilityReason reason, ArchLinterNet.Core.Model.ArchitectureApplicabilityProvenance provenance)
+  ctor(string controlIdentity, string family, ArchLinterNet.Core.Model.ArchitectureApplicabilityMembership? membership, ArchLinterNet.Core.Model.ArchitectureApplicabilityRecordState? state, ArchLinterNet.Core.Model.ArchitectureApplicabilityRecordState? validatedState, ArchLinterNet.Core.Model.ArchitectureApplicabilityReason reason)
+  method ArchLinterNet.Core.Model.ArchitectureApplicabilityDiagnostic <Clone>$()
+  method bool Equals(ArchLinterNet.Core.Model.ArchitectureApplicabilityDiagnostic? other)
+  method bool Equals(ArchLinterNet.Core.Model.ArchitectureDiagnostic? other)
+  method bool Equals(object? obj)
+  method int GetHashCode()
+  method string ToString()
+  operator !=(ArchLinterNet.Core.Model.ArchitectureApplicabilityDiagnostic? left, ArchLinterNet.Core.Model.ArchitectureApplicabilityDiagnostic? right)
+  operator ==(ArchLinterNet.Core.Model.ArchitectureApplicabilityDiagnostic? left, ArchLinterNet.Core.Model.ArchitectureApplicabilityDiagnostic? right)
+  property ArchLinterNet.Core.Model.ArchitectureApplicabilityMembership? Membership {get;}
+  property ArchLinterNet.Core.Model.ArchitectureApplicabilityProvenance Provenance {get;}
+  property ArchLinterNet.Core.Model.ArchitectureApplicabilityReason Reason {get;}
+  property ArchLinterNet.Core.Model.ArchitectureApplicabilityRecordState? State {get;}
+  property ArchLinterNet.Core.Model.ArchitectureApplicabilityRecordState? ValidatedState {get;}
+  property ArchLinterNet.Core.Model.ArchitectureDiagnosticKind Kind {get;}
+  property string ControlIdentity {get;}
+  property string EffectiveControlId {get;}
+  property string Family {get;}
+  property string PolicyIdentity {get;}
+  property string ReasonCode {get;}
 sealed class ArchLinterNet.Core.Model.ArchitectureApplicabilityExpectedEntry : System.IEquatable<ArchLinterNet.Core.Model.ArchitectureApplicabilityExpectedEntry>
   ctor(string controlIdentity, string family, ArchLinterNet.Core.Model.ArchitectureApplicabilityMembership membership)
   ctor(string controlIdentity, string family, ArchLinterNet.Core.Model.ArchitectureApplicabilityMembership membership, ArchLinterNet.Core.Model.ArchitectureApplicabilityProvenance provenance)
@@ -2072,6 +2099,21 @@ enum ArchLinterNet.Core.Model.ArchitectureApplicabilityMembership : int
   enum-member NotApplicable = 2
   enum-member Optional = 1
   enum-member Required = 0
+sealed class ArchLinterNet.Core.Model.ArchitectureApplicabilityProjection : System.IEquatable<ArchLinterNet.Core.Model.ArchitectureApplicabilityProjection>
+  ctor(ArchLinterNet.Core.Model.ArchitectureAssessmentCompletionEvidence completion, ArchLinterNet.Core.Model.ArchitectureApplicabilitySummary summary, System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Model.ArchitectureFinding> findings)
+  method ArchLinterNet.Core.Model.ArchitectureApplicabilityProjection <Clone>$()
+  method bool Equals(ArchLinterNet.Core.Model.ArchitectureApplicabilityProjection? other)
+  method bool Equals(object? obj)
+  method int GetHashCode()
+  method string ToString()
+  operator !=(ArchLinterNet.Core.Model.ArchitectureApplicabilityProjection? left, ArchLinterNet.Core.Model.ArchitectureApplicabilityProjection? right)
+  operator ==(ArchLinterNet.Core.Model.ArchitectureApplicabilityProjection? left, ArchLinterNet.Core.Model.ArchitectureApplicabilityProjection? right)
+  property ArchLinterNet.Core.Model.ArchitectureApplicabilitySummary Summary {get;}
+  property ArchLinterNet.Core.Model.ArchitectureAssessmentCompletionEvidence Completion {get;}
+  property ArchLinterNet.Core.Model.ArchitectureAssessmentCompletionEvidence CompletionEvidence {get;}
+  property System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Model.ArchitectureApplicabilityAssessment> Controls {get;}
+  property System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Model.ArchitectureApplicabilityReason> Reasons {get;}
+  property System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Model.ArchitectureFinding> Findings {get;}
 sealed class ArchLinterNet.Core.Model.ArchitectureApplicabilityProvenance : System.IEquatable<ArchLinterNet.Core.Model.ArchitectureApplicabilityProvenance>
   ctor(string family, string controlIdentity, string policyIdentity = "")
   method ArchLinterNet.Core.Model.ArchitectureApplicabilityProvenance <Clone>$()
@@ -2137,6 +2179,30 @@ enum ArchLinterNet.Core.Model.ArchitectureApplicabilityRecordState : int
   enum-member Evaluable = 0
   enum-member NotApplicable = 1
   enum-member Unassessable = 2
+sealed class ArchLinterNet.Core.Model.ArchitectureApplicabilitySummary : System.IEquatable<ArchLinterNet.Core.Model.ArchitectureApplicabilitySummary>
+  ctor(int requiredCount, int requiredEvaluableCount, int requiredUnassessableCount, int evaluableCount, int unassessableCount, int optionalCount, int notApplicableCount)
+  method ArchLinterNet.Core.Model.ArchitectureApplicabilitySummary <Clone>$()
+  method bool Equals(ArchLinterNet.Core.Model.ArchitectureApplicabilitySummary? other)
+  method bool Equals(object? obj)
+  method int GetHashCode()
+  method string ToString()
+  operator !=(ArchLinterNet.Core.Model.ArchitectureApplicabilitySummary? left, ArchLinterNet.Core.Model.ArchitectureApplicabilitySummary? right)
+  operator ==(ArchLinterNet.Core.Model.ArchitectureApplicabilitySummary? left, ArchLinterNet.Core.Model.ArchitectureApplicabilitySummary? right)
+  property int EvaluableControlCount {get;}
+  property int EvaluableCount {get;}
+  property int NotApplicableControlCount {get;}
+  property int NotApplicableCount {get;}
+  property int OptionalControlCount {get;}
+  property int OptionalCount {get;}
+  property int RequiredControlCount {get;}
+  property int RequiredCount {get;}
+  property int RequiredEvaluableCount {get;}
+  property int RequiredUnassessableCount {get;}
+  property int UnassessableControlCount {get;}
+  property int UnassessableCount {get;}
+static class ArchLinterNet.Core.Model.ArchitectureApplicabilityWireNames
+  method static string MembershipToken(ArchLinterNet.Core.Model.ArchitectureApplicabilityMembership membership)
+  method static string StateToken(ArchLinterNet.Core.Model.ArchitectureApplicabilityRecordState state)
 sealed class ArchLinterNet.Core.Model.ArchitectureAssessmentCompletionEvidence : System.IEquatable<ArchLinterNet.Core.Model.ArchitectureAssessmentCompletionEvidence>
   ctor(ArchLinterNet.Core.Model.ArchitectureAssessmentCompletionState state, System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Model.ArchitectureApplicabilityAssessment> controls, System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Model.ArchitectureApplicabilityReason> reasons)
   method ArchLinterNet.Core.Model.ArchitectureAssessmentCompletionEvidence <Clone>$()
@@ -2380,6 +2446,7 @@ abstract class ArchLinterNet.Core.Model.ArchitectureDiagnostic : System.IEquatab
   property string ContractName {get;init;}
   property string? ContractId {get;init;}
 enum ArchLinterNet.Core.Model.ArchitectureDiagnosticKind : int
+  enum-member Applicability = 24
   enum-member ArchitecturePolicyError = 23
   enum-member AttributeUsage = 9
   enum-member Baseline = 22
@@ -2442,7 +2509,7 @@ sealed class ArchLinterNet.Core.Model.ArchitectureExpandedContractInstance : Sys
   property string? Source {get;init;}
 sealed class ArchLinterNet.Core.Model.ArchitectureFinding : System.IEquatable<ArchLinterNet.Core.Model.ArchitectureFinding>
   ctor(int SchemaVersion, string Kind, string ContractName, string? ContractId, string CanonicalIdentity, ArchLinterNet.Core.Model.ArchitectureDiagnostic Details)
-  field const int CurrentSchemaVersion = 1
+  field const int CurrentSchemaVersion = 2
   method ArchLinterNet.Core.Model.ArchitectureFinding <Clone>$()
   method bool Equals(ArchLinterNet.Core.Model.ArchitectureFinding? other)
   method bool Equals(object? obj)
@@ -4436,6 +4503,10 @@ interface ArchLinterNet.Core.Reporting.Abstractions.IArchitectureDiagnosticForma
 interface ArchLinterNet.Core.Reporting.Abstractions.IArchitectureSarifFormatter
   method string FormatResultAsSarif(string mode, System.Collections.Generic.IReadOnlyCollection<ArchLinterNet.Core.Model.ArchitectureViolation> violations, System.Collections.Generic.IReadOnlyCollection<string> cycles, System.Collections.Generic.IReadOnlyCollection<ArchLinterNet.Core.Model.BuildStatePreflightDiagnostic> preflightDiagnostics, string toolVersion)
   method string FormatResultAsSarif(string mode, System.Collections.Generic.IReadOnlyCollection<ArchLinterNet.Core.Model.ArchitectureViolation> violations, System.Collections.Generic.IReadOnlyCollection<string> cycles, string toolVersion)
+static class ArchLinterNet.Core.Reporting.ArchitectureApplicabilityProjector
+  method static ArchLinterNet.Core.Model.ArchitectureApplicabilityProjection? Project(ArchLinterNet.Core.Model.ArchitectureAssessmentCompletionEvidence? completion, string? mode = null)
+  method static ArchLinterNet.Core.Model.ArchitectureApplicabilitySummary Summarize(ArchLinterNet.Core.Model.ArchitectureAssessmentCompletionEvidence completion)
+  method static System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Model.ArchitectureFinding> ToFindings(ArchLinterNet.Core.Model.ArchitectureAssessmentCompletionEvidence completion, string? mode = null)
 static class ArchLinterNet.Core.Reporting.ArchitectureBaselineSarifFormatter
   method static string Format(System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Model.BaselineLifecycleEntry> entries, string toolVersion)
 sealed class ArchLinterNet.Core.Reporting.ArchitectureCoverageSummary : System.IEquatable<ArchLinterNet.Core.Reporting.ArchitectureCoverageSummary>
@@ -4524,6 +4595,7 @@ sealed class ArchLinterNet.Core.Reporting.ArchitectureDiagnosticFormatter : Arch
   method static System.Collections.Generic.Dictionary<string,object?> FormatNormalizedFindingForJson(ArchLinterNet.Core.Model.ArchitectureFinding finding)
   method static System.Collections.Generic.Dictionary<string,object?> FormatPolicyLocationForJson(ArchLinterNet.Core.Model.ArchitecturePolicySourceLocation location)
   method static string AddWaiversToCiArtifacts(string ciArtifacts, System.Collections.Generic.IReadOnlyCollection<ArchLinterNet.Core.Model.ArchitectureWaiverLifecycleRecord> waivers)
+  method static string FormatApplicabilityProjectionForHumans(ArchLinterNet.Core.Model.ArchitectureApplicabilityProjection? projection)
   method static string FormatAssessmentCompletionForHumans(ArchLinterNet.Core.Model.ArchitectureAssessmentCompletionEvidence? completion)
   method static string FormatCyclesForCiArtifacts(string contractName, string? contractId, System.Collections.Generic.IReadOnlyCollection<ArchLinterNet.Core.Model.ArchitectureCycleFinding> cycles)
   method static string FormatCyclesForHumans(System.Collections.Generic.IReadOnlyCollection<ArchLinterNet.Core.Model.ArchitectureCycleFinding> cycles)
@@ -4558,6 +4630,7 @@ static class ArchLinterNet.Core.Reporting.ArchitectureDiagnosticMapper
   method static ArchLinterNet.Core.Model.CycleDiagnostic FromCycle(string path, string contractName, string? contractId)
   method static ArchLinterNet.Core.Model.UnmatchedIgnoreDiagnostic FromUnmatchedIgnore(ArchLinterNet.Core.Model.ArchitectureUnmatchedIgnoredViolation unmatched)
 static class ArchLinterNet.Core.Reporting.ArchitectureFindingMapper
+  method static ArchLinterNet.Core.Model.ArchitectureFinding FromApplicabilityDiagnostic(ArchLinterNet.Core.Model.ArchitectureApplicabilityDiagnostic diagnostic, string? mode = null)
   method static ArchLinterNet.Core.Model.ArchitectureFinding FromBaseline(ArchLinterNet.Core.Model.BaselineLifecycleEntry lifecycle)
   method static ArchLinterNet.Core.Model.ArchitectureFinding FromDiagnostic(ArchLinterNet.Core.Model.ArchitectureDiagnostic diagnostic)
   method static ArchLinterNet.Core.Model.ArchitectureFinding FromDiagnostic(ArchLinterNet.Core.Model.ArchitectureDiagnostic diagnostic, string? mode)
@@ -5318,6 +5391,7 @@ sealed class ArchLinterNet.Core.Validation.ValidationOutcome : System.IEquatable
   operator !=(ArchLinterNet.Core.Validation.ValidationOutcome? left, ArchLinterNet.Core.Validation.ValidationOutcome? right)
   operator ==(ArchLinterNet.Core.Validation.ValidationOutcome? left, ArchLinterNet.Core.Validation.ValidationOutcome? right)
   property ArchLinterNet.Core.Execution.ArchitectureRunnerPreparation? PreparedPostBuildRunner {get;init;}
+  property ArchLinterNet.Core.Model.ArchitectureApplicabilityProjection? ApplicabilityProjection {get;init;}
   property ArchLinterNet.Core.Model.ArchitectureAssessmentCompletionEvidence? AssessmentCompletionEvidence {get;init;}
   property ArchLinterNet.Core.Model.ArchitectureClassificationPathDeferredNotice? ClassificationPathDeferred {get;init;}
   property ArchLinterNet.Core.Model.ArchitectureSourceExpansionInventory SourceExpansion {get;init;}
@@ -5333,6 +5407,7 @@ sealed class ArchLinterNet.Core.Validation.ValidationOutcome : System.IEquatable
   property System.Collections.Generic.IReadOnlyCollection<string> Cycles {get;init;}
   property System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Model.ArchitectureApplicabilityExpectedEntry> ApplicabilityExpectedEntries {get;init;}
   property System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Model.ArchitectureApplicabilityRecord> ApplicabilityRecords {get;init;}
+  property System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Model.ArchitectureFinding> ApplicabilityFindings {get;}
   property System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Model.ArchitectureSubtractiveMatcherParticipation> SubtractiveMatcherParticipation {get;init;}
   property System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Model.ArchitectureUnmatchedIgnoredViolation> UnmatchedIgnoredViolations {get;init;}
   property System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Model.ArchitectureWaiverLifecycleRecord> Waivers {get;init;}

@@ -43,6 +43,7 @@ public sealed partial class ArchitectureDiagnosticFormatter
             new(typeof(PolicyConsistencyDiagnostic), (d, o) => ApplyPolicyConsistencyCiFields((PolicyConsistencyDiagnostic)d, o)),
             new(typeof(BaselineLifecycleDiagnostic), (d, o) => ApplyBaselineLifecycleCiFields((BaselineLifecycleDiagnostic)d, o)),
             new(typeof(ArchitecturePolicyErrorDiagnostic), (d, o) => ApplyArchitecturePolicyErrorCiFields((ArchitecturePolicyErrorDiagnostic)d, o)),
+            new(typeof(ArchitectureApplicabilityDiagnostic), (d, o) => ApplyArchitectureApplicabilityCiFields((ArchitectureApplicabilityDiagnostic)d, o)),
         };
 
         public static IReadOnlyDictionary<Type, DiagnosticDetailProjector> ByType { get; } =

@@ -17,7 +17,7 @@ adoption-stabilization/v1
 ├── policy-root/v1 + policy-fragment/v1
 ├── baseline/v2 + violation identity_version 1
 ├── api-snapshot/v1
-├── finding/v1
+├── finding/v2 (with legacy v1 input)
 ├── analysis-build-state/v1
 ├── analysis-cache/v1
 ├── analysis-profile/v1
@@ -27,7 +27,7 @@ adoption-stabilization/v1
 The hierarchy is compositional, not substitutive:
 
 - `analysis-build-state/v1` owns build/analysis/artifact/session identity and snapshot publication.
-- `finding/v1` owns reportable result semantics and typed details.
+- `finding/v2` owns reportable result semantics and typed details; the reader retains legacy v1 input.
 - baseline v2 references canonical finding identity; it does not invent another key.
 - API snapshot v1 owns public API exactness; it does not reuse display signatures as identity.
 - cache v1 consumes completed-session identity plus independent trust and integrity controls.
@@ -234,13 +234,14 @@ Capture writes a complete candidate. Diff is read-only. Update is explicit and a
 
 ## Normalized finding model
 
-`finding/v1` is the semantic source for every adapter.
+`finding/v2` is the semantic source for every adapter. `finding/v1` remains a
+supported legacy input format and its release-qualified schema bytes are frozen.
 
 Minimum envelope:
 
 ```json
 {
-  "schema": "finding/v1",
+  "schema": "finding/v2",
   "tool_version": "0.5.1",
   "result_kind": "violation",
   "severity": "error",
@@ -477,7 +478,7 @@ Review questions:
 
 - Is there exactly one identity model?
 - Is there exactly one snapshot/build-state model?
-- Is every diagnostic family represented by `finding/v1` typed details?
+- Is every diagnostic family represented by `finding/v2` typed details?
 - Are baseline/API/cache/profile versions unambiguous?
 - Does every report sink consume one result?
 - Are `--report` and artifact `--output` unambiguous?

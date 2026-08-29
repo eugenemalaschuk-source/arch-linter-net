@@ -110,13 +110,16 @@ public sealed partial class CheckpointBReleaseGateTests
                 Assert.That(core.GetEntry($"contentFiles/any/any/schema/0.5.1/{schema}"), Is.Not.Null, schema);
             }
 
-            // policy-root/policy-fragment advanced to an independent 0.6.1 schema identity to add
-            // layers.*.overlaps_with. The manifest itself is release-qualified, so it also advances
-            // to a new 0.6.1 generation rather than being mutated in place; every other packaged
-            // schema stays referenced at its unchanged 0.5.1 identity from within that generation
-            // (see schema/0.6.1/compatibility-manifest.json).
+            // Policy root/fragment and the current applicability schemas advance to independent
+            // 0.6.1 identities. The frozen 0.5.1 finding/cache copies above stay packaged for
+            // offline legacy validation but are not registry-discoverable; `schema list` resolves
+            // the current 0.6.1 resources (see schema/0.6.1/compatibility-manifest.json).
             foreach (string schema in new[]
-                     { "compatibility-manifest.json", "dependencies.arch.fragment.schema.json", "dependencies.arch.schema.json" })
+                     {
+                         "compatibility-manifest.json", "dependencies.arch.fragment.schema.json",
+                         "dependencies.arch.schema.json", "normalized-finding.schema.json",
+                         "analysis-cache.schema.json",
+                     })
             {
                 Assert.That(core.GetEntry($"contentFiles/any/any/schema/0.6.1/{schema}"), Is.Not.Null, schema);
             }

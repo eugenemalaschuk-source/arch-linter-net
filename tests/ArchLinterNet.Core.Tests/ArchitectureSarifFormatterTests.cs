@@ -60,7 +60,7 @@ public sealed partial class ArchitectureSarifFormatterTests
             Assert.That(result.GetProperty("locations")[0].GetProperty("logicalLocations")[0]
                 .GetProperty("fullyQualifiedName").GetString(), Is.EqualTo("App.Service"));
             JsonElement normalized = properties.GetProperty("arch_linter_net");
-            Assert.That(normalized.GetProperty("schema_version").GetInt32(), Is.EqualTo(1));
+            Assert.That(normalized.GetProperty("schema_version").GetInt32(), Is.EqualTo(ArchitectureFinding.CurrentSchemaVersion));
             Assert.That(normalized.GetProperty("kind").GetString(), Is.EqualTo("baseline"));
             Assert.That(normalized.GetProperty("baseline_state").GetString(), Is.EqualTo("new"));
             Assert.That(normalized.GetProperty("details").GetProperty("identity").GetProperty("occurrence").GetInt32(), Is.EqualTo(1));
@@ -138,7 +138,7 @@ public sealed partial class ArchitectureSarifFormatterTests
             .GetProperty("properties").GetProperty("arch_linter_net");
         Assert.Multiple(() =>
         {
-            Assert.That(normalized.GetProperty("schema_version").GetInt32(), Is.EqualTo(1));
+            Assert.That(normalized.GetProperty("schema_version").GetInt32(), Is.EqualTo(ArchitectureFinding.CurrentSchemaVersion));
             Assert.That(normalized.GetProperty("kind").GetString(), Is.EqualTo("cycle"));
             Assert.That(normalized.GetProperty("details").GetProperty("path").GetString(), Is.EqualTo("A -> B -> A"));
         });

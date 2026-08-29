@@ -24,6 +24,12 @@ public static class ArchitectureFindingMapper
     public static ArchitectureFinding FromDiagnostic(ArchitectureDiagnostic diagnostic, string? mode) =>
         Create(diagnostic, BuildIdentity(diagnostic), mode);
 
+    /// <summary>Maps one Core applicability diagnostic through the existing finding envelope.</summary>
+    public static ArchitectureFinding FromApplicabilityDiagnostic(
+        ArchitectureApplicabilityDiagnostic diagnostic,
+        string? mode = null) =>
+        Create(diagnostic, BuildApplicabilityIdentity(diagnostic), mode);
+
     public static ArchitectureFinding FromBaseline(BaselineLifecycleEntry lifecycle)
     {
         ArchitectureBaselineComparisonEntry entry = lifecycle.Entry;
@@ -198,6 +204,7 @@ public static class ArchitectureFindingMapper
         ArchitectureDiagnosticKind.UnmatchedIgnore => "unmatched_ignore",
         ArchitectureDiagnosticKind.Baseline => "baseline",
         ArchitectureDiagnosticKind.ArchitecturePolicyError => "architecture_policy_error",
+        ArchitectureDiagnosticKind.Applicability => "applicability",
         _ => kind.ToString().ToLowerInvariant()
     };
 
@@ -247,6 +254,11 @@ public static class ArchitectureFindingMapper
 
     private static ArchitectureViolationIdentity BuildIdentity(ArchitectureDiagnostic diagnostic)
     {
+        if (diagnostic is ArchitectureApplicabilityDiagnostic applicability)
+        {
+            return BuildApplicabilityIdentity(applicability);
+        }
+
         // PolicyConsistencyDiagnostic is special-cased ahead of the generic IdentityParts/
         // SourceTypeOf switches below so PolicyConsistencyDistinguisher (an OrderBy+Join) runs once
         // per diagnostic instead of once per field.
@@ -283,6 +295,28 @@ public static class ArchitectureFindingMapper
             targetMember,
             0,
             configuration);
+    }
+
+    private static ArchitectureViolationIdentity BuildApplicabilityIdentity(
+        ArchitectureApplicabilityDiagnostic diagnostic)
+    {
+        // Applicability has no source/target dependency occurrence.  Existing structured identity
+        // slots are used as labeled semantic dimensions: source_type is the canonical control,
+        // source_member is the family, target_member is the reason, and configuration is the
+        // policy identity.  None of these values are formatted display text.
+        return new ArchitectureViolationIdentity(
+            ArchitectureViolationIdentity.CurrentVersion,
+            diagnostic.Family,
+            KindToken(diagnostic.Kind),
+            diagnostic.ContractId ?? diagnostic.ContractName,
+            null,
+            diagnostic.ControlIdentity,
+            diagnostic.Family,
+            null,
+            null,
+            diagnostic.ReasonCode,
+            0,
+            diagnostic.PolicyIdentity);
     }
 
     private static ArchitectureViolationIdentity BuildBaselineFallbackIdentity(ArchitectureBaselineComparisonEntry entry)
@@ -510,6 +544,7 @@ public static class ArchitectureFindingMapper
         // PolicyConsistencyDiagnostic is handled directly in BuildIdentity, ahead of this switch.
         BaselineLifecycleDiagnostic baseline => baseline.SourceType,
         ArchitecturePolicyErrorDiagnostic policyError => policyError.PolicyLocation?.SourcePath ?? "<policy>",
+        ArchitectureApplicabilityDiagnostic applicability => applicability.ControlIdentity,
         _ => SourceIdentifier(diagnostic),
     };
 
@@ -539,6 +574,7 @@ public static class ArchitectureFindingMapper
         BuildStatePreflightDiagnostic d => $"{d.State}:{d.Evidence.ProjectPath}",
         BaselineLifecycleDiagnostic d => d.SourceType,
         ArchitecturePolicyErrorDiagnostic d => d.PolicyLocation?.SourcePath ?? "<policy>",
+        ArchitectureApplicabilityDiagnostic d => d.ControlIdentity,
         _ => string.Empty,
     };
 

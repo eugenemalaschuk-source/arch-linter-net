@@ -31,7 +31,7 @@ The system SHALL publish one `adoption-stabilization/v1` registry for 0.5.1 that
 | Imported fragment | `policy-fragment/v1` | writes/validates the release-matched fragment schema |
 | Baseline | `baseline/v2`, YAML `version: 2`, identity `identity_version: 1` | writes v2; reads v1 and v2 |
 | Public API snapshot | `api-snapshot/v1`, document `version: 1` | writes v1 |
-| Normalized finding | `finding/v1`, JSON `schema_version: 1` | writes v1; unknown schema versions fail and unknown v1 kinds follow the documented strict/non-strict rule |
+| Normalized finding | `finding/v2`, JSON `schema_version: 2` | writes v2; reads v1 and v2; unknown schema versions fail and unknown kinds in a supported version follow the documented strict/non-strict rule |
 | Analysis/build state | `analysis-build-state/v1` | reuses the approved fingerprint/receipt contract |
 | Analysis cache | `analysis-cache/v1`, envelope format version 2 | writes and inspects verified cache entries; unsupported versions fail explicitly |
 | Analysis profile | `analysis-profile/v1` | writes deterministic counters and optional measurements; the package declares write-only support until a public reader exists |
@@ -46,6 +46,14 @@ The 0.6.0 product package line SHALL ship and document this registry as an indep
 #### Scenario: Future format changes equality
 - **WHEN** a future release changes a required field, equality rule, discriminated union, or canonicalization rule
 - **THEN** it introduces a new logical/document version or an explicitly compatible additive extension instead of silently reinterpreting a 0.5.1 version
+
+#### Scenario: A new normalized finding discriminator is introduced
+- **WHEN** a finding family adds a new `kind` and typed `details` branch
+- **THEN** writers advance the normalized finding document to a new version, retain the prior release-qualified schema bytes unchanged, and readers explicitly support the retained legacy version or reject it as unsupported
+
+#### Scenario: Cache evidence gains optional reconstruction data
+- **WHEN** an analysis-cache/v1 writer adds optional result-reconstruction evidence
+- **THEN** its entry advances to a new release-qualified schema identity, the previous schema bytes remain frozen, and a v1 reader treats absent optional evidence as the documented empty opt-out
 
 #### Scenario: Product package retains an unchanged compatibility registry
 - **WHEN** an adopter installs the 0.6.0 CLI package

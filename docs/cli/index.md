@@ -366,4 +366,11 @@ This projects an existing strict result into badge endpoint JSON. It does not re
 - Use SARIF for supported code-scanning projections, noting that not every non-SARIF finding category is representable there.
 - Use repeatable `--report` sinks when CI needs multiple formats from one validation run.
 
+When a policy provides applicability evidence, all three formats add the same deterministic completion
+projection: canonical control identity and provenance, membership/state records, and
+`required`/`evaluable`/`unassessable`/`not_applicable` counts. JSON exposes it in
+`assessment_completion` and additive `applicability_findings`; SARIF places the completion data in
+the run properties and the normalized findings in SARIF results. These counts show evidence
+completeness—not architecture quality—and do not replace the separately owned effective-rule count.
+
 See [Output formats](../usage/output-formats.md) and [Timings](../usage/timings.md).
