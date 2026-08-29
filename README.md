@@ -5,9 +5,9 @@
 <p align="center">
   <a href="https://www.nuget.org/packages/ArchLinterNet.Cli/"><img alt="NuGet version" src="https://img.shields.io/nuget/v/ArchLinterNet.Cli.svg"></a>
   <a href="https://www.nuget.org/packages/ArchLinterNet.Cli/"><img alt="NuGet downloads" src="https://img.shields.io/nuget/dt/ArchLinterNet.Cli"></a>
-  <a href="https://github.com/eugenemalaschuk-source/arch-linter-net/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/eugenemalaschuk-source/arch-linter-net/actions/workflows/ci.yml/badge.svg"></a>
-  <a href="https://github.com/eugenemalaschuk-source/arch-linter-net/actions/workflows/ci.yml"><img alt="Architecture policy" src="https://github.com/eugenemalaschuk-source/arch-linter-net/actions/workflows/ci.yml/badge.svg?branch=main"></a>
-  <a href="https://app.codecov.io/github/eugenemalaschuk-source/arch-linter-net"><img alt="Test coverage" src="https://codecov.io/github/eugenemalaschuk-source/arch-linter-net/graph/badge.svg"></a>
+  <a href="https://github.com/eugenemalaschuk-source/arch-linter-net/actions/workflows/main-quality.yml"><img alt="Main quality" src="https://github.com/eugenemalaschuk-source/arch-linter-net/actions/workflows/main-quality.yml/badge.svg?branch=main"></a>
+  <a href="https://sonarcloud.io/summary/overall?id=eugenemalaschuk-source_arch-linter-net&branch=main"><img alt="Sonar Quality Gate" src="https://sonarcloud.io/api/project_badges/measure?project=eugenemalaschuk-source_arch-linter-net&metric=alert_status&branch=main"></a>
+  <a href="https://app.codecov.io/github/eugenemalaschuk-source/arch-linter-net"><img alt="Test coverage" src="https://codecov.io/github/eugenemalaschuk-source/arch-linter-net/graph/badge.svg?branch=main"></a>
   <a href="https://eugenemalaschuk-source.github.io/arch-linter-net/"><img alt="Documentation" src="https://img.shields.io/badge/docs-GitHub%20Pages-blue"></a>
   <a href="LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-blue.svg"></a>
 </p>
@@ -128,6 +128,8 @@ The public capability references are checked against runtime/schema/CLI inventor
 
 Internal project documentation remains in repository Markdown files such as `docs/internal/`, `openspec/`, `.github/`, and root governance files. It is not part of the published product site.
 
+GitHub Pages is deployed only by the public release workflow. A merge to `main` refreshes quality telemetry and internal `main.N` packages, but does not deploy MkDocs.
+
 ## Local documentation workflow
 
 ```bash
@@ -163,20 +165,20 @@ arch-linter-net badge architecture-policy --input architecture-strict.json
   <a href="https://sonarcloud.io/summary/overall?id=eugenemalaschuk-source_arch-linter-net&branch=main"><img alt="Sonar Security" src="https://sonarcloud.io/api/project_badges/measure?project=eugenemalaschuk-source_arch-linter-net&metric=security_rating&branch=main"></a>
 </p>
 
-The CI badge tracks the central CI workflow. The Architecture policy badge is a separate dynamic status for the latest `main` run of strict ArchLinterNet self-policy validation; it does not claim test coverage or architecture coverage. SonarCloud also analyzes trusted pull requests, decorates the PR, and evaluates the quality gate on new code rather than forcing the entire historical codebase to be clean before the PR can merge:
+The Main quality badge tracks the latest merged `main` coverage telemetry run. That run refreshes Codecov and SonarCloud for the same merged revision and fails closed if coverage collection, Codecov upload, or the Sonar quality-gate scan cannot complete successfully. The old README `Architecture policy` image was only a second label over the generic CI workflow badge, so it is intentionally removed rather than presented as architecture evidence; v0.8 will publish a real Architecture Health badge from ArchLinterNet canonical outputs. SonarCloud also analyzes trusted pull requests, decorates the PR, and evaluates the quality gate on new code before merge:
 
 | Quality signal | Source |
 |---|---|
-| Build/test | `make acceptance` (lint + all tests) |
-| Test coverage (line %) | CI runs `make test-coverage`, uploads Cobertura XML to Codecov, and the primary coverage badge updates dynamically from Codecov |
-| Architecture policy | The Architecture policy badge tracks the latest `main` run of `make lint-architecture`; it proves the repository's strict, read-only self-policy passed, not a coverage percentage |
+| Build/test | Required pull-request validation runs `make acceptance`-equivalent unit/E2E/packed-artifact gates before merge |
+| Test coverage (line %) | PR CI and post-merge `Main Quality Telemetry` collect coverage; the merged-main run uploads Cobertura XML to Codecov so the primary coverage badge follows `main` |
+| Architecture policy | Required PR self-policy/architecture checks validate the up-to-date merge candidate; generic post-merge quality telemetry does not pretend to be architecture evidence |
 | SonarCloud PR quality gate | trusted `pull_request` runs analyze new code, publish a SonarCloud PR result link, and fail CI when the Sonar quality gate fails |
-| SonarCloud main quality signals | the Sonar badges track the `main` branch project status for quality gate, maintainability, reliability, and security |
+| SonarCloud main quality signals | `Main Quality Telemetry` analyzes the merged revision with OpenCover/TRX/Python coverage and refreshes the `main` quality-gate, maintainability, reliability, and security badges |
 | OpenSSF Scorecard | trusted pull requests produce reviewable SARIF; default-branch and scheduled runs publish the supply-chain score to the public Scorecard API and GitHub code scanning |
 | Architecture validation | strict ArchLinterNet self-policy check (`architecture/dependencies.arch.yml`), including the reviewed public API snapshots under `architecture/api/`; read-only, never rewrites either |
-| Architecture coverage | strict/audit coverage JSON artifacts + Markdown report + sticky PR comment |
+| Architecture coverage | strict/audit coverage JSON artifacts + Markdown report + sticky PR comment on the required pull-request gate |
 
-See [CI integration](docs/guides/ci-integration.md#architecture-policy-badge) for how the strict-policy badge, test coverage upload, SonarCloud PR analysis, and the separate architecture coverage gate fit together.
+See [CI integration](docs/guides/ci-integration.md) for how the PR gate, merged-main test coverage upload, SonarCloud analysis, and the separate architecture coverage gate fit together.
 
 </details>
 
