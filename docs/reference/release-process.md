@@ -7,7 +7,7 @@ This page documents the maintainer workflow for ArchLinterNet development builds
 ArchLinterNet deliberately separates four responsibilities:
 
 - **Pull-request CI** — the authoritative pre-merge validation gate. It owns workflow/repository lint, architecture checks, package validation, unit/E2E/packed-artifact checks, cross-platform validation, PR coverage/Sonar/Codecov, and required PR CodeQL.
-- **Main quality telemetry** — after an accepted merge, Linux coverage tests refresh SonarCloud and Codecov for the default branch. This is telemetry, not a second copy of the merge gate.
+- **Main quality telemetry** — after an accepted merge, Linux coverage tests refresh SonarCloud and Codecov for the default branch. This is telemetry, not a second copy of the merge gate. Once coverage evidence is available, the SonarCloud and Codecov refreshes are attempted independently; the overall workflow remains red if either required refresh fails.
 - **Installable main builds** — every accepted `main` state is packed as `<development-version>-main.<workflow-run-number>` and published to GitHub Packages for dogfooding in authorized consumer repositories. These packages are development builds, not release candidates and not public releases.
 - **Public release workflow** — the manual `release-nuget.yml` workflow creates its own immutable candidate, executes Checkpoint B and provenance verification, and optionally publishes to NuGet.org, creates the GitHub Release, and deploys docs.
 
@@ -60,7 +60,7 @@ ArchLinterNet follows Semantic Versioning 2.0.
 
 ### Development version authority and `main.N`
 
-`Directory.Build.props` carries one explicit development release line:
+`Directory.Build.props` carries one explicit development release line for installable main builds:
 
 ```xml
 <ArchLinterDevelopmentVersion>0.8.0</ArchLinterDevelopmentVersion>
@@ -75,7 +75,7 @@ The `Main NuGet Builds` workflow does not guess patch/minor/major intent from gi
 
 All four package IDs (`ArchLinterNet.CEL`, `ArchLinterNet.Core`, `ArchLinterNet.Cli`, and `ArchLinterNet.Testing`) use the same `main.N` identity and exact source SHA. Only the newest five **complete** four-package main-build sets are retained. Stable versions, other prerelease families such as `rc.*`, and partial/orphan `main.N` publications are never silently selected for retention deletion.
 
-Ordinary source-tree builds use the `dev` suffix. After a stable public release, advance `ArchLinterDevelopmentVersion` to the next intended release line in a normal reviewed PR. Do not edit it merely to execute a public release: `release-nuget.yml` still calculates/overrides the exact public candidate version independently.
+`ArchLinterDevelopmentVersion` is intentionally independent from the ordinary source-tree `VersionPrefix`/`VersionSuffix`. Advancing the next main-build line must not silently alter normal development binaries, serialized version evidence, or byte-golden product output. `main-packages.yml` explicitly overrides `Version` and `PackageVersion` with the generated `main.N` identity. After a stable public release, advance `ArchLinterDevelopmentVersion` to the next intended release line in a normal reviewed PR. Do not edit it merely to execute a public release: `release-nuget.yml` still calculates/overrides the exact public candidate version independently.
 
 Pre-1.0 public preview releases use versions such as `0.1.0-preview.1`. The manual release workflow calculates package versions from git tags based on the selected release scenario (`preview`, `patch`, `minor`, or `major`).
 
@@ -151,7 +151,7 @@ Internal project documentation remains in repository Markdown files and must not
 - repository-agent instructions;
 - implementation planning notes.
 
-The release workflow should deploy the generated MkDocs site only. It should not publish internal documentation as product docs.
+The ordinary `main` workflows never deploy MkDocs or GitHub Pages. The public release workflow deploys the generated MkDocs site only when a maintainer runs a real public release with `publish: true`; it must not publish internal documentation as product docs.
 
 ## NuGet metadata and links
 
@@ -253,7 +253,7 @@ Record the published package IDs, version, GitHub Release URL, NuGet package URL
 
 ## Failure and rerun notes
 
-- If main quality telemetry fails, fix or rerun that telemetry without blocking an independently successful `main.N` package publication.
+- If main quality telemetry fails, fix or rerun that telemetry without blocking an independently successful `main.N` package publication. Once coverage exists, SonarCloud and Codecov refreshes are attempted independently so one external-service failure does not suppress the other upload.
 - If a `main.N` publication partially succeeds, do not use duplicate-success semantics to hide the partial state. A fresh workflow run receives a new `main.N` version; the partial version remains visible for diagnosis and does not count toward the five complete retained sets.
 - If the public dry-run fails, fix the underlying problem and rerun with `publish: false`.
 - If public publication fails before NuGet push completes, no GitHub Release should be created.
