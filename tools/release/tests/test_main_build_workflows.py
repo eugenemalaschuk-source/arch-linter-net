@@ -109,7 +109,9 @@ def test_main_packages_require_private_visibility_before_continuing() -> None:
     assert "Publish verified private package set to GitHub Packages" in workflow
     assert "existing GitHub Package visibility" in workflow
     assert "expected 'private'" in workflow
-    assert "visibility=\"$(gh api" in workflow
+    assert 'package_json="$(gh api' in workflow
+    assert "existing_visibility=\"$(jq -r '.visibility'" in workflow
+    assert 'grep -q "HTTP 404"' in workflow
     assert "Visibility: private (verified through GitHub Packages metadata after publication)" in workflow
 
 
