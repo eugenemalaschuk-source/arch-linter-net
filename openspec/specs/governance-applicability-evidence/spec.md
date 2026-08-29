@@ -138,11 +138,16 @@ inferred to mean `evaluable`.
 ### Requirement: Unassessable state preserves stable reason and provenance
 A valid `unassessable` record or an unassessable joined collection-integrity
 outcome SHALL contain one or more deterministic reason classes and canonical
-provenance sufficient to identify the insufficient evidence. Supported reason
-classes SHALL distinguish, where meaningful to the family, missing or
-unavailable required input, unexpected empty input, unmapped subject, ambiguous
-subject, stale declaration, malformed or failed external input, wrong external
-evidence identity, repository, revision, or scope,
+provenance sufficient to identify the insufficient evidence. Every reason on a
+valid `unassessable` produced record SHALL have the same family, canonical
+effective-control identity, and policy identity as that record's canonical
+provenance. A record with no reason or with mismatched reason provenance is
+invalid contract-integrity evidence and SHALL be represented by canonical
+invalid-record-integrity evidence rather than exposing the untrusted reason.
+Supported reason classes SHALL distinguish, where meaningful to the family,
+missing or unavailable required input, unexpected empty input, unmapped
+subject, ambiguous subject, stale declaration, malformed or failed external
+input, wrong external evidence identity, repository, revision, or scope,
 `missing_applicability_record`, duplicate applicability-record identity,
 `unknown_applicability_record_identity`, and incompatible applicability-record
 identity or state.
@@ -161,6 +166,13 @@ text as the machine-readable reason.
   has no expected identity
 - **THEN** the joined collection exposes `missing_applicability_record` and
   `unknown_applicability_record_identity` as distinct integrity reasons
+
+#### Scenario: Unassessable reason with foreign provenance is rejected
+- **WHEN** an `unassessable` record for control A carries a reason whose family,
+  control, or policy provenance belongs to a different control
+- **THEN** the record is invalid contract-integrity evidence, the assessment is
+  unassessable, and output contains only the canonical invalid-record-integrity
+  provenance rather than the foreign reason provenance
 
 ### Requirement: Family evidence retains its native units
 Applicability records SHALL retain family-specific evidence as drill-down
@@ -298,3 +310,70 @@ this contract.
 - **WHEN** a policy contains only currently supported, pre-v0.8 contracts
 - **THEN** it has identical loading, validation, finding, baseline, and output
 behavior after this applicability contract is introduced
+
+### Requirement: Applicability evidence drives authoritative completion
+Every v0.8 family that opts into applicability SHALL project its canonical
+expected-membership and produced-record integrity result to the shared
+governance assessment-completion boundary. A required expected entry that is
+missing, duplicate, orphaned, incompatible, unexpectedly empty, stale,
+unmapped, ambiguous, or otherwise insufficient SHALL be unassessable rather
+than being inferred from a zero finding count. Explicit optional and
+not-applicable membership SHALL remain visible without changing the required
+denominator.
+
+#### Scenario: Complete records permit trusted conformance
+- **WHEN** every required expected applicability entry joins to one compatible
+  evaluable record and no configured architecture control fails
+- **THEN** the family supplies trusted evaluable evidence that can contribute
+  to authoritative assessment `pass`
+
+#### Scenario: Collection-integrity evidence prevents a clean completion
+- **WHEN** a required expected entry has no compatible produced record or the
+  produced collection contains an orphan identity
+- **THEN** the family supplies canonical unassessable completion evidence with
+  the collection-integrity reason and does not report a clean empty result
+
+### Requirement: Collection integrity preserves every expected and duplicate provenance
+An expected applicability entry's provenance SHALL use that entry's canonical
+effective-control identity and family. An applicability collection SHALL have
+exactly one compatible produced record for every canonical expected identity,
+regardless of whether its membership is `required`, `optional`, or
+`not_applicable`. A missing record SHALL produce `missing_applicability_record`
+integrity evidence and SHALL prevent the collection from being reported as
+complete; an intentionally absent optional input SHALL instead produce an
+explicit compatible `not_applicable` record.
+
+An expected entry with mismatched control or family provenance SHALL produce
+invalid-expected-integrity evidence with canonical provenance for that expected
+identity and SHALL prevent the collection from being reported as complete.
+
+For duplicate expected identities, consumers SHALL select the displayed
+representative by a deterministic ordering of membership, family, and complete
+provenance, and SHALL retain a duplicate-identity reason for every participating
+expected provenance. For duplicate produced identities, consumers SHALL retain
+a duplicate-identity reason for every participating produced provenance in
+deterministic order. Enumeration order SHALL NOT affect the representative,
+required denominator, reason list, or completion state.
+
+#### Scenario: Missing optional record is integrity evidence
+- **WHEN** an expected `optional` control has no produced record
+- **THEN** the joined projection exposes `missing_applicability_record`, the
+  required denominator remains unchanged, and the collection is not complete
+
+#### Scenario: Mismatched expected provenance is invalid authority
+- **WHEN** an expected entry for control A in family F carries provenance for a
+  different control or family, while a produced record otherwise matches A/F
+- **THEN** the join exposes invalid-expected-integrity evidence with A/F
+  provenance and completion is `unassessable`, not `pass`
+
+#### Scenario: Duplicate records retain producer provenance
+- **WHEN** two produced records for one expected identity have distinct policy
+  provenance
+- **THEN** collection integrity exposes one deterministic duplicate-record
+  reason for each producer provenance
+
+#### Scenario: Reordered duplicate expectations are equivalent
+- **WHEN** the same conflicting duplicate expected entries are supplied in
+  opposite enumeration orders
+- **THEN** the displayed representative, required denominator, reasons, and
+  completion state are identical

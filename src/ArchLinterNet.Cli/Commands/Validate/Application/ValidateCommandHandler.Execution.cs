@@ -1,4 +1,5 @@
 using ArchLinterNet.Core.BuildState;
+using ArchLinterNet.Core.Model;
 using ArchLinterNet.Core.Reporting;
 using ArchLinterNet.Core.Validation;
 
@@ -141,7 +142,7 @@ internal sealed partial class ValidateCommandHandler
             return CliExitCodes.InvalidArgumentsOrRuntimeError;
         }
 
-        return outcome.Passed ? CliExitCodes.Success : CliExitCodes.ValidationFailure;
+        return ResolveValidationExitCode(outcome);
     }
 
     // One ArchitectureAnalysisSnapshot serves every requested mode: policy composition, project
@@ -293,6 +294,40 @@ internal sealed partial class ValidateCommandHandler
         {
             WriteOutputError(options, errorFormat, result, isSingleMode: false, outcomesByMode);
             return CliExitCodes.InvalidArgumentsOrRuntimeError;
+        }
+
+        return ResolveCombinedValidationExitCode(outcomesByMode, allPassed);
+    }
+
+    internal static int ResolveValidationExitCode(ValidationOutcome outcome)
+    {
+        return outcome.AssessmentCompletionEvidence?.State switch
+        {
+            ArchitectureAssessmentCompletionState.Pass => outcome.Passed
+                ? CliExitCodes.Success
+                : CliExitCodes.ValidationFailure,
+            ArchitectureAssessmentCompletionState.Fail => CliExitCodes.ValidationFailure,
+            ArchitectureAssessmentCompletionState.Unassessable => CliExitCodes.InvalidArgumentsOrRuntimeError,
+            _ => outcome.Passed ? CliExitCodes.Success : CliExitCodes.ValidationFailure,
+        };
+    }
+
+    internal static int ResolveCombinedValidationExitCode(
+        IReadOnlyList<(string Mode, ValidationOutcome Outcome)> outcomesByMode,
+        bool allPassed)
+    {
+        // A valid unassessable assessment has precedence over trusted failures in any other
+        // requested mode, but only after the shared report has routed successfully.
+        if (outcomesByMode.Any(pair =>
+                pair.Outcome.AssessmentCompletionEvidence?.State == ArchitectureAssessmentCompletionState.Unassessable))
+        {
+            return CliExitCodes.InvalidArgumentsOrRuntimeError;
+        }
+
+        if (outcomesByMode.Any(pair =>
+                pair.Outcome.AssessmentCompletionEvidence?.State == ArchitectureAssessmentCompletionState.Fail))
+        {
+            return CliExitCodes.ValidationFailure;
         }
 
         return allPassed ? CliExitCodes.Success : CliExitCodes.ValidationFailure;

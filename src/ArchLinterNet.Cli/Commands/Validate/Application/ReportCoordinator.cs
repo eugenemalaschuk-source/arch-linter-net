@@ -653,6 +653,13 @@ internal sealed partial class ReportCoordinator
             }
         }
 
+        string assessmentCompletion = ArchitectureDiagnosticFormatter.FormatAssessmentCompletionForHumans(
+            outcome.AssessmentCompletionEvidence);
+        if (!string.IsNullOrEmpty(assessmentCompletion))
+        {
+            sb.AppendLine(assessmentCompletion);
+        }
+
         cancellationToken.ThrowIfCancellationRequested();
         AppendSection(sb, outcome.PolicyConsistencyConfig != "off" && outcome.PolicyConsistencyFindings.Count > 0,
             () => _runtime.FormatPolicyConsistencyForHumans(outcome.PolicyConsistencyFindings));
@@ -745,33 +752,6 @@ internal sealed partial class ReportCoordinator
         }
 
         return new JsonObject { ["version"] = "2.1.0", ["runs"] = runs }.ToJsonString();
-    }
-
-    // cancellationToken defaults to None so RenderReportContent (which must always complete a
-    // render regardless of the real cancellation state — see its own comment) keeps working
-    // unchanged; every other caller passes the live token through, checked per violation inside
-    // the widest FormatResultForCiArtifacts overload — the dominant contributor to a large
-    // report's size, not just before/after this call.
-    private string FormatJsonContent(string mode, ValidationOutcome outcome, CancellationToken cancellationToken = default)
-    {
-        string result = _runtime.FormatResultForCiArtifacts(
-            mode, outcome.Passed, outcome.Violations, outcome.Cycles, outcome.CycleFindings, outcome.CoverageFindings,
-            outcome.UnmatchedIgnoredViolations,
-            outcome.PolicyConsistencyConfig == "off" ? Array.Empty<PolicyConsistencyDiagnostic>() : outcome.PolicyConsistencyFindings,
-            outcome.CoverageSummaries, outcome.ClassificationConflicts, outcome.ClassificationMetadataFailures,
-            outcome.ClassificationRoles, outcome.ClassificationPathDeferred, outcome.PreflightDiagnostics,
-            outcome.SourceExpansion, outcome.SubtractiveMatcherParticipation, cancellationToken);
-
-        return outcome.Waivers.Count == 0
-            ? result
-            : ArchitectureDiagnosticFormatter.AddWaiversToCiArtifacts(result, outcome.Waivers);
-    }
-
-    private string FormatSarifContent(string mode, ValidationOutcome outcome, CancellationToken cancellationToken = default)
-    {
-        return _runtime.FormatResultAsSarif(
-            mode, outcome.Violations, outcome.Cycles, outcome.CycleFindings, outcome.PreflightDiagnostics,
-            outcome.CoverageSummaries, outcome.SourceExpansion, outcome.SubtractiveMatcherParticipation, cancellationToken);
     }
 
     private static string DispatchFormat(

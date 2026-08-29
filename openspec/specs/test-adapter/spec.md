@@ -2,7 +2,9 @@
 
 ## Purpose
 Provides a fluent NUnit-friendly test adapter that loads a policy by path or repository root and asserts strict/audit validation results.
+
 ## Requirements
+
 ### Requirement: Test adapter loads policy from path
 `ArchitectureAssertions.FromPolicy(path)` SHALL return an `ArchitectureValidationBuilder` configured to load the YAML policy from the given file path.
 
@@ -156,3 +158,15 @@ lifecycle evaluation.
   matches and supplies an evaluation date
 - **THEN** it can assert the waiver's ID, `stale` state, target, provenance,
   and failed strict policy-hygiene outcome through typed results
+
+### Requirement: Testing exposes typed assessment completion
+`ArchitectureValidationResult` SHALL expose the typed shared assessment
+completion state and its deterministic reason/provenance evidence. `ShouldPass`
+for a valid-but-unassessable result SHALL identify assessment insufficiency and
+its stable reasons without inventing ordinary architecture violations.
+
+#### Scenario: Test asserts missing required evidence
+- **WHEN** a mapped validation outcome is unassessable because required
+  evidence is missing
+- **THEN** a test can inspect that completion state and reason through
+  `ArchitectureValidationResult` without parsing formatted CLI output

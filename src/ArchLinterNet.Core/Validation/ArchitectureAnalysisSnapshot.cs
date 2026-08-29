@@ -328,7 +328,7 @@ public sealed partial class ArchitectureAnalysisSnapshot : IDisposable
             PolicyImportPaths = GetPolicyImportPaths(),
             ResolvedAssemblyPaths = GetResolvedAssemblyPaths(),
             DiscoveredProjectPaths = GetDiscoveredProjectPaths(),
-            SourceExpansion = _document.SourceExpansion
+            SourceExpansion = _document.SourceExpansion,
         };
     }
 
@@ -415,8 +415,11 @@ public sealed partial class ArchitectureAnalysisSnapshot : IDisposable
             || (ArchitectureWaiverProfile.Resolve(_document) == ArchitectureWaiverProfile.Strict
                 && waivers.Any(waiver => waiver.State is "expired" or "stale"));
 
-        bool passed = allViolations.Count == 0 && execution.Cycles.Count == 0
+        bool ordinaryPassed = allViolations.Count == 0 && execution.Cycles.Count == 0
             && !hasBlockingUnmatched && !hasBlockingPolicyConsistency && !hasBlockingCoverage && !hasBlockingWaiver;
+
+        ArchitectureAssessmentCompletionEvidence? assessmentCompletion = DeriveAssessmentCompletion(execution, ordinaryPassed);
+        bool passed = HasPassedAssessment(ordinaryPassed, assessmentCompletion);
 
         (IReadOnlyList<ArchitectureClassificationConflict> classificationConflicts,
             IReadOnlyList<ArchitectureClassificationMetadataFailure> classificationMetadataFailures) =
@@ -443,6 +446,9 @@ public sealed partial class ArchitectureAnalysisSnapshot : IDisposable
             DiscoveredProjectPaths = GetDiscoveredProjectPaths(),
             SourceExpansion = _document.SourceExpansion,
             Waivers = waivers,
+            ApplicabilityExpectedEntries = execution.ApplicabilityExpectedEntries,
+            ApplicabilityRecords = execution.ApplicabilityRecords,
+            AssessmentCompletionEvidence = assessmentCompletion,
             SubtractiveMatcherParticipation = runner.Session.SubtractiveMatcherParticipation
                 .Skip(subtractiveMatcherStartIndex)
                 .ToList()
@@ -554,23 +560,6 @@ public sealed partial class ArchitectureAnalysisSnapshot : IDisposable
             lookup.Entry.Outcome, _repositoryRoot, policyImportPaths, GetResolvedAssemblyPaths(),
             GetDiscoveredProjectPaths(), _document.SourceExpansion);
     }
-
-    private List<string> GetPolicyImportPaths()
-    {
-        return _document.Provenance.Sources
-            .Select(source => Path.GetFullPath(Path.Combine(_repositoryRoot, source.SourcePath)))
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .ToList();
-    }
-
-    // This is deliberately a snapshot copy, not the internal mutable counter record. Hosts use
-    // it when cancellation interrupts evaluation before a ValidationOutcome can expose inputs.
-    public IReadOnlyList<string> GetProfileInputPaths() => GetPolicyImportPaths()
-        .Concat(GetResolvedAssemblyPaths()
-            .SelectMany(path => new[] { path, BuildReceiptStore.ReceiptPathFor(path) }))
-        .Concat(GetDiscoveredProjectPaths())
-        .Distinct(StringComparer.OrdinalIgnoreCase)
-        .ToArray();
 
     private CacheArtifactEvidence GetCacheArtifactEvidence()
     {
