@@ -4,7 +4,7 @@ ArchLinterNet publishes an internal installable NuGet build for every successful
 
 ## Version authority
 
-`Directory.Build.props` contains the single explicit development release line:
+`Directory.Build.props` contains the single explicit development release line used by installable main builds:
 
 ```xml
 <ArchLinterDevelopmentVersion>0.8.0</ArchLinterDevelopmentVersion>
@@ -19,7 +19,7 @@ The `Main NuGet Builds` workflow combines that value with its monotonic GitHub A
 
 CI must not infer whether the next release is patch/minor/major from the latest git tag. After a stable public release, advance `ArchLinterDevelopmentVersion` to the next intended development line in a normal reviewed PR. The manual public release workflow remains tag/scenario driven and explicitly overrides the package/assembly version.
 
-Ordinary local source builds use the separate `dev` suffix (`0.8.0-dev`).
+`ArchLinterDevelopmentVersion` is intentionally decoupled from the ordinary source-tree `VersionPrefix`/`VersionSuffix`. Changing the next main-build release line therefore cannot silently change product output, serialized version evidence, or byte-golden tests in normal development builds. `main-packages.yml` supplies the exact `main.N` `Version`/`PackageVersion` explicitly when it builds and packs.
 
 ## Post-merge topology
 
@@ -42,7 +42,7 @@ main
 
 The full lint/architecture/cross-platform/E2E/packed-artifact/package-validation/CodeQL merge gate remains on the up-to-date pull request. `main` does not rerun that matrix merely because the accepted tree was merged.
 
-Package publication does not depend on SonarCloud/Codecov success, and quality telemetry does not depend on package-registry success.
+Package publication does not depend on SonarCloud/Codecov success, and quality telemetry does not depend on package-registry success. Within quality telemetry, SonarCloud and Codecov are attempted independently after the coverage evidence is available so an outage in one external service does not suppress the other refresh attempt; the overall main-quality run remains red when either required refresh fails.
 
 ## Producer authentication
 
@@ -99,3 +99,5 @@ GitHub's NuGet registry requires authenticated NuGet access. For local installat
 A successfully dogfooded `main.N` build is evidence that the corresponding `main` source state works in a consumer, but it is not the public release artifact.
 
 `release-nuget.yml` still creates a fresh immutable public candidate, executes Checkpoint B, freezes and verifies package/symbol subjects, creates GitHub provenance attestations, and only then may publish to NuGet.org and create the GitHub Release. No `main.N` package is promoted or renamed into a stable release.
+
+MkDocs/GitHub Pages publication is not part of either ordinary `main` workflow. Public docs are deployed only by `release-nuget.yml` for a real public release with `publish: true`.
