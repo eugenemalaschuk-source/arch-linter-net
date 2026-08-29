@@ -42,59 +42,118 @@ public static class ArchitectureApplicabilityEvaluator
         Dictionary<string, List<ArchitectureApplicabilityRecord>> recordsByIdentity =
             GroupByIdentity(records);
 
+        List<ArchitectureApplicabilityAssessment> assessments = BuildExpectedAssessments(
+            expectedByIdentity,
+            recordsByIdentity);
+        AddOrphanAssessments(assessments, expectedByIdentity, recordsByIdentity);
+        assessments = OrderAssessments(assessments);
+
+        IReadOnlyList<ArchitectureApplicabilityReason> reasons = CollectReasons(assessments);
+        ArchitectureAssessmentCompletionState state = DeriveState(assessments, conformancePassed);
+
+        return new ArchitectureAssessmentCompletionEvidence(state, assessments, reasons);
+    }
+
+    /// <summary>Alias emphasizing that this operation derives completion rather than findings.</summary>
+    public static ArchitectureAssessmentCompletionEvidence? DeriveCompletion(
+        IReadOnlyCollection<ArchitectureApplicabilityExpectedEntry> expectedEntries,
+        IReadOnlyCollection<ArchitectureApplicabilityRecord> records,
+        bool conformancePassed) => Evaluate(expectedEntries, records, conformancePassed);
+
+    private static List<ArchitectureApplicabilityAssessment> BuildExpectedAssessments(
+        IReadOnlyDictionary<string, List<ArchitectureApplicabilityExpectedEntry>> expectedByIdentity,
+        IReadOnlyDictionary<string, List<ArchitectureApplicabilityRecord>> recordsByIdentity)
+    {
         List<ArchitectureApplicabilityAssessment> assessments = new();
         foreach (string identity in expectedByIdentity.Keys.Order(StringComparer.Ordinal))
         {
-            List<ArchitectureApplicabilityExpectedEntry> expectedMatches = expectedByIdentity[identity];
-            ArchitectureApplicabilityExpectedEntry expected = expectedMatches[0];
-            List<ArchitectureApplicabilityReason> integrityReasons = new();
-
-            if (expectedMatches.Count > 1)
-            {
-                integrityReasons.Add(CreateReason(
-                    ArchitectureApplicabilityReasonCodes.DuplicateApplicabilityExpectedIdentity,
-                    expected.Provenance));
-            }
-
             recordsByIdentity.TryGetValue(identity, out List<ArchitectureApplicabilityRecord>? recordMatches);
-            ArchitectureApplicabilityRecord? record = null;
-            if (recordMatches is null or { Count: 0 })
-            {
-                if (expected.Membership == ArchitectureApplicabilityMembership.Required)
-                {
-                    integrityReasons.Add(CreateReason(
-                        ArchitectureApplicabilityReasonCodes.MissingApplicabilityRecord,
-                        expected.Provenance));
-                }
-            }
-            else if (recordMatches.Count > 1)
+            assessments.Add(BuildExpectedAssessment(expectedByIdentity[identity], recordMatches));
+        }
+
+        return assessments;
+    }
+
+    private static ArchitectureApplicabilityAssessment BuildExpectedAssessment(
+        IReadOnlyCollection<ArchitectureApplicabilityExpectedEntry> expectedEntries,
+        IReadOnlyCollection<ArchitectureApplicabilityRecord>? recordMatches)
+    {
+        ArchitectureApplicabilityExpectedEntry[] orderedExpected = OrderExpectedEntries(expectedEntries).ToArray();
+        ArchitectureApplicabilityExpectedEntry expected = orderedExpected[0];
+        List<ArchitectureApplicabilityReason> integrityReasons = new();
+        AddExpectedIdentityDefects(orderedExpected, integrityReasons);
+
+        ArchitectureApplicabilityRecord? record = ResolveRecord(expected, recordMatches, integrityReasons);
+        AddOpaqueUnassessableDefect(record, integrityReasons);
+        return new ArchitectureApplicabilityAssessment(expected, record, integrityReasons);
+    }
+
+    private static void AddExpectedIdentityDefects(
+        IReadOnlyList<ArchitectureApplicabilityExpectedEntry> expectedEntries,
+        List<ArchitectureApplicabilityReason> integrityReasons)
+    {
+        if (expectedEntries.Count < 2)
+        {
+            return;
+        }
+
+        foreach (ArchitectureApplicabilityExpectedEntry duplicate in expectedEntries)
+        {
+            integrityReasons.Add(CreateReason(
+                ArchitectureApplicabilityReasonCodes.DuplicateApplicabilityExpectedIdentity,
+                duplicate.Provenance));
+        }
+    }
+
+    private static ArchitectureApplicabilityRecord? ResolveRecord(
+        ArchitectureApplicabilityExpectedEntry expected,
+        IReadOnlyCollection<ArchitectureApplicabilityRecord>? recordMatches,
+        List<ArchitectureApplicabilityReason> integrityReasons)
+    {
+        if (recordMatches is null || recordMatches.Count == 0)
+        {
+            integrityReasons.Add(CreateReason(
+                ArchitectureApplicabilityReasonCodes.MissingApplicabilityRecord,
+                expected.Provenance));
+            return null;
+        }
+
+        if (recordMatches.Count > 1)
+        {
+            foreach (ArchitectureApplicabilityRecord duplicate in OrderRecords(recordMatches))
             {
                 integrityReasons.Add(CreateReason(
                     ArchitectureApplicabilityReasonCodes.DuplicateApplicabilityRecordIdentity,
-                    expected.Provenance));
-            }
-            else
-            {
-                record = recordMatches[0];
-                AddCompatibilityDefects(expected, record, integrityReasons);
+                    duplicate.Provenance));
             }
 
-            // An unassessable record without a reason would make the completion impossible to
-            // explain. Preserve it as integrity evidence rather than accepting an opaque state.
-            if (record?.State == ArchitectureApplicabilityRecordState.Unassessable
-                && record.Reasons.Count == 0)
-            {
-                integrityReasons.Add(CreateReason(
-                    ArchitectureApplicabilityReasonCodes.InvalidApplicabilityRecordIntegrity,
-                    record.Provenance));
-            }
-
-            assessments.Add(new ArchitectureApplicabilityAssessment(expected, record, integrityReasons));
+            return null;
         }
 
-        // The expected-to-produced left join cannot see records with no expected identity. Keep
-        // every orphan as a deterministic assessment row so a consumer cannot accidentally drop
-        // malformed producer output before checking collection integrity.
+        ArchitectureApplicabilityRecord record = recordMatches.Single();
+        AddCompatibilityDefects(expected, record, integrityReasons);
+        return record;
+    }
+
+    private static void AddOpaqueUnassessableDefect(
+        ArchitectureApplicabilityRecord? record,
+        List<ArchitectureApplicabilityReason> integrityReasons)
+    {
+        if (record?.State != ArchitectureApplicabilityRecordState.Unassessable || record.Reasons.Count > 0)
+        {
+            return;
+        }
+
+        integrityReasons.Add(CreateReason(
+            ArchitectureApplicabilityReasonCodes.InvalidApplicabilityRecordIntegrity,
+            record.Provenance));
+    }
+
+    private static void AddOrphanAssessments(
+        List<ArchitectureApplicabilityAssessment> assessments,
+        IReadOnlyDictionary<string, List<ArchitectureApplicabilityExpectedEntry>> expectedByIdentity,
+        IReadOnlyDictionary<string, List<ArchitectureApplicabilityRecord>> recordsByIdentity)
+    {
         foreach (string identity in recordsByIdentity.Keys.Order(StringComparer.Ordinal))
         {
             if (expectedByIdentity.ContainsKey(identity))
@@ -102,9 +161,7 @@ public static class ArchitectureApplicabilityEvaluator
                 continue;
             }
 
-            foreach (ArchitectureApplicabilityRecord record in recordsByIdentity[identity]
-                         .OrderBy(item => item.Family, StringComparer.Ordinal)
-                         .ThenBy(item => item.Provenance.PolicyIdentity, StringComparer.Ordinal))
+            foreach (ArchitectureApplicabilityRecord record in OrderRecords(recordsByIdentity[identity]))
             {
                 ArchitectureApplicabilityReason reason = CreateReason(
                     ArchitectureApplicabilityReasonCodes.UnknownApplicabilityRecordIdentity,
@@ -112,14 +169,22 @@ public static class ArchitectureApplicabilityEvaluator
                 assessments.Add(new ArchitectureApplicabilityAssessment(null, record, [reason]));
             }
         }
+    }
 
-        assessments = assessments
+    private static List<ArchitectureApplicabilityAssessment> OrderAssessments(
+        IEnumerable<ArchitectureApplicabilityAssessment> assessments)
+    {
+        return assessments
             .OrderBy(assessment => assessment.ControlIdentity, StringComparer.Ordinal)
             .ThenBy(assessment => assessment.Expected?.Family, StringComparer.Ordinal)
             .ThenBy(assessment => assessment.Record?.Family, StringComparer.Ordinal)
             .ToList();
+    }
 
-        IReadOnlyList<ArchitectureApplicabilityReason> reasons = assessments
+    private static IReadOnlyList<ArchitectureApplicabilityReason> CollectReasons(
+        IEnumerable<ArchitectureApplicabilityAssessment> assessments)
+    {
+        return assessments
             .SelectMany(assessment => assessment.IntegrityReasons)
             .Concat(assessments
                 .Where(assessment => assessment.IsIntegrityValid
@@ -130,24 +195,24 @@ public static class ArchitectureApplicabilityEvaluator
             .ThenBy(reason => reason.Provenance.Family, StringComparer.Ordinal)
             .ThenBy(reason => reason.Provenance.PolicyIdentity, StringComparer.Ordinal)
             .ToArray();
+    }
 
+    private static ArchitectureAssessmentCompletionState DeriveState(
+        IEnumerable<ArchitectureApplicabilityAssessment> assessments,
+        bool conformancePassed)
+    {
         bool hasInsufficientEvidence = assessments.Any(assessment =>
             !assessment.IsIntegrityValid
             || assessment.State == ArchitectureApplicabilityRecordState.Unassessable);
-        ArchitectureAssessmentCompletionState state = hasInsufficientEvidence
-            ? ArchitectureAssessmentCompletionState.Unassessable
-            : conformancePassed
-                ? ArchitectureAssessmentCompletionState.Pass
-                : ArchitectureAssessmentCompletionState.Fail;
+        if (hasInsufficientEvidence)
+        {
+            return ArchitectureAssessmentCompletionState.Unassessable;
+        }
 
-        return new ArchitectureAssessmentCompletionEvidence(state, assessments, reasons);
+        return conformancePassed
+            ? ArchitectureAssessmentCompletionState.Pass
+            : ArchitectureAssessmentCompletionState.Fail;
     }
-
-    /// <summary>Alias emphasizing that this operation derives completion rather than findings.</summary>
-    public static ArchitectureAssessmentCompletionEvidence? DeriveCompletion(
-        IReadOnlyCollection<ArchitectureApplicabilityExpectedEntry> expectedEntries,
-        IReadOnlyCollection<ArchitectureApplicabilityRecord> records,
-        bool conformancePassed) => Evaluate(expectedEntries, records, conformancePassed);
 
     private static Dictionary<string, List<T>> GroupByIdentity<T>(IEnumerable<T> values)
         where T : notnull
@@ -174,10 +239,32 @@ public static class ArchitectureApplicabilityEvaluator
         return grouped;
     }
 
+    private static IOrderedEnumerable<ArchitectureApplicabilityExpectedEntry> OrderExpectedEntries(
+        IEnumerable<ArchitectureApplicabilityExpectedEntry> entries)
+    {
+        return entries
+            .OrderBy(entry => entry.Membership)
+            .ThenBy(entry => entry.Family, StringComparer.Ordinal)
+            .ThenBy(entry => entry.Provenance.Family, StringComparer.Ordinal)
+            .ThenBy(entry => entry.Provenance.ControlIdentity, StringComparer.Ordinal)
+            .ThenBy(entry => entry.Provenance.PolicyIdentity, StringComparer.Ordinal);
+    }
+
+    private static IOrderedEnumerable<ArchitectureApplicabilityRecord> OrderRecords(
+        IEnumerable<ArchitectureApplicabilityRecord> records)
+    {
+        return records
+            .OrderBy(record => record.State)
+            .ThenBy(record => record.Family, StringComparer.Ordinal)
+            .ThenBy(record => record.Provenance.Family, StringComparer.Ordinal)
+            .ThenBy(record => record.Provenance.ControlIdentity, StringComparer.Ordinal)
+            .ThenBy(record => record.Provenance.PolicyIdentity, StringComparer.Ordinal);
+    }
+
     private static void AddCompatibilityDefects(
         ArchitectureApplicabilityExpectedEntry expected,
         ArchitectureApplicabilityRecord record,
-        ICollection<ArchitectureApplicabilityReason> defects)
+        List<ArchitectureApplicabilityReason> defects)
     {
         if (!string.Equals(expected.Family, record.Family, StringComparison.Ordinal)
             || !string.Equals(record.Provenance.Family, record.Family, StringComparison.Ordinal)

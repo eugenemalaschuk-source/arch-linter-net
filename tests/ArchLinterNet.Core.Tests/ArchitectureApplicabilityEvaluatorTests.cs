@@ -58,12 +58,20 @@ public sealed class ArchitectureApplicabilityEvaluatorTests
     }
 
     [Test]
-    public void DuplicateRecord_IsIntegrityEvidenceAndDoesNotEvaluateControl()
+    public void DuplicateRecord_IsIntegrityEvidenceAndRetainsEveryProducerProvenance()
     {
+        ArchitectureApplicabilityRecord first = new(
+            "control-a", "family", ArchitectureApplicabilityRecordState.Evaluable,
+            Array.Empty<ArchitectureApplicabilityReason>(),
+            new ArchitectureApplicabilityProvenance("family", "control-a", "policy-z"));
+        ArchitectureApplicabilityRecord second = new(
+            "control-a", "family", ArchitectureApplicabilityRecordState.Evaluable,
+            Array.Empty<ArchitectureApplicabilityReason>(),
+            new ArchitectureApplicabilityProvenance("family", "control-a", "policy-a"));
         ArchitectureAssessmentCompletionEvidence result =
             ArchitectureApplicabilityEvaluator.Evaluate(
                 [Entry("control-a", ArchitectureApplicabilityMembership.Required)],
-                [Record("control-a", ArchitectureApplicabilityRecordState.Evaluable), Record("control-a", ArchitectureApplicabilityRecordState.Evaluable)],
+                [first, second],
                 conformancePassed: true)!;
 
         ArchitectureApplicabilityAssessment assessment = result.Controls.Single();
@@ -72,8 +80,12 @@ public sealed class ArchitectureApplicabilityEvaluatorTests
             Assert.That(result.State, Is.EqualTo(ArchitectureAssessmentCompletionState.Unassessable));
             Assert.That(assessment.Record, Is.Null);
             Assert.That(assessment.State, Is.Null);
-            Assert.That(result.Reasons.Select(reason => reason.Code),
-                Does.Contain(ArchitectureApplicabilityReasonCodes.DuplicateApplicabilityRecordIdentity));
+            Assert.That(result.Reasons.Select(reason => reason.Code), Is.EqualTo(
+                [
+                    ArchitectureApplicabilityReasonCodes.DuplicateApplicabilityRecordIdentity,
+                    ArchitectureApplicabilityReasonCodes.DuplicateApplicabilityRecordIdentity,
+                ]));
+            Assert.That(result.Reasons.Select(reason => reason.Provenance.PolicyIdentity), Is.EqualTo(["policy-a", "policy-z"]));
         });
     }
 
@@ -135,7 +147,7 @@ public sealed class ArchitectureApplicabilityEvaluatorTests
     }
 
     [Test]
-    public void OptionalAndNotApplicableAbsent_DoNotMakeRequiredAssessmentUnassessable()
+    public void MissingOptionalAndNotApplicableRecords_AreCollectionIntegrityEvidence()
     {
         ArchitectureAssessmentCompletionEvidence result =
             ArchitectureApplicabilityEvaluator.Evaluate(
@@ -149,13 +161,50 @@ public sealed class ArchitectureApplicabilityEvaluatorTests
 
         Assert.Multiple(() =>
         {
-            Assert.That(result.State, Is.EqualTo(ArchitectureAssessmentCompletionState.Pass));
+            Assert.That(result.State, Is.EqualTo(ArchitectureAssessmentCompletionState.Unassessable));
             Assert.That(result.RequiredCount, Is.EqualTo(1));
             Assert.That(result.RequiredEvaluableCount, Is.EqualTo(1));
-            Assert.That(result.Controls.Single(control => control.ControlIdentity == "control-optional").IntegrityReasons,
-                Is.Empty);
-            Assert.That(result.Controls.Single(control => control.ControlIdentity == "control-not-applicable").IntegrityReasons,
-                Is.Empty);
+            Assert.That(result.Controls.Single(control => control.ControlIdentity == "control-optional").IntegrityReasons
+                .Select(reason => reason.Code), Is.EqualTo([ArchitectureApplicabilityReasonCodes.MissingApplicabilityRecord]));
+            Assert.That(result.Controls.Single(control => control.ControlIdentity == "control-not-applicable").IntegrityReasons
+                .Select(reason => reason.Code), Is.EqualTo([ArchitectureApplicabilityReasonCodes.MissingApplicabilityRecord]));
+        });
+    }
+
+    [Test]
+    public void ReorderedDuplicateExpectedEntries_ProduceIdenticalCanonicalAssessment()
+    {
+        ArchitectureApplicabilityExpectedEntry required = new(
+            "control-a", "family", ArchitectureApplicabilityMembership.Required,
+            new ArchitectureApplicabilityProvenance("family", "control-a", "policy-z"));
+        ArchitectureApplicabilityExpectedEntry optional = new(
+            "control-a", "family", ArchitectureApplicabilityMembership.Optional,
+            new ArchitectureApplicabilityProvenance("family", "control-a", "policy-a"));
+        ArchitectureApplicabilityRecord record = new(
+            "control-a", "family", ArchitectureApplicabilityRecordState.Evaluable,
+            Array.Empty<ArchitectureApplicabilityReason>(),
+            new ArchitectureApplicabilityProvenance("family", "control-a", "policy-z"));
+
+        ArchitectureAssessmentCompletionEvidence first = ArchitectureApplicabilityEvaluator.Evaluate(
+            [optional, required], [record], conformancePassed: true)!;
+        ArchitectureAssessmentCompletionEvidence second = ArchitectureApplicabilityEvaluator.Evaluate(
+            [required, optional], [record], conformancePassed: true)!;
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(first.State, Is.EqualTo(ArchitectureAssessmentCompletionState.Unassessable));
+            Assert.That(first.RequiredCount, Is.EqualTo(1));
+            Assert.That(first.Controls.Single().Expected!.Membership, Is.EqualTo(ArchitectureApplicabilityMembership.Required));
+            Assert.That(first.Controls.Single().Expected!.Provenance.PolicyIdentity, Is.EqualTo("policy-z"));
+            Assert.That(first.Reasons.Select(reason => reason.Provenance.PolicyIdentity), Is.EqualTo(["policy-a", "policy-z"]));
+            Assert.That(second.State, Is.EqualTo(first.State));
+            Assert.That(second.RequiredCount, Is.EqualTo(first.RequiredCount));
+            Assert.That(second.Controls.Single().Expected!.Membership,
+                Is.EqualTo(first.Controls.Single().Expected!.Membership));
+            Assert.That(second.Controls.Single().Expected!.Provenance.PolicyIdentity,
+                Is.EqualTo(first.Controls.Single().Expected!.Provenance.PolicyIdentity));
+            Assert.That(second.Reasons.Select(reason => reason.Provenance.PolicyIdentity),
+                Is.EqualTo(first.Reasons.Select(reason => reason.Provenance.PolicyIdentity)));
         });
     }
 
@@ -171,6 +220,35 @@ public sealed class ArchitectureApplicabilityEvaluatorTests
 
         Assert.That(result.State, Is.EqualTo(ArchitectureAssessmentCompletionState.Unassessable));
         Assert.That(result.Reasons.Single().Code, Is.EqualTo(ArchitectureApplicabilityReasonCodes.StaleDeclaration));
+    }
+
+    [Test]
+    public void UnreasonedUnassessableRecord_IsIntegrityEvidence()
+    {
+        ArchitectureAssessmentCompletionEvidence result =
+            ArchitectureApplicabilityEvaluator.Evaluate(
+                [Entry("control-a", ArchitectureApplicabilityMembership.Required)],
+                [Record("control-a", ArchitectureApplicabilityRecordState.Unassessable)],
+                conformancePassed: true)!;
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(result.State, Is.EqualTo(ArchitectureAssessmentCompletionState.Unassessable));
+            Assert.That(result.Reasons.Single().Code,
+                Is.EqualTo(ArchitectureApplicabilityReasonCodes.InvalidApplicabilityRecordIntegrity));
+        });
+    }
+
+    [Test]
+    public void TrustedEvidenceWithOrdinaryFailure_ReturnsFail()
+    {
+        ArchitectureAssessmentCompletionEvidence result =
+            ArchitectureApplicabilityEvaluator.Evaluate(
+                [Entry("control-a", ArchitectureApplicabilityMembership.Required)],
+                [Record("control-a", ArchitectureApplicabilityRecordState.Evaluable)],
+                conformancePassed: false)!;
+
+        Assert.That(result.State, Is.EqualTo(ArchitectureAssessmentCompletionState.Fail));
     }
 
     [Test]

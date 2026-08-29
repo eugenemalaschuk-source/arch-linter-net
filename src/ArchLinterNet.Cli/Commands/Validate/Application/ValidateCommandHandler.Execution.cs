@@ -303,7 +303,9 @@ internal sealed partial class ValidateCommandHandler
     {
         return outcome.AssessmentCompletionEvidence?.State switch
         {
-            ArchitectureAssessmentCompletionState.Pass => CliExitCodes.Success,
+            ArchitectureAssessmentCompletionState.Pass => outcome.Passed
+                ? CliExitCodes.Success
+                : CliExitCodes.ValidationFailure,
             ArchitectureAssessmentCompletionState.Fail => CliExitCodes.ValidationFailure,
             ArchitectureAssessmentCompletionState.Unassessable => CliExitCodes.InvalidArgumentsOrRuntimeError,
             _ => outcome.Passed ? CliExitCodes.Success : CliExitCodes.ValidationFailure,

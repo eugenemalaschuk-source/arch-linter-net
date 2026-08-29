@@ -73,16 +73,17 @@ be the machine-readable reason or identity.
   stable order and neither is flattened into a generic zero-findings result
 
 ### Requirement: Assessment completion fails closed across requested controls
-For an authoritative assessment, any requested required control with an
-unassessable applicability or completeness outcome SHALL make the overall
-completion state `unassessable`. Optional/not-applicable controls SHALL remain
-visible but SHALL not become required denominators or cause unassessability
-solely because they are deliberately absent. Completion aggregation SHALL not
-infer evaluability from a zero-finding count, a configured-control count, or a
-missing record.
+For an authoritative assessment, any requested control with an unassessable
+applicability or completeness outcome, or any expected identity without exactly
+one compatible produced record, SHALL make the overall completion state
+`unassessable`. `optional` and `not_applicable` controls SHALL remain visible
+but SHALL not inflate the required denominator; a deliberately absent optional
+input SHALL be represented by an explicit compatible `not_applicable` record,
+not by omitting its record. Completion aggregation SHALL not infer evaluability
+from a zero-finding count, a configured-control count, or a missing record.
 
 #### Scenario: Missing applicability record cannot become a pass
-- **WHEN** the expected membership contains a required control whose
-  applicability record is missing
-- **THEN** the control stays in scope with `missing_applicability_record`
-  evidence and the authoritative assessment is `unassessable`
+- **WHEN** the expected membership contains any control whose applicability
+  record is missing
+- **THEN** the control exposes `missing_applicability_record` evidence and the
+  authoritative assessment is `unassessable`

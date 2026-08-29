@@ -11,6 +11,7 @@ namespace ArchLinterNet.Cli.Tests;
 public sealed partial class ValidateCommandHandlerReportModeTests
 {
     [TestCase(ArchitectureAssessmentCompletionState.Pass, true, CliExitCodes.Success)]
+    [TestCase(ArchitectureAssessmentCompletionState.Pass, false, CliExitCodes.ValidationFailure)]
     [TestCase(ArchitectureAssessmentCompletionState.Fail, false, CliExitCodes.ValidationFailure)]
     [TestCase(ArchitectureAssessmentCompletionState.Unassessable, false, CliExitCodes.InvalidArgumentsOrRuntimeError)]
     public void ValidateHandler_CompletedAssessmentMapsCompletionStateToExitCategory(

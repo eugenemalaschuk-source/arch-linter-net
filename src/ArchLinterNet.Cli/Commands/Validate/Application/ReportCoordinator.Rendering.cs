@@ -8,6 +8,8 @@ namespace ArchLinterNet.Cli.Commands.Validate.Application;
 // Rendering helpers are kept separate from report routing so output accounting stays readable.
 internal sealed partial class ReportCoordinator
 {
+    private const string PropertiesPropertyName = "properties";
+
     private string FormatHumanContent(
         bool isSingleMode,
         IReadOnlyList<(string Mode, ValidationOutcome Outcome)> outcomesByMode,
@@ -115,8 +117,8 @@ internal sealed partial class ReportCoordinator
 
         if (runs.Count == 0)
         {
-            JsonObject properties = payload["properties"] as JsonObject ?? new JsonObject();
-            payload["properties"] = properties;
+            JsonObject properties = payload[PropertiesPropertyName] as JsonObject ?? new JsonObject();
+            payload[PropertiesPropertyName] = properties;
             properties["arch_linter_net.assessment_completion"] = BuildAssessmentCompletionJson(completion);
         }
         else
@@ -128,8 +130,8 @@ internal sealed partial class ReportCoordinator
                     continue;
                 }
 
-                JsonObject properties = runObject["properties"] as JsonObject ?? new JsonObject();
-                runObject["properties"] = properties;
+                JsonObject properties = runObject[PropertiesPropertyName] as JsonObject ?? new JsonObject();
+                runObject[PropertiesPropertyName] = properties;
                 properties["arch_linter_net.assessment_completion"] = BuildAssessmentCompletionJson(completion);
             }
         }

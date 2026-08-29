@@ -161,7 +161,7 @@ public sealed record ArchitectureApplicabilityRecord
         ControlIdentity = RequireValue(controlIdentity, nameof(controlIdentity));
         Family = RequireValue(family, nameof(family));
         State = state;
-        Reasons = CopyReasons(reasons);
+        Reasons = ArchitectureApplicabilityReasonOrdering.CopyByCode(reasons);
         Provenance = provenance ?? throw new ArgumentNullException(nameof(provenance));
     }
 
@@ -203,19 +203,6 @@ public sealed record ArchitectureApplicabilityRecord
 
     public ArchitectureApplicabilityProvenance Provenance { get; }
 
-    private static IReadOnlyList<ArchitectureApplicabilityReason> CopyReasons(
-        IReadOnlyList<ArchitectureApplicabilityReason> reasons)
-    {
-        ArgumentNullException.ThrowIfNull(reasons);
-        return reasons
-            .Where(reason => reason is not null)
-            .OrderBy(reason => reason.Code, StringComparer.Ordinal)
-            .ThenBy(reason => reason.Provenance.Family, StringComparer.Ordinal)
-            .ThenBy(reason => reason.Provenance.ControlIdentity, StringComparer.Ordinal)
-            .ThenBy(reason => reason.Provenance.PolicyIdentity, StringComparer.Ordinal)
-            .ToArray();
-    }
-
     private static string RequireValue(string value, string parameterName) =>
         string.IsNullOrWhiteSpace(value)
             ? throw new ArgumentException("A canonical applicability value is required.", parameterName)
@@ -236,7 +223,7 @@ public sealed record ArchitectureApplicabilityAssessment
     {
         Expected = expected;
         Record = record;
-        IntegrityReasons = CopyReasons(integrityReasons);
+        IntegrityReasons = ArchitectureApplicabilityReasonOrdering.CopyByCode(integrityReasons);
     }
 
     public ArchitectureApplicabilityExpectedEntry? Expected { get; }
@@ -257,18 +244,6 @@ public sealed record ArchitectureApplicabilityAssessment
 
     public bool IsIntegrityValid => IntegrityReasons.Count == 0;
 
-    private static IReadOnlyList<ArchitectureApplicabilityReason> CopyReasons(
-        IReadOnlyList<ArchitectureApplicabilityReason> reasons)
-    {
-        ArgumentNullException.ThrowIfNull(reasons);
-        return reasons
-            .Where(reason => reason is not null)
-            .OrderBy(reason => reason.Code, StringComparer.Ordinal)
-            .ThenBy(reason => reason.Provenance.Family, StringComparer.Ordinal)
-            .ThenBy(reason => reason.Provenance.ControlIdentity, StringComparer.Ordinal)
-            .ThenBy(reason => reason.Provenance.PolicyIdentity, StringComparer.Ordinal)
-            .ToArray();
-    }
 }
 
 /// <summary>Derived completion and stable per-control evidence for an authoritative assessment.</summary>
@@ -306,7 +281,7 @@ public sealed record ArchitectureAssessmentCompletionEvidence
 
     public bool IsUnassessable => State == ArchitectureAssessmentCompletionState.Unassessable;
 
-    private static IReadOnlyList<ArchitectureApplicabilityAssessment> CopyControls(
+    private static ArchitectureApplicabilityAssessment[] CopyControls(
         IReadOnlyList<ArchitectureApplicabilityAssessment> controls)
     {
         ArgumentNullException.ThrowIfNull(controls);
@@ -316,7 +291,7 @@ public sealed record ArchitectureAssessmentCompletionEvidence
             .ToArray();
     }
 
-    private static IReadOnlyList<ArchitectureApplicabilityReason> CopyReasons(
+    private static ArchitectureApplicabilityReason[] CopyReasons(
         IReadOnlyList<ArchitectureApplicabilityReason> reasons)
     {
         ArgumentNullException.ThrowIfNull(reasons);
@@ -325,6 +300,22 @@ public sealed record ArchitectureAssessmentCompletionEvidence
             .OrderBy(reason => reason.Provenance.ControlIdentity, StringComparer.Ordinal)
             .ThenBy(reason => reason.Code, StringComparer.Ordinal)
             .ThenBy(reason => reason.Provenance.Family, StringComparer.Ordinal)
+            .ThenBy(reason => reason.Provenance.PolicyIdentity, StringComparer.Ordinal)
+            .ToArray();
+    }
+}
+
+internal static class ArchitectureApplicabilityReasonOrdering
+{
+    internal static ArchitectureApplicabilityReason[] CopyByCode(
+        IReadOnlyList<ArchitectureApplicabilityReason> reasons)
+    {
+        ArgumentNullException.ThrowIfNull(reasons);
+        return reasons
+            .Where(reason => reason is not null)
+            .OrderBy(reason => reason.Code, StringComparer.Ordinal)
+            .ThenBy(reason => reason.Provenance.Family, StringComparer.Ordinal)
+            .ThenBy(reason => reason.Provenance.ControlIdentity, StringComparer.Ordinal)
             .ThenBy(reason => reason.Provenance.PolicyIdentity, StringComparer.Ordinal)
             .ToArray();
     }
