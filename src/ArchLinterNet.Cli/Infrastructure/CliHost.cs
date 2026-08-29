@@ -11,7 +11,7 @@ internal sealed class CliHost(ICliRootCommandFactory rootCommandFactory, ICliCon
     {
         Command rootCommand = rootCommandFactory.Create();
         ParseResult parseResult = rootCommand.Parse(args);
-        if (parseResult.Errors.Count > 0 || parseResult.UnmatchedTokens.Count > 0)
+        if (parseResult.UnmatchedTokens.Count > 0)
         {
             WriteParseErrors(parseResult);
             return CliExitCodes.InvalidArgumentsOrRuntimeError;
@@ -20,6 +20,12 @@ internal sealed class CliHost(ICliRootCommandFactory rootCommandFactory, ICliCon
         if (TryHandleLegacyValidateShortCircuit(args))
         {
             return CliExitCodes.Success;
+        }
+
+        if (parseResult.Errors.Count > 0)
+        {
+            WriteParseErrors(parseResult);
+            return CliExitCodes.InvalidArgumentsOrRuntimeError;
         }
 
         return parseResult.Invoke();
@@ -32,36 +38,49 @@ internal sealed class CliHost(ICliRootCommandFactory rootCommandFactory, ICliCon
             return false;
         }
 
-        int i = 0;
-        while (i < args.Length)
+        LegacyResponse? response = null;
+        for (int i = 0; i < args.Length; i++)
         {
             string arg = args[i];
             switch (arg)
             {
                 case "--help" or "-h":
-                    console.Out.WriteLine(ValidateCommandDefinition.HelpText);
-                    return true;
+                    response ??= LegacyResponse.Help;
+                    break;
                 case "--version" or "-v":
-                    console.Out.WriteLine($"arch-linter-net {runtime.Version}");
-                    return true;
+                    response ??= LegacyResponse.Version;
+                    break;
                 case "--policy" or "-p" or "--mode" or "-m" or "--format" or "-f" or "--contract" or "--condition-set" or "--baseline":
-                    if (i + 1 >= args.Length)
+                    if (++i >= args.Length)
                     {
                         return false;
                     }
 
-                    i += 2;
-                    continue;
+                    break;
                 case "--strict" or "--audit" or "--json" or "--timings":
                     break;
                 default:
                     return false;
             }
-
-            i++;
         }
 
-        return false;
+        switch (response)
+        {
+            case LegacyResponse.Help:
+                console.Out.WriteLine(ValidateCommandDefinition.HelpText);
+                return true;
+            case LegacyResponse.Version:
+                console.Out.WriteLine($"arch-linter-net {runtime.Version}");
+                return true;
+            default:
+                return false;
+        }
+    }
+
+    private enum LegacyResponse
+    {
+        Help,
+        Version,
     }
 
     private void WriteParseErrors(ParseResult parseResult)

@@ -254,6 +254,19 @@ public partial class CliIntegrationTests
         });
     }
 
+    [Test]
+    public void Help_WithAdditionalRootArguments_StillPrintsHelpAndExitsZero()
+    {
+        var (exitCode, stdout, stderr) = RunCli("--policy", _passingPolicy, "--help");
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(exitCode, Is.EqualTo(0));
+            Assert.That(stdout, Does.Contain("arch-linter-net"));
+            Assert.That(stderr, Is.Empty);
+        });
+    }
+
     /* --policy / -p */
 
     [Test]
