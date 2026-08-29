@@ -91,9 +91,7 @@ the machine-readable reason or identity.
   does not include the foreign provenance in machine-readable or human output
 
 ### Requirement: Assessment completion fails closed across requested controls
-For an authoritative assessment, any requested control with an unassessable
-applicability or completeness outcome, or any expected identity without exactly
-one compatible produced record, SHALL make the overall completion state
+For an authoritative assessment, any requested control with an unassessable applicability or completeness outcome, or any expected identity without exactly one compatible produced record, SHALL make the overall completion state
 `unassessable`. `optional` and `not_applicable` controls SHALL remain visible
 but SHALL not inflate the required denominator; a deliberately absent optional
 input SHALL be represented by an explicit compatible `not_applicable` record,

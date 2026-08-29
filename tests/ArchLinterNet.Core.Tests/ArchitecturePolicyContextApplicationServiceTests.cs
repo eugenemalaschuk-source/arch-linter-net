@@ -52,7 +52,7 @@ public sealed class ArchitecturePolicyContextApplicationServiceTests
 
         Assert.Multiple(() =>
         {
-            Assert.That(context.SchemaVersion, Is.EqualTo(4));
+            Assert.That(context.SchemaVersion, Is.EqualTo(5));
             Assert.That(context.Kind, Is.EqualTo("architecture-policy-context"));
             Assert.That(context.Guardrails.PolicyWeakening, Is.EqualTo("error"));
             Assert.That(context.Policy.HasImports, Is.True);
@@ -83,12 +83,70 @@ public sealed class ArchitecturePolicyContextApplicationServiceTests
         {
             Assert.That(secondJson, Is.EqualTo(firstJson));
             Assert.That(secondMarkdown, Is.EqualTo(firstMarkdown));
-            Assert.That(document.RootElement.GetProperty("schema_version").GetInt32(), Is.EqualTo(4));
+            Assert.That(document.RootElement.GetProperty("schema_version").GetInt32(), Is.EqualTo(5));
             Assert.That(document.RootElement.GetProperty("kind").GetString(), Is.EqualTo("architecture-policy-context"));
             Assert.That(firstMarkdown, Does.Contain("# Architecture policy context"));
             Assert.That(firstMarkdown, Does.Contain("Policy weakening severity: `error`"));
             Assert.That(firstMarkdown, Does.Contain("does not build projects, analyze assemblies, or prove architecture compliance"));
         });
+    }
+
+    [Test]
+    public void Export_Topology_ProjectsOrderedNativeFactsAndProvenance()
+    {
+        string temporaryDirectory = Path.Combine(Path.GetTempPath(), $"arch-linter-topology-context-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(temporaryDirectory);
+        string policyPath = Path.Combine(temporaryDirectory, "policy.yml");
+        try
+        {
+            File.WriteAllText(policyPath, """
+                version: 1
+                name: Native topology context
+                layers:
+                  application: { namespace: Sample.Application }
+                  domain: { namespace: Sample.Domain }
+                topology:
+                  mode: exhaustive
+                  subject_kind: type
+                  scope:
+                    selectors: [{ layer: domain }, { layer: application }]
+                  nodes:
+                    - id: domain
+                      mappings: [{ layer: domain }]
+                    - id: application
+                      mappings: [{ layer: application }]
+                  allowed_edges: [{ from: application, to: domain }]
+                  out_of_scope:
+                    - id: generated
+                      selector: { namespace: Sample.Generated }
+                      reason: Generated code is reviewed outside this topology.
+                  stale_declarations: true
+                """);
+
+            ArchitecturePolicyContextExport context = _engine.ExportPolicyContext(
+                new ArchitecturePolicyContextRequest { PolicyPath = policyPath });
+            ArchitecturePolicyContextTopology topology = context.Topology!;
+            string markdown = ArchitecturePolicyContextFormatter.FormatAsMarkdown(context);
+            using JsonDocument json = JsonDocument.Parse(ArchitecturePolicyContextFormatter.FormatAsJson(context));
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(topology, Is.Not.Null);
+                Assert.That(topology.Mode, Is.EqualTo("exhaustive"));
+                Assert.That(topology.SubjectKind, Is.EqualTo("type"));
+                Assert.That(topology.ScopeSelectors.Select(selector => selector.Value), Is.EqualTo(new[] { "application", "domain" }));
+                Assert.That(topology.Nodes.Select(node => node.Id), Is.EqualTo(new[] { "application", "domain" }));
+                Assert.That(topology.AllowedEdges.Single().From, Is.EqualTo("application"));
+                Assert.That(topology.OutOfScope.Single().Selector.Value, Is.EqualTo("Sample.Generated"));
+                Assert.That(topology.OutOfScope.Single().Provenance!.YamlPath, Does.Contain("out_of_scope"));
+                Assert.That(json.RootElement.GetProperty("topology").GetProperty("subject_kind").GetString(), Is.EqualTo("type"));
+                Assert.That(markdown, Does.Contain("## Declared topology").And.Contain("Reviewed out of scope `generated`"));
+            });
+        }
+        finally
+        {
+            Directory.Delete(temporaryDirectory, recursive: true);
+        }
     }
 
     [Test]
@@ -241,7 +299,7 @@ public sealed class ArchitecturePolicyContextApplicationServiceTests
 
             Assert.Multiple(() =>
             {
-                Assert.That(context.SchemaVersion, Is.EqualTo(4));
+                Assert.That(context.SchemaVersion, Is.EqualTo(5));
                 Assert.That(context.WaiverLifecycleProfile, Is.EqualTo("strict"));
                 Assert.That(waiver.WaiverId, Is.EqualTo("ARCH-IGN-001"));
                 Assert.That(waiver.TargetFingerprint, Is.EqualTo("sha256:" + new string('a', 64)));

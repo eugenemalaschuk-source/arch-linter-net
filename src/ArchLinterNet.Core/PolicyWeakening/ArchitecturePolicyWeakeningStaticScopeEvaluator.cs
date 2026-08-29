@@ -112,8 +112,95 @@ internal static class ArchitecturePolicyWeakeningStaticScopeEvaluator
                     instance.Provenance ?? baseExpansion.Provenance,
                     currentExpansion.Provenance,
                     Array.Empty<string>(),
-                    currentExpansion.OptionalReason));
+                currentExpansion.OptionalReason));
             }
         }
+
+        EvaluateTopologyExclusions(baseline.Topology, current.Topology, current.Guardrails.PolicyWeakening, findings);
+    }
+
+    private static void EvaluateTopologyExclusions(
+        ArchitecturePolicyContextTopology? baseline,
+        ArchitecturePolicyContextTopology? current,
+        string severity,
+        ICollection<ArchitecturePolicyWeakeningFinding> findings)
+    {
+        // A wholly new topology is a new declaration, not evidence that an existing topology was
+        // weakened. Once both states carry the same native model, an added exclusion is a direct
+        // static broadening of the reviewed scope and can reuse this generic scope comparison.
+        if (baseline is null || current is null)
+        {
+            return;
+        }
+
+        Dictionary<string, ArchitecturePolicyContextTopologyOutOfScope> baseEntries = baseline.OutOfScope
+            .ToDictionary(entry => entry.Id, _comparer);
+        foreach (ArchitecturePolicyContextTopologyOutOfScope entry in current.OutOfScope.OrderBy(entry => entry.Id, _comparer))
+        {
+            if (!baseEntries.TryGetValue(entry.Id, out ArchitecturePolicyContextTopologyOutOfScope? baseEntry))
+            {
+                findings.Add(CreateFinding(
+                    new PolicyWeakeningControlContext(
+                        "topology_out_of_scope_added", "topology:" + entry.Id, SemanticClassification, severity),
+                    Array.Empty<string>(),
+                    [TopologySelectorKey(entry.Selector)],
+                    null,
+                    entry.Provenance ?? entry.Selector.Provenance,
+                    Array.Empty<string>(),
+                    entry.Reason));
+                continue;
+            }
+
+            string baselineSelector = TopologySelectorKey(baseEntry.Selector);
+            string currentSelector = TopologySelectorKey(entry.Selector);
+            if (string.Equals(baselineSelector, currentSelector, StringComparison.Ordinal))
+            {
+                continue;
+            }
+
+            bool semantic = IsProvablyBroaderNamespace(baseEntry.Selector, entry.Selector);
+            findings.Add(CreateFinding(
+                new PolicyWeakeningControlContext(
+                    semantic ? "topology_out_of_scope_broadened" : "topology_out_of_scope_impact_not_proven",
+                    "topology:" + entry.Id,
+                    semantic ? SemanticClassification : "impact_not_proven",
+                    severity),
+                [baselineSelector],
+                [currentSelector],
+                baseEntry.Provenance ?? baseEntry.Selector.Provenance,
+                entry.Provenance ?? entry.Selector.Provenance,
+                Array.Empty<string>(),
+                entry.Reason));
+        }
+    }
+
+    private static bool IsProvablyBroaderNamespace(
+        ArchitecturePolicyContextTopologySelector baseline,
+        ArchitecturePolicyContextTopologySelector current)
+    {
+        if (baseline.Kind != "namespace"
+            || current.Kind != "namespace"
+            || !string.Equals(baseline.NamespaceSuffix, current.NamespaceSuffix, StringComparison.Ordinal)
+            || baseline.Value.Contains('*', StringComparison.Ordinal)
+            || current.Value.Contains('*', StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        return baseline.Value.StartsWith(current.Value + ".", StringComparison.Ordinal);
+    }
+
+    private static string TopologySelectorKey(ArchitecturePolicyContextTopologySelector selector)
+    {
+        if (selector.Kind != "context")
+        {
+            return selector.Kind + ":" + selector.Value + ":" + selector.NamespaceSuffix;
+        }
+
+        ArchitecturePolicyContextSelector? context = selector.Context;
+        return "context:" + (context?.Role ?? string.Empty) + ":" +
+               string.Join(",", context?.Metadata.OrderBy(item => item.Key, _comparer)
+                   .Select(item => item.Key + "=" + item.Value) ?? Array.Empty<string>()) + ":" +
+               (context?.When ?? string.Empty);
     }
 }

@@ -9,6 +9,7 @@ internal sealed class ArchitecturePolicyDocumentComposer
     private const string HistoryAnalysisSection = "history_analysis";
     private const string ContractsSection = "contracts";
     private const string ClassificationSection = "classification";
+    private const string TopologySection = "topology";
 
     private static readonly HashSet<string> _keyedSections = new(StringComparer.Ordinal)
     {
@@ -87,6 +88,10 @@ internal sealed class ArchitecturePolicyDocumentComposer
             else if (key == ClassificationSection)
             {
                 MergeClassification(effective, value, source);
+            }
+            else if (key == TopologySection)
+            {
+                AddSingleton(effective, key, value, source, key, ArchitecturePolicyProvenancePath.Property(key));
             }
         }
     }

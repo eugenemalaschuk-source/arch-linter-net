@@ -40,6 +40,7 @@ public static class ArchitecturePolicyContextFormatter
         AppendAnalysisInputs(markdown, context.Analysis);
 
         AppendLayers(markdown, context.Layers);
+        AppendTopology(markdown, context.Topology);
         AppendContracts(markdown, context.Contracts);
         AppendSourceExpansions(markdown, context.SourceExpansions);
         AppendClassification(markdown, context.Classification, context.Contexts);
@@ -86,6 +87,33 @@ public static class ArchitecturePolicyContextFormatter
         AppendAnalysisValues(markdown, "project include", analysis.ProjectInclude);
         AppendAnalysisValues(markdown, "project exclude", analysis.ProjectExclude);
         AppendAnalysisValues(markdown, "source roots", analysis.SourceRoots);
+    }
+
+    private static void AppendTopology(StringBuilder markdown, ArchitecturePolicyContextTopology? topology)
+    {
+        if (topology is null)
+        {
+            return;
+        }
+
+        markdown.AppendLine();
+        markdown.AppendLine("## Declared topology");
+        markdown.AppendLine($"- Mode: `{Inline(topology.Mode)}`; subject kind: `{Inline(topology.SubjectKind)}`; allow empty: `{topology.ScopeAllowsEmpty.ToString().ToLowerInvariant()}`; stale declarations: `{topology.StaleDeclarations.ToString().ToLowerInvariant()}`");
+        markdown.AppendLine($"- Scope: {string.Join(", ", topology.ScopeSelectors.Select(FormatTopologySelector))}");
+        foreach (ArchitecturePolicyContextTopologyNode node in topology.Nodes)
+        {
+            markdown.AppendLine($"- Node `{Inline(node.Id)}`: {string.Join(", ", node.Mappings.Select(FormatTopologySelector))}{FormatProvenance(node.Provenance)}");
+        }
+
+        foreach (ArchitecturePolicyContextTopologyEdge edge in topology.AllowedEdges)
+        {
+            markdown.AppendLine($"- Allowed edge `{Inline(edge.From)}` → `{Inline(edge.To)}`{FormatProvenance(edge.Provenance)}");
+        }
+
+        foreach (ArchitecturePolicyContextTopologyOutOfScope exclusion in topology.OutOfScope)
+        {
+            markdown.AppendLine($"- Reviewed out of scope `{Inline(exclusion.Id)}`: {FormatTopologySelector(exclusion.Selector)}; reason `{Inline(exclusion.Reason)}`{FormatProvenance(exclusion.Provenance)}");
+        }
     }
 
     private static void AppendAnalysisValues(StringBuilder markdown, string label, IReadOnlyList<string> values)
@@ -301,6 +329,14 @@ public static class ArchitecturePolicyContextFormatter
         string when = string.IsNullOrWhiteSpace(selector.When) ? string.Empty : $" when `{Inline(selector.When)}`";
         return $"{Inline(selector.Kind)} selector: role `{Inline(selector.Role)}`{metadata}{when}";
     }
+
+    private static string FormatTopologySelector(ArchitecturePolicyContextTopologySelector selector) => selector.Kind switch
+    {
+        "namespace" => $"namespace `{Inline(selector.Value)}`" +
+                       (string.IsNullOrWhiteSpace(selector.NamespaceSuffix) ? string.Empty : $" suffix `{Inline(selector.NamespaceSuffix)}`"),
+        "context" => selector.Context is null ? "context" : FormatSelector(selector.Context),
+        _ => $"{Inline(selector.Kind)} `{Inline(selector.Value)}`",
+    };
 
     private static string FormatExpandedInstance(ArchitecturePolicyContextExpandedInstance instance)
     {
