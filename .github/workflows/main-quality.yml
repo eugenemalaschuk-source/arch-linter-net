@@ -1,0 +1,246 @@
+name: Main Quality Telemetry
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+concurrency:
+  group: main-quality-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  SONAR_HOST_URL: https://sonarcloud.io
+  SONAR_PROJECT_KEY: ${{ vars.SONAR_PROJECT_KEY || 'eugenemalaschuk-source_arch-linter-net' }}
+  SONAR_ORGANIZATION: ${{ vars.SONAR_ORGANIZATION || 'eugenemalaschuk-source' }}
+
+jobs:
+  dotnet_coverage:
+    name: Main .NET Coverage (${{ matrix.name }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 18
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - id: core-1
+            name: Core Shard 1
+            target: test-coverage-core-1
+          - id: core-2
+            name: Core Shard 2
+            target: test-coverage-core-2
+          - id: other
+            name: CEL + CLI
+            target: test-coverage-other
+    permissions:
+      contents: read
+    env:
+      TEST_COVERAGE_DIAGNOSTICS: --blame-hang --blame-hang-timeout 5m
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Cache NuGet packages
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
+        with:
+          path: ~/.nuget/packages
+          key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj') }}
+          restore-keys: |
+            ${{ runner.os }}-nuget-
+
+      - name: Restore
+        run: make restore
+
+      - name: Collect ${{ matrix.name }} coverage
+        shell: bash
+        run: make ${{ matrix.target }}
+
+      - name: Upload .NET coverage shard
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: main-dotnet-coverage-${{ matrix.id }}
+          path: test-results/coverage
+          if-no-files-found: error
+          retention-days: 1
+
+  sonar:
+    name: Main SonarCloud
+    needs: dotnet_coverage
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Download .NET coverage shards
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+        with:
+          pattern: main-dotnet-coverage-*
+          path: test-results/coverage-shards
+
+      - name: Setup uv
+        uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Setup Java
+        uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Cache NuGet packages
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
+        with:
+          path: ~/.nuget/packages
+          key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj') }}
+          restore-keys: |
+            ${{ runner.os }}-nuget-
+
+      - name: Restore
+        run: make restore
+
+      - name: Collect Python tooling coverage
+        run: make test-tooling-coverage
+
+      - name: Cache SonarQube packages
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
+        with:
+          path: ~/.sonar/cache
+          key: ${{ runner.os }}-sonar
+          restore-keys: |
+            ${{ runner.os }}-sonar
+
+      - name: Install SonarScanner for .NET
+        run: |
+          mkdir -p ./.sonar/scanner
+          dotnet tool update dotnet-sonarscanner --tool-path ./.sonar/scanner
+
+      - name: Validate SonarCloud configuration
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        shell: bash
+        run: |
+          missing=()
+          [[ -n "$SONAR_TOKEN" ]] || missing+=("SONAR_TOKEN secret")
+          [[ -n "$SONAR_PROJECT_KEY" ]] || missing+=("SONAR_PROJECT_KEY repository variable or committed default")
+          [[ -n "$SONAR_ORGANIZATION" ]] || missing+=("SONAR_ORGANIZATION repository variable or committed default")
+          if [ ${#missing[@]} -gt 0 ]; then
+            printf 'Missing SonarCloud configuration: %s\n' "${missing[*]}" >&2
+            exit 1
+          fi
+
+      - name: Begin SonarCloud analysis
+        id: sonar_begin
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        shell: bash
+        run: |
+          ./.sonar/scanner/dotnet-sonarscanner begin \
+            /k:"$SONAR_PROJECT_KEY" \
+            /o:"$SONAR_ORGANIZATION" \
+            /d:sonar.token="$SONAR_TOKEN" \
+            /d:sonar.host.url="$SONAR_HOST_URL" \
+            /d:sonar.qualitygate.wait=true \
+            /d:sonar.qualitygate.timeout=300 \
+            /d:sonar.cs.opencover.reportsPaths="test-results/**/coverage.opencover.xml" \
+            /d:sonar.cs.vstest.reportsPaths="test-results/**/*.trx" \
+            /d:sonar.python.coverage.reportPaths="coverage-python.xml" \
+            /d:sonar.exclusions="**/AdoptionAcceptance/Fixtures/**" \
+            /d:sonar.coverage.exclusions="tools/ArchLinterNet.GitFuzz/**,tools/**/tests/**,**/CheckpointBReleaseGateTests*.cs"
+
+      - name: Build for SonarCloud analysis
+        run: dotnet build ArchLinterNet.slnx --no-restore --nologo
+
+      - name: End SonarCloud analysis and require quality gate
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        shell: bash
+        run: ./.sonar/scanner/dotnet-sonarscanner end /d:sonar.token="$SONAR_TOKEN"
+
+  codecov:
+    name: Main Codecov
+    needs: dotnet_coverage
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+
+      - name: Download .NET coverage shards
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+        with:
+          pattern: main-dotnet-coverage-*
+          path: test-results/coverage-shards
+
+      - name: Resolve coverage report paths
+        id: coverage_reports
+        shell: bash
+        run: |
+          files="$(find test-results -name 'coverage.cobertura.xml' -print | sed 's#^#./#' | paste -sd, -)"
+          echo "files=$files" >> "$GITHUB_OUTPUT"
+          if [ -z "$files" ]; then
+            echo "No .NET Cobertura coverage reports were downloaded." >&2
+            exit 1
+          fi
+
+      - name: Upload merged-main coverage to Codecov
+        uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f # v7.0.0
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: ${{ steps.coverage_reports.outputs.files }}
+          disable_search: true
+          fail_ci_if_error: true
+
+  summary:
+    name: Main Quality Summary
+    needs: [dotnet_coverage, sonar, codecov]
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    permissions: {}
+
+    steps:
+      - name: Publish main telemetry summary
+        shell: bash
+        run: |
+          {
+            echo "### Main quality telemetry"
+            echo
+            echo "- Source: \`$GITHUB_SHA\`"
+            echo "- .NET coverage shards: ${{ needs.dotnet_coverage.result }}"
+            echo "- SonarCloud main refresh: ${{ needs.sonar.result }}"
+            echo "- Codecov main refresh: ${{ needs.codecov.result }}"
+            echo "- SonarCloud and Codecov run as independent fan-out jobs from the same merged-main coverage evidence."
+            echo "- README main-quality, Sonar and Codecov badges are expected to represent this merged revision after successful jobs."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Require complete main telemetry
+        if: needs.dotnet_coverage.result != 'success' || needs.sonar.result != 'success' || needs.codecov.result != 'success'
+        run: exit 1
