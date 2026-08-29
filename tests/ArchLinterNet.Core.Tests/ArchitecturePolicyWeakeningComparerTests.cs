@@ -582,6 +582,35 @@ public sealed class ArchitecturePolicyWeakeningComparerTests
         });
     }
 
+    [Test]
+    public void Compare_ExtendedStructuredWaiverExpiry_IsSemanticWeakening()
+    {
+        ArchitecturePolicyWeakeningResult result = ArchitecturePolicyWeakeningComparer.Compare(new(
+            Context(waivers: [Waiver("ARCH-IGN-001", "sha256:" + new string('a', 64), "2026-09-01")]),
+            Context(waivers: [Waiver("ARCH-IGN-001", "sha256:" + new string('a', 64), "2027-09-01")]));
+        ArchitecturePolicyWeakeningFinding finding = result.Findings.Single();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(result.HasErrors, Is.True);
+            Assert.That(finding.Kind, Is.EqualTo("structured_waiver_expiry_extended"));
+            Assert.That(finding.Classification, Is.EqualTo("semantic"));
+            Assert.That(finding.Severity, Is.EqualTo("error"));
+            Assert.That(finding.BaseValues, Is.EqualTo(new[] { "2026-09-01" }));
+            Assert.That(finding.CurrentValues, Is.EqualTo(new[] { "2027-09-01" }));
+        });
+    }
+
+    [Test]
+    public void Compare_ShortenedStructuredWaiverExpiry_IsNotWeakening()
+    {
+        ArchitecturePolicyWeakeningResult result = ArchitecturePolicyWeakeningComparer.Compare(new(
+            Context(waivers: [Waiver("ARCH-IGN-001", "sha256:" + new string('a', 64), "2027-09-01")]),
+            Context(waivers: [Waiver("ARCH-IGN-001", "sha256:" + new string('a', 64), "2026-09-01")])));
+
+        Assert.That(result.Findings, Is.Empty);
+    }
+
     private static ArchitecturePolicyContextExport Context(
         IReadOnlyList<ArchitecturePolicyContextContract>? contracts = null,
         IReadOnlyList<ArchitecturePolicyContextSourceSet>? sourceSets = null,
@@ -609,7 +638,7 @@ public sealed class ArchitecturePolicyWeakeningComparerTests
             Waivers = waivers ?? [],
         };
 
-    private static ArchitecturePolicyContextWaiver Waiver(string id, string targetFingerprint) => new(
+    private static ArchitecturePolicyContextWaiver Waiver(string id, string targetFingerprint, string expires = "2026-10-01") => new(
         "strict",
         "dependency",
         "boundary",
@@ -619,7 +648,7 @@ public sealed class ArchitecturePolicyWeakeningComparerTests
         "architecture-team",
         "ARCH-231",
         "2026-08-01",
-        "2026-10-01",
+        expires,
         "Temporary extraction waiver",
         _importedProvenance);
 

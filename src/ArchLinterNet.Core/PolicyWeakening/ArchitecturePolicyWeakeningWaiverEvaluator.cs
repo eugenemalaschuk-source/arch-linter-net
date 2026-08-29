@@ -17,31 +17,79 @@ internal static class ArchitecturePolicyWeakeningWaiverEvaluator
         Dictionary<string, ArchitecturePolicyContextWaiver> baseById = baseline.Waivers
             .ToDictionary(WaiverKey, _comparer);
 
-        foreach (ArchitecturePolicyContextWaiver waiver in current.Waivers
-                     .Where(item => !baseById.TryGetValue(WaiverKey(item), out ArchitecturePolicyContextWaiver? previous)
-                         || !string.Equals(previous.TargetFingerprint, item.TargetFingerprint, StringComparison.Ordinal))
-                     .OrderBy(WaiverKey, _comparer))
+        foreach (ArchitecturePolicyContextWaiver waiver in current.Waivers.OrderBy(WaiverKey, _comparer))
         {
-            bool changedTarget = baseById.TryGetValue(WaiverKey(waiver), out ArchitecturePolicyContextWaiver? previous);
-            string kind = changedTarget ? "structured_waiver_target_changed" : "structured_waiver_added";
+            bool existsInBaseline = baseById.TryGetValue(WaiverKey(waiver), out ArchitecturePolicyContextWaiver? previous);
             string control = $"{waiver.ContractFamily}:{waiver.ContractId}:{waiver.WaiverId}";
-            string details = string.Join("; ", waiver.TargetFingerprint, waiver.ContractFamily, waiver.ContractId);
-            string[] baseValues = changedTarget ? [previous!.TargetFingerprint] : Array.Empty<string>();
 
-            findings.Add(CreateFinding(
-                new PolicyWeakeningControlContext(
-                    kind,
+            if (!existsInBaseline)
+            {
+                AddFinding(
+                    "structured_waiver_added",
+                    "semantic",
                     control,
-                    changedTarget ? "impact_not_proven" : "semantic",
-                    severity),
-                baseValues,
-                [details],
-                previous?.Provenance,
-                waiver.Provenance,
-                [waiver.ContractId, waiver.WaiverId, waiver.TargetFingerprint],
-                waiver.Reason));
+                    Array.Empty<string>(),
+                    [string.Join("; ", waiver.TargetFingerprint, waiver.ContractFamily, waiver.ContractId)],
+                    null,
+                    waiver,
+                    severity,
+                    findings);
+                continue;
+            }
+
+            if (!string.Equals(previous!.TargetFingerprint, waiver.TargetFingerprint, StringComparison.Ordinal))
+            {
+                AddFinding(
+                    "structured_waiver_target_changed",
+                    "impact_not_proven",
+                    control,
+                    [previous.TargetFingerprint],
+                    [string.Join("; ", waiver.TargetFingerprint, waiver.ContractFamily, waiver.ContractId)],
+                    previous,
+                    waiver,
+                    severity,
+                    findings);
+            }
+
+            if (HasExtendedExpiry(previous.Expires, waiver.Expires))
+            {
+                AddFinding(
+                    "structured_waiver_expiry_extended",
+                    "semantic",
+                    control,
+                    [previous.Expires!],
+                    [waiver.Expires!],
+                    previous,
+                    waiver,
+                    severity,
+                    findings);
+            }
         }
     }
+
+    private static void AddFinding(
+        string kind,
+        string classification,
+        string control,
+        IReadOnlyList<string> baseValues,
+        IReadOnlyList<string> currentValues,
+        ArchitecturePolicyContextWaiver? previous,
+        ArchitecturePolicyContextWaiver waiver,
+        string severity,
+        ICollection<ArchitecturePolicyWeakeningFinding> findings) => findings.Add(CreateFinding(
+        new PolicyWeakeningControlContext(kind, control, classification, severity),
+        baseValues,
+        currentValues,
+        previous?.Provenance,
+        waiver.Provenance,
+        [waiver.ContractId, waiver.WaiverId, waiver.TargetFingerprint],
+        waiver.Reason));
+
+    private static bool HasExtendedExpiry(string? previous, string? current) => DateOnly.TryParseExact(
+            previous, "yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.None, out DateOnly previousExpiry)
+        && DateOnly.TryParseExact(
+            current, "yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.None, out DateOnly currentExpiry)
+        && currentExpiry > previousExpiry;
 
     private static string WaiverKey(ArchitecturePolicyContextWaiver waiver) => string.Join(
         "\u001f", waiver.Mode, waiver.ContractFamily, waiver.ContractId, waiver.WaiverId);

@@ -34,12 +34,12 @@ sets, source expansions, or rule inputs, matched subtractive exclusions, explici
 permission/prohibition inventories, and universal ignores. It recognizes a
 universal ignore from the context artifact's typed `source_type` and
 `forbidden_reference` matchers, never from the display string.
-It also treats a newly declared structured architecture waiver as semantic
-weakening. A waiver with the same ID but a changed exact target fingerprint is
-reported as `impact_not_proven`: review it as a newly scoped exception rather
-than assuming the replacement has equivalent impact. This comparison is static
-policy evidence; expiry and staleness are evaluated by normal validation and
-reported in its waiver lifecycle section.
+It also treats a newly declared structured architecture waiver, or an extension
+of an existing waiver's expiry, as semantic weakening. A waiver with the same
+ID but a changed exact target fingerprint is reported as `impact_not_proven`:
+review it as a newly scoped exception rather than assuming the replacement has
+equivalent impact. Staleness and the current lifecycle state are evaluated by
+normal validation and reported in its waiver lifecycle section.
 Changes to type, role, attribute, inheritance, CEL, or public-API selectors are
 not guessed: without complete evaluator membership evidence they are reported
 as `impact_not_proven` for review, with no fabricated affected types. Treat a
