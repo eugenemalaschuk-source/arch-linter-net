@@ -3,6 +3,7 @@ using System.Globalization;
 using ArchLinterNet.Core.Contracts;
 using ArchLinterNet.Core.Contracts.Abstractions;
 using ArchLinterNet.Core.Contracts.Families;
+using ArchLinterNet.Core.Contracts.PolicyImports;
 using ArchLinterNet.Core.Execution;
 using ArchLinterNet.Core.Model;
 using ArchLinterNet.Core.PolicyContext.Abstractions;
@@ -83,6 +84,7 @@ public sealed class ArchitecturePolicyContextApplicationService(IArchitecturePol
         {
             WaiverLifecycleProfile = ArchitectureWaiverProfile.Resolve(document),
             Waivers = waivers,
+            Topology = ProjectTopology(document),
         };
     }
 
@@ -131,6 +133,104 @@ public sealed class ArchitecturePolicyContextApplicationService(IArchitecturePol
                     .ToArray(),
                 ProjectProvenance(document.Provenance.LocationForLayer(item.Key))))
             .ToArray();
+    }
+
+    private static ArchitecturePolicyContextTopology? ProjectTopology(ArchitectureContractDocument document)
+    {
+        if (document.Topology is not { } topology)
+        {
+            return null;
+        }
+
+        string topologyPath = ArchitecturePolicyProvenancePath.Property("topology");
+        string scopePath = ArchitecturePolicyProvenancePath.AppendProperty(topologyPath, "scope");
+        string scopeSelectorsPath = ArchitecturePolicyProvenancePath.AppendProperty(scopePath, "selectors");
+        string nodesPath = ArchitecturePolicyProvenancePath.AppendProperty(topologyPath, "nodes");
+        string edgesPath = ArchitecturePolicyProvenancePath.AppendProperty(topologyPath, "allowed_edges");
+        string exclusionsPath = ArchitecturePolicyProvenancePath.AppendProperty(topologyPath, "out_of_scope");
+
+        return new ArchitecturePolicyContextTopology(
+            topology.Mode,
+            topology.SubjectKind,
+            topology.Scope.AllowEmpty,
+            topology.Scope.Selectors
+                .Select((selector, index) => ProjectTopologySelector(document, selector,
+                    ArchitecturePolicyProvenancePath.AppendIndex(scopeSelectorsPath, index)))
+                .OrderBy(selector => selector, ArchitecturePolicyContextTopologySelectorComparer.Instance)
+                .ToArray(),
+            topology.Nodes
+                .Select((node, index) => new ArchitecturePolicyContextTopologyNode(
+                    node.Id,
+                    node.Mappings
+                        .Select((selector, mappingIndex) => ProjectTopologySelector(document, selector,
+                            ArchitecturePolicyProvenancePath.AppendIndex(
+                                ArchitecturePolicyProvenancePath.AppendProperty(
+                                    ArchitecturePolicyProvenancePath.AppendIndex(nodesPath, index), "mappings"), mappingIndex)))
+                        .OrderBy(selector => selector, ArchitecturePolicyContextTopologySelectorComparer.Instance)
+                        .ToArray(),
+                    ProjectTopologyProvenance(document, ArchitecturePolicyProvenancePath.AppendIndex(nodesPath, index))))
+                .OrderBy(node => node.Id, StringComparer.Ordinal)
+                .ToArray(),
+            topology.AllowedEdges
+                .Select((edge, index) => new ArchitecturePolicyContextTopologyEdge(
+                    edge.From,
+                    edge.To,
+                    ProjectTopologyProvenance(document, ArchitecturePolicyProvenancePath.AppendIndex(edgesPath, index))))
+                .OrderBy(edge => edge.From, StringComparer.Ordinal)
+                .ThenBy(edge => edge.To, StringComparer.Ordinal)
+                .ToArray(),
+            topology.OutOfScope
+                .Select((entry, index) => new ArchitecturePolicyContextTopologyOutOfScope(
+                    entry.Id,
+                    ProjectTopologySelector(document, entry.Selector,
+                        ArchitecturePolicyProvenancePath.AppendProperty(
+                            ArchitecturePolicyProvenancePath.AppendIndex(exclusionsPath, index), "selector")),
+                    entry.Reason,
+                    ProjectTopologyProvenance(document, ArchitecturePolicyProvenancePath.AppendIndex(exclusionsPath, index))))
+                .OrderBy(entry => entry.Id, StringComparer.Ordinal)
+                .ToArray(),
+            topology.StaleDeclarations,
+            ProjectTopologyProvenance(document, topologyPath));
+    }
+
+    private static ArchitecturePolicyContextTopologySelector ProjectTopologySelector(
+        ArchitectureContractDocument document,
+        ArchitectureTopologySubjectSelector selector,
+        string path)
+    {
+        ArchitecturePolicyContextProvenance? provenance = ProjectTopologyProvenance(document, path);
+        if (!string.IsNullOrWhiteSpace(selector.Layer))
+        {
+            return new ArchitecturePolicyContextTopologySelector("layer", selector.Layer, string.Empty, null, provenance);
+        }
+
+        if (!string.IsNullOrWhiteSpace(selector.Namespace))
+        {
+            return new ArchitecturePolicyContextTopologySelector(
+                "namespace", selector.Namespace, selector.NamespaceSuffix, null, provenance);
+        }
+
+        if (!string.IsNullOrWhiteSpace(selector.Project))
+        {
+            return new ArchitecturePolicyContextTopologySelector("project", selector.Project, string.Empty, null, provenance);
+        }
+
+        if (!string.IsNullOrWhiteSpace(selector.Assembly))
+        {
+            return new ArchitecturePolicyContextTopologySelector("assembly", selector.Assembly, string.Empty, null, provenance);
+        }
+
+        return new ArchitecturePolicyContextTopologySelector(
+            "context", string.Empty, string.Empty, ProjectSelector("context", selector.Context!), provenance);
+    }
+
+    private static ArchitecturePolicyContextProvenance? ProjectTopologyProvenance(
+        ArchitectureContractDocument document,
+        string path)
+    {
+        return document.Provenance.TryGetLocation(path, out ArchitecturePolicySourceLocation? location)
+            ? ProjectProvenance(location)
+            : null;
     }
 
     private static ArchitecturePolicyContextContract[] ProjectContracts(

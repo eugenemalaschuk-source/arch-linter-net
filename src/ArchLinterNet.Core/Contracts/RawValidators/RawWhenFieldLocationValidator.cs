@@ -45,6 +45,9 @@ internal sealed class RawWhenFieldLocationValidator : IArchitecturePolicyRawDocu
         new[] { ContractsKey, "audit_layout_conventions", "*", "files_matching" },
         new[] { ContractsKey, "strict_layout_conventions", "*", "exclude_files_matching", "*" },
         new[] { ContractsKey, "audit_layout_conventions", "*", "exclude_files_matching", "*" },
+        new[] { "topology", "scope", "selectors", "*", "context" },
+        new[] { "topology", "nodes", "*", "mappings", "*", "context" },
+        new[] { "topology", "out_of_scope", "*", "selector", "context" },
     };
 
     // Top-level dictionaries keyed by an author-chosen, arbitrary name (layer name, external-dependency-group

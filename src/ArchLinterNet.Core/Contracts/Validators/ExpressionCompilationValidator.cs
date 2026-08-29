@@ -76,12 +76,78 @@ internal sealed partial class ExpressionCompilationValidator : IArchitecturePoli
             CompileLayerSelector(document, layer.Selector, layerName, path);
         }
 
+        CompileTopologySelectors(document);
+
         CompileContextDependencyGroup(document, document.Contracts.StrictContextDependencies, "strict_context_dependencies");
         CompileContextDependencyGroup(document, document.Contracts.AuditContextDependencies, "audit_context_dependencies");
         CompileContextAllowOnlyGroup(document, document.Contracts.StrictContextAllowOnly, "strict_context_allow_only");
         CompileContextAllowOnlyGroup(document, document.Contracts.AuditContextAllowOnly, "audit_context_allow_only");
         CompileLayoutConventionGroup(document, document.Contracts.StrictLayoutConventions, "strict_layout_conventions");
         CompileLayoutConventionGroup(document, document.Contracts.AuditLayoutConventions, "audit_layout_conventions");
+    }
+
+    private static void CompileTopologySelectors(ArchitectureContractDocument document)
+    {
+        if (document.Topology is not { } topology)
+        {
+            return;
+        }
+
+        string topologyPath = ArchitecturePolicyProvenancePath.Property("topology");
+        CompileTopologySelectorList(document, topology.Scope.Selectors,
+            ArchitecturePolicyProvenancePath.AppendProperty(
+                ArchitecturePolicyProvenancePath.AppendProperty(topologyPath, "scope"), "selectors"));
+
+        string nodesPath = ArchitecturePolicyProvenancePath.AppendProperty(topologyPath, "nodes");
+        for (int nodeIndex = 0; nodeIndex < topology.Nodes.Count; nodeIndex++)
+        {
+            CompileTopologySelectorList(document, topology.Nodes[nodeIndex].Mappings,
+                ArchitecturePolicyProvenancePath.AppendProperty(
+                    ArchitecturePolicyProvenancePath.AppendIndex(nodesPath, nodeIndex), "mappings"));
+        }
+
+        string exclusionsPath = ArchitecturePolicyProvenancePath.AppendProperty(topologyPath, "out_of_scope");
+        for (int index = 0; index < topology.OutOfScope.Count; index++)
+        {
+            CompileTopologySelector(document, topology.OutOfScope[index].Selector,
+                ArchitecturePolicyProvenancePath.AppendProperty(
+                    ArchitecturePolicyProvenancePath.AppendIndex(exclusionsPath, index), "selector"));
+        }
+    }
+
+    private static void CompileTopologySelectorList(
+        ArchitectureContractDocument document,
+        List<ArchitectureTopologySubjectSelector> selectors,
+        string listPath)
+    {
+        for (int index = 0; index < selectors.Count; index++)
+        {
+            CompileTopologySelector(document, selectors[index], ArchitecturePolicyProvenancePath.AppendIndex(listPath, index));
+        }
+    }
+
+    private static void CompileTopologySelector(
+        ArchitectureContractDocument document,
+        ArchitectureTopologySubjectSelector selector,
+        string path)
+    {
+        if (selector.Context is not { When: { Length: > 0 } when })
+        {
+            return;
+        }
+
+        document.Provenance.SetValidationSubject(path);
+        CelCompilationResult<CelCompiledPredicate> result =
+            ArchitectureExpressionSchemas.SelectorEnvironment.CompilePredicate(when);
+        if (!result.IsSuccess)
+        {
+            throw new InvalidOperationException(
+                $"Topology selector 'context.when' expression failed to compile: {Describe(result.Diagnostics)}");
+        }
+
+        selector.Context.CompiledWhen = result.Program;
+        document.Provenance.TryGetLocation(path, out ArchitecturePolicySourceLocation? location);
+        selector.Context.WhenLocation = location;
     }
 
     private static void CompileLayoutConventionGroup(

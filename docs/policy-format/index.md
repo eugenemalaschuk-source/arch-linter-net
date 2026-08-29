@@ -23,6 +23,8 @@ source_sets: {}
 
 classification: {}
 
+topology: {}
+
 analysis: {}
 
 contracts: {}
@@ -31,6 +33,10 @@ contracts: {}
 `imports`, external/package/framework groups, source sets, and classification are optional. The root schema requires the root identity and the core `layers`, `analysis`, and `contracts` containers; imported fragments can contribute entries during composition.
 
 See [YAML schema reference](../reference/yaml-schema.md) and [Policy imports](imports.md).
+
+## Declared topology
+
+An optional native `topology` section declares stable components, their mappings, allowed directional edges, and the bounded observed subject universe that a later topology evaluator must assess. It is not a diagram language and does not infer unreviewed components. See [Declared topology](declared-topology.md) for the complete mapping, completeness, and reviewed out-of-scope semantics.
 
 ## Layers: namespaces and semantic selectors
 

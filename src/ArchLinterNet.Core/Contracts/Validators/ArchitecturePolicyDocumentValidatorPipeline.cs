@@ -19,6 +19,7 @@ internal static class ArchitecturePolicyDocumentValidatorPipeline
         new DuplicateIdValidator(),
         new AcyclicSiblingValidator(),
         new ModuleContainerValidator(),
+        new TopologyValidator(),
         new LayerNamespacesValidator(),
         new CoverageValidator(),
         new AssemblyIndependenceValidator(),
