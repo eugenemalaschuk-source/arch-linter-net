@@ -27,6 +27,7 @@ public sealed class ArchitectureValidationResult
     public string? Mode { get; }
     public IReadOnlyCollection<BaselineLifecycleEntry> BaselineLifecycleEntries { get; }
     public IReadOnlyCollection<ArchitectureSubtractiveMatcherParticipation> SubtractiveMatcherParticipation { get; }
+    public IReadOnlyCollection<ArchitectureWaiverLifecycleRecord> Waivers { get; }
 
     // Null unless the builder called WithProfile() — see
     // openspec/specs/analysis-profile/spec.md, "Testing API exposes the same profile semantics as
@@ -53,6 +54,7 @@ public sealed class ArchitectureValidationResult
         BaselineLifecycleEntries = @params.BaselineLifecycleEntries ?? Array.Empty<BaselineLifecycleEntry>();
         SubtractiveMatcherParticipation = @params.SubtractiveMatcherParticipation
             ?? Array.Empty<ArchitectureSubtractiveMatcherParticipation>();
+        Waivers = @params.Waivers ?? Array.Empty<ArchitectureWaiverLifecycleRecord>();
         Profile = @params.Profile;
         Findings = ArchitectureFindingMapper.Order(AllDiagnostics());
     }
@@ -146,6 +148,10 @@ public sealed class ArchitectureValidationResult
                 ? _formatter.FormatUnmatchedForHumans(UnmatchedIgnoredViolations)
                 : string.Empty);
 
+        message += FormatFailureSection(
+            null,
+            Waivers.Count > 0 ? _formatter.FormatWaiversForHumans(Waivers) : string.Empty);
+
         return message;
     }
 
@@ -191,5 +197,6 @@ public sealed record ArchitectureValidationResultParams(
     public string? Mode { get; init; }
     public IReadOnlyCollection<BaselineLifecycleEntry>? BaselineLifecycleEntries { get; init; }
     public IReadOnlyCollection<ArchitectureSubtractiveMatcherParticipation>? SubtractiveMatcherParticipation { get; init; }
+    public IReadOnlyCollection<ArchitectureWaiverLifecycleRecord>? Waivers { get; init; }
     public AnalysisProfile? Profile { get; init; }
 }

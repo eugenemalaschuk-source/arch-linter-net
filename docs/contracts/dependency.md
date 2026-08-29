@@ -50,3 +50,8 @@ ignored_violations:
 ```
 
 For larger adoption work, prefer a generated [migration baseline](../guides/migration-baselines.md).
+
+For new version-2 policy waivers, use the structured lifecycle form in the
+[YAML schema reference](../reference/yaml-schema.md#architecture-waiver-lifecycle).
+It matches the exact canonical finding fingerprint rather than broadening a
+`source_type` or `forbidden_reference` matcher.

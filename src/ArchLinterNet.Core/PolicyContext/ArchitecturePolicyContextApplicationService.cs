@@ -41,6 +41,7 @@ public sealed class ArchitecturePolicyContextApplicationService(IArchitecturePol
         IReadOnlyList<ArchitecturePolicyContextClassification> classification = ProjectClassification(document.Classification);
         IReadOnlyList<ArchitecturePolicyContextContract> contracts = ProjectContracts(catalog, document);
         IReadOnlyList<ArchitecturePolicyContextLayer> layers = ProjectLayers(document);
+        IReadOnlyList<ArchitecturePolicyContextWaiver> waivers = ProjectWaivers(catalog, document);
 
         return new ArchitecturePolicyContextExport(
             SchemaVersion: ArchitecturePolicyContextExport.CurrentSchemaVersion,
@@ -78,7 +79,11 @@ public sealed class ArchitecturePolicyContextApplicationService(IArchitecturePol
                 .ToArray(),
             SourceExpansions: ProjectSourceExpansions(document.SourceExpansion.Contracts),
             Exceptions: ProjectExceptions(document, catalog, contracts),
-            Guidance: _guidance);
+            Guidance: _guidance)
+        {
+            WaiverLifecycleProfile = ArchitectureWaiverProfile.Resolve(document),
+            Waivers = waivers,
+        };
     }
 
     private ArchitectureContractDocument LoadDocument(string policyPath)
@@ -398,6 +403,95 @@ public sealed class ArchitecturePolicyContextApplicationService(IArchitecturePol
             .ThenBy(exceptionItem => exceptionItem.Kind, StringComparer.Ordinal)
             .ThenBy(exceptionItem => exceptionItem.Details, StringComparer.Ordinal)
             .ToArray();
+    }
+
+    private static IReadOnlyList<ArchitecturePolicyContextWaiver> ProjectWaivers(
+        ArchitectureContractCatalog catalog,
+        ArchitectureContractDocument document)
+    {
+        var declarations = new Dictionary<ArchitectureIgnoredViolation, ArchitectureContractDescriptor>(
+            ReferenceEqualityComparer.Instance);
+
+        foreach (ArchitectureContractDescriptor descriptor in catalog.Descriptors)
+        {
+            foreach (ArchitectureIgnoredViolation ignored in GetIgnoredViolations(descriptor.Contract)
+                         .Where(ignored => ignored.HasStructuredWaiverFields))
+            {
+                // Source-set expansion clones the list but retains each authored waiver object.
+                // The generated descriptors are execution aliases, not separate declarations.
+                declarations.TryAdd(ignored, descriptor);
+            }
+        }
+
+        return declarations
+            .Select(declaration => ProjectWaiver(declaration.Value, declaration.Key, document))
+            .OrderBy(waiver => waiver.WaiverId, StringComparer.Ordinal)
+            .ThenBy(waiver => waiver.ContractFamily, StringComparer.Ordinal)
+            .ThenBy(waiver => waiver.ContractId, StringComparer.Ordinal)
+            .ToArray();
+    }
+
+    private static ArchitecturePolicyContextWaiver ProjectWaiver(
+        ArchitectureContractDescriptor descriptor,
+        ArchitectureIgnoredViolation ignored,
+        ArchitectureContractDocument document)
+    {
+        string contractId = descriptor.AuthoredId ?? descriptor.Id ?? descriptor.Name;
+        string contractName = descriptor.Contract is IArchitectureSourceExpandableContract { ExpansionOrigin: { } origin }
+            ? origin.AuthoredContractName
+            : descriptor.Name;
+
+        return new ArchitecturePolicyContextWaiver(
+            descriptor.Mode,
+            descriptor.Family,
+            contractId,
+            contractName,
+            ignored.WaiverId ?? string.Empty,
+            ignored.Target?.Fingerprint ?? string.Empty,
+            ignored.Owner,
+            ignored.Issue,
+            ignored.Introduced,
+            ignored.Expires,
+            ignored.Reason,
+            ProjectProvenance(document.Provenance.LocationFor(ignored)));
+    }
+
+    private static IEnumerable<ArchitectureIgnoredViolation> GetIgnoredViolations(IArchitectureContract contract)
+    {
+        return contract switch
+        {
+            ArchitectureDependencyContract value => value.IgnoredViolations,
+            ArchitectureLayerContract value => value.IgnoredViolations,
+            ArchitectureAllowOnlyContract value => value.IgnoredViolations,
+            ArchitectureCycleContract value => value.IgnoredViolations,
+            ArchitectureMethodBodyContract value => value.IgnoredViolations,
+            ArchitectureIndependenceContract value => value.IgnoredViolations,
+            ArchitectureAssemblyIndependenceContract value => value.IgnoredViolations,
+            ArchitectureAssemblyDependencyContract value => value.IgnoredViolations,
+            ArchitectureAssemblyAllowOnlyContract value => value.IgnoredViolations,
+            ArchitecturePackageDependencyContract value => value.IgnoredViolations,
+            ArchitecturePackageAllowOnlyContract value => value.IgnoredViolations,
+            ArchitectureFrameworkReferenceContract value => value.IgnoredViolations,
+            ArchitectureFrameworkReferenceAllowOnlyContract value => value.IgnoredViolations,
+            ArchitectureProjectMetadataContract value => value.IgnoredViolations,
+            ArchitectureProtectedContract value => value.IgnoredViolations,
+            ArchitectureExternalDependencyContract value => value.IgnoredViolations,
+            ArchitectureExternalAllowOnlyContract value => value.IgnoredViolations,
+            ArchitectureAcyclicSiblingContract value => value.IgnoredViolations,
+            ArchitectureModuleContainerContract value => value.IgnoredViolations,
+            ArchitectureTypePlacementContract value => value.IgnoredViolations,
+            ArchitectureLayoutConventionContract value => value.IgnoredViolations,
+            ArchitecturePublicApiSurfaceContract value => value.IgnoredViolations,
+            ArchitectureAttributeUsageContract value => value.IgnoredViolations,
+            ArchitectureInheritanceContract value => value.IgnoredViolations,
+            ArchitectureInterfaceImplementationContract value => value.IgnoredViolations,
+            ArchitectureCompositionContract value => value.IgnoredViolations,
+            ArchitectureContextDependencyContract value => value.IgnoredViolations,
+            ArchitectureContextAllowOnlyContract value => value.IgnoredViolations,
+            ArchitectureCoverageContract value => value.IgnoredViolations,
+            ArchitecturePortBoundaryContract value => value.IgnoredViolations,
+            _ => Array.Empty<ArchitectureIgnoredViolation>(),
+        };
     }
 
     private static IEnumerable<ArchitecturePolicyContextException> ProjectSourceExpansionExceptions(

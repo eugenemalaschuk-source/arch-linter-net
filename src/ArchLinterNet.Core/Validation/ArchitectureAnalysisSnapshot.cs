@@ -27,6 +27,7 @@ public sealed partial class ArchitectureAnalysisSnapshot : IDisposable
     private readonly string _unmatchedConfig;
     private readonly string _policyConsistencyConfig;
     private readonly string _coverageConfig;
+    private readonly DateOnly _waiverEvaluationDate;
     private readonly bool _enforceUnmatchedIgnoredViolationsPolicy;
     private readonly bool _includeAsmdefContracts;
     private readonly IArchitectureContractExecutor _contractExecutor;
@@ -73,7 +74,8 @@ public sealed partial class ArchitectureAnalysisSnapshot : IDisposable
         bool preparedArtifactClosureComplete = true,
         ArchitectureRunnerPreparation? preparedPostBuildRunner = null,
         Func<ArchitectureRunnerSetup>? materializeSetup = null,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        DateOnly? waiverEvaluationDate = null)
     {
         _document = document;
         _setup = setup;
@@ -83,6 +85,7 @@ public sealed partial class ArchitectureAnalysisSnapshot : IDisposable
         _unmatchedConfig = unmatchedConfig;
         _policyConsistencyConfig = policyConsistencyConfig;
         _coverageConfig = coverageConfig;
+        _waiverEvaluationDate = waiverEvaluationDate ?? DateOnly.FromDateTime(DateTime.UtcNow);
         _enforceUnmatchedIgnoredViolationsPolicy = enforceUnmatchedIgnoredViolationsPolicy;
         _includeAsmdefContracts = includeAsmdefContracts;
         _contractExecutor = contractExecutor;
@@ -384,9 +387,14 @@ public sealed partial class ArchitectureAnalysisSnapshot : IDisposable
             ? Array.Empty<ArchitectureViolation>()
             : execution.CoverageViolations;
 
+        IReadOnlyList<ArchitectureUnmatchedIgnoredViolation> rawUnmatched;
         IReadOnlyList<ArchitectureUnmatchedIgnoredViolation> unmatched;
         using (timing?.Measure("post_processing"))
         {
+            IReadOnlyList<ArchitectureUnmatchedIgnoredViolation> allUnmatched = runner.UnmatchedIgnoredViolations;
+            rawUnmatched = unmatchedStartIndex >= allUnmatched.Count
+                ? Array.Empty<ArchitectureUnmatchedIgnoredViolation>()
+                : allUnmatched.Skip(unmatchedStartIndex).ToList();
             unmatched = ResolveUnmatchedIgnoredViolations(runner, unmatchedStartIndex);
         }
 
@@ -401,8 +409,14 @@ public sealed partial class ArchitectureAnalysisSnapshot : IDisposable
 
         bool hasBlockingCoverage = _coverageConfig == ErrorSeverity && coverageFindings.Count > 0;
 
+        IReadOnlyList<ArchitectureWaiverLifecycleRecord> waivers = ArchitectureWaiverLifecycleEvaluator.Evaluate(
+            _document, mode, rawUnmatched, _waiverEvaluationDate, _requestedContractIds);
+        bool hasBlockingWaiver = waivers.Any(waiver => waiver.State == "invalid")
+            || (ArchitectureWaiverProfile.Resolve(_document) == ArchitectureWaiverProfile.Strict
+                && waivers.Any(waiver => waiver.State is "expired" or "stale"));
+
         bool passed = allViolations.Count == 0 && execution.Cycles.Count == 0
-            && !hasBlockingUnmatched && !hasBlockingPolicyConsistency && !hasBlockingCoverage;
+            && !hasBlockingUnmatched && !hasBlockingPolicyConsistency && !hasBlockingCoverage && !hasBlockingWaiver;
 
         (IReadOnlyList<ArchitectureClassificationConflict> classificationConflicts,
             IReadOnlyList<ArchitectureClassificationMetadataFailure> classificationMetadataFailures) =
@@ -428,6 +442,7 @@ public sealed partial class ArchitectureAnalysisSnapshot : IDisposable
             ResolvedAssemblyPaths = GetResolvedAssemblyPaths(),
             DiscoveredProjectPaths = GetDiscoveredProjectPaths(),
             SourceExpansion = _document.SourceExpansion,
+            Waivers = waivers,
             SubtractiveMatcherParticipation = runner.Session.SubtractiveMatcherParticipation
                 .Skip(subtractiveMatcherStartIndex)
                 .ToList()
@@ -485,7 +500,8 @@ public sealed partial class ArchitectureAnalysisSnapshot : IDisposable
             AnalysisCacheKey.ComputePreprocessorSymbolsDigest(cache.PreprocessorSymbols),
             keyInputs.BaselineInput?.ContentDigest ?? string.Empty,
             _includeAsmdefContracts,
-            _enforceUnmatchedIgnoredViolationsPolicy);
+            _enforceUnmatchedIgnoredViolationsPolicy,
+            _waiverEvaluationDate.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture));
 
         AnalysisCachePopulation.LookupPreparation preparation;
         using (timing?.Measure("cache_lookup"))
@@ -688,20 +704,6 @@ public sealed partial class ArchitectureAnalysisSnapshot : IDisposable
     private IReadOnlyList<string> GetDiscoveredProjectPaths()
     {
         return _setup?.Runner.Session.Context.DiscoveredProjectPaths ?? _preparedProjectPaths;
-    }
-
-    private IReadOnlyList<string> GetCacheProjectPaths()
-    {
-        IReadOnlyList<string> discoveredPaths = GetDiscoveredProjectPaths();
-        if (discoveredPaths.Count > 0 || _document.Analysis.Projects.Count == 0)
-        {
-            return discoveredPaths;
-        }
-
-        return _document.Analysis.Projects
-            .Select(path => Path.GetFullPath(Path.Combine(_repositoryRoot, path)))
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .ToArray();
     }
 
     private static string? SafeAssemblyLocation(Assembly assembly)

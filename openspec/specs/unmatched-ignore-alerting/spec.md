@@ -2,9 +2,7 @@
 
 ## Purpose
 Detects ignore entries that no longer match any actual violation and surfaces them as a diagnostic with contract and ignore-entry context.
-
 ## Requirements
-
 ### Requirement: Detect unmatched ignored violations
 
 The system SHALL detect `ignored_violations` entries that match no current dependency violation. An entry is unmatched if no (source_type, forbidden_reference) pair in the analyzed codebase satisfies both the source_type and forbidden_reference patterns simultaneously.
@@ -80,3 +78,15 @@ The introduction of unmatched detection SHALL NOT change existing ignore matchin
 #### Scenario: Existing ignore still suppresses
 - **WHEN** a contract has an `ignored_violations` entry that matches a current violation
 - **THEN** the violation SHALL be suppressed (not appear in output) AND the ignore entry SHALL NOT appear in unmatched diagnostics
+
+### Requirement: Unmatched manual ignores feed canonical waiver lifecycle
+The system SHALL retain unmatched-match evidence for every manual ignore and
+use it to classify the corresponding architecture waiver as stale when no
+higher-precedence invalid or expiry state applies. It SHALL preserve the
+existing unmatched-ignore output for legacy consumers while exposing the
+canonical lifecycle record as the authoritative waiver state.
+
+#### Scenario: Matching and lifecycle records stay aligned
+- **WHEN** a manual ignore stops matching all governed findings
+- **THEN** existing unmatched-ignore evidence and the related waiver lifecycle
+  record identify the same contract, matcher, and policy location

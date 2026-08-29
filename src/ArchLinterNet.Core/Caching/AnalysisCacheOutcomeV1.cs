@@ -55,4 +55,7 @@ public sealed record AnalysisCacheOutcomeV1(
 
     public IReadOnlyList<ArchitectureSubtractiveMatcherParticipation> SubtractiveMatcherParticipation { get; init; } =
         SubtractiveMatcherParticipation ?? Array.Empty<ArchitectureSubtractiveMatcherParticipation>();
+
+    public IReadOnlyList<ArchitectureWaiverLifecycleRecord> Waivers { get; init; } =
+        Array.Empty<ArchitectureWaiverLifecycleRecord>();
 }

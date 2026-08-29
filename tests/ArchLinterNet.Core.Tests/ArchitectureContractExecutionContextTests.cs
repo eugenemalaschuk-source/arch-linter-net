@@ -232,6 +232,55 @@ public sealed class ArchitectureContractExecutionContextTests
     }
 
     [Test]
+    public void IsIgnored_StructuredWaiver_MatchesOnlyItsCanonicalTargetFingerprint()
+    {
+        ArchitectureViolationIdentity identity = new(
+            ArchitectureViolationIdentity.CurrentVersion,
+            "strict",
+            "dependency",
+            "contract-id",
+            "Host.A",
+            "Program",
+            null,
+            "mscorlib",
+            null,
+            "System.Object",
+            0);
+        var ignoredViolations = new List<ArchitectureIgnoredViolation>
+        {
+            new()
+            {
+                SourceType = "Program",
+                ForbiddenReference = "System.Object",
+                Reason = "Move the dependency behind the boundary.",
+                WaiverId = "ARCH-IGN-001",
+                Target = new ArchitectureWaiverTarget
+                {
+                    Fingerprint = ArchitectureWaiverTargetFingerprint.Create(identity)
+                },
+                Owner = "architecture-team",
+                Issue = "ARCH-231",
+                Introduced = "2026-08-12",
+                Expires = "2026-10-01"
+            }
+        };
+        var context = new ArchitectureContractExecutionContext(
+            "contract-name", "contract-id", ignoredViolations,
+            enableUnmatchedIgnoreTracking: true, contractGroup: "strict", baselineCandidates: new List<ArchitectureBaselineCandidate>());
+
+        bool exactMatch = context.IsIgnored(
+            "Program", "System.Object", sourceAssembly: "Host.A", targetAssembly: "mscorlib", targetMember: "System.Object");
+        bool differentOccurrence = context.IsIgnored(
+            "Program", "System.Object", sourceAssembly: "Host.A", targetAssembly: "mscorlib", targetMember: "System.Object");
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(exactMatch, Is.True);
+            Assert.That(differentOccurrence, Is.False, "The second occurrence has a distinct canonical target identity.");
+        });
+    }
+
+    [Test]
     public void IsIgnored_MatchedIgnore_DoesNotAddCandidate_AndCollectUnmatchedReportsOnlyStaleIgnore()
     {
         var ignoredViolations = new List<ArchitectureIgnoredViolation>

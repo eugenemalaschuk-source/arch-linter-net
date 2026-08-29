@@ -140,6 +140,78 @@ public sealed class ArchitecturePolicyCheckTests
     }
 
     [Test]
+    public void CheckPolicy_IncompleteStructuredWaiver_ReturnsFailClosedLifecycleValidation()
+    {
+        string policyPath = Path.Combine(_tempDir, "incomplete-waiver.yml");
+        File.WriteAllText(policyPath, """
+            version: 2
+            name: Incomplete waiver
+            layers: {}
+            analysis:
+              target_assemblies: []
+            contracts:
+              strict:
+                - id: boundary
+                  name: boundary
+                  source: app
+                  forbidden: [infrastructure]
+                  ignored_violations:
+                    - id: ARCH-IGN-001
+                      source_type: App.Legacy
+                      forbidden_reference: Infrastructure.Db
+                      target:
+                        fingerprint: sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+                      reason: Temporary migration
+                      issue: ARCH-231
+                      introduced: 2026-08-01
+                      expires: 2026-10-01
+            """);
+
+        PolicyCheckOutcome outcome = ArchitectureValidator.CheckPolicy(policyPath);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(outcome.IsValid, Is.False);
+            Assert.That(outcome.Failure!.Message, Does.Contain("requires id, target.fingerprint"));
+            Assert.That(outcome.Failure.Diagnostic!.Location!.ContractId, Is.EqualTo("boundary"));
+        });
+    }
+
+    [Test]
+    public void CheckPolicy_UppercaseWaiverFingerprint_IsRejectedBySchema()
+    {
+        string policyPath = Path.Combine(_tempDir, "uppercase-waiver.yml");
+        File.WriteAllText(policyPath, """
+            version: 2
+            name: Uppercase waiver
+            layers: {}
+            analysis:
+              target_assemblies: []
+            contracts:
+              strict:
+                - id: boundary
+                  name: boundary
+                  source: app
+                  forbidden: [infrastructure]
+                  ignored_violations:
+                    - id: ARCH-IGN-001
+                      source_type: App.Legacy
+                      forbidden_reference: Infrastructure.Db
+                      target:
+                        fingerprint: sha256:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+                      reason: Temporary migration
+                      owner: architecture-team
+                      issue: ARCH-231
+                      introduced: 2026-08-01
+                      expires: 2026-10-01
+            """);
+
+        PolicyCheckOutcome outcome = ArchitectureValidator.CheckPolicy(policyPath);
+
+        Assert.That(outcome.IsValid, Is.False);
+    }
+
+    [Test]
     public void PolicyDocumentLoader_PublicContractPreservesSinglePathLoadMethod()
     {
         System.Reflection.MethodInfo? method = typeof(IArchitecturePolicyDocumentLoader)

@@ -39,6 +39,11 @@ public static class ArchitecturePolicyWeakeningComparer
             request.CurrentContext,
             request.CurrentContext.Guardrails.PolicyWeakening,
             findings);
+        ArchitecturePolicyWeakeningWaiverEvaluator.Evaluate(
+            request.BaseContext,
+            request.CurrentContext,
+            request.CurrentContext.Guardrails.PolicyWeakening,
+            findings);
         ArchitecturePolicyWeakeningSelectorEvaluator.Evaluate(request, findings);
 
         return new ArchitecturePolicyWeakeningResult(

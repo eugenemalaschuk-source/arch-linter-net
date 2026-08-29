@@ -54,6 +54,24 @@ internal static class ArchitectureIgnoreMatcher
     private static bool Matches(
         string sourceType, string forbiddenReference, ArchitectureViolationIdentity? liveIdentity, ArchitectureIgnoredViolation ignore)
     {
+        // An incomplete or non-canonical manual waiver is lifecycle evidence, never a fallback
+        // glob suppression. This keeps malformed strict declarations fail-closed while allowing
+        // compatibility-profile legacy entries (which have no validation error) unchanged.
+        if (ignore.WaiverValidationError is not null)
+        {
+            return false;
+        }
+
+        if (ignore.HasStructuredWaiverFields)
+        {
+            return liveIdentity is not null
+                && ignore.Target is not null
+                && string.Equals(
+                    ignore.Target.Fingerprint,
+                    ArchitectureWaiverTargetFingerprint.Create(liveIdentity),
+                    StringComparison.Ordinal);
+        }
+
         if (ignore.IdentityVersion == ArchitectureViolationIdentity.CurrentVersion && liveIdentity != null)
         {
             return MatchesIdentity(liveIdentity, ignore);
