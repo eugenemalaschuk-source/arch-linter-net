@@ -112,6 +112,96 @@ public partial class CliIntegrationTests
         });
     }
 
+    [TestCase("--help", "debt", "Unknown command or argument: debt")]
+    [TestCase("-h", "debt", "Unknown command or argument: debt")]
+    [TestCase("--version", "debt", "Unknown command or argument: debt")]
+    [TestCase("-v", "debt", "Unknown command or argument: debt")]
+    [TestCase("--help", "--bogus-flag", "Unknown option: --bogus-flag")]
+    public void HelpOrVersionFollowedByInvalidInput_FailsClosed(
+        string legacyOption,
+        string invalidInput,
+        string expectedDiagnostic)
+    {
+        var (exitCode, stdout, stderr) = RunCli(legacyOption, invalidInput);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(exitCode, Is.EqualTo(2));
+            Assert.That(stdout, Is.Empty);
+            Assert.That(stderr, Does.Contain(expectedDiagnostic));
+            Assert.That(stderr, Does.Contain("--help"));
+        });
+    }
+
+    [Test]
+    public void ValidFlagThenHelpFollowedByInvalidInput_FailsClosed()
+    {
+        var (exitCode, stdout, stderr) = RunCli("--strict", "--help", "debt");
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(exitCode, Is.EqualTo(2));
+            Assert.That(stdout, Is.Empty);
+            Assert.That(stderr, Does.Contain("Unknown command or argument: debt"));
+            Assert.That(stderr, Does.Contain("--help"));
+        });
+    }
+
+    [Test]
+    public void PolicyArgumentThenHelpFollowedByInvalidInput_FailsClosed()
+    {
+        var (exitCode, stdout, stderr) = RunCli("--policy", "x", "--help", "debt");
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(exitCode, Is.EqualTo(2));
+            Assert.That(stdout, Is.Empty);
+            Assert.That(stderr, Does.Contain("Unknown command or argument: debt"));
+            Assert.That(stderr, Does.Contain("--help"));
+        });
+    }
+
+    [Test]
+    public void UnknownTopLevelCommand_FailsClosedWithoutRootHelp()
+    {
+        var (exitCode, stdout, stderr) = RunCli("debt", "--help");
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(exitCode, Is.EqualTo(2));
+            Assert.That(stdout, Is.Empty);
+            Assert.That(stderr, Does.Contain("Unknown command or argument: debt"));
+            Assert.That(stderr, Does.Contain("--help"));
+        });
+    }
+
+    [Test]
+    public void UnknownSubcommand_FailsClosedWithoutParentHelp()
+    {
+        var (exitCode, stdout, stderr) = RunCli("policy", "debt", "--help");
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(exitCode, Is.EqualTo(2));
+            Assert.That(stdout, Is.Empty);
+            Assert.That(stderr, Does.Contain("Unknown command or argument: debt"));
+            Assert.That(stderr, Does.Contain("--help"));
+        });
+    }
+
+    [Test]
+    public void ValidSubcommandHelp_ExitsZero()
+    {
+        var (exitCode, stdout, stderr) = RunCli("policy", "--help");
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(exitCode, Is.EqualTo(0));
+            Assert.That(stdout, Does.Contain("policy"));
+            Assert.That(stderr, Is.Empty);
+        });
+    }
+
     [Test]
     public void DotnetProcessArguments_PreserveWhitespaceAndEmbeddedQuotes()
     {
@@ -155,6 +245,19 @@ public partial class CliIntegrationTests
     public void Version_WithAdditionalRootArguments_StillPrintsVersionAndExitsZero()
     {
         var (exitCode, stdout, stderr) = RunCli("--policy", _passingPolicy, "--version");
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(exitCode, Is.EqualTo(0));
+            Assert.That(stdout, Does.Contain("arch-linter-net"));
+            Assert.That(stderr, Is.Empty);
+        });
+    }
+
+    [Test]
+    public void Help_WithAdditionalRootArguments_StillPrintsHelpAndExitsZero()
+    {
+        var (exitCode, stdout, stderr) = RunCli("--policy", _passingPolicy, "--help");
 
         Assert.Multiple(() =>
         {
@@ -469,12 +572,14 @@ public partial class CliIntegrationTests
     [Test]
     public void UnknownFlag_ExitsWithError()
     {
-        var (exitCode, _, stderr) = RunCli("--bogus-flag");
+        var (exitCode, stdout, stderr) = RunCli("--bogus-flag");
 
         Assert.Multiple(() =>
         {
-            Assert.That(exitCode, Is.EqualTo(2));
-            Assert.That(stderr, Does.Contain("Unknown"));
+            Assert.That(exitCode, Is.EqualTo(CliExitCodes.InvalidArgumentsOrRuntimeError));
+            Assert.That(stdout, Is.Empty);
+            Assert.That(stderr, Does.Contain("--bogus-flag"));
+            Assert.That(stderr, Does.Contain("--help"));
         });
     }
 

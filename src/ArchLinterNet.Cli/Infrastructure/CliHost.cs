@@ -9,13 +9,19 @@ internal sealed class CliHost(ICliRootCommandFactory rootCommandFactory, ICliCon
 {
     public int Run(string[] args)
     {
+        Command rootCommand = rootCommandFactory.Create();
+        ParseResult parseResult = rootCommand.Parse(args);
+        if (parseResult.UnmatchedTokens.Count > 0)
+        {
+            WriteParseErrors(parseResult);
+            return CliExitCodes.InvalidArgumentsOrRuntimeError;
+        }
+
         if (TryHandleLegacyValidateShortCircuit(args))
         {
             return CliExitCodes.Success;
         }
 
-        Command rootCommand = rootCommandFactory.Create();
-        ParseResult parseResult = rootCommand.Parse(args);
         if (parseResult.Errors.Count > 0)
         {
             WriteParseErrors(parseResult);
@@ -27,60 +33,87 @@ internal sealed class CliHost(ICliRootCommandFactory rootCommandFactory, ICliCon
 
     private bool TryHandleLegacyValidateShortCircuit(string[] args)
     {
-        if (args.Length == 0 || IsTopLevelCommand(args[0]))
+        if (args.Length == 0)
         {
             return false;
         }
 
-        int i = 0;
-        while (i < args.Length)
+        LegacyResponse? response = null;
+        for (int i = 0; i < args.Length; i++)
         {
             string arg = args[i];
             switch (arg)
             {
                 case "--help" or "-h":
-                    console.Out.WriteLine(ValidateCommandDefinition.HelpText);
-                    return true;
+                    response ??= LegacyResponse.Help;
+                    break;
                 case "--version" or "-v":
-                    console.Out.WriteLine($"arch-linter-net {runtime.Version}");
-                    return true;
+                    response ??= LegacyResponse.Version;
+                    break;
                 case "--policy" or "-p" or "--mode" or "-m" or "--format" or "-f" or "--contract" or "--condition-set" or "--baseline":
-                    if (i + 1 >= args.Length)
+                    if (++i >= args.Length)
                     {
                         return false;
                     }
 
-                    i += 2;
-                    continue;
+                    break;
                 case "--strict" or "--audit" or "--json" or "--timings":
                     break;
                 default:
                     return false;
             }
-
-            i++;
         }
 
-        return false;
+        switch (response)
+        {
+            case LegacyResponse.Help:
+                console.Out.WriteLine(ValidateCommandDefinition.HelpText);
+                return true;
+            case LegacyResponse.Version:
+                console.Out.WriteLine($"arch-linter-net {runtime.Version}");
+                return true;
+            default:
+                return false;
+        }
     }
 
-    private static bool IsTopLevelCommand(string arg)
+    private enum LegacyResponse
     {
-        return arg is "baseline" or "graph" or "explain" or "policy" or "public-api";
+        Help,
+        Version,
     }
 
     private void WriteParseErrors(ParseResult parseResult)
     {
+        var handledUnmatchedTokens = new HashSet<string>(StringComparer.Ordinal);
         foreach (ParseError error in parseResult.Errors)
         {
+            string? unmatchedToken = parseResult.UnmatchedTokens.FirstOrDefault(token =>
+                error.Message.Contains($"'{token}'", StringComparison.Ordinal));
+            if (unmatchedToken is not null)
+            {
+                WriteUnknownToken(unmatchedToken);
+                handledUnmatchedTokens.Add(unmatchedToken);
+                continue;
+            }
+
             console.Error.WriteLine(NormalizeErrorMessage(error.Message));
         }
 
-        string? usageHint = GetUsageHint(parseResult.CommandResult.Command.Name);
-        if (!string.IsNullOrEmpty(usageHint))
+        foreach (string token in parseResult.UnmatchedTokens.Where(token => !handledUnmatchedTokens.Contains(token)))
         {
-            console.Error.WriteLine(usageHint);
+            WriteUnknownToken(token);
         }
+
+        console.Error.WriteLine(GetUsageHint(parseResult.CommandResult.Command.Name));
+    }
+
+    private void WriteUnknownToken(string token)
+    {
+        string kind = token.StartsWith("-", StringComparison.Ordinal)
+            ? "option"
+            : "command or argument";
+        console.Error.WriteLine($"Unknown {kind}: {token}");
     }
 
     private static string NormalizeErrorMessage(string message)
@@ -103,7 +136,7 @@ internal sealed class CliHost(ICliRootCommandFactory rootCommandFactory, ICliCon
             int end = message.IndexOf('\'', start);
             if (end > start)
             {
-                return $"Unknown option: {message[start..end]}";
+                return $"Unknown command or argument: {message[start..end]}";
             }
         }
 

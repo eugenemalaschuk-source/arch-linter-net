@@ -144,7 +144,7 @@ public sealed class CliHandlerCoverageTests
     }
 
     [Test]
-    public void Host_LegacyHelp_ShortCircuitsBeforeParsing()
+    public void Host_LegacyHelp_RendersAfterSuccessfulParsing()
     {
         var console = new RecordingConsole();
         int result = new CliHost(new RootCommandFactory(), console, new RecordingRuntime()).Run(_helpArgs);
@@ -154,13 +154,84 @@ public sealed class CliHandlerCoverageTests
     }
 
     [Test]
-    public void Host_LegacyVersion_ShortCircuitsBeforeParsing()
+    public void Host_UnknownCommand_FailsClosedWithHelpGuidance()
+    {
+        var console = new RecordingConsole();
+        int result = new CliHost(new RootCommandFactory(), console, new RecordingRuntime())
+            .Run(["debt", "--help"]);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(result, Is.EqualTo(CliExitCodes.InvalidArgumentsOrRuntimeError));
+            Assert.That(console.ErrorText, Does.Contain("Unknown command or argument: debt"));
+            Assert.That(console.ErrorText, Does.Contain("--help"));
+            Assert.That(console.OutputText, Is.Empty);
+        });
+    }
+
+    [Test]
+    public void Host_UnknownNestedCommand_FailsClosedWithHelpGuidance()
+    {
+        var console = new RecordingConsole();
+        int result = new CliHost(new RootCommandFactory(), console, new RecordingRuntime())
+            .Run(["graph", "debt", "--help"]);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(result, Is.EqualTo(CliExitCodes.InvalidArgumentsOrRuntimeError));
+            Assert.That(console.ErrorText, Does.Contain("Unknown command or argument: debt"));
+            Assert.That(console.ErrorText, Does.Contain("graph --help"));
+            Assert.That(console.OutputText, Is.Empty);
+        });
+    }
+
+    [Test]
+    public void Host_LegacyVersion_RendersAfterSuccessfulParsing()
     {
         var console = new RecordingConsole();
         int result = new CliHost(new RootCommandFactory(), console, new RecordingRuntime()).Run(_versionArgs);
 
         Assert.That(result, Is.EqualTo(CliExitCodes.Success));
         Assert.That(console.OutputText, Does.Contain("arch-linter-net 1.0.0"));
+    }
+
+    [TestCase("--help", "debt", "Unknown command or argument: debt")]
+    [TestCase("-h", "debt", "Unknown command or argument: debt")]
+    [TestCase("--version", "debt", "Unknown command or argument: debt")]
+    [TestCase("-v", "debt", "Unknown command or argument: debt")]
+    [TestCase("--help", "--bogus-flag", "Unknown option: --bogus-flag")]
+    public void Host_LegacyHelpOrVersionWithInvalidInput_FailsClosed(
+        string legacyOption,
+        string invalidInput,
+        string expectedDiagnostic)
+    {
+        var console = new RecordingConsole();
+        int result = new CliHost(new RootCommandFactory(), console, new RecordingRuntime())
+            .Run([legacyOption, invalidInput]);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(result, Is.EqualTo(CliExitCodes.InvalidArgumentsOrRuntimeError));
+            Assert.That(console.OutputText, Is.Empty);
+            Assert.That(console.ErrorText, Does.Contain(expectedDiagnostic));
+            Assert.That(console.ErrorText, Does.Contain("--help"));
+        });
+    }
+
+    [Test]
+    public void Host_LeadingHelpAfterValidFlagWithInvalidInput_FailsClosed()
+    {
+        var console = new RecordingConsole();
+        int result = new CliHost(new RootCommandFactory(), console, new RecordingRuntime())
+            .Run(["--strict", "--help", "debt"]);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(result, Is.EqualTo(CliExitCodes.InvalidArgumentsOrRuntimeError));
+            Assert.That(console.OutputText, Is.Empty);
+            Assert.That(console.ErrorText, Does.Contain("Unknown command or argument: debt"));
+            Assert.That(console.ErrorText, Does.Contain("--help"));
+        });
     }
 
     [Test]
@@ -174,22 +245,21 @@ public sealed class CliHandlerCoverageTests
         Assert.That(console.ErrorText, Does.Contain("graph --help"));
     }
 
-    // The legacy validate short-circuit only intercepts --help/--version; every other
-    // combination walks the arg list and returns false, falling through to normal parsing.
+    // The legacy validate renderer only emits root help/version after a successful parse.
     // These cases exercise the value-skipping (--policy <value>), flag (--strict), unknown-token,
-    // and dangling-option-value branches of TryHandleLegacyValidateShortCircuit.
+    // and dangling-option-value branches that leave TryHandleLegacyValidateShortCircuit without rendering.
     private static readonly string[] _policyThenFlagArgs = ["--policy", "custom.yml", "--strict"];
     private static readonly string[] _unknownLeadingTokenArgs = ["not-an-option"];
     private static readonly string[] _danglingPolicyValueArgs = ["--policy"];
 
     [TestCaseSource(nameof(LegacyFallThroughCases))]
-    public void Host_LegacyShortCircuit_NonHelpArgs_FallThroughToParsing(string[] args)
+    public void Host_LegacyRenderer_NonHelpArgs_FallsThroughToInvocation(string[] args)
     {
         var console = new RecordingConsole();
         int result = new CliHost(new RootCommandFactory(), console, new RecordingRuntime()).Run(args);
 
-        // The fake root command defines no options, so falling through to normal parsing
-        // yields a parse error rather than the legacy Success short-circuit.
+        // The fake root command defines no options, so parsing yields a parse error
+        // rather than a legacy Success response.
         Assert.That(result, Is.EqualTo(CliExitCodes.InvalidArgumentsOrRuntimeError));
     }
 
@@ -201,13 +271,12 @@ public sealed class CliHandlerCoverageTests
     }
 
     [Test]
-    public void Host_TopLevelCommand_SkipsLegacyShortCircuit()
+    public void Host_TopLevelCommand_SkipsLegacyRendering()
     {
         var console = new RecordingConsole();
         int result = new CliHost(new RootCommandFactory(), console, new RecordingRuntime()).Run(_graphUnknownOptionArgs);
 
-        // "graph" is a recognized top-level command, so the short-circuit returns immediately
-        // (IsTopLevelCommand branch) and the arg list is handed straight to the parser.
+        // "graph" is a recognized top-level command, so legacy root rendering does not apply.
         Assert.That(result, Is.EqualTo(CliExitCodes.InvalidArgumentsOrRuntimeError));
         Assert.That(console.ErrorText, Does.Contain("graph --help"));
     }
