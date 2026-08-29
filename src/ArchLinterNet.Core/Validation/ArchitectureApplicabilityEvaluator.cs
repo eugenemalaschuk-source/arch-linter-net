@@ -92,17 +92,28 @@ public static class ArchitectureApplicabilityEvaluator
         IReadOnlyList<ArchitectureApplicabilityExpectedEntry> expectedEntries,
         List<ArchitectureApplicabilityReason> integrityReasons)
     {
-        if (expectedEntries.Count < 2)
+        foreach (ArchitectureApplicabilityExpectedEntry expected in expectedEntries)
         {
-            return;
-        }
+            if (expectedEntries.Count > 1)
+            {
+                integrityReasons.Add(CreateReason(
+                    ArchitectureApplicabilityReasonCodes.DuplicateApplicabilityExpectedIdentity,
+                    expected.Provenance));
+            }
 
-        foreach (ArchitectureApplicabilityExpectedEntry duplicate in expectedEntries)
-        {
-            integrityReasons.Add(CreateReason(
-                ArchitectureApplicabilityReasonCodes.DuplicateApplicabilityExpectedIdentity,
-                duplicate.Provenance));
+            if (!HasCanonicalProvenance(expected))
+            {
+                integrityReasons.Add(CreateReason(
+                    ArchitectureApplicabilityReasonCodes.InvalidApplicabilityExpectedIntegrity,
+                    new ArchitectureApplicabilityProvenance(expected.Family, expected.ControlIdentity)));
+            }
         }
+    }
+
+    private static bool HasCanonicalProvenance(ArchitectureApplicabilityExpectedEntry expected)
+    {
+        return string.Equals(expected.Provenance.Family, expected.Family, StringComparison.Ordinal)
+            && string.Equals(expected.Provenance.ControlIdentity, expected.ControlIdentity, StringComparison.Ordinal);
     }
 
     private static ArchitectureApplicabilityRecord? ResolveRecord(

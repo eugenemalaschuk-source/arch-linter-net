@@ -40,6 +40,7 @@ public static class ArchitectureApplicabilityReasonCodes
     public const string DuplicateApplicabilityRecordIdentity = "duplicate_applicability_record_identity";
     public const string UnknownApplicabilityRecordIdentity = "unknown_applicability_record_identity";
     public const string IncompatibleApplicabilityRecord = "incompatible_applicability_record";
+    public const string InvalidApplicabilityExpectedIntegrity = "invalid_applicability_expected_integrity";
     public const string InvalidApplicabilityRecordIntegrity = "invalid_applicability_record_integrity";
     public const string DuplicateApplicabilityExpectedIdentity = "duplicate_applicability_expected_identity";
 }

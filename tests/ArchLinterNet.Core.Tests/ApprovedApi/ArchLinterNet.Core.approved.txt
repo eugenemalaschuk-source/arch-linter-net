@@ -2069,6 +2069,7 @@ static class ArchLinterNet.Core.Model.ArchitectureApplicabilityReasonCodes
   field const string DuplicateApplicabilityExpectedIdentity = "duplicate_applicability_expected_identity"
   field const string DuplicateApplicabilityRecordIdentity = "duplicate_applicability_record_identity"
   field const string IncompatibleApplicabilityRecord = "incompatible_applicability_record"
+  field const string InvalidApplicabilityExpectedIntegrity = "invalid_applicability_expected_integrity"
   field const string InvalidApplicabilityRecordIntegrity = "invalid_applicability_record_integrity"
   field const string MalformedExternalInput = "malformed_external_input"
   field const string MissingApplicabilityRecord = "missing_applicability_record"

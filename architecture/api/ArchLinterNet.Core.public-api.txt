@@ -454,6 +454,7 @@ const ArchLinterNet.Core.Model.ArchitectureApplicabilityReasonCodes.AmbiguousSub
 const ArchLinterNet.Core.Model.ArchitectureApplicabilityReasonCodes.DuplicateApplicabilityExpectedIdentity: System.String [value:"duplicate_applicability_expected_identity"]
 const ArchLinterNet.Core.Model.ArchitectureApplicabilityReasonCodes.DuplicateApplicabilityRecordIdentity: System.String [value:"duplicate_applicability_record_identity"]
 const ArchLinterNet.Core.Model.ArchitectureApplicabilityReasonCodes.IncompatibleApplicabilityRecord: System.String [value:"incompatible_applicability_record"]
+const ArchLinterNet.Core.Model.ArchitectureApplicabilityReasonCodes.InvalidApplicabilityExpectedIntegrity: System.String [value:"invalid_applicability_expected_integrity"]
 const ArchLinterNet.Core.Model.ArchitectureApplicabilityReasonCodes.InvalidApplicabilityRecordIntegrity: System.String [value:"invalid_applicability_record_integrity"]
 const ArchLinterNet.Core.Model.ArchitectureApplicabilityReasonCodes.MalformedExternalInput: System.String [value:"malformed_external_input"]
 const ArchLinterNet.Core.Model.ArchitectureApplicabilityReasonCodes.MissingApplicabilityRecord: System.String [value:"missing_applicability_record"]

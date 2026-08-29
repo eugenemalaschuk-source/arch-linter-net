@@ -57,6 +57,36 @@ public sealed class ArchitectureApplicabilityEvaluatorTests
         });
     }
 
+    [TestCase("family-a", "control-x")]
+    [TestCase("family-x", "control-a")]
+    public void MismatchedExpectedProvenance_IsIntegrityEvidenceEvenWhenRecordMatches(
+        string provenanceFamily,
+        string provenanceControlIdentity)
+    {
+        ArchitectureApplicabilityExpectedEntry expected = new(
+            "control-a", "family-a", ArchitectureApplicabilityMembership.Required,
+            new ArchitectureApplicabilityProvenance(provenanceFamily, provenanceControlIdentity, "untrusted-policy"));
+        ArchitectureApplicabilityRecord record = new(
+            "control-a", "family-a", ArchitectureApplicabilityRecordState.Evaluable,
+            Array.Empty<ArchitectureApplicabilityReason>(),
+            new ArchitectureApplicabilityProvenance("family-a", "control-a", "trusted-policy"));
+
+        ArchitectureAssessmentCompletionEvidence result =
+            ArchitectureApplicabilityEvaluator.Evaluate([expected], [record], conformancePassed: true)!;
+
+        ArchitectureApplicabilityReason reason = result.Reasons.Single();
+        Assert.Multiple(() =>
+        {
+            Assert.That(result.State, Is.EqualTo(ArchitectureAssessmentCompletionState.Unassessable));
+            Assert.That(result.Controls.Single().State, Is.Null);
+            Assert.That(reason.Code,
+                Is.EqualTo(ArchitectureApplicabilityReasonCodes.InvalidApplicabilityExpectedIntegrity));
+            Assert.That(reason.Provenance.Family, Is.EqualTo("family-a"));
+            Assert.That(reason.Provenance.ControlIdentity, Is.EqualTo("control-a"));
+            Assert.That(reason.Provenance.PolicyIdentity, Is.Empty);
+        });
+    }
+
     [Test]
     public void DuplicateRecord_IsIntegrityEvidenceAndRetainsEveryProducerProvenance()
     {
