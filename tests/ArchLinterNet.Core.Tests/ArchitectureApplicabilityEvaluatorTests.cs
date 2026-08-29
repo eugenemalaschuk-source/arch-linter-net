@@ -245,7 +245,11 @@ public sealed class ArchitectureApplicabilityEvaluatorTests
             ArchitectureApplicabilityEvaluator.Evaluate(
                 [Entry("control-a", ArchitectureApplicabilityMembership.Required)],
                 [Record("control-a", ArchitectureApplicabilityRecordState.Unassessable,
-                    new ArchitectureApplicabilityReason(ArchitectureApplicabilityReasonCodes.StaleDeclaration, "family", "control-a"))],
+                    new ArchitectureApplicabilityReason(
+                        ArchitectureApplicabilityReasonCodes.StaleDeclaration,
+                        "family",
+                        "control-a",
+                        "policy"))],
                 conformancePassed: false)!;
 
         Assert.That(result.State, Is.EqualTo(ArchitectureAssessmentCompletionState.Unassessable));
@@ -269,6 +273,43 @@ public sealed class ArchitectureApplicabilityEvaluatorTests
         });
     }
 
+    [TestCase("foreign-family", "control-a", "policy")]
+    [TestCase("family", "foreign-control", "policy")]
+    [TestCase("family", "control-a", "foreign-policy")]
+    public void UnassessableReasonWithForeignProvenance_IsCanonicalIntegrityEvidence(
+        string reasonFamily,
+        string reasonControlIdentity,
+        string reasonPolicyIdentity)
+    {
+        ArchitectureAssessmentCompletionEvidence result =
+            ArchitectureApplicabilityEvaluator.Evaluate(
+                [Entry("control-a", ArchitectureApplicabilityMembership.Required)],
+                [Record(
+                    "control-a",
+                    ArchitectureApplicabilityRecordState.Unassessable,
+                    new ArchitectureApplicabilityReason(
+                        ArchitectureApplicabilityReasonCodes.StaleDeclaration,
+                        reasonFamily,
+                        reasonControlIdentity,
+                        reasonPolicyIdentity))],
+                conformancePassed: true)!;
+
+        ArchitectureApplicabilityAssessment assessment = result.Controls.Single();
+        ArchitectureApplicabilityReason reason = result.Reasons.Single();
+        Assert.Multiple(() =>
+        {
+            Assert.That(result.State, Is.EqualTo(ArchitectureAssessmentCompletionState.Unassessable));
+            Assert.That(assessment.State, Is.Null);
+            Assert.That(reason.Code,
+                Is.EqualTo(ArchitectureApplicabilityReasonCodes.InvalidApplicabilityRecordIntegrity));
+            Assert.That(reason.Provenance.Family, Is.EqualTo("family"));
+            Assert.That(reason.Provenance.ControlIdentity, Is.EqualTo("control-a"));
+            Assert.That(reason.Provenance.PolicyIdentity, Is.EqualTo("policy"));
+            Assert.That(result.Reasons.Select(candidate => candidate.Code), Does.Not.Contain(
+                ArchitectureApplicabilityReasonCodes.StaleDeclaration));
+        });
+    }
+
     [Test]
     public void TrustedEvidenceWithOrdinaryFailure_ReturnsFail()
     {
@@ -288,9 +329,17 @@ public sealed class ArchitectureApplicabilityEvaluatorTests
             ArchitectureApplicabilityEvaluator.Evaluate(
                 [Entry("control-z", ArchitectureApplicabilityMembership.Required), Entry("control-a", ArchitectureApplicabilityMembership.Required)],
                 [Record("control-z", ArchitectureApplicabilityRecordState.Unassessable,
-                    new ArchitectureApplicabilityReason(ArchitectureApplicabilityReasonCodes.UnmappedSubject, "family", "control-z")),
+                    new ArchitectureApplicabilityReason(
+                        ArchitectureApplicabilityReasonCodes.UnmappedSubject,
+                        "family",
+                        "control-z",
+                        "policy")),
                  Record("control-a", ArchitectureApplicabilityRecordState.Unassessable,
-                    new ArchitectureApplicabilityReason(ArchitectureApplicabilityReasonCodes.MissingRequiredInput, "family", "control-a"))],
+                    new ArchitectureApplicabilityReason(
+                        ArchitectureApplicabilityReasonCodes.MissingRequiredInput,
+                        "family",
+                        "control-a",
+                        "policy"))],
                 conformancePassed: true)!;
 
         Assert.Multiple(() =>

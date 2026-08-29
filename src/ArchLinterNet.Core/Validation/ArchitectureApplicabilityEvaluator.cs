@@ -84,7 +84,7 @@ public static class ArchitectureApplicabilityEvaluator
         AddExpectedIdentityDefects(orderedExpected, integrityReasons);
 
         ArchitectureApplicabilityRecord? record = ResolveRecord(expected, recordMatches, integrityReasons);
-        AddOpaqueUnassessableDefect(record, integrityReasons);
+        AddUnassessableRecordDefects(record, integrityReasons);
         return new ArchitectureApplicabilityAssessment(expected, record, integrityReasons);
     }
 
@@ -146,18 +146,37 @@ public static class ArchitectureApplicabilityEvaluator
         return record;
     }
 
-    private static void AddOpaqueUnassessableDefect(
+    private static void AddUnassessableRecordDefects(
         ArchitectureApplicabilityRecord? record,
         List<ArchitectureApplicabilityReason> integrityReasons)
     {
-        if (record?.State != ArchitectureApplicabilityRecordState.Unassessable || record.Reasons.Count > 0)
+        if (record?.State != ArchitectureApplicabilityRecordState.Unassessable)
         {
             return;
         }
 
-        integrityReasons.Add(CreateReason(
-            ArchitectureApplicabilityReasonCodes.InvalidApplicabilityRecordIntegrity,
-            record.Provenance));
+        if (record.Reasons.Count == 0 || record.Reasons.Any(reason =>
+                !HasCanonicalReasonProvenance(reason, record.Provenance)))
+        {
+            integrityReasons.Add(CreateReason(
+                ArchitectureApplicabilityReasonCodes.InvalidApplicabilityRecordIntegrity,
+                record.Provenance));
+        }
+    }
+
+    private static bool HasCanonicalReasonProvenance(
+        ArchitectureApplicabilityReason reason,
+        ArchitectureApplicabilityProvenance recordProvenance)
+    {
+        return string.Equals(reason.Provenance.Family, recordProvenance.Family, StringComparison.Ordinal)
+            && string.Equals(
+                reason.Provenance.ControlIdentity,
+                recordProvenance.ControlIdentity,
+                StringComparison.Ordinal)
+            && string.Equals(
+                reason.Provenance.PolicyIdentity,
+                recordProvenance.PolicyIdentity,
+                StringComparison.Ordinal);
     }
 
     private static void AddOrphanAssessments(

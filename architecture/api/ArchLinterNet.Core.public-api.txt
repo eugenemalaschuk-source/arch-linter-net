@@ -2380,7 +2380,6 @@ property ArchLinterNet.Core.Execution.ResolutionResult.MissingAssemblyNames: Sys
 property ArchLinterNet.Core.Execution.ResolutionResult.ResolvedAssemblies: System.Collections.Generic.IReadOnlyCollection`1[System.Reflection.Assembly] [get, init]
 property ArchLinterNet.Core.Execution.Results.ArchitectureContractExecutionResult.ApplicabilityExpectedEntries: System.Collections.Generic.IReadOnlyList`1[ArchLinterNet.Core.Model.ArchitectureApplicabilityExpectedEntry] [get, init]
 property ArchLinterNet.Core.Execution.Results.ArchitectureContractExecutionResult.ApplicabilityRecords: System.Collections.Generic.IReadOnlyList`1[ArchLinterNet.Core.Model.ArchitectureApplicabilityRecord] [get, init]
-property ArchLinterNet.Core.Execution.Results.ArchitectureContractExecutionResult.AssessmentCompletionEvidence: ArchLinterNet.Core.Model.ArchitectureAssessmentCompletionEvidence [get, init]
 property ArchLinterNet.Core.Execution.Results.ArchitectureContractExecutionResult.ContractFamilyResultCounts: System.Collections.Generic.IReadOnlyDictionary`2[System.String,System.Int32] [get, init]
 property ArchLinterNet.Core.Execution.Results.ArchitectureContractExecutionResult.CoverageSummaries: System.Collections.Generic.IReadOnlyCollection`1[ArchLinterNet.Core.Reporting.ArchitectureCoverageSummary] [get, init]
 property ArchLinterNet.Core.Execution.Results.ArchitectureContractExecutionResult.CoverageViolations: System.Collections.Generic.IReadOnlyCollection`1[ArchLinterNet.Core.Model.ArchitectureViolation] [get, init]

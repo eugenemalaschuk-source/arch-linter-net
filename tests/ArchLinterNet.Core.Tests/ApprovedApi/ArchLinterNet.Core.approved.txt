@@ -1809,7 +1809,6 @@ sealed class ArchLinterNet.Core.Execution.Results.ArchitectureContractExecutionR
   method void Deconstruct(out System.Collections.Generic.IReadOnlyCollection<ArchLinterNet.Core.Model.ArchitectureViolation> Violations, out System.Collections.Generic.IReadOnlyCollection<string> Cycles, out System.Collections.Generic.IReadOnlyCollection<ArchLinterNet.Core.Model.ArchitectureViolation> CoverageViolations, out System.Collections.Generic.IReadOnlyCollection<ArchLinterNet.Core.Reporting.ArchitectureCoverageSummary> CoverageSummaries)
   operator !=(ArchLinterNet.Core.Execution.Results.ArchitectureContractExecutionResult? left, ArchLinterNet.Core.Execution.Results.ArchitectureContractExecutionResult? right)
   operator ==(ArchLinterNet.Core.Execution.Results.ArchitectureContractExecutionResult? left, ArchLinterNet.Core.Execution.Results.ArchitectureContractExecutionResult? right)
-  property ArchLinterNet.Core.Model.ArchitectureAssessmentCompletionEvidence? AssessmentCompletionEvidence {get;init;}
   property System.Collections.Generic.IReadOnlyCollection<ArchLinterNet.Core.Model.ArchitectureCycleFinding> CycleFindings {get;init;}
   property System.Collections.Generic.IReadOnlyCollection<ArchLinterNet.Core.Model.ArchitectureViolation> CoverageViolations {get;init;}
   property System.Collections.Generic.IReadOnlyCollection<ArchLinterNet.Core.Model.ArchitectureViolation> Violations {get;init;}
