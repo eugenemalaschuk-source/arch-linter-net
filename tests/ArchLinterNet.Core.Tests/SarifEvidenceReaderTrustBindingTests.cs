@@ -1,3 +1,4 @@
+using System.Runtime.InteropServices;
 using ArchLinterNet.Core.Contracts;
 using ArchLinterNet.Core.Execution;
 using ArchLinterNet.Core.Model;
@@ -6,8 +7,22 @@ using NUnit.Framework;
 namespace ArchLinterNet.Core.Tests;
 
 [TestFixture]
-public sealed class SarifEvidenceReaderTrustBindingTests
+public sealed partial class SarifEvidenceReaderTrustBindingTests
 {
+    private SarifEvidenceTestRepository _repository = null!;
+
+    [SetUp]
+    public void SetUp()
+    {
+        _repository = new SarifEvidenceTestRepository();
+    }
+
+    [TearDown]
+    public void TearDown()
+    {
+        _repository.Dispose();
+    }
+
     [TestCase("repository", SarifEvidenceTrustStatus.WrongRepository)]
     [TestCase("revision", SarifEvidenceTrustStatus.WrongRevision)]
     [TestCase("scope", SarifEvidenceTrustStatus.WrongScope)]
@@ -15,9 +30,7 @@ public sealed class SarifEvidenceReaderTrustBindingTests
         string dimension,
         SarifEvidenceTrustStatus expectedStatus)
     {
-        string json = BuildSarif();
-        var fileSystem = new FakeArchitectureFileSystem();
-        fileSystem.AddFile("/repo/scan.sarif", json, DateTime.UtcNow);
+        _repository.AddUtf8File("scan.sarif", BuildSarif());
         var requirement = Requirement();
         var producer = new SarifEvidenceProducerContext(
             logicalId: "external.scan",
@@ -29,9 +42,9 @@ public sealed class SarifEvidenceReaderTrustBindingTests
             revision: dimension == "revision" ? "other" : "revision",
             scope: dimension == "scope" ? "other" : "scope");
 
-        SarifEvidenceReadResult result = new SarifEvidenceReader(fileSystem).Read(
+        SarifEvidenceReadResult result = new SarifEvidenceReader().Read(
             requirement,
-            "/repo",
+            _repository.Root,
             new SarifEvidenceArtifactReference("scan.sarif", "external.scan", producer),
             expected,
             new SarifEvidenceLimits(4096, 4, 10));
@@ -49,20 +62,18 @@ public sealed class SarifEvidenceReaderTrustBindingTests
         string json = BuildSarif(
             repository: dimension == "repository" ? null : "repository",
             revision: dimension == "revision" ? null : "revision");
-        var fileSystem = new FakeArchitectureFileSystem();
-        fileSystem.AddFile("/repo/scan.sarif", json, DateTime.UtcNow);
+        _repository.AddUtf8File("scan.sarif", json);
         var expected = new SarifEvidenceAssessmentContext(
             repository: "repository",
             revision: "revision",
             scope: dimension == "scope" ? "scope" : null);
 
-        // Scope never comes from standard SARIF; it must be supplied explicitly by the producer.
         SarifEvidenceProducerContext? producer = dimension == "scope"
             ? new SarifEvidenceProducerContext("external.scan", "repository", "revision", null)
             : new SarifEvidenceProducerContext("external.scan", null, null, null);
-        SarifEvidenceReadResult result = new SarifEvidenceReader(fileSystem).Read(
+        SarifEvidenceReadResult result = new SarifEvidenceReader().Read(
             Requirement(),
-            "/repo",
+            _repository.Root,
             new SarifEvidenceArtifactReference("scan.sarif", "external.scan", producer),
             expected,
             new SarifEvidenceLimits(4096, 4, 10));
@@ -73,12 +84,11 @@ public sealed class SarifEvidenceReaderTrustBindingTests
     [Test]
     public void Read_WrongLogicalId_IsRejectedEvenWhenArtifactOtherwiseMatches()
     {
-        var fileSystem = new FakeArchitectureFileSystem();
-        fileSystem.AddFile("/repo/scan.sarif", BuildSarif(), DateTime.UtcNow);
+        _repository.AddUtf8File("scan.sarif", BuildSarif());
 
-        SarifEvidenceReadResult result = new SarifEvidenceReader(fileSystem).Read(
+        SarifEvidenceReadResult result = new SarifEvidenceReader().Read(
             Requirement(),
-            "/repo",
+            _repository.Root,
             new SarifEvidenceArtifactReference("scan.sarif", "other.scan"));
 
         Assert.Multiple(() =>
@@ -91,12 +101,11 @@ public sealed class SarifEvidenceReaderTrustBindingTests
     [Test]
     public void Read_ConflictingSarifAndProducerContext_FailsClosed()
     {
-        var fileSystem = new FakeArchitectureFileSystem();
-        fileSystem.AddFile("/repo/scan.sarif", BuildSarif(), DateTime.UtcNow);
+        _repository.AddUtf8File("scan.sarif", BuildSarif());
 
-        SarifEvidenceReadResult result = new SarifEvidenceReader(fileSystem).Read(
+        SarifEvidenceReadResult result = new SarifEvidenceReader().Read(
             Requirement(),
-            "/repo",
+            _repository.Root,
             new SarifEvidenceArtifactReference(
                 "scan.sarif",
                 "external.scan",
@@ -110,19 +119,14 @@ public sealed class SarifEvidenceReaderTrustBindingTests
     [TestCase("../scan.sarif", SarifEvidenceTrustStatus.UnsafePath)]
     [TestCase("/tmp/scan.sarif", SarifEvidenceTrustStatus.UnsafePath)]
     [TestCase("C:\\tmp\\scan.sarif", SarifEvidenceTrustStatus.UnsafePath)]
+    [TestCase("C:relative.sarif", SarifEvidenceTrustStatus.UnsafePath)]
     public void Read_MissingOrUnsafeArtifact_IsRejectedBeforeRead(
         string path,
         SarifEvidenceTrustStatus expectedStatus)
     {
-        var fileSystem = new FakeArchitectureFileSystem();
-        if (path == "scan.sarif")
-        {
-            // Intentionally do not add the file.
-        }
-
-        SarifEvidenceReadResult result = new SarifEvidenceReader(fileSystem).Read(
+        SarifEvidenceReadResult result = new SarifEvidenceReader().Read(
             Requirement(),
-            "/repo",
+            _repository.Root,
             new SarifEvidenceArtifactReference(path, "external.scan"));
 
         Assert.That(result.Status, Is.EqualTo(expectedStatus));
@@ -131,22 +135,17 @@ public sealed class SarifEvidenceReaderTrustBindingTests
     [Test]
     public void Read_ArtifactRunsAndResultsRespectIndependentBounds()
     {
-        var fileSystem = new FakeArchitectureFileSystem();
-        fileSystem.AddFile(
-            "/repo/too-large.sarif",
-            BuildSarif(results: "[{\"ruleId\":\"A\"},{\"ruleId\":\"B\"}]"),
-            DateTime.UtcNow);
-        fileSystem.AddFile(
-            "/repo/too-many-runs.sarif",
-            BuildSarifWithTwoRuns(),
-            DateTime.UtcNow);
+        _repository.AddUtf8File(
+            "too-large.sarif",
+            BuildSarif(results: "[{\"ruleId\":\"A\"},{\"ruleId\":\"B\"}]"));
+        _repository.AddUtf8File("too-many-runs.sarif", BuildSarifWithTwoRuns());
 
-        var reader = new SarifEvidenceReader(fileSystem);
+        var reader = new SarifEvidenceReader();
         SarifEvidenceReadResult results = reader.Read(
-            Requirement(), "/repo", new SarifEvidenceArtifactReference("too-large.sarif", "external.scan"),
+            Requirement(), _repository.Root, new SarifEvidenceArtifactReference("too-large.sarif", "external.scan"),
             new SarifEvidenceAssessmentContext("repository", "revision"), new SarifEvidenceLimits(4096, 4, 1));
         SarifEvidenceReadResult runs = reader.Read(
-            Requirement(), "/repo", new SarifEvidenceArtifactReference("too-many-runs.sarif", "external.scan"),
+            Requirement(), _repository.Root, new SarifEvidenceArtifactReference("too-many-runs.sarif", "external.scan"),
             new SarifEvidenceAssessmentContext("repository", "revision"), new SarifEvidenceLimits(4096, 1, 10));
 
         Assert.Multiple(() =>
@@ -162,13 +161,11 @@ public sealed class SarifEvidenceReaderTrustBindingTests
     public void Read_ArtifactByteLimitHashesConsumedBytesAndDoesNotParsePartialJson()
     {
         string json = BuildSarif();
-        var fileSystem = new FakeArchitectureFileSystem();
-        fileSystem.AddFile("/repo/scan.sarif", json, DateTime.UtcNow);
+        _repository.AddUtf8File("scan.sarif", json);
 
-        SarifEvidenceReadResult result = new SarifEvidenceReader(fileSystem).Read(
-            Requirement(), "/repo", new SarifEvidenceArtifactReference("scan.sarif", "external.scan"),
-            new SarifEvidenceAssessmentContext("repository", "revision"),
-            new SarifEvidenceLimits(10, 4, 10));
+        SarifEvidenceReadResult result = new SarifEvidenceReader().Read(
+            Requirement(), _repository.Root, new SarifEvidenceArtifactReference("scan.sarif", "external.scan"),
+            new SarifEvidenceAssessmentContext("repository", "revision"), new SarifEvidenceLimits(10, 4, 10));
 
         string consumed = json[..11];
         Assert.Multiple(() =>
@@ -179,6 +176,72 @@ public sealed class SarifEvidenceReaderTrustBindingTests
                     System.Text.Encoding.UTF8.GetBytes(consumed)))));
             Assert.That(result.ResultCount, Is.Null);
         });
+    }
+
+    [Test]
+    public void Read_Directory_IsRejectedAsAnUnsafeArtifact()
+    {
+        Directory.CreateDirectory(_repository.GetPath("directory.sarif"));
+
+        SarifEvidenceReadResult result = new SarifEvidenceReader().Read(
+            Requirement(), _repository.Root, new SarifEvidenceArtifactReference("directory.sarif", "external.scan"));
+
+        Assert.That(result.Status, Is.EqualTo(SarifEvidenceTrustStatus.UnsafePath));
+    }
+
+    [Test]
+    public void Read_Fifo_IsRejectedWithoutBlocking()
+    {
+        if (OperatingSystem.IsWindows())
+        {
+            Assert.Ignore("Windows does not expose POSIX FIFOs in this test environment.");
+        }
+
+        string fifo = _repository.GetPath("evidence.fifo");
+        Assert.That(CreateFifo(fifo, 0x1A4), Is.EqualTo(0));
+
+        SarifEvidenceReadResult result = new SarifEvidenceReader().Read(
+            Requirement(), _repository.Root, new SarifEvidenceArtifactReference("evidence.fifo", "external.scan"));
+
+        Assert.That(result.Status, Is.EqualTo(SarifEvidenceTrustStatus.UnsafePath));
+    }
+
+    [Test]
+    public void Read_FinalSymlink_IsRejected()
+    {
+        if (OperatingSystem.IsWindows())
+        {
+            Assert.Ignore("The Windows CI account cannot be assumed to have symlink creation rights.");
+        }
+
+        using var outside = new SarifEvidenceTestRepository();
+        string outsidePath = outside.AddUtf8File("outside.sarif", BuildSarif());
+        File.CreateSymbolicLink(_repository.GetPath("scan.sarif"), outsidePath);
+
+        SarifEvidenceReadResult result = new SarifEvidenceReader().Read(
+            Requirement(), _repository.Root, new SarifEvidenceArtifactReference("scan.sarif", "external.scan"));
+
+        Assert.That(result.Status, Is.EqualTo(SarifEvidenceTrustStatus.UnsafePath));
+    }
+
+    [Test]
+    public void Read_AncestorSymlink_IsRejected()
+    {
+        if (OperatingSystem.IsWindows())
+        {
+            Assert.Ignore("The Windows CI account cannot be assumed to have symlink creation rights.");
+        }
+
+        using var outside = new SarifEvidenceTestRepository();
+        outside.AddUtf8File("scan.sarif", BuildSarif());
+        Directory.CreateSymbolicLink(_repository.GetPath("linked"), outside.Root);
+
+        SarifEvidenceReadResult result = new SarifEvidenceReader().Read(
+            Requirement(),
+            _repository.Root,
+            new SarifEvidenceArtifactReference("linked/scan.sarif", "external.scan"));
+
+        Assert.That(result.Status, Is.EqualTo(SarifEvidenceTrustStatus.UnsafePath));
     }
 
     private static ArchitectureExternalEvidenceRequirement Requirement() => new()
@@ -211,5 +274,8 @@ public sealed class SarifEvidenceReaderTrustBindingTests
         + ","
         + BuildSarif()["{\"version\":\"2.1.0\",\"runs\":[".Length..^2]
         + "]}";
+
+    [LibraryImport("libc", EntryPoint = "mkfifo", SetLastError = true, StringMarshalling = StringMarshalling.Utf8)]
+    private static partial int CreateFifo(string path, uint mode);
 
 }

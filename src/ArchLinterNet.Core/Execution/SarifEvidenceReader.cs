@@ -66,19 +66,7 @@ public sealed partial class SarifEvidenceReader(IArchitectureFileSystem? fileSys
         }
 
         cancellationToken.ThrowIfCancellationRequested();
-        if (!_fileSystem.FileExists(path.FullPath))
-        {
-            return CreateResult(
-                requirementId,
-                requirement.Required
-                    ? SarifEvidenceTrustStatus.MissingRequiredInput
-                    : SarifEvidenceTrustStatus.MissingOptionalInput,
-                requirement.Required
-                    ? "The required external evidence artifact does not exist."
-                    : "The optional external evidence artifact does not exist.");
-        }
-
-        ByteReadOutcome bytes = ReadBoundedBytes(path.FullPath, limits.MaxArtifactBytes, cancellationToken);
+        ByteReadOutcome bytes = ReadBoundedBytes(path, limits.MaxArtifactBytes, cancellationToken);
         SarifEvidenceProvenance baseProvenance = new(
             requirementId,
             bytes.IsReadable || bytes.BytesRead > 0 ? path.RelativePath : null,
@@ -91,10 +79,20 @@ public sealed partial class SarifEvidenceReader(IArchitectureFileSystem? fileSys
 
         if (!bytes.IsReadable)
         {
+            SarifEvidenceTrustStatus status = bytes.Failure switch
+            {
+                ArtifactReadFailure.Missing => requirement.Required
+                    ? SarifEvidenceTrustStatus.MissingRequiredInput
+                    : SarifEvidenceTrustStatus.MissingOptionalInput,
+                ArtifactReadFailure.Unsafe => SarifEvidenceTrustStatus.UnsafePath,
+                _ => SarifEvidenceTrustStatus.UnreadableInput,
+            };
             return CreateResult(
                 requirementId,
-                SarifEvidenceTrustStatus.UnreadableInput,
-                "The evidence artifact could not be read.",
+                status,
+                bytes.Failure == ArtifactReadFailure.Unsafe
+                    ? "The evidence path is not a repository-local regular file or changed while it was opened."
+                    : "The evidence artifact could not be read.",
                 baseProvenance);
         }
 

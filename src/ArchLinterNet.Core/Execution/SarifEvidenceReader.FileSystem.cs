@@ -1,6 +1,7 @@
 using System.Security;
 using System.Security.Cryptography;
 using ArchLinterNet.Core.BuildState;
+using ArchLinterNet.Core.IO;
 
 namespace ArchLinterNet.Core.Execution;
 
@@ -34,7 +35,7 @@ public sealed partial class SarifEvidenceReader
             }
 
             string portable = relativePath.Replace('\\', '/');
-            return new PathResolution(true, fullPath, portable);
+            return new PathResolution(true, root, fullPath, portable);
         }
         catch (ArgumentException)
         {
@@ -52,14 +53,13 @@ public sealed partial class SarifEvidenceReader
 
     private static bool IsWindowsRootedPath(string path)
     {
-        return path.Length >= 3
+        return path.Length >= 2
             && char.IsLetter(path[0])
-            && path[1] == ':'
-            && (path[2] == '\\' || path[2] == '/');
+            && path[1] == ':';
     }
 
     private ByteReadOutcome ReadBoundedBytes(
-        string path,
+        PathResolution path,
         long maximumBytes,
         CancellationToken cancellationToken)
     {
@@ -68,7 +68,21 @@ public sealed partial class SarifEvidenceReader
         bool exceeded = false;
         try
         {
-            using Stream stream = _fileSystem.OpenRead(path);
+            if (_fileSystem != ArchitectureFileSystem.Real)
+            {
+                return new ByteReadOutcome(false, ArtifactReadFailure.Unreadable, false, [], 0, null);
+            }
+
+            using RegularFileHandleReader.RepositoryRoot repositoryRoot =
+                RegularFileHandleReader.OpenRepositoryRoot(path.RootPath);
+            if (!IsStillSafe(path))
+            {
+                return ByteReadOutcome.Unsafe;
+            }
+
+            using Stream stream = RegularFileHandleReader.OpenRepositoryLocal(repositoryRoot, path.RelativePath);
+            _ = RegularFileHandleReader.GetIdentity(stream);
+
             byte[] chunk = new byte[81920];
             while (bytesRead <= maximumBytes)
             {
@@ -99,29 +113,90 @@ public sealed partial class SarifEvidenceReader
 
             byte[] data = buffer.ToArray();
             string hash = Convert.ToHexStringLower(SHA256.HashData(data));
-            return new ByteReadOutcome(true, exceeded, data, bytesRead, hash);
+            return new ByteReadOutcome(true, ArtifactReadFailure.None, exceeded, data, bytesRead, hash);
+        }
+        catch (FileNotFoundException)
+        {
+            byte[] data = buffer.ToArray();
+            string? hash = data.Length == 0 ? null : Convert.ToHexStringLower(SHA256.HashData(data));
+            return new ByteReadOutcome(
+                false,
+                ArtifactReadFailure.Missing,
+                false,
+                data,
+                bytesRead,
+                hash);
+        }
+        catch (InvalidDataException)
+        {
+            byte[] data = buffer.ToArray();
+            string? hash = data.Length == 0 ? null : Convert.ToHexStringLower(SHA256.HashData(data));
+            return new ByteReadOutcome(
+                false,
+                ArtifactReadFailure.Unsafe,
+                false,
+                data,
+                bytesRead,
+                hash);
         }
         catch (Exception ex) when (ex is IOException
             or UnauthorizedAccessException
             or SecurityException
             or FileNotFoundException
-            or DirectoryNotFoundException)
+            or DirectoryNotFoundException
+            or NotSupportedException)
         {
             byte[] data = buffer.ToArray();
             string? hash = data.Length == 0 ? null : Convert.ToHexStringLower(SHA256.HashData(data));
-            return new ByteReadOutcome(false, false, data, bytesRead, hash);
+            return new ByteReadOutcome(
+                false,
+                ArtifactReadFailure.Unreadable,
+                false,
+                data,
+                bytesRead,
+                hash);
         }
     }
 
-    private readonly record struct PathResolution(bool IsSafe, string FullPath, string RelativePath)
+    private static bool IsStillSafe(PathResolution path)
     {
-        public static PathResolution Unsafe => new(false, string.Empty, string.Empty);
+        try
+        {
+            return FileSystemContainmentGuard.IsContained(path.FullPath, path.RootPath)
+                && !FileSystemContainmentGuard.HasReparsePointAncestor(path.FullPath, path.RootPath)
+                && !FileSystemContainmentGuard.IsReparsePoint(path.FullPath);
+        }
+        catch (IOException)
+        {
+            return false;
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return false;
+        }
+    }
+
+    private readonly record struct PathResolution(bool IsSafe, string RootPath, string FullPath, string RelativePath)
+    {
+        public static PathResolution Unsafe => new(false, string.Empty, string.Empty, string.Empty);
     }
 
     private readonly record struct ByteReadOutcome(
         bool IsReadable,
+        ArtifactReadFailure Failure,
         bool ExceededLimit,
         byte[] Data,
         long BytesRead,
-        string? Sha256);
+        string? Sha256)
+    {
+        public static ByteReadOutcome Unsafe => new(false, ArtifactReadFailure.Unsafe, false, [], 0, null);
+    }
+
+    private enum ArtifactReadFailure
+    {
+        None,
+        Missing,
+        Unsafe,
+        Unreadable,
+    }
 }

@@ -3,18 +3,16 @@ namespace ArchLinterNet.Core.IO.Abstractions;
 public interface IArchitectureFileSystem
 {
     /// <summary>
-    /// Opens a file for bounded, byte-preserving reads.
+    /// Opens a file for general reads.
     /// </summary>
     /// <remarks>
-    /// The default implementation keeps existing test and host implementations source-compatible.
-    /// Implementations that can provide the original bytes should override this member; the
-    /// fallback is intended only for the older text-oriented file-system seam.
+    /// This legacy default remains for source and runtime compatibility. It materializes text and
+    /// therefore must not be used for byte-sensitive evidence ingestion; that boundary uses the
+    /// built-in verified file opener instead.
     /// </remarks>
     Stream OpenRead(string path)
     {
-        return new MemoryStream(
-            System.Text.Encoding.UTF8.GetBytes(ReadAllText(path)),
-            writable: false);
+        return new MemoryStream(System.Text.Encoding.UTF8.GetBytes(ReadAllText(path)), writable: false);
     }
 
     bool FileExists(string path);

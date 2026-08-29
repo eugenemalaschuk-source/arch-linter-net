@@ -8,7 +8,7 @@ public sealed class ArchitectureFileSystem : IArchitectureFileSystem
 
     public Stream OpenRead(string path)
     {
-        return File.OpenRead(path);
+        return RegularFileHandleReader.Open(path);
     }
 
     public bool FileExists(string path)

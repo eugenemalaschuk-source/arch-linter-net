@@ -1,6 +1,8 @@
 using System.Text;
 using ArchLinterNet.Core.Contracts;
 using ArchLinterNet.Core.Execution;
+using ArchLinterNet.Core.IO;
+using ArchLinterNet.Core.IO.Abstractions;
 using ArchLinterNet.Core.Model;
 using NUnit.Framework;
 
@@ -9,6 +11,20 @@ namespace ArchLinterNet.Core.Tests;
 [TestFixture]
 public sealed class SarifEvidenceReaderTests
 {
+    private SarifEvidenceTestRepository _repository = null!;
+
+    [SetUp]
+    public void SetUp()
+    {
+        _repository = new SarifEvidenceTestRepository();
+    }
+
+    [TearDown]
+    public void TearDown()
+    {
+        _repository.Dispose();
+    }
+
     [Test]
     public void Read_MatchingSuccessfulZeroResultRun_IsValidAndCarriesStableProvenance()
     {
@@ -18,8 +34,7 @@ public sealed class SarifEvidenceReaderTests
             repository: "https://example.test/acme/repo",
             revision: "abc123",
             results: "[]");
-        var fileSystem = new FakeArchitectureFileSystem();
-        fileSystem.AddFile("/repo/reports/scan.sarif", json, DateTime.UtcNow);
+        _repository.AddUtf8File("reports/scan.sarif", json);
         var requirement = Requirement();
         var artifact = new SarifEvidenceArtifactReference(
             "reports\\scan.sarif",
@@ -30,9 +45,9 @@ public sealed class SarifEvidenceReaderTests
             "abc123",
             "strict");
 
-        SarifEvidenceReadResult result = new SarifEvidenceReader(fileSystem).Read(
+        SarifEvidenceReadResult result = new SarifEvidenceReader().Read(
             requirement,
-            "/repo",
+            _repository.Root,
             artifact,
             context,
             new SarifEvidenceLimits(4096, 4, 10));
@@ -61,12 +76,11 @@ public sealed class SarifEvidenceReaderTests
             tool: "Acme.Scanner",
             runId: "assessment-42",
             results: "[{\"ruleId\":\"A\"},{\"ruleId\":\"B\"}]");
-        var fileSystem = new FakeArchitectureFileSystem();
-        fileSystem.AddFile("/repo/scan.sarif", json, DateTime.UtcNow);
+        _repository.AddUtf8File("scan.sarif", json);
 
-        SarifEvidenceReadResult result = new SarifEvidenceReader(fileSystem).Read(
+        SarifEvidenceReadResult result = new SarifEvidenceReader().Read(
             Requirement(),
-            "/repo",
+            _repository.Root,
             new SarifEvidenceArtifactReference("scan.sarif", "external.scan"),
             new SarifEvidenceAssessmentContext("repo", "revision", null),
             new SarifEvidenceLimits(4096, 4, 10));
@@ -87,12 +101,11 @@ public sealed class SarifEvidenceReaderTests
         string json,
         SarifEvidenceTrustStatus expectedStatus)
     {
-        var fileSystem = new FakeArchitectureFileSystem();
-        fileSystem.AddFile("/repo/scan.sarif", json, DateTime.UtcNow);
+        _repository.AddUtf8File("scan.sarif", json);
 
-        SarifEvidenceReadResult result = new SarifEvidenceReader(fileSystem).Read(
+        SarifEvidenceReadResult result = new SarifEvidenceReader().Read(
             Requirement(),
-            "/repo",
+            _repository.Root,
             new SarifEvidenceArtifactReference("scan.sarif", "external.scan"),
             new SarifEvidenceAssessmentContext("repo", "revision"),
             new SarifEvidenceLimits(4096, 4, 10));
@@ -107,16 +120,14 @@ public sealed class SarifEvidenceReaderTests
         string missing = Sarif("Other.Scanner", "assessment-42", results: "[]");
         string ambiguous =
             $"{{\"version\":\"2.1.0\",\"runs\":[{RunObject("Acme.Scanner", "assessment-42", results: "[]")},{RunObject("Acme.Scanner", "assessment-42", results: "[]")}]}}";
-
-        var fileSystem = new FakeArchitectureFileSystem();
-        fileSystem.AddFile("/repo/missing.sarif", missing, DateTime.UtcNow);
-        fileSystem.AddFile("/repo/ambiguous.sarif", ambiguous, DateTime.UtcNow);
-        var reader = new SarifEvidenceReader(fileSystem);
+        _repository.AddUtf8File("missing.sarif", missing);
+        _repository.AddUtf8File("ambiguous.sarif", ambiguous);
+        var reader = new SarifEvidenceReader();
 
         SarifEvidenceReadResult missingResult = reader.Read(
-            Requirement(), "/repo", new SarifEvidenceArtifactReference("missing.sarif", "external.scan"));
+            Requirement(), _repository.Root, new SarifEvidenceArtifactReference("missing.sarif", "external.scan"));
         SarifEvidenceReadResult ambiguousResult = reader.Read(
-            Requirement(), "/repo", new SarifEvidenceArtifactReference("ambiguous.sarif", "external.scan"));
+            Requirement(), _repository.Root, new SarifEvidenceArtifactReference("ambiguous.sarif", "external.scan"));
 
         Assert.Multiple(() =>
         {
@@ -136,11 +147,10 @@ public sealed class SarifEvidenceReaderTests
             ? "{}"
             : $"{{\"executionSuccessful\":{executionValue}}}";
         string json = Sarif("Acme.Scanner", "assessment-42", invocation: invocation);
-        var fileSystem = new FakeArchitectureFileSystem();
-        fileSystem.AddFile("/repo/scan.sarif", json, DateTime.UtcNow);
+        _repository.AddUtf8File("scan.sarif", json);
 
-        SarifEvidenceReadResult result = new SarifEvidenceReader(fileSystem).Read(
-            Requirement(), "/repo", new SarifEvidenceArtifactReference("scan.sarif", "external.scan"));
+        SarifEvidenceReadResult result = new SarifEvidenceReader().Read(
+            Requirement(), _repository.Root, new SarifEvidenceArtifactReference("scan.sarif", "external.scan"));
 
         Assert.That(result.Status, Is.EqualTo(expectedStatus));
     }
@@ -153,7 +163,7 @@ public sealed class SarifEvidenceReaderTests
 
         SarifEvidenceReadResult result = new SarifEvidenceReader().Read(
             requirement,
-            "/repo",
+            _repository.Root,
             artifact: null,
             expectedContext: new SarifEvidenceAssessmentContext(),
             limits: new SarifEvidenceLimits(4096, 4, 10));
@@ -171,19 +181,50 @@ public sealed class SarifEvidenceReaderTests
     public void Read_EquivalentBytesAndContext_ProduceEqualProvenance()
     {
         string json = Sarif("Acme.Scanner", "assessment-42", results: "[]");
-        var firstFileSystem = new FakeArchitectureFileSystem();
-        var secondFileSystem = new FakeArchitectureFileSystem();
-        firstFileSystem.AddFile("/repo/reports/scan.sarif", json, DateTime.UtcNow);
-        secondFileSystem.AddFile("/repo/reports/scan.sarif", json, DateTime.UtcNow.AddDays(2));
+        _repository.AddUtf8File("reports/scan.sarif", json);
+        using var secondRepository = new SarifEvidenceTestRepository();
+        secondRepository.AddUtf8File("reports/scan.sarif", json);
         var artifact = new SarifEvidenceArtifactReference("reports/scan.sarif", "external.scan");
         var context = new SarifEvidenceAssessmentContext("repo", "revision", null);
-        var readerA = new SarifEvidenceReader(firstFileSystem);
-        var readerB = new SarifEvidenceReader(secondFileSystem);
 
-        SarifEvidenceProvenance first = readerA.Read(Requirement(), "/repo", artifact, context).Provenance;
-        SarifEvidenceProvenance second = readerB.Read(Requirement(), "/repo", artifact, context).Provenance;
+        SarifEvidenceProvenance first = new SarifEvidenceReader()
+            .Read(Requirement(), _repository.Root, artifact, context).Provenance;
+        SarifEvidenceProvenance second = new SarifEvidenceReader()
+            .Read(Requirement(), secondRepository.Root, artifact, context).Provenance;
 
         Assert.That(second, Is.EqualTo(first));
+    }
+
+    [Test]
+    public void Read_HashesExactArtifactBytesWithoutTextRoundTrip()
+    {
+        byte[] artifactBytes = [0xFF, 0x00, 0xFE, 0x7B, 0x7D];
+        _repository.AddFile("binary.sarif", artifactBytes);
+
+        SarifEvidenceReadResult result = new SarifEvidenceReader().Read(
+            Requirement(), _repository.Root, new SarifEvidenceArtifactReference("binary.sarif", "external.scan"));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(result.Status, Is.EqualTo(SarifEvidenceTrustStatus.MalformedInput));
+            Assert.That(result.ArtifactSha256, Is.EqualTo(
+                Convert.ToHexStringLower(System.Security.Cryptography.SHA256.HashData(artifactBytes))));
+        });
+    }
+
+    [Test]
+    public void Read_LegacyTextOnlyFileSystem_FailsClosedInsteadOfReencodingBytes()
+    {
+        _repository.AddUtf8File("scan.sarif", Sarif("Acme.Scanner", "assessment-42"));
+
+        SarifEvidenceReadResult result = new SarifEvidenceReader(new LegacyTextOnlyFileSystem()).Read(
+            Requirement(), _repository.Root, new SarifEvidenceArtifactReference("scan.sarif", "external.scan"));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(result.Status, Is.EqualTo(SarifEvidenceTrustStatus.UnreadableInput));
+            Assert.That(result.ArtifactSha256, Is.Null);
+        });
     }
 
     private static ArchitectureExternalEvidenceRequirement Requirement() => new()
@@ -216,4 +257,25 @@ public sealed class SarifEvidenceReaderTests
         string results = "[]",
         string invocation = "{\"executionSuccessful\":true}") =>
         $"{{\"tool\":{{\"driver\":{{\"name\":\"{tool}\",\"version\":\"7.2\"}}}},\"automationDetails\":{{\"id\":\"{runId}\"}},\"invocations\":[{invocation}],\"versionControlProvenance\":[{{\"repositoryUri\":\"{repository}\",\"revisionId\":\"{revision}\"}}],\"results\":{results}}}";
+
+    private sealed class LegacyTextOnlyFileSystem : IArchitectureFileSystem
+    {
+        public bool FileExists(string path) => ArchitectureFileSystem.Real.FileExists(path);
+
+        public string ReadAllText(string path) => ArchitectureFileSystem.Real.ReadAllText(path);
+
+        public IEnumerable<string> ReadLines(string path) => ArchitectureFileSystem.Real.ReadLines(path);
+
+        public bool DirectoryExists(string path) => ArchitectureFileSystem.Real.DirectoryExists(path);
+
+        public IEnumerable<string> EnumerateFiles(string path, string searchPattern, SearchOption searchOption) =>
+            ArchitectureFileSystem.Real.EnumerateFiles(path, searchPattern, searchOption);
+
+        public IEnumerable<string> EnumerateDirectories(string path, string searchPattern, SearchOption searchOption) =>
+            ArchitectureFileSystem.Real.EnumerateDirectories(path, searchPattern, searchOption);
+
+        public DateTime GetLastWriteTimeUtc(string path) => ArchitectureFileSystem.Real.GetLastWriteTimeUtc(path);
+
+        public string GetCurrentDirectory() => ArchitectureFileSystem.Real.GetCurrentDirectory();
+    }
 }
