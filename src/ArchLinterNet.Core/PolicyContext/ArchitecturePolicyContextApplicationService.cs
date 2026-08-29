@@ -409,26 +409,51 @@ public sealed class ArchitecturePolicyContextApplicationService(IArchitecturePol
         ArchitectureContractCatalog catalog,
         ArchitectureContractDocument document)
     {
-        return catalog.Descriptors
-            .SelectMany(descriptor => GetIgnoredViolations(descriptor.Contract)
-                .Where(ignored => ignored.HasStructuredWaiverFields)
-                .Select(ignored => new ArchitecturePolicyContextWaiver(
-                    descriptor.Mode,
-                    descriptor.Family,
-                    descriptor.Id ?? descriptor.Name,
-                    descriptor.Name,
-                    ignored.WaiverId ?? string.Empty,
-                    ignored.Target?.Fingerprint ?? string.Empty,
-                    ignored.Owner,
-                    ignored.Issue,
-                    ignored.Introduced,
-                    ignored.Expires,
-                    ignored.Reason,
-                    ProjectProvenance(document.Provenance.LocationFor(ignored)))))
+        var declarations = new Dictionary<ArchitectureIgnoredViolation, ArchitectureContractDescriptor>(
+            ReferenceEqualityComparer.Instance);
+
+        foreach (ArchitectureContractDescriptor descriptor in catalog.Descriptors)
+        {
+            foreach (ArchitectureIgnoredViolation ignored in GetIgnoredViolations(descriptor.Contract)
+                         .Where(ignored => ignored.HasStructuredWaiverFields))
+            {
+                // Source-set expansion clones the list but retains each authored waiver object.
+                // The generated descriptors are execution aliases, not separate declarations.
+                declarations.TryAdd(ignored, descriptor);
+            }
+        }
+
+        return declarations
+            .Select(declaration => ProjectWaiver(declaration.Value, declaration.Key, document))
             .OrderBy(waiver => waiver.WaiverId, StringComparer.Ordinal)
             .ThenBy(waiver => waiver.ContractFamily, StringComparer.Ordinal)
             .ThenBy(waiver => waiver.ContractId, StringComparer.Ordinal)
             .ToArray();
+    }
+
+    private static ArchitecturePolicyContextWaiver ProjectWaiver(
+        ArchitectureContractDescriptor descriptor,
+        ArchitectureIgnoredViolation ignored,
+        ArchitectureContractDocument document)
+    {
+        string contractId = descriptor.AuthoredId ?? descriptor.Id ?? descriptor.Name;
+        string contractName = descriptor.Contract is IArchitectureSourceExpandableContract { ExpansionOrigin: { } origin }
+            ? origin.AuthoredContractName
+            : descriptor.Name;
+
+        return new ArchitecturePolicyContextWaiver(
+            descriptor.Mode,
+            descriptor.Family,
+            contractId,
+            contractName,
+            ignored.WaiverId ?? string.Empty,
+            ignored.Target?.Fingerprint ?? string.Empty,
+            ignored.Owner,
+            ignored.Issue,
+            ignored.Introduced,
+            ignored.Expires,
+            ignored.Reason,
+            ProjectProvenance(document.Provenance.LocationFor(ignored)));
     }
 
     private static IEnumerable<ArchitectureIgnoredViolation> GetIgnoredViolations(IArchitectureContract contract)

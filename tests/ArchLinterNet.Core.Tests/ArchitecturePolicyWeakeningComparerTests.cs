@@ -571,9 +571,10 @@ public sealed class ArchitecturePolicyWeakeningComparerTests
     [Test]
     public void Compare_ChangedStructuredWaiverTarget_IsImpactNotProven()
     {
-        ArchitecturePolicyWeakeningFinding finding = ArchitecturePolicyWeakeningComparer.Compare(new(
+        ArchitecturePolicyWeakeningResult result = ArchitecturePolicyWeakeningComparer.Compare(new(
             Context(waivers: [Waiver("ARCH-IGN-001", "sha256:" + new string('a', 64))]),
-            Context(waivers: [Waiver("ARCH-IGN-001", "sha256:" + new string('b', 64))]))).Findings.Single();
+            Context(waivers: [Waiver("ARCH-IGN-001", "sha256:" + new string('b', 64))])));
+        ArchitecturePolicyWeakeningFinding finding = result.Findings.Single();
 
         Assert.Multiple(() =>
         {
@@ -587,7 +588,7 @@ public sealed class ArchitecturePolicyWeakeningComparerTests
     {
         ArchitecturePolicyWeakeningResult result = ArchitecturePolicyWeakeningComparer.Compare(new(
             Context(waivers: [Waiver("ARCH-IGN-001", "sha256:" + new string('a', 64), "2026-09-01")]),
-            Context(waivers: [Waiver("ARCH-IGN-001", "sha256:" + new string('a', 64), "2027-09-01")]));
+            Context(waivers: [Waiver("ARCH-IGN-001", "sha256:" + new string('a', 64), "2027-09-01")])));
         ArchitecturePolicyWeakeningFinding finding = result.Findings.Single();
 
         Assert.Multiple(() =>
