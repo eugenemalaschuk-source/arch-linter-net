@@ -199,12 +199,11 @@ jobs:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: ${{ steps.coverage_reports.outputs.files }}
           disable_search: true
-          fail_ci_if_error: false
+          fail_ci_if_error: true
 
       - name: End SonarCloud analysis
         id: sonar_end
         if: success() && steps.sonar_begin.outcome == 'success'
-        continue-on-error: true
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
         shell: bash
@@ -221,4 +220,5 @@ jobs:
             echo "- .NET coverage shards: ${{ needs.dotnet_coverage.result }}"
             echo "- Sonar scanner completion: ${{ steps.sonar_end.outcome || 'skipped' }}"
             echo "- Codecov reports: ${{ steps.coverage_reports.outputs.files != '' && 'found' || 'not found' }}"
+            echo "- README main-quality, Sonar and Codecov badges are expected to represent this merged revision after successful uploads."
           } >> "$GITHUB_STEP_SUMMARY"
