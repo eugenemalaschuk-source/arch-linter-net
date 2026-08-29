@@ -6,7 +6,7 @@ using NUnit.Framework;
 namespace ArchLinterNet.Core.Tests;
 
 [TestFixture]
-public sealed class ArchitecturePolicyWeakeningComparerTests
+public sealed partial class ArchitecturePolicyWeakeningComparerTests
 {
     [Test]
     public void Compare_StrictToSameControlAudit_ReportsSemanticDowngradeWithImportedProvenance()

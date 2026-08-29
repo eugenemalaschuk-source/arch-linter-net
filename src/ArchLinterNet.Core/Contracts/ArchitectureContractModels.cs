@@ -38,6 +38,8 @@ public sealed class ArchitectureContractDocument
     [YamlMember(Alias = "classification")]
     public ArchitectureClassificationConfiguration Classification { get; set; } = new();
 
+    [YamlMember(Alias = "topology")] public ArchitectureTopology? Topology { get; set; }
+
     // Not YAML-bound (deliberately: classification.path itself stays unbound/inert, see
     // ArchitectureClassificationConfiguration) — set post-deserialization by ArchitecturePolicyDocumentLoader
     // from a raw-YAML presence check when classification.path declares at least one entry.

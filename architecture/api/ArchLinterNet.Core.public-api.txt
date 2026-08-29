@@ -73,6 +73,12 @@ class ArchLinterNet.Core.Contracts.ArchitecturePolicyImportException [sealed]
 class ArchLinterNet.Core.Contracts.ArchitecturePolicyProvenanceIndex [sealed]
 class ArchLinterNet.Core.Contracts.ArchitectureSourceExpandableContractBase [abstract]
 class ArchLinterNet.Core.Contracts.ArchitectureSourceSet [sealed]
+class ArchLinterNet.Core.Contracts.ArchitectureTopology [sealed]
+class ArchLinterNet.Core.Contracts.ArchitectureTopologyEdge [sealed]
+class ArchLinterNet.Core.Contracts.ArchitectureTopologyNode [sealed]
+class ArchLinterNet.Core.Contracts.ArchitectureTopologyOutOfScopeDeclaration [sealed]
+class ArchLinterNet.Core.Contracts.ArchitectureTopologyScope [sealed]
+class ArchLinterNet.Core.Contracts.ArchitectureTopologySubjectSelector [sealed]
 class ArchLinterNet.Core.Contracts.ArchitectureWaiverProfile [static]
 class ArchLinterNet.Core.Contracts.ArchitectureWaiverTarget [sealed]
 class ArchLinterNet.Core.Contracts.ConditionSetResolutionService [sealed]
@@ -303,6 +309,11 @@ class ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextSelector [sealed
 class ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextSource [sealed]
 class ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextSourceExpansion [sealed]
 class ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextSourceSet [sealed]
+class ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextTopology [sealed]
+class ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextTopologyEdge [sealed]
+class ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextTopologyNode [sealed]
+class ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextTopologyOutOfScope [sealed]
+class ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextTopologySelector [sealed]
 class ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextValue [sealed]
 class ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextWaiver [sealed]
 class ArchLinterNet.Core.PolicyWeakening.ArchitecturePolicyContractMembership [sealed]
@@ -583,7 +594,7 @@ const ArchLinterNet.Core.Model.ExpressionParticipationResult.NotMatched: ArchLin
 const ArchLinterNet.Core.Model.PublicApiDeltaKind.Added: ArchLinterNet.Core.Model.PublicApiDeltaKind [value:0]
 const ArchLinterNet.Core.Model.PublicApiDeltaKind.Changed: ArchLinterNet.Core.Model.PublicApiDeltaKind [value:2]
 const ArchLinterNet.Core.Model.PublicApiDeltaKind.Removed: ArchLinterNet.Core.Model.PublicApiDeltaKind [value:1]
-const ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextExport.CurrentSchemaVersion: System.Int32 [value:4]
+const ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextExport.CurrentSchemaVersion: System.Int32 [value:5]
 const ArchLinterNet.Core.PolicyWeakening.ArchitecturePolicyMembershipEvidence.CurrentSchemaVersion: System.Int32 [value:1]
 const ArchLinterNet.Core.PolicyWeakening.ArchitecturePolicyMembershipEvidence.EvidenceKind: System.String [value:"architecture-policy-membership"]
 const ArchLinterNet.Core.PolicyWeakening.ArchitecturePolicyWeakeningResult.CurrentSchemaVersion: System.Int32 [value:1]
@@ -656,6 +667,12 @@ ctor ArchLinterNet.Core.Contracts.ArchitecturePolicyImportException(System.Objec
 ctor ArchLinterNet.Core.Contracts.ArchitecturePolicyImportException(System.Object, System.String, System.Object)
 ctor ArchLinterNet.Core.Contracts.ArchitectureSourceExpandableContractBase() [visibility:protected]
 ctor ArchLinterNet.Core.Contracts.ArchitectureSourceSet()
+ctor ArchLinterNet.Core.Contracts.ArchitectureTopology()
+ctor ArchLinterNet.Core.Contracts.ArchitectureTopologyEdge()
+ctor ArchLinterNet.Core.Contracts.ArchitectureTopologyNode()
+ctor ArchLinterNet.Core.Contracts.ArchitectureTopologyOutOfScopeDeclaration()
+ctor ArchLinterNet.Core.Contracts.ArchitectureTopologyScope()
+ctor ArchLinterNet.Core.Contracts.ArchitectureTopologySubjectSelector()
 ctor ArchLinterNet.Core.Contracts.ArchitectureWaiverTarget()
 ctor ArchLinterNet.Core.Contracts.ConditionSetResolutionService()
 ctor ArchLinterNet.Core.Contracts.Families.ArchitectureAcyclicSiblingContract()
@@ -879,6 +896,11 @@ ctor ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextSelector(System.S
 ctor ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextSource(System.String, System.String, System.Int32, System.String, System.String, System.Collections.Generic.IReadOnlyList`1[System.String])
 ctor ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextSourceExpansion(System.String, System.String, System.String, System.String, System.String, System.Collections.Generic.IReadOnlyList`1[System.String], System.Boolean, System.String, ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextProvenance, System.Collections.Generic.IReadOnlyList`1[ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextExpandedInstance], System.Collections.Generic.IReadOnlyList`1[ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextExpandedInstance], System.Collections.Generic.IReadOnlyList`1[ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextExpandedExclusion])
 ctor ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextSourceSet(System.String, System.String, System.Collections.Generic.IReadOnlyList`1[System.String], System.Boolean, System.String, ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextProvenance)
+ctor ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextTopology(System.String, System.String, System.Boolean, System.Collections.Generic.IReadOnlyList`1[ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextTopologySelector], System.Collections.Generic.IReadOnlyList`1[ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextTopologyNode], System.Collections.Generic.IReadOnlyList`1[ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextTopologyEdge], System.Collections.Generic.IReadOnlyList`1[ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextTopologyOutOfScope], System.Boolean, ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextProvenance)
+ctor ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextTopologyEdge(System.String, System.String, ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextProvenance)
+ctor ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextTopologyNode(System.String, System.Collections.Generic.IReadOnlyList`1[ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextTopologySelector], ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextProvenance)
+ctor ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextTopologyOutOfScope(System.String, ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextTopologySelector, System.String, ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextProvenance)
+ctor ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextTopologySelector(System.String, System.String, System.String, ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextSelector, ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextProvenance)
 ctor ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextValue(System.String, System.Collections.Generic.IReadOnlyList`1[System.String])
 ctor ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextWaiver(System.String, System.String, System.String, System.String, System.String, System.String, System.String, System.String, System.String, System.String, System.String, ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextProvenance)
 ctor ArchLinterNet.Core.PolicyWeakening.ArchitecturePolicyContractMembership(System.String, System.String, System.Collections.Generic.IReadOnlyList`1[System.String])
@@ -1805,6 +1827,7 @@ property ArchLinterNet.Core.Contracts.ArchitectureContractDocument.Packages: Sys
 property ArchLinterNet.Core.Contracts.ArchitectureContractDocument.Provenance: ArchLinterNet.Core.Contracts.ArchitecturePolicyProvenanceIndex [get, set:internal]
 property ArchLinterNet.Core.Contracts.ArchitectureContractDocument.SourceExpansion: ArchLinterNet.Core.Model.ArchitectureSourceExpansionInventory [get, set:internal]
 property ArchLinterNet.Core.Contracts.ArchitectureContractDocument.SourceSets: System.Collections.Generic.Dictionary`2[System.String,ArchLinterNet.Core.Contracts.ArchitectureSourceSet] [get, set]
+property ArchLinterNet.Core.Contracts.ArchitectureContractDocument.Topology: ArchLinterNet.Core.Contracts.ArchitectureTopology [get, set]
 property ArchLinterNet.Core.Contracts.ArchitectureContractDocument.Version: System.Int32 [get, set]
 property ArchLinterNet.Core.Contracts.ArchitectureExternalDependencyGroup.NamespacePrefixes: System.Collections.Generic.List`1[System.String] [get, set]
 property ArchLinterNet.Core.Contracts.ArchitectureExternalDependencyGroup.TypePrefixes: System.Collections.Generic.List`1[System.String] [get, set]
@@ -1874,6 +1897,28 @@ property ArchLinterNet.Core.Contracts.ArchitectureSourceSet.Kind: ArchLinterNet.
 property ArchLinterNet.Core.Contracts.ArchitectureSourceSet.Members: System.Collections.Generic.List`1[System.String] [get, set]
 property ArchLinterNet.Core.Contracts.ArchitectureSourceSet.Optional: System.Boolean [get, set]
 property ArchLinterNet.Core.Contracts.ArchitectureSourceSet.Reason: System.String [get, set]
+property ArchLinterNet.Core.Contracts.ArchitectureTopology.AllowedEdges: System.Collections.Generic.List`1[ArchLinterNet.Core.Contracts.ArchitectureTopologyEdge] [get, set]
+property ArchLinterNet.Core.Contracts.ArchitectureTopology.Mode: System.String [get, set]
+property ArchLinterNet.Core.Contracts.ArchitectureTopology.Nodes: System.Collections.Generic.List`1[ArchLinterNet.Core.Contracts.ArchitectureTopologyNode] [get, set]
+property ArchLinterNet.Core.Contracts.ArchitectureTopology.OutOfScope: System.Collections.Generic.List`1[ArchLinterNet.Core.Contracts.ArchitectureTopologyOutOfScopeDeclaration] [get, set]
+property ArchLinterNet.Core.Contracts.ArchitectureTopology.Scope: ArchLinterNet.Core.Contracts.ArchitectureTopologyScope [get, set]
+property ArchLinterNet.Core.Contracts.ArchitectureTopology.StaleDeclarations: System.Boolean [get, set]
+property ArchLinterNet.Core.Contracts.ArchitectureTopology.SubjectKind: System.String [get, set]
+property ArchLinterNet.Core.Contracts.ArchitectureTopologyEdge.From: System.String [get, set]
+property ArchLinterNet.Core.Contracts.ArchitectureTopologyEdge.To: System.String [get, set]
+property ArchLinterNet.Core.Contracts.ArchitectureTopologyNode.Id: System.String [get, set]
+property ArchLinterNet.Core.Contracts.ArchitectureTopologyNode.Mappings: System.Collections.Generic.List`1[ArchLinterNet.Core.Contracts.ArchitectureTopologySubjectSelector] [get, set]
+property ArchLinterNet.Core.Contracts.ArchitectureTopologyOutOfScopeDeclaration.Id: System.String [get, set]
+property ArchLinterNet.Core.Contracts.ArchitectureTopologyOutOfScopeDeclaration.Reason: System.String [get, set]
+property ArchLinterNet.Core.Contracts.ArchitectureTopologyOutOfScopeDeclaration.Selector: ArchLinterNet.Core.Contracts.ArchitectureTopologySubjectSelector [get, set]
+property ArchLinterNet.Core.Contracts.ArchitectureTopologyScope.AllowEmpty: System.Boolean [get, set]
+property ArchLinterNet.Core.Contracts.ArchitectureTopologyScope.Selectors: System.Collections.Generic.List`1[ArchLinterNet.Core.Contracts.ArchitectureTopologySubjectSelector] [get, set]
+property ArchLinterNet.Core.Contracts.ArchitectureTopologySubjectSelector.Assembly: System.String [get, set]
+property ArchLinterNet.Core.Contracts.ArchitectureTopologySubjectSelector.Context: ArchLinterNet.Core.Contracts.ArchitectureContextSelector [get, set]
+property ArchLinterNet.Core.Contracts.ArchitectureTopologySubjectSelector.Layer: System.String [get, set]
+property ArchLinterNet.Core.Contracts.ArchitectureTopologySubjectSelector.Namespace: System.String [get, set]
+property ArchLinterNet.Core.Contracts.ArchitectureTopologySubjectSelector.NamespaceSuffix: System.String [get, set]
+property ArchLinterNet.Core.Contracts.ArchitectureTopologySubjectSelector.Project: System.String [get, set]
 property ArchLinterNet.Core.Contracts.ArchitectureWaiverTarget.Fingerprint: System.String [get, set]
 property ArchLinterNet.Core.Contracts.Families.ArchitectureAcyclicSiblingContract.Ancestors: System.Collections.Generic.List`1[System.String] [get, set]
 property ArchLinterNet.Core.Contracts.Families.ArchitectureAcyclicSiblingContract.Id: System.String [virtual, get, set]
@@ -3084,6 +3129,7 @@ property ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextExport.Semant
 property ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextExport.SourceExpansions: System.Collections.Generic.IReadOnlyList`1[ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextSourceExpansion] [get, init]
 property ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextExport.SourceSets: System.Collections.Generic.IReadOnlyList`1[ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextSourceSet] [get, init]
 property ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextExport.Sources: System.Collections.Generic.IReadOnlyList`1[ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextSource] [get, init]
+property ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextExport.Topology: ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextTopology [get, init]
 property ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextExport.WaiverLifecycleProfile: System.String [get, init]
 property ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextExport.Waivers: System.Collections.Generic.IReadOnlyList`1[ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextWaiver] [get, init]
 property ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextGuardrails.PolicyWeakening: System.String [get, init]
@@ -3136,6 +3182,30 @@ property ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextSourceSet.Opt
 property ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextSourceSet.Provenance: ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextProvenance [get, init]
 property ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextSourceSet.Reason: System.String [get, init]
 property ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextSourceSet.ResolvedSources: System.Collections.Generic.IReadOnlyList`1[System.String] [get, init]
+property ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextTopology.AllowedEdges: System.Collections.Generic.IReadOnlyList`1[ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextTopologyEdge] [get, init]
+property ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextTopology.Mode: System.String [get, init]
+property ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextTopology.Nodes: System.Collections.Generic.IReadOnlyList`1[ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextTopologyNode] [get, init]
+property ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextTopology.OutOfScope: System.Collections.Generic.IReadOnlyList`1[ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextTopologyOutOfScope] [get, init]
+property ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextTopology.Provenance: ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextProvenance [get, init]
+property ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextTopology.ScopeAllowsEmpty: System.Boolean [get, init]
+property ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextTopology.ScopeSelectors: System.Collections.Generic.IReadOnlyList`1[ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextTopologySelector] [get, init]
+property ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextTopology.StaleDeclarations: System.Boolean [get, init]
+property ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextTopology.SubjectKind: System.String [get, init]
+property ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextTopologyEdge.From: System.String [get, init]
+property ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextTopologyEdge.Provenance: ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextProvenance [get, init]
+property ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextTopologyEdge.To: System.String [get, init]
+property ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextTopologyNode.Id: System.String [get, init]
+property ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextTopologyNode.Mappings: System.Collections.Generic.IReadOnlyList`1[ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextTopologySelector] [get, init]
+property ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextTopologyNode.Provenance: ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextProvenance [get, init]
+property ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextTopologyOutOfScope.Id: System.String [get, init]
+property ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextTopologyOutOfScope.Provenance: ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextProvenance [get, init]
+property ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextTopologyOutOfScope.Reason: System.String [get, init]
+property ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextTopologyOutOfScope.Selector: ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextTopologySelector [get, init]
+property ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextTopologySelector.Context: ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextSelector [get, init]
+property ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextTopologySelector.Kind: System.String [get, init]
+property ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextTopologySelector.NamespaceSuffix: System.String [get, init]
+property ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextTopologySelector.Provenance: ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextProvenance [get, init]
+property ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextTopologySelector.Value: System.String [get, init]
 property ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextValue.Key: System.String [get, init]
 property ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextValue.Values: System.Collections.Generic.IReadOnlyList`1[System.String] [get, init]
 property ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextWaiver.ContractFamily: System.String [get, init]

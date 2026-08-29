@@ -22,6 +22,7 @@ Supported policy features include:
 - exact role/metadata selectors, with namespace + selector using AND semantics;
 - explicit external dependency, NuGet package, and framework-reference groups;
 - reusable bounded `source_sets` for layers, assemblies, and projects;
+- opt-in native declared topology with stable nodes, bounded mappings, directional edges, explicit partial/exhaustive scope, and reviewed out-of-scope declarations;
 - project/solution discovery, source roots, condition sets, and build selectors;
 - strict and audit contract groups;
 - narrow ignored violations and reviewed migration baselines;

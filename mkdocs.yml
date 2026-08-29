@@ -31,6 +31,7 @@ nav:
       - Policy format: policy-format/index.md
       - Policy imports: policy-format/imports.md
       - Layers and namespace patterns: policy-format/layers-and-namespaces.md
+      - Declared topology: policy-format/declared-topology.md
       - External dependencies: policy-format/external-dependencies.md
       - Package dependencies: policy-format/package-dependencies.md
       - Project metadata: policy-format/project-metadata.md

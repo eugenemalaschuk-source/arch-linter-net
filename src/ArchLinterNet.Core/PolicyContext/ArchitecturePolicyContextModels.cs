@@ -26,13 +26,16 @@ public sealed record ArchitecturePolicyContextExport(
     IReadOnlyList<string> Guidance)
 {
     /// <summary>Current supported policy-context schema version.</summary>
-    public const int CurrentSchemaVersion = 4;
+    public const int CurrentSchemaVersion = 5;
 
     /// <summary>Gets the resolved static waiver-lifecycle profile.</summary>
     public string WaiverLifecycleProfile { get; init; } = "compatibility";
 
     /// <summary>Gets the structured waiver declarations present in the effective policy.</summary>
     public IReadOnlyList<ArchitecturePolicyContextWaiver> Waivers { get; init; } = Array.Empty<ArchitecturePolicyContextWaiver>();
+
+    /// <summary>Gets the optional native declared topology from the effective policy.</summary>
+    public ArchitecturePolicyContextTopology? Topology { get; init; }
 }
 
 /// <summary>Identifies the effective policy that produced a context export.</summary>
@@ -189,6 +192,45 @@ public sealed record ArchitecturePolicyContextWaiver(
     string? Issue,
     string? Introduced,
     string? Expires,
+    string Reason,
+    ArchitecturePolicyContextProvenance? Provenance);
+
+/// <summary>Typed, static projection of one native declared topology.</summary>
+public sealed record ArchitecturePolicyContextTopology(
+    string Mode,
+    string SubjectKind,
+    bool ScopeAllowsEmpty,
+    IReadOnlyList<ArchitecturePolicyContextTopologySelector> ScopeSelectors,
+    IReadOnlyList<ArchitecturePolicyContextTopologyNode> Nodes,
+    IReadOnlyList<ArchitecturePolicyContextTopologyEdge> AllowedEdges,
+    IReadOnlyList<ArchitecturePolicyContextTopologyOutOfScope> OutOfScope,
+    bool StaleDeclarations,
+    ArchitecturePolicyContextProvenance? Provenance);
+
+/// <summary>One topology selector represented without parsing or evaluating it.</summary>
+public sealed record ArchitecturePolicyContextTopologySelector(
+    string Kind,
+    string Value,
+    string NamespaceSuffix,
+    ArchitecturePolicyContextSelector? Context,
+    ArchitecturePolicyContextProvenance? Provenance);
+
+/// <summary>One declared topology node and its effective mapping selectors.</summary>
+public sealed record ArchitecturePolicyContextTopologyNode(
+    string Id,
+    IReadOnlyList<ArchitecturePolicyContextTopologySelector> Mappings,
+    ArchitecturePolicyContextProvenance? Provenance);
+
+/// <summary>One permitted direction between topology nodes.</summary>
+public sealed record ArchitecturePolicyContextTopologyEdge(
+    string From,
+    string To,
+    ArchitecturePolicyContextProvenance? Provenance);
+
+/// <summary>One reviewable exclusion from an otherwise declared topology universe.</summary>
+public sealed record ArchitecturePolicyContextTopologyOutOfScope(
+    string Id,
+    ArchitecturePolicyContextTopologySelector Selector,
     string Reason,
     ArchitecturePolicyContextProvenance? Provenance);
 

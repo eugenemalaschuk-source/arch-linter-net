@@ -15,7 +15,8 @@
     { "required": ["legacy_runtime_layers"] },
     { "required": ["analysis"] },
     { "required": ["contracts"] },
-    { "required": ["classification"] }
+    { "required": ["classification"] },
+    { "required": ["topology"] }
   ],
   "properties": {
     "imports": {
@@ -62,6 +63,9 @@
     },
     "classification": {
       "$ref": "https://archlinternet.dev/schema/0.6.1/dependencies.arch.schema.json#/$defs/classification"
+    },
+    "topology": {
+      "$ref": "https://archlinternet.dev/schema/0.6.1/dependencies.arch.schema.json#/$defs/topology"
     }
   }
 }

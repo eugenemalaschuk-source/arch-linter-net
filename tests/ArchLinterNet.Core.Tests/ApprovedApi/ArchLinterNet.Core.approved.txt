@@ -677,6 +677,7 @@ sealed class ArchLinterNet.Core.Contracts.ArchitectureContractDocument
   property ArchLinterNet.Core.Contracts.ArchitectureAnalysisConfiguration Analysis {get;set;}
   property ArchLinterNet.Core.Contracts.ArchitectureClassificationConfiguration Classification {get;set;}
   property ArchLinterNet.Core.Contracts.ArchitecturePolicyProvenanceIndex Provenance {get;internal set;}
+  property ArchLinterNet.Core.Contracts.ArchitectureTopology? Topology {get;set;}
   property ArchLinterNet.Core.Contracts.Families.ArchitectureContractGroups Contracts {get;set;}
   property ArchLinterNet.Core.Contracts.HistoryAnalysisConfiguration HistoryAnalysis {get;set;}
   property ArchLinterNet.Core.Model.ArchitectureClassificationPathDeferredNotice? ClassificationPathDeferred {get;set;}
@@ -802,6 +803,40 @@ sealed class ArchLinterNet.Core.Contracts.ArchitectureSourceSet
   property System.Collections.Generic.List<string> Members {get;set;}
   property bool Optional {get;set;}
   property string Reason {get;set;}
+sealed class ArchLinterNet.Core.Contracts.ArchitectureTopology
+  ctor()
+  property ArchLinterNet.Core.Contracts.ArchitectureTopologyScope Scope {get;set;}
+  property System.Collections.Generic.List<ArchLinterNet.Core.Contracts.ArchitectureTopologyEdge> AllowedEdges {get;set;}
+  property System.Collections.Generic.List<ArchLinterNet.Core.Contracts.ArchitectureTopologyNode> Nodes {get;set;}
+  property System.Collections.Generic.List<ArchLinterNet.Core.Contracts.ArchitectureTopologyOutOfScopeDeclaration> OutOfScope {get;set;}
+  property bool StaleDeclarations {get;set;}
+  property string Mode {get;set;}
+  property string SubjectKind {get;set;}
+sealed class ArchLinterNet.Core.Contracts.ArchitectureTopologyEdge
+  ctor()
+  property string From {get;set;}
+  property string To {get;set;}
+sealed class ArchLinterNet.Core.Contracts.ArchitectureTopologyNode
+  ctor()
+  property System.Collections.Generic.List<ArchLinterNet.Core.Contracts.ArchitectureTopologySubjectSelector> Mappings {get;set;}
+  property string Id {get;set;}
+sealed class ArchLinterNet.Core.Contracts.ArchitectureTopologyOutOfScopeDeclaration
+  ctor()
+  property ArchLinterNet.Core.Contracts.ArchitectureTopologySubjectSelector Selector {get;set;}
+  property string Id {get;set;}
+  property string Reason {get;set;}
+sealed class ArchLinterNet.Core.Contracts.ArchitectureTopologyScope
+  ctor()
+  property System.Collections.Generic.List<ArchLinterNet.Core.Contracts.ArchitectureTopologySubjectSelector> Selectors {get;set;}
+  property bool AllowEmpty {get;set;}
+sealed class ArchLinterNet.Core.Contracts.ArchitectureTopologySubjectSelector
+  ctor()
+  property ArchLinterNet.Core.Contracts.ArchitectureContextSelector? Context {get;set;}
+  property string Assembly {get;set;}
+  property string Layer {get;set;}
+  property string Namespace {get;set;}
+  property string NamespaceSuffix {get;set;}
+  property string Project {get;set;}
 static class ArchLinterNet.Core.Contracts.ArchitectureWaiverProfile
   field const string Compatibility = "compatibility"
   field const string Strict = "strict"
@@ -3845,7 +3880,7 @@ sealed class ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextExpandedI
   property string? Source {get;init;}
 sealed class ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextExport : System.IEquatable<ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextExport>
   ctor(int SchemaVersion, string Kind, ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextPolicy Policy, ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextGuardrails Guardrails, ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextAnalysis Analysis, System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextSource> Sources, System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextLayer> Layers, System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextContract> Contracts, System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextClassification> Classification, System.Collections.Generic.IReadOnlyList<string> SemanticRoles, System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextValue> Contexts, System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextSourceSet> SourceSets, System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextSourceExpansion> SourceExpansions, System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextException> Exceptions, System.Collections.Generic.IReadOnlyList<string> Guidance)
-  field const int CurrentSchemaVersion = 4
+  field const int CurrentSchemaVersion = 5
   method ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextExport <Clone>$()
   method bool Equals(ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextExport? other)
   method bool Equals(object? obj)
@@ -3857,6 +3892,7 @@ sealed class ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextExport : 
   property ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextAnalysis Analysis {get;init;}
   property ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextGuardrails Guardrails {get;init;}
   property ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextPolicy Policy {get;init;}
+  property ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextTopology? Topology {get;init;}
   property System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextClassification> Classification {get;init;}
   property System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextContract> Contracts {get;init;}
   property System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextException> Exceptions {get;init;}
@@ -4026,6 +4062,80 @@ sealed class ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextSourceSet
   property string Kind {get;init;}
   property string Name {get;init;}
   property string Reason {get;init;}
+sealed class ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextTopology : System.IEquatable<ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextTopology>
+  ctor(string Mode, string SubjectKind, bool ScopeAllowsEmpty, System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextTopologySelector> ScopeSelectors, System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextTopologyNode> Nodes, System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextTopologyEdge> AllowedEdges, System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextTopologyOutOfScope> OutOfScope, bool StaleDeclarations, ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextProvenance? Provenance)
+  method ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextTopology <Clone>$()
+  method bool Equals(ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextTopology? other)
+  method bool Equals(object? obj)
+  method int GetHashCode()
+  method string ToString()
+  method void Deconstruct(out string Mode, out string SubjectKind, out bool ScopeAllowsEmpty, out System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextTopologySelector> ScopeSelectors, out System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextTopologyNode> Nodes, out System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextTopologyEdge> AllowedEdges, out System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextTopologyOutOfScope> OutOfScope, out bool StaleDeclarations, out ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextProvenance? Provenance)
+  operator !=(ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextTopology? left, ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextTopology? right)
+  operator ==(ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextTopology? left, ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextTopology? right)
+  property ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextProvenance? Provenance {get;init;}
+  property System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextTopologyEdge> AllowedEdges {get;init;}
+  property System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextTopologyNode> Nodes {get;init;}
+  property System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextTopologyOutOfScope> OutOfScope {get;init;}
+  property System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextTopologySelector> ScopeSelectors {get;init;}
+  property bool ScopeAllowsEmpty {get;init;}
+  property bool StaleDeclarations {get;init;}
+  property string Mode {get;init;}
+  property string SubjectKind {get;init;}
+sealed class ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextTopologyEdge : System.IEquatable<ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextTopologyEdge>
+  ctor(string From, string To, ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextProvenance? Provenance)
+  method ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextTopologyEdge <Clone>$()
+  method bool Equals(ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextTopologyEdge? other)
+  method bool Equals(object? obj)
+  method int GetHashCode()
+  method string ToString()
+  method void Deconstruct(out string From, out string To, out ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextProvenance? Provenance)
+  operator !=(ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextTopologyEdge? left, ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextTopologyEdge? right)
+  operator ==(ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextTopologyEdge? left, ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextTopologyEdge? right)
+  property ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextProvenance? Provenance {get;init;}
+  property string From {get;init;}
+  property string To {get;init;}
+sealed class ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextTopologyNode : System.IEquatable<ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextTopologyNode>
+  ctor(string Id, System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextTopologySelector> Mappings, ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextProvenance? Provenance)
+  method ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextTopologyNode <Clone>$()
+  method bool Equals(ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextTopologyNode? other)
+  method bool Equals(object? obj)
+  method int GetHashCode()
+  method string ToString()
+  method void Deconstruct(out string Id, out System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextTopologySelector> Mappings, out ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextProvenance? Provenance)
+  operator !=(ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextTopologyNode? left, ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextTopologyNode? right)
+  operator ==(ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextTopologyNode? left, ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextTopologyNode? right)
+  property ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextProvenance? Provenance {get;init;}
+  property System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextTopologySelector> Mappings {get;init;}
+  property string Id {get;init;}
+sealed class ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextTopologyOutOfScope : System.IEquatable<ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextTopologyOutOfScope>
+  ctor(string Id, ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextTopologySelector Selector, string Reason, ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextProvenance? Provenance)
+  method ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextTopologyOutOfScope <Clone>$()
+  method bool Equals(ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextTopologyOutOfScope? other)
+  method bool Equals(object? obj)
+  method int GetHashCode()
+  method string ToString()
+  method void Deconstruct(out string Id, out ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextTopologySelector Selector, out string Reason, out ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextProvenance? Provenance)
+  operator !=(ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextTopologyOutOfScope? left, ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextTopologyOutOfScope? right)
+  operator ==(ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextTopologyOutOfScope? left, ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextTopologyOutOfScope? right)
+  property ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextProvenance? Provenance {get;init;}
+  property ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextTopologySelector Selector {get;init;}
+  property string Id {get;init;}
+  property string Reason {get;init;}
+sealed class ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextTopologySelector : System.IEquatable<ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextTopologySelector>
+  ctor(string Kind, string Value, string NamespaceSuffix, ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextSelector? Context, ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextProvenance? Provenance)
+  method ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextTopologySelector <Clone>$()
+  method bool Equals(ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextTopologySelector? other)
+  method bool Equals(object? obj)
+  method int GetHashCode()
+  method string ToString()
+  method void Deconstruct(out string Kind, out string Value, out string NamespaceSuffix, out ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextSelector? Context, out ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextProvenance? Provenance)
+  operator !=(ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextTopologySelector? left, ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextTopologySelector? right)
+  operator ==(ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextTopologySelector? left, ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextTopologySelector? right)
+  property ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextProvenance? Provenance {get;init;}
+  property ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextSelector? Context {get;init;}
+  property string Kind {get;init;}
+  property string NamespaceSuffix {get;init;}
+  property string Value {get;init;}
 sealed class ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextValue : System.IEquatable<ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextValue>
   ctor(string Key, System.Collections.Generic.IReadOnlyList<string> Values)
   method ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextValue <Clone>$()

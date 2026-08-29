@@ -39,6 +39,21 @@
     },
     "unsupported": ["regular expressions", "wildcards in layer namespace definitions", "assembly-only layer definitions"]
   },
+  "declaredTopology": {
+    "declaration": "Optional topology with an explicit subject_kind, partial or exhaustive mode, a non-empty policy-owned scope, stable nodes, directional allowed edges, and reviewed out_of_scope declarations.",
+    "mappingSelectors": ["layer", "namespace with optional namespace_suffix", "project", "assembly", "semantic context"],
+    "guarantees": [
+      "Every selector has exactly one primary selector form.",
+      "Topology node identifiers and declared mappings are unique.",
+      "The later evaluator receives an explicit scoped universe instead of inferring applicability from empty findings.",
+      "Out-of-scope declarations carry a stable identifier and non-empty review reason."
+    ],
+    "deferred": [
+      "observed-subject mapping and dependency-edge evaluation",
+      "unmapped, ambiguous, stale-declaration, and unexpected-empty diagnostics",
+      "external diagram adapters"
+    ]
+  },
   "sourceSets": {
     "declaration": "Document-level source_sets.<name> with kind (assembly | layer | project), explicit members, constrained globs, and an optional/reason pair.",
     "globUniverse": {

@@ -4,9 +4,7 @@
 Define deterministic control-level applicability evidence for v0.8 governance
 families without conflating proven evaluability with policy configuration or
 architecture quality.
-
 ## Requirements
-
 ### Requirement: Effective controls have explicit applicability membership
 The effective-policy/control projection SHALL materialize one canonical expected
 applicability-membership entry for every effective v0.8 control whose family
@@ -136,8 +134,7 @@ inferred to mean `evaluable`.
   not interpret the record as a valid applicability outcome
 
 ### Requirement: Unassessable state preserves stable reason and provenance
-A valid `unassessable` record or an unassessable joined collection-integrity
-outcome SHALL contain one or more deterministic reason classes and canonical
+A valid `unassessable` record or an unassessable joined collection-integrity outcome SHALL contain one or more deterministic reason classes and canonical
 provenance sufficient to identify the insufficient evidence. Every reason on a
 valid `unassessable` produced record SHALL have the same family, canonical
 effective-control identity, and policy identity as that record's canonical
@@ -377,3 +374,20 @@ required denominator, reason list, or completion state.
   opposite enumeration orders
 - **THEN** the displayed representative, required denominator, reasons, and
   completion state are identical
+
+### Requirement: Declared topology retains native completeness evidence
+The declared-topology applicability control SHALL retain deterministic native
+facts for the configured subject universe, mapped subjects, reviewed
+out-of-scope subjects, unmapped subjects, ambiguous subjects, and enabled stale
+declarations. It SHALL use the existing
+control identity, applicability membership/state, reason codes, and
+provenance; it SHALL NOT introduce a topology-only result envelope or quality
+percentage.
+
+#### Scenario: Exhaustive topology is complete
+- **WHEN** every observed subject in an exhaustive topology is exactly-one mapped or reviewed out of scope
+- **THEN** its applicability record can be evaluable with ordered native mapping evidence
+
+#### Scenario: Mapping gap is unassessable
+- **WHEN** an exhaustive topology has an unmapped or ambiguous required subject
+- **THEN** its record is unassessable with the existing unmapped-subject or ambiguous-subject reason and native drill-down evidence

@@ -16,7 +16,7 @@ public partial class CliIntegrationTests
         {
             Assert.That(exitCode, Is.EqualTo(0));
             Assert.That(stderr, Is.Empty);
-            Assert.That(document.RootElement.GetProperty("schema_version").GetInt32(), Is.EqualTo(4));
+            Assert.That(document.RootElement.GetProperty("schema_version").GetInt32(), Is.EqualTo(5));
             Assert.That(document.RootElement.GetProperty("kind").GetString(), Is.EqualTo("architecture-policy-context"));
             Assert.That(document.RootElement.GetProperty("contracts")[0].GetProperty("id").GetString(),
                 Is.EqualTo("core-no-forbidden"));
