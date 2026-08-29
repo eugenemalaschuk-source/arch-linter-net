@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import argparse
 import json
 import sys
 import xml.etree.ElementTree as ET
@@ -9,6 +10,7 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
+import package_manifest as manifest  # noqa: E402
 from main_build import (  # noqa: E402
     PACKAGE_IDS,
     create_retention_plan,
@@ -44,6 +46,46 @@ def test_repository_main_version_authority_is_explicit_and_source_build_decouple
     assert source_version_prefix
     assert source_version_prefix != "$(ArchLinterDevelopmentVersion)"
     assert format_main_version(read_development_version(props), 421) == "0.8.0-main.421"
+
+
+def test_main_version_is_manifest_verified_as_a_complete_package_set(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    version = "0.8.0-main.421"
+    source_commit = "a" * 40
+    packages = tmp_path / "packages"
+    packages.mkdir()
+
+    for package_id in manifest._PACKAGE_IDS:
+        for kind in manifest._SUBJECT_KINDS:
+            path = packages / manifest._expected_filename(package_id, version, kind)
+            path.write_bytes(f"{package_id}/{version}/{kind}".encode())
+
+    output = packages / "package-manifest.json"
+    manifest._create(
+        argparse.Namespace(
+            packages_dir=packages,
+            version=version,
+            source_commit=source_commit,
+            output=output,
+        )
+    )
+    manifest._verify(
+        argparse.Namespace(
+            packages_dir=packages,
+            manifest=output,
+            version=version,
+            source_commit=source_commit,
+            allow_v1=False,
+        )
+    )
+
+    value = json.loads(output.read_text(encoding="utf-8"))
+    assert value["version"] == version
+    assert value["source_commit"] == source_commit
+    assert [record["id"] for record in value["packages"]] == list(manifest._PACKAGE_IDS)
 
 
 @pytest.mark.parametrize(
