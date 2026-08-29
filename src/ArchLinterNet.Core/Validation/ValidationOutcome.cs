@@ -90,4 +90,15 @@ public sealed record ValidationOutcome(
     // the independently governed baseline lifecycle and are intentionally absent here.
     public IReadOnlyList<ArchitectureWaiverLifecycleRecord> Waivers { get; init; } =
         Array.Empty<ArchitectureWaiverLifecycleRecord>();
+
+    // Applicability is an additive, opt-in evidence boundary. Empty expected/produced
+    // collections and null completion preserve behavior for policies that do not participate in
+    // v0.8 applicability semantics; ordinary findings remain independent of this evidence.
+    public IReadOnlyList<ArchitectureApplicabilityExpectedEntry> ApplicabilityExpectedEntries { get; init; } =
+        Array.Empty<ArchitectureApplicabilityExpectedEntry>();
+
+    public IReadOnlyList<ArchitectureApplicabilityRecord> ApplicabilityRecords { get; init; } =
+        Array.Empty<ArchitectureApplicabilityRecord>();
+
+    public ArchitectureAssessmentCompletionEvidence? AssessmentCompletionEvidence { get; init; }
 }

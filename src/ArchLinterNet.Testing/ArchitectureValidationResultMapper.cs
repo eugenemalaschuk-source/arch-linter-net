@@ -31,6 +31,7 @@ internal static class ArchitectureValidationResultMapper
             Mode = mode,
             SubtractiveMatcherParticipation = outcome.SubtractiveMatcherParticipation,
             Waivers = outcome.Waivers,
+            AssessmentCompletionEvidence = outcome.AssessmentCompletionEvidence,
             Profile = profile,
         });
     }
