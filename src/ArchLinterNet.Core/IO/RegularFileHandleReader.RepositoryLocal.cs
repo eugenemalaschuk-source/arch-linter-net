@@ -24,9 +24,9 @@ internal static partial class RegularFileHandleReader
     private static string[] SplitRelativePath(string relativePath)
     {
         string[] segments = relativePath.Split(['/', '\\'], StringSplitOptions.RemoveEmptyEntries);
-        if (segments.Length == 0 || segments.Any(segment => segment is "." or ".."))
+        if (segments.Length == 0 || segments.Any(segment => segment is "." or ".." || segment.Contains(':')))
         {
-            throw NotRegular("External evidence must be a non-empty repository-relative path.");
+            throw NotRegular("External evidence must be a non-empty repository-relative path without alternate data streams.");
         }
 
         return segments;

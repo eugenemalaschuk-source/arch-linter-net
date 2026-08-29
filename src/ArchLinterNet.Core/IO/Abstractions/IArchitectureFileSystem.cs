@@ -7,8 +7,8 @@ public interface IArchitectureFileSystem
     /// </summary>
     /// <remarks>
     /// This legacy default remains for source and runtime compatibility. It materializes text and
-    /// therefore must not be used for byte-sensitive evidence ingestion; that boundary uses the
-    /// built-in verified file opener instead.
+    /// therefore must not be used for byte-sensitive evidence ingestion; that boundary requires
+    /// <see cref="IArchitectureEvidenceFileSystem"/> instead.
     /// </remarks>
     Stream OpenRead(string path)
     {

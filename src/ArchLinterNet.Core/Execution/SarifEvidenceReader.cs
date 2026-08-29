@@ -14,12 +14,12 @@ namespace ArchLinterNet.Core.Execution;
 /// or project findings. It only establishes that bounded bytes contain one successful, matching
 /// SARIF 2.1.0 run and that the run is explicitly bound to the requested assessment context.
 /// </remarks>
-/// <remarks>Creates a reader using the supplied file-system seam.</remarks>
-public sealed partial class SarifEvidenceReader(IArchitectureFileSystem? fileSystem = null)
+/// <remarks>Creates a reader using the supplied verified evidence-file capability.</remarks>
+public sealed partial class SarifEvidenceReader(IArchitectureEvidenceFileSystem? fileSystem = null)
 {
     private const string SupportedFormat = "sarif";
     private const string SupportedVersion = "2.1.0";
-    private readonly IArchitectureFileSystem _fileSystem = fileSystem ?? ArchitectureFileSystem.Real;
+    private readonly IArchitectureEvidenceFileSystem _fileSystem = fileSystem ?? ArchitectureFileSystem.Real;
 
     /// <summary>
     /// Reads and trust-validates one declared artifact. Trust failures are returned as values;
@@ -133,6 +133,13 @@ public sealed partial class SarifEvidenceReader(IArchitectureFileSystem? fileSys
             throw new ArgumentException("An external evidence tool name is required.", nameof(requirement));
         }
 
+        if (requirement.ToolVersion is not null && string.IsNullOrWhiteSpace(requirement.ToolVersion))
+        {
+            throw new ArgumentException(
+                "An external evidence tool version must be non-blank when supplied.",
+                nameof(requirement));
+        }
+
         if (string.IsNullOrWhiteSpace(requirement.Run))
         {
             throw new ArgumentException("An external evidence run id is required.", nameof(requirement));
@@ -178,15 +185,6 @@ public sealed partial class SarifEvidenceReader(IArchitectureFileSystem? fileSys
                     requirement.Id,
                     SarifEvidenceTrustStatus.UnsupportedShape,
                     "The SARIF document root must be an object.",
-                    baseProvenance);
-            }
-
-            if (HasDuplicateProperties(root))
-            {
-                return CreateResult(
-                    requirement.Id,
-                    SarifEvidenceTrustStatus.UnsupportedShape,
-                    "The SARIF document contains duplicate JSON object properties.",
                     baseProvenance);
             }
 
@@ -307,6 +305,11 @@ public sealed partial class SarifEvidenceReader(IArchitectureFileSystem? fileSys
                 return CreateResult(requirement.Id, resultStatus.Value, resultDetail!, selectedProvenance);
             }
 
+            if (HasDuplicateProperties(root, cancellationToken))
+            {
+                return DuplicatePropertiesResult(requirement.Id, selectedProvenance);
+            }
+
             _ = ReadExecutionState(selected.Run, out SarifEvidenceTrustStatus? executionStatus, out string? executionDetail);
             if (executionStatus is not null)
             {
@@ -346,6 +349,17 @@ public sealed partial class SarifEvidenceReader(IArchitectureFileSystem? fileSys
     {
         provenance ??= new SarifEvidenceProvenance(logicalId, null, null, null, null, null, null, null);
         return new SarifEvidenceReadResult(status, ReasonCode(status), detail, provenance);
+    }
+
+    private static SarifEvidenceReadResult DuplicatePropertiesResult(
+        string logicalId,
+        SarifEvidenceProvenance provenance)
+    {
+        return CreateResult(
+            logicalId,
+            SarifEvidenceTrustStatus.UnsupportedShape,
+            "The SARIF document contains duplicate JSON object properties.",
+            provenance);
     }
 
     private static SarifEvidenceProvenance WithRun(

@@ -120,6 +120,7 @@ public sealed partial class SarifEvidenceReaderTrustBindingTests
     [TestCase("/tmp/scan.sarif", SarifEvidenceTrustStatus.UnsafePath)]
     [TestCase("C:\\tmp\\scan.sarif", SarifEvidenceTrustStatus.UnsafePath)]
     [TestCase("C:relative.sarif", SarifEvidenceTrustStatus.UnsafePath)]
+    [TestCase("scan.sarif:Zone.Identifier", SarifEvidenceTrustStatus.UnsafePath)]
     public void Read_MissingOrUnsafeArtifact_IsRejectedBeforeRead(
         string path,
         SarifEvidenceTrustStatus expectedStatus)
@@ -158,6 +159,23 @@ public sealed partial class SarifEvidenceReaderTrustBindingTests
     }
 
     [Test]
+    public void Read_ResultBoundPrecedesDuplicatePropertyTraversal()
+    {
+        _repository.AddUtf8File(
+            "too-many-results.sarif",
+            BuildSarif(results: "[{\"properties\":{\"key\":1,\"key\":2}},{\"ruleId\":\"B\"}]"));
+
+        SarifEvidenceReadResult result = new SarifEvidenceReader().Read(
+            Requirement(),
+            _repository.Root,
+            new SarifEvidenceArtifactReference("too-many-results.sarif", "external.scan"),
+            new SarifEvidenceAssessmentContext("repository", "revision"),
+            new SarifEvidenceLimits(4096, 4, 1));
+
+        Assert.That(result.Status, Is.EqualTo(SarifEvidenceTrustStatus.TooManyResults));
+    }
+
+    [Test]
     public void Read_ArtifactByteLimitHashesConsumedBytesAndDoesNotParsePartialJson()
     {
         string json = BuildSarif();
@@ -187,6 +205,17 @@ public sealed partial class SarifEvidenceReaderTrustBindingTests
             Requirement(), _repository.Root, new SarifEvidenceArtifactReference("directory.sarif", "external.scan"));
 
         Assert.That(result.Status, Is.EqualTo(SarifEvidenceTrustStatus.UnsafePath));
+    }
+
+    [Test]
+    public void VerifiedEvidenceFileSystem_RejectsAlternateDataStreamSyntax()
+    {
+        _repository.AddUtf8File("scan.sarif", BuildSarif());
+
+        Assert.That(
+            () => new ArchLinterNet.Core.IO.ArchitectureFileSystem()
+                .OpenRepositoryLocalRegularFile(_repository.Root, "scan.sarif:Zone.Identifier"),
+            Throws.TypeOf<InvalidDataException>());
     }
 
     [Test]

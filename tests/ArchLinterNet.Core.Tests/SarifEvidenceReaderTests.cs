@@ -213,18 +213,54 @@ public sealed class SarifEvidenceReaderTests
     }
 
     [Test]
-    public void Read_LegacyTextOnlyFileSystem_FailsClosedInsteadOfReencodingBytes()
+    public void Read_InjectedVerifiedEvidenceFileSystem_UsesTheSuppliedByteStream()
     {
-        _repository.AddUtf8File("scan.sarif", Sarif("Acme.Scanner", "assessment-42"));
+        _repository.AddUtf8File("scan.sarif", "not sarif");
+        string supplied = Sarif("Acme.Scanner", "assessment-42");
+        var fileSystem = new InMemoryEvidenceFileSystem(supplied);
 
-        SarifEvidenceReadResult result = new SarifEvidenceReader(new LegacyTextOnlyFileSystem()).Read(
-            Requirement(), _repository.Root, new SarifEvidenceArtifactReference("scan.sarif", "external.scan"));
+        SarifEvidenceReadResult result = new SarifEvidenceReader(fileSystem).Read(
+            Requirement(),
+            _repository.Root,
+            new SarifEvidenceArtifactReference("scan.sarif", "external.scan"),
+            new SarifEvidenceAssessmentContext("repo", "revision"));
 
         Assert.Multiple(() =>
         {
-            Assert.That(result.Status, Is.EqualTo(SarifEvidenceTrustStatus.UnreadableInput));
-            Assert.That(result.ArtifactSha256, Is.Null);
+            Assert.That(result.Status, Is.EqualTo(SarifEvidenceTrustStatus.Valid));
+            Assert.That(fileSystem.OpenedPath, Is.EqualTo("scan.sarif"));
+            Assert.That(result.ArtifactSha256, Is.EqualTo(
+                Convert.ToHexStringLower(System.Security.Cryptography.SHA256.HashData(Encoding.UTF8.GetBytes(supplied)))));
         });
+    }
+
+    [Test]
+    public void Read_SeparateArchitectureFileSystemInstance_IsAWorkingEvidenceCapability()
+    {
+        _repository.AddUtf8File("scan.sarif", Sarif("Acme.Scanner", "assessment-42"));
+
+        SarifEvidenceReadResult result = new SarifEvidenceReader(new ArchitectureFileSystem()).Read(
+            Requirement(),
+            _repository.Root,
+            new SarifEvidenceArtifactReference("scan.sarif", "external.scan"),
+            new SarifEvidenceAssessmentContext("repo", "revision"));
+
+        Assert.That(result.Status, Is.EqualTo(SarifEvidenceTrustStatus.Valid));
+    }
+
+    [TestCase("")]
+    [TestCase(" ")]
+    public void Read_BlankProgrammaticToolVersion_IsRejected(string toolVersion)
+    {
+        ArchitectureExternalEvidenceRequirement requirement = Requirement();
+        requirement.ToolVersion = toolVersion;
+
+        Assert.That(
+            () => new SarifEvidenceReader().Read(
+                requirement,
+                _repository.Root,
+                new SarifEvidenceArtifactReference("scan.sarif", "external.scan")),
+            Throws.TypeOf<ArgumentException>());
     }
 
     private static ArchitectureExternalEvidenceRequirement Requirement() => new()
@@ -258,24 +294,14 @@ public sealed class SarifEvidenceReaderTests
         string invocation = "{\"executionSuccessful\":true}") =>
         $"{{\"tool\":{{\"driver\":{{\"name\":\"{tool}\",\"version\":\"7.2\"}}}},\"automationDetails\":{{\"id\":\"{runId}\"}},\"invocations\":[{invocation}],\"versionControlProvenance\":[{{\"repositoryUri\":\"{repository}\",\"revisionId\":\"{revision}\"}}],\"results\":{results}}}";
 
-    private sealed class LegacyTextOnlyFileSystem : IArchitectureFileSystem
+    private sealed class InMemoryEvidenceFileSystem(string artifact) : IArchitectureEvidenceFileSystem
     {
-        public bool FileExists(string path) => ArchitectureFileSystem.Real.FileExists(path);
+        public string? OpenedPath { get; private set; }
 
-        public string ReadAllText(string path) => ArchitectureFileSystem.Real.ReadAllText(path);
-
-        public IEnumerable<string> ReadLines(string path) => ArchitectureFileSystem.Real.ReadLines(path);
-
-        public bool DirectoryExists(string path) => ArchitectureFileSystem.Real.DirectoryExists(path);
-
-        public IEnumerable<string> EnumerateFiles(string path, string searchPattern, SearchOption searchOption) =>
-            ArchitectureFileSystem.Real.EnumerateFiles(path, searchPattern, searchOption);
-
-        public IEnumerable<string> EnumerateDirectories(string path, string searchPattern, SearchOption searchOption) =>
-            ArchitectureFileSystem.Real.EnumerateDirectories(path, searchPattern, searchOption);
-
-        public DateTime GetLastWriteTimeUtc(string path) => ArchitectureFileSystem.Real.GetLastWriteTimeUtc(path);
-
-        public string GetCurrentDirectory() => ArchitectureFileSystem.Real.GetCurrentDirectory();
+        public Stream OpenRepositoryLocalRegularFile(string repositoryRoot, string repositoryRelativePath)
+        {
+            OpenedPath = repositoryRelativePath;
+            return new MemoryStream(Encoding.UTF8.GetBytes(artifact), writable: false);
+        }
     }
 }

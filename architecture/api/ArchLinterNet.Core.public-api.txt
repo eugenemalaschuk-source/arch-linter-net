@@ -805,7 +805,7 @@ ctor ArchLinterNet.Core.Execution.ResolutionResult(System.Collections.Generic.IR
 ctor ArchLinterNet.Core.Execution.Results.ArchitectureContractExecutionResult(System.Collections.Generic.IReadOnlyCollection`1[ArchLinterNet.Core.Model.ArchitectureViolation], System.Collections.Generic.IReadOnlyCollection`1[System.String], System.Collections.Generic.IReadOnlyCollection`1[ArchLinterNet.Core.Model.ArchitectureViolation], System.Collections.Generic.IReadOnlyCollection`1[ArchLinterNet.Core.Reporting.ArchitectureCoverageSummary])
 ctor ArchLinterNet.Core.Execution.Results.ArchitectureHandlerResult(System.Collections.Generic.IReadOnlyCollection`1[ArchLinterNet.Core.Model.ArchitectureViolation], System.Collections.Generic.IReadOnlyCollection`1[System.String])
 ctor ArchLinterNet.Core.Execution.Results.ArchitectureRunnerSetup(System.String, ArchLinterNet.Core.Execution.Abstractions.IArchitectureContractRunner)
-ctor ArchLinterNet.Core.Execution.SarifEvidenceReader(ArchLinterNet.Core.IO.Abstractions.IArchitectureFileSystem)
+ctor ArchLinterNet.Core.Execution.SarifEvidenceReader(ArchLinterNet.Core.IO.Abstractions.IArchitectureEvidenceFileSystem)
 ctor ArchLinterNet.Core.Graph.ArchitectureExplainApplicationService(ArchLinterNet.Core.Graph.Abstractions.IArchitectureGraphApplicationService)
 ctor ArchLinterNet.Core.Graph.ArchitectureExplainOutcome(System.String, System.String, System.Collections.Generic.IReadOnlyList`1[System.String], System.Collections.Generic.IReadOnlyList`1[System.String])
 ctor ArchLinterNet.Core.Graph.ArchitectureExplainRequest()
@@ -1092,6 +1092,7 @@ interface ArchLinterNet.Core.Graph.IArchitectureGraphFormatter
 interface ArchLinterNet.Core.IO.Abstractions.IArchitectureAssemblyLoadScope
 interface ArchLinterNet.Core.IO.Abstractions.IArchitectureAssemblyLoader
 interface ArchLinterNet.Core.IO.Abstractions.IArchitectureEnvironment
+interface ArchLinterNet.Core.IO.Abstractions.IArchitectureEvidenceFileSystem
 interface ArchLinterNet.Core.IO.Abstractions.IArchitectureFileSystem
 interface ArchLinterNet.Core.IO.Abstractions.IRoslynCompilationFactory
 interface ArchLinterNet.Core.Model.IArchitectureDiagnosticPayload
@@ -1413,6 +1414,7 @@ method ArchLinterNet.Core.IO.Abstractions.IArchitectureAssemblyLoader.GetLoadedA
 method ArchLinterNet.Core.IO.Abstractions.IArchitectureAssemblyLoader.Load(System.Reflection.AssemblyName): System.Reflection.Assembly [abstract]
 method ArchLinterNet.Core.IO.Abstractions.IArchitectureAssemblyLoader.LoadFrom(System.String): System.Reflection.Assembly [abstract]
 method ArchLinterNet.Core.IO.Abstractions.IArchitectureEnvironment.GetEnvironmentVariable(System.String): System.String [abstract]
+method ArchLinterNet.Core.IO.Abstractions.IArchitectureEvidenceFileSystem.OpenRepositoryLocalRegularFile(System.String, System.String): System.IO.Stream [abstract]
 method ArchLinterNet.Core.IO.Abstractions.IArchitectureFileSystem.DirectoryExists(System.String): System.Boolean [abstract]
 method ArchLinterNet.Core.IO.Abstractions.IArchitectureFileSystem.EnumerateDirectories(System.String, System.String, System.IO.SearchOption): System.Collections.Generic.IEnumerable`1[System.String] [abstract]
 method ArchLinterNet.Core.IO.Abstractions.IArchitectureFileSystem.EnumerateFiles(System.String, System.String, System.IO.SearchOption): System.Collections.Generic.IEnumerable`1[System.String] [abstract]
@@ -1435,6 +1437,7 @@ method ArchLinterNet.Core.IO.ArchitectureFileSystem.FileExists(System.String): S
 method ArchLinterNet.Core.IO.ArchitectureFileSystem.GetCurrentDirectory(): System.String [virtual]
 method ArchLinterNet.Core.IO.ArchitectureFileSystem.GetLastWriteTimeUtc(System.String): System.DateTime [virtual]
 method ArchLinterNet.Core.IO.ArchitectureFileSystem.OpenRead(System.String): System.IO.Stream [virtual]
+method ArchLinterNet.Core.IO.ArchitectureFileSystem.OpenRepositoryLocalRegularFile(System.String, System.String): System.IO.Stream [virtual]
 method ArchLinterNet.Core.IO.ArchitectureFileSystem.ReadAllText(System.String): System.String [virtual]
 method ArchLinterNet.Core.IO.ArchitectureFileSystem.ReadLines(System.String): System.Collections.Generic.IEnumerable`1[System.String] [virtual]
 method ArchLinterNet.Core.IO.RoslynCompilationFactory.Create(System.String, System.Collections.Generic.IReadOnlyList`1[System.String], System.Collections.Generic.IReadOnlyList`1[System.String], ArchLinterNet.Core.IO.Abstractions.IArchitectureFileSystem, ArchLinterNet.Core.IO.Abstractions.IArchitectureAssemblyLoader, System.Collections.Generic.IReadOnlyList`1[System.String]): Microsoft.CodeAnalysis.CSharp.CSharpCompilation [virtual]

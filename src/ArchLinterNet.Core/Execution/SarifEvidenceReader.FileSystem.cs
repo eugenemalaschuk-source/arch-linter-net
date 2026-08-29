@@ -1,7 +1,6 @@
 using System.Security;
 using System.Security.Cryptography;
 using ArchLinterNet.Core.BuildState;
-using ArchLinterNet.Core.IO;
 
 namespace ArchLinterNet.Core.Execution;
 
@@ -12,7 +11,7 @@ public sealed partial class SarifEvidenceReader
         if (Path.IsPathRooted(artifactPath)
             || artifactPath.StartsWith('\\')
             || artifactPath.Contains('\0')
-            || IsWindowsRootedPath(artifactPath))
+            || artifactPath.Contains(':'))
         {
             return PathResolution.Unsafe;
         }
@@ -51,13 +50,6 @@ public sealed partial class SarifEvidenceReader
         }
     }
 
-    private static bool IsWindowsRootedPath(string path)
-    {
-        return path.Length >= 2
-            && char.IsLetter(path[0])
-            && path[1] == ':';
-    }
-
     private ByteReadOutcome ReadBoundedBytes(
         PathResolution path,
         long maximumBytes,
@@ -68,20 +60,12 @@ public sealed partial class SarifEvidenceReader
         bool exceeded = false;
         try
         {
-            if (_fileSystem != ArchitectureFileSystem.Real)
-            {
-                return new ByteReadOutcome(false, ArtifactReadFailure.Unreadable, false, [], 0, null);
-            }
-
-            using RegularFileHandleReader.RepositoryRoot repositoryRoot =
-                RegularFileHandleReader.OpenRepositoryRoot(path.RootPath);
             if (!IsStillSafe(path))
             {
                 return ByteReadOutcome.Unsafe;
             }
 
-            using Stream stream = RegularFileHandleReader.OpenRepositoryLocal(repositoryRoot, path.RelativePath);
-            _ = RegularFileHandleReader.GetIdentity(stream);
+            using Stream stream = _fileSystem.OpenRepositoryLocalRegularFile(path.RootPath, path.RelativePath);
 
             byte[] chunk = new byte[81920];
             while (bytesRead <= maximumBytes)

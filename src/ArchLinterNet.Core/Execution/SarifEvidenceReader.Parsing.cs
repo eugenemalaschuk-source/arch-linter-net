@@ -88,14 +88,16 @@ public sealed partial class SarifEvidenceReader
         return true;
     }
 
-    private static bool HasDuplicateProperties(JsonElement element)
+    private static bool HasDuplicateProperties(JsonElement element, CancellationToken cancellationToken)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         if (element.ValueKind == JsonValueKind.Object)
         {
             HashSet<string> names = new(StringComparer.Ordinal);
             foreach (JsonProperty property in element.EnumerateObject())
             {
-                if (!names.Add(property.Name) || HasDuplicateProperties(property.Value))
+                cancellationToken.ThrowIfCancellationRequested();
+                if (!names.Add(property.Name) || HasDuplicateProperties(property.Value, cancellationToken))
                 {
                     return true;
                 }
@@ -105,7 +107,8 @@ public sealed partial class SarifEvidenceReader
         {
             foreach (JsonElement item in element.EnumerateArray())
             {
-                if (HasDuplicateProperties(item))
+                cancellationToken.ThrowIfCancellationRequested();
+                if (HasDuplicateProperties(item, cancellationToken))
                 {
                     return true;
                 }
