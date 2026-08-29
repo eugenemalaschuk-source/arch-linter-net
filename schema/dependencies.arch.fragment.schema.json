@@ -13,6 +13,7 @@
     { "required": ["framework_references"] },
     { "required": ["source_sets"] },
     { "required": ["legacy_runtime_layers"] },
+    { "required": ["external_evidence"] },
     { "required": ["analysis"] },
     { "required": ["contracts"] },
     { "required": ["classification"] },
@@ -54,6 +55,12 @@
     },
     "legacy_runtime_layers": {
       "$ref": "https://archlinternet.dev/schema/0.6.1/dependencies.arch.schema.json#/$defs/stringList"
+    },
+    "external_evidence": {
+      "type": "array",
+      "items": {
+        "$ref": "https://archlinternet.dev/schema/0.6.1/dependencies.arch.schema.json#/$defs/externalEvidenceRequirement"
+      }
     },
     "analysis": {
       "$ref": "https://archlinternet.dev/schema/0.6.1/dependencies.arch.schema.json#/$defs/analysis"

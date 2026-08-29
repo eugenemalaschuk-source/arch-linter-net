@@ -55,6 +55,12 @@
       "items": { "type": "string", "minLength": 1 },
       "default": []
     },
+    "external_evidence": {
+      "type": "array",
+      "description": "Logical, repository-local external-analysis evidence requirements.",
+      "items": { "$ref": "#/$defs/externalEvidenceRequirement" },
+      "default": []
+    },
     "analysis": { "$ref": "#/$defs/analysis" },
     "contracts": { "$ref": "#/$defs/contracts" },
     "classification": { "$ref": "#/$defs/classification" },
@@ -62,6 +68,22 @@
     "history_analysis": { "$ref": "#/$defs/historyAnalysis" }
   },
   "$defs": {
+    "externalEvidenceRequirement": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "format", "required", "tool", "run"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "format": { "type": "string", "const": "sarif" },
+        "required": { "type": "boolean" },
+        "tool": { "type": "string", "minLength": 1 },
+        "tool_version": { "type": "string", "minLength": 1 },
+        "run": { "type": "string", "minLength": 1 },
+        "require_repository": { "type": "boolean", "default": false },
+        "require_revision": { "type": "boolean", "default": false },
+        "require_scope": { "type": "boolean", "default": false }
+      }
+    },
     "imports": {
       "type": "array",
       "description": "Ordered explicit local policy fragments, resolved relative to this document.",

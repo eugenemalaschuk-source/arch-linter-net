@@ -35,6 +35,7 @@ public static class ArchitectureApplicabilityReasonCodes
     public const string AmbiguousSubject = "ambiguous_subject";
     public const string StaleDeclaration = "stale_declaration";
     public const string MalformedExternalInput = "malformed_external_input";
+    public const string WrongExternalEvidenceIdentity = "wrong_external_evidence_identity";
     public const string WrongExternalRepository = "wrong_external_repository";
     public const string WrongExternalRevision = "wrong_external_revision";
     public const string WrongExternalScope = "wrong_external_scope";

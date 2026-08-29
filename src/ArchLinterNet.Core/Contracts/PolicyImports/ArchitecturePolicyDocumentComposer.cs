@@ -7,6 +7,7 @@ internal sealed class ArchitecturePolicyDocumentComposer
 {
     private const string AnalysisSection = "analysis";
     private const string HistoryAnalysisSection = "history_analysis";
+    private const string ExternalEvidenceSection = "external_evidence";
     private const string ContractsSection = "contracts";
     private const string ClassificationSection = "classification";
     private const string TopologySection = "topology";
@@ -70,6 +71,10 @@ internal sealed class ArchitecturePolicyDocumentComposer
                 MergeKeyedSection(effective, key, value, source);
             }
             else if (key == "legacy_runtime_layers")
+            {
+                AppendSequence(effective, key, value, source, key, ArchitecturePolicyProvenancePath.Property(key));
+            }
+            else if (key == ExternalEvidenceSection)
             {
                 AppendSequence(effective, key, value, source, key, ArchitecturePolicyProvenancePath.Property(key));
             }

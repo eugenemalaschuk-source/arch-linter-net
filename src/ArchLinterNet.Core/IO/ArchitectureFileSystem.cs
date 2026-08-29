@@ -6,6 +6,11 @@ public sealed class ArchitectureFileSystem : IArchitectureFileSystem
 {
     public static readonly ArchitectureFileSystem Real = new();
 
+    public Stream OpenRead(string path)
+    {
+        return File.OpenRead(path);
+    }
+
     public bool FileExists(string path)
     {
         return File.Exists(path);

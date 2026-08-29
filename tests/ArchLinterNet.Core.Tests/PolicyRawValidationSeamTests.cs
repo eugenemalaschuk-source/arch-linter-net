@@ -39,6 +39,7 @@ public sealed partial class PolicyRawValidationSeamTests
         nameof(RawTopologyNodeValidator),
         nameof(RawWhenFieldLocationValidator),
         nameof(RawHistoryAnalysisNodeValidator),
+        nameof(RawExternalEvidenceNodeValidator),
     };
 
     private static readonly RawMalformation[] _malformationsInPipelineOrder =
