@@ -6,7 +6,7 @@
   <a href="https://www.nuget.org/packages/ArchLinterNet.Cli/"><img alt="NuGet version" src="https://img.shields.io/nuget/v/ArchLinterNet.Cli.svg"></a>
   <a href="https://www.nuget.org/packages/ArchLinterNet.Cli/"><img alt="NuGet downloads" src="https://img.shields.io/nuget/dt/ArchLinterNet.Cli"></a>
   <a href="https://github.com/eugenemalaschuk-source/arch-linter-net/actions/workflows/main-quality.yml"><img alt="Main quality" src="https://github.com/eugenemalaschuk-source/arch-linter-net/actions/workflows/main-quality.yml/badge.svg?branch=main"></a>
-  <a href="https://sonarcloud.io/summary/overall?id=eugenemalaschuk-source_arch-linter-net"><img alt="Sonar Quality Gate" src="https://sonarcloud.io/api/project_badges/measure?project=eugenemalaschuk-source_arch-linter-net&metric=alert_status"></a>
+  <a href="https://sonarcloud.io/summary/overall?id=eugenemalaschuk-source_arch-linter-net&branch=main"><img alt="Sonar Quality Gate" src="https://sonarcloud.io/api/project_badges/measure?project=eugenemalaschuk-source_arch-linter-net&metric=alert_status&branch=main"></a>
   <a href="https://app.codecov.io/github/eugenemalaschuk-source/arch-linter-net"><img alt="Test coverage" src="https://codecov.io/github/eugenemalaschuk-source/arch-linter-net/graph/badge.svg?branch=main"></a>
   <a href="https://eugenemalaschuk-source.github.io/arch-linter-net/"><img alt="Documentation" src="https://img.shields.io/badge/docs-GitHub%20Pages-blue"></a>
   <a href="LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-blue.svg"></a>
@@ -79,75 +79,124 @@ Run from this repository during development:
 dotnet run --project src/ArchLinterNet.Cli -- --policy architecture/arch.yml --mode strict
 ```
 
-Or install the CLI as a local .NET tool:
+After installing the .NET tool from NuGet.org:
 
 ```bash
-dotnet new tool-manifest
-dotnet tool install ArchLinterNet.Cli --version <version>
-dotnet tool run arch-linter-net -- --policy architecture/arch.yml --mode strict
+arch-linter-net --policy architecture/arch.yml --mode strict
 ```
 
-For CI, pin the tool version in `.config/dotnet-tools.json` and run `dotnet tool restore` before invoking the CLI.
+For repository/CI adoption, prefer a local tool manifest and run `dotnet arch-linter-net ...`; see [Installation](https://eugenemalaschuk-source.github.io/arch-linter-net/installation/).
 
-## Core ideas
+## Main capabilities
 
-### Repository-owned policy
+ArchLinterNet focuses on static architecture governance:
 
-The architecture policy lives with the code and is reviewed through the same pull request process.
+- YAML root policies, deterministic local imports, packaged schemas, and reusable bounded source sets.
+- Namespace/layer dependency, allow-only, ordered-layer, protected-surface, cycle, independence, assembly, and module-container governance.
+- External dependency, NuGet package, framework-reference, project-metadata, method-body, and Unity `.asmdef` rules.
+- Type placement, source-layout conventions, attribute usage, inheritance, interface implementation, composition boundaries, and public API surface snapshots.
+- Semantic classification from implemented code facts, selector-backed layers, contextual dependency/allow-only rules, and semantic port/ACL boundaries.
+- Coverage contracts for `namespace`, `project`, `assembly`, `dependency_edge`, `rule_input`, and `semantic_role` inventory.
+- Project/solution discovery, explicit build-state preflight, opt-in `--ensure-built`, condition sets, persistent analysis cache, and bounded parallel scanning.
+- Strict gates, audit discovery, migration baselines, policy consistency, policy-context export, and policy-weakening review.
+- Architecture change snapshots/reports, history forensics, dependency graphs/path explanation, architecture-policy badge projection, and public API lifecycle commands.
+- Human, normalized JSON, SARIF where applicable, repeatable report sinks, timings, analysis profiles, and CI-oriented coverage artifacts.
+- CEL-backed `when` predicates at documented closed locations — standard CEL under a safe profile, not an open-ended scripting language.
 
-### Deterministic contracts
-
-Contracts are evaluated from explicit policy, project/assembly facts, semantic classification, and reviewed snapshots rather than hidden hosted configuration.
-
-### Strict and audit modes
-
-Strict mode is blocking. Audit mode produces diagnostics without converting known architecture debt into an implicit pass.
-
-### Architecture coverage
-
-Coverage reports whether first-party code is actually governed by configured architecture rules, so a green validation result cannot hide an accidentally unclassified area.
-
-### Baselines and change gates
-
-Reviewed baselines make existing debt explicit. The change gate can block newly introduced architecture debt without silently weakening the target architecture.
-
-### Public API governance
-
-Reviewed public API snapshots protect intentional compatibility surfaces independently from general CLR visibility.
-
-### Human and automation outputs
-
-The same analysis can produce readable diagnostics plus machine-oriented JSON/SARIF artifacts for CI and tooling.
+ArchLinterNet does **not** validate runtime dependency-injection behavior, authorization/security correctness, code ownership, arbitrary semantic data flow, or undocumented custom YAML contract families.
 
 ## Documentation
 
-The public documentation is published at <https://eugenemalaschuk-source.github.io/arch-linter-net/>.
+Public product documentation is published through MkDocs and GitHub Pages:
 
-Start with:
-
+- [Documentation home](https://eugenemalaschuk-source.github.io/arch-linter-net/)
 - [Getting started](https://eugenemalaschuk-source.github.io/arch-linter-net/getting-started/)
+- [Installation](https://eugenemalaschuk-source.github.io/arch-linter-net/installation/)
 - [CLI reference](https://eugenemalaschuk-source.github.io/arch-linter-net/cli/)
 - [Policy format](https://eugenemalaschuk-source.github.io/arch-linter-net/policy-format/)
-- [Contract reference](https://eugenemalaschuk-source.github.io/arch-linter-net/contracts/)
+- [Contract families](https://eugenemalaschuk-source.github.io/arch-linter-net/contracts/)
+- [Coverage contracts](https://eugenemalaschuk-source.github.io/arch-linter-net/contracts/coverage/)
+- [Supported capabilities and non-goals](https://eugenemalaschuk-source.github.io/arch-linter-net/policy-format/supported-capabilities/)
+- [Real-repository workflow](https://eugenemalaschuk-source.github.io/arch-linter-net/guides/real-repository-workflow/)
 - [CI integration](https://eugenemalaschuk-source.github.io/arch-linter-net/guides/ci-integration/)
+- [Adopt or upgrade ArchLinterNet](https://eugenemalaschuk-source.github.io/arch-linter-net/guides/upgrading/)
+- [Reference entrypoints](https://eugenemalaschuk-source.github.io/arch-linter-net/guides/reference-entrypoints/)
+- [Verify release provenance](https://eugenemalaschuk-source.github.io/arch-linter-net/guides/release-provenance-verification/)
+- [AI policy authoring](https://eugenemalaschuk-source.github.io/arch-linter-net/ai/)
 
-GitHub Pages is deployed only by the public release workflow. Merges to `main` refresh quality telemetry and internal `main.N` packages but do not publish MkDocs documentation.
+The public capability references are checked against runtime/schema/CLI inventories by `make lint-docs`, so a new executable capability cannot silently leave the main documentation matrix stale.
 
-## Packages
+Internal project documentation remains in repository Markdown files such as `docs/internal/`, `openspec/`, `.github/`, and root governance files. It is not part of the published product site.
 
-ArchLinterNet is shipped as four packages:
+GitHub Pages is deployed only by the public release workflow. A merge to `main` refreshes quality telemetry and internal `main.N` packages, but does not deploy MkDocs.
 
-- `ArchLinterNet.Cli` — installable .NET tool and primary user entrypoint.
-- `ArchLinterNet.Core` — reusable validation engine and policy model.
-- `ArchLinterNet.Testing` — NUnit adapter for architecture checks in test projects.
-- `ArchLinterNet.CEL` — reusable CEL-compatible expression engine used by semantic policy expressions.
+## Local documentation workflow
 
-Stable/preview public releases are published to NuGet.org. Internal `main.N` development builds are published to GitHub Packages for dogfooding and are not public releases.
+```bash
+make venv        # create Python virtual environment
+make docs-serve  # preview MkDocs locally
+make docs-build  # build the static documentation site
+make fmt-docs    # auto-format markdown documentation
+make lint-docs   # strict structure + semantic documentation validation
+```
 
-## Contributing
+Generated `site/` output is a build artifact and should not be committed.
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for development setup, validation commands, and pull request expectations.
+## Architecture-policy badge
+
+Project an existing strict JSON result to a Shields endpoint payload without rerunning analysis:
+
+```bash
+arch-linter-net badge architecture-policy --input architecture-strict.json
+```
+
+## Project health and assurance
+
+<details>
+<summary>Security, maintainability, and supply-chain status</summary>
+
+<p>
+  <a href="https://github.com/eugenemalaschuk-source/arch-linter-net/actions/workflows/codeql.yml"><img alt="CodeQL" src="https://github.com/eugenemalaschuk-source/arch-linter-net/actions/workflows/codeql.yml/badge.svg"></a>
+  <a href="https://scorecard.dev/viewer/?uri=github.com/eugenemalaschuk-source/arch-linter-net"><img alt="OpenSSF Scorecard" src="https://api.scorecard.dev/projects/github.com/eugenemalaschuk-source/arch-linter-net/badge"></a>
+  <a href="https://www.bestpractices.dev/en/projects/13572/passing"><img alt="OpenSSF Best Practices" src="https://www.bestpractices.dev/projects/13572/badge"></a>
+  <a href="https://sonarcloud.io/summary/overall?id=eugenemalaschuk-source_arch-linter-net&branch=main"><img alt="Sonar Quality Gate" src="https://sonarcloud.io/api/project_badges/measure?project=eugenemalaschuk-source_arch-linter-net&metric=alert_status&branch=main"></a>
+  <a href="https://sonarcloud.io/summary/overall?id=eugenemalaschuk-source_arch-linter-net&branch=main"><img alt="Sonar Maintainability" src="https://sonarcloud.io/api/project_badges/measure?project=eugenemalaschuk-source_arch-linter-net&metric=sqale_rating&branch=main"></a>
+  <a href="https://sonarcloud.io/summary/overall?id=eugenemalaschuk-source_arch-linter-net&branch=main"><img alt="Sonar Reliability" src="https://sonarcloud.io/api/project_badges/measure?project=eugenemalaschuk-source_arch-linter-net&metric=reliability_rating&branch=main"></a>
+  <a href="https://sonarcloud.io/summary/overall?id=eugenemalaschuk-source_arch-linter-net&branch=main"><img alt="Sonar Security" src="https://sonarcloud.io/api/project_badges/measure?project=eugenemalaschuk-source_arch-linter-net&metric=security_rating&branch=main"></a>
+</p>
+
+The Main quality badge tracks the latest merged `main` coverage telemetry run. That run refreshes Codecov and SonarCloud for the same merged revision and fails closed if coverage collection, Codecov upload, or the Sonar quality-gate scan cannot complete successfully. The old README `Architecture policy` image was only a second label over the generic CI workflow badge, so it is intentionally removed rather than presented as architecture evidence; v0.8 will publish a real Architecture Health badge from ArchLinterNet canonical outputs. SonarCloud also analyzes trusted pull requests, decorates the PR, and evaluates the quality gate on new code before merge:
+
+| Quality signal | Source |
+|---|---|
+| Build/test | Required pull-request validation runs `make acceptance`-equivalent unit/E2E/packed-artifact gates before merge |
+| Test coverage (line %) | PR CI and post-merge `Main Quality Telemetry` collect coverage; the merged-main run uploads Cobertura XML to Codecov so the primary coverage badge follows `main` |
+| Architecture policy | Required PR self-policy/architecture checks validate the up-to-date merge candidate; generic post-merge quality telemetry does not pretend to be architecture evidence |
+| SonarCloud PR quality gate | trusted `pull_request` runs analyze new code, publish a SonarCloud PR result link, and fail CI when the Sonar quality gate fails |
+| SonarCloud main quality signals | `Main Quality Telemetry` analyzes the merged revision with OpenCover/TRX/Python coverage and refreshes the `main` quality-gate, maintainability, reliability, and security badges |
+| OpenSSF Scorecard | trusted pull requests produce reviewable SARIF; default-branch and scheduled runs publish the supply-chain score to the public Scorecard API and GitHub code scanning |
+| Architecture validation | strict ArchLinterNet self-policy check (`architecture/dependencies.arch.yml`), including the reviewed public API snapshots under `architecture/api/`; read-only, never rewrites either |
+| Architecture coverage | strict/audit coverage JSON artifacts + Markdown report + sticky PR comment on the required pull-request gate |
+
+See [CI integration](docs/guides/ci-integration.md) for how the PR gate, merged-main test coverage upload, SonarCloud analysis, and the separate architecture coverage gate fit together.
+
+</details>
+
+## NuGet and repository links
+
+NuGet packages should expose only public user-facing links:
+
+- project/documentation URL: the GitHub Pages MkDocs site;
+- repository URL: this GitHub repository;
+- package README: this concise product README;
+- license: repository license expression.
+
+NuGet metadata must not point users to internal backlog governance, OpenSpec archives, or maintenance-agent instructions as product documentation.
+
+## Security
+
+Report suspected vulnerabilities privately through GitHub Private Vulnerability Reporting. Do not disclose unresolved vulnerabilities in public issues, pull requests, or discussions. See the [security policy](SECURITY.md) for supported preview releases, reporting guidance, and disclosure expectations.
 
 ## License
 
-MIT. See [LICENSE](LICENSE).
+MIT.
