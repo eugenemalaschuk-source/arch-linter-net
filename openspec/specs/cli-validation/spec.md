@@ -66,7 +66,7 @@ The CLI SHALL accept a `--format` (or `-f`) flag with values `human`, `json`, or
 - **THEN** JSON SHALL appear on stdout AND a SARIF document SHALL be written to `report.sarif`
 
 ### Requirement: CLI returns correct exit codes
-The CLI SHALL return exit code 0 when all contracts pass, exit code 1 when any contract fails, and exit code 2 on runtime errors (invalid arguments, missing file, policy parse error). An unrecognised top-level token or subcommand SHALL be treated as invalid input rather than successful command help.
+The CLI SHALL return exit code 0 when all contracts pass, exit code 1 when any contract fails, and exit code 2 on runtime errors (invalid arguments, missing file, policy parse error). An unrecognised top-level token or subcommand SHALL be treated as invalid input rather than successful command help. The CLI SHALL perform this invalid-input validation across the complete argument vector before returning successful root help or version output.
 
 #### Scenario: All contracts pass
 - **WHEN** the CLI validates a policy with no violations
@@ -91,6 +91,18 @@ The CLI SHALL return exit code 0 when all contracts pass, exit code 1 when any c
 #### Scenario: Unknown command token
 - **WHEN** the CLI is invoked with an unrecognised top-level token or subcommand
 - **THEN** it SHALL return exit code 2, write a stderr diagnostic naming that token, and direct the caller to `--help` for usage information
+
+#### Scenario: Help followed by unknown command input
+- **WHEN** the CLI is invoked with `--help debt`
+- **THEN** it SHALL return exit code 2, write a stderr diagnostic naming `debt`, and not write successful help output
+
+#### Scenario: Version followed by unknown command input
+- **WHEN** the CLI is invoked with `--version debt`
+- **THEN** it SHALL return exit code 2, write a stderr diagnostic naming `debt`, and not write successful version output
+
+#### Scenario: Help followed by unknown option input
+- **WHEN** the CLI is invoked with `--help --bogus-flag`
+- **THEN** it SHALL return exit code 2, write a stderr diagnostic naming `--bogus-flag`, and not write successful help output
 
 ### Requirement: CLI supports --help and --version
 The CLI SHALL print usage information on `--help` or `-h`, and version on `--version` or `-v`. Both SHALL return exit code 0.

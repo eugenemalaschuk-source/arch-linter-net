@@ -112,6 +112,41 @@ public partial class CliIntegrationTests
         });
     }
 
+    [TestCase("--help", "debt", "debt")]
+    [TestCase("-h", "debt", "debt")]
+    [TestCase("--version", "debt", "debt")]
+    [TestCase("-v", "debt", "debt")]
+    [TestCase("--help", "--bogus-flag", "--bogus-flag")]
+    public void HelpOrVersionFollowedByInvalidInput_FailsClosed(
+        string legacyOption,
+        string invalidInput,
+        string expectedDiagnostic)
+    {
+        var (exitCode, stdout, stderr) = RunCli(legacyOption, invalidInput);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(exitCode, Is.EqualTo(2));
+            Assert.That(stdout, Is.Empty);
+            Assert.That(stderr, Does.Contain(expectedDiagnostic));
+            Assert.That(stderr, Does.Contain("--help"));
+        });
+    }
+
+    [Test]
+    public void ValidFlagThenHelpFollowedByInvalidInput_FailsClosed()
+    {
+        var (exitCode, stdout, stderr) = RunCli("--strict", "--help", "debt");
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(exitCode, Is.EqualTo(2));
+            Assert.That(stdout, Is.Empty);
+            Assert.That(stderr, Does.Contain("debt"));
+            Assert.That(stderr, Does.Contain("--help"));
+        });
+    }
+
     [Test]
     public void UnknownTopLevelCommand_FailsClosedWithoutRootHelp()
     {

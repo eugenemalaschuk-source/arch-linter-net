@@ -9,17 +9,17 @@ internal sealed class CliHost(ICliRootCommandFactory rootCommandFactory, ICliCon
 {
     public int Run(string[] args)
     {
-        if (TryHandleLegacyValidateShortCircuit(args))
-        {
-            return CliExitCodes.Success;
-        }
-
         Command rootCommand = rootCommandFactory.Create();
         ParseResult parseResult = rootCommand.Parse(args);
         if (parseResult.Errors.Count > 0 || parseResult.UnmatchedTokens.Count > 0)
         {
             WriteParseErrors(parseResult);
             return CliExitCodes.InvalidArgumentsOrRuntimeError;
+        }
+
+        if (TryHandleLegacyValidateShortCircuit(args))
+        {
+            return CliExitCodes.Success;
         }
 
         return parseResult.Invoke();
