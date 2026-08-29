@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import sys
+import xml.etree.ElementTree as ET
 from pathlib import Path
 
 import pytest
@@ -16,6 +17,8 @@ from main_build import (  # noqa: E402
     read_development_version,
 )
 
+_REPOSITORY_ROOT = Path(__file__).resolve().parents[3]
+
 
 def test_main_version_uses_explicit_development_version(tmp_path: Path) -> None:
     props = tmp_path / "Directory.Build.props"
@@ -28,6 +31,19 @@ def test_main_version_uses_explicit_development_version(tmp_path: Path) -> None:
 
     assert read_development_version(props) == "0.8.0"
     assert format_main_version("0.8.0", 421) == "0.8.0-main.421"
+
+
+def test_repository_main_version_authority_is_explicit_and_source_build_decoupled() -> None:
+    props = _REPOSITORY_ROOT / "Directory.Build.props"
+    root = ET.parse(props).getroot()
+
+    development_version = root.findtext(".//ArchLinterDevelopmentVersion")
+    source_version_prefix = root.findtext(".//VersionPrefix")
+
+    assert development_version == "0.8.0"
+    assert source_version_prefix
+    assert source_version_prefix != "$(ArchLinterDevelopmentVersion)"
+    assert format_main_version(read_development_version(props), 421) == "0.8.0-main.421"
 
 
 @pytest.mark.parametrize(
