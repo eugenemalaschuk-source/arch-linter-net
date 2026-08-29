@@ -102,17 +102,18 @@ public sealed partial class CheckpointBReleaseGateTests
             });
             foreach (string schema in new[]
                      {
-                         "analysis-build-state.schema.json", "analysis-profile.schema.json",
-                         "api-snapshot.schema.json", "baseline.schema.json",
+                         "analysis-build-state.schema.json", "analysis-cache.schema.json",
+                         "analysis-profile.schema.json", "api-snapshot.schema.json", "baseline.schema.json",
+                         "normalized-finding.schema.json",
                      })
             {
                 Assert.That(core.GetEntry($"contentFiles/any/any/schema/0.5.1/{schema}"), Is.Not.Null, schema);
             }
 
-            // Policy root/fragment and the applicability schemas advance to independent 0.6.1
-            // schema identities. The manifest is release-qualified, so it also advances to a new
-            // 0.6.1 generation rather than being mutated in place; all pre-advance bytes remain
-            // frozen in source control (see schema/0.6.1/compatibility-manifest.json).
+            // Policy root/fragment and the current applicability schemas advance to independent
+            // 0.6.1 identities. The frozen 0.5.1 finding/cache copies above stay packaged for
+            // offline legacy validation but are not registry-discoverable; `schema list` resolves
+            // the current 0.6.1 resources (see schema/0.6.1/compatibility-manifest.json).
             foreach (string schema in new[]
                      {
                          "compatibility-manifest.json", "dependencies.arch.fragment.schema.json",
