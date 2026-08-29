@@ -113,6 +113,47 @@ public partial class CliIntegrationTests
     }
 
     [Test]
+    public void UnknownTopLevelCommand_FailsClosedWithoutRootHelp()
+    {
+        var (exitCode, stdout, stderr) = RunCli("debt", "--help");
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(exitCode, Is.EqualTo(2));
+            Assert.That(stdout, Is.Empty);
+            Assert.That(stderr, Does.Contain("debt"));
+            Assert.That(stderr, Does.Contain("--help"));
+        });
+    }
+
+    [Test]
+    public void UnknownSubcommand_FailsClosedWithoutParentHelp()
+    {
+        var (exitCode, stdout, stderr) = RunCli("policy", "debt", "--help");
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(exitCode, Is.EqualTo(2));
+            Assert.That(stdout, Is.Empty);
+            Assert.That(stderr, Does.Contain("debt"));
+            Assert.That(stderr, Does.Contain("--help"));
+        });
+    }
+
+    [Test]
+    public void ValidSubcommandHelp_ExitsZero()
+    {
+        var (exitCode, stdout, stderr) = RunCli("policy", "--help");
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(exitCode, Is.EqualTo(0));
+            Assert.That(stdout, Does.Contain("policy"));
+            Assert.That(stderr, Is.Empty);
+        });
+    }
+
+    [Test]
     public void DotnetProcessArguments_PreserveWhitespaceAndEmbeddedQuotes()
     {
         const string ComplexArgument = "path with spaces/\"quoted\".yml";
@@ -469,12 +510,14 @@ public partial class CliIntegrationTests
     [Test]
     public void UnknownFlag_ExitsWithError()
     {
-        var (exitCode, _, stderr) = RunCli("--bogus-flag");
+        var (exitCode, stdout, stderr) = RunCli("--bogus-flag");
 
         Assert.Multiple(() =>
         {
-            Assert.That(exitCode, Is.EqualTo(2));
-            Assert.That(stderr, Does.Contain("Unknown"));
+            Assert.That(exitCode, Is.EqualTo(CliExitCodes.InvalidArgumentsOrRuntimeError));
+            Assert.That(stdout, Is.Empty);
+            Assert.That(stderr, Does.Contain("--bogus-flag"));
+            Assert.That(stderr, Does.Contain("--help"));
         });
     }
 

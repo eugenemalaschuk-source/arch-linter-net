@@ -154,6 +154,38 @@ public sealed class CliHandlerCoverageTests
     }
 
     [Test]
+    public void Host_UnknownCommand_FailsClosedWithHelpGuidance()
+    {
+        var console = new RecordingConsole();
+        int result = new CliHost(new RootCommandFactory(), console, new RecordingRuntime())
+            .Run(["debt", "--help"]);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(result, Is.EqualTo(CliExitCodes.InvalidArgumentsOrRuntimeError));
+            Assert.That(console.ErrorText, Does.Contain("debt"));
+            Assert.That(console.ErrorText, Does.Contain("--help"));
+            Assert.That(console.OutputText, Is.Empty);
+        });
+    }
+
+    [Test]
+    public void Host_UnknownNestedCommand_FailsClosedWithHelpGuidance()
+    {
+        var console = new RecordingConsole();
+        int result = new CliHost(new RootCommandFactory(), console, new RecordingRuntime())
+            .Run(["graph", "debt", "--help"]);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(result, Is.EqualTo(CliExitCodes.InvalidArgumentsOrRuntimeError));
+            Assert.That(console.ErrorText, Does.Contain("debt"));
+            Assert.That(console.ErrorText, Does.Contain("graph --help"));
+            Assert.That(console.OutputText, Is.Empty);
+        });
+    }
+
+    [Test]
     public void Host_LegacyVersion_ShortCircuitsBeforeParsing()
     {
         var console = new RecordingConsole();
