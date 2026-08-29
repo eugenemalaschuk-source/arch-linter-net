@@ -82,6 +82,28 @@ public sealed class ArchitectureApplicabilityProjectionTests
     }
 
     [Test]
+    public void Project_EmitsTrustedFamilySpecificReasonWithoutProjectorRegistration()
+    {
+        const string ReasonCode = "family_specific_unavailable";
+        ArchitectureApplicabilityExpectedEntry expected = Entry(
+            "control", ArchitectureApplicabilityMembership.Required, "future-family");
+        ArchitectureApplicabilityRecord record = Record(
+            "control", ArchitectureApplicabilityRecordState.Unassessable, ReasonCode, "future-family");
+
+        ArchitectureAssessmentCompletionEvidence completion = ArchitectureApplicabilityEvaluator.Evaluate(
+            [expected], [record], conformancePassed: true)!;
+        ArchitectureApplicabilityProjection projection = ArchitectureApplicabilityProjector.Project(completion, "strict")!;
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(completion.State, Is.EqualTo(ArchitectureAssessmentCompletionState.Unassessable));
+            Assert.That(projection.Findings, Has.Count.EqualTo(1));
+            Assert.That(((ArchitectureApplicabilityDiagnostic)projection.Findings[0].Details).ReasonCode,
+                Is.EqualTo(ReasonCode));
+        });
+    }
+
+    [Test]
     public void Project_DeduplicatesReasonsByCanonicalEvidenceAndKeepsIntegrityReasons()
     {
         ArchitectureApplicabilityExpectedEntry expected = Entry(
@@ -136,6 +158,7 @@ public sealed class ArchitectureApplicabilityProjectionTests
             Assert.That(finding.Identity.SourceMember, Is.EqualTo("exposure"));
             Assert.That(finding.Identity.TargetMember, Is.EqualTo(ArchitectureApplicabilityReasonCodes.AmbiguousSubject));
             Assert.That(finding.Identity.Configuration, Is.EqualTo("policy-v08"));
+            Assert.That(finding.Identity.ContractId, Is.EqualTo(finding.ContractId ?? finding.ContractName));
             Assert.That(finding.CanonicalIdentity, Does.Not.Contain("display"));
             Assert.That(json["message_code"], Is.EqualTo("applicability"));
             Assert.That(((Dictionary<string, object?>)json["details"]!)["reason_code"],

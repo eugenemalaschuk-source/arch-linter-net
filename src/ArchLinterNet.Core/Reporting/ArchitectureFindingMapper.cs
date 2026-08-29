@@ -308,7 +308,7 @@ public static class ArchitectureFindingMapper
             ArchitectureViolationIdentity.CurrentVersion,
             diagnostic.Family,
             KindToken(diagnostic.Kind),
-            diagnostic.ControlIdentity,
+            diagnostic.ContractId ?? diagnostic.ContractName,
             null,
             diagnostic.ControlIdentity,
             diagnostic.Family,

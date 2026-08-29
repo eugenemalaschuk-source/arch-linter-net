@@ -63,11 +63,13 @@ public static class ArchitectureApplicabilityProjector
     {
         ArgumentNullException.ThrowIfNull(completion);
 
-        // Completion.Reasons is already evaluator-ordered.  Deduplicate by all canonical reason
-        // dimensions because duplicate collection entries must not create ambiguous baseline
-        // candidates, while distinct policy identities remain distinct findings.
+        // Completion.Reasons comes from the authoritative evaluator boundary.  Family-specific
+        // machine-readable reason codes are intentionally open-ended, so every non-null reason
+        // that reached this completed assessment projects through the normalized envelope.
+        // Deduplication uses only canonical dimensions so distinct policy identities remain
+        // distinct findings.
         IEnumerable<ArchitectureApplicabilityReason> reasons = completion.Reasons
-            .Where(IsProjectableReason)
+            .Where(reason => reason is not null)
             .GroupBy(ReasonKey, StringComparer.Ordinal)
             .Select(group => group.First())
             .OrderBy(reason => reason.Provenance.ControlIdentity, StringComparer.Ordinal)
@@ -75,10 +77,11 @@ public static class ArchitectureApplicabilityProjector
             .ThenBy(reason => reason.Provenance.PolicyIdentity, StringComparer.Ordinal)
             .ThenBy(reason => reason.Code, StringComparer.Ordinal);
 
+        var assessments = new AssessmentLookup(completion.Controls);
         var findings = new List<ArchitectureFinding>();
         foreach (ArchitectureApplicabilityReason reason in reasons)
         {
-            ArchitectureApplicabilityAssessment? assessment = FindAssessment(completion.Controls, reason);
+            ArchitectureApplicabilityAssessment? assessment = assessments.Find(reason);
             ArchitectureApplicabilityDiagnostic diagnostic = new(
                 controlIdentity: reason.Provenance.ControlIdentity,
                 family: assessment?.Expected?.Family
@@ -98,49 +101,6 @@ public static class ArchitectureApplicabilityProjector
         !control.IsIntegrityValid
         || control.State == ArchitectureApplicabilityRecordState.Unassessable;
 
-    private static ArchitectureApplicabilityAssessment? FindAssessment(
-        IReadOnlyList<ArchitectureApplicabilityAssessment> controls,
-        ArchitectureApplicabilityReason reason)
-    {
-        // A reason's control identity is canonical.  Family is used as a tie-breaker for a
-        // malformed hand-built completion where an orphan and expected row share an identity.
-        return controls
-            .Where(control => string.Equals(
-                control.ControlIdentity,
-                reason.Provenance.ControlIdentity,
-                StringComparison.Ordinal))
-            .OrderBy(control => string.Equals(
-                control.Expected?.Family ?? control.Record?.Family,
-                reason.Provenance.Family,
-                StringComparison.Ordinal) ? 0 : 1)
-            .ThenBy(control => control.Expected is null ? 1 : 0)
-            .FirstOrDefault();
-    }
-
-    private static bool IsProjectableReason(ArchitectureApplicabilityReason reason)
-    {
-        // These are the closed evaluator reason families.  Unknown strings in manually-created
-        // completion objects are not trusted as normalized findings; the evaluator itself only
-        // emits values from this set.
-        return reason is not null && reason.Code is
-            ArchitectureApplicabilityReasonCodes.MissingRequiredInput
-            or ArchitectureApplicabilityReasonCodes.UnexpectedEmptyInput
-            or ArchitectureApplicabilityReasonCodes.UnmappedSubject
-            or ArchitectureApplicabilityReasonCodes.AmbiguousSubject
-            or ArchitectureApplicabilityReasonCodes.StaleDeclaration
-            or ArchitectureApplicabilityReasonCodes.MalformedExternalInput
-            or ArchitectureApplicabilityReasonCodes.WrongExternalRepository
-            or ArchitectureApplicabilityReasonCodes.WrongExternalRevision
-            or ArchitectureApplicabilityReasonCodes.WrongExternalScope
-            or ArchitectureApplicabilityReasonCodes.MissingApplicabilityRecord
-            or ArchitectureApplicabilityReasonCodes.DuplicateApplicabilityRecordIdentity
-            or ArchitectureApplicabilityReasonCodes.UnknownApplicabilityRecordIdentity
-            or ArchitectureApplicabilityReasonCodes.IncompatibleApplicabilityRecord
-            or ArchitectureApplicabilityReasonCodes.InvalidApplicabilityExpectedIntegrity
-            or ArchitectureApplicabilityReasonCodes.InvalidApplicabilityRecordIntegrity
-            or ArchitectureApplicabilityReasonCodes.DuplicateApplicabilityExpectedIdentity;
-    }
-
     private static string ReasonKey(ArchitectureApplicabilityReason reason) =>
         string.Join(
             '\u001f',
@@ -148,4 +108,50 @@ public static class ArchitectureApplicabilityProjector
             reason.Provenance.Family,
             reason.Provenance.ControlIdentity,
             reason.Provenance.PolicyIdentity);
+
+    // A reason normally identifies one control. Keep the evaluator's historic tie-breaking for
+    // malformed hand-built completions (matching family first, then expected evidence) without
+    // sorting the full control collection for every projected reason.
+    private sealed class AssessmentLookup
+    {
+        private readonly Dictionary<string, ArchitectureApplicabilityAssessment> _byControlIdentity =
+            new(StringComparer.Ordinal);
+        private readonly Dictionary<AssessmentKey, ArchitectureApplicabilityAssessment> _byControlAndFamily = new();
+
+        public AssessmentLookup(IReadOnlyList<ArchitectureApplicabilityAssessment> controls)
+        {
+            foreach (ArchitectureApplicabilityAssessment control in controls)
+            {
+                AddPreferred(_byControlIdentity, control.ControlIdentity, control);
+
+                string? family = control.Expected?.Family ?? control.Record?.Family;
+                if (!string.IsNullOrEmpty(family))
+                {
+                    AddPreferred(_byControlAndFamily, new AssessmentKey(control.ControlIdentity, family), control);
+                }
+            }
+        }
+
+        public ArchitectureApplicabilityAssessment? Find(ArchitectureApplicabilityReason reason)
+        {
+            var exactKey = new AssessmentKey(reason.Provenance.ControlIdentity, reason.Provenance.Family);
+            return _byControlAndFamily.GetValueOrDefault(exactKey)
+                ?? _byControlIdentity.GetValueOrDefault(reason.Provenance.ControlIdentity);
+        }
+
+        private static void AddPreferred<TKey>(
+            Dictionary<TKey, ArchitectureApplicabilityAssessment> lookup,
+            TKey key,
+            ArchitectureApplicabilityAssessment candidate)
+            where TKey : notnull
+        {
+            if (!lookup.TryGetValue(key, out ArchitectureApplicabilityAssessment? existing)
+                || (existing.Expected is null && candidate.Expected is not null))
+            {
+                lookup[key] = candidate;
+            }
+        }
+    }
+
+    private readonly record struct AssessmentKey(string ControlIdentity, string Family);
 }

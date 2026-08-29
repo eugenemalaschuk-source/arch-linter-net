@@ -86,6 +86,19 @@ public sealed class NormalizedFindingSchemaMatrixTests
                 [],
                 []),
             "semantic-validation");
+        yield return ArchitectureFindingMapper.FromApplicabilityDiagnostic(
+            new ArchitectureApplicabilityDiagnostic(
+                "applicability-control",
+                "future-family",
+                ArchitectureApplicabilityMembership.Required,
+                ArchitectureApplicabilityRecordState.Unassessable,
+                ArchitectureApplicabilityRecordState.Unassessable,
+                new ArchitectureApplicabilityReason(
+                    "family_specific_unavailable",
+                    "future-family",
+                    "applicability-control",
+                    "policy-id")),
+            "strict");
     }
 
     private static ArchitectureViolation Violation(IArchitectureDiagnosticPayload payload) =>

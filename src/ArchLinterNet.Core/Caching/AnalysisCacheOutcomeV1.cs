@@ -89,6 +89,45 @@ public sealed record AnalysisCacheOutcomeV1(
     {
     }
 
+    // Positional records expose Deconstruct as part of their public API. Keep the original v1
+    // shape alongside the extended generated overload so existing consumers remain source and
+    // binary compatible.
+    public void Deconstruct(
+        out bool Passed,
+        out IReadOnlyList<ArchitectureViolation> Violations,
+        out IReadOnlyList<string> Cycles,
+        out IReadOnlyList<ArchitectureViolation> CoverageFindings,
+        out string CoverageConfig,
+        out IReadOnlyList<ArchitectureUnmatchedIgnoredViolation> UnmatchedIgnoredViolations,
+        out string UnmatchedIgnoredViolationsConfig,
+        out IReadOnlyList<PolicyConsistencyDiagnostic> PolicyConsistencyFindings,
+        out string PolicyConsistencyConfig,
+        out IReadOnlyList<ArchitectureClassificationConflict> ClassificationConflicts,
+        out IReadOnlyList<ArchitectureClassificationMetadataFailure> ClassificationMetadataFailures,
+        out IReadOnlyList<ArchitectureClassificationRoleFact>? ClassificationRoles,
+        out ArchitectureClassificationPathDeferredNotice? ClassificationPathDeferred,
+        out IReadOnlyList<ArchitectureCycleFinding>? CycleFindings,
+        out IReadOnlyList<ArchitectureCoverageSummary>? CoverageSummaries,
+        out IReadOnlyList<ArchitectureSubtractiveMatcherParticipation>? SubtractiveMatcherParticipation)
+    {
+        Passed = this.Passed;
+        Violations = this.Violations;
+        Cycles = this.Cycles;
+        CoverageFindings = this.CoverageFindings;
+        CoverageConfig = this.CoverageConfig;
+        UnmatchedIgnoredViolations = this.UnmatchedIgnoredViolations;
+        UnmatchedIgnoredViolationsConfig = this.UnmatchedIgnoredViolationsConfig;
+        PolicyConsistencyFindings = this.PolicyConsistencyFindings;
+        PolicyConsistencyConfig = this.PolicyConsistencyConfig;
+        ClassificationConflicts = this.ClassificationConflicts;
+        ClassificationMetadataFailures = this.ClassificationMetadataFailures;
+        ClassificationRoles = this.ClassificationRoles;
+        ClassificationPathDeferred = this.ClassificationPathDeferred;
+        CycleFindings = this.CycleFindings;
+        CoverageSummaries = this.CoverageSummaries;
+        SubtractiveMatcherParticipation = this.SubtractiveMatcherParticipation;
+    }
+
     public IReadOnlyList<ArchitectureClassificationRoleFact> ClassificationRoles { get; init; } =
         ClassificationRoles ?? Array.Empty<ArchitectureClassificationRoleFact>();
 
