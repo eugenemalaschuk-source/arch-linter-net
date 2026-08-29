@@ -150,6 +150,98 @@ public sealed class ArchitecturePolicyContextApplicationServiceTests
     }
 
     [Test]
+    public void Export_ImportedTopology_RetainsFragmentExclusionProvenance()
+    {
+        string temporaryDirectory = Path.Combine(Path.GetTempPath(), $"arch-linter-topology-context-import-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(temporaryDirectory);
+        string policyPath = Path.Combine(temporaryDirectory, "policy.yml");
+        string fragmentPath = Path.Combine(temporaryDirectory, "topology.yml");
+        try
+        {
+            File.WriteAllText(policyPath, """
+                version: 1
+                name: Imported topology context
+                imports: [topology.yml]
+                layers:
+                  application: { namespace: Sample.Application }
+                analysis: { target_assemblies: [] }
+                contracts: {}
+                """);
+            File.WriteAllText(fragmentPath, """
+                topology:
+                  subject_kind: type
+                  scope:
+                    selectors: [{ namespace: Sample.* }]
+                  nodes:
+                    - id: application
+                      mappings: [{ namespace: Sample.Application }]
+                  out_of_scope:
+                    - id: generated
+                      selector: { namespace: Sample.Generated }
+                      reason: Generated code is separately reviewed.
+                """);
+
+            ArchitecturePolicyContextExport context = _engine.ExportPolicyContext(
+                new ArchitecturePolicyContextRequest { PolicyPath = policyPath });
+            ArchitecturePolicyContextProvenance provenance = context.Topology!.OutOfScope.Single().Provenance!;
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(provenance.SourcePath, Is.EqualTo("topology.yml"));
+                Assert.That(provenance.Role, Is.EqualTo("fragment"));
+                Assert.That(provenance.YamlPath, Is.EqualTo("topology.out_of_scope[0]"));
+            });
+        }
+        finally
+        {
+            Directory.Delete(temporaryDirectory, recursive: true);
+        }
+    }
+
+    [Test]
+    public void Export_TopologyContextSelectorsUseStructuralDeterministicOrdering()
+    {
+        string temporaryDirectory = Path.Combine(Path.GetTempPath(), $"arch-linter-topology-context-order-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(temporaryDirectory);
+        string policyPath = Path.Combine(temporaryDirectory, "policy.yml");
+        try
+        {
+            string Policy(string selectors) => $$"""
+                version: 1
+                name: Topology ordering
+                topology:
+                  subject_kind: type
+                  scope:
+                    selectors:
+                {{selectors}}
+                  nodes:
+                    - id: application
+                      mappings: [{ namespace: Sample.Application }]
+                """;
+            const string FirstOrder = "      - context: { role: DomainLayer, metadata: { a: \"b,c=d\" } }\n      - context: { role: DomainLayer, metadata: { a: b, c: d } }";
+            const string SecondOrder = "      - context: { role: DomainLayer, metadata: { a: b, c: d } }\n      - context: { role: DomainLayer, metadata: { a: \"b,c=d\" } }";
+
+            File.WriteAllText(policyPath, Policy(FirstOrder));
+            ArchitecturePolicyContextTopology first = _engine.ExportPolicyContext(
+                new ArchitecturePolicyContextRequest { PolicyPath = policyPath }).Topology!;
+            File.WriteAllText(policyPath, Policy(SecondOrder));
+            ArchitecturePolicyContextTopology second = _engine.ExportPolicyContext(
+                new ArchitecturePolicyContextRequest { PolicyPath = policyPath }).Topology!;
+
+            string[] SelectorShapes(ArchitecturePolicyContextTopology topology) => topology.ScopeSelectors
+                .Select(selector => string.Join(",", selector.Context!.Metadata.OrderBy(item => item.Key, StringComparer.Ordinal)
+                    .Select(item => item.Key + "=" + item.Value)))
+                .ToArray();
+
+            Assert.That(SelectorShapes(second), Is.EqualTo(SelectorShapes(first)));
+        }
+        finally
+        {
+            Directory.Delete(temporaryDirectory, recursive: true);
+        }
+    }
+
+    [Test]
     public void Export_ProjectsSchemaValidatedPolicyWeakeningSeverity()
     {
         string temporaryDirectory = Path.Combine(Path.GetTempPath(), $"arch-linter-policy-context-{Guid.NewGuid():N}");

@@ -1,4 +1,3 @@
-using System.Globalization;
 using ArchLinterNet.Core.Contracts.PolicyImports;
 using ArchLinterNet.Core.Resolution;
 
@@ -11,6 +10,14 @@ internal sealed class TopologyValidator : IArchitecturePolicyDocumentValidator
 {
     private static readonly HashSet<string> _modes = ["partial", "exhaustive"];
     private static readonly HashSet<string> _subjectKinds = ["type", "namespace", "project", "assembly"];
+    private static readonly IReadOnlyDictionary<string, HashSet<string>> _selectorKindsBySubjectKind =
+        new Dictionary<string, HashSet<string>>(StringComparer.Ordinal)
+        {
+            ["type"] = ["layer", "namespace", "project", "assembly", "context"],
+            ["namespace"] = ["namespace", "project", "assembly"],
+            ["project"] = ["project"],
+            ["assembly"] = ["assembly"],
+        };
 
     public void Validate(ArchitectureContractDocument document)
     {
@@ -55,7 +62,7 @@ internal sealed class TopologyValidator : IArchitecturePolicyDocumentValidator
 
         string selectorPath = ArchitecturePolicyProvenancePath.AppendProperty(
             ArchitecturePolicyProvenancePath.AppendProperty(ArchitecturePolicyProvenancePath.Property("topology"), "scope"), "selectors");
-        ValidateSelectorList(document, topology.Scope.Selectors, selectorPath, "Topology scope");
+        ValidateSelectorList(document, topology.Scope.Selectors, topology.SubjectKind, selectorPath, "Topology scope");
     }
 
     private static void ValidateNodes(ArchitectureContractDocument document, ArchitectureTopology topology)
@@ -66,7 +73,7 @@ internal sealed class TopologyValidator : IArchitecturePolicyDocumentValidator
         }
 
         var nodeIds = new HashSet<string>(StringComparer.Ordinal);
-        var mappings = new Dictionary<string, string>(StringComparer.Ordinal);
+        var mappings = new Dictionary<TopologySelectorIdentity, string>();
         string nodesPath = ArchitecturePolicyProvenancePath.AppendProperty(ArchitecturePolicyProvenancePath.Property("topology"), "nodes");
         for (int index = 0; index < topology.Nodes.Count; index++)
         {
@@ -97,12 +104,13 @@ internal sealed class TopologyValidator : IArchitecturePolicyDocumentValidator
             for (int mappingIndex = 0; mappingIndex < node.Mappings.Count; mappingIndex++)
             {
                 string path = ArchitecturePolicyProvenancePath.AppendIndex(mappingPath, mappingIndex);
-                string identity = ValidateSelector(document, node.Mappings[mappingIndex], path, $"Topology node '{node.Id}' mapping");
+                TopologySelectorIdentity identity = ValidateSelector(
+                    document, node.Mappings[mappingIndex], topology.SubjectKind, path, $"Topology node '{node.Id}' mapping");
                 if (mappings.TryGetValue(identity, out string? existingNode))
                 {
                     string detail = string.Equals(existingNode, node.Id, StringComparison.Ordinal)
-                        ? $"Topology node '{node.Id}' declares duplicate mapping selector '{identity}'."
-                        : $"Topology nodes '{existingNode}' and '{node.Id}' declare the same mapping selector '{identity}', which is unambiguously ambiguous.";
+                        ? $"Topology node '{node.Id}' declares duplicate mapping selector."
+                        : $"Topology nodes '{existingNode}' and '{node.Id}' declare the same mapping selector, which is unambiguously ambiguous.";
                     throw new InvalidOperationException(detail);
                 }
 
@@ -119,7 +127,7 @@ internal sealed class TopologyValidator : IArchitecturePolicyDocumentValidator
         }
 
         HashSet<string> nodes = topology.Nodes.Select(node => node.Id).ToHashSet(StringComparer.Ordinal);
-        var edges = new HashSet<string>(StringComparer.Ordinal);
+        var edges = new HashSet<(string From, string To)>();
         string edgesPath = ArchitecturePolicyProvenancePath.AppendProperty(ArchitecturePolicyProvenancePath.Property("topology"), "allowed_edges");
         for (int index = 0; index < topology.AllowedEdges.Count; index++)
         {
@@ -136,10 +144,10 @@ internal sealed class TopologyValidator : IArchitecturePolicyDocumentValidator
                     $"Topology allowed edge '{edge.From}' -> '{edge.To}' references an undeclared node.");
             }
 
-            string identity = edge.From + "->" + edge.To;
+            (string From, string To) identity = (edge.From, edge.To);
             if (!edges.Add(identity))
             {
-                throw new InvalidOperationException($"Topology declares duplicate allowed edge '{identity}'.");
+                throw new InvalidOperationException($"Topology declares duplicate allowed edge '{edge.From}' -> '{edge.To}'.");
             }
         }
     }
@@ -173,7 +181,7 @@ internal sealed class TopologyValidator : IArchitecturePolicyDocumentValidator
                 throw new InvalidOperationException($"Topology out_of_scope entry '{entry.Id}' must declare a non-empty reason.");
             }
 
-            ValidateSelector(document, entry.Selector, ArchitecturePolicyProvenancePath.AppendProperty(entryPath, "selector"),
+            ValidateSelector(document, entry.Selector, topology.SubjectKind, ArchitecturePolicyProvenancePath.AppendProperty(entryPath, "selector"),
                 $"Topology out_of_scope entry '{entry.Id}'");
         }
     }
@@ -181,18 +189,20 @@ internal sealed class TopologyValidator : IArchitecturePolicyDocumentValidator
     private static void ValidateSelectorList(
         ArchitectureContractDocument document,
         List<ArchitectureTopologySubjectSelector> selectors,
+        string subjectKind,
         string path,
         string label)
     {
         for (int index = 0; index < selectors.Count; index++)
         {
-            ValidateSelector(document, selectors[index], ArchitecturePolicyProvenancePath.AppendIndex(path, index), $"{label} selector");
+            ValidateSelector(document, selectors[index], subjectKind, ArchitecturePolicyProvenancePath.AppendIndex(path, index), $"{label} selector");
         }
     }
 
-    private static string ValidateSelector(
+    private static TopologySelectorIdentity ValidateSelector(
         ArchitectureContractDocument document,
         ArchitectureTopologySubjectSelector? selector,
+        string subjectKind,
         string path,
         string label)
     {
@@ -212,6 +222,17 @@ internal sealed class TopologyValidator : IArchitecturePolicyDocumentValidator
         {
             throw new InvalidOperationException(
                 $"{label} must declare exactly one of layer, namespace, project, assembly, or context.");
+        }
+
+        string selectorKind = layer ? "layer"
+            : @namespace ? "namespace"
+            : project ? "project"
+            : assembly ? "assembly"
+            : "context";
+        if (!_selectorKindsBySubjectKind[subjectKind].Contains(selectorKind))
+        {
+            throw new InvalidOperationException(
+                $"{label} selector kind '{selectorKind}' is not valid for topology subject_kind '{subjectKind}'.");
         }
 
         if (!@namespace && !string.IsNullOrWhiteSpace(selector.NamespaceSuffix))
@@ -241,7 +262,7 @@ internal sealed class TopologyValidator : IArchitecturePolicyDocumentValidator
             ValidateContext(label, selector.Context!);
         }
 
-        return SelectorIdentity(selector);
+        return TopologySelectorIdentity.Create(selector, selectorKind);
     }
 
     private static void ValidateContext(string label, ArchitectureContextSelector context)
@@ -271,19 +292,6 @@ internal sealed class TopologyValidator : IArchitecturePolicyDocumentValidator
         }
     }
 
-    private static string SelectorIdentity(ArchitectureTopologySubjectSelector selector)
-    {
-        if (!string.IsNullOrWhiteSpace(selector.Layer)) return "layer:" + selector.Layer;
-        if (!string.IsNullOrWhiteSpace(selector.Namespace)) return "namespace:" + selector.Namespace + ";suffix:" + selector.NamespaceSuffix;
-        if (!string.IsNullOrWhiteSpace(selector.Project)) return "project:" + selector.Project;
-        if (!string.IsNullOrWhiteSpace(selector.Assembly)) return "assembly:" + selector.Assembly;
-
-        ArchitectureContextSelector context = selector.Context!;
-        string metadata = string.Join(",", context.Metadata.OrderBy(item => item.Key, StringComparer.Ordinal)
-            .Select(item => item.Key + "=" + Display(item.Value)));
-        return "context:" + context.Role + ";metadata:" + metadata + ";when:" + (context.When ?? string.Empty);
-    }
-
     private static bool IsSupportedScalar(object? value) => value switch
     {
         null => false,
@@ -295,7 +303,65 @@ internal sealed class TopologyValidator : IArchitecturePolicyDocumentValidator
 
     private static bool IsFinite(double number) => !double.IsNaN(number) && !double.IsInfinity(number);
 
-    private static string Display(object value) => value is IFormattable formattable
-        ? formattable.ToString(null, CultureInfo.InvariantCulture)
-        : value.ToString() ?? string.Empty;
+    private sealed record TopologySelectorIdentity(
+        string Kind,
+        string Value,
+        string NamespaceSuffix,
+        TopologyContextIdentity? Context)
+    {
+        public static TopologySelectorIdentity Create(ArchitectureTopologySubjectSelector selector, string kind) => kind switch
+        {
+            "layer" => new(kind, selector.Layer, string.Empty, null),
+            "namespace" => new(kind, selector.Namespace, selector.NamespaceSuffix, null),
+            "project" => new(kind, selector.Project, string.Empty, null),
+            "assembly" => new(kind, selector.Assembly, string.Empty, null),
+            _ => new(kind, string.Empty, string.Empty, TopologyContextIdentity.Create(selector.Context!)),
+        };
+    }
+
+    private sealed class TopologyContextIdentity : IEquatable<TopologyContextIdentity>
+    {
+        private readonly TopologyMetadataEntry[] _metadata;
+
+        private TopologyContextIdentity(string role, string? when, TopologyMetadataEntry[] metadata)
+        {
+            Role = role;
+            When = when;
+            _metadata = metadata;
+        }
+
+        private string Role { get; }
+
+        private string? When { get; }
+
+        public static TopologyContextIdentity Create(ArchitectureContextSelector context) => new(
+            context.Role,
+            context.When,
+            context.Metadata
+                .OrderBy(item => item.Key, StringComparer.Ordinal)
+                .Select(item => new TopologyMetadataEntry(item.Key, item.Value.GetType(), item.Value))
+                .ToArray());
+
+        public bool Equals(TopologyContextIdentity? other) => other is not null
+            && string.Equals(Role, other.Role, StringComparison.Ordinal)
+            && string.Equals(When, other.When, StringComparison.Ordinal)
+            && _metadata.SequenceEqual(other._metadata);
+
+        public override bool Equals(object? obj) => Equals(obj as TopologyContextIdentity);
+
+        public override int GetHashCode()
+        {
+            var hash = new HashCode();
+            hash.Add(Role, StringComparer.Ordinal);
+            hash.Add(When, StringComparer.Ordinal);
+            foreach (TopologyMetadataEntry entry in _metadata)
+            {
+                hash.Add(entry);
+            }
+
+            return hash.ToHashCode();
+        }
+    }
+
+    private readonly record struct TopologyMetadataEntry(string Key, Type ValueType, object Value);
 }

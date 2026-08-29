@@ -143,7 +143,7 @@ internal static class ArchitecturePolicyWeakeningStaticScopeEvaluator
                     new PolicyWeakeningControlContext(
                         "topology_out_of_scope_added", "topology:" + entry.Id, SemanticClassification, severity),
                     Array.Empty<string>(),
-                    [TopologySelectorKey(entry.Selector)],
+                    [ArchitecturePolicyContextTopologySelectorComparer.Describe(entry.Selector)],
                     null,
                     entry.Provenance ?? entry.Selector.Provenance,
                     Array.Empty<string>(),
@@ -151,12 +151,13 @@ internal static class ArchitecturePolicyWeakeningStaticScopeEvaluator
                 continue;
             }
 
-            string baselineSelector = TopologySelectorKey(baseEntry.Selector);
-            string currentSelector = TopologySelectorKey(entry.Selector);
-            if (string.Equals(baselineSelector, currentSelector, StringComparison.Ordinal))
+            if (ArchitecturePolicyContextTopologySelectorComparer.Instance.Compare(baseEntry.Selector, entry.Selector) == 0)
             {
                 continue;
             }
+
+            string baselineSelector = ArchitecturePolicyContextTopologySelectorComparer.Describe(baseEntry.Selector);
+            string currentSelector = ArchitecturePolicyContextTopologySelectorComparer.Describe(entry.Selector);
 
             bool semantic = IsProvablyBroaderNamespace(baseEntry.Selector, entry.Selector);
             findings.Add(CreateFinding(
@@ -190,17 +191,4 @@ internal static class ArchitecturePolicyWeakeningStaticScopeEvaluator
         return baseline.Value.StartsWith(current.Value + ".", StringComparison.Ordinal);
     }
 
-    private static string TopologySelectorKey(ArchitecturePolicyContextTopologySelector selector)
-    {
-        if (selector.Kind != "context")
-        {
-            return selector.Kind + ":" + selector.Value + ":" + selector.NamespaceSuffix;
-        }
-
-        ArchitecturePolicyContextSelector? context = selector.Context;
-        return "context:" + (context?.Role ?? string.Empty) + ":" +
-               string.Join(",", context?.Metadata.OrderBy(item => item.Key, _comparer)
-                   .Select(item => item.Key + "=" + item.Value) ?? Array.Empty<string>()) + ":" +
-               (context?.When ?? string.Empty);
-    }
 }

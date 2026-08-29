@@ -156,7 +156,7 @@ public sealed class ArchitecturePolicyContextApplicationService(IArchitecturePol
             topology.Scope.Selectors
                 .Select((selector, index) => ProjectTopologySelector(document, selector,
                     ArchitecturePolicyProvenancePath.AppendIndex(scopeSelectorsPath, index)))
-                .OrderBy(TopologySelectorKey, StringComparer.Ordinal)
+                .OrderBy(selector => selector, ArchitecturePolicyContextTopologySelectorComparer.Instance)
                 .ToArray(),
             topology.Nodes
                 .Select((node, index) => new ArchitecturePolicyContextTopologyNode(
@@ -166,7 +166,7 @@ public sealed class ArchitecturePolicyContextApplicationService(IArchitecturePol
                             ArchitecturePolicyProvenancePath.AppendIndex(
                                 ArchitecturePolicyProvenancePath.AppendProperty(
                                     ArchitecturePolicyProvenancePath.AppendIndex(nodesPath, index), "mappings"), mappingIndex)))
-                        .OrderBy(TopologySelectorKey, StringComparer.Ordinal)
+                        .OrderBy(selector => selector, ArchitecturePolicyContextTopologySelectorComparer.Instance)
                         .ToArray(),
                     ProjectTopologyProvenance(document, ArchitecturePolicyProvenancePath.AppendIndex(nodesPath, index))))
                 .OrderBy(node => node.Id, StringComparer.Ordinal)
@@ -232,15 +232,6 @@ public sealed class ArchitecturePolicyContextApplicationService(IArchitecturePol
             ? ProjectProvenance(location)
             : null;
     }
-
-    private static string TopologySelectorKey(ArchitecturePolicyContextTopologySelector selector) => selector.Kind switch
-    {
-        "context" => selector.Kind + ":" + (selector.Context?.Role ?? string.Empty) + ":" +
-                     string.Join(",", selector.Context?.Metadata.OrderBy(item => item.Key, StringComparer.Ordinal)
-                         .Select(item => item.Key + "=" + item.Value) ?? Array.Empty<string>()) + ":" +
-                     (selector.Context?.When ?? string.Empty),
-        _ => selector.Kind + ":" + selector.Value + ":" + selector.NamespaceSuffix,
-    };
 
     private static ArchitecturePolicyContextContract[] ProjectContracts(
         ArchitectureContractCatalog catalog,

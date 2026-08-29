@@ -75,12 +75,12 @@ public sealed class ArchitectureTopologyTests
     }
 
     [Test]
-    public void Load_ValidTopology_BindsAllSubjectKindsAndSelectorForms()
+    public void Load_TypeTopology_BindsAllSupportedSelectorForms()
     {
         ArchitectureContractDocument document = LoadPolicy($"""
             topology:
               mode: exhaustive
-              subject_kind: assembly
+              subject_kind: type
               scope:
                 selectors:
                   - layer: core
@@ -127,7 +127,7 @@ public sealed class ArchitectureTopologyTests
 
         Assert.Multiple(() =>
         {
-            Assert.That(topology.SubjectKind, Is.EqualTo("assembly"));
+            Assert.That(topology.SubjectKind, Is.EqualTo("type"));
             Assert.That(topology.Scope.Selectors, Has.Count.EqualTo(5));
             Assert.That(topology.Scope.Selectors[0].Layer, Is.EqualTo("core"));
             Assert.That(topology.Scope.Selectors[1].NamespaceSuffix, Is.EqualTo("Generated"));
@@ -194,7 +194,7 @@ public sealed class ArchitectureTopologyTests
     {
         InvalidOperationException exception = Assert.Throws<InvalidOperationException>(() => LoadPolicy("""
             topology:
-              subject_kind: namespace
+              subject_kind: type
               scope:
                 selectors: []
               nodes:
@@ -211,7 +211,7 @@ public sealed class ArchitectureTopologyTests
     {
         InvalidOperationException noNodes = Assert.Throws<InvalidOperationException>(() => LoadPolicy("""
             topology:
-              subject_kind: namespace
+              subject_kind: type
               scope:
                 selectors:
                   - namespace: App.*
@@ -220,7 +220,7 @@ public sealed class ArchitectureTopologyTests
 
         InvalidOperationException noMappings = Assert.Throws<InvalidOperationException>(() => LoadPolicy("""
             topology:
-              subject_kind: namespace
+              subject_kind: type
               scope:
                 selectors:
                   - namespace: App.*
@@ -246,7 +246,7 @@ public sealed class ArchitectureTopologyTests
     {
         InvalidOperationException exception = Assert.Throws<InvalidOperationException>(() => LoadPolicy($"""
             topology:
-              subject_kind: namespace
+              subject_kind: type
               scope:
                 selectors:
                   {selector}
@@ -264,7 +264,7 @@ public sealed class ArchitectureTopologyTests
     {
         InvalidOperationException emptyString = Assert.Throws<InvalidOperationException>(() => LoadPolicy("""
             topology:
-              subject_kind: namespace
+              subject_kind: type
               scope:
                 selectors:
                   - context:
@@ -279,7 +279,7 @@ public sealed class ArchitectureTopologyTests
 
         InvalidOperationException unsupportedValue = Assert.Throws<InvalidOperationException>(() => LoadPolicy("""
             topology:
-              subject_kind: namespace
+              subject_kind: type
               scope:
                 selectors:
                   - context:
@@ -305,7 +305,7 @@ public sealed class ArchitectureTopologyTests
     {
         InvalidOperationException unknownLayer = Assert.Throws<InvalidOperationException>(() => LoadPolicy("""
             topology:
-              subject_kind: namespace
+              subject_kind: type
               scope:
                 selectors:
                   - layer: missing
@@ -370,7 +370,7 @@ public sealed class ArchitectureTopologyTests
 
         InvalidOperationException crossNodeMapping = Assert.Throws<InvalidOperationException>(() => LoadPolicy("""
             topology:
-              subject_kind: namespace
+              subject_kind: type
               scope:
                 selectors:
                   - namespace: App.*
@@ -445,7 +445,7 @@ public sealed class ArchitectureTopologyTests
 
         Assert.Multiple(() =>
         {
-            Assert.That(duplicateEdge.Message, Does.Contain("duplicate allowed edge 'core->api'"));
+            Assert.That(duplicateEdge.Message, Does.Contain("duplicate allowed edge 'core' -> 'api'"));
             Assert.That(duplicateOutOfScope.Message, Does.Contain("duplicate out_of_scope id 'generated'"));
         });
     }
@@ -528,6 +528,122 @@ public sealed class ArchitectureTopologyTests
         {
             Assert.That(unknownTopologyProperty.Message, Does.Contain("topology contains unknown property 'selector'"));
             Assert.That(unknownContextProperty.Message, Does.Contain("contains unknown property 'metdata'"));
+        });
+    }
+
+    [TestCase("namespace", "layer: core", "layer")]
+    [TestCase("namespace", "context: { role: DomainLayer }", "context")]
+    [TestCase("project", "namespace: App.Core", "namespace")]
+    [TestCase("assembly", "project: App.Core", "project")]
+    public void Load_SelectorKindOutsideSubjectKindMatrix_FailsDeterministically(
+        string subjectKind,
+        string selector,
+        string selectorKind)
+    {
+        string validMapping = subjectKind switch
+        {
+            "namespace" => "namespace: App.Core",
+            "project" => "project: App.Core",
+            "assembly" => "assembly: App.Core",
+            _ => throw new ArgumentOutOfRangeException(nameof(subjectKind)),
+        };
+
+        InvalidOperationException exception = Assert.Throws<InvalidOperationException>(() => LoadPolicy($$"""
+            topology:
+              subject_kind: {{subjectKind}}
+              scope:
+                selectors:
+                  - {{selector}}
+              nodes:
+                - id: node
+                  mappings:
+                    - {{validMapping}}
+            """))!;
+
+        Assert.That(exception.Message, Does.Contain($"selector kind '{selectorKind}' is not valid for topology subject_kind '{subjectKind}'"));
+    }
+
+    [TestCase("namespace", "namespace: App.*")]
+    [TestCase("namespace", "project: App.Core")]
+    [TestCase("namespace", "assembly: App.Core")]
+    [TestCase("project", "project: App.Core")]
+    [TestCase("assembly", "assembly: App.Core")]
+    public void Load_SelectorKindInsideSubjectKindMatrix_IsAccepted(string subjectKind, string selector)
+    {
+        Assert.DoesNotThrow(() => LoadPolicy($$"""
+            topology:
+              subject_kind: {{subjectKind}}
+              scope:
+                selectors:
+                  - {{selector}}
+              nodes:
+                - id: node
+                  mappings:
+                    - {{selector}}
+            """));
+    }
+
+    [Test]
+    public void Load_DelimiterBearingContextSelectorsRemainDistinctMappings()
+    {
+        Assert.DoesNotThrow(() => LoadPolicy("""
+            topology:
+              subject_kind: type
+              scope:
+                selectors: [{ namespace: App.* }]
+              nodes:
+                - id: encoded-value
+                  mappings:
+                    - context:
+                        role: DomainLayer
+                        metadata: { a: "b,c=d" }
+                - id: separate-values
+                  mappings:
+                    - context:
+                        role: DomainLayer
+                        metadata: { a: b, c: d }
+            """));
+    }
+
+    [Test]
+    public void Load_ArrowBearingNodeIdsDoNotCollideAcrossDistinctEdges()
+    {
+        ArchitectureContractDocument document = LoadPolicy("""
+            topology:
+              subject_kind: type
+              scope:
+                selectors: [{ namespace: App.* }]
+              nodes:
+                - id: left->right
+                  mappings: [{ namespace: App.Left }]
+                - id: tail
+                  mappings: [{ namespace: App.Tail }]
+                - id: left
+                  mappings: [{ namespace: App.Start }]
+                - id: right->tail
+                  mappings: [{ namespace: App.Right }]
+              allowed_edges:
+                - from: left->right
+                  to: tail
+                - from: left
+                  to: right->tail
+            """);
+
+        Assert.That(document.Topology!.AllowedEdges, Has.Count.EqualTo(2));
+    }
+
+    [Test]
+    public void TopologySelector_NamespaceMutationInvalidatesParsedPattern()
+    {
+        var selector = new ArchitectureTopologySubjectSelector { Namespace = "App.First" };
+        Assert.That(selector.NamespacePattern.Match("App.First.Component").Matched, Is.True);
+
+        selector.Namespace = "App.Second";
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(selector.NamespacePattern.Match("App.First.Component").Matched, Is.False);
+            Assert.That(selector.NamespacePattern.Match("App.Second.Component").Matched, Is.True);
         });
     }
 

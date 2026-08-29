@@ -37,7 +37,20 @@ The node `id` is the stable component identity, not display text. Edge endpoints
 
 ## Subject selectors
 
-Each topology selector has exactly one primary selector. The closed vocabulary reuses established policy semantics:
+Each topology selector has exactly one primary selector. Its permitted kind is
+defined by `subject_kind`, so the future evaluator never has to aggregate types
+or infer ownership:
+
+| `subject_kind` | Permitted selectors | Matching fact |
+| --- | --- | --- |
+| `type` | `layer`, `namespace`, `project`, `assembly`, `context` | The one observed type and its canonical namespace, project, assembly, and semantic facts. |
+| `namespace` | `namespace`, `project`, `assembly` | The one observed namespace and its canonical owning project/assembly identity. |
+| `project` | `project` | The one observed project identity. |
+| `assembly` | `assembly` | The one observed assembly identity. |
+
+`layer` and `context` are intentionally invalid for non-type topology: neither
+means "any contained type" nor "all contained types." The closed vocabulary
+otherwise reuses established policy semantics:
 
 - `layer`: a declared layer key;
 - `namespace` plus optional `namespace_suffix`: the existing literal or constrained whole-segment namespace glob grammar;
@@ -65,7 +78,13 @@ The later declared-topology evaluator consumes these semantics. It reports nativ
 
 ## Mapping, reviewed scope, and drift
 
-Mapping is set-based, never YAML-order based. For one in-scope observed subject, a matching `out_of_scope` declaration produces the reviewed out-of-scope disposition; otherwise one matching node is mapped, zero is unmapped, and multiple is ambiguous.
+Mapping is set-based, never YAML-order based. Selector equality and ordering are
+structural: metadata keys and values are compared as typed fields, while allowed
+edges use their ordered `(from, to)` pair. Text containing punctuation such as
+commas or `->` cannot merge distinct declarations. For one in-scope observed
+subject, a matching `out_of_scope` declaration produces the reviewed
+out-of-scope disposition; otherwise one matching node is mapped, zero is
+unmapped, and multiple is ambiguous.
 
 `out_of_scope` is intended-scope evidence, not baseline or waiver debt. Each entry needs a stable `id`, exactly one bounded selector, and a reviewable `reason`. Adding or broadening an entry can reduce declared governance scope, so the existing policy-weakening comparison retains it as typed comparison evidence.
 

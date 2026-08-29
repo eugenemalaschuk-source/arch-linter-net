@@ -114,7 +114,11 @@
       "required": ["subject_kind", "scope", "nodes"],
       "properties": {
         "mode": { "type": "string", "enum": ["partial", "exhaustive"], "default": "partial" },
-        "subject_kind": { "type": "string", "enum": ["type", "namespace", "project", "assembly"] },
+        "subject_kind": {
+          "type": "string",
+          "enum": ["type", "namespace", "project", "assembly"],
+          "description": "Topology selector-kind validation is subject-specific: type accepts layer/namespace/project/assembly/context; namespace accepts namespace/project/assembly; project accepts project; assembly accepts assembly."
+        },
         "scope": { "$ref": "#/$defs/topologyScope" },
         "nodes": {
           "type": "array",
@@ -182,6 +186,7 @@
     "topologySelector": {
       "type": "object",
       "additionalProperties": false,
+      "description": "The post-deserialization topology validator enforces the subject_kind-specific selector matrix declared by topology.subject_kind.",
       "oneOf": [
         { "required": ["layer"] },
         { "required": ["namespace"] },

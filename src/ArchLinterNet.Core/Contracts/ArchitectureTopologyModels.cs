@@ -65,9 +65,20 @@ public sealed class ArchitectureTopologyOutOfScopeDeclaration
 /// </summary>
 public sealed class ArchitectureTopologySubjectSelector
 {
+    private string _namespace = string.Empty;
+
     [YamlMember(Alias = "layer")] public string Layer { get; set; } = string.Empty;
 
-    [YamlMember(Alias = "namespace")] public string Namespace { get; set; } = string.Empty;
+    [YamlMember(Alias = "namespace")]
+    public string Namespace
+    {
+        get => _namespace;
+        set
+        {
+            _namespace = value;
+            _cachedNamespacePattern = null;
+        }
+    }
 
     [YamlMember(Alias = "namespace_suffix")] public string NamespaceSuffix { get; set; } = string.Empty;
 
