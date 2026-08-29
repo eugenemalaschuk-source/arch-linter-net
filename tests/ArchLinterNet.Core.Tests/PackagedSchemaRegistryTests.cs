@@ -6,6 +6,7 @@ using ArchLinterNet.Core.BuildState;
 using ArchLinterNet.Core.Contracts;
 using ArchLinterNet.Core.Model;
 using ArchLinterNet.Core.Reporting;
+using ArchLinterNet.Core.Resolution;
 using ArchLinterNet.Core.Schema;
 using Json.Schema;
 using NUnit.Framework;
@@ -18,7 +19,8 @@ public sealed class PackagedSchemaRegistryTests
     private static readonly string[] _value = {
                 "analysis-build-state", "analysis-cache", "analysis-profile", "api-snapshot", "baseline", "normalized-finding", "policy-fragment", "policy-root",
             };
-    private static readonly string[] _value1 = { "policy-root", "policy-fragment" };
+    private static readonly string[] _advancedSchemaIds =
+        ["policy-root", "policy-fragment", "normalized-finding", "analysis-cache"];
 
     [Test]
     public void List_ReturnsEveryReleaseMatchedSchemaInOrdinalOrder()
@@ -31,24 +33,24 @@ public sealed class PackagedSchemaRegistryTests
         {
             Assert.That(schemas.Select(static schema => schema.LogicalId), Is.EqualTo(_value));
             Assert.That(schemas.Single(static schema => schema.LogicalId == "baseline").DocumentVersion, Is.EqualTo("v2"));
-            // policy-root/policy-fragment advanced to an independent 0.6.1 schema identity to add
-            // layers.*.overlaps_with while every other schema, and the frozen pre-overlaps_with
-            // 0.5.1 policy-root/policy-fragment bytes, remain untouched (see
+            Assert.That(schemas.Single(static schema => schema.LogicalId == "normalized-finding").DocumentVersion, Is.EqualTo("v2"));
+            // Policy root/fragment and the applicability schema advances own independent 0.6.1
+            // identities. Every previous 0.5.1 resource remains byte-for-byte frozen (see
             // openspec/specs/packaged-schema-registry and schema/0.5.1/compatibility-manifest.json).
             Assert.That(
-                schemas.Where(schema => !_value1.Contains(schema.LogicalId))
+                schemas.Where(schema => !_advancedSchemaIds.Contains(schema.LogicalId))
                     .All(static schema => schema.SchemaId.Contains("/schema/0.5.1/", StringComparison.Ordinal)),
                 Is.True);
             Assert.That(
-                schemas.Where(schema => _value1.Contains(schema.LogicalId))
+                schemas.Where(schema => _advancedSchemaIds.Contains(schema.LogicalId))
                     .All(static schema => schema.SchemaId.Contains("/schema/0.6.1/", StringComparison.Ordinal)),
                 Is.True);
             Assert.That(
-                schemas.Where(schema => !_value1.Contains(schema.LogicalId))
+                schemas.Where(schema => !_advancedSchemaIds.Contains(schema.LogicalId))
                     .All(static schema => schema.ResourcePath.StartsWith("schema/0.5.1/", StringComparison.Ordinal)),
                 Is.True);
             Assert.That(
-                schemas.Where(schema => _value1.Contains(schema.LogicalId))
+                schemas.Where(schema => _advancedSchemaIds.Contains(schema.LogicalId))
                     .All(static schema => schema.ResourcePath.StartsWith("schema/0.6.1/", StringComparison.Ordinal)),
                 Is.True);
             Assert.That(schemas.All(static schema => schema.Sha256.Length == 64), Is.True);
@@ -85,6 +87,24 @@ public sealed class PackagedSchemaRegistryTests
                 using JsonDocument document = JsonDocument.Parse(schema);
                 Assert.That(document.RootElement.GetProperty("$id").GetString(), Is.EqualTo(descriptor.SchemaId));
             });
+        }
+    }
+
+    [Test]
+    public void ApplicabilitySchemaAdvance_PreservesTheFrozenV1Bytes()
+    {
+        string repositoryRoot = new ArchitectureRepositoryRootResolver().Resolve();
+        var expectedDigests = new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+            ["normalized-finding.schema.json"] = "f3b6fb5de05de315e6c59bfdeedf921423165bdc7da6d2da4681600fcc4947d3",
+            ["analysis-cache.schema.json"] = "b0958295d23fc6bb4d575ddd81e837e8e458c355662cdae4844bf7a48dfcc9f2",
+        };
+
+        foreach ((string filename, string expectedDigest) in expectedDigests)
+        {
+            string path = Path.Combine(repositoryRoot, "schema", "0.5.1", filename);
+            string actualDigest = Convert.ToHexStringLower(SHA256.HashData(File.ReadAllBytes(path)));
+            Assert.That(actualDigest, Is.EqualTo(expectedDigest), filename);
         }
     }
 
@@ -131,13 +151,14 @@ public sealed class PackagedSchemaRegistryTests
 
         JsonSchema schema = JsonSchema.FromText(schemaText);
         Assert.That(schema.Evaluate(finding).IsValid, Is.True);
+        Assert.That(finding.GetProperty("schema_version").GetInt32(), Is.EqualTo(ArchitectureFinding.CurrentSchemaVersion));
 
         JsonObject unknownKind = JsonNode.Parse(finding.GetRawText())!.AsObject();
         unknownKind["kind"] = "future_finding";
         Assert.That(schema.Evaluate(unknownKind).IsValid, Is.False);
 
         JsonObject unknownVersion = JsonNode.Parse(finding.GetRawText())!.AsObject();
-        unknownVersion["schema_version"] = 2;
+        unknownVersion["schema_version"] = ArchitectureFinding.CurrentSchemaVersion + 1;
         Assert.That(schema.Evaluate(unknownVersion).IsValid, Is.False);
     }
 

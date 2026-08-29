@@ -257,6 +257,26 @@ public sealed partial class ArchitectureDiagnosticFormatter : IArchitectureDiagn
 
     private static string FormatForHumans(ArchitectureDiagnostic diagnostic)
     {
+        if (diagnostic is ArchitectureApplicabilityDiagnostic applicability)
+        {
+            string membership = applicability.Membership is { } membershipValue
+                ? ArchitectureApplicabilityWireNames.MembershipToken(membershipValue)
+                : "unknown";
+            string state = applicability.State is { } stateValue
+                ? ArchitectureApplicabilityWireNames.StateToken(stateValue)
+                : "missing";
+            string validatedState = applicability.ValidatedState is { } validatedStateValue
+                ? ArchitectureApplicabilityWireNames.StateToken(validatedStateValue)
+                : "untrusted";
+            string policy = string.IsNullOrEmpty(applicability.PolicyIdentity)
+                ? string.Empty
+                : $", policy={applicability.PolicyIdentity}";
+            return $"- [applicability] control={applicability.ControlIdentity}, family={applicability.Family}, "
+                + $"membership={membership}, state={state}, validated_state={validatedState}, "
+                + $"reason={applicability.ReasonCode}, provenance=(family={applicability.Provenance.Family}, "
+                + $"control={applicability.Provenance.ControlIdentity}{policy})";
+        }
+
         string idPrefix = diagnostic.ContractId != null ? $"[{diagnostic.ContractId}] " : string.Empty;
         string context = BuildHumanContext(diagnostic);
 

@@ -298,7 +298,8 @@ reviewed snapshot lifecycle.
 ### 6. Update machine consumers by contract identity
 
 JSON, SARIF, and `ArchLinterNet.Testing` expose normalized findings through
-machine contract identities such as `finding/v1`. Treat those identifiers as
+machine contract identities such as `finding/v2` (with `finding/v1` retained for
+legacy input). Treat those identifiers as
 persisted protocol/schema versions; do not infer them from the package SemVer.
 Readers should reject unsupported machine-contract versions rather than guessing
 meaning.

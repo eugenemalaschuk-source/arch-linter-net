@@ -32,6 +32,10 @@ internal static class ArchitectureChangeSnapshotProjector
         List<ArchitectureChangeFinding> findings = ArchitectureFindingMapper
             .FromViolations(validation.Violations.Concat(validation.CoverageFindings), mode)
             .Concat(PolicyLevelFindings(validation, mode))
+            // Applicability findings are already normalized by the authoritative projection. Keep
+            // their canonical identity intact; remapping would rebuild or lose the evidence that
+            // the evaluator produced for this assessment.
+            .Concat(validation.ApplicabilityFindings)
             .Select(static finding => new ArchitectureChangeFinding(
                 finding.CanonicalIdentity,
                 finding.Kind,

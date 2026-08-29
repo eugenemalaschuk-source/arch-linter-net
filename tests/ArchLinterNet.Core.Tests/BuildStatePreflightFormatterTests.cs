@@ -122,7 +122,7 @@ public sealed class BuildStatePreflightFormatterTests
             Assert.That(entry.GetProperty("assembly_name").GetString(), Is.EqualTo("Fixture"));
             Assert.That(entry.GetProperty("expected_output_path").GetString(), Is.EqualTo("bin/Debug/net10.0/Fixture.dll"));
             Assert.That(entry.GetProperty("detail").GetString(), Is.EqualTo("Selected source content changed."));
-            Assert.That(entry.GetProperty("schema_version").GetInt32(), Is.EqualTo(1));
+            Assert.That(entry.GetProperty("schema_version").GetInt32(), Is.EqualTo(ArchitectureFinding.CurrentSchemaVersion));
             Assert.That(entry.GetProperty("kind").GetString(), Is.EqualTo("build_state_preflight"));
             Assert.That(entry.GetProperty("details").GetProperty("state").GetString(), Is.EqualTo("stale-artifact"));
         });
@@ -163,7 +163,7 @@ public sealed class BuildStatePreflightFormatterTests
             Assert.That(result.GetProperty("message").GetProperty("text").GetString(), Does.Contain("Fixture"));
             Assert.That(result.GetProperty("message").GetProperty("text").GetString(), Does.Contain("Fixture.csproj"));
             JsonElement normalized = result.GetProperty("properties").GetProperty("arch_linter_net");
-            Assert.That(normalized.GetProperty("schema_version").GetInt32(), Is.EqualTo(1));
+            Assert.That(normalized.GetProperty("schema_version").GetInt32(), Is.EqualTo(ArchitectureFinding.CurrentSchemaVersion));
             Assert.That(normalized.GetProperty("kind").GetString(), Is.EqualTo("build_state_preflight"));
             Assert.That(normalized.GetProperty("details").GetProperty("state").GetString(), Is.EqualTo("missing-artifact"));
         });

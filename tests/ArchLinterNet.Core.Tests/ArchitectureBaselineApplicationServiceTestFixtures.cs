@@ -195,6 +195,9 @@ internal sealed class FakeContractExecutor : IArchitectureContractExecutor
 {
     public List<string> ModesReceived { get; } = new();
 
+    public IDictionary<string, ArchitectureContractExecutionResult> ResultsByMode { get; } =
+        new Dictionary<string, ArchitectureContractExecutionResult>(StringComparer.Ordinal);
+
     public ArchitectureContractExecutionResult Execute(
         ArchitectureAnalysisSession session,
         string mode,
@@ -203,11 +206,13 @@ internal sealed class FakeContractExecutor : IArchitectureContractExecutor
         ValidationTiming? timing = null)
     {
         ModesReceived.Add(mode);
-        return new ArchitectureContractExecutionResult(
-            Array.Empty<ArchitectureViolation>(),
-            Array.Empty<string>(),
-            Array.Empty<ArchitectureViolation>(),
-            Array.Empty<ArchitectureCoverageSummary>());
+        return ResultsByMode.TryGetValue(mode, out ArchitectureContractExecutionResult? result)
+            ? result
+            : new ArchitectureContractExecutionResult(
+                Array.Empty<ArchitectureViolation>(),
+                Array.Empty<string>(),
+                Array.Empty<ArchitectureViolation>(),
+                Array.Empty<ArchitectureCoverageSummary>());
     }
 }
 

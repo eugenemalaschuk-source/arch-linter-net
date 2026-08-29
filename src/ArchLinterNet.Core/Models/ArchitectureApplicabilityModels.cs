@@ -1,3 +1,5 @@
+using System.Text.Json.Serialization;
+
 namespace ArchLinterNet.Core.Model;
 
 /// <summary>Membership of an effective control in an applicability assessment.</summary>
@@ -82,6 +84,7 @@ public sealed record ArchitectureApplicabilityProvenance
 /// <summary>A deterministic machine-readable reason and the provenance that produced it.</summary>
 public sealed record ArchitectureApplicabilityReason
 {
+    [JsonConstructor]
     public ArchitectureApplicabilityReason(string code, ArchitectureApplicabilityProvenance provenance)
     {
         if (string.IsNullOrWhiteSpace(code))
@@ -113,6 +116,7 @@ public sealed record ArchitectureApplicabilityReason
 /// </summary>
 public sealed record ArchitectureApplicabilityExpectedEntry
 {
+    [JsonConstructor]
     public ArchitectureApplicabilityExpectedEntry(
         string controlIdentity,
         string family,
@@ -152,6 +156,7 @@ public sealed record ArchitectureApplicabilityExpectedEntry
 /// <summary>One family-produced applicability record keyed by an expected control identity.</summary>
 public sealed record ArchitectureApplicabilityRecord
 {
+    [JsonConstructor]
     public ArchitectureApplicabilityRecord(
         string controlIdentity,
         string family,
@@ -217,6 +222,7 @@ public sealed record ArchitectureApplicabilityRecord
 /// </summary>
 public sealed record ArchitectureApplicabilityAssessment
 {
+    [JsonConstructor]
     public ArchitectureApplicabilityAssessment(
         ArchitectureApplicabilityExpectedEntry? expected,
         ArchitectureApplicabilityRecord? record,
@@ -250,6 +256,7 @@ public sealed record ArchitectureApplicabilityAssessment
 /// <summary>Derived completion and stable per-control evidence for an authoritative assessment.</summary>
 public sealed record ArchitectureAssessmentCompletionEvidence
 {
+    [JsonConstructor]
     public ArchitectureAssessmentCompletionEvidence(
         ArchitectureAssessmentCompletionState state,
         IReadOnlyList<ArchitectureApplicabilityAssessment> controls,

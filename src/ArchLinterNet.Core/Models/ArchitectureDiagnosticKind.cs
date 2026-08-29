@@ -25,5 +25,6 @@ public enum ArchitectureDiagnosticKind
     FrameworkReferenceAllowOnly,
     BuildStatePreflight,
     Baseline,
-    ArchitecturePolicyError
+    ArchitecturePolicyError,
+    Applicability
 }

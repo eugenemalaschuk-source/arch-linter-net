@@ -5,6 +5,7 @@ using ArchLinterNet.Core.Execution;
 using ArchLinterNet.Core.Execution.Abstractions;
 using ArchLinterNet.Core.Execution.Results;
 using ArchLinterNet.Core.Model;
+using ArchLinterNet.Core.Reporting;
 using ArchLinterNet.Core.Validation.Abstractions;
 
 namespace ArchLinterNet.Core.Validation;
@@ -548,23 +549,33 @@ public sealed partial class ArchitectureBaselineApplicationService(
 
             bool includeStrict = mode is ModeStrict or "all";
             bool includeAudit = mode is ModeAudit or "all";
+            var applicabilityCandidates = new List<ArchitectureBaselineCandidate>();
 
             if (includeStrict)
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                contractExecutor.Execute(runner.Session, ModeStrict, handlerRegistry, includeAsmdefContracts: false);
+                ArchitectureContractExecutionResult execution = contractExecutor.Execute(
+                    runner.Session, ModeStrict, handlerRegistry, includeAsmdefContracts: false);
+                applicabilityCandidates.AddRange(ProjectApplicabilityCandidates(document, ModeStrict, execution));
             }
 
             if (includeAudit)
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                contractExecutor.Execute(runner.Session, ModeAudit, handlerRegistry, includeAsmdefContracts: false);
+                ArchitectureContractExecutionResult execution = contractExecutor.Execute(
+                    runner.Session, ModeAudit, handlerRegistry, includeAsmdefContracts: false);
+                applicabilityCandidates.AddRange(ProjectApplicabilityCandidates(document, ModeAudit, execution));
             }
 
             cancellationToken.ThrowIfCancellationRequested();
 
+            // Ordinary candidates are recorded by the executor while each contract runs. Read the
+            // runner only after both modes have completed, then append the projection-owned
+            // applicability candidates to that complete ordinary inventory.
+            var baselineCandidates = runner.BaselineCandidates.ToList();
+            baselineCandidates.AddRange(applicabilityCandidates);
             return new BaselineCandidateCollection(
-                document, runner.BaselineCandidates, new List<ArchitectureViolation>(), Array.Empty<BuildStatePreflightDiagnostic>());
+                document, baselineCandidates, new List<ArchitectureViolation>(), Array.Empty<BuildStatePreflightDiagnostic>());
         }
         finally
         {
@@ -572,6 +583,23 @@ public sealed partial class ArchitectureBaselineApplicationService(
             // load context is no longer needed once collection returns.
             setup?.Runner.Session.Context.Dispose();
         }
+    }
+
+    private static IReadOnlyList<ArchitectureBaselineCandidate> ProjectApplicabilityCandidates(
+        ArchitectureContractDocument document,
+        string mode,
+        ArchitectureContractExecutionResult execution)
+    {
+        // Baseline collection has no ordinary validation outcome from which to obtain the
+        // conformance bit. It is irrelevant to finding projection (which is driven solely by the
+        // evaluator's insufficiency reasons), so use the non-blocking value and preserve the exact
+        // expected/record join and reason ordering used by validation.
+        ArchitectureAssessmentCompletionEvidence? completion = ArchitectureApplicabilityEvaluator.Evaluate(
+            execution.ApplicabilityExpectedEntries,
+            execution.ApplicabilityRecords,
+            conformancePassed: true);
+        ArchitectureApplicabilityProjection? projection = ArchitectureApplicabilityProjector.Project(completion, mode);
+        return ArchitectureApplicabilityBaselineCandidateProjector.Project(document, mode, projection);
     }
 
     private static HashSet<string> CollectAvailableContractIds(ArchitectureContractDocument document, string mode)

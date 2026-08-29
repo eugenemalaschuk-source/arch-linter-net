@@ -419,6 +419,7 @@ public sealed partial class ArchitectureAnalysisSnapshot : IDisposable
             && !hasBlockingUnmatched && !hasBlockingPolicyConsistency && !hasBlockingCoverage && !hasBlockingWaiver;
 
         ArchitectureAssessmentCompletionEvidence? assessmentCompletion = DeriveAssessmentCompletion(execution, ordinaryPassed);
+        ArchitectureApplicabilityProjection? applicabilityProjection = ProjectApplicability(assessmentCompletion, mode);
         bool passed = HasPassedAssessment(ordinaryPassed, assessmentCompletion);
 
         (IReadOnlyList<ArchitectureClassificationConflict> classificationConflicts,
@@ -449,6 +450,7 @@ public sealed partial class ArchitectureAnalysisSnapshot : IDisposable
             ApplicabilityExpectedEntries = execution.ApplicabilityExpectedEntries,
             ApplicabilityRecords = execution.ApplicabilityRecords,
             AssessmentCompletionEvidence = assessmentCompletion,
+            ApplicabilityProjection = applicabilityProjection,
             SubtractiveMatcherParticipation = runner.Session.SubtractiveMatcherParticipation
                 .Skip(subtractiveMatcherStartIndex)
                 .ToList()
@@ -558,7 +560,7 @@ public sealed partial class ArchitectureAnalysisSnapshot : IDisposable
 
         return AnalysisCacheOutcomeMapper.FromCacheOutcome(
             lookup.Entry.Outcome, _repositoryRoot, policyImportPaths, GetResolvedAssemblyPaths(),
-            GetDiscoveredProjectPaths(), _document.SourceExpansion);
+            GetDiscoveredProjectPaths(), _document.SourceExpansion, mode);
     }
 
     private CacheArtifactEvidence GetCacheArtifactEvidence()
