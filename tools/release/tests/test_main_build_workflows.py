@@ -54,6 +54,34 @@ def test_main_quality_is_coverage_telemetry_only_and_fail_closed() -> None:
     assert "test-packed-artifact" not in workflow
 
 
+def test_main_sonar_and_codecov_refresh_independently_from_same_coverage() -> None:
+    workflow = _read("main-quality.yml")
+
+    assert "\n  sonar:\n" in workflow
+    assert "\n  codecov:\n" in workflow
+    assert "\n  summary:\n" in workflow
+
+    sonar_start = workflow.index("\n  sonar:\n")
+    codecov_start = workflow.index("\n  codecov:\n")
+    summary_start = workflow.index("\n  summary:\n")
+    sonar = workflow[sonar_start:codecov_start]
+    codecov = workflow[codecov_start:summary_start]
+    summary = workflow[summary_start:]
+
+    assert "needs: dotnet_coverage" in sonar
+    assert "pattern: main-dotnet-coverage-*" in sonar
+    assert "dotnet-sonarscanner" in sonar
+    assert "codecov/codecov-action@" not in sonar
+
+    assert "needs: dotnet_coverage" in codecov
+    assert "pattern: main-dotnet-coverage-*" in codecov
+    assert "codecov/codecov-action@" in codecov
+    assert "dotnet-sonarscanner" not in codecov
+
+    assert "needs: [dotnet_coverage, sonar, codecov]" in summary
+    assert "Require complete main telemetry" in summary
+
+
 def test_main_packages_uses_github_token_and_never_runs_validation_matrix() -> None:
     workflow = _read("main-packages.yml")
     trigger = _trigger_block(workflow, "\npermissions:")
