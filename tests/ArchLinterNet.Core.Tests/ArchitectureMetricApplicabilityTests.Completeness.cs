@@ -164,6 +164,45 @@ public sealed partial class ArchitectureMetricApplicabilityTests
         AssertUnassessable(measurement);
     }
 
+    [Test]
+    public void Evaluate_PublicSurfaceWithPartialExportedTypeUniverse_IsUnassessable()
+    {
+        using UnloadableFieldFixture fixture = UnloadableFieldFixture.Create(includeUnloadableType: true);
+        string assemblyName = fixture.ConsumerAssembly.GetName().Name!;
+        ArchitectureContractDocument document = new()
+        {
+            Name = "metric-partial-public-surface",
+            Contracts = new ArchitectureContractGroups
+            {
+                StrictPublicApiSurface =
+                [
+                    new ArchitecturePublicApiSurfaceContract
+                    {
+                        Id = "surface",
+                        Name = "Surface",
+                        Assemblies = [assemblyName],
+                    },
+                ],
+            },
+            Metrics =
+            [
+                new ArchitectureMetricDefinition
+                {
+                    Id = "surface-size",
+                    Kind = ArchitectureMetricKinds.PublicContractSurfaceCount,
+                    PublicApiSurface = "surface",
+                },
+            ],
+        };
+        using ArchitectureAnalysisContext context = CreateContext(fixture.ConsumerAssembly);
+        var session = new ArchitectureAnalysisSession(context, document, null, false, null);
+
+        ArchitectureMetricMeasurement measurement = ArchitectureMetricEvaluator.Evaluate(session, document.Metrics)
+            .Measurements.Single();
+
+        AssertUnassessable(measurement);
+    }
+
     private static Assembly CreateDuplicateAssembly(string simpleName, Version version)
     {
         AssemblyBuilder assembly = AssemblyBuilder.DefineDynamicAssembly(

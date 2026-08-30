@@ -450,6 +450,14 @@ public sealed class ArchitectureAnalysisSession
         _publicApiSurfaceAnalysisService.CapturePublicApiSurface(
             contract, out missingAssemblies, out selectorSafetyViolations);
 
+    internal IReadOnlyList<PublicApiSnapshotEntry> CapturePublicApiSurface(
+        ArchitecturePublicApiSurfaceContract contract,
+        out IReadOnlyList<string> missingAssemblies,
+        out IReadOnlyList<ArchitectureViolation> selectorSafetyViolations,
+        out bool isComplete) =>
+        _publicApiSurfaceAnalysisService.CapturePublicApiSurface(
+            contract, out missingAssemblies, out selectorSafetyViolations, out isComplete);
+
     public List<ArchitectureViolation> CheckFrameworkDependencyContract(ArchitectureFrameworkReferenceContract contract) =>
         _frameworkReferenceAnalysisService.CheckFrameworkDependencyContract(contract);
 

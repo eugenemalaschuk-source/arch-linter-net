@@ -47,15 +47,25 @@ internal static class ArchitecturePublicApiSurfaceScanner
     // Materializes the exported type universe and its complete normalized surface in one traversal.
     // The session-scoped public API index retains both read-only collections so selectors can match
     // the exact types that produced the entries without repeating the exported-type reflection pass.
-    internal static (IReadOnlyList<ArchitectureExportedApiEntry> Entries, IReadOnlyList<Type> ExportedTypes)
+    internal static (
+        IReadOnlyList<ArchitectureExportedApiEntry> Entries,
+        IReadOnlyList<Type> ExportedTypes,
+        bool IsComplete)
         MaterializeExportedSurface(Assembly assembly)
     {
         string assemblyName = assembly.GetName().Name ?? string.Empty;
         List<ArchitectureExportedApiEntry> entries = new();
         List<Type> exportedTypes = new();
+        ArchitectureLoadableTypeScan loadedTypes =
+            ArchitectureTypeScanner.GetLoadableTypesWithCompleteness(assembly, CancellationToken.None);
 
-        foreach (Type type in GetExportedTypes(assembly))
+        foreach (Type type in loadedTypes.Types)
         {
+            if (!IsExportedType(type) || IsCompilerGenerated(type))
+            {
+                continue;
+            }
+
             exportedTypes.Add(type);
             string typeName = ArchitectureTypeNames.SafeFullName(type);
             string typeSignature = NormalizeType(type);
@@ -74,7 +84,7 @@ internal static class ArchitecturePublicApiSurfaceScanner
             entries.AddRange(GetExportedMembers(type, assemblyName));
         }
 
-        return (entries.AsReadOnly(), exportedTypes.AsReadOnly());
+        return (entries.AsReadOnly(), exportedTypes.AsReadOnly(), loadedTypes.IsComplete);
     }
 
     // The exported type universe GetExportedSurface enumerates, factored out so a surface_selector

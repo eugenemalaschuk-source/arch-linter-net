@@ -475,9 +475,10 @@ internal static class ArchitectureMetricEvaluator
         IReadOnlyList<PublicApiSnapshotEntry> entries;
         IReadOnlyList<ArchitectureViolation> selectorSafety;
         IReadOnlyList<string> missing;
+        bool isComplete;
         try
         {
-            entries = session.CapturePublicApiSurface(contract, out missing, out selectorSafety);
+            entries = session.CapturePublicApiSurface(contract, out missing, out selectorSafety, out isComplete);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
@@ -485,7 +486,7 @@ internal static class ArchitectureMetricEvaluator
         }
 
         List<string> reasons = new();
-        if (missing.Count > 0 || selectorSafety.Count > 0)
+        if (missing.Count > 0 || selectorSafety.Count > 0 || !isComplete)
         {
             reasons.Add(ArchitectureApplicabilityReasonCodes.MissingRequiredInput);
         }

@@ -492,9 +492,12 @@ internal static class PublicApiSurfaceChecker
 
     private static ArchitecturePublicApiSurfaceMaterialization MaterializeSurface(Assembly assembly)
     {
-        (IReadOnlyList<ArchitectureExportedApiEntry> entries, IReadOnlyList<Type> exportedTypes) =
+        (
+            IReadOnlyList<ArchitectureExportedApiEntry> entries,
+            IReadOnlyList<Type> exportedTypes,
+            bool isComplete) =
             ArchitecturePublicApiSurfaceScanner.MaterializeExportedSurface(assembly);
-        return new ArchitecturePublicApiSurfaceMaterialization(entries, exportedTypes);
+        return new ArchitecturePublicApiSurfaceMaterialization(entries, exportedTypes, isComplete);
     }
 
     // Inline `declared_api` entries carry no assembly attribution, so they enter the differ as
