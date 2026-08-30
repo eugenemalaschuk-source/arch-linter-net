@@ -1,5 +1,6 @@
 using System.Text.Json;
 using ArchLinterNet.Core.Contracts;
+using ArchLinterNet.Core.Contracts.Validators;
 using ArchLinterNet.Core.IO;
 using ArchLinterNet.Core.IO.Abstractions;
 using ArchLinterNet.Core.Model;
@@ -433,23 +434,118 @@ public sealed partial class SarifEvidenceReader(IArchitectureEvidenceFileSystem?
             expectedContext,
             context.Context,
             out string? bindingDetail);
-        return bindingStatus is null
-            ? CreateResult(
+        if (bindingStatus is not null)
+        {
+            return CreateResult(requirement.Id, bindingStatus.Value, bindingDetail!, contextProvenance);
+        }
+
+        IReadOnlyList<SarifEvidenceSourceDiagnostic> sourceDiagnostics = Array.Empty<SarifEvidenceSourceDiagnostic>();
+        SarifEvidenceAuthorizationSnapshot? authorization = null;
+        if (requirement.DiagnosticFilter is not null
+            && !TryReadSourceDiagnostics(
+                selected.Run,
+                out sourceDiagnostics,
+                out string? sourceShapeDetail,
+                cancellationToken))
+        {
+            return CreateResult(
                 requirement.Id,
-                SarifEvidenceTrustStatus.Valid,
-                "The SARIF artifact contains one matching successful run bound to the assessment context.",
-                contextProvenance)
-            : CreateResult(requirement.Id, bindingStatus.Value, bindingDetail!, contextProvenance);
+                SarifEvidenceTrustStatus.UnsupportedShape,
+                sourceShapeDetail!,
+                contextProvenance);
+        }
+
+        if (requirement.DiagnosticFilter is not null)
+        {
+            authorization = CaptureAuthorization(
+                requirement,
+                expectedContext,
+                context.Context);
+        }
+
+        return CreateResult(
+            requirement.Id,
+            SarifEvidenceTrustStatus.Valid,
+            "The SARIF artifact contains one matching successful run bound to the assessment context.",
+            contextProvenance,
+            sourceDiagnostics,
+            authorization);
     }
 
     private static SarifEvidenceReadResult CreateResult(
         string logicalId,
         SarifEvidenceTrustStatus status,
         string detail,
-        SarifEvidenceProvenance? provenance = null)
+        SarifEvidenceProvenance? provenance = null,
+        IReadOnlyList<SarifEvidenceSourceDiagnostic>? sourceDiagnostics = null,
+        SarifEvidenceAuthorizationSnapshot? authorization = null)
     {
         provenance ??= new SarifEvidenceProvenance(logicalId, null, null, null, null, null, null, null);
-        return new SarifEvidenceReadResult(status, ReasonCode(status), detail, provenance);
+        return new SarifEvidenceReadResult(
+            status,
+            ReasonCode(status),
+            detail,
+            provenance,
+            sourceDiagnostics,
+            authorization);
+    }
+
+    private static SarifEvidenceAuthorizationSnapshot CaptureAuthorization(
+        ArchitectureExternalEvidenceRequirement requirement,
+        SarifEvidenceAssessmentContext assessmentContext,
+        SarifEvidenceResolvedContext validatedContext)
+    {
+        ArchitectureExternalEvidenceDiagnosticFilter? filter = requirement.DiagnosticFilter;
+        ValidateDiagnosticFilterBounds(filter);
+        return new SarifEvidenceAuthorizationSnapshot(
+            requirement.Id,
+            requirement.Tool,
+            requirement.ToolVersion,
+            requirement.Run,
+            requirement.RequireRepository,
+            requirement.RequireRevision,
+            requirement.RequireScope,
+            assessmentContext,
+            filter is null
+                ? null
+                : new SarifExternalDiagnosticFilterAuthorization(
+                    filter.RuleIds,
+                    filter.RuleTags,
+                    filter.Projects,
+                    filter.PathPrefixes,
+                    filter.Severity,
+                    filter.RequireMatches),
+            validatedContext);
+    }
+
+    private static void ValidateDiagnosticFilterBounds(ArchitectureExternalEvidenceDiagnosticFilter? filter)
+    {
+        if (filter is null)
+        {
+            return;
+        }
+
+        ValidateDiagnosticFilterBound("rule_ids", filter.RuleIds?.Count ?? 0);
+        ValidateDiagnosticFilterBound("rule_tags", filter.RuleTags?.Count ?? 0);
+        ValidateDiagnosticFilterBound("projects", filter.Projects?.Count ?? 0);
+        ValidateDiagnosticFilterBound("path_prefixes", filter.PathPrefixes?.Count ?? 0);
+        if (filter.Severity?.Count > ExternalDiagnosticFilterRules.SupportedSeverities.Length)
+        {
+            throw new ArgumentException(
+                "The external-evidence diagnostic_filter.severity map exceeds the supported source-severity bound.",
+                nameof(filter));
+        }
+    }
+
+    private static void ValidateDiagnosticFilterBound(string name, int count)
+    {
+        if (count > ExternalDiagnosticFilterRules.MaxValuesPerSelector)
+        {
+            throw new ArgumentException(
+                $"The external-evidence diagnostic_filter.{name} list exceeds the " +
+                $"{ExternalDiagnosticFilterRules.MaxValuesPerSelector}-value bound.",
+                name);
+        }
     }
 
     private static SarifEvidenceReadResult DuplicatePropertiesResult(

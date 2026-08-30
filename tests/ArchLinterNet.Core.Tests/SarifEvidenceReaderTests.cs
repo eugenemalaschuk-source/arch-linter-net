@@ -75,7 +75,7 @@ public sealed class SarifEvidenceReaderTests
         string json = Sarif(
             tool: "Acme.Scanner",
             runId: "assessment-42",
-            results: "[{\"ruleId\":\"A\"},{\"ruleId\":\"B\"}]");
+            results: "[{\"ruleId\":\"A\",\"message\":{\"text\":\"first\"}},{\"ruleId\":\"B\",\"message\":{\"text\":\"second\"}}]");
         _repository.AddUtf8File("scan.sarif", json);
 
         SarifEvidenceReadResult result = new SarifEvidenceReader().Read(
@@ -91,6 +91,31 @@ public sealed class SarifEvidenceReaderTests
             Assert.That(result.ResultCount, Is.EqualTo(2));
             Assert.That(result.Provenance.SelectedToolName, Is.EqualTo("Acme.Scanner"));
             Assert.That(result.Provenance.SelectedRunId, Is.EqualTo("assessment-42"));
+        });
+    }
+
+    [Test]
+    public void Read_TrustOnlyRequirementIgnoresUnprojectedResultMembers()
+    {
+        string json = Sarif(
+            tool: "Acme.Scanner",
+            runId: "assessment-42",
+            results: "[{\"ruleId\":false,\"message\":false,\"level\":false,\"locations\":false}]");
+        _repository.AddUtf8File("scan.sarif", json);
+
+        SarifEvidenceReadResult result = new SarifEvidenceReader().Read(
+            Requirement(),
+            _repository.Root,
+            new SarifEvidenceArtifactReference("scan.sarif", "external.scan"),
+            new SarifEvidenceAssessmentContext("repo", "revision"),
+            new SarifEvidenceLimits(4096, 4, 10));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(result.Status, Is.EqualTo(SarifEvidenceTrustStatus.Valid), result.Detail);
+            Assert.That(result.ResultCount, Is.EqualTo(1));
+            Assert.That(result.SourceDiagnostics, Is.Empty);
+            Assert.That(result.Authorization, Is.Null);
         });
     }
 
