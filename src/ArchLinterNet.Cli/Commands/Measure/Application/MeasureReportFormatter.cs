@@ -106,7 +106,7 @@ internal static class MeasureReportFormatter
                 continue;
             }
 
-            IReadOnlyList<string> contributors = measurement.Contributors;
+            IReadOnlyList<string> contributors = measurement.Contributors!;
             IReadOnlyList<string> bounded = allContributors
                 ? contributors
                 : contributors.Take(maxContributors).ToArray();
@@ -254,7 +254,7 @@ internal static class MeasureReportFormatter
             return;
         }
 
-        IReadOnlyList<string> contributors = measurement.Contributors;
+        IReadOnlyList<string> contributors = measurement.Contributors!;
         IReadOnlyList<string> bounded = allContributors
             ? contributors
             : contributors.Take(maxContributors).ToArray();

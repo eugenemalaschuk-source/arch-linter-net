@@ -51,7 +51,8 @@ public sealed partial class ArchitectureMetricApplicabilityTests
             Assert.That(outcome.Measurements.All(measurement =>
                     measurement.IsUnassessable
                     && measurement.Value == null
-                    && measurement.Contributors.Count == 0),
+                    && measurement.Contributors == null
+                    && measurement.ContributorCount == null),
                 Is.True);
             Assert.That(outcome.Applicability!.Controls.Select(control => control.Record!).SelectMany(record => record.Reasons)
                     .Select(reason => reason.Code),

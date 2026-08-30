@@ -1,6 +1,7 @@
 using System.Reflection;
 using ArchLinterNet.Core.Contracts;
 using ArchLinterNet.Core.Contracts.Families;
+using ArchLinterNet.Core.Discovery;
 using ArchLinterNet.Core.Model;
 using ArchLinterNet.Core.Reporting;
 using ArchLinterNet.Core.Scanning;
@@ -439,15 +440,15 @@ internal static class ArchitectureMetricEvaluator
     private static bool HasCanonicalProjectOwner(
         ArchitectureAnalysisSession session,
         ArchitectureTopologyEvaluator.ObservedSubject subject) =>
-        !string.IsNullOrWhiteSpace(subject.Assembly)
-        && session.Facts.TryGetProjectByAssemblyName(subject.Assembly, out _);
+        subject.ResolvedAssembly is not null
+        && session.Facts.TryGetProjectByResolvedAssembly(subject.ResolvedAssembly, out _);
 
     private static string? ResolveCanonicalProjectOwner(
         ArchitectureAnalysisSession session,
         ArchitectureTopologyEvaluator.ObservedSubject subject) =>
         HasCanonicalProjectOwner(session, subject)
-        && session.Facts.TryGetProjectByAssemblyName(subject.Assembly, out var project)
-            ? project.AssemblyName
+        && session.Facts.TryGetProjectByResolvedAssembly(subject.ResolvedAssembly!, out var project)
+            ? ProjectPathNormalizer.Normalize(project.Path)
             : null;
 
     private static MetricResult EvaluatePublicSurface(
@@ -598,7 +599,7 @@ internal static class ArchitectureMetricEvaluator
             unit,
             scope,
             value,
-            state == ArchitectureApplicabilityRecordState.Evaluable ? orderedContributors : Array.Empty<string>());
+            state == ArchitectureApplicabilityRecordState.Evaluable ? orderedContributors : null);
         ArchitectureApplicabilityRecord record = new(
             definition.Id, Family, state, reasons, provenance)
         {
@@ -612,7 +613,7 @@ internal static class ArchitectureMetricEvaluator
             scope,
             state,
             value,
-            state == ArchitectureApplicabilityRecordState.Evaluable ? orderedContributors : Array.Empty<string>());
+            state == ArchitectureApplicabilityRecordState.Evaluable ? orderedContributors : null);
         return new MetricResult(measurement, record);
     }
 

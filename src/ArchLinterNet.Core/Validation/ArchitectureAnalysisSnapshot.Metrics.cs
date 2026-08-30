@@ -18,25 +18,35 @@ public sealed partial class ArchitectureAnalysisSnapshot
                     "This snapshot observed cancellation during a prior operation and cannot be reused.");
             }
 
-            _cancellationToken.ThrowIfCancellationRequested();
-            if (_preflight.Blocked)
+            try
             {
-                return ArchitectureMetricEvaluator.Unavailable(
-                    _document.Metrics, metricIds, _document.Name,
-                    ArchitectureApplicabilityReasonCodes.MissingRequiredInput);
-            }
+                _cancellationToken.ThrowIfCancellationRequested();
+                if (_preflight.Blocked)
+                {
+                    return ArchitectureMetricEvaluator.Unavailable(
+                        _document.Metrics, metricIds, _document.Name,
+                        ArchitectureApplicabilityReasonCodes.MissingRequiredInput);
+                }
 
-            ArchitectureRunnerSetup setup = EnsureSetup();
-            if (setup.Runner.Session.Context.MissingAssemblyNames.Count > 0)
+                ArchitectureRunnerSetup setup = EnsureSetup();
+                if (setup.Runner.Session.Context.MissingAssemblyNames.Count > 0)
+                {
+                    return ArchitectureMetricEvaluator.Unavailable(
+                        _document.Metrics,
+                        metricIds,
+                        _document.Name,
+                        ArchitectureApplicabilityReasonCodes.MissingRequiredInput);
+                }
+
+                return ArchitectureMetricEvaluator.Evaluate(setup.Runner.Session, _document.Metrics, metricIds);
+            }
+            catch (OperationCanceledException)
             {
-                return ArchitectureMetricEvaluator.Unavailable(
-                    _document.Metrics,
-                    metricIds,
-                    _document.Name,
-                    ArchitectureApplicabilityReasonCodes.MissingRequiredInput);
+                // Keep Measure() on the same terminal lifecycle as Evaluate(): lazy analysis may
+                // have stopped after materializing only part of a session, so it cannot be reused.
+                _cancelled = true;
+                throw;
             }
-
-            return ArchitectureMetricEvaluator.Evaluate(setup.Runner.Session, _document.Metrics, metricIds);
         }
     }
 }

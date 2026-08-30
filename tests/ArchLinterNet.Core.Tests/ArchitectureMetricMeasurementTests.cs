@@ -104,6 +104,27 @@ public sealed class ArchitectureMetricMeasurementTests
     }
 
     [Test]
+    public void UnassessableCoreMetricEvidence_DoesNotExposeAnUnknownContributorUniverseAsEmpty()
+    {
+        ArchitectureMetricMeasurement measurement = new(
+            "incomplete", ArchitectureMetricKinds.OutgoingComponentCount, "component", null, "component",
+            ArchitectureApplicabilityRecordState.Unassessable, null, Array.Empty<string>());
+        ArchitectureMetricEvidence evidence = new(
+            "incomplete", ArchitectureMetricKinds.OutgoingComponentCount, "component", null, "component",
+            null, Array.Empty<string>());
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(measurement.Value, Is.Null);
+            Assert.That(measurement.Contributors, Is.Null);
+            Assert.That(measurement.ContributorCount, Is.Null);
+            Assert.That(evidence.Value, Is.Null);
+            Assert.That(evidence.Contributors, Is.Null);
+            Assert.That(evidence.ContributorCount, Is.Null);
+        });
+    }
+
+    [Test]
     public void PolicyLoad_AcceptsValidDefinitionsAndLeavesLegacyPoliciesUnchanged()
     {
         string metricsPolicy = WritePolicy("""
@@ -259,7 +280,7 @@ public sealed class ArchitectureMetricMeasurementTests
             Assert.That(outcome.Measurements.All(measurement =>
                 measurement.Value == measurement.ContributorCount), Is.True);
             Assert.That(outcome.Measurements.All(measurement =>
-                measurement.Contributors.SequenceEqual(measurement.Contributors.OrderBy(value => value, StringComparer.Ordinal))), Is.True);
+                measurement.Contributors!.SequenceEqual(measurement.Contributors!.OrderBy(value => value, StringComparer.Ordinal))), Is.True);
             Assert.That(outcome.Measurements.Single(measurement => measurement.Id == "external").Value, Is.Zero);
             Assert.That(outcome.Applicability!.Findings, Is.Empty);
         });
@@ -310,7 +331,7 @@ public sealed class ArchitectureMetricMeasurementTests
             Assert.That(measurement.Value, Is.GreaterThan(0));
             Assert.That(measurement.Value, Is.EqualTo(measurement.ContributorCount));
             string canonicalAssembly = ArchitectureTopologyEvaluator.ResolveCanonicalAssemblyIdentityForMetric(coreAssembly);
-            Assert.That(measurement.Contributors.All(value => value.StartsWith(canonicalAssembly + "|", StringComparison.Ordinal)), Is.True);
+            Assert.That(measurement.Contributors!.All(value => value.StartsWith(canonicalAssembly + "|", StringComparison.Ordinal)), Is.True);
         });
     }
 
@@ -408,6 +429,10 @@ public sealed class ArchitectureMetricMeasurementTests
             Array.Empty<ArchitectureProjectDiscoveryDiagnostic>())
         {
             DiscoveredProjects = [new ArchitectureDiscoveredProject("src/Core/Core.csproj", assemblyName, ["net10.0"])],
+            ResolvedAssemblyPathsByNormalizedProjectPath = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["src/Core/Core.csproj"] = assembly.Location,
+            },
         };
     }
 }

@@ -218,7 +218,8 @@ internal static partial class ArchitectureTopologyEvaluator
                     subject,
                     type,
                     canonicalAssemblyIdentity,
-                    assemblyReferenceIdentity);
+                    assemblyReferenceIdentity,
+                    type.Assembly);
                 subjectsByIdentity.Add(identity, observed);
             }
 
@@ -294,7 +295,8 @@ internal static partial class ArchitectureTopologyEvaluator
                     assemblyName,
                     assemblyName,
                     CanonicalAssemblyIdentity: canonicalAssemblyIdentity,
-                    AssemblyReferenceIdentity: AssemblyReferenceIdentity(assembly)));
+                    AssemblyReferenceIdentity: AssemblyReferenceIdentity(assembly),
+                    ResolvedAssembly: assembly));
         }
 
         // Do not derive assembly edges by aggregating type references: assembly metadata is the
@@ -714,7 +716,8 @@ internal static partial class ArchitectureTopologyEvaluator
         string Subject,
         Type? Type = null,
         string? CanonicalAssemblyIdentity = null,
-        string? AssemblyReferenceIdentity = null);
+        string? AssemblyReferenceIdentity = null,
+        Assembly? ResolvedAssembly = null);
 
     internal sealed record ObservedDependency(
         string SourceIdentity,

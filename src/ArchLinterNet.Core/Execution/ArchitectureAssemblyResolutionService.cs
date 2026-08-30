@@ -149,6 +149,7 @@ public sealed partial class ArchitectureAssemblyResolutionService : IArchitectur
 
         List<Assembly> assemblies = new(names.Count);
         List<string> selectedAssemblyArtifactPaths = new(names.Count);
+        Dictionary<Assembly, string> resolvedAssemblyArtifactPaths = new();
         List<string> missing = new();
         int assemblyLoads = 0;
 
@@ -192,7 +193,9 @@ public sealed partial class ArchitectureAssemblyResolutionService : IArchitectur
                     assemblies.Add(resolved.Assembly);
                     if (resolved.ArtifactPath is not null)
                     {
-                        selectedAssemblyArtifactPaths.Add(resolved.ArtifactPath);
+                        string artifactPath = Path.GetFullPath(resolved.ArtifactPath);
+                        selectedAssemblyArtifactPaths.Add(artifactPath);
+                        resolvedAssemblyArtifactPaths.TryAdd(resolved.Assembly, artifactPath);
                     }
 
                     assemblyLoads += resolved.WasLoaded ? 1 : 0;
@@ -221,6 +224,7 @@ public sealed partial class ArchitectureAssemblyResolutionService : IArchitectur
                 .Select(Path.GetFullPath)
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .ToArray(),
+            ResolvedAssemblyArtifactPaths = resolvedAssemblyArtifactPaths,
         };
     }
 
@@ -486,6 +490,9 @@ public sealed record ResolutionResult(
     IArchitectureAssemblyLoadScope? IsolatedLoadScope = null)
 {
     internal IReadOnlyCollection<string> SelectedAssemblyArtifactPaths { get; init; } = Array.Empty<string>();
+
+    internal IReadOnlyDictionary<Assembly, string> ResolvedAssemblyArtifactPaths { get; init; } =
+        new Dictionary<Assembly, string>();
 }
 
 internal sealed record ResolvedAssembly(Assembly Assembly, bool WasLoaded, string? ArtifactPath);

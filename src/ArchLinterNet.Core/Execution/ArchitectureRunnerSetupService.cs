@@ -332,6 +332,7 @@ public sealed class ArchitectureRunnerSetupService(
             resolution.MissingAssemblyNames, resolution.AssemblyProbingPaths, discovery.Diagnostics, attemptedDiscovery,
             resolution.IsolatedLoadScope, resolution.SelectedAssemblyArtifactPaths)
         {
+            ResolvedAssemblyArtifactPaths = resolution.ResolvedAssemblyArtifactPaths,
             CancellationToken = cancellationToken,
             MaxParallelism = MaxParallelismResolver.Resolve(maxParallelism),
         };

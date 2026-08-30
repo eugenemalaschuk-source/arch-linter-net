@@ -2,6 +2,7 @@ using System.Reflection;
 using System.Reflection.Emit;
 using ArchLinterNet.Core.Contracts;
 using ArchLinterNet.Core.Contracts.Families;
+using ArchLinterNet.Core.Discovery;
 using ArchLinterNet.Core.Execution;
 using ArchLinterNet.Core.Model;
 using NUnit.Framework;
@@ -107,6 +108,58 @@ public sealed partial class ArchitectureMetricApplicabilityTests
             .Measurements.Single();
 
         AssertUnassessable(measurement);
+    }
+
+    [Test]
+    public void Evaluate_ProjectFootprintWithDuplicateOutputArtifactOwners_IsUnassessableWithoutChoosingOneProject()
+    {
+        Assembly coreAssembly = typeof(ArchitectureMetricMeasurement).Assembly;
+        string assemblyName = coreAssembly.GetName().Name!;
+        string artifactPath = Path.GetFullPath(coreAssembly.Location);
+        ArchitectureContractDocument document = new()
+        {
+            Name = "metric-ambiguous-project-owner",
+            Topology = TypeTopology(),
+            Metrics =
+            [
+                new ArchitectureMetricDefinition
+                {
+                    Id = "project-footprint",
+                    Kind = ArchitectureMetricKinds.ComponentFootprintCount,
+                    TopologyNode = "model",
+                    Unit = "project",
+                },
+            ],
+        };
+        ProjectDiscoveryResult discovery = new(
+            [assemblyName], Array.Empty<string>(), Array.Empty<string>(),
+            Array.Empty<ArchitectureProjectDiscoveryDiagnostic>())
+        {
+            DiscoveredProjects =
+            [
+                new ArchitectureDiscoveredProject("src/First/Shared.csproj", assemblyName, ["net10.0"]),
+                new ArchitectureDiscoveredProject("src/Second/Shared.csproj", assemblyName, ["net10.0"]),
+            ],
+            ResolvedAssemblyPathsByNormalizedProjectPath = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["src/First/Shared.csproj"] = artifactPath,
+                ["src/Second/Shared.csproj"] = artifactPath,
+            },
+        };
+        using ArchitectureAnalysisContext context = new(
+            Path.GetTempPath(), [coreAssembly], Array.Empty<string>(), Array.Empty<string>(), projectDiscovery: discovery);
+        var session = new ArchitectureAnalysisSession(context, document, null, false, null);
+
+        ArchitectureMetricMeasurementOutcome outcome = ArchitectureMetricEvaluator.Evaluate(session, document.Metrics);
+        ArchitectureMetricMeasurement measurement = outcome.Measurements.Single();
+        ArchitectureApplicabilityRecord record = outcome.Applicability!.Controls.Single().Record!;
+
+        Assert.Multiple(() =>
+        {
+            AssertUnassessable(measurement);
+            Assert.That(record.Reasons.Select(reason => reason.Code),
+                Is.EqualTo(new[] { ArchitectureApplicabilityReasonCodes.MissingRequiredInput }));
+        });
     }
 
     [Test]
@@ -604,7 +657,8 @@ public sealed partial class ArchitectureMetricApplicabilityTests
         {
             Assert.That(measurement.IsUnassessable, Is.True);
             Assert.That(measurement.Value, Is.Null);
-            Assert.That(measurement.Contributors, Is.Empty);
+            Assert.That(measurement.Contributors, Is.Null);
+            Assert.That(measurement.ContributorCount, Is.Null);
         });
     }
 

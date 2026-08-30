@@ -9,13 +9,16 @@ public sealed record ArchitectureMetricMeasurement(
     string EffectiveScope,
     ArchitectureApplicabilityRecordState State,
     int? Value,
-    IReadOnlyList<string> Contributors)
+    IReadOnlyList<string>? Contributors)
 {
-    public IReadOnlyList<string> Contributors { get; init; } = Contributors
-        .OrderBy(contributor => contributor, StringComparer.Ordinal)
-        .ToArray();
+    public IReadOnlyList<string>? Contributors { get; init; } = Value is null
+        ? null
+        : (Contributors ?? throw new ArgumentException(
+                "Evaluable metric measurements must provide contributor evidence.", nameof(Contributors)))
+            .OrderBy(contributor => contributor, StringComparer.Ordinal)
+            .ToArray();
 
-    public int ContributorCount => Value is null ? 0 : Contributors.Count;
+    public int? ContributorCount => Value is null ? null : Contributors!.Count;
 
     public bool IsEvaluable => State == ArchitectureApplicabilityRecordState.Evaluable && Value is not null;
 

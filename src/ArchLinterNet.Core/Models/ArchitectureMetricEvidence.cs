@@ -12,13 +12,16 @@ public sealed record ArchitectureMetricEvidence(
     string? Unit,
     string EffectiveScope,
     int? Value,
-    IReadOnlyList<string> Contributors)
+    IReadOnlyList<string>? Contributors)
 {
-    public IReadOnlyList<string> Contributors { get; init; } = Contributors
-        .OrderBy(contributor => contributor, StringComparer.Ordinal)
-        .ToArray();
+    public IReadOnlyList<string>? Contributors { get; init; } = Value is null
+        ? null
+        : (Contributors ?? throw new ArgumentException(
+                "Complete metric evidence must provide contributor identities.", nameof(Contributors)))
+            .OrderBy(contributor => contributor, StringComparer.Ordinal)
+            .ToArray();
 
-    public int ContributorCount => Contributors.Count;
+    public int? ContributorCount => Value is null ? null : Contributors!.Count;
 
     public bool IsComplete => Value is not null;
 }
