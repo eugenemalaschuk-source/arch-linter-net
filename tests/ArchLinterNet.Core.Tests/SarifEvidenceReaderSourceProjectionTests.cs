@@ -158,6 +158,39 @@ public sealed class SarifEvidenceReaderSourceProjectionTests
         });
     }
 
+    [TestCase("{\"message\":{\"text\":\"x\"},\"locations\":false}", "", "locations member")]
+    [TestCase("{\"message\":{\"text\":\"x\"},\"locations\":[false]}", "", "primary location must be an object")]
+    [TestCase("{\"message\":{\"text\":\"x\"},\"locations\":[{\"physicalLocation\":false}]}", "", "physicalLocation member")]
+    [TestCase("{\"message\":{\"text\":\"x\"},\"locations\":[{\"physicalLocation\":{\"artifactLocation\":false}}]}", "", "artifactLocation member")]
+    [TestCase("{\"message\":{\"text\":\"x\"},\"locations\":[{\"physicalLocation\":{\"artifactLocation\":{\"uri\":\"../App.cs\"}}}]}", "", "repository-relative path")]
+    [TestCase("{\"message\":{\"text\":\"x\"},\"locations\":[{\"physicalLocation\":{\"region\":false}}]}", "", "region member")]
+    [TestCase("{\"message\":{\"text\":\"x\"},\"fingerprints\":false}", "", "fingerprints member")]
+    [TestCase("{\"message\":{\"text\":\"x\"},\"partialFingerprints\":{\"pair\":false}}", "", "partialFingerprints must contain")]
+    [TestCase("{\"message\":{\"text\":\"x\"}}", "\"artifacts\":false", "artifacts member")]
+    [TestCase("{\"message\":{\"text\":\"x\"}}", "\"artifacts\":[false]", "artifact must be an object")]
+    [TestCase("{\"message\":{\"text\":\"x\"}}", "\"artifacts\":[{\"location\":false}]", "artifact location must be an object")]
+    [TestCase("{\"message\":{\"text\":\"x\"},\"locations\":[{\"physicalLocation\":{\"artifactLocation\":{\"uri\":\"src/B.cs\",\"index\":0}}}]}", "\"artifacts\":[{\"location\":{\"uri\":\"src/A.cs\"}}]", "resolve to different paths")]
+    public void Read_MalformedSourceLocationsAndArtifactsAreRejectedFailClosed(
+        string sourceResult,
+        string runMembers,
+        string expectedDetail)
+    {
+        _repository.AddUtf8File("scan.sarif", Sarif(string.Empty, sourceResult, runMembers));
+
+        SarifEvidenceReadResult result = new SarifEvidenceReader().Read(
+            Requirement(),
+            _repository.Root,
+            new SarifEvidenceArtifactReference("scan.sarif", "external.scan"),
+            new SarifEvidenceAssessmentContext("repo", "revision"));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(result.Status, Is.EqualTo(SarifEvidenceTrustStatus.UnsupportedShape));
+            Assert.That(result.Detail, Does.Contain(expectedDetail));
+            Assert.That(result.SourceDiagnostics, Is.Empty);
+        });
+    }
+
     [Test]
     public void Read_ResolvesRuleReferencesByIdAndIndex()
     {
