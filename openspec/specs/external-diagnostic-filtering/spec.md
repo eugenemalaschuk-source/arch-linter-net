@@ -13,7 +13,9 @@ driver-rule tags, exact project identities, normalized repository-relative path 
 non-empty source-severity to governance-mode map. A severity map value SHALL be exactly `strict`
 or `audit`; a source severity key SHALL be exactly `error`, `warning`, `note`, `none`, or
 `unspecified`. Unknown, blank, duplicate, unsafe, or unsupported filter values SHALL fail policy
-validation with declaration provenance.
+validation with declaration provenance. Each rule-ID, rule-tag, project, and path-prefix selector
+list SHALL contain at most 128 values; the severity map SHALL contain at most the five supported
+source-severity keys.
 
 The trust reader SHALL capture an immutable authorization snapshot for every valid result. That
 snapshot SHALL include the parent logical ID, tool/version/run identity, required context-binding
@@ -65,6 +67,14 @@ selectable source diagnostics from a missing, malformed, unsuccessful, ambiguous
 wrong-context artifact. The selector SHALL consume only trusted reader results and SHALL NOT
 perform a second currentness or producer-service check.
 
+The reader SHALL resolve a result rule through `result.ruleId` and `result.rule.id`, or through
+`result.ruleIndex` and `result.rule.index` into `tool.driver.rules`, and SHALL reject conflicting
+ID/index combinations. A repeated descriptor ID is valid only when an index makes the descriptor
+unambiguous; an ID-only reference to repeated descriptors SHALL fail closed instead of combining
+their tags. The reader SHALL likewise resolve an artifact location index through `run.artifacts`.
+An absent result message or an unsupported unresolved message reference SHALL fail closed rather
+than become an empty source fact.
+
 #### Scenario: A trusted result retains source and trust provenance
 - **WHEN** a validated current-context SARIF result has a rule, message, location, tool version,
   source fingerprint, and artifact hash
@@ -75,6 +85,11 @@ perform a second currentness or producer-service check.
 - **WHEN** the bounded reader rejects an artifact because its revision differs from the current
   assessment context
 - **THEN** no ordinary selected diagnostic is exposed from that artifact
+
+#### Scenario: Repeated descriptor IDs retain their indexed tags
+- **WHEN** two tool-driver rule descriptors share an ID but have distinct tags and results identify
+  the descriptors by their respective rule indexes
+- **THEN** each source diagnostic retains only the tags of its indexed descriptor
 
 ### Requirement: Selection has deterministic severity, identity, ordering, and deduplication
 The system SHALL map each eligible source severity to the filter's configured `strict` or `audit`
@@ -134,6 +149,9 @@ deterministic ordinal ordering.
 The system SHALL operate only on bounded local SARIF bytes already supplied to the trust reader.
 It SHALL NOT execute or configure an analyzer, query a producer/SaaS API, use producer job status,
 or infer selection/currentness from artifact names, timestamps, workflow names, or display text.
+For each immutable authorization group, it SHALL evaluate source diagnostics in one pass using
+ordinal selector membership indexes; it SHALL not rescan the complete diagnostic collection for
+each required selector value.
 
 #### Scenario: Selection does not consult a producer service
 - **WHEN** a caller selects trusted external diagnostics

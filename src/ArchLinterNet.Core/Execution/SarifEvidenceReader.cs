@@ -1,5 +1,6 @@
 using System.Text.Json;
 using ArchLinterNet.Core.Contracts;
+using ArchLinterNet.Core.Contracts.Validators;
 using ArchLinterNet.Core.IO;
 using ArchLinterNet.Core.IO.Abstractions;
 using ArchLinterNet.Core.Model;
@@ -489,6 +490,7 @@ public sealed partial class SarifEvidenceReader(IArchitectureEvidenceFileSystem?
         SarifEvidenceResolvedContext validatedContext)
     {
         ArchitectureExternalEvidenceDiagnosticFilter? filter = requirement.DiagnosticFilter;
+        ValidateDiagnosticFilterBounds(filter);
         return new SarifEvidenceAuthorizationSnapshot(
             requirement.Id,
             requirement.Tool,
@@ -508,6 +510,36 @@ public sealed partial class SarifEvidenceReader(IArchitectureEvidenceFileSystem?
                     filter.Severity,
                     filter.RequireMatches),
             validatedContext);
+    }
+
+    private static void ValidateDiagnosticFilterBounds(ArchitectureExternalEvidenceDiagnosticFilter? filter)
+    {
+        if (filter is null)
+        {
+            return;
+        }
+
+        ValidateDiagnosticFilterBound("rule_ids", filter.RuleIds?.Count ?? 0);
+        ValidateDiagnosticFilterBound("rule_tags", filter.RuleTags?.Count ?? 0);
+        ValidateDiagnosticFilterBound("projects", filter.Projects?.Count ?? 0);
+        ValidateDiagnosticFilterBound("path_prefixes", filter.PathPrefixes?.Count ?? 0);
+        if (filter.Severity?.Count > ExternalDiagnosticFilterRules.SupportedSeverities.Length)
+        {
+            throw new ArgumentException(
+                "The external-evidence diagnostic_filter.severity map exceeds the supported source-severity bound.",
+                nameof(filter));
+        }
+    }
+
+    private static void ValidateDiagnosticFilterBound(string name, int count)
+    {
+        if (count > ExternalDiagnosticFilterRules.MaxValuesPerSelector)
+        {
+            throw new ArgumentException(
+                $"The external-evidence diagnostic_filter.{name} list exceeds the " +
+                $"{ExternalDiagnosticFilterRules.MaxValuesPerSelector}-value bound.",
+                name);
+        }
     }
 
     private static SarifEvidenceReadResult DuplicatePropertiesResult(

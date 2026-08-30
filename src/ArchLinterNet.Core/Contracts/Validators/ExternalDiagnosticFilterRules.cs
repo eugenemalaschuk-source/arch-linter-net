@@ -2,6 +2,8 @@ namespace ArchLinterNet.Core.Contracts.Validators;
 
 internal static class ExternalDiagnosticFilterRules
 {
+    public const int MaxValuesPerSelector = 128;
+
     public static readonly string[] SupportedSeverities =
     [
         "error", "warning", "note", "none", "unspecified",

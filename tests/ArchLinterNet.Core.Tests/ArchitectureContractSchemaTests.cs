@@ -62,6 +62,12 @@ public sealed class ArchitectureContractSchemaTests
             Assert.That(filter.GetProperty("required").EnumerateArray().Select(value => value.GetString()),
                 Is.EqualTo(["severity"]));
             Assert.That(filterProperties.GetProperty("severity").GetProperty("minProperties").GetInt32(), Is.EqualTo(1));
+            Assert.That(filterProperties.GetProperty("severity").GetProperty("maxProperties").GetInt32(), Is.EqualTo(5));
+            Assert.That(filterProperties.GetProperty("rule_ids").GetProperty("$ref").GetString(),
+                Is.EqualTo("#/$defs/boundedDiagnosticSelectorList"));
+            Assert.That(filterProperties.GetProperty("path_prefixes").GetProperty("maxItems").GetInt32(), Is.EqualTo(128));
+            Assert.That(schema.GetProperty("$defs").GetProperty("boundedDiagnosticSelectorList")
+                .GetProperty("allOf")[1].GetProperty("maxItems").GetInt32(), Is.EqualTo(128));
             Assert.That(filterProperties.GetProperty("severity").GetProperty("propertyNames")
                 .GetProperty("enum").EnumerateArray().Select(value => value.GetString()),
                 Is.EquivalentTo(["error", "warning", "note", "none", "unspecified"]));

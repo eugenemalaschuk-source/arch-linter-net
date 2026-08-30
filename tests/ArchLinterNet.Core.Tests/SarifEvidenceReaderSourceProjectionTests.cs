@@ -127,6 +127,63 @@ public sealed class SarifEvidenceReaderSourceProjectionTests
     }
 
     [Test]
+    public void Read_UsesIndexedDescriptorTagsWhenDriverRuleIdsRepeat()
+    {
+        const string rules =
+            "\"rules\":[{\"id\":\"DUP\",\"properties\":{\"tags\":[\"first\"]}}," +
+            "{\"id\":\"DUP\",\"properties\":{\"tags\":[\"second\"]}}," +
+            "{\"id\":\"SEC100/injection\",\"properties\":{\"tags\":[\"hierarchical\"]}}]";
+        const string results =
+            "[{\"ruleId\":\"DUP\",\"ruleIndex\":0,\"message\":{\"text\":\"first\"}}," +
+            "{\"rule\":{\"id\":\"DUP\",\"index\":1},\"message\":{\"text\":\"second\"}}," +
+            "{\"rule\":{\"id\":\"SEC100/injection\",\"index\":2},\"message\":{\"text\":\"hierarchical\"}}]";
+        _repository.AddUtf8File("scan.sarif", Sarif(rules, results));
+
+        SarifEvidenceReadResult result = new SarifEvidenceReader().Read(
+            Requirement(),
+            _repository.Root,
+            new SarifEvidenceArtifactReference("scan.sarif", "external.scan"),
+            new SarifEvidenceAssessmentContext("repo", "revision"));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(result.Status, Is.EqualTo(SarifEvidenceTrustStatus.Valid), result.Detail);
+            Assert.That(result.SourceDiagnostics.Select(diagnostic => diagnostic.RuleId),
+                Is.EqualTo(["DUP", "DUP", "SEC100/injection"]));
+            Assert.That(result.SourceDiagnostics.Select(diagnostic => diagnostic.DriverRuleTags), Is.EqualTo(
+            [
+                new[] { "first" },
+                new[] { "second" },
+                new[] { "hierarchical" },
+            ]));
+        });
+    }
+
+    [Test]
+    public void Read_AmbiguousRepeatedDriverRuleIdWithoutIndexIsRejectedFailClosed()
+    {
+        const string rules =
+            "\"rules\":[{\"id\":\"DUP\",\"properties\":{\"tags\":[\"first\"]}}," +
+            "{\"id\":\"DUP\",\"properties\":{\"tags\":[\"second\"]}}]";
+        _repository.AddUtf8File(
+            "scan.sarif",
+            Sarif(rules, "{\"ruleId\":\"DUP\",\"message\":{\"text\":\"ambiguous\"}}"));
+
+        SarifEvidenceReadResult result = new SarifEvidenceReader().Read(
+            Requirement(),
+            _repository.Root,
+            new SarifEvidenceArtifactReference("scan.sarif", "external.scan"),
+            new SarifEvidenceAssessmentContext("repo", "revision"));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(result.Status, Is.EqualTo(SarifEvidenceTrustStatus.UnsupportedShape));
+            Assert.That(result.Detail, Does.Contain("multiple tool driver descriptors"));
+            Assert.That(result.SourceDiagnostics, Is.Empty);
+        });
+    }
+
+    [Test]
     public void Read_ResolvesArtifactIndexesAndKeepsDistinctPaths()
     {
         const string artifacts = "\"artifacts\":[{\"location\":{\"uri\":\"src/A.cs\"}},{\"location\":{\"uri\":\"src/B.cs\"}}]";

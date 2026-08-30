@@ -245,6 +245,54 @@ public sealed class SarifExternalDiagnosticSelectorTests
     }
 
     [Test]
+    public void Read_RejectsProgrammaticSelectorListBeyondBound()
+    {
+        ArchitectureExternalEvidenceRequirement requirement = Requirement(
+            ruleIds: Enumerable.Range(0, 129).Select(index => $"SEC{index}").ToArray(),
+            severity: new Dictionary<string, string> { ["error"] = "strict" });
+        _repository.AddUtf8File(
+            "too-many-selectors.sarif",
+            Sarif(Results(Result("SEC0", "error", "src/App/One.cs", "bounded")), "revision"));
+
+        ArgumentException exception = Assert.Throws<ArgumentException>(() => new SarifEvidenceReader().Read(
+            requirement,
+            _repository.Root,
+            new SarifEvidenceArtifactReference("too-many-selectors.sarif", requirement.Id),
+            new SarifEvidenceAssessmentContext("repo", "revision")))!;
+
+        Assert.That(exception.Message, Does.Contain("rule_ids list exceeds the 128-value bound"));
+    }
+
+    [Test]
+    public void Select_ProcessesTheMaximumBoundedResultCountWithOneSelectionPass()
+    {
+        ArchitectureExternalEvidenceRequirement requirement = Requirement(
+            severity: new Dictionary<string, string> { ["error"] = "strict" });
+        const string sourceResult = "{\"message\":{\"text\":\"x\"},\"level\":\"error\"}";
+        string results = "[" + string.Join(",", Enumerable.Repeat(sourceResult, 100_000)) + "]";
+        _repository.AddUtf8File("maximum-results.sarif", Sarif(results, "revision"));
+
+        SarifEvidenceReadResult evidence = new SarifEvidenceReader().Read(
+            requirement,
+            _repository.Root,
+            new SarifEvidenceArtifactReference("maximum-results.sarif", requirement.Id),
+            new SarifEvidenceAssessmentContext("repo", "revision"),
+            new SarifEvidenceLimits(maxArtifactBytes: 8 * 1024 * 1024, maxResults: 100_000));
+        SarifExternalDiagnosticSelectionResult selection = new SarifExternalDiagnosticSelector().Select(
+        [
+            new SarifExternalDiagnosticSelectionInput(evidence),
+        ]);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(evidence.Status, Is.EqualTo(SarifEvidenceTrustStatus.Valid), evidence.Detail);
+            Assert.That(evidence.SourceDiagnostics, Has.Count.EqualTo(100_000));
+            Assert.That(selection.Diagnostics, Has.Count.EqualTo(1));
+            Assert.That(selection.FilterMismatches, Is.Empty);
+        });
+    }
+
+    [Test]
     public void Select_UsesTheImmutableAuthorizationCapturedAtReadTime()
     {
         ArchitectureExternalEvidenceRequirement requirement = Requirement(

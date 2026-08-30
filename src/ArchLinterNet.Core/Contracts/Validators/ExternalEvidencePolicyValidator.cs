@@ -138,6 +138,13 @@ internal sealed class ExternalEvidencePolicyValidator : IArchitecturePolicyDocum
                 $"external_evidence entry '{id}' diagnostic_filter.{key} must not be null.");
         }
 
+        if (values.Count() > ExternalDiagnosticFilterRules.MaxValuesPerSelector)
+        {
+            throw new InvalidOperationException(
+                $"external_evidence entry '{id}' diagnostic_filter.{key} must contain no more than " +
+                $"{ExternalDiagnosticFilterRules.MaxValuesPerSelector} values.");
+        }
+
         var seen = new HashSet<string>(StringComparer.Ordinal);
         int index = 0;
         foreach (string? value in values)

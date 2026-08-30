@@ -112,6 +112,21 @@ public sealed class ExternalEvidencePolicyTests
         Assert.That(exception.Message, Does.Contain("rule_ids declares duplicate value 'SEC100'"));
     }
 
+    [Test]
+    public void Load_DiagnosticSelectorBeyondBound_IsRejected()
+    {
+        string values = string.Join(", ", Enumerable.Range(0, 129).Select(index => $"SEC{index}"));
+        string declaration = ValidDeclarationWithFilter().Replace(
+            "rule_ids: [SEC100, SEC200]",
+            $"rule_ids: [{values}]",
+            StringComparison.Ordinal);
+
+        InvalidOperationException exception = Assert.Throws<InvalidOperationException>(
+            () => Load(MonolithicPolicy(declaration)))!;
+
+        Assert.That(exception.Message, Does.Contain("rule_ids must contain no more than 128 values"));
+    }
+
     [TestCase("critical")]
     [TestCase("ERROR")]
     public void Load_UnsupportedDiagnosticSeverityKey_IsRejected(string severity)

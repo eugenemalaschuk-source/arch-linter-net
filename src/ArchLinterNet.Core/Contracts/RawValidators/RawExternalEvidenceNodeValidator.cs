@@ -136,6 +136,13 @@ internal sealed class RawExternalEvidenceNodeValidator : IArchitecturePolicyRawD
                 $"external_evidence[{entryIndex}].diagnostic_filter.{key} must be a list of strings.");
         }
 
+        if (values.Children.Count > ExternalDiagnosticFilterRules.MaxValuesPerSelector)
+        {
+            throw new InvalidOperationException(
+                $"external_evidence entry {entryIndex} diagnostic_filter.{key} must contain no more than " +
+                $"{ExternalDiagnosticFilterRules.MaxValuesPerSelector} values.");
+        }
+
         var seen = new HashSet<string>(StringComparer.Ordinal);
         for (int valueIndex = 0; valueIndex < values.Children.Count; valueIndex++)
         {

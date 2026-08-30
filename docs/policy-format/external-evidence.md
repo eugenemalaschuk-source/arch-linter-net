@@ -72,10 +72,10 @@ filter.
 
 | Field | Description |
 | --- | --- |
-| `rule_ids` | Optional non-empty exact source rule IDs. |
-| `rule_tags` | Optional non-empty exact tags declared by the selected SARIF driver's matching rule. |
-| `projects` | Optional non-empty exact source `result.properties.project` identities. A result without that explicit source field does not match this criterion. |
-| `path_prefixes` | Optional normalized repository-relative `/` prefixes. A prefix matches the exact path or a descendant; absolute paths, `..`, backslashes, globs, and regular expressions are invalid. |
+| `rule_ids` | Optional non-empty exact source rule IDs; at most 128 values. |
+| `rule_tags` | Optional non-empty exact tags declared by the selected SARIF driver's matching rule; at most 128 values. |
+| `projects` | Optional non-empty exact source `result.properties.project` identities; at most 128 values. A result without that explicit source field does not match this criterion. |
+| `path_prefixes` | Optional normalized repository-relative `/` prefixes; at most 128 values. A prefix matches the exact path or a descendant; absolute paths, `..`, backslashes, globs, and regular expressions are invalid. |
 | `severity` | Required when `diagnostic_filter` is present. Maps one or more source levels (`error`, `warning`, `note`, `none`, `unspecified`) to the ArchLinterNet mode `strict` or `audit`. It both selects source levels and maps the selected result; it never changes the original source level. |
 | `require_matches` | Optional boolean. When `true`, every configured rule ID, tag, project, path prefix, and severity key must match at least one result satisfying the other configured criteria. |
 
@@ -91,6 +91,12 @@ the original tool, rule, message, source severity, primary location, optional
 project, driver-rule tags, and SARIF fingerprint pairs together with the trust
 provenance described below. A wrong-revision or otherwise untrusted artifact
 never supplies ordinary selected diagnostics.
+
+Rule tags are bound to one resolved driver-rule descriptor, not merely a rule
+ID. When a SARIF driver repeats a descriptor ID, a result must provide a
+consistent `ruleIndex` or `rule.index`; an ambiguous ID-only reference is
+rejected rather than borrowing tags from another descriptor. The reader also
+resolves supported artifact-location indexes through the run artifact table.
 
 When the reader accepts an artifact, it also captures an immutable authorization
 snapshot: the parent logical ID, tool/version/run identity, required binding

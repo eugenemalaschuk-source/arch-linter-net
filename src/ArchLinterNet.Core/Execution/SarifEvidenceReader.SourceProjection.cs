@@ -139,11 +139,10 @@ public sealed partial class SarifEvidenceReader
                 }
             }
 
-            if (!catalog.TryAdd(ruleId, tags))
-            {
-                detail = $"The SARIF tool driver rules member contains duplicate rule id '{ruleId}'.";
-                return false;
-            }
+            // SARIF allows several descriptors to share an id.  Keep each descriptor in
+            // its declared ordinal slot: a result ruleIndex/rule.index is the only way to
+            // select the right descriptor (and therefore its tags) in that situation.
+            catalog.Add(ruleId, tags);
         }
 
         return true;
@@ -171,7 +170,7 @@ public sealed partial class SarifEvidenceReader
             return false;
         }
 
-        if (!TryReadRuleIdentity(result, driverRules, resultIndex, out string? ruleId, out detail))
+        if (!TryReadRuleIdentity(result, driverRules, resultIndex, out SarifResolvedRule? resolvedRule, out detail))
         {
             return false;
         }
@@ -223,20 +222,13 @@ public sealed partial class SarifEvidenceReader
             return false;
         }
 
-        IReadOnlyList<string> tags = Array.Empty<string>();
-        if (ruleId is not null
-            && driverRules.TryGetTags(ruleId, out IReadOnlyList<string> matchedTags))
-        {
-            tags = matchedTags;
-        }
-
         diagnostic = new SarifEvidenceSourceDiagnostic(
             message,
-            ruleId,
+            resolvedRule?.Id,
             severity,
             primaryLocation,
             project,
-            tags,
+            resolvedRule?.Tags ?? Array.Empty<string>(),
             fingerprints,
             partialFingerprints);
         return true;
@@ -287,13 +279,19 @@ public sealed partial class SarifEvidenceReader
         JsonElement result,
         SarifDriverRuleCatalog driverRules,
         int resultIndex,
-        out string? ruleId,
+        out SarifResolvedRule? resolvedRule,
         out string? detail)
     {
-        ruleId = null;
+        resolvedRule = null;
         detail = null;
         if (!TryReadOptionalSourceString(result, "ruleId", resultIndex, out string? directRuleId, out detail))
         {
+            return false;
+        }
+
+        if (directRuleId is not null && string.IsNullOrWhiteSpace(directRuleId))
+        {
+            detail = $"The SARIF result at index {resultIndex} ruleId member must be a non-blank string when present.";
             return false;
         }
 
@@ -361,10 +359,10 @@ public sealed partial class SarifEvidenceReader
         }
 
         int? ruleIndex = directRuleIndex ?? referencedRuleIndex;
-        string? indexedRuleId = null;
+        SarifDriverRuleDescriptor? indexedDescriptor = null;
         if (ruleIndex is not null)
         {
-            if (!driverRules.TryResolve(ruleIndex.Value, out indexedRuleId))
+            if (!driverRules.TryResolve(ruleIndex.Value, out indexedDescriptor))
             {
                 detail =
                     $"The SARIF result at index {resultIndex} rule index {ruleIndex.Value} cannot be resolved by the tool driver rules.";
@@ -379,14 +377,42 @@ public sealed partial class SarifEvidenceReader
             return false;
         }
 
-        ruleId = directRuleId ?? referencedRuleId ?? indexedRuleId;
-        if (indexedRuleId is not null && ruleId is not null
-            && !string.Equals(indexedRuleId, ruleId, StringComparison.Ordinal))
+        string? ruleId = directRuleId ?? referencedRuleId ?? indexedDescriptor?.Id;
+        if (indexedDescriptor is not null && ruleId is not null
+            && !string.Equals(indexedDescriptor.Id, ruleId, StringComparison.Ordinal))
         {
             detail = $"The SARIF result at index {resultIndex} rule reference does not match its rule index.";
             return false;
         }
 
+        if (indexedDescriptor is not null)
+        {
+            resolvedRule = new SarifResolvedRule(indexedDescriptor.Id, indexedDescriptor.Tags);
+            return true;
+        }
+
+        if (ruleId is null)
+        {
+            return true;
+        }
+
+        if (driverRules.TryResolveUnique(ruleId, out SarifDriverRuleDescriptor? uniqueDescriptor, out bool isAmbiguous))
+        {
+            resolvedRule = new SarifResolvedRule(uniqueDescriptor!.Id, uniqueDescriptor.Tags);
+            return true;
+        }
+
+        if (isAmbiguous)
+        {
+            detail =
+                $"The SARIF result at index {resultIndex} rule id '{ruleId}' resolves to multiple tool driver descriptors; " +
+                "a ruleIndex or rule.index is required.";
+            return false;
+        }
+
+        // A producer can emit a rule without cataloguing it in tool.driver.rules. Its
+        // identifier remains a trusted source fact, but there are no descriptor tags.
+        resolvedRule = new SarifResolvedRule(ruleId, Array.Empty<string>());
         return true;
     }
 
@@ -487,43 +513,53 @@ public sealed partial class SarifEvidenceReader
 
     private sealed class SarifDriverRuleCatalog
     {
-        private readonly List<string> _ids = [];
-        private readonly Dictionary<string, IReadOnlyList<string>> _tagsById = new(StringComparer.Ordinal);
+        private readonly List<SarifDriverRuleDescriptor> _descriptors = [];
+        private readonly Dictionary<string, List<SarifDriverRuleDescriptor>> _descriptorsById = new(StringComparer.Ordinal);
 
-        public bool TryAdd(string id, IReadOnlyList<string> tags)
+        public void Add(string id, IReadOnlyList<string> tags)
         {
-            if (_tagsById.ContainsKey(id))
+            var descriptor = new SarifDriverRuleDescriptor(id, Array.AsReadOnly(tags.ToArray()));
+            _descriptors.Add(descriptor);
+            if (!_descriptorsById.TryGetValue(id, out List<SarifDriverRuleDescriptor>? descriptors))
             {
+                descriptors = [];
+                _descriptorsById.Add(id, descriptors);
+            }
+
+            descriptors.Add(descriptor);
+        }
+
+        public bool TryResolve(int index, out SarifDriverRuleDescriptor? descriptor)
+        {
+            if ((uint)index >= (uint)_descriptors.Count)
+            {
+                descriptor = null;
                 return false;
             }
 
-            _ids.Add(id);
-            _tagsById.Add(id, Array.AsReadOnly(tags.ToArray()));
+            descriptor = _descriptors[index];
             return true;
         }
 
-        public bool TryResolve(int index, out string? id)
+        public bool TryResolveUnique(
+            string id,
+            out SarifDriverRuleDescriptor? descriptor,
+            out bool isAmbiguous)
         {
-            if ((uint)index >= (uint)_ids.Count)
+            if (!_descriptorsById.TryGetValue(id, out List<SarifDriverRuleDescriptor>? descriptors))
             {
-                id = null;
+                descriptor = null;
+                isAmbiguous = false;
                 return false;
             }
 
-            id = _ids[index];
-            return true;
-        }
-
-        public bool TryGetTags(string id, out IReadOnlyList<string> tags)
-        {
-            if (_tagsById.TryGetValue(id, out IReadOnlyList<string>? found) && found is not null)
-            {
-                tags = found;
-                return true;
-            }
-
-            tags = Array.Empty<string>();
-            return false;
+            isAmbiguous = descriptors.Count > 1;
+            descriptor = isAmbiguous ? null : descriptors[0];
+            return !isAmbiguous;
         }
     }
+
+    private sealed record SarifDriverRuleDescriptor(string Id, IReadOnlyList<string> Tags);
+
+    private sealed record SarifResolvedRule(string Id, IReadOnlyList<string> Tags);
 }

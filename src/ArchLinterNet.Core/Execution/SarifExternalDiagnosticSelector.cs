@@ -30,24 +30,24 @@ public sealed class SarifExternalDiagnosticSelector
             SarifExternalDiagnosticSelectionInput[] groupInputs = group.ToArray();
             SarifEvidenceAuthorizationSnapshot authorization = groupInputs[0].Evidence.Authorization!;
             SarifExternalDiagnosticFilterAuthorization filter = authorization.DiagnosticFilter!;
+            var matcher = new FilterMatcher(filter);
             SourceOccurrence[] occurrences = groupInputs
                 .SelectMany(input => input.Evidence.SourceDiagnostics.Select(source =>
                     new SourceOccurrence(input.Evidence, source)))
                 .ToArray();
-
-            if (filter.RequireMatches)
-            {
-                mismatches.AddRange(FindRequiredFilterMismatches(
-                    authorization.LogicalId,
-                    filter,
-                    occurrences,
-                    cancellationToken));
-            }
+            RequiredFilterMatchAccumulator? requiredMatches = filter.RequireMatches
+                ? new RequiredFilterMatchAccumulator()
+                : null;
 
             foreach (SourceOccurrence occurrence in occurrences)
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                if (!TrySelect(filter, occurrence.Source, out SarifExternalDiagnosticGovernanceMode mode))
+                FilterMatch match = matcher.Match(occurrence.Source);
+                requiredMatches?.Record(matcher, occurrence.Source, match);
+                if (!match.IsComplete
+                    || !matcher.TryGetGovernanceMode(
+                        occurrence.Source.SourceSeverity,
+                        out SarifExternalDiagnosticGovernanceMode mode))
                 {
                     continue;
                 }
@@ -55,6 +55,11 @@ public sealed class SarifExternalDiagnosticSelector
                 SarifExternalDiagnosticFingerprint fingerprint = SelectFingerprint(occurrence.Evidence, occurrence.Source);
                 string identity = CreateCanonicalIdentity(occurrence.Evidence, occurrence.Source, mode, fingerprint);
                 candidates.Add(new SelectionCandidate(occurrence.Evidence, occurrence.Source, mode, fingerprint, identity));
+            }
+
+            if (requiredMatches is not null)
+            {
+                mismatches.AddRange(requiredMatches.CreateMismatches(authorization.LogicalId, matcher));
             }
         }
 
@@ -105,118 +110,6 @@ public sealed class SarifExternalDiagnosticSelector
         }
 
         return input;
-    }
-
-    private static IEnumerable<SarifExternalDiagnosticFilterMismatch> FindRequiredFilterMismatches(
-        string logicalEvidenceId,
-        SarifExternalDiagnosticFilterAuthorization filter,
-        IReadOnlyList<SourceOccurrence> occurrences,
-        CancellationToken cancellationToken)
-    {
-        var matchedRuleIds = new HashSet<string>(StringComparer.Ordinal);
-        var matchedRuleTags = new HashSet<string>(StringComparer.Ordinal);
-        var matchedProjects = new HashSet<string>(StringComparer.Ordinal);
-        var matchedPathPrefixes = new HashSet<string>(StringComparer.Ordinal);
-        var matchedSeverities = new HashSet<string>(StringComparer.Ordinal);
-
-        foreach (SourceOccurrence occurrence in occurrences)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            SarifEvidenceSourceDiagnostic source = occurrence.Source;
-            if (MatchesExcept(filter, source, SarifExternalDiagnosticFilterDimension.RuleId)
-                && source.RuleId is not null)
-            {
-                matchedRuleIds.Add(source.RuleId);
-            }
-
-            if (MatchesExcept(filter, source, SarifExternalDiagnosticFilterDimension.RuleTag))
-            {
-                matchedRuleTags.UnionWith(source.DriverRuleTags);
-            }
-
-            if (MatchesExcept(filter, source, SarifExternalDiagnosticFilterDimension.Project)
-                && source.Project is not null)
-            {
-                matchedProjects.Add(source.Project);
-            }
-
-            if (MatchesExcept(filter, source, SarifExternalDiagnosticFilterDimension.PathPrefix))
-            {
-                matchedPathPrefixes.UnionWith(filter.PathPrefixes.Where(prefix =>
-                    MatchesPathPrefix(source.PrimaryLocation?.Path, prefix)));
-            }
-
-            if (MatchesExcept(filter, source, SarifExternalDiagnosticFilterDimension.Severity))
-            {
-                matchedSeverities.Add(SeverityToken(source.SourceSeverity));
-            }
-        }
-
-        foreach (string ruleId in filter.RuleIds.Where(ruleId => !matchedRuleIds.Contains(ruleId)))
-        {
-            yield return new SarifExternalDiagnosticFilterMismatch(
-                logicalEvidenceId, SarifExternalDiagnosticFilterDimension.RuleId, ruleId);
-        }
-
-        foreach (string tag in filter.RuleTags.Where(tag => !matchedRuleTags.Contains(tag)))
-        {
-            yield return new SarifExternalDiagnosticFilterMismatch(
-                logicalEvidenceId, SarifExternalDiagnosticFilterDimension.RuleTag, tag);
-        }
-
-        foreach (string project in filter.Projects.Where(project => !matchedProjects.Contains(project)))
-        {
-            yield return new SarifExternalDiagnosticFilterMismatch(
-                logicalEvidenceId, SarifExternalDiagnosticFilterDimension.Project, project);
-        }
-
-        foreach (string prefix in filter.PathPrefixes.Where(prefix => !matchedPathPrefixes.Contains(prefix)))
-        {
-            yield return new SarifExternalDiagnosticFilterMismatch(
-                logicalEvidenceId, SarifExternalDiagnosticFilterDimension.PathPrefix, prefix);
-        }
-
-        foreach (string severity in filter.Severity.Keys.Where(severity => !matchedSeverities.Contains(severity)))
-        {
-            yield return new SarifExternalDiagnosticFilterMismatch(
-                logicalEvidenceId, SarifExternalDiagnosticFilterDimension.Severity, severity);
-        }
-    }
-
-    private static bool TrySelect(
-        SarifExternalDiagnosticFilterAuthorization filter,
-        SarifEvidenceSourceDiagnostic source,
-        out SarifExternalDiagnosticGovernanceMode mode)
-    {
-        mode = default;
-        if (!MatchesExcept(filter, source, excludedDimension: null))
-        {
-            return false;
-        }
-
-        return filter.Severity.TryGetValue(SeverityToken(source.SourceSeverity), out string? configuredMode)
-            && TryParseGovernanceMode(configuredMode, out mode);
-    }
-
-    private static bool MatchesExcept(
-        SarifExternalDiagnosticFilterAuthorization filter,
-        SarifEvidenceSourceDiagnostic source,
-        SarifExternalDiagnosticFilterDimension? excludedDimension)
-    {
-        return (excludedDimension == SarifExternalDiagnosticFilterDimension.RuleId
-                || filter.RuleIds.Count == 0
-                || source.RuleId is not null && filter.RuleIds.Contains(source.RuleId, StringComparer.Ordinal))
-            && (excludedDimension == SarifExternalDiagnosticFilterDimension.RuleTag
-                || filter.RuleTags.Count == 0
-                || source.DriverRuleTags.Any(tag => filter.RuleTags.Contains(tag, StringComparer.Ordinal)))
-            && (excludedDimension == SarifExternalDiagnosticFilterDimension.Project
-                || filter.Projects.Count == 0
-                || source.Project is not null && filter.Projects.Contains(source.Project, StringComparer.Ordinal))
-            && (excludedDimension == SarifExternalDiagnosticFilterDimension.PathPrefix
-                || filter.PathPrefixes.Count == 0
-                || filter.PathPrefixes.Any(prefix => MatchesPathPrefix(source.PrimaryLocation?.Path, prefix)))
-            && (excludedDimension == SarifExternalDiagnosticFilterDimension.Severity
-                || filter.Severity.ContainsKey(SeverityToken(source.SourceSeverity)));
     }
 
     private static bool MatchesPathPrefix(string? path, string prefix)
@@ -400,6 +293,178 @@ public sealed class SarifExternalDiagnosticSelector
         }
 
         return builder.ToString();
+    }
+
+    private sealed class FilterMatcher
+    {
+        private readonly HashSet<string> _ruleIds;
+        private readonly HashSet<string> _ruleTags;
+        private readonly HashSet<string> _projects;
+        private readonly Dictionary<string, string> _severity;
+
+        public FilterMatcher(SarifExternalDiagnosticFilterAuthorization filter)
+        {
+            Filter = filter;
+            ValidateBounds(filter);
+            _ruleIds = new HashSet<string>(filter.RuleIds, StringComparer.Ordinal);
+            _ruleTags = new HashSet<string>(filter.RuleTags, StringComparer.Ordinal);
+            _projects = new HashSet<string>(filter.Projects, StringComparer.Ordinal);
+            _severity = new Dictionary<string, string>(filter.Severity, StringComparer.Ordinal);
+        }
+
+        public SarifExternalDiagnosticFilterAuthorization Filter { get; }
+
+        public FilterMatch Match(SarifEvidenceSourceDiagnostic source)
+        {
+            bool ruleId = _ruleIds.Count == 0
+                || source.RuleId is not null && _ruleIds.Contains(source.RuleId);
+            bool ruleTag = _ruleTags.Count == 0
+                || source.DriverRuleTags.Any(_ruleTags.Contains);
+            bool project = _projects.Count == 0
+                || source.Project is not null && _projects.Contains(source.Project);
+            bool pathPrefix = Filter.PathPrefixes.Count == 0
+                || Filter.PathPrefixes.Any(prefix => MatchesPathPrefix(source.PrimaryLocation?.Path, prefix));
+            bool severity = _severity.ContainsKey(SeverityToken(source.SourceSeverity));
+            return new FilterMatch(ruleId, ruleTag, project, pathPrefix, severity);
+        }
+
+        public IEnumerable<string> MatchingPathPrefixes(string? path) =>
+            Filter.PathPrefixes.Where(prefix => MatchesPathPrefix(path, prefix));
+
+        public bool IsConfiguredRuleTag(string tag) => _ruleTags.Contains(tag);
+
+        public bool TryGetGovernanceMode(
+            SarifEvidenceSourceSeverity sourceSeverity,
+            out SarifExternalDiagnosticGovernanceMode mode)
+        {
+            mode = default;
+            return _severity.TryGetValue(SeverityToken(sourceSeverity), out string? configuredMode)
+                && TryParseGovernanceMode(configuredMode, out mode);
+        }
+
+        private static void ValidateBounds(SarifExternalDiagnosticFilterAuthorization filter)
+        {
+            ValidateSelectorCount("rule_ids", filter.RuleIds.Count);
+            ValidateSelectorCount("rule_tags", filter.RuleTags.Count);
+            ValidateSelectorCount("projects", filter.Projects.Count);
+            ValidateSelectorCount("path_prefixes", filter.PathPrefixes.Count);
+            if (filter.Severity.Count > ExternalDiagnosticFilterRules.SupportedSeverities.Length)
+            {
+                throw new ArgumentException(
+                    "The captured diagnostic_filter.severity map exceeds the supported source-severity bound.",
+                    nameof(filter));
+            }
+        }
+
+        private static void ValidateSelectorCount(string name, int count)
+        {
+            if (count > ExternalDiagnosticFilterRules.MaxValuesPerSelector)
+            {
+                throw new ArgumentException(
+                    $"The captured diagnostic_filter.{name} list exceeds the " +
+                    $"{ExternalDiagnosticFilterRules.MaxValuesPerSelector}-value bound.");
+            }
+        }
+    }
+
+    private readonly record struct FilterMatch(
+        bool RuleId,
+        bool RuleTag,
+        bool Project,
+        bool PathPrefix,
+        bool Severity)
+    {
+        public bool IsComplete => RuleId && RuleTag && Project && PathPrefix && Severity;
+
+        public bool MatchesExcept(SarifExternalDiagnosticFilterDimension dimension) => dimension switch
+        {
+            SarifExternalDiagnosticFilterDimension.RuleId => RuleTag && Project && PathPrefix && Severity,
+            SarifExternalDiagnosticFilterDimension.RuleTag => RuleId && Project && PathPrefix && Severity,
+            SarifExternalDiagnosticFilterDimension.Project => RuleId && RuleTag && PathPrefix && Severity,
+            SarifExternalDiagnosticFilterDimension.PathPrefix => RuleId && RuleTag && Project && Severity,
+            SarifExternalDiagnosticFilterDimension.Severity => RuleId && RuleTag && Project && PathPrefix,
+            _ => false,
+        };
+    }
+
+    private sealed class RequiredFilterMatchAccumulator
+    {
+        private readonly HashSet<string> _ruleIds = new(StringComparer.Ordinal);
+        private readonly HashSet<string> _ruleTags = new(StringComparer.Ordinal);
+        private readonly HashSet<string> _projects = new(StringComparer.Ordinal);
+        private readonly HashSet<string> _pathPrefixes = new(StringComparer.Ordinal);
+        private readonly HashSet<string> _severities = new(StringComparer.Ordinal);
+
+        public void Record(
+            FilterMatcher matcher,
+            SarifEvidenceSourceDiagnostic source,
+            FilterMatch match)
+        {
+            if (match.MatchesExcept(SarifExternalDiagnosticFilterDimension.RuleId)
+                && source.RuleId is not null)
+            {
+                _ruleIds.Add(source.RuleId);
+            }
+
+            if (match.MatchesExcept(SarifExternalDiagnosticFilterDimension.RuleTag))
+            {
+                foreach (string tag in source.DriverRuleTags.Where(matcher.IsConfiguredRuleTag))
+                {
+                    _ruleTags.Add(tag);
+                }
+            }
+
+            if (match.MatchesExcept(SarifExternalDiagnosticFilterDimension.Project)
+                && source.Project is not null)
+            {
+                _projects.Add(source.Project);
+            }
+
+            if (match.MatchesExcept(SarifExternalDiagnosticFilterDimension.PathPrefix))
+            {
+                _pathPrefixes.UnionWith(matcher.MatchingPathPrefixes(source.PrimaryLocation?.Path));
+            }
+
+            if (match.MatchesExcept(SarifExternalDiagnosticFilterDimension.Severity))
+            {
+                _severities.Add(SeverityToken(source.SourceSeverity));
+            }
+        }
+
+        public IEnumerable<SarifExternalDiagnosticFilterMismatch> CreateMismatches(
+            string logicalEvidenceId,
+            FilterMatcher matcher)
+        {
+            foreach (string ruleId in matcher.Filter.RuleIds.Where(ruleId => !_ruleIds.Contains(ruleId)))
+            {
+                yield return new SarifExternalDiagnosticFilterMismatch(
+                    logicalEvidenceId, SarifExternalDiagnosticFilterDimension.RuleId, ruleId);
+            }
+
+            foreach (string tag in matcher.Filter.RuleTags.Where(tag => !_ruleTags.Contains(tag)))
+            {
+                yield return new SarifExternalDiagnosticFilterMismatch(
+                    logicalEvidenceId, SarifExternalDiagnosticFilterDimension.RuleTag, tag);
+            }
+
+            foreach (string project in matcher.Filter.Projects.Where(project => !_projects.Contains(project)))
+            {
+                yield return new SarifExternalDiagnosticFilterMismatch(
+                    logicalEvidenceId, SarifExternalDiagnosticFilterDimension.Project, project);
+            }
+
+            foreach (string prefix in matcher.Filter.PathPrefixes.Where(prefix => !_pathPrefixes.Contains(prefix)))
+            {
+                yield return new SarifExternalDiagnosticFilterMismatch(
+                    logicalEvidenceId, SarifExternalDiagnosticFilterDimension.PathPrefix, prefix);
+            }
+
+            foreach (string severity in matcher.Filter.Severity.Keys.Where(severity => !_severities.Contains(severity)))
+            {
+                yield return new SarifExternalDiagnosticFilterMismatch(
+                    logicalEvidenceId, SarifExternalDiagnosticFilterDimension.Severity, severity);
+            }
+        }
     }
 
     private sealed record SourceOccurrence(
