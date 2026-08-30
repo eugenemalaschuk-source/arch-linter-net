@@ -210,6 +210,13 @@ public sealed record ArchitectureApplicabilityRecord
 
     public ArchitectureApplicabilityProvenance Provenance { get; }
 
+    /// <summary>
+    /// Optional native declared-topology evidence. It is attached to the shared applicability
+    /// record rather than forming a parallel topology result envelope, so consumers retain the
+    /// canonical control identity, state, and provenance alongside the bounded mapping facts.
+    /// </summary>
+    public ArchitectureTopologyMappingEvidence? TopologyEvidence { get; init; }
+
     private static string RequireValue(string value, string parameterName) =>
         string.IsNullOrWhiteSpace(value)
             ? throw new ArgumentException("A canonical applicability value is required.", parameterName)

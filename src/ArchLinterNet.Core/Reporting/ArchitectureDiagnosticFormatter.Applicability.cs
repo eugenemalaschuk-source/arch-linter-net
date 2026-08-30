@@ -66,11 +66,16 @@ public sealed partial class ArchitectureDiagnosticFormatter
         string recordProvenance = control.Record is null
             ? "none"
             : FormatApplicabilityProvenanceForHumans(control.Record.Provenance);
+        string topologyEvidence = control.Record?.TopologyEvidence is { } topology
+            ? $", topology=(declared_components={topology.DeclaredComponentCount}, observed_subjects={topology.ObservedSubjectCount}, "
+                + $"mapped_subjects={topology.MappedSubjectCount}, unmapped_subjects={topology.UnmappedSubjectCount}, "
+                + $"ambiguous_subjects={topology.AmbiguousSubjectCount})"
+            : string.Empty;
 
         return $"- control={control.ControlIdentity}, family={family}, membership={membership}, "
             + $"state={state}, record_state={recordState}, integrity_valid={control.IsIntegrityValid}, "
             + $"integrity_reasons={integrityReasons}, expected_provenance={expectedProvenance}, "
-            + $"record_provenance={recordProvenance}";
+            + $"record_provenance={recordProvenance}{topologyEvidence}";
     }
 
     private static string FormatApplicabilityReasonForHumans(ArchitectureApplicabilityReason reason)
