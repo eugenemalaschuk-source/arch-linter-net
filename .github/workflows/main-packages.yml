@@ -153,7 +153,7 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
 
   retention:
-    name: Retain latest five complete main builds
+    name: Verify packages, retain five complete builds, and clean stale orphans
     needs: publish
     if: needs.publish.result == 'success'
     runs-on: ubuntu-latest
@@ -161,9 +161,6 @@ jobs:
     permissions:
       contents: read
       packages: write
-    concurrency:
-      group: arch-linter-main-package-retention
-      cancel-in-progress: false
     env:
       PACKAGE_VERSION: ${{ needs.publish.outputs.package_version }}
       GH_TOKEN: ${{ github.token }}
@@ -173,6 +170,85 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           persist-credentials: false
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Configure GitHub Packages NuGet source
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          dotnet nuget add source \
+            --username "$GITHUB_ACTOR" \
+            --password "$GITHUB_TOKEN" \
+            --store-password-in-clear-text \
+            --name github \
+            "https://nuget.pkg.github.com/$GITHUB_REPOSITORY_OWNER/index.json"
+
+      - name: Verify exact published package set is consumable
+        shell: bash
+        run: |
+          set -euo pipefail
+          smoke_root="$RUNNER_TEMP/arch-linter-main-package-smoke"
+          feed="https://nuget.pkg.github.com/$GITHUB_REPOSITORY_OWNER/index.json"
+          export NUGET_PACKAGES="$smoke_root/nuget-packages"
+
+          for attempt in 1 2 3 4 5 6; do
+            rm -rf "$smoke_root"
+            mkdir -p "$smoke_root/tool" "$smoke_root/library"
+
+            dotnet nuget locals http-cache --clear > /dev/null
+            smoke_ok=true
+            if ! dotnet tool install ArchLinterNet.Cli \
+              --version "$PACKAGE_VERSION" \
+              --tool-path "$smoke_root/tool" \
+              --add-source "$feed"; then
+              smoke_ok=false
+            fi
+
+            if [ "$smoke_ok" = true ]; then
+              dotnet tool list --tool-path "$smoke_root/tool" | tee "$smoke_root/tool-list.txt"
+              installed_version="$(awk 'tolower($1) == "archlinternet.cli" { print $2 }' "$smoke_root/tool-list.txt")"
+              if [ "$installed_version" != "$PACKAGE_VERSION" ]; then
+                echo "Installed CLI package version '$installed_version' did not match $PACKAGE_VERSION." >&2
+                smoke_ok=false
+              elif ! "$smoke_root/tool/arch-linter-net" --help > /dev/null; then
+                echo "Installed CLI entrypoint did not execute successfully." >&2
+                smoke_ok=false
+              fi
+            fi
+
+            if [ "$smoke_ok" = true ]; then
+              (
+                cd "$smoke_root/library"
+                dotnet new classlib --framework net10.0 --no-restore
+                dotnet add package ArchLinterNet.Testing \
+                  --version "$PACKAGE_VERSION" \
+                  --source "$feed" \
+                  --no-restore
+                dotnet restore --no-cache
+                python3 "$GITHUB_WORKSPACE/tools/release/verify_restored_main_packages.py" \
+                  --assets obj/project.assets.json \
+                  --version "$PACKAGE_VERSION"
+              ) || smoke_ok=false
+            fi
+
+            if [ "$smoke_ok" = true ]; then
+              echo "Verified exact published package set $PACKAGE_VERSION from GitHub Packages."
+              break
+            fi
+
+            if [ "$attempt" -eq 6 ]; then
+              echo "Could not restore exact published package set $PACKAGE_VERSION after bounded retries." >&2
+              exit 1
+            fi
+
+            echo "GitHub Packages has not converged for $PACKAGE_VERSION yet; retrying ($attempt/6)." >&2
+            sleep 10
+          done
 
       - name: Resolve package owner API scope
         shell: bash
@@ -188,7 +264,7 @@ jobs:
           esac
           echo "PACKAGE_API_SCOPE=$package_scope" >> "$GITHUB_ENV"
 
-      - name: Build retention plan from complete package sets
+      - name: Build complete-set retention and stale-orphan cleanup plan
         shell: bash
         run: |
           set -euo pipefail
@@ -198,6 +274,7 @@ jobs:
             ArchLinterNet.Core
             ArchLinterNet.Testing
           )
+          stale_partial_before="$(date -u -d '1 hour ago' +'%Y-%m-%dT%H:%M:%SZ')"
           ready=false
           for attempt in 1 2 3 4 5 6; do
             rm -rf artifacts/main-package-inventory
@@ -217,6 +294,8 @@ jobs:
               --inventory-dir artifacts/main-package-inventory \
               --current-version "$PACKAGE_VERSION" \
               --keep 5 \
+              --prune-stale-partials \
+              --stale-partial-before "$stale_partial_before" \
               --output artifacts/main-package-retention.json; then
               ready=true
               break
@@ -231,18 +310,18 @@ jobs:
             exit 1
           fi
 
-      - name: Delete expired complete main build sets
+      - name: Delete expired complete builds and stale package orphans
         shell: bash
         run: |
           set -euo pipefail
-          jq -r '.delete[] | [.package_id, (.version_id | tostring), .version] | @tsv' \
+          jq -r '(.delete + .delete_orphans)[] | [.package_id, (.version_id | tostring), .version, .reason] | @tsv' \
             artifacts/main-package-retention.json |
-          while IFS=$'\t' read -r package_id version_id version; do
+          while IFS=$'\t' read -r package_id version_id version reason; do
             endpoint="$PACKAGE_API_SCOPE/packages/nuget/$package_id/versions/$version_id"
             if response="$(gh api --method DELETE -H "Accept: application/vnd.github+json" "$endpoint" 2>&1)"; then
-              echo "Deleted $package_id $version"
+              echo "Deleted $package_id $version ($reason)"
             elif grep -q "HTTP 404" <<< "$response"; then
-              echo "$package_id $version was already deleted by another retention run."
+              echo "$package_id $version ($reason) was already deleted by another cleanup run."
             else
               echo "$response" >&2
               exit 1
@@ -254,12 +333,22 @@ jobs:
         shell: bash
         run: |
           retained="$(jq -r '.retained_versions | join(", ")' artifacts/main-package-retention.json)"
-          partial="$(jq -r 'if (.partial_versions | length) == 0 then "none" else (.partial_versions | join(", ")) end' artifacts/main-package-retention.json)"
+          stale="$(jq -r 'if (.stale_partial_versions | length) == 0 then "none" else (.stale_partial_versions | join(", ")) end' artifacts/main-package-retention.json)"
+          stale_before="$(jq -r '.stale_partial_before // "disabled"' artifacts/main-package-retention.json)"
+          protected="$(jq -r 'if (.protected_partial_versions | length) == 0 then "none" else (.protected_partial_versions | join(", ")) end' artifacts/main-package-retention.json)"
+          expired_records="$(jq -r '.delete | length' artifacts/main-package-retention.json)"
+          orphan_records="$(jq -r '.delete_orphans | length' artifacts/main-package-retention.json)"
           deferred="$(jq -r '.current_retention_deferred' artifacts/main-package-retention.json)"
           {
             echo "### Main package retention"
             echo
+            echo "- Exact package restore smoke: passed for \`$PACKAGE_VERSION\`"
             echo "- Retained complete builds: $retained"
-            echo "- Partial/orphan main versions left diagnosable: $partial"
+            echo "- Stale partial/orphan versions selected for cleanup: $stale"
+            echo "- Partial cleanup safety cutoff: $stale_before (one-hour grace)"
+            echo "- Newer/concurrent partial versions preserved: $protected"
+            echo "- Expired complete-build package records selected for deletion: $expired_records"
+            echo "- Stale orphan package records selected for deletion: $orphan_records"
             echo "- Current-build safety deferred exact five-version convergence: $deferred"
+            echo "- Newer versions and partial versions inside the grace window remain protected from cleanup."
           } >> "$GITHUB_STEP_SUMMARY"
