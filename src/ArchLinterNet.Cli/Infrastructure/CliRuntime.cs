@@ -52,6 +52,13 @@ internal sealed class CliRuntime : ICliRuntime
         return _engine.CreateSnapshot(request, timing);
     }
 
+    public ArchitectureMetricMeasurementOutcome Measure(
+        ArchitectureMetricMeasurementRequest request,
+        ValidationTiming? timing)
+    {
+        return _engine.Measure(request, timing);
+    }
+
     public string FormatResultForCiArtifacts(
         string mode,
         bool passed,

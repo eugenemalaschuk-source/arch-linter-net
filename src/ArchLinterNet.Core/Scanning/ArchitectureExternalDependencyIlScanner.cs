@@ -86,6 +86,26 @@ internal sealed class ArchitectureExternalDependencyIlScanner : IArchitectureExt
         }
     }
 
+    // A measurement needs the same source-type-to-group facts as external validation, but it must
+    // not create validation violations merely to recover them. This internal projection keeps the
+    // authoritative IL token/matcher implementation shared while leaving the diagnostics contract
+    // above unchanged.
+    internal IEnumerable<ArchitectureExternalDependencyIlFact> FindMethodBodyFacts(
+        Type[] sourceTypes,
+        ArchitectureExternalDependencyGroup externalGroup,
+        CancellationToken cancellationToken = default)
+    {
+        Dictionary<MemberInfo, ExternalMemberMatch?> matchedTypes = new();
+        foreach (Type sourceType in sourceTypes)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            foreach (ExternalIlMatch match in FindTypeMatches(sourceType, externalGroup, matchedTypes))
+            {
+                yield return new ArchitectureExternalDependencyIlFact(sourceType, match.TargetType);
+            }
+        }
+    }
+
     private IEnumerable<ExternalIlMatch> FindTypeMatches(
         Type sourceType,
         ArchitectureExternalDependencyGroup externalGroup,
@@ -433,3 +453,5 @@ internal sealed class ArchitectureExternalDependencyIlScanner : IArchitectureExt
         return result;
     }
 }
+
+internal sealed record ArchitectureExternalDependencyIlFact(Type SourceType, string TargetType);

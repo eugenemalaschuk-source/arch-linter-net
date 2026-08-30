@@ -11,6 +11,7 @@ internal sealed class ArchitecturePolicyDocumentComposer
     private const string ContractsSection = "contracts";
     private const string ClassificationSection = "classification";
     private const string TopologySection = "topology";
+    private const string MetricsSection = "metrics";
 
     private static readonly HashSet<string> _keyedSections = new(StringComparer.Ordinal)
     {
@@ -97,6 +98,10 @@ internal sealed class ArchitecturePolicyDocumentComposer
             else if (key == TopologySection)
             {
                 AddSingleton(effective, key, value, source, key, ArchitecturePolicyProvenancePath.Property(key));
+            }
+            else if (key == MetricsSection)
+            {
+                AppendSequence(effective, key, value, source, key, ArchitecturePolicyProvenancePath.Property(key));
             }
         }
     }

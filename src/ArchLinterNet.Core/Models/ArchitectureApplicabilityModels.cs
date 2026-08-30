@@ -217,6 +217,12 @@ public sealed record ArchitectureApplicabilityRecord
     /// </summary>
     public ArchitectureTopologyMappingEvidence? TopologyEvidence { get; init; }
 
+    /// <summary>
+    /// Optional native metric evidence. It uses this generic applicability record's identity and
+    /// state rather than creating a metrics-only applicability envelope.
+    /// </summary>
+    public ArchitectureMetricEvidence? MetricEvidence { get; init; }
+
     private static string RequireValue(string value, string parameterName) =>
         string.IsNullOrWhiteSpace(value)
             ? throw new ArgumentException("A canonical applicability value is required.", parameterName)

@@ -17,7 +17,8 @@
     { "required": ["analysis"] },
     { "required": ["contracts"] },
     { "required": ["classification"] },
-    { "required": ["topology"] }
+    { "required": ["topology"] },
+    { "required": ["metrics"] }
   ],
   "properties": {
     "imports": {
@@ -73,6 +74,12 @@
     },
     "topology": {
       "$ref": "https://archlinternet.dev/schema/0.8.0/dependencies.arch.schema.json#/$defs/topology"
+    },
+    "metrics": {
+      "type": "array",
+      "items": {
+        "$ref": "https://archlinternet.dev/schema/0.8.0/dependencies.arch.schema.json#/$defs/metricDefinition"
+      }
     }
   }
 }

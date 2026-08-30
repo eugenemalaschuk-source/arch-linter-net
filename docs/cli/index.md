@@ -97,6 +97,10 @@ Run `arch-linter-net --help` or `arch-linter-net <command> --help` for the exact
 
 | `arch-linter-net graph ...` | Export dependency graphs as JSON, DOT, or Mermaid at supported granularities. |
 
+<!-- cli-command: measure -->
+
+| `arch-linter-net measure ...` | Read-only, deterministic report of declared architecture metrics. |
+
 <!-- cli-command: history -->
 
 | `arch-linter-net history` | Architecture history forensics. |
@@ -359,10 +363,35 @@ arch-linter-net badge architecture-policy \
 
 This projects an existing strict result into badge endpoint JSON. It does not rerun architecture analysis.
 
+## Measure-first metrics
+
+```bash
+arch-linter-net measure --policy architecture/dependencies.arch.yml
+arch-linter-net measure --format json --metric application-outgoing
+arch-linter-net measure --all-contributors
+```
+
+`measure` is read-only: it evaluates only policy-owned metric definitions and
+does not create a budget violation, rewrite a policy/baseline, or produce a
+SARIF report. Human output is the default; JSON uses
+`schema_id: "architecture-metrics-report/v1"` and `schema_version: 1`, and
+contains the native subject, effective scope, exact value when evaluable, and
+canonical contributors. By default, each contributor list is bounded to 20;
+use `--max-contributors <n>` to set another positive bound or
+`--all-contributors` to emit every contributor. JSON retains the full
+`contributor_count` and a `contributors_truncated` marker whenever it bounds a
+list.
+
+A complete measurement, including a trusted value of zero, exits 0. If a
+required metric scope is incomplete, the command still reports its typed shared
+applicability evidence but exits 2. That result is evidence completeness, not
+an architecture violation or quality score.
+
 ## Output guidance
 
 - Use human output for local diagnosis.
 - Use JSON when downstream tooling needs the complete normalized finding/coverage/build-state model.
+- Use `measure --format json` for the separate, versioned read-only metric-report model.
 - Use SARIF for supported code-scanning projections, noting that not every non-SARIF finding category is representable there.
 - Use repeatable `--report` sinks when CI needs multiple formats from one validation run.
 

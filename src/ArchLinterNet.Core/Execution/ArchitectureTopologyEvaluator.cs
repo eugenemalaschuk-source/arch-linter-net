@@ -1,3 +1,4 @@
+using System.Reflection;
 using ArchLinterNet.Core.Contracts;
 using ArchLinterNet.Core.Execution.Expressions;
 using ArchLinterNet.Core.Model;
@@ -42,11 +43,8 @@ internal static class ArchitectureTopologyEvaluator
         ArgumentNullException.ThrowIfNull(observedSubjects);
         ArgumentNullException.ThrowIfNull(observedDependencies);
 
-        List<SubjectClassification> classifications = observedSubjects
-            .Where(subject => topology.Scope.Selectors.Any(selector => Matches(session, topology, selector, subject)))
-            .OrderBy(subject => subject.Identity, StringComparer.Ordinal)
-            .Select(subject => Classify(session, topology, subject))
-            .ToList();
+        Projection projection = Project(session, topology, observedSubjects, observedDependencies);
+        List<SubjectClassification> classifications = projection.Classifications.ToList();
 
         Dictionary<string, SubjectClassification> classificationsByIdentity = classifications
             .ToDictionary(classification => classification.Subject.Identity, StringComparer.Ordinal);
@@ -54,7 +52,7 @@ internal static class ArchitectureTopologyEvaluator
             .Where(classification => classification.Disposition == Disposition.Mapped)
             .ToDictionary(classification => classification.Subject.Identity, classification => classification.NodeIds[0], StringComparer.Ordinal);
 
-        List<Relationship> relationships = BuildRelationships(observedDependencies, nodeBySubject);
+        List<Relationship> relationships = BuildRelationships(projection.Dependencies, nodeBySubject);
         HashSet<(string Source, string Target)> allowedEdges = topology.AllowedEdges
             .Select(edge => (edge.From, edge.To))
             .ToHashSet();
@@ -120,7 +118,40 @@ internal static class ArchitectureTopologyEvaluator
 
         List<ArchitectureViolation> violations = BuildViolations(
             topology, classifications, relationships, allowedEdges, staleNodes, staleEdges);
-        return new Result(violations, new[] { expected }, new[] { record });
+        return new Result(violations, new[] { expected }, new[] { record })
+        {
+            FactProjection = projection,
+        };
+    }
+
+    // Narrow observation/classification projection shared by measure-first metrics. Keeping this
+    // beside the topology evaluator makes metric mapping use exactly the same selector, ownership,
+    // reviewed-out-of-scope, unmapped, and ambiguous semantics as topology applicability.
+    internal static Projection Project(ArchitectureAnalysisSession session, ArchitectureTopology topology)
+    {
+        ArgumentNullException.ThrowIfNull(session);
+        ArgumentNullException.ThrowIfNull(topology);
+        (IReadOnlyList<ObservedSubject> subjects, IReadOnlyList<ObservedDependency> dependencies) =
+            Observe(session, topology.SubjectKind);
+        return Project(session, topology, subjects, dependencies);
+    }
+
+    internal static Projection Project(
+        ArchitectureAnalysisSession? session,
+        ArchitectureTopology topology,
+        IReadOnlyList<ObservedSubject> observedSubjects,
+        IReadOnlyList<ObservedDependency> observedDependencies)
+    {
+        ArgumentNullException.ThrowIfNull(topology);
+        ArgumentNullException.ThrowIfNull(observedSubjects);
+        ArgumentNullException.ThrowIfNull(observedDependencies);
+
+        List<SubjectClassification> classifications = observedSubjects
+            .Where(subject => topology.Scope.Selectors.Any(selector => Matches(session, topology, selector, subject)))
+            .OrderBy(subject => subject.Identity, StringComparer.Ordinal)
+            .Select(subject => Classify(session, topology, subject))
+            .ToList();
+        return new Projection(topology, observedSubjects, classifications, observedDependencies);
     }
 
     private static (IReadOnlyList<ObservedSubject> Subjects, IReadOnlyList<ObservedDependency> Dependencies) Observe(
@@ -158,6 +189,51 @@ internal static class ArchitectureTopologyEvaluator
             }
 
             subjectByType[type] = observed;
+        }
+
+        // Assembly topology has a native assembly-level dependency authority. Do not derive its
+        // edges by aggregating type references: doing that would change the metric semantics (and
+        // can miss references represented only in assembly metadata). Endpoints are the exact
+        // retained assembly subjects, so project/assembly ownership remains session-bound.
+        if (subjectKind == "assembly")
+        {
+            Dictionary<string, ObservedSubject> subjectsByAssembly = subjectsByIdentity.Values
+                .GroupBy(subject => subject.Assembly, StringComparer.Ordinal)
+                .ToDictionary(group => group.Key, group => group.First(), StringComparer.Ordinal);
+            var assemblyDependencies = new HashSet<ObservedDependency>();
+            foreach (Assembly assembly in session.Context.TargetAssemblies
+                         .OrderBy(candidate => candidate.GetName().Name ?? string.Empty, StringComparer.Ordinal))
+            {
+                string sourceAssembly = assembly.GetName().Name ?? string.Empty;
+                if (!subjectsByAssembly.TryGetValue(sourceAssembly, out ObservedSubject? sourceSubject))
+                {
+                    continue;
+                }
+
+                foreach (AssemblyName reference in assembly.GetReferencedAssemblies()
+                             .OrderBy(candidate => candidate.Name ?? string.Empty, StringComparer.Ordinal))
+                {
+                    string targetAssembly = reference.Name ?? string.Empty;
+                    if (string.IsNullOrEmpty(targetAssembly)
+                        || string.Equals(sourceAssembly, targetAssembly, StringComparison.Ordinal)
+                        || !subjectsByAssembly.TryGetValue(targetAssembly, out ObservedSubject? targetSubject))
+                    {
+                        continue;
+                    }
+
+                    assemblyDependencies.Add(new ObservedDependency(
+                        sourceSubject.Identity,
+                        targetSubject.Identity,
+                        $"{sourceAssembly} -> {targetAssembly}"));
+                }
+            }
+
+            return (
+                subjectsByIdentity.Values.OrderBy(subject => subject.Identity, StringComparer.Ordinal).ToArray(),
+                assemblyDependencies.OrderBy(dependency => dependency.SourceIdentity, StringComparer.Ordinal)
+                    .ThenBy(dependency => dependency.TargetIdentity, StringComparer.Ordinal)
+                    .ThenBy(dependency => dependency.Witness, StringComparer.Ordinal)
+                    .ToArray());
         }
 
         var dependencies = new HashSet<ObservedDependency>();
@@ -201,6 +277,11 @@ internal static class ArchitectureTopologyEvaluator
         // it is deterministic and does not invent a path/name convention.
         return assembly;
     }
+
+    // Shared with the metric projection so source-type external edges use the exact owner binding
+    // used when this evaluator observes project topology subjects.
+    internal static string ResolveProjectForMetric(ArchitectureAnalysisSession session, Type type) =>
+        ResolveProject(session, ArchitectureTypeNames.SafeAssemblyName(type) ?? string.Empty);
 
     private static SubjectClassification Classify(
         ArchitectureAnalysisSession? session,
@@ -434,13 +515,15 @@ internal static class ArchitectureTopologyEvaluator
         IReadOnlyList<ArchitectureApplicabilityExpectedEntry> ExpectedEntries,
         IReadOnlyList<ArchitectureApplicabilityRecord> Records)
     {
+        internal Projection? FactProjection { get; init; }
+
         public static Result Empty { get; } = new(
             Array.Empty<ArchitectureViolation>(),
             Array.Empty<ArchitectureApplicabilityExpectedEntry>(),
             Array.Empty<ArchitectureApplicabilityRecord>());
     }
 
-    private sealed record SubjectClassification(
+    internal sealed record SubjectClassification(
         ObservedSubject Subject,
         Disposition Disposition,
         IReadOnlyList<string> NodeIds,
@@ -448,11 +531,17 @@ internal static class ArchitectureTopologyEvaluator
 
     private sealed record Relationship(string SourceNode, string TargetNode, string Witness);
 
-    private enum Disposition
+    internal enum Disposition
     {
         Mapped,
         ReviewedOutOfScope,
         Unmapped,
         Ambiguous,
     }
+
+    internal sealed record Projection(
+        ArchitectureTopology Topology,
+        IReadOnlyList<ObservedSubject> ObservedSubjects,
+        IReadOnlyList<SubjectClassification> Classifications,
+        IReadOnlyList<ObservedDependency> Dependencies);
 }

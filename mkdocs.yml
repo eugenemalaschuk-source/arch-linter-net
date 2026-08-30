@@ -32,6 +32,7 @@ nav:
       - Policy imports: policy-format/imports.md
       - Layers and namespace patterns: policy-format/layers-and-namespaces.md
       - Declared topology: policy-format/declared-topology.md
+      - Architecture metrics: policy-format/architecture-metrics.md
       - External dependencies: policy-format/external-dependencies.md
       - External evidence: policy-format/external-evidence.md
       - Package dependencies: policy-format/package-dependencies.md

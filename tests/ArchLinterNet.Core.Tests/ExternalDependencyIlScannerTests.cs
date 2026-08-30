@@ -42,6 +42,28 @@ public sealed class ExternalDependencyIlScannerTests
             Is.True);
     }
 
+    [Test]
+    public void FindMethodBodyFacts_MethodCallToExternalGroup_ProjectsSourceAndMatchedTypeWithoutViolation()
+    {
+        var group = new ArchitectureExternalDependencyGroup
+        {
+            NamespacePrefixes = new List<string> { "ExternalDependencyContractTestsFixtures.VendorSdk" }
+        };
+        Type sourceType = typeof(ExternalDependencyContractTestsFixtures.Core.CoreTypeWithMethodCall);
+
+        ArchitectureExternalDependencyIlFact[] facts = new ArchitectureExternalDependencyIlScanner()
+            .FindMethodBodyFacts([sourceType], group)
+            .ToArray();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(facts, Is.Not.Empty);
+            Assert.That(facts.All(fact => fact.SourceType == sourceType), Is.True);
+            Assert.That(facts.Select(fact => fact.TargetType), Does.Contain(
+                "ExternalDependencyContractTestsFixtures.VendorSdk.Client"));
+        });
+    }
+
     // PR #416 review round 2: this scanner previously accepted no CancellationToken at all, so a
     // large source-type set could be walked (types, methods, IL instructions) to completion with
     // no way to interrupt it — only the surrounding per-contract-family boundary could stop it,

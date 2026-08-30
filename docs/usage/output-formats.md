@@ -199,6 +199,17 @@ JSON output is written to stdout by default. Use `--report json=<path>` to write
 
 For baseline-configuration and public-API snapshot or build-state failures after a command has selected `--format json`, stdout remains one parseable JSON error document and the existing exit code is retained. Those newly unified paths use a common envelope containing `schema_version: 1`, `status: "error"`, `kind: "command_error"`, and an `error` object with `category`, `message`, and typed `details` when the command has diagnostic evidence. Validation, policy-check, graph, and explain preserve their existing structured JSON error documents. Human output remains on stderr for the same failures.
 
+`arch-linter-net measure --format json` is a distinct read-only report rather
+than a validation-result document. Its `schema_id: "architecture-metrics-report/v1"` and `schema_version: 1` envelope has a
+`complete` or `unassessable` status and ordered `measurements`. Each measurement
+records its ID, metric kind, native subject, effective scope, typed
+applicability state, exact numeric value only when evaluable, and contributor
+evidence. A bounded contributor list always includes `contributor_count` and
+`contributors_truncated`; `--all-contributors` disables the bound. The report
+also carries the shared applicability completion/projection so an incomplete
+scope cannot be mistaken for a trustworthy low value. It does not contain
+healthy metric values as violations or SARIF findings.
+
 Current JSON output is a single top-level object with these arrays:
 
 - `violations`
