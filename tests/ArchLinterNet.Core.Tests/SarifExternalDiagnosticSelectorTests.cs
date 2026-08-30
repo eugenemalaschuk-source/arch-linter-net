@@ -268,8 +268,8 @@ public sealed class SarifExternalDiagnosticSelectorTests
     {
         ArchitectureExternalEvidenceRequirement requirement = Requirement(
             severity: new Dictionary<string, string> { ["error"] = "strict" });
-        const string sourceResult = "{\"message\":{\"text\":\"x\"},\"level\":\"error\"}";
-        string results = "[" + string.Join(",", Enumerable.Repeat(sourceResult, 100_000)) + "]";
+        const string SourceResult = "{\"message\":{\"text\":\"x\"},\"level\":\"error\"}";
+        string results = "[" + string.Join(",", Enumerable.Repeat(SourceResult, 100_000)) + "]";
         _repository.AddUtf8File("maximum-results.sarif", Sarif(results, "revision"));
 
         SarifEvidenceReadResult evidence = new SarifEvidenceReader().Read(

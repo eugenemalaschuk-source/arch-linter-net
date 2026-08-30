@@ -107,11 +107,11 @@ public sealed class SarifEvidenceReaderSourceProjectionTests
     [Test]
     public void Read_ResolvesRuleReferencesByIdAndIndex()
     {
-        const string rules = "\"rules\":[{\"id\":\"SEC100\"},{\"id\":\"SEC200\"}]";
+        const string Rules = "\"rules\":[{\"id\":\"SEC100\"},{\"id\":\"SEC200\"}]";
         string results =
             "[{\"rule\":{\"id\":\"SEC100\"},\"message\":{\"text\":\"by id\"}}," +
             "{\"ruleIndex\":1,\"message\":{\"text\":\"by index\"}}]";
-        _repository.AddUtf8File("scan.sarif", Sarif(rules, results));
+        _repository.AddUtf8File("scan.sarif", Sarif(Rules, results));
 
         SarifEvidenceReadResult result = new SarifEvidenceReader().Read(
             Requirement(),
@@ -129,15 +129,15 @@ public sealed class SarifEvidenceReaderSourceProjectionTests
     [Test]
     public void Read_UsesIndexedDescriptorTagsWhenDriverRuleIdsRepeat()
     {
-        const string rules =
+        const string Rules =
             "\"rules\":[{\"id\":\"DUP\",\"properties\":{\"tags\":[\"first\"]}}," +
             "{\"id\":\"DUP\",\"properties\":{\"tags\":[\"second\"]}}," +
             "{\"id\":\"SEC100/injection\",\"properties\":{\"tags\":[\"hierarchical\"]}}]";
-        const string results =
+        const string Results =
             "[{\"ruleId\":\"DUP\",\"ruleIndex\":0,\"message\":{\"text\":\"first\"}}," +
             "{\"rule\":{\"id\":\"DUP\",\"index\":1},\"message\":{\"text\":\"second\"}}," +
             "{\"rule\":{\"id\":\"SEC100/injection\",\"index\":2},\"message\":{\"text\":\"hierarchical\"}}]";
-        _repository.AddUtf8File("scan.sarif", Sarif(rules, results));
+        _repository.AddUtf8File("scan.sarif", Sarif(Rules, Results));
 
         SarifEvidenceReadResult result = new SarifEvidenceReader().Read(
             Requirement(),
@@ -162,12 +162,12 @@ public sealed class SarifEvidenceReaderSourceProjectionTests
     [Test]
     public void Read_AmbiguousRepeatedDriverRuleIdWithoutIndexIsRejectedFailClosed()
     {
-        const string rules =
+        const string Rules =
             "\"rules\":[{\"id\":\"DUP\",\"properties\":{\"tags\":[\"first\"]}}," +
             "{\"id\":\"DUP\",\"properties\":{\"tags\":[\"second\"]}}]";
         _repository.AddUtf8File(
             "scan.sarif",
-            Sarif(rules, "{\"ruleId\":\"DUP\",\"message\":{\"text\":\"ambiguous\"}}"));
+            Sarif(Rules, "{\"ruleId\":\"DUP\",\"message\":{\"text\":\"ambiguous\"}}"));
 
         SarifEvidenceReadResult result = new SarifEvidenceReader().Read(
             Requirement(),
@@ -186,11 +186,11 @@ public sealed class SarifEvidenceReaderSourceProjectionTests
     [Test]
     public void Read_ResolvesArtifactIndexesAndKeepsDistinctPaths()
     {
-        const string artifacts = "\"artifacts\":[{\"location\":{\"uri\":\"src/A.cs\"}},{\"location\":{\"uri\":\"src/B.cs\"}}]";
+        const string Artifacts = "\"artifacts\":[{\"location\":{\"uri\":\"src/A.cs\"}},{\"location\":{\"uri\":\"src/B.cs\"}}]";
         string results =
             "[{\"ruleId\":\"SEC100\",\"message\":{\"text\":\"first\"},\"locations\":[{\"physicalLocation\":{\"artifactLocation\":{\"index\":0}}}]}," +
             "{\"ruleId\":\"SEC100\",\"message\":{\"text\":\"second\"},\"locations\":[{\"physicalLocation\":{\"artifactLocation\":{\"index\":1}}}]}]";
-        _repository.AddUtf8File("scan.sarif", Sarif(string.Empty, results, artifacts));
+        _repository.AddUtf8File("scan.sarif", Sarif(string.Empty, results, Artifacts));
 
         SarifEvidenceReadResult result = new SarifEvidenceReader().Read(
             Requirement(),
