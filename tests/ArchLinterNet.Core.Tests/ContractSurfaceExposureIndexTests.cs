@@ -75,6 +75,17 @@ public sealed class ContractSurfaceExposureIndexTests
     }
 
     [Test]
+    public void Scan_ConstructedGenericRootRecordsGenericArgument()
+    {
+        ArchitectureContractSurfaceExposureResult result =
+            ArchitectureContractSurfaceExposureScanner.Scan(typeof(ContractRoot<BaseContract>));
+
+        Assert.That(result.Exposures.Any(exposure =>
+            Target(typeof(BaseContract)).Equals(exposure.ReferencedType)
+            && exposure.Path.Segments.Any(segment => segment.Kind == "generic_argument")), Is.True);
+    }
+
+    [Test]
     public void Index_CachesRootsWithinSessionButNotAcrossSessions()
     {
         ArchitectureContractDocument document = new() { Version = 1, Name = "exposure-tests" };
