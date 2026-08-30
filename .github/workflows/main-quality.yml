@@ -82,6 +82,8 @@ jobs:
     timeout-minutes: 15
     permissions:
       contents: read
+    outputs:
+      quality_gate: ${{ steps.sonar_end.outputs.quality_gate }}
 
     steps:
       - name: Checkout
@@ -173,11 +175,41 @@ jobs:
       - name: Build for SonarCloud analysis
         run: dotnet build ArchLinterNet.slnx --no-restore --nologo
 
-      - name: End SonarCloud analysis and require quality gate
+      - name: End SonarCloud analysis and record quality gate
+        id: sonar_end
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
         shell: bash
-        run: ./.sonar/scanner/dotnet-sonarscanner end /d:sonar.token="$SONAR_TOKEN"
+        run: |
+          set -uo pipefail
+          log="$RUNNER_TEMP/sonar-end.log"
+
+          set +e
+          ./.sonar/scanner/dotnet-sonarscanner end /d:sonar.token="$SONAR_TOKEN" 2>&1 | tee "$log"
+          scanner_status="${PIPESTATUS[0]}"
+          set -e
+
+          quality_gate=unknown
+          if grep -Fq "QUALITY GATE STATUS: FAILED" "$log"; then
+            quality_gate=failed
+          elif grep -Eq "QUALITY GATE STATUS: (PASSED|OK)" "$log"; then
+            quality_gate=passed
+          fi
+          echo "quality_gate=$quality_gate" >> "$GITHUB_OUTPUT"
+
+          if [ "$quality_gate" = failed ]; then
+            echo "::warning title=SonarCloud quality gate::Merged-main analysis was uploaded, but the SonarCloud quality gate is FAILED. PR checks remain the merge authority; review the SonarCloud dashboard for debt."
+            exit 0
+          fi
+
+          if [ "$scanner_status" -ne 0 ]; then
+            exit "$scanner_status"
+          fi
+
+          if [ "$quality_gate" = unknown ]; then
+            echo "SonarCloud analysis completed without a recognizable quality-gate status." >&2
+            exit 1
+          fi
 
   codecov:
     name: Main Codecov
@@ -228,17 +260,22 @@ jobs:
 
     steps:
       - name: Publish main telemetry summary
+        env:
+          SONAR_QUALITY_GATE: ${{ needs.sonar.outputs.quality_gate }}
         shell: bash
         run: |
+          quality_gate="${SONAR_QUALITY_GATE:-unavailable}"
           {
             echo "### Main quality telemetry"
             echo
             echo "- Source: \`$GITHUB_SHA\`"
             echo "- .NET coverage shards: ${{ needs.dotnet_coverage.result }}"
             echo "- SonarCloud main refresh: ${{ needs.sonar.result }}"
+            echo "- SonarCloud quality gate (telemetry only): $quality_gate"
             echo "- Codecov main refresh: ${{ needs.codecov.result }}"
             echo "- SonarCloud and Codecov run as independent fan-out jobs from the same merged-main coverage evidence."
-            echo "- README main-quality, Sonar and Codecov badges are expected to represent this merged revision after successful jobs."
+            echo "- An explicit processed Sonar quality-gate failure is surfaced as a warning and badge/dashboard signal; scanner, upload, processing and configuration failures remain red."
+            echo "- README main-quality, Sonar and Codecov badges are expected to represent this merged revision after successful refresh jobs."
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Require complete main telemetry
