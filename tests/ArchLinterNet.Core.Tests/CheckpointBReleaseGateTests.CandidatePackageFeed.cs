@@ -110,16 +110,16 @@ public sealed partial class CheckpointBReleaseGateTests
                 Assert.That(core.GetEntry($"contentFiles/any/any/schema/0.5.1/{schema}"), Is.Not.Null, schema);
             }
 
-            // Policy root/fragment and the current applicability schemas advance to independent
-            // 0.6.1 identities. The frozen 0.5.1 finding/cache copies above stay packaged for
-            // offline legacy validation but are not registry-discoverable; `schema list` resolves
-            // the current 0.6.1 resources (see schema/0.6.1/compatibility-manifest.json).
+            // Policy root/fragment advance to 0.8.0; applicability stays 0.6.1 and legacy 0.5.1 stays packaged offline.
             foreach (string schema in new[]
                      {
-                         "compatibility-manifest.json", "dependencies.arch.fragment.schema.json",
-                         "dependencies.arch.schema.json", "normalized-finding.schema.json",
-                         "analysis-cache.schema.json",
+                         "compatibility-manifest.json", "dependencies.arch.fragment.schema.json", "dependencies.arch.schema.json",
                      })
+            {
+                Assert.That(core.GetEntry($"contentFiles/any/any/schema/0.8.0/{schema}"), Is.Not.Null, schema);
+            }
+
+            foreach (string schema in new[] { "normalized-finding.schema.json", "analysis-cache.schema.json" })
             {
                 Assert.That(core.GetEntry($"contentFiles/any/any/schema/0.6.1/{schema}"), Is.Not.Null, schema);
             }

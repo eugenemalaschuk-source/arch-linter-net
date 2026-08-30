@@ -13,6 +13,7 @@ internal static class ArchitecturePolicyDocumentValidatorPipeline
     // invalid-policy test.
     public static IReadOnlyList<IArchitecturePolicyDocumentValidator> All { get; } =
     [
+        new ExternalEvidencePolicyValidator(),
         new HistoryAnalysisConfigurationValidator(),
         new PolicyWeakeningSeverityValidator(),
         new ArchitectureWaiverValidator(),

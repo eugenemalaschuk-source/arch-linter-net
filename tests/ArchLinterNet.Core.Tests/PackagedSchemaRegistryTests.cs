@@ -19,8 +19,8 @@ public sealed class PackagedSchemaRegistryTests
     private static readonly string[] _value = {
                 "analysis-build-state", "analysis-cache", "analysis-profile", "api-snapshot", "baseline", "normalized-finding", "policy-fragment", "policy-root",
             };
-    private static readonly string[] _advancedSchemaIds =
-        ["policy-root", "policy-fragment", "normalized-finding", "analysis-cache"];
+    private static readonly string[] _policySchemaIds = ["policy-root", "policy-fragment"];
+    private static readonly string[] _version061SchemaIds = ["normalized-finding", "analysis-cache"];
 
     [Test]
     public void List_ReturnsEveryReleaseMatchedSchemaInOrdinalOrder()
@@ -34,23 +34,33 @@ public sealed class PackagedSchemaRegistryTests
             Assert.That(schemas.Select(static schema => schema.LogicalId), Is.EqualTo(_value));
             Assert.That(schemas.Single(static schema => schema.LogicalId == "baseline").DocumentVersion, Is.EqualTo("v2"));
             Assert.That(schemas.Single(static schema => schema.LogicalId == "normalized-finding").DocumentVersion, Is.EqualTo("v2"));
-            // Policy root/fragment and the applicability schema advances own independent 0.6.1
-            // identities. Every previous 0.5.1 resource remains byte-for-byte frozen (see
+            // Policy root/fragment advanced independently to 0.8.0; applicability schemas retain
+            // their 0.6.1 identities. Every previous 0.5.1 resource remains byte-for-byte frozen (see
             // openspec/specs/packaged-schema-registry and schema/0.5.1/compatibility-manifest.json).
             Assert.That(
-                schemas.Where(schema => !_advancedSchemaIds.Contains(schema.LogicalId))
+                schemas.Where(schema => !_policySchemaIds.Contains(schema.LogicalId)
+                    && !_version061SchemaIds.Contains(schema.LogicalId))
                     .All(static schema => schema.SchemaId.Contains("/schema/0.5.1/", StringComparison.Ordinal)),
                 Is.True);
             Assert.That(
-                schemas.Where(schema => _advancedSchemaIds.Contains(schema.LogicalId))
+                schemas.Where(schema => _policySchemaIds.Contains(schema.LogicalId))
+                    .All(static schema => schema.SchemaId.Contains("/schema/0.8.0/", StringComparison.Ordinal)),
+                Is.True);
+            Assert.That(
+                schemas.Where(schema => _version061SchemaIds.Contains(schema.LogicalId))
                     .All(static schema => schema.SchemaId.Contains("/schema/0.6.1/", StringComparison.Ordinal)),
                 Is.True);
             Assert.That(
-                schemas.Where(schema => !_advancedSchemaIds.Contains(schema.LogicalId))
+                schemas.Where(schema => !_policySchemaIds.Contains(schema.LogicalId)
+                    && !_version061SchemaIds.Contains(schema.LogicalId))
                     .All(static schema => schema.ResourcePath.StartsWith("schema/0.5.1/", StringComparison.Ordinal)),
                 Is.True);
             Assert.That(
-                schemas.Where(schema => _advancedSchemaIds.Contains(schema.LogicalId))
+                schemas.Where(schema => _policySchemaIds.Contains(schema.LogicalId))
+                    .All(static schema => schema.ResourcePath.StartsWith("schema/0.8.0/", StringComparison.Ordinal)),
+                Is.True);
+            Assert.That(
+                schemas.Where(schema => _version061SchemaIds.Contains(schema.LogicalId))
                     .All(static schema => schema.ResourcePath.StartsWith("schema/0.6.1/", StringComparison.Ordinal)),
                 Is.True);
             Assert.That(schemas.All(static schema => schema.Sha256.Length == 64), Is.True);

@@ -2,9 +2,21 @@ using ArchLinterNet.Core.IO.Abstractions;
 
 namespace ArchLinterNet.Core.IO;
 
-public sealed class ArchitectureFileSystem : IArchitectureFileSystem
+public sealed class ArchitectureFileSystem : IArchitectureFileSystem, IArchitectureEvidenceFileSystem
 {
     public static readonly ArchitectureFileSystem Real = new();
+
+    public Stream OpenRead(string path)
+    {
+        return File.OpenRead(path);
+    }
+
+    /// <inheritdoc />
+    public Stream OpenRepositoryLocalRegularFile(string repositoryRoot, string repositoryRelativePath)
+    {
+        using RegularFileHandleReader.RepositoryRoot root = RegularFileHandleReader.OpenRepositoryRoot(repositoryRoot);
+        return RegularFileHandleReader.OpenRepositoryLocal(root, repositoryRelativePath);
+    }
 
     public bool FileExists(string path)
     {

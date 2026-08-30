@@ -33,6 +33,7 @@ nav:
       - Layers and namespace patterns: policy-format/layers-and-namespaces.md
       - Declared topology: policy-format/declared-topology.md
       - External dependencies: policy-format/external-dependencies.md
+      - External evidence: policy-format/external-evidence.md
       - Package dependencies: policy-format/package-dependencies.md
       - Project metadata: policy-format/project-metadata.md
       - Condition sets: policy-format/condition-sets.md

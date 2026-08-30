@@ -17,8 +17,8 @@ public sealed partial class CheckpointBReleaseGateTests
     // The public adoption package line this candidate belongs to, and the packaged schema
     // generation carrying its policy-root identity. These are release-line constants; the
     // candidate's own package version may additionally carry a prerelease or build suffix.
-    private const string ProductReleaseLine = "0.6.1";
-    private const string ProductSchemaGeneration = "0.6.1";
+    private const string ProductReleaseLine = "0.8.0";
+    private const string ProductSchemaGeneration = "0.8.0";
     private static readonly string[] _packageIds =
         ["ArchLinterNet.CEL", "ArchLinterNet.Cli", "ArchLinterNet.Core", "ArchLinterNet.Testing"];
 

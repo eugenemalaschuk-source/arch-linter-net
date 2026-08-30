@@ -28,6 +28,9 @@ public sealed class ArchitectureContractDocument
     [YamlMember(Alias = "legacy_runtime_layers")]
     public List<string> LegacyRuntimeLayers { get; set; } = new();
 
+    [YamlMember(Alias = "external_evidence")]
+    public List<ArchitectureExternalEvidenceRequirement> ExternalEvidence { get; set; } = new();
+
     [YamlMember(Alias = "analysis")] public ArchitectureAnalysisConfiguration Analysis { get; set; } = new();
 
     [YamlMember(Alias = "history_analysis")]

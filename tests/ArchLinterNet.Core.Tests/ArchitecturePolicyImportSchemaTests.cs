@@ -45,7 +45,7 @@ public sealed class ArchitecturePolicyImportSchemaTests
         JsonElement properties = schema.RootElement.GetProperty("properties");
         string[] expected =
         {
-            "imports", "layers", "external_dependencies", "packages", "framework_references", "source_sets", "legacy_runtime_layers",
+            "imports", "layers", "external_dependencies", "packages", "framework_references", "source_sets", "legacy_runtime_layers", "external_evidence",
             "analysis", "contracts", "classification", "topology"
         };
 
@@ -88,6 +88,34 @@ public sealed class ArchitecturePolicyImportSchemaTests
         });
     }
 
+    [Test]
+    public void ReleaseQualifiedFragmentSchema_ResolvesExternalEvidenceAgainstItsPairedRoot()
+    {
+        JsonSchema root = LoadReleaseQualified("dependencies.arch.schema.json");
+        JsonSchema fragment = LoadReleaseQualified("dependencies.arch.fragment.schema.json");
+        SchemaRegistry.Global.Register(root);
+        SchemaRegistry.Global.Register(fragment);
+        var instance = new JsonObject
+        {
+            ["external_evidence"] = new JsonArray
+            {
+                new JsonObject
+                {
+                    ["id"] = "security.scan",
+                    ["format"] = "sarif",
+                    ["required"] = true,
+                    ["tool"] = "Acme.Scanner",
+                    ["run"] = "assessment",
+                    ["require_revision"] = true,
+                },
+            },
+        };
+
+        EvaluationResults result = fragment.Evaluate(instance, new EvaluationOptions { OutputFormat = OutputFormat.List });
+
+        Assert.That(result.IsValid, Is.True, result.ToString());
+    }
+
     private static JsonSchema LoadSelfContainedFragmentSchema()
     {
         using JsonDocument rootDocument = Load("dependencies.arch.schema.json");
@@ -111,7 +139,7 @@ public sealed class ArchitecturePolicyImportSchemaTests
 
     private static void RewriteRootReferences(JsonNode? node)
     {
-        const string RootPrefix = "https://archlinternet.dev/schema/0.6.1/dependencies.arch.schema.json#/$defs/";
+        const string RootPrefix = "https://archlinternet.dev/schema/0.8.0/dependencies.arch.schema.json#/$defs/";
         if (node is JsonObject mapping)
         {
             foreach (string key in mapping.Select(pair => pair.Key).ToArray())
@@ -143,5 +171,12 @@ public sealed class ArchitecturePolicyImportSchemaTests
     {
         string repositoryRoot = new ArchitectureRepositoryRootResolver().Resolve();
         return JsonDocument.Parse(File.ReadAllText(Path.Combine(repositoryRoot, "schema", fileName)));
+    }
+
+    private static JsonSchema LoadReleaseQualified(string fileName)
+    {
+        string repositoryRoot = new ArchitectureRepositoryRootResolver().Resolve();
+        string path = Path.Combine(repositoryRoot, "schema", "0.8.0", fileName);
+        return JsonSchema.FromText(File.ReadAllText(path));
     }
 }

@@ -109,14 +109,25 @@ jobs:
             fi
           done
 
-          # Policy root/fragment and the current applicability schemas advance to independent 0.6.1
-          # identities. The frozen 0.5.1 finding/cache resources remain packaged above for offline
-          # legacy validation but are not registry-discoverable; the manifest itself is release-
-          # qualified and resolves the current 0.6.1 generation (see schema/0.6.1/compatibility-manifest.json).
+          # Policy root/fragment and their release-qualified manifest advance to independent 0.8.0
+          # identities. The frozen 0.5.1 finding/cache resources and the current 0.6.1
+          # normalized-finding/analysis-cache resources remain packaged above for offline legacy
+          # validation; the manifest resolves the current policy generation (see
+          # schema/0.8.0/compatibility-manifest.json).
           for required_schema in \
             compatibility-manifest.json \
             dependencies.arch.fragment.schema.json \
-            dependencies.arch.schema.json \
+            dependencies.arch.schema.json; do
+            required_entry="contentFiles/any/any/schema/0.8.0/$required_schema"
+            if ! printf '%s\n' "$core_listing" | grep -qxF "$required_entry"; then
+              echo "Core package is missing release-matched schema '$required_entry'." >&2
+              exit 1
+            fi
+          done
+
+          # Applicability result/cache schemas retain their independently frozen 0.6.1
+          # identities and must continue to ship alongside the current policy generation.
+          for required_schema in \
             normalized-finding.schema.json \
             analysis-cache.schema.json; do
             required_entry="contentFiles/any/any/schema/0.6.1/$required_schema"
@@ -164,7 +175,7 @@ jobs:
           # The CLI's established --version contract uses the three-part assembly version,
           # while NuGet package versions may include a prerelease or build suffix.
           grep -qF "$cli_assembly_version" version.txt
-          grep -qx $'policy-root\tv1\thttps://archlinternet.dev/schema/0.6.1/dependencies.arch.schema.json\tschema/0.6.1/dependencies.arch.schema.json' schemas.txt
+          grep -qx $'policy-root\tv1\thttps://archlinternet.dev/schema/0.8.0/dependencies.arch.schema.json\tschema/0.8.0/dependencies.arch.schema.json' schemas.txt
           grep -qx $'normalized-finding\tv2\thttps://archlinternet.dev/schema/0.6.1/normalized-finding.schema.json\tschema/0.6.1/normalized-finding.schema.json' schemas.txt
           grep -qx $'analysis-cache\tv1\thttps://archlinternet.dev/schema/0.6.1/analysis-cache.schema.json\tschema/0.6.1/analysis-cache.schema.json' schemas.txt
           grep -qx $'analysis-profile\tv1\thttps://archlinternet.dev/schema/0.5.1/analysis-profile.schema.json\tschema/0.5.1/analysis-profile.schema.json' schemas.txt
@@ -174,7 +185,7 @@ jobs:
           ./tool/arch-linter-net schema print analysis-profile > printed-analysis-profile-schema.json
 
           core_nupkg=$(printf '%s\n' "$GITHUB_WORKSPACE"/nupkg/ArchLinterNet.Core.*.nupkg)
-          unzip -p "$core_nupkg" contentFiles/any/any/schema/0.6.1/dependencies.arch.schema.json > packaged-schema.json
+          unzip -p "$core_nupkg" contentFiles/any/any/schema/0.8.0/dependencies.arch.schema.json > packaged-schema.json
           unzip -p "$core_nupkg" contentFiles/any/any/schema/0.6.1/normalized-finding.schema.json > packaged-normalized-finding-schema.json
           unzip -p "$core_nupkg" contentFiles/any/any/schema/0.6.1/analysis-cache.schema.json > packaged-analysis-cache-schema.json
           unzip -p "$core_nupkg" contentFiles/any/any/schema/0.5.1/analysis-profile.schema.json > packaged-analysis-profile-schema.json
