@@ -30,19 +30,22 @@ main
 ├─ Main Quality Telemetry
 │  ├─ Linux unit coverage shards
 │  ├─ Python tooling coverage
-│  ├─ SonarCloud main analysis
+│  ├─ SonarCloud main analysis + quality-gate observation
 │  └─ Codecov main upload
 └─ Main NuGet Builds
    ├─ restore + Release build
    ├─ pack CEL/Core/Cli/Testing
    ├─ verify package-manifest identity against the exact source SHA
    ├─ publish four primary .nupkg files to GitHub Packages
-   └─ retain the latest five complete main-build sets
+   ├─ install/restore the exact published version on a clean runner
+   └─ retain five complete sets and prune safely stale partial records
 ```
 
 The full lint/architecture/cross-platform/E2E/packed-artifact/package-validation/CodeQL merge gate remains on the up-to-date pull request. `main` does not rerun that matrix merely because the accepted tree was merged.
 
-Package publication does not depend on SonarCloud/Codecov success, and quality telemetry does not depend on package-registry success. Within quality telemetry, SonarCloud and Codecov are attempted independently after the coverage evidence is available so an outage in one external service does not suppress the other refresh attempt; the overall main-quality run remains red when either required refresh fails.
+Package publication does not depend on SonarCloud/Codecov success, and quality telemetry does not depend on package-registry success. Within quality telemetry, SonarCloud and Codecov are attempted independently after the coverage evidence is available so an outage in one external service does not suppress the other refresh attempt.
+
+The Sonar scanner still waits for the merged-main Quality Gate and records its result. An explicit processed `FAILED` gate is emitted as a workflow warning and remains visible through SonarCloud and its badge, but it does not redefine the post-merge telemetry refresh as failed: the required up-to-date PR checks remain the merge authority. Authentication, configuration, scanner, upload, processing, timeout, and unrecognized-result failures remain fail-closed and make `Main Quality Telemetry` red.
 
 ## Producer authentication and package visibility
 
@@ -53,6 +56,18 @@ The workflow uses the built-in `GITHUB_TOKEN` with job-local `packages: write` p
 Package visibility is not an authorization boundary for `main.N` publication. The workflow accepts the existing GitHub Package identity visibility and does not attempt to require or change it. This allows the development versions to share the same package IDs as the existing public ArchLinterNet packages while remaining clearly identified by their `-main.N` prerelease version.
 
 `RepositoryUrl` already links every ArchLinterNet package to this repository, which gives the publishing repository package administration needed by the retention workflow.
+
+## Published-package availability proof
+
+A successful package upload is not by itself treated as proof that a consumer can restore the build. Before retention starts, a clean runner performs a bounded eventual-consistency smoke against GitHub Packages:
+
+1. installs `ArchLinterNet.Cli` at the exact `main.N` version into an empty tool path;
+2. confirms the installed tool manifest reports that exact package version and executes the packaged entrypoint;
+3. creates an empty `net10.0` consumer project;
+4. restores `ArchLinterNet.Testing` at the exact version;
+5. verifies `project.assets.json` resolved the exact matching `ArchLinterNet.Testing`, `ArchLinterNet.Core`, and `ArchLinterNet.CEL` versions.
+
+The four-package build is declared consumable only after this proof succeeds. Registry/authentication/dependency convergence failures remain red, and cleanup does not run after a failed availability smoke.
 
 ## Retention semantics
 
@@ -65,7 +80,15 @@ A retained build is a version present under all four package IDs:
 
 Only versions matching `major.minor.patch-main.N` participate in retention. Stable versions and other prerelease families such as `rc.*` are never selected for deletion.
 
-The cleanup keeps the newest five complete sets. A partially published `main.N` is not counted and is intentionally left visible for diagnosis rather than being silently deleted. Cleanup starts only after the current four-package publication succeeds. Near-concurrent cleanup is safe: deletion of an already-removed version is tolerated, and the current workflow's version is never selected for deletion even if runs finish out of order.
+The cleanup keeps the newest five complete sets. Complete versions outside that window are deleted from all four package identities. The current workflow's version is never selected for deletion even when workflow runs finish out of order.
+
+Partial/orphan versions are handled separately. A partial version is eligible for cleanup only when all of these are true:
+
+- its parsed `major.minor.patch-main.N` identity is older than the current successfully published complete build;
+- every package-version record that exists for that partial version has a GitHub creation timestamp older than the explicit cleanup cutoff;
+- the current workflow has already passed the exact-version consumer restore smoke.
+
+The workflow currently uses a one-hour grace window. This leaves failed partial publication visible long enough for diagnosis and prevents a cleanup run from deleting a fresh package record belonging to an overlapping/in-flight publication. Newer partial versions, fresh partial records, records without trustworthy age metadata, stable versions, and unrelated prerelease families are protected. Near-concurrent deletion is idempotent: an already-deleted package-version record returning `404` is tolerated.
 
 The generated `.snupkg` files remain part of the local package manifest/integrity check. GitHub Packages receives only the four primary `.nupkg` packages (`dotnet nuget push --no-symbols`); public-release symbol publication remains owned by `release-nuget.yml`/NuGet.org.
 

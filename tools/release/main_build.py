@@ -8,6 +8,8 @@ import json
 import re
 import sys
 import xml.etree.ElementTree as ET
+from dataclasses import dataclass
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -22,7 +24,16 @@ _BASE_VERSION_RE = re.compile(r"^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$")
 _MAIN_VERSION_RE = re.compile(
     r"^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)-main\.([1-9]\d*)$"
 )
-_RETENTION_SCHEMA = "arch-linter-main-package-retention/v1"
+_RETENTION_SCHEMA = "arch-linter-main-package-retention/v2"
+
+
+@dataclass(frozen=True)
+class PackageVersionInfo:
+    version_id: int
+    created_at: datetime | None = None
+
+
+InventoryValue = int | PackageVersionInfo
 
 
 def _validate_base_version(version: str) -> str:
@@ -75,14 +86,34 @@ def _flatten_inventory(raw: Any, package_id: str) -> list[dict[str, Any]]:
     return raw
 
 
-def _load_package_inventory(path: Path, package_id: str) -> dict[str, int]:
+def _parse_github_timestamp(value: Any, package_id: str, version: str) -> datetime | None:
+    if value is None:
+        return None
+    if not isinstance(value, str):
+        raise ValueError(
+            f"GitHub Packages inventory for {package_id} version '{version}' has an invalid created_at value."
+        )
+    try:
+        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError as error:
+        raise ValueError(
+            f"GitHub Packages inventory for {package_id} version '{version}' has an invalid created_at value."
+        ) from error
+    if parsed.tzinfo is None:
+        raise ValueError(
+            f"GitHub Packages inventory for {package_id} version '{version}' has a timezone-less created_at value."
+        )
+    return parsed.astimezone(timezone.utc)
+
+
+def _load_package_inventory(path: Path, package_id: str) -> dict[str, PackageVersionInfo]:
     try:
         raw = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as error:
         raise ValueError(f"Cannot read GitHub Packages inventory '{path}': {error}") from error
 
     records = _flatten_inventory(raw, package_id)
-    versions: dict[str, int] = {}
+    versions: dict[str, PackageVersionInfo] = {}
     for record in records:
         version = record.get("name")
         version_id = record.get("id")
@@ -90,19 +121,57 @@ def _load_package_inventory(path: Path, package_id: str) -> dict[str, int]:
             raise ValueError(f"GitHub Packages inventory for {package_id} has an invalid id/name record.")
         if version in versions:
             raise ValueError(f"GitHub Packages inventory for {package_id} contains duplicate version '{version}'.")
-        versions[version] = version_id
+        versions[version] = PackageVersionInfo(
+            version_id=version_id,
+            created_at=_parse_github_timestamp(record.get("created_at"), package_id, version),
+        )
     return versions
 
 
+def _version_id(value: InventoryValue) -> int:
+    return value if isinstance(value, int) else value.version_id
+
+
+def _created_at(value: InventoryValue) -> datetime | None:
+    return None if isinstance(value, int) else value.created_at
+
+
+def _is_partial_version_stale(
+    version: str,
+    inventories: dict[str, dict[str, InventoryValue]],
+    stale_partial_before: datetime,
+) -> bool:
+    records = [
+        inventories[package_id][version]
+        for package_id in PACKAGE_IDS
+        if version in inventories[package_id]
+    ]
+    created_at_values = [_created_at(record) for record in records]
+    return bool(created_at_values) and all(
+        created_at is not None and created_at <= stale_partial_before
+        for created_at in created_at_values
+    )
+
+
 def create_retention_plan(
-    inventories: dict[str, dict[str, int]],
+    inventories: dict[str, dict[str, InventoryValue]],
     current_version: str,
     keep: int,
+    *,
+    prune_stale_partials: bool = False,
+    stale_partial_before: datetime | None = None,
 ) -> dict[str, Any]:
     if keep <= 0:
         raise ValueError("Retention count must be a positive integer.")
-    if _parse_main_version(current_version) is None:
+    current_version_key = _parse_main_version(current_version)
+    if current_version_key is None:
         raise ValueError(f"Current package version '{current_version}' is not a main build.")
+    if prune_stale_partials and stale_partial_before is None:
+        raise ValueError("Stale partial cleanup requires an explicit UTC cutoff.")
+    if stale_partial_before is not None:
+        if stale_partial_before.tzinfo is None:
+            raise ValueError("Stale partial cleanup cutoff must include a timezone.")
+        stale_partial_before = stale_partial_before.astimezone(timezone.utc)
 
     missing_packages = sorted(set(PACKAGE_IDS) - set(inventories))
     unexpected_packages = sorted(set(inventories) - set(PACKAGE_IDS))
@@ -127,6 +196,21 @@ def create_retention_plan(
         key=lambda version: _parse_main_version(version) or (-1, -1, -1, -1),
         reverse=True,
     )
+    stale_partial_versions = (
+        [
+            version
+            for version in partial_versions
+            if (_parse_main_version(version) or current_version_key) < current_version_key
+            and stale_partial_before is not None
+            and _is_partial_version_stale(version, inventories, stale_partial_before)
+        ]
+        if prune_stale_partials
+        else []
+    )
+    stale_partial_set = set(stale_partial_versions)
+    protected_partial_versions = [
+        version for version in partial_versions if version not in stale_partial_set
+    ]
     ordered_complete = sorted(
         complete_versions,
         key=lambda version: _parse_main_version(version) or (-1, -1, -1, -1),
@@ -141,6 +225,7 @@ def create_retention_plan(
 
     retained_set = set(retained)
     deletions = []
+    orphan_deletions = []
     for package_id in PACKAGE_IDS:
         for version in ordered_complete:
             if version in retained_set:
@@ -149,7 +234,21 @@ def create_retention_plan(
                 {
                     "package_id": package_id,
                     "version": version,
-                    "version_id": inventories[package_id][version],
+                    "version_id": _version_id(inventories[package_id][version]),
+                    "reason": "expired_complete",
+                }
+            )
+
+        for version in stale_partial_versions:
+            record = inventories[package_id].get(version)
+            if record is None:
+                continue
+            orphan_deletions.append(
+                {
+                    "package_id": package_id,
+                    "version": version,
+                    "version_id": _version_id(record),
+                    "reason": "stale_partial",
                 }
             )
 
@@ -161,8 +260,17 @@ def create_retention_plan(
         "target_retained_versions": target_retained,
         "retained_versions": retained,
         "partial_versions": partial_versions,
+        "orphan_cleanup_enabled": prune_stale_partials,
+        "stale_partial_before": (
+            stale_partial_before.isoformat().replace("+00:00", "Z")
+            if stale_partial_before is not None
+            else None
+        ),
+        "stale_partial_versions": stale_partial_versions,
+        "protected_partial_versions": protected_partial_versions,
         "current_retention_deferred": current_retention_deferred,
         "delete": deletions,
+        "delete_orphans": orphan_deletions,
     }
 
 
@@ -170,12 +278,21 @@ def create_retention_plan_from_directory(
     inventory_dir: Path,
     current_version: str,
     keep: int,
+    *,
+    prune_stale_partials: bool = False,
+    stale_partial_before: datetime | None = None,
 ) -> dict[str, Any]:
     inventories = {
         package_id: _load_package_inventory(inventory_dir / f"{package_id}.json", package_id)
         for package_id in PACKAGE_IDS
     }
-    return create_retention_plan(inventories, current_version, keep)
+    return create_retention_plan(
+        inventories,
+        current_version,
+        keep,
+        prune_stale_partials=prune_stale_partials,
+        stale_partial_before=stale_partial_before,
+    )
 
 
 def _append_key_value(path: Path | None, key: str, value: str) -> None:
@@ -200,13 +317,27 @@ def _retention_command(arguments: argparse.Namespace) -> None:
         arguments.inventory_dir,
         arguments.current_version,
         arguments.keep,
+        prune_stale_partials=arguments.prune_stale_partials,
+        stale_partial_before=arguments.stale_partial_before,
     )
     arguments.output.parent.mkdir(parents=True, exist_ok=True)
     arguments.output.write_text(json.dumps(plan, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     print(
         f"Retention plan: keep={plan['retained_versions']}, "
-        f"partial={plan['partial_versions']}, delete={len(plan['delete'])} package versions"
+        f"partial={plan['partial_versions']}, stale_partial={plan['stale_partial_versions']}, "
+        f"delete={len(plan['delete'])} package versions, "
+        f"orphan_delete={len(plan['delete_orphans'])} package versions"
     )
+
+
+def _utc_timestamp(value: str) -> datetime:
+    try:
+        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError as error:
+        raise argparse.ArgumentTypeError(f"Invalid UTC timestamp: {value}") from error
+    if parsed.tzinfo is None:
+        raise argparse.ArgumentTypeError("UTC timestamp must include a timezone.")
+    return parsed.astimezone(timezone.utc)
 
 
 def _parser() -> argparse.ArgumentParser:
@@ -222,11 +353,21 @@ def _parser() -> argparse.ArgumentParser:
 
     retention = subparsers.add_parser(
         "retention-plan",
-        help="Keep the latest complete main build sets and leave partial builds diagnosable.",
+        help="Keep the latest complete main build sets and optionally prune stale partial builds.",
     )
     retention.add_argument("--inventory-dir", type=Path, required=True)
     retention.add_argument("--current-version", required=True)
     retention.add_argument("--keep", type=int, default=5)
+    retention.add_argument(
+        "--prune-stale-partials",
+        action="store_true",
+        help="Delete old partial main versions behind the current complete build.",
+    )
+    retention.add_argument(
+        "--stale-partial-before",
+        type=_utc_timestamp,
+        help="UTC cutoff; every existing package record for a partial version must be this old before deletion.",
+    )
     retention.add_argument("--output", type=Path, required=True)
     retention.set_defaults(func=_retention_command)
 
