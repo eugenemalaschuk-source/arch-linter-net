@@ -339,6 +339,84 @@ public sealed class ArchitectureMetricApplicabilityTests
     }
 
     [Test]
+    public void Evaluate_AmbiguousSelectedAssemblyEndpoint_IsUnassessableWithoutTrustedZero()
+    {
+        ArchitectureTopology topologyDefinition = new()
+        {
+            Mode = "partial",
+            SubjectKind = "assembly",
+            Scope = new ArchitectureTopologyScope
+            {
+                Selectors = [new ArchitectureTopologySubjectSelector { Assembly = "Source" }],
+            },
+            Nodes = [AssemblyNode("source", "Source")],
+        };
+        ArchitectureTopologyEvaluator.ObservedSubject sourceFirst = AssemblySubject(
+            "source-first", "Source", "source-first-canonical", "Source, Version=1.0.0.0");
+        ArchitectureTopologyEvaluator.ObservedSubject sourceSecond = AssemblySubject(
+            "source-second", "Source", "source-second-canonical", "Source, Version=2.0.0.0");
+        ArchitectureTopologyEvaluator.ObservedSubject target = AssemblySubject(
+            "target", "Target", "target-canonical", "Target, Version=1.0.0.0");
+        ArchitectureTopologyEvaluator.ObservedDependency dependency = ArchitectureTopologyEvaluator.BindAssemblyDependencies(
+            [sourceFirst, sourceSecond, target],
+            [
+                new ArchitectureTopologyEvaluator.AssemblyDependencyObservation(
+                    "Source",
+                    "source-first-canonical",
+                    [new ArchitectureTopologyEvaluator.AssemblyReferenceObservation(
+                        "Target", "Target, Version=1.0.0.0")]),
+            ]).Single();
+        ArchitectureTopologyEvaluator.Result topology = ArchitectureTopologyEvaluator.Evaluate(
+            session: null,
+            topology: topologyDefinition,
+            observedSubjects: [sourceFirst, sourceSecond, target],
+            observedDependencies: [dependency]);
+        ArchitectureContractDocument document = new()
+        {
+            Name = "metric-ambiguous-selected-assembly-endpoint",
+            Topology = topologyDefinition,
+            Metrics = [TopologyMetric("source-outgoing", ArchitectureMetricKinds.OutgoingComponentCount, "source")],
+        };
+        using ArchitectureAnalysisContext context = CreateContext(typeof(ArchitectureMetricMeasurement).Assembly);
+        var session = new ArchitectureAnalysisSession(context, document, null, false, null);
+
+        ArchitectureMetricMeasurementOutcome outcome = ArchitectureMetricEvaluator.Evaluate(
+            session, document.Metrics, topology);
+        ArchitectureMetricMeasurement measurement = outcome.Measurements.Single();
+        ArchitectureApplicabilityRecord record = outcome.Applicability!.Controls.Single().Record!;
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(dependency.SourceBinding,
+                Is.EqualTo(ArchitectureTopologyEvaluator.AssemblyEndpointBinding.Ambiguous));
+            Assert.That(dependency.SourceAssemblyName, Is.EqualTo("Source"));
+            AssertUnassessable(measurement);
+            Assert.That(record.Reasons.Select(reason => reason.Code),
+                Is.EqualTo(new[] { ArchitectureApplicabilityReasonCodes.AmbiguousSubject }));
+        });
+    }
+
+    [Test]
+    public void BindAssemblyDependencies_ExcludesExternalMetadataReferenceFromRetainedFirstPartyGraph()
+    {
+        ArchitectureTopologyEvaluator.ObservedSubject source = AssemblySubject(
+            "source", "Source", "source-canonical", "Source, Version=1.0.0.0");
+
+        IReadOnlyList<ArchitectureTopologyEvaluator.ObservedDependency> dependencies =
+            ArchitectureTopologyEvaluator.BindAssemblyDependencies(
+                [source],
+                [
+                    new ArchitectureTopologyEvaluator.AssemblyDependencyObservation(
+                        "Source",
+                        "source-canonical",
+                        [new ArchitectureTopologyEvaluator.AssemblyReferenceObservation(
+                            "External.Library", "External.Library, Version=1.0.0.0")]),
+                ]);
+
+        Assert.That(dependencies, Is.Empty);
+    }
+
+    [Test]
     public void Evaluate_CanonicalTypeAndAssemblyContributorsDoNotCollapseSameNames()
     {
         const string CanonicalFirst = "Shared, Version=1.0.0.0|mvid=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
@@ -483,6 +561,40 @@ public sealed class ArchitectureMetricApplicabilityTests
         });
     }
 
+    [Test]
+    public void Project_AssemblyTopologyIncludesResolvedAssemblyWithoutLoadableTypes()
+    {
+        Assembly emptyAssembly = CreateEmptyDynamicAssembly("MetricEmptyAssembly");
+        string assemblyName = emptyAssembly.GetName().Name!;
+        ArchitectureTopology topology = new()
+        {
+            Mode = "partial",
+            SubjectKind = "assembly",
+            Scope = new ArchitectureTopologyScope
+            {
+                Selectors = [new ArchitectureTopologySubjectSelector { Assembly = assemblyName }],
+            },
+            Nodes = [AssemblyNode("empty", assemblyName)],
+        };
+        ArchitectureContractDocument document = new()
+        {
+            Name = "metric-empty-resolved-assembly",
+            Topology = topology,
+        };
+        using ArchitectureAnalysisContext context = CreateContext(emptyAssembly);
+        var session = new ArchitectureAnalysisSession(context, document, null, false, null);
+
+        ArchitectureTopologyEvaluator.Projection projection = ArchitectureTopologyEvaluator.Project(session, topology);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(emptyAssembly.GetTypes(), Is.Empty);
+            Assert.That(projection.ObservedSubjects.Select(subject => subject.Assembly), Is.EqualTo(new[] { assemblyName }));
+            Assert.That(projection.Classifications.Single().Disposition,
+                Is.EqualTo(ArchitectureTopologyEvaluator.Disposition.Mapped));
+        });
+    }
+
     private static ArchitectureAnalysisContext CreateContext(params Assembly[] assemblies) => new(
         Path.GetTempPath(), assemblies, Array.Empty<string>(), Array.Empty<string>());
 
@@ -557,6 +669,14 @@ public sealed class ArchitectureMetricApplicabilityTests
         AssemblyName name = new($"{assemblyPrefix}-{Guid.NewGuid():N}");
         AssemblyBuilder assembly = AssemblyBuilder.DefineDynamicAssembly(name, AssemblyBuilderAccess.Run);
         return assembly.DefineDynamicModule(name.Name!).DefineType(typeName).CreateType()!;
+    }
+
+    private static Assembly CreateEmptyDynamicAssembly(string assemblyPrefix)
+    {
+        AssemblyName name = new($"{assemblyPrefix}-{Guid.NewGuid():N}");
+        AssemblyBuilder assembly = AssemblyBuilder.DefineDynamicAssembly(name, AssemblyBuilderAccess.Run);
+        _ = assembly.DefineDynamicModule(name.Name!);
+        return assembly;
     }
 
     private static ArchitectureTopology TypeTopology() => new()

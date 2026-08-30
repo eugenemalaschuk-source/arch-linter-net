@@ -15,6 +15,8 @@ This correction closes those gaps before the draft PR can be approved.
   empty universe.
 - Treat an assembly endpoint with more than one same-simple-name retained
   subject as ambiguous without using its reference identity to choose one.
+- Preserve resolved assembly subjects that have no loadable types, and fail
+  closed when an ambiguous endpoint can belong to the metric's selected node.
 - Add focused regressions for every corrected boundary.
 
 ## Capabilities

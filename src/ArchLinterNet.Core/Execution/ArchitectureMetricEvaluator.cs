@@ -209,14 +209,13 @@ internal static class ArchitectureMetricEvaluator
 
         HashSet<string> relationContributors = definition.Kind == ArchitectureMetricKinds.ExternalDependencyGroupCount
             ? ExternalGroups(session, topology, scope, reasons, session.ExternalDependencyFacts.Facts)
-            : ComponentRelations(session, topology, scoped, scope, definition.Kind, reasons);
+            : ComponentRelations(session, topology, scope, definition.Kind, reasons);
         return Finish(definition, scope, null, reasons, relationContributors, provenance);
     }
 
     private static HashSet<string> ComponentRelations(
         ArchitectureAnalysisSession session,
         ArchitectureTopologyEvaluator.Projection topology,
-        IReadOnlyList<ArchitectureTopologyEvaluator.SubjectClassification> scoped,
         string node,
         string kind,
         ICollection<string> reasons)
@@ -231,6 +230,23 @@ internal static class ArchitectureMetricEvaluator
             bool outgoing = kind == ArchitectureMetricKinds.OutgoingComponentCount;
             string selectedIdentity = outgoing ? dependency.SourceIdentity : dependency.TargetIdentity;
             string otherIdentity = outgoing ? dependency.TargetIdentity : dependency.SourceIdentity;
+            ArchitectureTopologyEvaluator.AssemblyEndpointBinding selectedBinding = outgoing
+                ? dependency.SourceBinding
+                : dependency.TargetBinding;
+            string? selectedAssemblyName = outgoing
+                ? dependency.SourceAssemblyName
+                : dependency.TargetAssemblyName;
+            if (selectedBinding == ArchitectureTopologyEvaluator.AssemblyEndpointBinding.Ambiguous
+                && CouldBeSelectedNode(topology, selectedAssemblyName, node))
+            {
+                // The synthetic identity for an ambiguous endpoint cannot enter the exact
+                // classification map. If one of its retained candidates belongs to this node,
+                // skipping it would manufacture a trusted zero for a relation that may belong
+                // to the selected component.
+                reasons.Add(ArchitectureApplicabilityReasonCodes.AmbiguousSubject);
+                continue;
+            }
+
             if (!classes.TryGetValue(selectedIdentity, out ArchitectureTopologyEvaluator.SubjectClassification? selected))
             {
                 continue;
@@ -302,6 +318,15 @@ internal static class ArchitectureMetricEvaluator
 
         return contributors;
     }
+
+    private static bool CouldBeSelectedNode(
+        ArchitectureTopologyEvaluator.Projection topology,
+        string? assemblyName,
+        string node) =>
+        !string.IsNullOrEmpty(assemblyName)
+        && topology.Classifications.Any(classification =>
+            string.Equals(classification.Subject.Assembly, assemblyName, StringComparison.Ordinal)
+            && classification.NodeIds.Contains(node, StringComparer.Ordinal));
 
     internal static HashSet<string> ExternalGroups(
         ArchitectureAnalysisSession session,

@@ -158,6 +158,14 @@ internal static class ArchitectureTopologyEvaluator
         ArchitectureAnalysisSession session,
         string subjectKind)
     {
+        // Assembly topology is an assembly-metadata projection. In particular, a resolved target
+        // assembly can legitimately expose no loadable types, and must still remain a canonical
+        // topology subject for its assembly-level dependency facts.
+        if (subjectKind == "assembly")
+        {
+            return ObserveAssemblies(session);
+        }
+
         Type[] types = session.TypeIndex.AllTypes()
             .OrderBy(ArchitectureTypeNames.SafeFullName, StringComparer.Ordinal)
             .ToArray();
@@ -175,7 +183,6 @@ internal static class ArchitectureTopologyEvaluator
                 "type" => ArchitectureTypeNames.SafeFullName(type),
                 "namespace" => ArchitectureTypeNames.SafeNamespace(type),
                 "project" => project,
-                "assembly" => assembly,
                 _ => throw new InvalidOperationException($"Unsupported topology subject kind '{subjectKind}'."),
             };
             if (string.IsNullOrEmpty(subject))
@@ -198,31 +205,6 @@ internal static class ArchitectureTopologyEvaluator
             }
 
             subjectByType[type] = observed;
-        }
-
-        // Assembly topology has a native assembly-level dependency authority. Do not derive its
-        // edges by aggregating type references: doing that would change the metric semantics (and
-        // can miss references represented only in assembly metadata). Endpoints are the exact
-        // retained assembly subjects, so project/assembly ownership remains session-bound.
-        if (subjectKind == "assembly")
-        {
-            AssemblyDependencyObservation[] observations = session.Context.TargetAssemblies
-                .OrderBy(candidate => candidate.GetName().Name ?? string.Empty, StringComparer.Ordinal)
-                .ThenBy(CanonicalAssemblyIdentity, StringComparer.Ordinal)
-                .Select(assembly => new AssemblyDependencyObservation(
-                    assembly.GetName().Name ?? string.Empty,
-                    CanonicalAssemblyIdentity(assembly),
-                    assembly.GetReferencedAssemblies()
-                        .OrderBy(reference => reference.Name ?? string.Empty, StringComparer.Ordinal)
-                        .ThenBy(AssemblyReferenceIdentity, StringComparer.Ordinal)
-                        .Select(reference => new AssemblyReferenceObservation(
-                            reference.Name ?? string.Empty,
-                            AssemblyReferenceIdentity(reference)))
-                        .ToArray()))
-                .ToArray();
-            return (
-                subjectsByIdentity.Values.OrderBy(subject => subject.Identity, StringComparer.Ordinal).ToArray(),
-                BindAssemblyDependencies(subjectsByIdentity.Values.ToArray(), observations));
         }
 
         var dependencies = new HashSet<ObservedDependency>();
@@ -253,6 +235,64 @@ internal static class ArchitectureTopologyEvaluator
                 .ThenBy(dependency => dependency.Witness, StringComparer.Ordinal)
                 .ToArray());
     }
+
+    private static (IReadOnlyList<ObservedSubject> Subjects, IReadOnlyList<ObservedDependency> Dependencies) ObserveAssemblies(
+        ArchitectureAnalysisSession session)
+    {
+        Assembly[] assemblies = session.Context.TargetAssemblies
+            .OrderBy(candidate => candidate.GetName().Name ?? string.Empty, StringComparer.Ordinal)
+            .ThenBy(CanonicalAssemblyIdentity, StringComparer.Ordinal)
+            .ToArray();
+        var subjectsByIdentity = new Dictionary<string, ObservedSubject>(StringComparer.Ordinal);
+        foreach (Assembly assembly in assemblies)
+        {
+            string assemblyName = assembly.GetName().Name ?? string.Empty;
+            if (string.IsNullOrEmpty(assemblyName))
+            {
+                continue;
+            }
+
+            string canonicalAssemblyIdentity = CanonicalAssemblyIdentity(assembly);
+            string project = ResolveProject(session, assemblyName);
+            string identity = BuildIdentity(
+                "assembly",
+                project,
+                assemblyName,
+                canonicalAssemblyIdentity,
+                assemblyName);
+            subjectsByIdentity.TryAdd(
+                identity,
+                new ObservedSubject(
+                    identity,
+                    project,
+                    assemblyName,
+                    assemblyName,
+                    CanonicalAssemblyIdentity: canonicalAssemblyIdentity,
+                    AssemblyReferenceIdentity: AssemblyReferenceIdentity(assembly)));
+        }
+
+        // Do not derive assembly edges by aggregating type references: assembly metadata is the
+        // native authority, including references from assemblies with no loadable types.
+        AssemblyDependencyObservation[] observations = assemblies
+            .Where(assembly => !string.IsNullOrEmpty(assembly.GetName().Name))
+            .Select(ToAssemblyDependencyObservation)
+            .ToArray();
+        ObservedSubject[] subjects = subjectsByIdentity.Values
+            .OrderBy(subject => subject.Identity, StringComparer.Ordinal)
+            .ToArray();
+        return (subjects, BindAssemblyDependencies(subjects, observations));
+    }
+
+    private static AssemblyDependencyObservation ToAssemblyDependencyObservation(Assembly assembly) => new(
+        assembly.GetName().Name!,
+        CanonicalAssemblyIdentity(assembly),
+        assembly.GetReferencedAssemblies()
+            .OrderBy(reference => reference.Name ?? string.Empty, StringComparer.Ordinal)
+            .ThenBy(AssemblyReferenceIdentity, StringComparer.Ordinal)
+            .Select(reference => new AssemblyReferenceObservation(
+                reference.Name ?? string.Empty,
+                AssemblyReferenceIdentity(reference)))
+            .ToArray());
 
     // Kept internal for regression tests that model multiple resolved assemblies with one simple
     // name. The production observation path above supplies these records from real metadata.
@@ -286,9 +326,10 @@ internal static class ArchitectureTopologyEvaluator
                     continue;
                 }
 
-                // Assembly component metrics use the retained first-party assembly graph. A
-                // reference with no retained simple-name candidate is external to that graph;
-                // it is not an unmapped architecture component endpoint.
+                // Assembly component metrics use the retained first-party assembly graph. Every
+                // resolved target assembly now has a subject, even if it exposes no loadable
+                // types. A reference with no retained simple-name candidate is therefore external
+                // to that graph, not an unmapped architecture component endpoint.
                 if (!subjectsByAssembly.ContainsKey(reference.AssemblyName))
                 {
                     continue;
@@ -309,7 +350,9 @@ internal static class ArchitectureTopologyEvaluator
                     targetIdentity,
                     $"{observation.SourceAssemblyName} -> {reference.AssemblyName}",
                     sourceBinding,
-                    targetBinding));
+                    targetBinding,
+                    observation.SourceAssemblyName,
+                    reference.AssemblyName));
             }
         }
 
@@ -646,7 +689,9 @@ internal static class ArchitectureTopologyEvaluator
         string TargetIdentity,
         string Witness,
         AssemblyEndpointBinding SourceBinding = AssemblyEndpointBinding.Bound,
-        AssemblyEndpointBinding TargetBinding = AssemblyEndpointBinding.Bound);
+        AssemblyEndpointBinding TargetBinding = AssemblyEndpointBinding.Bound,
+        string? SourceAssemblyName = null,
+        string? TargetAssemblyName = null);
 
     internal sealed record AssemblyDependencyObservation(
         string SourceAssemblyName,

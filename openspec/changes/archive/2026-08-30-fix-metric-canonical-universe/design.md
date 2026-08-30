@@ -49,6 +49,22 @@ one candidate really is the observed endpoint. This implements the semantic
 requirement that zero or multiple canonical subjects for the simple name do
 not select an owner.
 
+Assembly topology materializes its canonical subjects from all resolved target
+assemblies rather than from their loadable types. This ensures a first-party
+assembly remains present in the retained dependency graph even when it contains
+no loadable types. For an ambiguous endpoint on the metric's selected side, the
+metric compares its retained simple-name candidates with the selected node and
+returns unassessable if the endpoint could belong to that node; its synthetic
+identity must never be allowed to produce a trusted zero.
+
+The direct assembly graph is a retained first-party graph: a raw metadata
+reference whose simple name is absent from the resolved target-assembly
+universe is external and is excluded before endpoint binding. The zero-or-many
+candidate requirement therefore applies to a retained first-party endpoint. As
+every resolved target assembly is now materialized as a subject, an endpoint
+from that universe is never silently dropped solely because it has no loadable
+types.
+
 ### Empty measurement scope is a value only when policy permits it
 
 `topology.scope.allow_empty` already makes the topology projection evaluable
