@@ -58,7 +58,8 @@ internal static partial class ArchitecturePublicApiSurfaceScanner
                 yield return new ArchitectureExportedApiEntry(
                     signature,
                     ArchitecturePublicApiSignatureDetails.Compose(
-                        signature, ArchitecturePublicApiSignatureDetails.ForMethod(ctor, visibility)),
+                        signature, ArchitecturePublicApiSignatureDetails.ForMethod(
+                            ctor, visibility, completeness.MarkIncomplete)),
                     declaringTypeName, assemblyName, visibility, false, null, referenced);
             }
         }
@@ -92,7 +93,8 @@ internal static partial class ArchitecturePublicApiSurfaceScanner
                 yield return new ArchitectureExportedApiEntry(
                     signature,
                     ArchitecturePublicApiSignatureDetails.Compose(
-                        signature, ArchitecturePublicApiSignatureDetails.ForMethod(method, visibility)),
+                        signature, ArchitecturePublicApiSignatureDetails.ForMethod(
+                            method, visibility, completeness.MarkIncomplete)),
                     declaringTypeName, assemblyName, visibility, false, null, referenced);
             }
         }
@@ -124,7 +126,7 @@ internal static partial class ArchitecturePublicApiSurfaceScanner
                 yield return new ArchitectureExportedApiEntry(
                     signature,
                     ArchitecturePublicApiSignatureDetails.Compose(
-                        signature, ArchitecturePublicApiSignatureDetails.ForProperty(property)),
+                        signature, ArchitecturePublicApiSignatureDetails.ForProperty(property, completeness.MarkIncomplete)),
                     declaringTypeName, assemblyName, AccessorVisibility(property.GetMethod, property.SetMethod), false, null,
                     referenced);
             }
@@ -160,9 +162,10 @@ internal static partial class ArchitecturePublicApiSurfaceScanner
             string? constQualifiedName = isConst ? $"{declaringTypeName}.{field.Name}" : null;
             string fieldVisibility = MemberVisibility(field);
             yield return new ArchitectureExportedApiEntry(
-                signature,
-                ArchitecturePublicApiSignatureDetails.Compose(
-                    signature, ArchitecturePublicApiSignatureDetails.ForField(field, fieldVisibility)),
+                    signature,
+                    ArchitecturePublicApiSignatureDetails.Compose(
+                        signature, ArchitecturePublicApiSignatureDetails.ForField(
+                            field, fieldVisibility, completeness.MarkIncomplete)),
                 declaringTypeName, assemblyName, fieldVisibility, isConst, constQualifiedName,
                 ReferencedTypes(new[] { field.FieldType }));
         }
@@ -192,9 +195,10 @@ internal static partial class ArchitecturePublicApiSurfaceScanner
             string eventSignature = $"event {declaringTypeName}.{evt.Name}: {eventTypeName}";
             string eventVisibility = MemberVisibility(evt.AddMethod!);
             yield return new ArchitectureExportedApiEntry(
-                eventSignature,
-                ArchitecturePublicApiSignatureDetails.Compose(
-                    eventSignature, ArchitecturePublicApiSignatureDetails.ForEvent(evt, eventVisibility)),
+                    eventSignature,
+                    ArchitecturePublicApiSignatureDetails.Compose(
+                        eventSignature, ArchitecturePublicApiSignatureDetails.ForEvent(
+                            evt, eventVisibility, completeness.MarkIncomplete)),
                 declaringTypeName, assemblyName, eventVisibility, false, null,
                 ReferencedTypes(new[] { handlerType! }));
         }

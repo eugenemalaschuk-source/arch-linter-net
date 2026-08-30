@@ -79,7 +79,8 @@ internal static partial class ArchitecturePublicApiSurfaceScanner
             entries.Add(new ArchitectureExportedApiEntry(
                 typeSignature,
                 ArchitecturePublicApiSignatureDetails.Compose(
-                    typeSignature, ArchitecturePublicApiSignatureDetails.ForType(type, typeVisibility)),
+                    typeSignature, ArchitecturePublicApiSignatureDetails.ForType(
+                        type, typeVisibility, completeness.MarkIncomplete)),
                 typeName, assemblyName, typeVisibility, false, null, typeReferenced));
 
             entries.AddRange(GetExportedMembers(type, assemblyName, completeness));
