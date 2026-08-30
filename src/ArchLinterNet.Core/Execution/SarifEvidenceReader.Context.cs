@@ -18,63 +18,147 @@ public sealed partial class SarifEvidenceReader
         string? revision = null;
         bool conflict = false;
 
-        if (run.TryGetProperty("versionControlProvenance", out JsonElement provenance))
+        if (!TryReadSarifProvenance(
+                run,
+                ref repository,
+                ref revision,
+                ref conflict,
+                out status,
+                out detail))
         {
-            if (provenance.ValueKind != JsonValueKind.Array)
-            {
-                status = SarifEvidenceTrustStatus.UnsupportedShape;
-                detail = "The SARIF versionControlProvenance member must be an array.";
-                return new ContextReadOutcome(new SarifEvidenceResolvedContext(artifact.LogicalId, null, null, null));
-            }
-
-            foreach (JsonElement entry in provenance.EnumerateArray())
-            {
-                if (entry.ValueKind != JsonValueKind.Object)
-                {
-                    status = SarifEvidenceTrustStatus.UnsupportedShape;
-                    detail = "Every SARIF version-control provenance entry must be an object.";
-                    return new ContextReadOutcome(new SarifEvidenceResolvedContext(artifact.LogicalId, repository, revision, null));
-                }
-
-                if (!TryReadOptionalString(entry, "repositoryUri", out string? entryRepository, out bool repositoryShapeValid)
-                    || !repositoryShapeValid
-                    || !TryReadOptionalString(entry, "revisionId", out string? entryRevision, out bool revisionShapeValid)
-                    || !revisionShapeValid)
-                {
-                    status = SarifEvidenceTrustStatus.UnsupportedShape;
-                    detail = "SARIF repositoryUri and revisionId values must be strings when present.";
-                    return new ContextReadOutcome(new SarifEvidenceResolvedContext(artifact.LogicalId, repository, revision, null));
-                }
-
-                conflict |= !TryMerge(ref repository, entryRepository);
-                conflict |= !TryMerge(ref revision, entryRevision);
-            }
+            return new ContextReadOutcome(new SarifEvidenceResolvedContext(artifact.LogicalId, repository, revision, null));
         }
 
-        SarifEvidenceProducerContext? producer = artifact.ProducerContext;
-        string? logicalId = artifact.LogicalId;
-        if (producer is not null)
-        {
-            string? producerLogicalId = NormalizeOptional(producer.LogicalId);
-            if (producerLogicalId is not null
-                && !string.Equals(producerLogicalId, artifact.LogicalId, StringComparison.Ordinal))
-            {
-                status = SarifEvidenceTrustStatus.WrongLogicalId;
-                detail = "The producer logical identity does not match the artifact logical identity.";
-            }
-
-            conflict |= !TryMerge(ref repository, NormalizeOptional(producer.Repository));
-            conflict |= !TryMerge(ref revision, NormalizeOptional(producer.Revision));
-        }
-
-        string? scope = NormalizeOptional(producer?.Scope);
+        string? scope = MergeProducerContext(
+            artifact,
+            ref repository,
+            ref revision,
+            ref conflict,
+            out status,
+            out detail);
         if (conflict)
         {
             status = SarifEvidenceTrustStatus.ConflictingContext;
             detail = "SARIF and explicit producer context contain conflicting identity metadata.";
         }
 
-        return new ContextReadOutcome(new SarifEvidenceResolvedContext(logicalId, repository, revision, scope));
+        return new ContextReadOutcome(new SarifEvidenceResolvedContext(artifact.LogicalId, repository, revision, scope));
+    }
+
+    private static bool TryReadSarifProvenance(
+        JsonElement run,
+        ref string? repository,
+        ref string? revision,
+        ref bool conflict,
+        out SarifEvidenceTrustStatus? status,
+        out string? detail)
+    {
+        status = null;
+        detail = null;
+        if (!run.TryGetProperty("versionControlProvenance", out JsonElement provenance))
+        {
+            return true;
+        }
+
+        if (provenance.ValueKind != JsonValueKind.Array)
+        {
+            status = SarifEvidenceTrustStatus.UnsupportedShape;
+            detail = "The SARIF versionControlProvenance member must be an array.";
+            return false;
+        }
+
+        foreach (JsonElement entry in provenance.EnumerateArray())
+        {
+            if (!TryMergeSarifProvenanceEntry(entry, ref repository, ref revision, ref conflict, out detail))
+            {
+                status = SarifEvidenceTrustStatus.UnsupportedShape;
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private static bool TryMergeSarifProvenanceEntry(
+        JsonElement entry,
+        ref string? repository,
+        ref string? revision,
+        ref bool conflict,
+        out string? detail)
+    {
+        detail = null;
+        if (entry.ValueKind != JsonValueKind.Object)
+        {
+            detail = "Every SARIF version-control provenance entry must be an object.";
+            return false;
+        }
+
+        if (!TryReadOptionalString(entry, "repositoryUri", out string? entryRepository, out bool repositoryShapeValid)
+            || !repositoryShapeValid
+            || !TryReadOptionalString(entry, "revisionId", out string? entryRevision, out bool revisionShapeValid)
+            || !revisionShapeValid)
+        {
+            detail = "SARIF repositoryUri and revisionId values must be strings when present.";
+            return false;
+        }
+
+        MergeSarifProvenanceEntry(
+            ref repository,
+            ref revision,
+            entryRepository,
+            entryRevision,
+            ref conflict);
+        return true;
+    }
+
+    private static void MergeSarifProvenanceEntry(
+        ref string? repository,
+        ref string? revision,
+        string? entryRepository,
+        string? entryRevision,
+        ref bool conflict)
+    {
+        if (repository is null && revision is null)
+        {
+            repository = entryRepository;
+            revision = entryRevision;
+            return;
+        }
+
+        if (!string.Equals(repository, entryRepository, StringComparison.Ordinal)
+            || !string.Equals(revision, entryRevision, StringComparison.Ordinal))
+        {
+            conflict = true;
+        }
+    }
+
+    private static string? MergeProducerContext(
+        SarifEvidenceArtifactReference artifact,
+        ref string? repository,
+        ref string? revision,
+        ref bool conflict,
+        out SarifEvidenceTrustStatus? status,
+        out string? detail)
+    {
+        status = null;
+        detail = null;
+        SarifEvidenceProducerContext? producer = artifact.ProducerContext;
+        if (producer is null)
+        {
+            return null;
+        }
+
+        string? producerLogicalId = NormalizeOptional(producer.LogicalId);
+        if (producerLogicalId is not null
+            && !string.Equals(producerLogicalId, artifact.LogicalId, StringComparison.Ordinal))
+        {
+            status = SarifEvidenceTrustStatus.WrongLogicalId;
+            detail = "The producer logical identity does not match the artifact logical identity.";
+        }
+
+        conflict |= !TryMerge(ref repository, NormalizeOptional(producer.Repository));
+        conflict |= !TryMerge(ref revision, NormalizeOptional(producer.Revision));
+        return NormalizeOptional(producer.Scope);
     }
 
     private static bool TryReadOptionalString(

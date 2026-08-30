@@ -57,7 +57,7 @@ internal static partial class RegularFileHandleReader
     private static SafeFileHandle OpenUnixDirectoryAt(SafeFileHandle directoryHandle, string segment)
     {
         int descriptor = OpenUnixDescriptorAt(
-            checked((int)directoryHandle.DangerousGetHandle()),
+            directoryHandle,
             segment,
             OpenReadOnly | OpenNonBlocking | OpenNoFollow | OpenDirectory);
         return CreateUnixDirectoryHandle(descriptor);
@@ -76,7 +76,7 @@ internal static partial class RegularFileHandleReader
     private static FileStream OpenUnixRegularFileAt(SafeFileHandle directoryHandle, string segment)
     {
         int descriptor = OpenUnixDescriptorAt(
-            checked((int)directoryHandle.DangerousGetHandle()),
+            directoryHandle,
             segment,
             OpenReadOnly | OpenNonBlocking | OpenNoFollow);
         if (descriptor < 0)
@@ -160,8 +160,10 @@ internal static partial class RegularFileHandleReader
     {
         IntPtr buffer = Marshal.StringToHGlobalUni(segment);
         IntPtr unicodeStringPointer = IntPtr.Zero;
+        bool rootHandleReference = false;
         try
         {
+            directoryHandle.DangerousAddRef(ref rootHandleReference);
             var unicodeString = new UnicodeString
             {
                 Length = checked((ushort)(segment.Length * sizeof(char))),
@@ -173,7 +175,7 @@ internal static partial class RegularFileHandleReader
             var attributes = new ObjectAttributes
             {
                 Length = Marshal.SizeOf<ObjectAttributes>(),
-                RootDirectory = directoryHandle.DangerousGetHandle(),
+                RootDirectory = directoryHandle.DangerousGetHandle(), // NOSONAR: the reference above pins the native root handle for NtCreateFile.
                 ObjectName = unicodeStringPointer,
                 Attributes = ObjectCaseInsensitive,
             };
@@ -212,6 +214,11 @@ internal static partial class RegularFileHandleReader
         }
         finally
         {
+            if (rootHandleReference)
+            {
+                directoryHandle.DangerousRelease();
+            }
+
             if (unicodeStringPointer != IntPtr.Zero)
             {
                 Marshal.FreeHGlobal(unicodeStringPointer);
@@ -260,7 +267,7 @@ internal static partial class RegularFileHandleReader
     private const uint ObjectCaseInsensitive = 0x00000040;
 
     [LibraryImport("libc", EntryPoint = "openat", SetLastError = true, StringMarshalling = StringMarshalling.Utf8)]
-    private static partial int OpenUnixDescriptorAt(int directoryDescriptor, string path, int flags);
+    private static partial int OpenUnixDescriptorAt(SafeFileHandle directoryHandle, string path, int flags);
 
     [SuppressMessage("Interoperability", "SYSLIB1054:Use LibraryImportAttribute instead of DllImportAttribute", Justification = "NtCreateFile uses native pointer-backed object attributes.")]
     [DllImport("ntdll.dll")]

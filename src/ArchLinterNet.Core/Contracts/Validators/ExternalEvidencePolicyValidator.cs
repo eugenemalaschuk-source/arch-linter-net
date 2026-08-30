@@ -19,50 +19,59 @@ internal sealed class ExternalEvidencePolicyValidator : IArchitecturePolicyDocum
             ArchitectureExternalEvidenceRequirement requirement = document.ExternalEvidence[index];
             string entryPath = EntryPath(index);
             document.Provenance.SetValidationSubject(entryPath);
-
-            if (requirement is null)
+            string id = ValidateIdentity(requirement, index);
+            if (!ids.Add(id))
             {
-                throw new InvalidOperationException($"external_evidence entry {index} must not be null.");
+                throw new InvalidOperationException($"external_evidence declares duplicate id '{id}'.");
             }
 
-            if (string.IsNullOrWhiteSpace(requirement.Id))
-            {
-                throw new InvalidOperationException($"external_evidence entry {index} must declare a non-blank id.");
-            }
+            ValidateProperties(document, requirement, entryPath, id);
+        }
+    }
 
-            if (!ids.Add(requirement.Id))
-            {
-                throw new InvalidOperationException(
-                    $"external_evidence declares duplicate id '{requirement.Id}'.");
-            }
+    private static string ValidateIdentity(ArchitectureExternalEvidenceRequirement? requirement, int index)
+    {
+        if (requirement is null)
+        {
+            throw new InvalidOperationException($"external_evidence entry {index} must not be null.");
+        }
 
-            document.Provenance.SetValidationSubject(Property(entryPath, "format"));
-            if (!string.Equals(requirement.Format, SupportedFormat, StringComparison.Ordinal))
-            {
-                throw new InvalidOperationException(
-                    $"external_evidence entry '{requirement.Id}' format must be exactly 'sarif'.");
-            }
+        if (string.IsNullOrWhiteSpace(requirement.Id))
+        {
+            throw new InvalidOperationException($"external_evidence entry {index} must declare a non-blank id.");
+        }
 
-            document.Provenance.SetValidationSubject(Property(entryPath, "tool"));
-            if (string.IsNullOrWhiteSpace(requirement.Tool))
-            {
-                throw new InvalidOperationException(
-                    $"external_evidence entry '{requirement.Id}' must declare a non-blank tool.");
-            }
+        return requirement.Id;
+    }
 
-            document.Provenance.SetValidationSubject(Property(entryPath, "tool_version"));
-            if (requirement.ToolVersion is not null && string.IsNullOrWhiteSpace(requirement.ToolVersion))
-            {
-                throw new InvalidOperationException(
-                    $"external_evidence entry '{requirement.Id}' tool_version must be non-blank when declared.");
-            }
+    private static void ValidateProperties(
+        ArchitectureContractDocument document,
+        ArchitectureExternalEvidenceRequirement requirement,
+        string entryPath,
+        string id)
+    {
+        document.Provenance.SetValidationSubject(Property(entryPath, "format"));
+        if (!string.Equals(requirement.Format, SupportedFormat, StringComparison.Ordinal))
+        {
+            throw new InvalidOperationException($"external_evidence entry '{id}' format must be exactly 'sarif'.");
+        }
 
-            document.Provenance.SetValidationSubject(Property(entryPath, "run"));
-            if (string.IsNullOrWhiteSpace(requirement.Run))
-            {
-                throw new InvalidOperationException(
-                    $"external_evidence entry '{requirement.Id}' must declare a non-blank run.");
-            }
+        document.Provenance.SetValidationSubject(Property(entryPath, "tool"));
+        if (string.IsNullOrWhiteSpace(requirement.Tool))
+        {
+            throw new InvalidOperationException($"external_evidence entry '{id}' must declare a non-blank tool.");
+        }
+
+        document.Provenance.SetValidationSubject(Property(entryPath, "tool_version"));
+        if (requirement.ToolVersion is not null && string.IsNullOrWhiteSpace(requirement.ToolVersion))
+        {
+            throw new InvalidOperationException($"external_evidence entry '{id}' tool_version must be non-blank when declared.");
+        }
+
+        document.Provenance.SetValidationSubject(Property(entryPath, "run"));
+        if (string.IsNullOrWhiteSpace(requirement.Run))
+        {
+            throw new InvalidOperationException($"external_evidence entry '{id}' must declare a non-blank run.");
         }
     }
 

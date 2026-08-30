@@ -9,71 +9,6 @@ namespace ArchLinterNet.Core.IO;
 // from indefinitely blocking the caller before fstat can reject it.
 internal static partial class RegularFileHandleReader
 {
-    internal static FileStream Open(string path)
-    {
-        return OperatingSystem.IsWindows() ? OpenWindows(path) : OpenUnix(path);
-    }
-
-    internal static string GetIdentity(Stream stream)
-    {
-        if (stream is not FileStream fileStream)
-        {
-            throw NotRegular("Binary evidence must be opened through a regular file handle.");
-        }
-
-        return GetIdentity(fileStream.SafeFileHandle);
-    }
-
-    private static FileStream OpenWindows(string path)
-    {
-        SafeFileHandle handle = CreateFile(
-            path,
-            GenericRead,
-            FileShareRead | FileShareWrite | FileShareDelete,
-            IntPtr.Zero,
-            OpenExisting,
-            FileAttributeNormal | FileFlagBackupSemantics | FileFlagOpenReparsePoint,
-            IntPtr.Zero);
-        if (handle.IsInvalid)
-        {
-            int error = Marshal.GetLastPInvokeError();
-            handle.Dispose();
-            throw ClassifyWindowsFailure(error);
-        }
-
-        try
-        {
-            _ = GetIdentity(handle);
-            return new FileStream(handle, FileAccess.Read);
-        }
-        catch
-        {
-            handle.Dispose();
-            throw;
-        }
-    }
-
-    private static FileStream OpenUnix(string path)
-    {
-        int descriptor = OpenUnixDescriptor(path, OpenReadOnly | OpenNonBlocking | OpenNoFollow);
-        if (descriptor < 0)
-        {
-            throw ClassifyUnixFailure(Marshal.GetLastPInvokeError());
-        }
-
-        var handle = new SafeFileHandle((IntPtr)descriptor, ownsHandle: true);
-        try
-        {
-            _ = GetIdentity(handle);
-            return new FileStream(handle, FileAccess.Read);
-        }
-        catch
-        {
-            handle.Dispose();
-            throw;
-        }
-    }
-
     private static string GetIdentity(SafeFileHandle handle)
     {
         if (handle.IsInvalid)
@@ -86,6 +21,7 @@ internal static partial class RegularFileHandleReader
             : GetUnixIdentity(handle);
     }
 
+    [ExcludeFromCodeCoverage]
     private static string GetWindowsIdentity(SafeFileHandle handle)
     {
         uint fileType = GetFileType(handle);
@@ -118,23 +54,22 @@ internal static partial class RegularFileHandleReader
 
     private static string GetUnixIdentity(SafeFileHandle handle)
     {
-        int descriptor = checked((int)handle.DangerousGetHandle());
         if (OperatingSystem.IsMacOS())
         {
-            return GetMacOsIdentity(descriptor);
+            return GetMacOsIdentity(handle);
         }
 
         return RuntimeInformation.ProcessArchitecture switch
         {
-            Architecture.X64 => GetLinuxX64Identity(descriptor),
-            Architecture.Arm64 => GetLinuxArm64Identity(descriptor),
+            Architecture.X64 => GetLinuxX64Identity(handle),
+            Architecture.Arm64 => GetLinuxArm64Identity(handle),
             _ => throw NotRegular("The current Unix architecture is not supported for regular-file verification."),
         };
     }
 
-    private static string GetLinuxX64Identity(int descriptor)
+    private static string GetLinuxX64Identity(SafeFileHandle handle)
     {
-        if (FStatLinuxX64(descriptor, out LinuxX64Stat stat) != 0)
+        if (FStatLinuxX64(handle, out LinuxX64Stat stat) != 0)
         {
             throw ClassifyUnixFailure(Marshal.GetLastPInvokeError());
         }
@@ -142,9 +77,10 @@ internal static partial class RegularFileHandleReader
         return CreateUnixIdentity(stat.Device, stat.Inode, stat.Mode);
     }
 
-    private static string GetLinuxArm64Identity(int descriptor)
+    [ExcludeFromCodeCoverage]
+    private static string GetLinuxArm64Identity(SafeFileHandle handle)
     {
-        if (FStatLinuxArm64(descriptor, out LinuxArm64Stat stat) != 0)
+        if (FStatLinuxArm64(handle, out LinuxArm64Stat stat) != 0)
         {
             throw ClassifyUnixFailure(Marshal.GetLastPInvokeError());
         }
@@ -162,7 +98,8 @@ internal static partial class RegularFileHandleReader
         return $"unix:{device:X16}:{inode:X16}";
     }
 
-    private static string GetMacOsIdentity(int descriptor)
+    [ExcludeFromCodeCoverage]
+    private static string GetMacOsIdentity(SafeFileHandle handle)
     {
         var attributes = new DarwinAttributeList
         {
@@ -170,7 +107,7 @@ internal static partial class RegularFileHandleReader
             CommonAttributes = CommonDeviceAttribute | CommonObjectTypeAttribute | CommonFileIdAttribute,
         };
         if (FGetAttributeList(
-                descriptor,
+                handle,
                 ref attributes,
                 out DarwinFileIdentityAttributes identity,
                 (nuint)Marshal.SizeOf<DarwinFileIdentityAttributes>(),
@@ -187,6 +124,7 @@ internal static partial class RegularFileHandleReader
         return $"darwin:{identity.Device:X8}:{identity.FileId:X16}";
     }
 
+    [ExcludeFromCodeCoverage]
     private static IOException ClassifyWindowsFailure(int error)
     {
         return error switch
@@ -262,18 +200,18 @@ internal static partial class RegularFileHandleReader
 
     [SuppressMessage("Interoperability", "SYSLIB1054:Use LibraryImportAttribute instead of DllImportAttribute", Justification = "stat uses an ABI-specific stat buffer unsupported by LibraryImport.")]
     [DllImport("libc", SetLastError = true, EntryPoint = "fstat")]
-    private static extern int FStatLinuxX64(int descriptor, out LinuxX64Stat stat);
+    private static extern int FStatLinuxX64(SafeFileHandle handle, out LinuxX64Stat stat);
 
     [SuppressMessage("Interoperability", "SYSLIB1054:Use LibraryImportAttribute instead of DllImportAttribute", Justification = "stat uses an ABI-specific stat buffer unsupported by LibraryImport.")]
     [DllImport("libc", SetLastError = true, EntryPoint = "fstat")]
-    private static extern int FStatLinuxArm64(int descriptor, out LinuxArm64Stat stat);
+    private static extern int FStatLinuxArm64(SafeFileHandle handle, out LinuxArm64Stat stat);
 
     [LibraryImport("libc", EntryPoint = "open", SetLastError = true, StringMarshalling = StringMarshalling.Utf8)]
     private static partial int OpenUnixDescriptor(string path, int flags);
 
     [LibraryImport("libc", EntryPoint = "fgetattrlist", SetLastError = true)]
     private static partial int FGetAttributeList(
-        int descriptor,
+        SafeFileHandle handle,
         ref DarwinAttributeList attributes,
         out DarwinFileIdentityAttributes attributeBuffer,
         nuint attributeBufferSize,

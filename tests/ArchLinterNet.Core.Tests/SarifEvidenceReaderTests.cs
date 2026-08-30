@@ -95,6 +95,9 @@ public sealed class SarifEvidenceReaderTests
     }
 
     [TestCase("not-json", SarifEvidenceTrustStatus.MalformedInput)]
+    [TestCase("[]", SarifEvidenceTrustStatus.UnsupportedShape)]
+    [TestCase("{\"runs\":[]}", SarifEvidenceTrustStatus.UnsupportedVersion)]
+    [TestCase("{\"version\":false,\"runs\":[]}", SarifEvidenceTrustStatus.UnsupportedShape)]
     [TestCase("{\"version\":\"2.0.0\",\"runs\":[]}", SarifEvidenceTrustStatus.UnsupportedVersion)]
     [TestCase("{\"version\":\"2.1.0\",\"runs\":{}}", SarifEvidenceTrustStatus.UnsupportedShape)]
     public void Read_InvalidDocument_ReturnsDistinctTrustStatus(
@@ -112,6 +115,126 @@ public sealed class SarifEvidenceReaderTests
 
         Assert.That(result.Status, Is.EqualTo(expectedStatus));
         Assert.That(result.ArtifactSha256, Is.Not.Null);
+    }
+
+    [TestCase("{}", SarifEvidenceTrustStatus.MissingExpectedRun)]
+    [TestCase("{\"tool\":null}", SarifEvidenceTrustStatus.UnsupportedShape)]
+    [TestCase("{\"tool\":{}}", SarifEvidenceTrustStatus.MissingExpectedRun)]
+    [TestCase("{\"tool\":{\"driver\":null}}", SarifEvidenceTrustStatus.UnsupportedShape)]
+    [TestCase("{\"tool\":{\"driver\":{}}}", SarifEvidenceTrustStatus.MissingExpectedRun)]
+    [TestCase("{\"tool\":{\"driver\":{\"name\":false}}}", SarifEvidenceTrustStatus.UnsupportedShape)]
+    [TestCase("{\"tool\":{\"driver\":{\"name\":\"Acme.Scanner\",\"version\":false}}}", SarifEvidenceTrustStatus.UnsupportedShape)]
+    [TestCase("{\"tool\":{\"driver\":{\"name\":\"Acme.Scanner\",\"version\":\"7.2\"}}}", SarifEvidenceTrustStatus.MissingExpectedRun)]
+    [TestCase("{\"tool\":{\"driver\":{\"name\":\"Acme.Scanner\",\"version\":\"7.2\"}},\"automationDetails\":null}", SarifEvidenceTrustStatus.UnsupportedShape)]
+    [TestCase("{\"tool\":{\"driver\":{\"name\":\"Acme.Scanner\",\"version\":\"7.2\"}},\"automationDetails\":{}}", SarifEvidenceTrustStatus.MissingExpectedRun)]
+    [TestCase("{\"tool\":{\"driver\":{\"name\":\"Acme.Scanner\",\"version\":\"7.2\"}},\"automationDetails\":{\"id\":false}}", SarifEvidenceTrustStatus.UnsupportedShape)]
+    public void Read_IncompleteOrIllTypedRunIdentity_IsNeverSelected(
+        string run,
+        SarifEvidenceTrustStatus expectedStatus)
+    {
+        _repository.AddUtf8File("scan.sarif", SarifDocumentWithRun(run));
+
+        SarifEvidenceReadResult result = new SarifEvidenceReader().Read(
+            Requirement(),
+            _repository.Root,
+            new SarifEvidenceArtifactReference("scan.sarif", "external.scan"));
+
+        Assert.That(result.Status, Is.EqualTo(expectedStatus));
+    }
+
+    [Test]
+    public void Read_MalformedSelectedRunMembers_AreRejectedWithTheirSpecificTrustStatus()
+    {
+        string standard = RunObject("Acme.Scanner", "assessment-42");
+        string resultShape = standard.Replace("\"results\":[]", "\"results\":{}", StringComparison.Ordinal);
+        string missingInvocation = standard.Replace(
+            "\"invocations\":[{\"executionSuccessful\":true}],",
+            string.Empty,
+            StringComparison.Ordinal);
+        string invocationShape = standard.Replace(
+            "\"invocations\":[{\"executionSuccessful\":true}]",
+            "\"invocations\":{}",
+            StringComparison.Ordinal);
+        string emptyInvocation = standard.Replace(
+            "\"invocations\":[{\"executionSuccessful\":true}]",
+            "\"invocations\":[]",
+            StringComparison.Ordinal);
+        _repository.AddUtf8File("result-shape.sarif", SarifDocumentWithRun(resultShape));
+        _repository.AddUtf8File("missing-invocation.sarif", SarifDocumentWithRun(missingInvocation));
+        _repository.AddUtf8File("invocation-shape.sarif", SarifDocumentWithRun(invocationShape));
+        _repository.AddUtf8File("empty-invocation.sarif", SarifDocumentWithRun(emptyInvocation));
+        var reader = new SarifEvidenceReader();
+
+        SarifEvidenceReadResult malformedResults = reader.Read(
+            Requirement(), _repository.Root, new SarifEvidenceArtifactReference("result-shape.sarif", "external.scan"));
+        SarifEvidenceReadResult missingInvocations = reader.Read(
+            Requirement(), _repository.Root, new SarifEvidenceArtifactReference("missing-invocation.sarif", "external.scan"));
+        SarifEvidenceReadResult malformedInvocations = reader.Read(
+            Requirement(), _repository.Root, new SarifEvidenceArtifactReference("invocation-shape.sarif", "external.scan"));
+        SarifEvidenceReadResult emptyInvocations = reader.Read(
+            Requirement(), _repository.Root, new SarifEvidenceArtifactReference("empty-invocation.sarif", "external.scan"));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(malformedResults.Status, Is.EqualTo(SarifEvidenceTrustStatus.UnsupportedShape));
+            Assert.That(missingInvocations.Status, Is.EqualTo(SarifEvidenceTrustStatus.IncompleteExecution));
+            Assert.That(malformedInvocations.Status, Is.EqualTo(SarifEvidenceTrustStatus.UnsupportedShape));
+            Assert.That(emptyInvocations.Status, Is.EqualTo(SarifEvidenceTrustStatus.IncompleteExecution));
+        });
+    }
+
+    [TestCase("{}")]
+    [TestCase("[false]")]
+    [TestCase("[{\"repositoryUri\":false}]")]
+    public void Read_MalformedVersionControlProvenance_IsRejected(string provenance)
+    {
+        string run = RunObject("Acme.Scanner", "assessment-42").Replace(
+            "\"versionControlProvenance\":[{\"repositoryUri\":\"repo\",\"revisionId\":\"revision\"}]",
+            $"\"versionControlProvenance\":{provenance}",
+            StringComparison.Ordinal);
+        _repository.AddUtf8File("scan.sarif", SarifDocumentWithRun(run));
+
+        SarifEvidenceReadResult result = new SarifEvidenceReader().Read(
+            Requirement(),
+            _repository.Root,
+            new SarifEvidenceArtifactReference("scan.sarif", "external.scan"));
+
+        Assert.That(result.Status, Is.EqualTo(SarifEvidenceTrustStatus.UnsupportedShape));
+    }
+
+    [Test]
+    public void Read_DuplicateProperties_AreRejectedAfterTheSelectedResultBound()
+    {
+        string json = Sarif(
+            tool: "Acme.Scanner",
+            runId: "assessment-42",
+            results: "[{\"properties\":{\"duplicate\":1,\"duplicate\":2}}]");
+        _repository.AddUtf8File("scan.sarif", json);
+
+        SarifEvidenceReadResult result = new SarifEvidenceReader().Read(
+            Requirement(),
+            _repository.Root,
+            new SarifEvidenceArtifactReference("scan.sarif", "external.scan"));
+
+        Assert.That(result.Status, Is.EqualTo(SarifEvidenceTrustStatus.UnsupportedShape));
+    }
+
+    [Test]
+    public void Read_SplitVersionControlProvenanceEntries_DoNotProveARepositoryRevisionPair()
+    {
+        string run = RunObject("Acme.Scanner", "assessment-42").Replace(
+            "\"versionControlProvenance\":[{\"repositoryUri\":\"repo\",\"revisionId\":\"revision\"}]",
+            "\"versionControlProvenance\":[{\"repositoryUri\":\"repo\"},{\"revisionId\":\"revision\"}]",
+            StringComparison.Ordinal);
+        _repository.AddUtf8File("scan.sarif", SarifDocumentWithRun(run));
+
+        SarifEvidenceReadResult result = new SarifEvidenceReader().Read(
+            Requirement(),
+            _repository.Root,
+            new SarifEvidenceArtifactReference("scan.sarif", "external.scan"),
+            new SarifEvidenceAssessmentContext("repo", "revision"));
+
+        Assert.That(result.Status, Is.EqualTo(SarifEvidenceTrustStatus.ConflictingContext));
     }
 
     [Test]
@@ -248,6 +371,40 @@ public sealed class SarifEvidenceReaderTests
         Assert.That(result.Status, Is.EqualTo(SarifEvidenceTrustStatus.Valid));
     }
 
+    [Test]
+    public void Read_EvidenceCapabilityIoFailure_IsReportedAsUnreadableInput()
+    {
+        var reader = new SarifEvidenceReader(new ThrowingEvidenceFileSystem());
+
+        SarifEvidenceReadResult result = reader.Read(
+            Requirement(),
+            _repository.Root,
+            new SarifEvidenceArtifactReference("scan.sarif", "external.scan"));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(result.Status, Is.EqualTo(SarifEvidenceTrustStatus.UnreadableInput));
+            Assert.That(result.ArtifactPath, Is.Null);
+            Assert.That(result.ArtifactSha256, Is.Null);
+        });
+    }
+
+    [Test]
+    public void Read_UnboundedByteLimit_RemainsBytePreserving()
+    {
+        string json = Sarif("Acme.Scanner", "assessment-42");
+        _repository.AddUtf8File("scan.sarif", json);
+
+        SarifEvidenceReadResult result = new SarifEvidenceReader().Read(
+            Requirement(),
+            _repository.Root,
+            new SarifEvidenceArtifactReference("scan.sarif", "external.scan"),
+            new SarifEvidenceAssessmentContext("repo", "revision"),
+            new SarifEvidenceLimits(long.MaxValue, 4, 10));
+
+        Assert.That(result.Status, Is.EqualTo(SarifEvidenceTrustStatus.Valid));
+    }
+
     [TestCase("")]
     [TestCase(" ")]
     public void Read_BlankProgrammaticToolVersion_IsRejected(string toolVersion)
@@ -285,6 +442,9 @@ public sealed class SarifEvidenceReaderTests
         string invocation = "{\"executionSuccessful\":true}") =>
         $"{{\"version\":\"2.1.0\",\"runs\":[{RunObject(tool, runId, repository, revision, results, invocation)}]}}";
 
+    private static string SarifDocumentWithRun(string run) =>
+        $"{{\"version\":\"2.1.0\",\"runs\":[{run}]}}";
+
     private static string RunObject(
         string tool,
         string runId,
@@ -302,6 +462,14 @@ public sealed class SarifEvidenceReaderTests
         {
             OpenedPath = repositoryRelativePath;
             return new MemoryStream(Encoding.UTF8.GetBytes(artifact), writable: false);
+        }
+    }
+
+    private sealed class ThrowingEvidenceFileSystem : IArchitectureEvidenceFileSystem
+    {
+        public Stream OpenRepositoryLocalRegularFile(string repositoryRoot, string repositoryRelativePath)
+        {
+            throw new IOException("The evidence source was unavailable.");
         }
     }
 }
