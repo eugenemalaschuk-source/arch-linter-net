@@ -44,6 +44,8 @@ public sealed class ArchitectureAnalysisSession
 
     private readonly ArchitecturePublicApiSurfaceIndex _publicApiSurfaceIndex = new();
 
+    private readonly ArchitectureContractSurfaceExposureIndex _contractSurfaceExposureIndex = new();
+
     private readonly ArchitectureCycleBaselineCandidateRecorder _cycleBaselineCandidateRecorder = new();
 
     private readonly ArchitectureFindingIdentityService _findingIdentityService = new();
@@ -159,6 +161,17 @@ public sealed class ArchitectureAnalysisSession
     // Friend-test evidence only; the index remains private to this session and no counter enters
     // the public analysis profile or schema.
     internal int PublicApiSurfaceMaterializationCount => _publicApiSurfaceIndex.MaterializationCount;
+
+    // Caller-selected roots keep reviewed public-API membership authoritative. The exposure index
+    // only materializes reusable reflection facts and never selects roots or assigns policy roles.
+    internal ArchitectureContractSurfaceExposureResult GetContractSurfaceExposure(IEnumerable<Type> roots) =>
+        _contractSurfaceExposureIndex.GetOrMaterialize(roots);
+
+    internal ArchitectureContractSurfaceExposureResult GetContractSurfaceExposure(params Type[] roots) =>
+        _contractSurfaceExposureIndex.GetOrMaterialize(roots);
+
+    internal int ContractSurfaceExposureMaterializationCount =>
+        _contractSurfaceExposureIndex.MaterializationCount;
 
     internal ArchitectureCheckerContext CheckerContext => _checkerContext ??= new ArchitectureCheckerContext(this);
 
