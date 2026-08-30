@@ -54,6 +54,20 @@ internal sealed class ArchitectureContractExecutor : IArchitectureContractExecut
             ExecuteStandardFamily(session, mode, family, handlerRegistry, timing, standardFamilyFindings, resultCounts);
         }
 
+        // Topology is an opt-in document control rather than a contracts.<mode> family. Evaluate
+        // it once per requested validation mode after ordinary contract checks have populated the
+        // shared reference graph, then transport its native applicability evidence through the
+        // same result boundary as every other v0.8 control.
+        ArchitectureTopologyEvaluator.Result topology = ArchitectureTopologyEvaluator.Evaluate(session);
+        if (topology.Violations.Count > 0)
+        {
+            int identityCursor = session.FindingIdentityCursor;
+            ArchitectureViolation[] violations = session.AttachFindingIdentities(topology.Violations, identityCursor).ToArray();
+            standardFamilyFindings.Violations.AddRange(violations);
+            AddResultCount(resultCounts, ArchitectureTopologyEvaluator.Family, violations.Length);
+            session.Context.ProfilingCounters.RecordContractFamilyResults(ArchitectureTopologyEvaluator.Family, violations.Length);
+        }
+
         return new ArchitectureContractExecutionResult(
             standardFamilyFindings.Violations,
             standardFamilyFindings.Cycles,
@@ -62,6 +76,8 @@ internal sealed class ArchitectureContractExecutor : IArchitectureContractExecut
         {
             CycleFindings = standardFamilyFindings.CycleFindings,
             ContractFamilyResultCounts = resultCounts,
+            ApplicabilityExpectedEntries = topology.ExpectedEntries,
+            ApplicabilityRecords = topology.Records,
         };
     }
 

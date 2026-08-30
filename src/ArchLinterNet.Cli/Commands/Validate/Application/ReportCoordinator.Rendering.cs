@@ -169,6 +169,65 @@ internal sealed partial class ReportCoordinator
             ["state"] = ArchitectureApplicabilityWireNames.StateToken(record.State),
             ["reasons"] = BuildApplicabilityReasonsJson(record.Reasons),
             ["provenance"] = BuildApplicabilityProvenanceJson(record.Provenance),
+            ["topology_evidence"] = BuildTopologyEvidenceJson(record.TopologyEvidence),
+        };
+    }
+
+    private static JsonObject? BuildTopologyEvidenceJson(ArchitectureTopologyMappingEvidence? evidence)
+    {
+        if (evidence is null)
+        {
+            return null;
+        }
+
+        JsonArray subjects = new();
+        foreach (ArchitectureTopologySubjectEvidence subject in evidence.Subjects)
+        {
+            subjects.Add(new JsonObject
+            {
+                ["identity"] = subject.Identity,
+                ["project"] = subject.Project,
+                ["assembly"] = subject.Assembly,
+                ["subject"] = subject.Subject,
+                ["disposition"] = subject.Disposition,
+                ["node_ids"] = new JsonArray(subject.NodeIds.Select(value => JsonValue.Create(value)).ToArray()),
+                ["reviewed_out_of_scope_id"] = subject.ReviewedOutOfScopeId,
+            });
+        }
+
+        JsonArray relationships = new();
+        foreach (ArchitectureTopologyRelationEvidence relationship in evidence.Relationships)
+        {
+            relationships.Add(new JsonObject
+            {
+                ["source_node"] = relationship.SourceNode,
+                ["target_node"] = relationship.TargetNode,
+                ["witness"] = relationship.Witness,
+                ["is_allowed"] = relationship.IsAllowed,
+            });
+        }
+
+        JsonArray staleEdges = new();
+        foreach (ArchitectureTopologyStaleEdgeEvidence edge in evidence.StaleEdges)
+        {
+            staleEdges.Add(new JsonObject { ["source_node"] = edge.SourceNode, ["target_node"] = edge.TargetNode });
+        }
+
+        return new JsonObject
+        {
+            ["interpretation"] = "topology completeness evidence; not an architecture quality score",
+            ["mode"] = evidence.Mode,
+            ["subject_kind"] = evidence.SubjectKind,
+            ["declared_component_count"] = evidence.DeclaredComponentCount,
+            ["observed_subject_count"] = evidence.ObservedSubjectCount,
+            ["mapped_subject_count"] = evidence.MappedSubjectCount,
+            ["reviewed_out_of_scope_subject_count"] = evidence.ReviewedOutOfScopeSubjectCount,
+            ["unmapped_subject_count"] = evidence.UnmappedSubjectCount,
+            ["ambiguous_subject_count"] = evidence.AmbiguousSubjectCount,
+            ["subjects"] = subjects,
+            ["relationships"] = relationships,
+            ["stale_nodes"] = new JsonArray(evidence.StaleNodes.Select(value => JsonValue.Create(value)).ToArray()),
+            ["stale_edges"] = staleEdges,
         };
     }
 

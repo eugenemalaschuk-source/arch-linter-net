@@ -52,7 +52,23 @@ public sealed partial class TestingAdapterTests
             new ArchitectureApplicabilityProvenance("topology", "topology-control", "policy-v08"));
         ArchitectureApplicabilityRecord record = new(
             "topology-control", "topology", ArchitectureApplicabilityRecordState.Unassessable, [reason],
-            new ArchitectureApplicabilityProvenance("topology", "topology-control", "policy-v08"));
+            new ArchitectureApplicabilityProvenance("topology", "topology-control", "policy-v08"))
+        {
+            TopologyEvidence = new ArchitectureTopologyMappingEvidence(
+                "exhaustive",
+                "namespace",
+                1,
+                [new ArchitectureTopologySubjectEvidence(
+                    "namespace|project=Example|assembly=Example|subject=Example.App",
+                    "Example",
+                    "Example",
+                    "Example.App",
+                    "mapped",
+                    ["application"])],
+                Array.Empty<ArchitectureTopologyRelationEvidence>(),
+                Array.Empty<string>(),
+                Array.Empty<ArchitectureTopologyStaleEdgeEvidence>()),
+        };
         ArchitectureAssessmentCompletionEvidence completion = ArchitectureApplicabilityEvaluator.Evaluate(
             [expected], [record], conformancePassed: true)!;
         ArchitectureApplicabilityProjection projection = ArchitectureApplicabilityProjector.Project(completion, "strict")!;
@@ -75,6 +91,8 @@ public sealed partial class TestingAdapterTests
             Assert.That(result.ApplicabilityProjection, Is.SameAs(projection));
             Assert.That(result.AssessmentCompletionEvidence, Is.SameAs(completion));
             Assert.That(projection.Summary.RequiredCount, Is.EqualTo(1));
+            Assert.That(result.ApplicabilityProjection!.Controls.Single().Record!.TopologyEvidence!.MappedSubjectCount,
+                Is.EqualTo(1));
             Assert.That(finding, Is.SameAs(projection.Findings.Single()));
             Assert.That(finding.Identity!.SourceType, Is.EqualTo("topology-control"));
             Assert.That(exception.Message, Does.Contain("Assessment completion: unassessable"));

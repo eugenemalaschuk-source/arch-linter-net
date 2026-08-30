@@ -236,6 +236,10 @@ class ArchLinterNet.Core.Model.ArchitectureSourceExpansionInventory [sealed]
 class ArchLinterNet.Core.Model.ArchitectureSourceExpansionOrigin [sealed]
 class ArchLinterNet.Core.Model.ArchitectureSourceSetResolution [sealed]
 class ArchLinterNet.Core.Model.ArchitectureSubtractiveMatcherParticipation [sealed]
+class ArchLinterNet.Core.Model.ArchitectureTopologyMappingEvidence [sealed]
+class ArchLinterNet.Core.Model.ArchitectureTopologyRelationEvidence [sealed]
+class ArchLinterNet.Core.Model.ArchitectureTopologyStaleEdgeEvidence [sealed]
+class ArchLinterNet.Core.Model.ArchitectureTopologySubjectEvidence [sealed]
 class ArchLinterNet.Core.Model.ArchitectureUnmatchedIgnoredViolation [sealed]
 class ArchLinterNet.Core.Model.ArchitectureViolation [sealed]
 class ArchLinterNet.Core.Model.ArchitectureViolationIdentity [sealed]
@@ -870,6 +874,10 @@ ctor ArchLinterNet.Core.Model.ArchitectureSourceExpansionInventory(System.Collec
 ctor ArchLinterNet.Core.Model.ArchitectureSourceExpansionOrigin(System.String, System.String, System.String, System.String, System.String)
 ctor ArchLinterNet.Core.Model.ArchitectureSourceSetResolution(System.String, ArchLinterNet.Core.Model.ArchitectureSourceSetKind, System.Collections.Generic.IReadOnlyList`1[System.String], System.Boolean, System.String)
 ctor ArchLinterNet.Core.Model.ArchitectureSubtractiveMatcherParticipation(System.String, System.String, System.String, System.Nullable`1[System.Int32], System.Boolean)
+ctor ArchLinterNet.Core.Model.ArchitectureTopologyMappingEvidence(System.String, System.String, System.Int32, System.Collections.Generic.IReadOnlyList`1[ArchLinterNet.Core.Model.ArchitectureTopologySubjectEvidence], System.Collections.Generic.IReadOnlyList`1[ArchLinterNet.Core.Model.ArchitectureTopologyRelationEvidence], System.Collections.Generic.IReadOnlyList`1[System.String], System.Collections.Generic.IReadOnlyList`1[ArchLinterNet.Core.Model.ArchitectureTopologyStaleEdgeEvidence])
+ctor ArchLinterNet.Core.Model.ArchitectureTopologyRelationEvidence(System.String, System.String, System.String, System.Boolean)
+ctor ArchLinterNet.Core.Model.ArchitectureTopologyStaleEdgeEvidence(System.String, System.String)
+ctor ArchLinterNet.Core.Model.ArchitectureTopologySubjectEvidence(System.String, System.String, System.String, System.String, System.String, System.Collections.Generic.IReadOnlyList`1[System.String], System.String)
 ctor ArchLinterNet.Core.Model.ArchitectureUnmatchedIgnoredViolation(System.String, System.String, System.Int32, System.String, System.String, System.String)
 ctor ArchLinterNet.Core.Model.ArchitectureViolation(System.String, System.String, System.String, System.String, System.Collections.Generic.IReadOnlyCollection`1[System.String])
 ctor ArchLinterNet.Core.Model.ArchitectureViolationIdentity(System.Int32, System.String, System.String, System.String, System.String, System.String, System.String, System.String, System.String, System.String, System.Int32, System.String)
@@ -2604,6 +2612,7 @@ property ArchLinterNet.Core.Model.ArchitectureApplicabilityRecord.Family: System
 property ArchLinterNet.Core.Model.ArchitectureApplicabilityRecord.Provenance: ArchLinterNet.Core.Model.ArchitectureApplicabilityProvenance [get]
 property ArchLinterNet.Core.Model.ArchitectureApplicabilityRecord.Reasons: System.Collections.Generic.IReadOnlyList`1[ArchLinterNet.Core.Model.ArchitectureApplicabilityReason] [get]
 property ArchLinterNet.Core.Model.ArchitectureApplicabilityRecord.State: ArchLinterNet.Core.Model.ArchitectureApplicabilityRecordState [get]
+property ArchLinterNet.Core.Model.ArchitectureApplicabilityRecord.TopologyEvidence: ArchLinterNet.Core.Model.ArchitectureTopologyMappingEvidence [get, init]
 property ArchLinterNet.Core.Model.ArchitectureApplicabilitySummary.EvaluableControlCount: System.Int32 [get]
 property ArchLinterNet.Core.Model.ArchitectureApplicabilitySummary.EvaluableCount: System.Int32 [get]
 property ArchLinterNet.Core.Model.ArchitectureApplicabilitySummary.NotApplicableControlCount: System.Int32 [get]
@@ -2834,6 +2843,31 @@ property ArchLinterNet.Core.Model.ArchitectureSubtractiveMatcherParticipation.Ki
 property ArchLinterNet.Core.Model.ArchitectureSubtractiveMatcherParticipation.Matched: System.Boolean [get, init]
 property ArchLinterNet.Core.Model.ArchitectureSubtractiveMatcherParticipation.Mode: ArchLinterNet.Core.Model.ArchitectureSelectorParticipationMode [get, init]
 property ArchLinterNet.Core.Model.ArchitectureSubtractiveMatcherParticipation.PolicyLocation: ArchLinterNet.Core.Model.ArchitecturePolicySourceLocation [get, init]
+property ArchLinterNet.Core.Model.ArchitectureTopologyMappingEvidence.AmbiguousSubjectCount: System.Int32 [get]
+property ArchLinterNet.Core.Model.ArchitectureTopologyMappingEvidence.DeclaredComponentCount: System.Int32 [get, init]
+property ArchLinterNet.Core.Model.ArchitectureTopologyMappingEvidence.MappedSubjectCount: System.Int32 [get]
+property ArchLinterNet.Core.Model.ArchitectureTopologyMappingEvidence.Mode: System.String [get, init]
+property ArchLinterNet.Core.Model.ArchitectureTopologyMappingEvidence.ObservedSubjectCount: System.Int32 [get]
+property ArchLinterNet.Core.Model.ArchitectureTopologyMappingEvidence.Relationships: System.Collections.Generic.IReadOnlyList`1[ArchLinterNet.Core.Model.ArchitectureTopologyRelationEvidence] [get, init]
+property ArchLinterNet.Core.Model.ArchitectureTopologyMappingEvidence.ReviewedOutOfScopeSubjectCount: System.Int32 [get]
+property ArchLinterNet.Core.Model.ArchitectureTopologyMappingEvidence.StaleEdges: System.Collections.Generic.IReadOnlyList`1[ArchLinterNet.Core.Model.ArchitectureTopologyStaleEdgeEvidence] [get, init]
+property ArchLinterNet.Core.Model.ArchitectureTopologyMappingEvidence.StaleNodes: System.Collections.Generic.IReadOnlyList`1[System.String] [get, init]
+property ArchLinterNet.Core.Model.ArchitectureTopologyMappingEvidence.SubjectKind: System.String [get, init]
+property ArchLinterNet.Core.Model.ArchitectureTopologyMappingEvidence.Subjects: System.Collections.Generic.IReadOnlyList`1[ArchLinterNet.Core.Model.ArchitectureTopologySubjectEvidence] [get, init]
+property ArchLinterNet.Core.Model.ArchitectureTopologyMappingEvidence.UnmappedSubjectCount: System.Int32 [get]
+property ArchLinterNet.Core.Model.ArchitectureTopologyRelationEvidence.IsAllowed: System.Boolean [get, init]
+property ArchLinterNet.Core.Model.ArchitectureTopologyRelationEvidence.SourceNode: System.String [get, init]
+property ArchLinterNet.Core.Model.ArchitectureTopologyRelationEvidence.TargetNode: System.String [get, init]
+property ArchLinterNet.Core.Model.ArchitectureTopologyRelationEvidence.Witness: System.String [get, init]
+property ArchLinterNet.Core.Model.ArchitectureTopologyStaleEdgeEvidence.SourceNode: System.String [get, init]
+property ArchLinterNet.Core.Model.ArchitectureTopologyStaleEdgeEvidence.TargetNode: System.String [get, init]
+property ArchLinterNet.Core.Model.ArchitectureTopologySubjectEvidence.Assembly: System.String [get, init]
+property ArchLinterNet.Core.Model.ArchitectureTopologySubjectEvidence.Disposition: System.String [get, init]
+property ArchLinterNet.Core.Model.ArchitectureTopologySubjectEvidence.Identity: System.String [get, init]
+property ArchLinterNet.Core.Model.ArchitectureTopologySubjectEvidence.NodeIds: System.Collections.Generic.IReadOnlyList`1[System.String] [get, init]
+property ArchLinterNet.Core.Model.ArchitectureTopologySubjectEvidence.Project: System.String [get, init]
+property ArchLinterNet.Core.Model.ArchitectureTopologySubjectEvidence.ReviewedOutOfScopeId: System.String [get, init]
+property ArchLinterNet.Core.Model.ArchitectureTopologySubjectEvidence.Subject: System.String [get, init]
 property ArchLinterNet.Core.Model.ArchitectureUnmatchedIgnoredViolation.ContractGroup: System.String [get, init]
 property ArchLinterNet.Core.Model.ArchitectureUnmatchedIgnoredViolation.ContractId: System.String [get, init]
 property ArchLinterNet.Core.Model.ArchitectureUnmatchedIgnoredViolation.ContractName: System.String [get, init]

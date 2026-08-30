@@ -126,6 +126,7 @@ public sealed partial class ValidateCommandHandlerReportModeTests
                     Assert.That(console.StdOut, Does.Contain("family=topology"));
                     Assert.That(console.StdOut, Does.Contain(ArchitectureApplicabilityReasonCodes.UnexpectedEmptyInput));
                     Assert.That(console.StdOut, Does.Contain("policy=policy-v08"));
+                    Assert.That(console.StdOut, Does.Contain("topology=(declared_components=2, observed_subjects=2"));
                 });
                 break;
             case "json":
@@ -150,6 +151,11 @@ public sealed partial class ValidateCommandHandlerReportModeTests
                         Assert.That(control.GetProperty("is_integrity_valid").GetBoolean(), Is.True);
                         Assert.That(control.GetProperty("record").GetProperty("provenance")
                             .GetProperty("policy_identity").GetString(), Is.EqualTo("policy-v08"));
+                        Assert.That(control.GetProperty("record").GetProperty("topology_evidence")
+                            .GetProperty("declared_component_count").GetInt32(), Is.EqualTo(2));
+                        Assert.That(control.GetProperty("record").GetProperty("topology_evidence")
+                            .GetProperty("relationships")[0].GetProperty("witness").GetString(),
+                            Is.EqualTo("Example.App.Service -> Example.Domain.Entity"));
                         Assert.That(finding.GetProperty("kind").GetString(), Is.EqualTo("applicability"));
                         Assert.That(finding.GetProperty("details").GetProperty("control_identity").GetString(),
                             Is.EqualTo("required-unassessable"));
@@ -166,6 +172,9 @@ public sealed partial class ValidateCommandHandlerReportModeTests
                     JsonElement run = sarif.RootElement.GetProperty("runs")[0];
                     JsonElement completion = run.GetProperty("properties")
                         .GetProperty("arch_linter_net.assessment_completion");
+                    JsonElement topologyControl = completion.GetProperty("controls")
+                        .EnumerateArray()
+                        .Single(element => element.GetProperty("control_identity").GetString() == "required-unassessable");
                     JsonElement result = run.GetProperty("results")[0];
                     JsonElement finding = result.GetProperty("properties")
                         .GetProperty("arch_linter_net");
@@ -174,6 +183,9 @@ public sealed partial class ValidateCommandHandlerReportModeTests
                         Assert.That(completion.GetProperty("summary").GetProperty("required_count").GetInt32(),
                             Is.EqualTo(2));
                         Assert.That(completion.GetProperty("controls").GetArrayLength(), Is.EqualTo(4));
+                        Assert.That(topologyControl.GetProperty("record")
+                            .GetProperty("topology_evidence").GetProperty("mapped_subject_count").GetInt32(),
+                            Is.EqualTo(1));
                         Assert.That(result.GetProperty("level").GetString(),
                             Is.EqualTo(mode == "strict" ? "error" : "warning"));
                         Assert.That(finding.GetProperty("kind").GetString(), Is.EqualTo("applicability"));
@@ -259,7 +271,10 @@ public sealed partial class ValidateCommandHandlerReportModeTests
                 Array.Empty<ArchitectureApplicabilityReason>(),
                 new ArchitectureApplicabilityProvenance("topology", "required-evaluable", "policy-v08")),
             new("required-unassessable", "topology", ArchitectureApplicabilityRecordState.Unassessable, [reason],
-                new ArchitectureApplicabilityProvenance("topology", "required-unassessable", "policy-v08")),
+                new ArchitectureApplicabilityProvenance("topology", "required-unassessable", "policy-v08"))
+            {
+                TopologyEvidence = CreateTopologyEvidence(),
+            },
             new("optional", "topology", ArchitectureApplicabilityRecordState.NotApplicable,
                 Array.Empty<ArchitectureApplicabilityReason>(),
                 new ArchitectureApplicabilityProvenance("topology", "optional", "policy-v08")),
@@ -286,4 +301,28 @@ public sealed partial class ValidateCommandHandlerReportModeTests
             ApplicabilityProjection = projection,
         };
     }
+
+    private static ArchitectureTopologyMappingEvidence CreateTopologyEvidence() => new(
+        "exhaustive",
+        "namespace",
+        2,
+        [
+            new ArchitectureTopologySubjectEvidence(
+                "namespace|project=Example|assembly=Example|subject=Example.App",
+                "Example",
+                "Example",
+                "Example.App",
+                "mapped",
+                ["application"]),
+            new ArchitectureTopologySubjectEvidence(
+                "namespace|project=Example|assembly=Example|subject=Example.Domain",
+                "Example",
+                "Example",
+                "Example.Domain",
+                "unmapped"),
+        ],
+        [new ArchitectureTopologyRelationEvidence(
+            "application", "domain", "Example.App.Service -> Example.Domain.Entity", IsAllowed: false)],
+        Array.Empty<string>(),
+        Array.Empty<ArchitectureTopologyStaleEdgeEvidence>());
 }

@@ -2192,6 +2192,7 @@ sealed class ArchLinterNet.Core.Model.ArchitectureApplicabilityRecord : System.I
   operator ==(ArchLinterNet.Core.Model.ArchitectureApplicabilityRecord? left, ArchLinterNet.Core.Model.ArchitectureApplicabilityRecord? right)
   property ArchLinterNet.Core.Model.ArchitectureApplicabilityProvenance Provenance {get;}
   property ArchLinterNet.Core.Model.ArchitectureApplicabilityRecordState State {get;}
+  property ArchLinterNet.Core.Model.ArchitectureTopologyMappingEvidence? TopologyEvidence {get;init;}
   property System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Model.ArchitectureApplicabilityReason> Reasons {get;}
   property string ControlIdentity {get;}
   property string EffectiveControlId {get;}
@@ -2846,6 +2847,71 @@ sealed class ArchLinterNet.Core.Model.ArchitectureSubtractiveMatcherParticipatio
   property string ContractId {get;init;}
   property string ContractName {get;init;}
   property string Field {get;init;}
+sealed class ArchLinterNet.Core.Model.ArchitectureTopologyMappingEvidence : System.IEquatable<ArchLinterNet.Core.Model.ArchitectureTopologyMappingEvidence>
+  ctor(string Mode, string SubjectKind, int DeclaredComponentCount, System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Model.ArchitectureTopologySubjectEvidence> Subjects, System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Model.ArchitectureTopologyRelationEvidence> Relationships, System.Collections.Generic.IReadOnlyList<string> StaleNodes, System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Model.ArchitectureTopologyStaleEdgeEvidence> StaleEdges)
+  method ArchLinterNet.Core.Model.ArchitectureTopologyMappingEvidence <Clone>$()
+  method bool Equals(ArchLinterNet.Core.Model.ArchitectureTopologyMappingEvidence? other)
+  method bool Equals(object? obj)
+  method int GetHashCode()
+  method string ToString()
+  method void Deconstruct(out string Mode, out string SubjectKind, out int DeclaredComponentCount, out System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Model.ArchitectureTopologySubjectEvidence> Subjects, out System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Model.ArchitectureTopologyRelationEvidence> Relationships, out System.Collections.Generic.IReadOnlyList<string> StaleNodes, out System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Model.ArchitectureTopologyStaleEdgeEvidence> StaleEdges)
+  operator !=(ArchLinterNet.Core.Model.ArchitectureTopologyMappingEvidence? left, ArchLinterNet.Core.Model.ArchitectureTopologyMappingEvidence? right)
+  operator ==(ArchLinterNet.Core.Model.ArchitectureTopologyMappingEvidence? left, ArchLinterNet.Core.Model.ArchitectureTopologyMappingEvidence? right)
+  property System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Model.ArchitectureTopologyRelationEvidence> Relationships {get;init;}
+  property System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Model.ArchitectureTopologyStaleEdgeEvidence> StaleEdges {get;init;}
+  property System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Model.ArchitectureTopologySubjectEvidence> Subjects {get;init;}
+  property System.Collections.Generic.IReadOnlyList<string> StaleNodes {get;init;}
+  property int AmbiguousSubjectCount {get;}
+  property int DeclaredComponentCount {get;init;}
+  property int MappedSubjectCount {get;}
+  property int ObservedSubjectCount {get;}
+  property int ReviewedOutOfScopeSubjectCount {get;}
+  property int UnmappedSubjectCount {get;}
+  property string Mode {get;init;}
+  property string SubjectKind {get;init;}
+sealed class ArchLinterNet.Core.Model.ArchitectureTopologyRelationEvidence : System.IEquatable<ArchLinterNet.Core.Model.ArchitectureTopologyRelationEvidence>
+  ctor(string SourceNode, string TargetNode, string Witness, bool IsAllowed)
+  method ArchLinterNet.Core.Model.ArchitectureTopologyRelationEvidence <Clone>$()
+  method bool Equals(ArchLinterNet.Core.Model.ArchitectureTopologyRelationEvidence? other)
+  method bool Equals(object? obj)
+  method int GetHashCode()
+  method string ToString()
+  method void Deconstruct(out string SourceNode, out string TargetNode, out string Witness, out bool IsAllowed)
+  operator !=(ArchLinterNet.Core.Model.ArchitectureTopologyRelationEvidence? left, ArchLinterNet.Core.Model.ArchitectureTopologyRelationEvidence? right)
+  operator ==(ArchLinterNet.Core.Model.ArchitectureTopologyRelationEvidence? left, ArchLinterNet.Core.Model.ArchitectureTopologyRelationEvidence? right)
+  property bool IsAllowed {get;init;}
+  property string SourceNode {get;init;}
+  property string TargetNode {get;init;}
+  property string Witness {get;init;}
+sealed class ArchLinterNet.Core.Model.ArchitectureTopologyStaleEdgeEvidence : System.IEquatable<ArchLinterNet.Core.Model.ArchitectureTopologyStaleEdgeEvidence>
+  ctor(string SourceNode, string TargetNode)
+  method ArchLinterNet.Core.Model.ArchitectureTopologyStaleEdgeEvidence <Clone>$()
+  method bool Equals(ArchLinterNet.Core.Model.ArchitectureTopologyStaleEdgeEvidence? other)
+  method bool Equals(object? obj)
+  method int GetHashCode()
+  method string ToString()
+  method void Deconstruct(out string SourceNode, out string TargetNode)
+  operator !=(ArchLinterNet.Core.Model.ArchitectureTopologyStaleEdgeEvidence? left, ArchLinterNet.Core.Model.ArchitectureTopologyStaleEdgeEvidence? right)
+  operator ==(ArchLinterNet.Core.Model.ArchitectureTopologyStaleEdgeEvidence? left, ArchLinterNet.Core.Model.ArchitectureTopologyStaleEdgeEvidence? right)
+  property string SourceNode {get;init;}
+  property string TargetNode {get;init;}
+sealed class ArchLinterNet.Core.Model.ArchitectureTopologySubjectEvidence : System.IEquatable<ArchLinterNet.Core.Model.ArchitectureTopologySubjectEvidence>
+  ctor(string Identity, string Project, string Assembly, string Subject, string Disposition, System.Collections.Generic.IReadOnlyList<string>? NodeIds = null, string? ReviewedOutOfScopeId = null)
+  method ArchLinterNet.Core.Model.ArchitectureTopologySubjectEvidence <Clone>$()
+  method bool Equals(ArchLinterNet.Core.Model.ArchitectureTopologySubjectEvidence? other)
+  method bool Equals(object? obj)
+  method int GetHashCode()
+  method string ToString()
+  method void Deconstruct(out string Identity, out string Project, out string Assembly, out string Subject, out string Disposition, out System.Collections.Generic.IReadOnlyList<string>? NodeIds, out string? ReviewedOutOfScopeId)
+  operator !=(ArchLinterNet.Core.Model.ArchitectureTopologySubjectEvidence? left, ArchLinterNet.Core.Model.ArchitectureTopologySubjectEvidence? right)
+  operator ==(ArchLinterNet.Core.Model.ArchitectureTopologySubjectEvidence? left, ArchLinterNet.Core.Model.ArchitectureTopologySubjectEvidence? right)
+  property System.Collections.Generic.IReadOnlyList<string> NodeIds {get;init;}
+  property string Assembly {get;init;}
+  property string Disposition {get;init;}
+  property string Identity {get;init;}
+  property string Project {get;init;}
+  property string Subject {get;init;}
+  property string? ReviewedOutOfScopeId {get;init;}
 enum ArchLinterNet.Core.Model.ArchitectureTypeKind : int
   enum-member Class = 0
   enum-member Delegate = 5

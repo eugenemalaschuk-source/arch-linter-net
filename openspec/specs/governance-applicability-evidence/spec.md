@@ -429,8 +429,8 @@ scores or combined with family-native units.
   semantics are preserved
 
 ### Requirement: Unassessable applicability evidence uses normalized outputs
-Every valid unassessable applicability record and collection-integrity outcome
-SHALL be projectable as an additive normalized finding using the canonical
+Every valid unassessable applicability record and collection-integrity outcome MUST
+be projectable as an additive normalized finding using the canonical
 effective-control identity and machine-readable reason/provenance. Human, JSON,
 SARIF, and Testing outputs SHALL expose equivalent identity and typed evidence;
 Human output MAY vary in prose but SHALL not discard the reason or provenance.
