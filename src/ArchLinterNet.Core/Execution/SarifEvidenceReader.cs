@@ -433,23 +433,41 @@ public sealed partial class SarifEvidenceReader(IArchitectureEvidenceFileSystem?
             expectedContext,
             context.Context,
             out string? bindingDetail);
-        return bindingStatus is null
-            ? CreateResult(
+        if (bindingStatus is not null)
+        {
+            return CreateResult(requirement.Id, bindingStatus.Value, bindingDetail!, contextProvenance);
+        }
+
+        if (!TryReadSourceDiagnostics(
+                selected.Run,
+                out IReadOnlyList<SarifEvidenceSourceDiagnostic> sourceDiagnostics,
+                out string? sourceShapeDetail,
+                cancellationToken))
+        {
+            return CreateResult(
                 requirement.Id,
-                SarifEvidenceTrustStatus.Valid,
-                "The SARIF artifact contains one matching successful run bound to the assessment context.",
-                contextProvenance)
-            : CreateResult(requirement.Id, bindingStatus.Value, bindingDetail!, contextProvenance);
+                SarifEvidenceTrustStatus.UnsupportedShape,
+                sourceShapeDetail!,
+                contextProvenance);
+        }
+
+        return CreateResult(
+            requirement.Id,
+            SarifEvidenceTrustStatus.Valid,
+            "The SARIF artifact contains one matching successful run bound to the assessment context.",
+            contextProvenance,
+            sourceDiagnostics);
     }
 
     private static SarifEvidenceReadResult CreateResult(
         string logicalId,
         SarifEvidenceTrustStatus status,
         string detail,
-        SarifEvidenceProvenance? provenance = null)
+        SarifEvidenceProvenance? provenance = null,
+        IReadOnlyList<SarifEvidenceSourceDiagnostic>? sourceDiagnostics = null)
     {
         provenance ??= new SarifEvidenceProvenance(logicalId, null, null, null, null, null, null, null);
-        return new SarifEvidenceReadResult(status, ReasonCode(status), detail, provenance);
+        return new SarifEvidenceReadResult(status, ReasonCode(status), detail, provenance, sourceDiagnostics);
     }
 
     private static SarifEvidenceReadResult DuplicatePropertiesResult(

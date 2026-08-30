@@ -46,6 +46,31 @@ public sealed class ArchitectureContractSchemaTests
         Assert.DoesNotThrow(() => LoadSchema());
     }
 
+    [Test]
+    public void Schema_ExternalEvidenceDiagnosticFilter_DeclaresClosedTypedShape()
+    {
+        JsonElement schema = LoadSchema();
+        JsonElement requirement = schema.GetProperty("$defs").GetProperty("externalEvidenceRequirement");
+        JsonElement filter = schema.GetProperty("$defs").GetProperty("diagnosticFilter");
+        JsonElement filterProperties = filter.GetProperty("properties");
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(requirement.GetProperty("properties").GetProperty("diagnostic_filter")
+                .GetProperty("$ref").GetString(), Is.EqualTo("#/$defs/diagnosticFilter"));
+            Assert.That(filter.GetProperty("additionalProperties").GetBoolean(), Is.False);
+            Assert.That(filter.GetProperty("required").EnumerateArray().Select(value => value.GetString()),
+                Is.EqualTo(["severity"]));
+            Assert.That(filterProperties.GetProperty("severity").GetProperty("minProperties").GetInt32(), Is.EqualTo(1));
+            Assert.That(filterProperties.GetProperty("severity").GetProperty("propertyNames")
+                .GetProperty("enum").EnumerateArray().Select(value => value.GetString()),
+                Is.EquivalentTo(["error", "warning", "note", "none", "unspecified"]));
+            Assert.That(filterProperties.GetProperty("severity").GetProperty("additionalProperties")
+                .GetProperty("enum").EnumerateArray().Select(value => value.GetString()),
+                Is.EquivalentTo(["strict", "audit"]));
+        });
+    }
+
     [TestCase("strict_assembly_dependency")]
     [TestCase("audit_assembly_dependency")]
     [TestCase("strict_assembly_allow_only")]

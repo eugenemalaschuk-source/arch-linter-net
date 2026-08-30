@@ -73,6 +73,97 @@ internal sealed class ExternalEvidencePolicyValidator : IArchitecturePolicyDocum
         {
             throw new InvalidOperationException($"external_evidence entry '{id}' must declare a non-blank run.");
         }
+
+        ValidateDiagnosticFilter(document, requirement.DiagnosticFilter, entryPath, id);
+    }
+
+    private static void ValidateDiagnosticFilter(
+        ArchitectureContractDocument document,
+        ArchitectureExternalEvidenceDiagnosticFilter? filter,
+        string entryPath,
+        string id)
+    {
+        if (filter is null)
+        {
+            return;
+        }
+
+        string filterPath = Property(entryPath, "diagnostic_filter");
+        document.Provenance.SetValidationSubject(filterPath);
+        ValidateSelectors(document, filterPath, id, "rule_ids", filter.RuleIds);
+        ValidateSelectors(document, filterPath, id, "rule_tags", filter.RuleTags);
+        ValidateSelectors(document, filterPath, id, "projects", filter.Projects);
+        ValidateSelectors(document, filterPath, id, "path_prefixes", filter.PathPrefixes, paths: true);
+
+        string severityPath = Property(filterPath, "severity");
+        document.Provenance.SetValidationSubject(severityPath);
+        if (filter.Severity is null || filter.Severity.Count == 0)
+        {
+            throw new InvalidOperationException(
+                $"external_evidence entry '{id}' diagnostic_filter severity must be non-empty.");
+        }
+
+        foreach ((string sourceSeverity, string mode) in filter.Severity.OrderBy(pair => pair.Key, StringComparer.Ordinal))
+        {
+            document.Provenance.SetValidationSubject(Property(severityPath, sourceSeverity));
+            if (string.IsNullOrWhiteSpace(sourceSeverity)
+                || !ExternalDiagnosticFilterRules.SupportedSeverities.Contains(sourceSeverity, StringComparer.Ordinal))
+            {
+                throw new InvalidOperationException(
+                    $"external_evidence entry '{id}' diagnostic_filter severity key '{sourceSeverity}' is unsupported or blank.");
+            }
+
+            if (string.IsNullOrWhiteSpace(mode)
+                || !ExternalDiagnosticFilterRules.SupportedModes.Contains(mode, StringComparer.Ordinal))
+            {
+                throw new InvalidOperationException(
+                    $"external_evidence entry '{id}' diagnostic_filter severity.{sourceSeverity} mode must be exactly 'strict' or 'audit'.");
+            }
+        }
+    }
+
+    private static void ValidateSelectors(
+        ArchitectureContractDocument document,
+        string filterPath,
+        string id,
+        string key,
+        IEnumerable<string>? values,
+        bool paths = false)
+    {
+        string fieldPath = Property(filterPath, key);
+        document.Provenance.SetValidationSubject(fieldPath);
+        if (values is null)
+        {
+            throw new InvalidOperationException(
+                $"external_evidence entry '{id}' diagnostic_filter.{key} must not be null.");
+        }
+
+        var seen = new HashSet<string>(StringComparer.Ordinal);
+        int index = 0;
+        foreach (string? value in values)
+        {
+            document.Provenance.SetValidationSubject(
+                ArchitecturePolicyProvenancePath.AppendIndex(fieldPath, index));
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                throw new InvalidOperationException(
+                    $"external_evidence entry '{id}' diagnostic_filter.{key}[{index}] must be non-blank.");
+            }
+
+            if (!seen.Add(value))
+            {
+                throw new InvalidOperationException(
+                    $"external_evidence entry '{id}' diagnostic_filter.{key} declares duplicate value '{value}'.");
+            }
+
+            if (paths && !ExternalDiagnosticFilterRules.IsSafePathPrefix(value))
+            {
+                throw new InvalidOperationException(
+                    $"external_evidence entry '{id}' diagnostic_filter.path_prefixes value '{value}' must be a safe repository-relative slash-normalized path prefix.");
+            }
+
+            index++;
+        }
     }
 
     private static string EntryPath(int index) => ArchitecturePolicyProvenancePath.AppendIndex(
