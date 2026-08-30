@@ -11,7 +11,7 @@ namespace ArchLinterNet.Core.Execution;
 // It intentionally has no YAML or output dependency: policy loading owns declaration validity and
 // Reporting owns presentation. This class only creates canonical native evidence and ordinary
 // violations for the executor to transport through the established result seams.
-internal static class ArchitectureTopologyEvaluator
+internal static partial class ArchitectureTopologyEvaluator
 {
     internal const string Family = "declared_topology";
     internal const string ControlIdentity = "declared-topology";
@@ -703,6 +703,9 @@ internal static class ArchitectureTopologyEvaluator
         string canonicalAssemblyIdentity,
         string subject) =>
         $"{subjectKind}|project={project}|assembly={assembly}|canonical_assembly={canonicalAssemblyIdentity}|subject={subject}";
+
+    private static string BuildValidationIdentity(string subjectKind, string project, string assembly, string subject) =>
+        $"{subjectKind}|project={project}|assembly={assembly}|subject={subject}";
 
     internal sealed record ObservedSubject(
         string Identity,
