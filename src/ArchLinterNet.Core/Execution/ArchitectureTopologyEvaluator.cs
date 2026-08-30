@@ -66,14 +66,25 @@ internal static class ArchitectureTopologyEvaluator
                 allowedEdges.Contains((relationship.SourceNode, relationship.TargetNode))))
             .ToList();
 
-        List<string> staleNodes = topology.StaleDeclarations
+        // Relationship enforcement can only use exactly mapped endpoints, but that projection is
+        // not enough authority to infer declaration drift. An unresolved subject might correspond
+        // to one or more declared nodes or edges, so stale facts are supported only after the
+        // whole declared universe is mapped exactly (or explicitly reviewed out of scope) and a
+        // required universe did not resolve to zero subjects.
+        bool missingRequiredUniverse = string.Equals(topology.Mode, "exhaustive", StringComparison.Ordinal)
+            && classifications.Count == 0
+            && !topology.Scope.AllowEmpty;
+        bool mappingComplete = !missingRequiredUniverse && classifications.All(classification =>
+            classification.Disposition is Disposition.Mapped or Disposition.ReviewedOutOfScope);
+        bool canInferDrift = topology.StaleDeclarations && mappingComplete;
+        List<string> staleNodes = canInferDrift
             ? topology.Nodes
                 .Where(node => !nodeBySubject.Values.Contains(node.Id, StringComparer.Ordinal))
                 .Select(node => node.Id)
                 .OrderBy(id => id, StringComparer.Ordinal)
                 .ToList()
             : new List<string>();
-        List<ArchitectureTopologyStaleEdgeEvidence> staleEdges = topology.StaleDeclarations
+        List<ArchitectureTopologyStaleEdgeEvidence> staleEdges = canInferDrift
             ? topology.AllowedEdges
                 .Where(edge => !relationships.Any(relationship =>
                     string.Equals(relationship.SourceNode, edge.From, StringComparison.Ordinal)

@@ -88,7 +88,7 @@ unmapped, and multiple is ambiguous.
 
 `out_of_scope` is intended-scope evidence, not baseline or waiver debt. Each entry needs a stable `id`, exactly one bounded selector, and a reviewable `reason`. Adding or broadening an entry can reduce declared governance scope, so the existing policy-weakening comparison retains it as typed comparison evidence.
 
-Set `stale_declarations: true` to have the evaluator retain a distinct stale-declaration result for a node with no observed mapping or an allowed edge with no observed relationship. A stale node is not a new unmapped observed subject.
+Set `stale_declarations: true` to have the evaluator retain a distinct stale-declaration result for a node with no observed mapping or an allowed edge with no observed relationship. Drift is inferred only when every scoped subject is exactly mapped or reviewed out of scope, and an exhaustive required scope is not empty. Unmapped, ambiguous, or required-empty evidence leaves stale declarations undecided rather than treating unresolved mappings as absent. A stale node is not a new unmapped observed subject.
 
 ## Evaluation and completeness evidence
 

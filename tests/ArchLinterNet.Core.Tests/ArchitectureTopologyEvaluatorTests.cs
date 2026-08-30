@@ -122,7 +122,7 @@ public sealed class ArchitectureTopologyEvaluatorTests
     }
 
     [Test]
-    public void Evaluate_RequiredEmptyAndStaleDeclarations_AreSeparateUnassessableEvidence()
+    public void Evaluate_RequiredEmptyUniverse_DoesNotInferDeclarationDrift()
     {
         ArchitectureTopology topology = Topology(
             nodes: [Node("application", "App.Application")],
@@ -134,12 +134,110 @@ public sealed class ArchitectureTopologyEvaluatorTests
         Assert.Multiple(() =>
         {
             Assert.That(record.Reasons.Select(reason => reason.Code), Is.EquivalentTo(
-                new[] { ArchitectureApplicabilityReasonCodes.UnexpectedEmptyInput, ArchitectureApplicabilityReasonCodes.StaleDeclaration }));
+                new[] { ArchitectureApplicabilityReasonCodes.UnexpectedEmptyInput }));
+            Assert.That(record.TopologyEvidence!.StaleNodes, Is.Empty);
+            Assert.That(record.TopologyEvidence.StaleEdges, Is.Empty);
+            Assert.That(result.Violations, Is.Empty);
+        });
+    }
+
+    [Test]
+    public void Evaluate_AllowedEmptyUniverse_CanInferDeclarationDrift()
+    {
+        ArchitectureTopology topology = Topology(
+            nodes: [Node("application", "App.Application")],
+            allowedEdges: [new ArchitectureTopologyEdge { From = "application", To = "application" }],
+            staleDeclarations: true,
+            allowEmpty: true);
+        ArchitectureTopologyEvaluator.Result result = Evaluate(topology, [], []);
+
+        ArchitectureApplicabilityRecord record = result.Records.Single();
+        Assert.Multiple(() =>
+        {
+            Assert.That(record.Reasons.Select(reason => reason.Code),
+                Is.EqualTo(new[] { ArchitectureApplicabilityReasonCodes.StaleDeclaration }));
             Assert.That(record.TopologyEvidence!.StaleNodes, Is.EqualTo(new[] { "application" }));
             Assert.That(record.TopologyEvidence.StaleEdges.Single(), Is.EqualTo(
                 new ArchitectureTopologyStaleEdgeEvidence("application", "application")));
             Assert.That(result.Violations.Select(violation => violation.ContractName),
                 Is.EqualTo(new[] { "topology declaration drift", "topology declaration drift" }));
+        });
+    }
+
+    [Test]
+    public void Evaluate_AmbiguousSubject_DoesNotProduceFalseStaleNodes()
+    {
+        ArchitectureTopology topology = Topology(
+            nodes: [Node("first", "App.Feature"), Node("second", "App.Feature")],
+            staleDeclarations: true);
+        ArchitectureTopologyEvaluator.Result result = Evaluate(
+            topology,
+            [Subject("feature", "App.Feature")],
+            []);
+
+        ArchitectureApplicabilityRecord record = result.Records.Single();
+        Assert.Multiple(() =>
+        {
+            Assert.That(record.Reasons.Select(reason => reason.Code),
+                Is.EqualTo(new[] { ArchitectureApplicabilityReasonCodes.AmbiguousSubject }));
+            Assert.That(record.TopologyEvidence!.StaleNodes, Is.Empty);
+            Assert.That(record.TopologyEvidence.StaleEdges, Is.Empty);
+            Assert.That(result.Violations.Select(violation => violation.ContractName),
+                Is.EqualTo(new[] { "topology structural mapping" }));
+        });
+    }
+
+    [Test]
+    public void Evaluate_UnmappedSubject_DoesNotProduceFalseStaleNodesOrEdges()
+    {
+        ArchitectureTopology topology = Topology(
+            nodes: [Node("source", "App.Source"), Node("target", "App.Target")],
+            allowedEdges: [new ArchitectureTopologyEdge { From = "source", To = "target" }],
+            staleDeclarations: true);
+        ArchitectureTopologyEvaluator.Result result = Evaluate(
+            topology,
+            [Subject("source", "App.Source"), Subject("unmapped", "App.Unmapped")],
+            [Dependency("source", "unmapped", "App.Source.Service -> App.Unmapped.Entity")]);
+
+        ArchitectureApplicabilityRecord record = result.Records.Single();
+        Assert.Multiple(() =>
+        {
+            Assert.That(record.Reasons.Select(reason => reason.Code),
+                Is.EqualTo(new[] { ArchitectureApplicabilityReasonCodes.UnmappedSubject }));
+            Assert.That(record.TopologyEvidence!.Relationships, Is.Empty);
+            Assert.That(record.TopologyEvidence.StaleNodes, Is.Empty);
+            Assert.That(record.TopologyEvidence.StaleEdges, Is.Empty);
+            Assert.That(result.Violations, Is.Empty);
+        });
+    }
+
+    [Test]
+    public void Evaluate_IncompleteEndpointMapping_DoesNotProduceFalseStaleEdge()
+    {
+        ArchitectureTopology topology = Topology(
+            nodes:
+            [
+                Node("source", "App.Source"),
+                Node("target-first", "App.Target"),
+                Node("target-second", "App.Target"),
+            ],
+            allowedEdges: [new ArchitectureTopologyEdge { From = "source", To = "target-first" }],
+            staleDeclarations: true);
+        ArchitectureTopologyEvaluator.Result result = Evaluate(
+            topology,
+            [Subject("source", "App.Source"), Subject("target", "App.Target")],
+            [Dependency("source", "target", "App.Source.Service -> App.Target.Entity")]);
+
+        ArchitectureApplicabilityRecord record = result.Records.Single();
+        Assert.Multiple(() =>
+        {
+            Assert.That(record.Reasons.Select(reason => reason.Code),
+                Is.EqualTo(new[] { ArchitectureApplicabilityReasonCodes.AmbiguousSubject }));
+            Assert.That(record.TopologyEvidence!.Relationships, Is.Empty);
+            Assert.That(record.TopologyEvidence.StaleNodes, Is.Empty);
+            Assert.That(record.TopologyEvidence.StaleEdges, Is.Empty);
+            Assert.That(result.Violations.Select(violation => violation.ContractName),
+                Is.EqualTo(new[] { "topology structural mapping" }));
         });
     }
 
@@ -245,11 +343,12 @@ public sealed class ArchitectureTopologyEvaluatorTests
         IReadOnlyList<ArchitectureTopologyNode> nodes,
         IReadOnlyList<ArchitectureTopologyEdge>? allowedEdges = null,
         string mode = "exhaustive",
-        bool staleDeclarations = false) => new()
+        bool staleDeclarations = false,
+        bool allowEmpty = false) => new()
         {
             Mode = mode,
             SubjectKind = "namespace",
-            Scope = new ArchitectureTopologyScope { Selectors = [Namespace("App")] },
+            Scope = new ArchitectureTopologyScope { AllowEmpty = allowEmpty, Selectors = [Namespace("App")] },
             Nodes = nodes.ToList(),
             AllowedEdges = allowedEdges?.ToList() ?? [],
             StaleDeclarations = staleDeclarations,
