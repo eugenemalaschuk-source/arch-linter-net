@@ -245,10 +245,40 @@ public sealed class ContractSurfaceExposureIndexTests
         });
     }
 
+    [Test]
+    public void Scan_VisibleAccessorMetadataRecordsTypeReferencesWithoutIncludingHiddenAccessorMetadata()
+    {
+        ArchitectureContractSurfaceExposureResult result =
+            ArchitectureContractSurfaceExposureScanner.Scan(typeof(AccessorMetadataRoot));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(HasAccessorPath(result, typeof(GetterMethodMetadataPayload), "get"), Is.True);
+            Assert.That(HasAccessorPath(result, typeof(GetterReturnMetadataPayload), "get", "return"), Is.True);
+            Assert.That(HasAccessorPath(result, typeof(SetterMethodMetadataPayload), "set"), Is.True);
+            Assert.That(HasAccessorPath(result, typeof(SetterParameterMetadataPayload), "set", "parameter"), Is.True);
+            Assert.That(HasAccessorPath(result, typeof(EventAddMethodMetadataPayload), "add"), Is.True);
+            Assert.That(HasAccessorPath(result, typeof(EventAddParameterMetadataPayload), "add", "parameter"), Is.True);
+            Assert.That(HasAccessorPath(result, typeof(EventRemoveMethodMetadataPayload), "remove"), Is.True);
+            Assert.That(HasAccessorPath(result, typeof(EventRemoveParameterMetadataPayload), "remove", "parameter"), Is.True);
+            Assert.That(Targets(result), Does.Not.Contain(Target(typeof(HiddenSetterParameterMetadataPayload))));
+        });
+    }
+
     private static bool HasPath(
         ArchitectureContractSurfaceExposureResult result, Type target, string segmentKind) =>
         result.Exposures.Any(exposure => Target(target).Equals(exposure.ReferencedType)
             && exposure.Path.Segments.Any(segment => segment.Kind == segmentKind));
+
+    private static bool HasAccessorPath(
+        ArchitectureContractSurfaceExposureResult result,
+        Type target,
+        string accessor,
+        string? nestedSegmentKind = null) =>
+        result.Exposures.Any(exposure =>
+            Target(target).Equals(exposure.ReferencedType)
+            && exposure.Path.Segments.Any(segment => segment.Kind == "accessor" && segment.Value == accessor)
+            && (nestedSegmentKind == null || exposure.Path.Segments.Any(segment => segment.Kind == nestedSegmentKind)));
 
     private static HashSet<ArchitectureContractExposureTarget> Targets(
         ArchitectureContractSurfaceExposureResult result) =>
@@ -339,6 +369,77 @@ public sealed class ContractSurfaceExposureIndexTests
 
     public sealed class NestedOnlyPayload
     {
+    }
+
+    public sealed class GetterMethodMetadataPayload
+    {
+    }
+
+    public sealed class GetterReturnMetadataPayload
+    {
+    }
+
+    public sealed class SetterMethodMetadataPayload
+    {
+    }
+
+    public sealed class SetterParameterMetadataPayload
+    {
+    }
+
+    public sealed class EventAddMethodMetadataPayload
+    {
+    }
+
+    public sealed class EventAddParameterMetadataPayload
+    {
+    }
+
+    public sealed class EventRemoveMethodMetadataPayload
+    {
+    }
+
+    public sealed class EventRemoveParameterMetadataPayload
+    {
+    }
+
+    public sealed class HiddenSetterParameterMetadataPayload
+    {
+    }
+
+    public sealed class AccessorMetadataRoot
+    {
+        private Customer _value = new();
+
+        public Customer Value
+        {
+            [ExposureMetadata(typeof(GetterMethodMetadataPayload), ExposureKind.Customer, 10, "getter-method")]
+            [return: ExposureMetadata(typeof(GetterReturnMetadataPayload), ExposureKind.Customer, 11, "getter-return")]
+            get => _value;
+
+            [ExposureMetadata(typeof(SetterMethodMetadataPayload), ExposureKind.Customer, 12, "setter-method")]
+            [param: ExposureMetadata(typeof(SetterParameterMetadataPayload), ExposureKind.Customer, 13, "setter-parameter")]
+            set => _value = value;
+        }
+
+        public event Action<Customer>? Changed
+        {
+            [ExposureMetadata(typeof(EventAddMethodMetadataPayload), ExposureKind.Customer, 14, "event-add-method")]
+            [param: ExposureMetadata(typeof(EventAddParameterMetadataPayload), ExposureKind.Customer, 15, "event-add-parameter")]
+            add { }
+
+            [ExposureMetadata(typeof(EventRemoveMethodMetadataPayload), ExposureKind.Customer, 16, "event-remove-method")]
+            [param: ExposureMetadata(typeof(EventRemoveParameterMetadataPayload), ExposureKind.Customer, 17, "event-remove-parameter")]
+            remove { }
+        }
+
+        public Customer VisibleWithHiddenSetter
+        {
+            get => _value;
+
+            [param: ExposureMetadata(typeof(HiddenSetterParameterMetadataPayload), ExposureKind.Customer, 18, "hidden-setter")]
+            private set => _value = value;
+        }
     }
 
     public class BaseContract

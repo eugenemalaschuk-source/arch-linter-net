@@ -36,7 +36,7 @@ The system SHALL record deterministic exposure paths from visible types and visi
 - **THEN** the index SHALL record its visible invoke parameter and return types with distinct stable path segments
 
 ### Requirement: Include visible compiled custom-attribute metadata
-The system SHALL record a custom attribute type attached to a visible type, visible member, visible parameter, visible return value, or visible generic parameter as exposure evidence. It SHALL record type-valued and enum-typed custom-attribute arguments when compiled metadata provides a referenced type identity, using path segments that distinguish the attribute from its argument.
+The system SHALL record a custom attribute type attached to a visible type, visible member, visible property/event accessor, visible parameter, visible return value, or visible generic parameter as exposure evidence. It SHALL record type-valued and enum-typed custom-attribute arguments when compiled metadata provides a referenced type identity, using path segments that distinguish the attribute from its argument. Metadata attached only to an accessor excluded by the requested visible-surface shape SHALL not enter the evidence.
 
 #### Scenario: Attribute type and typeof argument are exposed
 - **WHEN** a visible contract site carries a custom attribute whose constructor or named argument contains `typeof(Customer)`
@@ -45,6 +45,10 @@ The system SHALL record a custom attribute type attached to a visible type, visi
 #### Scenario: Primitive and string arguments are not fabricated as types
 - **WHEN** a visible custom attribute argument is a primitive or a string
 - **THEN** the index SHALL NOT interpret that value as a type reference
+
+#### Scenario: Visible accessor metadata is exposed
+- **WHEN** a visible property getter return, property setter value parameter, or event accessor carries a custom attribute with a type-valued argument
+- **THEN** the index SHALL record that type through an accessor-specific metadata path
 
 ### Requirement: Preserve deterministic, bounded, complete evidence
 The system SHALL produce a canonical order independent of reflection traversal order and SHALL terminate cyclic or self-referential signature structures deterministically. Different visible paths to the same target SHALL remain independently explainable. If reflection cannot obtain a required signature or metadata fact, the index SHALL preserve explicit incomplete evidence rather than silently presenting a shortened graph as complete.

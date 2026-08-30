@@ -8,7 +8,7 @@ namespace ArchLinterNet.Core.Scanning;
 // Walks only the visible, reflected contract surface of a caller-selected root. This is an
 // evidence scanner, not a policy scanner: every path is retained, including paths that reach the
 // same target through different members or shape transitions.
-internal static class ArchitectureContractSurfaceExposureScanner
+internal static partial class ArchitectureContractSurfaceExposureScanner
 {
     private const BindingFlags MemberFlags =
         BindingFlags.DeclaredOnly | BindingFlags.Public | BindingFlags.NonPublic |
@@ -28,7 +28,7 @@ internal static class ArchitectureContractSurfaceExposureScanner
         return new Walker(root, surfaceShape).Run();
     }
 
-    private sealed class Walker
+    private sealed partial class Walker
     {
         private readonly Type _root;
         private readonly ArchitectureContractSurfaceShape _surfaceShape;
@@ -220,8 +220,8 @@ internal static class ArchitectureContractSurfaceExposureScanner
                 "properties-unavailable");
             foreach (PropertyInfo property in properties.OrderBy(MemberSortKey, StringComparer.Ordinal))
             {
-                MethodInfo? getter = TryRead(() => property.GetMethod, typePath, "property-getter-unavailable");
-                MethodInfo? setter = TryRead(() => property.SetMethod, typePath, "property-setter-unavailable");
+                MethodInfo? getter = TryRead(() => property.GetGetMethod(nonPublic: true), typePath, "property-getter-unavailable");
+                MethodInfo? setter = TryRead(() => property.GetSetMethod(nonPublic: true), typePath, "property-setter-unavailable");
                 if ((!_surfaceShape.Includes(getter) && !_surfaceShape.Includes(setter)) || IsCompilerGenerated(property, typePath))
                 {
                     continue;
@@ -239,6 +239,15 @@ internal static class ArchitectureContractSurfaceExposureScanner
                     () => property.GetIndexParameters(), memberPath.Append("parameter"),
                     "property-parameters-unavailable");
                 ScanParameters(parameters, memberPath);
+                if (getter != null && _surfaceShape.Includes(getter))
+                {
+                    ScanAccessorMetadata(getter, memberPath, "get");
+                }
+
+                if (setter != null && _surfaceShape.Includes(setter))
+                {
+                    ScanAccessorMetadata(setter, memberPath, "set");
+                }
             }
         }
 
@@ -272,6 +281,7 @@ internal static class ArchitectureContractSurfaceExposureScanner
             foreach (EventInfo @event in events.OrderBy(MemberSortKey, StringComparer.Ordinal))
             {
                 MethodInfo? add = TryRead(() => @event.AddMethod, typePath, "event-accessor-unavailable");
+                MethodInfo? remove = TryRead(() => @event.RemoveMethod, typePath, "event-accessor-unavailable");
                 if (!_surfaceShape.Includes(add) || IsCompilerGenerated(@event, typePath))
                 {
                     continue;
@@ -279,54 +289,21 @@ internal static class ArchitectureContractSurfaceExposureScanner
 
                 ArchitectureContractExposurePath memberPath = typePath.Append("member", MemberSortKey(@event));
                 ScanAttributes(@event, memberPath);
+                if (add != null)
+                {
+                    ScanAccessorMetadata(add, memberPath, "add");
+                }
+
+                if (remove != null && _surfaceShape.Includes(remove))
+                {
+                    ScanAccessorMetadata(remove, memberPath, "remove");
+                }
+
                 Type? eventType = TryRead(() => @event.EventHandlerType, memberPath.Append("event_type"), "event-type-unavailable");
                 if (eventType != null)
                 {
                     ScanShape(eventType, memberPath.Append("event_type"));
                 }
-            }
-        }
-
-        private void ScanParameters(MethodBase method, ArchitectureContractExposurePath memberPath)
-        {
-            ParameterInfo[] parameters = TryReadArray(
-                () => method.GetParameters(), memberPath.Append("parameter"), "parameters-unavailable");
-            ScanParameters(parameters, memberPath);
-        }
-
-        private void ScanParameters(IEnumerable<ParameterInfo> parameters, ArchitectureContractExposurePath memberPath)
-        {
-            int index = 0;
-            foreach (ParameterInfo parameter in parameters)
-            {
-                ArchitectureContractExposurePath parameterPath = memberPath.Append(
-                    "parameter", index.ToString(CultureInfo.InvariantCulture));
-                ScanAttributes(parameter, parameterPath);
-                Type? parameterType = TryRead(() => parameter.ParameterType, parameterPath, "parameter-type-unavailable");
-                if (parameterType != null)
-                {
-                    ScanShape(parameterType, parameterPath);
-                }
-
-                index++;
-            }
-        }
-
-        private void ScanReturn(MethodInfo method, ArchitectureContractExposurePath memberPath)
-        {
-            ArchitectureContractExposurePath returnPath = memberPath.Append("return");
-            ParameterInfo? returnParameter = TryRead(
-                () => method.ReturnParameter, returnPath, "return-parameter-unavailable");
-            if (returnParameter == null)
-            {
-                return;
-            }
-
-            ScanAttributes(returnParameter, returnPath);
-            Type? returnType = TryRead(() => method.ReturnType, returnPath, "return-type-unavailable");
-            if (returnType != null)
-            {
-                ScanShape(returnType, returnPath);
             }
         }
 
