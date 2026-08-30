@@ -62,7 +62,9 @@ public partial class CliIntegrationTests
             Assert.That(measurement.GetProperty("id").GetString(), Is.EqualTo("execution-outgoing"));
             Assert.That(measurement.GetProperty("state").GetString(), Is.EqualTo("unassessable"));
             Assert.That(measurement.GetProperty("value").ValueKind, Is.EqualTo(JsonValueKind.Null));
-            Assert.That(measurement.GetProperty("contributors").GetArrayLength(), Is.Zero);
+            Assert.That(measurement.GetProperty("contributor_count").ValueKind, Is.EqualTo(JsonValueKind.Null));
+            Assert.That(measurement.GetProperty("contributors").ValueKind, Is.EqualTo(JsonValueKind.Null));
+            Assert.That(measurement.GetProperty("contributors_truncated").ValueKind, Is.EqualTo(JsonValueKind.Null));
             Assert.That(document.RootElement.GetProperty("applicability_findings").GetArrayLength(), Is.GreaterThan(0));
         });
     }

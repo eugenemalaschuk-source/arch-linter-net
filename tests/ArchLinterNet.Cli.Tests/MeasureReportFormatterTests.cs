@@ -68,6 +68,32 @@ public sealed class MeasureReportFormatterTests
         });
     }
 
+    [Test]
+    public void FormatJson_UnassessableMeasurementLeavesContributorEvidenceUnknown()
+    {
+        ArchitectureMetricMeasurement measurement = new(
+            "application-outgoing",
+            "outgoing_component_count",
+            "application",
+            null,
+            "application",
+            ArchitectureApplicabilityRecordState.Unassessable,
+            null,
+            Array.Empty<string>());
+
+        using JsonDocument document = JsonDocument.Parse(MeasureReportFormatter.FormatJson(
+            new ArchitectureMetricMeasurementOutcome([measurement], null, null), 20, allContributors: false));
+        JsonElement result = document.RootElement.GetProperty("measurements").EnumerateArray().Single();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(result.GetProperty("value").ValueKind, Is.EqualTo(JsonValueKind.Null));
+            Assert.That(result.GetProperty("contributor_count").ValueKind, Is.EqualTo(JsonValueKind.Null));
+            Assert.That(result.GetProperty("contributors").ValueKind, Is.EqualTo(JsonValueKind.Null));
+            Assert.That(result.GetProperty("contributors_truncated").ValueKind, Is.EqualTo(JsonValueKind.Null));
+        });
+    }
+
     private static ArchitectureMetricMeasurementOutcome CompleteOutcome(ArchitectureMetricMeasurement measurement)
     {
         ArchitectureApplicabilityProvenance provenance = new("metrics", measurement.Id, "test-policy");

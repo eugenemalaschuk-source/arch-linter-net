@@ -483,6 +483,7 @@ sealed class ArchLinterNet.Core.Composition.ArchitectureEngine : System.IAsyncDi
   method ArchLinterNet.Core.Asmdef.AsmdefValidationOutcome ValidateAsmdef(ArchLinterNet.Core.Asmdef.AsmdefValidationRequest request)
   method ArchLinterNet.Core.Graph.ArchitectureExplainOutcome Explain(ArchLinterNet.Core.Graph.ArchitectureExplainRequest request)
   method ArchLinterNet.Core.Graph.ArchitectureGraphOutcome BuildGraph(ArchLinterNet.Core.Graph.ArchitectureGraphRequest request)
+  method ArchLinterNet.Core.Model.ArchitectureMetricMeasurementOutcome Measure(ArchLinterNet.Core.Validation.ArchitectureMetricMeasurementRequest request, ArchLinterNet.Core.Reporting.ValidationTiming? timing = null)
   method ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextExport ExportPolicyContext(ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextRequest request)
   method ArchLinterNet.Core.Validation.ArchitectureAnalysisSnapshot CreateSnapshot(ArchLinterNet.Core.Validation.AnalysisSnapshotRequest request, ArchLinterNet.Core.Reporting.ValidationTiming? timing = null)
   method ArchLinterNet.Core.Validation.ArchitectureDebtGateOutcome EvaluateDebtGate(ArchLinterNet.Core.Validation.ArchitectureDebtGateRequest request)
@@ -693,6 +694,7 @@ sealed class ArchLinterNet.Core.Contracts.ArchitectureContractDocument
   property System.Collections.Generic.Dictionary<string,ArchLinterNet.Core.Contracts.ArchitecturePackageGroup> Packages {get;set;}
   property System.Collections.Generic.Dictionary<string,ArchLinterNet.Core.Contracts.ArchitectureSourceSet> SourceSets {get;set;}
   property System.Collections.Generic.List<ArchLinterNet.Core.Contracts.ArchitectureExternalEvidenceRequirement> ExternalEvidence {get;set;}
+  property System.Collections.Generic.List<ArchLinterNet.Core.Contracts.ArchitectureMetricDefinition> Metrics {get;set;}
   property System.Collections.Generic.List<string> LegacyRuntimeLayers {get;set;}
   property int Version {get;set;}
   property string Name {get;set;}
@@ -769,6 +771,26 @@ sealed class ArchLinterNet.Core.Contracts.ArchitectureLayerSelector
   property System.Collections.Generic.Dictionary<string,object> Metadata {get;set;}
   property string Role {get;set;}
   property string? When {get;set;}
+sealed class ArchLinterNet.Core.Contracts.ArchitectureMetricDefinition
+  ctor()
+  property string Id {get;set;}
+  property string Kind {get;set;}
+  property string? PublicApiSurface {get;set;}
+  property string? PublicApiSurfaceContractId {get;}
+  property string? TopologyNode {get;set;}
+  property string? TopologyNodeId {get;}
+  property string? Unit {get;set;}
+static class ArchLinterNet.Core.Contracts.ArchitectureMetricKinds
+  field const string ComponentFootprintCount = "component_footprint_count"
+  field const string ExternalDependencyGroupCount = "external_dependency_group_count"
+  field const string IncomingComponentCount = "incoming_component_count"
+  field const string OutgoingComponentCount = "outgoing_component_count"
+  field const string PublicContractSurfaceCount = "public_contract_surface_count"
+  field const string TopologyTypeCount = "topology_type_count"
+  property static System.Collections.Generic.IReadOnlyList<string> All {get;}
+static class ArchLinterNet.Core.Contracts.ArchitectureMetricTargetKinds
+  field const string PublicApiSurface = "public_api_surface"
+  field const string TopologyNode = "topology_node"
 sealed class ArchLinterNet.Core.Contracts.ArchitectureNamespaceClassificationMapping
   ctor()
   property System.Collections.Generic.Dictionary<string,object> Metadata {get;set;}
@@ -2214,6 +2236,7 @@ sealed class ArchLinterNet.Core.Model.ArchitectureApplicabilityRecord : System.I
   operator ==(ArchLinterNet.Core.Model.ArchitectureApplicabilityRecord? left, ArchLinterNet.Core.Model.ArchitectureApplicabilityRecord? right)
   property ArchLinterNet.Core.Model.ArchitectureApplicabilityProvenance Provenance {get;}
   property ArchLinterNet.Core.Model.ArchitectureApplicabilityRecordState State {get;}
+  property ArchLinterNet.Core.Model.ArchitectureMetricEvidence? MetricEvidence {get;init;}
   property ArchLinterNet.Core.Model.ArchitectureTopologyMappingEvidence? TopologyEvidence {get;init;}
   property System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Model.ArchitectureApplicabilityReason> Reasons {get;}
   property string ControlIdentity {get;}
@@ -2659,6 +2682,65 @@ enum ArchLinterNet.Core.Model.ArchitectureGraphNodeKind : int
   enum-member External = 3
   enum-member Namespace = 1
   enum-member Type = 0
+sealed class ArchLinterNet.Core.Model.ArchitectureMetricEvidence : System.IEquatable<ArchLinterNet.Core.Model.ArchitectureMetricEvidence>
+  ctor(string MetricId, string Kind, string? NativeSubject, string? Unit, string EffectiveScope, int? Value, System.Collections.Generic.IReadOnlyList<string> Contributors)
+  method ArchLinterNet.Core.Model.ArchitectureMetricEvidence <Clone>$()
+  method bool Equals(ArchLinterNet.Core.Model.ArchitectureMetricEvidence? other)
+  method bool Equals(object? obj)
+  method int GetHashCode()
+  method string ToString()
+  method void Deconstruct(out string MetricId, out string Kind, out string? NativeSubject, out string? Unit, out string EffectiveScope, out int? Value, out System.Collections.Generic.IReadOnlyList<string> Contributors)
+  operator !=(ArchLinterNet.Core.Model.ArchitectureMetricEvidence? left, ArchLinterNet.Core.Model.ArchitectureMetricEvidence? right)
+  operator ==(ArchLinterNet.Core.Model.ArchitectureMetricEvidence? left, ArchLinterNet.Core.Model.ArchitectureMetricEvidence? right)
+  property System.Collections.Generic.IReadOnlyList<string> Contributors {get;init;}
+  property bool IsComplete {get;}
+  property int ContributorCount {get;}
+  property int? Value {get;init;}
+  property string EffectiveScope {get;init;}
+  property string Kind {get;init;}
+  property string MetricId {get;init;}
+  property string? NativeSubject {get;init;}
+  property string? Unit {get;init;}
+sealed class ArchLinterNet.Core.Model.ArchitectureMetricMeasurement : System.IEquatable<ArchLinterNet.Core.Model.ArchitectureMetricMeasurement>
+  ctor(string Id, string Kind, string? NativeSubject, string? Unit, string EffectiveScope, ArchLinterNet.Core.Model.ArchitectureApplicabilityRecordState State, int? Value, System.Collections.Generic.IReadOnlyList<string> Contributors)
+  method ArchLinterNet.Core.Model.ArchitectureMetricMeasurement <Clone>$()
+  method bool Equals(ArchLinterNet.Core.Model.ArchitectureMetricMeasurement? other)
+  method bool Equals(object? obj)
+  method int GetHashCode()
+  method string ToString()
+  method void Deconstruct(out string Id, out string Kind, out string? NativeSubject, out string? Unit, out string EffectiveScope, out ArchLinterNet.Core.Model.ArchitectureApplicabilityRecordState State, out int? Value, out System.Collections.Generic.IReadOnlyList<string> Contributors)
+  operator !=(ArchLinterNet.Core.Model.ArchitectureMetricMeasurement? left, ArchLinterNet.Core.Model.ArchitectureMetricMeasurement? right)
+  operator ==(ArchLinterNet.Core.Model.ArchitectureMetricMeasurement? left, ArchLinterNet.Core.Model.ArchitectureMetricMeasurement? right)
+  property ArchLinterNet.Core.Model.ArchitectureApplicabilityRecordState State {get;init;}
+  property System.Collections.Generic.IReadOnlyList<string> Contributors {get;init;}
+  property bool IsEvaluable {get;}
+  property bool IsUnassessable {get;}
+  property int ContributorCount {get;}
+  property int? Value {get;init;}
+  property string EffectiveScope {get;init;}
+  property string Id {get;init;}
+  property string Kind {get;init;}
+  property string? NativeSubject {get;init;}
+  property string? Unit {get;init;}
+sealed class ArchLinterNet.Core.Model.ArchitectureMetricMeasurementOutcome : System.IEquatable<ArchLinterNet.Core.Model.ArchitectureMetricMeasurementOutcome>
+  ctor(System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Model.ArchitectureMetricMeasurement> Measurements, ArchLinterNet.Core.Model.ArchitectureAssessmentCompletionEvidence? Completion, ArchLinterNet.Core.Model.ArchitectureApplicabilityProjection? Applicability)
+  method ArchLinterNet.Core.Model.ArchitectureMetricMeasurementOutcome <Clone>$()
+  method bool Equals(ArchLinterNet.Core.Model.ArchitectureMetricMeasurementOutcome? other)
+  method bool Equals(object? obj)
+  method int GetHashCode()
+  method string ToString()
+  method void Deconstruct(out System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Model.ArchitectureMetricMeasurement> Measurements, out ArchLinterNet.Core.Model.ArchitectureAssessmentCompletionEvidence? Completion, out ArchLinterNet.Core.Model.ArchitectureApplicabilityProjection? Applicability)
+  operator !=(ArchLinterNet.Core.Model.ArchitectureMetricMeasurementOutcome? left, ArchLinterNet.Core.Model.ArchitectureMetricMeasurementOutcome? right)
+  operator ==(ArchLinterNet.Core.Model.ArchitectureMetricMeasurementOutcome? left, ArchLinterNet.Core.Model.ArchitectureMetricMeasurementOutcome? right)
+  property ArchLinterNet.Core.Model.ArchitectureApplicabilityProjection? Applicability {get;init;}
+  property ArchLinterNet.Core.Model.ArchitectureApplicabilityProjection? ApplicabilityProjection {get;}
+  property ArchLinterNet.Core.Model.ArchitectureAssessmentCompletionEvidence? AssessmentCompletionEvidence {get;}
+  property ArchLinterNet.Core.Model.ArchitectureAssessmentCompletionEvidence? Completion {get;init;}
+  property System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Model.ArchitectureApplicabilityExpectedEntry> ApplicabilityExpectedEntries {get;}
+  property System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Model.ArchitectureApplicabilityRecord> ApplicabilityRecords {get;}
+  property System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Model.ArchitectureMetricMeasurement> Measurements {get;init;}
+  property System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Model.ArchitectureMetricMeasurement> Results {get;}
+  property bool IsComplete {get;}
 sealed class ArchLinterNet.Core.Model.ArchitectureModuleNamespaceMembership : System.IEquatable<ArchLinterNet.Core.Model.ArchitectureModuleNamespaceMembership>
   ctor(string Container, string? ModuleName, string? Segment, bool IsContainerRoot)
   method ArchLinterNet.Core.Model.ArchitectureModuleNamespaceMembership <Clone>$()
@@ -5158,6 +5240,8 @@ interface ArchLinterNet.Core.Validation.Abstractions.IArchitectureBaselineApplic
   method ArchLinterNet.Core.Validation.BaselineVerifyOutcome Verify(ArchLinterNet.Core.Validation.BaselineVerifyRequest request)
 interface ArchLinterNet.Core.Validation.Abstractions.IArchitectureDebtGateApplicationService
   method ArchLinterNet.Core.Validation.ArchitectureDebtGateOutcome Evaluate(ArchLinterNet.Core.Validation.ArchitectureDebtGateRequest request)
+interface ArchLinterNet.Core.Validation.Abstractions.IArchitectureMetricMeasurementApplicationService
+  method ArchLinterNet.Core.Model.ArchitectureMetricMeasurementOutcome Measure(ArchLinterNet.Core.Validation.ArchitectureMetricMeasurementRequest request, ArchLinterNet.Core.Reporting.ValidationTiming? timing = null)
 interface ArchLinterNet.Core.Validation.Abstractions.IArchitecturePolicyCheckApplicationService
   method ArchLinterNet.Core.Validation.PolicyCheckOutcome Check(string policyPath)
 interface ArchLinterNet.Core.Validation.Abstractions.IArchitecturePublicApiApplicationService
@@ -5217,6 +5301,7 @@ sealed class ArchLinterNet.Core.Validation.AnalysisSnapshotRequest : System.IEqu
   property string? RequestedRuntimeIdentifier {get;init;}
   property string? RequestedTargetFramework {get;init;}
 sealed class ArchLinterNet.Core.Validation.ArchitectureAnalysisSnapshot : System.IDisposable
+  method ArchLinterNet.Core.Model.ArchitectureMetricMeasurementOutcome Measure(System.Collections.Generic.IReadOnlyCollection<string>? metricIds = null)
   method ArchLinterNet.Core.Validation.ValidationOutcome Evaluate(string mode, ArchLinterNet.Core.Reporting.ValidationTiming? timing = null)
   method System.Collections.Generic.IReadOnlyList<string> GetProfileInputPaths()
   method void Dispose()
@@ -5325,6 +5410,30 @@ sealed class ArchLinterNet.Core.Validation.ArchitectureDebtGateRequest : System.
   property bool NoRestore {get;init;}
   property string BaselinePath {get;init;}
   property string Mode {get;init;}
+  property string PolicyPath {get;init;}
+  property string? ConditionSetName {get;init;}
+  property string? RequestedConfiguration {get;init;}
+  property string? RequestedPlatform {get;init;}
+  property string? RequestedRuntimeIdentifier {get;init;}
+  property string? RequestedTargetFramework {get;init;}
+sealed class ArchLinterNet.Core.Validation.ArchitectureMetricMeasurementApplicationService : ArchLinterNet.Core.Validation.Abstractions.IArchitectureMetricMeasurementApplicationService
+  ctor(ArchLinterNet.Core.Validation.Abstractions.IArchitectureValidationApplicationService validationApplicationService)
+  method ArchLinterNet.Core.Model.ArchitectureMetricMeasurementOutcome Measure(ArchLinterNet.Core.Validation.ArchitectureMetricMeasurementRequest request, ArchLinterNet.Core.Reporting.ValidationTiming? timing = null)
+sealed class ArchLinterNet.Core.Validation.ArchitectureMetricMeasurementRequest : System.IEquatable<ArchLinterNet.Core.Validation.ArchitectureMetricMeasurementRequest>
+  ctor()
+  method ArchLinterNet.Core.Validation.ArchitectureMetricMeasurementRequest <Clone>$()
+  method bool Equals(ArchLinterNet.Core.Validation.ArchitectureMetricMeasurementRequest? other)
+  method bool Equals(object? obj)
+  method int GetHashCode()
+  method string ToString()
+  operator !=(ArchLinterNet.Core.Validation.ArchitectureMetricMeasurementRequest? left, ArchLinterNet.Core.Validation.ArchitectureMetricMeasurementRequest? right)
+  operator ==(ArchLinterNet.Core.Validation.ArchitectureMetricMeasurementRequest? left, ArchLinterNet.Core.Validation.ArchitectureMetricMeasurementRequest? right)
+  property ArchLinterNet.Core.BuildState.BuildPreparationMode PreparationMode {get;init;}
+  property System.Collections.Generic.IReadOnlyCollection<string>? MetricIds {get;init;}
+  property System.Collections.Generic.IReadOnlyList<string>? PreprocessorSymbols {get;init;}
+  property System.Threading.CancellationToken CancellationToken {get;init;}
+  property bool IncludeAsmdefContracts {get;init;}
+  property int? MaxParallelism {get;init;}
   property string PolicyPath {get;init;}
   property string? ConditionSetName {get;init;}
   property string? RequestedConfiguration {get;init;}

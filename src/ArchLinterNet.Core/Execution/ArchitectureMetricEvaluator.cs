@@ -21,6 +21,21 @@ internal static class ArchitectureMetricEvaluator
         ArgumentNullException.ThrowIfNull(session);
         ArgumentNullException.ThrowIfNull(definitions);
 
+        return Evaluate(session, definitions, ArchitectureTopologyEvaluator.Evaluate(session), selectedIds);
+    }
+
+    // This narrow overload keeps the evaluator testable against the same topology projection that
+    // production receives, including a dependency endpoint that cannot bind to one subject.
+    internal static ArchitectureMetricMeasurementOutcome Evaluate(
+        ArchitectureAnalysisSession session,
+        IReadOnlyCollection<ArchitectureMetricDefinition> definitions,
+        ArchitectureTopologyEvaluator.Result topologyResult,
+        IReadOnlyCollection<string>? selectedIds = null)
+    {
+        ArgumentNullException.ThrowIfNull(session);
+        ArgumentNullException.ThrowIfNull(definitions);
+        ArgumentNullException.ThrowIfNull(topologyResult);
+
         ArchitectureMetricDefinition[] selected = SelectDefinitions(definitions, selectedIds);
         if (selected.Length == 0)
         {
@@ -32,7 +47,6 @@ internal static class ArchitectureMetricEvaluator
         var expected = new List<ArchitectureApplicabilityExpectedEntry>(selected.Length);
         var records = new List<ArchitectureApplicabilityRecord>(selected.Length);
 
-        ArchitectureTopologyEvaluator.Result topologyResult = ArchitectureTopologyEvaluator.Evaluate(session);
         ArchitectureTopologyEvaluator.Projection? topology = topologyResult.FactProjection;
         ArchitectureTopologyMappingEvidence? topologyEvidence = topologyResult.Records.FirstOrDefault()?.TopologyEvidence;
 
@@ -200,7 +214,7 @@ internal static class ArchitectureMetricEvaluator
         }
 
         HashSet<string> relationContributors = definition.Kind == ArchitectureMetricKinds.ExternalDependencyGroupCount
-            ? ExternalGroups(session, topology, scoped, scope, reasons)
+            ? ExternalGroups(session, topology, scoped, scope, reasons, session.ExternalDependencyFacts.Facts)
             : ComponentRelations(session, topology, scoped, scope, definition.Kind, reasons);
         return Finish(definition, scope, null, reasons, relationContributors, provenance);
     }
@@ -231,6 +245,21 @@ internal static class ArchitectureMetricEvaluator
             if (selected.Disposition != ArchitectureTopologyEvaluator.Disposition.Mapped
                 || !selected.NodeIds.Contains(node, StringComparer.Ordinal))
             {
+                continue;
+            }
+
+            ArchitectureTopologyEvaluator.AssemblyEndpointBinding otherBinding = outgoing
+                ? dependency.TargetBinding
+                : dependency.SourceBinding;
+            if (otherBinding == ArchitectureTopologyEvaluator.AssemblyEndpointBinding.Ambiguous)
+            {
+                reasons.Add(ArchitectureApplicabilityReasonCodes.AmbiguousSubject);
+                continue;
+            }
+
+            if (otherBinding == ArchitectureTopologyEvaluator.AssemblyEndpointBinding.Missing)
+            {
+                reasons.Add(ArchitectureApplicabilityReasonCodes.UnmappedSubject);
                 continue;
             }
 
@@ -280,15 +309,16 @@ internal static class ArchitectureMetricEvaluator
         return contributors;
     }
 
-    private static HashSet<string> ExternalGroups(
+    internal static HashSet<string> ExternalGroups(
         ArchitectureAnalysisSession session,
         ArchitectureTopologyEvaluator.Projection topology,
         IReadOnlyList<ArchitectureTopologyEvaluator.SubjectClassification> scoped,
         string node,
-        ICollection<string> reasons)
+        ICollection<string> reasons,
+        IReadOnlyList<ArchitectureExternalDependencyFact> facts)
     {
         HashSet<string> contributors = new(StringComparer.Ordinal);
-        foreach (ArchitectureExternalDependencyFact fact in session.ExternalDependencyFacts.Facts)
+        foreach (ArchitectureExternalDependencyFact fact in facts)
         {
             if (topology.Topology.SubjectKind == "project"
                 && !session.Facts.TryGetProjectByAssemblyName(
@@ -320,6 +350,7 @@ internal static class ArchitectureMetricEvaluator
         string fullTypeName = ArchitectureTypeNames.SafeFullName(sourceType);
         string project = ArchitectureTopologyEvaluator.ResolveProjectForMetric(session, sourceType);
         string assembly = ArchitectureTypeNames.SafeAssemblyName(sourceType) ?? string.Empty;
+        string canonicalAssemblyIdentity = ArchitectureTopologyEvaluator.ResolveCanonicalAssemblyIdentityForMetric(sourceType);
         string subject = topology.Topology.SubjectKind switch
         {
             "type" => fullTypeName,
@@ -328,23 +359,12 @@ internal static class ArchitectureMetricEvaluator
             "assembly" => ArchitectureTypeNames.SafeAssemblyName(sourceType) ?? string.Empty,
             _ => string.Empty,
         };
-        string identity = SubjectIdentity(topology.Topology.SubjectKind, project, assembly, subject);
-        if (topology.Topology.SubjectKind == "namespace")
-        {
-            // Namespace observations retain the first owner in their identity. Match the native
-            // namespace subject as well so a later type in the same namespace can project its
-            // cached external edge without inventing a namespace ownership join.
-            return topology.Classifications.Where(item =>
-                string.Equals(item.Subject.Subject, subject, StringComparison.Ordinal)
-                || string.Equals(item.Subject.Identity, identity, StringComparison.Ordinal));
-        }
+        string identity = ArchitectureTopologyEvaluator.BuildMetricSubjectIdentity(
+            topology.Topology.SubjectKind, project, assembly, canonicalAssemblyIdentity, subject);
 
         return topology.Classifications.Where(item =>
             string.Equals(item.Subject.Identity, identity, StringComparison.Ordinal));
     }
-
-    private static string SubjectIdentity(string subjectKind, string project, string assembly, string subject) =>
-        $"{subjectKind}|project={project}|assembly={assembly}|subject={subject}";
 
     private static bool HasCanonicalProjectOwner(
         ArchitectureAnalysisSession session,

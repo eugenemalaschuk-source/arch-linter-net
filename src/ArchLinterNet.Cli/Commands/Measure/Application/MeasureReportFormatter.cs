@@ -85,11 +85,7 @@ internal static class MeasureReportFormatter
         JsonArray result = new();
         foreach (ArchitectureMetricMeasurement measurement in measurements)
         {
-            IReadOnlyList<string> contributors = measurement.Contributors;
-            IReadOnlyList<string> bounded = allContributors
-                ? contributors
-                : contributors.Take(maxContributors).ToArray();
-            result.Add(new JsonObject
+            JsonObject entry = new()
             {
                 ["id"] = measurement.Id,
                 ["kind"] = measurement.Kind,
@@ -98,12 +94,28 @@ internal static class MeasureReportFormatter
                 ["effective_scope"] = measurement.EffectiveScope,
                 ["state"] = ArchitectureApplicabilityWireNames.StateToken(measurement.State),
                 ["value"] = measurement.IsEvaluable ? measurement.Value : null,
-                ["contributor_count"] = measurement.ContributorCount,
-                ["contributors"] = new JsonArray(bounded
-                    .Select(static contributor => JsonValue.Create(contributor))
-                    .ToArray()),
-                ["contributors_truncated"] = !allContributors && bounded.Count < contributors.Count,
-            });
+            };
+            if (!measurement.IsEvaluable)
+            {
+                // The contributor universe is unknown when a metric is unassessable. Null keeps
+                // a stable schema without representing withheld evidence as an observed zero.
+                entry["contributor_count"] = null;
+                entry["contributors"] = null;
+                entry["contributors_truncated"] = null;
+                result.Add(entry);
+                continue;
+            }
+
+            IReadOnlyList<string> contributors = measurement.Contributors;
+            IReadOnlyList<string> bounded = allContributors
+                ? contributors
+                : contributors.Take(maxContributors).ToArray();
+            entry["contributor_count"] = measurement.ContributorCount;
+            entry["contributors"] = new JsonArray(bounded
+                .Select(static contributor => JsonValue.Create(contributor))
+                .ToArray());
+            entry["contributors_truncated"] = !allContributors && bounded.Count < contributors.Count;
+            result.Add(entry);
         }
 
         return result;

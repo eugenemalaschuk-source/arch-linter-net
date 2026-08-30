@@ -207,7 +207,10 @@ applicability state, exact numeric value only when evaluable, and contributor
 evidence. A bounded contributor list always includes `contributor_count` and
 `contributors_truncated`; `--all-contributors` disables the bound. The report
 also carries the shared applicability completion/projection so an incomplete
-scope cannot be mistaken for a trustworthy low value. It does not contain
+scope cannot be mistaken for a trustworthy low value. An unassessable
+measurement serializes `value`, `contributor_count`, `contributors`, and
+`contributors_truncated` as `null`: it has not proven an empty contributor
+universe. It does not contain
 healthy metric values as violations or SARIF findings.
 
 Current JSON output is a single top-level object with these arrays:
