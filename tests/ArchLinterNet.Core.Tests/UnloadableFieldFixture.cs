@@ -23,7 +23,9 @@ internal sealed class UnloadableFieldFixture : IDisposable
 
     public Type SourceType { get; }
 
-    public static UnloadableFieldFixture Create(Action<TypeBuilder>? configureConsumerType = null)
+    public static UnloadableFieldFixture Create(
+        Action<TypeBuilder>? configureConsumerType = null,
+        bool includeUnloadableType = false)
     {
         string unique = Guid.NewGuid().ToString("N");
         string tempDir = Path.Combine(Path.GetTempPath(), $"arch-linter-unloadable-{unique}");
@@ -44,6 +46,12 @@ internal sealed class UnloadableFieldFixture : IDisposable
         consumerTypeBuilder.DefineField("Target", dependencyType, FieldAttributes.Public);
         configureConsumerType?.Invoke(consumerTypeBuilder);
         consumerTypeBuilder.CreateType();
+        if (includeUnloadableType)
+        {
+            TypeBuilder unloadableType = consumerModule.DefineType("TypeWithUnloadableBase", TypeAttributes.Public);
+            unloadableType.SetParent(dependencyType);
+            unloadableType.CreateType();
+        }
         consumerBuilder.Save(consumerPath);
 
         File.Delete(dependencyPath);

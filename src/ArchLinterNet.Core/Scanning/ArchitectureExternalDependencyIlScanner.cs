@@ -17,7 +17,7 @@ internal sealed class ArchitectureExternalDependencyIlScanner : IArchitectureExt
     // external group this scanner instance scans. The cache is bounded by the number of distinct
     // tokens actually walked and is never shared between scanner instances, keeping it
     // deterministic and per-run.
-    private readonly Dictionary<IlTokenKey, MemberInfo?> _resolvedMembers = new();
+    private readonly Dictionary<IlTokenKey, ResolvedMember> _resolvedMembers = new();
 
     // Seam over Module.ResolveMember. The cache is invisible in the scanner's results — an uncached
     // implementation reports exactly the same findings — so a test can only prove the cache exists
@@ -55,7 +55,7 @@ internal sealed class ArchitectureExternalDependencyIlScanner : IArchitectureExt
             cancellationToken.ThrowIfCancellationRequested();
             string sourceTypeName = ArchitectureTypeNames.SafeFullName(sourceType);
             string sourceAssembly = sourceType.Assembly.GetName().Name ?? string.Empty;
-            string[] forbiddenReferences = FindTypeMatches(sourceType, externalGroup, matchedTypes)
+            string[] forbiddenReferences = FindTypeMatchesForValidation(sourceType, externalGroup, matchedTypes)
                 .Where(match => !executionContext.IsIgnored(
                     sourceTypeName,
                     match.Display,
@@ -93,51 +93,56 @@ internal sealed class ArchitectureExternalDependencyIlScanner : IArchitectureExt
     internal IEnumerable<ArchitectureExternalDependencyIlFact> FindMethodBodyFacts(
         Type[] sourceTypes,
         ArchitectureExternalDependencyGroup externalGroup,
+        CancellationToken cancellationToken = default) =>
+        FindMethodBodyFactsWithCompleteness(sourceTypes, externalGroup, cancellationToken).Facts;
+
+    // Metrics cannot turn an unavailable IL method-body scan into a lower trusted group count.
+    // Keep this separate from the validation-compatible facts-only method above, which has always
+    // performed best-effort scanning without adding a validation diagnostic for unavailable IL.
+    internal ArchitectureExternalDependencyIlScanResult FindMethodBodyFactsWithCompleteness(
+        Type[] sourceTypes,
+        ArchitectureExternalDependencyGroup externalGroup,
         CancellationToken cancellationToken = default)
     {
         Dictionary<MemberInfo, ExternalMemberMatch?> matchedTypes = new();
+        var facts = new List<ArchitectureExternalDependencyIlFact>();
+        var incompleteSourceTypes = new HashSet<Type>();
         foreach (Type sourceType in sourceTypes)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            foreach (ExternalIlMatch match in FindTypeMatches(sourceType, externalGroup, matchedTypes))
+            TypeScanResult scan = ScanType(sourceType, externalGroup, matchedTypes);
+            if (!scan.IsComplete)
             {
-                yield return new ArchitectureExternalDependencyIlFact(sourceType, match.TargetType);
+                incompleteSourceTypes.Add(sourceType);
+            }
+
+            foreach (ExternalIlMatch match in scan.Matches)
+            {
+                facts.Add(new ArchitectureExternalDependencyIlFact(sourceType, match.TargetType));
             }
         }
+
+        return new ArchitectureExternalDependencyIlScanResult(facts, incompleteSourceTypes);
     }
 
-    private IEnumerable<ExternalIlMatch> FindTypeMatches(
+    // Keep validation's long-standing best-effort behavior separate from the fail-closed metric
+    // projection. In particular, validation only treats FileNotFoundException from GetMethodBody
+    // as a non-match and otherwise preserves its historical exception behavior.
+    private IEnumerable<ExternalIlMatch> FindTypeMatchesForValidation(
         Type sourceType,
         ArchitectureExternalDependencyGroup externalGroup,
         Dictionary<MemberInfo, ExternalMemberMatch?> matchedTypes)
     {
         foreach (MethodBase method in EnumerateMethods(sourceType))
         {
-            foreach (ExternalIlMatch match in FindMethodMatches(method, externalGroup, matchedTypes))
+            foreach (ExternalIlMatch match in FindMethodMatchesForValidation(method, externalGroup, matchedTypes))
             {
                 yield return match;
             }
         }
     }
 
-    private static IEnumerable<MethodBase> EnumerateMethods(Type sourceType)
-    {
-        const BindingFlags Flags =
-            BindingFlags.Instance | BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic | // NOSONAR: intentional — IL scanning needs reflection access to all members
-            BindingFlags.DeclaredOnly;
-
-        foreach (MethodInfo method in sourceType.GetMethods(Flags))
-        {
-            yield return method;
-        }
-
-        foreach (ConstructorInfo constructor in sourceType.GetConstructors(Flags))
-        {
-            yield return constructor;
-        }
-    }
-
-    private IEnumerable<ExternalIlMatch> FindMethodMatches(
+    private IEnumerable<ExternalIlMatch> FindMethodMatchesForValidation(
         MethodBase method,
         ArchitectureExternalDependencyGroup externalGroup,
         Dictionary<MemberInfo, ExternalMemberMatch?> matchedTypes)
@@ -166,9 +171,6 @@ internal sealed class ArchitectureExternalDependencyIlScanner : IArchitectureExt
         string methodName = $"{method.DeclaringType?.FullName}.{method.Name}";
         if (!IlGenericContext.TryCreate(method, out IlGenericContext genericContext))
         {
-            // Reading the generic context used to happen inside the per-token resolve, where a
-            // failure made every token of this method unresolvable. Hoisting it out of the loop
-            // keeps that outcome: no token of this method can produce a match.
             yield break;
         }
 
@@ -190,19 +192,19 @@ internal sealed class ArchitectureExternalDependencyIlScanner : IArchitectureExt
                 continue;
             }
 
-            MemberInfo? referencedMember = ResolveReferencedMember(method.Module, token, genericContext);
-            if (referencedMember == null)
+            ResolvedMember resolved = ResolveReferencedMember(method.Module, token, genericContext);
+            if (!resolved.IsComplete || resolved.Member == null)
             {
                 continue;
             }
 
-            if (!matchedTypes.TryGetValue(referencedMember, out ExternalMemberMatch? memberMatch))
+            if (!matchedTypes.TryGetValue(resolved.Member, out ExternalMemberMatch? memberMatch))
             {
-                string? matched = FindMatchedExternalType(referencedMember, externalGroup);
+                string? matched = FindMatchedExternalType(resolved.Member, externalGroup);
                 memberMatch = matched == null
                     ? null
-                    : new ExternalMemberMatch(matched, referencedMember.DeclaringType?.Assembly.GetName().Name);
-                matchedTypes[referencedMember] = memberMatch;
+                    : new ExternalMemberMatch(matched, resolved.Member.DeclaringType?.Assembly.GetName().Name);
+                matchedTypes[resolved.Member] = memberMatch;
             }
 
             if (memberMatch == null)
@@ -216,6 +218,148 @@ internal sealed class ArchitectureExternalDependencyIlScanner : IArchitectureExt
                 memberMatch.MatchedType,
                 memberMatch.TargetAssembly);
         }
+    }
+
+    private TypeScanResult ScanType(
+        Type sourceType,
+        ArchitectureExternalDependencyGroup externalGroup,
+        Dictionary<MemberInfo, ExternalMemberMatch?> matchedTypes)
+    {
+        MethodBase[] methods;
+        try
+        {
+            methods = EnumerateMethods(sourceType).ToArray();
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            return TypeScanResult.Incomplete;
+        }
+
+        var matches = new List<ExternalIlMatch>();
+        bool isComplete = true;
+        foreach (MethodBase method in methods)
+        {
+            MethodScanResult scan = ScanMethod(method, externalGroup, matchedTypes);
+            matches.AddRange(scan.Matches);
+            isComplete &= scan.IsComplete;
+        }
+
+        return new TypeScanResult(matches, isComplete);
+    }
+
+    private static IEnumerable<MethodBase> EnumerateMethods(Type sourceType)
+    {
+        const BindingFlags Flags =
+            BindingFlags.Instance | BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic | // NOSONAR: intentional — IL scanning needs reflection access to all members
+            BindingFlags.DeclaredOnly;
+
+        foreach (MethodInfo method in sourceType.GetMethods(Flags))
+        {
+            yield return method;
+        }
+
+        foreach (ConstructorInfo constructor in sourceType.GetConstructors(Flags))
+        {
+            yield return constructor;
+        }
+    }
+
+    private MethodScanResult ScanMethod(
+        MethodBase method,
+        ArchitectureExternalDependencyGroup externalGroup,
+        Dictionary<MemberInfo, ExternalMemberMatch?> matchedTypes)
+    {
+        MethodBody? body;
+        try
+        {
+            body = method.GetMethodBody();
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            return MethodScanResult.Incomplete;
+        }
+
+        if (body == null)
+        {
+            return MethodScanResult.Empty;
+        }
+
+        byte[]? il;
+        try
+        {
+            il = body.GetILAsByteArray();
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            return MethodScanResult.Incomplete;
+        }
+
+        if (il == null)
+        {
+            return MethodScanResult.Incomplete;
+        }
+
+        if (il.Length == 0)
+        {
+            return MethodScanResult.Empty;
+        }
+
+        string methodName = $"{method.DeclaringType?.FullName}.{method.Name}";
+        if (!IlGenericContext.TryCreate(method, out IlGenericContext genericContext))
+        {
+            // Reading the generic context used to happen inside the per-token resolve, where a
+            // failure made every token of this method unresolvable. Hoisting it out of the loop
+            // keeps that outcome: no token of this method can produce a match.
+            return MethodScanResult.Incomplete;
+        }
+
+        var matches = new List<ExternalIlMatch>();
+        int position = 0;
+        while (position < il.Length)
+        {
+            if (!TryReadOpCode(il, ref position, out OpCode opCode))
+            {
+                return MethodScanResult.Incomplete;
+            }
+
+            if (!ArchitectureIlOperandSkipper.TryReadMetadataTokenIfPresent(opCode, il, ref position, out int token))
+            {
+                return MethodScanResult.Incomplete;
+            }
+
+            if (token == 0)
+            {
+                continue;
+            }
+
+            ResolvedMember resolved = ResolveReferencedMember(method.Module, token, genericContext);
+            if (!resolved.IsComplete || resolved.Member == null)
+            {
+                return MethodScanResult.Incomplete;
+            }
+
+            if (!matchedTypes.TryGetValue(resolved.Member, out ExternalMemberMatch? memberMatch))
+            {
+                string? matched = FindMatchedExternalType(resolved.Member, externalGroup);
+                memberMatch = matched == null
+                    ? null
+                    : new ExternalMemberMatch(matched, resolved.Member.DeclaringType?.Assembly.GetName().Name);
+                matchedTypes[resolved.Member] = memberMatch;
+            }
+
+            if (memberMatch == null)
+            {
+                continue;
+            }
+
+            matches.Add(new ExternalIlMatch(
+                $"{methodName}: {memberMatch.MatchedType}",
+                methodName,
+                memberMatch.MatchedType,
+                memberMatch.TargetAssembly));
+        }
+
+        return new MethodScanResult(matches, IsComplete: true);
     }
 
     private sealed record ExternalIlMatch(
@@ -387,28 +531,49 @@ internal sealed class ArchitectureExternalDependencyIlScanner : IArchitectureExt
         }
     }
 
-    private MemberInfo? ResolveReferencedMember(Module module, int token, IlGenericContext genericContext)
+    private ResolvedMember ResolveReferencedMember(Module module, int token, IlGenericContext genericContext)
     {
         IlTokenKey key = new(module, token, genericContext);
-        if (_resolvedMembers.TryGetValue(key, out MemberInfo? cached))
+        if (_resolvedMembers.TryGetValue(key, out ResolvedMember? cached))
         {
             return cached;
         }
 
-        MemberInfo? resolved;
+        ResolvedMember resolved;
         try
         {
-            resolved = _resolveMember(module, token, genericContext.TypeArguments, genericContext.MethodArguments);
+            MemberInfo? member = _resolveMember(module, token, genericContext.TypeArguments, genericContext.MethodArguments);
+            resolved = member == null
+                ? ResolvedMember.Incomplete
+                : new ResolvedMember(member, IsComplete: true);
         }
         catch
         {
             // Unresolvable tokens are cached too: a token that cannot be resolved once cannot be
-            // resolved later either, and re-throwing per call site is exactly the cost being removed.
-            resolved = null;
+            // resolved later either. Metrics must know this fact is incomplete; validation retains
+            // the same best-effort result through the facts-only API.
+            resolved = ResolvedMember.Incomplete;
         }
 
         _resolvedMembers[key] = resolved;
         return resolved;
+    }
+
+    private sealed record TypeScanResult(IReadOnlyList<ExternalIlMatch> Matches, bool IsComplete)
+    {
+        internal static TypeScanResult Incomplete { get; } = new(Array.Empty<ExternalIlMatch>(), false);
+    }
+
+    private sealed record MethodScanResult(IReadOnlyList<ExternalIlMatch> Matches, bool IsComplete)
+    {
+        internal static MethodScanResult Empty { get; } = new(Array.Empty<ExternalIlMatch>(), true);
+
+        internal static MethodScanResult Incomplete { get; } = new(Array.Empty<ExternalIlMatch>(), false);
+    }
+
+    private sealed record ResolvedMember(MemberInfo? Member, bool IsComplete)
+    {
+        internal static ResolvedMember Incomplete { get; } = new(null, false);
     }
 
     private static bool TryReadOpCode(byte[] il, ref int position, out OpCode opCode)
@@ -455,3 +620,7 @@ internal sealed class ArchitectureExternalDependencyIlScanner : IArchitectureExt
 }
 
 internal sealed record ArchitectureExternalDependencyIlFact(Type SourceType, string TargetType);
+
+internal sealed record ArchitectureExternalDependencyIlScanResult(
+    IReadOnlyList<ArchitectureExternalDependencyIlFact> Facts,
+    IReadOnlySet<Type> IncompleteSourceTypes);

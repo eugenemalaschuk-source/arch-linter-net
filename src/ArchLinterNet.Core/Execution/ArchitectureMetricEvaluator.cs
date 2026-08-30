@@ -21,6 +21,15 @@ internal static class ArchitectureMetricEvaluator
         ArgumentNullException.ThrowIfNull(session);
         ArgumentNullException.ThrowIfNull(definitions);
 
+        if (!session.TypeIndex.HasCompleteTypeUniverse)
+        {
+            return Unavailable(
+                definitions,
+                selectedIds,
+                session.Document.Name,
+                ArchitectureApplicabilityReasonCodes.MissingRequiredInput);
+        }
+
         return Evaluate(session, definitions, ArchitectureTopologyEvaluator.Evaluate(session), selectedIds);
     }
 
@@ -208,7 +217,13 @@ internal static class ArchitectureMetricEvaluator
         }
 
         HashSet<string> relationContributors = definition.Kind == ArchitectureMetricKinds.ExternalDependencyGroupCount
-            ? ExternalGroups(session, topology, scope, reasons, session.ExternalDependencyFacts.Facts)
+            ? ExternalGroups(
+                session,
+                topology,
+                scope,
+                reasons,
+                session.ExternalDependencyFacts.Facts,
+                session.ExternalDependencyFacts.IncompleteSourceTypes)
             : ComponentRelations(session, topology, scope, definition.Kind, reasons);
         return Finish(definition, scope, null, reasons, relationContributors, provenance);
     }
@@ -225,9 +240,22 @@ internal static class ArchitectureMetricEvaluator
         Dictionary<string, ArchitectureTopologyEvaluator.SubjectClassification> classes =
             topology.Classifications.ToDictionary(classification => classification.Subject.Identity, StringComparer.Ordinal);
         HashSet<string> contributors = new(StringComparer.Ordinal);
+        bool outgoing = kind == ArchitectureMetricKinds.OutgoingComponentCount;
+        bool hasIncompleteRequiredSource = topology.IncompleteDependencySourceIdentities.Any(identity =>
+            classes.TryGetValue(identity, out ArchitectureTopologyEvaluator.SubjectClassification? source)
+            && source.Disposition == ArchitectureTopologyEvaluator.Disposition.Mapped
+            && (!outgoing || source.NodeIds.Contains(node, StringComparer.Ordinal)));
+        if (hasIncompleteRequiredSource)
+        {
+            // An omitted direct edge from a selected outgoing source or any mapped incoming
+            // source can change this component's relation universe. Do not retain known edges as
+            // contributors once their required evidence is incomplete.
+            reasons.Add(ArchitectureApplicabilityReasonCodes.MissingRequiredInput);
+            return contributors;
+        }
+
         foreach (ArchitectureTopologyEvaluator.ObservedDependency dependency in dependencies)
         {
-            bool outgoing = kind == ArchitectureMetricKinds.OutgoingComponentCount;
             string selectedIdentity = outgoing ? dependency.SourceIdentity : dependency.TargetIdentity;
             string otherIdentity = outgoing ? dependency.TargetIdentity : dependency.SourceIdentity;
             ArchitectureTopologyEvaluator.AssemblyEndpointBinding selectedBinding = outgoing
@@ -333,9 +361,19 @@ internal static class ArchitectureMetricEvaluator
         ArchitectureTopologyEvaluator.Projection topology,
         string node,
         ICollection<string> reasons,
-        IReadOnlyList<ArchitectureExternalDependencyFact> facts)
+        IReadOnlyList<ArchitectureExternalDependencyFact> facts,
+        IReadOnlySet<Type>? incompleteSourceTypes = null)
     {
         HashSet<string> contributors = new(StringComparer.Ordinal);
+        if (incompleteSourceTypes != null && incompleteSourceTypes.Any(sourceType =>
+                FindClassifications(topology, sourceType, session).Any(source =>
+                    source.Disposition == ArchitectureTopologyEvaluator.Disposition.Mapped
+                    && source.NodeIds.Contains(node, StringComparer.Ordinal))))
+        {
+            reasons.Add(ArchitectureApplicabilityReasonCodes.MissingRequiredInput);
+            return contributors;
+        }
+
         foreach (ArchitectureExternalDependencyFact fact in facts)
         {
             foreach (ArchitectureTopologyEvaluator.SubjectClassification source in FindClassifications(

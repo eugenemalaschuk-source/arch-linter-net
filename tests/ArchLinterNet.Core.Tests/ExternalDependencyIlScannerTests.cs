@@ -64,6 +64,27 @@ public sealed class ExternalDependencyIlScannerTests
         });
     }
 
+    [Test]
+    public void FindMethodBodyFactsWithCompleteness_UnresolvableToken_MarksSourceIncomplete()
+    {
+        var group = new ArchitectureExternalDependencyGroup
+        {
+            NamespacePrefixes = new List<string> { "ExternalDependencyContractTestsFixtures.VendorSdk" }
+        };
+        Type sourceType = typeof(ExternalDependencyContractTestsFixtures.Core.CoreTypeWithMethodCall);
+        var scanner = new ArchitectureExternalDependencyIlScanner(
+            static (_, _, _, _) => throw new FileNotFoundException("Missing IL token dependency."));
+
+        ArchitectureExternalDependencyIlScanResult result = scanner.FindMethodBodyFactsWithCompleteness(
+            [sourceType], group);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(result.Facts, Is.Empty);
+            Assert.That(result.IncompleteSourceTypes, Does.Contain(sourceType));
+        });
+    }
+
     // PR #416 review round 2: this scanner previously accepted no CancellationToken at all, so a
     // large source-type set could be walked (types, methods, IL instructions) to completion with
     // no way to interrupt it — only the surrounding per-contract-family boundary could stop it,

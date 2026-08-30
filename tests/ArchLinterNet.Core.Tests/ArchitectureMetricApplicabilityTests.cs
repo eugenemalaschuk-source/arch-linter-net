@@ -9,7 +9,7 @@ using NUnit.Framework;
 namespace ArchLinterNet.Core.Tests;
 
 [TestFixture]
-public sealed class ArchitectureMetricApplicabilityTests
+public sealed partial class ArchitectureMetricApplicabilityTests
 {
     [Test]
     public void Evaluate_AmbiguousTopologyTarget_IsUnassessableWithoutPartialValue()

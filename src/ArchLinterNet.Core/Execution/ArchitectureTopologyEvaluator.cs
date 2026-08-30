@@ -26,9 +26,10 @@ internal static class ArchitectureTopologyEvaluator
             return Result.Empty;
         }
 
-        (IReadOnlyList<ObservedSubject> subjects, IReadOnlyList<ObservedDependency> dependencies) =
+        (IReadOnlyList<ObservedSubject> subjects, IReadOnlyList<ObservedDependency> dependencies,
+            IReadOnlySet<string> incompleteDependencySourceIdentities) =
             Observe(session, topology.SubjectKind);
-        return Evaluate(session, topology, subjects, dependencies);
+        return Evaluate(session, topology, subjects, dependencies, incompleteDependencySourceIdentities);
     }
 
     // Kept internal for focused deterministic tests. Session observation and policy matching remain
@@ -37,13 +38,19 @@ internal static class ArchitectureTopologyEvaluator
         ArchitectureAnalysisSession? session,
         ArchitectureTopology topology,
         IReadOnlyList<ObservedSubject> observedSubjects,
-        IReadOnlyList<ObservedDependency> observedDependencies)
+        IReadOnlyList<ObservedDependency> observedDependencies,
+        IReadOnlySet<string>? incompleteDependencySourceIdentities = null)
     {
         ArgumentNullException.ThrowIfNull(topology);
         ArgumentNullException.ThrowIfNull(observedSubjects);
         ArgumentNullException.ThrowIfNull(observedDependencies);
 
-        Projection projection = Project(session, topology, observedSubjects, observedDependencies);
+        Projection projection = Project(
+            session,
+            topology,
+            observedSubjects,
+            observedDependencies,
+            incompleteDependencySourceIdentities);
         List<SubjectClassification> classifications = projection.Classifications.ToList();
 
         Dictionary<string, SubjectClassification> classificationsByIdentity = classifications
@@ -131,16 +138,18 @@ internal static class ArchitectureTopologyEvaluator
     {
         ArgumentNullException.ThrowIfNull(session);
         ArgumentNullException.ThrowIfNull(topology);
-        (IReadOnlyList<ObservedSubject> subjects, IReadOnlyList<ObservedDependency> dependencies) =
+        (IReadOnlyList<ObservedSubject> subjects, IReadOnlyList<ObservedDependency> dependencies,
+            IReadOnlySet<string> incompleteDependencySourceIdentities) =
             Observe(session, topology.SubjectKind);
-        return Project(session, topology, subjects, dependencies);
+        return Project(session, topology, subjects, dependencies, incompleteDependencySourceIdentities);
     }
 
     internal static Projection Project(
         ArchitectureAnalysisSession? session,
         ArchitectureTopology topology,
         IReadOnlyList<ObservedSubject> observedSubjects,
-        IReadOnlyList<ObservedDependency> observedDependencies)
+        IReadOnlyList<ObservedDependency> observedDependencies,
+        IReadOnlySet<string>? incompleteDependencySourceIdentities = null)
     {
         ArgumentNullException.ThrowIfNull(topology);
         ArgumentNullException.ThrowIfNull(observedSubjects);
@@ -151,10 +160,18 @@ internal static class ArchitectureTopologyEvaluator
             .OrderBy(subject => subject.Identity, StringComparer.Ordinal)
             .Select(subject => Classify(session, topology, subject))
             .ToList();
-        return new Projection(topology, observedSubjects, classifications, observedDependencies);
+        return new Projection(
+            topology,
+            observedSubjects,
+            classifications,
+            observedDependencies,
+            incompleteDependencySourceIdentities ?? new HashSet<string>(StringComparer.Ordinal));
     }
 
-    private static (IReadOnlyList<ObservedSubject> Subjects, IReadOnlyList<ObservedDependency> Dependencies) Observe(
+    private static (
+        IReadOnlyList<ObservedSubject> Subjects,
+        IReadOnlyList<ObservedDependency> Dependencies,
+        IReadOnlySet<string> IncompleteDependencySourceIdentities) Observe(
         ArchitectureAnalysisSession session,
         string subjectKind)
     {
@@ -163,7 +180,8 @@ internal static class ArchitectureTopologyEvaluator
         // topology subject for its assembly-level dependency facts.
         if (subjectKind == "assembly")
         {
-            return ObserveAssemblies(session);
+            var (assemblySubjects, assemblyDependencies) = ObserveAssemblies(session);
+            return (assemblySubjects, assemblyDependencies, new HashSet<string>(StringComparer.Ordinal));
         }
 
         Type[] types = session.TypeIndex.AllTypes()
@@ -208,6 +226,7 @@ internal static class ArchitectureTopologyEvaluator
         }
 
         var dependencies = new HashSet<ObservedDependency>();
+        var incompleteDependencySourceIdentities = new HashSet<string>(StringComparer.Ordinal);
         foreach (Type source in types)
         {
             if (!subjectByType.TryGetValue(source, out ObservedSubject? sourceSubject))
@@ -215,7 +234,13 @@ internal static class ArchitectureTopologyEvaluator
                 continue;
             }
 
-            foreach (Type target in session.ReferenceGraph.GetReferencedTypes(source))
+            bool isComplete = session.ReferenceGraph.TryGetReferencedTypes(source, out IReadOnlyList<Type> referencedTypes);
+            if (!isComplete)
+            {
+                incompleteDependencySourceIdentities.Add(sourceSubject.Identity);
+            }
+
+            foreach (Type target in referencedTypes)
             {
                 if (!subjectByType.TryGetValue(target, out ObservedSubject? targetSubject)
                     || string.Equals(sourceSubject.Identity, targetSubject.Identity, StringComparison.Ordinal))
@@ -233,7 +258,8 @@ internal static class ArchitectureTopologyEvaluator
             dependencies.OrderBy(dependency => dependency.SourceIdentity, StringComparer.Ordinal)
                 .ThenBy(dependency => dependency.TargetIdentity, StringComparer.Ordinal)
                 .ThenBy(dependency => dependency.Witness, StringComparer.Ordinal)
-                .ToArray());
+                .ToArray(),
+            incompleteDependencySourceIdentities);
     }
 
     private static (IReadOnlyList<ObservedSubject> Subjects, IReadOnlyList<ObservedDependency> Dependencies) ObserveAssemblies(
@@ -740,5 +766,6 @@ internal static class ArchitectureTopologyEvaluator
         ArchitectureTopology Topology,
         IReadOnlyList<ObservedSubject> ObservedSubjects,
         IReadOnlyList<SubjectClassification> Classifications,
-        IReadOnlyList<ObservedDependency> Dependencies);
+        IReadOnlyList<ObservedDependency> Dependencies,
+        IReadOnlySet<string> IncompleteDependencySourceIdentities);
 }

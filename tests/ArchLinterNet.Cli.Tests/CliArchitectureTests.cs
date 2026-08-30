@@ -28,7 +28,7 @@ using NUnit.Framework;
 namespace ArchLinterNet.Cli.Tests;
 
 [TestFixture]
-public sealed class CliArchitectureTests
+public sealed partial class CliArchitectureTests
 {
     private static readonly string[] _value = { "badge", "baseline", "cache", "change", "coverage", "graph", "explain", "gate", "history", "measure", "policy", "public-api", "scaffold", "schema" };
     private static readonly string[] _value1 = { "generate", "update", "prune", "diff", "verify", "migrate" };
@@ -417,6 +417,8 @@ public sealed class CliArchitectureTests
 
         public ValidationOutcome? ForcedOutcome { get; init; }
 
+        public ArchitectureMetricMeasurementOutcome? ForcedMeasurementOutcome { get; init; }
+
         public bool TryParseGraphLevel(string value, out ArchitectureGraphLevel level)
         {
             level = ArchitectureGraphLevel.Namespace;
@@ -453,6 +455,11 @@ public sealed class CliArchitectureTests
 
         public ArchitectureAnalysisSnapshot CreateSnapshot(AnalysisSnapshotRequest request, ValidationTiming? timing) =>
             throw new NotSupportedException();
+
+        public ArchitectureMetricMeasurementOutcome Measure(
+            ArchitectureMetricMeasurementRequest request,
+            ValidationTiming? timing) =>
+            ForcedMeasurementOutcome ?? throw ExceptionToThrow ?? new NotSupportedException();
 
         public string FormatResultForCiArtifacts(
             string mode,

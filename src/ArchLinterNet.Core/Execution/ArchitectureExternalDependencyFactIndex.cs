@@ -11,30 +11,33 @@ namespace ArchLinterNet.Core.Execution;
 internal sealed class ArchitectureExternalDependencyFactIndex
 {
     private readonly ArchitectureAnalysisSession _session;
-    private readonly Lazy<IReadOnlyList<ArchitectureExternalDependencyFact>> _facts;
+    private readonly Lazy<FactProjection> _projection;
 
     internal ArchitectureExternalDependencyFactIndex(ArchitectureAnalysisSession session)
     {
         _session = session ?? throw new ArgumentNullException(nameof(session));
-        _facts = new Lazy<IReadOnlyList<ArchitectureExternalDependencyFact>>(
+        _projection = new Lazy<FactProjection>(
             Materialize,
             LazyThreadSafetyMode.ExecutionAndPublication);
     }
 
-    internal IReadOnlyList<ArchitectureExternalDependencyFact> Facts => _facts.Value;
+    internal IReadOnlyList<ArchitectureExternalDependencyFact> Facts => _projection.Value.Facts;
 
-    private IReadOnlyList<ArchitectureExternalDependencyFact> Materialize()
+    internal IReadOnlySet<Type> IncompleteSourceTypes => _projection.Value.IncompleteSourceTypes;
+
+    private FactProjection Materialize()
     {
         Dictionary<string, ArchitectureExternalDependencyGroup> groups = _session.Document.ExternalDependencies;
         if (groups.Count == 0)
         {
-            return Array.Empty<ArchitectureExternalDependencyFact>();
+            return FactProjection.Empty;
         }
 
         Type[] sourceTypes = _session.TypeIndex.AllTypes()
             .OrderBy(ArchitectureTypeNames.SafeFullName, StringComparer.Ordinal)
             .ToArray();
         var facts = new HashSet<ArchitectureExternalDependencyFact>();
+        var incompleteSourceTypes = new HashSet<Type>();
         ArchitectureExternalDependencyIlScanner ilScanner = new();
         foreach ((string groupName, ArchitectureExternalDependencyGroup group) in groups
                      .OrderBy(pair => pair.Key, StringComparer.Ordinal))
@@ -42,7 +45,15 @@ internal sealed class ArchitectureExternalDependencyFactIndex
             foreach (Type sourceType in sourceTypes)
             {
                 _session.Context.CancellationToken.ThrowIfCancellationRequested();
-                foreach (Type targetType in _session.ReferenceGraph.GetReferencedTypes(sourceType)
+                bool isComplete = _session.ReferenceGraph.TryGetReferencedTypes(
+                    sourceType,
+                    out IReadOnlyList<Type> referencedTypes);
+                if (!isComplete)
+                {
+                    incompleteSourceTypes.Add(sourceType);
+                }
+
+                foreach (Type targetType in referencedTypes
                              .Distinct()
                              .OrderBy(ArchitectureTypeNames.SafeFullName, StringComparer.Ordinal))
                 {
@@ -61,18 +72,31 @@ internal sealed class ArchitectureExternalDependencyFactIndex
                 }
             }
 
-            foreach (ArchitectureExternalDependencyIlFact fact in ilScanner.FindMethodBodyFacts(
-                         sourceTypes, group, _session.Context.CancellationToken))
+            ArchitectureExternalDependencyIlScanResult ilFacts = ilScanner.FindMethodBodyFactsWithCompleteness(
+                sourceTypes, group, _session.Context.CancellationToken);
+            incompleteSourceTypes.UnionWith(ilFacts.IncompleteSourceTypes);
+            foreach (ArchitectureExternalDependencyIlFact fact in ilFacts.Facts)
             {
                 facts.Add(new ArchitectureExternalDependencyFact(fact.SourceType, fact.TargetType, groupName));
             }
         }
 
-        return facts
-            .OrderBy(fact => ArchitectureTypeNames.SafeFullName(fact.SourceType), StringComparer.Ordinal)
-            .ThenBy(fact => fact.TargetIdentity, StringComparer.Ordinal)
-            .ThenBy(fact => fact.GroupName, StringComparer.Ordinal)
-            .ToArray();
+        return new FactProjection(
+            facts
+                .OrderBy(fact => ArchitectureTypeNames.SafeFullName(fact.SourceType), StringComparer.Ordinal)
+                .ThenBy(fact => fact.TargetIdentity, StringComparer.Ordinal)
+                .ThenBy(fact => fact.GroupName, StringComparer.Ordinal)
+                .ToArray(),
+            incompleteSourceTypes);
+    }
+
+    private sealed record FactProjection(
+        IReadOnlyList<ArchitectureExternalDependencyFact> Facts,
+        IReadOnlySet<Type> IncompleteSourceTypes)
+    {
+        internal static FactProjection Empty { get; } = new(
+            Array.Empty<ArchitectureExternalDependencyFact>(),
+            new HashSet<Type>());
     }
 }
 

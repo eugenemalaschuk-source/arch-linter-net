@@ -27,6 +27,15 @@ public sealed partial class ArchitectureAnalysisSnapshot
             }
 
             ArchitectureRunnerSetup setup = EnsureSetup();
+            if (setup.Runner.Session.Context.MissingAssemblyNames.Count > 0)
+            {
+                return ArchitectureMetricEvaluator.Unavailable(
+                    _document.Metrics,
+                    metricIds,
+                    _document.Name,
+                    ArchitectureApplicabilityReasonCodes.MissingRequiredInput);
+            }
+
             return ArchitectureMetricEvaluator.Evaluate(setup.Runner.Session, _document.Metrics, metricIds);
         }
     }
