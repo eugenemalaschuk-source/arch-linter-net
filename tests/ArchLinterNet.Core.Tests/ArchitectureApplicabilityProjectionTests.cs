@@ -178,7 +178,27 @@ public sealed class ArchitectureApplicabilityProjectionTests
         [Entry("a", ArchitectureApplicabilityMembership.Required), Entry("b", ArchitectureApplicabilityMembership.Optional)];
         ArchitectureApplicabilityRecord[] records =
         [
-            Record("a", ArchitectureApplicabilityRecordState.Unassessable, ArchitectureApplicabilityReasonCodes.UnexpectedEmptyInput),
+            Record(
+                "a",
+                ArchitectureApplicabilityRecordState.Unassessable,
+                ArchitectureApplicabilityReasonCodes.UnexpectedEmptyInput,
+                topologyEvidence: new ArchitectureTopologyMappingEvidence(
+                    "exhaustive",
+                    "namespace",
+                    2,
+                    [
+                        new ArchitectureTopologySubjectEvidence(
+                            "namespace|project=Example|assembly=Example|subject=Example.App",
+                            "Example",
+                            "Example",
+                            "Example.App",
+                            "mapped",
+                            ["application"]),
+                    ],
+                    [new ArchitectureTopologyRelationEvidence(
+                        "application", "domain", "Example.App.Service -> Example.Domain.Entity", IsAllowed: true)],
+                    Array.Empty<string>(),
+                    Array.Empty<ArchitectureTopologyStaleEdgeEvidence>())),
             Record("b", ArchitectureApplicabilityRecordState.NotApplicable),
         ];
         ArchitectureAssessmentCompletionEvidence completion =
@@ -247,13 +267,17 @@ public sealed class ArchitectureApplicabilityProjectionTests
         string identity,
         ArchitectureApplicabilityRecordState state,
         string? reasonCode = null,
-        string family = "family")
+        string family = "family",
+        ArchitectureTopologyMappingEvidence? topologyEvidence = null)
     {
         ArchitectureApplicabilityReason[] reasons = reasonCode is null
             ? Array.Empty<ArchitectureApplicabilityReason>()
             : [new ArchitectureApplicabilityReason(reasonCode, family, identity, "policy")];
         return new ArchitectureApplicabilityRecord(
             identity, family, state, reasons,
-            new ArchitectureApplicabilityProvenance(family, identity, "policy"));
+            new ArchitectureApplicabilityProvenance(family, identity, "policy"))
+        {
+            TopologyEvidence = topologyEvidence,
+        };
     }
 }

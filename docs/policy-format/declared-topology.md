@@ -90,6 +90,28 @@ unmapped, and multiple is ambiguous.
 
 Set `stale_declarations: true` to have the evaluator retain a distinct stale-declaration result for a node with no observed mapping or an allowed edge with no observed relationship. A stale node is not a new unmapped observed subject.
 
+## Evaluation and completeness evidence
+
+Validation evaluates a declared topology from the same first-party subject and
+dependency facts used for the policy run. It first selects the declared scope,
+then gives a reviewed `out_of_scope` entry precedence over node mappings. Every
+remaining scoped subject is mapped to exactly one node, unmapped, or ambiguous;
+declaration/input order does not affect this result.
+
+Only dependencies whose source and target are exactly mapped are compared with
+`allowed_edges`. An undeclared component direction produces one deterministic
+finding with source node, target node, and a representative subject-level
+dependency witness. A mapping gap is not guessed into a forbidden edge: in an
+exhaustive topology it is unassessable applicability evidence with the original
+unmapped or ambiguous subject available for drill-down.
+
+The JSON, SARIF, Human, and Testing outputs retain canonical topology evidence:
+declared components; observed, mapped, reviewed-out-of-scope, unmapped, and
+ambiguous subjects; observed component relationships; and enabled stale nodes
+or edges. These counts prove completeness of the declared mapping; they are not
+an architecture quality score. Consumers must use this evidence rather than
+reparsing policy YAML or rescanning assemblies.
+
 ## Validation and boundaries
 
 Policy loading rejects invalid selector shapes, unknown layer or node references, duplicate node IDs, duplicate directional edges, duplicate reviewed scope IDs, and exact duplicate mappings that make components unambiguously ambiguous. Fact-dependent selector overlap is preserved for the evaluator instead of being resolved by declaration order.
