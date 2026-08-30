@@ -371,6 +371,53 @@ public sealed class SarifExternalDiagnosticSelectorTests
     }
 
     [Test]
+    public void Select_SeparatesAuthorizationGroupsWithControlCharactersInFilterValues()
+    {
+        const string ControlRuleId = "SEC100\u001eSEC200";
+        ArchitectureExternalEvidenceRequirement controlValueRequirement = Requirement(
+            requireMatches: true,
+            ruleIds: [ControlRuleId],
+            severity: new Dictionary<string, string> { ["error"] = "strict" });
+        ArchitectureExternalEvidenceRequirement splitValueRequirement = Requirement(
+            requireMatches: true,
+            ruleIds: ["SEC100", "SEC200"],
+            severity: new Dictionary<string, string> { ["error"] = "strict" });
+        SarifEvidenceReadResult controlValueEvidence = Read(
+            controlValueRequirement,
+            "control-value.sarif",
+            "[{\"ruleId\":\"SEC100\\u001eSEC200\",\"message\":{\"text\":\"control\"},\"level\":\"error\"}]");
+        SarifEvidenceReadResult splitValueEvidence = Read(
+            splitValueRequirement,
+            "split-value.sarif",
+            Results(Result("SEC100", "error", "src/App/One.cs", "split")));
+        var selector = new SarifExternalDiagnosticSelector();
+
+        SarifExternalDiagnosticSelectionResult forward = selector.Select(
+        [
+            new SarifExternalDiagnosticSelectionInput(controlValueEvidence),
+            new SarifExternalDiagnosticSelectionInput(splitValueEvidence),
+        ]);
+        SarifExternalDiagnosticSelectionResult reverse = selector.Select(
+        [
+            new SarifExternalDiagnosticSelectionInput(splitValueEvidence),
+            new SarifExternalDiagnosticSelectionInput(controlValueEvidence),
+        ]);
+
+        SarifExternalDiagnosticFilterMismatch expectedMismatch = new(
+            "external.scan", SarifExternalDiagnosticFilterDimension.RuleId, "SEC200");
+        Assert.Multiple(() =>
+        {
+            Assert.That(controlValueEvidence.Authorization!.GroupIdentity,
+                Is.Not.EqualTo(splitValueEvidence.Authorization!.GroupIdentity));
+            Assert.That(forward.Diagnostics, Has.Count.EqualTo(2));
+            Assert.That(forward.FilterMismatches, Is.EqualTo([expectedMismatch]));
+            Assert.That(reverse.Diagnostics.Select(diagnostic => diagnostic.CanonicalIdentity),
+                Is.EqualTo(forward.Diagnostics.Select(diagnostic => diagnostic.CanonicalIdentity)));
+            Assert.That(reverse.FilterMismatches, Is.EqualTo(forward.FilterMismatches));
+        });
+    }
+
+    [Test]
     public void Select_KeepsDifferentSourceSeveritiesAndGovernanceModesDistinct()
     {
         ArchitectureExternalEvidenceRequirement requirement = Requirement(

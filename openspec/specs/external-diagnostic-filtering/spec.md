@@ -21,7 +21,9 @@ The trust reader SHALL capture an immutable authorization snapshot for every val
 snapshot SHALL include the parent logical ID, tool/version/run identity, required context-binding
 flags, validated assessment context, and a detached diagnostic-filter copy. The selector SHALL
 consume only that captured snapshot; it SHALL NOT accept a second mutable requirement or apply a
-different policy's filter to already trusted evidence.
+different policy's filter to already trusted evidence. An authorization-group identity SHALL be
+structural or use unambiguous length-prefixed values; a policy-supplied control or separator
+character SHALL NOT cause distinct authorization snapshots to join the same group.
 
 Non-empty categories SHALL combine conjunctively and multiple values in one category SHALL combine
 disjunctively. `require_matches: true` SHALL require every configured rule ID, tag, project, path
@@ -76,6 +78,12 @@ their tags. The reader SHALL likewise resolve an artifact location index through
 An absent result message or an unsupported unresolved message reference SHALL fail closed rather
 than become an empty source fact.
 
+When present, `startLine`, `startColumn`, `endLine`, and `endColumn` SHALL be positive integers;
+`charOffset` and `charLength` SHALL be non-negative integers. An end line SHALL not precede a
+start line, and an end column on the same line SHALL not precede the start column. A region that
+violates these bounds or ordering constraints SHALL fail closed rather than become a trusted
+location fact.
+
 For a requirement without a diagnostic filter, the reader SHALL retain the preceding trust-only
 SARIF behavior: it SHALL not project or validate result members needed only for source diagnostic
 selection, and it SHALL expose no source diagnostics or selection authorization.
@@ -100,6 +108,11 @@ selection, and it SHALL expose no source diagnostics or selection authorization.
 - **WHEN** an otherwise valid SARIF requirement has no diagnostic filter and its result contains a
   member that is irrelevant to trust validation but unsupported by source projection
 - **THEN** the reader remains valid and exposes no source diagnostics
+
+#### Scenario: Invalid region bounds are not trusted
+- **WHEN** a projected result contains a zero or negative line/column, a negative character
+  offset/length, or an ending position before its start
+- **THEN** the reader rejects the artifact as an unsupported shape and exposes no source diagnostics
 
 ### Requirement: Selection has deterministic severity, identity, ordering, and deduplication
 The system SHALL map each eligible source severity to the filter's configured `strict` or `audit`
@@ -132,6 +145,12 @@ deterministic ordinal ordering.
   required rule IDs
 - **THEN** the selector evaluates required matches across their combined trusted source facts and
   reports no mismatch in either input order
+
+#### Scenario: Separator characters cannot merge authorization groups
+- **WHEN** two authorization snapshots differ only through a filter value containing a control or
+  separator character
+- **THEN** the selector evaluates their required matches independently and does not combine their
+  trusted source facts
 
 #### Scenario: Different source severities remain distinct
 - **WHEN** two otherwise equivalent source results have the same fingerprint and location but map

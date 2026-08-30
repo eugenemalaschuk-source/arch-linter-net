@@ -111,6 +111,13 @@ The selector consumes that snapshot rather than a second mutable requirement, so
 evidence trusted for one policy cannot be reinterpreted by a later policy with
 the same `id`. For repeated artifacts with the same snapshot,
 `require_matches` is evaluated across their combined trusted results.
+Authorization grouping uses an unambiguous structural encoding, so filter values
+containing control characters cannot merge distinct policy snapshots.
+
+For projected primary locations, present line and column values must be positive
+and character offsets/lengths must be non-negative. Ending positions cannot
+precede their starts; malformed regions reject the artifact rather than becoming
+trusted fallback-identity facts.
 
 For a selected diagnostic, ArchLinterNet preserves source-provided
 `fingerprints` where available and otherwise creates a deterministic fallback

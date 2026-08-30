@@ -214,13 +214,28 @@ public sealed partial class SarifEvidenceReader
             return false;
         }
 
-        if (!TryReadOptionalRegionInt(regionElement, "startLine", resultIndex, out int? startLine, out detail)
-            || !TryReadOptionalRegionInt(regionElement, "startColumn", resultIndex, out int? startColumn, out detail)
-            || !TryReadOptionalRegionInt(regionElement, "endLine", resultIndex, out int? endLine, out detail)
-            || !TryReadOptionalRegionInt(regionElement, "endColumn", resultIndex, out int? endColumn, out detail)
-            || !TryReadOptionalRegionInt(regionElement, "charOffset", resultIndex, out int? charOffset, out detail)
-            || !TryReadOptionalRegionInt(regionElement, "charLength", resultIndex, out int? charLength, out detail))
+        if (!TryReadOptionalRegionInt(regionElement, "startLine", 1, resultIndex, out int? startLine, out detail)
+            || !TryReadOptionalRegionInt(regionElement, "startColumn", 1, resultIndex, out int? startColumn, out detail)
+            || !TryReadOptionalRegionInt(regionElement, "endLine", 1, resultIndex, out int? endLine, out detail)
+            || !TryReadOptionalRegionInt(regionElement, "endColumn", 1, resultIndex, out int? endColumn, out detail)
+            || !TryReadOptionalRegionInt(regionElement, "charOffset", 0, resultIndex, out int? charOffset, out detail)
+            || !TryReadOptionalRegionInt(regionElement, "charLength", 0, resultIndex, out int? charLength, out detail))
         {
+            return false;
+        }
+
+        if (endLine is not null && startLine is not null && endLine < startLine)
+        {
+            detail = $"The SARIF result at index {resultIndex} region.endLine must not precede region.startLine.";
+            return false;
+        }
+
+        if (endLine == startLine
+            && endColumn is not null
+            && startColumn is not null
+            && endColumn < startColumn)
+        {
+            detail = $"The SARIF result at index {resultIndex} region.endColumn must not precede region.startColumn on the same line.";
             return false;
         }
 
@@ -238,6 +253,7 @@ public sealed partial class SarifEvidenceReader
     private static bool TryReadOptionalRegionInt(
         JsonElement region,
         string propertyName,
+        int minimum,
         int resultIndex,
         out int? value,
         out string? detail)
@@ -253,6 +269,12 @@ public sealed partial class SarifEvidenceReader
             || !property.TryGetInt32(out int parsed))
         {
             detail = $"The SARIF result at index {resultIndex} region.{propertyName} member must be a 32-bit integer when present.";
+            return false;
+        }
+
+        if (parsed < minimum)
+        {
+            detail = $"The SARIF result at index {resultIndex} region.{propertyName} member must be at least {minimum} when present.";
             return false;
         }
 

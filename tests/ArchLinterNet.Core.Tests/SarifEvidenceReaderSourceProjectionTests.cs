@@ -226,6 +226,56 @@ public sealed class SarifEvidenceReaderSourceProjectionTests
         });
     }
 
+    [TestCase("startLine", 0)]
+    [TestCase("startColumn", 0)]
+    [TestCase("endLine", -1)]
+    [TestCase("endColumn", 0)]
+    [TestCase("charOffset", -1)]
+    [TestCase("charLength", -1)]
+    public void Read_RegionValuesOutsideSarifBoundsAreRejectedFailClosed(string property, int value)
+    {
+        string result =
+            "{\"ruleId\":\"SEC100\",\"message\":{\"text\":\"invalid region\"},\"locations\":[{\"physicalLocation\":{\"artifactLocation\":{\"uri\":\"src/App.cs\"},\"region\":{\""
+            + property + "\":" + value + "}}}]}";
+        _repository.AddUtf8File("scan.sarif", Sarif(string.Empty, result));
+
+        SarifEvidenceReadResult read = new SarifEvidenceReader().Read(
+            Requirement(),
+            _repository.Root,
+            new SarifEvidenceArtifactReference("scan.sarif", "external.scan"),
+            new SarifEvidenceAssessmentContext("repo", "revision"));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(read.Status, Is.EqualTo(SarifEvidenceTrustStatus.UnsupportedShape));
+            Assert.That(read.Detail, Does.Contain($"region.{property}"));
+            Assert.That(read.SourceDiagnostics, Is.Empty);
+        });
+    }
+
+    [TestCase("\"startLine\":7,\"endLine\":6", "region.endLine")]
+    [TestCase("\"startLine\":7,\"startColumn\":8,\"endLine\":7,\"endColumn\":7", "region.endColumn")]
+    public void Read_RegionEndingBeforeItsStartIsRejectedFailClosed(string members, string expectedDetail)
+    {
+        string result =
+            "{\"ruleId\":\"SEC100\",\"message\":{\"text\":\"inconsistent region\"},\"locations\":[{\"physicalLocation\":{\"artifactLocation\":{\"uri\":\"src/App.cs\"},\"region\":{"
+            + members + "}}}]}";
+        _repository.AddUtf8File("scan.sarif", Sarif(string.Empty, result));
+
+        SarifEvidenceReadResult read = new SarifEvidenceReader().Read(
+            Requirement(),
+            _repository.Root,
+            new SarifEvidenceArtifactReference("scan.sarif", "external.scan"),
+            new SarifEvidenceAssessmentContext("repo", "revision"));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(read.Status, Is.EqualTo(SarifEvidenceTrustStatus.UnsupportedShape));
+            Assert.That(read.Detail, Does.Contain(expectedDetail));
+            Assert.That(read.SourceDiagnostics, Is.Empty);
+        });
+    }
+
     [Test]
     public void Read_MalformedSourceFactOrWrongContextExposesNoDiagnostics()
     {

@@ -1,4 +1,6 @@
 using System.Collections.ObjectModel;
+using System.Globalization;
+using System.Text;
 
 namespace ArchLinterNet.Core.Model;
 
@@ -113,42 +115,79 @@ public sealed record SarifEvidenceAuthorizationSnapshot
     /// <summary>Resolved artifact context accepted by the trust reader, when the read was valid.</summary>
     public SarifEvidenceResolvedContext? ValidatedContext { get; }
 
-    internal string GroupIdentity => string.Join(
-        "\u001f",
-        [
-            LogicalId,
-            Tool,
-            ToolVersion ?? string.Empty,
-            Run,
-            RequireRepository ? "true" : "false",
-            RequireRevision ? "true" : "false",
-            RequireScope ? "true" : "false",
-            AssessmentContext.Repository ?? string.Empty,
-            AssessmentContext.Revision ?? string.Empty,
-            AssessmentContext.Scope ?? string.Empty,
-            ValidatedContext?.Repository ?? string.Empty,
-            ValidatedContext?.Revision ?? string.Empty,
-            ValidatedContext?.Scope ?? string.Empty,
-            CreateFilterIdentity(DiagnosticFilter),
-        ]);
+    internal string GroupIdentity => CreateGroupIdentity();
 
-    private static string CreateFilterIdentity(SarifExternalDiagnosticFilterAuthorization? filter)
+    private string CreateGroupIdentity()
+    {
+        var builder = new StringBuilder("sarif-evidence-authorization:v1;");
+        AppendString(builder, LogicalId);
+        AppendString(builder, Tool);
+        AppendString(builder, ToolVersion);
+        AppendString(builder, Run);
+        AppendBoolean(builder, RequireRepository);
+        AppendBoolean(builder, RequireRevision);
+        AppendBoolean(builder, RequireScope);
+        AppendString(builder, AssessmentContext.Repository);
+        AppendString(builder, AssessmentContext.Revision);
+        AppendString(builder, AssessmentContext.Scope);
+        AppendString(builder, ValidatedContext?.Repository);
+        AppendString(builder, ValidatedContext?.Revision);
+        AppendString(builder, ValidatedContext?.Scope);
+        AppendFilter(builder, DiagnosticFilter);
+        return builder.ToString();
+    }
+
+    private static void AppendFilter(
+        StringBuilder builder,
+        SarifExternalDiagnosticFilterAuthorization? filter)
     {
         if (filter is null)
         {
-            return string.Empty;
+            builder.Append("N;");
+            return;
         }
 
-        IEnumerable<string> parts = filter.RuleIds
-            .Append("|")
-            .Concat(filter.RuleTags)
-            .Append("|")
-            .Concat(filter.Projects)
-            .Append("|")
-            .Concat(filter.PathPrefixes)
-            .Append("|")
-            .Concat(filter.Severity.Select(pair => pair.Key + "=" + pair.Value))
-            .Append(filter.RequireMatches ? "true" : "false");
-        return string.Join("\u001e", parts);
+        builder.Append("F;");
+        AppendStrings(builder, filter.RuleIds);
+        AppendStrings(builder, filter.RuleTags);
+        AppendStrings(builder, filter.Projects);
+        AppendStrings(builder, filter.PathPrefixes);
+        builder.Append('M');
+        builder.Append(filter.Severity.Count.ToString(CultureInfo.InvariantCulture));
+        builder.Append(';');
+        foreach ((string key, string value) in filter.Severity.OrderBy(pair => pair.Key, StringComparer.Ordinal))
+        {
+            AppendString(builder, key);
+            AppendString(builder, value);
+        }
+
+        AppendBoolean(builder, filter.RequireMatches);
     }
+
+    private static void AppendStrings(StringBuilder builder, IReadOnlyList<string> values)
+    {
+        builder.Append('L');
+        builder.Append(values.Count.ToString(CultureInfo.InvariantCulture));
+        builder.Append(';');
+        foreach (string value in values)
+        {
+            AppendString(builder, value);
+        }
+    }
+
+    private static void AppendString(StringBuilder builder, string? value)
+    {
+        if (value is null)
+        {
+            builder.Append("N;");
+            return;
+        }
+
+        builder.Append('S');
+        builder.Append(value.Length.ToString(CultureInfo.InvariantCulture));
+        builder.Append(':');
+        builder.Append(value);
+    }
+
+    private static void AppendBoolean(StringBuilder builder, bool value) => builder.Append(value ? "B1;" : "B0;");
 }
