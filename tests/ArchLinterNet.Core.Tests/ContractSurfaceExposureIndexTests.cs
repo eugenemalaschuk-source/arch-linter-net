@@ -100,22 +100,30 @@ public sealed class ContractSurfaceExposureIndexTests
     }
 
     [Test]
-    public void Scan_SameFullNameFromDistinctAssembliesRemainsDistinct()
+    public void Scan_SameFullNameFromAssembliesWithSameSimpleNameRemainsDistinct()
     {
-        (Type firstRoot, Type firstTarget) = BuildSyntheticSurface("First");
-        (Type secondRoot, Type secondTarget) = BuildSyntheticSurface("Second");
+        (Type firstRoot, Type firstTarget) = BuildSyntheticSurface(new Version(1, 0, 0, 0));
+        (Type secondRoot, Type secondTarget) = BuildSyntheticSurface(new Version(2, 0, 0, 0));
 
-        ArchitectureContractSurfaceExposureResult first = ArchitectureContractSurfaceExposureScanner.Scan(firstRoot);
-        ArchitectureContractSurfaceExposureResult second = ArchitectureContractSurfaceExposureScanner.Scan(secondRoot);
+        ArchitectureContractDocument document = new() { Version = 1, Name = "exposure-tests" };
+        ArchitectureAnalysisContext context = new(
+            "/tmp", new[] { firstRoot.Assembly, secondRoot.Assembly }, Array.Empty<string>(), Array.Empty<string>());
+        ArchitectureAnalysisSession session = new(context, document, null, false, null);
+        ArchitectureContractSurfaceExposureResult result =
+            session.GetContractSurfaceExposure(new[] { firstRoot, secondRoot });
         ArchitectureContractExposureTarget firstIdentity = Target(firstTarget);
         ArchitectureContractExposureTarget secondIdentity = Target(secondTarget);
+        HashSet<ArchitectureContractExposureTarget> duplicateTargets = result.Exposures
+            .Where(exposure => exposure.ReferencedType.FullTypeName == firstTarget.FullName)
+            .Select(exposure => exposure.ReferencedType)
+            .ToHashSet();
 
         Assert.Multiple(() =>
         {
             Assert.That(firstIdentity.FullTypeName, Is.EqualTo(secondIdentity.FullTypeName));
+            Assert.That(firstTarget.Assembly.GetName().Name, Is.EqualTo(secondTarget.Assembly.GetName().Name));
             Assert.That(firstIdentity.AssemblyName, Is.Not.EqualTo(secondIdentity.AssemblyName));
-            Assert.That(first.Exposures.Any(exposure => exposure.ReferencedType.Equals(firstIdentity)), Is.True);
-            Assert.That(second.Exposures.Any(exposure => exposure.ReferencedType.Equals(secondIdentity)), Is.True);
+            Assert.That(duplicateTargets, Is.EquivalentTo(new[] { firstIdentity, secondIdentity }));
         });
     }
 
@@ -136,6 +144,34 @@ public sealed class ContractSurfaceExposureIndexTests
         });
     }
 
+    [Test]
+    public void Scan_EmptyEnumArrayAttributeArgumentRecordsDeclaredEnumType()
+    {
+        ArchitectureContractSurfaceExposureResult result =
+            ArchitectureContractSurfaceExposureScanner.Scan(typeof(EmptyEnumArrayAttributeRoot));
+
+        Assert.That(result.Exposures.Any(exposure =>
+            Target(typeof(ExposureKind)).Equals(exposure.ReferencedType)
+            && exposure.Path.Segments.Any(segment => segment.Kind == "attribute_argument")), Is.True);
+    }
+
+    [Test]
+    public void Scan_ReorderedAllowMultipleAttributesUseStableOccurrencePaths()
+    {
+        ArchitectureContractSurfaceExposureResult forward =
+            ArchitectureContractSurfaceExposureScanner.Scan(typeof(ForwardRepeatedAttributes));
+        ArchitectureContractSurfaceExposureResult reverse =
+            ArchitectureContractSurfaceExposureScanner.Scan(typeof(ReverseRepeatedAttributes));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(AttributeOccurrence(forward, typeof(Customer)),
+                Is.EqualTo(AttributeOccurrence(reverse, typeof(Customer))));
+            Assert.That(AttributeOccurrence(forward, typeof(AlternateCustomer)),
+                Is.EqualTo(AttributeOccurrence(reverse, typeof(AlternateCustomer))));
+        });
+    }
+
     private static bool HasPath(
         ArchitectureContractSurfaceExposureResult result, Type target, string segmentKind) =>
         result.Exposures.Any(exposure => Target(target).Equals(exposure.ReferencedType)
@@ -146,12 +182,18 @@ public sealed class ContractSurfaceExposureIndexTests
         result.Exposures.Select(exposure => exposure.ReferencedType).ToHashSet();
 
     private static ArchitectureContractExposureTarget Target(Type type) =>
-        new(type.Assembly.GetName().Name!, type.FullName!);
+        new(type.Assembly.FullName!, type.FullName!);
 
-    private static (Type Root, Type Target) BuildSyntheticSurface(string suffix)
+    private static string AttributeOccurrence(ArchitectureContractSurfaceExposureResult result, Type target) =>
+        result.Exposures.Single(exposure =>
+            Target(target).Equals(exposure.ReferencedType)
+            && exposure.Path.Segments.Any(segment => segment.Kind == "attribute_argument" && segment.Value == "constructor:0"))
+            .Path.Segments.Single(segment => segment.Kind == "attribute").Value;
+
+    private static (Type Root, Type Target) BuildSyntheticSurface(Version version)
     {
         AssemblyBuilder assembly = AssemblyBuilder.DefineDynamicAssembly(
-            new AssemblyName($"ContractExposure-{suffix}-{Guid.NewGuid():N}"), AssemblyBuilderAccess.Run);
+            new AssemblyName("ContractExposureDuplicate") { Version = version }, AssemblyBuilderAccess.Run);
         ModuleBuilder module = assembly.DefineDynamicModule("Main");
         TypeBuilder target = module.DefineType("Duplicate.Target", TypeAttributes.Public | TypeAttributes.Class);
         Type targetType = target.CreateType()!;
@@ -163,6 +205,10 @@ public sealed class ContractSurfaceExposureIndexTests
     }
 
     public sealed class Customer
+    {
+    }
+
+    public sealed class AlternateCustomer
     {
     }
 
@@ -209,6 +255,34 @@ public sealed class ContractSurfaceExposureIndexTests
         public string Text { get; }
 
         public Type? NamedType { get; set; }
+    }
+
+    [AttributeUsage(AttributeTargets.All)]
+    public sealed class EnumArrayMetadataAttribute : Attribute
+    {
+        public EnumArrayMetadataAttribute(ExposureKind[] values)
+        {
+            Values = values;
+        }
+
+        public ExposureKind[] Values { get; }
+    }
+
+    [EnumArrayMetadata(new ExposureKind[0])]
+    public sealed class EmptyEnumArrayAttributeRoot
+    {
+    }
+
+    [ExposureMetadata(typeof(Customer), ExposureKind.Customer, 1, "customer")]
+    [ExposureMetadata(typeof(AlternateCustomer), ExposureKind.Customer, 2, "alternate")]
+    public sealed class ForwardRepeatedAttributes
+    {
+    }
+
+    [ExposureMetadata(typeof(AlternateCustomer), ExposureKind.Customer, 2, "alternate")]
+    [ExposureMetadata(typeof(Customer), ExposureKind.Customer, 1, "customer")]
+    public sealed class ReverseRepeatedAttributes
+    {
     }
 
     [ExposureMetadata(typeof(Customer), ExposureKind.Customer, 1, "value", NamedType = typeof(Customer))]

@@ -87,7 +87,7 @@ internal sealed class ArchitectureContractSurfaceExposureIndex
     {
         try
         {
-            return $"{type.Assembly.GetName().Name ?? string.Empty}\u001f{type.FullName ?? type.Name}";
+            return $"{type.Assembly.FullName ?? string.Empty}\u001f{type.FullName ?? type.Name}";
         }
         catch (Exception exception) when (exception is TypeLoadException or FileNotFoundException or FileLoadException)
         {

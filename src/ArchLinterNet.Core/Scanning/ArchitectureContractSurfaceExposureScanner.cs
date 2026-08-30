@@ -434,7 +434,7 @@ internal static class ArchitectureContractSurfaceExposureScanner
 
         private void ScanAttributeData(IReadOnlyList<CustomAttributeData> attributes, ArchitectureContractExposurePath sitePath)
         {
-            int attributeIndex = 0;
+            Dictionary<string, int> attributeOccurrences = new(StringComparer.Ordinal);
             foreach (CustomAttributeData attribute in attributes.OrderBy(AttributeSortKey, StringComparer.Ordinal))
             {
                 Type? attributeType = TryRead(() => attribute.AttributeType, sitePath, "attribute-type-unavailable");
@@ -443,11 +443,16 @@ internal static class ArchitectureContractSurfaceExposureScanner
                     continue;
                 }
 
-                // Include the deterministic occurrence ordinal so two AllowMultiple attributes of
-                // the same type remain independently explainable paths.
+                // AttributeSortKey includes the normalized metadata arguments, so the occurrence
+                // ordinal below stays stable even if reflection enumerates AllowMultiple
+                // attributes of the same type in a different order.
+                string attributeTypeSortKey = TypeSortKey(attributeType);
+                int occurrence = attributeOccurrences.TryGetValue(attributeTypeSortKey, out int previous)
+                    ? previous
+                    : 0;
+                attributeOccurrences[attributeTypeSortKey] = occurrence + 1;
                 ArchitectureContractExposurePath attributePath = sitePath.Append(
-                    "attribute", $"{TypeSortKey(attributeType)}:{attributeIndex}");
-                attributeIndex++;
+                    "attribute", $"{attributeTypeSortKey}:{occurrence}");
                 AddExposure(attributePath, attributeType);
                 IList<CustomAttributeTypedArgument> constructorArguments = TryRead(
                     () => attribute.ConstructorArguments, attributePath, "attribute-arguments-unavailable")
@@ -478,6 +483,16 @@ internal static class ArchitectureContractSurfaceExposureScanner
 
             if (argumentType.IsArray)
             {
+                Type? elementType = TryRead(
+                    () => argumentType.GetElementType(), path, "attribute-array-element-type-unavailable");
+                if (elementType != null && TryRead(
+                        () => elementType.IsEnum, path, "attribute-array-element-type-unavailable"))
+                {
+                    // The declared element type is semantic evidence even when the metadata array
+                    // has no values to scan.
+                    AddExposure(path, elementType);
+                }
+
                 object? value = TryRead(() => argument.Value, path, "attribute-array-value-unavailable");
                 if (value is IEnumerable values)
                 {
@@ -581,7 +596,7 @@ internal static class ArchitectureContractSurfaceExposureScanner
             try
             {
                 string fullName = type.FullName ?? type.Name;
-                string assemblyName = type.Assembly.GetName().Name ?? string.Empty;
+                string assemblyName = type.Assembly.FullName ?? string.Empty;
                 complete = fullName.Length != 0 && assemblyName.Length != 0;
                 return new ArchitectureContractExposureTarget(assemblyName, fullName);
             }
@@ -622,13 +637,48 @@ internal static class ArchitectureContractSurfaceExposureScanner
         {
             try
             {
-                return TypeSortKey(attribute.AttributeType);
+                IList<CustomAttributeTypedArgument> constructorArguments = attribute.ConstructorArguments;
+                IList<CustomAttributeNamedArgument> namedArguments = attribute.NamedArguments;
+                return JoinSortKeyParts(
+                    TypeSortKey(attribute.AttributeType),
+                    JoinSortKeyParts(constructorArguments.Select(AttributeArgumentSortKey)),
+                    JoinSortKeyParts(namedArguments
+                        .Select(argument => new
+                        {
+                            Name = argument.MemberName,
+                            Value = AttributeArgumentSortKey(argument.TypedValue)
+                        })
+                        .OrderBy(argument => argument.Name, StringComparer.Ordinal)
+                        .ThenBy(argument => argument.Value, StringComparer.Ordinal)
+                        .Select(argument => JoinSortKeyParts(argument.Name, argument.Value))));
             }
             catch (Exception exception) when (IsReflectionFailure(exception))
             {
                 return string.Empty;
             }
         }
+
+        private static string AttributeArgumentSortKey(CustomAttributeTypedArgument argument)
+        {
+            Type argumentType = argument.ArgumentType;
+            object? value = argument.Value;
+            string valueKey = value switch
+            {
+                null => "null",
+                Type referencedType => JoinSortKeyParts("type", TypeSortKey(referencedType)),
+                IList<CustomAttributeTypedArgument> elements => JoinSortKeyParts(
+                    "array", JoinSortKeyParts(elements.Select(AttributeArgumentSortKey))),
+                IFormattable formattable => JoinSortKeyParts(
+                    "value", formattable.ToString(null, CultureInfo.InvariantCulture) ?? string.Empty),
+                _ => JoinSortKeyParts("value", value.ToString() ?? string.Empty)
+            };
+            return JoinSortKeyParts(TypeSortKey(argumentType), valueKey);
+        }
+
+        private static string JoinSortKeyParts(params string[] parts) => JoinSortKeyParts((IEnumerable<string>)parts);
+
+        private static string JoinSortKeyParts(IEnumerable<string> parts) => string.Concat(parts.Select(
+            part => $"{part.Length.ToString(CultureInfo.InvariantCulture)}:{part}"));
 
         private static string MemberSortKey(MemberInfo member)
         {

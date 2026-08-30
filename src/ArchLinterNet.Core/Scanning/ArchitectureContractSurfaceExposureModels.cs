@@ -1,6 +1,7 @@
 namespace ArchLinterNet.Core.Scanning;
 
-// A type identity used by the contract-surface evidence layer. Full names alone are not enough:
+// A type identity used by the contract-surface evidence layer. AssemblyName contains
+// Assembly.FullName, because full type names and simple assembly names alone are not enough:
 // two resolved assemblies may legitimately contain the same namespace-qualified type name.
 internal readonly record struct ArchitectureContractExposureTarget(
     string AssemblyName,
