@@ -1,3 +1,4 @@
+using System.Reflection;
 using ArchLinterNet.Core.Contracts;
 using ArchLinterNet.Core.Contracts.Families;
 using ArchLinterNet.Core.Model;
@@ -20,15 +21,6 @@ internal static class ArchitectureMetricEvaluator
     {
         ArgumentNullException.ThrowIfNull(session);
         ArgumentNullException.ThrowIfNull(definitions);
-
-        if (!session.TypeIndex.HasCompleteTypeUniverse)
-        {
-            return Unavailable(
-                definitions,
-                selectedIds,
-                session.Document.Name,
-                ArchitectureApplicabilityReasonCodes.MissingRequiredInput);
-        }
 
         return Evaluate(session, definitions, ArchitectureTopologyEvaluator.Evaluate(session), selectedIds);
     }
@@ -63,8 +55,14 @@ internal static class ArchitectureMetricEvaluator
         {
             ArchitectureApplicabilityProvenance provenance =
                 new(Family, definition.Id, session.Document.Name);
-            MetricResult result = EvaluateDefinition(
-                session, definition, topology, topologyEvidence, provenance);
+            MetricResult result = RequiresCompleteTypeUniverse(definition, topology)
+                && !session.TypeIndex.HasCompleteTypeUniverse
+                ? Unassessable(
+                    definition,
+                    definition.TopologyNode ?? definition.PublicApiSurface ?? string.Empty,
+                    provenance,
+                    ArchitectureApplicabilityReasonCodes.MissingRequiredInput)
+                : EvaluateDefinition(session, definition, topology, topologyEvidence, provenance);
             records.Add(result.Record);
             expected.Add(new ArchitectureApplicabilityExpectedEntry(
                 definition.Id, Family, ArchitectureApplicabilityMembership.Required, provenance));
@@ -75,6 +73,22 @@ internal static class ArchitectureMetricEvaluator
             expected, records, conformancePassed: true);
         ArchitectureApplicabilityProjection? projection = ArchitectureApplicabilityProjector.Project(completion);
         return new ArchitectureMetricMeasurementOutcome(measurements, completion, projection);
+    }
+
+    // Assembly component relations and assembly footprint use the assembly-metadata graph, whose
+    // native universe is independent of Assembly.GetTypes(). Every other topology metric consumes
+    // type/reflection facts; those cannot retain a trusted known subset after a type-load failure.
+    private static bool RequiresCompleteTypeUniverse(
+        ArchitectureMetricDefinition definition,
+        ArchitectureTopologyEvaluator.Projection? topology)
+    {
+        if (definition.Kind == ArchitectureMetricKinds.PublicContractSurfaceCount || topology is null)
+        {
+            return false;
+        }
+
+        return topology.Topology.SubjectKind != "assembly"
+            || definition.Kind == ArchitectureMetricKinds.ExternalDependencyGroupCount;
     }
 
     internal static ArchitectureMetricMeasurementOutcome Unavailable(
@@ -450,6 +464,14 @@ internal static class ArchitectureMetricEvaluator
             return Unassessable(definition, scope, provenance, ArchitectureApplicabilityReasonCodes.MissingRequiredInput);
         }
 
+        if (!TryResolvePublicSurfaceAssemblyIdentities(session, contract, out IReadOnlyDictionary<string, string>? identities))
+        {
+            // The legacy public-surface configuration names assemblies by simple name. A metric
+            // cannot safely turn that into a resolved contributor identity if the current target
+            // set contains zero or multiple canonical assemblies for that name.
+            return Unassessable(definition, scope, provenance, ArchitectureApplicabilityReasonCodes.MissingRequiredInput);
+        }
+
         IReadOnlyList<PublicApiSnapshotEntry> entries;
         IReadOnlyList<ArchitectureViolation> selectorSafety;
         IReadOnlyList<string> missing;
@@ -468,10 +490,43 @@ internal static class ArchitectureMetricEvaluator
             reasons.Add(ArchitectureApplicabilityReasonCodes.MissingRequiredInput);
         }
 
-        HashSet<string> contributors = entries
-            .Select(entry => $"{entry.AssemblyName}|{entry.Signature}")
-            .ToHashSet(StringComparer.Ordinal);
+        HashSet<string> contributors = new(StringComparer.Ordinal);
+        foreach (PublicApiSnapshotEntry entry in entries)
+        {
+            if (!identities.TryGetValue(entry.AssemblyName, out string? identity))
+            {
+                reasons.Add(ArchitectureApplicabilityReasonCodes.MissingRequiredInput);
+                continue;
+            }
+
+            contributors.Add($"{identity}|{entry.Signature}");
+        }
+
         return Finish(definition, scope, null, reasons, contributors, provenance);
+    }
+
+    private static bool TryResolvePublicSurfaceAssemblyIdentities(
+        ArchitectureAnalysisSession session,
+        ArchitecturePublicApiSurfaceContract contract,
+        out IReadOnlyDictionary<string, string> identities)
+    {
+        var resolved = new Dictionary<string, string>(StringComparer.Ordinal);
+        foreach (string assemblyName in contract.Assemblies.Distinct(StringComparer.Ordinal))
+        {
+            Assembly[] candidates = session.Context.TargetAssemblies
+                .Where(candidate => string.Equals(candidate.GetName().Name, assemblyName, StringComparison.Ordinal))
+                .ToArray();
+            if (candidates.Length != 1)
+            {
+                identities = new Dictionary<string, string>(StringComparer.Ordinal);
+                return false;
+            }
+
+            resolved.Add(assemblyName, ArchitectureTopologyEvaluator.ResolveCanonicalAssemblyIdentityForMetric(candidates[0]));
+        }
+
+        identities = resolved;
+        return true;
     }
 
     private static MetricResult Unassessable(

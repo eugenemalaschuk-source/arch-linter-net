@@ -79,6 +79,27 @@ public sealed class MetricDefinitionValidatorTests
             WithTopology(Document(Metric(unit: "assembly"))),
             "Metric 'metric' kind 'outgoing_component_count' does not accept 'unit'.");
         yield return Case(
+            WithTopology(Document(Metric(unit: " "))),
+            "Metric 'metric' kind 'outgoing_component_count' does not accept 'unit'.");
+        yield return Case(
+            WithTopology(Document(new ArchitectureMetricDefinition
+            {
+                Id = "metric",
+                Kind = ArchitectureMetricKinds.OutgoingComponentCount,
+                TopologyNode = "node",
+                PublicApiSurface = " ",
+            })),
+            "Metric 'metric' kind 'outgoing_component_count' requires exactly one 'topology_node' target.");
+        yield return Case(
+            Document(new ArchitectureMetricDefinition
+            {
+                Id = "metric",
+                Kind = ArchitectureMetricKinds.PublicContractSurfaceCount,
+                TopologyNode = " ",
+                PublicApiSurface = "surface",
+            }),
+            "Metric 'metric' kind 'public_contract_surface_count' requires exactly one 'public_api_surface' target.");
+        yield return Case(
             Document(Metric()),
             "Metric 'metric' targets topology node 'node', but no topology is declared.");
         yield return Case(

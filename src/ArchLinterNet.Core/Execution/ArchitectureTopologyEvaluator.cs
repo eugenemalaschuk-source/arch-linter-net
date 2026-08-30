@@ -450,7 +450,10 @@ internal static class ArchitectureTopologyEvaluator
     // Shared with the metric projection so external facts use the exact owner binding that
     // topology observation uses for a source type.
     internal static string ResolveCanonicalAssemblyIdentityForMetric(Type type) =>
-        CanonicalAssemblyIdentity(type.Assembly);
+        ResolveCanonicalAssemblyIdentityForMetric(type.Assembly);
+
+    internal static string ResolveCanonicalAssemblyIdentityForMetric(Assembly assembly) =>
+        CanonicalAssemblyIdentity(assembly);
 
     internal static string BuildMetricSubjectIdentity(
         string subjectKind,

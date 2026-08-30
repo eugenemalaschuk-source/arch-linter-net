@@ -1,4 +1,7 @@
+using System.Reflection;
+using System.Reflection.Emit;
 using ArchLinterNet.Core.Contracts;
+using ArchLinterNet.Core.Contracts.Families;
 using ArchLinterNet.Core.Execution;
 using ArchLinterNet.Core.Model;
 using NUnit.Framework;
@@ -85,5 +88,88 @@ public sealed partial class ArchitectureMetricApplicabilityTests
             Assert.That(session.TypeIndex.HasCompleteTypeUniverse, Is.False);
             AssertUnassessable(measurement);
         });
+    }
+
+    [Test]
+    public void Evaluate_PartiallyLoadableTypeUniverse_DoesNotBlockMetadataNativeAssemblyMetric()
+    {
+        using UnloadableFieldFixture fixture = UnloadableFieldFixture.Create(includeUnloadableType: true);
+        string assemblyName = fixture.ConsumerAssembly.GetName().Name!;
+        ArchitectureTopologySubjectSelector selector = new() { Assembly = assemblyName };
+        ArchitectureContractDocument document = new()
+        {
+            Name = "metric-partial-types-assembly-topology",
+            Topology = new ArchitectureTopology
+            {
+                Mode = "partial",
+                SubjectKind = "assembly",
+                Scope = new ArchitectureTopologyScope { AllowEmpty = true, Selectors = [selector] },
+                Nodes = [new ArchitectureTopologyNode { Id = "consumer", Mappings = [selector] }],
+            },
+            Metrics = [TopologyMetric("outgoing", ArchitectureMetricKinds.OutgoingComponentCount, "consumer")],
+        };
+        using ArchitectureAnalysisContext context = CreateContext(fixture.ConsumerAssembly);
+        var session = new ArchitectureAnalysisSession(context, document, null, false, null);
+
+        Assert.That(session.TypeIndex.HasCompleteTypeUniverse, Is.False);
+
+        ArchitectureMetricMeasurement measurement = ArchitectureMetricEvaluator.Evaluate(session, document.Metrics)
+            .Measurements.Single();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(measurement.IsEvaluable, Is.True);
+            Assert.That(measurement.Value, Is.Zero);
+            Assert.That(measurement.Contributors, Is.Empty);
+        });
+    }
+
+    [Test]
+    public void Evaluate_PublicSurfaceWithAmbiguousSimpleAssemblyName_IsUnassessable()
+    {
+        const string AssemblyName = "MetricDuplicateAssembly";
+        Assembly first = CreateDuplicateAssembly(AssemblyName, new Version(1, 0, 0, 0));
+        Assembly second = CreateDuplicateAssembly(AssemblyName, new Version(2, 0, 0, 0));
+        ArchitectureContractDocument document = new()
+        {
+            Name = "metric-ambiguous-public-surface",
+            Contracts = new ArchitectureContractGroups
+            {
+                StrictPublicApiSurface =
+                [
+                    new ArchitecturePublicApiSurfaceContract
+                    {
+                        Id = "surface",
+                        Name = "Surface",
+                        Assemblies = [AssemblyName],
+                    },
+                ],
+            },
+            Metrics =
+            [
+                new ArchitectureMetricDefinition
+                {
+                    Id = "surface-size",
+                    Kind = ArchitectureMetricKinds.PublicContractSurfaceCount,
+                    PublicApiSurface = "surface",
+                },
+            ],
+        };
+        using ArchitectureAnalysisContext context = CreateContext(first, second);
+        var session = new ArchitectureAnalysisSession(context, document, null, false, null);
+
+        ArchitectureMetricMeasurement measurement = ArchitectureMetricEvaluator.Evaluate(session, document.Metrics)
+            .Measurements.Single();
+
+        AssertUnassessable(measurement);
+    }
+
+    private static Assembly CreateDuplicateAssembly(string simpleName, Version version)
+    {
+        AssemblyBuilder assembly = AssemblyBuilder.DefineDynamicAssembly(
+            new AssemblyName(simpleName) { Version = version }, AssemblyBuilderAccess.Run);
+        ModuleBuilder module = assembly.DefineDynamicModule("Main");
+        _ = module.DefineType("PublicType", TypeAttributes.Public).CreateType();
+        return assembly;
     }
 }

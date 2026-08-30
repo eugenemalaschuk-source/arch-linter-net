@@ -30,20 +30,22 @@ internal sealed class MetricDefinitionValidator : IArchitecturePolicyDocumentVal
                     $"Supported values are {string.Join(", ", ArchitectureMetricKinds.All.Select(kind => $"'{kind}'"))}.");
             }
 
+            bool hasTopologyTarget = definition.TopologyNode is not null;
+            bool hasPublicTarget = definition.PublicApiSurface is not null;
+            bool hasUnitTarget = definition.Unit is not null;
             bool topologyTarget = !string.IsNullOrWhiteSpace(definition.TopologyNode);
             bool publicTarget = !string.IsNullOrWhiteSpace(definition.PublicApiSurface);
-            bool unitTarget = !string.IsNullOrWhiteSpace(definition.Unit);
             bool isPublic = definition.Kind == ArchitectureMetricKinds.PublicContractSurfaceCount;
             bool isFootprint = definition.Kind == ArchitectureMetricKinds.ComponentFootprintCount;
             bool isTopology = !isPublic;
 
-            if (isTopology && (!topologyTarget || publicTarget))
+            if (isTopology && (!topologyTarget || hasPublicTarget))
             {
                 throw new InvalidOperationException(
                     $"Metric '{definition.Id}' kind '{definition.Kind}' requires exactly one 'topology_node' target.");
             }
 
-            if (isPublic && (topologyTarget || unitTarget || !publicTarget))
+            if (isPublic && (hasTopologyTarget || hasUnitTarget || !publicTarget))
             {
                 throw new InvalidOperationException(
                     $"Metric '{definition.Id}' kind '{definition.Kind}' requires exactly one 'public_api_surface' target.");
@@ -55,7 +57,7 @@ internal sealed class MetricDefinitionValidator : IArchitecturePolicyDocumentVal
                     $"Metric '{definition.Id}' footprint must select unit 'project' or 'assembly'.");
             }
 
-            if (!isFootprint && unitTarget)
+            if (!isFootprint && hasUnitTarget)
             {
                 throw new InvalidOperationException(
                     $"Metric '{definition.Id}' kind '{definition.Kind}' does not accept 'unit'.");
