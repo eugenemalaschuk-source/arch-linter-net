@@ -42,6 +42,9 @@ internal sealed class ArchitectureSessionMetadataIndexes
     public bool TryGetProjectByResolvedAssembly(Assembly assembly, out ArchitectureDiscoveredProject project) =>
         _projectMetadata.Value.ByResolvedAssembly.TryGetValue(assembly, out project!);
 
+    public bool HasAmbiguousProjectOutputAssemblyName(string assemblyName) =>
+        _projectMetadata.Value.AmbiguousOutputAssemblyNames.Contains(assemblyName);
+
     public bool TryGetPackageReferences(
         string assemblyName,
         out IReadOnlyList<ArchitectureDiscoveredPackageReference> references) =>
@@ -69,6 +72,7 @@ internal sealed class ArchitectureSessionMetadataIndexes
             new(StringComparer.Ordinal);
         Dictionary<string, List<ArchitectureDiscoveredProject>> projectsByArtifactPath =
             new(StringComparer.OrdinalIgnoreCase);
+        Dictionary<string, HashSet<string>> artifactPathsByOutputAssemblyName = new(StringComparer.Ordinal);
 
         foreach (ArchitectureDiscoveredProject project in _discoveredProjects)
         {
@@ -88,6 +92,15 @@ internal sealed class ArchitectureSessionMetadataIndexes
                 }
 
                 projects.Add(project);
+
+                if (!artifactPathsByOutputAssemblyName.TryGetValue(project.AssemblyName,
+                        out HashSet<string>? artifactPaths))
+                {
+                    artifactPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                    artifactPathsByOutputAssemblyName.Add(project.AssemblyName, artifactPaths);
+                }
+
+                artifactPaths.Add(normalizedArtifactPath);
             }
         }
 
@@ -108,12 +121,17 @@ internal sealed class ArchitectureSessionMetadataIndexes
             projectsByAssemblyName,
             projectsByNormalizedPath,
             packageReferencesByAssemblyName,
-            projectsByResolvedAssembly);
+            projectsByResolvedAssembly,
+            artifactPathsByOutputAssemblyName
+                .Where(pair => pair.Value.Count > 1)
+                .Select(pair => pair.Key)
+                .ToHashSet(StringComparer.Ordinal));
     }
 
     private sealed record ProjectMetadataIndexes(
         IReadOnlyDictionary<string, ArchitectureDiscoveredProject> ByAssemblyName,
         IReadOnlyDictionary<string, ArchitectureDiscoveredProject> ByNormalizedPath,
         IReadOnlyDictionary<string, IReadOnlyList<ArchitectureDiscoveredPackageReference>> PackageReferencesByAssemblyName,
-        IReadOnlyDictionary<Assembly, ArchitectureDiscoveredProject> ByResolvedAssembly);
+        IReadOnlyDictionary<Assembly, ArchitectureDiscoveredProject> ByResolvedAssembly,
+        IReadOnlySet<string> AmbiguousOutputAssemblyNames);
 }

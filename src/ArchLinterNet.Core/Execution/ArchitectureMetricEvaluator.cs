@@ -448,9 +448,12 @@ internal static class ArchitectureMetricEvaluator
 
     private static bool HasCanonicalProjectOwner(
         ArchitectureAnalysisSession session,
-        ArchitectureTopologyEvaluator.ObservedSubject subject) =>
-        subject.ResolvedAssembly is not null
-        && session.Facts.TryGetProjectByResolvedAssembly(subject.ResolvedAssembly, out _);
+        ArchitectureTopologyEvaluator.ObservedSubject subject)
+    {
+        return subject.ResolvedAssembly is not null
+               && session.Facts.TryGetProjectByResolvedAssembly(subject.ResolvedAssembly, out var project)
+               && !session.Facts.HasAmbiguousProjectOutputAssemblyName(project.AssemblyName);
+    }
 
     private static string? ResolveCanonicalProjectOwner(
         ArchitectureAnalysisSession session,

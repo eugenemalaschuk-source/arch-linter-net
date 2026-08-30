@@ -70,6 +70,28 @@ public partial class CliIntegrationTests
     }
 
     [Test]
+    public void Measure_ExplicitTargetAssemblyWithProjectMetricUsesTheDiscoveredProjectOutput()
+    {
+        string policy = Path.Combine(
+            _repoRoot, "tests", "ArchLinterNet.Cli.Tests", "TestPolicies", "metrics-project-policy.yml");
+
+        var (exitCode, stdout, stderr) = RunCli("measure", "--policy", policy, "--format", "json");
+
+        Assert.That(exitCode, Is.EqualTo(0), $"stderr: {stderr}");
+
+        using JsonDocument document = JsonDocument.Parse(stdout);
+        JsonElement measurement = document.RootElement.GetProperty("measurements").EnumerateArray().Single();
+        Assert.Multiple(() =>
+        {
+            Assert.That(measurement.GetProperty("state").GetString(), Is.EqualTo("evaluable"));
+            Assert.That(measurement.GetProperty("value").GetInt32(), Is.EqualTo(1));
+            Assert.That(measurement.GetProperty("contributors").EnumerateArray()
+                    .Select(contributor => contributor.GetString()),
+                Is.EqualTo(new[] { "../../../src/ArchLinterNet.Testing/ArchLinterNet.Testing.csproj" }));
+        });
+    }
+
+    [Test]
     public void Measure_UnknownMetric_ReportsConfigurationErrorAndExitsTwo()
     {
         string policy = Path.Combine(_repoRoot, "tests", "ArchLinterNet.Cli.Tests", "TestPolicies", "metrics-policy.yml");

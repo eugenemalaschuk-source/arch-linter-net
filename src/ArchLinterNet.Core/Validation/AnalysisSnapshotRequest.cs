@@ -45,6 +45,11 @@ public sealed record AnalysisSnapshotRequest
 
     public CancellationToken CancellationToken { get; init; } = default;
 
+    // Measurement's exact project-output analysis is read-only and intentionally does not turn
+    // absence of an optional build-state receipt into missing metric evidence. This remains
+    // internal so ordinary validation snapshots retain their reviewed preflight contract.
+    internal bool IsMetricMeasurement { get; init; }
+
     public ValidationRequest ForMode(string mode)
     {
         return new ValidationRequest

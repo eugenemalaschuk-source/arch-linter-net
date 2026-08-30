@@ -39,8 +39,10 @@ public sealed partial class ArchitectureAssemblyResolutionService : IArchitectur
         HashSet<string>? selectedContractIds,
         CancellationToken cancellationToken = default)
     {
+        bool requiresExactMetricArtifact = ArchitectureMetricProjectOwnership.RequiresExactArtifactBinding(document);
         return Resolve(document, repositoryRoot, discovery, resolveAssemblyOutputs, mode, selectedContractIds,
-            forceIsolatedLoading: false, exactPostBuildAssemblyPaths: null,
+            forceIsolatedLoading: requiresExactMetricArtifact,
+            exactAssemblyPaths: requiresExactMetricArtifact ? discovery.ResolvedAssemblyPaths : null,
             expectedArtifactContentDigests: null, cancellationToken);
     }
 
@@ -55,7 +57,7 @@ public sealed partial class ArchitectureAssemblyResolutionService : IArchitectur
         CancellationToken cancellationToken = default)
     {
         return Resolve(document, repositoryRoot, discovery, resolveAssemblyOutputs, mode, selectedContractIds,
-            forceIsolatedLoading: true, exactPostBuildAssemblyPaths: discovery.ResolvedAssemblyPaths,
+            forceIsolatedLoading: true, exactAssemblyPaths: discovery.ResolvedAssemblyPaths,
             expectedArtifactContentDigests, cancellationToken);
     }
 
@@ -67,7 +69,7 @@ public sealed partial class ArchitectureAssemblyResolutionService : IArchitectur
         string? mode,
         HashSet<string>? selectedContractIds,
         bool forceIsolatedLoading,
-        IReadOnlyDictionary<string, string>? exactPostBuildAssemblyPaths,
+        IReadOnlyDictionary<string, string>? exactAssemblyPaths,
         IReadOnlyDictionary<string, string>? expectedArtifactContentDigests,
         CancellationToken cancellationToken)
     {
@@ -113,7 +115,7 @@ public sealed partial class ArchitectureAssemblyResolutionService : IArchitectur
         return document.Analysis.TargetAssemblies.Count == 0 && projectCoverageCanReportUnresolvedProjects
             ? new ResolutionResult(Array.Empty<Assembly>(), Array.Empty<string>(), Array.Empty<string>())
             : ResolveFromDocument(document, repositoryRoot, _fileSystem, _environment, _assemblyLoader,
-                forceIsolatedLoading, exactPostBuildAssemblyPaths, discovery.AssemblySearchPaths,
+                forceIsolatedLoading, exactAssemblyPaths, discovery.AssemblySearchPaths,
                 expectedArtifactContentDigests, cancellationToken);
     }
 
@@ -123,7 +125,7 @@ public sealed partial class ArchitectureAssemblyResolutionService : IArchitectur
         CancellationToken cancellationToken = default)
     {
         return ResolveFromDocument(document, repositoryRoot, _fileSystem, _environment, _assemblyLoader,
-            forceIsolatedLoading: false, exactPostBuildAssemblyPaths: null, additionalProbingPaths: null,
+            forceIsolatedLoading: false, exactAssemblyPaths: null, additionalProbingPaths: null,
             expectedArtifactContentDigests: null, cancellationToken);
     }
 
@@ -134,7 +136,7 @@ public sealed partial class ArchitectureAssemblyResolutionService : IArchitectur
         IArchitectureEnvironment environment,
         IArchitectureAssemblyLoader assemblyLoader,
         bool forceIsolatedLoading,
-        IReadOnlyDictionary<string, string>? exactPostBuildAssemblyPaths,
+        IReadOnlyDictionary<string, string>? exactAssemblyPaths,
         IReadOnlyCollection<string>? additionalProbingPaths,
         IReadOnlyDictionary<string, string>? expectedArtifactContentDigests,
         CancellationToken cancellationToken)
@@ -153,14 +155,13 @@ public sealed partial class ArchitectureAssemblyResolutionService : IArchitectur
         List<string> missing = new();
         int assemblyLoads = 0;
 
-        // Shared-framework probing only applies to the isolated post-build (--ensure-built) load
-        // scope — the documented entrypoint for analyzing framework-dependent consumer assemblies.
-        // See the assembly-resolution spec's shared-framework requirement for why the non-isolated
-        // path is out of scope.
+        // Shared-framework probing applies to every isolated exact-artifact scope: post-build
+        // analysis and ordinary project metrics both load their selected output rather than a
+        // same-simple-name host assembly. Non-isolated resolution keeps its existing boundary.
         IEnumerable<string> sharedFrameworkProbingPaths = forceIsolatedLoading
             ? ArchitectureSharedFrameworkResolver.ResolveProbingPaths(
                 document.Analysis.SharedFrameworks, document.Analysis.TargetFramework,
-                ExtractDiscoveredTargetFrameworks(exactPostBuildAssemblyPaths, names), fileSystem, environment)
+                ExtractDiscoveredTargetFrameworks(exactAssemblyPaths, names), fileSystem, environment)
             : Array.Empty<string>();
         IReadOnlyList<string> probingPaths = ResolveProbingPaths(
             document,
@@ -169,7 +170,7 @@ public sealed partial class ArchitectureAssemblyResolutionService : IArchitectur
             environment,
             additionalProbingPaths,
             sharedFrameworkProbingPaths);
-        IReadOnlyDictionary<string, string> exactPaths = exactPostBuildAssemblyPaths
+        IReadOnlyDictionary<string, string> exactPaths = exactAssemblyPaths
             ?? new Dictionary<string, string>(StringComparer.Ordinal);
         IArchitectureAssemblyLoadScope? isolatedLoadScope = forceIsolatedLoading
             ? assemblyLoader.CreateIsolatedLoadScope(probingPaths, exactPaths, expectedArtifactContentDigests)
@@ -234,11 +235,11 @@ public sealed partial class ArchitectureAssemblyResolutionService : IArchitectur
         IArchitectureFileSystem fileSystem,
         IArchitectureAssemblyLoader assemblyLoader,
         IArchitectureAssemblyLoadScope? isolatedLoadScope,
-        IReadOnlyDictionary<string, string> exactPostBuildAssemblyPaths)
+        IReadOnlyDictionary<string, string> exactAssemblyPaths)
     {
         if (isolatedLoadScope != null)
         {
-            if (!exactPostBuildAssemblyPaths.TryGetValue(assemblyName, out string? exactPath))
+            if (!exactAssemblyPaths.TryGetValue(assemblyName, out string? exactPath))
             {
                 throw new InvalidOperationException(
                     $"No verified post-build artifact was discovered for target assembly '{assemblyName}'.");

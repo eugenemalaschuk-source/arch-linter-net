@@ -1,6 +1,8 @@
+using System.Reflection;
 using ArchLinterNet.Core.Contracts;
 using ArchLinterNet.Core.Contracts.Families;
 using ArchLinterNet.Core.Discovery;
+using ArchLinterNet.Core.Discovery.Abstractions;
 using ArchLinterNet.Core.Execution;
 using ArchLinterNet.Core.Execution.Abstractions;
 using ArchLinterNet.Core.Model;
@@ -153,6 +155,84 @@ public sealed class ArchitectureRunnerSetupServiceDiscoveryTests
     }
 
     [Test]
+    public void BuildRunner_ExplicitTargetAssemblies_ProjectMetricUsesTheExactDiscoveredProjectOutput()
+    {
+        Assembly assembly = typeof(ArchitectureMetricMeasurement).Assembly;
+        const string ProjectPath = "src/MyApp/MyApp.csproj";
+        string artifactPath = Path.Combine(_repoRoot, "src", "MyApp", "bin", "Debug", "net10.0", "MyApp.dll");
+        ProjectDiscoveryResult discovery = new(
+            [assembly.GetName().Name!], Array.Empty<string>(), Array.Empty<string>(),
+            Array.Empty<ArchitectureProjectDiscoveryDiagnostic>())
+        {
+            DiscoveredProjects = [new ArchitectureDiscoveredProject(ProjectPath, assembly.GetName().Name!, ["net10.0"])],
+            ResolvedAssemblyPathsByNormalizedProjectPath = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+            {
+                [ProjectPath] = artifactPath,
+            },
+        };
+        var projectDiscovery = new RecordingProjectDiscoveryService(discovery);
+        var resolution = new StaticAssemblyResolutionService(assembly, artifactPath);
+        var service = new ArchitectureRunnerSetupService(
+            new ArchitecturePolicyDocumentLoader(),
+            new ArchitectureBaselineLoadingService(),
+            new ArchitectureRepositoryRootResolver(),
+            new ConditionSetResolutionService(),
+            projectDiscovery,
+            resolution);
+        var document = new ArchitectureContractDocument
+        {
+            Version = 1,
+            Name = "Test",
+            Analysis = new ArchitectureAnalysisConfiguration
+            {
+                TargetAssemblies = new List<string> { assembly.GetName().Name! },
+                Projects = new List<string> { ProjectPath },
+            },
+            Topology = new ArchitectureTopology
+            {
+                Mode = "partial",
+                SubjectKind = "type",
+                Scope = new ArchitectureTopologyScope
+                {
+                    Selectors = [new ArchitectureTopologySubjectSelector { Namespace = "ArchLinterNet.Core.Model" }],
+                },
+                Nodes =
+                [
+                    new ArchitectureTopologyNode
+                    {
+                        Id = "application",
+                        Mappings = [new ArchitectureTopologySubjectSelector { Namespace = "ArchLinterNet.Core.Model" }],
+                    },
+                ],
+            },
+            Metrics =
+            [
+                new ArchitectureMetricDefinition
+                {
+                    Id = "application-project-footprint",
+                    Kind = ArchitectureMetricKinds.ComponentFootprintCount,
+                    TopologyNode = "application",
+                    Unit = "project",
+                },
+            ],
+        };
+
+        ArchitectureRunnerSetup setup = service.BuildRunner(document, _policyPath);
+        ArchitectureMetricMeasurement measurement = ArchitectureMetricEvaluator
+            .Evaluate(setup.Runner.Session, document.Metrics)
+            .Measurements
+            .Single();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(projectDiscovery.ResolveAssemblyOutputs, Is.True);
+            Assert.That(measurement.IsEvaluable, Is.True);
+            Assert.That(measurement.Value, Is.EqualTo(1));
+            Assert.That(measurement.Contributors, Is.EqualTo(new[] { ProjectPath }));
+        });
+    }
+
+    [Test]
     public void BuildRunner_NoTargetAssembliesAndDiscoveredProjectHasNoOutput_ReportsItMissingInsteadOfThrowing()
     {
         // A real project was discovered (analysis.projects) — it just has no build output. Build-
@@ -270,5 +350,49 @@ public sealed class ArchitectureRunnerSetupServiceDiscoveryTests
         string outputDir = Path.Combine(projectDir, "bin", "Debug", targetFramework);
         Directory.CreateDirectory(outputDir);
         File.WriteAllText(Path.Combine(outputDir, $"{assemblyName}.dll"), string.Empty);
+    }
+
+    private sealed class RecordingProjectDiscoveryService(ProjectDiscoveryResult result) : IArchitectureProjectDiscoveryService
+    {
+        public bool ResolveAssemblyOutputs { get; private set; }
+
+        public ProjectDiscoveryResult ResolveAndApply(
+            ArchitectureContractDocument document,
+            string repositoryRoot,
+            bool resolveAssemblyOutputs,
+            CancellationToken cancellationToken = default)
+        {
+            ResolveAssemblyOutputs = resolveAssemblyOutputs;
+            return result;
+        }
+    }
+
+    private sealed class StaticAssemblyResolutionService(Assembly assembly, string artifactPath)
+        : IArchitectureAssemblyResolutionService
+    {
+        public ResolutionResult Resolve(
+            ArchitectureContractDocument document,
+            string repositoryRoot,
+            ProjectDiscoveryResult discovery,
+            bool resolveAssemblyOutputs,
+            string? mode,
+            HashSet<string>? selectedContractIds,
+            CancellationToken cancellationToken = default) => CreateResult();
+
+        public ResolutionResult ResolvePostBuild(
+            ArchitectureContractDocument document,
+            string repositoryRoot,
+            ProjectDiscoveryResult discovery,
+            bool resolveAssemblyOutputs,
+            string? mode,
+            HashSet<string>? selectedContractIds,
+            IReadOnlyDictionary<string, string>? expectedArtifactContentDigests = null,
+            CancellationToken cancellationToken = default) => CreateResult();
+
+        private ResolutionResult CreateResult() => new(
+            [assembly], Array.Empty<string>(), Array.Empty<string>())
+        {
+            ResolvedAssemblyArtifactPaths = new Dictionary<Assembly, string> { [assembly] = artifactPath },
+        };
     }
 }

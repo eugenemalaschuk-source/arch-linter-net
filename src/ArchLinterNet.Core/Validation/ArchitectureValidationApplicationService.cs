@@ -382,12 +382,28 @@ public sealed class ArchitectureValidationApplicationService(
     // signal that it never ran — BuildStatePreflightRunner.Run encodes that same short-circuit.
     private BuildStatePreflightResult RunBuildStatePreflight(AnalysisSnapshotRequest request, IArchitectureContractRunner runner)
     {
+        if (request.IsMetricMeasurement
+            && request.PreparationMode == BuildPreparationMode.Ordinary
+            && ArchitectureMetricProjectOwnership.RequiresExactArtifactBinding(runner.Session.Document))
+        {
+            // Ordinary `measure` must be able to inspect a fresh, configured project output
+            // without requiring a build-state receipt or `--ensure-built`. Its isolated exact
+            // artifact selection is metric evidence; build receipt enforcement belongs to
+            // validation/preparation workflows and remains unchanged for those callers.
+            return new BuildStatePreflightResult(Array.Empty<BuildStatePreflightDiagnostic>());
+        }
+
         return BuildStatePreflightRunner.Run(
             runner.Session.Context.RepositoryRoot,
             runner.Session.Context.ProjectDiscovery,
             runner.Session.Context.TargetAssemblies,
             runner.Session.Context.MissingAssemblyNames,
-            includeResolvedAssemblyPathsFromDiscovery: false,
+            // Project metrics load the discovered output in an isolated scope so a host's
+            // already-loaded same-name assembly cannot become its owner. Stream-loaded
+            // assemblies have no Assembly.Location, therefore preflight must consume the same
+            // discovery evidence rather than misclassifying that selected artifact as missing.
+            includeResolvedAssemblyPathsFromDiscovery:
+                ArchitectureMetricProjectOwnership.RequiresExactArtifactBinding(runner.Session.Document),
             () => buildStatePreparationService,
             request.PreparationMode,
             request.NoRestore,
