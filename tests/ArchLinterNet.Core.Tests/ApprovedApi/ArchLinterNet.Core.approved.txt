@@ -692,6 +692,7 @@ sealed class ArchLinterNet.Core.Contracts.ArchitectureContractDocument
   property System.Collections.Generic.Dictionary<string,ArchLinterNet.Core.Contracts.ArchitectureLayer> Layers {get;set;}
   property System.Collections.Generic.Dictionary<string,ArchLinterNet.Core.Contracts.ArchitecturePackageGroup> Packages {get;set;}
   property System.Collections.Generic.Dictionary<string,ArchLinterNet.Core.Contracts.ArchitectureSourceSet> SourceSets {get;set;}
+  property System.Collections.Generic.List<ArchLinterNet.Core.Contracts.ArchitectureExternalEvidenceRequirement> ExternalEvidence {get;set;}
   property System.Collections.Generic.List<string> LegacyRuntimeLayers {get;set;}
   property int Version {get;set;}
   property string Name {get;set;}
@@ -699,6 +700,17 @@ sealed class ArchLinterNet.Core.Contracts.ArchitectureExternalDependencyGroup
   ctor()
   property System.Collections.Generic.List<string> NamespacePrefixes {get;set;}
   property System.Collections.Generic.List<string> TypePrefixes {get;set;}
+sealed class ArchLinterNet.Core.Contracts.ArchitectureExternalEvidenceRequirement
+  ctor()
+  property bool RequireRepository {get;set;}
+  property bool RequireRevision {get;set;}
+  property bool RequireScope {get;set;}
+  property bool Required {get;set;}
+  property string Format {get;set;}
+  property string Id {get;set;}
+  property string Run {get;set;}
+  property string Tool {get;set;}
+  property string? ToolVersion {get;set;}
 sealed class ArchLinterNet.Core.Contracts.ArchitectureFrameworkReferenceGroup
   ctor()
   property System.Collections.Generic.List<string> FrameworkNamePrefixes {get;set;}
@@ -1884,6 +1896,9 @@ sealed class ArchLinterNet.Core.Execution.Results.ArchitectureRunnerSetup : Syst
   property ArchLinterNet.Core.Execution.Abstractions.IArchitectureContractRunner Runner {get;init;}
   property int AssemblyLoads {get;init;}
   property string RepositoryRoot {get;init;}
+sealed class ArchLinterNet.Core.Execution.SarifEvidenceReader
+  ctor(ArchLinterNet.Core.IO.Abstractions.IArchitectureEvidenceFileSystem? fileSystem = null)
+  method ArchLinterNet.Core.Model.SarifEvidenceReadResult Read(ArchLinterNet.Core.Contracts.ArchitectureExternalEvidenceRequirement requirement, string repositoryRoot, ArchLinterNet.Core.Model.SarifEvidenceArtifactReference? artifact, ArchLinterNet.Core.Model.SarifEvidenceAssessmentContext? expectedContext = null, ArchLinterNet.Core.Model.SarifEvidenceLimits? limits = null, System.Threading.CancellationToken cancellationToken = null)
 interface ArchLinterNet.Core.Graph.Abstractions.IArchitectureExplainApplicationService
   method ArchLinterNet.Core.Graph.ArchitectureExplainOutcome Explain(ArchLinterNet.Core.Graph.ArchitectureExplainRequest request)
 interface ArchLinterNet.Core.Graph.Abstractions.IArchitectureGraphApplicationService
@@ -1997,11 +2012,14 @@ interface ArchLinterNet.Core.IO.Abstractions.IArchitectureEnvironment
   method string? GetEnvironmentVariable(string name)
   property string BaseDirectory {get;}
   property string RuntimeDirectory {get;}
+interface ArchLinterNet.Core.IO.Abstractions.IArchitectureEvidenceFileSystem
+  method System.IO.Stream OpenRepositoryLocalRegularFile(string repositoryRoot, string repositoryRelativePath)
 interface ArchLinterNet.Core.IO.Abstractions.IArchitectureFileSystem
   method System.Collections.Generic.IEnumerable<string> EnumerateDirectories(string path, string searchPattern, System.IO.SearchOption searchOption)
   method System.Collections.Generic.IEnumerable<string> EnumerateFiles(string path, string searchPattern, System.IO.SearchOption searchOption)
   method System.Collections.Generic.IEnumerable<string> ReadLines(string path)
   method System.DateTime GetLastWriteTimeUtc(string path)
+  method System.IO.Stream OpenRead(string path)
   method bool DirectoryExists(string path)
   method bool FileExists(string path)
   method string GetCurrentDirectory()
@@ -2021,13 +2039,15 @@ sealed class ArchLinterNet.Core.IO.ArchitectureEnvironment : ArchLinterNet.Core.
   method string? GetEnvironmentVariable(string name)
   property string BaseDirectory {get;}
   property string RuntimeDirectory {get;}
-sealed class ArchLinterNet.Core.IO.ArchitectureFileSystem : ArchLinterNet.Core.IO.Abstractions.IArchitectureFileSystem
+sealed class ArchLinterNet.Core.IO.ArchitectureFileSystem : ArchLinterNet.Core.IO.Abstractions.IArchitectureEvidenceFileSystem, ArchLinterNet.Core.IO.Abstractions.IArchitectureFileSystem
   ctor()
   field static readonly ArchLinterNet.Core.IO.ArchitectureFileSystem Real
   method System.Collections.Generic.IEnumerable<string> EnumerateDirectories(string path, string searchPattern, System.IO.SearchOption searchOption)
   method System.Collections.Generic.IEnumerable<string> EnumerateFiles(string path, string searchPattern, System.IO.SearchOption searchOption)
   method System.Collections.Generic.IEnumerable<string> ReadLines(string path)
   method System.DateTime GetLastWriteTimeUtc(string path)
+  method System.IO.Stream OpenRead(string path)
+  method System.IO.Stream OpenRepositoryLocalRegularFile(string repositoryRoot, string repositoryRelativePath)
   method bool DirectoryExists(string path)
   method bool FileExists(string path)
   method string GetCurrentDirectory()
@@ -2154,6 +2174,7 @@ static class ArchLinterNet.Core.Model.ArchitectureApplicabilityReasonCodes
   field const string UnexpectedEmptyInput = "unexpected_empty_input"
   field const string UnknownApplicabilityRecordIdentity = "unknown_applicability_record_identity"
   field const string UnmappedSubject = "unmapped_subject"
+  field const string WrongExternalEvidenceIdentity = "wrong_external_evidence_identity"
   field const string WrongExternalRepository = "wrong_external_repository"
   field const string WrongExternalRevision = "wrong_external_revision"
   field const string WrongExternalScope = "wrong_external_scope"
@@ -3760,6 +3781,158 @@ sealed class ArchLinterNet.Core.Model.PublicApiSurfacePayload : ArchLinterNet.Co
   property string? PreviousApiSignature {get;init;}
   property string? UndeclaredApiSignature {get;init;}
   property string? UnselectedFirstPartyDependency {get;init;}
+sealed class ArchLinterNet.Core.Model.SarifEvidenceArtifactReference : System.IEquatable<ArchLinterNet.Core.Model.SarifEvidenceArtifactReference>
+  ctor(string path, string logicalId, ArchLinterNet.Core.Model.SarifEvidenceProducerContext? producerContext = null)
+  method ArchLinterNet.Core.Model.SarifEvidenceArtifactReference <Clone>$()
+  method bool Equals(ArchLinterNet.Core.Model.SarifEvidenceArtifactReference? other)
+  method bool Equals(object? obj)
+  method int GetHashCode()
+  method string ToString()
+  operator !=(ArchLinterNet.Core.Model.SarifEvidenceArtifactReference? left, ArchLinterNet.Core.Model.SarifEvidenceArtifactReference? right)
+  operator ==(ArchLinterNet.Core.Model.SarifEvidenceArtifactReference? left, ArchLinterNet.Core.Model.SarifEvidenceArtifactReference? right)
+  property ArchLinterNet.Core.Model.SarifEvidenceProducerContext? ProducerContext {get;}
+  property string ArtifactPath {get;}
+  property string LogicalId {get;}
+  property string Path {get;}
+sealed class ArchLinterNet.Core.Model.SarifEvidenceAssessmentContext : System.IEquatable<ArchLinterNet.Core.Model.SarifEvidenceAssessmentContext>
+  ctor(string? repository = null, string? revision = null, string? scope = null)
+  method ArchLinterNet.Core.Model.SarifEvidenceAssessmentContext <Clone>$()
+  method bool Equals(ArchLinterNet.Core.Model.SarifEvidenceAssessmentContext? other)
+  method bool Equals(object? obj)
+  method int GetHashCode()
+  method string ToString()
+  operator !=(ArchLinterNet.Core.Model.SarifEvidenceAssessmentContext? left, ArchLinterNet.Core.Model.SarifEvidenceAssessmentContext? right)
+  operator ==(ArchLinterNet.Core.Model.SarifEvidenceAssessmentContext? left, ArchLinterNet.Core.Model.SarifEvidenceAssessmentContext? right)
+  property string? Repository {get;}
+  property string? RepositoryUri {get;}
+  property string? Revision {get;}
+  property string? RevisionId {get;}
+  property string? Scope {get;}
+sealed class ArchLinterNet.Core.Model.SarifEvidenceLimits : System.IEquatable<ArchLinterNet.Core.Model.SarifEvidenceLimits>
+  ctor(long maxArtifactBytes = 4194304, int maxRuns = 32, int maxResults = 100000)
+  method ArchLinterNet.Core.Model.SarifEvidenceLimits <Clone>$()
+  method bool Equals(ArchLinterNet.Core.Model.SarifEvidenceLimits? other)
+  method bool Equals(object? obj)
+  method int GetHashCode()
+  method string ToString()
+  operator !=(ArchLinterNet.Core.Model.SarifEvidenceLimits? left, ArchLinterNet.Core.Model.SarifEvidenceLimits? right)
+  operator ==(ArchLinterNet.Core.Model.SarifEvidenceLimits? left, ArchLinterNet.Core.Model.SarifEvidenceLimits? right)
+  property int MaxResults {get;}
+  property int MaxRuns {get;}
+  property int MaximumResults {get;}
+  property int MaximumRuns {get;}
+  property long MaxArtifactBytes {get;}
+  property long MaximumArtifactBytes {get;}
+sealed class ArchLinterNet.Core.Model.SarifEvidenceProducerContext : System.IEquatable<ArchLinterNet.Core.Model.SarifEvidenceProducerContext>
+  ctor()
+  ctor(string? logicalId, string? repository, string? revision, string? scope)
+  ctor(string? repository, string? revision, string? scope)
+  method ArchLinterNet.Core.Model.SarifEvidenceProducerContext <Clone>$()
+  method bool Equals(ArchLinterNet.Core.Model.SarifEvidenceProducerContext? other)
+  method bool Equals(object? obj)
+  method int GetHashCode()
+  method string ToString()
+  operator !=(ArchLinterNet.Core.Model.SarifEvidenceProducerContext? left, ArchLinterNet.Core.Model.SarifEvidenceProducerContext? right)
+  operator ==(ArchLinterNet.Core.Model.SarifEvidenceProducerContext? left, ArchLinterNet.Core.Model.SarifEvidenceProducerContext? right)
+  property string? LogicalId {get;init;}
+  property string? Repository {get;init;}
+  property string? RepositoryUri {get;}
+  property string? Revision {get;init;}
+  property string? RevisionId {get;}
+  property string? Scope {get;init;}
+sealed class ArchLinterNet.Core.Model.SarifEvidenceProvenance : System.IEquatable<ArchLinterNet.Core.Model.SarifEvidenceProvenance>
+  ctor(string LogicalId, string? ArtifactPath, string? ArtifactSha256, string? ToolName, string? ToolVersion, string? RunId, int? ResultCount, ArchLinterNet.Core.Model.SarifEvidenceResolvedContext? Context)
+  method ArchLinterNet.Core.Model.SarifEvidenceProvenance <Clone>$()
+  method bool Equals(ArchLinterNet.Core.Model.SarifEvidenceProvenance? other)
+  method bool Equals(object? obj)
+  method int GetHashCode()
+  method string ToString()
+  method void Deconstruct(out string LogicalId, out string? ArtifactPath, out string? ArtifactSha256, out string? ToolName, out string? ToolVersion, out string? RunId, out int? ResultCount, out ArchLinterNet.Core.Model.SarifEvidenceResolvedContext? Context)
+  operator !=(ArchLinterNet.Core.Model.SarifEvidenceProvenance? left, ArchLinterNet.Core.Model.SarifEvidenceProvenance? right)
+  operator ==(ArchLinterNet.Core.Model.SarifEvidenceProvenance? left, ArchLinterNet.Core.Model.SarifEvidenceProvenance? right)
+  property ArchLinterNet.Core.Model.SarifEvidenceResolvedContext? Context {get;init;}
+  property int? ResultCount {get;init;}
+  property string LogicalId {get;init;}
+  property string? ArtifactHash {get;}
+  property string? ArtifactPath {get;init;}
+  property string? ArtifactSha256 {get;init;}
+  property string? RunId {get;init;}
+  property string? SelectedRunId {get;}
+  property string? SelectedToolName {get;}
+  property string? SelectedToolVersion {get;}
+  property string? ToolName {get;init;}
+  property string? ToolVersion {get;init;}
+sealed class ArchLinterNet.Core.Model.SarifEvidenceReadResult : System.IEquatable<ArchLinterNet.Core.Model.SarifEvidenceReadResult>
+  method ArchLinterNet.Core.Model.SarifEvidenceReadResult <Clone>$()
+  method bool Equals(ArchLinterNet.Core.Model.SarifEvidenceReadResult? other)
+  method bool Equals(object? obj)
+  method int GetHashCode()
+  method string ToString()
+  operator !=(ArchLinterNet.Core.Model.SarifEvidenceReadResult? left, ArchLinterNet.Core.Model.SarifEvidenceReadResult? right)
+  operator ==(ArchLinterNet.Core.Model.SarifEvidenceReadResult? left, ArchLinterNet.Core.Model.SarifEvidenceReadResult? right)
+  property ArchLinterNet.Core.Model.SarifEvidenceProvenance Provenance {get;}
+  property ArchLinterNet.Core.Model.SarifEvidenceResolvedContext? Context {get;}
+  property ArchLinterNet.Core.Model.SarifEvidenceResolvedContext? ResolvedContext {get;}
+  property ArchLinterNet.Core.Model.SarifEvidenceTrustStatus Status {get;}
+  property ArchLinterNet.Core.Model.SarifEvidenceTrustStatus TrustStatus {get;}
+  property bool IsValid {get;}
+  property int? ResultCount {get;}
+  property int? SelectedResultCount {get;}
+  property string Detail {get;}
+  property string LogicalId {get;}
+  property string ReasonCode {get;}
+  property string? ArtifactPath {get;}
+  property string? ArtifactRelativePath {get;}
+  property string? ArtifactSha256 {get;}
+  property string? RunId {get;}
+  property string? SelectedRunId {get;}
+  property string? SelectedToolName {get;}
+  property string? SelectedToolVersion {get;}
+  property string? Sha256 {get;}
+  property string? ToolName {get;}
+  property string? ToolVersion {get;}
+sealed class ArchLinterNet.Core.Model.SarifEvidenceResolvedContext : System.IEquatable<ArchLinterNet.Core.Model.SarifEvidenceResolvedContext>
+  ctor(string? LogicalId, string? Repository, string? Revision, string? Scope)
+  method ArchLinterNet.Core.Model.SarifEvidenceResolvedContext <Clone>$()
+  method bool Equals(ArchLinterNet.Core.Model.SarifEvidenceResolvedContext? other)
+  method bool Equals(object? obj)
+  method int GetHashCode()
+  method string ToString()
+  method void Deconstruct(out string? LogicalId, out string? Repository, out string? Revision, out string? Scope)
+  operator !=(ArchLinterNet.Core.Model.SarifEvidenceResolvedContext? left, ArchLinterNet.Core.Model.SarifEvidenceResolvedContext? right)
+  operator ==(ArchLinterNet.Core.Model.SarifEvidenceResolvedContext? left, ArchLinterNet.Core.Model.SarifEvidenceResolvedContext? right)
+  property string? LogicalId {get;init;}
+  property string? Repository {get;init;}
+  property string? RepositoryUri {get;}
+  property string? Revision {get;init;}
+  property string? RevisionId {get;}
+  property string? Scope {get;init;}
+enum ArchLinterNet.Core.Model.SarifEvidenceTrustStatus : int
+  enum-member AmbiguousExpectedRun = 11
+  enum-member ArtifactTooLarge = 6
+  enum-member ConflictingContext = 22
+  enum-member FailedExecution = 12
+  enum-member IncompleteExecution = 13
+  enum-member MalformedInput = 7
+  enum-member MissingExpectedRun = 10
+  enum-member MissingLogicalId = 14
+  enum-member MissingOptionalInput = 3
+  enum-member MissingRepository = 16
+  enum-member MissingRequiredInput = 2
+  enum-member MissingRevision = 18
+  enum-member MissingScope = 20
+  enum-member OptionalNotConfigured = 1
+  enum-member TooManyResults = 24
+  enum-member TooManyRuns = 23
+  enum-member UnreadableInput = 4
+  enum-member UnsafePath = 5
+  enum-member UnsupportedShape = 9
+  enum-member UnsupportedVersion = 8
+  enum-member Valid = 0
+  enum-member WrongLogicalId = 15
+  enum-member WrongRepository = 17
+  enum-member WrongRevision = 19
+  enum-member WrongScope = 21
 sealed class ArchLinterNet.Core.Model.TypePlacementDiagnostic : ArchLinterNet.Core.Model.ArchitectureDiagnostic, System.IEquatable<ArchLinterNet.Core.Model.TypePlacementDiagnostic>
   ctor(string ContractName, string? ContractId, string SourceType, string ForbiddenNamespace, System.Collections.Generic.IReadOnlyCollection<string> ForbiddenReferences)
   method ArchLinterNet.Core.Model.TypePlacementDiagnostic <Clone>$()

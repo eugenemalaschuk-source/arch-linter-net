@@ -23,5 +23,6 @@ internal static class ArchitecturePolicyRawDocumentValidatorPipeline
         new RawTopologyNodeValidator(),
         new RawWhenFieldLocationValidator(),
         new RawHistoryAnalysisNodeValidator(),
+        new RawExternalEvidenceNodeValidator(),
     ];
 }

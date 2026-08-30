@@ -13,11 +13,11 @@ namespace ArchLinterNet.Core.Schema;
 public sealed class PackagedSchemaRegistry
 {
     // The manifest itself is release-qualified: its own $id/bytes are the immutable contract, so
-    // an entry advancing (e.g. policy-root/policy-fragment to 0.6.1) means loading a new manifest
+    // an entry advancing (e.g. policy-root/policy-fragment to 0.8.0) means loading a new manifest
     // generation rather than mutating the frozen 0.5.1 one in place. See
-    // schema/0.6.1/compatibility-manifest.json and openspec/specs/packaged-schema-registry.
+    // schema/0.8.0/compatibility-manifest.json and openspec/specs/packaged-schema-registry.
     private const string ManifestResourceName =
-        "ArchLinterNet.Core.Schema.0.6.1.compatibility-manifest.json";
+        "ArchLinterNet.Core.Schema.0.8.0.compatibility-manifest.json";
     private readonly Assembly _assembly;
     private readonly IReadOnlyDictionary<string, Entry> _entries;
 
