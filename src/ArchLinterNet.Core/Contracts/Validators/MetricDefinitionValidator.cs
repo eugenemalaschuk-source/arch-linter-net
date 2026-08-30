@@ -85,13 +85,21 @@ internal sealed class MetricDefinitionValidator : IArchitecturePolicyDocumentVal
 
             if (isPublic)
             {
-                bool knownSurface = document.Contracts.StrictPublicApiSurface
-                    .Concat(document.Contracts.AuditPublicApiSurface)
-                    .Any(contract => string.Equals(contract.Id, definition.PublicApiSurface, StringComparison.Ordinal));
-                if (!knownSurface)
+                bool strictMatch = document.Contracts.StrictPublicApiSurface
+                    .Any(contract => string.Equals(contract.Id, definition.PublicApiSurface, StringComparison.OrdinalIgnoreCase));
+                bool auditMatch = document.Contracts.AuditPublicApiSurface
+                    .Any(contract => string.Equals(contract.Id, definition.PublicApiSurface, StringComparison.OrdinalIgnoreCase));
+                if (!strictMatch && !auditMatch)
                 {
                     throw new InvalidOperationException(
                         $"Metric '{definition.Id}' references unknown public API surface '{definition.PublicApiSurface}'.");
+                }
+
+                if (strictMatch && auditMatch)
+                {
+                    throw new InvalidOperationException(
+                        $"Metric '{definition.Id}' references ambiguous public API surface '{definition.PublicApiSurface}' " +
+                        "declared in both strict and audit modes.");
                 }
             }
         }

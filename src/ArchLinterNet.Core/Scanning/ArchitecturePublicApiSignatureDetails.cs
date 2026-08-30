@@ -45,7 +45,11 @@ internal static class ArchitecturePublicApiSignatureDetails
         {
             if (type.IsEnum)
             {
-                string? underlying = ArchitectureTypeNames.SafeFullName(Enum.GetUnderlyingType(type));
+                if (!ArchitectureTypeNames.TryGetFullName(Enum.GetUnderlyingType(type), out string underlying))
+                {
+                    onIncomplete?.Invoke();
+                }
+
                 details.Add($"underlying:{underlying}");
                 return details;
             }
@@ -442,7 +446,16 @@ internal static class ArchitecturePublicApiSignatureDetails
             }
 
             foreach (string constraint in genericParameter.GetGenericParameterConstraints()
-                         .Select(ArchitectureTypeNames.SafeFullName)
+                         .Select(type =>
+                         {
+                             if (ArchitectureTypeNames.TryGetFullName(type, out string fullName))
+                             {
+                                 return fullName;
+                             }
+
+                             onIncomplete?.Invoke();
+                             return string.Empty;
+                         })
                          .OrderBy(name => name, StringComparer.Ordinal))
             {
                 constraints.Add(constraint);

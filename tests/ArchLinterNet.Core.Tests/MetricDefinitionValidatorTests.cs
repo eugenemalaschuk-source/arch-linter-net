@@ -45,6 +45,61 @@ public sealed class MetricDefinitionValidatorTests
         Assert.DoesNotThrow(() => new MetricDefinitionValidator().Validate(document));
     }
 
+    [Test]
+    public void Validate_AcceptsCaseInsensitivePublicMetricTarget()
+    {
+        ArchitectureContractDocument document = Document(
+            new ArchitectureMetricDefinition
+            {
+                Id = "public-surface",
+                Kind = ArchitectureMetricKinds.PublicContractSurfaceCount,
+                PublicApiSurface = "SURFACE",
+            });
+        document.Contracts = new ArchitectureContractGroups
+        {
+            StrictPublicApiSurface =
+            [
+                new ArchitecturePublicApiSurfaceContract
+                {
+                    Id = "surface",
+                    Name = "Surface",
+                    Assemblies = ["Fixture"],
+                },
+            ],
+        };
+
+        Assert.DoesNotThrow(() => new MetricDefinitionValidator().Validate(document));
+    }
+
+    [Test]
+    public void Validate_RejectsPublicMetricForCrossModeDuplicateSurface()
+    {
+        ArchitectureContractDocument document = Document(
+            new ArchitectureMetricDefinition
+            {
+                Id = "public-surface",
+                Kind = ArchitectureMetricKinds.PublicContractSurfaceCount,
+                PublicApiSurface = "surface",
+            });
+        document.Contracts = new ArchitectureContractGroups
+        {
+            StrictPublicApiSurface =
+            [
+                new ArchitecturePublicApiSurfaceContract { Id = "surface", Name = "Strict", Assemblies = ["Fixture"] },
+            ],
+            AuditPublicApiSurface =
+            [
+                new ArchitecturePublicApiSurfaceContract { Id = "Surface", Name = "Audit", Assemblies = ["Fixture"] },
+            ],
+        };
+
+        InvalidOperationException error = Assert.Throws<InvalidOperationException>(
+            () => new MetricDefinitionValidator().Validate(document))!;
+
+        Assert.That(error.Message, Is.EqualTo(
+            "Metric 'public-surface' references ambiguous public API surface 'surface' declared in both strict and audit modes."));
+    }
+
     private static IEnumerable<TestCaseData> InvalidMetrics()
     {
         yield return Case(

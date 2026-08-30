@@ -9,7 +9,11 @@ internal static partial class ArchitecturePublicApiSurfaceScanner
         string assemblyName,
         SurfaceScanCompleteness completeness)
     {
-        string declaringTypeName = ArchitectureTypeNames.SafeFullName(type);
+        string? declaringTypeName = TryRenderTypeName(type, completeness);
+        if (declaringTypeName == null)
+        {
+            yield break;
+        }
 
         foreach (ArchitectureExportedApiEntry entry in GetExportedConstructors(type, declaringTypeName, assemblyName, completeness))
         {
@@ -54,7 +58,7 @@ internal static partial class ArchitecturePublicApiSurfaceScanner
             if (signature != null)
             {
                 string visibility = MemberVisibility(ctor);
-                var referenced = ReferencedTypes(SafeGetParameters(ctor).Select(p => p.ParameterType));
+                var referenced = ReferencedTypes(SafeGetParameters(ctor).Select(p => p.ParameterType), completeness: completeness);
                 yield return new ArchitectureExportedApiEntry(
                     signature,
                     ArchitecturePublicApiSignatureDetails.Compose(
@@ -89,7 +93,7 @@ internal static partial class ArchitecturePublicApiSurfaceScanner
                 string visibility = MemberVisibility(method);
                 Type[]? genericParameters = method.IsGenericMethodDefinition ? method.GetGenericArguments() : null;
                 var referenced = ReferencedTypes(
-                    SafeGetParameters(method).Select(p => p.ParameterType).Append(method.ReturnType), genericParameters);
+                    SafeGetParameters(method).Select(p => p.ParameterType).Append(method.ReturnType), genericParameters, completeness);
                 yield return new ArchitectureExportedApiEntry(
                     signature,
                     ArchitecturePublicApiSignatureDetails.Compose(
@@ -122,7 +126,8 @@ internal static partial class ArchitecturePublicApiSurfaceScanner
             if (signature != null)
             {
                 var referenced = ReferencedTypes(
-                    new[] { property.PropertyType }.Concat(SafeGetIndexParameters(property).Select(p => p.ParameterType)));
+                    new[] { property.PropertyType }.Concat(SafeGetIndexParameters(property).Select(p => p.ParameterType)),
+                    completeness: completeness);
                 yield return new ArchitectureExportedApiEntry(
                     signature,
                     ArchitecturePublicApiSignatureDetails.Compose(
@@ -167,7 +172,7 @@ internal static partial class ArchitecturePublicApiSurfaceScanner
                         signature, ArchitecturePublicApiSignatureDetails.ForField(
                             field, fieldVisibility, completeness.MarkIncomplete)),
                 declaringTypeName, assemblyName, fieldVisibility, isConst, constQualifiedName,
-                ReferencedTypes(new[] { field.FieldType }));
+                ReferencedTypes(new[] { field.FieldType }, completeness: completeness));
         }
     }
 
@@ -200,7 +205,7 @@ internal static partial class ArchitecturePublicApiSurfaceScanner
                         eventSignature, ArchitecturePublicApiSignatureDetails.ForEvent(
                             evt, eventVisibility, completeness.MarkIncomplete)),
                 declaringTypeName, assemblyName, eventVisibility, false, null,
-                ReferencedTypes(new[] { handlerType! }));
+                ReferencedTypes(new[] { handlerType! }, completeness: completeness));
         }
     }
 
@@ -239,7 +244,11 @@ internal static partial class ArchitecturePublicApiSurfaceScanner
             parameterTypeNames[i] = renderedParameterType;
         }
 
-        string declaringTypeName = ArchitectureTypeNames.SafeFullName(declaringType);
+        string? declaringTypeName = TryRenderTypeName(declaringType, completeness);
+        if (declaringTypeName == null)
+        {
+            return null;
+        }
         string name = declaringTypeName;
         if (includeName)
         {
@@ -292,7 +301,11 @@ internal static partial class ArchitecturePublicApiSurfaceScanner
             return null;
         }
 
-        string declaringTypeName = ArchitectureTypeNames.SafeFullName(declaringType);
+        string? declaringTypeName = TryRenderTypeName(declaringType, completeness);
+        if (declaringTypeName == null)
+        {
+            return null;
+        }
 
         if (indexParameters.Length == 0)
         {
@@ -318,7 +331,13 @@ internal static partial class ArchitecturePublicApiSurfaceScanner
     {
         try
         {
-            return RenderTypeName(type);
+            string? name = RenderTypeName(type, completeness);
+            if (name == null)
+            {
+                completeness?.MarkIncomplete();
+            }
+
+            return name;
         }
         catch (TypeLoadException)
         {
@@ -337,7 +356,7 @@ internal static partial class ArchitecturePublicApiSurfaceScanner
     // parameter) so renaming a generic parameter alone never changes the normalized signature.
     // Everything else falls back to Type.FullName, which already carries the CLR arity marker
     // (Foo`1) for generic type definitions.
-    private static string RenderTypeName(Type type)
+    private static string? RenderTypeName(Type type, SurfaceScanCompleteness? completeness)
     {
         if (type.IsGenericParameter)
         {
@@ -348,29 +367,56 @@ internal static partial class ArchitecturePublicApiSurfaceScanner
 
         if (type.IsByRef)
         {
-            return RenderTypeName(type.GetElementType()!) + "&";
+            string? element = RenderTypeName(type.GetElementType()!, completeness);
+            return element == null ? null : element + "&";
         }
 
         if (type.IsPointer)
         {
-            return RenderTypeName(type.GetElementType()!) + "*";
+            string? element = RenderTypeName(type.GetElementType()!, completeness);
+            return element == null ? null : element + "*";
         }
 
         if (type.IsArray)
         {
             int rank = type.GetArrayRank();
             string commas = rank > 1 ? new string(',', rank - 1) : string.Empty;
-            return RenderTypeName(type.GetElementType()!) + "[" + commas + "]";
+            string? element = RenderTypeName(type.GetElementType()!, completeness);
+            return element == null ? null : element + "[" + commas + "]";
         }
 
         if (type.IsGenericType && !type.IsGenericTypeDefinition)
         {
-            string genericDefinitionName = ArchitectureTypeNames.SafeFullName(type.GetGenericTypeDefinition());
-            string args = string.Join(",", type.GetGenericArguments().Select(RenderTypeName));
+            if (!ArchitectureTypeNames.TryGetFullName(type.GetGenericTypeDefinition(), out string genericDefinitionName))
+            {
+                completeness?.MarkIncomplete();
+                return null;
+            }
+
+            Type[] genericArguments = type.GetGenericArguments();
+            string[] names = new string[genericArguments.Length];
+            for (int i = 0; i < genericArguments.Length; i++)
+            {
+                string? rendered = RenderTypeName(genericArguments[i], completeness);
+                if (rendered == null)
+                {
+                    return null;
+                }
+
+                names[i] = rendered;
+            }
+
+            string args = string.Join(",", names);
             return $"{genericDefinitionName}[{args}]";
         }
 
-        return ArchitectureTypeNames.SafeFullName(type);
+        if (!ArchitectureTypeNames.TryGetFullName(type, out string fullName))
+        {
+            completeness?.MarkIncomplete();
+            return null;
+        }
+
+        return fullName;
     }
 
     private static TMember[] SafeGetMembers<TMember>(

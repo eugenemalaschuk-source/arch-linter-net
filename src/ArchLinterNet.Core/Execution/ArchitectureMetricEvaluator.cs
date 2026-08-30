@@ -456,13 +456,16 @@ internal static class ArchitectureMetricEvaluator
         ArchitectureApplicabilityProvenance provenance)
     {
         string scope = definition.PublicApiSurface ?? string.Empty;
-        ArchitecturePublicApiSurfaceContract? contract = session.Document.Contracts.StrictPublicApiSurface
+        ArchitecturePublicApiSurfaceContract[] candidates = session.Document.Contracts.StrictPublicApiSurface
             .Concat(session.Document.Contracts.AuditPublicApiSurface)
-            .FirstOrDefault(candidate => string.Equals(candidate.Id, scope, StringComparison.Ordinal));
-        if (contract is null || contract.ApiSnapshotError is not null)
+            .Where(candidate => string.Equals(candidate.Id, scope, StringComparison.OrdinalIgnoreCase))
+            .ToArray();
+        if (candidates.Length != 1 || candidates[0].ApiSnapshotError is not null)
         {
             return Unassessable(definition, scope, provenance, ArchitectureApplicabilityReasonCodes.MissingRequiredInput);
         }
+
+        ArchitecturePublicApiSurfaceContract contract = candidates[0];
 
         if (!TryResolvePublicSurfaceAssemblyIdentities(session, contract, out IReadOnlyDictionary<string, string>? identities))
         {

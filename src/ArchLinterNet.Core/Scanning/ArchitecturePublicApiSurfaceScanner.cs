@@ -67,14 +67,19 @@ internal static partial class ArchitecturePublicApiSurfaceScanner
                 continue;
             }
 
+            if (!ArchitectureTypeNames.TryGetFullName(type, out string typeName))
+            {
+                completeness.MarkIncomplete();
+                continue;
+            }
+
             exportedTypes.Add(type);
-            string typeName = ArchitectureTypeNames.SafeFullName(type);
-            string typeSignature = NormalizeType(type);
+            string typeSignature = NormalizeType(type, typeName);
             string typeVisibility = TypeVisibility(type);
             // A generic type's own declaration can reference a first-party type purely through a
             // constraint (`class Foo<T> where T : HiddenExported`), with no member involved at all.
             (string, string)[] typeReferenced = type.IsGenericTypeDefinition
-                ? ReferencedTypes(Array.Empty<Type>(), type.GetGenericArguments())
+                ? ReferencedTypes(Array.Empty<Type>(), type.GetGenericArguments(), completeness)
                 : Array.Empty<(string, string)>();
             entries.Add(new ArchitectureExportedApiEntry(
                 typeSignature,
@@ -166,7 +171,9 @@ internal static partial class ArchitecturePublicApiSurfaceScanner
     // identity. Assembly-qualified because two distinct assemblies can legitimately export a type
     // under the identical full name.
     private static (string AssemblyName, string TypeFullName)[] ReferencedTypes(
-        IEnumerable<Type> types, IEnumerable<Type>? genericParameters = null)
+        IEnumerable<Type> types,
+        IEnumerable<Type>? genericParameters = null,
+        SurfaceScanCompleteness? completeness = null)
     {
         var collected = new HashSet<Type>();
         foreach (Type type in types)
@@ -178,7 +185,7 @@ internal static partial class ArchitecturePublicApiSurfaceScanner
         {
             foreach (Type parameter in genericParameters)
             {
-                foreach (Type constraint in SafeGetGenericParameterConstraints(parameter))
+                foreach (Type constraint in SafeGetGenericParameterConstraints(parameter, completeness))
                 {
                     CollectReferencedTypes(constraint, collected);
                 }
@@ -189,7 +196,7 @@ internal static partial class ArchitecturePublicApiSurfaceScanner
         // stable across runs, and downstream escape-violation reporting depends on encountering
         // multiple escaping types for the same member in a deterministic sequence.
         return collected
-            .Select(type => (AssemblyName: SafeAssemblyName(type), TypeFullName: ArchitectureTypeNames.SafeFullName(type)))
+            .Select(type => ReferencedTypeIdentity(type, completeness))
             .Distinct()
             .OrderBy(reference => reference.AssemblyName, StringComparer.Ordinal)
             .ThenBy(reference => reference.TypeFullName, StringComparer.Ordinal)
@@ -228,7 +235,20 @@ internal static partial class ArchitecturePublicApiSurfaceScanner
         collected.Add(type);
     }
 
-    private static string SafeAssemblyName(Type type)
+    private static (string AssemblyName, string TypeFullName) ReferencedTypeIdentity(
+        Type type,
+        SurfaceScanCompleteness? completeness)
+    {
+        string assemblyName = SafeAssemblyName(type, completeness);
+        if (!ArchitectureTypeNames.TryGetFullName(type, out string typeFullName))
+        {
+            completeness?.MarkIncomplete();
+        }
+
+        return (assemblyName, typeFullName);
+    }
+
+    private static string SafeAssemblyName(Type type, SurfaceScanCompleteness? completeness = null)
     {
         try
         {
@@ -236,15 +256,19 @@ internal static partial class ArchitecturePublicApiSurfaceScanner
         }
         catch (TypeLoadException)
         {
+            completeness?.MarkIncomplete();
             return string.Empty;
         }
         catch (FileNotFoundException)
         {
+            completeness?.MarkIncomplete();
             return string.Empty;
         }
     }
 
-    private static Type[] SafeGetGenericParameterConstraints(Type parameter)
+    private static Type[] SafeGetGenericParameterConstraints(
+        Type parameter,
+        SurfaceScanCompleteness? completeness = null)
     {
         try
         {
@@ -252,10 +276,12 @@ internal static partial class ArchitecturePublicApiSurfaceScanner
         }
         catch (TypeLoadException)
         {
+            completeness?.MarkIncomplete();
             return Array.Empty<Type>();
         }
         catch (FileNotFoundException)
         {
+            completeness?.MarkIncomplete();
             return Array.Empty<Type>();
         }
     }
@@ -408,9 +434,9 @@ internal static partial class ArchitecturePublicApiSurfaceScanner
         }
     }
 
-    private static string NormalizeType(Type type)
+    private static string NormalizeType(Type type, string typeName)
     {
-        return $"{TypeKind(type)} {ArchitectureTypeNames.SafeFullName(type)}";
+        return $"{TypeKind(type)} {typeName}";
     }
 
     private static string TypeKind(Type type)

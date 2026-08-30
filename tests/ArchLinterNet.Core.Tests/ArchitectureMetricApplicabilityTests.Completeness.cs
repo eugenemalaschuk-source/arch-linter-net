@@ -165,6 +165,93 @@ public sealed partial class ArchitectureMetricApplicabilityTests
     }
 
     [Test]
+    public void Evaluate_PublicSurfaceTargetIsCaseInsensitive()
+    {
+        Assembly coreAssembly = typeof(ArchitectureMetricMeasurement).Assembly;
+        string assemblyName = coreAssembly.GetName().Name!;
+        ArchitectureContractDocument document = new()
+        {
+            Name = "metric-case-insensitive-public-surface",
+            Contracts = new ArchitectureContractGroups
+            {
+                StrictPublicApiSurface =
+                [
+                    new ArchitecturePublicApiSurfaceContract
+                    {
+                        Id = "surface",
+                        Name = "Surface",
+                        Assemblies = [assemblyName],
+                    },
+                ],
+            },
+            Metrics =
+            [
+                new ArchitectureMetricDefinition
+                {
+                    Id = "surface-size",
+                    Kind = ArchitectureMetricKinds.PublicContractSurfaceCount,
+                    PublicApiSurface = "SURFACE",
+                },
+            ],
+        };
+        using ArchitectureAnalysisContext context = CreateContext(coreAssembly);
+        var session = new ArchitectureAnalysisSession(context, document, null, false, null);
+
+        ArchitectureMetricMeasurement measurement = ArchitectureMetricEvaluator.Evaluate(session, document.Metrics)
+            .Measurements.Single();
+
+        Assert.That(measurement.IsEvaluable, Is.True);
+    }
+
+    [Test]
+    public void Evaluate_PublicSurfaceWithCrossModeDuplicateId_IsUnassessable()
+    {
+        Assembly coreAssembly = typeof(ArchitectureMetricMeasurement).Assembly;
+        string assemblyName = coreAssembly.GetName().Name!;
+        ArchitectureContractDocument document = new()
+        {
+            Name = "metric-ambiguous-public-surface-id",
+            Contracts = new ArchitectureContractGroups
+            {
+                StrictPublicApiSurface =
+                [
+                    new ArchitecturePublicApiSurfaceContract
+                    {
+                        Id = "surface",
+                        Name = "Strict surface",
+                        Assemblies = [assemblyName],
+                    },
+                ],
+                AuditPublicApiSurface =
+                [
+                    new ArchitecturePublicApiSurfaceContract
+                    {
+                        Id = "Surface",
+                        Name = "Audit surface",
+                        Assemblies = [assemblyName],
+                    },
+                ],
+            },
+            Metrics =
+            [
+                new ArchitectureMetricDefinition
+                {
+                    Id = "surface-size",
+                    Kind = ArchitectureMetricKinds.PublicContractSurfaceCount,
+                    PublicApiSurface = "surface",
+                },
+            ],
+        };
+        using ArchitectureAnalysisContext context = CreateContext(coreAssembly);
+        var session = new ArchitectureAnalysisSession(context, document, null, false, null);
+
+        ArchitectureMetricMeasurement measurement = ArchitectureMetricEvaluator.Evaluate(session, document.Metrics)
+            .Measurements.Single();
+
+        AssertUnassessable(measurement);
+    }
+
+    [Test]
     public void Evaluate_PublicSurfaceWithPartialExportedTypeUniverse_IsUnassessable()
     {
         using UnloadableFieldFixture fixture = UnloadableFieldFixture.Create(includeUnloadableType: true);
