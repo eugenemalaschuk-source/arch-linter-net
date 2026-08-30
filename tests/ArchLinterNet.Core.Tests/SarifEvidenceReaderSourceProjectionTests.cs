@@ -263,6 +263,10 @@ public sealed class SarifEvidenceReaderSourceProjectionTests
         Run = "assessment-42",
         RequireRepository = true,
         RequireRevision = true,
+        DiagnosticFilter = new ArchitectureExternalEvidenceDiagnosticFilter
+        {
+            Severity = new Dictionary<string, string> { ["error"] = "strict" },
+        },
     };
 
     private static string Sarif(string driverMembers, string result, string runMembers = "") =>

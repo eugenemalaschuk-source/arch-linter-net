@@ -92,6 +92,12 @@ project, driver-rule tags, and SARIF fingerprint pairs together with the trust
 provenance described below. A wrong-revision or otherwise untrusted artifact
 never supplies ordinary selected diagnostics.
 
+When `diagnostic_filter` is omitted, the reader retains its trust-only
+behavior: it does not parse or validate result members that are relevant only
+to diagnostic selection, and it exposes neither source diagnostics nor an
+authorization snapshot. This keeps existing #520 evidence valid unless it
+violates the SARIF trust contract itself.
+
 Rule tags are bound to one resolved driver-rule descriptor, not merely a rule
 ID. When a SARIF driver repeats a descriptor ID, a result must provide a
 consistent `ruleIndex` or `rule.index`; an ambiguous ID-only reference is

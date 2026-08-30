@@ -439,9 +439,12 @@ public sealed partial class SarifEvidenceReader(IArchitectureEvidenceFileSystem?
             return CreateResult(requirement.Id, bindingStatus.Value, bindingDetail!, contextProvenance);
         }
 
-        if (!TryReadSourceDiagnostics(
+        IReadOnlyList<SarifEvidenceSourceDiagnostic> sourceDiagnostics = Array.Empty<SarifEvidenceSourceDiagnostic>();
+        SarifEvidenceAuthorizationSnapshot? authorization = null;
+        if (requirement.DiagnosticFilter is not null
+            && !TryReadSourceDiagnostics(
                 selected.Run,
-                out IReadOnlyList<SarifEvidenceSourceDiagnostic> sourceDiagnostics,
+                out sourceDiagnostics,
                 out string? sourceShapeDetail,
                 cancellationToken))
         {
@@ -452,10 +455,13 @@ public sealed partial class SarifEvidenceReader(IArchitectureEvidenceFileSystem?
                 contextProvenance);
         }
 
-        SarifEvidenceAuthorizationSnapshot authorization = CaptureAuthorization(
-            requirement,
-            expectedContext,
-            context.Context);
+        if (requirement.DiagnosticFilter is not null)
+        {
+            authorization = CaptureAuthorization(
+                requirement,
+                expectedContext,
+                context.Context);
+        }
 
         return CreateResult(
             requirement.Id,

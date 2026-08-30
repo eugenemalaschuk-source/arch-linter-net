@@ -54,13 +54,14 @@ NOT be silently treated as a valid zero-result selection.
   selection does not reinterpret it as an unmatched rule filter
 
 ### Requirement: Trusted source diagnostics retain typed source facts and evidence provenance
-The system SHALL expose an immutable typed source-diagnostic collection only after the bounded
-SARIF reader has accepted the selected run as valid. Each source record SHALL retain, where
-present, the original message, rule ID, original source severity, primary source location and
-region, project identity, driver-rule tags, and source-provided fingerprint pairs. Each selected
-diagnostic SHALL retain the complete validated evidence provenance: logical evidence key, producer
-tool/version, SARIF run identity, repository/revision/scope context, repository-relative artifact
-path, and deterministic artifact content hash.
+When an external-evidence requirement declares a diagnostic filter, the system SHALL expose an
+immutable typed source-diagnostic collection only after the bounded SARIF reader has accepted the
+selected run as valid. Each source record SHALL retain, where present, the original message, rule
+ID, original source severity, primary source location and region, project identity, driver-rule
+tags, and source-provided fingerprint pairs. Each selected diagnostic SHALL retain the complete
+validated evidence provenance: logical evidence key, producer tool/version, SARIF run identity,
+repository/revision/scope context, repository-relative artifact path, and deterministic artifact
+content hash.
 
 The reader SHALL parse these facts from the same bounded bytes that it trusts and SHALL expose no
 selectable source diagnostics from a missing, malformed, unsuccessful, ambiguous, stale, or
@@ -74,6 +75,10 @@ unambiguous; an ID-only reference to repeated descriptors SHALL fail closed inst
 their tags. The reader SHALL likewise resolve an artifact location index through `run.artifacts`.
 An absent result message or an unsupported unresolved message reference SHALL fail closed rather
 than become an empty source fact.
+
+For a requirement without a diagnostic filter, the reader SHALL retain the preceding trust-only
+SARIF behavior: it SHALL not project or validate result members needed only for source diagnostic
+selection, and it SHALL expose no source diagnostics or selection authorization.
 
 #### Scenario: A trusted result retains source and trust provenance
 - **WHEN** a validated current-context SARIF result has a rule, message, location, tool version,
@@ -90,6 +95,11 @@ than become an empty source fact.
 - **WHEN** two tool-driver rule descriptors share an ID but have distinct tags and results identify
   the descriptors by their respective rule indexes
 - **THEN** each source diagnostic retains only the tags of its indexed descriptor
+
+#### Scenario: Trust-only evidence retains #520 result-shape compatibility
+- **WHEN** an otherwise valid SARIF requirement has no diagnostic filter and its result contains a
+  member that is irrelevant to trust validation but unsupported by source projection
+- **THEN** the reader remains valid and exposes no source diagnostics
 
 ### Requirement: Selection has deterministic severity, identity, ordering, and deduplication
 The system SHALL map each eligible source severity to the filter's configured `strict` or `audit`

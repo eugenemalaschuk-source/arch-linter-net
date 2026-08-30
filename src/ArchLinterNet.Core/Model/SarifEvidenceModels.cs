@@ -272,14 +272,15 @@ public sealed record SarifEvidenceReadResult
 
     /// <summary>
     /// Immutable typed source diagnostics from the selected run. This collection is non-empty only
-    /// for a valid trusted read; trust failures never expose selectable source facts.
+    /// for a valid trusted read whose requirement declares a diagnostic filter; trust failures
+    /// never expose selectable source facts.
     /// </summary>
     public IReadOnlyList<SarifEvidenceSourceDiagnostic> SourceDiagnostics { get; }
 
     /// <summary>
-    /// Immutable policy and assessment authorization captured when this result was trusted. It is
-    /// present only for valid reads and prevents a caller from selecting the evidence under a
-    /// different mutable policy requirement.
+    /// Immutable policy and assessment authorization captured for a valid read with a diagnostic
+    /// filter. It prevents a caller from selecting the evidence under a different mutable policy
+    /// requirement.
     /// </summary>
     public SarifEvidenceAuthorizationSnapshot? Authorization { get; }
 

@@ -94,11 +94,13 @@ ordering, or workflow/job name.
 ### Requirement: Trust provenance is deterministic and reusable
 Every completed artifact read SHALL expose the configured logical evidence identity, selected
 producer/run identity, normalized repository-relative artifact path, deterministic lowercase
-SHA-256 content hash, result count, and validated context bindings. A valid trusted read SHALL
-also expose an immutable typed collection of the selected run's source diagnostics for the
-external-diagnostic filtering boundary. Equivalent bytes and context SHALL produce equivalent
-provenance regardless of host path separators or read order. The reader SHALL preserve these facts
-for later filtering and normalized-finding work without invoking a producer-specific service API.
+SHA-256 content hash, result count, and validated context bindings. A valid trusted read whose
+requirement declares a diagnostic filter SHALL also expose an immutable typed collection of the
+selected run's source diagnostics for the external-diagnostic filtering boundary. A trust-only
+requirement without that filter SHALL retain source-projection independence from result members.
+Equivalent bytes and context SHALL produce equivalent provenance regardless of host path
+separators or read order. The reader SHALL preserve these facts for later filtering and
+normalized-finding work without invoking a producer-specific service API.
 
 Source diagnostics SHALL be exposed only after the selected artifact succeeds every required trust
 and context check. A trust failure SHALL retain the applicable evidence provenance but SHALL expose
