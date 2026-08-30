@@ -332,28 +332,25 @@ internal static class ArchitectureTopologyEvaluator
             return AssemblyEndpointBinding.Missing;
         }
 
-        IEnumerable<ObservedSubject> matching = candidates;
-        if (!string.IsNullOrEmpty(canonicalAssemblyIdentity))
+        if (candidates.Length != 1)
         {
-            matching = matching.Where(candidate => string.Equals(
-                candidate.CanonicalAssemblyIdentity, canonicalAssemblyIdentity, StringComparison.Ordinal));
-        }
-        else if (!string.IsNullOrEmpty(referenceIdentity))
-        {
-            matching = matching.Where(candidate => string.Equals(
-                candidate.AssemblyReferenceIdentity, referenceIdentity, StringComparison.Ordinal));
+            identity = UnboundAssemblyEndpointIdentity(assemblyName, referenceIdentity ?? canonicalAssemblyIdentity);
+            return AssemblyEndpointBinding.Ambiguous;
         }
 
-        ObservedSubject[] resolved = matching.OrderBy(candidate => candidate.Identity, StringComparer.Ordinal).ToArray();
-        if (resolved.Length == 1)
+        ObservedSubject candidate = candidates[0];
+        bool canonicalMatches = string.IsNullOrEmpty(canonicalAssemblyIdentity)
+            || string.Equals(candidate.CanonicalAssemblyIdentity, canonicalAssemblyIdentity, StringComparison.Ordinal);
+        bool referenceMatches = string.IsNullOrEmpty(referenceIdentity)
+            || string.Equals(candidate.AssemblyReferenceIdentity, referenceIdentity, StringComparison.Ordinal);
+        if (canonicalMatches && referenceMatches)
         {
-            identity = resolved[0].Identity;
+            identity = candidate.Identity;
             return AssemblyEndpointBinding.Bound;
         }
 
         identity = UnboundAssemblyEndpointIdentity(assemblyName, referenceIdentity ?? canonicalAssemblyIdentity);
-        // At least one retained candidate has this simple name. Zero exact matches and multiple
-        // exact matches are both non-unique canonical bindings; neither can select an owner.
+        // The single retained simple-name candidate does not represent this canonical endpoint.
         return AssemblyEndpointBinding.Ambiguous;
     }
 

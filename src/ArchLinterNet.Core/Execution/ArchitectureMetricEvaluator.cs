@@ -143,7 +143,7 @@ internal static class ArchitectureMetricEvaluator
 
         if (topology.Classifications.Count == 0)
         {
-            return Unassessable(definition, scope, provenance, ArchitectureApplicabilityReasonCodes.UnexpectedEmptyInput);
+            return EmptyScopeResult(definition, scope, topologyEvidence, topology.Topology.Scope.AllowEmpty, provenance);
         }
 
         ArchitectureTopologyEvaluator.SubjectClassification[] classifications = topology.Classifications.ToArray();
@@ -152,13 +152,7 @@ internal static class ArchitectureMetricEvaluator
             .ToArray();
         if (scoped.Length == 0)
         {
-            return Unassessable(
-                definition,
-                scope,
-                provenance,
-                topologyEvidence.StaleNodes.Contains(scope, StringComparer.Ordinal)
-                    ? ArchitectureApplicabilityReasonCodes.StaleDeclaration
-                    : ArchitectureApplicabilityReasonCodes.UnexpectedEmptyInput);
+            return EmptyScopeResult(definition, scope, topologyEvidence, topology.Topology.Scope.AllowEmpty, provenance);
         }
 
         List<string> reasons = new();
@@ -190,7 +184,7 @@ internal static class ArchitectureMetricEvaluator
 
                 string? owner = definition.Unit == "project"
                     ? ResolveCanonicalProjectOwner(session, classification.Subject)
-                    : classification.Subject.Assembly;
+                    : classification.Subject.CanonicalAssemblyIdentity;
                 if (string.IsNullOrWhiteSpace(owner))
                 {
                     reasons.Add(ArchitectureApplicabilityReasonCodes.MissingRequiredInput);
@@ -208,13 +202,13 @@ internal static class ArchitectureMetricEvaluator
         {
             HashSet<string> contributors = scoped
                 .Where(classification => classification.Disposition == ArchitectureTopologyEvaluator.Disposition.Mapped)
-                .Select(classification => classification.Subject.Subject)
+                .Select(classification => classification.Subject.Identity)
                 .ToHashSet(StringComparer.Ordinal);
             return Finish(definition, scope, null, reasons, contributors, provenance);
         }
 
         HashSet<string> relationContributors = definition.Kind == ArchitectureMetricKinds.ExternalDependencyGroupCount
-            ? ExternalGroups(session, topology, scoped, scope, reasons, session.ExternalDependencyFacts.Facts)
+            ? ExternalGroups(session, topology, scope, reasons, session.ExternalDependencyFacts.Facts)
             : ComponentRelations(session, topology, scoped, scope, definition.Kind, reasons);
         return Finish(definition, scope, null, reasons, relationContributors, provenance);
     }
@@ -312,7 +306,6 @@ internal static class ArchitectureMetricEvaluator
     internal static HashSet<string> ExternalGroups(
         ArchitectureAnalysisSession session,
         ArchitectureTopologyEvaluator.Projection topology,
-        IReadOnlyList<ArchitectureTopologyEvaluator.SubjectClassification> scoped,
         string node,
         ICollection<string> reasons,
         IReadOnlyList<ArchitectureExternalDependencyFact> facts)
@@ -320,21 +313,21 @@ internal static class ArchitectureMetricEvaluator
         HashSet<string> contributors = new(StringComparer.Ordinal);
         foreach (ArchitectureExternalDependencyFact fact in facts)
         {
-            if (topology.Topology.SubjectKind == "project"
-                && !session.Facts.TryGetProjectByAssemblyName(
-                    ArchitectureTypeNames.SafeAssemblyName(fact.SourceType) ?? string.Empty, out _))
-            {
-                reasons.Add(ArchitectureApplicabilityReasonCodes.MissingRequiredInput);
-                continue;
-            }
-
             foreach (ArchitectureTopologyEvaluator.SubjectClassification source in FindClassifications(
                          topology, fact.SourceType, session))
             {
                 if (source.Disposition == ArchitectureTopologyEvaluator.Disposition.Mapped
                     && source.NodeIds.Contains(node, StringComparer.Ordinal))
                 {
-                    contributors.Add(fact.GroupName);
+                    if (topology.Topology.SubjectKind == "project"
+                        && !HasCanonicalProjectOwner(session, source.Subject))
+                    {
+                        reasons.Add(ArchitectureApplicabilityReasonCodes.MissingRequiredInput);
+                    }
+                    else
+                    {
+                        contributors.Add(fact.GroupName);
+                    }
                 }
             }
         }
@@ -425,6 +418,32 @@ internal static class ArchitectureMetricEvaluator
         string reasonCode)
     {
         return Finish(definition, scope, definition.Unit, [reasonCode], new HashSet<string>(StringComparer.Ordinal), provenance);
+    }
+
+    private static MetricResult EmptyScopeResult(
+        ArchitectureMetricDefinition definition,
+        string scope,
+        ArchitectureTopologyMappingEvidence topologyEvidence,
+        bool allowEmpty,
+        ArchitectureApplicabilityProvenance provenance)
+    {
+        if (topologyEvidence.StaleNodes.Contains(scope, StringComparer.Ordinal))
+        {
+            return Unassessable(definition, scope, provenance, ArchitectureApplicabilityReasonCodes.StaleDeclaration);
+        }
+
+        if (!allowEmpty)
+        {
+            return Unassessable(definition, scope, provenance, ArchitectureApplicabilityReasonCodes.UnexpectedEmptyInput);
+        }
+
+        return Finish(
+            definition,
+            scope,
+            definition.Kind == ArchitectureMetricKinds.ComponentFootprintCount ? definition.Unit : null,
+            Array.Empty<string>(),
+            Array.Empty<string>(),
+            provenance);
     }
 
     private static MetricResult Finish(

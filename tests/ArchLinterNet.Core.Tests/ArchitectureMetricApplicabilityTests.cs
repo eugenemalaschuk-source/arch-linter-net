@@ -258,9 +258,9 @@ public sealed class ArchitectureMetricApplicabilityTests
         ArchitectureExternalDependencyFact[] facts = [new(ownerA, "Vendor.Client", "vendor-sdk")];
 
         HashSet<string> first = ArchitectureMetricEvaluator.ExternalGroups(
-            session, projection, projection.Classifications, "owner-a", new List<string>(), facts);
+            session, projection, "owner-a", new List<string>(), facts);
         HashSet<string> second = ArchitectureMetricEvaluator.ExternalGroups(
-            session, projection, projection.Classifications, "owner-b", new List<string>(), facts);
+            session, projection, "owner-b", new List<string>(), facts);
 
         Assert.Multiple(() =>
         {
@@ -287,7 +287,7 @@ public sealed class ArchitectureMetricApplicabilityTests
         ArchitectureTopologyEvaluator.ObservedSubject targetFirst = AssemblySubject(
             "shared-first", "Shared", "shared-first-canonical", "Shared, Version=1.0.0.0");
         ArchitectureTopologyEvaluator.ObservedSubject targetSecond = AssemblySubject(
-            "shared-second", "Shared", "shared-second-canonical", "Shared, Version=1.0.0.0");
+            "shared-second", "Shared", "shared-second-canonical", "Shared, Version=2.0.0.0");
         ArchitectureTopologyEvaluator.ObservedDependency dependency = ArchitectureTopologyEvaluator.BindAssemblyDependencies(
             [source, targetFirst, targetSecond],
             [
@@ -335,6 +335,151 @@ public sealed class ArchitectureMetricApplicabilityTests
             AssertUnassessable(measurement);
             Assert.That(record.Reasons.Select(reason => reason.Code),
                 Is.EqualTo(new[] { ArchitectureApplicabilityReasonCodes.AmbiguousSubject }));
+        });
+    }
+
+    [Test]
+    public void Evaluate_CanonicalTypeAndAssemblyContributorsDoNotCollapseSameNames()
+    {
+        const string CanonicalFirst = "Shared, Version=1.0.0.0|mvid=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+        const string CanonicalSecond = "Shared, Version=1.0.0.0|mvid=bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
+        ArchitectureTopology topologyDefinition = new()
+        {
+            Mode = "partial",
+            SubjectKind = "type",
+            Scope = new ArchitectureTopologyScope
+            {
+                Selectors = [new ArchitectureTopologySubjectSelector { Assembly = "Shared" }],
+            },
+            Nodes = [AssemblyNode("component", "Shared")],
+        };
+        ArchitectureTopologyEvaluator.ObservedSubject first = TypeSubject(CanonicalFirst);
+        ArchitectureTopologyEvaluator.ObservedSubject second = TypeSubject(CanonicalSecond);
+        ArchitectureTopologyEvaluator.Result topology = ArchitectureTopologyEvaluator.Evaluate(
+            session: null,
+            topology: topologyDefinition,
+            observedSubjects: [first, second],
+            observedDependencies: Array.Empty<ArchitectureTopologyEvaluator.ObservedDependency>());
+        ArchitectureContractDocument document = new()
+        {
+            Name = "metric-canonical-contributors",
+            Topology = topologyDefinition,
+            Metrics =
+            [
+                new ArchitectureMetricDefinition
+                {
+                    Id = "assembly-footprint",
+                    Kind = ArchitectureMetricKinds.ComponentFootprintCount,
+                    TopologyNode = "component",
+                    Unit = "assembly",
+                },
+                TopologyMetric("type-count", ArchitectureMetricKinds.TopologyTypeCount, "component"),
+            ],
+        };
+        using ArchitectureAnalysisContext context = CreateContext(typeof(ArchitectureMetricMeasurement).Assembly);
+        var session = new ArchitectureAnalysisSession(context, document, null, false, null);
+
+        ArchitectureMetricMeasurementOutcome outcome = ArchitectureMetricEvaluator.Evaluate(
+            session, document.Metrics, topology);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(outcome.Measurements.Single(item => item.Id == "assembly-footprint").Contributors,
+                Is.EqualTo(new[] { CanonicalFirst, CanonicalSecond }));
+            Assert.That(outcome.Measurements.Single(item => item.Id == "type-count").Contributors,
+                Is.EqualTo(new[] { first.Identity, second.Identity }.OrderBy(item => item, StringComparer.Ordinal)));
+            Assert.That(outcome.Measurements.All(item => item.Value == 2), Is.True);
+        });
+    }
+
+    [Test]
+    public void Evaluate_EmptyTopologyScopeHonorsAllowEmpty()
+    {
+        ArchitectureTopology allowedTopology = EmptyTypeTopology(allowEmpty: true);
+        ArchitectureContractDocument allowedDocument = new()
+        {
+            Name = "metric-allowed-empty-topology",
+            Topology = allowedTopology,
+            Metrics = [TopologyMetric("empty", ArchitectureMetricKinds.TopologyTypeCount, "empty")],
+        };
+        ArchitectureTopology requiredTopology = EmptyTypeTopology(allowEmpty: false);
+        ArchitectureContractDocument requiredDocument = new()
+        {
+            Name = "metric-required-empty-topology",
+            Topology = requiredTopology,
+            Metrics = [TopologyMetric("empty", ArchitectureMetricKinds.TopologyTypeCount, "empty")],
+        };
+        ArchitectureTopology selectedEmptyTopology = EmptySelectedNodeTopology();
+        ArchitectureContractDocument selectedEmptyDocument = new()
+        {
+            Name = "metric-allowed-empty-selected-node",
+            Topology = selectedEmptyTopology,
+            Metrics = [TopologyMetric("empty", ArchitectureMetricKinds.TopologyTypeCount, "empty")],
+        };
+        using ArchitectureAnalysisContext allowedContext = CreateContext(typeof(ArchitectureMetricMeasurement).Assembly);
+        using ArchitectureAnalysisContext requiredContext = CreateContext(typeof(ArchitectureMetricMeasurement).Assembly);
+        using ArchitectureAnalysisContext selectedEmptyContext = CreateContext(typeof(ArchitectureMetricMeasurement).Assembly);
+        var allowedSession = new ArchitectureAnalysisSession(allowedContext, allowedDocument, null, false, null);
+        var requiredSession = new ArchitectureAnalysisSession(requiredContext, requiredDocument, null, false, null);
+        var selectedEmptySession = new ArchitectureAnalysisSession(
+            selectedEmptyContext, selectedEmptyDocument, null, false, null);
+
+        ArchitectureMetricMeasurement allowed = ArchitectureMetricEvaluator.Evaluate(allowedSession, allowedDocument.Metrics)
+            .Measurements.Single();
+        ArchitectureMetricMeasurement required = ArchitectureMetricEvaluator.Evaluate(requiredSession, requiredDocument.Metrics)
+            .Measurements.Single();
+        ArchitectureMetricMeasurement selectedEmpty = ArchitectureMetricEvaluator.Evaluate(
+                selectedEmptySession, selectedEmptyDocument.Metrics)
+            .Measurements.Single();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(allowed.IsEvaluable, Is.True);
+            Assert.That(allowed.Value, Is.Zero);
+            Assert.That(allowed.Contributors, Is.Empty);
+            Assert.That(selectedEmpty.IsEvaluable, Is.True);
+            Assert.That(selectedEmpty.Value, Is.Zero);
+            AssertUnassessable(required);
+        });
+    }
+
+    [Test]
+    public void ExternalGroups_UnrelatedProjectFactDoesNotRequireAnOwner()
+    {
+        Type selected = CreateDynamicType("MetricSelectedProject", "Metric.Selected.Type");
+        Type unrelated = CreateDynamicType("MetricUnrelatedProject", "Metric.Unrelated.Type");
+        string selectedProject = selected.Assembly.GetName().Name!;
+        ArchitectureTopology topologyDefinition = new()
+        {
+            Mode = "partial",
+            SubjectKind = "project",
+            Scope = new ArchitectureTopologyScope
+            {
+                Selectors = [new ArchitectureTopologySubjectSelector { Project = selectedProject }],
+            },
+            Nodes = [ProjectNode("selected", selectedProject)],
+        };
+        ArchitectureContractDocument document = new()
+        {
+            Name = "metric-unrelated-project-fact",
+            Topology = topologyDefinition,
+        };
+        using ArchitectureAnalysisContext context = CreateContext(selected.Assembly, unrelated.Assembly);
+        var session = new ArchitectureAnalysisSession(context, document, null, false, null);
+        ArchitectureTopologyEvaluator.Projection projection = ArchitectureTopologyEvaluator.Project(session, topologyDefinition);
+        var reasons = new List<string>();
+
+        HashSet<string> contributors = ArchitectureMetricEvaluator.ExternalGroups(
+            session,
+            projection,
+            "selected",
+            reasons,
+            [new ArchitectureExternalDependencyFact(unrelated, "Vendor.Client", "vendor-sdk")]);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(contributors, Is.Empty);
+            Assert.That(reasons, Is.Empty);
         });
     }
 
@@ -424,4 +569,37 @@ public sealed class ArchitectureMetricApplicabilityTests
         },
         Nodes = [Node("model", "ArchLinterNet.Core.Model")],
     };
+
+    private static ArchitectureTopology EmptyTypeTopology(bool allowEmpty) => new()
+    {
+        Mode = "partial",
+        SubjectKind = "type",
+        Scope = new ArchitectureTopologyScope
+        {
+            AllowEmpty = allowEmpty,
+            Selectors = [new ArchitectureTopologySubjectSelector { Namespace = "Metric.No.Types" }],
+        },
+        Nodes = [Node("empty", "Metric.No.Types")],
+    };
+
+    private static ArchitectureTopology EmptySelectedNodeTopology() => new()
+    {
+        Mode = "partial",
+        SubjectKind = "type",
+        Scope = new ArchitectureTopologyScope
+        {
+            AllowEmpty = true,
+            Selectors = [new ArchitectureTopologySubjectSelector { Namespace = "ArchLinterNet.Core.Model" }],
+        },
+        Nodes = [Node("empty", "Metric.No.Types")],
+    };
+
+    private static ArchitectureTopologyEvaluator.ObservedSubject TypeSubject(string canonicalAssembly) => new(
+        ArchitectureTopologyEvaluator.BuildMetricSubjectIdentity(
+            "type", "Shared", "Shared", canonicalAssembly, "Metric.Shared.Type"),
+        "Shared",
+        "Shared",
+        "Metric.Shared.Type",
+        CanonicalAssemblyIdentity: canonicalAssembly,
+        AssemblyReferenceIdentity: "Shared, Version=1.0.0.0");
 }
