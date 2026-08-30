@@ -21,7 +21,7 @@ The system SHALL make reusable exposure evidence available for a caller-selected
 - **THEN** the index SHALL materialize and cache distinct evidence sets without reselecting the root
 
 ### Requirement: Traverse visible signature shapes recursively
-The system SHALL record deterministic exposure paths from visible types and visible members through constructor parameters, method parameters and returns, properties, fields, events, delegate invoke signatures, base types, implemented interfaces, generic arguments, generic constraints, arrays, nullable wrappers, tuples, nested generic containers, and participating nested types. A property or event SHALL participate when at least one of its accessors matches the requested visible-surface shape. It SHALL retain path segments that distinguish the declaring member or relationship from structural nesting.
+The system SHALL record deterministic exposure paths from visible types and visible members through constructor parameters, method parameters and returns, properties, fields, events, delegate invoke signatures, base types, implemented interfaces, generic arguments, generic constraints, arrays, nullable wrappers, tuples, nested generic containers, and participating nested types. A property SHALL participate when at least one of its accessors matches the requested visible-surface shape; an event SHALL use its add accessor, matching the reviewed public-API surface convention. It SHALL retain path segments that distinguish the declaring member or relationship from structural nesting.
 
 #### Scenario: Nested generic return type exposes its nested target
 - **WHEN** a visible member returns a nested generic shape such as `Task<Envelope<Customer>>`

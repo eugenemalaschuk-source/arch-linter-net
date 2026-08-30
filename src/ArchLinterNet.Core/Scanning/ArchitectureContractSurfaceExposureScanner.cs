@@ -185,7 +185,8 @@ internal static class ArchitectureContractSurfaceExposureScanner
                 "methods-unavailable");
             foreach (MethodInfo method in methods.OrderBy(MemberSortKey, StringComparer.Ordinal))
             {
-                if (!_surfaceShape.Includes(method) || IsCompilerGenerated(method, typePath) || IsAccessor(method.Name))
+                if (!_surfaceShape.Includes(method) || IsCompilerGenerated(method, typePath) ||
+                    (method.IsSpecialName && IsAccessor(method.Name)))
                 {
                     continue;
                 }
@@ -271,8 +272,7 @@ internal static class ArchitectureContractSurfaceExposureScanner
             foreach (EventInfo @event in events.OrderBy(MemberSortKey, StringComparer.Ordinal))
             {
                 MethodInfo? add = TryRead(() => @event.AddMethod, typePath, "event-accessor-unavailable");
-                MethodInfo? remove = TryRead(() => @event.RemoveMethod, typePath, "event-accessor-unavailable");
-                if ((!_surfaceShape.Includes(add) && !_surfaceShape.Includes(remove)) || IsCompilerGenerated(@event, typePath))
+                if (!_surfaceShape.Includes(add) || IsCompilerGenerated(@event, typePath))
                 {
                     continue;
                 }
@@ -344,7 +344,6 @@ internal static class ArchitectureContractSurfaceExposureScanner
 
                 ArchitectureContractExposurePath nestedPath = typePath.Append("nested_type", TypeSortKey(nested));
                 AddExposure(nestedPath, nested);
-                ScanDeclaredType(nested, nestedPath);
             }
         }
 

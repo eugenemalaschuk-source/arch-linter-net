@@ -199,16 +199,50 @@ public sealed class ContractSurfaceExposureIndexTests
     }
 
     [Test]
-    public void Scan_EventWithVisibleRemoveAccessorRecordsEventType()
+    public void Scan_NonSpecialAccessorNamedMethodRecordsItsSignatureExposure()
     {
-        (Type root, Type target) = BuildRemoveOnlyEventSurface();
-
         ArchitectureContractSurfaceExposureResult result =
-            ArchitectureContractSurfaceExposureScanner.Scan(root);
+            ArchitectureContractSurfaceExposureScanner.Scan(typeof(AccessorNamedMethodRoot));
 
         Assert.That(result.Exposures.Any(exposure =>
-            Target(target).Equals(exposure.ReferencedType)
-            && exposure.Path.Segments.Any(segment => segment.Kind == "event_type")), Is.True);
+            Target(typeof(Customer)).Equals(exposure.ReferencedType)
+            && exposure.Path.Segments.Any(segment =>
+                segment.Kind == "member" && segment.Value.Contains("get_Current", StringComparison.Ordinal))), Is.True);
+    }
+
+    [Test]
+    public void Scan_SelectedOuterDoesNotTraverseUnselectedNestedMembers()
+    {
+        ArchitectureContractSurfaceExposureResult result =
+            ArchitectureContractSurfaceExposureScanner.Scan(typeof(SelectedOuterRoot));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(Targets(result), Does.Contain(Target(typeof(SelectedOuterRoot.UnselectedNested))));
+            Assert.That(Targets(result), Does.Not.Contain(Target(typeof(NestedOnlyPayload))));
+        });
+    }
+
+    [Test]
+    public void Scan_EventVisibilityMatchesPublicApiAddAccessorSemantics()
+    {
+        (Type excludedRoot, Type excludedTarget) = BuildEventSurface(MethodAttributes.Private, MethodAttributes.Public);
+        (Type includedRoot, Type includedTarget) = BuildEventSurface(MethodAttributes.Public, MethodAttributes.Private);
+
+        ArchitectureContractSurfaceExposureResult excluded =
+            ArchitectureContractSurfaceExposureScanner.Scan(excludedRoot);
+        ArchitectureContractSurfaceExposureResult included =
+            ArchitectureContractSurfaceExposureScanner.Scan(includedRoot);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(Targets(excluded), Does.Not.Contain(Target(excludedTarget)));
+            Assert.That(Targets(included), Does.Contain(Target(includedTarget)));
+            Assert.That(ArchitecturePublicApiSurfaceScanner.GetExportedSurface(excludedRoot.Assembly)
+                .Any(entry => entry.Signature.StartsWith("event ", StringComparison.Ordinal)), Is.False);
+            Assert.That(ArchitecturePublicApiSurfaceScanner.GetExportedSurface(includedRoot.Assembly)
+                .Any(entry => entry.Signature.StartsWith("event ", StringComparison.Ordinal)), Is.True);
+        });
     }
 
     private static bool HasPath(
@@ -243,7 +277,9 @@ public sealed class ContractSurfaceExposureIndexTests
         return (root.CreateType()!, targetType);
     }
 
-    private static (Type Root, Type Target) BuildRemoveOnlyEventSurface()
+    private static (Type Root, Type Target) BuildEventSurface(
+        MethodAttributes addVisibility,
+        MethodAttributes removeVisibility)
     {
         AssemblyBuilder assembly = AssemblyBuilder.DefineDynamicAssembly(
             new AssemblyName($"ContractExposureEvent-{Guid.NewGuid():N}"), AssemblyBuilderAccess.Run);
@@ -254,11 +290,11 @@ public sealed class ContractSurfaceExposureIndexTests
         TypeBuilder root = module.DefineType("Events.RemoveOnlyEventRoot", TypeAttributes.Public | TypeAttributes.Class);
         EventBuilder @event = root.DefineEvent("Changed", EventAttributes.None, eventHandlerType);
         MethodBuilder add = root.DefineMethod(
-            "add_Changed", MethodAttributes.Private | MethodAttributes.SpecialName | MethodAttributes.HideBySig,
+            "add_Changed", addVisibility | MethodAttributes.SpecialName | MethodAttributes.HideBySig,
             typeof(void), new[] { eventHandlerType });
         add.GetILGenerator().Emit(OpCodes.Ret);
         MethodBuilder remove = root.DefineMethod(
-            "remove_Changed", MethodAttributes.Public | MethodAttributes.SpecialName | MethodAttributes.HideBySig,
+            "remove_Changed", removeVisibility | MethodAttributes.SpecialName | MethodAttributes.HideBySig,
             typeof(void), new[] { eventHandlerType });
         remove.GetILGenerator().Emit(OpCodes.Ret);
         @event.SetAddOnMethod(add);
@@ -283,6 +319,23 @@ public sealed class ContractSurfaceExposureIndexTests
         public Customer PublicValue => new();
 
         internal InternalSurfacePayload InternalValue => new();
+    }
+
+    public sealed class AccessorNamedMethodRoot
+    {
+        public Customer get_Current() => new();
+    }
+
+    public sealed class SelectedOuterRoot
+    {
+        public sealed class UnselectedNested
+        {
+            public NestedOnlyPayload Value => new();
+        }
+    }
+
+    public sealed class NestedOnlyPayload
+    {
     }
 
     public class BaseContract
