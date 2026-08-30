@@ -104,6 +104,60 @@ public sealed class SarifEvidenceReaderSourceProjectionTests
         });
     }
 
+    [TestCase("\"rules\":{}", "rules member")]
+    [TestCase("\"rules\":[false]", "rule must be an object")]
+    [TestCase("\"rules\":[{}]", "declare a string id")]
+    [TestCase("\"rules\":[{\"id\":\" \"}]", "non-blank id")]
+    [TestCase("\"rules\":[{\"id\":\"SEC100\",\"properties\":false}]", "properties member")]
+    [TestCase("\"rules\":[{\"id\":\"SEC100\",\"properties\":{\"tags\":false}}]", "tags member")]
+    [TestCase("\"rules\":[{\"id\":\"SEC100\",\"properties\":{\"tags\":[false]}}]", "tag must be a string")]
+    public void Read_MalformedDriverRuleDescriptorsAreRejectedFailClosed(string driverMembers, string expectedDetail)
+    {
+        _repository.AddUtf8File(
+            "scan.sarif",
+            Sarif(driverMembers, "{\"message\":{\"text\":\"unread result\"}}"));
+
+        SarifEvidenceReadResult result = new SarifEvidenceReader().Read(
+            Requirement(),
+            _repository.Root,
+            new SarifEvidenceArtifactReference("scan.sarif", "external.scan"),
+            new SarifEvidenceAssessmentContext("repo", "revision"));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(result.Status, Is.EqualTo(SarifEvidenceTrustStatus.UnsupportedShape));
+            Assert.That(result.Detail, Does.Contain(expectedDetail));
+            Assert.That(result.SourceDiagnostics, Is.Empty);
+        });
+    }
+
+    [TestCase("{\"message\":false}", "message member")]
+    [TestCase("{\"message\":{\"text\":false}}", "string text")]
+    [TestCase("{\"message\":{\"text\":\"x\"},\"level\":\"trace\"}", "level must be one")]
+    [TestCase("{\"message\":{\"text\":\"x\"},\"ruleId\":false}", "ruleId member")]
+    [TestCase("{\"message\":{\"text\":\"x\"},\"rule\":false}", "rule member")]
+    [TestCase("{\"message\":{\"text\":\"x\"},\"rule\":{\"id\":false}}", "rule.id member")]
+    [TestCase("{\"message\":{\"text\":\"x\"},\"ruleIndex\":-1}", "ruleIndex member")]
+    [TestCase("{\"message\":{\"text\":\"x\"},\"properties\":false}", "properties member")]
+    [TestCase("{\"message\":{\"text\":\"x\"},\"properties\":{\"project\":false}}", "properties.project member")]
+    public void Read_MalformedProjectedResultMembersAreRejectedFailClosed(string sourceResult, string expectedDetail)
+    {
+        _repository.AddUtf8File("scan.sarif", Sarif(string.Empty, sourceResult));
+
+        SarifEvidenceReadResult result = new SarifEvidenceReader().Read(
+            Requirement(),
+            _repository.Root,
+            new SarifEvidenceArtifactReference("scan.sarif", "external.scan"),
+            new SarifEvidenceAssessmentContext("repo", "revision"));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(result.Status, Is.EqualTo(SarifEvidenceTrustStatus.UnsupportedShape));
+            Assert.That(result.Detail, Does.Contain(expectedDetail));
+            Assert.That(result.SourceDiagnostics, Is.Empty);
+        });
+    }
+
     [Test]
     public void Read_ResolvesRuleReferencesByIdAndIndex()
     {
