@@ -323,7 +323,10 @@ public sealed class ContractSurfaceExposureIndexTests
 
     public sealed class AccessorNamedMethodRoot
     {
+        // The name intentionally resembles a CLR property accessor without carrying SpecialName.
+#pragma warning disable IDE1006 // Naming Styles
         public Customer get_Current() => new();
+#pragma warning restore IDE1006 // Naming Styles
     }
 
     public sealed class SelectedOuterRoot
