@@ -111,27 +111,10 @@ jobs:
             --name github \
             "https://nuget.pkg.github.com/$GITHUB_REPOSITORY_OWNER/index.json"
 
-      - name: Resolve package owner API scope
-        shell: bash
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          owner_type="$(gh api "repos/$GITHUB_REPOSITORY" --jq '.owner.type')"
-          case "$owner_type" in
-            User) package_scope="users/$GITHUB_REPOSITORY_OWNER" ;;
-            Organization) package_scope="orgs/$GITHUB_REPOSITORY_OWNER" ;;
-            *)
-              echo "Unsupported repository owner type: $owner_type" >&2
-              exit 2
-              ;;
-          esac
-          echo "PACKAGE_API_SCOPE=$package_scope" >> "$GITHUB_ENV"
-
-      - name: Publish verified private package set to GitHub Packages
+      - name: Publish main package set to GitHub Packages
         shell: bash
         env:
           GITHUB_TOKEN: ${{ github.token }}
-          GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           package_ids=(
@@ -148,46 +131,11 @@ jobs:
           )
           test "${#packages[@]}" -eq "${#package_ids[@]}"
 
-          for index in "${!package_ids[@]}"; do
-            package_id="${package_ids[$index]}"
-            endpoint="$PACKAGE_API_SCOPE/packages/nuget/$package_id"
-
-            if package_json="$(gh api -H "Accept: application/vnd.github+json" "$endpoint" 2>&1)"; then
-              existing_visibility="$(jq -r '.visibility' <<< "$package_json")"
-              if [ "$existing_visibility" != private ]; then
-                echo "Refusing to publish $package_id: existing GitHub Package visibility is '$existing_visibility', expected 'private'." >&2
-                exit 1
-              fi
-            elif grep -q "HTTP 404" <<< "$package_json"; then
-              echo "$package_id does not exist yet; NuGet's first-publication default must create it private."
-            else
-              echo "$package_json" >&2
-              exit 1
-            fi
-
-            dotnet nuget push "$PACKAGE_OUTPUT/${packages[$index]}" \
+          for package in "${packages[@]}"; do
+            dotnet nuget push "$PACKAGE_OUTPUT/$package" \
               --source github \
               --api-key "$GITHUB_TOKEN" \
               --no-symbols
-
-            visibility=""
-            package_json=""
-            for attempt in 1 2 3 4 5 6; do
-              if package_json="$(gh api -H "Accept: application/vnd.github+json" "$endpoint" 2>&1)"; then
-                visibility="$(jq -r '.visibility' <<< "$package_json")"
-                break
-              fi
-              if ! grep -q "HTTP 404" <<< "$package_json"; then
-                echo "$package_json" >&2
-                exit 1
-              fi
-              echo "Waiting for GitHub Packages metadata for $package_id ($attempt/6)." >&2
-              sleep 5
-            done
-            if [ "$visibility" != private ]; then
-              echo "Refusing to continue: $package_id visibility is '${visibility:-unavailable}', expected 'private'." >&2
-              exit 1
-            fi
           done
 
       - name: Publish main build summary
@@ -200,7 +148,7 @@ jobs:
             echo "- Source SHA: \`$GITHUB_SHA\`"
             echo "- Feed: \`https://nuget.pkg.github.com/$GITHUB_REPOSITORY_OWNER/index.json\`"
             echo "- Packages: ArchLinterNet.CEL, ArchLinterNet.Core, ArchLinterNet.Cli, ArchLinterNet.Testing"
-            echo "- Visibility: private (verified through GitHub Packages metadata after publication)"
+            echo "- Package visibility: unchanged; main builds accept the existing GitHub Package identity visibility."
             echo "- Symbols were manifest-verified locally; GitHub Packages receives the four primary .nupkg packages only."
           } >> "$GITHUB_STEP_SUMMARY"
 

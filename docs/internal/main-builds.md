@@ -1,6 +1,6 @@
 # Installable `main.N` builds
 
-ArchLinterNet publishes an internal installable NuGet build for every successful `main` package workflow run. These builds exist for dogfooding in real consumer repositories before a public release; they are not release candidates and are never published to NuGet.org.
+ArchLinterNet publishes an installable NuGet development build for every successful `main` package workflow run. These builds exist for dogfooding in real consumer repositories before a public release; they are not release candidates and are never published to NuGet.org.
 
 ## Version authority
 
@@ -44,13 +44,15 @@ The full lint/architecture/cross-platform/E2E/packed-artifact/package-validation
 
 Package publication does not depend on SonarCloud/Codecov success, and quality telemetry does not depend on package-registry success. Within quality telemetry, SonarCloud and Codecov are attempted independently after the coverage evidence is available so an outage in one external service does not suppress the other refresh attempt; the overall main-quality run remains red when either required refresh fails.
 
-## Producer authentication
+## Producer authentication and package visibility
 
 No new repository secret is required for `arch-linter-net`.
 
 The workflow uses the built-in `GITHUB_TOKEN` with job-local `packages: write` permission to publish and to manage package retention. The token is added only to the ephemeral runner's NuGet source; no credential is committed to the repository.
 
-The first GitHub Packages publication is private by default. `RepositoryUrl` already links every ArchLinterNet package to this repository, which gives the publishing repository package administration needed by the retention workflow.
+Package visibility is not an authorization boundary for `main.N` publication. The workflow accepts the existing GitHub Package identity visibility and does not attempt to require or change it. This allows the development versions to share the same package IDs as the existing public ArchLinterNet packages while remaining clearly identified by their `-main.N` prerelease version.
+
+`RepositoryUrl` already links every ArchLinterNet package to this repository, which gives the publishing repository package administration needed by the retention workflow.
 
 ## Retention semantics
 
@@ -69,7 +71,7 @@ The generated `.snupkg` files remain part of the local package manifest/integrit
 
 ## Use from another GitHub Actions repository
 
-For a private main-build package, grant the consumer repository **Read** access under each package's **Package settings → Manage Actions access** once. Then that consumer repository can authenticate its GitHub Packages NuGet source with its own `GITHUB_TOKEN`; do not create a shared `GITHUB_PACKAGES_PAT` repository secret for this workflow.
+Consumer repositories should authenticate their GitHub Packages NuGet source with their own `GITHUB_TOKEN`; do not create a shared `GITHUB_PACKAGES_PAT` repository secret for this workflow. If a package identity or repository access policy requires explicit Actions access, grant the consumer repository **Read** under **Package settings → Manage Actions access** once. Main-build publication itself does not depend on package visibility being private.
 
 Use source mapping when GitHub Packages and NuGet.org are both configured so only `ArchLinterNet.*` is resolved from the GitHub feed.
 

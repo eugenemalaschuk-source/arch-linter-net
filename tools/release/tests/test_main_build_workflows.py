@@ -103,16 +103,19 @@ def test_main_packages_uses_github_token_and_never_runs_validation_matrix() -> N
     assert "Codecov" not in workflow
 
 
-def test_main_packages_require_private_visibility_before_continuing() -> None:
+def test_main_packages_accept_existing_package_visibility() -> None:
     workflow = _read("main-packages.yml")
+    publish_start = workflow.index("\n  publish:\n")
+    retention_start = workflow.index("\n  retention:\n")
+    publish = workflow[publish_start:retention_start]
 
-    assert "Publish verified private package set to GitHub Packages" in workflow
-    assert "existing GitHub Package visibility" in workflow
-    assert "expected 'private'" in workflow
-    assert 'package_json="$(gh api' in workflow
-    assert "existing_visibility=\"$(jq -r '.visibility'" in workflow
-    assert 'grep -q "HTTP 404"' in workflow
-    assert "Visibility: private (verified through GitHub Packages metadata after publication)" in workflow
+    assert "Publish main package set to GitHub Packages" in publish
+    assert "dotnet nuget push" in publish
+    assert "gh api" not in publish
+    assert "PACKAGE_API_SCOPE" not in publish
+    assert "existing GitHub Package visibility" not in workflow
+    assert "expected 'private'" not in workflow
+    assert "Package visibility: unchanged" in workflow
 
 
 def test_main_package_retention_is_complete_set_and_current_build_safe() -> None:
