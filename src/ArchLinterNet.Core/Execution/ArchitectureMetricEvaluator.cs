@@ -23,7 +23,7 @@ internal static class ArchitectureMetricEvaluator
         ArgumentNullException.ThrowIfNull(session);
         ArgumentNullException.ThrowIfNull(definitions);
 
-        return Evaluate(session, definitions, ArchitectureTopologyEvaluator.Evaluate(session), selectedIds);
+        return Evaluate(session, definitions, ArchitectureTopologyEvaluator.EvaluateForMetrics(session), selectedIds);
     }
 
     // This narrow overload keeps the evaluator testable against the same topology projection that
@@ -193,6 +193,15 @@ internal static class ArchitectureMetricEvaluator
         if (topology.Topology.SubjectKind == "project" && scoped.Any(classification =>
                 !HasCanonicalProjectOwner(session, classification.Subject)))
         {
+            reasons.Add(ArchitectureApplicabilityReasonCodes.MissingRequiredInput);
+        }
+
+        if (topology.Topology.SubjectKind == "project"
+            && HasAmbiguousProjectSelectorIdentity(topology.Topology, scope, scoped))
+        {
+            // Topology policy keeps its backward-compatible project selector spelling (the output
+            // assembly simple name), but a metric must not merge two artifact-derived owners that
+            // that spelling cannot distinguish.
             reasons.Add(ArchitectureApplicabilityReasonCodes.MissingRequiredInput);
         }
 
@@ -450,6 +459,24 @@ internal static class ArchitectureMetricEvaluator
         && session.Facts.TryGetProjectByResolvedAssembly(subject.ResolvedAssembly!, out var project)
             ? ProjectPathNormalizer.Normalize(project.Path)
             : null;
+
+    private static bool HasAmbiguousProjectSelectorIdentity(
+        ArchitectureTopology topology,
+        string nodeId,
+        IEnumerable<ArchitectureTopologyEvaluator.SubjectClassification> classifications) =>
+        topology.Nodes
+            .Where(node => string.Equals(node.Id, nodeId, StringComparison.Ordinal))
+            .SelectMany(node => node.Mappings)
+            .Where(selector => !string.IsNullOrEmpty(selector.Project))
+            .Any(selector => classifications
+                .Where(classification => string.Equals(
+                    classification.Subject.ProjectSelectorIdentity ?? classification.Subject.Project,
+                    selector.Project,
+                    StringComparison.Ordinal))
+                .Select(classification => classification.Subject.Project)
+                .Distinct(StringComparer.Ordinal)
+                .Skip(1)
+                .Any());
 
     private static MetricResult EvaluatePublicSurface(
         ArchitectureAnalysisSession session,

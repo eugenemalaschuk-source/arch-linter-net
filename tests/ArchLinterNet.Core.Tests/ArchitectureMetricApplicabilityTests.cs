@@ -703,7 +703,8 @@ public sealed partial class ArchitectureMetricApplicabilityTests
             @namespace,
             type,
             canonicalAssembly,
-            type.Assembly.FullName);
+            type.Assembly.FullName,
+            ProjectSelectorIdentity: assembly);
     }
 
     private static ArchitectureTopologyEvaluator.ObservedSubject AssemblySubject(

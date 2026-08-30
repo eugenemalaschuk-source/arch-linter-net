@@ -28,7 +28,7 @@ internal static partial class ArchitectureTopologyEvaluator
 
         (IReadOnlyList<ObservedSubject> subjects, IReadOnlyList<ObservedDependency> dependencies,
             IReadOnlySet<string> incompleteDependencySourceIdentities) =
-            Observe(session, topology.SubjectKind);
+            Observe(session, topology.SubjectKind, useMetricProjectOwnership: false);
         return Evaluate(session, topology, subjects, dependencies, incompleteDependencySourceIdentities);
     }
 
@@ -140,7 +140,7 @@ internal static partial class ArchitectureTopologyEvaluator
         ArgumentNullException.ThrowIfNull(topology);
         (IReadOnlyList<ObservedSubject> subjects, IReadOnlyList<ObservedDependency> dependencies,
             IReadOnlySet<string> incompleteDependencySourceIdentities) =
-            Observe(session, topology.SubjectKind);
+            Observe(session, topology.SubjectKind, useMetricProjectOwnership: false);
         return Project(session, topology, subjects, dependencies, incompleteDependencySourceIdentities);
     }
 
@@ -173,14 +173,15 @@ internal static partial class ArchitectureTopologyEvaluator
         IReadOnlyList<ObservedDependency> Dependencies,
         IReadOnlySet<string> IncompleteDependencySourceIdentities) Observe(
         ArchitectureAnalysisSession session,
-        string subjectKind)
+        string subjectKind,
+        bool useMetricProjectOwnership)
     {
         // Assembly topology is an assembly-metadata projection. In particular, a resolved target
         // assembly can legitimately expose no loadable types, and must still remain a canonical
         // topology subject for its assembly-level dependency facts.
         if (subjectKind == "assembly")
         {
-            var (assemblySubjects, assemblyDependencies) = ObserveAssemblies(session);
+            var (assemblySubjects, assemblyDependencies) = ObserveAssemblies(session, useMetricProjectOwnership);
             return (assemblySubjects, assemblyDependencies, new HashSet<string>(StringComparer.Ordinal));
         }
 
@@ -195,7 +196,12 @@ internal static partial class ArchitectureTopologyEvaluator
             string assembly = ArchitectureTypeNames.SafeAssemblyName(type) ?? string.Empty;
             string canonicalAssemblyIdentity = CanonicalAssemblyIdentity(type.Assembly);
             string assemblyReferenceIdentity = AssemblyReferenceIdentity(type.Assembly);
-            string project = ResolveProject(session, assembly);
+            string project = useMetricProjectOwnership
+                ? ResolveProjectForMetric(session, type)
+                : ResolveProject(session, assembly);
+            string projectSelectorIdentity = useMetricProjectOwnership
+                ? ResolveProjectSelectorForMetric(session, type)
+                : project;
             string subject = subjectKind switch
             {
                 "type" => ArchitectureTypeNames.SafeFullName(type),
@@ -219,7 +225,8 @@ internal static partial class ArchitectureTopologyEvaluator
                     type,
                     canonicalAssemblyIdentity,
                     assemblyReferenceIdentity,
-                    type.Assembly);
+                    type.Assembly,
+                    projectSelectorIdentity);
                 subjectsByIdentity.Add(identity, observed);
             }
 
@@ -264,7 +271,8 @@ internal static partial class ArchitectureTopologyEvaluator
     }
 
     private static (IReadOnlyList<ObservedSubject> Subjects, IReadOnlyList<ObservedDependency> Dependencies) ObserveAssemblies(
-        ArchitectureAnalysisSession session)
+        ArchitectureAnalysisSession session,
+        bool useMetricProjectOwnership)
     {
         Assembly[] assemblies = session.Context.TargetAssemblies
             .OrderBy(candidate => candidate.GetName().Name ?? string.Empty, StringComparer.Ordinal)
@@ -280,7 +288,12 @@ internal static partial class ArchitectureTopologyEvaluator
             }
 
             string canonicalAssemblyIdentity = CanonicalAssemblyIdentity(assembly);
-            string project = ResolveProject(session, assemblyName);
+            string project = useMetricProjectOwnership
+                ? ResolveProjectForMetric(session, assembly)
+                : ResolveProject(session, assemblyName);
+            string projectSelectorIdentity = useMetricProjectOwnership
+                ? ResolveProjectSelectorForMetric(session, assembly)
+                : project;
             string identity = BuildIdentity(
                 "assembly",
                 project,
@@ -296,7 +309,8 @@ internal static partial class ArchitectureTopologyEvaluator
                     assemblyName,
                     CanonicalAssemblyIdentity: canonicalAssemblyIdentity,
                     AssemblyReferenceIdentity: AssemblyReferenceIdentity(assembly),
-                    ResolvedAssembly: assembly));
+                    ResolvedAssembly: assembly,
+                    ProjectSelectorIdentity: projectSelectorIdentity));
         }
 
         // Do not derive assembly edges by aggregating type references: assembly metadata is the
@@ -478,11 +492,6 @@ internal static partial class ArchitectureTopologyEvaluator
         return assembly;
     }
 
-    // Shared with the metric projection so source-type external edges use the exact owner binding
-    // used when this evaluator observes project topology subjects.
-    internal static string ResolveProjectForMetric(ArchitectureAnalysisSession session, Type type) =>
-        ResolveProject(session, ArchitectureTypeNames.SafeAssemblyName(type) ?? string.Empty);
-
     private static SubjectClassification Classify(
         ArchitectureAnalysisSession? session,
         ArchitectureTopology topology,
@@ -533,7 +542,10 @@ internal static partial class ArchitectureTopologyEvaluator
 
         if (!string.IsNullOrEmpty(selector.Project))
         {
-            return string.Equals(selector.Project, subject.Project, StringComparison.Ordinal);
+            return string.Equals(
+                selector.Project,
+                subject.ProjectSelectorIdentity ?? subject.Project,
+                StringComparison.Ordinal);
         }
 
         if (!string.IsNullOrEmpty(selector.Assembly))
@@ -717,7 +729,8 @@ internal static partial class ArchitectureTopologyEvaluator
         Type? Type = null,
         string? CanonicalAssemblyIdentity = null,
         string? AssemblyReferenceIdentity = null,
-        Assembly? ResolvedAssembly = null);
+        Assembly? ResolvedAssembly = null,
+        string? ProjectSelectorIdentity = null);
 
     internal sealed record ObservedDependency(
         string SourceIdentity,

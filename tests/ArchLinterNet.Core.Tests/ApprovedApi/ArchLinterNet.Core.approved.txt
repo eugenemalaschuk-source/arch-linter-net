@@ -2683,18 +2683,18 @@ enum ArchLinterNet.Core.Model.ArchitectureGraphNodeKind : int
   enum-member Namespace = 1
   enum-member Type = 0
 sealed class ArchLinterNet.Core.Model.ArchitectureMetricEvidence : System.IEquatable<ArchLinterNet.Core.Model.ArchitectureMetricEvidence>
-  ctor(string MetricId, string Kind, string? NativeSubject, string? Unit, string EffectiveScope, int? Value, System.Collections.Generic.IReadOnlyList<string> Contributors)
+  ctor(string MetricId, string Kind, string? NativeSubject, string? Unit, string EffectiveScope, int? Value, System.Collections.Generic.IReadOnlyList<string>? Contributors)
   method ArchLinterNet.Core.Model.ArchitectureMetricEvidence <Clone>$()
   method bool Equals(ArchLinterNet.Core.Model.ArchitectureMetricEvidence? other)
   method bool Equals(object? obj)
   method int GetHashCode()
   method string ToString()
-  method void Deconstruct(out string MetricId, out string Kind, out string? NativeSubject, out string? Unit, out string EffectiveScope, out int? Value, out System.Collections.Generic.IReadOnlyList<string> Contributors)
+  method void Deconstruct(out string MetricId, out string Kind, out string? NativeSubject, out string? Unit, out string EffectiveScope, out int? Value, out System.Collections.Generic.IReadOnlyList<string>? Contributors)
   operator !=(ArchLinterNet.Core.Model.ArchitectureMetricEvidence? left, ArchLinterNet.Core.Model.ArchitectureMetricEvidence? right)
   operator ==(ArchLinterNet.Core.Model.ArchitectureMetricEvidence? left, ArchLinterNet.Core.Model.ArchitectureMetricEvidence? right)
-  property System.Collections.Generic.IReadOnlyList<string> Contributors {get;init;}
+  property System.Collections.Generic.IReadOnlyList<string>? Contributors {get;init;}
   property bool IsComplete {get;}
-  property int ContributorCount {get;}
+  property int? ContributorCount {get;}
   property int? Value {get;init;}
   property string EffectiveScope {get;init;}
   property string Kind {get;init;}
@@ -2702,20 +2702,20 @@ sealed class ArchLinterNet.Core.Model.ArchitectureMetricEvidence : System.IEquat
   property string? NativeSubject {get;init;}
   property string? Unit {get;init;}
 sealed class ArchLinterNet.Core.Model.ArchitectureMetricMeasurement : System.IEquatable<ArchLinterNet.Core.Model.ArchitectureMetricMeasurement>
-  ctor(string Id, string Kind, string? NativeSubject, string? Unit, string EffectiveScope, ArchLinterNet.Core.Model.ArchitectureApplicabilityRecordState State, int? Value, System.Collections.Generic.IReadOnlyList<string> Contributors)
+  ctor(string Id, string Kind, string? NativeSubject, string? Unit, string EffectiveScope, ArchLinterNet.Core.Model.ArchitectureApplicabilityRecordState State, int? Value, System.Collections.Generic.IReadOnlyList<string>? Contributors)
   method ArchLinterNet.Core.Model.ArchitectureMetricMeasurement <Clone>$()
   method bool Equals(ArchLinterNet.Core.Model.ArchitectureMetricMeasurement? other)
   method bool Equals(object? obj)
   method int GetHashCode()
   method string ToString()
-  method void Deconstruct(out string Id, out string Kind, out string? NativeSubject, out string? Unit, out string EffectiveScope, out ArchLinterNet.Core.Model.ArchitectureApplicabilityRecordState State, out int? Value, out System.Collections.Generic.IReadOnlyList<string> Contributors)
+  method void Deconstruct(out string Id, out string Kind, out string? NativeSubject, out string? Unit, out string EffectiveScope, out ArchLinterNet.Core.Model.ArchitectureApplicabilityRecordState State, out int? Value, out System.Collections.Generic.IReadOnlyList<string>? Contributors)
   operator !=(ArchLinterNet.Core.Model.ArchitectureMetricMeasurement? left, ArchLinterNet.Core.Model.ArchitectureMetricMeasurement? right)
   operator ==(ArchLinterNet.Core.Model.ArchitectureMetricMeasurement? left, ArchLinterNet.Core.Model.ArchitectureMetricMeasurement? right)
   property ArchLinterNet.Core.Model.ArchitectureApplicabilityRecordState State {get;init;}
-  property System.Collections.Generic.IReadOnlyList<string> Contributors {get;init;}
+  property System.Collections.Generic.IReadOnlyList<string>? Contributors {get;init;}
   property bool IsEvaluable {get;}
   property bool IsUnassessable {get;}
-  property int ContributorCount {get;}
+  property int? ContributorCount {get;}
   property int? Value {get;init;}
   property string EffectiveScope {get;init;}
   property string Id {get;init;}
