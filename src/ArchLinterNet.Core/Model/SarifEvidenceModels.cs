@@ -241,12 +241,18 @@ public sealed record SarifEvidenceReadResult
         SarifEvidenceTrustStatus status,
         string reasonCode,
         string detail,
-        SarifEvidenceProvenance provenance)
+        SarifEvidenceProvenance provenance,
+        IReadOnlyList<SarifEvidenceSourceDiagnostic>? sourceDiagnostics = null,
+        SarifEvidenceAuthorizationSnapshot? authorization = null)
     {
         Status = status;
         ReasonCode = reasonCode;
         Detail = detail;
         Provenance = provenance;
+        SourceDiagnostics = sourceDiagnostics is null || sourceDiagnostics.Count == 0
+            ? Array.Empty<SarifEvidenceSourceDiagnostic>()
+            : Array.AsReadOnly(sourceDiagnostics.ToArray());
+        Authorization = authorization;
     }
 
     /// <summary>The single trust decision for this artifact.</summary>
@@ -263,6 +269,20 @@ public sealed record SarifEvidenceReadResult
 
     /// <summary>All identity, context, and byte provenance retained by the reader.</summary>
     public SarifEvidenceProvenance Provenance { get; }
+
+    /// <summary>
+    /// Immutable typed source diagnostics from the selected run. This collection is non-empty only
+    /// for a valid trusted read whose requirement declares a diagnostic filter; trust failures
+    /// never expose selectable source facts.
+    /// </summary>
+    public IReadOnlyList<SarifEvidenceSourceDiagnostic> SourceDiagnostics { get; }
+
+    /// <summary>
+    /// Immutable policy and assessment authorization captured for a valid read with a diagnostic
+    /// filter. It prevents a caller from selecting the evidence under a different mutable policy
+    /// requirement.
+    /// </summary>
+    public SarifEvidenceAuthorizationSnapshot? Authorization { get; }
 
     /// <summary>Whether the selected run is trusted evidence.</summary>
     public bool IsValid => Status == SarifEvidenceTrustStatus.Valid;

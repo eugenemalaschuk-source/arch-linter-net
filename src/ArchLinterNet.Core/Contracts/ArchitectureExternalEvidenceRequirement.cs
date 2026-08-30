@@ -31,4 +31,29 @@ public sealed class ArchitectureExternalEvidenceRequirement
 
     [YamlMember(Alias = "require_scope")]
     public bool RequireScope { get; set; }
+
+    [YamlMember(Alias = "diagnostic_filter")]
+    public ArchitectureExternalEvidenceDiagnosticFilter? DiagnosticFilter { get; set; }
+}
+
+/// <summary>Optional exact-match filter for diagnostics in one external-evidence requirement.</summary>
+public sealed class ArchitectureExternalEvidenceDiagnosticFilter
+{
+    [YamlMember(Alias = "rule_ids")]
+    public List<string> RuleIds { get; set; } = new();
+
+    [YamlMember(Alias = "rule_tags")]
+    public List<string> RuleTags { get; set; } = new();
+
+    [YamlMember(Alias = "projects")]
+    public List<string> Projects { get; set; } = new();
+
+    [YamlMember(Alias = "path_prefixes")]
+    public List<string> PathPrefixes { get; set; } = new();
+
+    [YamlMember(Alias = "severity")]
+    public Dictionary<string, string> Severity { get; set; } = new(StringComparer.Ordinal);
+
+    [YamlMember(Alias = "require_matches")]
+    public bool RequireMatches { get; set; }
 }

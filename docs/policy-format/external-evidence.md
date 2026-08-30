@@ -3,7 +3,8 @@
 Use `external_evidence` to declare a vendor-neutral requirement for a
 pre-produced SARIF artifact. The declaration describes which evidence is
 expected and which context bindings are required; it does not run an analyzer
-or choose a file by name.
+or choose a file by name. An optional diagnostic filter selects a bounded,
+policy-authorized subset only after the artifact has passed that trust boundary.
 
 This is a trust boundary for a later consuming family. The Core external-
 evidence boundary receives the repository-local artifact and the explicit
@@ -27,6 +28,15 @@ external_evidence:
     require_repository: true
     require_revision: true
     require_scope: true
+    diagnostic_filter:
+      rule_ids: [SEC100]
+      rule_tags: [security]
+      projects: [src/ArchLinterNet.Core]
+      path_prefixes: [src/]
+      severity:
+        error: strict
+        warning: audit
+      require_matches: true
 ```
 
 The declaration is intentionally separate from the artifact location. A
@@ -46,11 +56,78 @@ the policy does not contain a URL, filename, or vendor service reference.
 | `require_repository` | Optional boolean. Set to `true` when the producer/CI evidence must bind to the current repository identity. |
 | `require_revision` | Optional boolean. Set to `true` when the producer/CI evidence must bind to the current source revision. |
 | `require_scope` | Optional boolean. Set to `true` when the producer/CI evidence must bind to the current assessment scope. |
+| `diagnostic_filter` | Optional typed selector for diagnostics from this already-trusted logical evidence input. Omit it to retain the reader's trust-only behavior. |
 
 The three `require_...` fields are opt-in binding requirements. If a binding
 is required, its value must be available and must agree between the evidence
 and the current assessment context. Omitting a requirement (or setting it to
 `false`) does not make that dimension a required binding.
+
+## Diagnostic filtering
+
+`diagnostic_filter` is owned by one `external_evidence` entry. The parent
+entry's `id`, `tool`, optional `tool_version`, and `run` remain the logical
+evidence and expected-producer selector; do not repeat those fields in the
+filter.
+
+| Field | Description |
+| --- | --- |
+| `rule_ids` | Optional non-empty exact source rule IDs; at most 128 values. |
+| `rule_tags` | Optional non-empty exact tags declared by the selected SARIF driver's matching rule; at most 128 values. |
+| `projects` | Optional non-empty exact source `result.properties.project` identities; at most 128 values. A result without that explicit source field does not match this criterion. |
+| `path_prefixes` | Optional normalized repository-relative `/` prefixes; at most 128 values. A prefix matches the exact path or a descendant; absolute paths, `..`, backslashes, globs, and regular expressions are invalid. |
+| `severity` | Required when `diagnostic_filter` is present. Maps one or more source levels (`error`, `warning`, `note`, `none`, `unspecified`) to the ArchLinterNet mode `strict` or `audit`. It both selects source levels and maps the selected result; it never changes the original source level. |
+| `require_matches` | Optional boolean. When `true`, every configured rule ID, tag, project, path prefix, and severity key must match at least one result satisfying the other configured criteria. |
+
+Non-empty filter categories combine with **and**; values within one category
+combine with **or**. For example, a result must have a listed rule ID *and* a
+listed path prefix, while either listed rule ID can match. With
+`require_matches: true`, an old rule ID or source path produces deterministic
+unmatched-filter evidence rather than disappearing behind a zero-result
+selection.
+
+Filtering only consumes typed source data from a valid selected run. It keeps
+the original tool, rule, message, source severity, primary location, optional
+project, driver-rule tags, and SARIF fingerprint pairs together with the trust
+provenance described below. A wrong-revision or otherwise untrusted artifact
+never supplies ordinary selected diagnostics.
+
+When `diagnostic_filter` is omitted, the reader retains its trust-only
+behavior: it does not parse or validate result members that are relevant only
+to diagnostic selection, and it exposes neither source diagnostics nor an
+authorization snapshot. This keeps existing #520 evidence valid unless it
+violates the SARIF trust contract itself.
+
+Rule tags are bound to one resolved driver-rule descriptor, not merely a rule
+ID. When a SARIF driver repeats a descriptor ID, a result must provide a
+consistent `ruleIndex` or `rule.index`; an ambiguous ID-only reference is
+rejected rather than borrowing tags from another descriptor. The reader also
+resolves supported artifact-location indexes through the run artifact table.
+
+When the reader accepts an artifact, it also captures an immutable authorization
+snapshot: the parent logical ID, tool/version/run identity, required binding
+flags, validated assessment context, and a detached copy of `diagnostic_filter`.
+The selector consumes that snapshot rather than a second mutable requirement, so
+evidence trusted for one policy cannot be reinterpreted by a later policy with
+the same `id`. For repeated artifacts with the same snapshot,
+`require_matches` is evaluated across their combined trusted results.
+Authorization grouping uses an unambiguous structural encoding, so filter values
+containing control characters cannot merge distinct policy snapshots.
+
+For projected primary locations, present line and column values must be positive
+and character offsets/lengths must be non-negative. Ending positions cannot
+precede their starts; malformed regions reject the artifact rather than becoming
+trusted fallback-identity facts.
+
+For a selected diagnostic, ArchLinterNet preserves source-provided
+`fingerprints` where available and otherwise creates a deterministic fallback
+from stable evidence, rule, project, and normalized location facts. Neither
+fallback nor canonical selected-result identity uses a display message or
+runtime result ordering. Equivalent current-context repeated runs deduplicate
+while retaining each ordered artifact/run provenance; different logical keys,
+revisions, scopes, and source locations remain distinct. Results with different
+source severities or mapped governance modes also remain distinct, so a strict
+occurrence cannot be lost to an audit occurrence with the same fingerprint.
 
 ## Assessment context and producer/CI context
 
@@ -90,8 +167,9 @@ For a declared requirement, the Core boundary:
 
 The result retains the normalized repository-relative artifact path, content
 hash, selected tool/run facts, result count, and validated context bindings so
-a later family can consume the trust decision. The reader does not select,
-filter, or interpret individual diagnostics.
+a later family can consume the trust decision. For a valid selected run, the
+reader also retains typed source facts for the diagnostic filtering boundary;
+it does not normalize them into native contract families or query a producer.
 
 Missing required artifacts, malformed JSON or SARIF, unsupported versions,
 ambiguous or absent expected runs, unsuccessful execution, unsafe paths,
@@ -132,9 +210,8 @@ This declaration and reader do not provide:
 
 - analyzer execution or analyzer configuration;
 - remote URLs or vendor service APIs;
-- diagnostic filters, severity mapping, result selection, deduplication, or
-  normalized findings ([#521](https://github.com/eugenemalaschuk-source/arch-linter-net/issues/521)
-  and [#522](https://github.com/eugenemalaschuk-source/arch-linter-net/issues/522)); or
+- normalized findings, baseline/output integration, or producer-service queries
+  ([#522](https://github.com/eugenemalaschuk-source/arch-linter-net/issues/522)); or
 - freshness inference from filenames, modification times, or workflow/job
   names.
 

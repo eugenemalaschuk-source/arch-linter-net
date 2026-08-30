@@ -81,7 +81,49 @@
         "run": { "type": "string", "minLength": 1 },
         "require_repository": { "type": "boolean", "default": false },
         "require_revision": { "type": "boolean", "default": false },
-        "require_scope": { "type": "boolean", "default": false }
+        "require_scope": { "type": "boolean", "default": false },
+        "diagnostic_filter": { "$ref": "#/$defs/diagnosticFilter" }
+      }
+    },
+    "diagnosticFilter": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["severity"],
+      "description": "Optional exact selectors for trusted SARIF diagnostics. Non-empty categories combine with AND; values within one category combine with OR.",
+      "properties": {
+        "rule_ids": { "$ref": "#/$defs/boundedDiagnosticSelectorList" },
+        "rule_tags": { "$ref": "#/$defs/boundedDiagnosticSelectorList" },
+        "projects": { "$ref": "#/$defs/boundedDiagnosticSelectorList" },
+        "path_prefixes": {
+          "type": "array",
+          "maxItems": 128,
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "pattern": "^(?!/)(?!~/)(?![A-Za-z]:)(?!.*\\\\)(?!.*//)(?!.*(?:^|/)\\.\\.?(?:/|$)).*\\S.*",
+            "not": { "pattern": "[*?\\[\\]]" }
+          },
+          "default": [],
+          "description": "Repository-relative slash-normalized prefixes; exact paths and descendants match. A trailing slash is allowed for directory prefixes."
+        },
+        "severity": {
+          "type": "object",
+          "minProperties": 1,
+          "maxProperties": 5,
+          "propertyNames": {
+            "enum": ["error", "warning", "note", "none", "unspecified"]
+          },
+          "additionalProperties": {
+            "type": "string",
+            "enum": ["strict", "audit"]
+          },
+          "description": "Non-empty mapping from source SARIF severity to ArchLinterNet governance mode."
+        },
+        "require_matches": {
+          "type": "boolean",
+          "default": false,
+          "description": "Require every configured selector value to match at least one result satisfying the other categories."
+        }
       }
     },
     "imports": {
@@ -250,6 +292,12 @@
       "type": "array",
       "items": { "type": "string", "minLength": 1, "pattern": ".*\\S.*" },
       "default": []
+    },
+    "boundedDiagnosticSelectorList": {
+      "allOf": [
+        { "$ref": "#/$defs/nonBlankStringList" },
+        { "maxItems": 128 }
+      ]
     },
     "exactSourceWithExclusions": {
       "required": ["source"],

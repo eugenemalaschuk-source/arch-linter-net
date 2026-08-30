@@ -5,6 +5,7 @@ namespace ArchLinterNet.Core.Execution;
 
 public sealed partial class SarifEvidenceReader
 {
+
     private static bool TryReadRunIdentity(
         JsonElement run,
         out SarifRunCandidate candidate,
@@ -209,6 +210,5 @@ public sealed partial class SarifEvidenceReader
         string ToolName,
         string? ToolVersion,
         string RunId);
-
     private readonly record struct ExecutionState;
 }

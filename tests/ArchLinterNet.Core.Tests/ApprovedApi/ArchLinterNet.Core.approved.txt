@@ -700,8 +700,17 @@ sealed class ArchLinterNet.Core.Contracts.ArchitectureExternalDependencyGroup
   ctor()
   property System.Collections.Generic.List<string> NamespacePrefixes {get;set;}
   property System.Collections.Generic.List<string> TypePrefixes {get;set;}
+sealed class ArchLinterNet.Core.Contracts.ArchitectureExternalEvidenceDiagnosticFilter
+  ctor()
+  property System.Collections.Generic.Dictionary<string,string> Severity {get;set;}
+  property System.Collections.Generic.List<string> PathPrefixes {get;set;}
+  property System.Collections.Generic.List<string> Projects {get;set;}
+  property System.Collections.Generic.List<string> RuleIds {get;set;}
+  property System.Collections.Generic.List<string> RuleTags {get;set;}
+  property bool RequireMatches {get;set;}
 sealed class ArchLinterNet.Core.Contracts.ArchitectureExternalEvidenceRequirement
   ctor()
+  property ArchLinterNet.Core.Contracts.ArchitectureExternalEvidenceDiagnosticFilter? DiagnosticFilter {get;set;}
   property bool RequireRepository {get;set;}
   property bool RequireRevision {get;set;}
   property bool RequireScope {get;set;}
@@ -1899,6 +1908,19 @@ sealed class ArchLinterNet.Core.Execution.Results.ArchitectureRunnerSetup : Syst
 sealed class ArchLinterNet.Core.Execution.SarifEvidenceReader
   ctor(ArchLinterNet.Core.IO.Abstractions.IArchitectureEvidenceFileSystem? fileSystem = null)
   method ArchLinterNet.Core.Model.SarifEvidenceReadResult Read(ArchLinterNet.Core.Contracts.ArchitectureExternalEvidenceRequirement requirement, string repositoryRoot, ArchLinterNet.Core.Model.SarifEvidenceArtifactReference? artifact, ArchLinterNet.Core.Model.SarifEvidenceAssessmentContext? expectedContext = null, ArchLinterNet.Core.Model.SarifEvidenceLimits? limits = null, System.Threading.CancellationToken cancellationToken = null)
+sealed class ArchLinterNet.Core.Execution.SarifExternalDiagnosticSelectionInput : System.IEquatable<ArchLinterNet.Core.Execution.SarifExternalDiagnosticSelectionInput>
+  ctor(ArchLinterNet.Core.Model.SarifEvidenceReadResult evidence)
+  method ArchLinterNet.Core.Execution.SarifExternalDiagnosticSelectionInput <Clone>$()
+  method bool Equals(ArchLinterNet.Core.Execution.SarifExternalDiagnosticSelectionInput? other)
+  method bool Equals(object? obj)
+  method int GetHashCode()
+  method string ToString()
+  operator !=(ArchLinterNet.Core.Execution.SarifExternalDiagnosticSelectionInput? left, ArchLinterNet.Core.Execution.SarifExternalDiagnosticSelectionInput? right)
+  operator ==(ArchLinterNet.Core.Execution.SarifExternalDiagnosticSelectionInput? left, ArchLinterNet.Core.Execution.SarifExternalDiagnosticSelectionInput? right)
+  property ArchLinterNet.Core.Model.SarifEvidenceReadResult Evidence {get;}
+sealed class ArchLinterNet.Core.Execution.SarifExternalDiagnosticSelector
+  ctor()
+  method ArchLinterNet.Core.Model.SarifExternalDiagnosticSelectionResult Select(System.Collections.Generic.IEnumerable<ArchLinterNet.Core.Execution.SarifExternalDiagnosticSelectionInput> inputs, System.Threading.CancellationToken cancellationToken = null)
 interface ArchLinterNet.Core.Graph.Abstractions.IArchitectureExplainApplicationService
   method ArchLinterNet.Core.Graph.ArchitectureExplainOutcome Explain(ArchLinterNet.Core.Graph.ArchitectureExplainRequest request)
 interface ArchLinterNet.Core.Graph.Abstractions.IArchitectureGraphApplicationService
@@ -3874,6 +3896,24 @@ sealed class ArchLinterNet.Core.Model.SarifEvidenceAssessmentContext : System.IE
   property string? Revision {get;}
   property string? RevisionId {get;}
   property string? Scope {get;}
+sealed class ArchLinterNet.Core.Model.SarifEvidenceAuthorizationSnapshot : System.IEquatable<ArchLinterNet.Core.Model.SarifEvidenceAuthorizationSnapshot>
+  method ArchLinterNet.Core.Model.SarifEvidenceAuthorizationSnapshot <Clone>$()
+  method bool Equals(ArchLinterNet.Core.Model.SarifEvidenceAuthorizationSnapshot? other)
+  method bool Equals(object? obj)
+  method int GetHashCode()
+  method string ToString()
+  operator !=(ArchLinterNet.Core.Model.SarifEvidenceAuthorizationSnapshot? left, ArchLinterNet.Core.Model.SarifEvidenceAuthorizationSnapshot? right)
+  operator ==(ArchLinterNet.Core.Model.SarifEvidenceAuthorizationSnapshot? left, ArchLinterNet.Core.Model.SarifEvidenceAuthorizationSnapshot? right)
+  property ArchLinterNet.Core.Model.SarifEvidenceAssessmentContext AssessmentContext {get;}
+  property ArchLinterNet.Core.Model.SarifEvidenceResolvedContext? ValidatedContext {get;}
+  property ArchLinterNet.Core.Model.SarifExternalDiagnosticFilterAuthorization? DiagnosticFilter {get;}
+  property bool RequireRepository {get;}
+  property bool RequireRevision {get;}
+  property bool RequireScope {get;}
+  property string LogicalId {get;}
+  property string Run {get;}
+  property string Tool {get;}
+  property string? ToolVersion {get;}
 sealed class ArchLinterNet.Core.Model.SarifEvidenceLimits : System.IEquatable<ArchLinterNet.Core.Model.SarifEvidenceLimits>
   ctor(long maxArtifactBytes = 4194304, int maxRuns = 32, int maxResults = 100000)
   method ArchLinterNet.Core.Model.SarifEvidenceLimits <Clone>$()
@@ -3936,11 +3976,13 @@ sealed class ArchLinterNet.Core.Model.SarifEvidenceReadResult : System.IEquatabl
   method string ToString()
   operator !=(ArchLinterNet.Core.Model.SarifEvidenceReadResult? left, ArchLinterNet.Core.Model.SarifEvidenceReadResult? right)
   operator ==(ArchLinterNet.Core.Model.SarifEvidenceReadResult? left, ArchLinterNet.Core.Model.SarifEvidenceReadResult? right)
+  property ArchLinterNet.Core.Model.SarifEvidenceAuthorizationSnapshot? Authorization {get;}
   property ArchLinterNet.Core.Model.SarifEvidenceProvenance Provenance {get;}
   property ArchLinterNet.Core.Model.SarifEvidenceResolvedContext? Context {get;}
   property ArchLinterNet.Core.Model.SarifEvidenceResolvedContext? ResolvedContext {get;}
   property ArchLinterNet.Core.Model.SarifEvidenceTrustStatus Status {get;}
   property ArchLinterNet.Core.Model.SarifEvidenceTrustStatus TrustStatus {get;}
+  property System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Model.SarifEvidenceSourceDiagnostic> SourceDiagnostics {get;}
   property bool IsValid {get;}
   property int? ResultCount {get;}
   property int? SelectedResultCount {get;}
@@ -3973,6 +4015,68 @@ sealed class ArchLinterNet.Core.Model.SarifEvidenceResolvedContext : System.IEqu
   property string? Revision {get;init;}
   property string? RevisionId {get;}
   property string? Scope {get;init;}
+sealed class ArchLinterNet.Core.Model.SarifEvidenceSourceDiagnostic : System.IEquatable<ArchLinterNet.Core.Model.SarifEvidenceSourceDiagnostic>
+  ctor(string? message, string? ruleId, ArchLinterNet.Core.Model.SarifEvidenceSourceSeverity sourceSeverity, ArchLinterNet.Core.Model.SarifEvidenceSourceLocation? primaryLocation = null, string? project = null, System.Collections.Generic.IReadOnlyList<string>? driverRuleTags = null, System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Model.SarifEvidenceSourceFingerprint>? fingerprints = null, System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Model.SarifEvidenceSourceFingerprint>? partialFingerprints = null)
+  method ArchLinterNet.Core.Model.SarifEvidenceSourceDiagnostic <Clone>$()
+  method bool Equals(ArchLinterNet.Core.Model.SarifEvidenceSourceDiagnostic? other)
+  method bool Equals(object? obj)
+  method int GetHashCode()
+  method string ToString()
+  operator !=(ArchLinterNet.Core.Model.SarifEvidenceSourceDiagnostic? left, ArchLinterNet.Core.Model.SarifEvidenceSourceDiagnostic? right)
+  operator ==(ArchLinterNet.Core.Model.SarifEvidenceSourceDiagnostic? left, ArchLinterNet.Core.Model.SarifEvidenceSourceDiagnostic? right)
+  property ArchLinterNet.Core.Model.SarifEvidenceSourceLocation? PrimaryLocation {get;}
+  property ArchLinterNet.Core.Model.SarifEvidenceSourceSeverity SourceSeverity {get;}
+  property System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Model.SarifEvidenceSourceFingerprint> FingerprintPairs {get;}
+  property System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Model.SarifEvidenceSourceFingerprint> Fingerprints {get;}
+  property System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Model.SarifEvidenceSourceFingerprint> PartialFingerprints {get;}
+  property System.Collections.Generic.IReadOnlyList<string> DriverRuleTags {get;}
+  property string? Message {get;}
+  property string? Project {get;}
+  property string? RuleId {get;}
+sealed class ArchLinterNet.Core.Model.SarifEvidenceSourceFingerprint : System.IEquatable<ArchLinterNet.Core.Model.SarifEvidenceSourceFingerprint>
+  ctor(string name, string value, bool isPartial = false)
+  method ArchLinterNet.Core.Model.SarifEvidenceSourceFingerprint <Clone>$()
+  method bool Equals(ArchLinterNet.Core.Model.SarifEvidenceSourceFingerprint? other)
+  method bool Equals(object? obj)
+  method int GetHashCode()
+  method string ToString()
+  operator !=(ArchLinterNet.Core.Model.SarifEvidenceSourceFingerprint? left, ArchLinterNet.Core.Model.SarifEvidenceSourceFingerprint? right)
+  operator ==(ArchLinterNet.Core.Model.SarifEvidenceSourceFingerprint? left, ArchLinterNet.Core.Model.SarifEvidenceSourceFingerprint? right)
+  property bool IsPartial {get;}
+  property string Name {get;}
+  property string Value {get;}
+sealed class ArchLinterNet.Core.Model.SarifEvidenceSourceLocation : System.IEquatable<ArchLinterNet.Core.Model.SarifEvidenceSourceLocation>
+  ctor(string? path, ArchLinterNet.Core.Model.SarifEvidenceSourceRegion? region = null)
+  method ArchLinterNet.Core.Model.SarifEvidenceSourceLocation <Clone>$()
+  method bool Equals(ArchLinterNet.Core.Model.SarifEvidenceSourceLocation? other)
+  method bool Equals(object? obj)
+  method int GetHashCode()
+  method string ToString()
+  operator !=(ArchLinterNet.Core.Model.SarifEvidenceSourceLocation? left, ArchLinterNet.Core.Model.SarifEvidenceSourceLocation? right)
+  operator ==(ArchLinterNet.Core.Model.SarifEvidenceSourceLocation? left, ArchLinterNet.Core.Model.SarifEvidenceSourceLocation? right)
+  property ArchLinterNet.Core.Model.SarifEvidenceSourceRegion? Region {get;}
+  property string? Path {get;}
+sealed class ArchLinterNet.Core.Model.SarifEvidenceSourceRegion : System.IEquatable<ArchLinterNet.Core.Model.SarifEvidenceSourceRegion>
+  ctor(int? startLine = null, int? startColumn = null, int? endLine = null, int? endColumn = null, int? charOffset = null, int? charLength = null)
+  method ArchLinterNet.Core.Model.SarifEvidenceSourceRegion <Clone>$()
+  method bool Equals(ArchLinterNet.Core.Model.SarifEvidenceSourceRegion? other)
+  method bool Equals(object? obj)
+  method int GetHashCode()
+  method string ToString()
+  operator !=(ArchLinterNet.Core.Model.SarifEvidenceSourceRegion? left, ArchLinterNet.Core.Model.SarifEvidenceSourceRegion? right)
+  operator ==(ArchLinterNet.Core.Model.SarifEvidenceSourceRegion? left, ArchLinterNet.Core.Model.SarifEvidenceSourceRegion? right)
+  property int? CharLength {get;}
+  property int? CharOffset {get;}
+  property int? EndColumn {get;}
+  property int? EndLine {get;}
+  property int? StartColumn {get;}
+  property int? StartLine {get;}
+enum ArchLinterNet.Core.Model.SarifEvidenceSourceSeverity : int
+  enum-member Error = 0
+  enum-member None = 3
+  enum-member Note = 2
+  enum-member Unspecified = 4
+  enum-member Warning = 1
 enum ArchLinterNet.Core.Model.SarifEvidenceTrustStatus : int
   enum-member AmbiguousExpectedRun = 11
   enum-member ArtifactTooLarge = 6
@@ -3999,6 +4103,83 @@ enum ArchLinterNet.Core.Model.SarifEvidenceTrustStatus : int
   enum-member WrongRepository = 17
   enum-member WrongRevision = 19
   enum-member WrongScope = 21
+sealed class ArchLinterNet.Core.Model.SarifExternalDiagnosticFilterAuthorization : System.IEquatable<ArchLinterNet.Core.Model.SarifExternalDiagnosticFilterAuthorization>
+  method ArchLinterNet.Core.Model.SarifExternalDiagnosticFilterAuthorization <Clone>$()
+  method bool Equals(ArchLinterNet.Core.Model.SarifExternalDiagnosticFilterAuthorization? other)
+  method bool Equals(object? obj)
+  method int GetHashCode()
+  method string ToString()
+  operator !=(ArchLinterNet.Core.Model.SarifExternalDiagnosticFilterAuthorization? left, ArchLinterNet.Core.Model.SarifExternalDiagnosticFilterAuthorization? right)
+  operator ==(ArchLinterNet.Core.Model.SarifExternalDiagnosticFilterAuthorization? left, ArchLinterNet.Core.Model.SarifExternalDiagnosticFilterAuthorization? right)
+  property System.Collections.Generic.IReadOnlyDictionary<string,string> Severity {get;}
+  property System.Collections.Generic.IReadOnlyList<string> PathPrefixes {get;}
+  property System.Collections.Generic.IReadOnlyList<string> Projects {get;}
+  property System.Collections.Generic.IReadOnlyList<string> RuleIds {get;}
+  property System.Collections.Generic.IReadOnlyList<string> RuleTags {get;}
+  property bool RequireMatches {get;}
+enum ArchLinterNet.Core.Model.SarifExternalDiagnosticFilterDimension : int
+  enum-member PathPrefix = 3
+  enum-member Project = 2
+  enum-member RuleId = 0
+  enum-member RuleTag = 1
+  enum-member Severity = 4
+sealed class ArchLinterNet.Core.Model.SarifExternalDiagnosticFilterMismatch : System.IEquatable<ArchLinterNet.Core.Model.SarifExternalDiagnosticFilterMismatch>
+  ctor(string LogicalEvidenceId, ArchLinterNet.Core.Model.SarifExternalDiagnosticFilterDimension Dimension, string Value)
+  method ArchLinterNet.Core.Model.SarifExternalDiagnosticFilterMismatch <Clone>$()
+  method bool Equals(ArchLinterNet.Core.Model.SarifExternalDiagnosticFilterMismatch? other)
+  method bool Equals(object? obj)
+  method int GetHashCode()
+  method string ToString()
+  method void Deconstruct(out string LogicalEvidenceId, out ArchLinterNet.Core.Model.SarifExternalDiagnosticFilterDimension Dimension, out string Value)
+  operator !=(ArchLinterNet.Core.Model.SarifExternalDiagnosticFilterMismatch? left, ArchLinterNet.Core.Model.SarifExternalDiagnosticFilterMismatch? right)
+  operator ==(ArchLinterNet.Core.Model.SarifExternalDiagnosticFilterMismatch? left, ArchLinterNet.Core.Model.SarifExternalDiagnosticFilterMismatch? right)
+  property ArchLinterNet.Core.Model.SarifExternalDiagnosticFilterDimension Dimension {get;init;}
+  property string LogicalEvidenceId {get;init;}
+  property string Value {get;init;}
+sealed class ArchLinterNet.Core.Model.SarifExternalDiagnosticFingerprint : System.IEquatable<ArchLinterNet.Core.Model.SarifExternalDiagnosticFingerprint>
+  ctor(ArchLinterNet.Core.Model.SarifExternalDiagnosticFingerprintOrigin origin, string value, string? sourceName = null)
+  method ArchLinterNet.Core.Model.SarifExternalDiagnosticFingerprint <Clone>$()
+  method bool Equals(ArchLinterNet.Core.Model.SarifExternalDiagnosticFingerprint? other)
+  method bool Equals(object? obj)
+  method int GetHashCode()
+  method string ToString()
+  operator !=(ArchLinterNet.Core.Model.SarifExternalDiagnosticFingerprint? left, ArchLinterNet.Core.Model.SarifExternalDiagnosticFingerprint? right)
+  operator ==(ArchLinterNet.Core.Model.SarifExternalDiagnosticFingerprint? left, ArchLinterNet.Core.Model.SarifExternalDiagnosticFingerprint? right)
+  property ArchLinterNet.Core.Model.SarifExternalDiagnosticFingerprintOrigin Origin {get;}
+  property string Value {get;}
+  property string? SourceName {get;}
+enum ArchLinterNet.Core.Model.SarifExternalDiagnosticFingerprintOrigin : int
+  enum-member Deterministic = 1
+  enum-member Source = 0
+enum ArchLinterNet.Core.Model.SarifExternalDiagnosticGovernanceMode : int
+  enum-member Audit = 1
+  enum-member Strict = 0
+sealed class ArchLinterNet.Core.Model.SarifExternalDiagnosticSelectionResult : System.IEquatable<ArchLinterNet.Core.Model.SarifExternalDiagnosticSelectionResult>
+  ctor(System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Model.SarifSelectedExternalDiagnostic>? diagnostics = null, System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Model.SarifExternalDiagnosticFilterMismatch>? filterMismatches = null)
+  method ArchLinterNet.Core.Model.SarifExternalDiagnosticSelectionResult <Clone>$()
+  method bool Equals(ArchLinterNet.Core.Model.SarifExternalDiagnosticSelectionResult? other)
+  method bool Equals(object? obj)
+  method int GetHashCode()
+  method string ToString()
+  operator !=(ArchLinterNet.Core.Model.SarifExternalDiagnosticSelectionResult? left, ArchLinterNet.Core.Model.SarifExternalDiagnosticSelectionResult? right)
+  operator ==(ArchLinterNet.Core.Model.SarifExternalDiagnosticSelectionResult? left, ArchLinterNet.Core.Model.SarifExternalDiagnosticSelectionResult? right)
+  property System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Model.SarifExternalDiagnosticFilterMismatch> FilterMismatches {get;}
+  property System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Model.SarifSelectedExternalDiagnostic> Diagnostics {get;}
+  property bool HasRequiredFilterMatches {get;}
+sealed class ArchLinterNet.Core.Model.SarifSelectedExternalDiagnostic : System.IEquatable<ArchLinterNet.Core.Model.SarifSelectedExternalDiagnostic>
+  ctor(string canonicalIdentity, ArchLinterNet.Core.Model.SarifEvidenceSourceDiagnostic sourceDiagnostic, ArchLinterNet.Core.Model.SarifExternalDiagnosticGovernanceMode governanceMode, ArchLinterNet.Core.Model.SarifExternalDiagnosticFingerprint fingerprint, System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Model.SarifEvidenceProvenance> evidenceProvenances)
+  method ArchLinterNet.Core.Model.SarifSelectedExternalDiagnostic <Clone>$()
+  method bool Equals(ArchLinterNet.Core.Model.SarifSelectedExternalDiagnostic? other)
+  method bool Equals(object? obj)
+  method int GetHashCode()
+  method string ToString()
+  operator !=(ArchLinterNet.Core.Model.SarifSelectedExternalDiagnostic? left, ArchLinterNet.Core.Model.SarifSelectedExternalDiagnostic? right)
+  operator ==(ArchLinterNet.Core.Model.SarifSelectedExternalDiagnostic? left, ArchLinterNet.Core.Model.SarifSelectedExternalDiagnostic? right)
+  property ArchLinterNet.Core.Model.SarifEvidenceSourceDiagnostic SourceDiagnostic {get;}
+  property ArchLinterNet.Core.Model.SarifExternalDiagnosticFingerprint Fingerprint {get;}
+  property ArchLinterNet.Core.Model.SarifExternalDiagnosticGovernanceMode GovernanceMode {get;}
+  property System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Model.SarifEvidenceProvenance> EvidenceProvenances {get;}
+  property string CanonicalIdentity {get;}
 sealed class ArchLinterNet.Core.Model.TypePlacementDiagnostic : ArchLinterNet.Core.Model.ArchitectureDiagnostic, System.IEquatable<ArchLinterNet.Core.Model.TypePlacementDiagnostic>
   ctor(string ContractName, string? ContractId, string SourceType, string ForbiddenNamespace, System.Collections.Generic.IReadOnlyCollection<string> ForbiddenReferences)
   method ArchLinterNet.Core.Model.TypePlacementDiagnostic <Clone>$()

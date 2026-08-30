@@ -60,6 +60,7 @@ class ArchLinterNet.Core.Contracts.ArchitectureClassificationConfiguration [seal
 class ArchLinterNet.Core.Contracts.ArchitectureContextSelector [sealed]
 class ArchLinterNet.Core.Contracts.ArchitectureContractDocument [sealed]
 class ArchLinterNet.Core.Contracts.ArchitectureExternalDependencyGroup [sealed]
+class ArchLinterNet.Core.Contracts.ArchitectureExternalEvidenceDiagnosticFilter [sealed]
 class ArchLinterNet.Core.Contracts.ArchitectureExternalEvidenceRequirement [sealed]
 class ArchLinterNet.Core.Contracts.ArchitectureFrameworkReferenceGroup [sealed]
 class ArchLinterNet.Core.Contracts.ArchitectureIgnoredViolation [sealed]
@@ -176,6 +177,8 @@ class ArchLinterNet.Core.Execution.Results.ArchitectureContractExecutionResult [
 class ArchLinterNet.Core.Execution.Results.ArchitectureHandlerResult [sealed]
 class ArchLinterNet.Core.Execution.Results.ArchitectureRunnerSetup [sealed]
 class ArchLinterNet.Core.Execution.SarifEvidenceReader [sealed]
+class ArchLinterNet.Core.Execution.SarifExternalDiagnosticSelectionInput [sealed]
+class ArchLinterNet.Core.Execution.SarifExternalDiagnosticSelector [sealed]
 class ArchLinterNet.Core.Graph.ArchitectureExplainApplicationService [sealed]
 class ArchLinterNet.Core.Graph.ArchitectureExplainOutcome [sealed]
 class ArchLinterNet.Core.Graph.ArchitectureExplainRequest [sealed]
@@ -296,11 +299,21 @@ class ArchLinterNet.Core.Model.PublicApiSurfaceDiagnostic [sealed]
 class ArchLinterNet.Core.Model.PublicApiSurfacePayload [sealed]
 class ArchLinterNet.Core.Model.SarifEvidenceArtifactReference [sealed]
 class ArchLinterNet.Core.Model.SarifEvidenceAssessmentContext [sealed]
+class ArchLinterNet.Core.Model.SarifEvidenceAuthorizationSnapshot [sealed]
 class ArchLinterNet.Core.Model.SarifEvidenceLimits [sealed]
 class ArchLinterNet.Core.Model.SarifEvidenceProducerContext [sealed]
 class ArchLinterNet.Core.Model.SarifEvidenceProvenance [sealed]
 class ArchLinterNet.Core.Model.SarifEvidenceReadResult [sealed]
 class ArchLinterNet.Core.Model.SarifEvidenceResolvedContext [sealed]
+class ArchLinterNet.Core.Model.SarifEvidenceSourceDiagnostic [sealed]
+class ArchLinterNet.Core.Model.SarifEvidenceSourceFingerprint [sealed]
+class ArchLinterNet.Core.Model.SarifEvidenceSourceLocation [sealed]
+class ArchLinterNet.Core.Model.SarifEvidenceSourceRegion [sealed]
+class ArchLinterNet.Core.Model.SarifExternalDiagnosticFilterAuthorization [sealed]
+class ArchLinterNet.Core.Model.SarifExternalDiagnosticFilterMismatch [sealed]
+class ArchLinterNet.Core.Model.SarifExternalDiagnosticFingerprint [sealed]
+class ArchLinterNet.Core.Model.SarifExternalDiagnosticSelectionResult [sealed]
+class ArchLinterNet.Core.Model.SarifSelectedExternalDiagnostic [sealed]
 class ArchLinterNet.Core.Model.TypePlacementDiagnostic [sealed]
 class ArchLinterNet.Core.Model.TypePlacementPayload [sealed]
 class ArchLinterNet.Core.Model.UnmatchedIgnoreDiagnostic [sealed]
@@ -614,6 +627,11 @@ const ArchLinterNet.Core.Model.ExpressionParticipationResult.NotMatched: ArchLin
 const ArchLinterNet.Core.Model.PublicApiDeltaKind.Added: ArchLinterNet.Core.Model.PublicApiDeltaKind [value:0]
 const ArchLinterNet.Core.Model.PublicApiDeltaKind.Changed: ArchLinterNet.Core.Model.PublicApiDeltaKind [value:2]
 const ArchLinterNet.Core.Model.PublicApiDeltaKind.Removed: ArchLinterNet.Core.Model.PublicApiDeltaKind [value:1]
+const ArchLinterNet.Core.Model.SarifEvidenceSourceSeverity.Error: ArchLinterNet.Core.Model.SarifEvidenceSourceSeverity [value:0]
+const ArchLinterNet.Core.Model.SarifEvidenceSourceSeverity.None: ArchLinterNet.Core.Model.SarifEvidenceSourceSeverity [value:3]
+const ArchLinterNet.Core.Model.SarifEvidenceSourceSeverity.Note: ArchLinterNet.Core.Model.SarifEvidenceSourceSeverity [value:2]
+const ArchLinterNet.Core.Model.SarifEvidenceSourceSeverity.Unspecified: ArchLinterNet.Core.Model.SarifEvidenceSourceSeverity [value:4]
+const ArchLinterNet.Core.Model.SarifEvidenceSourceSeverity.Warning: ArchLinterNet.Core.Model.SarifEvidenceSourceSeverity [value:1]
 const ArchLinterNet.Core.Model.SarifEvidenceTrustStatus.AmbiguousExpectedRun: ArchLinterNet.Core.Model.SarifEvidenceTrustStatus [value:11]
 const ArchLinterNet.Core.Model.SarifEvidenceTrustStatus.ArtifactTooLarge: ArchLinterNet.Core.Model.SarifEvidenceTrustStatus [value:6]
 const ArchLinterNet.Core.Model.SarifEvidenceTrustStatus.ConflictingContext: ArchLinterNet.Core.Model.SarifEvidenceTrustStatus [value:22]
@@ -639,6 +657,15 @@ const ArchLinterNet.Core.Model.SarifEvidenceTrustStatus.WrongLogicalId: ArchLint
 const ArchLinterNet.Core.Model.SarifEvidenceTrustStatus.WrongRepository: ArchLinterNet.Core.Model.SarifEvidenceTrustStatus [value:17]
 const ArchLinterNet.Core.Model.SarifEvidenceTrustStatus.WrongRevision: ArchLinterNet.Core.Model.SarifEvidenceTrustStatus [value:19]
 const ArchLinterNet.Core.Model.SarifEvidenceTrustStatus.WrongScope: ArchLinterNet.Core.Model.SarifEvidenceTrustStatus [value:21]
+const ArchLinterNet.Core.Model.SarifExternalDiagnosticFilterDimension.PathPrefix: ArchLinterNet.Core.Model.SarifExternalDiagnosticFilterDimension [value:3]
+const ArchLinterNet.Core.Model.SarifExternalDiagnosticFilterDimension.Project: ArchLinterNet.Core.Model.SarifExternalDiagnosticFilterDimension [value:2]
+const ArchLinterNet.Core.Model.SarifExternalDiagnosticFilterDimension.RuleId: ArchLinterNet.Core.Model.SarifExternalDiagnosticFilterDimension [value:0]
+const ArchLinterNet.Core.Model.SarifExternalDiagnosticFilterDimension.RuleTag: ArchLinterNet.Core.Model.SarifExternalDiagnosticFilterDimension [value:1]
+const ArchLinterNet.Core.Model.SarifExternalDiagnosticFilterDimension.Severity: ArchLinterNet.Core.Model.SarifExternalDiagnosticFilterDimension [value:4]
+const ArchLinterNet.Core.Model.SarifExternalDiagnosticFingerprintOrigin.Deterministic: ArchLinterNet.Core.Model.SarifExternalDiagnosticFingerprintOrigin [value:1]
+const ArchLinterNet.Core.Model.SarifExternalDiagnosticFingerprintOrigin.Source: ArchLinterNet.Core.Model.SarifExternalDiagnosticFingerprintOrigin [value:0]
+const ArchLinterNet.Core.Model.SarifExternalDiagnosticGovernanceMode.Audit: ArchLinterNet.Core.Model.SarifExternalDiagnosticGovernanceMode [value:1]
+const ArchLinterNet.Core.Model.SarifExternalDiagnosticGovernanceMode.Strict: ArchLinterNet.Core.Model.SarifExternalDiagnosticGovernanceMode [value:0]
 const ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextExport.CurrentSchemaVersion: System.Int32 [value:5]
 const ArchLinterNet.Core.PolicyWeakening.ArchitecturePolicyMembershipEvidence.CurrentSchemaVersion: System.Int32 [value:1]
 const ArchLinterNet.Core.PolicyWeakening.ArchitecturePolicyMembershipEvidence.EvidenceKind: System.String [value:"architecture-policy-membership"]
@@ -699,6 +726,7 @@ ctor ArchLinterNet.Core.Contracts.ArchitectureClassificationConfiguration()
 ctor ArchLinterNet.Core.Contracts.ArchitectureContextSelector()
 ctor ArchLinterNet.Core.Contracts.ArchitectureContractDocument()
 ctor ArchLinterNet.Core.Contracts.ArchitectureExternalDependencyGroup()
+ctor ArchLinterNet.Core.Contracts.ArchitectureExternalEvidenceDiagnosticFilter()
 ctor ArchLinterNet.Core.Contracts.ArchitectureExternalEvidenceRequirement()
 ctor ArchLinterNet.Core.Contracts.ArchitectureFrameworkReferenceGroup()
 ctor ArchLinterNet.Core.Contracts.ArchitectureIgnoredViolation()
@@ -810,6 +838,8 @@ ctor ArchLinterNet.Core.Execution.Results.ArchitectureContractExecutionResult(Sy
 ctor ArchLinterNet.Core.Execution.Results.ArchitectureHandlerResult(System.Collections.Generic.IReadOnlyCollection`1[ArchLinterNet.Core.Model.ArchitectureViolation], System.Collections.Generic.IReadOnlyCollection`1[System.String])
 ctor ArchLinterNet.Core.Execution.Results.ArchitectureRunnerSetup(System.String, ArchLinterNet.Core.Execution.Abstractions.IArchitectureContractRunner)
 ctor ArchLinterNet.Core.Execution.SarifEvidenceReader(ArchLinterNet.Core.IO.Abstractions.IArchitectureEvidenceFileSystem)
+ctor ArchLinterNet.Core.Execution.SarifExternalDiagnosticSelectionInput(ArchLinterNet.Core.Model.SarifEvidenceReadResult)
+ctor ArchLinterNet.Core.Execution.SarifExternalDiagnosticSelector()
 ctor ArchLinterNet.Core.Graph.ArchitectureExplainApplicationService(ArchLinterNet.Core.Graph.Abstractions.IArchitectureGraphApplicationService)
 ctor ArchLinterNet.Core.Graph.ArchitectureExplainOutcome(System.String, System.String, System.Collections.Generic.IReadOnlyList`1[System.String], System.Collections.Generic.IReadOnlyList`1[System.String])
 ctor ArchLinterNet.Core.Graph.ArchitectureExplainRequest()
@@ -936,6 +966,14 @@ ctor ArchLinterNet.Core.Model.SarifEvidenceProducerContext(System.String, System
 ctor ArchLinterNet.Core.Model.SarifEvidenceProducerContext(System.String, System.String, System.String, System.String)
 ctor ArchLinterNet.Core.Model.SarifEvidenceProvenance(System.String, System.String, System.String, System.String, System.String, System.String, System.Nullable`1[System.Int32], ArchLinterNet.Core.Model.SarifEvidenceResolvedContext)
 ctor ArchLinterNet.Core.Model.SarifEvidenceResolvedContext(System.String, System.String, System.String, System.String)
+ctor ArchLinterNet.Core.Model.SarifEvidenceSourceDiagnostic(System.String, System.String, ArchLinterNet.Core.Model.SarifEvidenceSourceSeverity, ArchLinterNet.Core.Model.SarifEvidenceSourceLocation, System.String, System.Collections.Generic.IReadOnlyList`1[System.String], System.Collections.Generic.IReadOnlyList`1[ArchLinterNet.Core.Model.SarifEvidenceSourceFingerprint], System.Collections.Generic.IReadOnlyList`1[ArchLinterNet.Core.Model.SarifEvidenceSourceFingerprint])
+ctor ArchLinterNet.Core.Model.SarifEvidenceSourceFingerprint(System.String, System.String, System.Boolean)
+ctor ArchLinterNet.Core.Model.SarifEvidenceSourceLocation(System.String, ArchLinterNet.Core.Model.SarifEvidenceSourceRegion)
+ctor ArchLinterNet.Core.Model.SarifEvidenceSourceRegion(System.Nullable`1[System.Int32], System.Nullable`1[System.Int32], System.Nullable`1[System.Int32], System.Nullable`1[System.Int32], System.Nullable`1[System.Int32], System.Nullable`1[System.Int32])
+ctor ArchLinterNet.Core.Model.SarifExternalDiagnosticFilterMismatch(System.String, ArchLinterNet.Core.Model.SarifExternalDiagnosticFilterDimension, System.String)
+ctor ArchLinterNet.Core.Model.SarifExternalDiagnosticFingerprint(ArchLinterNet.Core.Model.SarifExternalDiagnosticFingerprintOrigin, System.String, System.String)
+ctor ArchLinterNet.Core.Model.SarifExternalDiagnosticSelectionResult(System.Collections.Generic.IReadOnlyList`1[ArchLinterNet.Core.Model.SarifSelectedExternalDiagnostic], System.Collections.Generic.IReadOnlyList`1[ArchLinterNet.Core.Model.SarifExternalDiagnosticFilterMismatch])
+ctor ArchLinterNet.Core.Model.SarifSelectedExternalDiagnostic(System.String, ArchLinterNet.Core.Model.SarifEvidenceSourceDiagnostic, ArchLinterNet.Core.Model.SarifExternalDiagnosticGovernanceMode, ArchLinterNet.Core.Model.SarifExternalDiagnosticFingerprint, System.Collections.Generic.IReadOnlyList`1[ArchLinterNet.Core.Model.SarifEvidenceProvenance])
 ctor ArchLinterNet.Core.Model.TypePlacementDiagnostic(System.String, System.String, System.String, System.String, System.Collections.Generic.IReadOnlyCollection`1[System.String])
 ctor ArchLinterNet.Core.Model.TypePlacementPayload(System.String, System.String, System.String, System.String)
 ctor ArchLinterNet.Core.Model.UnmatchedIgnoreDiagnostic(System.String, System.String, System.Int32, System.String, System.String, System.String)
@@ -1067,7 +1105,11 @@ enum ArchLinterNet.Core.Model.BaselineEntryLifecycle [underlying:System.Int32]
 enum ArchLinterNet.Core.Model.BuildStatePreflightState [underlying:System.Int32]
 enum ArchLinterNet.Core.Model.ExpressionParticipationResult [underlying:System.Int32]
 enum ArchLinterNet.Core.Model.PublicApiDeltaKind [underlying:System.Int32]
+enum ArchLinterNet.Core.Model.SarifEvidenceSourceSeverity [underlying:System.Int32]
 enum ArchLinterNet.Core.Model.SarifEvidenceTrustStatus [underlying:System.Int32]
+enum ArchLinterNet.Core.Model.SarifExternalDiagnosticFilterDimension [underlying:System.Int32]
+enum ArchLinterNet.Core.Model.SarifExternalDiagnosticFingerprintOrigin [underlying:System.Int32]
+enum ArchLinterNet.Core.Model.SarifExternalDiagnosticGovernanceMode [underlying:System.Int32]
 enum ArchLinterNet.Core.Profiling.AnalysisProfileCompletionStatus [underlying:System.Int32]
 enum ArchLinterNet.Core.Profiling.AnalysisProfileReservedFieldStatus [underlying:System.Int32]
 enum ArchLinterNet.Core.Validation.PublicApiFailureKind [underlying:System.Int32]
@@ -1406,6 +1448,7 @@ method ArchLinterNet.Core.Execution.MaxParallelismResolver.Resolve(System.Nullab
 method ArchLinterNet.Core.Execution.Results.ArchitectureHandlerResult.FromCycles(System.Collections.Generic.IReadOnlyCollection`1[System.String]): ArchLinterNet.Core.Execution.Results.ArchitectureHandlerResult [static]
 method ArchLinterNet.Core.Execution.Results.ArchitectureHandlerResult.FromViolations(System.Collections.Generic.IReadOnlyCollection`1[ArchLinterNet.Core.Model.ArchitectureViolation]): ArchLinterNet.Core.Execution.Results.ArchitectureHandlerResult [static]
 method ArchLinterNet.Core.Execution.SarifEvidenceReader.Read(ArchLinterNet.Core.Contracts.ArchitectureExternalEvidenceRequirement, System.String, ArchLinterNet.Core.Model.SarifEvidenceArtifactReference, ArchLinterNet.Core.Model.SarifEvidenceAssessmentContext, ArchLinterNet.Core.Model.SarifEvidenceLimits, System.Threading.CancellationToken): ArchLinterNet.Core.Model.SarifEvidenceReadResult
+method ArchLinterNet.Core.Execution.SarifExternalDiagnosticSelector.Select(System.Collections.Generic.IEnumerable`1[ArchLinterNet.Core.Execution.SarifExternalDiagnosticSelectionInput], System.Threading.CancellationToken): ArchLinterNet.Core.Model.SarifExternalDiagnosticSelectionResult
 method ArchLinterNet.Core.Graph.Abstractions.IArchitectureExplainApplicationService.Explain(ArchLinterNet.Core.Graph.ArchitectureExplainRequest): ArchLinterNet.Core.Graph.ArchitectureExplainOutcome [abstract]
 method ArchLinterNet.Core.Graph.Abstractions.IArchitectureGraphApplicationService.BuildGraph(ArchLinterNet.Core.Graph.ArchitectureGraphRequest): ArchLinterNet.Core.Graph.ArchitectureGraphOutcome [abstract]
 method ArchLinterNet.Core.Graph.ArchitectureExplainApplicationService.Explain(ArchLinterNet.Core.Graph.ArchitectureExplainRequest): ArchLinterNet.Core.Graph.ArchitectureExplainOutcome [virtual]
@@ -1914,6 +1957,13 @@ property ArchLinterNet.Core.Contracts.ArchitectureContractDocument.Topology: Arc
 property ArchLinterNet.Core.Contracts.ArchitectureContractDocument.Version: System.Int32 [get, set]
 property ArchLinterNet.Core.Contracts.ArchitectureExternalDependencyGroup.NamespacePrefixes: System.Collections.Generic.List`1[System.String] [get, set]
 property ArchLinterNet.Core.Contracts.ArchitectureExternalDependencyGroup.TypePrefixes: System.Collections.Generic.List`1[System.String] [get, set]
+property ArchLinterNet.Core.Contracts.ArchitectureExternalEvidenceDiagnosticFilter.PathPrefixes: System.Collections.Generic.List`1[System.String] [get, set]
+property ArchLinterNet.Core.Contracts.ArchitectureExternalEvidenceDiagnosticFilter.Projects: System.Collections.Generic.List`1[System.String] [get, set]
+property ArchLinterNet.Core.Contracts.ArchitectureExternalEvidenceDiagnosticFilter.RequireMatches: System.Boolean [get, set]
+property ArchLinterNet.Core.Contracts.ArchitectureExternalEvidenceDiagnosticFilter.RuleIds: System.Collections.Generic.List`1[System.String] [get, set]
+property ArchLinterNet.Core.Contracts.ArchitectureExternalEvidenceDiagnosticFilter.RuleTags: System.Collections.Generic.List`1[System.String] [get, set]
+property ArchLinterNet.Core.Contracts.ArchitectureExternalEvidenceDiagnosticFilter.Severity: System.Collections.Generic.Dictionary`2[System.String,System.String] [get, set]
+property ArchLinterNet.Core.Contracts.ArchitectureExternalEvidenceRequirement.DiagnosticFilter: ArchLinterNet.Core.Contracts.ArchitectureExternalEvidenceDiagnosticFilter [get, set]
 property ArchLinterNet.Core.Contracts.ArchitectureExternalEvidenceRequirement.Format: System.String [get, set]
 property ArchLinterNet.Core.Contracts.ArchitectureExternalEvidenceRequirement.Id: System.String [get, set]
 property ArchLinterNet.Core.Contracts.ArchitectureExternalEvidenceRequirement.RequireRepository: System.Boolean [get, set]
@@ -2528,6 +2578,7 @@ property ArchLinterNet.Core.Execution.Results.ArchitectureHandlerResult.Violatio
 property ArchLinterNet.Core.Execution.Results.ArchitectureRunnerSetup.AssemblyLoads: System.Int32 [get, init]
 property ArchLinterNet.Core.Execution.Results.ArchitectureRunnerSetup.RepositoryRoot: System.String [get, init]
 property ArchLinterNet.Core.Execution.Results.ArchitectureRunnerSetup.Runner: ArchLinterNet.Core.Execution.Abstractions.IArchitectureContractRunner [get, init]
+property ArchLinterNet.Core.Execution.SarifExternalDiagnosticSelectionInput.Evidence: ArchLinterNet.Core.Model.SarifEvidenceReadResult [get]
 property ArchLinterNet.Core.Graph.ArchitectureExplainOutcome.ContractIds: System.Collections.Generic.IReadOnlyList`1[System.String] [get, init]
 property ArchLinterNet.Core.Graph.ArchitectureExplainOutcome.CoverageSummaries: System.Collections.Generic.IReadOnlyCollection`1[ArchLinterNet.Core.Reporting.ArchitectureCoverageSummary] [get, init]
 property ArchLinterNet.Core.Graph.ArchitectureExplainOutcome.ExpressionParticipation: System.Collections.Generic.IReadOnlyList`1[ArchLinterNet.Core.Graph.ExplainExpressionParticipation] [get, init]
@@ -3203,6 +3254,16 @@ property ArchLinterNet.Core.Model.SarifEvidenceAssessmentContext.RepositoryUri: 
 property ArchLinterNet.Core.Model.SarifEvidenceAssessmentContext.Revision: System.String [get]
 property ArchLinterNet.Core.Model.SarifEvidenceAssessmentContext.RevisionId: System.String [get]
 property ArchLinterNet.Core.Model.SarifEvidenceAssessmentContext.Scope: System.String [get]
+property ArchLinterNet.Core.Model.SarifEvidenceAuthorizationSnapshot.AssessmentContext: ArchLinterNet.Core.Model.SarifEvidenceAssessmentContext [get]
+property ArchLinterNet.Core.Model.SarifEvidenceAuthorizationSnapshot.DiagnosticFilter: ArchLinterNet.Core.Model.SarifExternalDiagnosticFilterAuthorization [get]
+property ArchLinterNet.Core.Model.SarifEvidenceAuthorizationSnapshot.LogicalId: System.String [get]
+property ArchLinterNet.Core.Model.SarifEvidenceAuthorizationSnapshot.RequireRepository: System.Boolean [get]
+property ArchLinterNet.Core.Model.SarifEvidenceAuthorizationSnapshot.RequireRevision: System.Boolean [get]
+property ArchLinterNet.Core.Model.SarifEvidenceAuthorizationSnapshot.RequireScope: System.Boolean [get]
+property ArchLinterNet.Core.Model.SarifEvidenceAuthorizationSnapshot.Run: System.String [get]
+property ArchLinterNet.Core.Model.SarifEvidenceAuthorizationSnapshot.Tool: System.String [get]
+property ArchLinterNet.Core.Model.SarifEvidenceAuthorizationSnapshot.ToolVersion: System.String [get]
+property ArchLinterNet.Core.Model.SarifEvidenceAuthorizationSnapshot.ValidatedContext: ArchLinterNet.Core.Model.SarifEvidenceResolvedContext [get]
 property ArchLinterNet.Core.Model.SarifEvidenceLimits.MaxArtifactBytes: System.Int64 [get]
 property ArchLinterNet.Core.Model.SarifEvidenceLimits.MaxResults: System.Int32 [get]
 property ArchLinterNet.Core.Model.SarifEvidenceLimits.MaxRuns: System.Int32 [get]
@@ -3230,6 +3291,7 @@ property ArchLinterNet.Core.Model.SarifEvidenceProvenance.ToolVersion: System.St
 property ArchLinterNet.Core.Model.SarifEvidenceReadResult.ArtifactPath: System.String [get]
 property ArchLinterNet.Core.Model.SarifEvidenceReadResult.ArtifactRelativePath: System.String [get]
 property ArchLinterNet.Core.Model.SarifEvidenceReadResult.ArtifactSha256: System.String [get]
+property ArchLinterNet.Core.Model.SarifEvidenceReadResult.Authorization: ArchLinterNet.Core.Model.SarifEvidenceAuthorizationSnapshot [get]
 property ArchLinterNet.Core.Model.SarifEvidenceReadResult.Context: ArchLinterNet.Core.Model.SarifEvidenceResolvedContext [get]
 property ArchLinterNet.Core.Model.SarifEvidenceReadResult.Detail: System.String [get]
 property ArchLinterNet.Core.Model.SarifEvidenceReadResult.IsValid: System.Boolean [get]
@@ -3244,6 +3306,7 @@ property ArchLinterNet.Core.Model.SarifEvidenceReadResult.SelectedRunId: System.
 property ArchLinterNet.Core.Model.SarifEvidenceReadResult.SelectedToolName: System.String [get]
 property ArchLinterNet.Core.Model.SarifEvidenceReadResult.SelectedToolVersion: System.String [get]
 property ArchLinterNet.Core.Model.SarifEvidenceReadResult.Sha256: System.String [get]
+property ArchLinterNet.Core.Model.SarifEvidenceReadResult.SourceDiagnostics: System.Collections.Generic.IReadOnlyList`1[ArchLinterNet.Core.Model.SarifEvidenceSourceDiagnostic] [get]
 property ArchLinterNet.Core.Model.SarifEvidenceReadResult.Status: ArchLinterNet.Core.Model.SarifEvidenceTrustStatus [get]
 property ArchLinterNet.Core.Model.SarifEvidenceReadResult.ToolName: System.String [get]
 property ArchLinterNet.Core.Model.SarifEvidenceReadResult.ToolVersion: System.String [get]
@@ -3254,6 +3317,46 @@ property ArchLinterNet.Core.Model.SarifEvidenceResolvedContext.RepositoryUri: Sy
 property ArchLinterNet.Core.Model.SarifEvidenceResolvedContext.Revision: System.String [get, init]
 property ArchLinterNet.Core.Model.SarifEvidenceResolvedContext.RevisionId: System.String [get]
 property ArchLinterNet.Core.Model.SarifEvidenceResolvedContext.Scope: System.String [get, init]
+property ArchLinterNet.Core.Model.SarifEvidenceSourceDiagnostic.DriverRuleTags: System.Collections.Generic.IReadOnlyList`1[System.String] [get]
+property ArchLinterNet.Core.Model.SarifEvidenceSourceDiagnostic.FingerprintPairs: System.Collections.Generic.IReadOnlyList`1[ArchLinterNet.Core.Model.SarifEvidenceSourceFingerprint] [get]
+property ArchLinterNet.Core.Model.SarifEvidenceSourceDiagnostic.Fingerprints: System.Collections.Generic.IReadOnlyList`1[ArchLinterNet.Core.Model.SarifEvidenceSourceFingerprint] [get]
+property ArchLinterNet.Core.Model.SarifEvidenceSourceDiagnostic.Message: System.String [get]
+property ArchLinterNet.Core.Model.SarifEvidenceSourceDiagnostic.PartialFingerprints: System.Collections.Generic.IReadOnlyList`1[ArchLinterNet.Core.Model.SarifEvidenceSourceFingerprint] [get]
+property ArchLinterNet.Core.Model.SarifEvidenceSourceDiagnostic.PrimaryLocation: ArchLinterNet.Core.Model.SarifEvidenceSourceLocation [get]
+property ArchLinterNet.Core.Model.SarifEvidenceSourceDiagnostic.Project: System.String [get]
+property ArchLinterNet.Core.Model.SarifEvidenceSourceDiagnostic.RuleId: System.String [get]
+property ArchLinterNet.Core.Model.SarifEvidenceSourceDiagnostic.SourceSeverity: ArchLinterNet.Core.Model.SarifEvidenceSourceSeverity [get]
+property ArchLinterNet.Core.Model.SarifEvidenceSourceFingerprint.IsPartial: System.Boolean [get]
+property ArchLinterNet.Core.Model.SarifEvidenceSourceFingerprint.Name: System.String [get]
+property ArchLinterNet.Core.Model.SarifEvidenceSourceFingerprint.Value: System.String [get]
+property ArchLinterNet.Core.Model.SarifEvidenceSourceLocation.Path: System.String [get]
+property ArchLinterNet.Core.Model.SarifEvidenceSourceLocation.Region: ArchLinterNet.Core.Model.SarifEvidenceSourceRegion [get]
+property ArchLinterNet.Core.Model.SarifEvidenceSourceRegion.CharLength: System.Nullable`1[System.Int32] [get]
+property ArchLinterNet.Core.Model.SarifEvidenceSourceRegion.CharOffset: System.Nullable`1[System.Int32] [get]
+property ArchLinterNet.Core.Model.SarifEvidenceSourceRegion.EndColumn: System.Nullable`1[System.Int32] [get]
+property ArchLinterNet.Core.Model.SarifEvidenceSourceRegion.EndLine: System.Nullable`1[System.Int32] [get]
+property ArchLinterNet.Core.Model.SarifEvidenceSourceRegion.StartColumn: System.Nullable`1[System.Int32] [get]
+property ArchLinterNet.Core.Model.SarifEvidenceSourceRegion.StartLine: System.Nullable`1[System.Int32] [get]
+property ArchLinterNet.Core.Model.SarifExternalDiagnosticFilterAuthorization.PathPrefixes: System.Collections.Generic.IReadOnlyList`1[System.String] [get]
+property ArchLinterNet.Core.Model.SarifExternalDiagnosticFilterAuthorization.Projects: System.Collections.Generic.IReadOnlyList`1[System.String] [get]
+property ArchLinterNet.Core.Model.SarifExternalDiagnosticFilterAuthorization.RequireMatches: System.Boolean [get]
+property ArchLinterNet.Core.Model.SarifExternalDiagnosticFilterAuthorization.RuleIds: System.Collections.Generic.IReadOnlyList`1[System.String] [get]
+property ArchLinterNet.Core.Model.SarifExternalDiagnosticFilterAuthorization.RuleTags: System.Collections.Generic.IReadOnlyList`1[System.String] [get]
+property ArchLinterNet.Core.Model.SarifExternalDiagnosticFilterAuthorization.Severity: System.Collections.Generic.IReadOnlyDictionary`2[System.String,System.String] [get]
+property ArchLinterNet.Core.Model.SarifExternalDiagnosticFilterMismatch.Dimension: ArchLinterNet.Core.Model.SarifExternalDiagnosticFilterDimension [get, init]
+property ArchLinterNet.Core.Model.SarifExternalDiagnosticFilterMismatch.LogicalEvidenceId: System.String [get, init]
+property ArchLinterNet.Core.Model.SarifExternalDiagnosticFilterMismatch.Value: System.String [get, init]
+property ArchLinterNet.Core.Model.SarifExternalDiagnosticFingerprint.Origin: ArchLinterNet.Core.Model.SarifExternalDiagnosticFingerprintOrigin [get]
+property ArchLinterNet.Core.Model.SarifExternalDiagnosticFingerprint.SourceName: System.String [get]
+property ArchLinterNet.Core.Model.SarifExternalDiagnosticFingerprint.Value: System.String [get]
+property ArchLinterNet.Core.Model.SarifExternalDiagnosticSelectionResult.Diagnostics: System.Collections.Generic.IReadOnlyList`1[ArchLinterNet.Core.Model.SarifSelectedExternalDiagnostic] [get]
+property ArchLinterNet.Core.Model.SarifExternalDiagnosticSelectionResult.FilterMismatches: System.Collections.Generic.IReadOnlyList`1[ArchLinterNet.Core.Model.SarifExternalDiagnosticFilterMismatch] [get]
+property ArchLinterNet.Core.Model.SarifExternalDiagnosticSelectionResult.HasRequiredFilterMatches: System.Boolean [get]
+property ArchLinterNet.Core.Model.SarifSelectedExternalDiagnostic.CanonicalIdentity: System.String [get]
+property ArchLinterNet.Core.Model.SarifSelectedExternalDiagnostic.EvidenceProvenances: System.Collections.Generic.IReadOnlyList`1[ArchLinterNet.Core.Model.SarifEvidenceProvenance] [get]
+property ArchLinterNet.Core.Model.SarifSelectedExternalDiagnostic.Fingerprint: ArchLinterNet.Core.Model.SarifExternalDiagnosticFingerprint [get]
+property ArchLinterNet.Core.Model.SarifSelectedExternalDiagnostic.GovernanceMode: ArchLinterNet.Core.Model.SarifExternalDiagnosticGovernanceMode [get]
+property ArchLinterNet.Core.Model.SarifSelectedExternalDiagnostic.SourceDiagnostic: ArchLinterNet.Core.Model.SarifEvidenceSourceDiagnostic [get]
 property ArchLinterNet.Core.Model.TypePlacementDiagnostic.ActualTypeLocation: System.String [get, init]
 property ArchLinterNet.Core.Model.TypePlacementDiagnostic.ActualTypeName: System.String [get, init]
 property ArchLinterNet.Core.Model.TypePlacementDiagnostic.ExpectedTypeLocation: System.String [get, init]
