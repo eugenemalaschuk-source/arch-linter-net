@@ -5,28 +5,47 @@ namespace ArchLinterNet.Core.Execution;
 
 // Session-owned cache for recursive contract exposure facts. Type object identity is intentional:
 // two load contexts can expose the same assembly/type names while reflection sees different types.
+// The normalized visible-surface shape is part of the key, because one root can legitimately have
+// different evidence for exported and internal-visible contract semantics.
 internal sealed class ArchitectureContractSurfaceExposureIndex
 {
-    private readonly Dictionary<Type, ArchitectureContractSurfaceExposureResult> _roots =
+    private readonly Dictionary<Type, Dictionary<ArchitectureContractSurfaceShape, ArchitectureContractSurfaceExposureResult>> _roots =
         new(ReferenceEqualityComparer.Instance);
 
     internal int MaterializationCount { get; private set; }
 
     internal ArchitectureContractSurfaceExposureResult GetOrMaterialize(Type root)
     {
+        return GetOrMaterialize(root, ArchitectureContractSurfaceShape.Exported);
+    }
+
+    internal ArchitectureContractSurfaceExposureResult GetOrMaterialize(
+        Type root,
+        ArchitectureContractSurfaceShape surfaceShape)
+    {
         ArgumentNullException.ThrowIfNull(root);
-        if (_roots.TryGetValue(root, out ArchitectureContractSurfaceExposureResult? result))
+        if (_roots.TryGetValue(root, out Dictionary<ArchitectureContractSurfaceShape, ArchitectureContractSurfaceExposureResult>? results) &&
+            results.TryGetValue(surfaceShape, out ArchitectureContractSurfaceExposureResult? result))
         {
             return result;
         }
 
-        result = ArchitectureContractSurfaceExposureScanner.Scan(root);
-        _roots.Add(root, result);
+        result = ArchitectureContractSurfaceExposureScanner.Scan(root, surfaceShape);
+        results ??= new Dictionary<ArchitectureContractSurfaceShape, ArchitectureContractSurfaceExposureResult>();
+        results.Add(surfaceShape, result);
+        _roots[root] = results;
         MaterializationCount++;
         return result;
     }
 
     internal ArchitectureContractSurfaceExposureResult GetOrMaterialize(IEnumerable<Type> roots)
+    {
+        return GetOrMaterialize(roots, ArchitectureContractSurfaceShape.Exported);
+    }
+
+    internal ArchitectureContractSurfaceExposureResult GetOrMaterialize(
+        IEnumerable<Type> roots,
+        ArchitectureContractSurfaceShape surfaceShape)
     {
         ArgumentNullException.ThrowIfNull(roots);
 
@@ -49,7 +68,7 @@ internal sealed class ArchitectureContractSurfaceExposureIndex
         HashSet<ArchitectureContractExposureIncompleteEvidence> incompleteSet = new();
         foreach (Type root in orderedRoots)
         {
-            ArchitectureContractSurfaceExposureResult result = GetOrMaterialize(root);
+            ArchitectureContractSurfaceExposureResult result = GetOrMaterialize(root, surfaceShape);
             foreach (ArchitectureContractExposure exposure in result.Exposures)
             {
                 if (exposureSet.Add(exposure))

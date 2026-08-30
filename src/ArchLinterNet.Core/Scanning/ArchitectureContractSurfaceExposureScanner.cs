@@ -16,13 +16,22 @@ internal static class ArchitectureContractSurfaceExposureScanner
 
     internal static ArchitectureContractSurfaceExposureResult Scan(Type root)
     {
+        return Scan(root, ArchitectureContractSurfaceShape.Exported);
+    }
+
+    internal static ArchitectureContractSurfaceExposureResult Scan(
+        Type root,
+        ArchitectureContractSurfaceShape surfaceShape)
+    {
         ArgumentNullException.ThrowIfNull(root);
-        return new Walker(root).Run();
+        surfaceShape.EnsureValid();
+        return new Walker(root, surfaceShape).Run();
     }
 
     private sealed class Walker
     {
         private readonly Type _root;
+        private readonly ArchitectureContractSurfaceShape _surfaceShape;
         private readonly List<ArchitectureContractExposure> _exposures = new();
         private readonly List<ArchitectureContractExposureIncompleteEvidence> _incomplete = new();
         private readonly HashSet<ArchitectureContractExposure> _exposureSet = new();
@@ -33,9 +42,10 @@ internal static class ArchitectureContractSurfaceExposureScanner
         private readonly ArchitectureContractExposureTarget _rootTarget;
         private readonly ArchitectureContractExposurePath _rootPath;
 
-        internal Walker(Type root)
+        internal Walker(Type root, ArchitectureContractSurfaceShape surfaceShape)
         {
             _root = root;
+            _surfaceShape = surfaceShape;
             _rootTarget = TypeIdentity(root, out bool complete);
             _rootPath = ArchitectureContractExposurePath.Empty.Append("type", _rootTarget.FullTypeName);
             if (!complete)
@@ -157,7 +167,7 @@ internal static class ArchitectureContractSurfaceExposureScanner
                 "constructors-unavailable");
             foreach (ConstructorInfo constructor in constructors.OrderBy(MemberSortKey, StringComparer.Ordinal))
             {
-                if (!IsVisible(constructor) || IsCompilerGenerated(constructor, typePath))
+                if (!_surfaceShape.Includes(constructor) || IsCompilerGenerated(constructor, typePath))
                 {
                     continue;
                 }
@@ -175,7 +185,7 @@ internal static class ArchitectureContractSurfaceExposureScanner
                 "methods-unavailable");
             foreach (MethodInfo method in methods.OrderBy(MemberSortKey, StringComparer.Ordinal))
             {
-                if (!IsVisible(method) || IsCompilerGenerated(method, typePath) || IsAccessor(method.Name))
+                if (!_surfaceShape.Includes(method) || IsCompilerGenerated(method, typePath) || IsAccessor(method.Name))
                 {
                     continue;
                 }
@@ -211,7 +221,7 @@ internal static class ArchitectureContractSurfaceExposureScanner
             {
                 MethodInfo? getter = TryRead(() => property.GetMethod, typePath, "property-getter-unavailable");
                 MethodInfo? setter = TryRead(() => property.SetMethod, typePath, "property-setter-unavailable");
-                if ((!IsVisible(getter) && !IsVisible(setter)) || IsCompilerGenerated(property, typePath))
+                if ((!_surfaceShape.Includes(getter) && !_surfaceShape.Includes(setter)) || IsCompilerGenerated(property, typePath))
                 {
                     continue;
                 }
@@ -238,7 +248,7 @@ internal static class ArchitectureContractSurfaceExposureScanner
                 "fields-unavailable");
             foreach (FieldInfo field in fields.OrderBy(MemberSortKey, StringComparer.Ordinal))
             {
-                if (!IsVisible(field) || IsCompilerGenerated(field, typePath) || field.IsSpecialName)
+                if (!_surfaceShape.Includes(field) || IsCompilerGenerated(field, typePath) || field.IsSpecialName)
                 {
                     continue;
                 }
@@ -261,7 +271,8 @@ internal static class ArchitectureContractSurfaceExposureScanner
             foreach (EventInfo @event in events.OrderBy(MemberSortKey, StringComparer.Ordinal))
             {
                 MethodInfo? add = TryRead(() => @event.AddMethod, typePath, "event-accessor-unavailable");
-                if (!IsVisible(add) || IsCompilerGenerated(@event, typePath))
+                MethodInfo? remove = TryRead(() => @event.RemoveMethod, typePath, "event-accessor-unavailable");
+                if ((!_surfaceShape.Includes(add) && !_surfaceShape.Includes(remove)) || IsCompilerGenerated(@event, typePath))
                 {
                     continue;
                 }
@@ -326,7 +337,7 @@ internal static class ArchitectureContractSurfaceExposureScanner
                 "nested-types-unavailable");
             foreach (Type nested in nestedTypes.OrderBy(TypeSortKey, StringComparer.Ordinal))
             {
-                if (!IsExportedType(nested) || IsCompilerGenerated(nested, typePath))
+                if (!IsNestedTypeVisible(nested, typePath) || IsCompilerGenerated(nested, typePath))
                 {
                     continue;
                 }
@@ -701,12 +712,6 @@ internal static class ArchitectureContractSurfaceExposureScanner
             }
         }
 
-        private static bool IsVisible(MethodBase? method) => method != null &&
-            (method.IsPublic || method.IsFamily || method.IsFamilyOrAssembly);
-
-        private static bool IsVisible(FieldInfo? field) => field != null &&
-            (field.IsPublic || field.IsFamily || field.IsFamilyOrAssembly);
-
         private static bool IsAccessor(string name) => name.StartsWith("get_", StringComparison.Ordinal)
             || name.StartsWith("set_", StringComparison.Ordinal)
             || name.StartsWith("add_", StringComparison.Ordinal)
@@ -725,22 +730,27 @@ internal static class ArchitectureContractSurfaceExposureScanner
             }
         }
 
-        private static bool IsExportedType(Type type)
+        private bool IsNestedTypeVisible(Type type, ArchitectureContractExposurePath path)
         {
-            Type current = type;
-            while (true)
+            try
             {
-                if (!current.IsNested)
+                Type? current = type;
+                while (current != null && !ReferenceEquals(current, _root))
                 {
-                    return current.IsPublic;
+                    if (!_surfaceShape.Includes(current))
+                    {
+                        return false;
+                    }
+
+                    current = current.DeclaringType;
                 }
 
-                if (!(current.IsNestedPublic || current.IsNestedFamily || current.IsNestedFamORAssem))
-                {
-                    return false;
-                }
-
-                current = current.DeclaringType!;
+                return current != null;
+            }
+            catch (Exception exception) when (IsReflectionFailure(exception))
+            {
+                AddIncomplete(path, "nested-type-visibility-unavailable");
+                return false;
             }
         }
 

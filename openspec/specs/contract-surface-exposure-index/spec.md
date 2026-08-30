@@ -6,7 +6,7 @@ Provide deterministic reusable evidence of the type references a visible .NET co
 ## Requirements
 
 ### Requirement: Index visible contract exposure evidence
-The system SHALL make reusable exposure evidence available for a caller-selected visible type surface without defining policy selection, target allow/deny rules, semantic roles, or reviewed API membership. Each exposure record SHALL identify the declaring visible type, the metadata or member site, a stable path, and the referenced type's assembly-qualified identity.
+The system SHALL make reusable exposure evidence available for a caller-selected visible type surface without defining policy selection, target allow/deny rules, semantic roles, or reviewed API membership. A normalized visible-surface shape SHALL control which declared members and nested types contribute evidence and SHALL be part of the session-cache identity; callers remain authoritative for selecting roots. Each exposure record SHALL identify the declaring visible type, the metadata or member site, a stable path, and the referenced type's assembly-qualified identity.
 
 #### Scenario: Effective reviewed surface supplies the roots
 - **WHEN** a caller supplies types selected through an existing reviewed public-API surface
@@ -16,8 +16,12 @@ The system SHALL make reusable exposure evidence available for a caller-selected
 - **WHEN** two referenced types have the same full name but different assembly identities
 - **THEN** the index SHALL retain them as distinct exposure targets and paths
 
+#### Scenario: One root is requested with two visible-surface shapes
+- **WHEN** the same caller-selected root is requested with exported and internal-visible shapes
+- **THEN** the index SHALL materialize and cache distinct evidence sets without reselecting the root
+
 ### Requirement: Traverse visible signature shapes recursively
-The system SHALL record deterministic exposure paths from visible types and visible members through constructor parameters, method parameters and returns, properties, fields, events, delegate invoke signatures, base types, implemented interfaces, generic arguments, generic constraints, arrays, nullable wrappers, tuples, nested generic containers, and participating nested types. It SHALL retain path segments that distinguish the declaring member or relationship from structural nesting.
+The system SHALL record deterministic exposure paths from visible types and visible members through constructor parameters, method parameters and returns, properties, fields, events, delegate invoke signatures, base types, implemented interfaces, generic arguments, generic constraints, arrays, nullable wrappers, tuples, nested generic containers, and participating nested types. A property or event SHALL participate when at least one of its accessors matches the requested visible-surface shape. It SHALL retain path segments that distinguish the declaring member or relationship from structural nesting.
 
 #### Scenario: Nested generic return type exposes its nested target
 - **WHEN** a visible member returns a nested generic shape such as `Task<Envelope<Customer>>`

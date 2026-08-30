@@ -100,6 +100,32 @@ public sealed class ContractSurfaceExposureIndexTests
     }
 
     [Test]
+    public void Index_KeysEvidenceByRequestedVisibleSurfaceShape()
+    {
+        ArchitectureContractDocument document = new() { Version = 1, Name = "exposure-tests" };
+        ArchitectureAnalysisContext context = new(
+            "/tmp", new[] { typeof(SurfaceShapeRoot).Assembly }, Array.Empty<string>(), Array.Empty<string>());
+        ArchitectureAnalysisSession session = new(context, document, null, false, null);
+        ArchitectureContractSurfaceShape internalVisible = new(
+            ArchitectureContractSurfaceVisibility.Public | ArchitectureContractSurfaceVisibility.Internal);
+
+        ArchitectureContractSurfaceExposureResult exported =
+            session.GetContractSurfaceExposure(typeof(SurfaceShapeRoot));
+        ArchitectureContractSurfaceExposureResult configured =
+            session.GetContractSurfaceExposure(typeof(SurfaceShapeRoot), internalVisible);
+        ArchitectureContractSurfaceExposureResult repeated =
+            session.GetContractSurfaceExposure(typeof(SurfaceShapeRoot), internalVisible);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(Targets(exported), Does.Not.Contain(Target(typeof(InternalSurfacePayload))));
+            Assert.That(Targets(configured), Does.Contain(Target(typeof(InternalSurfacePayload))));
+            Assert.That(repeated.Exposures, Is.EqualTo(configured.Exposures));
+            Assert.That(session.ContractSurfaceExposureMaterializationCount, Is.EqualTo(2));
+        });
+    }
+
+    [Test]
     public void Scan_SameFullNameFromAssembliesWithSameSimpleNameRemainsDistinct()
     {
         (Type firstRoot, Type firstTarget) = BuildSyntheticSurface(new Version(1, 0, 0, 0));
@@ -172,6 +198,19 @@ public sealed class ContractSurfaceExposureIndexTests
         });
     }
 
+    [Test]
+    public void Scan_EventWithVisibleRemoveAccessorRecordsEventType()
+    {
+        (Type root, Type target) = BuildRemoveOnlyEventSurface();
+
+        ArchitectureContractSurfaceExposureResult result =
+            ArchitectureContractSurfaceExposureScanner.Scan(root);
+
+        Assert.That(result.Exposures.Any(exposure =>
+            Target(target).Equals(exposure.ReferencedType)
+            && exposure.Path.Segments.Any(segment => segment.Kind == "event_type")), Is.True);
+    }
+
     private static bool HasPath(
         ArchitectureContractSurfaceExposureResult result, Type target, string segmentKind) =>
         result.Exposures.Any(exposure => Target(target).Equals(exposure.ReferencedType)
@@ -204,12 +243,46 @@ public sealed class ContractSurfaceExposureIndexTests
         return (root.CreateType()!, targetType);
     }
 
+    private static (Type Root, Type Target) BuildRemoveOnlyEventSurface()
+    {
+        AssemblyBuilder assembly = AssemblyBuilder.DefineDynamicAssembly(
+            new AssemblyName($"ContractExposureEvent-{Guid.NewGuid():N}"), AssemblyBuilderAccess.Run);
+        ModuleBuilder module = assembly.DefineDynamicModule("Main");
+        TypeBuilder target = module.DefineType("Events.RemoveOnlyPayload", TypeAttributes.Public | TypeAttributes.Class);
+        Type targetType = target.CreateType()!;
+        Type eventHandlerType = typeof(Action<>).MakeGenericType(targetType);
+        TypeBuilder root = module.DefineType("Events.RemoveOnlyEventRoot", TypeAttributes.Public | TypeAttributes.Class);
+        EventBuilder @event = root.DefineEvent("Changed", EventAttributes.None, eventHandlerType);
+        MethodBuilder add = root.DefineMethod(
+            "add_Changed", MethodAttributes.Private | MethodAttributes.SpecialName | MethodAttributes.HideBySig,
+            typeof(void), new[] { eventHandlerType });
+        add.GetILGenerator().Emit(OpCodes.Ret);
+        MethodBuilder remove = root.DefineMethod(
+            "remove_Changed", MethodAttributes.Public | MethodAttributes.SpecialName | MethodAttributes.HideBySig,
+            typeof(void), new[] { eventHandlerType });
+        remove.GetILGenerator().Emit(OpCodes.Ret);
+        @event.SetAddOnMethod(add);
+        @event.SetRemoveOnMethod(remove);
+        return (root.CreateType()!, targetType);
+    }
+
     public sealed class Customer
     {
     }
 
     public sealed class AlternateCustomer
     {
+    }
+
+    internal sealed class InternalSurfacePayload
+    {
+    }
+
+    public sealed class SurfaceShapeRoot
+    {
+        public Customer PublicValue => new();
+
+        internal InternalSurfacePayload InternalValue => new();
     }
 
     public class BaseContract

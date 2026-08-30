@@ -167,8 +167,23 @@ public sealed class ArchitectureAnalysisSession
     internal ArchitectureContractSurfaceExposureResult GetContractSurfaceExposure(IEnumerable<Type> roots) =>
         _contractSurfaceExposureIndex.GetOrMaterialize(roots);
 
+    internal ArchitectureContractSurfaceExposureResult GetContractSurfaceExposure(
+        IEnumerable<Type> roots,
+        ArchitectureContractSurfaceShape surfaceShape) =>
+        _contractSurfaceExposureIndex.GetOrMaterialize(roots, surfaceShape);
+
+    internal ArchitectureContractSurfaceExposureResult GetContractSurfaceExposure(
+        Type root,
+        ArchitectureContractSurfaceShape surfaceShape) =>
+        _contractSurfaceExposureIndex.GetOrMaterialize(root, surfaceShape);
+
     internal ArchitectureContractSurfaceExposureResult GetContractSurfaceExposure(params Type[] roots) =>
         _contractSurfaceExposureIndex.GetOrMaterialize(roots);
+
+    internal ArchitectureContractSurfaceExposureResult GetContractSurfaceExposure(
+        ArchitectureContractSurfaceShape surfaceShape,
+        params Type[] roots) =>
+        _contractSurfaceExposureIndex.GetOrMaterialize(roots, surfaceShape);
 
     internal int ContractSurfaceExposureMaterializationCount =>
         _contractSurfaceExposureIndex.MaterializationCount;
