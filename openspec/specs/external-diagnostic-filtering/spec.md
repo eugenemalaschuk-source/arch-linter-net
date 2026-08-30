@@ -1,7 +1,9 @@
 # external-diagnostic-filtering Specification
 
 ## Purpose
-TBD - created by archiving change add-external-diagnostic-filtering. Update Purpose after archive.
+Define the trusted, deterministic projection of external SARIF diagnostics into policy-selected
+findings. This capability keeps producer evidence local and bounded while preserving the validated
+provenance, source facts, severity mapping, and stable identity required by downstream consumers.
 ## Requirements
 ### Requirement: Policy declares a bounded diagnostic filter with explicit matching expectations
 An external-evidence requirement SHALL optionally declare one schema-backed diagnostic filter. The
@@ -12,6 +14,12 @@ non-empty source-severity to governance-mode map. A severity map value SHALL be 
 or `audit`; a source severity key SHALL be exactly `error`, `warning`, `note`, `none`, or
 `unspecified`. Unknown, blank, duplicate, unsafe, or unsupported filter values SHALL fail policy
 validation with declaration provenance.
+
+The trust reader SHALL capture an immutable authorization snapshot for every valid result. That
+snapshot SHALL include the parent logical ID, tool/version/run identity, required context-binding
+flags, validated assessment context, and a detached diagnostic-filter copy. The selector SHALL
+consume only that captured snapshot; it SHALL NOT accept a second mutable requirement or apply a
+different policy's filter to already trusted evidence.
 
 Non-empty categories SHALL combine conjunctively and multiple values in one category SHALL combine
 disjunctively. `require_matches: true` SHALL require every configured rule ID, tag, project, path
@@ -30,6 +38,12 @@ NOT be silently treated as a valid zero-result selection.
   satisfies the other configured criteria
 - **THEN** selection exposes a deterministic unmatched-rule filter record rather than silently
   returning a valid empty result
+
+#### Scenario: A later mutable policy cannot re-authorize trusted evidence
+- **WHEN** a result was trusted for one tool/run/filter authorization and a caller later changes
+  a requirement with the same logical ID
+- **THEN** selection uses only the immutable authorization captured by the reader and cannot apply
+  the changed requirement to that evidence
 
 #### Scenario: An unknown producer remains a trust failure
 - **WHEN** a SARIF artifact has no run matching the parent requirement's expected tool and run
@@ -72,10 +86,13 @@ text or runtime enumeration order.
 
 The canonical selected-result identity SHALL include the logical evidence key, validated
 repository/revision/scope context, expected producer identity, rule/project/location facts, and
-preferred-or-fallback fingerprint. It SHALL exclude transient artifact hash and run identity from
+preferred-or-fallback fingerprint, original source severity, and mapped governance mode. It SHALL
+exclude transient artifact hash and run identity from
 the persistent selected-result identity while preserving them as ordered provenance. Equivalent
-results SHALL deduplicate into one selected result with all authorizing provenance entries;
-different logical evidence keys, revisions, scopes, or source locations SHALL remain distinct.
+results with the same source severity and governance mode SHALL deduplicate into one selected
+result with all authorizing provenance entries; results with different source severities or modes
+SHALL remain distinct. Different logical evidence keys, revisions, scopes, or source locations
+SHALL also remain distinct.
 Selected results, mismatch records, source-fingerprint pairs, and provenance entries SHALL use
 deterministic ordinal ordering.
 
@@ -84,6 +101,18 @@ deterministic ordinal ordering.
   logical evidence and validated context but have different artifact hashes or result ordering
 - **THEN** selection returns one canonical result with both ordered provenance entries and an
   identity that does not depend on either result message or input order
+
+#### Scenario: Complementary trusted artifacts jointly satisfy required values
+- **WHEN** two artifacts authorized by the same immutable requirement each contain one of two
+  required rule IDs
+- **THEN** the selector evaluates required matches across their combined trusted source facts and
+  reports no mismatch in either input order
+
+#### Scenario: Different source severities remain distinct
+- **WHEN** two otherwise equivalent source results have the same fingerprint and location but map
+  from different source severities to different governance modes
+- **THEN** selection returns one stable result for each severity/mode rather than discarding either
+  governance semantic during deduplication
 
 #### Scenario: Same rule at distinct locations remains distinct
 - **WHEN** two eligible source results have the same rule and fingerprint but distinct normalized

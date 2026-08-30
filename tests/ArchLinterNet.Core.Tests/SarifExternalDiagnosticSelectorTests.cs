@@ -48,7 +48,7 @@ public sealed class SarifExternalDiagnosticSelectorTests
 
         SarifExternalDiagnosticSelectionResult result = new SarifExternalDiagnosticSelector().Select(
         [
-            new SarifExternalDiagnosticSelectionInput(requirement, evidence),
+            new SarifExternalDiagnosticSelectionInput(evidence),
         ]);
 
         SarifSelectedExternalDiagnostic strict = result.Diagnostics.Single(diagnostic =>
@@ -89,7 +89,7 @@ public sealed class SarifExternalDiagnosticSelectorTests
 
         SarifExternalDiagnosticSelectionResult result = new SarifExternalDiagnosticSelector().Select(
         [
-            new SarifExternalDiagnosticSelectionInput(requirement, evidence),
+            new SarifExternalDiagnosticSelectionInput(evidence),
         ]);
 
         Assert.Multiple(() =>
@@ -131,15 +131,15 @@ public sealed class SarifExternalDiagnosticSelectorTests
 
         SarifExternalDiagnosticSelectionResult forward = selector.Select(
         [
-            new SarifExternalDiagnosticSelectionInput(requirement: requirement, evidence: first),
-            new SarifExternalDiagnosticSelectionInput(requirement, second),
-            new SarifExternalDiagnosticSelectionInput(requirement, distinct),
+            new SarifExternalDiagnosticSelectionInput(first),
+            new SarifExternalDiagnosticSelectionInput(second),
+            new SarifExternalDiagnosticSelectionInput(distinct),
         ]);
         SarifExternalDiagnosticSelectionResult reverse = selector.Select(
         [
-            new SarifExternalDiagnosticSelectionInput(requirement, distinct),
-            new SarifExternalDiagnosticSelectionInput(requirement, second),
-            new SarifExternalDiagnosticSelectionInput(requirement, first),
+            new SarifExternalDiagnosticSelectionInput(distinct),
+            new SarifExternalDiagnosticSelectionInput(second),
+            new SarifExternalDiagnosticSelectionInput(first),
         ]);
 
         SarifSelectedExternalDiagnostic deduplicated = forward.Diagnostics.Single(diagnostic =>
@@ -186,9 +186,9 @@ public sealed class SarifExternalDiagnosticSelectorTests
 
         SarifExternalDiagnosticSelectionResult result = new SarifExternalDiagnosticSelector().Select(
         [
-            new SarifExternalDiagnosticSelectionInput(requirement, firstRevision),
-            new SarifExternalDiagnosticSelectionInput(requirement, secondRevision),
-            new SarifExternalDiagnosticSelectionInput(requirement, otherLocation),
+            new SarifExternalDiagnosticSelectionInput(firstRevision),
+            new SarifExternalDiagnosticSelectionInput(secondRevision),
+            new SarifExternalDiagnosticSelectionInput(otherLocation),
         ]);
 
         Assert.Multiple(() =>
@@ -235,12 +235,137 @@ public sealed class SarifExternalDiagnosticSelectorTests
             Assert.That(untrusted.IsValid, Is.False);
             Assert.That(() => selector.Select(
             [
-                new SarifExternalDiagnosticSelectionInput(filtered, untrusted),
+                new SarifExternalDiagnosticSelectionInput(untrusted),
             ]), Throws.ArgumentException);
             Assert.That(() => selector.Select(
             [
-                new SarifExternalDiagnosticSelectionInput(unfiltered, trusted),
+                new SarifExternalDiagnosticSelectionInput(trusted),
             ]), Throws.ArgumentException);
+        });
+    }
+
+    [Test]
+    public void Select_UsesTheImmutableAuthorizationCapturedAtReadTime()
+    {
+        ArchitectureExternalEvidenceRequirement requirement = Requirement(
+            ruleIds: ["SEC100"],
+            severity: new Dictionary<string, string> { ["error"] = "strict" });
+        SarifEvidenceReadResult evidence = Read(
+            requirement,
+            "authorized.sarif",
+            Results(Result("SEC100", "error", "src/App/One.cs", "trusted")));
+
+        requirement.Tool = "Other.Scanner";
+        requirement.ToolVersion = "99";
+        requirement.Run = "other-run";
+        requirement.RequireRepository = false;
+        requirement.RequireRevision = false;
+        requirement.RequireScope = true;
+        requirement.DiagnosticFilter = new ArchitectureExternalEvidenceDiagnosticFilter
+        {
+            RuleIds = ["OTHER"],
+            Severity = new Dictionary<string, string> { ["error"] = "audit" },
+        };
+
+        SarifExternalDiagnosticSelectionResult result = new SarifExternalDiagnosticSelector().Select(
+        [
+            new SarifExternalDiagnosticSelectionInput(evidence),
+        ]);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(evidence.Authorization, Is.Not.Null);
+            Assert.That(evidence.Authorization!.Tool, Is.EqualTo("Acme.Scanner"));
+            Assert.That(evidence.Authorization.Run, Is.EqualTo("assessment-42"));
+            Assert.That(evidence.Authorization.RequireRevision, Is.True);
+            Assert.That(evidence.Authorization.DiagnosticFilter!.RuleIds, Is.EqualTo(new[] { "SEC100" }));
+            Assert.That(result.Diagnostics, Has.Count.EqualTo(1));
+            Assert.That(result.Diagnostics[0].GovernanceMode, Is.EqualTo(SarifExternalDiagnosticGovernanceMode.Strict));
+        });
+    }
+
+    [Test]
+    public void Select_AggregatesRequiredFiltersAcrossEquivalentTrustedEvidenceInEitherOrder()
+    {
+        ArchitectureExternalEvidenceRequirement requirement = Requirement(
+            requireMatches: true,
+            ruleIds: ["SEC100", "SEC200"],
+            severity: new Dictionary<string, string> { ["error"] = "strict" });
+        SarifEvidenceReadResult first = Read(
+            requirement,
+            "first.sarif",
+            Results(Result("SEC100", "error", "src/App/One.cs", "first")));
+        SarifEvidenceReadResult second = Read(
+            requirement,
+            "second.sarif",
+            Results(Result("SEC200", "error", "src/App/Two.cs", "second")));
+        var selector = new SarifExternalDiagnosticSelector();
+
+        SarifExternalDiagnosticSelectionResult forward = selector.Select(
+        [
+            new SarifExternalDiagnosticSelectionInput(first),
+            new SarifExternalDiagnosticSelectionInput(second),
+        ]);
+        SarifExternalDiagnosticSelectionResult reverse = selector.Select(
+        [
+            new SarifExternalDiagnosticSelectionInput(second),
+            new SarifExternalDiagnosticSelectionInput(first),
+        ]);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(forward.HasRequiredFilterMatches, Is.True);
+            Assert.That(forward.FilterMismatches, Is.Empty);
+            Assert.That(reverse.FilterMismatches, Is.Empty);
+            Assert.That(forward.Diagnostics.Select(diagnostic => diagnostic.CanonicalIdentity),
+                Is.EqualTo(reverse.Diagnostics.Select(diagnostic => diagnostic.CanonicalIdentity)));
+        });
+    }
+
+    [Test]
+    public void Select_KeepsDifferentSourceSeveritiesAndGovernanceModesDistinct()
+    {
+        ArchitectureExternalEvidenceRequirement requirement = Requirement(
+            ruleIds: ["SEC100"],
+            severity: new Dictionary<string, string>
+            {
+                ["error"] = "audit",
+                ["warning"] = "strict",
+            });
+        SarifEvidenceReadResult error = Read(
+            requirement,
+            "error.sarif",
+            Results(Result("SEC100", "error", "src/App/Shared.cs", "error", "{\"stable\":\"same\"}")));
+        SarifEvidenceReadResult warning = Read(
+            requirement,
+            "warning.sarif",
+            Results(Result("SEC100", "warning", "src/App/Shared.cs", "warning", "{\"stable\":\"same\"}")));
+        var selector = new SarifExternalDiagnosticSelector();
+
+        SarifExternalDiagnosticSelectionResult forward = selector.Select(
+        [
+            new SarifExternalDiagnosticSelectionInput(error),
+            new SarifExternalDiagnosticSelectionInput(warning),
+        ]);
+        SarifExternalDiagnosticSelectionResult reverse = selector.Select(
+        [
+            new SarifExternalDiagnosticSelectionInput(warning),
+            new SarifExternalDiagnosticSelectionInput(error),
+        ]);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(forward.Diagnostics, Has.Count.EqualTo(2));
+            Assert.That(forward.Diagnostics.Select(diagnostic => diagnostic.GovernanceMode),
+                Is.EquivalentTo(new[]
+                {
+                    SarifExternalDiagnosticGovernanceMode.Audit,
+                    SarifExternalDiagnosticGovernanceMode.Strict,
+                }));
+            Assert.That(forward.Diagnostics.Select(diagnostic => diagnostic.SourceDiagnostic.SourceSeverity),
+                Is.EquivalentTo(new[] { SarifEvidenceSourceSeverity.Error, SarifEvidenceSourceSeverity.Warning }));
+            Assert.That(forward.Diagnostics.Select(diagnostic => diagnostic.CanonicalIdentity),
+                Is.EqualTo(reverse.Diagnostics.Select(diagnostic => diagnostic.CanonicalIdentity)));
         });
     }
 

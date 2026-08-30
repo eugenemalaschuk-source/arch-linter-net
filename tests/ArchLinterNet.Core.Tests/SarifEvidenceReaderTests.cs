@@ -75,7 +75,7 @@ public sealed class SarifEvidenceReaderTests
         string json = Sarif(
             tool: "Acme.Scanner",
             runId: "assessment-42",
-            results: "[{\"ruleId\":\"A\"},{\"ruleId\":\"B\"}]");
+            results: "[{\"ruleId\":\"A\",\"message\":{\"text\":\"first\"}},{\"ruleId\":\"B\",\"message\":{\"text\":\"second\"}}]");
         _repository.AddUtf8File("scan.sarif", json);
 
         SarifEvidenceReadResult result = new SarifEvidenceReader().Read(

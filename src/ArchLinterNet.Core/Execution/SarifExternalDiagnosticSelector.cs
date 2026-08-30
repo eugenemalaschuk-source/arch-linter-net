@@ -1,7 +1,6 @@
 using System.Globalization;
 using System.Security.Cryptography;
 using System.Text;
-using ArchLinterNet.Core.Contracts;
 using ArchLinterNet.Core.Contracts.Validators;
 using ArchLinterNet.Core.Model;
 
@@ -10,36 +9,52 @@ namespace ArchLinterNet.Core.Execution;
 /// <summary>Filters, fingerprints, orders, and deduplicates trusted external SARIF diagnostics.</summary>
 public sealed class SarifExternalDiagnosticSelector
 {
-    /// <summary>Selects only policy-authorized diagnostics from already trusted reader results.</summary>
+    /// <summary>Selects only diagnostics authorized by their immutable trusted-reader snapshots.</summary>
     public SarifExternalDiagnosticSelectionResult Select(
         IEnumerable<SarifExternalDiagnosticSelectionInput> inputs,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(inputs);
 
+        SarifExternalDiagnosticSelectionInput[] validatedInputs = inputs
+            .Select(ValidateInput)
+            .ToArray();
         var candidates = new List<SelectionCandidate>();
         var mismatches = new List<SarifExternalDiagnosticFilterMismatch>();
-        foreach (SarifExternalDiagnosticSelectionInput input in inputs)
+
+        foreach (IGrouping<string, SarifExternalDiagnosticSelectionInput> group in validatedInputs
+                     .GroupBy(input => input.Evidence.Authorization!.GroupIdentity, StringComparer.Ordinal)
+                     .OrderBy(group => group.Key, StringComparer.Ordinal))
         {
             cancellationToken.ThrowIfCancellationRequested();
-            ValidateInput(input);
-            ArchitectureExternalEvidenceDiagnosticFilter filter = input.Requirement.DiagnosticFilter!;
+            SarifExternalDiagnosticSelectionInput[] groupInputs = group.ToArray();
+            SarifEvidenceAuthorizationSnapshot authorization = groupInputs[0].Evidence.Authorization!;
+            SarifExternalDiagnosticFilterAuthorization filter = authorization.DiagnosticFilter!;
+            SourceOccurrence[] occurrences = groupInputs
+                .SelectMany(input => input.Evidence.SourceDiagnostics.Select(source =>
+                    new SourceOccurrence(input.Evidence, source)))
+                .ToArray();
+
             if (filter.RequireMatches)
             {
-                mismatches.AddRange(FindRequiredFilterMismatches(input, filter, cancellationToken));
+                mismatches.AddRange(FindRequiredFilterMismatches(
+                    authorization.LogicalId,
+                    filter,
+                    occurrences,
+                    cancellationToken));
             }
 
-            foreach (SarifEvidenceSourceDiagnostic source in input.Evidence.SourceDiagnostics)
+            foreach (SourceOccurrence occurrence in occurrences)
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                if (!TrySelect(filter, source, out SarifExternalDiagnosticGovernanceMode mode))
+                if (!TrySelect(filter, occurrence.Source, out SarifExternalDiagnosticGovernanceMode mode))
                 {
                     continue;
                 }
 
-                SarifExternalDiagnosticFingerprint fingerprint = SelectFingerprint(input, source);
-                string identity = CreateCanonicalIdentity(input, source, fingerprint);
-                candidates.Add(new SelectionCandidate(input, source, mode, fingerprint, identity));
+                SarifExternalDiagnosticFingerprint fingerprint = SelectFingerprint(occurrence.Evidence, occurrence.Source);
+                string identity = CreateCanonicalIdentity(occurrence.Evidence, occurrence.Source, mode, fingerprint);
+                candidates.Add(new SelectionCandidate(occurrence.Evidence, occurrence.Source, mode, fingerprint, identity));
             }
         }
 
@@ -57,99 +72,119 @@ public sealed class SarifExternalDiagnosticSelector
         return new SarifExternalDiagnosticSelectionResult(diagnostics, orderedMismatches);
     }
 
-    private static void ValidateInput(SarifExternalDiagnosticSelectionInput input)
+    private static SarifExternalDiagnosticSelectionInput ValidateInput(
+        SarifExternalDiagnosticSelectionInput input)
     {
         ArgumentNullException.ThrowIfNull(input);
-        if (input.Requirement.DiagnosticFilter is null)
-        {
-            throw new ArgumentException(
-                "Each selected external-evidence requirement must declare diagnostic_filter.",
-                nameof(input));
-        }
-
-        if (!input.Evidence.IsValid)
+        SarifEvidenceReadResult evidence = input.Evidence;
+        if (!evidence.IsValid)
         {
             throw new ArgumentException(
                 "External diagnostics can be selected only from a valid trusted evidence result.",
                 nameof(input));
         }
 
-        if (!string.Equals(input.Requirement.Id, input.Evidence.LogicalId, StringComparison.Ordinal))
+        SarifEvidenceAuthorizationSnapshot? authorization = evidence.Authorization;
+        if (authorization?.DiagnosticFilter is null)
         {
             throw new ArgumentException(
-                "The trusted evidence logical identity must match its selecting policy requirement.",
+                "Each selected external-evidence result must have a diagnostic_filter captured by the trust reader.",
                 nameof(input));
         }
+
+        SarifEvidenceProvenance provenance = evidence.Provenance;
+        if (!string.Equals(authorization.LogicalId, evidence.LogicalId, StringComparison.Ordinal)
+            || !string.Equals(authorization.Tool, provenance.ToolName, StringComparison.Ordinal)
+            || !string.Equals(authorization.ToolVersion, provenance.ToolVersion, StringComparison.Ordinal)
+            || !string.Equals(authorization.Run, provenance.RunId, StringComparison.Ordinal)
+            || authorization.ValidatedContext is null)
+        {
+            throw new ArgumentException(
+                "The trusted evidence authorization snapshot does not match its validated provenance.",
+                nameof(input));
+        }
+
+        return input;
     }
 
     private static IEnumerable<SarifExternalDiagnosticFilterMismatch> FindRequiredFilterMismatches(
-        SarifExternalDiagnosticSelectionInput input,
-        ArchitectureExternalEvidenceDiagnosticFilter filter,
+        string logicalEvidenceId,
+        SarifExternalDiagnosticFilterAuthorization filter,
+        IReadOnlyList<SourceOccurrence> occurrences,
         CancellationToken cancellationToken)
     {
-        foreach (string ruleId in filter.RuleIds)
+        var matchedRuleIds = new HashSet<string>(StringComparer.Ordinal);
+        var matchedRuleTags = new HashSet<string>(StringComparer.Ordinal);
+        var matchedProjects = new HashSet<string>(StringComparer.Ordinal);
+        var matchedPathPrefixes = new HashSet<string>(StringComparer.Ordinal);
+        var matchedSeverities = new HashSet<string>(StringComparer.Ordinal);
+
+        foreach (SourceOccurrence occurrence in occurrences)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            if (!input.Evidence.SourceDiagnostics.Any(source =>
-                    string.Equals(source.RuleId, ruleId, StringComparison.Ordinal)
-                    && MatchesExcept(filter, source, SarifExternalDiagnosticFilterDimension.RuleId)))
+            SarifEvidenceSourceDiagnostic source = occurrence.Source;
+            if (MatchesExcept(filter, source, SarifExternalDiagnosticFilterDimension.RuleId)
+                && source.RuleId is not null)
             {
-                yield return new SarifExternalDiagnosticFilterMismatch(
-                    input.Requirement.Id, SarifExternalDiagnosticFilterDimension.RuleId, ruleId);
+                matchedRuleIds.Add(source.RuleId);
+            }
+
+            if (MatchesExcept(filter, source, SarifExternalDiagnosticFilterDimension.RuleTag))
+            {
+                matchedRuleTags.UnionWith(source.DriverRuleTags);
+            }
+
+            if (MatchesExcept(filter, source, SarifExternalDiagnosticFilterDimension.Project)
+                && source.Project is not null)
+            {
+                matchedProjects.Add(source.Project);
+            }
+
+            if (MatchesExcept(filter, source, SarifExternalDiagnosticFilterDimension.PathPrefix))
+            {
+                matchedPathPrefixes.UnionWith(filter.PathPrefixes.Where(prefix =>
+                    MatchesPathPrefix(source.PrimaryLocation?.Path, prefix)));
+            }
+
+            if (MatchesExcept(filter, source, SarifExternalDiagnosticFilterDimension.Severity))
+            {
+                matchedSeverities.Add(SeverityToken(source.SourceSeverity));
             }
         }
 
-        foreach (string tag in filter.RuleTags)
+        foreach (string ruleId in filter.RuleIds.Where(ruleId => !matchedRuleIds.Contains(ruleId)))
         {
-            cancellationToken.ThrowIfCancellationRequested();
-            if (!input.Evidence.SourceDiagnostics.Any(source =>
-                    source.DriverRuleTags.Contains(tag, StringComparer.Ordinal)
-                    && MatchesExcept(filter, source, SarifExternalDiagnosticFilterDimension.RuleTag)))
-            {
-                yield return new SarifExternalDiagnosticFilterMismatch(
-                    input.Requirement.Id, SarifExternalDiagnosticFilterDimension.RuleTag, tag);
-            }
+            yield return new SarifExternalDiagnosticFilterMismatch(
+                logicalEvidenceId, SarifExternalDiagnosticFilterDimension.RuleId, ruleId);
         }
 
-        foreach (string project in filter.Projects)
+        foreach (string tag in filter.RuleTags.Where(tag => !matchedRuleTags.Contains(tag)))
         {
-            cancellationToken.ThrowIfCancellationRequested();
-            if (!input.Evidence.SourceDiagnostics.Any(source =>
-                    string.Equals(source.Project, project, StringComparison.Ordinal)
-                    && MatchesExcept(filter, source, SarifExternalDiagnosticFilterDimension.Project)))
-            {
-                yield return new SarifExternalDiagnosticFilterMismatch(
-                    input.Requirement.Id, SarifExternalDiagnosticFilterDimension.Project, project);
-            }
+            yield return new SarifExternalDiagnosticFilterMismatch(
+                logicalEvidenceId, SarifExternalDiagnosticFilterDimension.RuleTag, tag);
         }
 
-        foreach (string pathPrefix in filter.PathPrefixes)
+        foreach (string project in filter.Projects.Where(project => !matchedProjects.Contains(project)))
         {
-            cancellationToken.ThrowIfCancellationRequested();
-            if (!input.Evidence.SourceDiagnostics.Any(source =>
-                    MatchesPathPrefix(source.PrimaryLocation?.Path, pathPrefix)
-                    && MatchesExcept(filter, source, SarifExternalDiagnosticFilterDimension.PathPrefix)))
-            {
-                yield return new SarifExternalDiagnosticFilterMismatch(
-                    input.Requirement.Id, SarifExternalDiagnosticFilterDimension.PathPrefix, pathPrefix);
-            }
+            yield return new SarifExternalDiagnosticFilterMismatch(
+                logicalEvidenceId, SarifExternalDiagnosticFilterDimension.Project, project);
         }
 
-        foreach (string sourceSeverity in filter.Severity.Keys.OrderBy(key => key, StringComparer.Ordinal))
+        foreach (string prefix in filter.PathPrefixes.Where(prefix => !matchedPathPrefixes.Contains(prefix)))
         {
-            cancellationToken.ThrowIfCancellationRequested();
-            if (!input.Evidence.SourceDiagnostics.Any(source =>
-                    string.Equals(SeverityToken(source.SourceSeverity), sourceSeverity, StringComparison.Ordinal)
-                    && MatchesExcept(filter, source, SarifExternalDiagnosticFilterDimension.Severity)))
-            {
-                yield return new SarifExternalDiagnosticFilterMismatch(
-                    input.Requirement.Id, SarifExternalDiagnosticFilterDimension.Severity, sourceSeverity);
-            }
+            yield return new SarifExternalDiagnosticFilterMismatch(
+                logicalEvidenceId, SarifExternalDiagnosticFilterDimension.PathPrefix, prefix);
+        }
+
+        foreach (string severity in filter.Severity.Keys.Where(severity => !matchedSeverities.Contains(severity)))
+        {
+            yield return new SarifExternalDiagnosticFilterMismatch(
+                logicalEvidenceId, SarifExternalDiagnosticFilterDimension.Severity, severity);
         }
     }
 
     private static bool TrySelect(
-        ArchitectureExternalEvidenceDiagnosticFilter filter,
+        SarifExternalDiagnosticFilterAuthorization filter,
         SarifEvidenceSourceDiagnostic source,
         out SarifExternalDiagnosticGovernanceMode mode)
     {
@@ -164,7 +199,7 @@ public sealed class SarifExternalDiagnosticSelector
     }
 
     private static bool MatchesExcept(
-        ArchitectureExternalEvidenceDiagnosticFilter filter,
+        SarifExternalDiagnosticFilterAuthorization filter,
         SarifEvidenceSourceDiagnostic source,
         SarifExternalDiagnosticFilterDimension? excludedDimension)
     {
@@ -198,7 +233,7 @@ public sealed class SarifExternalDiagnosticSelector
     }
 
     private static SarifExternalDiagnosticFingerprint SelectFingerprint(
-        SarifExternalDiagnosticSelectionInput input,
+        SarifEvidenceReadResult evidence,
         SarifEvidenceSourceDiagnostic source)
     {
         SarifEvidenceSourceFingerprint? preferredSource = source.Fingerprints
@@ -216,33 +251,36 @@ public sealed class SarifExternalDiagnosticSelector
 
         return new SarifExternalDiagnosticFingerprint(
             SarifExternalDiagnosticFingerprintOrigin.Deterministic,
-            "sha256:" + StableHash(FallbackIdentityParts(input, source)));
+            "sha256:" + StableHash(FallbackIdentityParts(evidence, source)));
     }
 
     private static string CreateCanonicalIdentity(
-        SarifExternalDiagnosticSelectionInput input,
+        SarifEvidenceReadResult evidence,
         SarifEvidenceSourceDiagnostic source,
+        SarifExternalDiagnosticGovernanceMode mode,
         SarifExternalDiagnosticFingerprint fingerprint)
     {
-        string?[] fingerprintParts = [
+        string?[] fingerprintParts =
+        [
             fingerprint.Origin.ToString(), fingerprint.SourceName, fingerprint.Value,
+            SeverityToken(source.SourceSeverity), mode.ToString(),
         ];
-        return "external-diagnostic:v1:"
-            + StableHash(FallbackIdentityParts(input, source).Concat(fingerprintParts));
+        return "external-diagnostic:v2:"
+            + StableHash(FallbackIdentityParts(evidence, source).Concat(fingerprintParts));
     }
 
     private static IEnumerable<string?> FallbackIdentityParts(
-        SarifExternalDiagnosticSelectionInput input,
+        SarifEvidenceReadResult evidence,
         SarifEvidenceSourceDiagnostic source)
     {
-        SarifEvidenceProvenance provenance = input.Evidence.Provenance;
+        SarifEvidenceProvenance provenance = evidence.Provenance;
         SarifEvidenceResolvedContext? context = provenance.Context;
         SarifEvidenceSourceLocation? location = source.PrimaryLocation;
         SarifEvidenceSourceRegion? region = location?.Region;
         return
         [
-            "external-diagnostic-fallback-v1",
-            input.Requirement.Id,
+            "external-diagnostic-fallback-v2",
+            evidence.LogicalId,
             context?.Repository,
             context?.Revision,
             context?.Scope,
@@ -266,7 +304,7 @@ public sealed class SarifExternalDiagnosticSelector
     {
         SelectionCandidate[] occurrences = group
             .OrderBy(candidate => SourceSortKey(candidate.Source), StringComparer.Ordinal)
-            .ThenBy(candidate => ProvenanceSortKey(candidate.Input.Evidence.Provenance), StringComparer.Ordinal)
+            .ThenBy(candidate => ProvenanceSortKey(candidate.Evidence.Provenance), StringComparer.Ordinal)
             .ToArray();
         foreach (SelectionCandidate _ in occurrences)
         {
@@ -274,7 +312,7 @@ public sealed class SarifExternalDiagnosticSelector
         }
 
         SarifEvidenceProvenance[] provenance = occurrences
-            .Select(candidate => candidate.Input.Evidence.Provenance)
+            .Select(candidate => candidate.Evidence.Provenance)
             .Distinct()
             .OrderBy(ProvenanceSortKey, StringComparer.Ordinal)
             .ToArray();
@@ -364,8 +402,12 @@ public sealed class SarifExternalDiagnosticSelector
         return builder.ToString();
     }
 
+    private sealed record SourceOccurrence(
+        SarifEvidenceReadResult Evidence,
+        SarifEvidenceSourceDiagnostic Source);
+
     private sealed record SelectionCandidate(
-        SarifExternalDiagnosticSelectionInput Input,
+        SarifEvidenceReadResult Evidence,
         SarifEvidenceSourceDiagnostic Source,
         SarifExternalDiagnosticGovernanceMode Mode,
         SarifExternalDiagnosticFingerprint Fingerprint,

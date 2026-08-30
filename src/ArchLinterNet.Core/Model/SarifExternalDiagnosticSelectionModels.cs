@@ -1,27 +1,4 @@
-using ArchLinterNet.Core.Contracts;
-
 namespace ArchLinterNet.Core.Model;
-
-/// <summary>One trusted evidence result together with the policy requirement that authorizes it.</summary>
-public sealed record SarifExternalDiagnosticSelectionInput
-{
-    /// <summary>Creates one authorized trusted-evidence selection input.</summary>
-    public SarifExternalDiagnosticSelectionInput(
-        ArchitectureExternalEvidenceRequirement requirement,
-        SarifEvidenceReadResult evidence)
-    {
-        ArgumentNullException.ThrowIfNull(requirement);
-        ArgumentNullException.ThrowIfNull(evidence);
-        Requirement = requirement;
-        Evidence = evidence;
-    }
-
-    /// <summary>The exact logical evidence and diagnostic-filter policy requirement.</summary>
-    public ArchitectureExternalEvidenceRequirement Requirement { get; }
-
-    /// <summary>The already trust-validated source evidence result.</summary>
-    public SarifEvidenceReadResult Evidence { get; }
-}
 
 /// <summary>The ArchLinterNet governance mode mapped from one original source severity.</summary>
 public enum SarifExternalDiagnosticGovernanceMode

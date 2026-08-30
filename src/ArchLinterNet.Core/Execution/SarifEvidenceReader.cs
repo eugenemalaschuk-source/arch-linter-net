@@ -451,12 +451,18 @@ public sealed partial class SarifEvidenceReader(IArchitectureEvidenceFileSystem?
                 contextProvenance);
         }
 
+        SarifEvidenceAuthorizationSnapshot authorization = CaptureAuthorization(
+            requirement,
+            expectedContext,
+            context.Context);
+
         return CreateResult(
             requirement.Id,
             SarifEvidenceTrustStatus.Valid,
             "The SARIF artifact contains one matching successful run bound to the assessment context.",
             contextProvenance,
-            sourceDiagnostics);
+            sourceDiagnostics,
+            authorization);
     }
 
     private static SarifEvidenceReadResult CreateResult(
@@ -464,10 +470,44 @@ public sealed partial class SarifEvidenceReader(IArchitectureEvidenceFileSystem?
         SarifEvidenceTrustStatus status,
         string detail,
         SarifEvidenceProvenance? provenance = null,
-        IReadOnlyList<SarifEvidenceSourceDiagnostic>? sourceDiagnostics = null)
+        IReadOnlyList<SarifEvidenceSourceDiagnostic>? sourceDiagnostics = null,
+        SarifEvidenceAuthorizationSnapshot? authorization = null)
     {
         provenance ??= new SarifEvidenceProvenance(logicalId, null, null, null, null, null, null, null);
-        return new SarifEvidenceReadResult(status, ReasonCode(status), detail, provenance, sourceDiagnostics);
+        return new SarifEvidenceReadResult(
+            status,
+            ReasonCode(status),
+            detail,
+            provenance,
+            sourceDiagnostics,
+            authorization);
+    }
+
+    private static SarifEvidenceAuthorizationSnapshot CaptureAuthorization(
+        ArchitectureExternalEvidenceRequirement requirement,
+        SarifEvidenceAssessmentContext assessmentContext,
+        SarifEvidenceResolvedContext validatedContext)
+    {
+        ArchitectureExternalEvidenceDiagnosticFilter? filter = requirement.DiagnosticFilter;
+        return new SarifEvidenceAuthorizationSnapshot(
+            requirement.Id,
+            requirement.Tool,
+            requirement.ToolVersion,
+            requirement.Run,
+            requirement.RequireRepository,
+            requirement.RequireRevision,
+            requirement.RequireScope,
+            assessmentContext,
+            filter is null
+                ? null
+                : new SarifExternalDiagnosticFilterAuthorization(
+                    filter.RuleIds,
+                    filter.RuleTags,
+                    filter.Projects,
+                    filter.PathPrefixes,
+                    filter.Severity,
+                    filter.RequireMatches),
+            validatedContext);
     }
 
     private static SarifEvidenceReadResult DuplicatePropertiesResult(

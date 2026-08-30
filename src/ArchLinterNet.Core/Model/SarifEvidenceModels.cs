@@ -242,7 +242,8 @@ public sealed record SarifEvidenceReadResult
         string reasonCode,
         string detail,
         SarifEvidenceProvenance provenance,
-        IReadOnlyList<SarifEvidenceSourceDiagnostic>? sourceDiagnostics = null)
+        IReadOnlyList<SarifEvidenceSourceDiagnostic>? sourceDiagnostics = null,
+        SarifEvidenceAuthorizationSnapshot? authorization = null)
     {
         Status = status;
         ReasonCode = reasonCode;
@@ -251,6 +252,7 @@ public sealed record SarifEvidenceReadResult
         SourceDiagnostics = sourceDiagnostics is null || sourceDiagnostics.Count == 0
             ? Array.Empty<SarifEvidenceSourceDiagnostic>()
             : Array.AsReadOnly(sourceDiagnostics.ToArray());
+        Authorization = authorization;
     }
 
     /// <summary>The single trust decision for this artifact.</summary>
@@ -273,6 +275,13 @@ public sealed record SarifEvidenceReadResult
     /// for a valid trusted read; trust failures never expose selectable source facts.
     /// </summary>
     public IReadOnlyList<SarifEvidenceSourceDiagnostic> SourceDiagnostics { get; }
+
+    /// <summary>
+    /// Immutable policy and assessment authorization captured when this result was trusted. It is
+    /// present only for valid reads and prevents a caller from selecting the evidence under a
+    /// different mutable policy requirement.
+    /// </summary>
+    public SarifEvidenceAuthorizationSnapshot? Authorization { get; }
 
     /// <summary>Whether the selected run is trusted evidence.</summary>
     public bool IsValid => Status == SarifEvidenceTrustStatus.Valid;

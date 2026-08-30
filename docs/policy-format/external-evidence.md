@@ -92,13 +92,23 @@ project, driver-rule tags, and SARIF fingerprint pairs together with the trust
 provenance described below. A wrong-revision or otherwise untrusted artifact
 never supplies ordinary selected diagnostics.
 
+When the reader accepts an artifact, it also captures an immutable authorization
+snapshot: the parent logical ID, tool/version/run identity, required binding
+flags, validated assessment context, and a detached copy of `diagnostic_filter`.
+The selector consumes that snapshot rather than a second mutable requirement, so
+evidence trusted for one policy cannot be reinterpreted by a later policy with
+the same `id`. For repeated artifacts with the same snapshot,
+`require_matches` is evaluated across their combined trusted results.
+
 For a selected diagnostic, ArchLinterNet preserves source-provided
 `fingerprints` where available and otherwise creates a deterministic fallback
 from stable evidence, rule, project, and normalized location facts. Neither
 fallback nor canonical selected-result identity uses a display message or
 runtime result ordering. Equivalent current-context repeated runs deduplicate
 while retaining each ordered artifact/run provenance; different logical keys,
-revisions, scopes, and source locations remain distinct.
+revisions, scopes, and source locations remain distinct. Results with different
+source severities or mapped governance modes also remain distinct, so a strict
+occurrence cannot be lost to an audit occurrence with the same fingerprint.
 
 ## Assessment context and producer/CI context
 

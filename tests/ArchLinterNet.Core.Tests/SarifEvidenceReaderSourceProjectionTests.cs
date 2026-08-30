@@ -23,7 +23,7 @@ public sealed class SarifEvidenceReaderSourceProjectionTests
             "scan.sarif",
             Sarif(
                 "\"rules\":[{\"id\":\"SEC100\",\"properties\":{\"tags\":[\"security\",\"injection\"]}},{\"id\":\"OTHER\",\"properties\":{\"tags\":[\"other\"]}}]",
-                "{\"ruleId\":\"SEC100\",\"message\":{\"text\":\"unsafe input\"},\"level\":\"error\",\"properties\":{\"project\":\"App\"},\"locations\":[{\"physicalLocation\":{\"artifactLocation\":{\"uri\":\"src\\\\App.cs\"},\"region\":{\"startLine\":7,\"startColumn\":3,\"endLine\":7,\"endColumn\":9}}}],\"fingerprints\":{\"primary\":\"abc\"},\"partialFingerprints\":{\"partial\":\"def\"}}"));
+                "{\"ruleId\":\"SEC100\",\"message\":{\"text\":\"unsafe input\"},\"level\":\"error\",\"properties\":{\"project\":\"App\"},\"locations\":[{\"physicalLocation\":{\"artifactLocation\":{\"uri\":\"src\\\\App.cs\"},\"region\":{\"startLine\":7,\"startColumn\":3,\"endLine\":7,\"endColumn\":9}}}],\"fingerprints\":{\"zeta\":\"z-value\",\"alpha\":\"a-value\"},\"partialFingerprints\":{\"zeta-partial\":\"z-value\",\"alpha-partial\":\"a-value\"}}"));
 
         SarifEvidenceReadResult result = new SarifEvidenceReader().Read(
             Requirement(),
@@ -44,15 +44,28 @@ public sealed class SarifEvidenceReaderSourceProjectionTests
             Assert.That(diagnostic.PrimaryLocation.Region!.StartLine, Is.EqualTo(7));
             Assert.That(diagnostic.PrimaryLocation.Region.EndColumn, Is.EqualTo(9));
             Assert.That(diagnostic.DriverRuleTags, Is.EqualTo(new[] { "security", "injection" }));
-            Assert.That(diagnostic.Fingerprints.Single(), Is.EqualTo(
-                new SarifEvidenceSourceFingerprint("primary", "abc")));
-            Assert.That(diagnostic.PartialFingerprints.Single(), Is.EqualTo(
-                new SarifEvidenceSourceFingerprint("partial", "def", isPartial: true)));
+            Assert.That(diagnostic.Fingerprints, Is.EqualTo(new[]
+            {
+                new SarifEvidenceSourceFingerprint("alpha", "a-value"),
+                new SarifEvidenceSourceFingerprint("zeta", "z-value"),
+            }));
+            Assert.That(diagnostic.PartialFingerprints, Is.EqualTo(new[]
+            {
+                new SarifEvidenceSourceFingerprint("alpha-partial", "a-value", isPartial: true),
+                new SarifEvidenceSourceFingerprint("zeta-partial", "z-value", isPartial: true),
+            }));
+            Assert.That(diagnostic.FingerprintPairs, Is.EqualTo(new[]
+            {
+                new SarifEvidenceSourceFingerprint("alpha", "a-value"),
+                new SarifEvidenceSourceFingerprint("zeta", "z-value"),
+                new SarifEvidenceSourceFingerprint("alpha-partial", "a-value", isPartial: true),
+                new SarifEvidenceSourceFingerprint("zeta-partial", "z-value", isPartial: true),
+            }));
         });
     }
 
     [Test]
-    public void Read_AbsentOptionalSourceFactsRemainAbsentAndLevelIsUnspecified()
+    public void Read_MissingResultMessageIsRejectedFailClosed()
     {
         _repository.AddUtf8File("scan.sarif", Sarif(string.Empty, "{}"));
 
@@ -62,17 +75,97 @@ public sealed class SarifEvidenceReaderSourceProjectionTests
             new SarifEvidenceArtifactReference("scan.sarif", "external.scan"),
             new SarifEvidenceAssessmentContext("repo", "revision"));
 
-        SarifEvidenceSourceDiagnostic diagnostic = result.SourceDiagnostics.Single();
         Assert.Multiple(() =>
         {
-            Assert.That(result.Status, Is.EqualTo(SarifEvidenceTrustStatus.Valid));
-            Assert.That(diagnostic.Message, Is.Null);
-            Assert.That(diagnostic.RuleId, Is.Null);
-            Assert.That(diagnostic.SourceSeverity, Is.EqualTo(SarifEvidenceSourceSeverity.Unspecified));
-            Assert.That(diagnostic.PrimaryLocation, Is.Null);
-            Assert.That(diagnostic.Project, Is.Null);
-            Assert.That(diagnostic.DriverRuleTags, Is.Empty);
-            Assert.That(diagnostic.FingerprintPairs, Is.Empty);
+            Assert.That(result.Status, Is.EqualTo(SarifEvidenceTrustStatus.UnsupportedShape));
+            Assert.That(result.Detail, Does.Contain("must contain a message"));
+            Assert.That(result.SourceDiagnostics, Is.Empty);
+        });
+    }
+
+    [Test]
+    public void Read_MessageIdWithoutResolvedTextIsRejectedFailClosed()
+    {
+        _repository.AddUtf8File(
+            "scan.sarif",
+            Sarif(string.Empty, "{\"ruleId\":\"SEC100\",\"message\":{\"id\":\"message-1\"}}"));
+
+        SarifEvidenceReadResult result = new SarifEvidenceReader().Read(
+            Requirement(),
+            _repository.Root,
+            new SarifEvidenceArtifactReference("scan.sarif", "external.scan"),
+            new SarifEvidenceAssessmentContext("repo", "revision"));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(result.Status, Is.EqualTo(SarifEvidenceTrustStatus.UnsupportedShape));
+            Assert.That(result.Detail, Does.Contain("message.id"));
+            Assert.That(result.SourceDiagnostics, Is.Empty);
+        });
+    }
+
+    [Test]
+    public void Read_ResolvesRuleReferencesByIdAndIndex()
+    {
+        const string rules = "\"rules\":[{\"id\":\"SEC100\"},{\"id\":\"SEC200\"}]";
+        string results =
+            "[{\"rule\":{\"id\":\"SEC100\"},\"message\":{\"text\":\"by id\"}}," +
+            "{\"ruleIndex\":1,\"message\":{\"text\":\"by index\"}}]";
+        _repository.AddUtf8File("scan.sarif", Sarif(rules, results));
+
+        SarifEvidenceReadResult result = new SarifEvidenceReader().Read(
+            Requirement(),
+            _repository.Root,
+            new SarifEvidenceArtifactReference("scan.sarif", "external.scan"),
+            new SarifEvidenceAssessmentContext("repo", "revision"));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(result.Status, Is.EqualTo(SarifEvidenceTrustStatus.Valid), result.Detail);
+            Assert.That(result.SourceDiagnostics.Select(diagnostic => diagnostic.RuleId), Is.EqualTo(new[] { "SEC100", "SEC200" }));
+        });
+    }
+
+    [Test]
+    public void Read_ResolvesArtifactIndexesAndKeepsDistinctPaths()
+    {
+        const string artifacts = "\"artifacts\":[{\"location\":{\"uri\":\"src/A.cs\"}},{\"location\":{\"uri\":\"src/B.cs\"}}]";
+        string results =
+            "[{\"ruleId\":\"SEC100\",\"message\":{\"text\":\"first\"},\"locations\":[{\"physicalLocation\":{\"artifactLocation\":{\"index\":0}}}]}," +
+            "{\"ruleId\":\"SEC100\",\"message\":{\"text\":\"second\"},\"locations\":[{\"physicalLocation\":{\"artifactLocation\":{\"index\":1}}}]}]";
+        _repository.AddUtf8File("scan.sarif", Sarif(string.Empty, results, artifacts));
+
+        SarifEvidenceReadResult result = new SarifEvidenceReader().Read(
+            Requirement(),
+            _repository.Root,
+            new SarifEvidenceArtifactReference("scan.sarif", "external.scan"),
+            new SarifEvidenceAssessmentContext("repo", "revision"));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(result.Status, Is.EqualTo(SarifEvidenceTrustStatus.Valid), result.Detail);
+            Assert.That(result.SourceDiagnostics.Select(diagnostic => diagnostic.PrimaryLocation!.Path), Is.EqualTo(new[] { "src/A.cs", "src/B.cs" }));
+        });
+    }
+
+    [Test]
+    public void Read_UnresolvableArtifactIndexIsRejectedFailClosed()
+    {
+        _repository.AddUtf8File(
+            "scan.sarif",
+            Sarif(string.Empty, "{\"ruleId\":\"SEC100\",\"message\":{\"text\":\"missing artifact\"},\"locations\":[{\"physicalLocation\":{\"artifactLocation\":{\"index\":3}}}]}"));
+
+        SarifEvidenceReadResult result = new SarifEvidenceReader().Read(
+            Requirement(),
+            _repository.Root,
+            new SarifEvidenceArtifactReference("scan.sarif", "external.scan"),
+            new SarifEvidenceAssessmentContext("repo", "revision"));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(result.Status, Is.EqualTo(SarifEvidenceTrustStatus.UnsupportedShape));
+            Assert.That(result.Detail, Does.Contain("cannot be resolved"));
+            Assert.That(result.SourceDiagnostics, Is.Empty);
         });
     }
 
@@ -115,9 +208,11 @@ public sealed class SarifEvidenceReaderSourceProjectionTests
         RequireRevision = true,
     };
 
-    private static string Sarif(string driverMembers, string result) =>
+    private static string Sarif(string driverMembers, string result, string runMembers = "") =>
         "{\"version\":\"2.1.0\",\"runs\":[{\"tool\":{\"driver\":{\"name\":\"Acme.Scanner\",\"version\":\"7.2\"" +
         (string.IsNullOrEmpty(driverMembers) ? string.Empty : "," + driverMembers) +
         "}},\"automationDetails\":{\"id\":\"assessment-42\"},\"invocations\":[{\"executionSuccessful\":true}]," +
-        "\"versionControlProvenance\":[{\"repositoryUri\":\"repo\",\"revisionId\":\"revision\"}],\"results\":[" + result + "]}]}";
+        (string.IsNullOrEmpty(runMembers) ? string.Empty : runMembers + ",") +
+        "\"versionControlProvenance\":[{\"repositoryUri\":\"repo\",\"revisionId\":\"revision\"}],\"results\":" +
+        (result.TrimStart().StartsWith("[", StringComparison.Ordinal) ? result : "[" + result + "]") + "}]}";
 }

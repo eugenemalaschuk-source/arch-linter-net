@@ -121,15 +121,16 @@ public sealed record SarifEvidenceSourceDiagnostic
         SourceSeverity = sourceSeverity;
         PrimaryLocation = primaryLocation;
         Project = project;
-        DriverRuleTags = ReadOnlyCopy(driverRuleTags);
-        Fingerprints = ReadOnlyCopy(fingerprints);
-        PartialFingerprints = ReadOnlyCopy(partialFingerprints);
+        DriverRuleTags = CopyStrings(driverRuleTags);
+        Fingerprints = CopyFingerprints(fingerprints);
+        PartialFingerprints = CopyFingerprints(partialFingerprints);
 
         List<SarifEvidenceSourceFingerprint> allFingerprints =
             new(Fingerprints.Count + PartialFingerprints.Count);
         allFingerprints.AddRange(Fingerprints);
         allFingerprints.AddRange(PartialFingerprints);
-        FingerprintPairs = ReadOnlyCopy(allFingerprints);
+        allFingerprints.Sort(CompareFingerprintPairs);
+        FingerprintPairs = Array.AsReadOnly(allFingerprints.ToArray());
     }
 
     /// <summary>The original SARIF result message text, when supplied.</summary>
@@ -150,28 +151,66 @@ public sealed record SarifEvidenceSourceDiagnostic
     /// <summary>Tags attached to the matching SARIF driver rule by exact rule id.</summary>
     public IReadOnlyList<string> DriverRuleTags { get; }
 
-    /// <summary>String-valued SARIF <c>fingerprints</c> pairs in source order.</summary>
+    /// <summary>String-valued SARIF <c>fingerprints</c> pairs in ordinal name/value order.</summary>
     public IReadOnlyList<SarifEvidenceSourceFingerprint> Fingerprints { get; }
 
-    /// <summary>String-valued SARIF <c>partialFingerprints</c> pairs in source order.</summary>
+    /// <summary>String-valued SARIF <c>partialFingerprints</c> pairs in ordinal name/value order.</summary>
     public IReadOnlyList<SarifEvidenceSourceFingerprint> PartialFingerprints { get; }
 
-    /// <summary>All source fingerprint pairs, full pairs followed by partial pairs.</summary>
+    /// <summary>All source fingerprint pairs in ordinal partial/name/value order.</summary>
     public IReadOnlyList<SarifEvidenceSourceFingerprint> FingerprintPairs { get; }
 
-    private static IReadOnlyList<T> ReadOnlyCopy<T>(IReadOnlyList<T>? values)
+    private static IReadOnlyList<string> CopyStrings(IReadOnlyList<string>? values)
     {
         if (values is null || values.Count == 0)
         {
-            return Array.Empty<T>();
+            return Array.Empty<string>();
         }
 
-        T[] copy = new T[values.Count];
+        string[] copy = new string[values.Count];
         for (int index = 0; index < values.Count; index++)
         {
             copy[index] = values[index];
         }
 
         return Array.AsReadOnly(copy);
+    }
+
+    private static IReadOnlyList<SarifEvidenceSourceFingerprint> CopyFingerprints(
+        IReadOnlyList<SarifEvidenceSourceFingerprint>? values)
+    {
+        if (values is null || values.Count == 0)
+        {
+            return Array.Empty<SarifEvidenceSourceFingerprint>();
+        }
+
+        SarifEvidenceSourceFingerprint[] copy = new SarifEvidenceSourceFingerprint[values.Count];
+        for (int index = 0; index < values.Count; index++)
+        {
+            copy[index] = values[index];
+        }
+
+        Array.Sort(copy, CompareFingerprintNamesAndValues);
+        return Array.AsReadOnly(copy);
+    }
+
+    private static int CompareFingerprintNamesAndValues(
+        SarifEvidenceSourceFingerprint left,
+        SarifEvidenceSourceFingerprint right)
+    {
+        int nameComparison = string.Compare(left.Name, right.Name, StringComparison.Ordinal);
+        return nameComparison != 0
+            ? nameComparison
+            : string.Compare(left.Value, right.Value, StringComparison.Ordinal);
+    }
+
+    private static int CompareFingerprintPairs(
+        SarifEvidenceSourceFingerprint left,
+        SarifEvidenceSourceFingerprint right)
+    {
+        int partialComparison = left.IsPartial.CompareTo(right.IsPartial);
+        return partialComparison != 0
+            ? partialComparison
+            : CompareFingerprintNamesAndValues(left, right);
     }
 }
