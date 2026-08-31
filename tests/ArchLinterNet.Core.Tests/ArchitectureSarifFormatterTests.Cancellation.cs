@@ -49,6 +49,27 @@ public sealed partial class ArchitectureSarifFormatterTests
             "both preflight entries were materialized before cancellation was observed — the exception must come from the final sort's per-comparison check");
     }
 
+    [Test]
+    public void FormatFindingsAsSarif_CancelledAfterEntryMaterialization_ThrowsFromFinalSort()
+    {
+        ArchitectureFinding[] findings =
+        [
+            ArchitectureFindingMapper.FromDiagnostic(new CycleDiagnostic("z-contract", "z-rule", "Z -> Z"), "strict"),
+            ArchitectureFindingMapper.FromDiagnostic(new CycleDiagnostic("a-contract", "a-rule", "A -> A"), "strict"),
+        ];
+        var collection = new CancelOnTerminationCollection<ArchitectureFinding>(findings);
+        using CancellationTokenSource cts = new();
+        collection.CancellationTokenSource = cts;
+
+        Assert.Throws<OperationCanceledException>(() => ArchitectureSarifFormatter.FormatFindingsAsSarif(
+            collection,
+            "1.2.3",
+            cts.Token));
+
+        Assert.That(collection.FetchedCount, Is.EqualTo(findings.Length),
+            "both findings were materialized before cancellation was observed — the exception must come from the final sort's per-comparison check");
+    }
+
     private sealed class CancelOnTerminationCollection<T> : IReadOnlyCollection<T>
     {
         private readonly IReadOnlyList<T> _items;

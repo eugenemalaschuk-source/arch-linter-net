@@ -1,6 +1,8 @@
 using ArchLinterNet.Core.Contracts;
 using ArchLinterNet.Core.Execution;
 using ArchLinterNet.Core.Model;
+using ArchLinterNet.Core.Reporting;
+using ArchLinterNet.Core.Validation;
 using NUnit.Framework;
 
 namespace ArchLinterNet.Core.Tests;
@@ -58,6 +60,7 @@ public sealed class SarifExternalDiagnosticSelectorTests
         Assert.Multiple(() =>
         {
             Assert.That(result.FilterMismatches, Is.Empty);
+            Assert.That(result.ProcessedLogicalEvidenceIds, Is.EqualTo(["external.scan"]));
             Assert.That(strict.Fingerprint, Is.EqualTo(new SarifExternalDiagnosticFingerprint(
                 SarifExternalDiagnosticFingerprintOrigin.Source,
                 "a-value",
@@ -69,6 +72,30 @@ public sealed class SarifExternalDiagnosticSelectorTests
             Assert.That(audit.Fingerprint.Origin, Is.EqualTo(SarifExternalDiagnosticFingerprintOrigin.Deterministic));
             Assert.That(audit.Fingerprint.Value, Does.StartWith("sha256:"));
             Assert.That(audit.Fingerprint.Value, Does.Match("^sha256:[0-9a-f]{64}$"));
+        });
+    }
+
+    [Test]
+    public void Select_RecordsAProcessedControlWhenNoDiagnosticIsSelected()
+    {
+        ArchitectureExternalEvidenceRequirement requirement = Requirement(
+            ruleIds: ["SEC404"],
+            severity: new Dictionary<string, string> { ["error"] = "strict" });
+        SarifEvidenceReadResult evidence = Read(
+            requirement,
+            "zero-result.sarif",
+            Results(Result("SEC100", "error", "src/App/One.cs", "not selected")));
+
+        SarifExternalDiagnosticSelectionResult result = new SarifExternalDiagnosticSelector().Select(
+        [
+            new SarifExternalDiagnosticSelectionInput(evidence),
+        ]);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(result.Diagnostics, Is.Empty);
+            Assert.That(result.FilterMismatches, Is.Empty);
+            Assert.That(result.ProcessedLogicalEvidenceIds, Is.EqualTo(["external.scan"]));
         });
     }
 
@@ -198,6 +225,88 @@ public sealed class SarifExternalDiagnosticSelectorTests
             Assert.That(
                 result.Diagnostics.Select(diagnostic => diagnostic.Fingerprint.Origin),
                 Is.All.EqualTo(SarifExternalDiagnosticFingerprintOrigin.Deterministic));
+        });
+    }
+
+    [Test]
+    public void Select_ProjectAndBaseline_PreserveV2ToolVersionSemanticsWithoutRunOrArtifactChurn()
+    {
+        ArchitectureExternalEvidenceRequirement firstRequirement = Requirement(
+            ruleIds: ["SEC100"],
+            severity: new Dictionary<string, string> { ["error"] = "strict" });
+        ArchitectureExternalEvidenceRequirement upgradedRequirement = Requirement(
+            ruleIds: ["SEC100"],
+            severity: new Dictionary<string, string> { ["error"] = "strict" });
+        upgradedRequirement.ToolVersion = "7.3";
+        upgradedRequirement.Run = "assessment-43";
+        ArchitectureExternalEvidenceRequirement rerunRequirement = Requirement(
+            ruleIds: ["SEC100"],
+            severity: new Dictionary<string, string> { ["error"] = "strict" });
+        rerunRequirement.Run = "assessment-43";
+
+        SarifEvidenceReadResult firstEvidence = Read(
+            firstRequirement,
+            "artifacts/first.sarif",
+            Results(Result("SEC100", "error", "src/App/Shared.cs", "same governed occurrence", "{\"stable\":\"same\"}")),
+            toolVersion: "7.2",
+            runId: "assessment-42");
+        SarifEvidenceReadResult upgradedEvidence = Read(
+            upgradedRequirement,
+            "reports/upgraded.sarif",
+            Results(Result("SEC100", "error", "src/App/Shared.cs", "same governed occurrence", "{\"stable\":\"same\"}")),
+            toolVersion: "7.3",
+            runId: "assessment-43");
+        SarifEvidenceReadResult rerunEvidence = Read(
+            rerunRequirement,
+            "reports/rerun.sarif",
+            Results(Result("SEC100", "error", "src/App/Shared.cs", "same governed occurrence", "{\"stable\":\"same\"}")),
+            toolVersion: "7.2",
+            runId: "assessment-43");
+        var selector = new SarifExternalDiagnosticSelector();
+
+        SarifExternalDiagnosticSelectionResult firstSelection = selector.Select(
+        [
+            new SarifExternalDiagnosticSelectionInput(firstEvidence),
+        ]);
+        SarifExternalDiagnosticSelectionResult upgradedSelection = selector.Select(
+        [
+            new SarifExternalDiagnosticSelectionInput(upgradedEvidence),
+        ]);
+        SarifExternalDiagnosticSelectionResult rerunSelection = selector.Select(
+        [
+            new SarifExternalDiagnosticSelectionInput(rerunEvidence),
+        ]);
+        ImportedExternalDiagnosticProjection firstProjection = ArchitectureImportedDiagnosticProjector.Project(firstSelection);
+        ImportedExternalDiagnosticProjection upgradedProjection = ArchitectureImportedDiagnosticProjector.Project(upgradedSelection);
+        ImportedExternalDiagnosticProjection rerunProjection = ArchitectureImportedDiagnosticProjector.Project(rerunSelection);
+        ArchitectureBaselineCandidate firstBaseline = ArchitectureImportedDiagnosticBaselineProjector
+            .ToBaselineCandidates(firstSelection)
+            .Single();
+        ArchitectureBaselineCandidate upgradedBaseline = ArchitectureImportedDiagnosticBaselineProjector
+            .ToBaselineCandidates(upgradedSelection)
+            .Single();
+        ArchitectureBaselineCandidate rerunBaseline = ArchitectureImportedDiagnosticBaselineProjector
+            .ToBaselineCandidates(rerunSelection)
+            .Single();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(firstEvidence.Provenance.ToolVersion, Is.EqualTo("7.2"));
+            Assert.That(upgradedEvidence.Provenance.ToolVersion, Is.EqualTo("7.3"));
+            Assert.That(firstEvidence.Provenance.RunId, Is.EqualTo("assessment-42"));
+            Assert.That(upgradedEvidence.Provenance.RunId, Is.EqualTo("assessment-43"));
+            Assert.That(firstEvidence.Provenance.ArtifactPath, Is.Not.EqualTo(upgradedEvidence.Provenance.ArtifactPath));
+            Assert.That(firstEvidence.Provenance.ArtifactSha256, Is.Not.EqualTo(upgradedEvidence.Provenance.ArtifactSha256));
+            Assert.That(firstSelection.Diagnostics.Single().CanonicalIdentity,
+                Is.Not.EqualTo(upgradedSelection.Diagnostics.Single().CanonicalIdentity));
+            Assert.That(firstSelection.Diagnostics.Single().CanonicalIdentity,
+                Is.EqualTo(rerunSelection.Diagnostics.Single().CanonicalIdentity));
+            Assert.That(firstProjection.Findings.Single().CanonicalIdentity,
+                Is.Not.EqualTo(upgradedProjection.Findings.Single().CanonicalIdentity));
+            Assert.That(firstProjection.Findings.Single().CanonicalIdentity,
+                Is.EqualTo(rerunProjection.Findings.Single().CanonicalIdentity));
+            Assert.That(firstBaseline.Identity, Is.Not.EqualTo(upgradedBaseline.Identity));
+            Assert.That(firstBaseline.Identity, Is.EqualTo(rerunBaseline.Identity));
         });
     }
 
@@ -497,9 +606,11 @@ public sealed class SarifExternalDiagnosticSelectorTests
         string path,
         string results,
         string revision = "revision",
-        string? artifactRevision = null)
+        string? artifactRevision = null,
+        string toolVersion = "7.2",
+        string runId = "assessment-42")
     {
-        _repository.AddUtf8File(path, Sarif(results, artifactRevision ?? revision));
+        _repository.AddUtf8File(path, Sarif(results, artifactRevision ?? revision, toolVersion, runId));
         return new SarifEvidenceReader().Read(
             requirement,
             _repository.Root,
@@ -523,10 +634,14 @@ public sealed class SarifExternalDiagnosticSelectorTests
         + (partialFingerprints is null ? string.Empty : ",\"partialFingerprints\":" + partialFingerprints)
         + "}";
 
-    private static string Sarif(string results, string revision) =>
-        "{\"version\":\"2.1.0\",\"runs\":[{\"tool\":{\"driver\":{\"name\":\"Acme.Scanner\",\"version\":\"7.2\","
+    private static string Sarif(
+        string results,
+        string revision,
+        string toolVersion = "7.2",
+        string runId = "assessment-42") =>
+        "{\"version\":\"2.1.0\",\"runs\":[{\"tool\":{\"driver\":{\"name\":\"Acme.Scanner\",\"version\":\"" + toolVersion + "\","
         + "\"rules\":[{\"id\":\"SEC100\",\"properties\":{\"tags\":[\"security\",\"code\"]}}]}},"
-        + "\"automationDetails\":{\"id\":\"assessment-42\"},\"invocations\":[{\"executionSuccessful\":true}],"
+        + "\"automationDetails\":{\"id\":\"" + runId + "\"},\"invocations\":[{\"executionSuccessful\":true}],"
         + "\"versionControlProvenance\":[{\"repositoryUri\":\"repo\",\"revisionId\":\"" + revision + "\"}],\"results\":"
         + results + "}]}";
 }

@@ -129,6 +129,30 @@ revisions, scopes, and source locations remain distinct. Results with different
 source severities or mapped governance modes also remain distinct, so a strict
 occurrence cannot be lost to an audit occurrence with the same fingerprint.
 
+## Normalized finding consumption
+
+`SarifExternalDiagnosticSelector` produces selected diagnostics only from trusted reader results.
+`ArchitectureImportedDiagnosticProjector` converts those selected diagnostics into the ordinary
+ArchLinterNet normalized finding seam. `ArchitectureImportedDiagnosticBaselineProjector` reuses
+the resulting exact identity for baseline candidates. The projections keep the selected logical
+evidence control, policy-mapped strict/audit mode, original source rule/message/severity/location,
+source-or-fallback fingerprint, and every authorizing evidence context.
+
+The stable governed finding identity comes from the selected diagnostic's current-context/source
+identity. Artifact path, content hash, and producer run remain inspectable provenance rather than
+new debt identity, so an equivalent rerun does not create artificial baseline churn. A distinct
+logical evidence key, revision, scope, or source location stays distinct where selection made it
+distinct.
+
+Human output, normalized JSON, SARIF's `properties.arch_linter_net`, and the Testing adapter use
+the same typed facts. ArchLinterNet emits one of its own SARIF results for a normalized imported
+finding; it does not nest or copy the original SARIF log.
+
+External evidence completion uses the shared applicability projection: a trusted required
+zero-result artifact is evaluable, deliberate optional absence is not applicable, and missing,
+malformed, filter-mismatched, or wrong-context evidence is unassessable. This consumer carries the
+reader's decision forward; it does not perform a second trust check.
+
 ## Assessment context and producer/CI context
 
 The two contexts have different owners and purposes:
@@ -210,8 +234,7 @@ This declaration and reader do not provide:
 
 - analyzer execution or analyzer configuration;
 - remote URLs or vendor service APIs;
-- normalized findings, baseline/output integration, or producer-service queries
-  ([#522](https://github.com/eugenemalaschuk-source/arch-linter-net/issues/522)); or
+- producer-service queries; or
 - freshness inference from filenames, modification times, or workflow/job
   names.
 

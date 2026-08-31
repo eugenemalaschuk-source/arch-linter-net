@@ -4,20 +4,104 @@ using ArchLinterNet.Core.Reporting;
 
 namespace ArchLinterNet.Core.Validation;
 
-public sealed record ValidationOutcome(
-    bool Passed,
-    IReadOnlyCollection<ArchitectureViolation> Violations,
-    IReadOnlyCollection<string> Cycles,
-    IReadOnlyCollection<ArchitectureViolation> CoverageFindings,
-    string CoverageConfig,
-    IReadOnlyList<ArchitectureUnmatchedIgnoredViolation> UnmatchedIgnoredViolations,
-    string UnmatchedIgnoredViolationsConfig,
-    IReadOnlyCollection<PolicyConsistencyDiagnostic> PolicyConsistencyFindings,
-    string PolicyConsistencyConfig,
-    IReadOnlyCollection<ArchitectureCoverageSummary> CoverageSummaries,
-    IReadOnlyCollection<ArchitectureClassificationConflict> ClassificationConflicts,
-    IReadOnlyCollection<ArchitectureClassificationMetadataFailure> ClassificationMetadataFailures)
+public sealed record ValidationOutcome
 {
+    private bool _nativePassed;
+    private bool _passed;
+
+    public ValidationOutcome(
+        bool Passed,
+        IReadOnlyCollection<ArchitectureViolation> Violations,
+        IReadOnlyCollection<string> Cycles,
+        IReadOnlyCollection<ArchitectureViolation> CoverageFindings,
+        string CoverageConfig,
+        IReadOnlyList<ArchitectureUnmatchedIgnoredViolation> UnmatchedIgnoredViolations,
+        string UnmatchedIgnoredViolationsConfig,
+        IReadOnlyCollection<PolicyConsistencyDiagnostic> PolicyConsistencyFindings,
+        string PolicyConsistencyConfig,
+        IReadOnlyCollection<ArchitectureCoverageSummary> CoverageSummaries,
+        IReadOnlyCollection<ArchitectureClassificationConflict> ClassificationConflicts,
+        IReadOnlyCollection<ArchitectureClassificationMetadataFailure> ClassificationMetadataFailures)
+    {
+        this.Passed = Passed;
+        this.Violations = Violations;
+        this.Cycles = Cycles;
+        this.CoverageFindings = CoverageFindings;
+        this.CoverageConfig = CoverageConfig;
+        this.UnmatchedIgnoredViolations = UnmatchedIgnoredViolations;
+        this.UnmatchedIgnoredViolationsConfig = UnmatchedIgnoredViolationsConfig;
+        this.PolicyConsistencyFindings = PolicyConsistencyFindings;
+        this.PolicyConsistencyConfig = PolicyConsistencyConfig;
+        this.CoverageSummaries = CoverageSummaries;
+        this.ClassificationConflicts = ClassificationConflicts;
+        this.ClassificationMetadataFailures = ClassificationMetadataFailures;
+    }
+
+    /// <summary>Effective pass state after all attached Core governance projections.</summary>
+    public bool Passed
+    {
+        get => _passed;
+        init
+        {
+            _nativePassed = value;
+            _passed = value && !ImportedDiagnostics.HasBlockingFindings;
+        }
+    }
+
+    /// <summary>Immutable native conformance state before imported-diagnostic governance.</summary>
+    public bool NativePassed => _nativePassed;
+
+    private bool EffectivePassed
+    {
+        get => _passed;
+        init => _passed = value;
+    }
+
+    public IReadOnlyCollection<ArchitectureViolation> Violations { get; init; }
+    public IReadOnlyCollection<string> Cycles { get; init; }
+    public IReadOnlyCollection<ArchitectureViolation> CoverageFindings { get; init; }
+    public string CoverageConfig { get; init; }
+    public IReadOnlyList<ArchitectureUnmatchedIgnoredViolation> UnmatchedIgnoredViolations { get; init; }
+    public string UnmatchedIgnoredViolationsConfig { get; init; }
+    public IReadOnlyCollection<PolicyConsistencyDiagnostic> PolicyConsistencyFindings { get; init; }
+    public string PolicyConsistencyConfig { get; init; }
+    public IReadOnlyCollection<ArchitectureCoverageSummary> CoverageSummaries { get; init; }
+    public IReadOnlyCollection<ArchitectureClassificationConflict> ClassificationConflicts { get; init; }
+    public IReadOnlyCollection<ArchitectureClassificationMetadataFailure> ClassificationMetadataFailures { get; init; }
+
+    /// <summary>
+    /// Preserves the public positional-record deconstruction shape that callers used before the
+    /// outcome gained an explicit native pass-state. The value returned for <paramref name="Passed"/>
+    /// is the current effective state, exactly as it was for the original positional record.
+    /// </summary>
+    public void Deconstruct(
+        out bool Passed,
+        out IReadOnlyCollection<ArchitectureViolation> Violations,
+        out IReadOnlyCollection<string> Cycles,
+        out IReadOnlyCollection<ArchitectureViolation> CoverageFindings,
+        out string CoverageConfig,
+        out IReadOnlyList<ArchitectureUnmatchedIgnoredViolation> UnmatchedIgnoredViolations,
+        out string UnmatchedIgnoredViolationsConfig,
+        out IReadOnlyCollection<PolicyConsistencyDiagnostic> PolicyConsistencyFindings,
+        out string PolicyConsistencyConfig,
+        out IReadOnlyCollection<ArchitectureCoverageSummary> CoverageSummaries,
+        out IReadOnlyCollection<ArchitectureClassificationConflict> ClassificationConflicts,
+        out IReadOnlyCollection<ArchitectureClassificationMetadataFailure> ClassificationMetadataFailures)
+    {
+        Passed = this.Passed;
+        Violations = this.Violations;
+        Cycles = this.Cycles;
+        CoverageFindings = this.CoverageFindings;
+        CoverageConfig = this.CoverageConfig;
+        UnmatchedIgnoredViolations = this.UnmatchedIgnoredViolations;
+        UnmatchedIgnoredViolationsConfig = this.UnmatchedIgnoredViolationsConfig;
+        PolicyConsistencyFindings = this.PolicyConsistencyFindings;
+        PolicyConsistencyConfig = this.PolicyConsistencyConfig;
+        CoverageSummaries = this.CoverageSummaries;
+        ClassificationConflicts = this.ClassificationConflicts;
+        ClassificationMetadataFailures = this.ClassificationMetadataFailures;
+    }
+
     // Declared as an init-only property outside the primary constructor, not as a 13th positional
     // parameter, so existing positional `new ValidationOutcome(...)` call sites and Deconstruct
     // usages compiled against the prior (12-parameter) shape keep working unchanged; callers who
@@ -107,6 +191,30 @@ public sealed record ValidationOutcome(
     /// null for policies without applicability opt-in, just like completion evidence.
     /// </summary>
     public ArchitectureApplicabilityProjection? ApplicabilityProjection { get; init; }
+
+    /// <summary>
+    /// The Core-owned projection of trusted imported diagnostics. Its findings and blocking state
+    /// remain coupled so strict diagnostics always affect the effective validation outcome.
+    /// </summary>
+    public ImportedExternalDiagnosticProjection ImportedDiagnostics { get; private init; } =
+        ImportedExternalDiagnosticProjection.Empty;
+
+    /// <summary>Trusted imported-diagnostic findings in the normalized finding envelope.</summary>
+    public IReadOnlyList<ArchitectureFinding> ImportedDiagnosticFindings => ImportedDiagnostics.Findings;
+
+    /// <summary>
+    /// Attaches Core-projected imported diagnostics and derives the effective pass state from their
+    /// governance mode. Audit diagnostics remain reportable without making the result fail.
+    /// </summary>
+    public ValidationOutcome WithImportedDiagnostics(ImportedExternalDiagnosticProjection importedDiagnostics)
+    {
+        ArgumentNullException.ThrowIfNull(importedDiagnostics);
+        return this with
+        {
+            ImportedDiagnostics = importedDiagnostics,
+            EffectivePassed = NativePassed && !importedDiagnostics.HasBlockingFindings,
+        };
+    }
 
     /// <summary>Normalized applicability insufficiency findings, when the projection is present.</summary>
     public IReadOnlyList<ArchitectureFinding> ApplicabilityFindings =>

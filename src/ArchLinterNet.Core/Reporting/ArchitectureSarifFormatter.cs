@@ -9,7 +9,7 @@ namespace ArchLinterNet.Core.Reporting;
 public sealed partial class ArchitectureSarifFormatter : IArchitectureSarifFormatter
 {
     private const string SchemaUri =
-        "https://raw.githubusercontent.com/oasis-tcs/sarif-spec/master/Schemata/sarif-schema-2.1.0.json";
+        "https://docs.oasis-open.org/sarif/sarif/v2.1.0/errata01/os/schemas/sarif-schema-2.1.0.json";
 
     private const string ToolName = "arch-linter-net";
     private const string SarifVersion = "2.1.0";
@@ -54,6 +54,67 @@ public sealed partial class ArchitectureSarifFormatter : IArchitectureSarifForma
                 BuildCycleEntry(ArchitectureDiagnosticMapper.FromCycle(cycle), level))),
             toolVersion,
             Array.Empty<BuildStatePreflightDiagnostic>());
+    }
+
+    /// <summary>Formats already-normalized findings as one ArchLinterNet SARIF run.</summary>
+    public static string FormatFindingsAsSarif(
+        IReadOnlyCollection<ArchitectureFinding> findings,
+        string toolVersion,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(findings);
+
+        List<ResultEntry> entries;
+        try
+        {
+            entries = findings
+                .Select(finding =>
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    string level = finding.Severity == "warning" ? "warning" : "error";
+                    return BuildViolationEntry(finding, level);
+                })
+                .OrderBy(entry => entry, new ResultEntryOrderComparer(cancellationToken))
+                .ToList();
+        }
+        catch (InvalidOperationException ex) when (ex.InnerException is OperationCanceledException)
+        {
+            throw ex.InnerException;
+        }
+
+        object[] rules = entries
+            .GroupBy(entry => entry.RuleId, StringComparer.Ordinal)
+            .OrderBy(group => group.Key, StringComparer.Ordinal)
+            .Select(group => (object)new Dictionary<string, object?>
+            {
+                ["id"] = group.Key,
+                ["shortDescription"] = new Dictionary<string, object?> { ["text"] = group.First().ContractName },
+            })
+            .ToArray();
+
+        var payload = new Dictionary<string, object?>
+        {
+            ["$schema"] = SchemaUri,
+            [VersionPropertyName] = SarifVersion,
+            ["runs"] = new object[]
+            {
+                new Dictionary<string, object?>
+                {
+                    ["tool"] = new Dictionary<string, object?>
+                    {
+                        ["driver"] = new Dictionary<string, object?>
+                        {
+                            ["name"] = ToolName,
+                            ["version"] = toolVersion,
+                            ["rules"] = rules,
+                        },
+                    },
+                    ["results"] = entries.Select(entry => (object)entry.Json).ToArray(),
+                },
+            },
+        };
+
+        return JsonSerializer.Serialize(payload);
     }
 
     private static string FormatResultAsSarifCore( // NOSONAR: each parameter represents a semantically distinct section of the SARIF payload; grouping would obscure the data contract
@@ -187,13 +248,16 @@ public sealed partial class ArchitectureSarifFormatter : IArchitectureSarifForma
         (string sourceType, string forbiddenNamespace, IReadOnlyCollection<string> references) = ExtractFields(diagnostic);
         string ruleId = diagnostic.ContractId ?? ArchitecturePolicyDocumentLoader.NormalizeToContractId(diagnostic.ContractName);
 
+        string message = diagnostic is ImportedExternalDiagnostic imported
+            ? imported.SourceDiagnostic.Message ?? "Imported external diagnostic"
+            : $"[{diagnostic.ContractName}] {sourceType} -> {forbiddenNamespace}: {string.Join(", ", references)}";
         var json = new Dictionary<string, object?>
         {
             ["ruleId"] = ruleId,
             ["level"] = level,
             [MessagePropertyName] = new Dictionary<string, object?>
             {
-                ["text"] = $"[{diagnostic.ContractName}] {sourceType} -> {forbiddenNamespace}: {string.Join(", ", references)}",
+                ["text"] = message,
             },
         };
 
@@ -210,6 +274,14 @@ public sealed partial class ArchitectureSarifFormatter : IArchitectureSarifForma
             // logical (type-name) location it cannot resolve on disk.
             json["locations"] = BuildPhysicalLocations(matchedFilePath, Array.Empty<string>());
         }
+        else if (diagnostic is ImportedExternalDiagnostic importedDiagnostic
+                 && HasImportedExternalDiagnosticLocation(importedDiagnostic.SourceDiagnostic.PrimaryLocation))
+        {
+            json["locations"] = BuildImportedExternalDiagnosticLocations(
+                importedDiagnostic.SourceDiagnostic.PrimaryLocation!,
+                sourceType,
+                LogicalLocationKindFor(diagnostic, forbiddenNamespace));
+        }
         else if (FirstFrameworkReferenceSourcePath(diagnostic) is { } frameworkSourcePath)
         {
             // Every matched FrameworkReference was evaluated from the same source project's .csproj -
@@ -220,7 +292,7 @@ public sealed partial class ArchitectureSarifFormatter : IArchitectureSarifForma
         }
         else
         {
-            json["logicalLocations"] = BuildLogicalLocations(sourceType, LogicalLocationKindFor(diagnostic, forbiddenNamespace));
+            json["locations"] = BuildLogicalLocations(sourceType, LogicalLocationKindFor(diagnostic, forbiddenNamespace));
         }
 
         object[] relatedPolicyLocations = FormatPolicyLocationsForSarif(
@@ -502,7 +574,7 @@ public sealed partial class ArchitectureSarifFormatter : IArchitectureSarifForma
             ["ruleId"] = ruleId,
             ["level"] = level,
             [MessagePropertyName] = new Dictionary<string, object?> { ["text"] = $"Dependency cycle detected: {path}" },
-            ["logicalLocations"] = BuildLogicalLocations(path, "namespace"),
+            ["locations"] = BuildLogicalLocations(path, "namespace"),
             [PropertiesKey] = new Dictionary<string, object?>
             {
                 ["arch_linter_net"] = ArchitectureDiagnosticFormatter.FormatNormalizedFindingForSarif(finding),
@@ -524,7 +596,7 @@ public sealed partial class ArchitectureSarifFormatter : IArchitectureSarifForma
             ["ruleId"] = ruleId,
             ["level"] = level,
             [MessagePropertyName] = new Dictionary<string, object?> { ["text"] = $"Dependency cycle detected: {diagnostic.Path}" },
-            ["logicalLocations"] = BuildLogicalLocations(diagnostic.Path, "namespace"),
+            ["locations"] = BuildLogicalLocations(diagnostic.Path, "namespace"),
             [PropertiesKey] = new Dictionary<string, object?>
             {
                 ["arch_linter_net"] = ArchitectureDiagnosticFormatter.FormatNormalizedFindingForSarif(finding),
@@ -575,18 +647,6 @@ public sealed partial class ArchitectureSarifFormatter : IArchitectureSarifForma
         }).ToArray();
     }
 
-    private static object[] BuildLogicalLocations(string fullyQualifiedName, string kind)
-    {
-        return new object[]
-        {
-            new Dictionary<string, object?>
-            {
-                ["fullyQualifiedName"] = fullyQualifiedName,
-                ["kind"] = kind,
-            },
-        };
-    }
-
     // Best-effort hint: no diagnostic kind carries an explicit "this identifier is a
     // namespace/type/package" flag, so the kind is inferred from the diagnostic's concrete subtype.
     // IL-scanned method-body violations are a special case: they map to the generic
@@ -630,6 +690,10 @@ public sealed partial class ArchitectureSarifFormatter : IArchitectureSarifForma
             MetricBudgetDiagnostic d => (d.SourceType, d.ForbiddenNamespace, d.ForbiddenReferences),
             ContextDependencyDiagnostic d => (d.SourceType, d.ForbiddenNamespace, d.ForbiddenReferences),
             ContextAllowOnlyDiagnostic d => (d.SourceType, d.ForbiddenNamespace, d.ForbiddenReferences),
+            ImportedExternalDiagnostic d => (
+                d.SourceDiagnostic.RuleId ?? d.SelectedCanonicalIdentity,
+                d.SourceDiagnostic.Project ?? string.Empty,
+                Array.Empty<string>()),
             _ => (string.Empty, string.Empty, Array.Empty<string>()),
         };
 

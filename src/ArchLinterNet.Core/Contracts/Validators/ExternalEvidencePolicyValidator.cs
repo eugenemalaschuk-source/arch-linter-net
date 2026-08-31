@@ -14,6 +14,13 @@ internal sealed class ExternalEvidencePolicyValidator : IArchitecturePolicyDocum
         ArgumentNullException.ThrowIfNull(document);
 
         var ids = new HashSet<string>(StringComparer.Ordinal);
+        var nativeExternalIds = new HashSet<string>(
+            document.Contracts.StrictExternal
+                .Concat(document.Contracts.AuditExternal)
+                .Select(contract => contract.Id)
+                .Where(static id => !string.IsNullOrWhiteSpace(id))
+                .Select(static id => id!),
+            StringComparer.OrdinalIgnoreCase);
         for (int index = 0; index < document.ExternalEvidence.Count; index++)
         {
             ArchitectureExternalEvidenceRequirement requirement = document.ExternalEvidence[index];
@@ -23,6 +30,14 @@ internal sealed class ExternalEvidencePolicyValidator : IArchitecturePolicyDocum
             if (!ids.Add(id))
             {
                 throw new InvalidOperationException($"external_evidence declares duplicate id '{id}'.");
+            }
+
+            if (nativeExternalIds.Contains(id))
+            {
+                throw new InvalidOperationException(
+                    $"external_evidence id '{id}' conflicts with a contracts.strict_external or "
+                    + "contracts.audit_external id. These namespaces must not overlap because they "
+                    + "have distinct baseline ownership.");
             }
 
             ValidateProperties(document, requirement, entryPath, id);

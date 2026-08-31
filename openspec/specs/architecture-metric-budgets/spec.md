@@ -65,10 +65,10 @@ produce a budget finding; it remains available through the measure workflow.
 - **THEN** normal validation produces no budget finding
 
 ### Requirement: Insufficient metric scope is projected through common applicability evidence
-If a budget's referenced metric is missing required input or has an unmapped,
-ambiguous, stale, unexpectedly empty, unresolved, or otherwise incomplete
-native scope, the assessment SHALL reuse the normalized applicability and
-completion projection. It SHALL retain deterministic policy/control identity,
+The assessment SHALL reuse the normalized applicability and completion projection
+when a budget's referenced metric has missing required input or an unmapped,
+ambiguous, stale, unexpectedly empty, unresolved, or otherwise incomplete native
+scope. It SHALL retain deterministic policy/control identity,
 reason, provenance, and strict/audit mode through the existing Human, JSON,
 SARIF, Testing, and baseline result paths. It SHALL not publish a partial
 numeric value, silently pass the budget, or recast insufficient evidence as an

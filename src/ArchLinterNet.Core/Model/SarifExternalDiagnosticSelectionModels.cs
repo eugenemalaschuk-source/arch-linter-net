@@ -105,10 +105,21 @@ public sealed record SarifSelectedExternalDiagnostic
 /// <summary>The deterministic selected diagnostics and explicit required-filter mismatch evidence.</summary>
 public sealed record SarifExternalDiagnosticSelectionResult
 {
-    /// <summary>Creates an immutable selection result.</summary>
+    /// <summary>Creates an immutable selection result without explicit zero-result completion evidence.</summary>
     public SarifExternalDiagnosticSelectionResult(
         IReadOnlyList<SarifSelectedExternalDiagnostic>? diagnostics = null,
         IReadOnlyList<SarifExternalDiagnosticFilterMismatch>? filterMismatches = null)
+        : this(diagnostics, filterMismatches, processedLogicalEvidenceIds: null)
+    {
+    }
+
+    // The selector's zero-result completion proof must be created inside Core. Public callers
+    // retain the two-argument constructor, whose selected diagnostics and mismatches still make
+    // their processed controls observable, but cannot forge a clean completed control.
+    internal SarifExternalDiagnosticSelectionResult(
+        IReadOnlyList<SarifSelectedExternalDiagnostic>? diagnostics,
+        IReadOnlyList<SarifExternalDiagnosticFilterMismatch>? filterMismatches,
+        IReadOnlyList<string>? processedLogicalEvidenceIds)
     {
         Diagnostics = diagnostics is null || diagnostics.Count == 0
             ? Array.Empty<SarifSelectedExternalDiagnostic>()
@@ -116,6 +127,10 @@ public sealed record SarifExternalDiagnosticSelectionResult
         FilterMismatches = filterMismatches is null || filterMismatches.Count == 0
             ? Array.Empty<SarifExternalDiagnosticFilterMismatch>()
             : Array.AsReadOnly(filterMismatches.ToArray());
+        ProcessedLogicalEvidenceIds = CreateProcessedLogicalEvidenceIds(
+            Diagnostics,
+            FilterMismatches,
+            processedLogicalEvidenceIds);
     }
 
     /// <summary>Canonical selected diagnostics ordered by their canonical identities.</summary>
@@ -124,6 +139,48 @@ public sealed record SarifExternalDiagnosticSelectionResult
     /// <summary>Ordered filter values that were explicitly required but matched no trusted source result.</summary>
     public IReadOnlyList<SarifExternalDiagnosticFilterMismatch> FilterMismatches { get; }
 
+    // Exact logical evidence identities that completed #521 selection. This includes valid
+    // zero-result controls, so downstream applicability can distinguish a selected clean result
+    // from an omitted selection stage.
+    internal IReadOnlyList<string> ProcessedLogicalEvidenceIds { get; }
+
     /// <summary>Whether every explicitly required configured filter value matched.</summary>
     public bool HasRequiredFilterMatches => FilterMismatches.Count == 0;
+
+    private static IReadOnlyList<string> CreateProcessedLogicalEvidenceIds(
+        IReadOnlyList<SarifSelectedExternalDiagnostic> diagnostics,
+        IReadOnlyList<SarifExternalDiagnosticFilterMismatch> filterMismatches,
+        IReadOnlyList<string>? processedLogicalEvidenceIds)
+    {
+        var ids = new SortedSet<string>(StringComparer.Ordinal);
+        if (processedLogicalEvidenceIds is not null)
+        {
+            foreach (string id in processedLogicalEvidenceIds)
+            {
+                if (string.IsNullOrWhiteSpace(id))
+                {
+                    throw new ArgumentException(
+                        "A processed logical evidence ID must be non-blank.",
+                        nameof(processedLogicalEvidenceIds));
+                }
+
+                ids.Add(id);
+            }
+        }
+
+        foreach (SarifSelectedExternalDiagnostic diagnostic in diagnostics)
+        {
+            foreach (SarifEvidenceProvenance provenance in diagnostic.EvidenceProvenances)
+            {
+                ids.Add(provenance.LogicalId);
+            }
+        }
+
+        foreach (SarifExternalDiagnosticFilterMismatch mismatch in filterMismatches)
+        {
+            ids.Add(mismatch.LogicalEvidenceId);
+        }
+
+        return ids.Count == 0 ? Array.Empty<string>() : Array.AsReadOnly(ids.ToArray());
+    }
 }

@@ -31,6 +31,11 @@ prefix, and source-severity value to match at least one source result satisfying
 configured categories. A filter mismatch SHALL be explicit, ordered selection evidence; it SHALL
 NOT be silently treated as a valid zero-result selection.
 
+The selection result SHALL retain exact ordinal logical evidence IDs for every authorization
+control the selector completed, including valid controls that selected zero diagnostics. A caller
+that constructs a result without this zero-result completion proof SHALL not be able to claim that
+an otherwise unrepresented `require_matches` control was selected.
+
 #### Scenario: A strict rule and audit warning are declared
 - **WHEN** a logical SARIF evidence requirement declares rule ID `SEC100`, path prefix `src/`,
   and source severities `error: strict` and `warning: audit`
@@ -42,6 +47,18 @@ NOT be silently treated as a valid zero-result selection.
   satisfies the other configured criteria
 - **THEN** selection exposes a deterministic unmatched-rule filter record rather than silently
   returning a valid empty result
+
+#### Scenario: A required filter is not treated as selected by omission
+- **WHEN** trusted evidence carries a `require_matches: true` authorization but a downstream
+  consumer has no corresponding selection result
+- **THEN** that consumer SHALL treat the selection as unavailable rather than treating the trusted
+  reader result as a clean zero-result selection
+
+#### Scenario: One completed selection does not authorize a different control
+- **WHEN** the selector completes `require_matches` control A but a downstream applicability
+  projection also receives valid control B without completion evidence for B
+- **THEN** B is treated as selection-unavailable and stale rather than as a clean zero-result
+  selection
 
 #### Scenario: A later mutable policy cannot re-authorize trusted evidence
 - **WHEN** a result was trusted for one tool/run/filter authorization and a caller later changes
@@ -186,3 +203,14 @@ each required selector value.
 - **WHEN** a caller selects trusted external diagnostics
 - **THEN** the operation uses only the supplied trusted reader results and policy filter without
   network or producer-status access
+
+### Requirement: Selected diagnostics have one non-revalidating normalization consumer
+The trusted external-diagnostic selection result SHALL be consumable by a normalized-finding
+projector that preserves its immutable source and evidence provenance. The consumer SHALL treat
+#520 trust status and #521 selection identity as authoritative and SHALL NOT accept a replacement
+mutable filter, reopen SARIF bytes, or turn a rejected artifact into a selected finding.
+
+#### Scenario: Normalization cannot reauthorize stale evidence
+- **WHEN** an artifact was rejected for a wrong required revision
+- **THEN** normalization records the corresponding applicability evidence but cannot project its
+  source results as a current governed finding

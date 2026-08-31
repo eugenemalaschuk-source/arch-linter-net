@@ -21,6 +21,7 @@ public sealed class SarifExternalDiagnosticSelector
             .ToArray();
         var candidates = new List<SelectionCandidate>();
         var mismatches = new List<SarifExternalDiagnosticFilterMismatch>();
+        var processedLogicalEvidenceIds = new SortedSet<string>(StringComparer.Ordinal);
 
         foreach (IGrouping<string, SarifExternalDiagnosticSelectionInput> group in validatedInputs
                      .GroupBy(input => input.Evidence.Authorization!.GroupIdentity, StringComparer.Ordinal)
@@ -29,6 +30,7 @@ public sealed class SarifExternalDiagnosticSelector
             cancellationToken.ThrowIfCancellationRequested();
             SarifExternalDiagnosticSelectionInput[] groupInputs = group.ToArray();
             SarifEvidenceAuthorizationSnapshot authorization = groupInputs[0].Evidence.Authorization!;
+            processedLogicalEvidenceIds.Add(authorization.LogicalId);
             SarifExternalDiagnosticFilterAuthorization filter = authorization.DiagnosticFilter!;
             var matcher = new FilterMatcher(filter);
             SourceOccurrence[] occurrences = groupInputs
@@ -74,7 +76,10 @@ public sealed class SarifExternalDiagnosticSelector
             .ThenBy(mismatch => mismatch.Dimension)
             .ThenBy(mismatch => mismatch.Value, StringComparer.Ordinal)
             .ToArray();
-        return new SarifExternalDiagnosticSelectionResult(diagnostics, orderedMismatches);
+        return new SarifExternalDiagnosticSelectionResult(
+            diagnostics,
+            orderedMismatches,
+            processedLogicalEvidenceIds.ToArray());
     }
 
     private static SarifExternalDiagnosticSelectionInput ValidateInput(

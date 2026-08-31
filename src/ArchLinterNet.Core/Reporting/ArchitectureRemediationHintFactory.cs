@@ -46,6 +46,7 @@ internal static class ArchitectureRemediationHintProviderRegistry
             new(typeof(BaselineLifecycleDiagnostic), (d, i) => ArchitectureRemediationHintFactory.ForBaseline((BaselineLifecycleDiagnostic)d, i)),
             new(typeof(ArchitecturePolicyErrorDiagnostic), (d, i) => ArchitectureRemediationHintFactory.ForPolicyError((ArchitecturePolicyErrorDiagnostic)d, i)),
             new(typeof(ArchitectureApplicabilityDiagnostic), (d, i) => ArchitectureRemediationHintFactory.ForApplicability((ArchitectureApplicabilityDiagnostic)d, i)),
+            new(typeof(ImportedExternalDiagnostic), (d, i) => ArchitectureRemediationHintFactory.ForImportedExternalDiagnostic((ImportedExternalDiagnostic)d, i)),
         };
 
     internal static IReadOnlyDictionary<Type, ArchitectureRemediationHintProvider> ByType { get; } =
@@ -346,6 +347,10 @@ internal static class ArchitectureRemediationHintFactory
 
     internal static ArchitectureRemediationHint? ForApplicability(
         ArchitectureApplicabilityDiagnostic diagnostic,
+        ArchitectureViolationIdentity identity) => null;
+
+    internal static ArchitectureRemediationHint? ForImportedExternalDiagnostic(
+        ImportedExternalDiagnostic diagnostic,
         ArchitectureViolationIdentity identity) => null;
 
     internal static string CategoryToken(ArchitectureRemediationHintCategory category) => category switch

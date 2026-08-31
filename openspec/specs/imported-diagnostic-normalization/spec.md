@@ -1,0 +1,97 @@
+# imported-diagnostic-normalization Specification
+
+## Purpose
+TBD - created by archiving change normalize-imported-external-diagnostics. Update Purpose after archive.
+## Requirements
+### Requirement: Selected external diagnostics project into governed findings
+The system SHALL project only `SarifSelectedExternalDiagnostic` instances produced by the trusted
+selection boundary into a typed imported-diagnostic detail and the existing normalized
+`ArchitectureFinding` envelope. The projection SHALL preserve the selected policy governance mode
+and SHALL NOT read an artifact, query a producer, or reapply a diagnostic filter.
+
+#### Scenario: A selected strict diagnostic becomes a governed finding
+- **WHEN** #521 supplies one selected diagnostic mapped to strict
+- **THEN** the projection returns one imported normalized finding with strict/error semantics and
+  no second trust or selection decision
+
+#### Scenario: An untrusted artifact has no governed diagnostic
+- **WHEN** #520 rejects an artifact before #521 selection
+- **THEN** the imported-diagnostic projection receives no selected source diagnostic and creates
+  no ordinary imported finding
+
+### Requirement: Imported projections derive pass state from the native outcome
+Core SHALL retain an explicit immutable native conformance state separately from the effective pass
+state after an imported-diagnostic projection is attached. Replacing an attached projection SHALL
+recompute the effective state from that native state and the replacement projection's blocking
+state, so the findings and `Passed` outcome cannot diverge. A public update of the native pass
+state SHALL update that explicit native state too; an earlier native failure SHALL never become a
+pass merely because an imported projection is replaced.
+
+#### Scenario: Replacing a strict projection with audit restores a passing native outcome
+- **WHEN** a passing native outcome first receives a strict imported projection and then receives
+  an audit-only or empty replacement projection
+- **THEN** the replacement remains reportable and the effective outcome passes
+
+#### Scenario: Audit projection cannot hide a native validation failure
+- **WHEN** a failing native outcome receives an audit-only imported projection
+- **THEN** the effective outcome remains failed
+
+#### Scenario: A public native failure remains failed after replacement
+- **WHEN** a caller changes a public validation outcome from passing to failing and then attaches
+  an empty or audit-only imported projection
+- **THEN** the outcome remains failed and its explicit native conformance state is failed
+
+### Requirement: Imported finding identity is stable and evidence provenance remains drillable
+An imported finding's canonical persistent identity SHALL be deterministic from the selected
+diagnostic's stable semantic identity, logical evidence control, and governance semantics. It
+SHALL distinguish selected diagnostics that differ in required logical evidence, producer tool or
+tool version, repository, revision, scope, source location, source severity, or mapped mode where
+#521 distinguishes them. It SHALL exclude source display text, artifact content hash, run identity,
+artifact path, and producer run ordering. The finding detail SHALL retain original
+tool/rule/message/severity/location,
+fingerprint origin/value, and every ordered evidence provenance entry including logical key,
+tool/version/run, repository/revision/scope, artifact path, and content hash.
+
+#### Scenario: Equivalent reruns retain debt identity and update provenance
+- **WHEN** equivalent current-context source results are selected from two runs with different
+  artifact hashes or run IDs
+- **THEN** their projected finding identity remains stable while the ordered provenance keeps both
+  authorizing run/hash entries
+
+#### Scenario: A producer version preserves the published identity boundary
+- **WHEN** otherwise equivalent selected diagnostics are produced by two different tool versions
+- **THEN** their canonical imported-finding identities are distinct, while reruns from the same
+  tool version remain stable across run ID and artifact-hash changes
+
+#### Scenario: Different source locations do not collide
+- **WHEN** two selected source results have the same rule and source fingerprint but different
+  normalized primary locations
+- **THEN** the projection produces distinct canonical finding identities and source locations
+
+### Requirement: Imported findings yield exact baseline candidates without a parallel lifecycle
+The system SHALL expose baseline candidates for imported findings from the same structured identity
+used by their normalized finding. It SHALL use existing baseline candidate/comparison structures
+and SHALL NOT write, suppress, or reinterpret a baseline entry during projection.
+
+#### Scenario: Exact known imported finding remains known
+- **WHEN** an imported finding is projected again from equivalent current-context evidence
+- **THEN** its baseline candidate has the same structured identity and can match the existing
+  reviewed baseline entry without source-message, artifact-hash, or run-ID churn
+
+### Requirement: Empty source locations are absent from normalized findings
+The normalized finding projection SHALL emit a source location only when the trusted source
+location has at least one schema-valid anchor: an artifact path, region start line, or region
+character offset. An empty SARIF `physicalLocation`, an empty `region`, or a pathless region that
+contains only column/end values SHALL be represented as no source location, not as an all-null or
+anchorless location object.
+
+#### Scenario: Empty physical location remains schema-valid
+- **WHEN** a trusted SARIF diagnostic declares `physicalLocation: {}`
+- **THEN** its normalized finding has no source location and validates against the packaged
+  normalized-finding schema
+
+#### Scenario: Anchorless region remains schema-valid
+- **WHEN** a trusted SARIF diagnostic declares `physicalLocation.region: {}` or a pathless region
+  containing only `startColumn`
+- **THEN** its normalized finding has no source location and validates against the packaged
+  normalized-finding schema

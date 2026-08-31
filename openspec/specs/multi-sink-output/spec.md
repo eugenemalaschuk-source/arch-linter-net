@@ -3,9 +3,7 @@
 ## Purpose
 
 Routes a single validation result to multiple output sinks (stdout, stderr, files) without re-analysis per format.
-
 ## Requirements
-
 ### Requirement: CLI accepts --report for additional output sinks
 
 The CLI SHALL accept a repeatable `--report` option with format `<format>=<destination>`. The format SHALL be one of `human`, `json`, or `sarif`. The destination SHALL be `stdout`, `stderr`, or a file path. The option MAY be specified multiple times to configure multiple sinks. `--format`/`--json` are separate one-sink legacy forms and SHALL NOT be combined with `--report`.
@@ -101,3 +99,20 @@ The help text SHALL describe which output goes to stdout, stderr, and files for 
 #### Scenario: Help text documents output routing
 - **WHEN** a user invokes `--help`
 - **THEN** the help text SHALL describe stdout, stderr, and file output behavior
+
+### Requirement: Imported finding projections preserve source and trust provenance
+Human, JSON, and SARIF projections of an imported finding SHALL present equivalent policy control,
+canonical identity, original source diagnostic, selected fingerprint, and validated evidence
+provenance. SARIF output SHALL emit an ordinary ArchLinterNet result at the available original
+source location and SHALL NOT recursively embed the input SARIF document. Human output SHALL
+encode CR, LF, and every other control character in producer-controlled source or provenance
+fields as visible escape sequences, so each finding remains one rendered diagnostic line.
+
+#### Scenario: JSON and SARIF provide the same drill-down facts
+- **WHEN** one imported finding has source and evidence provenance
+- **THEN** JSON and the normalized ArchLinterNet property in SARIF expose equivalent source/trust
+  facts in deterministic order
+
+#### Scenario: Producer text cannot forge a human diagnostic line
+- **WHEN** a trusted source diagnostic or its provenance contains a newline or another control character
+- **THEN** human output presents the character as an escape sequence and emits no additional source-controlled line

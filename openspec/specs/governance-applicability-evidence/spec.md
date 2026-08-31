@@ -4,9 +4,7 @@
 Define deterministic control-level applicability evidence for v0.8 governance
 families without conflating proven evaluability with policy configuration or
 architecture quality.
-
 ## Requirements
-
 ### Requirement: Effective controls have explicit applicability membership
 The effective-policy/control projection SHALL materialize one canonical expected
 applicability-membership entry for every effective v0.8 control whose family
@@ -230,15 +228,23 @@ the families that opt in:
 
 Each family SHALL make its own exact subject and declaration semantics explicit
 when it implements a control; it SHALL use this matrix rather than inventing a
-parallel result envelope. The external-diagnostics family SHALL convert the
-reader's typed trust outcome to its applicability record without deriving
-evaluable state from an empty diagnostics collection.
+parallel result envelope. The external-diagnostics family SHALL convert the reader's typed trust
+outcome to its applicability record without deriving evaluable state from an empty diagnostics
+collection. For an authorization with `require_matches: true`, it SHALL additionally require
+completion evidence for that exact ordinal logical evidence ID from #521; the presence of a
+selection result for another control is not completion evidence.
 
 #### Scenario: Valid current SARIF with no selected findings
 - **WHEN** an external-diagnostics control receives a valid, successful,
   current-context SARIF run with zero selected diagnostics
 - **THEN** its record is `evaluable` and distinguishes that state from a missing
   or stale required run
+
+#### Scenario: Partial selection fails closed per external evidence control
+- **WHEN** two valid external-evidence controls require matches and selection completed only one
+  of their logical IDs
+- **THEN** the completed control may be evaluable, while the other is `unassessable` with stale
+  declaration evidence
 
 #### Scenario: Optional external evidence is not a failed required run
 - **WHEN** an explicitly optional external-evidence control has no supplied
@@ -455,3 +461,37 @@ failure findings.
 - **WHEN** an applicability finding is rendered in Human and SARIF formats
 - **THEN** its baseline-capable canonical identity is identical in both formats
   and does not derive from either rendered message
+
+### Requirement: External diagnostic evidence uses shared applicability controls
+For every policy-declared external-diagnostic evidence requirement, the system SHALL project its
+trusted selection/completeness result through #507 expected applicability membership and produced
+records. All physical artifacts for one logical evidence requirement SHALL aggregate to exactly
+one shared applicability control. A required valid zero-result artifact SHALL be evaluable;
+deliberate optional absence SHALL be not-applicable; a missing, malformed, filter-mismatched, or
+wrong-context supplied artifact SHALL be unassessable with canonical reason/provenance. If the
+captured authorization or declared requirement uses `require_matches: true`, the corresponding
+selection result is mandatory; its absence SHALL be unassessable rather than clean/evaluable. This
+projection SHALL NOT create an imported-diagnostic-specific applicability envelope or
+independently revalidate #520 trust.
+
+#### Scenario: Wrong revision remains unassessable instead of zero-clean
+- **WHEN** a required evidence artifact is structurally valid but rejected for its required source
+  revision
+- **THEN** the external applicability record is unassessable with canonical external-revision
+  provenance and no ordinary selected imported finding is emitted
+
+#### Scenario: Valid selected zero-result evidence is evaluable
+- **WHEN** a required current-context artifact is trusted and its selected diagnostic collection is empty
+- **THEN** its external applicability record is evaluable and is distinguishable from missing or
+  unassessable evidence
+
+#### Scenario: Complementary trusted artifacts are one control
+- **WHEN** two trusted artifacts for one logical evidence requirement contain complementary
+  selected diagnostics
+- **THEN** applicability projects one evaluable record for that logical control, not duplicate
+  applicability-record identities
+
+#### Scenario: Required filter selection cannot be omitted
+- **WHEN** valid trusted evidence was authorized with `require_matches: true` but no #521
+  selection result is supplied to applicability projection
+- **THEN** the logical control is unassessable with `stale_declaration`, rather than evaluable

@@ -8,7 +8,7 @@ The system SHALL render a valid SARIF 2.1.0 document with `version: "2.1.0"`, a 
 
 #### Scenario: Valid SARIF envelope
 - **WHEN** the CLI is invoked with `--format sarif`
-- **THEN** the output parses as JSON with `version == "2.1.0"`, a `$schema` field, and `runs` containing exactly one run with `tool.driver.name` set
+- **THEN** the output validates against the OASIS SARIF 2.1.0 schema with `version == "2.1.0"`, a `$schema` field, and `runs` containing exactly one run with `tool.driver.name` set
 
 ### Requirement: Contract IDs become stable SARIF rule IDs
 The SARIF formatter SHALL map each diagnostic's contract ID (falling back to the normalized contract name when the ID is absent) to a `rule.id` in `tool.driver.rules`, deduplicated across all results referencing the same contract.
@@ -47,16 +47,27 @@ The SARIF formatter SHALL populate `physicalLocation` (artifact URI and start li
 - **WHEN** a method-body violation's reference entry does not match the expected `"line {N}: ..."` shape
 - **THEN** the SARIF result still includes `artifactLocation.uri` for the file, without a `region`
 
+### Requirement: SARIF source regions preserve only valid coordinates
+The SARIF formatter SHALL omit absent source coordinates rather than serializing JSON `null`. It SHALL emit a `physicalLocation.region` only when an artifact URI and a SARIF region anchor are available. When an imported source diagnostic has a region anchor but no artifact URI, the formatter SHALL retain the anchor in a valid location annotation alongside a logical location.
+
+#### Scenario: Pathless imported source region remains available
+- **WHEN** a trusted imported source diagnostic has `startLine` or `charOffset` but no artifact path
+- **THEN** the SARIF result contains the source coordinates in `locations[*].annotations` and no invalid pathless physical location
+
+#### Scenario: Empty imported source region is omitted
+- **WHEN** an imported source diagnostic has an artifact path but no source coordinate anchor
+- **THEN** the SARIF result includes the artifact URI and omits `physicalLocation.region`
+
 ### Requirement: Non-source diagnostics include logical locations
-The SARIF formatter SHALL populate `logicalLocations` with a fully-qualified name for diagnostic kinds that identify a type, namespace, assembly, or package rather than a file position.
+The SARIF formatter SHALL populate `result.locations[*].logicalLocations` with a fully-qualified name for diagnostic kinds that identify a type, namespace, assembly, or package rather than a file position.
 
 #### Scenario: Logical location for a namespace-level violation
 - **WHEN** a layer or dependency contract produces a violation with no file location available
-- **THEN** the corresponding SARIF result includes a `logicalLocations` entry with `fullyQualifiedName` equal to the diagnostic's source identifier
+- **THEN** the corresponding SARIF result includes a `locations` entry with `logicalLocations[0].fullyQualifiedName` equal to the diagnostic's source identifier
 
 #### Scenario: Logical location for a cycle
 - **WHEN** cycle detection produces a `CycleDiagnostic`
-- **THEN** the corresponding SARIF result includes a `logicalLocations` entry with `fullyQualifiedName` equal to the cycle path
+- **THEN** the corresponding SARIF result includes a `locations` entry with `logicalLocations[0].fullyQualifiedName` equal to the cycle path
 
 ### Requirement: SARIF output is deterministically ordered
 The SARIF formatter SHALL order `results` by contract ID, then source identifier, then forbidden namespace, and SHALL order `tool.driver.rules` alphabetically by rule ID.

@@ -59,13 +59,14 @@ public partial class CliIntegrationTests
 
         using JsonDocument document = JsonDocument.Parse(stdout);
         JsonElement result = document.RootElement.GetProperty("runs")[0].GetProperty("results")[0];
+        JsonElement logicalLocation = result.GetProperty("locations")[0].GetProperty("logicalLocations")[0];
         JsonElement relatedLocation = result.GetProperty("relatedLocations")[0];
 
         Assert.Multiple(() =>
         {
             Assert.That(exitCode, Is.EqualTo(1));
             Assert.That(stderr, Is.Empty);
-            Assert.That(result.TryGetProperty("logicalLocations", out _), Is.True);
+            Assert.That(logicalLocation.GetProperty("fullyQualifiedName").GetString(), Is.Not.Empty);
             Assert.That(relatedLocation.GetProperty("physicalLocation")
                 .GetProperty("artifactLocation").GetProperty("uri").GetString(),
                 Is.EqualTo("imported-provenance-fragment.yml"));

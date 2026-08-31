@@ -2,9 +2,7 @@
 
 ## Purpose
 Provides a fluent NUnit-friendly test adapter that loads a policy by path or repository root and asserts strict/audit validation results.
-
 ## Requirements
-
 ### Requirement: Test adapter loads policy from path
 `ArchitectureAssertions.FromPolicy(path)` SHALL return an `ArchitectureValidationBuilder` configured to load the YAML policy from the given file path.
 
@@ -170,3 +168,12 @@ its stable reasons without inventing ordinary architecture violations.
   evidence is missing
 - **THEN** a test can inspect that completion state and reason through
   `ArchitectureValidationResult` without parsing formatted CLI output
+
+### Requirement: Testing results include imported normalized findings
+The Testing adapter SHALL expose projected imported diagnostics in its existing normalized finding
+collection with the same canonical identity, strict/audit semantics, source evidence, and trust
+provenance as Core output. It SHALL not create a testing-only imported result collection.
+
+#### Scenario: Audit imported diagnostic is observable without failing strict
+- **WHEN** a projected imported diagnostic is mapped to audit and native strict findings are absent
+- **THEN** Testing exposes the audit finding while strict pass/fail state remains unchanged

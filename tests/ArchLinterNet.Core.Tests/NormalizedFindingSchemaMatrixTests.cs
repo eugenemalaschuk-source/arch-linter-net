@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using ArchLinterNet.Core.Model;
 using ArchLinterNet.Core.Reporting;
 using ArchLinterNet.Core.Schema;
@@ -11,7 +12,7 @@ namespace ArchLinterNet.Core.Tests;
 public sealed class NormalizedFindingSchemaMatrixTests
 {
     [Test]
-    public void EveryFindingFamily_CentralProjectionValidatesAgainstPackagedV2Schema()
+    public void EveryFindingFamily_CentralProjectionValidatesAgainstPackagedV3Schema()
     {
         PackagedSchemaRegistry registry = new();
         Assert.That(registry.TryRead("normalized-finding", out string schemaText), Is.True);
@@ -35,6 +36,43 @@ public sealed class NormalizedFindingSchemaMatrixTests
             EvaluationResults result = schema.Evaluate(document.RootElement);
             Assert.That(result.IsValid, Is.True, $"Schema rejected generated '{finding.Kind}' finding: {json}");
         }
+    }
+
+    [Test]
+    public void ImportedFindingSchema_PathlessSourceLocationRequiresARegionAnchor()
+    {
+        PackagedSchemaRegistry registry = new();
+        Assert.That(registry.TryRead("normalized-finding", out string schemaText), Is.True);
+        JsonSchema schema = JsonSchema.FromText(schemaText);
+        ArchitectureFinding imported = SpecialFindings()
+            .Single(finding => finding.Kind == "imported_external_diagnostic");
+        JsonObject malformed = JsonNode.Parse(JsonSerializer.Serialize(
+            ArchitectureDiagnosticFormatter.FormatNormalizedFindingForJson(imported)))!.AsObject();
+        JsonObject location = malformed["details"]!["source_diagnostic"]!["location"]!.AsObject();
+        location["path"] = null;
+        location["start_line"] = null;
+        location["start_column"] = null;
+        location["end_line"] = null;
+        location["end_column"] = null;
+        location["char_offset"] = null;
+        location["char_length"] = null;
+
+        Assert.That(schema.Evaluate(malformed).IsValid, Is.False);
+    }
+
+    [Test]
+    public void ImportedFindingSchema_AbsentSourceLocationRemainsValid()
+    {
+        PackagedSchemaRegistry registry = new();
+        Assert.That(registry.TryRead("normalized-finding", out string schemaText), Is.True);
+        JsonSchema schema = JsonSchema.FromText(schemaText);
+        ArchitectureFinding imported = SpecialFindings()
+            .Single(finding => finding.Kind == "imported_external_diagnostic");
+        JsonObject normalized = JsonNode.Parse(JsonSerializer.Serialize(
+            ArchitectureDiagnosticFormatter.FormatNormalizedFindingForJson(imported)))!.AsObject();
+        normalized["details"]!["source_diagnostic"]!["location"] = null;
+
+        Assert.That(schema.Evaluate(normalized).IsValid, Is.True);
     }
 
     private static IEnumerable<ArchitectureViolation> OrdinaryViolations()
@@ -101,7 +139,44 @@ public sealed class NormalizedFindingSchemaMatrixTests
                     "future-family",
                     "applicability-control",
                     "policy-id")),
-            "strict");
+                "strict");
+        yield return ArchitectureImportedDiagnosticProjector.Project(
+            new SarifExternalDiagnosticSelectionResult(
+            [
+                new SarifSelectedExternalDiagnostic(
+                    "external-diagnostic:v2:matrix",
+                    new SarifEvidenceSourceDiagnostic(
+                        "Imported diagnostic from the schema matrix fixture.",
+                        "SEC100",
+                        SarifEvidenceSourceSeverity.Error,
+                        new SarifEvidenceSourceLocation(
+                            path: null,
+                            new SarifEvidenceSourceRegion(startLine: 12, startColumn: 5)),
+                        project: "App",
+                        driverRuleTags: ["security"]),
+                    SarifExternalDiagnosticGovernanceMode.Strict,
+                    new SarifExternalDiagnosticFingerprint(
+                        SarifExternalDiagnosticFingerprintOrigin.Source,
+                        "matrix-fingerprint",
+                        "primary"),
+                    [
+                        new SarifEvidenceProvenance(
+                            "external.scan",
+                            "artifacts/imported.sarif",
+                            "matrix-artifact-sha256",
+                            "Example Analyzer",
+                            "1.2.3",
+                            "assessment-42",
+                            1,
+                            new SarifEvidenceResolvedContext(
+                                "external.scan",
+                                "repository",
+                                "revision",
+                                "scope")),
+                    ]),
+            ]))
+            .Findings
+            .Single();
     }
 
     private static ArchitectureViolation Violation(IArchitectureDiagnosticPayload payload) =>

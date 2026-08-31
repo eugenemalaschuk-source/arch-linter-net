@@ -17,7 +17,7 @@
         "project_metadata", "context_dependency", "context_allow_only", "port_boundary",
         "layout_convention", "package_allow_only", "framework_reference",
         "framework_reference_allow_only", "build_state_preflight", "baseline",
-        "architecture_policy_error", "applicability", "metric_budget"
+        "architecture_policy_error", "applicability", "metric_budget", "imported_external_diagnostic"
       ]
     },
     "contract": { "type": ["string", "null"] },
@@ -33,7 +33,7 @@
         "project_metadata", "context_dependency", "context_allow_only", "port_boundary",
         "layout_convention", "package_allow_only", "framework_reference",
         "framework_reference_allow_only", "build_state_preflight", "baseline",
-        "architecture_policy_error", "applicability", "metric_budget"
+        "architecture_policy_error", "applicability", "metric_budget", "imported_external_diagnostic"
       ]
     },
     "policy_origin": {
@@ -82,7 +82,8 @@
     { "$ref": "#/$defs/baseline" },
     { "$ref": "#/$defs/architecturePolicyError" },
     { "$ref": "#/$defs/applicability" },
-    { "$ref": "#/$defs/metricBudget" }
+    { "$ref": "#/$defs/metricBudget" },
+    { "$ref": "#/$defs/importedExternalDiagnostic" }
   ],
   "$defs": {
     "policyOrigin": {
@@ -594,6 +595,105 @@
             "policy_identity": { "type": "string" }
           }
         }
+      }
+    },
+    "importedExternalDiagnostic": {
+      "type": "object",
+      "required": ["kind", "message_code", "details"],
+      "properties": {
+        "kind": { "const": "imported_external_diagnostic" },
+        "message_code": { "const": "imported_external_diagnostic" },
+        "details": { "$ref": "#/$defs/importedExternalDiagnosticDetails" }
+      }
+    },
+    "importedExternalDiagnosticDetails": {
+      "type": "object",
+      "required": [
+        "detail_kind", "contract", "contract_id", "logical_evidence_id",
+        "selected_diagnostic_identity", "governance_mode", "source_diagnostic",
+        "evidence_provenance"
+      ],
+      "properties": {
+        "detail_kind": { "const": "imported_external_diagnostic" },
+        "contract": { "type": "string" },
+        "contract_id": { "type": "string", "minLength": 1 },
+        "logical_evidence_id": { "type": "string", "minLength": 1 },
+        "selected_diagnostic_identity": { "type": "string", "minLength": 1 },
+        "governance_mode": { "enum": ["strict", "audit"] },
+        "source_diagnostic": { "$ref": "#/$defs/importedSourceDiagnostic" },
+        "evidence_provenance": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/importedEvidenceProvenance" }
+        }
+      }
+    },
+    "importedSourceDiagnostic": {
+      "type": "object",
+      "required": [
+        "tool", "rule_id", "message", "severity", "project", "driver_rule_tags",
+        "location", "fingerprint"
+      ],
+      "properties": {
+        "tool": { "type": ["string", "null"] },
+        "rule_id": { "type": ["string", "null"] },
+        "message": { "type": ["string", "null"] },
+        "severity": { "enum": ["error", "warning", "note", "none", "unspecified"] },
+        "project": { "type": ["string", "null"] },
+        "driver_rule_tags": { "type": "array", "items": { "type": "string" } },
+        "location": {
+          "anyOf": [
+            { "$ref": "#/$defs/importedSourceLocation" },
+            { "type": "null" }
+          ]
+        },
+        "fingerprint": { "$ref": "#/$defs/importedFingerprint" }
+      }
+    },
+    "importedSourceLocation": {
+      "type": "object",
+      "required": ["path", "start_line", "start_column", "end_line", "end_column", "char_offset", "char_length"],
+      "properties": {
+        "path": { "type": ["string", "null"], "minLength": 1 },
+        "start_line": { "type": ["integer", "null"], "minimum": 1 },
+        "start_column": { "type": ["integer", "null"], "minimum": 1 },
+        "end_line": { "type": ["integer", "null"], "minimum": 1 },
+        "end_column": { "type": ["integer", "null"], "minimum": 1 },
+        "char_offset": { "type": ["integer", "null"], "minimum": 0 },
+        "char_length": { "type": ["integer", "null"], "minimum": 0 }
+      },
+      "anyOf": [
+        { "properties": { "path": { "type": "string", "minLength": 1 } } },
+        { "properties": { "start_line": { "type": "integer", "minimum": 1 } } },
+        { "properties": { "char_offset": { "type": "integer", "minimum": 0 } } }
+      ]
+    },
+    "importedFingerprint": {
+      "type": "object",
+      "required": ["origin", "name", "value"],
+      "properties": {
+        "origin": { "enum": ["source", "deterministic"] },
+        "name": { "type": ["string", "null"] },
+        "value": { "type": "string", "minLength": 1 }
+      }
+    },
+    "importedEvidenceProvenance": {
+      "type": "object",
+      "required": [
+        "logical_evidence_id", "tool", "tool_version", "run_id", "artifact_path",
+        "artifact_sha256", "result_count", "repository", "revision", "scope"
+      ],
+      "properties": {
+        "logical_evidence_id": { "type": "string", "minLength": 1 },
+        "tool": { "type": ["string", "null"] },
+        "tool_version": { "type": ["string", "null"] },
+        "run_id": { "type": ["string", "null"] },
+        "artifact_path": { "type": ["string", "null"] },
+        "artifact_sha256": { "type": ["string", "null"] },
+        "result_count": { "type": ["integer", "null"], "minimum": 0 },
+        "repository": { "type": ["string", "null"] },
+        "revision": { "type": ["string", "null"] },
+        "scope": { "type": ["string", "null"] }
       }
     }
   },
