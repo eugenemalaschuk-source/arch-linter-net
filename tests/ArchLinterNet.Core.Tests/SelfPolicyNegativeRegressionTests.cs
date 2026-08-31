@@ -209,17 +209,18 @@ public sealed class SelfPolicyNegativeRegressionTests
 
     // ── #742 partial-declaration debt ratchet ───────────────────────────────
     [Test]
-    public void PartialDeclarationRatchet_RejectsAnAggregateExceedingItsReviewedCount()
+    public void PartialDeclarationRatchet_RejectsAnAggregateWhoseReviewedExceptionNoLongerMatches()
     {
-        // The reviewed exception freezes ArchitectureDiagnosticFormatter's declaration count at its
-        // exact current value (19) via an exact-text ignored_violations entry. Lowering the frozen
-        // count by one reproduces "the aggregate grew past what was reviewed" without touching real
-        // source files: the live finding still says "found 19", the mutated entry now says "found
-        // 18", the exact-text match fails, and the (unignored) violation surfaces.
+        // The reviewed exception freezes ArchitectureDiagnosticFormatter's exact current
+        // declaration text via an exact-text ignored_violations entry. Retargeting the entry's
+        // source_type away from the real type reproduces "this aggregate's frozen entry no longer
+        // matches its live finding" — the same failure a genuine growth in declaration count would
+        // cause — without hardcoding the type's live declaration count, which legitimately shifts
+        // as unrelated work lands elsewhere in the repository.
         string mutated = SelfPolicyRepository.Replace(
             _policy,
-            "found 19: src/ArchLinterNet.Core/Reporting/ArchitectureDiagnosticFormatter.Applicability.cs",
-            "found 18: src/ArchLinterNet.Core/Reporting/ArchitectureDiagnosticFormatter.Applicability.cs");
+            "source_type: \"ArchLinterNet.Core.Reporting.ArchitectureDiagnosticFormatter\"",
+            "source_type: \"ArchLinterNet.Core.Reporting.ArchitectureDiagnosticFormatterRenamed\"");
 
         ArchitectureValidationResult result = ValidateMutated(
             mutated, "production-partial-type-declaration-count-does-not-increase");
