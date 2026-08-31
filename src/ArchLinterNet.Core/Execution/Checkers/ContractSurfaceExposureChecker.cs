@@ -57,7 +57,13 @@ internal static class ContractSurfaceExposureChecker
 
         List<ArchitectureViolation> violations = exposure is null || matchingSelectorsByTarget.Count == 0
             ? new List<ArchitectureViolation>()
-            : BuildViolations(contract, executionContext, exposure, matchingSelectorsByTarget);
+            : BuildViolations(new ContractSurfaceExposureFindingInput(
+                contract,
+                executionContext,
+                exposure,
+                matchingSelectorsByTarget,
+                ExportedSurface,
+                contract.Source.PublicApiSurface));
 
         ArchitectureApplicabilityRecord record = reasons.Count == 0
             ? new ArchitectureApplicabilityRecord(
@@ -103,16 +109,12 @@ internal static class ContractSurfaceExposureChecker
         return reasons;
     }
 
-    private static List<ArchitectureViolation> BuildViolations(
-        ArchitectureContractSurfaceExposureContract contract,
-        ArchitectureContractExecutionContext executionContext,
-        ArchitectureContractSurfaceExposureResult exposure,
-        Dictionary<ArchitectureContractExposureTarget, int[]> matchingSelectorsByTarget)
+    internal static List<ArchitectureViolation> BuildViolations(ContractSurfaceExposureFindingInput input)
     {
         var violations = new List<ArchitectureViolation>();
-        foreach (ArchitectureContractExposure occurrence in exposure.Exposures)
+        foreach (ArchitectureContractExposure occurrence in input.Exposure.Exposures)
         {
-            if (!matchingSelectorsByTarget.TryGetValue(occurrence.ReferencedType, out int[]? matchingSelectors))
+            if (!input.MatchingSelectorsByTarget.TryGetValue(occurrence.ReferencedType, out int[]? matchingSelectors))
             {
                 continue;
             }
@@ -120,7 +122,7 @@ internal static class ContractSurfaceExposureChecker
             string targetReference = occurrence.ReferencedType.Identity;
             string sourceType = occurrence.DeclaringType.FullTypeName;
             string? sourceSite = SourceSite(occurrence.Path);
-            bool ignored = executionContext.IsIgnored(
+            bool ignored = input.ExecutionContext.IsIgnored(
                 sourceType,
                 targetReference,
                 sourceAssembly: occurrence.DeclaringType.AssemblyName,
@@ -134,8 +136,8 @@ internal static class ContractSurfaceExposureChecker
             }
 
             violations.Add(new ArchitectureViolation(
-                contract.Name,
-                contract.Id,
+                input.Contract.Name,
+                input.Contract.Id,
                 sourceType,
                 occurrence.ReferencedType.FullTypeName,
                 [targetReference])
@@ -147,9 +149,9 @@ internal static class ContractSurfaceExposureChecker
                     occurrence.Path.CanonicalKey,
                     occurrence.ReferencedType.AssemblyName,
                     occurrence.ReferencedType.FullTypeName,
-                    ExportedSurface,
+                    input.SourceSurface,
                     sourceSite,
-                    contract.Source.PublicApiSurface,
+                    input.ReviewedPublicApiSurface,
                     matchingSelectors),
             });
         }
@@ -380,3 +382,12 @@ internal sealed record ContractSurfaceExposureEvaluationResult(
     IReadOnlyList<ArchitectureViolation> Violations,
     ArchitectureApplicabilityExpectedEntry ApplicabilityExpectedEntry,
     ArchitectureApplicabilityRecord ApplicabilityRecord);
+
+/// <summary>Shared typed input for families that project existing exposure facts into findings.</summary>
+internal sealed record ContractSurfaceExposureFindingInput(
+    IArchitectureContract Contract,
+    ArchitectureContractExecutionContext ExecutionContext,
+    ArchitectureContractSurfaceExposureResult Exposure,
+    IReadOnlyDictionary<ArchitectureContractExposureTarget, int[]> MatchingSelectorsByTarget,
+    string SourceSurface,
+    string? ReviewedPublicApiSurface);

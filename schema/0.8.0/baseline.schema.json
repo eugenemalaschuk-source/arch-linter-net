@@ -393,6 +393,20 @@
           },
           "default": []
         },
+        "strict_versioned_contract_surface_isolation": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/baselineContractEntryV1"
+          },
+          "default": []
+        },
+        "audit_versioned_contract_surface_isolation": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/baselineContractEntryV1"
+          },
+          "default": []
+        },
         "strict_attribute_usage": {
           "type": "array",
           "items": {
@@ -771,6 +785,20 @@
           "default": []
         },
         "audit_contract_surface_exposure": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/baselineContractEntryV2"
+          },
+          "default": []
+        },
+        "strict_versioned_contract_surface_isolation": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/baselineContractEntryV2"
+          },
+          "default": []
+        },
+        "audit_versioned_contract_surface_isolation": {
           "type": "array",
           "items": {
             "$ref": "#/$defs/baselineContractEntryV2"

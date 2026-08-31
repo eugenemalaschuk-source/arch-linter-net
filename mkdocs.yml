@@ -66,6 +66,7 @@ nav:
       - Layout convention contracts: contracts/layout-conventions.md
       - Public API surface contracts: contracts/public-api-surface.md
       - Contract-surface exposure contracts: contracts/contract-surface-exposure.md
+      - Versioned contract-surface isolation contracts: contracts/versioned-contract-surface-isolation.md
       - Attribute usage contracts: contracts/attribute-usage.md
       - Inheritance contracts: contracts/inheritance.md
       - Interface implementation contracts: contracts/interface-implementation.md

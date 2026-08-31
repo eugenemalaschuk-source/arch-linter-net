@@ -208,6 +208,13 @@
       "validates": "Selected exported public/protected/protected-internal source types do not recursively expose types selected by forbidden structural or semantic selectors through visible contract signatures. Source constraints and selector fields combine with AND semantics; forbidden entries combine with OR semantics. Sources may reuse the effective selected roots of a reviewed public-api-surface contract without changing snapshot membership or semantic roles. Nested generic, tuple, wrapper, and metadata-supported signature paths are reported deterministically; zero source/target matches and incomplete index evidence are explicit unassessable applicability results."
     },
     {
+      "kind": "versioned-contract-surface-isolation",
+      "strictGroup": "strict_versioned_contract_surface_isolation",
+      "auditGroup": "audit_versioned_contract_surface_isolation",
+      "fields": ["name", "id", "surfaces.id", "surfaces.types_matching.name_suffix", "surfaces.types_matching.name_prefix", "surfaces.types_matching.namespace", "surfaces.types_matching.layer", "surfaces.types_matching.base_type", "surfaces.types_matching.implements_interface", "surfaces.types_matching.has_attribute", "surfaces.types_matching.role", "source_surface", "forbidden_surfaces", "ignored_violations", "reason"],
+      "validates": "A locally named exported source contract surface does not recursively expose types selected by one or more locally named version or implementation surfaces. Surface selectors reuse bounded structural and semantic selector evidence; group references are closed, source/self references are rejected, and each referenced zero-match or incomplete input is an unassessable applicability result. Findings retain the existing deterministic visible-signature/metadata exposure path and assembly-qualified target identity; this is static contract isolation, not runtime version negotiation or binary compatibility analysis."
+    },
+    {
       "kind": "attribute-usage",
       "strictGroup": "strict_attribute_usage",
       "auditGroup": "audit_attribute_usage",

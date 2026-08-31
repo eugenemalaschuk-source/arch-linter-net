@@ -98,7 +98,7 @@ public sealed class PackagedSchemaRegistryTests
             ["schema/0.5.1/normalized-finding.schema.json"] = "f3b6fb5de05de315e6c59bfdeedf921423165bdc7da6d2da4681600fcc4947d3",
             ["schema/0.5.1/analysis-cache.schema.json"] = "b0958295d23fc6bb4d575ddd81e837e8e458c355662cdae4844bf7a48dfcc9f2",
             ["schema/0.5.1/baseline.schema.json"] = "5f1d45820133e77403245dbe1f965a464dee6bf3e68654b1162b857db4f96bb2",
-            ["schema/0.8.0/baseline.schema.json"] = "a2fe301065aa08cbc9eb1858665dc17fb5753093aba457dd41163be58975392d",
+            ["schema/0.8.0/baseline.schema.json"] = "83a8555939d1a976ca23c84832120d0108d3914f0e92ce314c256bfb44ed9b21",
         };
 
         foreach ((string relativePath, string expectedDigest) in expectedDigests)
