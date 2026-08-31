@@ -67,23 +67,81 @@ jobs:
         shell: bash
         run: make ${{ matrix.target }}
 
-      - name: Upload .NET coverage shard
+      - name: Canonicalize coverage shard evidence
+        shell: bash
+        run: |
+          python3 tools/release/main_quality_coverage.py canonicalize-shard \
+            --shard "${{ matrix.id }}" \
+            --source-sha "$GITHUB_SHA" \
+            --coverage-root "test-results/coverage/${{ matrix.id }}" \
+            --output-root test-results/main-quality-shard
+
+      - name: Upload canonical .NET coverage shard
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: main-dotnet-coverage-${{ matrix.id }}
-          path: test-results/coverage
+          path: |
+            test-results/main-quality-shard
+            test-results/coverage
+          if-no-files-found: error
+          retention-days: 1
+
+  coverage_inventory:
+    name: Main Coverage Evidence
+    needs: dotnet_coverage
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    permissions:
+      contents: read
+    outputs:
+      source_sha: ${{ steps.coverage_inventory.outputs.source_sha }}
+      shard_count: ${{ steps.coverage_inventory.outputs.shard_count }}
+      expected_shard_count: ${{ steps.coverage_inventory.outputs.expected_shard_count }}
+      opencover_count: ${{ steps.coverage_inventory.outputs.opencover_count }}
+      cobertura_count: ${{ steps.coverage_inventory.outputs.cobertura_count }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+
+      - name: Download canonical .NET coverage shards
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+        with:
+          pattern: main-dotnet-coverage-*
+          path: test-results/coverage-shards
+
+      - name: Assemble and verify complete coverage inventory
+        id: coverage_inventory
+        shell: bash
+        run: |
+          python3 tools/release/main_quality_coverage.py assemble \
+            --artifacts-root test-results/coverage-shards \
+            --expected-sha "$GITHUB_SHA" \
+            --output-root test-results/main-quality-canonical \
+            --github-output "$GITHUB_OUTPUT"
+
+      - name: Upload complete canonical coverage inventory
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: main-dotnet-coverage-canonical
+          path: test-results/main-quality-canonical
           if-no-files-found: error
           retention-days: 1
 
   sonar:
     name: Main SonarCloud
-    needs: dotnet_coverage
+    needs: coverage_inventory
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
       contents: read
     outputs:
       quality_gate: ${{ steps.sonar_end.outputs.quality_gate }}
+      analysis_revision: ${{ steps.sonar_evidence.outputs.analysis_revision }}
+      coverage_import_status: ${{ steps.sonar_evidence.outputs.coverage_import_status }}
+      covered_main_files: ${{ steps.sonar_evidence.outputs.covered_main_files }}
 
     steps:
       - name: Checkout
@@ -92,11 +150,26 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
-      - name: Download .NET coverage shards
+      - name: Download complete canonical coverage inventory
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+        with:
+          name: main-dotnet-coverage-canonical
+          path: test-results/main-quality-canonical
+
+      - name: Download .NET test execution reports
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
         with:
           pattern: main-dotnet-coverage-*
-          path: test-results/coverage-shards
+          path: test-results/test-execution-shards
+
+      - name: Verify canonical coverage inventory
+        id: coverage_evidence
+        shell: bash
+        run: |
+          python3 tools/release/main_quality_coverage.py verify-inventory \
+            --inventory-root test-results/main-quality-canonical \
+            --expected-sha "$GITHUB_SHA" \
+            --github-output "$GITHUB_OUTPUT"
 
       - name: Setup uv
         uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
@@ -157,6 +230,7 @@ jobs:
         id: sonar_begin
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          OPENCOVER_FILES: ${{ steps.coverage_evidence.outputs.opencover_files }}
         shell: bash
         run: |
           ./.sonar/scanner/dotnet-sonarscanner begin \
@@ -166,8 +240,9 @@ jobs:
             /d:sonar.host.url="$SONAR_HOST_URL" \
             /d:sonar.qualitygate.wait=true \
             /d:sonar.qualitygate.timeout=300 \
-            /d:sonar.cs.opencover.reportsPaths="test-results/**/coverage.opencover.xml" \
-            /d:sonar.cs.vstest.reportsPaths="test-results/**/*.trx" \
+            /d:sonar.scm.revision="$GITHUB_SHA" \
+            /d:sonar.cs.opencover.reportsPaths="$OPENCOVER_FILES" \
+            /d:sonar.cs.vstest.reportsPaths="test-results/test-execution-shards/**/*.trx" \
             /d:sonar.python.coverage.reportPaths="coverage-python.xml" \
             /d:sonar.exclusions="**/AdoptionAcceptance/Fixtures/**" \
             /d:sonar.coverage.exclusions="tools/ArchLinterNet.GitFuzz/**,tools/**/tests/**,**/CheckpointBReleaseGateTests*.cs"
@@ -211,13 +286,39 @@ jobs:
             exit 1
           fi
 
+      - name: Verify SonarCloud coverage import and revision
+        id: sonar_evidence
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        shell: bash
+        run: |
+          analysis_json="$RUNNER_TEMP/sonar-project-analyses.json"
+          curl --silent --show-error --fail \
+            --retry 3 --retry-delay 2 --retry-all-errors \
+            --header "Authorization: Bearer $SONAR_TOKEN" \
+            --get "$SONAR_HOST_URL/api/project_analyses/search" \
+            --data-urlencode "project=$SONAR_PROJECT_KEY" \
+            --data-urlencode "branch=main" \
+            --data-urlencode "ps=20" \
+            > "$analysis_json"
+          python3 tools/release/main_quality_coverage.py verify-sonar \
+            --inventory-root test-results/main-quality-canonical \
+            --expected-sha "$GITHUB_SHA" \
+            --scanner-log "$RUNNER_TEMP/sonar-end.log" \
+            --analysis-json "$analysis_json" \
+            --github-output "$GITHUB_OUTPUT"
+
   codecov:
     name: Main Codecov
-    needs: dotnet_coverage
+    needs: coverage_inventory
     runs-on: ubuntu-latest
     timeout-minutes: 8
     permissions:
       contents: read
+    outputs:
+      upload_status: ${{ steps.codecov_evidence.outputs.upload_status }}
+      commit: ${{ steps.codecov_evidence.outputs.commit }}
+      report_count: ${{ steps.codecov_evidence.outputs.report_count }}
 
     steps:
       - name: Checkout
@@ -225,34 +326,47 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Download .NET coverage shards
+      - name: Download complete canonical coverage inventory
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
         with:
-          pattern: main-dotnet-coverage-*
-          path: test-results/coverage-shards
+          name: main-dotnet-coverage-canonical
+          path: test-results/main-quality-canonical
 
-      - name: Resolve coverage report paths
-        id: coverage_reports
+      - name: Verify canonical coverage inventory
+        id: coverage_evidence
         shell: bash
         run: |
-          files="$(find test-results -name 'coverage.cobertura.xml' -print | sed 's#^#./#' | paste -sd, -)"
-          echo "files=$files" >> "$GITHUB_OUTPUT"
-          if [ -z "$files" ]; then
-            echo "No .NET Cobertura coverage reports were downloaded." >&2
-            exit 1
-          fi
+          python3 tools/release/main_quality_coverage.py verify-inventory \
+            --inventory-root test-results/main-quality-canonical \
+            --expected-sha "$GITHUB_SHA" \
+            --github-output "$GITHUB_OUTPUT"
 
       - name: Upload merged-main coverage to Codecov
+        id: codecov_upload
         uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f # v7.0.0
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
-          files: ${{ steps.coverage_reports.outputs.files }}
+          files: ${{ steps.coverage_evidence.outputs.cobertura_files }}
           disable_search: true
           fail_ci_if_error: true
+          override_commit: ${{ github.sha }}
+          name: main-quality-${{ github.run_id }}-${{ github.run_attempt }}
+          verbose: true
+
+      - name: Record Codecov commit-bound upload evidence
+        id: codecov_evidence
+        env:
+          REPORT_COUNT: ${{ steps.coverage_evidence.outputs.cobertura_count }}
+        shell: bash
+        run: |
+          echo "upload_status=uploaded" >> "$GITHUB_OUTPUT"
+          echo "commit=$GITHUB_SHA" >> "$GITHUB_OUTPUT"
+          echo "report_count=$REPORT_COUNT" >> "$GITHUB_OUTPUT"
+          echo "Codecov accepted explicit canonical coverage input: commit=$GITHUB_SHA reports=$REPORT_COUNT disable_search=true"
 
   summary:
     name: Main Quality Summary
-    needs: [dotnet_coverage, sonar, codecov]
+    needs: [dotnet_coverage, coverage_inventory, sonar, codecov]
     if: always()
     runs-on: ubuntu-latest
     timeout-minutes: 2
@@ -261,23 +375,50 @@ jobs:
     steps:
       - name: Publish main telemetry summary
         env:
+          COVERAGE_SOURCE_SHA: ${{ needs.coverage_inventory.outputs.source_sha }}
+          COVERAGE_SHARDS: ${{ needs.coverage_inventory.outputs.shard_count }}
+          COVERAGE_EXPECTED_SHARDS: ${{ needs.coverage_inventory.outputs.expected_shard_count }}
+          OPENCOVER_COUNT: ${{ needs.coverage_inventory.outputs.opencover_count }}
+          COBERTURA_COUNT: ${{ needs.coverage_inventory.outputs.cobertura_count }}
           SONAR_QUALITY_GATE: ${{ needs.sonar.outputs.quality_gate }}
+          SONAR_REVISION: ${{ needs.sonar.outputs.analysis_revision }}
+          SONAR_IMPORT_STATUS: ${{ needs.sonar.outputs.coverage_import_status }}
+          SONAR_COVERED_MAIN_FILES: ${{ needs.sonar.outputs.covered_main_files }}
+          CODECOV_UPLOAD_STATUS: ${{ needs.codecov.outputs.upload_status }}
+          CODECOV_COMMIT: ${{ needs.codecov.outputs.commit }}
+          CODECOV_REPORT_COUNT: ${{ needs.codecov.outputs.report_count }}
         shell: bash
         run: |
+          source_sha="${COVERAGE_SOURCE_SHA:-unavailable}"
+          shards="${COVERAGE_SHARDS:-0}/${COVERAGE_EXPECTED_SHARDS:-3}"
+          opencover="${OPENCOVER_COUNT:-0}"
+          cobertura="${COBERTURA_COUNT:-0}"
           quality_gate="${SONAR_QUALITY_GATE:-unavailable}"
+          sonar_revision="${SONAR_REVISION:-unavailable}"
+          sonar_import="${SONAR_IMPORT_STATUS:-unavailable}"
+          sonar_main_files="${SONAR_COVERED_MAIN_FILES:-0}"
+          codecov_status="${CODECOV_UPLOAD_STATUS:-unavailable}"
+          codecov_commit="${CODECOV_COMMIT:-unavailable}"
+          codecov_reports="${CODECOV_REPORT_COUNT:-0}"
           {
             echo "### Main quality telemetry"
             echo
-            echo "- Source: \`$GITHUB_SHA\`"
-            echo "- .NET coverage shards: ${{ needs.dotnet_coverage.result }}"
+            echo "- Workflow source SHA: \`$GITHUB_SHA\`"
+            echo "- Coverage evidence SHA: \`$source_sha\`"
+            echo "- Required .NET coverage shards: $shards"
+            echo "- Canonical OpenCover reports: $opencover"
+            echo "- Canonical Cobertura reports: $cobertura"
+            echo "- Coverage inventory gate: ${{ needs.coverage_inventory.result }}"
             echo "- SonarCloud main refresh: ${{ needs.sonar.result }}"
+            echo "- SonarCloud analysis revision: \`$sonar_revision\`"
+            echo "- SonarCloud .NET coverage import: $sonar_import (covered main files: $sonar_main_files)"
             echo "- SonarCloud quality gate (telemetry only): $quality_gate"
             echo "- Codecov main refresh: ${{ needs.codecov.result }}"
-            echo "- SonarCloud and Codecov run as independent fan-out jobs from the same merged-main coverage evidence."
-            echo "- An explicit processed Sonar quality-gate failure is surfaced as a warning and badge/dashboard signal; scanner, upload, processing and configuration failures remain red."
-            echo "- README main-quality, Sonar and Codecov badges are expected to represent this merged revision after successful refresh jobs."
+            echo "- Codecov commit/upload: $codecov_status for \`$codecov_commit\` with $codecov_reports canonical reports"
+            echo "- SonarCloud and Codecov fan out independently only after the same commit-bound 3/3 coverage inventory is verified."
+            echo "- An explicit processed Sonar quality-gate failure is surfaced as a warning and badge/dashboard signal; scanner, coverage import, revision, upload, processing and configuration failures remain red."
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Require complete main telemetry
-        if: needs.dotnet_coverage.result != 'success' || needs.sonar.result != 'success' || needs.codecov.result != 'success'
+        if: needs.dotnet_coverage.result != 'success' || needs.coverage_inventory.result != 'success' || needs.sonar.result != 'success' || needs.codecov.result != 'success'
         run: exit 1

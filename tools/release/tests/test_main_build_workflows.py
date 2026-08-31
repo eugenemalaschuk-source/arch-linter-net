@@ -43,6 +43,9 @@ def test_main_quality_is_coverage_telemetry_only_and_fail_closed() -> None:
     assert "test-coverage-core-1" in workflow
     assert "test-coverage-core-2" in workflow
     assert "test-coverage-other" in workflow
+    assert "Canonicalize coverage shard evidence" in workflow
+    assert "Main Coverage Evidence" in workflow
+    assert "Assemble and verify complete coverage inventory" in workflow
     assert "dotnet-sonarscanner" in workflow
     assert "codecov/codecov-action@" in workflow
     assert "fail_ci_if_error: true" in workflow
@@ -54,31 +57,63 @@ def test_main_quality_is_coverage_telemetry_only_and_fail_closed() -> None:
     assert "test-packed-artifact" not in workflow
 
 
+def test_main_quality_uses_commit_bound_canonical_coverage_evidence() -> None:
+    workflow = _read("main-quality.yml")
+
+    assert "main_quality_coverage.py canonicalize-shard" in workflow
+    assert "main_quality_coverage.py assemble" in workflow
+    assert workflow.count('--expected-sha "$GITHUB_SHA"') >= 3
+    assert "/d:sonar.scm.revision=\"$GITHUB_SHA\"" in workflow
+    assert "/d:sonar.cs.opencover.reportsPaths=\"$OPENCOVER_FILES\"" in workflow
+    assert 'sonar.cs.opencover.reportsPaths="test-results/**/coverage.opencover.xml"' not in workflow
+    assert "find test-results -name 'coverage.cobertura.xml'" not in workflow
+    assert "files: ${{ steps.coverage_evidence.outputs.cobertura_files }}" in workflow
+    assert "disable_search: true" in workflow
+    assert "override_commit: ${{ github.sha }}" in workflow
+    assert "main_quality_coverage.py verify-sonar" in workflow
+    assert "/api/project_analyses/search" in workflow
+    assert "Required .NET coverage shards: $shards" in workflow
+    assert "Canonical OpenCover reports: $opencover" in workflow
+    assert "Canonical Cobertura reports: $cobertura" in workflow
+    assert "SonarCloud analysis revision:" in workflow
+    assert "Codecov commit/upload:" in workflow
+
+
 def test_main_sonar_and_codecov_refresh_independently_from_same_coverage() -> None:
     workflow = _read("main-quality.yml")
 
+    assert "\n  coverage_inventory:\n" in workflow
     assert "\n  sonar:\n" in workflow
     assert "\n  codecov:\n" in workflow
     assert "\n  summary:\n" in workflow
 
+    inventory_start = workflow.index("\n  coverage_inventory:\n")
     sonar_start = workflow.index("\n  sonar:\n")
     codecov_start = workflow.index("\n  codecov:\n")
     summary_start = workflow.index("\n  summary:\n")
+    inventory = workflow[inventory_start:sonar_start]
     sonar = workflow[sonar_start:codecov_start]
     codecov = workflow[codecov_start:summary_start]
     summary = workflow[summary_start:]
 
-    assert "needs: dotnet_coverage" in sonar
-    assert "pattern: main-dotnet-coverage-*" in sonar
+    assert "needs: dotnet_coverage" in inventory
+    assert "pattern: main-dotnet-coverage-*" in inventory
+    assert "main_quality_coverage.py assemble" in inventory
+    assert "main-dotnet-coverage-canonical" in inventory
+
+    assert "needs: coverage_inventory" in sonar
+    assert "name: main-dotnet-coverage-canonical" in sonar
+    assert "main_quality_coverage.py verify-inventory" in sonar
     assert "dotnet-sonarscanner" in sonar
     assert "codecov/codecov-action@" not in sonar
 
-    assert "needs: dotnet_coverage" in codecov
-    assert "pattern: main-dotnet-coverage-*" in codecov
+    assert "needs: coverage_inventory" in codecov
+    assert "name: main-dotnet-coverage-canonical" in codecov
+    assert "main_quality_coverage.py verify-inventory" in codecov
     assert "codecov/codecov-action@" in codecov
     assert "dotnet-sonarscanner" not in codecov
 
-    assert "needs: [dotnet_coverage, sonar, codecov]" in summary
+    assert "needs: [dotnet_coverage, coverage_inventory, sonar, codecov]" in summary
     assert "Require complete main telemetry" in summary
 
 
