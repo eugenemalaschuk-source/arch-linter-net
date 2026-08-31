@@ -203,6 +203,7 @@ alone, or use a partial known subset in any of those cases.
   unassessable and does not select a subject by assembly simple name
 
 ### Requirement: Project metric ownership binds one resolved artifact
+Project metric projections SHALL bind each resolved artifact to one project.
 Project topology, project footprint, and project external-dependency metric
 projections SHALL bind every contributing resolved assembly artifact to exactly
 one discovered project through its stable normalized project identity. They
