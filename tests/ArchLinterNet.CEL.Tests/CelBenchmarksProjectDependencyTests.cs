@@ -18,7 +18,7 @@ namespace ArchLinterNet.CEL.Tests;
 /// intact.
 /// </summary>
 /// <remarks>
-/// BenchmarkDotNet 0.14.0 itself transitively depends on <c>Microsoft.CodeAnalysis.CSharp</c> for
+/// BenchmarkDotNet itself transitively depends on <c>Microsoft.CodeAnalysis.CSharp</c> for
 /// its own internal benchmark-harness generation — this is inherent to using the benchmarking tool
 /// the issue explicitly directs ("Prefer BenchmarkDotNet..."), not a Roslyn dependency this
 /// project's benchmark or test code introduces or calls into. No file in

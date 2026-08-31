@@ -18,7 +18,7 @@ public sealed class PublicApiCompatibilityTests
 
         Assert.That(exception.Category, Is.EqualTo(ArchitecturePolicyImportErrorCategory.SourceShape));
         Assert.That(exception.Message, Is.EqualTo("Invalid policy."));
-        Assert.That(exception.Diagnostic, Is.Null);
+        Assert.That((object?)exception.Diagnostic, Is.Null);
     }
 
     [Test]

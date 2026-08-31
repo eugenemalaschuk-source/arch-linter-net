@@ -131,7 +131,7 @@ public sealed class GitDeltaDecoderTests
         AssertFailsWithObjectMalformed(() => GitDeltaDecoder.Apply([], delta));
     }
 
-    private static void AssertFailsWithObjectMalformed(TestDelegate action)
+    private static void AssertFailsWithObjectMalformed(Action action)
     {
         HistoryFailureException failure = Assert.Throws<HistoryFailureException>(action)!;
         Assert.That(((HistoryDiagnostic)failure.Diagnostic).KindText, Is.EqualTo("object_malformed"));
