@@ -34,6 +34,51 @@ internal static class ContractSurfaceExposureChecker
             provenance);
 
         RootSelection roots = ResolveRoots(context, contract);
+        List<ArchitectureApplicabilityReason> reasons = CollectRootReasons(context, roots, provenance);
+
+        // The analysis type index contains only first-party targets. Exposure facts also retain
+        // the actual reflected Type for every referenced target, including framework/external
+        // assemblies, so forbidden selectors operate over the complete relevant universe.
+        ArchitectureContractSurfaceExposureResult? exposure = roots.Roots.Count == 0
+            ? null
+            : context.GetContractSurfaceExposure(roots.Roots, ArchitectureContractSurfaceShape.Exported);
+        if (exposure is not null && !exposure.IsComplete)
+        {
+            reasons.Add(Reason(ArchitectureApplicabilityReasonCodes.MissingRequiredInput, provenance));
+        }
+
+        Type[] targetUniverse = context.TypeIndex.AllTypes()
+            .Concat(exposure?.ReferencedTypes.Values ?? Enumerable.Empty<Type>())
+            .Distinct()
+            .OrderBy(TypeIdentity, StringComparer.Ordinal)
+            .ToArray();
+        Dictionary<ArchitectureContractExposureTarget, int[]> matchingSelectorsByTarget =
+            MatchForbiddenTargets(context, contract, targetUniverse, reasons, provenance);
+
+        List<ArchitectureViolation> violations = exposure is null || matchingSelectorsByTarget.Count == 0
+            ? new List<ArchitectureViolation>()
+            : BuildViolations(contract, executionContext, exposure, matchingSelectorsByTarget);
+
+        ArchitectureApplicabilityRecord record = reasons.Count == 0
+            ? new ArchitectureApplicabilityRecord(
+                contract.Id ?? contract.Name,
+                Family,
+                ArchitectureApplicabilityRecordState.Evaluable,
+                provenance)
+            : new ArchitectureApplicabilityRecord(
+                contract.Id ?? contract.Name,
+                Family,
+                ArchitectureApplicabilityRecordState.Unassessable,
+                reasons.Distinct().ToArray(),
+                provenance);
+        return new ContractSurfaceExposureEvaluationResult(violations, expected, record);
+    }
+
+    private static List<ArchitectureApplicabilityReason> CollectRootReasons(
+        ArchitectureCheckerContext context,
+        RootSelection roots,
+        ArchitectureApplicabilityProvenance provenance)
+    {
         List<ArchitectureApplicabilityReason> reasons = new();
 
         if (!roots.IsComplete)
@@ -55,95 +100,68 @@ internal static class ContractSurfaceExposureChecker
             reasons.Add(Reason(ArchitectureApplicabilityReasonCodes.MissingRequiredInput, provenance));
         }
 
-        // The analysis type index contains only first-party targets. Exposure facts also retain
-        // the actual reflected Type for every referenced target, including framework/external
-        // assemblies, so forbidden selectors operate over the complete relevant universe.
-        ArchitectureContractSurfaceExposureResult? exposure = roots.Roots.Count == 0
-            ? null
-            : context.GetContractSurfaceExposure(roots.Roots, ArchitectureContractSurfaceShape.Exported);
-        if (exposure is not null && !exposure.IsComplete)
-        {
-            reasons.Add(Reason(ArchitectureApplicabilityReasonCodes.MissingRequiredInput, provenance));
-        }
-
-        Type[] targetUniverse = context.TypeIndex.AllTypes()
-            .Concat(exposure?.ReferencedTypes.Values ?? Enumerable.Empty<Type>())
-            .Distinct()
-            .OrderBy(TypeIdentity, StringComparer.Ordinal)
-            .ToArray();
-        IReadOnlyDictionary<ArchitectureContractExposureTarget, int[]> matchingSelectorsByTarget =
-            MatchForbiddenTargets(context, contract, targetUniverse, reasons, provenance);
-
-        var violations = new List<ArchitectureViolation>();
-        if (exposure is not null && matchingSelectorsByTarget.Count > 0)
-        {
-            foreach (ArchitectureContractExposure occurrence in exposure.Exposures)
-            {
-                if (!matchingSelectorsByTarget.TryGetValue(
-                        occurrence.ReferencedType,
-                        out int[]? matchingSelectors))
-                {
-                    continue;
-                }
-
-                string targetReference = occurrence.ReferencedType.Identity;
-                string sourceType = occurrence.DeclaringType.FullTypeName;
-                string? sourceSite = SourceSite(occurrence.Path);
-                bool ignored = executionContext.IsIgnored(
-                    sourceType,
-                    targetReference,
-                    sourceAssembly: occurrence.DeclaringType.AssemblyName,
-                    targetAssembly: occurrence.ReferencedType.AssemblyName,
-                    targetType: occurrence.ReferencedType.FullTypeName,
-                    sourceMember: sourceSite,
-                    targetMember: occurrence.Path.CanonicalKey);
-                if (ignored)
-                {
-                    continue;
-                }
-
-                violations.Add(new ArchitectureViolation(
-                    contract.Name,
-                    contract.Id,
-                    sourceType,
-                    occurrence.ReferencedType.FullTypeName,
-                    [targetReference])
-                {
-                    Payload = new ContractSurfaceExposurePayload(
-                        occurrence.DeclaringType.AssemblyName,
-                        sourceType,
-                        occurrence.Path.ToString(),
-                        occurrence.Path.CanonicalKey,
-                        occurrence.ReferencedType.AssemblyName,
-                        occurrence.ReferencedType.FullTypeName,
-                        ExportedSurface,
-                        sourceSite,
-                        contract.Source.PublicApiSurface,
-                        matchingSelectors),
-                });
-            }
-        }
-
-        ArchitectureApplicabilityRecord record = reasons.Count == 0
-            ? new ArchitectureApplicabilityRecord(
-                contract.Id ?? contract.Name,
-                Family,
-                ArchitectureApplicabilityRecordState.Evaluable,
-                provenance)
-            : new ArchitectureApplicabilityRecord(
-                contract.Id ?? contract.Name,
-                Family,
-                ArchitectureApplicabilityRecordState.Unassessable,
-                reasons.Distinct().ToArray(),
-                provenance);
-        return new ContractSurfaceExposureEvaluationResult(violations, expected, record);
+        return reasons;
     }
 
-    private static IReadOnlyDictionary<ArchitectureContractExposureTarget, int[]> MatchForbiddenTargets(
+    private static List<ArchitectureViolation> BuildViolations(
+        ArchitectureContractSurfaceExposureContract contract,
+        ArchitectureContractExecutionContext executionContext,
+        ArchitectureContractSurfaceExposureResult exposure,
+        Dictionary<ArchitectureContractExposureTarget, int[]> matchingSelectorsByTarget)
+    {
+        var violations = new List<ArchitectureViolation>();
+        foreach (ArchitectureContractExposure occurrence in exposure.Exposures)
+        {
+            if (!matchingSelectorsByTarget.TryGetValue(occurrence.ReferencedType, out int[]? matchingSelectors))
+            {
+                continue;
+            }
+
+            string targetReference = occurrence.ReferencedType.Identity;
+            string sourceType = occurrence.DeclaringType.FullTypeName;
+            string? sourceSite = SourceSite(occurrence.Path);
+            bool ignored = executionContext.IsIgnored(
+                sourceType,
+                targetReference,
+                sourceAssembly: occurrence.DeclaringType.AssemblyName,
+                targetAssembly: occurrence.ReferencedType.AssemblyName,
+                targetType: occurrence.ReferencedType.FullTypeName,
+                sourceMember: sourceSite,
+                targetMember: occurrence.Path.CanonicalKey);
+            if (ignored)
+            {
+                continue;
+            }
+
+            violations.Add(new ArchitectureViolation(
+                contract.Name,
+                contract.Id,
+                sourceType,
+                occurrence.ReferencedType.FullTypeName,
+                [targetReference])
+            {
+                Payload = new ContractSurfaceExposurePayload(
+                    occurrence.DeclaringType.AssemblyName,
+                    sourceType,
+                    occurrence.Path.ToString(),
+                    occurrence.Path.CanonicalKey,
+                    occurrence.ReferencedType.AssemblyName,
+                    occurrence.ReferencedType.FullTypeName,
+                    ExportedSurface,
+                    sourceSite,
+                    contract.Source.PublicApiSurface,
+                    matchingSelectors),
+            });
+        }
+
+        return violations;
+    }
+
+    private static Dictionary<ArchitectureContractExposureTarget, int[]> MatchForbiddenTargets(
         ArchitectureCheckerContext context,
         ArchitectureContractSurfaceExposureContract contract,
         IReadOnlyList<Type> targetUniverse,
-        ICollection<ArchitectureApplicabilityReason> reasons,
+        List<ArchitectureApplicabilityReason> reasons,
         ArchitectureApplicabilityProvenance provenance)
     {
         var selectorIndexesByTarget = new Dictionary<ArchitectureContractExposureTarget, List<int>>();
@@ -187,21 +205,43 @@ internal static class ContractSurfaceExposureChecker
         ArchitectureContractSurfaceExposureContract contract)
     {
         ArchitectureContractSurfaceExposureSource source = contract.Source;
+        HashSet<string> targetAssemblyNames = context.AnalysisContext.TargetAssemblies
+            .Select(assembly => assembly.GetName().Name ?? string.Empty)
+            .ToHashSet(StringComparer.Ordinal);
+
+        RootFilterResolution filters = ResolveRootFilters(context, source, targetAssemblyNames);
+        RootCandidateResolution candidateResolution = ResolveRootCandidates(
+            context, source, filters.AssemblyFilter, filters.ProjectAssemblies);
+
+        List<Type> candidates = FilterCandidates(
+            context, contract, source, candidateResolution.Candidates, filters.AssemblyFilter, filters.ProjectAssemblies);
+
+        Type[] roots = candidates
+            .Distinct()
+            .OrderBy(TypeIdentity, StringComparer.Ordinal)
+            .ToArray();
+        return new RootSelection(
+            roots,
+            filters.IsComplete && candidateResolution.IsComplete,
+            filters.Stale || candidateResolution.Stale);
+    }
+
+    // Assembly/project selectors are declarations over the resolved analysis graph. A partly
+    // resolved selector cannot be treated as an empty, clean source set: otherwise one typo or
+    // one missing project would silently narrow the contract to the remaining assemblies.
+    private static RootFilterResolution ResolveRootFilters(
+        ArchitectureCheckerContext context,
+        ArchitectureContractSurfaceExposureSource source,
+        HashSet<string> targetAssemblyNames)
+    {
         bool hasAssemblyFilter = source.Assemblies is { Count: > 0 };
-        bool hasProjectFilter = source.Projects is { Count: > 0 };
         HashSet<string>? assemblyFilter = hasAssemblyFilter
             ? source.Assemblies.ToHashSet(StringComparer.Ordinal)
             : null;
         HashSet<string>? projectAssemblies = null;
         bool stale = false;
-        HashSet<string> targetAssemblyNames = context.AnalysisContext.TargetAssemblies
-            .Select(assembly => assembly.GetName().Name ?? string.Empty)
-            .ToHashSet(StringComparer.Ordinal);
         bool isComplete = true;
 
-        // Assembly/project selectors are declarations over the resolved analysis graph. A partly
-        // resolved selector cannot be treated as an empty, clean source set: otherwise one typo or
-        // one missing project would silently narrow the contract to the remaining assemblies.
         if (hasAssemblyFilter)
         {
             bool hasUnknownAssembly = source.Assemblies
@@ -211,7 +251,7 @@ internal static class ContractSurfaceExposureChecker
             isComplete &= !hasUnknownAssembly;
         }
 
-        if (hasProjectFilter)
+        if (source.Projects is { Count: > 0 })
         {
             string[] requestedProjects = source.Projects.Distinct(StringComparer.Ordinal).ToArray();
             projectAssemblies = context.ResolveProjectAssemblyNames(requestedProjects.ToList())
@@ -222,44 +262,59 @@ internal static class ContractSurfaceExposureChecker
             isComplete &= !hasUnknownProject && !hasNoResolvedTargetProject;
         }
 
-        List<Type> candidates;
+        return new RootFilterResolution(assemblyFilter, projectAssemblies, isComplete, stale);
+    }
+
+    private static RootCandidateResolution ResolveRootCandidates(
+        ArchitectureCheckerContext context,
+        ArchitectureContractSurfaceExposureSource source,
+        HashSet<string>? assemblyFilter,
+        HashSet<string>? projectAssemblies)
+    {
         if (!string.IsNullOrWhiteSpace(source.PublicApiSurface))
         {
             ArchitecturePublicApiSurfaceRootResolution resolved =
-                context.ResolvePublicApiSurfaceRoots(source.PublicApiSurface!);
-            candidates = resolved.Roots.ToList();
-            isComplete &= resolved.HasContract && resolved.IsComplete;
-            stale |= !resolved.HasContract;
+                context.ResolvePublicApiSurfaceRoots(source.PublicApiSurface);
+            return new RootCandidateResolution(
+                resolved.Roots.ToList(),
+                resolved.HasContract && resolved.IsComplete,
+                !resolved.HasContract);
         }
-        else
+
+        var candidates = new List<Type>();
+        bool isComplete = true;
+        foreach (Assembly assembly in context.AnalysisContext.TargetAssemblies
+                     .Distinct()
+                     .OrderBy(AssemblyIdentity, StringComparer.Ordinal))
         {
-            candidates = new List<Type>();
-            foreach (Assembly assembly in context.AnalysisContext.TargetAssemblies
-                         .Distinct()
-                         .OrderBy(AssemblyIdentity, StringComparer.Ordinal))
+            string assemblyName = assembly.GetName().Name ?? string.Empty;
+            if (assemblyFilter is not null && !assemblyFilter.Contains(assemblyName))
             {
-                string assemblyName = assembly.GetName().Name ?? string.Empty;
-                if (assemblyFilter is not null && !assemblyFilter.Contains(assemblyName))
-                {
-                    continue;
-                }
-
-                if (projectAssemblies is not null && !projectAssemblies.Contains(assemblyName))
-                {
-                    continue;
-                }
-
-                ArchitecturePublicApiSurfaceMaterialization surface = context.GetPublicApiSurface(assembly);
-                isComplete &= surface.IsComplete;
-                candidates.AddRange(surface.ExportedTypes);
+                continue;
             }
 
-            if (hasAssemblyFilter && candidates.Count == 0)
+            if (projectAssemblies is not null && !projectAssemblies.Contains(assemblyName))
             {
-                stale = true;
+                continue;
             }
+
+            ArchitecturePublicApiSurfaceMaterialization surface = context.GetPublicApiSurface(assembly);
+            isComplete &= surface.IsComplete;
+            candidates.AddRange(surface.ExportedTypes);
         }
 
+        bool stale = assemblyFilter is not null && candidates.Count == 0;
+        return new RootCandidateResolution(candidates, isComplete, stale);
+    }
+
+    private static List<Type> FilterCandidates(
+        ArchitectureCheckerContext context,
+        ArchitectureContractSurfaceExposureContract contract,
+        ArchitectureContractSurfaceExposureSource source,
+        List<Type> candidates,
+        HashSet<string>? assemblyFilter,
+        HashSet<string>? projectAssemblies)
+    {
         if (assemblyFilter is not null)
         {
             candidates = candidates
@@ -282,11 +337,7 @@ internal static class ContractSurfaceExposureChecker
                 .ToList();
         }
 
-        Type[] roots = candidates
-            .Distinct()
-            .OrderBy(TypeIdentity, StringComparer.Ordinal)
-            .ToArray();
-        return new RootSelection(roots, isComplete, stale);
+        return candidates;
     }
 
     private static ArchitectureApplicabilityReason Reason(
@@ -295,9 +346,9 @@ internal static class ContractSurfaceExposureChecker
 
     private static string? SourceSite(ArchitectureContractExposurePath path)
     {
-        ArchitectureContractExposurePathSegment? member = path.Segments
+        ArchitectureContractExposurePathSegment member = path.Segments
             .FirstOrDefault(segment => segment.Kind is "member" or "attribute" or "attribute_argument");
-        return member?.ToString();
+        return member.ToString();
     }
 
     private static ArchitectureContractExposureTarget TargetIdentity(Type type) =>
@@ -312,6 +363,17 @@ internal static class ContractSurfaceExposureChecker
         IReadOnlyList<Type> Roots,
         bool IsComplete,
         bool HasStaleSource);
+
+    private sealed record RootFilterResolution(
+        HashSet<string>? AssemblyFilter,
+        HashSet<string>? ProjectAssemblies,
+        bool IsComplete,
+        bool Stale);
+
+    private sealed record RootCandidateResolution(
+        List<Type> Candidates,
+        bool IsComplete,
+        bool Stale);
 }
 
 internal sealed record ContractSurfaceExposureEvaluationResult(

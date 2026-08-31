@@ -50,11 +50,11 @@ internal sealed class RawContractSurfaceExposureNodeValidator : IArchitecturePol
                     $"Contract group '{groupKey}' entry {index} must be an object.");
             }
 
-            ValidateContract(contractNode, groupKey);
+            ValidateContract(contractNode);
         }
     }
 
-    private static void ValidateContract(YamlMappingNode contractNode, string groupKey)
+    private static void ValidateContract(YamlMappingNode contractNode)
     {
         string contractName = RawYamlNodes.ContractName(contractNode);
         RawYamlNodes.ValidateKnownKeys(contractNode, contractName, "contract-surface exposure contract", _contractKeys);
@@ -97,7 +97,7 @@ internal sealed class RawContractSurfaceExposureNodeValidator : IArchitecturePol
         bool hasAssemblies = RawYamlNodes.TryGetChild(source, "assemblies", out YamlNode? assembliesNode);
         bool hasProjects = RawYamlNodes.TryGetChild(source, "projects", out YamlNode? projectsNode);
         bool hasTypesMatching = RawYamlNodes.TryGetChild(source, "types_matching", out YamlNode? typesMatchingNode);
-        bool hasPublicApiSurface = RawYamlNodes.TryGetChild(source, "public_api_surface", out YamlNode? publicApiNode);
+        bool hasPublicApiSurface = RawYamlNodes.TryGetChild(source, "public_api_surface", out _);
 
         if (hasAssemblies)
         {

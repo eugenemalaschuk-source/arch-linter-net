@@ -27,12 +27,9 @@ internal sealed class ArchitectureContractExecutor : IArchitectureContractExecut
 
         session.PrepareRuleInputCoverageDeferral(mode);
 
-        var standardFamilyFindings = new StandardFamilyFindings();
+        var accumulator = new ExecutionAccumulator();
         List<ArchitectureViolation> coverageViolations = new();
         List<ArchitectureCoverageSummary> coverageSummaries = new();
-        Dictionary<string, int> resultCounts = new(StringComparer.Ordinal);
-        List<ArchitectureApplicabilityExpectedEntry> applicabilityExpected = new();
-        List<ArchitectureApplicabilityRecord> applicabilityRecords = new();
 
         // Iterating the catalog's families rather than a hardcoded per-family list means a new
         // violations-or-cycles-shaped family (added to ArchitectureContractCatalog.Build plus a
@@ -45,15 +42,13 @@ internal sealed class ArchitectureContractExecutor : IArchitectureContractExecut
 
             if (family == CoverageFamily)
             {
-                ExecuteCoverageFamily(session, mode, handlerRegistry, timing, coverageViolations, coverageSummaries, resultCounts);
+                ExecuteCoverageFamily(session, mode, handlerRegistry, timing, coverageViolations, coverageSummaries, accumulator.ResultCounts);
                 continue;
             }
 
             if (family == MetricBudgetFamily)
             {
-                ExecuteMetricBudgetFamily(
-                    session, mode, timing, standardFamilyFindings, resultCounts,
-                    applicabilityExpected, applicabilityRecords);
+                ExecuteMetricBudgetFamily(session, mode, timing, accumulator);
                 continue;
             }
 
@@ -62,9 +57,7 @@ internal sealed class ArchitectureContractExecutor : IArchitectureContractExecut
                 continue;
             }
 
-            ExecuteStandardFamily(
-                session, mode, family, handlerRegistry, timing, standardFamilyFindings, resultCounts,
-                applicabilityExpected, applicabilityRecords);
+            ExecuteStandardFamily(session, mode, family, handlerRegistry, timing, accumulator);
         }
 
         // Topology is an opt-in document control rather than a contracts.<mode> family. Evaluate
@@ -76,21 +69,21 @@ internal sealed class ArchitectureContractExecutor : IArchitectureContractExecut
         {
             int identityCursor = session.FindingIdentityCursor;
             ArchitectureViolation[] violations = session.AttachFindingIdentities(topology.Violations, identityCursor).ToArray();
-            standardFamilyFindings.Violations.AddRange(violations);
-            AddResultCount(resultCounts, ArchitectureTopologyEvaluator.Family, violations.Length);
+            accumulator.Findings.Violations.AddRange(violations);
+            AddResultCount(accumulator.ResultCounts, ArchitectureTopologyEvaluator.Family, violations.Length);
             session.Context.ProfilingCounters.RecordContractFamilyResults(ArchitectureTopologyEvaluator.Family, violations.Length);
         }
 
         return new ArchitectureContractExecutionResult(
-            standardFamilyFindings.Violations,
-            standardFamilyFindings.Cycles,
+            accumulator.Findings.Violations,
+            accumulator.Findings.Cycles,
             coverageViolations,
             coverageSummaries)
         {
-            CycleFindings = standardFamilyFindings.CycleFindings,
-            ContractFamilyResultCounts = resultCounts,
-            ApplicabilityExpectedEntries = applicabilityExpected.Concat(topology.ExpectedEntries).ToArray(),
-            ApplicabilityRecords = applicabilityRecords.Concat(topology.Records).ToArray(),
+            CycleFindings = accumulator.Findings.CycleFindings,
+            ContractFamilyResultCounts = accumulator.ResultCounts,
+            ApplicabilityExpectedEntries = accumulator.ApplicabilityExpected.Concat(topology.ExpectedEntries).ToArray(),
+            ApplicabilityRecords = accumulator.ApplicabilityRecords.Concat(topology.Records).ToArray(),
         };
     }
 
@@ -98,11 +91,12 @@ internal sealed class ArchitectureContractExecutor : IArchitectureContractExecut
         ArchitectureAnalysisSession session,
         string mode,
         ValidationTiming? timing,
-        StandardFamilyFindings findings,
-        IDictionary<string, int> resultCounts,
-        List<ArchitectureApplicabilityExpectedEntry> applicabilityExpected,
-        List<ArchitectureApplicabilityRecord> applicabilityRecords)
+        ExecutionAccumulator accumulator)
     {
+        StandardFamilyFindings findings = accumulator.Findings;
+        IDictionary<string, int> resultCounts = accumulator.ResultCounts;
+        List<ArchitectureApplicabilityExpectedEntry> applicabilityExpected = accumulator.ApplicabilityExpected;
+        List<ArchitectureApplicabilityRecord> applicabilityRecords = accumulator.ApplicabilityRecords;
         int[] budgetCount = [0];
         using (timing?.MeasureContractFamily(MetricBudgetFamily, () => budgetCount[0]))
         {
@@ -188,11 +182,12 @@ internal sealed class ArchitectureContractExecutor : IArchitectureContractExecut
         string family,
         IArchitectureContractHandlerRegistry handlerRegistry,
         ValidationTiming? timing,
-        StandardFamilyFindings findings,
-        IDictionary<string, int> resultCounts,
-        List<ArchitectureApplicabilityExpectedEntry> applicabilityExpected,
-        List<ArchitectureApplicabilityRecord> applicabilityRecords)
+        ExecutionAccumulator accumulator)
     {
+        StandardFamilyFindings findings = accumulator.Findings;
+        IDictionary<string, int> resultCounts = accumulator.ResultCounts;
+        List<ArchitectureApplicabilityExpectedEntry> applicabilityExpected = accumulator.ApplicabilityExpected;
+        List<ArchitectureApplicabilityRecord> applicabilityRecords = accumulator.ApplicabilityRecords;
         int[] count = [0];
         using (timing?.MeasureContractFamily(family, () => count[0]))
         {
@@ -242,5 +237,16 @@ internal sealed class ArchitectureContractExecutor : IArchitectureContractExecut
         public List<string> Cycles { get; } = new();
 
         public List<ArchitectureCycleFinding> CycleFindings { get; } = new();
+    }
+
+    private sealed class ExecutionAccumulator
+    {
+        public StandardFamilyFindings Findings { get; } = new();
+
+        public Dictionary<string, int> ResultCounts { get; } = new(StringComparer.Ordinal);
+
+        public List<ArchitectureApplicabilityExpectedEntry> ApplicabilityExpected { get; } = new();
+
+        public List<ArchitectureApplicabilityRecord> ApplicabilityRecords { get; } = new();
     }
 }

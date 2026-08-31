@@ -7,6 +7,8 @@ namespace ArchLinterNet.Core.Tests;
 [TestFixture]
 public sealed class ContractSurfaceExposurePolicyTests
 {
+    private static readonly string[] _expectedAuditProjects = ["src/Example.Api/Example.Api.csproj"];
+
     private string _tempDir = null!;
 
     [SetUp]
@@ -70,7 +72,7 @@ public sealed class ContractSurfaceExposurePolicyTests
             Assert.That(document.Contracts.StrictContractSurfaceExposure[0].Forbidden[0].Namespace,
                 Is.EqualTo("Example.Domain"));
             Assert.That(document.Contracts.AuditContractSurfaceExposure[0].Source.Projects,
-                Is.EqualTo(new[] { "src/Example.Api/Example.Api.csproj" }));
+                Is.EqualTo(_expectedAuditProjects));
         });
     }
 
@@ -80,6 +82,12 @@ public sealed class ContractSurfaceExposurePolicyTests
     [TestCase("id: unknown-selector\nname: Unknown selector\nsource:\n  types_matching:\n    regex: Entity\nforbidden:\n  - role: Entity\n", "unknown property 'regex'")]
     [TestCase("id: blank-assembly\nname: Blank assembly\nsource:\n  assemblies: [' ']\nforbidden:\n  - role: Entity\n", "blank")]
     [TestCase("name: missing-id\nsource:\n  assemblies: [Example.Api]\nforbidden:\n  - role: Entity\n", "non-blank 'id'")]
+    [TestCase("id: bad-source\nname: Bad source\nsource: not-an-object\nforbidden:\n  - role: Entity\n", "must declare a 'source' object")]
+    [TestCase("id: bad-forbidden-entry\nname: Bad forbidden entry\nsource:\n  assemblies: [Example.Api]\nforbidden:\n  - not-an-object\n", "must be a selector object")]
+    [TestCase("id: bad-types-matching\nname: Bad types matching\nsource:\n  types_matching: not-an-object\nforbidden:\n  - role: Entity\n", "source.types_matching must be a selector object")]
+    [TestCase("id: bad-selector-value\nname: Bad selector value\nsource:\n  assemblies: [Example.Api]\nforbidden:\n  - role:\n      nested: true\n", "selector values must be non-blank scalars")]
+    [TestCase("id: blank-selector-value\nname: Blank selector value\nsource:\n  assemblies: [Example.Api]\nforbidden:\n  - role: ' '\n", "declares a blank")]
+    [TestCase("id: empty-assemblies-list\nname: Empty assemblies list\nsource:\n  assemblies: []\nforbidden:\n  - role: Entity\n", "declares an empty 'source.assemblies' list")]
     public void Load_MalformedControl_FailsClosed(string contractYaml, string expectedMessage)
     {
         string path = WritePolicy($"""
@@ -96,6 +104,43 @@ public sealed class ContractSurfaceExposurePolicyTests
             new ArchitecturePolicyDocumentLoader().Load(path))!;
 
         Assert.That(exception.Message, Does.Contain(expectedMessage));
+    }
+
+    [Test]
+    public void Load_ContractGroupNotAList_FailsClosed()
+    {
+        string path = WritePolicy("""
+            version: 1
+            name: Contract group not a list
+            analysis:
+              target_assemblies: [Example.Api]
+            contracts:
+              strict_contract_surface_exposure: not-a-list
+            """);
+
+        InvalidOperationException exception = Assert.Throws<InvalidOperationException>(() =>
+            new ArchitecturePolicyDocumentLoader().Load(path))!;
+
+        Assert.That(exception.Message, Does.Contain("must be a list of contract objects"));
+    }
+
+    [Test]
+    public void Load_ContractGroupEntryNotAnObject_FailsClosed()
+    {
+        string path = WritePolicy("""
+            version: 1
+            name: Contract group entry not an object
+            analysis:
+              target_assemblies: [Example.Api]
+            contracts:
+              strict_contract_surface_exposure:
+                - not-an-object
+            """);
+
+        InvalidOperationException exception = Assert.Throws<InvalidOperationException>(() =>
+            new ArchitecturePolicyDocumentLoader().Load(path))!;
+
+        Assert.That(exception.Message, Does.Contain("must be an object"));
     }
 
     [Test]
