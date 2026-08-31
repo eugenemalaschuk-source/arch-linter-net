@@ -8,6 +8,15 @@ namespace ArchLinterNet.Core.Tests;
 [TestFixture]
 public sealed class ArchitecturePolicyContextContractFactsProjectorTests
 {
+    private static readonly string[] _expectedAssemblies = ["Product.Api"];
+    private static readonly string[] _expectedProjects = ["src/Product.Api/Product.Api.csproj"];
+    private static readonly string[] _expectedNamespace = ["Product.Api.Contracts"];
+    private static readonly string[] _expectedLayer = ["api"];
+    private static readonly string[] _expectedRole = ["ApiContract"];
+    private static readonly string[] _expectedPublicApiSurface = ["reviewed-api"];
+    private static readonly string[] _expectedForbiddenNamespace = ["Product.Internal"];
+    private static readonly string[] _expectedForbiddenAttribute = ["Product.InternalAttribute"];
+
     [Test]
     public void Project_ContractSurfaceExposure_PreservesSourceAndForbiddenSelectorFacts()
     {
@@ -46,21 +55,21 @@ public sealed class ArchitecturePolicyContextContractFactsProjectorTests
         Assert.Multiple(() =>
         {
             Assert.That(projection.Reason, Is.EqualTo(contract.Reason));
-            Assert.That(source.Items.Single(fact => fact.Name == "assemblies").Values, Is.EqualTo(new[] { "Product.Api" }));
+            Assert.That(source.Items.Single(fact => fact.Name == "assemblies").Values, Is.EqualTo(_expectedAssemblies));
             Assert.That(source.Items.Single(fact => fact.Name == "projects").Values,
-                Is.EqualTo(new[] { "src/Product.Api/Product.Api.csproj" }));
+                Is.EqualTo(_expectedProjects));
             Assert.That(typesMatching.Items.Single(fact => fact.Name == "namespace").Values,
-                Is.EqualTo(new[] { "Product.Api.Contracts" }));
-            Assert.That(typesMatching.Items.Single(fact => fact.Name == "layer").Values, Is.EqualTo(new[] { "api" }));
+                Is.EqualTo(_expectedNamespace));
+            Assert.That(typesMatching.Items.Single(fact => fact.Name == "layer").Values, Is.EqualTo(_expectedLayer));
             Assert.That(typesMatching.Items.Single(fact => fact.Name == "role").Values,
-                Is.EqualTo(new[] { "ApiContract" }));
+                Is.EqualTo(_expectedRole));
             Assert.That(source.Items.Single(fact => fact.Name == "public_api_surface").Values,
-                Is.EqualTo(new[] { "reviewed-api" }));
+                Is.EqualTo(_expectedPublicApiSurface));
             Assert.That(selector.Name, Is.EqualTo("selector"));
             Assert.That(selector.Items.Single(fact => fact.Name == "namespace").Values,
-                Is.EqualTo(new[] { "Product.Internal" }));
+                Is.EqualTo(_expectedForbiddenNamespace));
             Assert.That(selector.Items.Single(fact => fact.Name == "has_attribute").Values,
-                Is.EqualTo(new[] { "Product.InternalAttribute" }));
+                Is.EqualTo(_expectedForbiddenAttribute));
         });
     }
 }

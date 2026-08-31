@@ -8,6 +8,8 @@ namespace ArchLinterNet.Core.Tests;
 [TestFixture]
 public sealed class ContractSurfaceExposureReportingTests
 {
+    private static readonly int[] _expectedMatchingForbiddenSelectors = [1, 3];
+
     [Test]
     public void FormatViolationsForHumans_ContractSurfaceExposure_FormatsCompleteOptionalContext()
     {
@@ -72,7 +74,7 @@ public sealed class ContractSurfaceExposureReportingTests
             Assert.That(properties.GetProperty("member_or_metadata_site").GetString(), Is.EqualTo("property:Order"));
             Assert.That(properties.GetProperty("reviewed_public_api_surface").GetString(), Is.EqualTo("reviewed-api"));
             Assert.That(properties.GetProperty("matching_forbidden_selectors").EnumerateArray()
-                .Select(item => item.GetInt32()), Is.EqualTo(new[] { 1, 3 }));
+                .Select(item => item.GetInt32()), Is.EqualTo(_expectedMatchingForbiddenSelectors));
             Assert.That(document.RootElement.GetProperty("runs")[0].GetProperty("results")[1]
                 .GetProperty("properties").GetProperty("matching_forbidden_selectors").ValueKind,
                 Is.EqualTo(JsonValueKind.Null));

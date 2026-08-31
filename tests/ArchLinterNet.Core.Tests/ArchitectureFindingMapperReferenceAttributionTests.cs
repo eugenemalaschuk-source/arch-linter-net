@@ -206,6 +206,40 @@ public sealed class ArchitectureFindingMapperReferenceAttributionTests
         }));
     }
 
+    // Contract-surface exposure occurrences can also aggregate into one violation with multiple
+    // identities (one per referenced target), so projection must split their references exactly
+    // like every other identity-bearing family.
+    [Test]
+    public void FromViolations_ContractSurfaceExposureMultipleIdentities_AttributeOneReferencePerIdentity()
+    {
+        string[] references = { "Product.Internal.OrderEntity", "Product.Internal.CustomerEntity" };
+
+        ArchitectureViolation violation = new(
+            "no-internal-contract-types", "no-internal-contract-types", "Product.Api.OrdersContract",
+            "Product.Internal", references)
+        {
+            Payload = new ContractSurfaceExposurePayload(
+                "Product.Api", "Product.Api.OrdersContract", "method:Get.return", "10:method3:Get6:return",
+                "Product.Internal", "Product.Internal.OrderEntity", "exported", null, null, null),
+            Identity = Identity("Product.Api.OrdersContract", references[0], occurrence: 0),
+            Identities = new[]
+            {
+                Identity("Product.Api.OrdersContract", references[0], occurrence: 0),
+                Identity("Product.Api.OrdersContract", references[1], occurrence: 0),
+            },
+        };
+
+        IReadOnlyList<ArchitectureFinding> findings = ArchitectureFindingMapper.FromViolations(new[] { violation });
+
+        Assert.That(findings.Select(finding =>
+                ((ContractSurfaceExposureDiagnostic)finding.Details).ForbiddenReferences.ToArray()),
+            Is.EqualTo(new[]
+            {
+                new[] { references[0] },
+                new[] { references[1] },
+            }));
+    }
+
     private static string[] ReferencesOf(ArchitectureFinding finding)
     {
         return ((ExternalDependencyDiagnostic)finding.Details).ForbiddenReferences.ToArray();
