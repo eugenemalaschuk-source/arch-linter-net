@@ -31,6 +31,7 @@ internal static class ArchitectureValidationResultMapper
             Mode = mode,
             SubtractiveMatcherParticipation = outcome.SubtractiveMatcherParticipation,
             Waivers = outcome.Waivers,
+            PolicyInventory = outcome.PolicyInventory,
             AssessmentCompletionEvidence = outcome.AssessmentCompletionEvidence,
             ApplicabilityProjection = outcome.ApplicabilityProjection,
             ImportedDiagnostics = outcome.ImportedDiagnostics,

@@ -402,4 +402,14 @@ projection: canonical control identity and provenance, membership/state records,
 the run properties and the normalized findings in SARIF results. These counts show evidence
 completeness—not architecture quality—and do not replace the separately owned effective-rule count.
 
+When Core produces policy-inventory evidence, human and JSON validation output
+also disclose the canonical effective-control count and explicit waiver debt.
+The `policy_inventory` JSON object is the source for downstream architecture
+Health/report/badge consumers; do not recalculate either number from policy
+YAML, findings, or exclusion syntax. Its strict/audit/coverage count is
+repository-level for the selected policy even when validation evaluates only one
+finding mode. Its waiver records and debt totals use the same selected
+repository scope; mode-local waiver output still governs only that mode's
+validation result. Missing inventory evidence is not a zero-debt result.
+
 See [Output formats](../usage/output-formats.md) and [Timings](../usage/timings.md).

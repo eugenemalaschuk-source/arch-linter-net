@@ -128,6 +128,19 @@ public sealed class AnalysisCacheHitReconstructionTests
                     "Temporary migration waiver", "architecture-team", "#687",
                     new DateOnly(2026, 8, 1), new DateOnly(2026, 9, 1), new DateOnly(2026, 8, 28), true),
             },
+            PolicyInventory = new ArchitecturePolicyInventory(
+                ArchitecturePolicyInventory.CurrentSchemaId,
+                2,
+                new ArchitecturePolicyInventoryRules(2, 0, 0),
+                new ArchitecturePolicyInventoryIgnoreDebt(1, 1, 0, 0, 0, 0),
+                [
+                    new ArchitectureWaiverLifecycleRecord(
+                        "legacy-0123456789abcdef", "active", "no_infra_from_domain", "R001", "layers",
+                        "MyApp.Domain.Order", "MyApp.Infrastructure",
+                        "sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+                        "Temporary migration waiver", "architecture-team", "#687",
+                        new DateOnly(2026, 8, 1), new DateOnly(2026, 9, 1), new DateOnly(2026, 8, 28), true),
+                ]),
         };
     }
 
@@ -205,6 +218,15 @@ public sealed class AnalysisCacheHitReconstructionTests
             Assert.That(reconstructed.SubtractiveMatcherParticipation.Count, Is.EqualTo(1));
             Assert.That(reconstructed.SubtractiveMatcherParticipation.Single().Field, Is.EqualTo("exclude_types_matching"));
             Assert.That(reconstructed.Waivers, Is.EqualTo(original.Waivers));
+            Assert.That(reconstructed.PolicyInventory, Is.Not.Null);
+            Assert.Multiple(() =>
+            {
+                Assert.That(reconstructed.PolicyInventory!.SchemaId, Is.EqualTo(original.PolicyInventory!.SchemaId));
+                Assert.That(reconstructed.PolicyInventory.EffectiveRuleCount, Is.EqualTo(original.PolicyInventory.EffectiveRuleCount));
+                Assert.That(reconstructed.PolicyInventory.Rules, Is.EqualTo(original.PolicyInventory.Rules));
+                Assert.That(reconstructed.PolicyInventory.IgnoreDebt, Is.EqualTo(original.PolicyInventory.IgnoreDebt));
+                Assert.That(reconstructed.PolicyInventory.Waivers, Is.EqualTo(original.PolicyInventory.Waivers));
+            });
 
             // Byte-identical, using the product's own definition of identity: re-mapping the
             // reconstructed outcome back to AnalysisCacheOutcomeV1 and comparing its canonical JSON

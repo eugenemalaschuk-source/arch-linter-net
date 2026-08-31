@@ -64,6 +64,39 @@
         "CoverageSummaries": { "type": "array", "items": { "type": "object" } },
         "SubtractiveMatcherParticipation": { "type": "array", "items": { "type": "object" } },
         "Waivers": { "type": "array", "items": { "type": "object" } },
+        "PolicyInventory": {
+          "type": ["object", "null"],
+          "required": ["SchemaId", "EffectiveRuleCount", "Rules", "IgnoreDebt", "Waivers"],
+          "properties": {
+            "SchemaId": { "const": "architecture-policy-inventory/v1" },
+            "EffectiveRuleCount": { "type": "integer", "minimum": 0 },
+            "Rules": {
+              "type": "object",
+              "required": ["Strict", "Audit", "Coverage"],
+              "properties": {
+                "Strict": { "type": "integer", "minimum": 0 },
+                "Audit": { "type": "integer", "minimum": 0 },
+                "Coverage": { "type": "integer", "minimum": 0 }
+              },
+              "additionalProperties": false
+            },
+            "IgnoreDebt": {
+              "type": "object",
+              "required": ["Total", "Active", "Stale", "Expired", "MetadataIncomplete", "Invalid"],
+              "properties": {
+                "Total": { "type": "integer", "minimum": 0 },
+                "Active": { "type": "integer", "minimum": 0 },
+                "Stale": { "type": "integer", "minimum": 0 },
+                "Expired": { "type": "integer", "minimum": 0 },
+                "MetadataIncomplete": { "type": "integer", "minimum": 0 },
+                "Invalid": { "type": "integer", "minimum": 0 }
+              },
+              "additionalProperties": false
+            },
+            "Waivers": { "type": "array", "items": { "type": "object" } }
+          },
+          "additionalProperties": false
+        },
         "ApplicabilityExpectedEntries": { "type": "array", "items": { "type": "object" } },
         "ApplicabilityRecords": { "type": "array", "items": { "type": "object" } }
       },

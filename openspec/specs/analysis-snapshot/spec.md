@@ -7,9 +7,7 @@ requested `strict`/`audit` validation view (coverage included, via the existing
 cache-only outcomes and at most one lazy runner materialization shared by
 cache-miss evaluations — while keeping ordinary single-mode validation exactly
 as simple and behaviorally unchanged as it was before this capability existed.
-
 ## Requirements
-
 ### Requirement: Snapshot composes policy once and evaluates the project graph as few times as build state requires
 The system SHALL provide `ArchitectureAnalysisSnapshot`, constructed via `IArchitectureValidationApplicationService.CreateSnapshot(AnalysisSnapshotRequest, ValidationTiming?)`, which composes the effective policy exactly once for the snapshot's lifetime and runs build-state preflight exactly once. Ordinary and no-restore preparation SHALL evaluate the selected project graph and create one immutable metadata-only preparation plan containing the selected verified artifact paths and identity evidence; it SHALL NOT load target assemblies into a CLR context. Explicit `--ensure-built` preparation SHALL evaluate the project graph a second time after a successful build and replace the plan with one for the exact verified post-build output paths; it SHALL NOT choose a target through environment/policy probing precedence. The policy document composed at the start of `CreateSnapshot` SHALL be reused for that second pass rather than recomposed. `Evaluate` SHALL materialize a runner from the plan only after its cache lookup misses.
 
@@ -58,11 +56,20 @@ The system SHALL serialize `Evaluate` and `Dispose` for one `ArchitectureAnalysi
 - **THEN** the two session evaluations execute serially, the outcomes remain mode-isolated, and the counters and memoized outcomes remain internally consistent
 
 ### Requirement: Single-mode validation remains simple and unchanged
-The system SHALL implement `IArchitectureValidationApplicationService.Validate(ValidationRequest, ValidationTiming?)` on top of `CreateSnapshot` and `Evaluate`, producing the same `ValidationOutcome` it produced before this change for the same request, with the snapshot disposed before `Validate` returns.
+The system SHALL implement
+`IArchitectureValidationApplicationService.Validate(ValidationRequest, ValidationTiming?)`
+on top of `CreateSnapshot` and `Evaluate`, with the snapshot disposed before
+`Validate` returns. The returned `ValidationOutcome` SHALL preserve the
+requested mode's findings, `Waivers`, waiver gating, pass/fail result, and all
+other mode-local semantics. Its policy inventory MAY additionally include
+repository-level lifecycle evidence from selected companion modes, without
+imposing a new object or disposal responsibility on the caller.
 
 #### Scenario: Existing single-mode callers are unaffected
-- **WHEN** an existing caller invokes `Validate` for a single mode as before this change
-- **THEN** the returned `ValidationOutcome` is unchanged, and no new object or disposal responsibility is imposed on that caller
+- **WHEN** an existing caller invokes `Validate` for a single mode
+- **THEN** the returned outcome retains the requested mode's findings,
+  `Waivers`, gating, and pass/fail result, while its policy inventory can carry
+  the canonical repository-wide waiver evidence
 
 ### Requirement: Invalid build state fails the whole snapshot
 The system SHALL treat a blocked build-state preflight result as a property of the snapshot: when `CreateSnapshot`'s preflight blocks, `Evaluate(mode)` SHALL return the same blocked `ValidationOutcome` shape used today, for every requested mode, without executing contract checks for that mode.
@@ -190,3 +197,26 @@ rejected as reuse of a cancelled snapshot.
   session
 - **THEN** a subsequent `Measure()` or `Evaluate()` on that snapshot throws
   cancellation rather than reusing the partial session
+
+### Requirement: Repository inventory completes selected waiver lifecycle evidence
+Before returning a non-blocked `ValidationOutcome` with a policy inventory, an
+`ArchitectureAnalysisSnapshot` SHALL obtain normal canonical waiver lifecycle
+records for every selected strict or audit mode that declares a manual waiver.
+It SHALL combine those records into the Core-owned repository policy inventory.
+The outcome's `Waivers`, waiver gating, findings, and pass/fail value SHALL
+remain the results of its requested mode only. Companion lifecycle work SHALL
+use normal snapshot cache lookup and per-mode memoization, and a later explicit
+evaluation of that companion mode SHALL reuse the completed outcome.
+
+#### Scenario: Strict outcome carries audit waiver debt without audit gating
+- **WHEN** a strict validation requests a policy with selected strict and audit
+  waivers
+- **THEN** the strict outcome retains only its strict `Waivers` and strict
+  gating result, while its policy inventory includes both strict and audit
+  waiver lifecycle records
+
+#### Scenario: Companion outcome shares the canonical inventory
+- **WHEN** an audit mode is completed as companion lifecycle work for a strict
+  outcome and the caller later evaluates audit explicitly
+- **THEN** audit returns its memoized mode-local outcome with the same
+  repository policy inventory as strict, without another audit execution

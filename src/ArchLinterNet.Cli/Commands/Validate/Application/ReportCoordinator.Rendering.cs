@@ -456,6 +456,7 @@ internal sealed partial class ReportCoordinator
         result = outcome.Waivers.Count == 0
             ? result
             : ArchitectureDiagnosticFormatter.AddWaiversToCiArtifacts(result, outcome.Waivers);
+        result = ArchitectureDiagnosticFormatter.AddPolicyInventoryToCiArtifacts(result, outcome.PolicyInventory);
 
         return AddAssessmentCompletionToJson(
             result, outcome.AssessmentCompletionEvidence, outcome.ApplicabilityProjection);
