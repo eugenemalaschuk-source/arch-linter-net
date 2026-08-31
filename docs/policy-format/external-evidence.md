@@ -139,10 +139,11 @@ evidence control, policy-mapped strict/audit mode, original source rule/message/
 source-or-fallback fingerprint, and every authorizing evidence context.
 
 The stable governed finding identity comes from the selected diagnostic's current-context/source
-identity. Artifact path, content hash, and producer run remain inspectable provenance rather than
-new debt identity, so an equivalent rerun does not create artificial baseline churn. A distinct
-logical evidence key, revision, scope, or source location stays distinct where selection made it
-distinct.
+identity. Run ID, artifact path, and artifact content hash remain inspectable transient provenance
+rather than new debt identity, so an equivalent rerun does not create artificial baseline churn.
+Producer tool name/version and the selected repository, revision, and scope remain intentional
+identity dimensions: changing one can create a new baseline occurrence. A distinct logical evidence
+key or source location also stays distinct where selection made it distinct.
 
 Human output, normalized JSON, SARIF's `properties.arch_linter_net`, and the Testing adapter use
 the same typed facts. ArchLinterNet emits one of its own SARIF results for a normalized imported
@@ -195,9 +196,11 @@ the resulting canonical finding retains the logical evidence identity,
 producer/run facts, repository/revision/scope, deterministic artifact hash, and
 source location/fingerprint provenance. Human, JSON, SARIF, Testing, and later
 report consumers use those canonical facts; they do not need to reopen the source
-SARIF or query a producer service. Baseline candidates retain only the stable
-canonical identity and strict/audit debt-lifecycle semantics, so producer/run and
-artifact provenance cannot create baseline churn.
+SARIF or query a producer service. Baseline candidates retain the selected canonical identity and
+strict/audit debt-lifecycle semantics. Transient run ID, artifact path, and artifact content hash
+do not create baseline churn. Producer tool name/version and selected repository, revision, or scope
+remain identity dimensions, so their change can create a new baseline occurrence for normal
+[baseline review](../guides/migration-baselines.md).
 
 A successful trusted run with no selected results is explicit evaluable evidence.
 By contrast, a missing required artifact, or a malformed, unsuccessful, wrong-repository,

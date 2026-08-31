@@ -1,10 +1,4 @@
-# external-diagnostics-federation Specification
-
-## Purpose
-Define deterministic, vendor-neutral reference scenarios for the complete external-diagnostic
-evidence federation path.
-
-## Requirements
+## MODIFIED Requirements
 
 ### Requirement: Synthetic reference scenarios preserve trusted external diagnostic semantics end to end
 The system SHALL provide deterministic, public-safe synthetic SARIF reference scenarios that
@@ -61,34 +55,3 @@ artifact SHALL remain explicitly evaluable and distinct from absent or unusable 
   evidence producer
 - **THEN** it is consumed as an imported finding with its external source and trust provenance,
   without invoking or recreating a compatibility-analysis engine
-
-### Requirement: Synthetic reference scenarios fail closed and preserve deterministic occurrence identity
-The system SHALL provide synthetic reference scenarios that prove required missing, malformed,
-failed, incomplete, wrong logical-key, wrong repository, wrong revision, wrong scope, and
-missing-required-binding evidence is unassessable rather than a clean result. The scenarios SHALL
-also prove stable artifact hashing, order-independent repeated-result selection, source and
-fallback fingerprint paths, distinct source locations, and distinct logical-evidence and scope
-contexts without using analyzer execution, producer-service APIs, filenames, timestamps, or CI
-job names as trust inputs.
-
-#### Scenario: Required stale or invalid evidence cannot normalize
-- **WHEN** a synthetic required evidence artifact is missing, unusable, stale, wrong-context, or
-  missing a required binding
-- **THEN** its applicability outcome is unassessable and it produces no selected or normalized
-  imported finding
-
-#### Scenario: Equivalent repeated evidence deduplicates deterministically
-- **WHEN** equivalent current-context SARIF results occur in different artifact or result orders
-- **THEN** selection yields stable canonical output and identity while retaining deterministic
-  authorizing provenance and keeping distinct locations, logical-evidence controls, and scope
-  contexts distinct
-
-#### Scenario: Source location independently isolates canonical identity
-- **WHEN** two valid source results have the same logical context, rule, severity, project,
-  message, and source fingerprint but differ only by source path or region
-- **THEN** selection and normalized finding projection retain two distinct canonical identities
-
-#### Scenario: Reference protocol stays vendor-neutral
-- **WHEN** the documented reference scenario describes external evidence consumption
-- **THEN** it uses synthetic SARIF and explicit context bindings without naming, executing, or
-  querying an analyzer or producer service
