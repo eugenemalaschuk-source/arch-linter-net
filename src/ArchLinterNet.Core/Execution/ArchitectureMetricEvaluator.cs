@@ -119,7 +119,7 @@ internal static class ArchitectureMetricEvaluator
             measurements, completion, ArchitectureApplicabilityProjector.Project(completion));
     }
 
-    private static ArchitectureMetricDefinition[] SelectDefinitions(
+    internal static ArchitectureMetricDefinition[] SelectDefinitions(
         IReadOnlyCollection<ArchitectureMetricDefinition> definitions,
         IReadOnlyCollection<string>? selectedIds)
     {
@@ -388,9 +388,13 @@ internal static class ArchitectureMetricEvaluator
         IReadOnlyList<ArchitectureExternalDependencyFact> facts,
         IReadOnlySet<Type>? incompleteSourceTypes = null)
     {
+        Dictionary<string, ArchitectureTopologyEvaluator.SubjectClassification[]> classificationsByIdentity =
+            topology.Classifications
+                .GroupBy(classification => classification.Subject.Identity, StringComparer.Ordinal)
+                .ToDictionary(group => group.Key, group => group.ToArray(), StringComparer.Ordinal);
         HashSet<string> contributors = new(StringComparer.Ordinal);
         if (incompleteSourceTypes != null && incompleteSourceTypes.Any(sourceType =>
-                FindClassifications(topology, sourceType, session).Any(source =>
+                FindClassifications(classificationsByIdentity, topology, sourceType, session).Any(source =>
                     source.Disposition == ArchitectureTopologyEvaluator.Disposition.Mapped
                     && source.NodeIds.Contains(node, StringComparer.Ordinal))))
         {
@@ -401,7 +405,7 @@ internal static class ArchitectureMetricEvaluator
         foreach (ArchitectureExternalDependencyFact fact in facts)
         {
             foreach (ArchitectureTopologyEvaluator.SubjectClassification source in FindClassifications(
-                         topology, fact.SourceType, session))
+                         classificationsByIdentity, topology, fact.SourceType, session))
             {
                 if (source.Disposition == ArchitectureTopologyEvaluator.Disposition.Mapped
                     && source.NodeIds.Contains(node, StringComparer.Ordinal))
@@ -423,6 +427,18 @@ internal static class ArchitectureMetricEvaluator
     }
 
     private static IEnumerable<ArchitectureTopologyEvaluator.SubjectClassification> FindClassifications(
+        IReadOnlyDictionary<string, ArchitectureTopologyEvaluator.SubjectClassification[]> classificationsByIdentity,
+        ArchitectureTopologyEvaluator.Projection topology,
+        Type sourceType,
+        ArchitectureAnalysisSession session)
+    {
+        string identity = ResolveMetricSubjectIdentity(topology, sourceType, session);
+        return classificationsByIdentity.TryGetValue(identity, out ArchitectureTopologyEvaluator.SubjectClassification[]? classifications)
+            ? classifications
+            : Array.Empty<ArchitectureTopologyEvaluator.SubjectClassification>();
+    }
+
+    private static string ResolveMetricSubjectIdentity(
         ArchitectureTopologyEvaluator.Projection topology,
         Type sourceType,
         ArchitectureAnalysisSession session)
@@ -439,11 +455,8 @@ internal static class ArchitectureMetricEvaluator
             "assembly" => ArchitectureTypeNames.SafeAssemblyName(sourceType) ?? string.Empty,
             _ => string.Empty,
         };
-        string identity = ArchitectureTopologyEvaluator.BuildMetricSubjectIdentity(
+        return ArchitectureTopologyEvaluator.BuildMetricSubjectIdentity(
             topology.Topology.SubjectKind, project, assembly, canonicalAssemblyIdentity, subject);
-
-        return topology.Classifications.Where(item =>
-            string.Equals(item.Subject.Identity, identity, StringComparison.Ordinal));
     }
 
     private static bool HasCanonicalProjectOwner(

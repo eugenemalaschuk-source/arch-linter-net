@@ -43,5 +43,6 @@ public sealed record ArchitectureMetricMeasurementRequest
         MaxParallelism = MaxParallelism,
         CancellationToken = CancellationToken,
         IsMetricMeasurement = true,
+        SelectedMetricIds = MetricIds,
     };
 }

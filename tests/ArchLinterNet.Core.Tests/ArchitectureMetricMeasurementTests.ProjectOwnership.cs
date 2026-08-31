@@ -8,6 +8,62 @@ namespace ArchLinterNet.Core.Tests;
 public sealed partial class ArchitectureMetricMeasurementTests
 {
     [Test]
+    public void Measure_SelectedNonProjectMetric_DoesNotRequireAnUnselectedProjectMetricArtifact()
+    {
+        string projectDirectory = Path.Combine(_temporaryDirectory, "src", "Unavailable");
+        Directory.CreateDirectory(projectDirectory);
+        File.WriteAllText(Path.Combine(projectDirectory, "Unavailable.csproj"), """
+            <Project Sdk="Microsoft.NET.Sdk">
+              <PropertyGroup>
+                <TargetFramework>net10.0</TargetFramework>
+                <AssemblyName>UnavailableProject</AssemblyName>
+              </PropertyGroup>
+            </Project>
+            """);
+        File.WriteAllText(_policyPath, """
+            version: 1
+            name: Selected metric setup isolation test
+            analysis:
+              target_assemblies: [ArchLinterNet.Core]
+              projects: [src/Unavailable/Unavailable.csproj]
+            topology:
+              mode: partial
+              subject_kind: namespace
+              scope:
+                selectors:
+                  - namespace: ArchLinterNet.Core.Model
+              nodes:
+                - id: model
+                  mappings:
+                    - namespace: ArchLinterNet.Core.Model
+            metrics:
+              - id: model-external-groups
+                kind: external_dependency_group_count
+                topology_node: model
+              - id: unavailable-project-footprint
+                kind: component_footprint_count
+                topology_node: model
+                unit: project
+            contracts: {}
+            """);
+
+        using ArchitectureEngine engine = new ArchitectureEngineBuilder().AddArchLinterNetCore().Build();
+        ArchitectureMetricMeasurementOutcome outcome = engine.Measure(new ArchitectureMetricMeasurementRequest
+        {
+            PolicyPath = _policyPath,
+            MetricIds = ["model-external-groups"],
+        });
+
+        ArchitectureMetricMeasurement measurement = outcome.Measurements.Single();
+        Assert.Multiple(() =>
+        {
+            Assert.That(measurement.Id, Is.EqualTo("model-external-groups"));
+            Assert.That(measurement.IsEvaluable, Is.True);
+            Assert.That(measurement.Value, Is.Zero);
+        });
+    }
+
+    [Test]
     public void Measure_ExplicitTargetAssemblyWithProjectMetricUsesTheDiscoveredOutputWithoutBuildPreparation()
     {
         const string ProjectPath = "src/MyApp/MyApp.csproj";

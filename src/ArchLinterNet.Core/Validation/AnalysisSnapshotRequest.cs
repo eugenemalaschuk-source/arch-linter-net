@@ -50,6 +50,11 @@ public sealed record AnalysisSnapshotRequest
     // internal so ordinary validation snapshots retain their reviewed preflight contract.
     internal bool IsMetricMeasurement { get; init; }
 
+    // Applied after the complete policy has been loaded and validated, before measurement setup
+    // chooses project/artifact evidence. This remains internal because ordinary snapshots never
+    // select metric definitions.
+    internal IReadOnlyCollection<string>? SelectedMetricIds { get; init; }
+
     public ValidationRequest ForMode(string mode)
     {
         return new ValidationRequest

@@ -97,6 +97,11 @@ public sealed class ArchitectureValidationApplicationService(
         catch (Exception ex) when (state.Document is not null
             && ex is not ArchitecturePolicyLoadException and not ArchitecturePolicyValidationException)
         {
+            if (request.IsMetricMeasurement && ex is ArgumentException)
+            {
+                throw;
+            }
+
             throw CreateEvaluationException(ex, request, state);
         }
     }
@@ -126,6 +131,7 @@ public sealed class ArchitectureValidationApplicationService(
 
             request.CancellationToken.ThrowIfCancellationRequested();
             state.Policy = ComposeDocument(state.Document, request, modeHint);
+            ApplyMetricSelection(state.Policy.Document, request);
             request = ApplyPolicyOutputDefaults(request, state.Policy.Document.Analysis);
             state.PolicyCompositions = 1;
         }
@@ -512,6 +518,21 @@ public sealed class ArchitectureValidationApplicationService(
                 policy.Document, request.PolicyPath, request.ConditionSetName, request.PreprocessorSymbols,
                 policy.SelectedContractIds, policy.EnableUnmatchedIgnoreTracking, timing, modeHint,
                 request.CancellationToken, request.MaxParallelism);
+    }
+
+    private static void ApplyMetricSelection(
+        ArchitectureContractDocument document,
+        AnalysisSnapshotRequest request)
+    {
+        if (!request.IsMetricMeasurement || request.SelectedMetricIds is not { Count: > 0 })
+        {
+            return;
+        }
+
+        // Policy validation deliberately covers every authored metric before this point. Once it
+        // has succeeded, setup needs evidence only for the metrics this measurement will report.
+        document.Metrics = ArchitectureMetricEvaluator.SelectDefinitions(
+            document.Metrics, request.SelectedMetricIds).ToList();
     }
 
     private static void EnsureValidSeverityConfig(string value, string settingName)
