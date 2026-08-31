@@ -198,7 +198,7 @@ and later report consumers use those canonical facts; they do not need to reopen
 the source SARIF or query a producer service.
 
 A successful trusted run with no selected results is explicit evaluable evidence.
-By contrast, a missing, malformed, unsuccessful, wrong-repository,
+By contrast, a missing required artifact, or a malformed, unsuccessful, wrong-repository,
 wrong-revision, wrong-scope, wrong-logical-key, or binding-incomplete artifact is
 unassessable evidence. It neither becomes a clean zero-result run nor supplies a
 current imported finding. Equivalent repeated current-context results can

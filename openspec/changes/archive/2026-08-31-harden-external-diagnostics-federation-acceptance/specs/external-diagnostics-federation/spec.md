@@ -1,9 +1,5 @@
-# external-diagnostics-federation Specification
+## MODIFIED Requirements
 
-## Purpose
-Define deterministic, vendor-neutral reference scenarios for the complete external-diagnostic
-evidence federation path.
-## Requirements
 ### Requirement: Synthetic reference scenarios preserve trusted external diagnostic semantics end to end
 The system SHALL provide deterministic, public-safe synthetic SARIF reference scenarios that
 compose bounded evidence trust validation, external-diagnostic selection, normalized finding and

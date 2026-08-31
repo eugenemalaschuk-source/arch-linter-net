@@ -124,6 +124,9 @@ public sealed partial class ExternalDiagnosticsFederationReferenceScenarioTests
             Assert.That(rehydrated.Kind, Is.EqualTo("imported_external_diagnostic"));
             Assert.That(rehydrated.CanonicalIdentity, Is.EqualTo(strict.CanonicalIdentity));
             Assert.That(records.Single().State, Is.EqualTo(ArchitectureApplicabilityRecordState.Evaluable));
+            Assert.That(records.Single().Reasons, Is.Empty);
+            Assert.That(records.Single().Provenance,
+                Is.EqualTo(new ArchitectureApplicabilityProvenance("external_diagnostics", "external.scan", "external.scan")));
             Assert.That(completion.State, Is.EqualTo(ArchitectureAssessmentCompletionState.Pass));
             Assert.That(path, Does.EndWith("evidence" + Path.DirectorySeparatorChar + "current.sarif"));
         });
@@ -157,6 +160,9 @@ public sealed partial class ExternalDiagnosticsFederationReferenceScenarioTests
             Assert.That(selection.Diagnostics, Is.Empty);
             Assert.That(projection.Findings, Is.Empty);
             Assert.That(records.Single().State, Is.EqualTo(ArchitectureApplicabilityRecordState.Evaluable));
+            Assert.That(records.Single().Reasons, Is.Empty);
+            Assert.That(records.Single().Provenance,
+                Is.EqualTo(new ArchitectureApplicabilityProvenance("external_diagnostics", "external.scan", "external.scan")));
             Assert.That(completion.State, Is.EqualTo(ArchitectureAssessmentCompletionState.Pass));
             Assert.That(missing.Status, Is.EqualTo(SarifEvidenceTrustStatus.MissingRequiredInput));
             Assert.That(missingRecords.Single().State, Is.EqualTo(ArchitectureApplicabilityRecordState.Unassessable));
@@ -164,20 +170,21 @@ public sealed partial class ExternalDiagnosticsFederationReferenceScenarioTests
         });
     }
 
-    [TestCase("missing", SarifEvidenceTrustStatus.MissingRequiredInput)]
-    [TestCase("malformed", SarifEvidenceTrustStatus.MalformedInput)]
-    [TestCase("failed", SarifEvidenceTrustStatus.FailedExecution)]
-    [TestCase("incomplete", SarifEvidenceTrustStatus.IncompleteExecution)]
-    [TestCase("wrong-key", SarifEvidenceTrustStatus.WrongLogicalId)]
-    [TestCase("wrong-repository", SarifEvidenceTrustStatus.WrongRepository)]
-    [TestCase("wrong-revision", SarifEvidenceTrustStatus.WrongRevision)]
-    [TestCase("wrong-scope", SarifEvidenceTrustStatus.WrongScope)]
-    [TestCase("missing-repository", SarifEvidenceTrustStatus.MissingRepository)]
-    [TestCase("missing-revision", SarifEvidenceTrustStatus.MissingRevision)]
-    [TestCase("missing-scope", SarifEvidenceTrustStatus.MissingScope)]
+    [TestCase("missing", SarifEvidenceTrustStatus.MissingRequiredInput, "missing_required_input")]
+    [TestCase("malformed", SarifEvidenceTrustStatus.MalformedInput, "malformed_external_input")]
+    [TestCase("failed", SarifEvidenceTrustStatus.FailedExecution, "malformed_external_input")]
+    [TestCase("incomplete", SarifEvidenceTrustStatus.IncompleteExecution, "malformed_external_input")]
+    [TestCase("wrong-key", SarifEvidenceTrustStatus.WrongLogicalId, "wrong_external_evidence_identity")]
+    [TestCase("wrong-repository", SarifEvidenceTrustStatus.WrongRepository, "wrong_external_repository")]
+    [TestCase("wrong-revision", SarifEvidenceTrustStatus.WrongRevision, "wrong_external_revision")]
+    [TestCase("wrong-scope", SarifEvidenceTrustStatus.WrongScope, "wrong_external_scope")]
+    [TestCase("missing-repository", SarifEvidenceTrustStatus.MissingRepository, "malformed_external_input")]
+    [TestCase("missing-revision", SarifEvidenceTrustStatus.MissingRevision, "malformed_external_input")]
+    [TestCase("missing-scope", SarifEvidenceTrustStatus.MissingScope, "malformed_external_input")]
     public void RequiredInvalidOrStaleEvidence_IsUnassessableAndCannotBeSelected(
         string scenario,
-        SarifEvidenceTrustStatus expectedStatus)
+        SarifEvidenceTrustStatus expectedStatus,
+        string expectedReasonCode)
     {
         ArchitectureExternalEvidenceRequirement requirement = Requirement("external.scan");
         SarifEvidenceArtifactReference? artifact = null;
@@ -265,6 +272,8 @@ public sealed partial class ExternalDiagnosticsFederationReferenceScenarioTests
                 [new SarifExternalDiagnosticSelectionInput(read)]), Throws.ArgumentException);
             Assert.That(projection.Findings, Is.Empty);
             Assert.That(records.Single().State, Is.EqualTo(ArchitectureApplicabilityRecordState.Unassessable));
+            Assert.That(records.Single().Reasons.Select(reason => reason.Code), Is.EqualTo([expectedReasonCode]));
+            Assert.That(records.Single().Reasons.Single().Provenance, Is.EqualTo(records.Single().Provenance));
         });
     }
 
@@ -416,7 +425,8 @@ public sealed partial class ExternalDiagnosticsFederationReferenceScenarioTests
 
     private static ArchitectureExternalEvidenceRequirement Requirement(
         string id,
-        Dictionary<string, string>? severity = null) => new()
+        Dictionary<string, string>? severity = null,
+        IReadOnlyList<string>? ruleIds = null) => new()
         {
             Id = id,
             Format = "sarif",
@@ -429,6 +439,7 @@ public sealed partial class ExternalDiagnosticsFederationReferenceScenarioTests
             RequireScope = true,
             DiagnosticFilter = new ArchitectureExternalEvidenceDiagnosticFilter
             {
+                RuleIds = ruleIds?.ToList() ?? [],
                 Severity = severity ?? new Dictionary<string, string> { ["error"] = "strict" },
             },
         };
