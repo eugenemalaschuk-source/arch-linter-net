@@ -326,6 +326,11 @@ public sealed partial class ArchitectureSarifFormatter : IArchitectureSarifForma
             return BuildPublicApiSurfaceProperties(publicApiSurface);
         }
 
+        if (diagnostic is ContractSurfaceExposureDiagnostic contractSurfaceExposure)
+        {
+            return BuildContractSurfaceExposureProperties(contractSurfaceExposure);
+        }
+
         if (diagnostic is LayoutConventionDiagnostic layoutConvention)
         {
             return BuildLayoutConventionProperties(layoutConvention);
@@ -458,6 +463,22 @@ public sealed partial class ArchitectureSarifFormatter : IArchitectureSarifForma
 
         return properties;
     }
+
+    private static Dictionary<string, object?> BuildContractSurfaceExposureProperties(
+        ContractSurfaceExposureDiagnostic exposure) =>
+        new()
+        {
+            ["source_assembly"] = exposure.SourceAssemblyName,
+            ["declaring_source_type"] = exposure.DeclaringSourceType,
+            ["exposure_path"] = exposure.ExposurePath,
+            ["canonical_exposure_path"] = exposure.CanonicalExposurePath,
+            ["target_assembly"] = exposure.TargetAssemblyName,
+            ["target_type"] = exposure.TargetTypeName,
+            ["source_surface"] = exposure.SourceSurface,
+            ["member_or_metadata_site"] = exposure.MemberOrMetadataSite,
+            ["reviewed_public_api_surface"] = exposure.ReviewedPublicApiSurface,
+            ["matching_forbidden_selectors"] = exposure.MatchingForbiddenSelectors?.ToArray(),
+        };
 
     private static string? FirstFrameworkReferenceSourcePath(ArchitectureDiagnostic diagnostic)
     {
@@ -682,6 +703,7 @@ public sealed partial class ArchitectureSarifFormatter : IArchitectureSarifForma
             TypePlacementDiagnostic d => (d.SourceType, d.ForbiddenNamespace, d.ForbiddenReferences),
             LayoutConventionDiagnostic d => (d.SourceType, d.ForbiddenNamespace, d.ForbiddenReferences),
             PublicApiSurfaceDiagnostic d => (d.SourceType, d.ForbiddenNamespace, d.ForbiddenReferences),
+            ContractSurfaceExposureDiagnostic d => (d.SourceType, d.ForbiddenNamespace, d.ForbiddenReferences),
             AttributeUsageDiagnostic d => (d.SourceType, d.ForbiddenNamespace, d.ForbiddenReferences),
             InheritanceDiagnostic d => (d.SourceType, d.ForbiddenNamespace, d.ForbiddenReferences),
             InterfaceImplementationDiagnostic d => (d.SourceType, d.ForbiddenNamespace, d.ForbiddenReferences),

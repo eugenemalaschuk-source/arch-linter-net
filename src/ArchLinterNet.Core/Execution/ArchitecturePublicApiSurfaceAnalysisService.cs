@@ -34,6 +34,58 @@ internal sealed class ArchitecturePublicApiSurfaceAnalysisService
         return violations;
     }
 
+    // The contract-surface exposure family consumes this exact selected exported-type universe.
+    // Keeping the resolver on the public-api analysis seam is important: API membership remains
+    // owned by the materialization/index path and exposure evaluation never reconstructs it from
+    // snapshots or by running a second reflection selector.
+    internal ArchitecturePublicApiSurfaceRootResolution ResolveSelectedRoots(
+        string publicApiSurfaceId)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(publicApiSurfaceId);
+
+        ArchitecturePublicApiSurfaceContract? contract = _session.Document.Contracts.StrictPublicApiSurface
+            .Concat(_session.Document.Contracts.AuditPublicApiSurface)
+            .SingleOrDefault(candidate => string.Equals(
+                candidate.Id, publicApiSurfaceId, StringComparison.OrdinalIgnoreCase));
+
+        if (contract is null)
+        {
+            return new ArchitecturePublicApiSurfaceRootResolution(
+                Array.Empty<Type>(), IsComplete: false, HasContract: false);
+        }
+
+        IReadOnlyDictionary<string, Assembly> resolvedAssemblies = _session.Facts.BuildAssemblyLookup();
+        Func<Type, bool>? selectorPredicate =
+            PublicApiSurfaceChecker.BuildSurfaceSelectorPredicate(contract, _session.Document, _session.RoleIndex);
+        List<Type> roots = new();
+        bool isComplete = contract.ApiSnapshotError is null;
+
+        foreach (string assemblyName in contract.Assemblies
+                     .Distinct(StringComparer.Ordinal)
+                     .OrderBy(name => name, StringComparer.Ordinal))
+        {
+            if (!resolvedAssemblies.TryGetValue(assemblyName, out Assembly? assembly))
+            {
+                isComplete = false;
+                continue;
+            }
+
+            ArchitecturePublicApiSurfaceMaterialization surface = _session.GetPublicApiSurface(assembly);
+            isComplete &= surface.IsComplete;
+            roots.AddRange(selectorPredicate is null
+                ? surface.ExportedTypes
+                : surface.ExportedTypes.Where(selectorPredicate));
+        }
+
+        Type[] distinctRoots = roots
+            .Distinct()
+            .OrderBy(type => type.Assembly.FullName ?? string.Empty, StringComparer.Ordinal)
+            .ThenBy(type => type.FullName ?? type.Name, StringComparer.Ordinal)
+            .ToArray();
+        return new ArchitecturePublicApiSurfaceRootResolution(
+            distinctRoots, isComplete, HasContract: true);
+    }
+
     // Captures a contract's exported surface without evaluating it against any declaration. This is
     // the read side the public-api capture/diff/update/migrate workflow builds on; contract
     // selection and ignore matching deliberately do not apply to the captured entries themselves,

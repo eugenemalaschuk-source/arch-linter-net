@@ -55,6 +55,21 @@ public sealed partial class ArchitectureDiagnosticFormatter
         obj["absolute_cap"] = budget.AbsoluteCap;
     }
 
+    private static void ApplyContractSurfaceExposureCiFields(
+        ContractSurfaceExposureDiagnostic exposure, Dictionary<string, object?> obj)
+    {
+        obj["source_assembly"] = exposure.SourceAssemblyName;
+        obj["declaring_source_type"] = exposure.DeclaringSourceType;
+        obj["exposure_path"] = exposure.ExposurePath;
+        obj["canonical_exposure_path"] = exposure.CanonicalExposurePath;
+        obj["target_assembly"] = exposure.TargetAssemblyName;
+        obj["target_type"] = exposure.TargetTypeName;
+        obj["source_surface"] = exposure.SourceSurface;
+        obj["member_or_metadata_site"] = exposure.MemberOrMetadataSite;
+        obj["reviewed_public_api_surface"] = exposure.ReviewedPublicApiSurface;
+        obj["matching_forbidden_selectors"] = exposure.MatchingForbiddenSelectors?.ToArray();
+    }
+
     private static void ApplyCycleCiFields(CycleDiagnostic cycle, Dictionary<string, object?> obj)
     {
         obj["path"] = cycle.Path;

@@ -104,6 +104,8 @@ class ArchLinterNet.Core.Contracts.Families.ArchitectureContextAllowOnlyContract
 class ArchLinterNet.Core.Contracts.Families.ArchitectureContextDependencyContract [sealed]
 class ArchLinterNet.Core.Contracts.Families.ArchitectureContextMetadataSelector [sealed]
 class ArchLinterNet.Core.Contracts.Families.ArchitectureContractGroups [sealed]
+class ArchLinterNet.Core.Contracts.Families.ArchitectureContractSurfaceExposureContract [sealed]
+class ArchLinterNet.Core.Contracts.Families.ArchitectureContractSurfaceExposureSource [sealed]
 class ArchLinterNet.Core.Contracts.Families.ArchitectureCoverageContract [sealed]
 class ArchLinterNet.Core.Contracts.Families.ArchitectureCoverageExclusion [sealed]
 class ArchLinterNet.Core.Contracts.Families.ArchitectureCoverageRoot [sealed]
@@ -277,6 +279,8 @@ class ArchLinterNet.Core.Model.ContextAllowOnlyDiagnostic [sealed]
 class ArchLinterNet.Core.Model.ContextAllowOnlyPayload [sealed]
 class ArchLinterNet.Core.Model.ContextDependencyDiagnostic [sealed]
 class ArchLinterNet.Core.Model.ContextDependencyPayload [sealed]
+class ArchLinterNet.Core.Model.ContractSurfaceExposureDiagnostic [sealed]
+class ArchLinterNet.Core.Model.ContractSurfaceExposurePayload [sealed]
 class ArchLinterNet.Core.Model.CycleDiagnostic [sealed]
 class ArchLinterNet.Core.Model.DependencyDiagnostic [sealed]
 class ArchLinterNet.Core.Model.DependencyPayload [sealed]
@@ -563,6 +567,7 @@ const ArchLinterNet.Core.Model.ArchitectureDiagnosticKind.Composition: ArchLinte
 const ArchLinterNet.Core.Model.ArchitectureDiagnosticKind.Configuration: ArchLinterNet.Core.Model.ArchitectureDiagnosticKind [value:3]
 const ArchLinterNet.Core.Model.ArchitectureDiagnosticKind.ContextAllowOnly: ArchLinterNet.Core.Model.ArchitectureDiagnosticKind [value:15]
 const ArchLinterNet.Core.Model.ArchitectureDiagnosticKind.ContextDependency: ArchLinterNet.Core.Model.ArchitectureDiagnosticKind [value:14]
+const ArchLinterNet.Core.Model.ArchitectureDiagnosticKind.ContractSurfaceExposure: ArchLinterNet.Core.Model.ArchitectureDiagnosticKind [value:27]
 const ArchLinterNet.Core.Model.ArchitectureDiagnosticKind.Cycle: ArchLinterNet.Core.Model.ArchitectureDiagnosticKind [value:1]
 const ArchLinterNet.Core.Model.ArchitectureDiagnosticKind.Dependency: ArchLinterNet.Core.Model.ArchitectureDiagnosticKind [value:0]
 const ArchLinterNet.Core.Model.ArchitectureDiagnosticKind.ExternalDependency: ArchLinterNet.Core.Model.ArchitectureDiagnosticKind [value:4]
@@ -802,6 +807,8 @@ ctor ArchLinterNet.Core.Contracts.Families.ArchitectureContextAllowOnlyContract(
 ctor ArchLinterNet.Core.Contracts.Families.ArchitectureContextDependencyContract()
 ctor ArchLinterNet.Core.Contracts.Families.ArchitectureContextMetadataSelector()
 ctor ArchLinterNet.Core.Contracts.Families.ArchitectureContractGroups()
+ctor ArchLinterNet.Core.Contracts.Families.ArchitectureContractSurfaceExposureContract()
+ctor ArchLinterNet.Core.Contracts.Families.ArchitectureContractSurfaceExposureSource()
 ctor ArchLinterNet.Core.Contracts.Families.ArchitectureCoverageContract()
 ctor ArchLinterNet.Core.Contracts.Families.ArchitectureCoverageExclusion()
 ctor ArchLinterNet.Core.Contracts.Families.ArchitectureCoverageRoot()
@@ -971,6 +978,8 @@ ctor ArchLinterNet.Core.Model.ContextAllowOnlyDiagnostic(System.String, System.S
 ctor ArchLinterNet.Core.Model.ContextAllowOnlyPayload(System.String, System.Collections.Generic.IReadOnlyDictionary`2[System.String,System.Object], System.String, System.Collections.Generic.IReadOnlyDictionary`2[System.String,System.Object], System.String)
 ctor ArchLinterNet.Core.Model.ContextDependencyDiagnostic(System.String, System.String, System.String, System.String, System.Collections.Generic.IReadOnlyCollection`1[System.String])
 ctor ArchLinterNet.Core.Model.ContextDependencyPayload(System.String, System.Collections.Generic.IReadOnlyDictionary`2[System.String,System.Object], System.String, System.Collections.Generic.IReadOnlyDictionary`2[System.String,System.Object], System.String)
+ctor ArchLinterNet.Core.Model.ContractSurfaceExposureDiagnostic(System.String, System.String, System.String, System.String, System.Collections.Generic.IReadOnlyCollection`1[System.String])
+ctor ArchLinterNet.Core.Model.ContractSurfaceExposurePayload(System.String, System.String, System.String, System.String, System.String, System.String, System.String, System.String, System.String, System.Collections.Generic.IReadOnlyCollection`1[System.Int32])
 ctor ArchLinterNet.Core.Model.CycleDiagnostic(System.String, System.String, System.String)
 ctor ArchLinterNet.Core.Model.DependencyDiagnostic(System.String, System.String, System.String, System.String, System.Collections.Generic.IReadOnlyCollection`1[System.String])
 ctor ArchLinterNet.Core.Model.DependencyPayload(System.String, System.String, System.Collections.Generic.IReadOnlyCollection`1[System.String])
@@ -1567,6 +1576,7 @@ method ArchLinterNet.Core.Model.CompositionPayload.ToDiagnostic(ArchLinterNet.Co
 method ArchLinterNet.Core.Model.ConfigurationPayload.ToDiagnostic(ArchLinterNet.Core.Model.ArchitectureViolation): ArchLinterNet.Core.Model.ArchitectureDiagnostic [virtual]
 method ArchLinterNet.Core.Model.ContextAllowOnlyPayload.ToDiagnostic(ArchLinterNet.Core.Model.ArchitectureViolation): ArchLinterNet.Core.Model.ArchitectureDiagnostic [virtual]
 method ArchLinterNet.Core.Model.ContextDependencyPayload.ToDiagnostic(ArchLinterNet.Core.Model.ArchitectureViolation): ArchLinterNet.Core.Model.ArchitectureDiagnostic [virtual]
+method ArchLinterNet.Core.Model.ContractSurfaceExposurePayload.ToDiagnostic(ArchLinterNet.Core.Model.ArchitectureViolation): ArchLinterNet.Core.Model.ArchitectureDiagnostic [virtual]
 method ArchLinterNet.Core.Model.DependencyPayload.ToDiagnostic(ArchLinterNet.Core.Model.ArchitectureViolation): ArchLinterNet.Core.Model.ArchitectureDiagnostic [virtual]
 method ArchLinterNet.Core.Model.ExternalDependencyPayload.ToDiagnostic(ArchLinterNet.Core.Model.ArchitectureViolation): ArchLinterNet.Core.Model.ArchitectureDiagnostic [virtual]
 method ArchLinterNet.Core.Model.FrameworkReferenceAllowOnlyPayload.ToDiagnostic(ArchLinterNet.Core.Model.ArchitectureViolation): ArchLinterNet.Core.Model.ArchitectureDiagnostic [virtual]
@@ -1936,6 +1946,7 @@ property ArchLinterNet.Core.Contracts.ArchitectureBaselineContractGroups.AuditAt
 property ArchLinterNet.Core.Contracts.ArchitectureBaselineContractGroups.AuditComposition: System.Collections.Generic.List`1[ArchLinterNet.Core.Contracts.ArchitectureBaselineContractEntry] [get, set]
 property ArchLinterNet.Core.Contracts.ArchitectureBaselineContractGroups.AuditContextAllowOnly: System.Collections.Generic.List`1[ArchLinterNet.Core.Contracts.ArchitectureBaselineContractEntry] [get, set]
 property ArchLinterNet.Core.Contracts.ArchitectureBaselineContractGroups.AuditContextDependencies: System.Collections.Generic.List`1[ArchLinterNet.Core.Contracts.ArchitectureBaselineContractEntry] [get, set]
+property ArchLinterNet.Core.Contracts.ArchitectureBaselineContractGroups.AuditContractSurfaceExposure: System.Collections.Generic.List`1[ArchLinterNet.Core.Contracts.ArchitectureBaselineContractEntry] [get, set]
 property ArchLinterNet.Core.Contracts.ArchitectureBaselineContractGroups.AuditCoverage: System.Collections.Generic.List`1[ArchLinterNet.Core.Contracts.ArchitectureBaselineContractEntry] [get, set]
 property ArchLinterNet.Core.Contracts.ArchitectureBaselineContractGroups.AuditCycles: System.Collections.Generic.List`1[ArchLinterNet.Core.Contracts.ArchitectureBaselineContractEntry] [get, set]
 property ArchLinterNet.Core.Contracts.ArchitectureBaselineContractGroups.AuditExternal: System.Collections.Generic.List`1[ArchLinterNet.Core.Contracts.ArchitectureBaselineContractEntry] [get, set]
@@ -1967,6 +1978,7 @@ property ArchLinterNet.Core.Contracts.ArchitectureBaselineContractGroups.StrictA
 property ArchLinterNet.Core.Contracts.ArchitectureBaselineContractGroups.StrictComposition: System.Collections.Generic.List`1[ArchLinterNet.Core.Contracts.ArchitectureBaselineContractEntry] [get, set]
 property ArchLinterNet.Core.Contracts.ArchitectureBaselineContractGroups.StrictContextAllowOnly: System.Collections.Generic.List`1[ArchLinterNet.Core.Contracts.ArchitectureBaselineContractEntry] [get, set]
 property ArchLinterNet.Core.Contracts.ArchitectureBaselineContractGroups.StrictContextDependencies: System.Collections.Generic.List`1[ArchLinterNet.Core.Contracts.ArchitectureBaselineContractEntry] [get, set]
+property ArchLinterNet.Core.Contracts.ArchitectureBaselineContractGroups.StrictContractSurfaceExposure: System.Collections.Generic.List`1[ArchLinterNet.Core.Contracts.ArchitectureBaselineContractEntry] [get, set]
 property ArchLinterNet.Core.Contracts.ArchitectureBaselineContractGroups.StrictCoverage: System.Collections.Generic.List`1[ArchLinterNet.Core.Contracts.ArchitectureBaselineContractEntry] [get, set]
 property ArchLinterNet.Core.Contracts.ArchitectureBaselineContractGroups.StrictCycles: System.Collections.Generic.List`1[ArchLinterNet.Core.Contracts.ArchitectureBaselineContractEntry] [get, set]
 property ArchLinterNet.Core.Contracts.ArchitectureBaselineContractGroups.StrictExternal: System.Collections.Generic.List`1[ArchLinterNet.Core.Contracts.ArchitectureBaselineContractEntry] [get, set]
@@ -2247,6 +2259,7 @@ property ArchLinterNet.Core.Contracts.Families.ArchitectureContractGroups.AuditA
 property ArchLinterNet.Core.Contracts.Families.ArchitectureContractGroups.AuditComposition: System.Collections.Generic.List`1[ArchLinterNet.Core.Contracts.Families.ArchitectureCompositionContract] [get, set]
 property ArchLinterNet.Core.Contracts.Families.ArchitectureContractGroups.AuditContextAllowOnly: System.Collections.Generic.List`1[ArchLinterNet.Core.Contracts.Families.ArchitectureContextAllowOnlyContract] [get, set]
 property ArchLinterNet.Core.Contracts.Families.ArchitectureContractGroups.AuditContextDependencies: System.Collections.Generic.List`1[ArchLinterNet.Core.Contracts.Families.ArchitectureContextDependencyContract] [get, set]
+property ArchLinterNet.Core.Contracts.Families.ArchitectureContractGroups.AuditContractSurfaceExposure: System.Collections.Generic.List`1[ArchLinterNet.Core.Contracts.Families.ArchitectureContractSurfaceExposureContract] [get, set]
 property ArchLinterNet.Core.Contracts.Families.ArchitectureContractGroups.AuditCoverage: System.Collections.Generic.List`1[ArchLinterNet.Core.Contracts.Families.ArchitectureCoverageContract] [get, set]
 property ArchLinterNet.Core.Contracts.Families.ArchitectureContractGroups.AuditCycles: System.Collections.Generic.List`1[ArchLinterNet.Core.Contracts.Families.ArchitectureCycleContract] [get, set]
 property ArchLinterNet.Core.Contracts.Families.ArchitectureContractGroups.AuditExternal: System.Collections.Generic.List`1[ArchLinterNet.Core.Contracts.Families.ArchitectureExternalDependencyContract] [get, set]
@@ -2280,6 +2293,7 @@ property ArchLinterNet.Core.Contracts.Families.ArchitectureContractGroups.Strict
 property ArchLinterNet.Core.Contracts.Families.ArchitectureContractGroups.StrictComposition: System.Collections.Generic.List`1[ArchLinterNet.Core.Contracts.Families.ArchitectureCompositionContract] [get, set]
 property ArchLinterNet.Core.Contracts.Families.ArchitectureContractGroups.StrictContextAllowOnly: System.Collections.Generic.List`1[ArchLinterNet.Core.Contracts.Families.ArchitectureContextAllowOnlyContract] [get, set]
 property ArchLinterNet.Core.Contracts.Families.ArchitectureContractGroups.StrictContextDependencies: System.Collections.Generic.List`1[ArchLinterNet.Core.Contracts.Families.ArchitectureContextDependencyContract] [get, set]
+property ArchLinterNet.Core.Contracts.Families.ArchitectureContractGroups.StrictContractSurfaceExposure: System.Collections.Generic.List`1[ArchLinterNet.Core.Contracts.Families.ArchitectureContractSurfaceExposureContract] [get, set]
 property ArchLinterNet.Core.Contracts.Families.ArchitectureContractGroups.StrictCoverage: System.Collections.Generic.List`1[ArchLinterNet.Core.Contracts.Families.ArchitectureCoverageContract] [get, set]
 property ArchLinterNet.Core.Contracts.Families.ArchitectureContractGroups.StrictCycles: System.Collections.Generic.List`1[ArchLinterNet.Core.Contracts.Families.ArchitectureCycleContract] [get, set]
 property ArchLinterNet.Core.Contracts.Families.ArchitectureContractGroups.StrictExternal: System.Collections.Generic.List`1[ArchLinterNet.Core.Contracts.Families.ArchitectureExternalDependencyContract] [get, set]
@@ -2302,6 +2316,16 @@ property ArchLinterNet.Core.Contracts.Families.ArchitectureContractGroups.Strict
 property ArchLinterNet.Core.Contracts.Families.ArchitectureContractGroups.StrictProtected: System.Collections.Generic.List`1[ArchLinterNet.Core.Contracts.Families.ArchitectureProtectedContract] [get, set]
 property ArchLinterNet.Core.Contracts.Families.ArchitectureContractGroups.StrictPublicApiSurface: System.Collections.Generic.List`1[ArchLinterNet.Core.Contracts.Families.ArchitecturePublicApiSurfaceContract] [get, set]
 property ArchLinterNet.Core.Contracts.Families.ArchitectureContractGroups.StrictTypePlacement: System.Collections.Generic.List`1[ArchLinterNet.Core.Contracts.Families.ArchitectureTypePlacementContract] [get, set]
+property ArchLinterNet.Core.Contracts.Families.ArchitectureContractSurfaceExposureContract.Forbidden: System.Collections.Generic.List`1[ArchLinterNet.Core.Contracts.Families.ArchitecturePublicApiSurfaceSelector] [get, set]
+property ArchLinterNet.Core.Contracts.Families.ArchitectureContractSurfaceExposureContract.Id: System.String [virtual, get, set]
+property ArchLinterNet.Core.Contracts.Families.ArchitectureContractSurfaceExposureContract.IgnoredViolations: System.Collections.Generic.List`1[ArchLinterNet.Core.Contracts.ArchitectureIgnoredViolation] [get, set]
+property ArchLinterNet.Core.Contracts.Families.ArchitectureContractSurfaceExposureContract.Name: System.String [virtual, get, set]
+property ArchLinterNet.Core.Contracts.Families.ArchitectureContractSurfaceExposureContract.Reason: System.String [get, set]
+property ArchLinterNet.Core.Contracts.Families.ArchitectureContractSurfaceExposureContract.Source: ArchLinterNet.Core.Contracts.Families.ArchitectureContractSurfaceExposureSource [get, set]
+property ArchLinterNet.Core.Contracts.Families.ArchitectureContractSurfaceExposureSource.Assemblies: System.Collections.Generic.List`1[System.String] [get, set]
+property ArchLinterNet.Core.Contracts.Families.ArchitectureContractSurfaceExposureSource.Projects: System.Collections.Generic.List`1[System.String] [get, set]
+property ArchLinterNet.Core.Contracts.Families.ArchitectureContractSurfaceExposureSource.PublicApiSurface: System.String [get, set]
+property ArchLinterNet.Core.Contracts.Families.ArchitectureContractSurfaceExposureSource.TypesMatching: ArchLinterNet.Core.Contracts.Families.ArchitecturePublicApiSurfaceSelector [get, set]
 property ArchLinterNet.Core.Contracts.Families.ArchitectureCoverageContract.Between: System.Collections.Generic.List`1[System.Collections.Generic.List`1[System.String]] [get, set]
 property ArchLinterNet.Core.Contracts.Families.ArchitectureCoverageContract.ContractIds: System.Collections.Generic.List`1[System.String] [get, set]
 property ArchLinterNet.Core.Contracts.Families.ArchitectureCoverageContract.Exclude: System.Collections.Generic.List`1[ArchLinterNet.Core.Contracts.Families.ArchitectureCoverageExclusion] [get, set]
@@ -2683,6 +2707,8 @@ property ArchLinterNet.Core.Execution.Results.ArchitectureContractExecutionResul
 property ArchLinterNet.Core.Execution.Results.ArchitectureContractExecutionResult.CycleFindings: System.Collections.Generic.IReadOnlyCollection`1[ArchLinterNet.Core.Model.ArchitectureCycleFinding] [get, init]
 property ArchLinterNet.Core.Execution.Results.ArchitectureContractExecutionResult.Cycles: System.Collections.Generic.IReadOnlyCollection`1[System.String] [get, init]
 property ArchLinterNet.Core.Execution.Results.ArchitectureContractExecutionResult.Violations: System.Collections.Generic.IReadOnlyCollection`1[ArchLinterNet.Core.Model.ArchitectureViolation] [get, init]
+property ArchLinterNet.Core.Execution.Results.ArchitectureHandlerResult.ApplicabilityExpectedEntries: System.Collections.Generic.IReadOnlyCollection`1[ArchLinterNet.Core.Model.ArchitectureApplicabilityExpectedEntry] [get, init]
+property ArchLinterNet.Core.Execution.Results.ArchitectureHandlerResult.ApplicabilityRecords: System.Collections.Generic.IReadOnlyCollection`1[ArchLinterNet.Core.Model.ArchitectureApplicabilityRecord] [get, init]
 property ArchLinterNet.Core.Execution.Results.ArchitectureHandlerResult.Cycles: System.Collections.Generic.IReadOnlyCollection`1[System.String] [get, init]
 property ArchLinterNet.Core.Execution.Results.ArchitectureHandlerResult.Violations: System.Collections.Generic.IReadOnlyCollection`1[ArchLinterNet.Core.Model.ArchitectureViolation] [get, init]
 property ArchLinterNet.Core.Execution.Results.ArchitectureRunnerSetup.AssemblyLoads: System.Int32 [get, init]
@@ -3214,6 +3240,30 @@ property ArchLinterNet.Core.Model.ContextDependencyPayload.SourceRole: System.St
 property ArchLinterNet.Core.Model.ContextDependencyPayload.TargetMetadata: System.Collections.Generic.IReadOnlyDictionary`2[System.String,System.Object] [get, init]
 property ArchLinterNet.Core.Model.ContextDependencyPayload.TargetRole: System.String [get, init]
 property ArchLinterNet.Core.Model.ContextDependencyPayload.WhenExpressions: System.Collections.Generic.IReadOnlyList`1[ArchLinterNet.Core.Model.ExpressionParticipation] [get, init]
+property ArchLinterNet.Core.Model.ContractSurfaceExposureDiagnostic.CanonicalExposurePath: System.String [get, init]
+property ArchLinterNet.Core.Model.ContractSurfaceExposureDiagnostic.DeclaringSourceType: System.String [get, init]
+property ArchLinterNet.Core.Model.ContractSurfaceExposureDiagnostic.ExposurePath: System.String [get, init]
+property ArchLinterNet.Core.Model.ContractSurfaceExposureDiagnostic.ForbiddenNamespace: System.String [get, init]
+property ArchLinterNet.Core.Model.ContractSurfaceExposureDiagnostic.ForbiddenReferences: System.Collections.Generic.IReadOnlyCollection`1[System.String] [get, init]
+property ArchLinterNet.Core.Model.ContractSurfaceExposureDiagnostic.Kind: ArchLinterNet.Core.Model.ArchitectureDiagnosticKind [override, get]
+property ArchLinterNet.Core.Model.ContractSurfaceExposureDiagnostic.MatchingForbiddenSelectors: System.Collections.Generic.IReadOnlyCollection`1[System.Int32] [get, init]
+property ArchLinterNet.Core.Model.ContractSurfaceExposureDiagnostic.MemberOrMetadataSite: System.String [get, init]
+property ArchLinterNet.Core.Model.ContractSurfaceExposureDiagnostic.ReviewedPublicApiSurface: System.String [get, init]
+property ArchLinterNet.Core.Model.ContractSurfaceExposureDiagnostic.SourceAssemblyName: System.String [get, init]
+property ArchLinterNet.Core.Model.ContractSurfaceExposureDiagnostic.SourceSurface: System.String [get, init]
+property ArchLinterNet.Core.Model.ContractSurfaceExposureDiagnostic.SourceType: System.String [get, init]
+property ArchLinterNet.Core.Model.ContractSurfaceExposureDiagnostic.TargetAssemblyName: System.String [get, init]
+property ArchLinterNet.Core.Model.ContractSurfaceExposureDiagnostic.TargetTypeName: System.String [get, init]
+property ArchLinterNet.Core.Model.ContractSurfaceExposurePayload.CanonicalExposurePath: System.String [get, init]
+property ArchLinterNet.Core.Model.ContractSurfaceExposurePayload.DeclaringSourceType: System.String [get, init]
+property ArchLinterNet.Core.Model.ContractSurfaceExposurePayload.ExposurePath: System.String [get, init]
+property ArchLinterNet.Core.Model.ContractSurfaceExposurePayload.MatchingForbiddenSelectors: System.Collections.Generic.IReadOnlyCollection`1[System.Int32] [get, init]
+property ArchLinterNet.Core.Model.ContractSurfaceExposurePayload.MemberOrMetadataSite: System.String [get, init]
+property ArchLinterNet.Core.Model.ContractSurfaceExposurePayload.ReviewedPublicApiSurface: System.String [get, init]
+property ArchLinterNet.Core.Model.ContractSurfaceExposurePayload.SourceAssemblyName: System.String [get, init]
+property ArchLinterNet.Core.Model.ContractSurfaceExposurePayload.SourceSurface: System.String [get, init]
+property ArchLinterNet.Core.Model.ContractSurfaceExposurePayload.TargetAssemblyName: System.String [get, init]
+property ArchLinterNet.Core.Model.ContractSurfaceExposurePayload.TargetTypeName: System.String [get, init]
 property ArchLinterNet.Core.Model.CycleDiagnostic.Kind: ArchLinterNet.Core.Model.ArchitectureDiagnosticKind [override, get]
 property ArchLinterNet.Core.Model.CycleDiagnostic.Path: System.String [get, init]
 property ArchLinterNet.Core.Model.DependencyDiagnostic.AllowedImporters: System.Collections.Generic.IReadOnlyCollection`1[System.String] [get, init]

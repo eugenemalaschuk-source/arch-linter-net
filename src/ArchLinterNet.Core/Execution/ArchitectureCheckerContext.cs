@@ -41,6 +41,9 @@ internal sealed class ArchitectureCheckerContext
 
     public ArchitectureReferenceGraph ReferenceGraph => _session.ReferenceGraph;
 
+    public ArchitecturePublicApiSurfaceRootResolution ResolvePublicApiSurfaceRoots(string publicApiSurfaceId) =>
+        _session.ResolvePublicApiSurfaceRoots(publicApiSurfaceId);
+
     public IReadOnlyList<string>? PreprocessorSymbols => _session.PreprocessorSymbols;
 
     // Matches analysis.configuration, defaulting to "Debug" exactly like project discovery's own

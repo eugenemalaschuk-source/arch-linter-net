@@ -29,6 +29,7 @@ internal static class ArchitectureRemediationHintProviderRegistry
             new(typeof(TypePlacementDiagnostic), (d, i) => ArchitectureRemediationHintFactory.ForTypePlacement((TypePlacementDiagnostic)d, i)),
             new(typeof(LayoutConventionDiagnostic), (d, i) => ArchitectureRemediationHintFactory.ForLayoutConvention((LayoutConventionDiagnostic)d, i)),
             new(typeof(PublicApiSurfaceDiagnostic), (d, i) => ArchitectureRemediationHintFactory.ForPublicApiSurface((PublicApiSurfaceDiagnostic)d, i)),
+            new(typeof(ContractSurfaceExposureDiagnostic), (d, i) => ArchitectureRemediationHintFactory.ForContractSurfaceExposure((ContractSurfaceExposureDiagnostic)d, i)),
             new(typeof(AttributeUsageDiagnostic), (d, i) => ArchitectureRemediationHintFactory.ForAttributeUsage((AttributeUsageDiagnostic)d, i)),
             new(typeof(InheritanceDiagnostic), (d, i) => ArchitectureRemediationHintFactory.ForInheritance((InheritanceDiagnostic)d, i)),
             new(typeof(InterfaceImplementationDiagnostic), (d, i) => ArchitectureRemediationHintFactory.ForInterfaceImplementation((InterfaceImplementationDiagnostic)d, i)),
@@ -196,6 +197,20 @@ internal static class ArchitectureRemediationHintFactory
         identity,
         [Evidence("public_surface", diagnostic.ApiAssemblyName ?? diagnostic.SourceType)],
         caveat: "Do not rewrite a reviewed API snapshot or expand selection solely to make this finding disappear.",
+        requiresReview: true);
+
+    internal static ArchitectureRemediationHint ForContractSurfaceExposure(
+        ContractSurfaceExposureDiagnostic diagnostic,
+        ArchitectureViolationIdentity identity) => Create(
+        ArchitectureRemediationHintCategory.ReviewContract,
+        "Review the visible contract path and target type before changing the public surface.",
+        identity,
+        [
+            Evidence("source_surface", diagnostic.SourceSurface ?? "exported"),
+            Evidence("exposure_path", diagnostic.CanonicalExposurePath ?? diagnostic.ExposurePath ?? string.Empty),
+            Evidence("target_type", diagnostic.TargetTypeName ?? diagnostic.ForbiddenNamespace),
+        ],
+        caveat: "Do not broaden the source surface or rewrite a reviewed API snapshot solely to make this finding disappear.",
         requiresReview: true);
 
     internal static ArchitectureRemediationHint ForAttributeUsage(

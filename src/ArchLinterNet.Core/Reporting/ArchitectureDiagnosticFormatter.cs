@@ -360,6 +360,11 @@ public sealed partial class ArchitectureDiagnosticFormatter : IArchitectureDiagn
             context += Reporting.ArchitectureDiagnosticFormatter.FormatPublicApiSurfaceContextForHumans(publicApiSurface);
         }
 
+        if (diagnostic is ContractSurfaceExposureDiagnostic exposure)
+        {
+            context += FormatContractSurfaceExposureContextForHumans(exposure);
+        }
+
         if (diagnostic is AttributeUsageDiagnostic attributeUsage)
         {
             context += FormatAttributeUsageContextForHumans(attributeUsage);

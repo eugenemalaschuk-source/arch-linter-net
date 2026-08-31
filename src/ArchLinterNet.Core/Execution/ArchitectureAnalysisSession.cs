@@ -452,6 +452,9 @@ public sealed class ArchitectureAnalysisSession
     public List<ArchitectureViolation> CheckPublicApiSurfaceContract(ArchitecturePublicApiSurfaceContract contract) =>
         _publicApiSurfaceAnalysisService.CheckPublicApiSurfaceContract(contract);
 
+    internal ArchitecturePublicApiSurfaceRootResolution ResolvePublicApiSurfaceRoots(string publicApiSurfaceId) =>
+        _publicApiSurfaceAnalysisService.ResolveSelectedRoots(publicApiSurfaceId);
+
     public IReadOnlyList<PublicApiSnapshotEntry> CapturePublicApiSurface(
         ArchitecturePublicApiSurfaceContract contract,
         out IReadOnlyList<string> missingAssemblies) =>

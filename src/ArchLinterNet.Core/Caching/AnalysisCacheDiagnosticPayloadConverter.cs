@@ -10,7 +10,7 @@ namespace ArchLinterNet.Core.Caching;
 // ExternalDependencyPayload, DependencyPayload, PortBoundaryPayload, AttributeUsagePayload,
 // InheritancePayload, InterfaceImplementationPayload, LayoutConventionPayload,
 // ContextAllowOnlyPayload, ContextDependencyPayload, PackageAllowOnlyPayload,
-// PublicApiSurfacePayload, MetricBudgetPayload — see src/ArchLinterNet.Core/Model/*Payload.cs).
+// PublicApiSurfacePayload, ContractSurfaceExposurePayload, MetricBudgetPayload — see src/ArchLinterNet.Core/Model/*Payload.cs).
 //
 // This is the exact closed-set discrimination review finding #1 asked for: the "$kind"
 // discriminator written on serialization is matched against a fixed switch statement enumerating
@@ -63,10 +63,11 @@ internal sealed class AnalysisCacheDiagnosticPayloadConverter : JsonConverter<IA
             nameof(ContextDependencyPayload) => Deserialize<ContextDependencyPayload>(raw, options),
             nameof(PackageAllowOnlyPayload) => Deserialize<PackageAllowOnlyPayload>(raw, options),
             nameof(PublicApiSurfacePayload) => Deserialize<PublicApiSurfacePayload>(raw, options),
+            nameof(ContractSurfaceExposurePayload) => Deserialize<ContractSurfaceExposurePayload>(raw, options),
             nameof(MetricBudgetPayload) => Deserialize<MetricBudgetPayload>(raw, options),
             _ => throw new JsonException(
                 $"Cached diagnostic payload has an unrecognized '$kind' value '{kind}'. Never deserialized " +
-                "as an arbitrary type — this is a closed set of 19 known payload records."),
+                "as an arbitrary type — this is a closed set of 20 known payload records."),
         };
     }
 
