@@ -1,3 +1,4 @@
+using System.Reflection;
 using ArchLinterNet.Core.Contracts;
 using ArchLinterNet.Core.Execution.Expressions;
 using ArchLinterNet.Core.Model;
@@ -10,7 +11,7 @@ namespace ArchLinterNet.Core.Execution;
 // It intentionally has no YAML or output dependency: policy loading owns declaration validity and
 // Reporting owns presentation. This class only creates canonical native evidence and ordinary
 // violations for the executor to transport through the established result seams.
-internal static class ArchitectureTopologyEvaluator
+internal static partial class ArchitectureTopologyEvaluator
 {
     internal const string Family = "declared_topology";
     internal const string ControlIdentity = "declared-topology";
@@ -25,9 +26,10 @@ internal static class ArchitectureTopologyEvaluator
             return Result.Empty;
         }
 
-        (IReadOnlyList<ObservedSubject> subjects, IReadOnlyList<ObservedDependency> dependencies) =
-            Observe(session, topology.SubjectKind);
-        return Evaluate(session, topology, subjects, dependencies);
+        (IReadOnlyList<ObservedSubject> subjects, IReadOnlyList<ObservedDependency> dependencies,
+            IReadOnlySet<string> incompleteDependencySourceIdentities) =
+            Observe(session, topology.SubjectKind, useMetricProjectOwnership: false);
+        return Evaluate(session, topology, subjects, dependencies, incompleteDependencySourceIdentities);
     }
 
     // Kept internal for focused deterministic tests. Session observation and policy matching remain
@@ -36,17 +38,20 @@ internal static class ArchitectureTopologyEvaluator
         ArchitectureAnalysisSession? session,
         ArchitectureTopology topology,
         IReadOnlyList<ObservedSubject> observedSubjects,
-        IReadOnlyList<ObservedDependency> observedDependencies)
+        IReadOnlyList<ObservedDependency> observedDependencies,
+        IReadOnlySet<string>? incompleteDependencySourceIdentities = null)
     {
         ArgumentNullException.ThrowIfNull(topology);
         ArgumentNullException.ThrowIfNull(observedSubjects);
         ArgumentNullException.ThrowIfNull(observedDependencies);
 
-        List<SubjectClassification> classifications = observedSubjects
-            .Where(subject => topology.Scope.Selectors.Any(selector => Matches(session, topology, selector, subject)))
-            .OrderBy(subject => subject.Identity, StringComparer.Ordinal)
-            .Select(subject => Classify(session, topology, subject))
-            .ToList();
+        Projection projection = Project(
+            session,
+            topology,
+            observedSubjects,
+            observedDependencies,
+            incompleteDependencySourceIdentities);
+        List<SubjectClassification> classifications = projection.Classifications.ToList();
 
         Dictionary<string, SubjectClassification> classificationsByIdentity = classifications
             .ToDictionary(classification => classification.Subject.Identity, StringComparer.Ordinal);
@@ -54,7 +59,7 @@ internal static class ArchitectureTopologyEvaluator
             .Where(classification => classification.Disposition == Disposition.Mapped)
             .ToDictionary(classification => classification.Subject.Identity, classification => classification.NodeIds[0], StringComparer.Ordinal);
 
-        List<Relationship> relationships = BuildRelationships(observedDependencies, nodeBySubject);
+        List<Relationship> relationships = BuildRelationships(projection.Dependencies, nodeBySubject);
         HashSet<(string Source, string Target)> allowedEdges = topology.AllowedEdges
             .Select(edge => (edge.From, edge.To))
             .ToHashSet();
@@ -120,13 +125,66 @@ internal static class ArchitectureTopologyEvaluator
 
         List<ArchitectureViolation> violations = BuildViolations(
             topology, classifications, relationships, allowedEdges, staleNodes, staleEdges);
-        return new Result(violations, new[] { expected }, new[] { record });
+        return new Result(violations, new[] { expected }, new[] { record })
+        {
+            FactProjection = projection,
+        };
     }
 
-    private static (IReadOnlyList<ObservedSubject> Subjects, IReadOnlyList<ObservedDependency> Dependencies) Observe(
-        ArchitectureAnalysisSession session,
-        string subjectKind)
+    // Narrow observation/classification projection shared by measure-first metrics. Keeping this
+    // beside the topology evaluator makes metric mapping use exactly the same selector, ownership,
+    // reviewed-out-of-scope, unmapped, and ambiguous semantics as topology applicability.
+    internal static Projection Project(ArchitectureAnalysisSession session, ArchitectureTopology topology)
     {
+        ArgumentNullException.ThrowIfNull(session);
+        ArgumentNullException.ThrowIfNull(topology);
+        (IReadOnlyList<ObservedSubject> subjects, IReadOnlyList<ObservedDependency> dependencies,
+            IReadOnlySet<string> incompleteDependencySourceIdentities) =
+            Observe(session, topology.SubjectKind, useMetricProjectOwnership: false);
+        return Project(session, topology, subjects, dependencies, incompleteDependencySourceIdentities);
+    }
+
+    internal static Projection Project(
+        ArchitectureAnalysisSession? session,
+        ArchitectureTopology topology,
+        IReadOnlyList<ObservedSubject> observedSubjects,
+        IReadOnlyList<ObservedDependency> observedDependencies,
+        IReadOnlySet<string>? incompleteDependencySourceIdentities = null)
+    {
+        ArgumentNullException.ThrowIfNull(topology);
+        ArgumentNullException.ThrowIfNull(observedSubjects);
+        ArgumentNullException.ThrowIfNull(observedDependencies);
+
+        List<SubjectClassification> classifications = observedSubjects
+            .Where(subject => topology.Scope.Selectors.Any(selector => Matches(session, topology, selector, subject)))
+            .OrderBy(subject => subject.Identity, StringComparer.Ordinal)
+            .Select(subject => Classify(session, topology, subject))
+            .ToList();
+        return new Projection(
+            topology,
+            observedSubjects,
+            classifications,
+            observedDependencies,
+            incompleteDependencySourceIdentities ?? new HashSet<string>(StringComparer.Ordinal));
+    }
+
+    private static (
+        IReadOnlyList<ObservedSubject> Subjects,
+        IReadOnlyList<ObservedDependency> Dependencies,
+        IReadOnlySet<string> IncompleteDependencySourceIdentities) Observe(
+        ArchitectureAnalysisSession session,
+        string subjectKind,
+        bool useMetricProjectOwnership)
+    {
+        // Assembly topology is an assembly-metadata projection. In particular, a resolved target
+        // assembly can legitimately expose no loadable types, and must still remain a canonical
+        // topology subject for its assembly-level dependency facts.
+        if (subjectKind == "assembly")
+        {
+            var (assemblySubjects, assemblyDependencies) = ObserveAssemblies(session, useMetricProjectOwnership);
+            return (assemblySubjects, assemblyDependencies, new HashSet<string>(StringComparer.Ordinal));
+        }
+
         Type[] types = session.TypeIndex.AllTypes()
             .OrderBy(ArchitectureTypeNames.SafeFullName, StringComparer.Ordinal)
             .ToArray();
@@ -136,13 +194,19 @@ internal static class ArchitectureTopologyEvaluator
         foreach (Type type in types)
         {
             string assembly = ArchitectureTypeNames.SafeAssemblyName(type) ?? string.Empty;
-            string project = ResolveProject(session, assembly);
+            string canonicalAssemblyIdentity = CanonicalAssemblyIdentity(type.Assembly);
+            string assemblyReferenceIdentity = AssemblyReferenceIdentity(type.Assembly);
+            string project = useMetricProjectOwnership
+                ? ResolveProjectForMetric(session, type)
+                : ResolveProject(session, assembly);
+            string projectSelectorIdentity = useMetricProjectOwnership
+                ? ResolveProjectSelectorForMetric(session, type)
+                : project;
             string subject = subjectKind switch
             {
                 "type" => ArchitectureTypeNames.SafeFullName(type),
                 "namespace" => ArchitectureTypeNames.SafeNamespace(type),
                 "project" => project,
-                "assembly" => assembly,
                 _ => throw new InvalidOperationException($"Unsupported topology subject kind '{subjectKind}'."),
             };
             if (string.IsNullOrEmpty(subject))
@@ -150,10 +214,19 @@ internal static class ArchitectureTopologyEvaluator
                 continue;
             }
 
-            string identity = BuildIdentity(subjectKind, project, assembly, subject);
+            string identity = BuildIdentity(subjectKind, project, assembly, canonicalAssemblyIdentity, subject);
             if (!subjectsByIdentity.TryGetValue(identity, out ObservedSubject? observed))
             {
-                observed = new ObservedSubject(identity, project, assembly, subject, type);
+                observed = new ObservedSubject(
+                    identity,
+                    project,
+                    assembly,
+                    subject,
+                    type,
+                    canonicalAssemblyIdentity,
+                    assemblyReferenceIdentity,
+                    type.Assembly,
+                    projectSelectorIdentity);
                 subjectsByIdentity.Add(identity, observed);
             }
 
@@ -161,6 +234,7 @@ internal static class ArchitectureTopologyEvaluator
         }
 
         var dependencies = new HashSet<ObservedDependency>();
+        var incompleteDependencySourceIdentities = new HashSet<string>(StringComparer.Ordinal);
         foreach (Type source in types)
         {
             if (!subjectByType.TryGetValue(source, out ObservedSubject? sourceSubject))
@@ -168,7 +242,13 @@ internal static class ArchitectureTopologyEvaluator
                 continue;
             }
 
-            foreach (Type target in session.ReferenceGraph.GetReferencedTypes(source))
+            bool isComplete = session.ReferenceGraph.TryGetReferencedTypes(source, out IReadOnlyList<Type> referencedTypes);
+            if (!isComplete)
+            {
+                incompleteDependencySourceIdentities.Add(sourceSubject.Identity);
+            }
+
+            foreach (Type target in referencedTypes)
             {
                 if (!subjectByType.TryGetValue(target, out ObservedSubject? targetSubject)
                     || string.Equals(sourceSubject.Identity, targetSubject.Identity, StringComparison.Ordinal))
@@ -186,8 +266,218 @@ internal static class ArchitectureTopologyEvaluator
             dependencies.OrderBy(dependency => dependency.SourceIdentity, StringComparer.Ordinal)
                 .ThenBy(dependency => dependency.TargetIdentity, StringComparer.Ordinal)
                 .ThenBy(dependency => dependency.Witness, StringComparer.Ordinal)
-                .ToArray());
+                .ToArray(),
+            incompleteDependencySourceIdentities);
     }
+
+    private static (IReadOnlyList<ObservedSubject> Subjects, IReadOnlyList<ObservedDependency> Dependencies) ObserveAssemblies(
+        ArchitectureAnalysisSession session,
+        bool useMetricProjectOwnership)
+    {
+        Assembly[] assemblies = session.Context.TargetAssemblies
+            .OrderBy(candidate => candidate.GetName().Name ?? string.Empty, StringComparer.Ordinal)
+            .ThenBy(CanonicalAssemblyIdentity, StringComparer.Ordinal)
+            .ToArray();
+        var subjectsByIdentity = new Dictionary<string, ObservedSubject>(StringComparer.Ordinal);
+        foreach (Assembly assembly in assemblies)
+        {
+            string assemblyName = assembly.GetName().Name ?? string.Empty;
+            if (string.IsNullOrEmpty(assemblyName))
+            {
+                continue;
+            }
+
+            string canonicalAssemblyIdentity = CanonicalAssemblyIdentity(assembly);
+            string project = useMetricProjectOwnership
+                ? ResolveProjectForMetric(session, assembly)
+                : ResolveProject(session, assemblyName);
+            string projectSelectorIdentity = useMetricProjectOwnership
+                ? ResolveProjectSelectorForMetric(session, assembly)
+                : project;
+            string identity = BuildIdentity(
+                "assembly",
+                project,
+                assemblyName,
+                canonicalAssemblyIdentity,
+                assemblyName);
+            subjectsByIdentity.TryAdd(
+                identity,
+                new ObservedSubject(
+                    identity,
+                    project,
+                    assemblyName,
+                    assemblyName,
+                    CanonicalAssemblyIdentity: canonicalAssemblyIdentity,
+                    AssemblyReferenceIdentity: AssemblyReferenceIdentity(assembly),
+                    ResolvedAssembly: assembly,
+                    ProjectSelectorIdentity: projectSelectorIdentity));
+        }
+
+        // Do not derive assembly edges by aggregating type references: assembly metadata is the
+        // native authority, including references from assemblies with no loadable types.
+        AssemblyDependencyObservation[] observations = assemblies
+            .Where(assembly => !string.IsNullOrEmpty(assembly.GetName().Name))
+            .Select(ToAssemblyDependencyObservation)
+            .ToArray();
+        ObservedSubject[] subjects = subjectsByIdentity.Values
+            .OrderBy(subject => subject.Identity, StringComparer.Ordinal)
+            .ToArray();
+        return (subjects, BindAssemblyDependencies(subjects, observations));
+    }
+
+    private static AssemblyDependencyObservation ToAssemblyDependencyObservation(Assembly assembly) => new(
+        assembly.GetName().Name!,
+        CanonicalAssemblyIdentity(assembly),
+        assembly.GetReferencedAssemblies()
+            .OrderBy(reference => reference.Name ?? string.Empty, StringComparer.Ordinal)
+            .ThenBy(AssemblyReferenceIdentity, StringComparer.Ordinal)
+            .Select(reference => new AssemblyReferenceObservation(
+                reference.Name ?? string.Empty,
+                AssemblyReferenceIdentity(reference)))
+            .ToArray());
+
+    // Kept internal for regression tests that model multiple resolved assemblies with one simple
+    // name. The production observation path above supplies these records from real metadata.
+    internal static IReadOnlyList<ObservedDependency> BindAssemblyDependencies(
+        IReadOnlyList<ObservedSubject> subjects,
+        IReadOnlyList<AssemblyDependencyObservation> observations)
+    {
+        ArgumentNullException.ThrowIfNull(subjects);
+        ArgumentNullException.ThrowIfNull(observations);
+
+        Dictionary<string, ObservedSubject[]> subjectsByAssembly = subjects
+            .GroupBy(subject => subject.Assembly, StringComparer.Ordinal)
+            .ToDictionary(
+                group => group.Key,
+                group => group.OrderBy(subject => subject.Identity, StringComparer.Ordinal).ToArray(),
+                StringComparer.Ordinal);
+        var dependencies = new HashSet<ObservedDependency>();
+        foreach (AssemblyDependencyObservation observation in observations
+                     .OrderBy(item => item.SourceAssemblyName, StringComparer.Ordinal)
+                     .ThenBy(item => item.SourceCanonicalAssemblyIdentity, StringComparer.Ordinal))
+        {
+            AssemblyEndpointBinding sourceBinding = BindAssemblyEndpoint(
+                subjectsByAssembly, observation.SourceAssemblyName, observation.SourceCanonicalAssemblyIdentity,
+                referenceIdentity: null, out string sourceIdentity);
+            foreach (AssemblyReferenceObservation reference in observation.References
+                         .OrderBy(item => item.AssemblyName, StringComparer.Ordinal)
+                         .ThenBy(item => item.ReferenceIdentity, StringComparer.Ordinal))
+            {
+                if (string.IsNullOrEmpty(reference.AssemblyName))
+                {
+                    continue;
+                }
+
+                // Assembly component metrics use the retained first-party assembly graph. Every
+                // resolved target assembly now has a subject, even if it exposes no loadable
+                // types. A reference with no retained simple-name candidate is therefore external
+                // to that graph, not an unmapped architecture component endpoint.
+                if (!subjectsByAssembly.ContainsKey(reference.AssemblyName))
+                {
+                    continue;
+                }
+
+                AssemblyEndpointBinding targetBinding = BindAssemblyEndpoint(
+                    subjectsByAssembly, reference.AssemblyName, canonicalAssemblyIdentity: null,
+                    reference.ReferenceIdentity, out string targetIdentity);
+                if (sourceBinding == AssemblyEndpointBinding.Bound
+                    && targetBinding == AssemblyEndpointBinding.Bound
+                    && string.Equals(sourceIdentity, targetIdentity, StringComparison.Ordinal))
+                {
+                    continue;
+                }
+
+                dependencies.Add(new ObservedDependency(
+                    sourceIdentity,
+                    targetIdentity,
+                    $"{observation.SourceAssemblyName} -> {reference.AssemblyName}",
+                    sourceBinding,
+                    targetBinding,
+                    observation.SourceAssemblyName,
+                    reference.AssemblyName));
+            }
+        }
+
+        return dependencies.OrderBy(dependency => dependency.SourceIdentity, StringComparer.Ordinal)
+            .ThenBy(dependency => dependency.TargetIdentity, StringComparer.Ordinal)
+            .ThenBy(dependency => dependency.Witness, StringComparer.Ordinal)
+            .ToArray();
+    }
+
+    private static AssemblyEndpointBinding BindAssemblyEndpoint(
+        IReadOnlyDictionary<string, ObservedSubject[]> subjectsByAssembly,
+        string assemblyName,
+        string? canonicalAssemblyIdentity,
+        string? referenceIdentity,
+        out string identity)
+    {
+        if (!subjectsByAssembly.TryGetValue(assemblyName, out ObservedSubject[]? candidates))
+        {
+            identity = UnboundAssemblyEndpointIdentity(assemblyName, referenceIdentity ?? canonicalAssemblyIdentity);
+            return AssemblyEndpointBinding.Missing;
+        }
+
+        if (candidates.Length != 1)
+        {
+            identity = UnboundAssemblyEndpointIdentity(assemblyName, referenceIdentity ?? canonicalAssemblyIdentity);
+            return AssemblyEndpointBinding.Ambiguous;
+        }
+
+        ObservedSubject candidate = candidates[0];
+        bool canonicalMatches = string.IsNullOrEmpty(canonicalAssemblyIdentity)
+            || string.Equals(candidate.CanonicalAssemblyIdentity, canonicalAssemblyIdentity, StringComparison.Ordinal);
+        bool referenceMatches = string.IsNullOrEmpty(referenceIdentity)
+            || string.Equals(candidate.AssemblyReferenceIdentity, referenceIdentity, StringComparison.Ordinal);
+        if (canonicalMatches && referenceMatches)
+        {
+            identity = candidate.Identity;
+            return AssemblyEndpointBinding.Bound;
+        }
+
+        identity = UnboundAssemblyEndpointIdentity(assemblyName, referenceIdentity ?? canonicalAssemblyIdentity);
+        // The single retained simple-name candidate does not represent this canonical endpoint.
+        return AssemblyEndpointBinding.Ambiguous;
+    }
+
+    private static string UnboundAssemblyEndpointIdentity(string assemblyName, string? identity) =>
+        $"assembly-endpoint|assembly={assemblyName}|identity={identity ?? string.Empty}";
+
+    private static string CanonicalAssemblyIdentity(Assembly assembly)
+    {
+        try
+        {
+            return $"{AssemblyReferenceIdentity(assembly)}|mvid={assembly.ManifestModule.ModuleVersionId:N}";
+        }
+        catch (NotSupportedException)
+        {
+            return AssemblyReferenceIdentity(assembly);
+        }
+    }
+
+    private static string AssemblyReferenceIdentity(Assembly assembly) => assembly.FullName
+        ?? assembly.GetName().FullName
+        ?? assembly.GetName().Name
+        ?? string.Empty;
+
+    private static string AssemblyReferenceIdentity(AssemblyName assemblyName) => assemblyName.FullName
+        ?? assemblyName.Name
+        ?? string.Empty;
+
+    // Shared with the metric projection so external facts use the exact owner binding that
+    // topology observation uses for a source type.
+    internal static string ResolveCanonicalAssemblyIdentityForMetric(Type type) =>
+        ResolveCanonicalAssemblyIdentityForMetric(type.Assembly);
+
+    internal static string ResolveCanonicalAssemblyIdentityForMetric(Assembly assembly) =>
+        CanonicalAssemblyIdentity(assembly);
+
+    internal static string BuildMetricSubjectIdentity(
+        string subjectKind,
+        string project,
+        string assembly,
+        string canonicalAssemblyIdentity,
+        string subject) =>
+        BuildIdentity(subjectKind, project, assembly, canonicalAssemblyIdentity, subject);
 
     private static string ResolveProject(ArchitectureAnalysisSession session, string assembly)
     {
@@ -252,7 +542,10 @@ internal static class ArchitectureTopologyEvaluator
 
         if (!string.IsNullOrEmpty(selector.Project))
         {
-            return string.Equals(selector.Project, subject.Project, StringComparison.Ordinal);
+            return string.Equals(
+                selector.Project,
+                subject.ProjectSelectorIdentity ?? subject.Project,
+                StringComparison.Ordinal);
         }
 
         if (!string.IsNullOrEmpty(selector.Assembly))
@@ -417,7 +710,15 @@ internal static class ArchitectureTopologyEvaluator
         classification.NodeIds,
         classification.ReviewedOutOfScopeId);
 
-    private static string BuildIdentity(string subjectKind, string project, string assembly, string subject) =>
+    private static string BuildIdentity(
+        string subjectKind,
+        string project,
+        string assembly,
+        string canonicalAssemblyIdentity,
+        string subject) =>
+        $"{subjectKind}|project={project}|assembly={assembly}|canonical_assembly={canonicalAssemblyIdentity}|subject={subject}";
+
+    private static string BuildValidationIdentity(string subjectKind, string project, string assembly, string subject) =>
         $"{subjectKind}|project={project}|assembly={assembly}|subject={subject}";
 
     internal sealed record ObservedSubject(
@@ -425,22 +726,49 @@ internal static class ArchitectureTopologyEvaluator
         string Project,
         string Assembly,
         string Subject,
-        Type? Type = null);
+        Type? Type = null,
+        string? CanonicalAssemblyIdentity = null,
+        string? AssemblyReferenceIdentity = null,
+        Assembly? ResolvedAssembly = null,
+        string? ProjectSelectorIdentity = null);
 
-    internal sealed record ObservedDependency(string SourceIdentity, string TargetIdentity, string Witness);
+    internal sealed record ObservedDependency(
+        string SourceIdentity,
+        string TargetIdentity,
+        string Witness,
+        AssemblyEndpointBinding SourceBinding = AssemblyEndpointBinding.Bound,
+        AssemblyEndpointBinding TargetBinding = AssemblyEndpointBinding.Bound,
+        string? SourceAssemblyName = null,
+        string? TargetAssemblyName = null);
+
+    internal sealed record AssemblyDependencyObservation(
+        string SourceAssemblyName,
+        string SourceCanonicalAssemblyIdentity,
+        IReadOnlyList<AssemblyReferenceObservation> References);
+
+    internal sealed record AssemblyReferenceObservation(string AssemblyName, string ReferenceIdentity);
+
+    internal enum AssemblyEndpointBinding
+    {
+        Bound,
+        Missing,
+        Ambiguous,
+    }
 
     internal sealed record Result(
         IReadOnlyList<ArchitectureViolation> Violations,
         IReadOnlyList<ArchitectureApplicabilityExpectedEntry> ExpectedEntries,
         IReadOnlyList<ArchitectureApplicabilityRecord> Records)
     {
+        internal Projection? FactProjection { get; init; }
+
         public static Result Empty { get; } = new(
             Array.Empty<ArchitectureViolation>(),
             Array.Empty<ArchitectureApplicabilityExpectedEntry>(),
             Array.Empty<ArchitectureApplicabilityRecord>());
     }
 
-    private sealed record SubjectClassification(
+    internal sealed record SubjectClassification(
         ObservedSubject Subject,
         Disposition Disposition,
         IReadOnlyList<string> NodeIds,
@@ -448,11 +776,18 @@ internal static class ArchitectureTopologyEvaluator
 
     private sealed record Relationship(string SourceNode, string TargetNode, string Witness);
 
-    private enum Disposition
+    internal enum Disposition
     {
         Mapped,
         ReviewedOutOfScope,
         Unmapped,
         Ambiguous,
     }
+
+    internal sealed record Projection(
+        ArchitectureTopology Topology,
+        IReadOnlyList<ObservedSubject> ObservedSubjects,
+        IReadOnlyList<SubjectClassification> Classifications,
+        IReadOnlyList<ObservedDependency> Dependencies,
+        IReadOnlySet<string> IncompleteDependencySourceIdentities);
 }

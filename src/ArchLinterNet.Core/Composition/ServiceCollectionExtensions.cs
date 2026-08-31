@@ -64,6 +64,7 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<IArchitectureContractExecutor, ArchitectureContractExecutor>();
         services.AddSingleton<IBuildStatePreparationService, BuildStatePreparationService>();
         services.AddSingleton<IArchitectureValidationApplicationService, ArchitectureValidationApplicationService>();
+        services.AddSingleton<IArchitectureMetricMeasurementApplicationService, ArchitectureMetricMeasurementApplicationService>();
         services.AddSingleton<IArchitecturePolicyCheckApplicationService, ArchitecturePolicyCheckApplicationService>();
         services.AddSingleton<IArchitecturePolicyContextApplicationService, ArchitecturePolicyContextApplicationService>();
         services.AddSingleton<IArchitectureBaselineApplicationService, ArchitectureBaselineApplicationService>();

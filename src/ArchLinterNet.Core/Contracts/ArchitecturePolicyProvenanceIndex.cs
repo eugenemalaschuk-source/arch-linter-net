@@ -62,6 +62,21 @@ public sealed class ArchitecturePolicyProvenanceIndex
         BindOwner(document.Analysis, ArchitecturePolicyProvenancePath.Property("analysis"), null, null);
         BindOwner(document.Classification, ArchitecturePolicyProvenancePath.Property("classification"), null, null);
 
+        if (document.Topology is { } topology)
+        {
+            BindOwner(topology, ArchitecturePolicyProvenancePath.Property("topology"), null, null);
+        }
+
+        for (int metricIndex = 0; metricIndex < document.Metrics.Count; metricIndex++)
+        {
+            BindOwner(
+                document.Metrics[metricIndex],
+                ArchitecturePolicyProvenancePath.AppendIndex(
+                    ArchitecturePolicyProvenancePath.Property("metrics"), metricIndex),
+                null,
+                null);
+        }
+
         foreach ((string name, ArchitectureLayer layer) in document.Layers)
         {
             string path = ArchitecturePolicyProvenancePath.AppendProperty(

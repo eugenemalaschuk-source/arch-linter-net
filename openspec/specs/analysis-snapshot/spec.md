@@ -7,7 +7,9 @@ requested `strict`/`audit` validation view (coverage included, via the existing
 cache-only outcomes and at most one lazy runner materialization shared by
 cache-miss evaluations — while keeping ordinary single-mode validation exactly
 as simple and behaviorally unchanged as it was before this capability existed.
+
 ## Requirements
+
 ### Requirement: Snapshot composes policy once and evaluates the project graph as few times as build state requires
 The system SHALL provide `ArchitectureAnalysisSnapshot`, constructed via `IArchitectureValidationApplicationService.CreateSnapshot(AnalysisSnapshotRequest, ValidationTiming?)`, which composes the effective policy exactly once for the snapshot's lifetime and runs build-state preflight exactly once. Ordinary and no-restore preparation SHALL evaluate the selected project graph and create one immutable metadata-only preparation plan containing the selected verified artifact paths and identity evidence; it SHALL NOT load target assemblies into a CLR context. Explicit `--ensure-built` preparation SHALL evaluate the project graph a second time after a successful build and replace the plan with one for the exact verified post-build output paths; it SHALL NOT choose a target through environment/policy probing precedence. The policy document composed at the start of `CreateSnapshot` SHALL be reused for that second pass rather than recomposed. `Evaluate` SHALL materialize a runner from the plan only after its cache lookup misses.
 
@@ -175,3 +177,16 @@ When a combined CLI validation routes human, JSON, and/or SARIF reports, every r
   sinks in addition to its normal output
 - **THEN** the report artifacts contain the two completed mode results and the
   profile's analysis counters remain those of the one shared snapshot
+
+### Requirement: Measurement cancellation is terminal for a snapshot
+The snapshot SHALL apply its cancellation lifecycle uniformly to `Measure()`
+and `Evaluate()`. If cancellation is observed while a measurement lazily
+materializes analysis facts, the snapshot SHALL become cancelled before the
+operation rethrows, and all later measurement or validation attempts SHALL be
+rejected as reuse of a cancelled snapshot.
+
+#### Scenario: A cancelled measurement cannot be followed by evaluation
+- **WHEN** `Measure()` observes cancellation while materializing its analysis
+  session
+- **THEN** a subsequent `Measure()` or `Evaluate()` on that snapshot throws
+  cancellation rather than reusing the partial session

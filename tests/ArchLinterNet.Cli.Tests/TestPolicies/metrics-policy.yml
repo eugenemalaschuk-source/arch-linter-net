@@ -1,0 +1,19 @@
+version: 1
+name: Metric CLI complete
+analysis:
+  target_assemblies: [ArchLinterNet.Core]
+topology:
+  mode: partial
+  subject_kind: namespace
+  scope:
+    selectors:
+      - namespace: ArchLinterNet.Core.Model
+  nodes:
+    - id: model
+      mappings:
+        - namespace: ArchLinterNet.Core.Model
+metrics:
+  - id: model-external-groups
+    kind: external_dependency_group_count
+    topology_node: model
+contracts: {}

@@ -28,4 +28,20 @@ public sealed class ArchitectureReferenceGraphTests
 
         Assert.That(first, Is.SameAs(second));
     }
+
+    [Test]
+    public void TryGetReferencedTypes_UnloadableMember_PreservesBestEffortListAndReportsIncomplete()
+    {
+        using UnloadableFieldFixture fixture = UnloadableFieldFixture.Create();
+        var graph = new ArchitectureReferenceGraph();
+
+        bool isComplete = graph.TryGetReferencedTypes(fixture.SourceType, out IReadOnlyList<Type> referenced);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(isComplete, Is.False);
+            Assert.That(graph.GetReferencedTypes(fixture.SourceType), Is.SameAs(referenced));
+            Assert.That(referenced.Any(type => type.Name == "UnloadableTargetType"), Is.False);
+        });
+    }
 }

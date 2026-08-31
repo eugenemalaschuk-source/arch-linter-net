@@ -68,6 +68,12 @@ public sealed record ProjectDiscoveryResult(
     public IReadOnlyDictionary<string, string> ResolvedAssemblyPaths { get; init; } =
         new Dictionary<string, string>(StringComparer.Ordinal);
 
+    // Retains the output artifact that belongs to each discovered project. The legacy
+    // simple-name map above is still consumed by ordinary assembly resolution, while metric
+    // ownership uses this project-path keyed evidence to avoid collapsing same-name outputs.
+    internal IReadOnlyDictionary<string, string> ResolvedAssemblyPathsByNormalizedProjectPath { get; init; } =
+        new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+
     public static readonly ProjectDiscoveryResult Empty = new(
         Array.Empty<string>(), Array.Empty<string>(), Array.Empty<string>(),
         Array.Empty<ArchitectureProjectDiscoveryDiagnostic>());

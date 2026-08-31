@@ -68,9 +68,35 @@ public sealed class ArchitectureAnalysisContext : IDisposable
     // assemblies). These are physical files, not Assembly.Location-derived guesses.
     internal IReadOnlyList<string> SelectedAssemblyArtifactPaths { get; }
 
+    // Maps the actual CLR assembly instance to the exact artifact selected by resolution. This
+    // survives stream loading, where Assembly.Location is intentionally empty.
+    internal IReadOnlyDictionary<Assembly, string> ResolvedAssemblyArtifactPaths { get; init; } =
+        new Dictionary<Assembly, string>();
+
     internal IReadOnlyList<ArchitectureLoadedAssemblyArtifact> LoadedAssemblyArtifacts =>
         (_isolatedLoadScope as IArchitectureAssemblyLoadScopeArtifactInventory)?.LoadedAssemblyArtifacts.ToArray()
         ?? Array.Empty<ArchitectureLoadedAssemblyArtifact>();
+
+    internal bool TryGetResolvedAssemblyArtifactPath(Assembly assembly, out string artifactPath)
+    {
+        ArgumentNullException.ThrowIfNull(assembly);
+
+        if (ResolvedAssemblyArtifactPaths.TryGetValue(assembly, out string? resolved))
+        {
+            artifactPath = Path.GetFullPath(resolved);
+            return true;
+        }
+
+        string? location = SafeAssemblyLocation(assembly);
+        if (location is not null)
+        {
+            artifactPath = location;
+            return true;
+        }
+
+        artifactPath = string.Empty;
+        return false;
+    }
 
     // Cache evidence alone needs the eager local reference closure. Keep it out of ordinary
     // post-build resolution so a cache-disabled run retains the historical lazy-load behavior.

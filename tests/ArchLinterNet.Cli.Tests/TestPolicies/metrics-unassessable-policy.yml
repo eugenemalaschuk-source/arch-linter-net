@@ -1,0 +1,20 @@
+version: 1
+name: Metric CLI unassessable
+analysis:
+  target_assemblies: [ArchLinterNet.Core]
+topology:
+  mode: exhaustive
+  subject_kind: namespace
+  scope:
+    selectors:
+      - namespace: ArchLinterNet.Core.Execution
+      - namespace: ArchLinterNet.Core.Contracts
+  nodes:
+    - id: execution
+      mappings:
+        - namespace: ArchLinterNet.Core.Execution
+metrics:
+  - id: execution-outgoing
+    kind: outgoing_component_count
+    topology_node: execution
+contracts: {}

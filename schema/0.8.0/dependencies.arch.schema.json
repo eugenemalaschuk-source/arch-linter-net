@@ -65,6 +65,12 @@
     "contracts": { "$ref": "#/$defs/contracts" },
     "classification": { "$ref": "#/$defs/classification" },
     "topology": { "$ref": "#/$defs/topology" },
+    "metrics": {
+      "type": "array",
+      "description": "Optional threshold-free architecture metric definitions.",
+      "items": { "$ref": "#/$defs/metricDefinition" },
+      "default": []
+    },
     "history_analysis": { "$ref": "#/$defs/historyAnalysis" }
   },
   "$defs": {
@@ -201,6 +207,45 @@
         },
         "stale_declarations": { "type": "boolean", "default": false }
       }
+    },
+    "metricDefinition": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "kind"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "kind": {
+          "type": "string",
+          "enum": [
+            "outgoing_component_count",
+            "incoming_component_count",
+            "external_dependency_group_count",
+            "component_footprint_count",
+            "topology_type_count",
+            "public_contract_surface_count"
+          ]
+        },
+        "topology_node": { "type": "string", "minLength": 1 },
+        "unit": { "type": "string", "enum": ["project", "assembly"] },
+        "public_api_surface": { "type": "string", "minLength": 1 }
+      },
+      "oneOf": [
+        {
+          "properties": { "kind": { "enum": ["outgoing_component_count", "incoming_component_count", "external_dependency_group_count", "topology_type_count"] } },
+          "required": ["topology_node"],
+          "not": { "anyOf": [{ "required": ["unit"] }, { "required": ["public_api_surface"] }] }
+        },
+        {
+          "properties": { "kind": { "const": "component_footprint_count" } },
+          "required": ["topology_node", "unit"],
+          "not": { "required": ["public_api_surface"] }
+        },
+        {
+          "properties": { "kind": { "const": "public_contract_surface_count" } },
+          "required": ["public_api_surface"],
+          "not": { "anyOf": [{ "required": ["topology_node"] }, { "required": ["unit"] }] }
+        }
+      ]
     },
     "topologyScope": {
       "type": "object",

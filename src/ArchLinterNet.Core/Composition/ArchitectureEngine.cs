@@ -2,6 +2,7 @@ using ArchLinterNet.Core.Asmdef;
 using ArchLinterNet.Core.Asmdef.Abstractions;
 using ArchLinterNet.Core.Graph;
 using ArchLinterNet.Core.Graph.Abstractions;
+using ArchLinterNet.Core.Model;
 using ArchLinterNet.Core.PolicyContext;
 using ArchLinterNet.Core.PolicyContext.Abstractions;
 using ArchLinterNet.Core.Reporting;
@@ -50,6 +51,14 @@ public sealed class ArchitectureEngine : IDisposable, IAsyncDisposable
     {
         return _serviceProvider.GetRequiredService<IArchitectureValidationApplicationService>()
             .CreateSnapshot(request, timing);
+    }
+
+    public ArchitectureMetricMeasurementOutcome Measure(
+        ArchitectureMetricMeasurementRequest request,
+        ValidationTiming? timing = null)
+    {
+        return _serviceProvider.GetRequiredService<IArchitectureMetricMeasurementApplicationService>()
+            .Measure(request, timing);
     }
 
     public BaselineGenerationOutcome GenerateBaseline(BaselineGenerationRequest request)

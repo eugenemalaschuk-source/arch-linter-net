@@ -18,19 +18,27 @@ internal static class ArchitectureTypeNames
         }
     }
 
-    public static string SafeFullName(Type type)
+    public static string SafeFullName(Type type) =>
+        TryGetFullName(type, out string fullName) ? fullName : string.Empty;
+
+    // Keeps legacy callers best-effort while letting a measurement authority distinguish an
+    // unavailable reflection name from a legitimate empty namespace or other display fallback.
+    public static bool TryGetFullName(Type type, out string fullName)
     {
         try
         {
-            return type.FullName ?? type.Name;
+            fullName = type.FullName ?? type.Name;
+            return true;
         }
         catch (FileNotFoundException)
         {
-            return string.Empty;
+            fullName = string.Empty;
+            return false;
         }
         catch (TypeLoadException)
         {
-            return string.Empty;
+            fullName = string.Empty;
+            return false;
         }
     }
 

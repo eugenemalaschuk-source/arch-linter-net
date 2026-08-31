@@ -97,6 +97,7 @@ public sealed class ArchitectureAnalysisSession
             RoleIndex,
             ExpressionFacts,
             new ArchitectureSessionMetadataIndexes(context));
+        ExternalDependencyFacts = new ArchitectureExternalDependencyFactIndex(this);
         _contextualConsumerRegistry = new ArchitectureContextualConsumerRegistry();
         RegisterAllContextualConsumersFromDocument();
         _configurationValidationService = new ArchitectureConfigurationValidationService(this);
@@ -191,6 +192,11 @@ public sealed class ArchitectureAnalysisSession
     internal ArchitectureCheckerContext CheckerContext => _checkerContext ??= new ArchitectureCheckerContext(this);
 
     public ArchitectureReferenceGraph ReferenceGraph { get; } = new();
+
+    // Direct external-group facts are materialized once per analysis session. Measurement and
+    // future consumers read this projection instead of re-running the external violation finders
+    // or an IL/reference scan of their own.
+    internal ArchitectureExternalDependencyFactIndex ExternalDependencyFacts { get; }
 
     public IReadOnlyList<ArchitectureUnmatchedIgnoredViolation> UnmatchedIgnoredViolations
         => _unmatchedIgnoredViolations;
@@ -443,6 +449,14 @@ public sealed class ArchitectureAnalysisSession
         out IReadOnlyList<ArchitectureViolation> selectorSafetyViolations) =>
         _publicApiSurfaceAnalysisService.CapturePublicApiSurface(
             contract, out missingAssemblies, out selectorSafetyViolations);
+
+    internal IReadOnlyList<PublicApiSnapshotEntry> CapturePublicApiSurface(
+        ArchitecturePublicApiSurfaceContract contract,
+        out IReadOnlyList<string> missingAssemblies,
+        out IReadOnlyList<ArchitectureViolation> selectorSafetyViolations,
+        out bool isComplete) =>
+        _publicApiSurfaceAnalysisService.CapturePublicApiSurface(
+            contract, out missingAssemblies, out selectorSafetyViolations, out isComplete);
 
     public List<ArchitectureViolation> CheckFrameworkDependencyContract(ArchitectureFrameworkReferenceContract contract) =>
         _frameworkReferenceAnalysisService.CheckFrameworkDependencyContract(contract);

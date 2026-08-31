@@ -10,6 +10,7 @@ using ArchLinterNet.Cli.Commands.Coverage.EntryPoint;
 using ArchLinterNet.Cli.Commands.Explain;
 using ArchLinterNet.Cli.Commands.Gate.EntryPoint;
 using ArchLinterNet.Cli.Commands.Graph;
+using ArchLinterNet.Cli.Commands.Measure.EntryPoint;
 using ArchLinterNet.Cli.Commands.Policy;
 using ArchLinterNet.Cli.Commands.PublicApi;
 using ArchLinterNet.Cli.Commands.Schema;
@@ -27,9 +28,9 @@ using NUnit.Framework;
 namespace ArchLinterNet.Cli.Tests;
 
 [TestFixture]
-public sealed class CliArchitectureTests
+public sealed partial class CliArchitectureTests
 {
-    private static readonly string[] _value = { "badge", "baseline", "cache", "change", "coverage", "graph", "explain", "gate", "history", "policy", "public-api", "scaffold", "schema" };
+    private static readonly string[] _value = { "badge", "baseline", "cache", "change", "coverage", "graph", "explain", "gate", "history", "measure", "policy", "public-api", "scaffold", "schema" };
     private static readonly string[] _value1 = { "generate", "update", "prune", "diff", "verify", "migrate" };
     private static readonly string[] _value2 = { "rule-1" };
     [Test]
@@ -54,6 +55,7 @@ public sealed class CliArchitectureTests
                 typeof(ExplainCommandModule),
                 typeof(GateCommandModule),
                 typeof(ArchLinterNet.Cli.Commands.History.EntryPoint.HistoryCommandModule),
+                typeof(MeasureCommandModule),
                 typeof(PolicyCommandModule),
                 typeof(PublicApiCommandModule),
                 typeof(ScaffoldCommandModule),
@@ -415,6 +417,8 @@ public sealed class CliArchitectureTests
 
         public ValidationOutcome? ForcedOutcome { get; init; }
 
+        public ArchitectureMetricMeasurementOutcome? ForcedMeasurementOutcome { get; init; }
+
         public bool TryParseGraphLevel(string value, out ArchitectureGraphLevel level)
         {
             level = ArchitectureGraphLevel.Namespace;
@@ -451,6 +455,11 @@ public sealed class CliArchitectureTests
 
         public ArchitectureAnalysisSnapshot CreateSnapshot(AnalysisSnapshotRequest request, ValidationTiming? timing) =>
             throw new NotSupportedException();
+
+        public ArchitectureMetricMeasurementOutcome Measure(
+            ArchitectureMetricMeasurementRequest request,
+            ValidationTiming? timing) =>
+            ForcedMeasurementOutcome ?? throw ExceptionToThrow ?? new NotSupportedException();
 
         public string FormatResultForCiArtifacts(
             string mode,
