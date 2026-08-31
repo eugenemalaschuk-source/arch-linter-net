@@ -175,6 +175,7 @@ public sealed class ImportedExternalDiagnosticProjectionTests
         ValidationOutcome publiclyFailedOutcome = PassingOutcome() with { Passed = false };
         ValidationOutcome publiclyFailedThenEmptyOutcome = publiclyFailedOutcome.WithImportedDiagnostics(
             ImportedExternalDiagnosticProjection.Empty);
+        var (deconstructedPassed, _, _, _, _, _, _, _, _, _, _, _) = strictOutcome;
         var strictResult = new ArchitectureValidationResult(new ArchitectureValidationResultParams(
             Passed: true,
             Violations: Array.Empty<ArchitectureViolation>(),
@@ -193,6 +194,7 @@ public sealed class ImportedExternalDiagnosticProjectionTests
         Assert.Multiple(() =>
         {
             Assert.That(strictOutcome.Passed, Is.False);
+            Assert.That(deconstructedPassed, Is.False);
             Assert.That(auditOutcome.Passed, Is.True);
             Assert.That(strictThenAuditOutcome.Passed, Is.True);
             Assert.That(strictThenAuditOutcome.ImportedDiagnosticFindings, Is.EqualTo(audit.Findings));
@@ -256,6 +258,67 @@ public sealed class ImportedExternalDiagnosticProjectionTests
                 Assert.That(comparison.New, Is.Empty);
                 Assert.That(comparison.Frozen, Has.Count.EqualTo(1));
                 Assert.That(comparison.Frozen.Single().Identity, Is.EqualTo(candidates.Single().Identity));
+            });
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    [Test]
+    public void ImportedBaseline_CaseDistinctLogicalEvidenceIdsRoundTripIndependently()
+    {
+        SarifSelectedExternalDiagnostic lowerCase = Selected(
+            "external-diagnostic:v2:case-lower",
+            SarifExternalDiagnosticGovernanceMode.Strict,
+            "case-lower-hash",
+            "case-run",
+            "lower-case source message",
+            "src/App/Lower.cs",
+            logicalEvidenceId: "scan");
+        SarifSelectedExternalDiagnostic upperCase = Selected(
+            "external-diagnostic:v2:case-upper",
+            SarifExternalDiagnosticGovernanceMode.Strict,
+            "case-upper-hash",
+            "case-run",
+            "upper-case source message",
+            "src/App/Upper.cs",
+            logicalEvidenceId: "Scan");
+        ArchitectureContractDocument policy = new()
+        {
+            ExternalEvidence =
+            [
+                ExternalEvidenceRequirement("scan"),
+                ExternalEvidenceRequirement("Scan"),
+            ],
+        };
+        IReadOnlyList<ArchitectureBaselineCandidate> candidates =
+            ArchitectureImportedDiagnosticBaselineProjector.ToBaselineCandidates(
+                new SarifExternalDiagnosticSelectionResult([lowerCase, upperCase]));
+        var generator = new ArchitectureBaselineGenerator();
+        ArchitectureBaselineDocument generated = generator.Generate(policy, candidates);
+        string path = Path.Combine(Path.GetTempPath(), "arch-linter-net-imported-baseline-casing-" + Guid.NewGuid() + ".yml");
+
+        try
+        {
+            File.WriteAllText(path, generator.Serialize(generated));
+            ArchitectureBaselineDocument loaded = new ArchitectureBaselineLoadingService().LoadFromPath(path);
+            ArchitectureBaselineLoadingService.MergeAndValidate(policy, loaded);
+            ArchitectureBaselineComparisonResult comparison = ArchitectureBaselineComparer.Compare(
+                policy,
+                loaded,
+                candidates,
+                "strict");
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(loaded.Baseline.StrictExternal.Select(entry => entry.Id),
+                    Is.EquivalentTo(["scan", "Scan"]));
+                Assert.That(comparison.New, Is.Empty);
+                Assert.That(comparison.Frozen, Has.Count.EqualTo(2));
+                Assert.That(comparison.Frozen.Select(entry => entry.ContractId),
+                    Is.EquivalentTo(["scan", "Scan"]));
             });
         }
         finally
@@ -368,7 +431,8 @@ public sealed class ImportedExternalDiagnosticProjectionTests
         string artifactHash,
         string runId,
         string message,
-        string path)
+        string path,
+        string logicalEvidenceId = "external.scan")
     {
         var source = new SarifEvidenceSourceDiagnostic(
             message,
@@ -380,14 +444,14 @@ public sealed class ImportedExternalDiagnosticProjectionTests
             project: "App",
             driverRuleTags: ["security"]);
         var provenance = new SarifEvidenceProvenance(
-            "external.scan",
+            logicalEvidenceId,
             "artifacts/analysis.sarif",
             artifactHash,
             "Example Analyzer",
             "1.2.3",
             runId,
             1,
-            new SarifEvidenceResolvedContext("external.scan", "repo", "revision", "scope"));
+            new SarifEvidenceResolvedContext(logicalEvidenceId, "repo", "revision", "scope"));
         return new SarifSelectedExternalDiagnostic(
             canonicalIdentity,
             source,
@@ -395,4 +459,13 @@ public sealed class ImportedExternalDiagnosticProjectionTests
             new SarifExternalDiagnosticFingerprint(SarifExternalDiagnosticFingerprintOrigin.Source, "source-fingerprint", "primary"),
             [provenance]);
     }
+
+    private static ArchitectureExternalEvidenceRequirement ExternalEvidenceRequirement(string id) => new()
+    {
+        Id = id,
+        Format = "sarif",
+        Required = true,
+        Tool = "Example Analyzer",
+        Run = "case-run",
+    };
 }

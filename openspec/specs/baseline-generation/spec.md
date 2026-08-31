@@ -607,10 +607,26 @@ it as a native contract ID. This explicit ownership resolution SHALL preserve th
 baseline group and structured identity semantics, and SHALL NOT materialize the imported ignore in
 a native contract matcher.
 
+External-evidence logical IDs are exact ordinal identities throughout validation, baseline loading,
+and comparison: `scan` and `Scan` are distinct when the policy declares both. To keep imported
+baseline ownership unambiguous while retaining the strict/audit external baseline groups, a policy
+SHALL NOT reuse (including only a case change) an `external_evidence[].id` as an ID in
+`contracts.strict_external` or `contracts.audit_external`.
+
 #### Scenario: Native and imported candidates remain distinct
 - **WHEN** a native finding and an imported diagnostic have similar display text or source labels
 - **THEN** their structured baseline candidates remain distinct unless their full canonical
   identities are exactly equal
+
+#### Scenario: Case-distinct imported controls remain distinct
+- **WHEN** a policy declares external-evidence IDs `scan` and `Scan`
+- **THEN** imported baseline generation, loading, and exact comparison preserve two distinct
+  logical controls
+
+#### Scenario: Imported and native external IDs cannot collide
+- **WHEN** a policy reuses one ID in external evidence and a native strict or audit external
+  contract
+- **THEN** policy validation rejects the declaration before baseline generation
 
 #### Scenario: Imported external evidence completes a baseline round trip
 - **WHEN** a current imported external-diagnostic candidate is generated, serialized, loaded into

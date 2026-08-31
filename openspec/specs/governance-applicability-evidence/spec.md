@@ -228,15 +228,23 @@ the families that opt in:
 
 Each family SHALL make its own exact subject and declaration semantics explicit
 when it implements a control; it SHALL use this matrix rather than inventing a
-parallel result envelope. The external-diagnostics family SHALL convert the
-reader's typed trust outcome to its applicability record without deriving
-evaluable state from an empty diagnostics collection.
+parallel result envelope. The external-diagnostics family SHALL convert the reader's typed trust
+outcome to its applicability record without deriving evaluable state from an empty diagnostics
+collection. For an authorization with `require_matches: true`, it SHALL additionally require
+completion evidence for that exact ordinal logical evidence ID from #521; the presence of a
+selection result for another control is not completion evidence.
 
 #### Scenario: Valid current SARIF with no selected findings
 - **WHEN** an external-diagnostics control receives a valid, successful,
   current-context SARIF run with zero selected diagnostics
 - **THEN** its record is `evaluable` and distinguishes that state from a missing
   or stale required run
+
+#### Scenario: Partial selection fails closed per external evidence control
+- **WHEN** two valid external-evidence controls require matches and selection completed only one
+  of their logical IDs
+- **THEN** the completed control may be evaluable, while the other is `unassessable` with stale
+  declaration evidence
 
 #### Scenario: Optional external evidence is not a failed required run
 - **WHEN** an explicitly optional external-evidence control has no supplied

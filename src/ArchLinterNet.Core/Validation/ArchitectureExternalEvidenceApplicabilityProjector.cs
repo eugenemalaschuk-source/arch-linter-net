@@ -128,6 +128,9 @@ public static class ArchitectureExternalEvidenceApplicabilityProjector
             .Select(mismatch => mismatch.LogicalEvidenceId)
             .ToHashSet(StringComparer.Ordinal)
             ?? new HashSet<string>(StringComparer.Ordinal);
+        HashSet<string> selectionProcessedLogicalEvidenceIds = selection?.ProcessedLogicalEvidenceIds
+            .ToHashSet(StringComparer.Ordinal)
+            ?? new HashSet<string>(StringComparer.Ordinal);
 
         return readResults
             .Select(readResult =>
@@ -142,7 +145,7 @@ public static class ArchitectureExternalEvidenceApplicabilityProjector
             .Select(group => CreateRecord(
                 group.Key,
                 group.OrderBy(ReadResultSortKey, StringComparer.Ordinal).ToArray(),
-                selection is not null,
+                selectionProcessedLogicalEvidenceIds.Contains(group.Key),
                 selectionMismatches.Contains(group.Key),
                 RequiresSelection(group.Key, group, requirementsById)))
             .OrderBy(record => record.ControlIdentity, StringComparer.Ordinal)
@@ -155,7 +158,7 @@ public static class ArchitectureExternalEvidenceApplicabilityProjector
     private static ArchitectureApplicabilityRecord CreateRecord(
         string logicalId,
         IReadOnlyList<SarifEvidenceReadResult> readResults,
-        bool selectionProvided,
+        bool selectionCompleted,
         bool hasSelectionMismatch,
         bool requiresSelection)
     {
@@ -168,7 +171,7 @@ public static class ArchitectureExternalEvidenceApplicabilityProjector
                 or SarifEvidenceTrustStatus.MissingOptionalInput)
             && readResults.Any(readResult => readResult.Status == SarifEvidenceTrustStatus.Valid))
         {
-            if (hasSelectionMismatch || requiresSelection && !selectionProvided)
+            if (hasSelectionMismatch || requiresSelection && !selectionCompleted)
             {
                 state = ArchitectureApplicabilityRecordState.Unassessable;
                 reasonCode = ArchitectureApplicabilityReasonCodes.StaleDeclaration;

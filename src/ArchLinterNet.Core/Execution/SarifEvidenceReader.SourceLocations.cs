@@ -113,14 +113,18 @@ public sealed partial class SarifEvidenceReader
             return false;
         }
 
-        // An empty physicalLocation carries no usable source fact. Preserve a real path or region,
-        // but collapse `{ "physicalLocation": {} }` to no location so downstream normalized
-        // findings never serialize an all-null location that violates their own schema.
-        location = path is null && region is null
+        // A location must carry a normalized-schema anchor. A path always anchors it; without a
+        // path only a start line or character offset does. Empty and column-only SARIF regions
+        // contain no usable primary-location fact, so collapse them instead of serializing an
+        // all-null/anchorless normalized location.
+        location = path is null && !HasNormalizedLocationAnchor(region)
             ? null
             : new SarifEvidenceSourceLocation(path, region);
         return true;
     }
+
+    private static bool HasNormalizedLocationAnchor(SarifEvidenceSourceRegion? region) =>
+        region?.StartLine is not null || region?.CharOffset is not null;
 
     private static bool TryReadRunArtifacts(
         JsonElement run,

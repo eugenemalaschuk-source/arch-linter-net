@@ -60,6 +60,7 @@ public sealed class SarifExternalDiagnosticSelectorTests
         Assert.Multiple(() =>
         {
             Assert.That(result.FilterMismatches, Is.Empty);
+            Assert.That(result.ProcessedLogicalEvidenceIds, Is.EqualTo(["external.scan"]));
             Assert.That(strict.Fingerprint, Is.EqualTo(new SarifExternalDiagnosticFingerprint(
                 SarifExternalDiagnosticFingerprintOrigin.Source,
                 "a-value",
@@ -71,6 +72,30 @@ public sealed class SarifExternalDiagnosticSelectorTests
             Assert.That(audit.Fingerprint.Origin, Is.EqualTo(SarifExternalDiagnosticFingerprintOrigin.Deterministic));
             Assert.That(audit.Fingerprint.Value, Does.StartWith("sha256:"));
             Assert.That(audit.Fingerprint.Value, Does.Match("^sha256:[0-9a-f]{64}$"));
+        });
+    }
+
+    [Test]
+    public void Select_RecordsAProcessedControlWhenNoDiagnosticIsSelected()
+    {
+        ArchitectureExternalEvidenceRequirement requirement = Requirement(
+            ruleIds: ["SEC404"],
+            severity: new Dictionary<string, string> { ["error"] = "strict" });
+        SarifEvidenceReadResult evidence = Read(
+            requirement,
+            "zero-result.sarif",
+            Results(Result("SEC100", "error", "src/App/One.cs", "not selected")));
+
+        SarifExternalDiagnosticSelectionResult result = new SarifExternalDiagnosticSelector().Select(
+        [
+            new SarifExternalDiagnosticSelectionInput(evidence),
+        ]);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(result.Diagnostics, Is.Empty);
+            Assert.That(result.FilterMismatches, Is.Empty);
+            Assert.That(result.ProcessedLogicalEvidenceIds, Is.EqualTo(["external.scan"]));
         });
     }
 

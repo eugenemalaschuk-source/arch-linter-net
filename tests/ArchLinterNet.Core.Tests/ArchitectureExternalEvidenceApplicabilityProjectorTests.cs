@@ -235,6 +235,36 @@ public sealed class ArchitectureExternalEvidenceApplicabilityProjectorTests
     }
 
     [Test]
+    public void Project_RequireMatchesFailsClosedForAControlMissingFromAnOtherwiseNonEmptySelection()
+    {
+        ArchitectureExternalEvidenceRequirement first = RequireMatchesRequirement("external.a");
+        ArchitectureExternalEvidenceRequirement second = RequireMatchesRequirement("external.b");
+        SarifExternalDiagnosticSelectionResult selection = new(
+            diagnostics: null,
+            filterMismatches: null,
+            processedLogicalEvidenceIds: ["external.a"]);
+
+        (_, IReadOnlyList<ArchitectureApplicabilityRecord> records) =
+            ArchitectureExternalEvidenceApplicabilityProjector.Project(
+                [first, second],
+                [
+                    ReadResult("external.a", SarifEvidenceTrustStatus.Valid),
+                    ReadResult("external.b", SarifEvidenceTrustStatus.Valid),
+                ],
+                selection);
+
+        ArchitectureApplicabilityRecord firstRecord = records.Single(record => record.ControlIdentity == "external.a");
+        ArchitectureApplicabilityRecord secondRecord = records.Single(record => record.ControlIdentity == "external.b");
+        Assert.Multiple(() =>
+        {
+            Assert.That(firstRecord.State, Is.EqualTo(ArchitectureApplicabilityRecordState.Evaluable));
+            Assert.That(secondRecord.State, Is.EqualTo(ArchitectureApplicabilityRecordState.Unassessable));
+            Assert.That(secondRecord.Reasons.Select(reason => reason.Code), Is.EqualTo([
+                ArchitectureApplicabilityReasonCodes.StaleDeclaration]));
+        });
+    }
+
+    [Test]
     public void Project_CapturedRequireMatchesFailsClosedEvenWhenCallerSuppliesAnUnfilteredDeclaration()
     {
         (_, IReadOnlyList<ArchitectureApplicabilityRecord> records) =
@@ -304,6 +334,17 @@ public sealed class ArchitectureExternalEvidenceApplicabilityProjectorTests
             Tool = "Acme.Scanner",
             Run = "assessment-42",
         };
+
+    private static ArchitectureExternalEvidenceRequirement RequireMatchesRequirement(string id)
+    {
+        ArchitectureExternalEvidenceRequirement requirement = Requirement(id);
+        requirement.DiagnosticFilter = new ArchitectureExternalEvidenceDiagnosticFilter
+        {
+            RuleIds = ["SEC404"],
+            RequireMatches = true,
+        };
+        return requirement;
+    }
 
     private static SarifEvidenceReadResult ReadResult(
         string logicalId,

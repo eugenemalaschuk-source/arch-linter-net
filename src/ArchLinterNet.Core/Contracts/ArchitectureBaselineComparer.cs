@@ -35,7 +35,7 @@ public static class ArchitectureBaselineComparer
             BuildCanonicalIdsByGroup(policyDocument.Contracts);
         Dictionary<string, string> externalEvidenceIds = policyDocument.ExternalEvidence
             .Where(requirement => !string.IsNullOrWhiteSpace(requirement.Id))
-            .ToDictionary(requirement => requirement.Id, requirement => requirement.Id, StringComparer.OrdinalIgnoreCase);
+            .ToDictionary(requirement => requirement.Id, requirement => requirement.Id, StringComparer.Ordinal);
 
         foreach (var groupName in ArchitectureBaselineContractGroups.GroupNames)
         {

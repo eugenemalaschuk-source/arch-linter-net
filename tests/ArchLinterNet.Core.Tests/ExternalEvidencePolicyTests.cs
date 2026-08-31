@@ -1,4 +1,6 @@
 using ArchLinterNet.Core.Contracts;
+using ArchLinterNet.Core.Contracts.Families;
+using ArchLinterNet.Core.Contracts.Validators;
 using ArchLinterNet.Core.Model;
 using NUnit.Framework;
 
@@ -204,6 +206,46 @@ public sealed class ExternalEvidencePolicyTests
         Assert.That(exception.Message, Does.Contain("duplicate id 'static-analysis'"));
     }
 
+    [TestCase("static-analysis")]
+    [TestCase("STATIC-ANALYSIS")]
+    public void Validate_ExternalEvidenceIdCannotOverlapANativeExternalContractId(string externalEvidenceId)
+    {
+        var document = new ArchitectureContractDocument
+        {
+            Contracts = new ArchitectureContractGroups
+            {
+                StrictExternal =
+                [
+                    new ArchitectureExternalDependencyContract { Id = "static-analysis" },
+                ],
+            },
+            ExternalEvidence =
+            [
+                Requirement(externalEvidenceId),
+            ],
+        };
+
+        InvalidOperationException exception = Assert.Throws<InvalidOperationException>(
+            () => new ExternalEvidencePolicyValidator().Validate(document))!;
+
+        Assert.That(exception.Message, Does.Contain("must not overlap"));
+    }
+
+    [Test]
+    public void Validate_CaseDistinctExternalEvidenceIdsRemainDistinctLogicalControls()
+    {
+        var document = new ArchitectureContractDocument
+        {
+            ExternalEvidence =
+            [
+                Requirement("scan"),
+                Requirement("Scan"),
+            ],
+        };
+
+        Assert.DoesNotThrow(() => new ExternalEvidencePolicyValidator().Validate(document));
+    }
+
     [TestCase("", "non-blank")]
     [TestCase("xml", "exactly 'sarif'")]
     public void Load_InvalidFormat_IsRejected(string format, string expectedMessage)
@@ -309,6 +351,18 @@ public sealed class ExternalEvidencePolicyTests
             require_revision: true
             require_scope: false
         """;
+
+    private static ArchitectureExternalEvidenceRequirement Requirement(string id) => new()
+    {
+        Id = id,
+        Format = "sarif",
+        Required = true,
+        Tool = "Semgrep",
+        ToolVersion = "1.0",
+        Run = "security",
+        RequireRepository = true,
+        RequireRevision = true,
+    };
 
     private static string ValidDeclarationWithFilter() => """
           - id: static-analysis

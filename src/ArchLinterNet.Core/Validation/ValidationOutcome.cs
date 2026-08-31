@@ -69,6 +69,39 @@ public sealed record ValidationOutcome
     public IReadOnlyCollection<ArchitectureClassificationConflict> ClassificationConflicts { get; init; }
     public IReadOnlyCollection<ArchitectureClassificationMetadataFailure> ClassificationMetadataFailures { get; init; }
 
+    /// <summary>
+    /// Preserves the public positional-record deconstruction shape that callers used before the
+    /// outcome gained an explicit native pass-state. The value returned for <paramref name="Passed"/>
+    /// is the current effective state, exactly as it was for the original positional record.
+    /// </summary>
+    public void Deconstruct(
+        out bool Passed,
+        out IReadOnlyCollection<ArchitectureViolation> Violations,
+        out IReadOnlyCollection<string> Cycles,
+        out IReadOnlyCollection<ArchitectureViolation> CoverageFindings,
+        out string CoverageConfig,
+        out IReadOnlyList<ArchitectureUnmatchedIgnoredViolation> UnmatchedIgnoredViolations,
+        out string UnmatchedIgnoredViolationsConfig,
+        out IReadOnlyCollection<PolicyConsistencyDiagnostic> PolicyConsistencyFindings,
+        out string PolicyConsistencyConfig,
+        out IReadOnlyCollection<ArchitectureCoverageSummary> CoverageSummaries,
+        out IReadOnlyCollection<ArchitectureClassificationConflict> ClassificationConflicts,
+        out IReadOnlyCollection<ArchitectureClassificationMetadataFailure> ClassificationMetadataFailures)
+    {
+        Passed = this.Passed;
+        Violations = this.Violations;
+        Cycles = this.Cycles;
+        CoverageFindings = this.CoverageFindings;
+        CoverageConfig = this.CoverageConfig;
+        UnmatchedIgnoredViolations = this.UnmatchedIgnoredViolations;
+        UnmatchedIgnoredViolationsConfig = this.UnmatchedIgnoredViolationsConfig;
+        PolicyConsistencyFindings = this.PolicyConsistencyFindings;
+        PolicyConsistencyConfig = this.PolicyConsistencyConfig;
+        CoverageSummaries = this.CoverageSummaries;
+        ClassificationConflicts = this.ClassificationConflicts;
+        ClassificationMetadataFailures = this.ClassificationMetadataFailures;
+    }
+
     // Declared as an init-only property outside the primary constructor, not as a 13th positional
     // parameter, so existing positional `new ValidationOutcome(...)` call sites and Deconstruct
     // usages compiled against the prior (12-parameter) shape keep working unchanged; callers who

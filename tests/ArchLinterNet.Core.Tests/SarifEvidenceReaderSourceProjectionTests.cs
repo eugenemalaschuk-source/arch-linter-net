@@ -1,6 +1,9 @@
 using ArchLinterNet.Core.Contracts;
 using ArchLinterNet.Core.Execution;
 using ArchLinterNet.Core.Model;
+using ArchLinterNet.Core.Reporting;
+using ArchLinterNet.Core.Schema;
+using Json.Schema;
 using NUnit.Framework;
 
 namespace ArchLinterNet.Core.Tests;
@@ -330,6 +333,41 @@ public sealed class SarifEvidenceReaderSourceProjectionTests
         {
             Assert.That(result.Status, Is.EqualTo(SarifEvidenceTrustStatus.Valid), result.Detail);
             Assert.That(result.SourceDiagnostics.Single().PrimaryLocation, Is.Null);
+        });
+    }
+
+    [TestCase("{}")]
+    [TestCase("{\"startColumn\":4}")]
+    public void Read_PathlessAnchorlessRegionCollapsesBeforeImportedFindingSchemaProjection(string region)
+    {
+        _repository.AddUtf8File(
+            "scan.sarif",
+            Sarif(string.Empty,
+                "{\"ruleId\":\"SEC100\",\"message\":{\"text\":\"anchorless region\"},\"level\":\"error\",\"locations\":[{\"physicalLocation\":{\"region\":"
+                + region + "}}]}"));
+
+        SarifEvidenceReadResult read = new SarifEvidenceReader().Read(
+            Requirement(),
+            _repository.Root,
+            new SarifEvidenceArtifactReference("scan.sarif", "external.scan"),
+            new SarifEvidenceAssessmentContext("repo", "revision"));
+        SarifExternalDiagnosticSelectionResult selection = new SarifExternalDiagnosticSelector().Select(
+        [
+            new SarifExternalDiagnosticSelectionInput(read),
+        ]);
+        ArchitectureFinding finding = ArchitectureImportedDiagnosticProjector.Project(selection).Findings.Single();
+        var registry = new PackagedSchemaRegistry();
+        Assert.That(registry.TryRead("normalized-finding", out string schemaText), Is.True);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(read.Status, Is.EqualTo(SarifEvidenceTrustStatus.Valid), read.Detail);
+            Assert.That(read.SourceDiagnostics.Single().PrimaryLocation, Is.Null);
+            Assert.That(finding.SourceLocation, Is.Null);
+            Assert.That(JsonSchema.FromText(schemaText).Evaluate(
+                System.Text.Json.JsonSerializer.SerializeToElement(
+                    ArchitectureDiagnosticFormatter.FormatNormalizedFindingForJson(finding))).IsValid,
+                Is.True);
         });
     }
 

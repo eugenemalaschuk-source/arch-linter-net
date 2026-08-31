@@ -80,11 +80,18 @@ and SHALL NOT write, suppress, or reinterpret a baseline entry during projection
 
 ### Requirement: Empty source locations are absent from normalized findings
 The normalized finding projection SHALL emit a source location only when the trusted source
-location has at least one schema-valid anchor: an artifact path, region line, or region character
-offset. An empty SARIF `physicalLocation` SHALL be represented as no source location, not as an
-all-null location object.
+location has at least one schema-valid anchor: an artifact path, region start line, or region
+character offset. An empty SARIF `physicalLocation`, an empty `region`, or a pathless region that
+contains only column/end values SHALL be represented as no source location, not as an all-null or
+anchorless location object.
 
 #### Scenario: Empty physical location remains schema-valid
 - **WHEN** a trusted SARIF diagnostic declares `physicalLocation: {}`
+- **THEN** its normalized finding has no source location and validates against the packaged
+  normalized-finding schema
+
+#### Scenario: Anchorless region remains schema-valid
+- **WHEN** a trusted SARIF diagnostic declares `physicalLocation.region: {}` or a pathless region
+  containing only `startColumn`
 - **THEN** its normalized finding has no source location and validates against the packaged
   normalized-finding schema

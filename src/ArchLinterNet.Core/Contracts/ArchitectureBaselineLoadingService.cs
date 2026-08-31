@@ -216,7 +216,7 @@ public sealed class ArchitectureBaselineLoadingService : IArchitectureBaselineLo
             _groups = document.Contracts;
             _externalEvidenceIds = new HashSet<string>(
                 document.ExternalEvidence.Select(requirement => requirement.Id),
-                StringComparer.OrdinalIgnoreCase);
+                StringComparer.Ordinal);
         }
 
         public List<(string GroupName, string ContractId)> MergeGroup(

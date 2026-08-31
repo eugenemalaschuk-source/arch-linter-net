@@ -6040,6 +6040,7 @@ sealed class ArchLinterNet.Core.Validation.ValidationOutcome : System.IEquatable
   property System.Collections.Generic.IReadOnlyList<string> DiscoveredProjectPaths {get;init;}
   property System.Collections.Generic.IReadOnlyList<string> PolicyImportPaths {get;init;}
   property System.Collections.Generic.IReadOnlyList<string> ResolvedAssemblyPaths {get;init;}
+  property bool NativePassed {get;}
   property bool Passed {get;init;}
   property bool PreflightBlocked {get;init;}
   property string CoverageConfig {get;init;}
