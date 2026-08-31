@@ -398,6 +398,20 @@
             "$ref": "#/$defs/baselineContractEntryV1"
           },
           "default": []
+        },
+        "strict_metric_budgets": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/baselineContractEntryV1"
+          },
+          "default": []
+        },
+        "audit_metric_budgets": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/baselineContractEntryV1"
+          },
+          "default": []
         }
       }
     },
@@ -749,6 +763,20 @@
           "default": []
         },
         "audit_coverage": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/baselineContractEntryV2"
+          },
+          "default": []
+        },
+        "strict_metric_budgets": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/baselineContractEntryV2"
+          },
+          "default": []
+        },
+        "audit_metric_budgets": {
           "type": "array",
           "items": {
             "$ref": "#/$defs/baselineContractEntryV2"

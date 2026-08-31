@@ -20,8 +20,8 @@ public sealed class ArchitectureContractFamilyBindingsTests
     {
         var familyIds = ArchitectureContractFamilyBindings.All.Select(b => b.FamilyId).ToList();
 
-        Assert.That(familyIds, Has.Count.EqualTo(32));
-        Assert.That(familyIds.Distinct(StringComparer.Ordinal).Count(), Is.EqualTo(32));
+        Assert.That(familyIds, Has.Count.EqualTo(33));
+        Assert.That(familyIds.Distinct(StringComparer.Ordinal).Count(), Is.EqualTo(33));
     }
 
     [Test]
@@ -72,6 +72,7 @@ public sealed class ArchitectureContractFamilyBindingsTests
             { new ArchitectureInterfaceImplementationContract { Name = "n", Id = "interface_implementation" } },
         StrictComposition = { new ArchitectureCompositionContract { Name = "n", Id = "composition" } },
         StrictCoverage = { new ArchitectureCoverageContract { Name = "n", Id = "coverage" } },
+        StrictMetricBudgets = { new ArchitectureMetricBudgetContract { Id = "metric_budgets", Metric = "metric" } },
         StrictPortBoundaries = { new ArchitecturePortBoundaryContract { Name = "n", Id = "port_boundary" } },
     };
 
@@ -82,7 +83,7 @@ public sealed class ArchitectureContractFamilyBindingsTests
 
         var strictIds = groups.AllStrict.Select(c => c.Id).ToList();
 
-        Assert.That(strictIds, Has.Count.EqualTo(26));
+        Assert.That(strictIds, Has.Count.EqualTo(27));
         Assert.That(strictIds, Does.Not.Contain("layer_template"));
     }
 

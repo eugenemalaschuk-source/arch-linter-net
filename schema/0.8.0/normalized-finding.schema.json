@@ -1,0 +1,601 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://archlinternet.dev/schema/0.8.0/normalized-finding.schema.json",
+  "title": "ArchLinterNet normalized finding v3",
+  "type": "object",
+  "required": [
+    "schema_version", "kind", "canonical_identity", "mode", "severity",
+    "message_code", "policy_origin", "source_location", "baseline_state", "details"
+  ],
+  "properties": {
+    "schema_version": { "const": 3 },
+    "kind": {
+      "enum": [
+        "dependency", "cycle", "unmatched_ignore", "configuration", "external_dependency",
+        "policy_consistency", "package_dependency", "type_placement", "public_api_surface",
+        "attribute_usage", "inheritance", "interface_implementation", "composition",
+        "project_metadata", "context_dependency", "context_allow_only", "port_boundary",
+        "layout_convention", "package_allow_only", "framework_reference",
+        "framework_reference_allow_only", "build_state_preflight", "baseline",
+        "architecture_policy_error", "applicability", "metric_budget"
+      ]
+    },
+    "contract": { "type": ["string", "null"] },
+    "contract_id": { "type": ["string", "null"] },
+    "canonical_identity": { "type": "string", "minLength": 1 },
+    "mode": { "enum": ["strict", "audit", null] },
+    "severity": { "enum": ["error", "warning", null] },
+    "message_code": {
+      "enum": [
+        "dependency", "cycle", "unmatched_ignore", "configuration", "external_dependency",
+        "policy_consistency", "package_dependency", "type_placement", "public_api_surface",
+        "attribute_usage", "inheritance", "interface_implementation", "composition",
+        "project_metadata", "context_dependency", "context_allow_only", "port_boundary",
+        "layout_convention", "package_allow_only", "framework_reference",
+        "framework_reference_allow_only", "build_state_preflight", "baseline",
+        "architecture_policy_error", "applicability", "metric_budget"
+      ]
+    },
+    "policy_origin": {
+      "anyOf": [
+        { "$ref": "#/$defs/policyOrigin" },
+        { "type": "null" }
+      ]
+    },
+    "source_location": {
+      "anyOf": [
+        { "$ref": "#/$defs/sourceLocation" },
+        { "type": "null" }
+      ]
+    },
+    "baseline_state": {
+      "enum": [
+        "new", "matched", "resolved", "stale", "changed", "ambiguous",
+        "configuration-error", null
+      ]
+    },
+    "details": { "type": "object" }
+  },
+  "oneOf": [
+    { "$ref": "#/$defs/dependency" },
+    { "$ref": "#/$defs/cycle" },
+    { "$ref": "#/$defs/unmatchedIgnore" },
+    { "$ref": "#/$defs/configuration" },
+    { "$ref": "#/$defs/externalDependency" },
+    { "$ref": "#/$defs/policyConsistency" },
+    { "$ref": "#/$defs/packageDependency" },
+    { "$ref": "#/$defs/typePlacement" },
+    { "$ref": "#/$defs/publicApiSurface" },
+    { "$ref": "#/$defs/attributeUsage" },
+    { "$ref": "#/$defs/inheritance" },
+    { "$ref": "#/$defs/interfaceImplementation" },
+    { "$ref": "#/$defs/composition" },
+    { "$ref": "#/$defs/projectMetadata" },
+    { "$ref": "#/$defs/contextDependency" },
+    { "$ref": "#/$defs/contextAllowOnly" },
+    { "$ref": "#/$defs/portBoundary" },
+    { "$ref": "#/$defs/layoutConvention" },
+    { "$ref": "#/$defs/packageAllowOnly" },
+    { "$ref": "#/$defs/frameworkReference" },
+    { "$ref": "#/$defs/frameworkReferenceAllowOnly" },
+    { "$ref": "#/$defs/buildStatePreflight" },
+    { "$ref": "#/$defs/baseline" },
+    { "$ref": "#/$defs/architecturePolicyError" },
+    { "$ref": "#/$defs/applicability" },
+    { "$ref": "#/$defs/metricBudget" }
+  ],
+  "$defs": {
+    "policyOrigin": {
+      "type": "object",
+      "required": [
+        "root_path", "source_path", "role", "yaml_path", "line", "column",
+        "source_ordinal", "import_chain"
+      ],
+      "properties": {
+        "root_path": { "type": "string", "minLength": 1 },
+        "source_path": { "type": "string", "minLength": 1 },
+        "role": { "enum": ["root", "fragment"] },
+        "yaml_path": { "type": "string", "minLength": 1 },
+        "line": { "type": ["integer", "null"], "minimum": 1 },
+        "column": { "type": ["integer", "null"], "minimum": 1 },
+        "source_ordinal": { "type": "integer", "minimum": 0 },
+        "import_chain": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "declaring_source_path": { "type": "string" },
+        "authored_import_path": { "type": "string" },
+        "contract_family": { "type": "string" },
+        "contract_id": { "type": "string" }
+      }
+    },
+    "sourceLocation": {
+      "type": "object",
+      "required": ["path", "line", "column"],
+      "properties": {
+        "path": { "type": "string", "minLength": 1 },
+        "line": { "type": ["integer", "null"], "minimum": 1 },
+        "column": { "type": ["integer", "null"], "minimum": 1 }
+      },
+      "additionalProperties": false
+    },
+    "ordinaryDetails": {
+      "type": "object",
+      "required": [
+        "detail_kind", "contract", "contract_id", "source",
+        "forbidden_namespace", "forbidden_references"
+      ],
+      "properties": {
+        "detail_kind": { "type": "string" },
+        "contract": { "type": "string" },
+        "contract_id": { "type": ["string", "null"] },
+        "source": { "type": "string", "minLength": 1 },
+        "forbidden_namespace": { "type": "string" },
+        "forbidden_references": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      }
+    },
+    "ordinaryBranch": {
+      "type": "object",
+      "required": ["kind", "details"]
+    },
+    "dependency": {
+      "allOf": [
+        { "$ref": "#/$defs/ordinaryBranch" },
+        { "properties": { "kind": { "const": "dependency" }, "details": { "$ref": "#/$defs/dependencyDetails" } } }
+      ]
+    },
+    "dependencyDetails": {
+      "allOf": [
+        { "$ref": "#/$defs/ordinaryDetails" },
+        { "properties": { "detail_kind": { "const": "dependency" } } }
+      ]
+    },
+    "configuration": {
+      "allOf": [
+        { "$ref": "#/$defs/ordinaryBranch" },
+        { "properties": { "kind": { "const": "configuration" }, "details": { "$ref": "#/$defs/configurationDetails" } } }
+      ]
+    },
+    "configurationDetails": {
+      "allOf": [
+        { "$ref": "#/$defs/ordinaryDetails" },
+        { "properties": { "detail_kind": { "const": "configuration" } } }
+      ]
+    },
+    "externalDependency": {
+      "allOf": [
+        { "$ref": "#/$defs/ordinaryBranch" },
+        { "properties": { "kind": { "const": "external_dependency" }, "details": { "$ref": "#/$defs/externalDependencyDetails" } } }
+      ]
+    },
+    "externalDependencyDetails": {
+      "allOf": [
+        { "$ref": "#/$defs/ordinaryDetails" },
+        {
+          "required": ["forbidden_external_group"],
+          "properties": {
+            "detail_kind": { "const": "external_dependency" },
+            "forbidden_external_group": { "type": "string" }
+          }
+        }
+      ]
+    },
+    "packageDependency": {
+      "allOf": [
+        { "$ref": "#/$defs/ordinaryBranch" },
+        { "properties": { "kind": { "const": "package_dependency" }, "details": { "$ref": "#/$defs/packageDependencyDetails" } } }
+      ]
+    },
+    "packageDependencyDetails": {
+      "allOf": [
+        { "$ref": "#/$defs/ordinaryDetails" },
+        {
+          "required": ["forbidden_package_group"],
+          "properties": {
+            "detail_kind": { "const": "package_dependency" },
+            "forbidden_package_group": { "type": "string" }
+          }
+        }
+      ]
+    },
+    "packageAllowOnly": {
+      "allOf": [
+        { "$ref": "#/$defs/ordinaryBranch" },
+        { "properties": { "kind": { "const": "package_allow_only" }, "details": { "$ref": "#/$defs/packageAllowOnlyDetails" } } }
+      ]
+    },
+    "packageAllowOnlyDetails": {
+      "allOf": [
+        { "$ref": "#/$defs/ordinaryDetails" },
+        {
+          "required": ["allowed_package_groups"],
+          "properties": {
+            "detail_kind": { "const": "package_allow_only" },
+            "allowed_package_groups": { "type": "array", "items": { "type": "string" } }
+          }
+        }
+      ]
+    },
+    "frameworkReference": {
+      "allOf": [
+        { "$ref": "#/$defs/ordinaryBranch" },
+        { "properties": { "kind": { "const": "framework_reference" }, "details": { "$ref": "#/$defs/frameworkReferenceDetails" } } }
+      ]
+    },
+    "frameworkReferenceDetails": {
+      "allOf": [
+        { "$ref": "#/$defs/ordinaryDetails" },
+        {
+          "required": ["forbidden_framework_group"],
+          "properties": {
+            "detail_kind": { "const": "framework_reference" },
+            "forbidden_framework_group": { "type": "string" }
+          }
+        }
+      ]
+    },
+    "frameworkReferenceAllowOnly": {
+      "allOf": [
+        { "$ref": "#/$defs/ordinaryBranch" },
+        { "properties": { "kind": { "const": "framework_reference_allow_only" }, "details": { "$ref": "#/$defs/frameworkReferenceAllowOnlyDetails" } } }
+      ]
+    },
+    "frameworkReferenceAllowOnlyDetails": {
+      "allOf": [
+        { "$ref": "#/$defs/ordinaryDetails" },
+        {
+          "required": ["allowed_framework_groups"],
+          "properties": {
+            "detail_kind": { "const": "framework_reference_allow_only" },
+            "allowed_framework_groups": { "type": "array", "items": { "type": "string" } }
+          }
+        }
+      ]
+    },
+    "typePlacement": { "$ref": "#/$defs/typePlacementBranch" },
+    "typePlacementBranch": {
+      "allOf": [
+        { "$ref": "#/$defs/ordinaryBranch" },
+        { "properties": { "kind": { "const": "type_placement" }, "details": { "$ref": "#/$defs/typePlacementDetails" } } }
+      ]
+    },
+    "typePlacementDetails": {
+      "allOf": [
+        { "$ref": "#/$defs/ordinaryDetails" },
+        { "properties": { "detail_kind": { "const": "type_placement" } } }
+      ]
+    },
+    "publicApiSurface": {
+      "allOf": [
+        { "$ref": "#/$defs/ordinaryBranch" },
+        { "properties": { "kind": { "const": "public_api_surface" }, "details": { "$ref": "#/$defs/publicApiSurfaceDetails" } } }
+      ]
+    },
+    "publicApiSurfaceDetails": {
+      "allOf": [
+        { "$ref": "#/$defs/ordinaryDetails" },
+        { "properties": { "detail_kind": { "const": "public_api_surface" } } }
+      ]
+    },
+    "attributeUsage": {
+      "allOf": [
+        { "$ref": "#/$defs/ordinaryBranch" },
+        { "properties": { "kind": { "const": "attribute_usage" }, "details": { "$ref": "#/$defs/attributeUsageDetails" } } }
+      ]
+    },
+    "attributeUsageDetails": {
+      "allOf": [
+        { "$ref": "#/$defs/ordinaryDetails" },
+        { "properties": { "detail_kind": { "const": "attribute_usage" } } }
+      ]
+    },
+    "inheritance": {
+      "allOf": [
+        { "$ref": "#/$defs/ordinaryBranch" },
+        { "properties": { "kind": { "const": "inheritance" }, "details": { "$ref": "#/$defs/inheritanceDetails" } } }
+      ]
+    },
+    "inheritanceDetails": {
+      "allOf": [
+        { "$ref": "#/$defs/ordinaryDetails" },
+        { "properties": { "detail_kind": { "const": "inheritance" } } }
+      ]
+    },
+    "interfaceImplementation": {
+      "allOf": [
+        { "$ref": "#/$defs/ordinaryBranch" },
+        { "properties": { "kind": { "const": "interface_implementation" }, "details": { "$ref": "#/$defs/interfaceImplementationDetails" } } }
+      ]
+    },
+    "interfaceImplementationDetails": {
+      "allOf": [
+        { "$ref": "#/$defs/ordinaryDetails" },
+        { "properties": { "detail_kind": { "const": "interface_implementation" } } }
+      ]
+    },
+    "composition": {
+      "allOf": [
+        { "$ref": "#/$defs/ordinaryBranch" },
+        { "properties": { "kind": { "const": "composition" }, "details": { "$ref": "#/$defs/compositionDetails" } } }
+      ]
+    },
+    "compositionDetails": {
+      "allOf": [
+        { "$ref": "#/$defs/ordinaryDetails" },
+        {
+          "required": ["matched_forbidden_api"],
+          "properties": {
+            "detail_kind": { "const": "composition" },
+            "matched_forbidden_api": { "type": "string" }
+          }
+        }
+      ]
+    },
+    "projectMetadata": {
+      "allOf": [
+        { "$ref": "#/$defs/ordinaryBranch" },
+        { "properties": { "kind": { "const": "project_metadata" }, "details": { "$ref": "#/$defs/projectMetadataDetails" } } }
+      ]
+    },
+    "projectMetadataDetails": {
+      "allOf": [
+        { "$ref": "#/$defs/ordinaryDetails" },
+        { "properties": { "detail_kind": { "const": "project_metadata" } } }
+      ]
+    },
+    "contextDependency": {
+      "allOf": [
+        { "$ref": "#/$defs/ordinaryBranch" },
+        { "properties": { "kind": { "const": "context_dependency" }, "details": { "$ref": "#/$defs/contextDependencyDetails" } } }
+      ]
+    },
+    "contextDependencyDetails": {
+      "allOf": [
+        { "$ref": "#/$defs/ordinaryDetails" },
+        { "properties": { "detail_kind": { "const": "context_dependency" } } }
+      ]
+    },
+    "contextAllowOnly": {
+      "allOf": [
+        { "$ref": "#/$defs/ordinaryBranch" },
+        { "properties": { "kind": { "const": "context_allow_only" }, "details": { "$ref": "#/$defs/contextAllowOnlyDetails" } } }
+      ]
+    },
+    "contextAllowOnlyDetails": {
+      "allOf": [
+        { "$ref": "#/$defs/ordinaryDetails" },
+        { "properties": { "detail_kind": { "const": "context_allow_only" } } }
+      ]
+    },
+    "portBoundary": {
+      "allOf": [
+        { "$ref": "#/$defs/ordinaryBranch" },
+        { "properties": { "kind": { "const": "port_boundary" }, "details": { "$ref": "#/$defs/portBoundaryDetails" } } }
+      ]
+    },
+    "portBoundaryDetails": {
+      "allOf": [
+        { "$ref": "#/$defs/ordinaryDetails" },
+        { "properties": { "detail_kind": { "const": "port_boundary" } } }
+      ]
+    },
+    "layoutConvention": {
+      "allOf": [
+        { "$ref": "#/$defs/ordinaryBranch" },
+        { "properties": { "kind": { "const": "layout_convention" }, "details": { "$ref": "#/$defs/layoutConventionDetails" } } }
+      ]
+    },
+    "layoutConventionDetails": {
+      "allOf": [
+        { "$ref": "#/$defs/ordinaryDetails" },
+        { "properties": { "detail_kind": { "const": "layout_convention" } } }
+      ]
+    },
+    "cycle": {
+      "type": "object",
+      "required": ["kind", "details"],
+      "properties": {
+        "kind": { "const": "cycle" },
+        "details": {
+          "type": "object",
+          "required": ["detail_kind", "contract", "contract_id", "path"],
+          "properties": {
+            "detail_kind": { "const": "cycle" },
+            "contract": { "type": "string" },
+            "contract_id": { "type": ["string", "null"] },
+            "path": { "type": "string", "minLength": 1 }
+          }
+        }
+      }
+    },
+    "unmatchedIgnore": {
+      "type": "object",
+      "required": ["kind", "details"],
+      "properties": {
+        "kind": { "const": "unmatched_ignore" },
+        "details": {
+          "type": "object",
+          "required": [
+            "detail_kind", "contract", "contract_id", "ignore_index",
+            "source_type", "forbidden_reference", "reason"
+          ],
+          "properties": {
+            "detail_kind": { "const": "unmatched_ignore" },
+            "contract": { "type": "string" },
+            "contract_id": { "type": ["string", "null"] },
+            "ignore_index": { "type": "integer", "minimum": 0 },
+            "source_type": { "type": "string" },
+            "forbidden_reference": { "type": "string" },
+            "reason": { "type": "string" }
+          }
+        }
+      }
+    },
+    "policyConsistency": {
+      "type": "object",
+      "required": ["kind", "details"],
+      "properties": {
+        "kind": { "const": "policy_consistency" },
+        "details": {
+          "type": "object",
+          "required": [
+            "detail_kind", "contract", "contract_id", "check_kind", "reason",
+            "conflicting_contract_ids", "conflicting_contract_names", "layers"
+          ],
+          "properties": {
+            "detail_kind": { "const": "policy_consistency" },
+            "contract": { "type": "string" },
+            "contract_id": { "type": ["string", "null"] },
+            "check_kind": { "type": "string" },
+            "reason": { "type": "string" },
+            "conflicting_contract_ids": { "type": "array", "items": { "type": "string" } },
+            "conflicting_contract_names": { "type": "array", "items": { "type": "string" } },
+            "layers": { "type": "array", "items": { "type": "string" } },
+            "representative_type": { "type": ["string", "null"] }
+          }
+        }
+      }
+    },
+    "buildStatePreflight": {
+      "type": "object",
+      "required": ["kind", "details"],
+      "properties": {
+        "kind": { "const": "build_state_preflight" },
+        "details": {
+          "type": "object",
+          "required": ["detail_kind", "contract", "contract_id", "state", "project_path", "assembly_name"],
+          "properties": {
+            "detail_kind": { "const": "build_state_preflight" },
+            "contract": { "type": "string" },
+            "contract_id": { "type": ["string", "null"] },
+            "state": { "type": "string" },
+            "project_path": { "type": "string" },
+            "assembly_name": { "type": "string" }
+          }
+        }
+      }
+    },
+    "baseline": {
+      "type": "object",
+      "required": ["kind", "details"],
+      "properties": {
+        "kind": { "const": "baseline" },
+        "details": {
+          "type": "object",
+          "required": [
+            "detail_kind", "contract", "contract_id", "contract_group", "source_type",
+            "forbidden_reference", "disposition", "suppresses", "identity"
+          ],
+          "properties": {
+            "detail_kind": { "const": "baseline" },
+            "contract": { "type": "string" },
+            "contract_id": { "type": ["string", "null"] },
+            "contract_group": { "type": "string" },
+            "source_type": { "type": "string" },
+            "forbidden_reference": { "type": "string" },
+            "disposition": { "type": "string" },
+            "suppresses": { "type": "boolean" },
+            "identity": { "type": ["object", "null"] }
+          }
+        }
+      }
+    },
+    "architecturePolicyError": {
+      "type": "object",
+      "required": ["kind", "details"],
+      "properties": {
+        "kind": { "const": "architecture_policy_error" },
+        "details": {
+          "type": "object",
+          "required": [
+            "detail_kind", "contract", "contract_id", "diagnostic_kind",
+            "error_category", "import_chain", "message"
+          ],
+          "properties": {
+            "detail_kind": { "const": "architecture_policy_error" },
+            "contract": { "type": "string" },
+            "contract_id": { "type": ["string", "null"] },
+            "diagnostic_kind": { "type": "string" },
+            "error_category": { "type": ["string", "null"] },
+            "import_chain": { "type": "array", "items": { "type": "string" } },
+            "message": { "type": "string" }
+          }
+        }
+      }
+    },
+    "metricBudget": {
+      "allOf": [
+        { "$ref": "#/$defs/ordinaryBranch" },
+        {
+          "properties": {
+            "kind": { "const": "metric_budget" },
+            "details": {
+              "allOf": [
+                { "$ref": "#/$defs/ordinaryDetails" },
+                {
+                  "required": [
+                    "budget_id", "metric_id", "metric_kind", "native_subject", "effective_scope",
+                    "measured_value", "breached_bound", "configured_limit", "contributor_count", "contributors"
+                  ],
+                  "properties": {
+                    "detail_kind": { "const": "metric_budget" },
+                    "budget_id": { "type": "string", "minLength": 1 },
+                    "metric_id": { "type": "string", "minLength": 1 },
+                    "metric_kind": { "type": "string", "minLength": 1 },
+                    "native_subject": { "type": ["string", "null"] },
+                    "effective_scope": { "type": "string", "minLength": 1 },
+                    "measured_value": { "type": "integer", "minimum": 0 },
+                    "breached_bound": { "enum": ["minimum", "maximum"] },
+                    "configured_limit": { "type": "integer", "minimum": 0 },
+                    "contributor_count": { "type": "integer", "minimum": 0 },
+                    "contributors": { "type": "array", "items": { "type": "string" } }
+                  }
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "applicability": {
+      "type": "object",
+      "required": ["kind", "details"],
+      "properties": {
+        "kind": { "const": "applicability" },
+        "details": { "$ref": "#/$defs/applicabilityDetails" }
+      }
+    },
+    "applicabilityDetails": {
+      "type": "object",
+      "required": [
+        "detail_kind", "contract", "contract_id", "control_identity", "family",
+        "membership", "state", "validated_state", "reason_code", "policy_identity", "provenance"
+      ],
+      "properties": {
+        "detail_kind": { "const": "applicability" },
+        "contract": { "type": "string" },
+        "contract_id": { "type": ["string", "null"] },
+        "control_identity": { "type": "string", "minLength": 1 },
+        "family": { "type": "string", "minLength": 1 },
+        "membership": { "enum": ["required", "optional", "not_applicable", null] },
+        "state": { "enum": ["evaluable", "not_applicable", "unassessable", null] },
+        "validated_state": { "enum": ["evaluable", "not_applicable", "unassessable", null] },
+        "reason_code": { "type": "string", "minLength": 1 },
+        "policy_identity": { "type": "string" },
+        "provenance": {
+          "type": "object",
+          "required": ["family", "control_identity", "policy_identity"],
+          "properties": {
+            "family": { "type": "string", "minLength": 1 },
+            "control_identity": { "type": "string", "minLength": 1 },
+            "policy_identity": { "type": "string" }
+          }
+        }
+      }
+    }
+  },
+  "additionalProperties": true
+}

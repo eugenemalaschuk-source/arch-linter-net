@@ -205,6 +205,7 @@ public static class ArchitectureFindingMapper
         ArchitectureDiagnosticKind.Baseline => "baseline",
         ArchitectureDiagnosticKind.ArchitecturePolicyError => "architecture_policy_error",
         ArchitectureDiagnosticKind.Applicability => "applicability",
+        ArchitectureDiagnosticKind.MetricBudget => "metric_budget",
         _ => kind.ToString().ToLowerInvariant()
     };
 
@@ -367,6 +368,9 @@ public static class ArchitectureFindingMapper
                 (null, PolicyErrorImportPosition(policyError), null, null,
                     policyError.PolicyLocation?.YamlPath ?? policyError.DiagnosticKind.ToString(),
                     PolicyErrorConfiguration(policyError)),
+            MetricBudgetDiagnostic metricBudget =>
+                (null, metricBudget.MetricId, null, metricBudget.EffectiveScope,
+                    $"{metricBudget.BreachedBound}:{metricBudget.ConfiguredLimit}", metricBudget.MetricKind),
             _ => (null, null, null, null, SourceIdentifier(diagnostic), diagnostic.Kind.ToString()),
         };
     }
@@ -545,6 +549,7 @@ public static class ArchitectureFindingMapper
         BaselineLifecycleDiagnostic baseline => baseline.SourceType,
         ArchitecturePolicyErrorDiagnostic policyError => policyError.PolicyLocation?.SourcePath ?? "<policy>",
         ArchitectureApplicabilityDiagnostic applicability => applicability.ControlIdentity,
+        MetricBudgetDiagnostic metricBudget => metricBudget.SourceType,
         _ => SourceIdentifier(diagnostic),
     };
 
@@ -575,6 +580,7 @@ public static class ArchitectureFindingMapper
         BaselineLifecycleDiagnostic d => d.SourceType,
         ArchitecturePolicyErrorDiagnostic d => d.PolicyLocation?.SourcePath ?? "<policy>",
         ArchitectureApplicabilityDiagnostic d => d.ControlIdentity,
+        MetricBudgetDiagnostic d => d.SourceType,
         _ => string.Empty,
     };
 

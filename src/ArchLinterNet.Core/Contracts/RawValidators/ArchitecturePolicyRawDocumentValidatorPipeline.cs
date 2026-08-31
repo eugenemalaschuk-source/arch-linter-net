@@ -22,6 +22,7 @@ internal static class ArchitecturePolicyRawDocumentValidatorPipeline
         new RawLayerTemplateNodeValidator(),
         new RawTopologyNodeValidator(),
         new RawMetricDefinitionValidator(),
+        new RawMetricBudgetValidator(),
         new RawWhenFieldLocationValidator(),
         new RawHistoryAnalysisNodeValidator(),
         new RawExternalEvidenceNodeValidator(),

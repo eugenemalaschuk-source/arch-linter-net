@@ -247,6 +247,39 @@
         }
       ]
     },
+    "metricBudgetContract": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["metric"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": ".*\\S.*",
+          "description": "Stable budget identifier. IDs are unique across strict and audit metric budgets."
+        },
+        "metric": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": ".*\\S.*",
+          "description": "ID of a previously declared top-level metric."
+        },
+        "minimum": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Inclusive non-negative lower bound."
+        },
+        "maximum": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Inclusive non-negative upper bound."
+        }
+      },
+      "anyOf": [
+        { "required": ["minimum"] },
+        { "required": ["maximum"] }
+      ]
+    },
     "topologyScope": {
       "type": "object",
       "additionalProperties": false,
@@ -1455,6 +1488,16 @@
         "audit_coverage": {
           "type": "array",
           "items": { "$ref": "#/$defs/coverageContract" },
+          "default": []
+        },
+        "strict_metric_budgets": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/metricBudgetContract" },
+          "default": []
+        },
+        "audit_metric_budgets": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/metricBudgetContract" },
           "default": []
         },
         "strict_context_dependencies": {

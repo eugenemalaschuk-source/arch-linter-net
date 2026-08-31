@@ -35,6 +35,7 @@ internal static class ArchitectureRemediationHintProviderRegistry
             new(typeof(CompositionDiagnostic), (d, i) => ArchitectureRemediationHintFactory.ForComposition((CompositionDiagnostic)d, i)),
             new(typeof(ProjectMetadataDiagnostic), (d, i) => ArchitectureRemediationHintFactory.ForProjectMetadata((ProjectMetadataDiagnostic)d, i)),
             new(typeof(ConfigurationDiagnostic), (d, i) => ArchitectureRemediationHintFactory.ForConfiguration((ConfigurationDiagnostic)d, i)),
+            new(typeof(MetricBudgetDiagnostic), (_, _) => null),
             new(typeof(ContextDependencyDiagnostic), (d, i) => ArchitectureRemediationHintFactory.ForContextDependency((ContextDependencyDiagnostic)d, i)),
             new(typeof(ContextAllowOnlyDiagnostic), (d, i) => ArchitectureRemediationHintFactory.ForContextAllowOnly((ContextAllowOnlyDiagnostic)d, i)),
             new(typeof(PortBoundaryDiagnostic), (d, i) => ArchitectureRemediationHintFactory.ForPortBoundary((PortBoundaryDiagnostic)d, i)),

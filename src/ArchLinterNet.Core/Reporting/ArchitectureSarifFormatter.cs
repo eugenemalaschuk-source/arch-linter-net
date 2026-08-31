@@ -604,6 +604,7 @@ public sealed partial class ArchitectureSarifFormatter : IArchitectureSarifForma
             DependencyDiagnostic or ConfigurationDiagnostic => "namespace",
             PackageDependencyDiagnostic or PackageAllowOnlyDiagnostic => "package",
             FrameworkReferenceDiagnostic or FrameworkReferenceAllowOnlyDiagnostic => "framework-reference",
+            MetricBudgetDiagnostic => "metric",
             _ => "type",
         };
     }
@@ -626,6 +627,7 @@ public sealed partial class ArchitectureSarifFormatter : IArchitectureSarifForma
             InterfaceImplementationDiagnostic d => (d.SourceType, d.ForbiddenNamespace, d.ForbiddenReferences),
             CompositionDiagnostic d => (d.SourceType, d.ForbiddenNamespace, d.ForbiddenReferences),
             ProjectMetadataDiagnostic d => (d.SourceType, d.ForbiddenNamespace, d.ForbiddenReferences),
+            MetricBudgetDiagnostic d => (d.SourceType, d.ForbiddenNamespace, d.ForbiddenReferences),
             ContextDependencyDiagnostic d => (d.SourceType, d.ForbiddenNamespace, d.ForbiddenReferences),
             ContextAllowOnlyDiagnostic d => (d.SourceType, d.ForbiddenNamespace, d.ForbiddenReferences),
             _ => (string.Empty, string.Empty, Array.Empty<string>()),

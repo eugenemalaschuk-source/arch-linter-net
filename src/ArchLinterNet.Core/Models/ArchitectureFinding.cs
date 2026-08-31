@@ -13,7 +13,7 @@ public sealed record ArchitectureFinding(
     string CanonicalIdentity,
     ArchitectureDiagnostic Details)
 {
-    public const int CurrentSchemaVersion = 2;
+    public const int CurrentSchemaVersion = 3;
 
     public string? Mode { get; init; }
 

@@ -48,6 +48,7 @@
          schema/0.8.0/compatibility-manifest.json. -->
     <EmbeddedResource Include="..\..\schema\0.8.0\dependencies.arch.schema.json" Link="Schema\0.8.0\dependencies.arch.schema.json" LogicalName="ArchLinterNet.Core.Schema.0.8.0.dependencies.arch.schema.json" />
     <EmbeddedResource Include="..\..\schema\0.8.0\dependencies.arch.fragment.schema.json" Link="Schema\0.8.0\dependencies.arch.fragment.schema.json" LogicalName="ArchLinterNet.Core.Schema.0.8.0.dependencies.arch.fragment.schema.json" />
+    <EmbeddedResource Include="..\..\schema\0.8.0\normalized-finding.schema.json" Link="Schema\0.8.0\normalized-finding.schema.json" LogicalName="ArchLinterNet.Core.Schema.0.8.0.normalized-finding.schema.json" />
     <!-- The manifest itself is release-qualified (its own $id/bytes are the immutable contract),
          so advancing any entry (policy-root/policy-fragment to 0.8.0) requires a new manifest
          generation rather than editing schema/0.5.1/compatibility-manifest.json in place - that
@@ -65,6 +66,7 @@
     <EmbeddedResource Include="..\..\schema\0.5.1\analysis-profile.schema.json" Link="Schema\0.5.1\analysis-profile.schema.json" LogicalName="ArchLinterNet.Core.Schema.0.5.1.analysis-profile.schema.json" />
     <Content Include="..\..\schema\0.8.0\dependencies.arch.schema.json" Pack="true" PackagePath="contentFiles/any/any/schema/0.8.0/dependencies.arch.schema.json" />
     <Content Include="..\..\schema\0.8.0\dependencies.arch.fragment.schema.json" Pack="true" PackagePath="contentFiles/any/any/schema/0.8.0/dependencies.arch.fragment.schema.json" />
+    <Content Include="..\..\schema\0.8.0\normalized-finding.schema.json" Pack="true" PackagePath="contentFiles/any/any/schema/0.8.0/normalized-finding.schema.json" />
     <Content Include="..\..\schema\baseline.schema.json" Pack="true" PackagePath="contentFiles/any/any/schema/0.5.1/baseline.schema.json" />
     <Content Include="..\..\schema\0.8.0\compatibility-manifest.json" Pack="true" PackagePath="contentFiles/any/any/schema/0.8.0/" />
     <Content Include="..\..\schema\0.5.1\api-snapshot.schema.json" Pack="true" PackagePath="contentFiles/any/any/schema/0.5.1/" />

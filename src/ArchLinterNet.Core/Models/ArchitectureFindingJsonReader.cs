@@ -56,6 +56,11 @@ public static class ArchitectureFindingJsonReader
         "applicability",
     };
 
+    private static readonly HashSet<string> _v3KnownKinds = new(_v2KnownKinds, StringComparer.Ordinal)
+    {
+        "metric_budget",
+    };
+
     public static ArchitectureFindingReadEnvelope Read(string json, bool strict)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(json);
@@ -65,7 +70,8 @@ public static class ArchitectureFindingJsonReader
         HashSet<string>? knownKinds = version switch
         {
             1 => _v1KnownKinds,
-            ArchitectureFinding.CurrentSchemaVersion => _v2KnownKinds,
+            2 => _v2KnownKinds,
+            ArchitectureFinding.CurrentSchemaVersion => _v3KnownKinds,
             _ => null,
         };
         if (knownKinds is null)

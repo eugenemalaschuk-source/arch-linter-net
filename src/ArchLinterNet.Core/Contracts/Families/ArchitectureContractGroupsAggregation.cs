@@ -200,6 +200,12 @@ public sealed class ArchitectureContractGroups
     [YamlMember(Alias = "audit_coverage")]
     public List<ArchitectureCoverageContract> AuditCoverage { get; set; } = new();
 
+    [YamlMember(Alias = "strict_metric_budgets")]
+    public List<ArchitectureMetricBudgetContract> StrictMetricBudgets { get; set; } = new();
+
+    [YamlMember(Alias = "audit_metric_budgets")]
+    public List<ArchitectureMetricBudgetContract> AuditMetricBudgets { get; set; } = new();
+
     public IEnumerable<IArchitectureContract> AllStrict =>
         ArchitectureContractFamilyBindings.All
             .Where(binding => binding.IncludeInContractEnumeration)

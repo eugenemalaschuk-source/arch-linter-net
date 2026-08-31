@@ -10,6 +10,7 @@ namespace ArchLinterNet.Core.Execution;
 internal sealed class ArchitectureContractExecutor : IArchitectureContractExecutor
 {
     private const string CoverageFamily = "coverage";
+    private const string MetricBudgetFamily = "metric_budgets";
     private const string AsmdefFamily = "asmdef";
 
     public ArchitectureContractExecutionResult Execute(
@@ -30,6 +31,8 @@ internal sealed class ArchitectureContractExecutor : IArchitectureContractExecut
         List<ArchitectureViolation> coverageViolations = new();
         List<ArchitectureCoverageSummary> coverageSummaries = new();
         Dictionary<string, int> resultCounts = new(StringComparer.Ordinal);
+        List<ArchitectureApplicabilityExpectedEntry> applicabilityExpected = new();
+        List<ArchitectureApplicabilityRecord> applicabilityRecords = new();
 
         // Iterating the catalog's families rather than a hardcoded per-family list means a new
         // violations-or-cycles-shaped family (added to ArchitectureContractCatalog.Build plus a
@@ -43,6 +46,14 @@ internal sealed class ArchitectureContractExecutor : IArchitectureContractExecut
             if (family == CoverageFamily)
             {
                 ExecuteCoverageFamily(session, mode, handlerRegistry, timing, coverageViolations, coverageSummaries, resultCounts);
+                continue;
+            }
+
+            if (family == MetricBudgetFamily)
+            {
+                ExecuteMetricBudgetFamily(
+                    session, mode, timing, standardFamilyFindings, resultCounts,
+                    applicabilityExpected, applicabilityRecords);
                 continue;
             }
 
@@ -76,9 +87,56 @@ internal sealed class ArchitectureContractExecutor : IArchitectureContractExecut
         {
             CycleFindings = standardFamilyFindings.CycleFindings,
             ContractFamilyResultCounts = resultCounts,
-            ApplicabilityExpectedEntries = topology.ExpectedEntries,
-            ApplicabilityRecords = topology.Records,
+            ApplicabilityExpectedEntries = applicabilityExpected.Concat(topology.ExpectedEntries).ToArray(),
+            ApplicabilityRecords = applicabilityRecords.Concat(topology.Records).ToArray(),
         };
+    }
+
+    private static void ExecuteMetricBudgetFamily(
+        ArchitectureAnalysisSession session,
+        string mode,
+        ValidationTiming? timing,
+        StandardFamilyFindings findings,
+        IDictionary<string, int> resultCounts,
+        List<ArchitectureApplicabilityExpectedEntry> applicabilityExpected,
+        List<ArchitectureApplicabilityRecord> applicabilityRecords)
+    {
+        int[] budgetCount = [0];
+        using (timing?.MeasureContractFamily(MetricBudgetFamily, () => budgetCount[0]))
+        {
+            ArchitectureMetricBudgetContract[] contracts = session.Catalog
+                .ContractsFor(mode, MetricBudgetFamily)
+                .OfType<ArchitectureMetricBudgetContract>()
+                .ToArray();
+            foreach (ArchitectureMetricBudgetContract _ in contracts)
+            {
+                session.Context.CancellationToken.ThrowIfCancellationRequested();
+                budgetCount[0]++;
+                session.Context.ProfilingCounters.RecordContractExecution();
+            }
+
+            if (contracts.Length == 0)
+            {
+                return;
+            }
+
+            int identityCursor = session.FindingIdentityCursor;
+            ArchitectureMetricBudgetEvaluationResult result = session.CheckMetricBudgetContracts(contracts);
+            Dictionary<string, ArchitectureMetricBudgetContract> contractsById = contracts
+                .Where(contract => contract.Id is not null)
+                .ToDictionary(contract => contract.Id!, StringComparer.Ordinal);
+            ArchitectureViolation[] violations = session.AttachFindingIdentities(result.Violations, identityCursor)
+                .Select(violation => contractsById.TryGetValue(violation.ContractId ?? string.Empty, out ArchitectureMetricBudgetContract? contract)
+                    ? session.Document.Provenance.Enrich(violation, contract)
+                    : violation)
+                .ToArray();
+            findings.Violations.AddRange(violations);
+            applicabilityExpected.AddRange(result.ApplicabilityExpectedEntries);
+            applicabilityRecords.AddRange(result.ApplicabilityRecords);
+
+            AddResultCount(resultCounts, MetricBudgetFamily, violations.Length);
+            session.Context.ProfilingCounters.RecordContractFamilyResults(MetricBudgetFamily, violations.Length);
+        }
     }
 
     private static void ExecuteCoverageFamily(

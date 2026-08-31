@@ -23,6 +23,7 @@ public sealed partial class ArchitectureDiagnosticFormatter
             new(typeof(ExternalDependencyDiagnostic), (d, o) => ApplyExternalDependencyCiFields((ExternalDependencyDiagnostic)d, o)),
             new(typeof(PackageDependencyDiagnostic), (d, o) => ApplyPackageDependencyCiFields((PackageDependencyDiagnostic)d, o)),
             new(typeof(PackageAllowOnlyDiagnostic), (d, o) => ApplyPackageAllowOnlyCiFields((PackageAllowOnlyDiagnostic)d, o)),
+            new(typeof(MetricBudgetDiagnostic), (d, o) => ApplyMetricBudgetCiFields((MetricBudgetDiagnostic)d, o)),
             new(typeof(FrameworkReferenceDiagnostic), (d, o) => ApplyFrameworkReferenceCiFields((FrameworkReferenceDiagnostic)d, o)),
             new(typeof(FrameworkReferenceAllowOnlyDiagnostic), (d, o) => ApplyFrameworkReferenceAllowOnlyCiFields((FrameworkReferenceAllowOnlyDiagnostic)d, o)),
             new(typeof(TypePlacementDiagnostic), (d, o) => ApplyTypePlacementCiFields((TypePlacementDiagnostic)d, o)),
