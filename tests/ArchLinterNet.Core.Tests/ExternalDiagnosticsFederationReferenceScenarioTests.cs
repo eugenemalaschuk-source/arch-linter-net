@@ -12,7 +12,7 @@ using NUnit.Framework;
 namespace ArchLinterNet.Core.Tests;
 
 [TestFixture]
-public sealed class ExternalDiagnosticsFederationReferenceScenarioTests
+public sealed partial class ExternalDiagnosticsFederationReferenceScenarioTests
 {
     private SarifEvidenceTestRepository _repository = null!;
 
@@ -87,6 +87,7 @@ public sealed class ExternalDiagnosticsFederationReferenceScenarioTests
         });
 
         string expectedHash = Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(sarif)));
+        AssertOutputParity(strictDetail, strict, json, human, sarifResult, testing, expectedHash);
         Assert.Multiple(() =>
         {
             Assert.That(read.Status, Is.EqualTo(SarifEvidenceTrustStatus.Valid));
@@ -120,22 +121,8 @@ public sealed class ExternalDiagnosticsFederationReferenceScenarioTests
             Assert.That(baselineComparison.Frozen.Single().Identity, Is.EqualTo(strictBaseline.Identity));
             Assert.That(strict.SourceLocation, Is.EqualTo(new ArchitectureFindingSourceLocation(
                 "src/App/One.cs", 7, 3)));
-            Assert.That(json["logical_evidence_id"], Is.EqualTo("external.scan"));
-            Assert.That(json["governance_mode"], Is.EqualTo("strict"));
-            Assert.That(human, Does.Contain("sha256=" + expectedHash));
-            Assert.That(human, Does.Contain("canonical_identity=" + strict.CanonicalIdentity));
             Assert.That(rehydrated.Kind, Is.EqualTo("imported_external_diagnostic"));
             Assert.That(rehydrated.CanonicalIdentity, Is.EqualTo(strict.CanonicalIdentity));
-            Assert.That(sarifResult.GetProperty("locations")[0].GetProperty("physicalLocation")
-                .GetProperty("artifactLocation").GetProperty("uri").GetString(), Is.EqualTo("src/App/One.cs"));
-            Assert.That(sarifResult.GetProperty("properties").GetProperty("arch_linter_net")
-                .GetProperty("evidence_provenance")[0].GetProperty("scope").GetString(), Is.EqualTo("scope"));
-            Assert.That(sarifResult.GetProperty("properties").GetProperty("arch_linter_net")
-                .GetProperty("evidence_provenance")[0].GetProperty("artifact_sha256").GetString(),
-                Is.EqualTo(expectedHash));
-            Assert.That(testing.ImportedDiagnosticFindings, Has.Count.EqualTo(2));
-            Assert.That(testing.Findings, Has.Count.EqualTo(2));
-            Assert.That(testing.Passed, Is.False);
             Assert.That(records.Single().State, Is.EqualTo(ArchitectureApplicabilityRecordState.Evaluable));
             Assert.That(completion.State, Is.EqualTo(ArchitectureAssessmentCompletionState.Pass));
             Assert.That(path, Does.EndWith("evidence" + Path.DirectorySeparatorChar + "current.sarif"));
@@ -413,14 +400,15 @@ public sealed class ExternalDiagnosticsFederationReferenceScenarioTests
     private SarifEvidenceReadResult Read(
         ArchitectureExternalEvidenceRequirement requirement,
         string path,
-        SarifEvidenceProducerContext? producer = null)
+        SarifEvidenceProducerContext? producer = null,
+        string assessmentScope = "scope")
     {
-        producer ??= new SarifEvidenceProducerContext(requirement.Id, "repo", "revision", "scope");
+        producer ??= new SarifEvidenceProducerContext(requirement.Id, "repo", "revision", assessmentScope);
         return new SarifEvidenceReader().Read(
             requirement,
             _repository.Root,
             new SarifEvidenceArtifactReference(path, requirement.Id, producer),
-            new SarifEvidenceAssessmentContext("repo", "revision", "scope"));
+            new SarifEvidenceAssessmentContext("repo", "revision", assessmentScope));
     }
 
     private static SarifExternalDiagnosticSelectionResult Select(SarifEvidenceReadResult read) =>

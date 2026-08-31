@@ -40,7 +40,7 @@ The system SHALL provide synthetic reference scenarios that prove required missi
 failed, incomplete, wrong logical-key, wrong repository, wrong revision, wrong scope, and
 missing-required-binding evidence is unassessable rather than a clean result. The scenarios SHALL
 also prove stable artifact hashing, order-independent repeated-result selection, source and
-fallback fingerprint paths, distinct source locations, and distinct logical evidence contexts
+fallback fingerprint paths, distinct source locations, and distinct logical-evidence and scope contexts
 without using analyzer execution, producer-service APIs, filenames, timestamps, or CI job names as
 trust inputs.
 
@@ -53,7 +53,7 @@ trust inputs.
 #### Scenario: Equivalent repeated evidence deduplicates deterministically
 - **WHEN** equivalent current-context SARIF results occur in different artifact or result orders
 - **THEN** selection yields stable canonical output and identity while retaining deterministic
-  authorizing provenance and keeping distinct locations or logical evidence contexts distinct
+  authorizing provenance and keeping distinct locations, logical-evidence controls, and scope contexts distinct
 
 #### Scenario: Reference protocol stays vendor-neutral
 - **WHEN** the documented reference scenario describes external evidence consumption

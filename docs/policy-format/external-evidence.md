@@ -203,7 +203,7 @@ wrong-revision, wrong-scope, wrong-logical-key, or binding-incomplete artifact i
 unassessable evidence. It neither becomes a clean zero-result run nor supplies a
 current imported finding. Equivalent repeated current-context results can
 deduplicate deterministically, while different source locations and logical
-evidence contexts remain distinct.
+evidence and scope contexts remain distinct.
 
 ## What the bounded reader proves
 
