@@ -27,9 +27,7 @@ internal static class ArchitectureWaiverLifecycleEvaluator
         ArgumentNullException.ThrowIfNull(unmatched);
 
         ArchitectureContractDescriptor[] descriptors = ArchitectureContractCatalog.Build(document).Descriptors
-            .Where(item => item.Mode == mode
-                && (selectedContractIds is not { Count: > 0 }
-                    || selectedContractIds.Contains(item.Id ?? item.Name, StringComparer.OrdinalIgnoreCase)))
+            .Where(item => item.Mode == mode && IsSelected(item, selectedContractIds))
             .ToArray();
         var declarations = new Dictionary<ArchitectureIgnoredViolation, List<WaiverOccurrence>>(
             ReferenceEqualityComparer.Instance);
@@ -76,6 +74,21 @@ internal static class ArchitectureWaiverLifecycleEvaluator
         return document.Contracts.AllStrict.Concat(document.Contracts.AllAudit)
             .SelectMany(GetIgnoredViolations)
             .Any(ignore => !ignore.IsBaselineImported);
+    }
+
+    private static bool IsSelected(
+        ArchitectureContractDescriptor descriptor,
+        IReadOnlyCollection<string>? selectedContractIds)
+    {
+        if (selectedContractIds is not { Count: > 0 })
+        {
+            return true;
+        }
+
+        return (descriptor.Id is not null
+                && selectedContractIds.Contains(descriptor.Id, StringComparer.OrdinalIgnoreCase))
+            || (descriptor.AuthoredId is not null
+                && selectedContractIds.Contains(descriptor.AuthoredId, StringComparer.OrdinalIgnoreCase));
     }
 
     private static bool IsUnmatched(

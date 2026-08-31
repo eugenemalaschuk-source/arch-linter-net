@@ -43,10 +43,38 @@ public sealed class ArchitecturePolicyInventoryProjectorTests
         Assert.Multiple(() =>
         {
             Assert.That(all.SchemaId, Is.EqualTo(ArchitecturePolicyInventory.CurrentSchemaId));
-            Assert.That(all.EffectiveRuleCount, Is.EqualTo(3));
-            Assert.That(all.Rules, Is.EqualTo(new ArchitecturePolicyInventoryRules(2, 0, 1)));
+            Assert.That(all.EffectiveRuleCount, Is.EqualTo(4));
+            Assert.That(all.Rules, Is.EqualTo(new ArchitecturePolicyInventoryRules(2, 1, 1)));
             Assert.That(selected.EffectiveRuleCount, Is.EqualTo(1));
             Assert.That(selected.Rules, Is.EqualTo(new ArchitecturePolicyInventoryRules(1, 0, 0)));
+        });
+    }
+
+    [Test]
+    public void Project_StrictAndAuditInvocations_ExposeTheSameRepositoryInventory()
+    {
+        ArchitectureContractDocument document = new()
+        {
+            Version = 1,
+            Name = "Inventory",
+            Contracts = new ArchitectureContractGroups
+            {
+                Strict = [new ArchitectureDependencyContract { Id = "strict", Name = "strict" }],
+                Audit = [new ArchitectureDependencyContract { Id = "audit", Name = "audit" }],
+                StrictCoverage = [new ArchitectureCoverageContract { Id = "coverage", Name = "coverage", Scope = "namespace" }],
+            },
+        };
+
+        ArchitecturePolicyInventory strict = ArchitecturePolicyInventoryProjector.Project(
+            document, "strict", Array.Empty<ArchitectureWaiverLifecycleRecord>());
+        ArchitecturePolicyInventory audit = ArchitecturePolicyInventoryProjector.Project(
+            document, "audit", Array.Empty<ArchitectureWaiverLifecycleRecord>());
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(strict.EffectiveRuleCount, Is.EqualTo(3));
+            Assert.That(strict.Rules, Is.EqualTo(new ArchitecturePolicyInventoryRules(1, 1, 1)));
+            Assert.That(audit, Is.EqualTo(strict));
         });
     }
 

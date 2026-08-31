@@ -23,8 +23,9 @@ internal static class ArchitecturePolicyInventoryProjector
     ];
 
     /// <summary>
-    /// Projects the exact selected mode scope. A null or empty selection means all contracts in
-    /// that mode, matching <see cref="ArchitectureAnalysisSession.IsContractSelected(string?)"/>.
+    /// Projects the selected effective policy across strict, audit, and coverage controls. A null
+    /// or empty selection means every effective control, matching
+    /// <see cref="ArchitectureAnalysisSession.IsContractSelected(string?)"/>.
     /// </summary>
     internal static ArchitecturePolicyInventory Project(
         ArchitectureContractDocument document,
@@ -50,8 +51,7 @@ internal static class ArchitecturePolicyInventoryProjector
 
         foreach (ArchitectureContractDescriptor descriptor in catalog.Descriptors)
         {
-            if (descriptor.Mode != mode
-                || !includeAsmdefContracts && descriptor.Family == AsmdefFamily
+            if (!includeAsmdefContracts && descriptor.Family == AsmdefFamily
                 || !includeCoverageContracts && descriptor.Family == CoverageFamily
                 || !IsSelected(descriptor, selectedContractIds))
             {
@@ -62,7 +62,7 @@ internal static class ArchitecturePolicyInventoryProjector
             // the authored identity in AuthoredId. Every other family remains one identity per
             // effective Id/name, scoped by mode/group/family so distinct controls cannot collide.
             string identity = descriptor.AuthoredId ?? descriptor.Id ?? descriptor.Name;
-            if (!identities.Add(new RuleIdentity(mode, descriptor.Group, descriptor.Family, identity)))
+            if (!identities.Add(new RuleIdentity(descriptor.Mode, descriptor.Group, descriptor.Family, identity)))
             {
                 continue;
             }
@@ -71,7 +71,7 @@ internal static class ArchitecturePolicyInventoryProjector
             {
                 coverage++;
             }
-            else if (mode == "strict")
+            else if (descriptor.Mode == "strict")
             {
                 strict++;
             }

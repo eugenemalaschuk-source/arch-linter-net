@@ -13,10 +13,15 @@ SHALL count once regardless of its executable alias fan-out. Findings, matched
 subjects, files, types, edges, baseline entries, and waiver entries SHALL NOT
 increase the rule count.
 
-The inventory SHALL expose a deterministic partition of the headline count into
-non-coverage `strict`, non-coverage `audit`, and `coverage` controls. Disabled
-or optional-empty controls that do not participate in the effective analyzed
-scope SHALL NOT be reported as effective controls.
+The inventory SHALL be repository-level authority over every selected effective
+strict, audit, and coverage control, independent of the mode used to evaluate
+findings for the current invocation. The inventory SHALL expose a deterministic
+partition of the headline count into non-coverage `strict`, non-coverage
+`audit`, and `coverage` controls. Disabled or optional-empty controls that do
+not participate in the effective analyzed scope SHALL NOT be reported as
+effective controls. A strict and an audit invocation with the same effective
+policy selection and execution-scope exclusions SHALL expose identical
+inventory counts.
 
 #### Scenario: Source-set aliases count as one control
 - **WHEN** one authored dependency contract expands to multiple source-set
@@ -34,6 +39,12 @@ scope SHALL NOT be reported as effective controls.
 - **WHEN** validation selects only a subset of effective contract IDs
 - **THEN** the inventory describes that exact selected analyzed scope and does
   not count unselected controls
+
+#### Scenario: Invocation mode does not partition repository-level inventory
+- **WHEN** strict and audit validation run against the same selected effective
+  policy containing controls in both modes
+- **THEN** each outcome exposes the same inventory with non-zero strict and
+  audit counts rather than omitting the mode that was not evaluated for findings
 
 ### Requirement: Explicit waiver debt consumes the canonical lifecycle
 The policy inventory SHALL expose an `ignore_debt` summary over the canonical
