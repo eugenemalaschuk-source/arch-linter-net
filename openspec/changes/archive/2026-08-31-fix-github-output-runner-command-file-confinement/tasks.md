@@ -33,12 +33,30 @@
       both tests pass under
       `pytest tools/release/tests/test_main_quality_coverage.py -q`.
 
-## 4. Spec synchronization
+## 4. Wire up main_build.py (spec-consistency completion)
 
-- [x] 4.1 Author the `release-tooling-workspace-confinement` MODIFIED delta documenting the
+- [x] 4.1 Replace `_append_key_value(arguments.github_env, ...)` /
+      `_append_key_value(arguments.github_output, ...)` in `_version_command` with validated
+      `github_env`/`github_output` locals produced by `_github_command_file_path(...,
+      "GITHUB_ENV")` / `_github_command_file_path(..., "GITHUB_OUTPUT")`; verify with `grep -n
+      _github_command_file_path tools/release/main_build.py` showing the import and 2 call sites.
+- [x] 4.2 Add `test_version_cli_rejects_github_output_not_matching_the_runner_env_var` and
+      `test_version_cli_rejects_github_env_when_the_runner_env_var_is_unset` to
+      `tools/release/tests/test_main_build.py`, and set `GITHUB_ENV`/`GITHUB_OUTPUT` via
+      `monkeypatch.setenv` in the existing
+      `test_version_cli_writes_github_environment_and_outputs`; verify with `make
+      test-release-evidence` passing (230/230).
+
+## 5. Spec synchronization
+
+- [x] 5.1 Author the `release-tooling-workspace-confinement` MODIFIED delta documenting the
       GitHub-runner-command-file exception and the new
       `## ADDED Requirements`-equivalent sibling requirement for the environment-anchored trust
       boundary; verify with `openspec validate fix-github-output-runner-command-file-confinement
       --strict`.
-- [x] 4.2 Run `openspec archive fix-github-output-runner-command-file-confinement` and
+- [x] 5.2 Run `openspec archive fix-github-output-runner-command-file-confinement` and
       `openspec validate --all` to confirm the rebuilt main spec passes.
+- [x] 5.3 After code review flagged that `main_build.py` left the newly-archived spec's
+      requirement unmet, complete section 4 above so the spec and the implementation agree; verify
+      with `openspec validate --all` still passing (151/151) and `make test-release-evidence`
+      passing (230/230).

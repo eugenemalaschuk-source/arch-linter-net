@@ -16,8 +16,6 @@ outside the checkout.
 
 **Non-Goals:**
 - Changing `_safe_path`'s behavior or any of its other call sites.
-- Adding the same trust boundary to `main_build.py`'s `--github-env`/`--github-output` — those were
-  never passed through `_safe_path`, so they have no regression to fix here.
 - Validating that the path is shaped like a runner temp path (e.g. contains
   `_runner_file_commands`) — see Decisions below for why that's not the chosen check.
 
@@ -38,10 +36,17 @@ existing broad confinement requirement intact and testable independently (per #7
 keeps the new trust boundary a single well-named function other scripts can adopt for their own
 `--github-env`/`--github-output` arguments later, without exceptions scattered through call sites.
 
-**Scope the fix to the 3 `--github-output` call sites in `main_quality_coverage.py`.** These are
+**Fix the #736 regression at its 3 call sites in `main_quality_coverage.py`, and also close the
+matching gap in `main_build.py`.** `main_quality_coverage.py`'s 3 `--github-output` call sites are
 the only places `_safe_path` was ever applied to a runner command-file argument (confirmed by
-`grep -rn _safe_path tools/release/*.py`). `main_build.py` never wrapped its own
-`--github-env`/`--github-output` in `_safe_path`, so it isn't part of this regression.
+`grep -rn _safe_path tools/release/*.py`), so they carry the actual #743 regression.
+`main_build.py`'s `--github-env`/`--github-output` (in its `version` subcommand) never used
+`_safe_path`, so they were never regressed by #736 — but the new
+`release-tooling-workspace-confinement` requirement is written generically for every runner
+command-file transport argument under `tools/release/`, and leaving `main_build.py` unvalidated
+would make the spec and the code inconsistent the moment this change lands. Wiring both scripts
+through the same `_github_command_file_path` keeps the spec accurate without narrowing it to name
+one script.
 
 ## Risks / Trade-offs
 

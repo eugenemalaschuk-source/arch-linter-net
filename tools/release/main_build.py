@@ -13,6 +13,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from _release_workspace import _github_command_file_path
+
 PACKAGE_IDS = (
     "ArchLinterNet.CEL",
     "ArchLinterNet.Cli",
@@ -25,6 +27,8 @@ _MAIN_VERSION_RE = re.compile(
     r"^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)-main\.([1-9]\d*)$"
 )
 _RETENTION_SCHEMA = "arch-linter-main-package-retention/v2"
+_GITHUB_ENV_DESCRIPTION = "GitHub environment file"
+_GITHUB_OUTPUT_DESCRIPTION = "GitHub output file"
 
 
 @dataclass(frozen=True)
@@ -305,10 +309,20 @@ def _append_key_value(path: Path | None, key: str, value: str) -> None:
 def _version_command(arguments: argparse.Namespace) -> None:
     base_version = read_development_version(arguments.props)
     package_version = format_main_version(base_version, arguments.build_number)
-    _append_key_value(arguments.github_env, "ARCH_LINTER_DEVELOPMENT_VERSION", base_version)
-    _append_key_value(arguments.github_env, "PACKAGE_VERSION", package_version)
-    _append_key_value(arguments.github_output, "development_version", base_version)
-    _append_key_value(arguments.github_output, "package_version", package_version)
+    github_env = (
+        _github_command_file_path(arguments.github_env, _GITHUB_ENV_DESCRIPTION, "GITHUB_ENV")
+        if arguments.github_env is not None
+        else None
+    )
+    github_output = (
+        _github_command_file_path(arguments.github_output, _GITHUB_OUTPUT_DESCRIPTION, "GITHUB_OUTPUT")
+        if arguments.github_output is not None
+        else None
+    )
+    _append_key_value(github_env, "ARCH_LINTER_DEVELOPMENT_VERSION", base_version)
+    _append_key_value(github_env, "PACKAGE_VERSION", package_version)
+    _append_key_value(github_output, "development_version", base_version)
+    _append_key_value(github_output, "package_version", package_version)
     print(package_version)
 
 

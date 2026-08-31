@@ -26,9 +26,12 @@ telemetry needs this to run on every push, so this is a P0 regression fix (#743)
 - Add regression tests covering: the runner-shaped path (outside the workspace) is accepted when
   `GITHUB_OUTPUT` matches; an arbitrary `--github-output` path is rejected when it does not match
   `GITHUB_OUTPUT`; the check fails closed when `GITHUB_OUTPUT` is unset.
-
-`tools/release/main_build.py`'s `--github-env`/`--github-output` arguments were never passed
-through `_safe_path`, so they are unaffected and out of scope.
+- Wire `tools/release/main_build.py`'s `--github-env`/`--github-output` arguments (in its `version`
+  subcommand) through `_github_command_file_path` too. They were never passed through `_safe_path`,
+  so they carried no #736 regression, but leaving them unvalidated would make the codebase
+  immediately inconsistent with the `release-tooling-workspace-confinement` spec's requirement that
+  every runner command-file transport argument in `tools/release/` use this trust boundary. Add
+  matching regression tests.
 
 ## Capabilities
 
@@ -47,7 +50,9 @@ through `_safe_path`, so they are unaffected and out of scope.
 
 - `tools/release/_release_workspace.py`
 - `tools/release/main_quality_coverage.py`
+- `tools/release/main_build.py`
 - `tools/release/tests/test_main_quality_coverage.py`
+- `tools/release/tests/test_main_build.py`
 - Restores `Main Coverage Evidence` → `Main SonarCloud` / `Main Codecov` reachability on `main`
   push runs (#706, #728 provenance checks remain authoritative downstream)
 - No public API, no architecture-governed dependency edges, no CI workflow YAML changes
