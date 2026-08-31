@@ -142,7 +142,7 @@ internal static class ArchitecturePolicyWeakeningContractFactsEvaluator
         ICollection<ArchitecturePolicyWeakeningFinding> findings)
     {
         if (!IsComparableMetricBudgetBound(comparison, baseContract, currentContract, out int baseLimit, out int currentLimit)
-            || comparison.FactName == "maximum" && currentLimit <= baseLimit
+            || comparison.FactName is "maximum" or "max_delta" && currentLimit <= baseLimit
             || comparison.FactName == "minimum" && currentLimit >= baseLimit)
         {
             return;
@@ -279,7 +279,7 @@ internal static class ArchitecturePolicyWeakeningContractFactsEvaluator
         currentLimit = 0;
         return baseContract.Family == "metric_budgets"
             && currentContract.Family == "metric_budgets"
-            && factName is "minimum" or "maximum"
+            && factName is "minimum" or "maximum" or "max_delta"
             && TryGetIntegerValue(baseFact, out baseLimit)
             && TryGetIntegerValue(currentFact, out currentLimit);
     }

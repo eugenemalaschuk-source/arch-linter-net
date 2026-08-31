@@ -24,7 +24,7 @@ internal sealed class ArchitectureBaselineGenerator : IArchitectureBaselineGener
 
     public ArchitectureBaselineDocument BuildFromEntries(IReadOnlyList<ArchitectureBaselineComparisonEntry> entries, int version = 2)
     {
-        return version == 1 ? BuildLegacyDocument(entries) : BuildStructuredDocument(entries);
+        return version == 1 ? BuildLegacyDocument(entries) : BuildStructuredDocument(entries, version);
     }
 
     private static ArchitectureBaselineDocument BuildLegacyDocument(IReadOnlyList<ArchitectureBaselineComparisonEntry> entries)
@@ -68,11 +68,13 @@ internal sealed class ArchitectureBaselineGenerator : IArchitectureBaselineGener
         return baseline;
     }
 
-    private static ArchitectureBaselineDocument BuildStructuredDocument(IReadOnlyList<ArchitectureBaselineComparisonEntry> entries)
+    private static ArchitectureBaselineDocument BuildStructuredDocument(
+        IReadOnlyList<ArchitectureBaselineComparisonEntry> entries,
+        int version)
     {
         var baseline = new ArchitectureBaselineDocument
         {
-            Version = ArchitectureViolationIdentity.CurrentVersion,
+            Version = version,
             Baseline = new ArchitectureBaselineContractGroups()
         };
 

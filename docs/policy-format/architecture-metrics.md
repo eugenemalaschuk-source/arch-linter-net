@@ -78,6 +78,89 @@ stale, or unexpected-empty evidence, validation projects the same shared
 applicability evidence for the budget instead of treating a partial low count
 as a passing result.
 
+## Baseline-relative budgets
+
+A metric budget can ratchet growth from a reviewed scalar value instead of
+declaring only an absolute bound. Relative budgets remain ordinary strict or
+audit contracts: put a blocking budget in `strict_metric_budgets` and an
+informational one in `audit_metric_budgets`. `baseline_mode` is the relative
+dimension; strict/audit are still the enforcement modes. There is no third
+`ratchet` mode.
+
+The supported modes are:
+
+- `no_worse_than_baseline` allows no increase over the reviewed value (allowed
+  delta `0`);
+- `max_delta` allows an increase up to the required non-negative integer
+  `max_delta`.
+
+The existing `maximum` can optionally remain as an absolute safety cap. The
+effective threshold is the lower of the reviewed value plus the allowed delta
+and that cap, when a cap is present. Relative budgets must not declare
+`minimum`; absolute budgets without `baseline_mode` keep their existing
+`minimum`/`maximum` behavior.
+
+For example, these budgets share the metric definitions above:
+
+```yaml
+contracts:
+  strict_metric_budgets:
+    - id: application-outgoing-ratchet
+      metric: application-outgoing
+      baseline_mode: no_worse_than_baseline
+  audit_metric_budgets:
+    - id: application-footprint-ratchet
+      metric: application-footprint
+      baseline_mode: max_delta
+      max_delta: 2
+      maximum: 20
+```
+
+The reviewed values live in a version-3 baseline's separate top-level
+`metric_baselines` collection. A scalar entry is identified only by its
+canonical metric definition and subject fields, not by a budget ID, display
+text, contributor label, or finding identity:
+
+```yaml
+version: 3
+baseline:
+  strict_metric_budgets: []
+  audit_metric_budgets: []
+metric_baselines:
+  - metric_identity_version: 1
+    metric_id: application-outgoing
+    metric_kind: outgoing_component_count
+    native_subject: application
+    effective_scope: application
+    value: 3
+  - metric_identity_version: 1
+    metric_id: application-footprint
+    metric_kind: component_footprint_count
+    native_subject: application
+    unit: project
+    effective_scope: application
+    value: 2
+```
+
+`unit` is included when the metric definition declares one; omit it for an
+unqualified metric. `native_subject` and `effective_scope` are the canonical
+values reported by `measure`, so copy them from that output rather than
+inventing display labels. The [migration baseline guide](../guides/migration-baselines.md#metric-baseline-capture)
+describes how to capture and review these entries.
+
+A relative budget is assessable only when its selected baseline contains one
+matching scalar entry. A missing entry, unsupported identity version, or change
+to the metric kind, native subject, unit, or effective scope is stale or
+otherwise unassessable baseline evidence. It fails closed: the value is not
+treated as zero, the budget does not pass, and the entry is never used as a
+finding-level ignore. Ordinary validation does not refresh a reviewed value.
+
+Run `baseline generate` explicitly after reviewing the current measurement to
+capture a complete scalar value. `baseline update` and `baseline prune` are
+finding-debt lifecycle commands; they preserve existing `metric_baselines`
+values and never add, replace, or recalculate them. A new reviewed value
+requires another explicit generation or a reviewed manual edit.
+
 Run the report with:
 
 ```bash

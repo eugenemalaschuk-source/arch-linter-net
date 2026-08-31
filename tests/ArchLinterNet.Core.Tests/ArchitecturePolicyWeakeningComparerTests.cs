@@ -320,6 +320,7 @@ public sealed partial class ArchitecturePolicyWeakeningComparerTests
 
     [TestCase("maximum", "10", "20")]
     [TestCase("minimum", "10", "5")]
+    [TestCase("max_delta", "0", "2")]
     public void Compare_RelaxedMetricBudgetBound_IsSemanticWeakening(string bound, string baselineValue, string currentValue)
     {
         ArchitecturePolicyWeakeningFinding finding = ArchitecturePolicyWeakeningComparer.Compare(new(
