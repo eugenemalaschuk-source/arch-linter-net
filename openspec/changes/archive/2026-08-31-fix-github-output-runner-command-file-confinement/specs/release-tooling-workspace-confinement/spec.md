@@ -1,9 +1,4 @@
-# release-tooling-workspace-confinement Specification
-
-## Purpose
-TBD - created by archiving change fix-sonarcloud-new-code-debt. Update Purpose after archive.
-
-## Requirements
+## MODIFIED Requirements
 
 ### Requirement: Path-typed CLI arguments are confined to the release workspace
 
@@ -39,6 +34,8 @@ argument handling in an error-reporting boundary.
   rejects
 - **THEN** the CLI prints `Error: ...` to stderr and exits with status `2`, matching how the same
   entry point already reports other `ValueError`s from `verify_restored_main_packages()`
+
+## ADDED Requirements
 
 ### Requirement: GitHub runner command-file transport arguments use an environment-anchored trust boundary
 

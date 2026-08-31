@@ -33,3 +33,25 @@ def _safe_path(value: Path, description: str) -> Path:
         if contained:
             return Path(resolved)
     raise ValueError(f"The {description} '{value}' resolves outside the release workspace.")
+
+
+def _github_command_file_path(value: Path, description: str, env_var: str) -> Path:
+    """Validate a GitHub Actions runner command-file transport path, e.g. $GITHUB_OUTPUT or
+    $GITHUB_ENV. These files are created by the runner under its own temp directory, outside the
+    repository checkout, so `_safe_path`'s repository-workspace confinement does not (and must
+    not) apply to them: a real workflow run would always be rejected. Trust is instead anchored
+    to the workflow-provided environment variable itself, not to the CLI argument's label -
+    the path is accepted only when it is exactly the transport path the runner supplied via
+    `env_var`, never an arbitrary filesystem path merely passed as a `--github-*` argument."""
+    resolved = os.path.realpath(str(value))
+    trusted = os.environ.get(env_var)
+    if not trusted:
+        raise ValueError(
+            f"The {description} '{value}' cannot be trusted: the {env_var} "
+            "environment variable is not set by the runner."
+        )
+    if resolved != os.path.realpath(trusted):
+        raise ValueError(
+            f"The {description} '{value}' does not match the runner-provided {env_var} transport path."
+        )
+    return Path(resolved)
