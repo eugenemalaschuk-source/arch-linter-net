@@ -207,6 +207,26 @@ public sealed class SelfPolicyNegativeRegressionTests
         AssertFailedMentioning(result, "Exception");
     }
 
+    // ── #742 partial-declaration debt ratchet ───────────────────────────────
+    [Test]
+    public void PartialDeclarationRatchet_RejectsAnAggregateExceedingItsReviewedCount()
+    {
+        // The reviewed exception freezes ArchitectureDiagnosticFormatter's declaration count at its
+        // exact current value (19) via an exact-text ignored_violations entry. Lowering the frozen
+        // count by one reproduces "the aggregate grew past what was reviewed" without touching real
+        // source files: the live finding still says "found 19", the mutated entry now says "found
+        // 18", the exact-text match fails, and the (unignored) violation surfaces.
+        string mutated = SelfPolicyRepository.Replace(
+            _policy,
+            "found 19: src/ArchLinterNet.Core/Reporting/ArchitectureDiagnosticFormatter.Applicability.cs",
+            "found 18: src/ArchLinterNet.Core/Reporting/ArchitectureDiagnosticFormatter.Applicability.cs");
+
+        ArchitectureValidationResult result = ValidateMutated(
+            mutated, "production-partial-type-declaration-count-does-not-increase");
+
+        AssertFailedMentioning(result, "ArchitectureDiagnosticFormatter");
+    }
+
     [Test]
     public void ModelsLeafRule_RejectsCliDependenciesWhenTheRuleIsPointedAtTheCliSourceSet()
     {
