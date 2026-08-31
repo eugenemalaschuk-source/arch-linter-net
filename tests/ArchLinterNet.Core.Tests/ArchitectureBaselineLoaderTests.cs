@@ -338,7 +338,7 @@ metric_baselines:
         Assert.That(ex!.Message, Does.Contain(diagnostic));
     }
 
-    [TestCase("    metric_identity_version: 1\n", "", "metric_identity_version")]
+    [TestCase("metric_identity_version: 1", "", "metric_identity_version")]
     [TestCase("    value: 3", "", "value")]
     [TestCase("    value: 3", "    valu: 3", "valu")]
     [TestCase("    value: 3", "    value: 3\n    unknown: true", "unknown")]
