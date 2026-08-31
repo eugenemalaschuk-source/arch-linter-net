@@ -34,6 +34,80 @@ contracts:
         allowed_roles: [Exception]
       reason: Exceptions directories contain only types classified by inheritance as Exception.
 
+    # #742 ratchet: production-types-have-one-source-declaration (below, in audit_layout_conventions)
+    # stays audit-only and keeps reporting the complete debt inventory that decompose-god-classes
+    # targets. This strict rule reuses the same max_declarations_per_type evidence to block any
+    # *new* or *grown* handwritten production partial aggregate immediately, while the
+    # ignored_violations entries below freeze today's 19 known aggregates as reviewed debt using
+    # their exact current declaration count and file list. Any added, removed, or renamed
+    # declaration changes that exact text, so a frozen entry only tolerates an unchanged aggregate;
+    # growth, a new offender, or an improvement all surface as a failing (or newly unmatched, itself
+    # failing) finding that requires a reviewed one-line policy update in the same change.
+    - name: production-partial-type-declaration-count-does-not-increase
+      id: production-partial-type-declaration-count-does-not-increase
+      files_matching:
+        folder_segment: src
+      max_declarations_per_type: 1
+      reason: New or grown handwritten production partial-type aggregates are blocked immediately; see #742 and the decompose-god-classes OpenSpec change for the full cleanup authority.
+      ignored_violations:
+        - source_type: "ArchLinterNet.Cli.Commands.Validate.Application.ReportCoordinator"
+          forbidden_reference: "expected at most 1 source declaration(s), found 2: src/ArchLinterNet.Cli/Commands/Validate/Application/ReportCoordinator.Rendering.cs, src/ArchLinterNet.Cli/Commands/Validate/Application/ReportCoordinator.cs"
+          reason: "Reviewed decompose-god-classes debt frozen by #742; decompose-god-classes owns removing this aggregate."
+        - source_type: "ArchLinterNet.Cli.Commands.Validate.Application.ValidateCommandHandler"
+          forbidden_reference: "expected at most 1 source declaration(s), found 5: src/ArchLinterNet.Cli/Commands/Validate/Application/ValidateCommandHandler.Cache.cs, src/ArchLinterNet.Cli/Commands/Validate/Application/ValidateCommandHandler.Cancellation.cs, src/ArchLinterNet.Cli/Commands/Validate/Application/ValidateCommandHandler.Execution.cs, src/ArchLinterNet.Cli/Commands/Validate/Application/ValidateCommandHandler.Profile.cs, src/ArchLinterNet.Cli/Commands/Validate/Application/ValidateCommandHandler.cs"
+          reason: "Reviewed decompose-god-classes debt frozen by #742; decompose-god-classes owns removing this aggregate."
+        - source_type: "ArchLinterNet.Core.BuildState.BuildStatePreparationService"
+          forbidden_reference: "expected at most 1 source declaration(s), found 2: src/ArchLinterNet.Core/BuildState/BuildStatePreparationService.RuntimeBuild.cs, src/ArchLinterNet.Core/BuildState/BuildStatePreparationService.cs"
+          reason: "Reviewed decompose-god-classes debt frozen by #742; decompose-god-classes owns removing this aggregate."
+        - source_type: "ArchLinterNet.Core.Execution.ArchitectureAssemblyResolutionService"
+          forbidden_reference: "expected at most 1 source declaration(s), found 2: src/ArchLinterNet.Core/Execution/ArchitectureAssemblyResolutionService.TargetFramework.cs, src/ArchLinterNet.Core/Execution/ArchitectureAssemblyResolutionService.cs"
+          reason: "Reviewed decompose-god-classes debt frozen by #742; decompose-god-classes owns removing this aggregate."
+        - source_type: "ArchLinterNet.Core.Execution.ArchitectureCoverageAnalysisService"
+          forbidden_reference: "expected at most 1 source declaration(s), found 2: src/ArchLinterNet.Core/Execution/ArchitectureCoverageAnalysisService.RuleInputCoverage.cs, src/ArchLinterNet.Core/Execution/ArchitectureCoverageAnalysisService.cs"
+          reason: "Reviewed decompose-god-classes debt frozen by #742; decompose-god-classes owns removing this aggregate."
+        - source_type: "ArchLinterNet.Core.Execution.ArchitectureSourceFileFactIndex"
+          forbidden_reference: "expected at most 1 source declaration(s), found 2: src/ArchLinterNet.Core/Execution/ArchitectureSourceFileFactIndex.BoundedParallel.cs, src/ArchLinterNet.Core/Execution/ArchitectureSourceFileFactIndex.cs"
+          reason: "Reviewed decompose-god-classes debt frozen by #742; decompose-god-classes owns removing this aggregate."
+        - source_type: "ArchLinterNet.Core.Execution.ArchitectureTopologyEvaluator"
+          forbidden_reference: "expected at most 1 source declaration(s), found 3: src/ArchLinterNet.Core/Execution/ArchitectureTopologyEvaluator.Metrics.cs, src/ArchLinterNet.Core/Execution/ArchitectureTopologyEvaluator.Validation.cs, src/ArchLinterNet.Core/Execution/ArchitectureTopologyEvaluator.cs"
+          reason: "Reviewed decompose-god-classes debt frozen by #742; decompose-god-classes owns removing this aggregate."
+        - source_type: "ArchLinterNet.Core.Execution.Checkers.LayoutConventionChecker"
+          forbidden_reference: "expected at most 1 source declaration(s), found 2: src/ArchLinterNet.Core/Execution/Checkers/LayoutConventionChecker.Matching.cs, src/ArchLinterNet.Core/Execution/Checkers/LayoutConventionChecker.cs"
+          reason: "Reviewed decompose-god-classes debt frozen by #742; decompose-god-classes owns removing this aggregate."
+        - source_type: "ArchLinterNet.Core.Execution.SarifEvidenceReader"
+          forbidden_reference: "expected at most 1 source declaration(s), found 6: src/ArchLinterNet.Core/Execution/SarifEvidenceReader.Context.cs, src/ArchLinterNet.Core/Execution/SarifEvidenceReader.FileSystem.cs, src/ArchLinterNet.Core/Execution/SarifEvidenceReader.Parsing.cs, src/ArchLinterNet.Core/Execution/SarifEvidenceReader.SourceLocations.cs, src/ArchLinterNet.Core/Execution/SarifEvidenceReader.SourceProjection.cs, src/ArchLinterNet.Core/Execution/SarifEvidenceReader.cs"
+          reason: "Reviewed decompose-god-classes debt frozen by #742; decompose-god-classes owns removing this aggregate."
+        - source_type: "ArchLinterNet.Core.Graph.ArchitectureGraphApplicationService"
+          forbidden_reference: "expected at most 1 source declaration(s), found 2: src/ArchLinterNet.Core/Graph/ArchitectureGraphApplicationService.BuildState.cs, src/ArchLinterNet.Core/Graph/ArchitectureGraphApplicationService.cs"
+          reason: "Reviewed decompose-god-classes debt frozen by #742; decompose-god-classes owns removing this aggregate."
+        - source_type: "ArchLinterNet.Core.IO.RegularFileHandleReader"
+          forbidden_reference: "expected at most 1 source declaration(s), found 2: src/ArchLinterNet.Core/IO/RegularFileHandleReader.RepositoryLocal.cs, src/ArchLinterNet.Core/IO/RegularFileHandleReader.cs"
+          reason: "Reviewed decompose-god-classes debt frozen by #742; decompose-god-classes owns removing this aggregate."
+        - source_type: "ArchLinterNet.Core.Reporting.ArchitectureDiagnosticFormatter"
+          forbidden_reference: "expected at most 1 source declaration(s), found 20: src/ArchLinterNet.Core/Reporting/ArchitectureDiagnosticFormatter.Applicability.cs, src/ArchLinterNet.Core/Reporting/ArchitectureDiagnosticFormatter.BuildStatePreflight.cs, src/ArchLinterNet.Core/Reporting/ArchitectureDiagnosticFormatter.CiArtifacts.cs, src/ArchLinterNet.Core/Reporting/ArchitectureDiagnosticFormatter.Classification.cs, src/ArchLinterNet.Core/Reporting/ArchitectureDiagnosticFormatter.Context.cs, src/ArchLinterNet.Core/Reporting/ArchitectureDiagnosticFormatter.ContractSurfaceExposure.cs, src/ArchLinterNet.Core/Reporting/ArchitectureDiagnosticFormatter.CoverageJson.cs, src/ArchLinterNet.Core/Reporting/ArchitectureDiagnosticFormatter.Cycles.cs, src/ArchLinterNet.Core/Reporting/ArchitectureDiagnosticFormatter.DetailProjectionRegistry.cs, src/ArchLinterNet.Core/Reporting/ArchitectureDiagnosticFormatter.FrameworkReference.cs, src/ArchLinterNet.Core/Reporting/ArchitectureDiagnosticFormatter.ImportedExternalDiagnostics.cs, src/ArchLinterNet.Core/Reporting/ArchitectureDiagnosticFormatter.LayoutConventions.cs, src/ArchLinterNet.Core/Reporting/ArchitectureDiagnosticFormatter.NormalizedDetails.cs, src/ArchLinterNet.Core/Reporting/ArchitectureDiagnosticFormatter.PolicyConsistencyJson.cs, src/ArchLinterNet.Core/Reporting/ArchitectureDiagnosticFormatter.PolicyInventory.cs, src/ArchLinterNet.Core/Reporting/ArchitectureDiagnosticFormatter.PolicyProvenance.cs, src/ArchLinterNet.Core/Reporting/ArchitectureDiagnosticFormatter.PublicApiSurface.cs, src/ArchLinterNet.Core/Reporting/ArchitectureDiagnosticFormatter.SourceExpansion.cs, src/ArchLinterNet.Core/Reporting/ArchitectureDiagnosticFormatter.Waivers.cs, src/ArchLinterNet.Core/Reporting/ArchitectureDiagnosticFormatter.cs"
+          reason: "Reviewed decompose-god-classes debt frozen by #742; decompose-god-classes owns removing this aggregate. Refreshed after #745 (main) added ArchitectureDiagnosticFormatter.ContractSurfaceExposure.cs, taking the reviewed count from 19 to 20."
+        - source_type: "ArchLinterNet.Core.Reporting.ArchitectureSarifFormatter"
+          forbidden_reference: "expected at most 1 source declaration(s), found 4: src/ArchLinterNet.Core/Reporting/ArchitectureSarifFormatter.BuildStatePreflight.cs, src/ArchLinterNet.Core/Reporting/ArchitectureSarifFormatter.Locations.cs, src/ArchLinterNet.Core/Reporting/ArchitectureSarifFormatter.SourceExpansion.cs, src/ArchLinterNet.Core/Reporting/ArchitectureSarifFormatter.cs"
+          reason: "Reviewed decompose-god-classes debt frozen by #742; decompose-god-classes owns removing this aggregate."
+        - source_type: "ArchLinterNet.Core.Scanning.ArchitectureContractSurfaceExposureScanner"
+          forbidden_reference: "expected at most 1 source declaration(s), found 2: src/ArchLinterNet.Core/Scanning/ArchitectureContractSurfaceExposureAccessorMetadataScanner.cs, src/ArchLinterNet.Core/Scanning/ArchitectureContractSurfaceExposureScanner.cs"
+          reason: "Reviewed decompose-god-classes debt frozen by #742; decompose-god-classes owns removing this aggregate."
+        - source_type: "ArchLinterNet.Core.Scanning.ArchitectureContractSurfaceExposureScanner+Walker"
+          forbidden_reference: "expected at most 1 source declaration(s), found 2: src/ArchLinterNet.Core/Scanning/ArchitectureContractSurfaceExposureAccessorMetadataScanner.cs, src/ArchLinterNet.Core/Scanning/ArchitectureContractSurfaceExposureScanner.cs"
+          reason: "Reviewed decompose-god-classes debt frozen by #742; decompose-god-classes owns removing this aggregate."
+        - source_type: "ArchLinterNet.Core.Scanning.ArchitecturePublicApiSurfaceScanner"
+          forbidden_reference: "expected at most 1 source declaration(s), found 2: src/ArchLinterNet.Core/Scanning/ArchitecturePublicApiSurfaceScanner.Members.cs, src/ArchLinterNet.Core/Scanning/ArchitecturePublicApiSurfaceScanner.cs"
+          reason: "Reviewed decompose-god-classes debt frozen by #742; decompose-god-classes owns removing this aggregate."
+        - source_type: "ArchLinterNet.Core.Validation.ArchitectureAnalysisSnapshot"
+          forbidden_reference: "expected at most 1 source declaration(s), found 7: src/ArchLinterNet.Core/Validation/ArchitectureAnalysisSnapshot.Applicability.cs, src/ArchLinterNet.Core/Validation/ArchitectureAnalysisSnapshot.CacheProjectPaths.cs, src/ArchLinterNet.Core/Validation/ArchitectureAnalysisSnapshot.CacheWork.cs, src/ArchLinterNet.Core/Validation/ArchitectureAnalysisSnapshot.Inputs.cs, src/ArchLinterNet.Core/Validation/ArchitectureAnalysisSnapshot.Metrics.cs, src/ArchLinterNet.Core/Validation/ArchitectureAnalysisSnapshot.cs, src/ArchLinterNet.Core/Validation/ArchitectureAnalysisSnapshotEvaluationOrchestrator.cs"
+          reason: "Reviewed decompose-god-classes debt frozen by #742; decompose-god-classes owns removing this aggregate."
+        - source_type: "ArchLinterNet.Core.Validation.ArchitectureBaselineApplicationService"
+          forbidden_reference: "expected at most 1 source declaration(s), found 2: src/ArchLinterNet.Core/Validation/ArchitectureBaselineApplicationService.BuildState.cs, src/ArchLinterNet.Core/Validation/ArchitectureBaselineApplicationService.cs"
+          reason: "Reviewed decompose-god-classes debt frozen by #742; decompose-god-classes owns removing this aggregate."
+        - source_type: "ArchLinterNet.Core.Validation.ArchitecturePublicApiApplicationService"
+          forbidden_reference: "expected at most 1 source declaration(s), found 2: src/ArchLinterNet.Core/Validation/ArchitecturePublicApiApplicationService.SurfaceResolution.cs, src/ArchLinterNet.Core/Validation/ArchitecturePublicApiApplicationService.cs"
+          reason: "Reviewed decompose-god-classes debt frozen by #742; decompose-god-classes owns removing this aggregate."
+
   audit_layout_conventions:
     - name: production-types-have-one-source-declaration
       id: production-types-have-one-source-declaration
