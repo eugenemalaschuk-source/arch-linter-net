@@ -113,7 +113,12 @@ public sealed partial class SarifEvidenceReader
             return false;
         }
 
-        location = new SarifEvidenceSourceLocation(path, region);
+        // An empty physicalLocation carries no usable source fact. Preserve a real path or region,
+        // but collapse `{ "physicalLocation": {} }` to no location so downstream normalized
+        // findings never serialize an all-null location that violates their own schema.
+        location = path is null && region is null
+            ? null
+            : new SarifEvidenceSourceLocation(path, region);
         return true;
     }
 

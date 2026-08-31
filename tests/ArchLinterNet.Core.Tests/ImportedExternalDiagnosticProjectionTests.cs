@@ -78,7 +78,7 @@ public sealed class ImportedExternalDiagnosticProjectionTests
             Assert.That(((ImportedExternalDiagnostic)repeatedFinding.Details).EvidenceProvenances.Single().RunId,
                 Is.EqualTo("second-run"));
             Assert.That(candidates.Single().Identity, Is.EqualTo(firstFinding.Identity));
-            Assert.That(candidates.Single().ContractGroup, Is.EqualTo("strict"));
+            Assert.That(candidates.Single().ContractGroup, Is.EqualTo("strict_external"));
             Assert.That(candidates.Single().ForbiddenReference, Is.EqualTo("external-diagnostic:v2:stable"));
         });
     }
@@ -172,6 +172,9 @@ public sealed class ImportedExternalDiagnosticProjectionTests
         ValidationOutcome strictThenAuditOutcome = strictOutcome.WithImportedDiagnostics(audit);
         ValidationOutcome strictThenEmptyOutcome = strictOutcome.WithImportedDiagnostics(ImportedExternalDiagnosticProjection.Empty);
         ValidationOutcome nativeFailureWithAuditOutcome = Outcome(passed: false).WithImportedDiagnostics(audit);
+        ValidationOutcome publiclyFailedOutcome = PassingOutcome() with { Passed = false };
+        ValidationOutcome publiclyFailedThenEmptyOutcome = publiclyFailedOutcome.WithImportedDiagnostics(
+            ImportedExternalDiagnosticProjection.Empty);
         var strictResult = new ArchitectureValidationResult(new ArchitectureValidationResultParams(
             Passed: true,
             Violations: Array.Empty<ArchitectureViolation>(),
@@ -196,8 +199,110 @@ public sealed class ImportedExternalDiagnosticProjectionTests
             Assert.That(strictThenEmptyOutcome.Passed, Is.True);
             Assert.That(strictThenEmptyOutcome.ImportedDiagnosticFindings, Is.Empty);
             Assert.That(nativeFailureWithAuditOutcome.Passed, Is.False);
+            Assert.That(publiclyFailedOutcome.NativePassed, Is.False);
+            Assert.That(publiclyFailedThenEmptyOutcome.Passed, Is.False);
             Assert.That(strictResult.Passed, Is.False);
             Assert.That(auditResult.Passed, Is.True);
+        });
+    }
+
+    [Test]
+    public void ImportedBaseline_GenerateSerializeLoadAndCompareKeepsExactFindingKnownWithoutNativeIgnore()
+    {
+        SarifSelectedExternalDiagnostic selected = Selected(
+            "external-diagnostic:v2:baseline-round-trip",
+            SarifExternalDiagnosticGovernanceMode.Strict,
+            "baseline-hash",
+            "baseline-run",
+            "baseline source message",
+            "src/App/Baseline.cs");
+        ArchitectureContractDocument policy = new()
+        {
+            ExternalEvidence =
+            [
+                new ArchitectureExternalEvidenceRequirement
+                {
+                    Id = "external.scan",
+                    Format = "sarif",
+                    Required = true,
+                    Tool = "Example Analyzer",
+                    Run = "baseline-run",
+                },
+            ],
+        };
+        IReadOnlyList<ArchitectureBaselineCandidate> candidates =
+            ArchitectureImportedDiagnosticBaselineProjector.ToBaselineCandidates(
+                new SarifExternalDiagnosticSelectionResult([selected]));
+        var generator = new ArchitectureBaselineGenerator();
+        ArchitectureBaselineDocument generated = generator.Generate(policy, candidates);
+        string path = Path.Combine(Path.GetTempPath(), "arch-linter-net-imported-baseline-" + Guid.NewGuid() + ".yml");
+
+        try
+        {
+            File.WriteAllText(path, generator.Serialize(generated));
+            ArchitectureBaselineDocument loaded = new ArchitectureBaselineLoadingService().LoadFromPath(path);
+            ArchitectureBaselineLoadingService.MergeAndValidate(policy, loaded);
+            ArchitectureBaselineComparisonResult comparison = ArchitectureBaselineComparer.Compare(
+                policy,
+                loaded,
+                candidates,
+                "strict");
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(candidates.Single().ContractGroup, Is.EqualTo("strict_external"));
+                Assert.That(loaded.Baseline.StrictExternal.Single().Id, Is.EqualTo("external.scan"));
+                Assert.That(policy.Contracts.StrictExternal, Is.Empty);
+                Assert.That(comparison.New, Is.Empty);
+                Assert.That(comparison.Frozen, Has.Count.EqualTo(1));
+                Assert.That(comparison.Frozen.Single().Identity, Is.EqualTo(candidates.Single().Identity));
+            });
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    [Test]
+    public void BaselineProjection_PrecomputesOneIdentitySortKeyPerHighCardinalityCandidate()
+    {
+        const int CandidateCount = 2_048;
+        ArchitectureBaselineCandidate[] candidates = Enumerable.Range(0, CandidateCount)
+            .Select(index => new ArchitectureBaselineCandidate(
+                "strict_external",
+                "external.scan",
+                $"source-{CandidateCount - index:D4}",
+                $"external-diagnostic:v2:{index:D4}",
+                new ArchitectureViolationIdentity(
+                    ArchitectureViolationIdentity.CurrentVersion,
+                    "external_diagnostic",
+                    "external_diagnostic",
+                    "external.scan",
+                    SourceAssembly: null,
+                    SourceType: $"source-{CandidateCount - index:D4}",
+                    SourceMember: null,
+                    TargetAssembly: null,
+                    TargetType: null,
+                    TargetMember: $"external-diagnostic:v2:{index:D4}",
+                    Occurrence: index)))
+            .ToArray();
+        int serializationCount = 0;
+
+        IReadOnlyList<ArchitectureBaselineCandidate> ordered =
+            ArchitectureImportedDiagnosticBaselineProjector.SortCandidates(
+                candidates,
+                identity =>
+                {
+                    serializationCount++;
+                    return ArchitectureViolationIdentityJson.Serialize(identity);
+                });
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(serializationCount, Is.EqualTo(CandidateCount));
+            Assert.That(ordered, Has.Count.EqualTo(CandidateCount));
+            Assert.That(ordered[0].SourceType, Is.EqualTo("source-0001"));
         });
     }
 

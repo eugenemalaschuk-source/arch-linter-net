@@ -175,7 +175,7 @@ public sealed class ArchitectureExternalEvidenceApplicabilityProjectorTests
     }
 
     [Test]
-    public void Project_DoesNotFabricateMissingOrCollapseDuplicateRecords()
+    public void Project_FederatesComplementaryTrustedArtifactsIntoOneEvaluableControl()
     {
         IReadOnlyList<ArchitectureApplicabilityExpectedEntry> expected;
         IReadOnlyList<ArchitectureApplicabilityRecord> missingRecords;
@@ -187,16 +187,16 @@ public sealed class ArchitectureExternalEvidenceApplicabilityProjectorTests
             missingRecords,
             conformancePassed: true)!;
 
-        IReadOnlyList<ArchitectureApplicabilityRecord> duplicateRecords =
+        IReadOnlyList<ArchitectureApplicabilityRecord> federatedRecords =
             ArchitectureExternalEvidenceApplicabilityProjector.ProjectRecords(
                 [Requirement("external.scan")],
                 [
-                    ReadResult("external.scan", SarifEvidenceTrustStatus.Valid),
-                    ReadResult("external.scan", SarifEvidenceTrustStatus.Valid),
+                    ReadResult("external.scan", SarifEvidenceTrustStatus.Valid, "artifacts/sec100.sarif"),
+                    ReadResult("external.scan", SarifEvidenceTrustStatus.Valid, "artifacts/sec200.sarif"),
                 ]);
-        ArchitectureAssessmentCompletionEvidence duplicateCompletion = ArchitectureApplicabilityEvaluator.Evaluate(
+        ArchitectureAssessmentCompletionEvidence federationCompletion = ArchitectureApplicabilityEvaluator.Evaluate(
             expected,
-            duplicateRecords,
+            federatedRecords,
             conformancePassed: true)!;
 
         Assert.Multiple(() =>
@@ -204,9 +204,69 @@ public sealed class ArchitectureExternalEvidenceApplicabilityProjectorTests
             Assert.That(missingRecords, Is.Empty);
             Assert.That(missingCompletion.Reasons.Select(reason => reason.Code), Contains.Item(
                 ArchitectureApplicabilityReasonCodes.MissingApplicabilityRecord));
-            Assert.That(duplicateRecords, Has.Count.EqualTo(2));
-            Assert.That(duplicateCompletion.Reasons.Select(reason => reason.Code), Contains.Item(
-                ArchitectureApplicabilityReasonCodes.DuplicateApplicabilityRecordIdentity));
+            Assert.That(federatedRecords, Has.Count.EqualTo(1));
+            Assert.That(federatedRecords.Single().State, Is.EqualTo(ArchitectureApplicabilityRecordState.Evaluable));
+            Assert.That(federationCompletion.State, Is.EqualTo(ArchitectureAssessmentCompletionState.Pass));
+        });
+    }
+
+    [Test]
+    public void Project_RequireMatchesFailsClosedWhenTheSelectionStageIsMissing()
+    {
+        ArchitectureExternalEvidenceRequirement requirement = Requirement("external.scan");
+        requirement.DiagnosticFilter = new ArchitectureExternalEvidenceDiagnosticFilter
+        {
+            RuleIds = ["SEC404"],
+            RequireMatches = true,
+        };
+
+        (_, IReadOnlyList<ArchitectureApplicabilityRecord> records) =
+            ArchitectureExternalEvidenceApplicabilityProjector.Project(
+                [requirement],
+                [ReadResult("external.scan", SarifEvidenceTrustStatus.Valid)]);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(records, Has.Count.EqualTo(1));
+            Assert.That(records.Single().State, Is.EqualTo(ArchitectureApplicabilityRecordState.Unassessable));
+            Assert.That(records.Single().Reasons.Select(reason => reason.Code), Is.EqualTo([
+                ArchitectureApplicabilityReasonCodes.StaleDeclaration]));
+        });
+    }
+
+    [Test]
+    public void Project_CapturedRequireMatchesFailsClosedEvenWhenCallerSuppliesAnUnfilteredDeclaration()
+    {
+        (_, IReadOnlyList<ArchitectureApplicabilityRecord> records) =
+            ArchitectureExternalEvidenceApplicabilityProjector.Project(
+                [Requirement("external.scan")],
+                [ReadResult(
+                    "external.scan",
+                    SarifEvidenceTrustStatus.Valid,
+                    authorization: new SarifEvidenceAuthorizationSnapshot(
+                        "external.scan",
+                        "Acme.Scanner",
+                        toolVersion: "7.2",
+                        run: "assessment-42",
+                        requireRepository: false,
+                        requireRevision: false,
+                        requireScope: false,
+                        assessmentContext: new SarifEvidenceAssessmentContext(),
+                        diagnosticFilter: new SarifExternalDiagnosticFilterAuthorization(
+                            ["SEC404"],
+                            ruleTags: null,
+                            projects: null,
+                            pathPrefixes: null,
+                            severity: null,
+                            requireMatches: true),
+                        validatedContext: null))]);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(records, Has.Count.EqualTo(1));
+            Assert.That(records.Single().State, Is.EqualTo(ArchitectureApplicabilityRecordState.Unassessable));
+            Assert.That(records.Single().Reasons.Select(reason => reason.Code), Is.EqualTo([
+                ArchitectureApplicabilityReasonCodes.StaleDeclaration]));
         });
     }
 
@@ -247,9 +307,12 @@ public sealed class ArchitectureExternalEvidenceApplicabilityProjectorTests
 
     private static SarifEvidenceReadResult ReadResult(
         string logicalId,
-        SarifEvidenceTrustStatus status) => new(
+        SarifEvidenceTrustStatus status,
+        string? artifactPath = null,
+        SarifEvidenceAuthorizationSnapshot? authorization = null) => new(
             status,
             status.ToString(),
             "test detail",
-            new SarifEvidenceProvenance(logicalId, null, null, null, null, null, null, null));
+            new SarifEvidenceProvenance(logicalId, artifactPath, null, null, null, null, null, null),
+            authorization: authorization);
 }

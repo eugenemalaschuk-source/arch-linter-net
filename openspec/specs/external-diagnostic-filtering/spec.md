@@ -43,6 +43,12 @@ NOT be silently treated as a valid zero-result selection.
 - **THEN** selection exposes a deterministic unmatched-rule filter record rather than silently
   returning a valid empty result
 
+#### Scenario: A required filter is not treated as selected by omission
+- **WHEN** trusted evidence carries a `require_matches: true` authorization but a downstream
+  consumer has no corresponding selection result
+- **THEN** that consumer SHALL treat the selection as unavailable rather than treating the trusted
+  reader result as a clean zero-result selection
+
 #### Scenario: A later mutable policy cannot re-authorize trusted evidence
 - **WHEN** a result was trusted for one tool/run/filter authorization and a caller later changes
   a requirement with the same logical ID

@@ -4,24 +4,70 @@ using ArchLinterNet.Core.Reporting;
 
 namespace ArchLinterNet.Core.Validation;
 
-public sealed record ValidationOutcome(
-    bool Passed,
-    IReadOnlyCollection<ArchitectureViolation> Violations,
-    IReadOnlyCollection<string> Cycles,
-    IReadOnlyCollection<ArchitectureViolation> CoverageFindings,
-    string CoverageConfig,
-    IReadOnlyList<ArchitectureUnmatchedIgnoredViolation> UnmatchedIgnoredViolations,
-    string UnmatchedIgnoredViolationsConfig,
-    IReadOnlyCollection<PolicyConsistencyDiagnostic> PolicyConsistencyFindings,
-    string PolicyConsistencyConfig,
-    IReadOnlyCollection<ArchitectureCoverageSummary> CoverageSummaries,
-    IReadOnlyCollection<ArchitectureClassificationConflict> ClassificationConflicts,
-    IReadOnlyCollection<ArchitectureClassificationMetadataFailure> ClassificationMetadataFailures)
+public sealed record ValidationOutcome
 {
-    // `Passed` becomes the effective state once imported diagnostics are attached. Keep the
-    // original Core/native result so replacing a strict projection with audit or empty findings
-    // recomputes from the same base rather than carrying an obsolete strict failure forward.
-    private bool NativePassed { get; init; } = Passed;
+    private bool _nativePassed;
+    private bool _passed;
+
+    public ValidationOutcome(
+        bool Passed,
+        IReadOnlyCollection<ArchitectureViolation> Violations,
+        IReadOnlyCollection<string> Cycles,
+        IReadOnlyCollection<ArchitectureViolation> CoverageFindings,
+        string CoverageConfig,
+        IReadOnlyList<ArchitectureUnmatchedIgnoredViolation> UnmatchedIgnoredViolations,
+        string UnmatchedIgnoredViolationsConfig,
+        IReadOnlyCollection<PolicyConsistencyDiagnostic> PolicyConsistencyFindings,
+        string PolicyConsistencyConfig,
+        IReadOnlyCollection<ArchitectureCoverageSummary> CoverageSummaries,
+        IReadOnlyCollection<ArchitectureClassificationConflict> ClassificationConflicts,
+        IReadOnlyCollection<ArchitectureClassificationMetadataFailure> ClassificationMetadataFailures)
+    {
+        this.Passed = Passed;
+        this.Violations = Violations;
+        this.Cycles = Cycles;
+        this.CoverageFindings = CoverageFindings;
+        this.CoverageConfig = CoverageConfig;
+        this.UnmatchedIgnoredViolations = UnmatchedIgnoredViolations;
+        this.UnmatchedIgnoredViolationsConfig = UnmatchedIgnoredViolationsConfig;
+        this.PolicyConsistencyFindings = PolicyConsistencyFindings;
+        this.PolicyConsistencyConfig = PolicyConsistencyConfig;
+        this.CoverageSummaries = CoverageSummaries;
+        this.ClassificationConflicts = ClassificationConflicts;
+        this.ClassificationMetadataFailures = ClassificationMetadataFailures;
+    }
+
+    /// <summary>Effective pass state after all attached Core governance projections.</summary>
+    public bool Passed
+    {
+        get => _passed;
+        init
+        {
+            _nativePassed = value;
+            _passed = value && !ImportedDiagnostics.HasBlockingFindings;
+        }
+    }
+
+    /// <summary>Immutable native conformance state before imported-diagnostic governance.</summary>
+    public bool NativePassed => _nativePassed;
+
+    private bool EffectivePassed
+    {
+        get => _passed;
+        init => _passed = value;
+    }
+
+    public IReadOnlyCollection<ArchitectureViolation> Violations { get; init; }
+    public IReadOnlyCollection<string> Cycles { get; init; }
+    public IReadOnlyCollection<ArchitectureViolation> CoverageFindings { get; init; }
+    public string CoverageConfig { get; init; }
+    public IReadOnlyList<ArchitectureUnmatchedIgnoredViolation> UnmatchedIgnoredViolations { get; init; }
+    public string UnmatchedIgnoredViolationsConfig { get; init; }
+    public IReadOnlyCollection<PolicyConsistencyDiagnostic> PolicyConsistencyFindings { get; init; }
+    public string PolicyConsistencyConfig { get; init; }
+    public IReadOnlyCollection<ArchitectureCoverageSummary> CoverageSummaries { get; init; }
+    public IReadOnlyCollection<ArchitectureClassificationConflict> ClassificationConflicts { get; init; }
+    public IReadOnlyCollection<ArchitectureClassificationMetadataFailure> ClassificationMetadataFailures { get; init; }
 
     // Declared as an init-only property outside the primary constructor, not as a 13th positional
     // parameter, so existing positional `new ValidationOutcome(...)` call sites and Deconstruct
@@ -132,8 +178,8 @@ public sealed record ValidationOutcome(
         ArgumentNullException.ThrowIfNull(importedDiagnostics);
         return this with
         {
-            Passed = NativePassed && !importedDiagnostics.HasBlockingFindings,
             ImportedDiagnostics = importedDiagnostics,
+            EffectivePassed = NativePassed && !importedDiagnostics.HasBlockingFindings,
         };
     }
 

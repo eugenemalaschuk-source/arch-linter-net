@@ -33,6 +33,9 @@ public static class ArchitectureBaselineComparer
 
         Dictionary<string, Dictionary<string, string>> canonicalIdsByGroup =
             BuildCanonicalIdsByGroup(policyDocument.Contracts);
+        Dictionary<string, string> externalEvidenceIds = policyDocument.ExternalEvidence
+            .Where(requirement => !string.IsNullOrWhiteSpace(requirement.Id))
+            .ToDictionary(requirement => requirement.Id, requirement => requirement.Id, StringComparer.OrdinalIgnoreCase);
 
         foreach (var groupName in ArchitectureBaselineContractGroups.GroupNames)
         {
@@ -46,7 +49,14 @@ public static class ArchitectureBaselineComparer
                 : new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
 
             HashSet<string> baselineKeys = ProcessBaselineEntries(
-                new BaselineGroupScope(groupName, entries, groupInScope, selectedIds, knownIds, canonicalIds),
+                new BaselineGroupScope(
+                    groupName,
+                    entries,
+                    groupInScope,
+                    selectedIds,
+                    knownIds,
+                    canonicalIds,
+                    externalEvidenceIds),
                 candidates,
                 useStructuredIdentity,
                 new BaselineClassification(outOfScope, configurationErrors, frozen, resolved, ambiguous));
@@ -56,7 +66,15 @@ public static class ArchitectureBaselineComparer
                 continue;
             }
 
-            ProcessNewCandidates(groupName, candidates, selectedIds, canonicalIds, baselineKeys, useStructuredIdentity, newEntries);
+            ProcessNewCandidates(
+                groupName,
+                candidates,
+                selectedIds,
+                canonicalIds,
+                externalEvidenceIds,
+                baselineKeys,
+                useStructuredIdentity,
+                newEntries);
         }
 
         return new ArchitectureBaselineComparisonResult(newEntries, frozen, resolved, configurationErrors, outOfScope)
@@ -73,7 +91,8 @@ public static class ArchitectureBaselineComparer
         bool GroupInScope,
         HashSet<string>? SelectedIds,
         HashSet<string> KnownIds,
-        Dictionary<string, string> CanonicalIds);
+        Dictionary<string, string> CanonicalIds,
+        Dictionary<string, string> ExternalEvidenceIds);
 
     // The five buckets an entry can land in.
     private sealed record BaselineClassification(
@@ -107,11 +126,18 @@ public static class ArchitectureBaselineComparer
                 continue;
             }
 
-            bool idKnown = scope.KnownIds.Contains(entry.Id);
-            string canonicalContractId = CanonicalizeContractId(scope.CanonicalIds, entry.Id);
-
             foreach (var ignore in entry.IgnoredViolations)
             {
+                bool isImportedExternalDiagnostic = IsImportedExternalDiagnostic(
+                    scope.GroupName,
+                    ignore,
+                    useStructuredIdentity);
+                bool idKnown = isImportedExternalDiagnostic
+                    ? scope.ExternalEvidenceIds.ContainsKey(entry.Id)
+                    : scope.KnownIds.Contains(entry.Id);
+                string canonicalContractId = CanonicalizeContractId(
+                    isImportedExternalDiagnostic ? scope.ExternalEvidenceIds : scope.CanonicalIds,
+                    entry.Id);
                 baselineKeys.Add(useStructuredIdentity
                     ? BuildIdentityKey(ignore.ToIdentity(canonicalContractId))
                     : BuildLegacyKey(canonicalContractId, ignore.SourceType, ignore.ForbiddenReference));
@@ -189,6 +215,7 @@ public static class ArchitectureBaselineComparer
         IReadOnlyList<ArchitectureBaselineCandidate> candidates,
         HashSet<string>? selectedIds,
         Dictionary<string, string> canonicalIds,
+        Dictionary<string, string> externalEvidenceIds,
         HashSet<string> baselineKeys,
         bool useStructuredIdentity,
         List<ArchitectureBaselineComparisonEntry> newEntries)
@@ -206,7 +233,13 @@ public static class ArchitectureBaselineComparer
                 continue;
             }
 
-            string canonicalContractId = CanonicalizeContractId(canonicalIds, candidate.ContractId);
+            bool isImportedExternalDiagnostic = IsImportedExternalDiagnostic(
+                groupName,
+                candidate.Identity,
+                useStructuredIdentity);
+            string canonicalContractId = CanonicalizeContractId(
+                isImportedExternalDiagnostic ? externalEvidenceIds : canonicalIds,
+                candidate.ContractId);
             ArchitectureViolationIdentity? candidateIdentity = useStructuredIdentity
                 ? (candidate.Identity ?? BuildFallbackIdentity(groupName, canonicalContractId, candidate)) with { ContractId = canonicalContractId }
                 : null;
@@ -243,6 +276,22 @@ public static class ArchitectureBaselineComparer
             candidate.ForbiddenReference,
             Occurrence: 0);
     }
+
+    private static bool IsImportedExternalDiagnostic(
+        string groupName,
+        ArchitectureBaselineIgnoredViolation ignore,
+        bool useStructuredIdentity) =>
+        useStructuredIdentity
+        && groupName is "strict_external" or "audit_external"
+        && string.Equals(ignore.Kind, "external_diagnostic", StringComparison.Ordinal);
+
+    private static bool IsImportedExternalDiagnostic(
+        string groupName,
+        ArchitectureViolationIdentity? identity,
+        bool useStructuredIdentity) =>
+        useStructuredIdentity
+        && groupName is "strict_external" or "audit_external"
+        && string.Equals(identity?.Kind, "external_diagnostic", StringComparison.Ordinal);
 
     private static Dictionary<string, Dictionary<string, string>> BuildCanonicalIdsByGroup(Families.ArchitectureContractGroups groups)
     {

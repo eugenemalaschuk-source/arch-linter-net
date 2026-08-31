@@ -4112,6 +4112,7 @@ property ArchLinterNet.Core.Validation.ValidationOutcome.Cycles: System.Collecti
 property ArchLinterNet.Core.Validation.ValidationOutcome.DiscoveredProjectPaths: System.Collections.Generic.IReadOnlyList`1[System.String] [get, init]
 property ArchLinterNet.Core.Validation.ValidationOutcome.ImportedDiagnosticFindings: System.Collections.Generic.IReadOnlyList`1[ArchLinterNet.Core.Model.ArchitectureFinding] [get]
 property ArchLinterNet.Core.Validation.ValidationOutcome.ImportedDiagnostics: ArchLinterNet.Core.Model.ImportedExternalDiagnosticProjection [get, init:private]
+property ArchLinterNet.Core.Validation.ValidationOutcome.NativePassed: System.Boolean [get]
 property ArchLinterNet.Core.Validation.ValidationOutcome.Passed: System.Boolean [get, init]
 property ArchLinterNet.Core.Validation.ValidationOutcome.PolicyConsistencyConfig: System.String [get, init]
 property ArchLinterNet.Core.Validation.ValidationOutcome.PolicyConsistencyFindings: System.Collections.Generic.IReadOnlyCollection`1[ArchLinterNet.Core.Model.PolicyConsistencyDiagnostic] [get, init]

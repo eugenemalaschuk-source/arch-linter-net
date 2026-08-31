@@ -178,6 +178,7 @@ public sealed class SarifExternalDiagnosticSelector
             context?.Revision,
             context?.Scope,
             provenance.ToolName,
+            provenance.ToolVersion,
             source.RuleId,
             source.Project,
             location?.Path,

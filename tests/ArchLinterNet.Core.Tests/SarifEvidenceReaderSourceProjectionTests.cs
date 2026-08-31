@@ -313,6 +313,26 @@ public sealed class SarifEvidenceReaderSourceProjectionTests
         });
     }
 
+    [Test]
+    public void Read_EmptyPhysicalLocationIsCollapsedToNoSourceLocation()
+    {
+        _repository.AddUtf8File(
+            "scan.sarif",
+            Sarif(string.Empty, "{\"ruleId\":\"SEC100\",\"message\":{\"text\":\"no location fact\"},\"locations\":[{\"physicalLocation\":{}}]}"));
+
+        SarifEvidenceReadResult result = new SarifEvidenceReader().Read(
+            Requirement(),
+            _repository.Root,
+            new SarifEvidenceArtifactReference("scan.sarif", "external.scan"),
+            new SarifEvidenceAssessmentContext("repo", "revision"));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(result.Status, Is.EqualTo(SarifEvidenceTrustStatus.Valid), result.Detail);
+            Assert.That(result.SourceDiagnostics.Single().PrimaryLocation, Is.Null);
+        });
+    }
+
     [TestCase("startLine", 0)]
     [TestCase("startColumn", 0)]
     [TestCase("endLine", -1)]

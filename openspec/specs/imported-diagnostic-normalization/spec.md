@@ -20,10 +20,12 @@ and SHALL NOT read an artifact, query a producer, or reapply a diagnostic filter
   no ordinary imported finding
 
 ### Requirement: Imported projections derive pass state from the native outcome
-Core SHALL retain the native validation pass state separately from the effective pass state after
-an imported-diagnostic projection is attached. Replacing an attached projection SHALL recompute
-the effective state from that native state and the replacement projection's blocking state, so the
-findings and `Passed` outcome cannot diverge.
+Core SHALL retain an explicit immutable native conformance state separately from the effective pass
+state after an imported-diagnostic projection is attached. Replacing an attached projection SHALL
+recompute the effective state from that native state and the replacement projection's blocking
+state, so the findings and `Passed` outcome cannot diverge. A public update of the native pass
+state SHALL update that explicit native state too; an earlier native failure SHALL never become a
+pass merely because an imported projection is replaced.
 
 #### Scenario: Replacing a strict projection with audit restores a passing native outcome
 - **WHEN** a passing native outcome first receives a strict imported projection and then receives
@@ -34,13 +36,19 @@ findings and `Passed` outcome cannot diverge.
 - **WHEN** a failing native outcome receives an audit-only imported projection
 - **THEN** the effective outcome remains failed
 
+#### Scenario: A public native failure remains failed after replacement
+- **WHEN** a caller changes a public validation outcome from passing to failing and then attaches
+  an empty or audit-only imported projection
+- **THEN** the outcome remains failed and its explicit native conformance state is failed
+
 ### Requirement: Imported finding identity is stable and evidence provenance remains drillable
 An imported finding's canonical persistent identity SHALL be deterministic from the selected
 diagnostic's stable semantic identity, logical evidence control, and governance semantics. It
-SHALL distinguish selected diagnostics that differ in required logical evidence, repository,
-revision, scope, source location, source severity, or mapped mode where #521 distinguishes them.
-It SHALL exclude source display text, artifact content hash, run identity, artifact path, and
-producer run ordering. The finding detail SHALL retain original tool/rule/message/severity/location,
+SHALL distinguish selected diagnostics that differ in required logical evidence, producer tool or
+tool version, repository, revision, scope, source location, source severity, or mapped mode where
+#521 distinguishes them. It SHALL exclude source display text, artifact content hash, run identity,
+artifact path, and producer run ordering. The finding detail SHALL retain original
+tool/rule/message/severity/location,
 fingerprint origin/value, and every ordered evidence provenance entry including logical key,
 tool/version/run, repository/revision/scope, artifact path, and content hash.
 
@@ -49,6 +57,11 @@ tool/version/run, repository/revision/scope, artifact path, and content hash.
   artifact hashes or run IDs
 - **THEN** their projected finding identity remains stable while the ordered provenance keeps both
   authorizing run/hash entries
+
+#### Scenario: A producer version preserves the published identity boundary
+- **WHEN** otherwise equivalent selected diagnostics are produced by two different tool versions
+- **THEN** their canonical imported-finding identities are distinct, while reruns from the same
+  tool version remain stable across run ID and artifact-hash changes
 
 #### Scenario: Different source locations do not collide
 - **WHEN** two selected source results have the same rule and source fingerprint but different
@@ -64,3 +77,14 @@ and SHALL NOT write, suppress, or reinterpret a baseline entry during projection
 - **WHEN** an imported finding is projected again from equivalent current-context evidence
 - **THEN** its baseline candidate has the same structured identity and can match the existing
   reviewed baseline entry without source-message, artifact-hash, or run-ID churn
+
+### Requirement: Empty source locations are absent from normalized findings
+The normalized finding projection SHALL emit a source location only when the trusted source
+location has at least one schema-valid anchor: an artifact path, region line, or region character
+offset. An empty SARIF `physicalLocation` SHALL be represented as no source location, not as an
+all-null location object.
+
+#### Scenario: Empty physical location remains schema-valid
+- **WHEN** a trusted SARIF diagnostic declares `physicalLocation: {}`
+- **THEN** its normalized finding has no source location and validates against the packaged
+  normalized-finding schema

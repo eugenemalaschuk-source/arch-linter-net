@@ -204,7 +204,7 @@ public sealed class SarifExternalDiagnosticSelectorTests
     }
 
     [Test]
-    public void Select_ProjectAndBaseline_KeepPersistentDebtIdentityStableAcrossToolAndRunChanges()
+    public void Select_ProjectAndBaseline_PreserveV2ToolVersionSemanticsWithoutRunOrArtifactChurn()
     {
         ArchitectureExternalEvidenceRequirement firstRequirement = Requirement(
             ruleIds: ["SEC100"],
@@ -214,6 +214,10 @@ public sealed class SarifExternalDiagnosticSelectorTests
             severity: new Dictionary<string, string> { ["error"] = "strict" });
         upgradedRequirement.ToolVersion = "7.3";
         upgradedRequirement.Run = "assessment-43";
+        ArchitectureExternalEvidenceRequirement rerunRequirement = Requirement(
+            ruleIds: ["SEC100"],
+            severity: new Dictionary<string, string> { ["error"] = "strict" });
+        rerunRequirement.Run = "assessment-43";
 
         SarifEvidenceReadResult firstEvidence = Read(
             firstRequirement,
@@ -227,6 +231,12 @@ public sealed class SarifExternalDiagnosticSelectorTests
             Results(Result("SEC100", "error", "src/App/Shared.cs", "same governed occurrence", "{\"stable\":\"same\"}")),
             toolVersion: "7.3",
             runId: "assessment-43");
+        SarifEvidenceReadResult rerunEvidence = Read(
+            rerunRequirement,
+            "reports/rerun.sarif",
+            Results(Result("SEC100", "error", "src/App/Shared.cs", "same governed occurrence", "{\"stable\":\"same\"}")),
+            toolVersion: "7.2",
+            runId: "assessment-43");
         var selector = new SarifExternalDiagnosticSelector();
 
         SarifExternalDiagnosticSelectionResult firstSelection = selector.Select(
@@ -237,13 +247,21 @@ public sealed class SarifExternalDiagnosticSelectorTests
         [
             new SarifExternalDiagnosticSelectionInput(upgradedEvidence),
         ]);
+        SarifExternalDiagnosticSelectionResult rerunSelection = selector.Select(
+        [
+            new SarifExternalDiagnosticSelectionInput(rerunEvidence),
+        ]);
         ImportedExternalDiagnosticProjection firstProjection = ArchitectureImportedDiagnosticProjector.Project(firstSelection);
         ImportedExternalDiagnosticProjection upgradedProjection = ArchitectureImportedDiagnosticProjector.Project(upgradedSelection);
+        ImportedExternalDiagnosticProjection rerunProjection = ArchitectureImportedDiagnosticProjector.Project(rerunSelection);
         ArchitectureBaselineCandidate firstBaseline = ArchitectureImportedDiagnosticBaselineProjector
             .ToBaselineCandidates(firstSelection)
             .Single();
         ArchitectureBaselineCandidate upgradedBaseline = ArchitectureImportedDiagnosticBaselineProjector
             .ToBaselineCandidates(upgradedSelection)
+            .Single();
+        ArchitectureBaselineCandidate rerunBaseline = ArchitectureImportedDiagnosticBaselineProjector
+            .ToBaselineCandidates(rerunSelection)
             .Single();
 
         Assert.Multiple(() =>
@@ -255,10 +273,15 @@ public sealed class SarifExternalDiagnosticSelectorTests
             Assert.That(firstEvidence.Provenance.ArtifactPath, Is.Not.EqualTo(upgradedEvidence.Provenance.ArtifactPath));
             Assert.That(firstEvidence.Provenance.ArtifactSha256, Is.Not.EqualTo(upgradedEvidence.Provenance.ArtifactSha256));
             Assert.That(firstSelection.Diagnostics.Single().CanonicalIdentity,
-                Is.EqualTo(upgradedSelection.Diagnostics.Single().CanonicalIdentity));
+                Is.Not.EqualTo(upgradedSelection.Diagnostics.Single().CanonicalIdentity));
+            Assert.That(firstSelection.Diagnostics.Single().CanonicalIdentity,
+                Is.EqualTo(rerunSelection.Diagnostics.Single().CanonicalIdentity));
             Assert.That(firstProjection.Findings.Single().CanonicalIdentity,
-                Is.EqualTo(upgradedProjection.Findings.Single().CanonicalIdentity));
-            Assert.That(firstBaseline.Identity, Is.EqualTo(upgradedBaseline.Identity));
+                Is.Not.EqualTo(upgradedProjection.Findings.Single().CanonicalIdentity));
+            Assert.That(firstProjection.Findings.Single().CanonicalIdentity,
+                Is.EqualTo(rerunProjection.Findings.Single().CanonicalIdentity));
+            Assert.That(firstBaseline.Identity, Is.Not.EqualTo(upgradedBaseline.Identity));
+            Assert.That(firstBaseline.Identity, Is.EqualTo(rerunBaseline.Identity));
         });
     }
 

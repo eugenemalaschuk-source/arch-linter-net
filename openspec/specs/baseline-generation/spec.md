@@ -601,8 +601,20 @@ existing structured `ArchitectureBaselineCandidate` identity contract. Candidate
 the same canonical occurrence identity as the imported normalized finding and SHALL exclude
 transient artifact/run provenance.
 
+For a structured imported external-diagnostic candidate, baseline loading and comparison SHALL
+resolve the candidate's logical evidence ID against `external_evidence[].id`, rather than treating
+it as a native contract ID. This explicit ownership resolution SHALL preserve the strict/audit
+baseline group and structured identity semantics, and SHALL NOT materialize the imported ignore in
+a native contract matcher.
+
 #### Scenario: Native and imported candidates remain distinct
 - **WHEN** a native finding and an imported diagnostic have similar display text or source labels
 - **THEN** their structured baseline candidates remain distinct unless their full canonical
   identities are exactly equal
 
+#### Scenario: Imported external evidence completes a baseline round trip
+- **WHEN** a current imported external-diagnostic candidate is generated, serialized, loaded into
+  a policy declaring the same `external_evidence` logical ID, and compared with the exact same
+  finding
+- **THEN** loading accepts the entry without requiring a native contract of that ID, comparison
+  reports it as known, and no native contract ignore is created

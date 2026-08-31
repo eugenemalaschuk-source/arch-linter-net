@@ -23,7 +23,9 @@ public static class ArchitectureExternalEvidenceApplicabilityProjector
     /// <remarks>
     /// The tuple is only a collection convenience; the projection's actual values are the
     /// ordinary shared applicability types. Inputs are not de-duplicated so the common evaluator
-    /// can report duplicate or orphan identities through its existing integrity checks.
+    /// reader results for the same logical control are aggregated here: one evidence requirement can
+    /// legitimately be satisfied by complementary trusted artifacts. Unknown logical identities stay
+    /// visible as orphan records for the common evaluator.
     /// </remarks>
     public static (
         IReadOnlyList<ArchitectureApplicabilityExpectedEntry> ExpectedEntries,
@@ -44,7 +46,7 @@ public static class ArchitectureExternalEvidenceApplicabilityProjector
             .ToArray();
         return (
             ProjectExpectedEntries(declared),
-            ProjectRecords(readResults, selection));
+            ProjectRecords(declared, readResults, selection));
     }
 
     /// <summary>Projects one expected shared-applicability entry for each declaration.</summary>
@@ -72,13 +74,13 @@ public static class ArchitectureExternalEvidenceApplicabilityProjector
     }
 
     /// <summary>
-    /// Projects each supplied reader result into one shared applicability record.
+    /// Projects each logical external-evidence control into one shared applicability record.
     /// </summary>
     /// <remarks>
-    /// Every supplied result is retained, including an identity not present in the declarations
-    /// and repeated identities. The common evaluator owns those unknown/duplicate identity
-    /// diagnostics. A result's <see cref="SarifEvidenceReadResult.Status"/> is the sole trust
-    /// input here; the artifact and its context are never re-read or revalidated.
+    /// Trusted artifacts are aggregated by their declared logical identity. A result's
+    /// <see cref="SarifEvidenceReadResult.Status"/> is the sole trust input here; artifacts and
+    /// contexts are never re-read or revalidated. Missing mandatory selection for an authorized
+    /// <c>require_matches</c> filter fails closed as a stale declaration.
     /// </remarks>
     public static IReadOnlyList<ArchitectureApplicabilityRecord> ProjectRecords(
         IEnumerable<ArchitectureExternalEvidenceRequirement> requirements,
@@ -88,18 +90,17 @@ public static class ArchitectureExternalEvidenceApplicabilityProjector
         ArgumentNullException.ThrowIfNull(requirements);
         ArgumentNullException.ThrowIfNull(readResults);
 
-        // Validate declarations at this boundary even though record identity comes solely from
-        // the reader result. The declaration list is used by the paired projection, while this
-        // overload keeps the two collection projections convenient for callers that already have
-        // both inputs.
-        _ = requirements
+        ArchitectureExternalEvidenceRequirement[] declared = requirements
             .Select(requirement =>
             {
                 ArgumentNullException.ThrowIfNull(requirement);
                 return requirement;
             })
             .ToArray();
-        return ProjectRecords(readResults, selection);
+        IReadOnlyDictionary<string, ArchitectureExternalEvidenceRequirement> requirementsById = declared
+            .GroupBy(requirement => requirement.Id, StringComparer.Ordinal)
+            .ToDictionary(group => group.Key, group => group.Single(), StringComparer.Ordinal);
+        return ProjectRecords(readResults, selection, requirementsById);
     }
 
     /// <summary>
@@ -111,6 +112,17 @@ public static class ArchitectureExternalEvidenceApplicabilityProjector
     {
         ArgumentNullException.ThrowIfNull(readResults);
 
+        return ProjectRecords(
+            readResults,
+            selection,
+            new Dictionary<string, ArchitectureExternalEvidenceRequirement>(StringComparer.Ordinal));
+    }
+
+    private static IReadOnlyList<ArchitectureApplicabilityRecord> ProjectRecords(
+        IEnumerable<SarifEvidenceReadResult> readResults,
+        SarifExternalDiagnosticSelectionResult? selection,
+        IReadOnlyDictionary<string, ArchitectureExternalEvidenceRequirement> requirementsById)
+    {
         HashSet<string> selectionMismatches = selection?.FilterMismatches
             .Where(mismatch => mismatch is not null)
             .Select(mismatch => mismatch.LogicalEvidenceId)
@@ -118,7 +130,21 @@ public static class ArchitectureExternalEvidenceApplicabilityProjector
             ?? new HashSet<string>(StringComparer.Ordinal);
 
         return readResults
-            .Select(readResult => CreateRecord(readResult, selectionMismatches))
+            .Select(readResult =>
+            {
+                ArgumentNullException.ThrowIfNull(readResult);
+                return readResult;
+            })
+            // One logical evidence control can deliberately federate multiple artifacts. The
+            // common evaluator's identity is the policy control, so aggregate artifact trust at
+            // this boundary instead of presenting each physical artifact as a duplicate control.
+            .GroupBy(readResult => readResult.LogicalId, StringComparer.Ordinal)
+            .Select(group => CreateRecord(
+                group.Key,
+                group.OrderBy(ReadResultSortKey, StringComparer.Ordinal).ToArray(),
+                selection is not null,
+                selectionMismatches.Contains(group.Key),
+                RequiresSelection(group.Key, group, requirementsById)))
             .OrderBy(record => record.ControlIdentity, StringComparer.Ordinal)
             .ThenBy(record => record.State)
             .ThenBy(record => record.Reasons.Count == 0 ? string.Empty : record.Reasons[0].Code,
@@ -127,40 +153,44 @@ public static class ArchitectureExternalEvidenceApplicabilityProjector
     }
 
     private static ArchitectureApplicabilityRecord CreateRecord(
-        SarifEvidenceReadResult readResult,
-        IReadOnlySet<string> selectionMismatches)
+        string logicalId,
+        IReadOnlyList<SarifEvidenceReadResult> readResults,
+        bool selectionProvided,
+        bool hasSelectionMismatch,
+        bool requiresSelection)
     {
-        ArgumentNullException.ThrowIfNull(readResult);
-
-        string logicalId = readResult.LogicalId;
         ArchitectureApplicabilityProvenance provenance = Provenance(logicalId);
         ArchitectureApplicabilityRecordState state;
         string? reasonCode = null;
 
-        switch (readResult.Status)
+        if (readResults.All(readResult => readResult.Status is SarifEvidenceTrustStatus.Valid
+                or SarifEvidenceTrustStatus.OptionalNotConfigured
+                or SarifEvidenceTrustStatus.MissingOptionalInput)
+            && readResults.Any(readResult => readResult.Status == SarifEvidenceTrustStatus.Valid))
         {
-            case SarifEvidenceTrustStatus.Valid:
-                if (selectionMismatches.Contains(logicalId))
-                {
-                    state = ArchitectureApplicabilityRecordState.Unassessable;
-                    reasonCode = ArchitectureApplicabilityReasonCodes.StaleDeclaration;
-                }
-                else
-                {
-                    state = ArchitectureApplicabilityRecordState.Evaluable;
-                }
-
-                break;
-
-            case SarifEvidenceTrustStatus.OptionalNotConfigured:
-            case SarifEvidenceTrustStatus.MissingOptionalInput:
-                state = ArchitectureApplicabilityRecordState.NotApplicable;
-                break;
-
-            default:
+            if (hasSelectionMismatch || requiresSelection && !selectionProvided)
+            {
                 state = ArchitectureApplicabilityRecordState.Unassessable;
-                reasonCode = ReadStatusReasonCode(readResult.Status);
-                break;
+                reasonCode = ArchitectureApplicabilityReasonCodes.StaleDeclaration;
+            }
+            else
+            {
+                state = ArchitectureApplicabilityRecordState.Evaluable;
+            }
+        }
+        else if (readResults.All(readResult => readResult.Status is SarifEvidenceTrustStatus.OptionalNotConfigured
+                 or SarifEvidenceTrustStatus.MissingOptionalInput))
+        {
+            state = ArchitectureApplicabilityRecordState.NotApplicable;
+        }
+        else
+        {
+            SarifEvidenceReadResult failure = readResults.First(readResult =>
+                readResult.Status is not SarifEvidenceTrustStatus.Valid
+                and not SarifEvidenceTrustStatus.OptionalNotConfigured
+                and not SarifEvidenceTrustStatus.MissingOptionalInput);
+            state = ArchitectureApplicabilityRecordState.Unassessable;
+            reasonCode = ReadStatusReasonCode(failure.Status);
         }
 
         IReadOnlyList<ArchitectureApplicabilityReason> reasons = reasonCode is null
@@ -173,6 +203,24 @@ public static class ArchitectureExternalEvidenceApplicabilityProjector
             reasons,
             provenance);
     }
+
+    private static bool RequiresSelection(
+        string logicalId,
+        IEnumerable<SarifEvidenceReadResult> readResults,
+        IReadOnlyDictionary<string, ArchitectureExternalEvidenceRequirement> requirementsById)
+    {
+        // The reader's detached authorization is authoritative. A current declaration is only
+        // additive here, because a mutable caller must not weaken a previously authorized
+        // require_matches obligation by passing a different requirement with the same logical ID.
+        bool declaredRequireMatches = requirementsById.TryGetValue(logicalId,
+            out ArchitectureExternalEvidenceRequirement? requirement)
+            && requirement.DiagnosticFilter?.RequireMatches == true;
+        return declaredRequireMatches
+            || readResults.Any(readResult => readResult.Authorization?.DiagnosticFilter?.RequireMatches == true);
+    }
+
+    private static string ReadResultSortKey(SarifEvidenceReadResult readResult) =>
+        readResult.Status + "|" + readResult.ArtifactPath + "|" + readResult.ArtifactSha256 + "|" + readResult.Detail;
 
     private static string ReadStatusReasonCode(SarifEvidenceTrustStatus status) =>
         status switch

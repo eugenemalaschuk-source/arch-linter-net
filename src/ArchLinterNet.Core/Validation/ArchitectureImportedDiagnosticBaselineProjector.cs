@@ -7,8 +7,8 @@ namespace ArchLinterNet.Core.Validation;
 /// <summary>Projects trusted imported diagnostics into the established baseline candidate shape.</summary>
 public static class ArchitectureImportedDiagnosticBaselineProjector
 {
-    private const string StrictGroup = "strict";
-    private const string AuditGroup = "audit";
+    private const string StrictGroup = "strict_external";
+    private const string AuditGroup = "audit_external";
 
     /// <summary>Projects selected diagnostics into exact existing baseline-candidate structures.</summary>
     public static IReadOnlyList<ArchitectureBaselineCandidate> ToBaselineCandidates(
@@ -26,32 +26,37 @@ public static class ArchitectureImportedDiagnosticBaselineProjector
             candidates.Add(new ArchitectureBaselineCandidate(
                 detail.GovernanceMode == SarifExternalDiagnosticGovernanceMode.Strict ? StrictGroup : AuditGroup,
                 detail.LogicalEvidenceId,
-                SourceDisplayIdentity(detail),
+                detail.SelectedCanonicalIdentity,
                 detail.SelectedCanonicalIdentity,
                 finding.Identity));
         }
 
+        return SortCandidates(candidates, ArchitectureViolationIdentityJson.Serialize);
+    }
+
+    /// <summary>
+    /// Orders candidates using one precomputed representation of each structured identity.
+    /// </summary>
+    internal static IReadOnlyList<ArchitectureBaselineCandidate> SortCandidates(
+        IEnumerable<ArchitectureBaselineCandidate> candidates,
+        Func<ArchitectureViolationIdentity, string> identitySerializer)
+    {
+        ArgumentNullException.ThrowIfNull(candidates);
+        ArgumentNullException.ThrowIfNull(identitySerializer);
+
         return candidates
-            .OrderBy(candidate => candidate.ContractGroup, StringComparer.Ordinal)
-            .ThenBy(candidate => candidate.ContractId, StringComparer.Ordinal)
-            .ThenBy(candidate => candidate.Identity, ArchitectureViolationIdentityComparer.Instance)
+            // Candidate identity is immutable, and baseline projection can receive the reader's
+            // full 100k-result allowance. Serialize once per candidate, not twice per sort
+            // comparison, so ordering remains deterministic without an allocation-heavy hot path.
+            .Select(candidate => new CandidateSortEntry(
+                candidate,
+                candidate.Identity is null ? string.Empty : identitySerializer(candidate.Identity)))
+            .OrderBy(entry => entry.Candidate.ContractGroup, StringComparer.Ordinal)
+            .ThenBy(entry => entry.Candidate.ContractId, StringComparer.Ordinal)
+            .ThenBy(entry => entry.IdentitySortKey, StringComparer.Ordinal)
+            .Select(entry => entry.Candidate)
             .ToArray();
     }
 
-    private static string SourceDisplayIdentity(ImportedExternalDiagnostic diagnostic)
-    {
-        string tool = diagnostic.EvidenceProvenances[0].ToolName ?? "<unknown-tool>";
-        string rule = diagnostic.SourceDiagnostic.RuleId ?? "<unknown-rule>";
-        return tool + "/" + rule;
-    }
-
-    private sealed class ArchitectureViolationIdentityComparer : IComparer<ArchitectureViolationIdentity?>
-    {
-        public static ArchitectureViolationIdentityComparer Instance { get; } = new();
-
-        public int Compare(ArchitectureViolationIdentity? left, ArchitectureViolationIdentity? right) =>
-            StringComparer.Ordinal.Compare(
-                left is null ? string.Empty : ArchitectureViolationIdentityJson.Serialize(left),
-                right is null ? string.Empty : ArchitectureViolationIdentityJson.Serialize(right));
-    }
+    private sealed record CandidateSortEntry(ArchitectureBaselineCandidate Candidate, string IdentitySortKey);
 }

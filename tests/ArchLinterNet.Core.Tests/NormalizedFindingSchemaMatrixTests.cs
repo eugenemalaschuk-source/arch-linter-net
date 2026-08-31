@@ -60,6 +60,21 @@ public sealed class NormalizedFindingSchemaMatrixTests
         Assert.That(schema.Evaluate(malformed).IsValid, Is.False);
     }
 
+    [Test]
+    public void ImportedFindingSchema_AbsentSourceLocationRemainsValid()
+    {
+        PackagedSchemaRegistry registry = new();
+        Assert.That(registry.TryRead("normalized-finding", out string schemaText), Is.True);
+        JsonSchema schema = JsonSchema.FromText(schemaText);
+        ArchitectureFinding imported = SpecialFindings()
+            .Single(finding => finding.Kind == "imported_external_diagnostic");
+        JsonObject normalized = JsonNode.Parse(JsonSerializer.Serialize(
+            ArchitectureDiagnosticFormatter.FormatNormalizedFindingForJson(imported)))!.AsObject();
+        normalized["details"]!["source_diagnostic"]!["location"] = null;
+
+        Assert.That(schema.Evaluate(normalized).IsValid, Is.True);
+    }
+
     private static IEnumerable<ArchitectureViolation> OrdinaryViolations()
     {
         yield return Violation(new DependencyPayload("source", "target"));
