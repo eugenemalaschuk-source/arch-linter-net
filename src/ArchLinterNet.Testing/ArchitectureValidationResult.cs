@@ -35,6 +35,11 @@ public sealed class ArchitectureValidationResult
     /// formatted output is never parsed to reconstruct it.
     /// </summary>
     public ArchitectureApplicabilityProjection? ApplicabilityProjection { get; }
+    /// <summary>
+    /// Trusted external findings projected by Core. They are included in <see cref="Findings"/>
+    /// rather than exposed through a testing-only aggregate.
+    /// </summary>
+    public IReadOnlyCollection<ArchitectureFinding> ImportedDiagnosticFindings { get; }
 
     // Null unless the builder called WithProfile() — see
     // openspec/specs/analysis-profile/spec.md, "Testing API exposes the same profile semantics as
@@ -64,6 +69,7 @@ public sealed class ArchitectureValidationResult
         Waivers = @params.Waivers ?? Array.Empty<ArchitectureWaiverLifecycleRecord>();
         AssessmentCompletionEvidence = @params.AssessmentCompletionEvidence;
         ApplicabilityProjection = @params.ApplicabilityProjection;
+        ImportedDiagnosticFindings = @params.ImportedDiagnosticFindings ?? Array.Empty<ArchitectureFinding>();
         Profile = @params.Profile;
         Findings = ArchitectureFindingMapper.Order(AllDiagnostics());
     }
@@ -120,6 +126,11 @@ public sealed class ArchitectureValidationResult
             {
                 yield return finding;
             }
+        }
+
+        foreach (ArchitectureFinding finding in ImportedDiagnosticFindings)
+        {
+            yield return finding;
         }
 
         foreach (BaselineLifecycleEntry baseline in BaselineLifecycleEntries)
@@ -227,4 +238,5 @@ public sealed record ArchitectureValidationResultParams(
     public AnalysisProfile? Profile { get; init; }
     public ArchitectureAssessmentCompletionEvidence? AssessmentCompletionEvidence { get; init; }
     public ArchitectureApplicabilityProjection? ApplicabilityProjection { get; init; }
+    public IReadOnlyCollection<ArchitectureFinding>? ImportedDiagnosticFindings { get; init; }
 }

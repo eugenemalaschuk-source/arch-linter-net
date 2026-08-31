@@ -1,0 +1,167 @@
+using System.Text.Json;
+using ArchLinterNet.Core.Contracts;
+using ArchLinterNet.Core.Model;
+using ArchLinterNet.Core.Reporting;
+using ArchLinterNet.Core.Validation;
+using ArchLinterNet.Testing;
+using NUnit.Framework;
+
+namespace ArchLinterNet.Core.Tests;
+
+[TestFixture]
+public sealed class ImportedExternalDiagnosticProjectionTests
+{
+    [Test]
+    public void ToFindings_ProjectsStrictAndAuditDiagnosticsWithSelectedIdentityAndProvenance()
+    {
+        SarifSelectedExternalDiagnostic strict = Selected(
+            canonicalIdentity: "external-diagnostic:v2:strict",
+            mode: SarifExternalDiagnosticGovernanceMode.Strict,
+            artifactHash: "hash-one",
+            runId: "run-one",
+            message: "strict source message",
+            path: "src/App/Strict.cs");
+        SarifSelectedExternalDiagnostic audit = Selected(
+            canonicalIdentity: "external-diagnostic:v2:audit",
+            mode: SarifExternalDiagnosticGovernanceMode.Audit,
+            artifactHash: "hash-two",
+            runId: "run-two",
+            message: "audit source message",
+            path: "src/App/Audit.cs");
+
+        IReadOnlyList<ArchitectureFinding> findings = ArchitectureImportedDiagnosticProjector.ToFindings(
+            new SarifExternalDiagnosticSelectionResult([audit, strict]));
+
+        ArchitectureFinding strictFinding = findings.Single(finding => finding.Mode == "strict");
+        ArchitectureFinding auditFinding = findings.Single(finding => finding.Mode == "audit");
+        var strictDetail = (ImportedExternalDiagnostic)strictFinding.Details;
+        Assert.Multiple(() =>
+        {
+            Assert.That(strictFinding.Kind, Is.EqualTo("imported_external_diagnostic"));
+            Assert.That(strictFinding.Severity, Is.EqualTo("error"));
+            Assert.That(auditFinding.Severity, Is.EqualTo("warning"));
+            Assert.That(strictDetail.LogicalEvidenceId, Is.EqualTo("external.scan"));
+            Assert.That(strictDetail.SourceDiagnostic.Message, Is.EqualTo("strict source message"));
+            Assert.That(strictDetail.EvidenceProvenances.Single().ArtifactSha256, Is.EqualTo("hash-one"));
+            Assert.That(strictFinding.SourceLocation, Is.EqualTo(new ArchitectureFindingSourceLocation("src/App/Strict.cs", 10, 4)));
+            Assert.That(ArchitectureImportedDiagnosticProjector.HasBlockingFindings(
+                new SarifExternalDiagnosticSelectionResult([audit, strict])), Is.True);
+        });
+    }
+
+    [Test]
+    public void ToFindings_ExcludesTransientRunAndArtifactProvenanceFromPersistentIdentity()
+    {
+        SarifSelectedExternalDiagnostic first = Selected(
+            canonicalIdentity: "external-diagnostic:v2:stable",
+            mode: SarifExternalDiagnosticGovernanceMode.Strict,
+            artifactHash: "first-hash",
+            runId: "first-run",
+            message: "first display text",
+            path: "src/App/Shared.cs");
+        SarifSelectedExternalDiagnostic repeated = Selected(
+            canonicalIdentity: "external-diagnostic:v2:stable",
+            mode: SarifExternalDiagnosticGovernanceMode.Strict,
+            artifactHash: "second-hash",
+            runId: "second-run",
+            message: "changed display text",
+            path: "src/App/Shared.cs");
+
+        ArchitectureFinding firstFinding = ArchitectureImportedDiagnosticProjector.ToFinding(first);
+        ArchitectureFinding repeatedFinding = ArchitectureImportedDiagnosticProjector.ToFinding(repeated);
+        IReadOnlyList<ArchitectureBaselineCandidate> candidates = ArchitectureImportedDiagnosticBaselineProjector.ToBaselineCandidates(
+            new SarifExternalDiagnosticSelectionResult([first]));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(firstFinding.CanonicalIdentity, Is.EqualTo(repeatedFinding.CanonicalIdentity));
+            Assert.That(((ImportedExternalDiagnostic)repeatedFinding.Details).EvidenceProvenances.Single().RunId,
+                Is.EqualTo("second-run"));
+            Assert.That(candidates.Single().Identity, Is.EqualTo(firstFinding.Identity));
+            Assert.That(candidates.Single().ContractGroup, Is.EqualTo("strict"));
+            Assert.That(candidates.Single().ForbiddenReference, Is.EqualTo("external-diagnostic:v2:stable"));
+        });
+    }
+
+    [Test]
+    public void ToFindings_DistinguishesSelectedLocationIdentitiesAndRetainsOutputParity()
+    {
+        SarifSelectedExternalDiagnostic first = Selected(
+            canonicalIdentity: "external-diagnostic:v2:location-one",
+            mode: SarifExternalDiagnosticGovernanceMode.Strict,
+            artifactHash: "hash-one",
+            runId: "run-one",
+            message: "source finding",
+            path: "src/App/One.cs");
+        SarifSelectedExternalDiagnostic second = Selected(
+            canonicalIdentity: "external-diagnostic:v2:location-two",
+            mode: SarifExternalDiagnosticGovernanceMode.Strict,
+            artifactHash: "hash-two",
+            runId: "run-two",
+            message: "source finding",
+            path: "src/App/Two.cs");
+        IReadOnlyList<ArchitectureFinding> findings = ArchitectureImportedDiagnosticProjector.ToFindings(
+            new SarifExternalDiagnosticSelectionResult([first, second]));
+
+        Dictionary<string, object?> json = ArchitectureDiagnosticFormatter.FormatNormalizedFindingForJson(findings[0]);
+        string human = ArchitectureDiagnosticFormatter.FormatFindingsForHumans(findings);
+        string sarif = ArchitectureSarifFormatter.FormatFindingsAsSarif(findings, "1.2.3");
+        using JsonDocument document = JsonDocument.Parse(sarif);
+        JsonElement result = document.RootElement.GetProperty("runs")[0].GetProperty("results")[0];
+        JsonElement normalized = result.GetProperty("properties").GetProperty("arch_linter_net");
+
+        var testingResult = new ArchitectureValidationResult(new ArchitectureValidationResultParams(
+            Passed: true,
+            Violations: Array.Empty<ArchitectureViolation>(),
+            Cycles: Array.Empty<string>())
+        {
+            ImportedDiagnosticFindings = findings,
+        });
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(findings.Select(finding => finding.CanonicalIdentity).Distinct().Count(), Is.EqualTo(2));
+            Assert.That(human, Does.Contain("sha256=hash-one"));
+            Assert.That(json["logical_evidence_id"], Is.EqualTo("external.scan"));
+            Assert.That(result.GetProperty("locations")[0].GetProperty("physicalLocation")
+                .GetProperty("artifactLocation").GetProperty("uri").GetString(), Is.EqualTo("src/App/One.cs"));
+            Assert.That(normalized.GetProperty("evidence_provenance")[0]
+                .GetProperty("artifact_sha256").GetString(), Is.EqualTo("hash-one"));
+            Assert.That(testingResult.Findings.Count(finding => finding.Kind == "imported_external_diagnostic"), Is.EqualTo(2));
+        });
+    }
+
+    private static SarifSelectedExternalDiagnostic Selected(
+        string canonicalIdentity,
+        SarifExternalDiagnosticGovernanceMode mode,
+        string artifactHash,
+        string runId,
+        string message,
+        string path)
+    {
+        var source = new SarifEvidenceSourceDiagnostic(
+            message,
+            "SEC100",
+            mode == SarifExternalDiagnosticGovernanceMode.Strict
+                ? SarifEvidenceSourceSeverity.Error
+                : SarifEvidenceSourceSeverity.Warning,
+            new SarifEvidenceSourceLocation(path, new SarifEvidenceSourceRegion(startLine: 10, startColumn: 4)),
+            project: "App",
+            driverRuleTags: ["security"]);
+        var provenance = new SarifEvidenceProvenance(
+            "external.scan",
+            "artifacts/analysis.sarif",
+            artifactHash,
+            "Example Analyzer",
+            "1.2.3",
+            runId,
+            1,
+            new SarifEvidenceResolvedContext("external.scan", "repo", "revision", "scope"));
+        return new SarifSelectedExternalDiagnostic(
+            canonicalIdentity,
+            source,
+            mode,
+            new SarifExternalDiagnosticFingerprint(SarifExternalDiagnosticFingerprintOrigin.Source, "source-fingerprint", "primary"),
+            [provenance]);
+    }
+}

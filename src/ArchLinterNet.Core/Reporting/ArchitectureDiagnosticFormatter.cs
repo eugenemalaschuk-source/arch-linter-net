@@ -53,6 +53,23 @@ public sealed partial class ArchitectureDiagnosticFormatter : IArchitectureDiagn
         return string.Join(Environment.NewLine, lines);
     }
 
+    /// <summary>Formats already-normalized findings without recovering facts from display text.</summary>
+    public static string FormatFindingsForHumans(
+        IReadOnlyCollection<ArchitectureFinding> findings,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(findings);
+        IReadOnlyList<ArchitectureFinding> ordered = ArchitectureFindingMapper.Order(findings, cancellationToken);
+        var lines = new string[ordered.Count];
+        for (int index = 0; index < ordered.Count; index++)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            lines[index] = FormatFindingForHumans(ordered[index]);
+        }
+
+        return string.Join(Environment.NewLine, lines);
+    }
+
     public string FormatUnmatchedForHumans(IReadOnlyCollection<ArchitectureUnmatchedIgnoredViolation> unmatched)
     {
         if (unmatched.Count == 0)
@@ -207,6 +224,7 @@ public sealed partial class ArchitectureDiagnosticFormatter : IArchitectureDiagn
         ContextDependencyDiagnostic d => d.SourceType,
         ContextAllowOnlyDiagnostic d => d.SourceType,
         PortBoundaryDiagnostic d => d.SourceType,
+        ImportedExternalDiagnostic d => d.SourceDiagnostic.RuleId ?? d.SelectedCanonicalIdentity,
         _ => string.Empty
     };
 
@@ -231,6 +249,7 @@ public sealed partial class ArchitectureDiagnosticFormatter : IArchitectureDiagn
         ContextDependencyDiagnostic d => d.ForbiddenNamespace,
         ContextAllowOnlyDiagnostic d => d.ForbiddenNamespace,
         PortBoundaryDiagnostic d => d.ForbiddenNamespace,
+        ImportedExternalDiagnostic d => d.SourceDiagnostic.Project ?? string.Empty,
         _ => string.Empty
     };
 
@@ -255,6 +274,7 @@ public sealed partial class ArchitectureDiagnosticFormatter : IArchitectureDiagn
         ContextDependencyDiagnostic d => d.ForbiddenReferences,
         ContextAllowOnlyDiagnostic d => d.ForbiddenReferences,
         PortBoundaryDiagnostic d => d.ForbiddenReferences,
+        ImportedExternalDiagnostic => Array.Empty<string>(),
         _ => Array.Empty<string>()
     };
 
@@ -278,6 +298,11 @@ public sealed partial class ArchitectureDiagnosticFormatter : IArchitectureDiagn
                 + $"membership={membership}, state={state}, validated_state={validatedState}, "
                 + $"reason={applicability.ReasonCode}, provenance=(family={applicability.Provenance.Family}, "
                 + $"control={applicability.Provenance.ControlIdentity}{policy})";
+        }
+
+        if (diagnostic is ImportedExternalDiagnostic imported)
+        {
+            return FormatImportedExternalDiagnosticForHumans(imported);
         }
 
         string idPrefix = diagnostic.ContractId != null ? $"[{diagnostic.ContractId}] " : string.Empty;

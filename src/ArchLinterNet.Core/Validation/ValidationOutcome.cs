@@ -108,6 +108,14 @@ public sealed record ValidationOutcome(
     /// </summary>
     public ArchitectureApplicabilityProjection? ApplicabilityProjection { get; init; }
 
+    /// <summary>
+    /// Trusted imported-diagnostic findings supplied by an external evidence consumer. They use the
+    /// same normalized finding envelope as native diagnostics and are empty when no such consumer
+    /// participates in this validation outcome.
+    /// </summary>
+    public IReadOnlyList<ArchitectureFinding> ImportedDiagnosticFindings { get; init; } =
+        Array.Empty<ArchitectureFinding>();
+
     /// <summary>Normalized applicability insufficiency findings, when the projection is present.</summary>
     public IReadOnlyList<ArchitectureFinding> ApplicabilityFindings =>
         ApplicabilityProjection?.Findings

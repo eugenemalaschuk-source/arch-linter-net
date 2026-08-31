@@ -56,6 +56,59 @@ public sealed partial class ArchitectureSarifFormatter : IArchitectureSarifForma
             Array.Empty<BuildStatePreflightDiagnostic>());
     }
 
+    /// <summary>Formats already-normalized findings as one ArchLinterNet SARIF run.</summary>
+    public static string FormatFindingsAsSarif(
+        IReadOnlyCollection<ArchitectureFinding> findings,
+        string toolVersion,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(findings);
+
+        List<ResultEntry> entries = findings
+            .Select(finding =>
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                string level = finding.Severity == "warning" ? "warning" : "error";
+                return BuildViolationEntry(finding, level);
+            })
+            .OrderBy(entry => entry, new ResultEntryOrderComparer(cancellationToken))
+            .ToList();
+
+        object[] rules = entries
+            .GroupBy(entry => entry.RuleId, StringComparer.Ordinal)
+            .OrderBy(group => group.Key, StringComparer.Ordinal)
+            .Select(group => (object)new Dictionary<string, object?>
+            {
+                ["id"] = group.Key,
+                ["shortDescription"] = new Dictionary<string, object?> { ["text"] = group.First().ContractName },
+            })
+            .ToArray();
+
+        var payload = new Dictionary<string, object?>
+        {
+            ["$schema"] = SchemaUri,
+            [VersionPropertyName] = SarifVersion,
+            ["runs"] = new object[]
+            {
+                new Dictionary<string, object?>
+                {
+                    ["tool"] = new Dictionary<string, object?>
+                    {
+                        ["driver"] = new Dictionary<string, object?>
+                        {
+                            ["name"] = ToolName,
+                            ["version"] = toolVersion,
+                            ["rules"] = rules,
+                        },
+                    },
+                    ["results"] = entries.Select(entry => (object)entry.Json).ToArray(),
+                },
+            },
+        };
+
+        return JsonSerializer.Serialize(payload);
+    }
+
     private static string FormatResultAsSarifCore( // NOSONAR: each parameter represents a semantically distinct section of the SARIF payload; grouping would obscure the data contract
         string mode,
         IReadOnlyCollection<ArchitectureViolation> violations,
@@ -187,13 +240,16 @@ public sealed partial class ArchitectureSarifFormatter : IArchitectureSarifForma
         (string sourceType, string forbiddenNamespace, IReadOnlyCollection<string> references) = ExtractFields(diagnostic);
         string ruleId = diagnostic.ContractId ?? ArchitecturePolicyDocumentLoader.NormalizeToContractId(diagnostic.ContractName);
 
+        string message = diagnostic is ImportedExternalDiagnostic imported
+            ? imported.SourceDiagnostic.Message ?? "Imported external diagnostic"
+            : $"[{diagnostic.ContractName}] {sourceType} -> {forbiddenNamespace}: {string.Join(", ", references)}";
         var json = new Dictionary<string, object?>
         {
             ["ruleId"] = ruleId,
             ["level"] = level,
             [MessagePropertyName] = new Dictionary<string, object?>
             {
-                ["text"] = $"[{diagnostic.ContractName}] {sourceType} -> {forbiddenNamespace}: {string.Join(", ", references)}",
+                ["text"] = message,
             },
         };
 
@@ -209,6 +265,11 @@ public sealed partial class ArchitectureSarifFormatter : IArchitectureSarifForma
             // Scanning anchor the finding to that file/line instead of falling back to a generic
             // logical (type-name) location it cannot resolve on disk.
             json["locations"] = BuildPhysicalLocations(matchedFilePath, Array.Empty<string>());
+        }
+        else if (diagnostic is ImportedExternalDiagnostic importedDiagnostic
+                 && importedDiagnostic.SourceDiagnostic.PrimaryLocation?.Path is not null)
+        {
+            json["locations"] = BuildImportedExternalDiagnosticLocations(importedDiagnostic.SourceDiagnostic.PrimaryLocation);
         }
         else if (FirstFrameworkReferenceSourcePath(diagnostic) is { } frameworkSourcePath)
         {
@@ -575,6 +636,29 @@ public sealed partial class ArchitectureSarifFormatter : IArchitectureSarifForma
         }).ToArray();
     }
 
+    private static object[] BuildImportedExternalDiagnosticLocations(SarifEvidenceSourceLocation location)
+    {
+        var physicalLocation = new Dictionary<string, object?>
+        {
+            [ArtifactLocationKey] = new Dictionary<string, object?> { ["uri"] = location.Path },
+        };
+        if (location.Region is { } region)
+        {
+            var sarifRegion = new Dictionary<string, object?>
+            {
+                ["startLine"] = region.StartLine,
+                ["startColumn"] = region.StartColumn,
+                ["endLine"] = region.EndLine,
+                ["endColumn"] = region.EndColumn,
+                ["charOffset"] = region.CharOffset,
+                ["charLength"] = region.CharLength,
+            };
+            physicalLocation["region"] = sarifRegion;
+        }
+
+        return new object[] { new Dictionary<string, object?> { [PhysicalLocationKey] = physicalLocation } };
+    }
+
     private static object[] BuildLogicalLocations(string fullyQualifiedName, string kind)
     {
         return new object[]
@@ -630,6 +714,10 @@ public sealed partial class ArchitectureSarifFormatter : IArchitectureSarifForma
             MetricBudgetDiagnostic d => (d.SourceType, d.ForbiddenNamespace, d.ForbiddenReferences),
             ContextDependencyDiagnostic d => (d.SourceType, d.ForbiddenNamespace, d.ForbiddenReferences),
             ContextAllowOnlyDiagnostic d => (d.SourceType, d.ForbiddenNamespace, d.ForbiddenReferences),
+            ImportedExternalDiagnostic d => (
+                d.SourceDiagnostic.RuleId ?? d.SelectedCanonicalIdentity,
+                d.SourceDiagnostic.Project ?? string.Empty,
+                Array.Empty<string>()),
             _ => (string.Empty, string.Empty, Array.Empty<string>()),
         };
 

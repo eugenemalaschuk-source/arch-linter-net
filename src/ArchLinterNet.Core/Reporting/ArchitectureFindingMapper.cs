@@ -30,6 +30,10 @@ public static class ArchitectureFindingMapper
         string? mode = null) =>
         Create(diagnostic, BuildApplicabilityIdentity(diagnostic), mode);
 
+    /// <summary>Maps one trusted selected external diagnostic through the existing finding envelope.</summary>
+    public static ArchitectureFinding FromImportedExternalDiagnostic(ImportedExternalDiagnostic diagnostic) =>
+        Create(diagnostic, BuildImportedExternalDiagnosticIdentity(diagnostic), GovernanceModeToken(diagnostic.GovernanceMode));
+
     public static ArchitectureFinding FromBaseline(BaselineLifecycleEntry lifecycle)
     {
         ArchitectureBaselineComparisonEntry entry = lifecycle.Entry;
@@ -206,6 +210,7 @@ public static class ArchitectureFindingMapper
         ArchitectureDiagnosticKind.ArchitecturePolicyError => "architecture_policy_error",
         ArchitectureDiagnosticKind.Applicability => "applicability",
         ArchitectureDiagnosticKind.MetricBudget => "metric_budget",
+        ArchitectureDiagnosticKind.ImportedExternalDiagnostic => "imported_external_diagnostic",
         _ => kind.ToString().ToLowerInvariant()
     };
 
@@ -250,6 +255,11 @@ public static class ArchitectureFindingMapper
             new ArchitectureFindingSourceLocation(evidence.First().SourcePath),
         ProjectMetadataDiagnostic { ProjectMetadataSourcePath: { } path } => new ArchitectureFindingSourceLocation(path),
         BuildStatePreflightDiagnostic { Evidence.ProjectPath: var path } => new ArchitectureFindingSourceLocation(path),
+        ImportedExternalDiagnostic { SourceDiagnostic.PrimaryLocation.Path: { } path } imported =>
+            new ArchitectureFindingSourceLocation(
+                path,
+                imported.SourceDiagnostic.PrimaryLocation.Region?.StartLine,
+                imported.SourceDiagnostic.PrimaryLocation.Region?.StartColumn),
         _ => null,
     };
 
@@ -258,6 +268,11 @@ public static class ArchitectureFindingMapper
         if (diagnostic is ArchitectureApplicabilityDiagnostic applicability)
         {
             return BuildApplicabilityIdentity(applicability);
+        }
+
+        if (diagnostic is ImportedExternalDiagnostic imported)
+        {
+            return BuildImportedExternalDiagnosticIdentity(imported);
         }
 
         // PolicyConsistencyDiagnostic is special-cased ahead of the generic IdentityParts/
@@ -319,6 +334,35 @@ public static class ArchitectureFindingMapper
             0,
             diagnostic.PolicyIdentity);
     }
+
+    private static ArchitectureViolationIdentity BuildImportedExternalDiagnosticIdentity(
+        ImportedExternalDiagnostic diagnostic)
+    {
+        // #521's selected identity includes the stable logical evidence/current-context/source
+        // dimensions.  It intentionally excludes artifact hash/run provenance, which stays in the
+        // typed diagnostic detail so equivalent reruns remain exact baseline matches.
+        SarifEvidenceProvenance provenance = diagnostic.EvidenceProvenances[0];
+        return new ArchitectureViolationIdentity(
+            ArchitectureViolationIdentity.CurrentVersion,
+            "external_diagnostic",
+            "external_diagnostic",
+            diagnostic.LogicalEvidenceId,
+            provenance.ToolName,
+            diagnostic.SelectedCanonicalIdentity,
+            diagnostic.SourceDiagnostic.RuleId,
+            provenance.Context?.Repository,
+            provenance.Context?.Revision,
+            provenance.Context?.Scope,
+            0,
+            GovernanceModeToken(diagnostic.GovernanceMode));
+    }
+
+    private static string GovernanceModeToken(SarifExternalDiagnosticGovernanceMode mode) => mode switch
+    {
+        SarifExternalDiagnosticGovernanceMode.Strict => "strict",
+        SarifExternalDiagnosticGovernanceMode.Audit => "audit",
+        _ => throw new ArgumentOutOfRangeException(nameof(mode), mode, "Unknown imported diagnostic governance mode."),
+    };
 
     private static ArchitectureViolationIdentity BuildBaselineFallbackIdentity(ArchitectureBaselineComparisonEntry entry)
     {
@@ -581,6 +625,7 @@ public static class ArchitectureFindingMapper
         ArchitecturePolicyErrorDiagnostic d => d.PolicyLocation?.SourcePath ?? "<policy>",
         ArchitectureApplicabilityDiagnostic d => d.ControlIdentity,
         MetricBudgetDiagnostic d => d.SourceType,
+        ImportedExternalDiagnostic d => d.SourceDiagnostic.RuleId ?? d.SelectedCanonicalIdentity,
         _ => string.Empty,
     };
 
