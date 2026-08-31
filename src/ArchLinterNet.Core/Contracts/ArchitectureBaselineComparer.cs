@@ -320,6 +320,8 @@ public static class ArchitectureBaselineComparer
             "audit_composition" => groups.AuditComposition.Select(c => c.Id),
             "strict_coverage" => groups.StrictCoverage.Select(c => c.Id),
             "audit_coverage" => groups.AuditCoverage.Select(c => c.Id),
+            "strict_metric_budgets" => groups.StrictMetricBudgets.Select(c => c.Id),
+            "audit_metric_budgets" => groups.AuditMetricBudgets.Select(c => c.Id),
             _ => Enumerable.Empty<string?>(),
         };
 

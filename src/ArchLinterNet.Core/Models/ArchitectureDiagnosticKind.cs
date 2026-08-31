@@ -26,5 +26,6 @@ public enum ArchitectureDiagnosticKind
     BuildStatePreflight,
     Baseline,
     ArchitecturePolicyError,
-    Applicability
+    Applicability,
+    MetricBudget
 }

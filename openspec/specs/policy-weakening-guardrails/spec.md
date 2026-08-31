@@ -2,7 +2,9 @@
 
 ## Purpose
 TBD - created by archiving change add-policy-weakening-guardrails. Update Purpose after archive.
+
 ## Requirements
+
 ### Requirement: Separately authoritative policy contexts are compared fail-closed
 
 Core SHALL compare a base and current `architecture-policy-context` artifact
@@ -265,3 +267,17 @@ containment cannot be proven SHALL retain bounded impact-not-proven semantics.
 #### Scenario: Structurally changed same-ID exclusion remains visible
 - **WHEN** a same-ID reviewed topology exclusion changes only metadata values that collide under delimiter serialization
 - **THEN** comparison emits the bounded changed-selector evidence instead of treating the exclusions as equal
+
+### Requirement: Relaxed metric-budget bounds are semantic weakening
+The policy-weakening comparer SHALL report semantic weakening when a retained
+metric-budget contract's maximum increases or minimum decreases. It SHALL use
+the typed budget facts from effective policy contexts and preserve ordinary
+deterministic control identity, evidence, and provenance.
+
+#### Scenario: An upper bound is relaxed
+- **WHEN** a retained strict metric budget changes its maximum from 10 to 20
+- **THEN** comparison reports a semantic weakening for that budget
+
+#### Scenario: A lower bound is relaxed
+- **WHEN** a retained strict metric budget changes its minimum from 10 to 5
+- **THEN** comparison reports a semantic weakening for that budget

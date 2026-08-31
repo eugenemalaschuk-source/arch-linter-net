@@ -87,6 +87,8 @@ public sealed class ArchitectureBaselineContractGroups
     [YamlMember(Alias = "audit_composition")] public List<ArchitectureBaselineContractEntry> AuditComposition { get; set; } = new();
     [YamlMember(Alias = "strict_coverage")] public List<ArchitectureBaselineContractEntry> StrictCoverage { get; set; } = new();
     [YamlMember(Alias = "audit_coverage")] public List<ArchitectureBaselineContractEntry> AuditCoverage { get; set; } = new();
+    [YamlMember(Alias = "strict_metric_budgets")] public List<ArchitectureBaselineContractEntry> StrictMetricBudgets { get; set; } = new();
+    [YamlMember(Alias = "audit_metric_budgets")] public List<ArchitectureBaselineContractEntry> AuditMetricBudgets { get; set; } = new();
     [YamlMember(Alias = "strict_context_dependencies")] public List<ArchitectureBaselineContractEntry> StrictContextDependencies { get; set; } = new();
     [YamlMember(Alias = "audit_context_dependencies")] public List<ArchitectureBaselineContractEntry> AuditContextDependencies { get; set; } = new();
     [YamlMember(Alias = "strict_context_allow_only")] public List<ArchitectureBaselineContractEntry> StrictContextAllowOnly { get; set; } = new();
@@ -127,6 +129,7 @@ public sealed class ArchitectureBaselineContractGroups
         "strict_interface_implementation", "audit_interface_implementation",
         "strict_composition", "audit_composition",
         "strict_coverage", "audit_coverage",
+        "strict_metric_budgets", "audit_metric_budgets",
         "strict_context_dependencies", "audit_context_dependencies",
         "strict_context_allow_only", "audit_context_allow_only",
         "strict_port_boundaries", "audit_port_boundaries",
@@ -190,6 +193,8 @@ public sealed class ArchitectureBaselineContractGroups
             "audit_composition" => AuditComposition,
             "strict_coverage" => StrictCoverage,
             "audit_coverage" => AuditCoverage,
+            "strict_metric_budgets" => StrictMetricBudgets,
+            "audit_metric_budgets" => AuditMetricBudgets,
             "strict_context_dependencies" => StrictContextDependencies,
             "audit_context_dependencies" => AuditContextDependencies,
             "strict_context_allow_only" => StrictContextAllowOnly,
@@ -259,6 +264,8 @@ public sealed class ArchitectureBaselineContractGroups
             case "audit_composition": AuditComposition = entries; break;
             case "strict_coverage": StrictCoverage = entries; break;
             case "audit_coverage": AuditCoverage = entries; break;
+            case "strict_metric_budgets": StrictMetricBudgets = entries; break;
+            case "audit_metric_budgets": AuditMetricBudgets = entries; break;
             case "strict_context_dependencies": StrictContextDependencies = entries; break;
             case "audit_context_dependencies": AuditContextDependencies = entries; break;
             case "strict_context_allow_only": StrictContextAllowOnly = entries; break;

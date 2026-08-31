@@ -120,6 +120,7 @@ class ArchLinterNet.Core.Contracts.Families.ArchitectureLayoutConventionContract
 class ArchLinterNet.Core.Contracts.Families.ArchitectureLayoutDeclarationShape [sealed]
 class ArchLinterNet.Core.Contracts.Families.ArchitectureLayoutFileMatcher [sealed]
 class ArchLinterNet.Core.Contracts.Families.ArchitectureMethodBodyContract [sealed]
+class ArchLinterNet.Core.Contracts.Families.ArchitectureMetricBudgetContract [sealed]
 class ArchLinterNet.Core.Contracts.Families.ArchitectureModuleContainerContract [sealed]
 class ArchLinterNet.Core.Contracts.Families.ArchitectureOptionalRuleInput [sealed]
 class ArchLinterNet.Core.Contracts.Families.ArchitecturePackageAllowOnlyContract [sealed]
@@ -288,6 +289,8 @@ class ArchLinterNet.Core.Model.InterfaceImplementationDiagnostic [sealed]
 class ArchLinterNet.Core.Model.InterfaceImplementationPayload [sealed]
 class ArchLinterNet.Core.Model.LayoutConventionDiagnostic [sealed]
 class ArchLinterNet.Core.Model.LayoutConventionPayload [sealed]
+class ArchLinterNet.Core.Model.MetricBudgetDiagnostic [sealed]
+class ArchLinterNet.Core.Model.MetricBudgetPayload [sealed]
 class ArchLinterNet.Core.Model.PackageAllowOnlyDiagnostic [sealed]
 class ArchLinterNet.Core.Model.PackageAllowOnlyPayload [sealed]
 class ArchLinterNet.Core.Model.PackageDependencyDiagnostic [sealed]
@@ -555,6 +558,7 @@ const ArchLinterNet.Core.Model.ArchitectureDiagnosticKind.FrameworkReferenceAllo
 const ArchLinterNet.Core.Model.ArchitectureDiagnosticKind.Inheritance: ArchLinterNet.Core.Model.ArchitectureDiagnosticKind [value:10]
 const ArchLinterNet.Core.Model.ArchitectureDiagnosticKind.InterfaceImplementation: ArchLinterNet.Core.Model.ArchitectureDiagnosticKind [value:11]
 const ArchLinterNet.Core.Model.ArchitectureDiagnosticKind.LayoutConvention: ArchLinterNet.Core.Model.ArchitectureDiagnosticKind [value:17]
+const ArchLinterNet.Core.Model.ArchitectureDiagnosticKind.MetricBudget: ArchLinterNet.Core.Model.ArchitectureDiagnosticKind [value:25]
 const ArchLinterNet.Core.Model.ArchitectureDiagnosticKind.PackageAllowOnly: ArchLinterNet.Core.Model.ArchitectureDiagnosticKind [value:18]
 const ArchLinterNet.Core.Model.ArchitectureDiagnosticKind.PackageDependency: ArchLinterNet.Core.Model.ArchitectureDiagnosticKind [value:6]
 const ArchLinterNet.Core.Model.ArchitectureDiagnosticKind.PolicyConsistency: ArchLinterNet.Core.Model.ArchitectureDiagnosticKind [value:5]
@@ -563,7 +567,7 @@ const ArchLinterNet.Core.Model.ArchitectureDiagnosticKind.ProjectMetadata: ArchL
 const ArchLinterNet.Core.Model.ArchitectureDiagnosticKind.PublicApiSurface: ArchLinterNet.Core.Model.ArchitectureDiagnosticKind [value:8]
 const ArchLinterNet.Core.Model.ArchitectureDiagnosticKind.TypePlacement: ArchLinterNet.Core.Model.ArchitectureDiagnosticKind [value:7]
 const ArchLinterNet.Core.Model.ArchitectureDiagnosticKind.UnmatchedIgnore: ArchLinterNet.Core.Model.ArchitectureDiagnosticKind [value:2]
-const ArchLinterNet.Core.Model.ArchitectureFinding.CurrentSchemaVersion: System.Int32 [value:2]
+const ArchLinterNet.Core.Model.ArchitectureFinding.CurrentSchemaVersion: System.Int32 [value:3]
 const ArchLinterNet.Core.Model.ArchitectureGraphLevel.Assembly: ArchLinterNet.Core.Model.ArchitectureGraphLevel [value:2]
 const ArchLinterNet.Core.Model.ArchitectureGraphLevel.Namespace: ArchLinterNet.Core.Model.ArchitectureGraphLevel [value:0]
 const ArchLinterNet.Core.Model.ArchitectureGraphLevel.Type: ArchLinterNet.Core.Model.ArchitectureGraphLevel [value:1]
@@ -799,6 +803,7 @@ ctor ArchLinterNet.Core.Contracts.Families.ArchitectureLayoutConventionContract(
 ctor ArchLinterNet.Core.Contracts.Families.ArchitectureLayoutDeclarationShape()
 ctor ArchLinterNet.Core.Contracts.Families.ArchitectureLayoutFileMatcher()
 ctor ArchLinterNet.Core.Contracts.Families.ArchitectureMethodBodyContract()
+ctor ArchLinterNet.Core.Contracts.Families.ArchitectureMetricBudgetContract()
 ctor ArchLinterNet.Core.Contracts.Families.ArchitectureModuleContainerContract()
 ctor ArchLinterNet.Core.Contracts.Families.ArchitectureOptionalRuleInput()
 ctor ArchLinterNet.Core.Contracts.Families.ArchitecturePackageAllowOnlyContract()
@@ -963,6 +968,8 @@ ctor ArchLinterNet.Core.Model.InterfaceImplementationDiagnostic(System.String, S
 ctor ArchLinterNet.Core.Model.InterfaceImplementationPayload(System.String, System.String, System.String, System.String)
 ctor ArchLinterNet.Core.Model.LayoutConventionDiagnostic(System.String, System.String, System.String, System.String, System.Collections.Generic.IReadOnlyCollection`1[System.String])
 ctor ArchLinterNet.Core.Model.LayoutConventionPayload(System.String, System.String, System.String, System.String, System.String, System.String, System.Boolean)
+ctor ArchLinterNet.Core.Model.MetricBudgetDiagnostic(System.String, System.String, System.String, System.String, System.Collections.Generic.IReadOnlyCollection`1[System.String], System.String, System.String, System.String, System.String, System.String, System.Int32, System.String, System.Int32, System.Collections.Generic.IReadOnlyCollection`1[System.String])
+ctor ArchLinterNet.Core.Model.MetricBudgetPayload(System.String, System.String, System.String, System.String, System.String, System.Int32, System.String, System.Int32, System.Collections.Generic.IReadOnlyCollection`1[System.String])
 ctor ArchLinterNet.Core.Model.PackageAllowOnlyDiagnostic(System.String, System.String, System.String, System.String, System.Collections.Generic.IReadOnlyCollection`1[System.String], System.Collections.Generic.IReadOnlyCollection`1[System.String])
 ctor ArchLinterNet.Core.Model.PackageAllowOnlyPayload(System.Collections.Generic.IReadOnlyCollection`1[System.String])
 ctor ArchLinterNet.Core.Model.PackageDependencyDiagnostic(System.String, System.String, System.String, System.String, System.Collections.Generic.IReadOnlyCollection`1[System.String], System.String)
@@ -1371,6 +1378,7 @@ method ArchLinterNet.Core.Execution.ArchitectureAnalysisSession.CheckInterfaceIm
 method ArchLinterNet.Core.Execution.ArchitectureAnalysisSession.CheckLayerContract(ArchLinterNet.Core.Contracts.Families.ArchitectureLayerContract): System.Collections.Generic.List`1[ArchLinterNet.Core.Model.ArchitectureViolation]
 method ArchLinterNet.Core.Execution.ArchitectureAnalysisSession.CheckLayoutConventionsContract(ArchLinterNet.Core.Contracts.Families.ArchitectureLayoutConventionContract): System.Collections.Generic.List`1[ArchLinterNet.Core.Model.ArchitectureViolation]
 method ArchLinterNet.Core.Execution.ArchitectureAnalysisSession.CheckMethodBodyContract(ArchLinterNet.Core.Contracts.Families.ArchitectureMethodBodyContract): System.Collections.Generic.List`1[ArchLinterNet.Core.Model.ArchitectureViolation]
+method ArchLinterNet.Core.Execution.ArchitectureAnalysisSession.CheckMetricBudgetContract(ArchLinterNet.Core.Contracts.Families.ArchitectureMetricBudgetContract): System.Collections.Generic.List`1[ArchLinterNet.Core.Model.ArchitectureViolation]
 method ArchLinterNet.Core.Execution.ArchitectureAnalysisSession.CheckModuleContainerContract(ArchLinterNet.Core.Contracts.Families.ArchitectureModuleContainerContract): System.Collections.Generic.List`1[ArchLinterNet.Core.Model.ArchitectureViolation]
 method ArchLinterNet.Core.Execution.ArchitectureAnalysisSession.CheckPackageAllowOnlyContract(ArchLinterNet.Core.Contracts.Families.ArchitecturePackageAllowOnlyContract): System.Collections.Generic.List`1[ArchLinterNet.Core.Model.ArchitectureViolation]
 method ArchLinterNet.Core.Execution.ArchitectureAnalysisSession.CheckPackageDependencyContract(ArchLinterNet.Core.Contracts.Families.ArchitecturePackageDependencyContract): System.Collections.Generic.List`1[ArchLinterNet.Core.Model.ArchitectureViolation]
@@ -1546,6 +1554,7 @@ method ArchLinterNet.Core.Model.IArchitectureDiagnosticPayload.ToDiagnostic(Arch
 method ArchLinterNet.Core.Model.InheritancePayload.ToDiagnostic(ArchLinterNet.Core.Model.ArchitectureViolation): ArchLinterNet.Core.Model.ArchitectureDiagnostic [virtual]
 method ArchLinterNet.Core.Model.InterfaceImplementationPayload.ToDiagnostic(ArchLinterNet.Core.Model.ArchitectureViolation): ArchLinterNet.Core.Model.ArchitectureDiagnostic [virtual]
 method ArchLinterNet.Core.Model.LayoutConventionPayload.ToDiagnostic(ArchLinterNet.Core.Model.ArchitectureViolation): ArchLinterNet.Core.Model.ArchitectureDiagnostic [virtual]
+method ArchLinterNet.Core.Model.MetricBudgetPayload.ToDiagnostic(ArchLinterNet.Core.Model.ArchitectureViolation): ArchLinterNet.Core.Model.ArchitectureDiagnostic [virtual]
 method ArchLinterNet.Core.Model.PackageAllowOnlyPayload.ToDiagnostic(ArchLinterNet.Core.Model.ArchitectureViolation): ArchLinterNet.Core.Model.ArchitectureDiagnostic [virtual]
 method ArchLinterNet.Core.Model.PackageDependencyPayload.ToDiagnostic(ArchLinterNet.Core.Model.ArchitectureViolation): ArchLinterNet.Core.Model.ArchitectureDiagnostic [virtual]
 method ArchLinterNet.Core.Model.PortBoundaryPayload.ToDiagnostic(ArchLinterNet.Core.Model.ArchitectureViolation): ArchLinterNet.Core.Model.ArchitectureDiagnostic [virtual]
@@ -1903,6 +1912,7 @@ property ArchLinterNet.Core.Contracts.ArchitectureBaselineContractGroups.AuditIn
 property ArchLinterNet.Core.Contracts.ArchitectureBaselineContractGroups.AuditLayers: System.Collections.Generic.List`1[ArchLinterNet.Core.Contracts.ArchitectureBaselineContractEntry] [get, set]
 property ArchLinterNet.Core.Contracts.ArchitectureBaselineContractGroups.AuditLayoutConventions: System.Collections.Generic.List`1[ArchLinterNet.Core.Contracts.ArchitectureBaselineContractEntry] [get, set]
 property ArchLinterNet.Core.Contracts.ArchitectureBaselineContractGroups.AuditMethodBody: System.Collections.Generic.List`1[ArchLinterNet.Core.Contracts.ArchitectureBaselineContractEntry] [get, set]
+property ArchLinterNet.Core.Contracts.ArchitectureBaselineContractGroups.AuditMetricBudgets: System.Collections.Generic.List`1[ArchLinterNet.Core.Contracts.ArchitectureBaselineContractEntry] [get, set]
 property ArchLinterNet.Core.Contracts.ArchitectureBaselineContractGroups.AuditModuleContainers: System.Collections.Generic.List`1[ArchLinterNet.Core.Contracts.ArchitectureBaselineContractEntry] [get, set]
 property ArchLinterNet.Core.Contracts.ArchitectureBaselineContractGroups.AuditPackageAllowOnly: System.Collections.Generic.List`1[ArchLinterNet.Core.Contracts.ArchitectureBaselineContractEntry] [get, set]
 property ArchLinterNet.Core.Contracts.ArchitectureBaselineContractGroups.AuditPackageDependency: System.Collections.Generic.List`1[ArchLinterNet.Core.Contracts.ArchitectureBaselineContractEntry] [get, set]
@@ -1933,6 +1943,7 @@ property ArchLinterNet.Core.Contracts.ArchitectureBaselineContractGroups.StrictI
 property ArchLinterNet.Core.Contracts.ArchitectureBaselineContractGroups.StrictLayers: System.Collections.Generic.List`1[ArchLinterNet.Core.Contracts.ArchitectureBaselineContractEntry] [get, set]
 property ArchLinterNet.Core.Contracts.ArchitectureBaselineContractGroups.StrictLayoutConventions: System.Collections.Generic.List`1[ArchLinterNet.Core.Contracts.ArchitectureBaselineContractEntry] [get, set]
 property ArchLinterNet.Core.Contracts.ArchitectureBaselineContractGroups.StrictMethodBody: System.Collections.Generic.List`1[ArchLinterNet.Core.Contracts.ArchitectureBaselineContractEntry] [get, set]
+property ArchLinterNet.Core.Contracts.ArchitectureBaselineContractGroups.StrictMetricBudgets: System.Collections.Generic.List`1[ArchLinterNet.Core.Contracts.ArchitectureBaselineContractEntry] [get, set]
 property ArchLinterNet.Core.Contracts.ArchitectureBaselineContractGroups.StrictModuleContainers: System.Collections.Generic.List`1[ArchLinterNet.Core.Contracts.ArchitectureBaselineContractEntry] [get, set]
 property ArchLinterNet.Core.Contracts.ArchitectureBaselineContractGroups.StrictPackageAllowOnly: System.Collections.Generic.List`1[ArchLinterNet.Core.Contracts.ArchitectureBaselineContractEntry] [get, set]
 property ArchLinterNet.Core.Contracts.ArchitectureBaselineContractGroups.StrictPackageDependency: System.Collections.Generic.List`1[ArchLinterNet.Core.Contracts.ArchitectureBaselineContractEntry] [get, set]
@@ -2198,6 +2209,7 @@ property ArchLinterNet.Core.Contracts.Families.ArchitectureContractGroups.AuditL
 property ArchLinterNet.Core.Contracts.Families.ArchitectureContractGroups.AuditLayers: System.Collections.Generic.List`1[ArchLinterNet.Core.Contracts.Families.ArchitectureLayerContract] [get, set]
 property ArchLinterNet.Core.Contracts.Families.ArchitectureContractGroups.AuditLayoutConventions: System.Collections.Generic.List`1[ArchLinterNet.Core.Contracts.Families.ArchitectureLayoutConventionContract] [get, set]
 property ArchLinterNet.Core.Contracts.Families.ArchitectureContractGroups.AuditMethodBody: System.Collections.Generic.List`1[ArchLinterNet.Core.Contracts.Families.ArchitectureMethodBodyContract] [get, set]
+property ArchLinterNet.Core.Contracts.Families.ArchitectureContractGroups.AuditMetricBudgets: System.Collections.Generic.List`1[ArchLinterNet.Core.Contracts.Families.ArchitectureMetricBudgetContract] [get, set]
 property ArchLinterNet.Core.Contracts.Families.ArchitectureContractGroups.AuditModuleContainers: System.Collections.Generic.List`1[ArchLinterNet.Core.Contracts.Families.ArchitectureModuleContainerContract] [get, set]
 property ArchLinterNet.Core.Contracts.Families.ArchitectureContractGroups.AuditPackageAllowOnly: System.Collections.Generic.List`1[ArchLinterNet.Core.Contracts.Families.ArchitecturePackageAllowOnlyContract] [get, set]
 property ArchLinterNet.Core.Contracts.Families.ArchitectureContractGroups.AuditPackageDependency: System.Collections.Generic.List`1[ArchLinterNet.Core.Contracts.Families.ArchitecturePackageDependencyContract] [get, set]
@@ -2230,6 +2242,7 @@ property ArchLinterNet.Core.Contracts.Families.ArchitectureContractGroups.Strict
 property ArchLinterNet.Core.Contracts.Families.ArchitectureContractGroups.StrictLayers: System.Collections.Generic.List`1[ArchLinterNet.Core.Contracts.Families.ArchitectureLayerContract] [get, set]
 property ArchLinterNet.Core.Contracts.Families.ArchitectureContractGroups.StrictLayoutConventions: System.Collections.Generic.List`1[ArchLinterNet.Core.Contracts.Families.ArchitectureLayoutConventionContract] [get, set]
 property ArchLinterNet.Core.Contracts.Families.ArchitectureContractGroups.StrictMethodBody: System.Collections.Generic.List`1[ArchLinterNet.Core.Contracts.Families.ArchitectureMethodBodyContract] [get, set]
+property ArchLinterNet.Core.Contracts.Families.ArchitectureContractGroups.StrictMetricBudgets: System.Collections.Generic.List`1[ArchLinterNet.Core.Contracts.Families.ArchitectureMetricBudgetContract] [get, set]
 property ArchLinterNet.Core.Contracts.Families.ArchitectureContractGroups.StrictModuleContainers: System.Collections.Generic.List`1[ArchLinterNet.Core.Contracts.Families.ArchitectureModuleContainerContract] [get, set]
 property ArchLinterNet.Core.Contracts.Families.ArchitectureContractGroups.StrictPackageAllowOnly: System.Collections.Generic.List`1[ArchLinterNet.Core.Contracts.Families.ArchitecturePackageAllowOnlyContract] [get, set]
 property ArchLinterNet.Core.Contracts.Families.ArchitectureContractGroups.StrictPackageDependency: System.Collections.Generic.List`1[ArchLinterNet.Core.Contracts.Families.ArchitecturePackageDependencyContract] [get, set]
@@ -2358,6 +2371,11 @@ property ArchLinterNet.Core.Contracts.Families.ArchitectureMethodBodyContract.Ig
 property ArchLinterNet.Core.Contracts.Families.ArchitectureMethodBodyContract.Name: System.String [virtual, get, set]
 property ArchLinterNet.Core.Contracts.Families.ArchitectureMethodBodyContract.Reason: System.String [get, set]
 property ArchLinterNet.Core.Contracts.Families.ArchitectureMethodBodyContract.Source: System.String [get, set]
+property ArchLinterNet.Core.Contracts.Families.ArchitectureMetricBudgetContract.Id: System.String [virtual, get, set]
+property ArchLinterNet.Core.Contracts.Families.ArchitectureMetricBudgetContract.Maximum: System.Nullable`1[System.Int32] [get, set]
+property ArchLinterNet.Core.Contracts.Families.ArchitectureMetricBudgetContract.Metric: System.String [get, set]
+property ArchLinterNet.Core.Contracts.Families.ArchitectureMetricBudgetContract.Minimum: System.Nullable`1[System.Int32] [get, set]
+property ArchLinterNet.Core.Contracts.Families.ArchitectureMetricBudgetContract.Name: System.String [virtual, get]
 property ArchLinterNet.Core.Contracts.Families.ArchitectureModuleContainerContract.AllowedContainerRootTypes: System.Collections.Generic.List`1[System.String] [get, set]
 property ArchLinterNet.Core.Contracts.Families.ArchitectureModuleContainerContract.AllowedModuleRootTypes: System.Collections.Generic.List`1[System.String] [get, set]
 property ArchLinterNet.Core.Contracts.Families.ArchitectureModuleContainerContract.Container: System.String [get, set]
@@ -3227,6 +3245,29 @@ property ArchLinterNet.Core.Model.LayoutConventionPayload.ExpectedTypeKind: Syst
 property ArchLinterNet.Core.Model.LayoutConventionPayload.ExpectedTypeName: System.String [get, init]
 property ArchLinterNet.Core.Model.LayoutConventionPayload.MatchedFilePath: System.String [get, init]
 property ArchLinterNet.Core.Model.LayoutConventionPayload.WhenExpressions: System.Collections.Generic.IReadOnlyList`1[ArchLinterNet.Core.Model.ExpressionParticipation] [get, init]
+property ArchLinterNet.Core.Model.MetricBudgetDiagnostic.BreachedBound: System.String [get, init]
+property ArchLinterNet.Core.Model.MetricBudgetDiagnostic.BudgetId: System.String [get, init]
+property ArchLinterNet.Core.Model.MetricBudgetDiagnostic.ConfiguredLimit: System.Int32 [get, init]
+property ArchLinterNet.Core.Model.MetricBudgetDiagnostic.ContributorCount: System.Int32 [get]
+property ArchLinterNet.Core.Model.MetricBudgetDiagnostic.Contributors: System.Collections.Generic.IReadOnlyCollection`1[System.String] [get, init]
+property ArchLinterNet.Core.Model.MetricBudgetDiagnostic.EffectiveScope: System.String [get, init]
+property ArchLinterNet.Core.Model.MetricBudgetDiagnostic.ForbiddenNamespace: System.String [get, init]
+property ArchLinterNet.Core.Model.MetricBudgetDiagnostic.ForbiddenReferences: System.Collections.Generic.IReadOnlyCollection`1[System.String] [get, init]
+property ArchLinterNet.Core.Model.MetricBudgetDiagnostic.Kind: ArchLinterNet.Core.Model.ArchitectureDiagnosticKind [override, get]
+property ArchLinterNet.Core.Model.MetricBudgetDiagnostic.MeasuredValue: System.Int32 [get, init]
+property ArchLinterNet.Core.Model.MetricBudgetDiagnostic.MetricId: System.String [get, init]
+property ArchLinterNet.Core.Model.MetricBudgetDiagnostic.MetricKind: System.String [get, init]
+property ArchLinterNet.Core.Model.MetricBudgetDiagnostic.NativeSubject: System.String [get, init]
+property ArchLinterNet.Core.Model.MetricBudgetDiagnostic.SourceType: System.String [get, init]
+property ArchLinterNet.Core.Model.MetricBudgetPayload.BreachedBound: System.String [get, init]
+property ArchLinterNet.Core.Model.MetricBudgetPayload.BudgetId: System.String [get, init]
+property ArchLinterNet.Core.Model.MetricBudgetPayload.ConfiguredLimit: System.Int32 [get, init]
+property ArchLinterNet.Core.Model.MetricBudgetPayload.Contributors: System.Collections.Generic.IReadOnlyCollection`1[System.String] [get, init]
+property ArchLinterNet.Core.Model.MetricBudgetPayload.EffectiveScope: System.String [get, init]
+property ArchLinterNet.Core.Model.MetricBudgetPayload.MeasuredValue: System.Int32 [get, init]
+property ArchLinterNet.Core.Model.MetricBudgetPayload.MetricId: System.String [get, init]
+property ArchLinterNet.Core.Model.MetricBudgetPayload.MetricKind: System.String [get, init]
+property ArchLinterNet.Core.Model.MetricBudgetPayload.NativeSubject: System.String [get, init]
 property ArchLinterNet.Core.Model.PackageAllowOnlyDiagnostic.AllowedPackageGroups: System.Collections.Generic.IReadOnlyCollection`1[System.String] [get, init]
 property ArchLinterNet.Core.Model.PackageAllowOnlyDiagnostic.ForbiddenNamespace: System.String [get, init]
 property ArchLinterNet.Core.Model.PackageAllowOnlyDiagnostic.ForbiddenReferences: System.Collections.Generic.IReadOnlyCollection`1[System.String] [get, init]

@@ -27,13 +27,13 @@ internal static partial class ArchitecturePolicySourceParser
     private static readonly HashSet<string> _allowedRootFields = new(StringComparer.Ordinal)
     {
         "version", "name", ImportsField, "layers", "external_dependencies", "packages", "framework_references",
-        "source_sets", "legacy_runtime_layers", "external_evidence", "analysis", "history_analysis", "contracts", "classification", "topology"
+        "source_sets", "legacy_runtime_layers", "external_evidence", "analysis", "history_analysis", "contracts", "classification", "topology", "metrics"
     };
 
     private static readonly HashSet<string> _mergeableFields = new(StringComparer.Ordinal)
     {
         "layers", "external_dependencies", "packages", "framework_references", "source_sets",
-        "legacy_runtime_layers", "external_evidence", "analysis", "history_analysis", "contracts", "classification", "topology"
+        "legacy_runtime_layers", "external_evidence", "analysis", "history_analysis", "contracts", "classification", "topology", "metrics"
     };
 
     public static bool ContainsImports(string yaml, ArchitecturePolicySourceDescriptor descriptor)

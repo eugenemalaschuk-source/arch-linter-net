@@ -345,6 +345,13 @@ public sealed class ArchitectureAnalysisSession
     public List<ArchitectureViolation> CheckCoverageContract(ArchitectureCoverageContract contract) =>
         _coverageAnalysisService.CheckCoverageContract(contract);
 
+    public List<ArchitectureViolation> CheckMetricBudgetContract(ArchitectureMetricBudgetContract contract) =>
+        ArchitectureMetricBudgetAnalysisService.Evaluate(this, [contract]).Violations.ToList();
+
+    internal ArchitectureMetricBudgetEvaluationResult CheckMetricBudgetContracts(
+        IReadOnlyCollection<ArchitectureMetricBudgetContract> contracts) =>
+        ArchitectureMetricBudgetAnalysisService.Evaluate(this, contracts);
+
     public List<ArchitectureViolation> CheckContract(ArchitectureDependencyContract contract) =>
         _coreContractCheckingService.CheckContract(contract);
 
@@ -478,6 +485,15 @@ public sealed class ArchitectureAnalysisSession
         IReadOnlyDictionary<string, HashSet<string>> graph,
         IReadOnlyCollection<CycleCandidateEvidence> candidateEvidence) =>
         _cycleBaselineCandidateRecorder.Record(EnableUnmatchedIgnoreTracking, graph, candidateEvidence);
+
+    internal void AddMetricBudgetBaselineCandidate(ArchitectureBaselineCandidate candidate)
+    {
+        _findingIdentityService.Candidates.Add(candidate);
+        if (EnableUnmatchedIgnoreTracking)
+        {
+            _cycleBaselineCandidateRecorder.CandidateStore.Add(candidate);
+        }
+    }
 
     internal int FindingIdentityCursor => _findingIdentityService.Cursor;
 

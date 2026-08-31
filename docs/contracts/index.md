@@ -107,6 +107,10 @@ Strict groups are blocking. Audit groups use the same family semantics for non-b
 
 | [Coverage](coverage.md) | `strict_coverage` / `audit_coverage` | Govern namespace, project, assembly, dependency-edge, rule-input, and semantic-role coverage. |
 
+<!-- contract-family: metric-budget -->
+
+| [Metric budget](../policy-format/architecture-metrics.md) | `strict_metric_budgets` / `audit_metric_budgets` | Enforce inclusive minimum and maximum bounds on declared architecture metrics. |
+
 <!-- contract-family: context-dependency -->
 
 | [Contextual dependency](context-dependency.md) | `strict_context_dependencies` / `audit_context_dependencies` | Forbid dependencies between semantic role/metadata contexts. |

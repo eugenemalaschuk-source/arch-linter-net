@@ -35,6 +35,20 @@ public sealed partial class ArchitectureDiagnosticFormatter
         obj["allowed_package_groups"] = package.AllowedPackageGroups.ToArray();
     }
 
+    private static void ApplyMetricBudgetCiFields(MetricBudgetDiagnostic budget, Dictionary<string, object?> obj)
+    {
+        obj["budget_id"] = budget.BudgetId;
+        obj["metric_id"] = budget.MetricId;
+        obj["metric_kind"] = budget.MetricKind;
+        obj["native_subject"] = budget.NativeSubject;
+        obj["effective_scope"] = budget.EffectiveScope;
+        obj["measured_value"] = budget.MeasuredValue;
+        obj["breached_bound"] = budget.BreachedBound;
+        obj["configured_limit"] = budget.ConfiguredLimit;
+        obj["contributor_count"] = budget.ContributorCount;
+        obj["contributors"] = budget.Contributors.ToArray();
+    }
+
     private static void ApplyCycleCiFields(CycleDiagnostic cycle, Dictionary<string, object?> obj)
     {
         obj["path"] = cycle.Path;

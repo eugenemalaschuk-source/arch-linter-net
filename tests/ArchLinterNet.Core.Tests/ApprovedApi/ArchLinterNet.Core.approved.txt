@@ -599,6 +599,7 @@ sealed class ArchLinterNet.Core.Contracts.ArchitectureBaselineContractGroups
   property System.Collections.Generic.List<ArchLinterNet.Core.Contracts.ArchitectureBaselineContractEntry> AuditLayers {get;set;}
   property System.Collections.Generic.List<ArchLinterNet.Core.Contracts.ArchitectureBaselineContractEntry> AuditLayoutConventions {get;set;}
   property System.Collections.Generic.List<ArchLinterNet.Core.Contracts.ArchitectureBaselineContractEntry> AuditMethodBody {get;set;}
+  property System.Collections.Generic.List<ArchLinterNet.Core.Contracts.ArchitectureBaselineContractEntry> AuditMetricBudgets {get;set;}
   property System.Collections.Generic.List<ArchLinterNet.Core.Contracts.ArchitectureBaselineContractEntry> AuditModuleContainers {get;set;}
   property System.Collections.Generic.List<ArchLinterNet.Core.Contracts.ArchitectureBaselineContractEntry> AuditPackageAllowOnly {get;set;}
   property System.Collections.Generic.List<ArchLinterNet.Core.Contracts.ArchitectureBaselineContractEntry> AuditPackageDependency {get;set;}
@@ -629,6 +630,7 @@ sealed class ArchLinterNet.Core.Contracts.ArchitectureBaselineContractGroups
   property System.Collections.Generic.List<ArchLinterNet.Core.Contracts.ArchitectureBaselineContractEntry> StrictLayers {get;set;}
   property System.Collections.Generic.List<ArchLinterNet.Core.Contracts.ArchitectureBaselineContractEntry> StrictLayoutConventions {get;set;}
   property System.Collections.Generic.List<ArchLinterNet.Core.Contracts.ArchitectureBaselineContractEntry> StrictMethodBody {get;set;}
+  property System.Collections.Generic.List<ArchLinterNet.Core.Contracts.ArchitectureBaselineContractEntry> StrictMetricBudgets {get;set;}
   property System.Collections.Generic.List<ArchLinterNet.Core.Contracts.ArchitectureBaselineContractEntry> StrictModuleContainers {get;set;}
   property System.Collections.Generic.List<ArchLinterNet.Core.Contracts.ArchitectureBaselineContractEntry> StrictPackageAllowOnly {get;set;}
   property System.Collections.Generic.List<ArchLinterNet.Core.Contracts.ArchitectureBaselineContractEntry> StrictPackageDependency {get;set;}
@@ -1054,6 +1056,8 @@ sealed class ArchLinterNet.Core.Contracts.Families.ArchitectureContractGroups
   property System.Collections.Generic.List<ArchLinterNet.Core.Contracts.Families.ArchitectureLayoutConventionContract> StrictLayoutConventions {get;set;}
   property System.Collections.Generic.List<ArchLinterNet.Core.Contracts.Families.ArchitectureMethodBodyContract> AuditMethodBody {get;set;}
   property System.Collections.Generic.List<ArchLinterNet.Core.Contracts.Families.ArchitectureMethodBodyContract> StrictMethodBody {get;set;}
+  property System.Collections.Generic.List<ArchLinterNet.Core.Contracts.Families.ArchitectureMetricBudgetContract> AuditMetricBudgets {get;set;}
+  property System.Collections.Generic.List<ArchLinterNet.Core.Contracts.Families.ArchitectureMetricBudgetContract> StrictMetricBudgets {get;set;}
   property System.Collections.Generic.List<ArchLinterNet.Core.Contracts.Families.ArchitectureModuleContainerContract> AuditModuleContainers {get;set;}
   property System.Collections.Generic.List<ArchLinterNet.Core.Contracts.Families.ArchitectureModuleContainerContract> StrictModuleContainers {get;set;}
   property System.Collections.Generic.List<ArchLinterNet.Core.Contracts.Families.ArchitecturePackageAllowOnlyContract> AuditPackageAllowOnly {get;set;}
@@ -1229,6 +1233,13 @@ sealed class ArchLinterNet.Core.Contracts.Families.ArchitectureMethodBodyContrac
   property string Name {get;set;}
   property string Reason {get;set;}
   property string Source {get;set;}
+  property string? Id {get;set;}
+sealed class ArchLinterNet.Core.Contracts.Families.ArchitectureMetricBudgetContract : ArchLinterNet.Core.Contracts.IArchitectureContract
+  ctor()
+  property int? Maximum {get;set;}
+  property int? Minimum {get;set;}
+  property string Metric {get;set;}
+  property string Name {get;}
   property string? Id {get;set;}
 sealed class ArchLinterNet.Core.Contracts.Families.ArchitectureModuleContainerContract : ArchLinterNet.Core.Contracts.IArchitectureContract
   ctor()
@@ -1650,6 +1661,7 @@ sealed class ArchLinterNet.Core.Execution.ArchitectureAnalysisSession
   method System.Collections.Generic.List<ArchLinterNet.Core.Model.ArchitectureViolation> CheckLayerContract(ArchLinterNet.Core.Contracts.Families.ArchitectureLayerContract contract)
   method System.Collections.Generic.List<ArchLinterNet.Core.Model.ArchitectureViolation> CheckLayoutConventionsContract(ArchLinterNet.Core.Contracts.Families.ArchitectureLayoutConventionContract contract)
   method System.Collections.Generic.List<ArchLinterNet.Core.Model.ArchitectureViolation> CheckMethodBodyContract(ArchLinterNet.Core.Contracts.Families.ArchitectureMethodBodyContract contract)
+  method System.Collections.Generic.List<ArchLinterNet.Core.Model.ArchitectureViolation> CheckMetricBudgetContract(ArchLinterNet.Core.Contracts.Families.ArchitectureMetricBudgetContract contract)
   method System.Collections.Generic.List<ArchLinterNet.Core.Model.ArchitectureViolation> CheckModuleContainerContract(ArchLinterNet.Core.Contracts.Families.ArchitectureModuleContainerContract contract)
   method System.Collections.Generic.List<ArchLinterNet.Core.Model.ArchitectureViolation> CheckPackageAllowOnlyContract(ArchLinterNet.Core.Contracts.Families.ArchitecturePackageAllowOnlyContract contract)
   method System.Collections.Generic.List<ArchLinterNet.Core.Model.ArchitectureViolation> CheckPackageDependencyContract(ArchLinterNet.Core.Contracts.Families.ArchitecturePackageDependencyContract contract)
@@ -2530,6 +2542,7 @@ enum ArchLinterNet.Core.Model.ArchitectureDiagnosticKind : int
   enum-member Inheritance = 10
   enum-member InterfaceImplementation = 11
   enum-member LayoutConvention = 17
+  enum-member MetricBudget = 25
   enum-member PackageAllowOnly = 18
   enum-member PackageDependency = 6
   enum-member PolicyConsistency = 5
@@ -2576,7 +2589,7 @@ sealed class ArchLinterNet.Core.Model.ArchitectureExpandedContractInstance : Sys
   property string? Source {get;init;}
 sealed class ArchLinterNet.Core.Model.ArchitectureFinding : System.IEquatable<ArchLinterNet.Core.Model.ArchitectureFinding>
   ctor(int SchemaVersion, string Kind, string ContractName, string? ContractId, string CanonicalIdentity, ArchLinterNet.Core.Model.ArchitectureDiagnostic Details)
-  field const int CurrentSchemaVersion = 2
+  field const int CurrentSchemaVersion = 3
   method ArchLinterNet.Core.Model.ArchitectureFinding <Clone>$()
   method bool Equals(ArchLinterNet.Core.Model.ArchitectureFinding? other)
   method bool Equals(object? obj)
@@ -3702,6 +3715,51 @@ sealed class ArchLinterNet.Core.Model.LayoutConventionPayload : ArchLinterNet.Co
   property string? ExpectedTypeKind {get;init;}
   property string? ExpectedTypeName {get;init;}
   property string? MatchedFilePath {get;init;}
+sealed class ArchLinterNet.Core.Model.MetricBudgetDiagnostic : ArchLinterNet.Core.Model.ArchitectureDiagnostic, System.IEquatable<ArchLinterNet.Core.Model.MetricBudgetDiagnostic>
+  ctor(string ContractName, string? ContractId, string SourceType, string ForbiddenNamespace, System.Collections.Generic.IReadOnlyCollection<string> ForbiddenReferences, string BudgetId, string MetricId, string MetricKind, string? NativeSubject, string EffectiveScope, int MeasuredValue, string BreachedBound, int ConfiguredLimit, System.Collections.Generic.IReadOnlyCollection<string> Contributors)
+  method ArchLinterNet.Core.Model.MetricBudgetDiagnostic <Clone>$()
+  method bool Equals(ArchLinterNet.Core.Model.ArchitectureDiagnostic? other)
+  method bool Equals(ArchLinterNet.Core.Model.MetricBudgetDiagnostic? other)
+  method bool Equals(object? obj)
+  method int GetHashCode()
+  method string ToString()
+  method void Deconstruct(out string ContractName, out string? ContractId, out string SourceType, out string ForbiddenNamespace, out System.Collections.Generic.IReadOnlyCollection<string> ForbiddenReferences, out string BudgetId, out string MetricId, out string MetricKind, out string? NativeSubject, out string EffectiveScope, out int MeasuredValue, out string BreachedBound, out int ConfiguredLimit, out System.Collections.Generic.IReadOnlyCollection<string> Contributors)
+  operator !=(ArchLinterNet.Core.Model.MetricBudgetDiagnostic? left, ArchLinterNet.Core.Model.MetricBudgetDiagnostic? right)
+  operator ==(ArchLinterNet.Core.Model.MetricBudgetDiagnostic? left, ArchLinterNet.Core.Model.MetricBudgetDiagnostic? right)
+  property ArchLinterNet.Core.Model.ArchitectureDiagnosticKind Kind {get;}
+  property System.Collections.Generic.IReadOnlyCollection<string> Contributors {get;init;}
+  property System.Collections.Generic.IReadOnlyCollection<string> ForbiddenReferences {get;init;}
+  property int ConfiguredLimit {get;init;}
+  property int ContributorCount {get;}
+  property int MeasuredValue {get;init;}
+  property string BreachedBound {get;init;}
+  property string BudgetId {get;init;}
+  property string EffectiveScope {get;init;}
+  property string ForbiddenNamespace {get;init;}
+  property string MetricId {get;init;}
+  property string MetricKind {get;init;}
+  property string SourceType {get;init;}
+  property string? NativeSubject {get;init;}
+sealed class ArchLinterNet.Core.Model.MetricBudgetPayload : ArchLinterNet.Core.Model.IArchitectureDiagnosticPayload, System.IEquatable<ArchLinterNet.Core.Model.MetricBudgetPayload>
+  ctor(string BudgetId, string MetricId, string MetricKind, string? NativeSubject, string EffectiveScope, int MeasuredValue, string BreachedBound, int ConfiguredLimit, System.Collections.Generic.IReadOnlyCollection<string> Contributors)
+  method ArchLinterNet.Core.Model.ArchitectureDiagnostic ToDiagnostic(ArchLinterNet.Core.Model.ArchitectureViolation violation)
+  method ArchLinterNet.Core.Model.MetricBudgetPayload <Clone>$()
+  method bool Equals(ArchLinterNet.Core.Model.MetricBudgetPayload? other)
+  method bool Equals(object? obj)
+  method int GetHashCode()
+  method string ToString()
+  method void Deconstruct(out string BudgetId, out string MetricId, out string MetricKind, out string? NativeSubject, out string EffectiveScope, out int MeasuredValue, out string BreachedBound, out int ConfiguredLimit, out System.Collections.Generic.IReadOnlyCollection<string> Contributors)
+  operator !=(ArchLinterNet.Core.Model.MetricBudgetPayload? left, ArchLinterNet.Core.Model.MetricBudgetPayload? right)
+  operator ==(ArchLinterNet.Core.Model.MetricBudgetPayload? left, ArchLinterNet.Core.Model.MetricBudgetPayload? right)
+  property System.Collections.Generic.IReadOnlyCollection<string> Contributors {get;init;}
+  property int ConfiguredLimit {get;init;}
+  property int MeasuredValue {get;init;}
+  property string BreachedBound {get;init;}
+  property string BudgetId {get;init;}
+  property string EffectiveScope {get;init;}
+  property string MetricId {get;init;}
+  property string MetricKind {get;init;}
+  property string? NativeSubject {get;init;}
 sealed class ArchLinterNet.Core.Model.PackageAllowOnlyDiagnostic : ArchLinterNet.Core.Model.ArchitectureDiagnostic, System.IEquatable<ArchLinterNet.Core.Model.PackageAllowOnlyDiagnostic>
   ctor(string ContractName, string? ContractId, string SourceType, string ForbiddenNamespace, System.Collections.Generic.IReadOnlyCollection<string> ForbiddenReferences, System.Collections.Generic.IReadOnlyCollection<string> AllowedPackageGroups)
   method ArchLinterNet.Core.Model.PackageAllowOnlyDiagnostic <Clone>$()

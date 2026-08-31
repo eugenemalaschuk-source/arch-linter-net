@@ -217,6 +217,19 @@ public sealed class ArchitectureContractSchemaInstanceValidationTests
         Assert.That(Validate(Yaml, "classificationOverride"), Is.False);
     }
 
+    [TestCase("id: max-types\nmetric: type-count\nmaximum: 0", true)]
+    [TestCase("id: min-types\nmetric: type-count\nminimum: 2", true)]
+    [TestCase("id: bounded-types\nmetric: type-count\nminimum: 2\nmaximum: 5", true)]
+    [TestCase("id: no-bound\nmetric: type-count", false)]
+    [TestCase("id: negative-minimum\nmetric: type-count\nminimum: -1", false)]
+    [TestCase("id: negative-maximum\nmetric: type-count\nmaximum: -1", false)]
+    [TestCase("id: invalid-shape\nmetric: type-count\nmaximum: 3\nname: extra", false)]
+    [TestCase("id: ' '\nmetric: type-count\nmaximum: 3", false)]
+    public void MetricBudgetContract_EnforcesClosedShapeAndNonNegativeBounds(string yaml, bool expectedValid)
+    {
+        Assert.That(Validate(yaml, "metricBudgetContract"), Is.EqualTo(expectedValid), yaml);
+    }
+
     [Test]
     public void ClassificationExclusion_SingleScopeWithReason_IsValid()
     {

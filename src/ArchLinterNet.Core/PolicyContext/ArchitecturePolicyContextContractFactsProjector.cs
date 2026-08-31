@@ -38,6 +38,7 @@ internal static class ArchitecturePolicyContextContractFactsProjector
         typeof(ArchitectureInheritanceContract), typeof(ArchitectureInterfaceImplementationContract),
         typeof(ArchitectureCompositionContract), typeof(ArchitectureContextDependencyContract),
         typeof(ArchitectureContextAllowOnlyContract), typeof(ArchitectureCoverageContract),
+        typeof(ArchitectureMetricBudgetContract),
         typeof(ArchitecturePortBoundaryContract),
     ];
 
@@ -138,6 +139,8 @@ internal static class ArchitecturePolicyContextContractFactsProjector
                 Text("contract_id", item.ContractId), Text("role", item.Role), Map("metadata", item.Metadata), Values("between", item.Between), Text("reason", item.Reason)))),
             Objects("optional_inputs", value.OptionalInputs.Select(item => ObjectFromItems("input", Text("contract_id", item.ContractId),
                 Text("input", item.Input), Text(LayerFact, item.Layer), Text("reason", item.Reason)))))),
+        ArchitectureMetricBudgetContract value => Create(string.Empty, Array.Empty<ArchitectureIgnoredViolation>(), Facts(
+            Text("metric", value.Metric), Number("minimum", value.Minimum), Number("maximum", value.Maximum))),
         ArchitecturePortBoundaryContract value => Create(value.Reason, value.IgnoredViolations, Facts(
             ObjectFromItems("target_context", Map("metadata", value.TargetContext.Metadata)))),
         _ => throw new InvalidOperationException($"Policy-context projection does not support contract type '{contract.GetType().FullName}'."),

@@ -90,6 +90,32 @@ public sealed class ArchitectureContractSchemaTests
             $"contracts.{propertyName} must be declared in the schema's contracts.properties.");
     }
 
+    [Test]
+    public void Schema_MetricBudgetContract_IsClosedAndRequiresAtLeastOneBound()
+    {
+        JsonElement schema = LoadSchema();
+        JsonElement contracts = schema.GetProperty("$defs").GetProperty("contracts").GetProperty("properties");
+        JsonElement budget = schema.GetProperty("$defs").GetProperty("metricBudgetContract");
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(contracts.GetProperty("strict_metric_budgets").GetProperty("items")
+                .GetProperty("$ref").GetString(), Is.EqualTo("#/$defs/metricBudgetContract"));
+            Assert.That(contracts.GetProperty("audit_metric_budgets").GetProperty("items")
+                .GetProperty("$ref").GetString(), Is.EqualTo("#/$defs/metricBudgetContract"));
+            Assert.That(budget.GetProperty("additionalProperties").GetBoolean(), Is.False);
+            Assert.That(budget.GetProperty("required").EnumerateArray().Select(value => value.GetString()),
+                Is.EquivalentTo(["metric"]));
+            Assert.That(budget.GetProperty("anyOf").EnumerateArray()
+                .Select(option => option.GetProperty("required")[0].GetString()),
+                Is.EquivalentTo(["minimum", "maximum"]));
+            Assert.That(budget.GetProperty("properties").GetProperty("minimum").GetProperty("minimum").GetInt32(),
+                Is.EqualTo(0));
+            Assert.That(budget.GetProperty("properties").GetProperty("maximum").GetProperty("minimum").GetInt32(),
+                Is.EqualTo(0));
+        });
+    }
+
     [TestCase("assemblyDependencyContract")]
     [TestCase("assemblyAllowOnlyContract")]
     public void Schema_AssemblyContractDefs_RestrictDependencyDepthToDirectOnly(string defName)

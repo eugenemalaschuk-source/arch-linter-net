@@ -356,6 +356,8 @@ public sealed class ArchitectureBaselineLoadingService : IArchitectureBaselineLo
                 "audit_composition" => _groups.AuditComposition.Select(c => (IArchitectureContract)c).ToList(),
                 "strict_coverage" => _groups.StrictCoverage.Select(c => (IArchitectureContract)c).ToList(),
                 "audit_coverage" => _groups.AuditCoverage.Select(c => (IArchitectureContract)c).ToList(),
+                "strict_metric_budgets" => _groups.StrictMetricBudgets.Select(c => (IArchitectureContract)c).ToList(),
+                "audit_metric_budgets" => _groups.AuditMetricBudgets.Select(c => (IArchitectureContract)c).ToList(),
                 "strict_context_dependencies" => _groups.StrictContextDependencies.Select(c => (IArchitectureContract)c).ToList(),
                 "audit_context_dependencies" => _groups.AuditContextDependencies.Select(c => (IArchitectureContract)c).ToList(),
                 "strict_context_allow_only" => _groups.StrictContextAllowOnly.Select(c => (IArchitectureContract)c).ToList(),

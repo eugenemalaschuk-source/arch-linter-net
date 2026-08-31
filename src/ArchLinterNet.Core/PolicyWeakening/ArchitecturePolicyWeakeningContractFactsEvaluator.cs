@@ -47,6 +47,7 @@ internal static class ArchitecturePolicyWeakeningContractFactsEvaluator
             AddPermissionBroadenedFinding(comparison, baseContract, currentContract, severity, findings);
             AddScopeNarrowedFinding(comparison, baseContract, currentContract, severity, findings);
             AddProhibitionRemovedFlagFinding(comparison, baseContract, currentContract, severity, findings);
+            AddMetricBudgetBoundRelaxationFinding(comparison, baseContract, currentContract, severity, findings);
         }
     }
 
@@ -133,6 +134,26 @@ internal static class ArchitecturePolicyWeakeningContractFactsEvaluator
             "prohibition_removed", comparison.FactName, severity, baseContract, currentContract, ["true"], ["false"]));
     }
 
+    private static void AddMetricBudgetBoundRelaxationFinding(
+        FactComparison comparison,
+        ArchitecturePolicyContextContract baseContract,
+        ArchitecturePolicyContextContract currentContract,
+        string severity,
+        ICollection<ArchitecturePolicyWeakeningFinding> findings)
+    {
+        if (!IsComparableMetricBudgetBound(comparison, baseContract, currentContract, out int baseLimit, out int currentLimit)
+            || comparison.FactName == "maximum" && currentLimit <= baseLimit
+            || comparison.FactName == "minimum" && currentLimit >= baseLimit)
+        {
+            return;
+        }
+
+        findings.Add(CreateSemanticFinding(
+            "metric_budget_bound_relaxed", comparison.FactName, severity, baseContract, currentContract,
+            [baseLimit.ToString(System.Globalization.CultureInfo.InvariantCulture)],
+            [currentLimit.ToString(System.Globalization.CultureInfo.InvariantCulture)]));
+    }
+
     private static ArchitecturePolicyWeakeningFinding CreateSemanticFinding(
         string kind,
         string identitySuffix,
@@ -173,6 +194,7 @@ internal static class ArchitecturePolicyWeakeningContractFactsEvaluator
             baseFacts.TryGetValue(factName, out ArchitecturePolicyContextContractFact? baseFact);
             currentFacts.TryGetValue(factName, out ArchitecturePolicyContextContractFact? currentFact);
             if (IsKnownDirectionalFact(factName, baseFact, currentFact)
+                || IsComparableMetricBudgetBound(factName, baseFact, currentFact, baseContract, currentContract)
                 || string.Equals(baseEvidence, currentEvidence, StringComparison.Ordinal))
             {
                 continue;
@@ -226,5 +248,50 @@ internal static class ArchitecturePolicyWeakeningContractFactsEvaluator
                 Array.Empty<string>(),
                 current.Reason ?? baseline.Reason));
         }
+    }
+
+    private static bool IsComparableMetricBudgetBound(
+        FactComparison comparison,
+        ArchitecturePolicyContextContract baseContract,
+        ArchitecturePolicyContextContract currentContract,
+        out int baseLimit,
+        out int currentLimit) => IsComparableMetricBudgetBound(
+        comparison.FactName, comparison.BaseFact, comparison.CurrentFact, baseContract, currentContract, out baseLimit, out currentLimit);
+
+    private static bool IsComparableMetricBudgetBound(
+        string factName,
+        ArchitecturePolicyContextContractFact? baseFact,
+        ArchitecturePolicyContextContractFact? currentFact,
+        ArchitecturePolicyContextContract baseContract,
+        ArchitecturePolicyContextContract currentContract) => IsComparableMetricBudgetBound(
+        factName, baseFact, currentFact, baseContract, currentContract, out _, out _);
+
+    private static bool IsComparableMetricBudgetBound(
+        string factName,
+        ArchitecturePolicyContextContractFact? baseFact,
+        ArchitecturePolicyContextContractFact? currentFact,
+        ArchitecturePolicyContextContract baseContract,
+        ArchitecturePolicyContextContract currentContract,
+        out int baseLimit,
+        out int currentLimit)
+    {
+        baseLimit = 0;
+        currentLimit = 0;
+        return baseContract.Family == "metric_budgets"
+            && currentContract.Family == "metric_budgets"
+            && factName is "minimum" or "maximum"
+            && TryGetIntegerValue(baseFact, out baseLimit)
+            && TryGetIntegerValue(currentFact, out currentLimit);
+    }
+
+    private static bool TryGetIntegerValue(ArchitecturePolicyContextContractFact? fact, out int value)
+    {
+        value = 0;
+        return fact is { Items.Count: 0, Values.Count: 1 }
+            && int.TryParse(
+                fact.Values[0],
+                System.Globalization.NumberStyles.None,
+                System.Globalization.CultureInfo.InvariantCulture,
+                out value);
     }
 }

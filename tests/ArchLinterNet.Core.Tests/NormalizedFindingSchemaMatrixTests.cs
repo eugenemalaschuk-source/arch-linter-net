@@ -44,6 +44,9 @@ public sealed class NormalizedFindingSchemaMatrixTests
         yield return Violation(new ExternalDependencyPayload("vendor"));
         yield return Violation(new PackageDependencyPayload("forbidden"));
         yield return Violation(new PackageAllowOnlyPayload(["allowed"]));
+        yield return Violation(new MetricBudgetPayload(
+            "component-budget", "component-count", "topology_type_count", "App.Core", "core",
+            4, "maximum", 3, ["App.Core.A", "App.Core.B", "App.Core.C", "App.Core.D"]));
         yield return Violation(new FrameworkReferencePayload("aspnet"));
         yield return Violation(new FrameworkReferenceAllowOnlyPayload(["runtime"]));
         yield return Violation(new TypePlacementPayload("expected", "actual", "Expected", "Actual"));

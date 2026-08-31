@@ -11,7 +11,7 @@ namespace ArchLinterNet.Core.Tests;
 
 // A real AnalysisCacheStore-serialized AnalysisCacheEntryV1 validates against the exact
 // release-matched resource returned by PackagedSchemaRegistry, including a violation carrying a
-// real closed-set Payload so the schema's "$kind"/"value" envelope is exercised.
+// real MetricBudgetPayload so the schema's "$kind"/"value" envelope is exercised.
 [TestFixture]
 public sealed class AnalysisCacheSchemaValidationTests
 {
@@ -30,7 +30,8 @@ public sealed class AnalysisCacheSchemaValidationTests
             "no_infra_from_domain", "R001", "MyApp.Domain.Order", "MyApp.Infrastructure",
             _value)
         {
-            Payload = new DependencyPayload("Domain", "Infrastructure", _value1),
+            Payload = new MetricBudgetPayload(
+                "model-type-budget", "model-types", "topology_type_count", "model", "model", 3, "maximum", 2, _value1),
         };
 
         AnalysisCacheOutcomeV1 outcome = new(
@@ -73,7 +74,7 @@ public sealed class AnalysisCacheSchemaValidationTests
     }
 
     [Test]
-    public void RealCacheEntry_ValidatesAgainstSchema()
+    public void RealCacheEntryWithMetricBudgetPayload_ValidatesAgainstCurrentSchema()
     {
         string cacheRoot = Path.Combine(Path.GetTempPath(), "arch-linter-net-cache-schema-key-tests", Guid.NewGuid().ToString("N"));
         try
@@ -99,7 +100,7 @@ public sealed class AnalysisCacheSchemaValidationTests
     }
 
     [Test]
-    public void RealCacheEntry_RoundTripsThroughStore_AndValidatesAgainstSchema()
+    public void RealCacheEntryWithMetricBudgetPayload_RoundTripsThroughStore_AndValidatesAgainstCurrentSchema()
     {
         string root = Path.Combine(Path.GetTempPath(), "arch-linter-net-cache-schema-tests", Guid.NewGuid().ToString("N"));
         AnalysisCacheLocation location = new(root, AnalysisCacheMode.ExplicitPath);
