@@ -177,7 +177,7 @@ public sealed class ArchitectureBaselineLoadingService : IArchitectureBaselineLo
 
     internal static void Merge(ArchitectureContractDocument policyDocument, ArchitectureBaselineDocument baselineDocument)
     {
-        var groupMerger = new ContractGroupMerger(policyDocument.Contracts);
+        var groupMerger = new ContractGroupMerger(policyDocument);
         foreach (string groupName in ArchitectureBaselineContractGroups.GroupNames)
         {
             groupMerger.MergeGroup(baselineDocument.Baseline.GetGroup(groupName), groupName, baselineDocument.Version);
@@ -189,7 +189,7 @@ public sealed class ArchitectureBaselineLoadingService : IArchitectureBaselineLo
         ArchitectureBaselineDocument baselineDocument)
     {
         var unknownIds = new List<(string GroupName, string ContractId)>();
-        var groupMerger = new ContractGroupMerger(policyDocument.Contracts);
+        var groupMerger = new ContractGroupMerger(policyDocument);
 
         foreach (string groupName in ArchitectureBaselineContractGroups.GroupNames)
         {
@@ -209,10 +209,14 @@ public sealed class ArchitectureBaselineLoadingService : IArchitectureBaselineLo
     private sealed class ContractGroupMerger
     {
         private readonly Families.ArchitectureContractGroups _groups;
+        private readonly HashSet<string> _externalEvidenceIds;
 
-        public ContractGroupMerger(Families.ArchitectureContractGroups groups)
+        public ContractGroupMerger(ArchitectureContractDocument document)
         {
-            _groups = groups;
+            _groups = document.Contracts;
+            _externalEvidenceIds = new HashSet<string>(
+                document.ExternalEvidence.Select(requirement => requirement.Id),
+                StringComparer.Ordinal);
         }
 
         public List<(string GroupName, string ContractId)> MergeGroup(
@@ -226,6 +230,19 @@ public sealed class ArchitectureBaselineLoadingService : IArchitectureBaselineLo
 
             foreach (var baselineEntry in baselineEntries)
             {
+                if (IsImportedExternalDiagnosticEntry(baselineEntry, groupName, documentVersion))
+                {
+                    if (!_externalEvidenceIds.Contains(baselineEntry.Id))
+                    {
+                        unknownIds.Add((groupName, baselineEntry.Id));
+                    }
+
+                    // Imported findings are compared through their exact structured identities by
+                    // baseline lifecycle services. They must not become native external-contract
+                    // ignores, which could otherwise affect ArchitectureIgnoreMatcher.
+                    continue;
+                }
+
                 var contract = contracts.FirstOrDefault(c =>
                     string.Equals(c.Id, baselineEntry.Id, StringComparison.OrdinalIgnoreCase));
 
@@ -282,6 +299,34 @@ public sealed class ArchitectureBaselineLoadingService : IArchitectureBaselineLo
             }
 
             return unknownIds;
+        }
+
+        private static bool IsImportedExternalDiagnosticEntry(
+            ArchitectureBaselineContractEntry entry,
+            string groupName,
+            int documentVersion)
+        {
+            if (documentVersion != ArchitectureViolationIdentity.CurrentVersion
+                || groupName is not ("strict_external" or "audit_external"))
+            {
+                return false;
+            }
+
+            bool containsImportedDiagnostic = entry.IgnoredViolations.Any(ignore =>
+                string.Equals(ignore.Kind, "external_diagnostic", StringComparison.Ordinal));
+            if (!containsImportedDiagnostic)
+            {
+                return false;
+            }
+
+            if (entry.IgnoredViolations.Any(ignore =>
+                    !string.Equals(ignore.Kind, "external_diagnostic", StringComparison.Ordinal)))
+            {
+                throw new InvalidOperationException(
+                    $"Baseline entry '{entry.Id}' in group '{groupName}' cannot mix imported external diagnostics with native contract ignores.");
+            }
+
+            return true;
         }
 
         private static bool IdentityEquals(ArchitectureIgnoredViolation existing, ArchitectureBaselineIgnoredViolation candidate)

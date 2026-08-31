@@ -59,6 +59,7 @@ public static class ArchitectureFindingJsonReader
     private static readonly HashSet<string> _v3KnownKinds = new(_v2KnownKinds, StringComparer.Ordinal)
     {
         "metric_budget",
+        "imported_external_diagnostic",
     };
 
     public static ArchitectureFindingReadEnvelope Read(string json, bool strict)

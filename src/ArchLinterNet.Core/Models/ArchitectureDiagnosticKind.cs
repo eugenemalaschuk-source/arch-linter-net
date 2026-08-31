@@ -27,5 +27,6 @@ public enum ArchitectureDiagnosticKind
     Baseline,
     ArchitecturePolicyError,
     Applicability,
-    MetricBudget
+    MetricBudget,
+    ImportedExternalDiagnostic
 }

@@ -34,6 +34,9 @@ public sealed partial class ArchitectureSarifFormatterTests
         return JsonDocument.Parse(json).RootElement;
     }
 
+    private static JsonElement LogicalLocationOf(JsonElement result) =>
+        result.GetProperty("locations")[0].GetProperty("logicalLocations")[0];
+
     [Test]
     public void BaselineComparisonSarif_ExposesStatusAndCanonicalIdentity()
     {
@@ -453,9 +456,7 @@ public sealed partial class ArchitectureSarifFormatterTests
         JsonElement root = Run("strict", violations);
 
         JsonElement result = root.GetProperty("runs")[0].GetProperty("results")[0];
-        Assert.That(result.TryGetProperty("logicalLocations", out JsonElement logicalLocations), Is.True);
-        Assert.That(logicalLocations[0].GetProperty("fullyQualifiedName").GetString(), Is.EqualTo("Layout.Source"));
-        Assert.That(result.TryGetProperty("locations", out _), Is.False);
+        Assert.That(LogicalLocationOf(result).GetProperty("fullyQualifiedName").GetString(), Is.EqualTo("Layout.Source"));
     }
 
     [Test]
@@ -537,8 +538,7 @@ public sealed partial class ArchitectureSarifFormatterTests
         JsonElement root = Run("strict", violations);
 
         JsonElement result = root.GetProperty("runs")[0].GetProperty("results")[0];
-        Assert.That(result.TryGetProperty("locations", out _), Is.False);
-        JsonElement logicalLocation = result.GetProperty("logicalLocations")[0];
+        JsonElement logicalLocation = LogicalLocationOf(result);
         Assert.Multiple(() =>
         {
             Assert.That(logicalLocation.GetProperty("fullyQualifiedName").GetString(), Is.EqualTo("MyApp.Web.Foo"));
@@ -560,7 +560,7 @@ public sealed partial class ArchitectureSarifFormatterTests
         JsonElement root = Run("strict", violations);
 
         JsonElement result = root.GetProperty("runs")[0].GetProperty("results")[0];
-        JsonElement logicalLocation = result.GetProperty("logicalLocations")[0];
+        JsonElement logicalLocation = LogicalLocationOf(result);
         Assert.That(logicalLocation.GetProperty("kind").GetString(), Is.EqualTo("package"));
     }
 
@@ -579,7 +579,7 @@ public sealed partial class ArchitectureSarifFormatterTests
         JsonElement root = Run("strict", violations);
 
         JsonElement result = root.GetProperty("runs")[0].GetProperty("results")[0];
-        JsonElement logicalLocation = result.GetProperty("logicalLocations")[0];
+        JsonElement logicalLocation = LogicalLocationOf(result);
         Assert.That(logicalLocation.GetProperty("kind").GetString(), Is.EqualTo("package"));
     }
 
@@ -597,7 +597,7 @@ public sealed partial class ArchitectureSarifFormatterTests
         JsonElement root = Run("strict", violations);
 
         JsonElement result = root.GetProperty("runs")[0].GetProperty("results")[0];
-        JsonElement logicalLocation = result.GetProperty("logicalLocations")[0];
+        JsonElement logicalLocation = LogicalLocationOf(result);
         Assert.That(logicalLocation.GetProperty("kind").GetString(), Is.EqualTo("framework-reference"));
     }
 
@@ -616,7 +616,7 @@ public sealed partial class ArchitectureSarifFormatterTests
         JsonElement root = Run("strict", violations);
 
         JsonElement result = root.GetProperty("runs")[0].GetProperty("results")[0];
-        JsonElement logicalLocation = result.GetProperty("logicalLocations")[0];
+        JsonElement logicalLocation = LogicalLocationOf(result);
         Assert.That(logicalLocation.GetProperty("kind").GetString(), Is.EqualTo("framework-reference"));
     }
 
@@ -666,7 +666,7 @@ public sealed partial class ArchitectureSarifFormatterTests
         JsonElement root = Run("strict", violations);
 
         JsonElement result = root.GetProperty("runs")[0].GetProperty("results")[0];
-        JsonElement logicalLocation = result.GetProperty("logicalLocations")[0];
+        JsonElement logicalLocation = LogicalLocationOf(result);
         Assert.That(logicalLocation.GetProperty("kind").GetString(), Is.EqualTo("type"));
     }
 
@@ -686,8 +686,7 @@ public sealed partial class ArchitectureSarifFormatterTests
         JsonElement root = Run("strict", violations);
 
         JsonElement result = root.GetProperty("runs")[0].GetProperty("results")[0];
-        Assert.That(result.TryGetProperty("locations", out _), Is.False);
-        JsonElement logicalLocation = result.GetProperty("logicalLocations")[0];
+        JsonElement logicalLocation = LogicalLocationOf(result);
         Assert.Multiple(() =>
         {
             Assert.That(logicalLocation.GetProperty("fullyQualifiedName").GetString(),
@@ -707,7 +706,7 @@ public sealed partial class ArchitectureSarifFormatterTests
         Assert.Multiple(() =>
         {
             Assert.That(result.GetProperty("ruleId").GetString(), Is.EqualTo("cycle-check"));
-            Assert.That(result.GetProperty("logicalLocations")[0].GetProperty("fullyQualifiedName").GetString(),
+            Assert.That(LogicalLocationOf(result).GetProperty("fullyQualifiedName").GetString(),
                 Is.EqualTo("A -> B -> A"));
         });
     }

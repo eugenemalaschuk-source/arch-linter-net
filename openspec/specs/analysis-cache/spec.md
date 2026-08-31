@@ -249,9 +249,8 @@ The cache profile SHALL report avoided assembly loads, fact-index materializatio
 - **THEN** `Hits` equals one, `AssemblyLoads` equals zero, and avoided assembly plus fact-or-contract work are positive
 
 ### Requirement: The advertised current cache schema accepts every writer payload
-The schema advertised as the current write contract for `analysis-cache/v1`
-SHALL accept every payload emitted by the cache writer, including metric-budget
-payloads. A frozen historical cache schema SHALL remain byte-stable and be
+The advertised `analysis-cache/v1` write schema SHALL accept every cache-writer payload,
+including metric-budget payloads. A frozen historical cache schema SHALL remain byte-stable and be
 advertised only as a legacy read contract when it cannot represent a current
 payload.
 

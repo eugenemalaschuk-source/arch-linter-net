@@ -228,6 +228,64 @@ public sealed class PackagedSchemaRegistryTests
     }
 
     [Test]
+    public void NormalizedFindingReader_ImportedDiagnosticIsUnknownToFrozenV2AndKnownToV3()
+    {
+        const string V2Imported = """
+            {
+              "schema_version": 2,
+              "kind": "imported_external_diagnostic",
+              "contract": "external evidence",
+              "contract_id": "external-evidence",
+              "canonical_identity": "external-diagnostic:v2:example",
+              "mode": "strict",
+              "severity": "error",
+              "message_code": "imported_external_diagnostic",
+              "policy_origin": null,
+              "source_location": null,
+              "baseline_state": null,
+              "details": { "detail_kind": "imported_external_diagnostic" }
+            }
+            """;
+        const string V3Imported = """
+            {
+              "schema_version": 3,
+              "kind": "imported_external_diagnostic",
+              "contract": "external evidence",
+              "contract_id": "external-evidence",
+              "canonical_identity": "external-diagnostic:v2:example",
+              "mode": "strict",
+              "severity": "error",
+              "message_code": "imported_external_diagnostic",
+              "policy_origin": null,
+              "source_location": null,
+              "baseline_state": null,
+              "details": { "detail_kind": "imported_external_diagnostic" }
+            }
+            """;
+        string repositoryRoot = new ArchitectureRepositoryRootResolver().Resolve();
+        JsonSchema frozenV2Schema = JsonSchema.FromText(File.ReadAllText(Path.Combine(
+            repositoryRoot,
+            "schema",
+            "0.6.1",
+            "normalized-finding.schema.json")));
+        using JsonDocument v2Document = JsonDocument.Parse(V2Imported);
+
+        ArchitectureFindingReadEnvelope opaque = ArchitectureFindingJsonReader.Read(V2Imported, strict: false);
+        ArchitectureFindingReadEnvelope knownV3 = ArchitectureFindingJsonReader.Read(V3Imported, strict: true);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(frozenV2Schema.Evaluate(v2Document.RootElement).IsValid, Is.False);
+            Assert.That(opaque.IsOpaque, Is.True);
+            Assert.That(
+                () => ArchitectureFindingJsonReader.Read(V2Imported, strict: true),
+                Throws.TypeOf<ArchitectureFindingFormatException>()
+                    .With.Message.Contains("Unsupported normalized finding kind 'imported_external_diagnostic'"));
+            Assert.That(knownV3.IsOpaque, Is.False);
+        });
+    }
+
+    [Test]
     public void ApiSnapshotContract_ValidatesSerializedTextAgainstThePackagedResource()
     {
         string snapshot = PublicApiSnapshotFormat.Serialize(new PublicApiSnapshotDocument(

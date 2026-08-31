@@ -35,6 +35,16 @@ public sealed class ArchitectureValidationResult
     /// formatted output is never parsed to reconstruct it.
     /// </summary>
     public ArchitectureApplicabilityProjection? ApplicabilityProjection { get; }
+    /// <summary>
+    /// Trusted external findings projected by Core. They are included in <see cref="Findings"/>
+    /// rather than exposed through a testing-only aggregate.
+    /// </summary>
+    public IReadOnlyCollection<ArchitectureFinding> ImportedDiagnosticFindings { get; }
+    /// <summary>
+    /// Core-owned imported-diagnostic projection. It couples normalized findings to their strict
+    /// governance-blocking semantics before this adapter exposes the result.
+    /// </summary>
+    public ImportedExternalDiagnosticProjection ImportedDiagnostics { get; }
 
     // Null unless the builder called WithProfile() — see
     // openspec/specs/analysis-profile/spec.md, "Testing API exposes the same profile semantics as
@@ -43,7 +53,8 @@ public sealed class ArchitectureValidationResult
 
     public ArchitectureValidationResult(ArchitectureValidationResultParams @params)
     {
-        Passed = @params.Passed;
+        ImportedDiagnostics = @params.ImportedDiagnostics ?? ImportedExternalDiagnosticProjection.Empty;
+        Passed = @params.Passed && !ImportedDiagnostics.HasBlockingFindings;
         Violations = @params.Violations;
         Cycles = @params.Cycles;
         CycleFindings = @params.CycleFindings ?? Array.Empty<ArchitectureCycleFinding>();
@@ -64,6 +75,7 @@ public sealed class ArchitectureValidationResult
         Waivers = @params.Waivers ?? Array.Empty<ArchitectureWaiverLifecycleRecord>();
         AssessmentCompletionEvidence = @params.AssessmentCompletionEvidence;
         ApplicabilityProjection = @params.ApplicabilityProjection;
+        ImportedDiagnosticFindings = ImportedDiagnostics.Findings;
         Profile = @params.Profile;
         Findings = ArchitectureFindingMapper.Order(AllDiagnostics());
     }
@@ -122,6 +134,11 @@ public sealed class ArchitectureValidationResult
             }
         }
 
+        foreach (ArchitectureFinding finding in ImportedDiagnosticFindings)
+        {
+            yield return finding;
+        }
+
         foreach (BaselineLifecycleEntry baseline in BaselineLifecycleEntries)
         {
             yield return ArchitectureFindingMapper.FromBaseline(baseline);
@@ -178,6 +195,12 @@ public sealed class ArchitectureValidationResult
                 ? ArchitectureDiagnosticFormatter.FormatAssessmentCompletionForHumans(AssessmentCompletionEvidence)
                 : string.Empty);
 
+        message += FormatFailureSection(
+            "Imported external diagnostics:",
+            ImportedDiagnostics.HasBlockingFindings
+                ? ArchitectureDiagnosticFormatter.FormatFindingsForHumans(ImportedDiagnosticFindings)
+                : string.Empty);
+
         return message;
     }
 
@@ -227,4 +250,5 @@ public sealed record ArchitectureValidationResultParams(
     public AnalysisProfile? Profile { get; init; }
     public ArchitectureAssessmentCompletionEvidence? AssessmentCompletionEvidence { get; init; }
     public ArchitectureApplicabilityProjection? ApplicabilityProjection { get; init; }
+    public ImportedExternalDiagnosticProjection? ImportedDiagnostics { get; init; }
 }
