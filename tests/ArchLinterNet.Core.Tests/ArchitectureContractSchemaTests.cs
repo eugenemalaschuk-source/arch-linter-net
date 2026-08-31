@@ -106,9 +106,12 @@ public sealed class ArchitectureContractSchemaTests
             Assert.That(budget.GetProperty("additionalProperties").GetBoolean(), Is.False);
             Assert.That(budget.GetProperty("required").EnumerateArray().Select(value => value.GetString()),
                 Is.EquivalentTo(["metric"]));
-            Assert.That(budget.GetProperty("anyOf").EnumerateArray()
-                .Select(option => option.GetProperty("required")[0].GetString()),
-                Is.EquivalentTo(["minimum", "maximum"]));
+            Assert.That(budget.GetProperty("oneOf").EnumerateArray().ToArray(), Has.Length.EqualTo(3));
+            Assert.That(budget.GetProperty("properties").GetProperty("baseline_mode")
+                .GetProperty("enum").EnumerateArray().Select(value => value.GetString()),
+                Is.EquivalentTo(["no_worse_than_baseline", "max_delta"]));
+            Assert.That(budget.GetProperty("properties").GetProperty("max_delta")
+                .GetProperty("minimum").GetInt32(), Is.Zero);
             Assert.That(budget.GetProperty("properties").GetProperty("minimum").GetProperty("minimum").GetInt32(),
                 Is.EqualTo(0));
             Assert.That(budget.GetProperty("properties").GetProperty("maximum").GetProperty("minimum").GetInt32(),

@@ -3,6 +3,7 @@ using ArchLinterNet.Core.Contracts.Families;
 using ArchLinterNet.Core.IO;
 using ArchLinterNet.Core.IO.Abstractions;
 using ArchLinterNet.Core.Model;
+using YamlDotNet.RepresentationModel;
 using YamlDotNet.Serialization;
 using YamlDotNet.Serialization.NamingConventions;
 
@@ -27,6 +28,7 @@ public sealed class ArchitectureBaselineLoadingService : IArchitectureBaselineLo
         LoadedBaseline baseline = LoadWithIdentity(baselinePath);
         MergeAndValidate(document, baseline.Document);
         document.BaselineContentIdentity = baseline.ContentIdentity;
+        document.MetricBaselines = baseline.Document.MetricBaselines.ToArray();
     }
 
     public ArchitectureBaselineDocument Load(string baselinePath)
@@ -69,7 +71,7 @@ public sealed class ArchitectureBaselineLoadingService : IArchitectureBaselineLo
             throw new InvalidOperationException("Failed to deserialize baseline YAML.");
         }
 
-        ValidateBaseline(document);
+        ValidateBaseline(document, yaml);
         return new LoadedBaseline(
             document,
             ArchitectureLoadedTextIdentityFactory.FromText(baselinePath, yaml));
@@ -79,23 +81,198 @@ public sealed class ArchitectureBaselineLoadingService : IArchitectureBaselineLo
         ArchitectureBaselineDocument Document,
         ArchitectureLoadedTextIdentity ContentIdentity);
 
-    private static void ValidateBaseline(ArchitectureBaselineDocument document)
+    private static void ValidateBaseline(ArchitectureBaselineDocument document, string yaml)
     {
-        if (document.Version is not (1 or 2))
+        if (document.Version is not (1 or 2 or 3))
         {
             throw new InvalidOperationException(
-                $"Unsupported baseline version: {document.Version}. Only versions 1 and 2 are supported.");
+                $"Unsupported baseline version: {document.Version}. Only versions 1, 2, and 3 are supported.");
+        }
+
+        if (document.MetricBaselines is null)
+        {
+            throw new InvalidOperationException("Baseline 'metric_baselines' must be an array when present.");
+        }
+
+        if (document.Version != 3 && document.MetricBaselines.Count > 0)
+        {
+            throw new InvalidOperationException(
+                $"Baseline contains 'metric_baselines', but the document is 'version: {document.Version}'. " +
+                "Metric baselines are only valid in a 'version: 3' document.");
         }
 
         foreach (string groupName in ArchitectureBaselineContractGroups.GroupNames)
         {
             ValidateGroupEntries(document.Baseline.GetGroup(groupName), groupName, document.Version);
         }
+
+        if (document.Version == 3)
+        {
+            ValidateMetricBaselineRequiredFields(yaml);
+            ValidateMetricBaselines(document.MetricBaselines);
+        }
+    }
+
+    // The baseline deserializer deliberately ignores unmatched properties for forward compatibility.
+    // For the versioned metric record, however, required keys must be fail-closed: an omitted key
+    // or a typo such as `valu` must not be silently mapped to a scalar default value.
+    private static void ValidateMetricBaselineRequiredFields(string yaml)
+    {
+        var stream = new YamlStream();
+        using var reader = new StringReader(yaml);
+        stream.Load(reader);
+
+        if (stream.Documents.Count != 1
+            || stream.Documents[0].RootNode is not YamlMappingNode root
+            || !TryGetChild(root, "metric_baselines", out YamlNode? metricBaselines)
+            || metricBaselines is not YamlSequenceNode entries)
+        {
+            return;
+        }
+
+        string[] requiredKeys =
+        [
+            "metric_identity_version", "metric_id", "metric_kind", "native_subject", "effective_scope", "value",
+        ];
+        string[] allowedKeys = [.. requiredKeys, "unit"];
+        for (int index = 0; index < entries.Children.Count; index++)
+        {
+            if (entries.Children[index] is not YamlMappingNode entry)
+            {
+                continue;
+            }
+
+            foreach (YamlNode field in entry.Children.Keys)
+            {
+                if (field is not YamlScalarNode { Value: { } fieldName })
+                {
+                    throw new InvalidOperationException(
+                        $"metric_baselines entry at index {index} has an unknown non-scalar field.");
+                }
+
+                if (!allowedKeys.Contains(fieldName, StringComparer.Ordinal))
+                {
+                    throw new InvalidOperationException(
+                        $"metric_baselines entry at index {index} has an unknown field '{fieldName}'.");
+                }
+            }
+
+            foreach (string requiredKey in requiredKeys)
+            {
+                if (!TryGetChild(entry, requiredKey, out _))
+                {
+                    throw new InvalidOperationException(
+                        $"metric_baselines entry at index {index} has a missing '{requiredKey}'.");
+                }
+            }
+        }
+    }
+
+    private static bool TryGetChild(YamlMappingNode mapping, string key, out YamlNode? value)
+    {
+        foreach ((YamlNode node, YamlNode child) in mapping.Children)
+        {
+            if (node is YamlScalarNode { Value: { } nodeKey }
+                && string.Equals(nodeKey, key, StringComparison.Ordinal))
+            {
+                value = child;
+                return true;
+            }
+        }
+
+        value = null;
+        return false;
+    }
+
+    private static void ValidateMetricBaselines(IReadOnlyList<ArchitectureMetricBaselineEntry> entries)
+    {
+        var metricIds = new HashSet<string>(StringComparer.Ordinal);
+        for (int index = 0; index < entries.Count; index++)
+        {
+            ArchitectureMetricBaselineEntry entry = entries[index];
+            string location = $"metric_baselines entry at index {index}";
+
+            if (entry.MetricIdentityVersion is null)
+            {
+                throw new InvalidOperationException(
+                    $"{location} has a missing 'metric_identity_version'.");
+            }
+
+            if (entry.MetricIdentityVersion != ArchitectureMetricBaselineIdentity.CurrentVersion)
+            {
+                throw new InvalidOperationException(
+                    $"{location} has unsupported 'metric_identity_version' " +
+                    $"(expected {ArchitectureMetricBaselineIdentity.CurrentVersion}).");
+            }
+
+            if (string.IsNullOrWhiteSpace(entry.MetricId))
+            {
+                throw new InvalidOperationException(
+                    $"{location} has an empty or missing 'metric_id'.");
+            }
+
+            if (!metricIds.Add(entry.MetricId))
+            {
+                throw new InvalidOperationException(
+                    $"Duplicate metric baseline id '{entry.MetricId}'. Each metric ID may appear only once.");
+            }
+
+            if (string.IsNullOrWhiteSpace(entry.MetricKind))
+            {
+                throw new InvalidOperationException(
+                    $"{location} for metric '{entry.MetricId}' has an empty or missing 'metric_kind'.");
+            }
+
+            if (!ArchitectureMetricKinds.All.Contains(entry.MetricKind, StringComparer.Ordinal))
+            {
+                throw new InvalidOperationException(
+                    $"{location} for metric '{entry.MetricId}' has unsupported 'metric_kind' '{entry.MetricKind}'.");
+            }
+
+            if (string.IsNullOrWhiteSpace(entry.NativeSubject))
+            {
+                throw new InvalidOperationException(
+                    $"{location} for metric '{entry.MetricId}' has an empty or missing 'native_subject'.");
+            }
+
+            if (entry.Unit is not null)
+            {
+                if (string.IsNullOrWhiteSpace(entry.Unit))
+                {
+                    throw new InvalidOperationException(
+                        $"{location} for metric '{entry.MetricId}' has an empty 'unit'.");
+                }
+
+                if (entry.Unit is not ("project" or "assembly"))
+                {
+                    throw new InvalidOperationException(
+                        $"{location} for metric '{entry.MetricId}' has unsupported 'unit' '{entry.Unit}'.");
+                }
+            }
+
+            if (string.IsNullOrWhiteSpace(entry.EffectiveScope))
+            {
+                throw new InvalidOperationException(
+                    $"{location} for metric '{entry.MetricId}' has an empty or missing 'effective_scope'.");
+            }
+
+            if (entry.Value is null)
+            {
+                throw new InvalidOperationException(
+                    $"{location} for metric '{entry.MetricId}' has a missing 'value'.");
+            }
+
+            if (entry.Value < 0)
+            {
+                throw new InvalidOperationException(
+                    $"{location} for metric '{entry.MetricId}' has a negative 'value'.");
+            }
+        }
     }
 
     private static void ValidateGroupEntries(List<ArchitectureBaselineContractEntry> entries, string groupName, int documentVersion)
     {
-        bool isStructured = documentVersion == ArchitectureViolationIdentity.CurrentVersion;
+        bool isStructured = documentVersion is 2 or 3;
 
         for (int i = 0; i < entries.Count; i++)
         {
@@ -133,13 +310,13 @@ public sealed class ArchitectureBaselineLoadingService : IArchitectureBaselineLo
                     throw new InvalidOperationException(
                         $"Baseline entry '{entry.Id}' in group '{groupName}' has an ignored_violations entry " +
                         $"at index {j} with an 'identity_version' field, but the document is 'version: {documentVersion}'. " +
-                        "Structured identity fields are only valid in a 'version: 2' document.");
+                        "Structured identity fields are only valid in a 'version: 2' or 'version: 3' document.");
                 }
             }
         }
     }
 
-    // A `version: 2` document is only trustworthy if every entry actually carries the structured
+    // A `version: 2` or `version: 3` document is only trustworthy if every entry actually carries the structured
     // identity that version claims — otherwise a legacy-shaped (or hand-edited, or corrupted) entry
     // mislabeled as version 2 would silently fall back to default/empty identity fields and match
     // differently at `validate` time than it does in `diff`/`verify`/`migrate`. Fail closed instead.
@@ -150,28 +327,28 @@ public sealed class ArchitectureBaselineLoadingService : IArchitectureBaselineLo
             throw new InvalidOperationException(
                 $"Baseline entry '{entryId}' in group '{groupName}' has an ignored_violations entry at index {index} " +
                 $"with a missing or unsupported 'identity_version' (expected {ArchitectureViolationIdentity.CurrentVersion}) " +
-                "in a 'version: 2' document. Every entry in a version-2 baseline must carry structured identity.");
+                "in a 'version: 2' or 'version: 3' document. Every entry in a structured baseline must carry structured identity.");
         }
 
         if (string.IsNullOrWhiteSpace(ignore.ContractFamily))
         {
             throw new InvalidOperationException(
                 $"Baseline entry '{entryId}' in group '{groupName}' has an ignored_violations entry at index {index} " +
-                "with an empty or missing 'contract_family', required in a 'version: 2' document.");
+                "with an empty or missing 'contract_family', required in a 'version: 2' or 'version: 3' document.");
         }
 
         if (string.IsNullOrWhiteSpace(ignore.Kind))
         {
             throw new InvalidOperationException(
                 $"Baseline entry '{entryId}' in group '{groupName}' has an ignored_violations entry at index {index} " +
-                "with an empty or missing 'kind', required in a 'version: 2' document.");
+                "with an empty or missing 'kind', required in a 'version: 2' or 'version: 3' document.");
         }
 
         if (ignore.Occurrence == null || ignore.Occurrence < 0)
         {
             throw new InvalidOperationException(
                 $"Baseline entry '{entryId}' in group '{groupName}' has an ignored_violations entry at index {index} " +
-                "with a missing or negative 'occurrence', required in a 'version: 2' document.");
+                "with a missing or negative 'occurrence', required in a 'version: 2' or 'version: 3' document.");
         }
     }
 
@@ -226,7 +403,7 @@ public sealed class ArchitectureBaselineLoadingService : IArchitectureBaselineLo
         {
             var unknownIds = new List<(string GroupName, string ContractId)>();
             var contracts = GetContracts(groupName);
-            bool isStructured = documentVersion == ArchitectureViolationIdentity.CurrentVersion;
+            bool isStructured = documentVersion is 2 or 3;
 
             foreach (var baselineEntry in baselineEntries)
             {
@@ -306,7 +483,7 @@ public sealed class ArchitectureBaselineLoadingService : IArchitectureBaselineLo
             string groupName,
             int documentVersion)
         {
-            if (documentVersion != ArchitectureViolationIdentity.CurrentVersion
+            if (documentVersion is not (2 or 3)
                 || groupName is not ("strict_external" or "audit_external"))
             {
                 return false;
@@ -444,6 +621,7 @@ public sealed class ArchitectureBaselineLoadingService : IArchitectureBaselineLo
                 ArchitectureInterfaceImplementationContract c => c.IgnoredViolations,
                 ArchitectureCompositionContract c => c.IgnoredViolations,
                 ArchitectureCoverageContract c => c.IgnoredViolations,
+                ArchitectureMetricBudgetContract c => c.IgnoredViolations,
                 ArchitectureContextDependencyContract c => c.IgnoredViolations,
                 ArchitectureContextAllowOnlyContract c => c.IgnoredViolations,
                 ArchitecturePortBoundaryContract c => c.IgnoredViolations,

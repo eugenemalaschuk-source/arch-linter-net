@@ -220,10 +220,17 @@ public sealed class ArchitectureContractSchemaInstanceValidationTests
     [TestCase("id: max-types\nmetric: type-count\nmaximum: 0", true)]
     [TestCase("id: min-types\nmetric: type-count\nminimum: 2", true)]
     [TestCase("id: bounded-types\nmetric: type-count\nminimum: 2\nmaximum: 5", true)]
+    [TestCase("id: no-worse-types\nmetric: type-count\nbaseline_mode: no_worse_than_baseline", true)]
+    [TestCase("id: delta-types\nmetric: type-count\nbaseline_mode: max_delta\nmax_delta: 2", true)]
+    [TestCase("id: delta-capped-types\nmetric: type-count\nbaseline_mode: max_delta\nmax_delta: 2\nmaximum: 5", true)]
     [TestCase("id: no-bound\nmetric: type-count", false)]
     [TestCase("id: negative-minimum\nmetric: type-count\nminimum: -1", false)]
     [TestCase("id: negative-maximum\nmetric: type-count\nmaximum: -1", false)]
     [TestCase("id: invalid-shape\nmetric: type-count\nmaximum: 3\nname: extra", false)]
+    [TestCase("id: relative-minimum\nmetric: type-count\nbaseline_mode: max_delta\nmax_delta: 2\nminimum: 0", false)]
+    [TestCase("id: relative-without-delta\nmetric: type-count\nbaseline_mode: max_delta", false)]
+    [TestCase("id: no-worse-with-delta\nmetric: type-count\nbaseline_mode: no_worse_than_baseline\nmax_delta: 1", false)]
+    [TestCase("id: delta-without-mode\nmetric: type-count\nmax_delta: 1\nmaximum: 3", false)]
     [TestCase("id: ' '\nmetric: type-count\nmaximum: 3", false)]
     public void MetricBudgetContract_EnforcesClosedShapeAndNonNegativeBounds(string yaml, bool expectedValid)
     {

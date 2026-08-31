@@ -55,10 +55,47 @@ internal sealed class MetricBudgetValidator : IArchitecturePolicyDocumentValidat
                     $"Metric budget '{budget.Id}' references unknown metric '{budget.Metric}'.");
             }
 
-            if (budget.Minimum is null && budget.Maximum is null)
+            if (budget.BaselineMode is not null
+                && budget.BaselineMode is not ("no_worse_than_baseline" or "max_delta"))
             {
                 throw new InvalidOperationException(
-                    $"Metric budget '{budget.Id}' must declare at least one of 'minimum' or 'maximum'.");
+                    $"Metric budget '{budget.Id}' has unsupported baseline_mode '{budget.BaselineMode}'. " +
+                    "Supported values are 'no_worse_than_baseline' and 'max_delta'.");
+            }
+
+            if (budget.BaselineMode is null)
+            {
+                if (budget.Minimum is null && budget.Maximum is null)
+                {
+                    throw new InvalidOperationException(
+                        $"Metric budget '{budget.Id}' must declare at least one of 'minimum' or 'maximum'.");
+                }
+
+                if (budget.MaxDelta is not null)
+                {
+                    throw new InvalidOperationException(
+                        $"Metric budget '{budget.Id}' may declare 'max_delta' only with baseline_mode 'max_delta'.");
+                }
+            }
+            else
+            {
+                if (budget.Minimum is not null)
+                {
+                    throw new InvalidOperationException(
+                        $"Metric budget '{budget.Id}' cannot declare 'minimum' with baseline_mode '{budget.BaselineMode}'.");
+                }
+
+                if (budget.BaselineMode == "max_delta" && budget.MaxDelta is null)
+                {
+                    throw new InvalidOperationException(
+                        $"Metric budget '{budget.Id}' requires 'max_delta' with baseline_mode 'max_delta'.");
+                }
+
+                if (budget.BaselineMode == "no_worse_than_baseline" && budget.MaxDelta is not null)
+                {
+                    throw new InvalidOperationException(
+                        $"Metric budget '{budget.Id}' must not declare 'max_delta' with baseline_mode 'no_worse_than_baseline'.");
+                }
             }
 
             if (budget.Minimum is < 0)
@@ -71,6 +108,12 @@ internal sealed class MetricBudgetValidator : IArchitecturePolicyDocumentValidat
             {
                 throw new InvalidOperationException(
                     $"Metric budget '{budget.Id}' maximum must be non-negative.");
+            }
+
+            if (budget.MaxDelta is < 0)
+            {
+                throw new InvalidOperationException(
+                    $"Metric budget '{budget.Id}' max_delta must be non-negative.");
             }
 
             if (budget.Minimum is { } minimum && budget.Maximum is { } maximum && minimum > maximum)

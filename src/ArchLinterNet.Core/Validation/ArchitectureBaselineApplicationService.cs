@@ -1,6 +1,7 @@
 using ArchLinterNet.Core.BuildState;
 using ArchLinterNet.Core.Contracts;
 using ArchLinterNet.Core.Contracts.Abstractions;
+using ArchLinterNet.Core.Contracts.Families;
 using ArchLinterNet.Core.Execution;
 using ArchLinterNet.Core.Execution.Abstractions;
 using ArchLinterNet.Core.Execution.Results;
@@ -35,8 +36,10 @@ public sealed partial class ArchitectureBaselineApplicationService(
             };
         }
 
-        (_, IReadOnlyList<ArchitectureBaselineCandidate>? candidates, List<ArchitectureViolation> configViolations) =
-            CollectCandidates(request.PolicyPath, request.Mode, request.ConditionSetName, request.ContractIds, request.CancellationToken);
+        BaselineCandidateCollection collection = CollectCandidates(
+            request.PolicyPath, request.Mode, request.ConditionSetName, request.ContractIds, request.CancellationToken);
+        IReadOnlyList<ArchitectureBaselineCandidate>? candidates = collection.Candidates;
+        List<ArchitectureViolation> configViolations = collection.ConfigurationViolations;
 
         if (candidates == null)
         {
@@ -46,7 +49,11 @@ public sealed partial class ArchitectureBaselineApplicationService(
 
         BaselineWritePlan plan = BaselineWritePlanner.PlanGenerate(candidates, reasonMap);
         ArchitectureBaselineDocument baseline = baselineGenerator.BuildFromEntries(
-            plan.OutputEntries, ArchitectureViolationIdentity.CurrentVersion);
+            plan.OutputEntries,
+            collection.HasSelectedRelativeMetricBudgets
+                ? ArchitectureViolationIdentity.CurrentVersion + 1
+                : ArchitectureViolationIdentity.CurrentVersion);
+        baseline.MetricBaselines = collection.MetricBaselineCandidates.ToList();
 
         return new BaselineGenerationOutcome(
             Succeeded: true,
@@ -72,8 +79,11 @@ public sealed partial class ArchitectureBaselineApplicationService(
             };
         }
 
-        (ArchitectureContractDocument document, IReadOnlyList<ArchitectureBaselineCandidate>? candidates, List<ArchitectureViolation> configViolations) =
-            CollectCandidates(request.PolicyPath, request.Mode, request.ConditionSetName, request.ContractIds, request.CancellationToken);
+        BaselineCandidateCollection collection = CollectCandidates(
+            request.PolicyPath, request.Mode, request.ConditionSetName, request.ContractIds, request.CancellationToken);
+        ArchitectureContractDocument document = collection.Document;
+        IReadOnlyList<ArchitectureBaselineCandidate>? candidates = collection.Candidates;
+        List<ArchitectureViolation> configViolations = collection.ConfigurationViolations;
 
         if (candidates == null)
         {
@@ -87,6 +97,7 @@ public sealed partial class ArchitectureBaselineApplicationService(
 
         BaselineWritePlan plan = BaselineWritePlanner.PlanUpdate(comparison, reasonMap);
         ArchitectureBaselineDocument updated = baselineGenerator.BuildFromEntries(plan.OutputEntries, existingBaseline.Version);
+        updated.MetricBaselines = existingBaseline.MetricBaselines.ToList();
 
         BaselineCommentInspection comments = InspectComments(request.BaselinePath);
 
@@ -104,8 +115,11 @@ public sealed partial class ArchitectureBaselineApplicationService(
 
     public BaselinePruneOutcome Prune(BaselinePruneRequest request)
     {
-        (ArchitectureContractDocument document, IReadOnlyList<ArchitectureBaselineCandidate>? candidates, List<ArchitectureViolation> configViolations) =
-            CollectCandidates(request.PolicyPath, request.Mode, request.ConditionSetName, request.ContractIds, request.CancellationToken);
+        BaselineCandidateCollection collection = CollectCandidates(
+            request.PolicyPath, request.Mode, request.ConditionSetName, request.ContractIds, request.CancellationToken);
+        ArchitectureContractDocument document = collection.Document;
+        IReadOnlyList<ArchitectureBaselineCandidate>? candidates = collection.Candidates;
+        List<ArchitectureViolation> configViolations = collection.ConfigurationViolations;
 
         if (candidates == null)
         {
@@ -134,7 +148,7 @@ public sealed partial class ArchitectureBaselineApplicationService(
         string yaml = plan.RemovesNothing
             ? rawBaseline
             : comments.Header + baselineGenerator.Serialize(
-                baselineGenerator.BuildFromEntries(plan.OutputEntries, existingBaseline.Version));
+                BuildPreservingMetricBaselines(plan.OutputEntries, existingBaseline));
 
         return new BaselinePruneOutcome(
             Succeeded: true,
@@ -258,8 +272,10 @@ public sealed partial class ArchitectureBaselineApplicationService(
         // --mode/--contract: every entry in the file is always classified against the full current
         // candidate set (which is why candidates are always collected with mode "all" and no
         // --contract restriction) before anything is written.
-        (_, IReadOnlyList<ArchitectureBaselineCandidate>? candidates, List<ArchitectureViolation> configViolations) =
-            CollectCandidates(request.PolicyPath, "all", request.ConditionSetName, contractIds: null, cancellationToken: request.CancellationToken);
+        BaselineCandidateCollection collection = CollectCandidates(
+            request.PolicyPath, "all", request.ConditionSetName, contractIds: null, cancellationToken: request.CancellationToken);
+        IReadOnlyList<ArchitectureBaselineCandidate>? candidates = collection.Candidates;
+        List<ArchitectureViolation> configViolations = collection.ConfigurationViolations;
 
         if (candidates == null)
         {
@@ -352,8 +368,7 @@ public sealed partial class ArchitectureBaselineApplicationService(
         return string.Equals(normalizedOutput, normalizedBaseline, StringComparison.OrdinalIgnoreCase);
     }
 
-    private (ArchitectureContractDocument Document, IReadOnlyList<ArchitectureBaselineCandidate>? Candidates, List<ArchitectureViolation> ConfigurationViolations)
-        CollectCandidates(
+    private BaselineCandidateCollection CollectCandidates(
             string policyPath,
             string mode,
             string? conditionSetName,
@@ -362,7 +377,16 @@ public sealed partial class ArchitectureBaselineApplicationService(
     {
         BaselineCandidateCollection collection = CollectCandidatesCore(
             policyPath, mode, conditionSetName, contractIds, cancellationToken, buildState: null);
-        return (collection.Document, collection.Candidates, collection.ConfigurationViolations);
+        return collection;
+    }
+
+    private ArchitectureBaselineDocument BuildPreservingMetricBaselines(
+        IReadOnlyList<ArchitectureBaselineComparisonEntry> entries,
+        ArchitectureBaselineDocument existingBaseline)
+    {
+        ArchitectureBaselineDocument updated = baselineGenerator.BuildFromEntries(entries, existingBaseline.Version);
+        updated.MetricBaselines = existingBaseline.MetricBaselines.ToList();
+        return updated;
     }
 
     private BaselineCandidateCollection CollectCandidatesCore(
@@ -575,7 +599,11 @@ public sealed partial class ArchitectureBaselineApplicationService(
             var baselineCandidates = runner.BaselineCandidates.ToList();
             baselineCandidates.AddRange(applicabilityCandidates);
             return new BaselineCandidateCollection(
-                document, baselineCandidates, new List<ArchitectureViolation>(), Array.Empty<BuildStatePreflightDiagnostic>());
+                document, baselineCandidates, new List<ArchitectureViolation>(), Array.Empty<BuildStatePreflightDiagnostic>())
+            {
+                MetricBaselineCandidates = runner.Session.MetricBaselineCandidates,
+                HasSelectedRelativeMetricBudgets = HasSelectedRelativeMetricBudgets(document, mode, selectedContractIds),
+            };
         }
         finally
         {
@@ -614,5 +642,22 @@ public sealed partial class ArchitectureBaselineApplicationService(
         }
 
         return catalog.AvailableContractIds(mode);
+    }
+
+    private static bool HasSelectedRelativeMetricBudgets(
+        ArchitectureContractDocument document,
+        string mode,
+        IReadOnlyCollection<string>? selectedContractIds)
+    {
+        IEnumerable<ArchitectureMetricBudgetContract> budgets = mode switch
+        {
+            ModeStrict => document.Contracts.StrictMetricBudgets,
+            ModeAudit => document.Contracts.AuditMetricBudgets,
+            "all" => document.Contracts.StrictMetricBudgets.Concat(document.Contracts.AuditMetricBudgets),
+            _ => Array.Empty<ArchitectureMetricBudgetContract>(),
+        };
+        return budgets.Any(budget => budget.IsRelative
+            && (selectedContractIds is not { Count: > 0 }
+                || budget.Id is not null && selectedContractIds.Contains(budget.Id, StringComparer.OrdinalIgnoreCase)));
     }
 }

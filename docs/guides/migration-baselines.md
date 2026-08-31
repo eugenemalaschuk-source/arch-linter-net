@@ -71,10 +71,13 @@ arch-linter-net baseline generate \
 ```
 
 The generated file captures every current violation as an `ignored_violations`
-entry grouped by contract ID. Newly generated baselines use format **version
-2**, which carries a versioned, structured identity per entry instead of
-relying on the `source_type`/`forbidden_reference` display text alone. Example
-output:
+entry grouped by contract ID. When no selected contract uses a baseline-relative
+metric budget, newly generated baselines use format **version 2**, which carries
+a versioned, structured identity per entry instead of relying on the
+`source_type`/`forbidden_reference` display text alone. When one or more selected
+relative metric budgets need a reviewed value, generation uses **version 3**:
+it retains the finding-level entries and adds a separate top-level
+`metric_baselines` collection. Example version-2 finding output:
 
 ```yaml
 version: 2
@@ -117,6 +120,73 @@ Baseline files written before this change use format **version 1** (the plain
 `(source_type, forbidden_reference)` pair as identity). They continue to load
 and match exactly as before — nothing about their behavior changes until you
 explicitly run `baseline migrate` (below).
+
+### Metric baseline capture
+
+Baseline-relative budgets are documented in
+[Architecture metrics](../policy-format/architecture-metrics.md#baseline-relative-budgets).
+They use the same `strict_metric_budgets` and `audit_metric_budgets` collections
+as absolute budgets, with either `baseline_mode: no_worse_than_baseline` or
+`baseline_mode: max_delta`. The former allows only delta `0`; the latter
+requires a non-negative `max_delta`. An optional `maximum` remains an absolute
+safety cap, so the effective threshold is the lower of baseline plus allowed
+delta and that cap. `minimum` is not valid in relative mode.
+
+Run `baseline generate` deliberately to capture the current value of each
+unique, complete metric selected by a relative budget:
+
+```bash
+arch-linter-net baseline generate \
+  --config architecture/dependencies.arch.yml \
+  --output architecture/baseline.arch.yml \
+  --reason "Reviewed metric starting points"
+```
+
+The generated file is version 3 when selected relative budgets are present. It
+keeps ordinary finding debt under `baseline` and stores scalar metric values
+separately under `metric_baselines`. Each scalar entry uses the canonical
+identity fields `metric_identity_version`, `metric_id`, `metric_kind`,
+`native_subject`, `effective_scope`, and `value`; include `unit` when the metric
+definition has one:
+
+```yaml
+version: 3
+baseline:
+  strict_metric_budgets: []
+metric_baselines:
+  - metric_identity_version: 1
+    metric_id: application-outgoing
+    metric_kind: outgoing_component_count
+    native_subject: application
+    effective_scope: application
+    value: 3
+  - metric_identity_version: 1
+    metric_id: application-footprint
+    metric_kind: component_footprint_count
+    native_subject: application
+    unit: project
+    effective_scope: application
+    value: 2
+```
+
+Do not use a budget contract ID, contributor label, display text, or finding
+identity as the scalar key. `metric_baselines` entries are not
+`ignored_violations`: they do not suppress findings and do not participate in
+the #121 finding-level debt baseline. The existing finding-level `baseline`
+collection keeps its version-1/version-2 matching behavior independently.
+
+Relative validation fails closed when the selected version-3 baseline has no
+matching entry or when its `metric_identity_version`, metric kind, native
+subject, unit, or effective scope no longer matches the current metric
+definition. Such evidence is stale or unassessable; it is not a zero, a pass,
+or a finding-level baseline match. Ordinary validation does not refresh it.
+
+Only an explicit, reviewed `baseline generate` captures a new scalar value, and
+an incomplete measurement is never captured. `baseline update` and
+`baseline prune` operate on ordinary finding debt and preserve existing metric
+scalar values unchanged. They do not automatically update or prune those
+values; generate again, or make a reviewed manual edit, when the starting point
+should change.
 
 ### Baseline lifecycle
 

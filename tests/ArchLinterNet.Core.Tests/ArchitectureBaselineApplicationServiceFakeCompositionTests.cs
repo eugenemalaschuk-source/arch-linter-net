@@ -280,6 +280,54 @@ public sealed partial class ArchitectureBaselineApplicationServiceFakeCompositio
     }
 
     [Test]
+    public void Update_PreservesReviewedMetricBaselinesWithoutRecapturingThem()
+    {
+        (var runnerSetupService, var contractExecutor, var baselineGenerator, var baselineLoadingService) =
+            CreateMixedScenarioCollaborators();
+        baselineLoadingService.DocumentToReturn = new ArchitectureBaselineDocument
+        {
+            Version = 3,
+            Baseline = CreateMixedBaseline().Baseline,
+            MetricBaselines =
+            [
+                new ArchitectureMetricBaselineEntry
+                {
+                    MetricIdentityVersion = ArchitectureMetricBaselineIdentity.CurrentVersion,
+                    MetricId = "reviewed-types",
+                    MetricKind = "topology_type_count",
+                    NativeSubject = "model",
+                    EffectiveScope = "model",
+                    Value = 42,
+                },
+            ],
+        };
+        var applicationService = new ArchitectureBaselineApplicationService(
+            runnerSetupService, new FakeContractHandlerRegistry(), contractExecutor, baselineGenerator, baselineLoadingService);
+
+        BaselineUpdateOutcome outcome = applicationService.Update(new BaselineUpdateRequest
+        {
+            PolicyPath = "unused-by-fakes.arch.yml",
+            BaselinePath = "unused-by-fakes.baseline.yml",
+            Mode = "all",
+        });
+
+        ArchitectureMetricBaselineEntry preserved = baselineGenerator.SerializedDocument!.MetricBaselines.Single();
+        Assert.Multiple(() =>
+        {
+            Assert.That(outcome.Succeeded, Is.True);
+            Assert.That(baselineGenerator.SerializedDocument!.Version, Is.EqualTo(3));
+            Assert.That(preserved.Identity, Is.EqualTo(new ArchitectureMetricBaselineIdentity(
+                ArchitectureMetricBaselineIdentity.CurrentVersion,
+                "reviewed-types",
+                "topology_type_count",
+                "model",
+                null,
+                "model")));
+            Assert.That(preserved.Value, Is.EqualTo(42));
+        });
+    }
+
+    [Test]
     public void Prune_RemovesResolvedAndConfigurationErrorEntriesOnly()
     {
         (var runnerSetupService, var contractExecutor, var baselineGenerator, var baselineLoadingService) =

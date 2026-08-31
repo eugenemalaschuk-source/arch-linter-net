@@ -549,10 +549,16 @@
                     "native_subject": { "type": ["string", "null"] },
                     "effective_scope": { "type": "string", "minLength": 1 },
                     "measured_value": { "type": "integer", "minimum": 0 },
-                    "breached_bound": { "enum": ["minimum", "maximum"] },
+                    "breached_bound": { "enum": ["minimum", "maximum", "baseline", "max_delta"] },
                     "configured_limit": { "type": "integer", "minimum": 0 },
                     "contributor_count": { "type": "integer", "minimum": 0 },
-                    "contributors": { "type": "array", "items": { "type": "string" } }
+                    "contributors": { "type": "array", "items": { "type": "string" } },
+                    "baseline_mode": { "type": ["string", "null"], "enum": ["no_worse_than_baseline", "max_delta", null] },
+                    "baseline_value": { "type": ["integer", "null"], "minimum": 0 },
+                    "delta": { "type": ["integer", "null"] },
+                    "allowed_delta": { "type": ["integer", "null"], "minimum": 0 },
+                    "effective_threshold": { "type": ["integer", "null"], "minimum": 0 },
+                    "absolute_cap": { "type": ["integer", "null"], "minimum": 0 }
                   }
                 }
               ]

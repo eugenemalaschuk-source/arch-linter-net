@@ -215,6 +215,175 @@ baseline:
     }
 
     [Test]
+    public void LoadFromPath_WellFormedVersion3Document_LoadsMetricBaselinesAndStructuredFindings()
+    {
+        File.WriteAllText(Path.Combine(_tempDir, "baseline.yml"), @"
+version: 3
+baseline:
+  strict:
+    - id: my-rule
+      ignored_violations:
+        - source_type: Host.A.Program
+          forbidden_reference: System.Object
+          reason: known debt
+          identity_version: 2
+          contract_family: strict
+          kind: dependency
+          source_assembly: Host.A
+          target_assembly: mscorlib
+          target_member: System.Object
+          occurrence: 0
+metric_baselines:
+  - metric_identity_version: 1
+    metric_id: app-outgoing
+    metric_kind: outgoing_component_count
+    native_subject: application
+    effective_scope: application
+    value: 3
+");
+
+        ArchitectureBaselineDocument document = _service.LoadFromPath(Path.Combine(_tempDir, "baseline.yml"));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(document.Version, Is.EqualTo(3));
+            Assert.That(document.Baseline.Strict[0].IgnoredViolations, Has.Count.EqualTo(1));
+            Assert.That(document.MetricBaselines, Has.Count.EqualTo(1));
+            Assert.That(document.MetricBaselines[0].Identity, Is.EqualTo(new ArchitectureMetricBaselineIdentity(
+                1, "app-outgoing", "outgoing_component_count", "application", null, "application")));
+            Assert.That(document.MetricBaselines[0].Value, Is.EqualTo(3));
+        });
+    }
+
+    [Test]
+    public void LoadFromPath_Version3DuplicateMetricIds_Throws()
+    {
+        File.WriteAllText(Path.Combine(_tempDir, "baseline.yml"), @"
+version: 3
+baseline: {}
+metric_baselines:
+  - metric_identity_version: 1
+    metric_id: app-outgoing
+    metric_kind: outgoing_component_count
+    native_subject: application
+    effective_scope: application
+    value: 3
+  - metric_identity_version: 1
+    metric_id: app-outgoing
+    metric_kind: outgoing_component_count
+    native_subject: application
+    effective_scope: application
+    value: 4
+");
+
+        var ex = Assert.Throws<InvalidOperationException>(() =>
+            _service.LoadFromPath(Path.Combine(_tempDir, "baseline.yml")));
+        Assert.That(ex!.Message, Does.Contain("Duplicate metric baseline id"));
+    }
+
+    [Test]
+    public void LoadFromPath_Version3MetricBaselinesRequireVersion3()
+    {
+        File.WriteAllText(Path.Combine(_tempDir, "baseline.yml"), @"
+version: 2
+baseline: {}
+metric_baselines:
+  - metric_identity_version: 1
+    metric_id: app-outgoing
+    metric_kind: outgoing_component_count
+    native_subject: application
+    effective_scope: application
+    value: 3
+");
+
+        var ex = Assert.Throws<InvalidOperationException>(() =>
+            _service.LoadFromPath(Path.Combine(_tempDir, "baseline.yml")));
+        Assert.That(ex!.Message, Does.Contain("only valid in a 'version: 3'"));
+    }
+
+    [TestCase("metric_identity_version: 2", "metric_identity_version")]
+    [TestCase("metric_id: ''", "metric_id")]
+    [TestCase("metric_kind: ''", "metric_kind")]
+    [TestCase("native_subject: ''", "native_subject")]
+    [TestCase("effective_scope: ''", "effective_scope")]
+    [TestCase("value: -1", "value")]
+    public void LoadFromPath_Version3MalformedMetricEntry_Throws(string replacement, string diagnostic)
+    {
+        string metric = $"""
+  - metric_identity_version: 1
+    metric_id: app-outgoing
+    metric_kind: outgoing_component_count
+    native_subject: application
+    effective_scope: application
+    value: 3
+""";
+        metric = metric.Replace(
+            replacement.StartsWith("metric_identity_version", StringComparison.Ordinal)
+                ? "metric_identity_version: 1"
+                : replacement.StartsWith("metric_id", StringComparison.Ordinal)
+                    ? "metric_id: app-outgoing"
+                    : replacement.StartsWith("metric_kind", StringComparison.Ordinal)
+                        ? "metric_kind: outgoing_component_count"
+                        : replacement.StartsWith("native_subject", StringComparison.Ordinal)
+                            ? "native_subject: application"
+                            : replacement.StartsWith("effective_scope", StringComparison.Ordinal)
+                                ? "effective_scope: application"
+                                : "value: 3",
+            replacement,
+            StringComparison.Ordinal);
+        File.WriteAllText(Path.Combine(_tempDir, "baseline.yml"), $"version: 3\nbaseline: {{}}\nmetric_baselines:\n{metric}");
+
+        var ex = Assert.Throws<InvalidOperationException>(() =>
+            _service.LoadFromPath(Path.Combine(_tempDir, "baseline.yml")));
+        Assert.That(ex!.Message, Does.Contain(diagnostic));
+    }
+
+    [TestCase("metric_identity_version: 1", "", "metric_identity_version")]
+    [TestCase("    value: 3", "", "value")]
+    [TestCase("    value: 3", "    valu: 3", "valu")]
+    [TestCase("    value: 3", "    value: 3\n    unknown: true", "unknown")]
+    public void LoadFromPath_Version3MetricEntryWithMissingOrMisspelledRequiredField_Throws(
+        string original,
+        string replacement,
+        string diagnostic)
+    {
+        string metric = """
+  -
+    metric_identity_version: 1
+    metric_id: app-outgoing
+    metric_kind: outgoing_component_count
+    native_subject: application
+    effective_scope: application
+    value: 3
+""".Replace(original, replacement, StringComparison.Ordinal);
+        File.WriteAllText(Path.Combine(_tempDir, "baseline.yml"), $"version: 3\nbaseline: {{}}\nmetric_baselines:\n{metric}");
+
+        InvalidOperationException? exception = Assert.Throws<InvalidOperationException>(() =>
+            _service.LoadFromPath(Path.Combine(_tempDir, "baseline.yml")));
+        Assert.That(exception!.Message, Does.Contain(diagnostic));
+    }
+
+    [Test]
+    public void LoadFromPath_Version3FindingEntryWithoutStructuredIdentity_Throws()
+    {
+        File.WriteAllText(Path.Combine(_tempDir, "baseline.yml"), @"
+version: 3
+baseline:
+  strict:
+    - id: my-rule
+      ignored_violations:
+        - source_type: Some.Type
+          forbidden_reference: Bad.Type
+          reason: legacy-shaped-mislabeled-as-v3
+metric_baselines: []
+");
+
+        var ex = Assert.Throws<InvalidOperationException>(() =>
+            _service.LoadFromPath(Path.Combine(_tempDir, "baseline.yml")));
+        Assert.That(ex!.Message, Does.Contain("identity_version"));
+    }
+
+    [Test]
     public void MergeAndValidate_ProjectMetadataGroup_AppliesIgnoredViolations()
     {
         ArchitectureContractDocument policy = new()

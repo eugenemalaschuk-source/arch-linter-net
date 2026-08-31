@@ -62,6 +62,13 @@ public sealed class ArchitectureContractDocument
     [YamlIgnore]
     internal ArchitectureLoadedTextIdentity? BaselineContentIdentity { get; set; }
 
+    // Reviewed scalar values are loaded alongside the finding-level baseline but remain a
+    // separate input to relative metric budgets. They are transient run evidence, never policy
+    // data and never merged into ignored_violations.
+    [YamlIgnore]
+    internal IReadOnlyList<ArchitectureMetricBaselineEntry> MetricBaselines { get; set; } =
+        Array.Empty<ArchitectureMetricBaselineEntry>();
+
     // Deterministic record of what `source_sets` resolved to and which contract instances were
     // expanded from which authored contract. Populated once by ArchitectureSourceSetExpander during
     // ArchitecturePolicyDocumentLoader.Load, and empty for every policy that declares no set.

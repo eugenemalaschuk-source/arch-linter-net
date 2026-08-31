@@ -642,6 +642,7 @@ sealed class ArchLinterNet.Core.Contracts.ArchitectureBaselineContractGroups
 sealed class ArchLinterNet.Core.Contracts.ArchitectureBaselineDocument
   ctor()
   property ArchLinterNet.Core.Contracts.ArchitectureBaselineContractGroups Baseline {get;set;}
+  property System.Collections.Generic.List<ArchLinterNet.Core.Contracts.ArchitectureMetricBaselineEntry> MetricBaselines {get;set;}
   property int Version {get;set;}
 sealed class ArchLinterNet.Core.Contracts.ArchitectureBaselineIgnoredViolation
   ctor()
@@ -773,6 +774,33 @@ sealed class ArchLinterNet.Core.Contracts.ArchitectureLayerSelector
   property System.Collections.Generic.Dictionary<string,object> Metadata {get;set;}
   property string Role {get;set;}
   property string? When {get;set;}
+sealed class ArchLinterNet.Core.Contracts.ArchitectureMetricBaselineEntry
+  ctor()
+  property ArchLinterNet.Core.Contracts.ArchitectureMetricBaselineIdentity Identity {get;}
+  property int? MetricIdentityVersion {get;set;}
+  property int? Value {get;set;}
+  property string EffectiveScope {get;set;}
+  property string MetricId {get;set;}
+  property string MetricKind {get;set;}
+  property string NativeSubject {get;set;}
+  property string? Unit {get;set;}
+sealed class ArchLinterNet.Core.Contracts.ArchitectureMetricBaselineIdentity : System.IEquatable<ArchLinterNet.Core.Contracts.ArchitectureMetricBaselineIdentity>
+  ctor(int MetricIdentityVersion, string MetricId, string MetricKind, string NativeSubject, string? Unit, string EffectiveScope)
+  field const int CurrentVersion = 1
+  method ArchLinterNet.Core.Contracts.ArchitectureMetricBaselineIdentity <Clone>$()
+  method bool Equals(ArchLinterNet.Core.Contracts.ArchitectureMetricBaselineIdentity? other)
+  method bool Equals(object? obj)
+  method int GetHashCode()
+  method string ToString()
+  method void Deconstruct(out int MetricIdentityVersion, out string MetricId, out string MetricKind, out string NativeSubject, out string? Unit, out string EffectiveScope)
+  operator !=(ArchLinterNet.Core.Contracts.ArchitectureMetricBaselineIdentity? left, ArchLinterNet.Core.Contracts.ArchitectureMetricBaselineIdentity? right)
+  operator ==(ArchLinterNet.Core.Contracts.ArchitectureMetricBaselineIdentity? left, ArchLinterNet.Core.Contracts.ArchitectureMetricBaselineIdentity? right)
+  property int MetricIdentityVersion {get;init;}
+  property string EffectiveScope {get;init;}
+  property string MetricId {get;init;}
+  property string MetricKind {get;init;}
+  property string NativeSubject {get;init;}
+  property string? Unit {get;init;}
 sealed class ArchLinterNet.Core.Contracts.ArchitectureMetricDefinition
   ctor()
   property string Id {get;set;}
@@ -1236,10 +1264,15 @@ sealed class ArchLinterNet.Core.Contracts.Families.ArchitectureMethodBodyContrac
   property string? Id {get;set;}
 sealed class ArchLinterNet.Core.Contracts.Families.ArchitectureMetricBudgetContract : ArchLinterNet.Core.Contracts.IArchitectureContract
   ctor()
+  property System.Collections.Generic.List<ArchLinterNet.Core.Contracts.ArchitectureIgnoredViolation> IgnoredViolations {get;set;}
+  property bool IsRelative {get;}
+  property int AllowedDelta {get;}
+  property int? MaxDelta {get;set;}
   property int? Maximum {get;set;}
   property int? Minimum {get;set;}
   property string Metric {get;set;}
   property string Name {get;}
+  property string? BaselineMode {get;set;}
   property string? Id {get;set;}
 sealed class ArchLinterNet.Core.Contracts.Families.ArchitectureModuleContainerContract : ArchLinterNet.Core.Contracts.IArchitectureContract
   ctor()
@@ -2225,8 +2258,10 @@ static class ArchLinterNet.Core.Model.ArchitectureApplicabilityReasonCodes
   field const string InvalidApplicabilityRecordIntegrity = "invalid_applicability_record_integrity"
   field const string MalformedExternalInput = "malformed_external_input"
   field const string MissingApplicabilityRecord = "missing_applicability_record"
+  field const string MissingMetricBaseline = "missing_metric_baseline"
   field const string MissingRequiredInput = "missing_required_input"
   field const string StaleDeclaration = "stale_declaration"
+  field const string StaleMetricBaseline = "stale_metric_baseline"
   field const string UnexpectedEmptyInput = "unexpected_empty_input"
   field const string UnknownApplicabilityRecordIdentity = "unknown_applicability_record_identity"
   field const string UnmappedSubject = "unmapped_subject"
@@ -3755,6 +3790,11 @@ sealed class ArchLinterNet.Core.Model.MetricBudgetDiagnostic : ArchLinterNet.Cor
   property int ConfiguredLimit {get;init;}
   property int ContributorCount {get;}
   property int MeasuredValue {get;init;}
+  property int? AbsoluteCap {get;init;}
+  property int? AllowedDelta {get;init;}
+  property int? BaselineValue {get;init;}
+  property int? Delta {get;init;}
+  property long? EffectiveThreshold {get;init;}
   property string BreachedBound {get;init;}
   property string BudgetId {get;init;}
   property string EffectiveScope {get;init;}
@@ -3762,6 +3802,7 @@ sealed class ArchLinterNet.Core.Model.MetricBudgetDiagnostic : ArchLinterNet.Cor
   property string MetricId {get;init;}
   property string MetricKind {get;init;}
   property string SourceType {get;init;}
+  property string? BaselineMode {get;init;}
   property string? NativeSubject {get;init;}
 sealed class ArchLinterNet.Core.Model.MetricBudgetPayload : ArchLinterNet.Core.Model.IArchitectureDiagnosticPayload, System.IEquatable<ArchLinterNet.Core.Model.MetricBudgetPayload>
   ctor(string BudgetId, string MetricId, string MetricKind, string? NativeSubject, string EffectiveScope, int MeasuredValue, string BreachedBound, int ConfiguredLimit, System.Collections.Generic.IReadOnlyCollection<string> Contributors)
@@ -3777,11 +3818,17 @@ sealed class ArchLinterNet.Core.Model.MetricBudgetPayload : ArchLinterNet.Core.M
   property System.Collections.Generic.IReadOnlyCollection<string> Contributors {get;init;}
   property int ConfiguredLimit {get;init;}
   property int MeasuredValue {get;init;}
+  property int? AbsoluteCap {get;init;}
+  property int? AllowedDelta {get;init;}
+  property int? BaselineValue {get;init;}
+  property int? Delta {get;init;}
+  property long? EffectiveThreshold {get;init;}
   property string BreachedBound {get;init;}
   property string BudgetId {get;init;}
   property string EffectiveScope {get;init;}
   property string MetricId {get;init;}
   property string MetricKind {get;init;}
+  property string? BaselineMode {get;init;}
   property string? NativeSubject {get;init;}
 sealed class ArchLinterNet.Core.Model.PackageAllowOnlyDiagnostic : ArchLinterNet.Core.Model.ArchitectureDiagnostic, System.IEquatable<ArchLinterNet.Core.Model.PackageAllowOnlyDiagnostic>
   ctor(string ContractName, string? ContractId, string SourceType, string ForbiddenNamespace, System.Collections.Generic.IReadOnlyCollection<string> ForbiddenReferences, System.Collections.Generic.IReadOnlyCollection<string> AllowedPackageGroups)

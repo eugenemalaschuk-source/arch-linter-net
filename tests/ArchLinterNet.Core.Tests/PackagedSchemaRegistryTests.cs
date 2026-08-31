@@ -19,7 +19,7 @@ public sealed class PackagedSchemaRegistryTests
     private static readonly string[] _value = {
                 "analysis-build-state", "analysis-cache", "analysis-profile", "api-snapshot", "baseline", "normalized-finding", "policy-fragment", "policy-root",
             };
-    private static readonly string[] _version080SchemaIds = ["analysis-cache", "policy-root", "policy-fragment", "normalized-finding"];
+    private static readonly string[] _version080SchemaIds = ["analysis-cache", "baseline", "policy-root", "policy-fragment", "normalized-finding"];
 
     [Test]
     public void List_ReturnsEveryReleaseMatchedSchemaInOrdinalOrder()
@@ -31,9 +31,9 @@ public sealed class PackagedSchemaRegistryTests
         Assert.Multiple(() =>
         {
             Assert.That(schemas.Select(static schema => schema.LogicalId), Is.EqualTo(_value));
-            Assert.That(schemas.Single(static schema => schema.LogicalId == "baseline").DocumentVersion, Is.EqualTo("v2"));
+            Assert.That(schemas.Single(static schema => schema.LogicalId == "baseline").DocumentVersion, Is.EqualTo("v3"));
             Assert.That(schemas.Single(static schema => schema.LogicalId == "normalized-finding").DocumentVersion, Is.EqualTo("v3"));
-            // Policy root/fragment, normalized findings, and the analysis cache advanced to 0.8.0.
+            // Policy root/fragment, baseline, normalized findings, and the analysis cache advanced to 0.8.0.
             // Every previous 0.5.1 resource remains byte-for-byte frozen (see
             // openspec/specs/packaged-schema-registry and schema/0.5.1/compatibility-manifest.json).
             Assert.That(
@@ -90,20 +90,22 @@ public sealed class PackagedSchemaRegistryTests
     }
 
     [Test]
-    public void ApplicabilitySchemaAdvance_PreservesTheFrozenV1Bytes()
+    public void SchemaAdvances_PreserveFrozenAndVersionedBaselineBytes()
     {
         string repositoryRoot = new ArchitectureRepositoryRootResolver().Resolve();
         var expectedDigests = new Dictionary<string, string>(StringComparer.Ordinal)
         {
-            ["normalized-finding.schema.json"] = "f3b6fb5de05de315e6c59bfdeedf921423165bdc7da6d2da4681600fcc4947d3",
-            ["analysis-cache.schema.json"] = "b0958295d23fc6bb4d575ddd81e837e8e458c355662cdae4844bf7a48dfcc9f2",
+            ["schema/0.5.1/normalized-finding.schema.json"] = "f3b6fb5de05de315e6c59bfdeedf921423165bdc7da6d2da4681600fcc4947d3",
+            ["schema/0.5.1/analysis-cache.schema.json"] = "b0958295d23fc6bb4d575ddd81e837e8e458c355662cdae4844bf7a48dfcc9f2",
+            ["schema/0.5.1/baseline.schema.json"] = "5f1d45820133e77403245dbe1f965a464dee6bf3e68654b1162b857db4f96bb2",
+            ["schema/0.8.0/baseline.schema.json"] = "bad0c77decb2d4daf48a9872a926fc5ec8e55eda73e2ab5329d005e742db55da",
         };
 
-        foreach ((string filename, string expectedDigest) in expectedDigests)
+        foreach ((string relativePath, string expectedDigest) in expectedDigests)
         {
-            string path = Path.Combine(repositoryRoot, "schema", "0.5.1", filename);
+            string path = Path.Combine(repositoryRoot, relativePath.Replace('/', Path.DirectorySeparatorChar));
             string actualDigest = Convert.ToHexStringLower(SHA256.HashData(File.ReadAllBytes(path)));
-            Assert.That(actualDigest, Is.EqualTo(expectedDigest), filename);
+            Assert.That(actualDigest, Is.EqualTo(expectedDigest), relativePath);
         }
     }
 

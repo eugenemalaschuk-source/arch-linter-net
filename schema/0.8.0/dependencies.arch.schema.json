@@ -273,11 +273,33 @@
           "type": "integer",
           "minimum": 0,
           "description": "Inclusive non-negative upper bound."
+        },
+        "baseline_mode": {
+          "type": "string",
+          "enum": ["no_worse_than_baseline", "max_delta"],
+          "description": "Optional reviewed metric baseline-relative mode."
+        },
+        "max_delta": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Non-negative allowed increase required by max_delta mode."
         }
       },
-      "anyOf": [
-        { "required": ["minimum"] },
-        { "required": ["maximum"] }
+      "oneOf": [
+        {
+          "not": { "anyOf": [{ "required": ["baseline_mode"] }, { "required": ["max_delta"] }] },
+          "anyOf": [{ "required": ["minimum"] }, { "required": ["maximum"] }]
+        },
+        {
+          "required": ["baseline_mode"],
+          "properties": { "baseline_mode": { "const": "no_worse_than_baseline" } },
+          "not": { "anyOf": [{ "required": ["minimum"] }, { "required": ["max_delta"] }] }
+        },
+        {
+          "required": ["baseline_mode", "max_delta"],
+          "properties": { "baseline_mode": { "const": "max_delta" } },
+          "not": { "required": ["minimum"] }
+        }
       ]
     },
     "topologyScope": {

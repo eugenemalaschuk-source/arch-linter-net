@@ -109,7 +109,7 @@ jobs:
             fi
           done
 
-          # Policy root/fragment, normalized findings, and the analysis-cache current contracts
+          # Policy root/fragment, baseline, normalized findings, and the analysis-cache current contracts
           # advance to 0.8.0. The frozen 0.5.1 and 0.6.1 finding/cache resources remain packaged
           # below for offline legacy validation; the manifest resolves the current generation (see
           # schema/0.8.0/compatibility-manifest.json).
@@ -117,6 +117,7 @@ jobs:
             compatibility-manifest.json \
             dependencies.arch.fragment.schema.json \
             dependencies.arch.schema.json \
+            baseline.schema.json \
             normalized-finding.schema.json \
             analysis-cache.schema.json; do
             required_entry="contentFiles/any/any/schema/0.8.0/$required_schema"

@@ -145,6 +145,11 @@ public sealed partial class ArchitectureBaselineApplicationService
         List<ArchitectureViolation> ConfigurationViolations,
         IReadOnlyCollection<BuildStatePreflightDiagnostic> PreflightDiagnostics)
     {
+        public IReadOnlyList<ArchitectureMetricBaselineEntry> MetricBaselineCandidates { get; init; } =
+            Array.Empty<ArchitectureMetricBaselineEntry>();
+
+        public bool HasSelectedRelativeMetricBudgets { get; init; }
+
         public static BaselineCandidateCollection PreflightBlocked(
             ArchitectureContractDocument document,
             IReadOnlyCollection<BuildStatePreflightDiagnostic> diagnostics) =>

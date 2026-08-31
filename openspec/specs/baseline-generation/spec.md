@@ -2,132 +2,163 @@
 
 ## Purpose
 Generates and consumes baseline files that record pre-existing violations so policies can be enforced incrementally going forward.
+
 ## Requirements
+
 ### Requirement: User can generate a baseline file from current violations
+The system SHALL provide a `baseline generate` CLI subcommand that runs
+validation against the current codebase and writes a baseline file containing
+`ignored_violations` entries for all current violations not already suppressed
+by manual ignores. The generated baseline SHALL be deterministic — identical
+output for identical input code, policy, and selected contracts.
 
-The system SHALL provide a `baseline generate` CLI subcommand that runs validation against the current codebase and writes a baseline file containing `ignored_violations` entries for all current violations not already suppressed by manual ignores.
+The generated baseline SHALL only contain entries for violations that survive
+manual `ignored_violations` in the policy file. Manually ignored violations
+SHALL NOT appear in the generated baseline. The subcommand SHALL accept
+repeatable `--contract <id>` options that scope generation to named contracts;
+without that option it SHALL cover all contracts in the selected mode.
 
-The generated baseline file SHALL be deterministic — identical output for identical input code, regardless of when or how many times generation is run.
+For policies without selected baseline-relative metric budgets, generated files
+SHALL retain format version `2`, with exact structured finding identities as
+before. When one or more selected relative metric budgets are present, the
+generated file SHALL use format version `3`, retain those structured finding
+entries, and add one deterministic `metric_baselines` entry for every unique,
+complete metric referenced by the selected relative budgets. A metric baseline
+entry SHALL record its canonical metric identity and current scalar value; it
+SHALL not be derived from a threshold finding and SHALL not replace or suppress
+an `ignored_violations` entry.
 
-The generated baseline SHALL only contain entries for violations that survive after manual `ignored_violations` in the policy file are applied. Manually ignored violations SHALL NOT appear in the generated baseline.
-
-The `baseline generate` subcommand SHALL accept an optional `--contract <id>` flag, repeatable, that scopes generation to only the named contract id(s). Without `--contract`, generation SHALL cover all contracts in the selected mode, as today.
-
-Newly generated baseline files SHALL use format version `2`, with each `ignored_violations` entry carrying a structured `ArchitectureViolationIdentity` (contract family, kind, source/target assembly, source/target type, source/target member, and an occurrence discriminator) in addition to human-readable `source_type`/`forbidden_reference` display fields and `reason`:
-
-```yaml
-version: 2
-baseline:
-  <contract-group>:
-    - id: "<contract-id>"
-      ignored_violations:
-        - identity_version: 1
-          contract_family: "<family>"
-          kind: "<dependency|reference|call|package|framework|api_change|coverage>"
-          source_assembly: "<assembly-name-or-null>"
-          source_type: "<exact-source-type-fqn>"
-          source_member: "<member-or-null>"
-          target_assembly: "<assembly-name-or-null>"
-          target_type: "<target-type-fqn-or-null>"
-          target_member: "<exact-forbidden-symbol-or-null>"
-          occurrence: 0
-          forbidden_reference: "<exact-forbidden-reference-fqn>"
-          reason: "generated baseline"
-```
-
-For contract families whose checks are qualified with assembly/member information (dependency-style and method-body/call contracts), `source_assembly`, `target_assembly`, and — for method-body/call contracts — `target_member` and `occurrence` SHALL be populated from the actual scanned symbols, not left null. For families not yet qualified with assembly/member data, those fields SHALL be `null` and matching SHALL fall back to `(contract family, contract id, source_type, target_type)` — this is strictly no less precise than the pre-existing `(source_type, forbidden_reference)` behavior for those families.
-
-One baseline entry SHALL suppress exactly one `ArchitectureViolationIdentity`. Multiple distinct occurrences that previously collapsed into a single generated entry (because their legacy `(source_type, forbidden_reference)` strings were identical) SHALL now each produce their own entry, distinguished by the `occurrence` discriminator.
-
-Display messages (including any embedded source line number) SHALL NOT be used as identity; identity SHALL be composed only of the structured fields above.
+One finding baseline entry SHALL suppress exactly one
+`ArchitectureViolationIdentity`. Multiple distinct occurrences that share the
+same legacy display text SHALL remain distinct by their structured occurrence
+identity. Display messages, including embedded source line numbers, SHALL NOT
+be used as identity.
 
 #### Scenario: Generate baseline for a clean project
-- **WHEN** user runs `arch-linter baseline generate --config policy.yml --output baseline.yml` on a project with zero violations
-- **THEN** the generated `baseline.yml` SHALL contain `version: 2` and `baseline:` with empty contract groups (no entries)
+- **WHEN** a user runs `baseline generate` on a project with no relative metric
+  budgets and zero violations
+- **THEN** the generated baseline contains `version: 2` and an empty
+  finding-level `baseline` collection
 
 #### Scenario: Generate baseline captures exact violations
-- **WHEN** user runs baseline generation on a project with known dependency violations
-- **THEN** each violation SHALL appear as one or more baseline entries under the correct contract group and contract ID, each with a structured `ArchitectureViolationIdentity`
+- **WHEN** a user runs baseline generation on a project with known dependency
+  violations
+- **THEN** each violation appears under its correct contract group and ID with
+  a structured `ArchitectureViolationIdentity`
+
+#### Scenario: Generate baseline captures a relative metric without a violation
+- **WHEN** a policy has a complete no-worse metric budget whose current value
+  equals its reviewed starting point and the user runs `baseline generate`
+- **THEN** the generated version-3 file contains the metric scalar entry even
+  though the budget produces no threshold finding
 
 #### Scenario: Deterministic output across repeated runs
-- **WHEN** user runs baseline generation twice on the same unchanged codebase
-- **THEN** both output files SHALL be byte-identical, including `occurrence` discriminators
+- **WHEN** a user runs baseline generation twice on the same unchanged codebase
+- **THEN** both output files are byte-identical, including finding occurrences
+  and metric baseline entries
 
 #### Scenario: Manual ignores are not duplicated in baseline
-- **WHEN** user runs baseline generation on a project where some violations are already covered by manual `ignored_violations` in the policy
-- **THEN** the baseline SHALL NOT contain entries for those already-ignored violations
+- **WHEN** a user runs baseline generation where some violations are covered by
+  manual `ignored_violations`
+- **THEN** those violations do not appear as generated finding baseline entries
 
 #### Scenario: CLI help describes baseline subcommand
-- **WHEN** user runs `arch-linter --help` or `arch-linter baseline --help`
-- **THEN** output SHALL include usage information for `baseline generate`, `baseline update`, `baseline prune`, `baseline diff`, `baseline verify`, and `baseline migrate`
+- **WHEN** a user runs `arch-linter --help` or `arch-linter baseline --help`
+- **THEN** output includes usage information for `baseline generate`, `baseline
+  update`, `baseline prune`, `baseline diff`, `baseline verify`, and `baseline migrate`
 
 #### Scenario: Selected-contract generation scopes output
-- **WHEN** user runs `arch-linter baseline generate --config policy.yml --output baseline.yml --contract app-boundaries` on a project with violations in multiple contracts
-- **THEN** the generated baseline SHALL only contain entries for the `app-boundaries` contract id, even if other contracts also have current violations
+- **WHEN** a user runs baseline generation with `--contract app-budget` where
+  only `app-budget` is a relative metric budget
+- **THEN** generated finding and metric baseline output contains only values
+  referenced by selected contract IDs
 
 #### Scenario: Same-named types in different assemblies do not collide
-- **WHEN** two different assemblies each contain a violating type with the same simple name and namespace (e.g. two `Program` types), and baseline generation is run then one occurrence is baselined
-- **THEN** the baseline entry SHALL suppress only the violation from its own `source_assembly`; the same-named violation in the other assembly SHALL still be reported as new debt by `validate --baseline`
+- **WHEN** two assemblies contain a same-named violating type and baseline
+  generation captures only one exact structured finding identity
+- **THEN** the entry suppresses only that assembly's violation during validation
 
 #### Scenario: Multiple forbidden calls in one type each get a distinct entry
-- **WHEN** a single source type contains multiple distinct forbidden-call occurrences to the same target member, and baseline generation is run then only the first occurrence's entry is baselined
-- **THEN** the additional occurrences SHALL still be reported as new debt; baselining one occurrence SHALL NOT suppress the others
+- **WHEN** one type contains repeated distinct forbidden-call occurrences and
+  baseline generation captures only the first occurrence
+- **THEN** the remaining occurrence still fails validation as new finding debt
 
 ### Requirement: User can consume a baseline file during validation
+The system SHALL accept `--baseline` on validation and baseline lifecycle
+subcommands. It SHALL load a dedicated baseline document and merge only its
+finding-level `ignored_violations` entries into matching policy contracts in
+memory. Version-1 files retain legacy exact display-pair matching; version-2
+and version-3 finding entries retain full structured
+`ArchitectureViolationIdentity` matching. A version-3 `metric_baselines`
+collection SHALL be available only to selected relative metric budgets and
+shall never be merged as an ignore.
 
-The system SHALL accept a `--baseline` flag on the `validate` subcommand that loads a baseline file and merges its `ignored_violations` entries into the corresponding contracts' ignore lists in memory before running validation.
-
-The merge SHALL identify the target contract by `id` within each contract group (e.g., `baseline.strict[].id` matches `contracts.strict[].Id`).
-
-For `version: 1` baseline files, the merge SHALL deduplicate by the legacy `(source_type, forbidden_reference)` pair within each contract, exactly as before — this behavior SHALL NOT change for existing v1 files.
-
-For `version: 2` baseline files, the merge SHALL deduplicate by full `ArchitectureViolationIdentity` structural equality within each contract.
-
-The merged ignores SHALL participate in all existing validation behavior: matching via `ArchitectureIgnoreMatcher.IsIgnored`, stale tracking via `ArchitectureIgnoreUsageTracker`, and unmatched ignore alerting via `unmatched_ignored_violations` config. For an ignore entry merged from a `version: 2` baseline, `IsIgnored` SHALL match by full structured-identity equality (contract family, kind, source/target assembly, source/target type and member, and occurrence) against the live candidate identity computed at the same call site — never by `(source_type, forbidden_reference)` text matching. For an entry with no structured identity (a manually authored policy ignore, or one merged from a `version: 1` baseline), `IsIgnored` SHALL continue to match by the legacy glob pair exactly as before. This guarantee applies to `validate --baseline` itself, not only to `baseline diff`/`verify`/`migrate` — two same-named types in different assemblies, or two distinct forbidden calls in the same source type, SHALL be distinguished at validation time.
-
-Occurrence discrimination SHALL be computed live and unconditionally, in deterministic call order, at the same choke point that decides whether a call is ignored — not as a separate pass over only the non-suppressed occurrences — so a baselined occurrence's index matches what generation originally assigned it, whether or not this particular run's `--baseline` merge suppresses it.
-
-The baseline file SHALL NOT be validated against the main policy schema. It SHALL be loaded via a dedicated `ArchitectureBaselineDocument` model and loader that dispatches on `version` (`1` or `2`); any other value SHALL fail loading with an explicit unsupported-version error.
+The merged finding ignores SHALL retain all existing matching, stale tracking,
+and unmatched-ignore behavior. The loader SHALL accept versions 1, 2, and 3
+only; other versions or malformed/ambiguous metric baseline entries SHALL fail
+explicitly. A version-3 document's finding entries SHALL retain the structured
+identity requirements of version 2.
 
 #### Scenario: Baseline suppresses existing violations but allows new ones
-- **WHEN** user runs `arch-linter validate --config policy.yml --baseline baseline.yml` against code with a baseline on a subset of violations
-- **THEN** violations present in the baseline SHALL NOT be reported; violations NOT in the baseline SHALL still fail validation
+- **WHEN** validation uses a baseline containing a subset of finding debt
+- **THEN** only exact matched finding identities are suppressed and unmatched
+  violations still fail normal validation
+
+#### Scenario: Legacy versions retain finding-baseline behavior
+- **WHEN** validation reads an existing version-1 or version-2 baseline with
+  no metric baseline collection
+- **THEN** its existing finding matching behavior remains unchanged
 
 #### Scenario: Baseline entries are resolved when violations are fixed
-- **WHEN** user fixes a violation that has a baseline entry, then runs validation
-- **THEN** the fixed violation SHALL NOT be reported, and the resolved baseline entry SHALL be reported as an unmatched ignored violation (governed by `unmatched_ignored_violations` config)
+- **WHEN** a finding baseline entry no longer matches a current violation
+- **THEN** existing resolved/unmatched-ignore behavior remains available for
+  finding debt without mutating metric baseline values
 
 #### Scenario: Baseline merges with manual ignores without duplicates
-- **WHEN** user runs validation with both policy manual ignores and baseline ignores for the same contract
-- **THEN** duplicate identities SHALL only suppress the violation once; the deduplication SHALL NOT affect other entries
+- **WHEN** validation loads both a manual ignore and an exact matching baseline
+  ignore for one finding
+- **THEN** the violation is suppressed once and other identities are unaffected
 
 #### Scenario: Baseline validation fails with unknown contract ID
-- **WHEN** baseline references a `contract_id` that does not exist in the loaded policy document
-- **THEN** validation SHALL report an error and exit with a non-zero code, listing the unknown IDs; baseline lifecycle commands SHALL classify the entry as `stale`
+- **WHEN** a finding-level baseline entry references a contract that the loaded
+  policy does not declare
+- **THEN** validation reports the unknown contract explicitly and does not
+  reinterpret it as a metric baseline entry
 
 #### Scenario: Legacy version 1 baseline files load and match unchanged
-- **WHEN** user runs `validate --baseline` with an existing `version: 1` baseline file that has not been migrated
-- **THEN** the file SHALL load successfully and match violations using the exact legacy `(source_type, forbidden_reference)` pair semantics, with no reinterpretation of its entries
+- **WHEN** validation reads a version-1 baseline that has not been migrated
+- **THEN** its exact legacy `(source_type, forbidden_reference)` matching is
+  unchanged
+
+#### Scenario: Version-3 metric entries do not suppress a finding
+- **WHEN** a version-3 baseline contains a metric baseline and current
+  validation also produces an ordinary dependency violation
+- **THEN** the metric entry does not suppress that dependency violation
 
 #### Scenario: Unsupported baseline version is rejected
-- **WHEN** user runs any `baseline` subcommand or `validate --baseline` against a file whose `version` is neither `1` nor `2`
-- **THEN** the command SHALL fail with an explicit unsupported-version error and a non-zero exit code
+- **WHEN** a baseline command or validation reads a document whose version is
+  not 1, 2, or 3
+- **THEN** it fails with an explicit unsupported-version error
 
 #### Scenario: validate --baseline distinguishes same-named types in different assemblies
-- **WHEN** user runs `validate --baseline` with a `version: 2` baseline entry that baselines a violation from one specific assembly, and the current codebase also contains a same-named violation from a different assembly
-- **THEN** the baselined assembly's violation SHALL NOT be reported; the other assembly's same-named violation SHALL still fail validation
+- **WHEN** a version-2 or version-3 finding baseline entry selects one
+  assembly's same-named violation
+- **THEN** the similarly named violation in another assembly remains unsuppressed
 
 #### Scenario: validate --baseline distinguishes multiple occurrences in one type
-- **WHEN** user runs `validate --baseline` with a `version: 2` baseline entry that baselines one specific occurrence of a repeated forbidden call within a source type, and the current codebase still contains a second, distinct occurrence of that same call
-- **THEN** the baselined occurrence SHALL NOT be reported; the second occurrence SHALL still fail validation
+- **WHEN** a version-2 or version-3 finding baseline entry selects one repeated
+  forbidden-call occurrence
+- **THEN** another canonical occurrence in the same type remains unsuppressed
 
 #### Scenario: A version: 2 document whose entries lack structured identity fields is rejected
-- **WHEN** a baseline file declares `version: 2` but one or more `ignored_violations` entries are missing `identity_version`, `contract_family`, `kind`, or `occurrence`
-- **THEN** loading SHALL fail with an explicit error identifying the offending entry, rather than silently defaulting the missing fields
+- **WHEN** a version-2 document has an ignored-violation entry missing required
+  structured identity fields
+- **THEN** loading fails explicitly rather than defaulting the missing identity
 
 #### Scenario: A version: 1 document with structured identity fields is rejected
-- **WHEN** a baseline file declares `version: 1` but one or more `ignored_violations` entries carry an `identity_version` field
-- **THEN** loading SHALL fail with an explicit error, since structured identity fields are only valid in a `version: 2` document
+- **WHEN** a version-1 document carries an ignored-violation identity version
+- **THEN** loading fails because structured finding identity is unavailable in
+  version 1
 
 ### Requirement: Baseline entries cover cycle and sibling-cycle contracts
 
