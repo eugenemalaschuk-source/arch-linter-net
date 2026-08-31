@@ -4,13 +4,13 @@ using ArchLinterNet.Core.Model;
 
 namespace ArchLinterNet.Core.Caching;
 
-// Explicit closed-set converter for IArchitectureDiagnosticPayload's 18 concrete record types
+// Explicit closed-set converter for IArchitectureDiagnosticPayload's 19 concrete record types
 // (FrameworkReferenceAllowOnlyPayload, PackageDependencyPayload, FrameworkReferencePayload,
 // ConfigurationPayload, ProjectMetadataPayload, CompositionPayload, TypePlacementPayload,
 // ExternalDependencyPayload, DependencyPayload, PortBoundaryPayload, AttributeUsagePayload,
 // InheritancePayload, InterfaceImplementationPayload, LayoutConventionPayload,
 // ContextAllowOnlyPayload, ContextDependencyPayload, PackageAllowOnlyPayload,
-// PublicApiSurfacePayload — see src/ArchLinterNet.Core/Model/*Payload.cs).
+// PublicApiSurfacePayload, MetricBudgetPayload — see src/ArchLinterNet.Core/Model/*Payload.cs).
 //
 // This is the exact closed-set discrimination review finding #1 asked for: the "$kind"
 // discriminator written on serialization is matched against a fixed switch statement enumerating
@@ -63,9 +63,10 @@ internal sealed class AnalysisCacheDiagnosticPayloadConverter : JsonConverter<IA
             nameof(ContextDependencyPayload) => Deserialize<ContextDependencyPayload>(raw, options),
             nameof(PackageAllowOnlyPayload) => Deserialize<PackageAllowOnlyPayload>(raw, options),
             nameof(PublicApiSurfacePayload) => Deserialize<PublicApiSurfacePayload>(raw, options),
+            nameof(MetricBudgetPayload) => Deserialize<MetricBudgetPayload>(raw, options),
             _ => throw new JsonException(
                 $"Cached diagnostic payload has an unrecognized '$kind' value '{kind}'. Never deserialized " +
-                "as an arbitrary type — this is a closed set of 18 known payload records."),
+                "as an arbitrary type — this is a closed set of 19 known payload records."),
         };
     }
 
@@ -81,7 +82,7 @@ internal sealed class AnalysisCacheDiagnosticPayloadConverter : JsonConverter<IA
         writer.WriteStartObject();
         writer.WriteString(KindProperty, value.GetType().Name);
         writer.WritePropertyName(ValueProperty);
-        // value.GetType() is always one of the 18 concrete sealed record types above — never the
+        // value.GetType() is always one of the 19 concrete sealed record types above — never the
         // IArchitectureDiagnosticPayload interface itself — so this call resolves the reflection-based
         // default converter for that concrete record, not this converter again (JsonConverter<T>.CanConvert
         // only matches the exact declared T == IArchitectureDiagnosticPayload).

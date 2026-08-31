@@ -391,6 +391,14 @@ internal static class ArchitectureContractFamilyRegistry
             OwnedContractTypes = new[] { typeof(ArchitectureCoverageContract) },
         },
         new(
+            "metric_budgets", "strict_metric_budgets", "audit_metric_budgets", true,
+            g => g.StrictMetricBudgets, g => g.AuditMetricBudgets,
+            (session, contract) => ArchitectureHandlerResult.FromViolations(
+                session.CheckMetricBudgetContract((ArchitectureMetricBudgetContract)contract)))
+        {
+            OwnedContractTypes = new[] { typeof(ArchitectureMetricBudgetContract) },
+        },
+        new(
             "context_dependency", "strict_context_dependencies", "audit_context_dependencies", true,
             g => g.StrictContextDependencies, g => g.AuditContextDependencies,
             (session, contract) => ArchitectureHandlerResult.FromViolations(

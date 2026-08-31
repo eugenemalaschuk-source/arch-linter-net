@@ -203,6 +203,7 @@ public sealed partial class ArchitectureDiagnosticFormatter : IArchitectureDiagn
         InterfaceImplementationDiagnostic d => d.SourceType,
         CompositionDiagnostic d => d.SourceType,
         ProjectMetadataDiagnostic d => d.SourceType,
+        MetricBudgetDiagnostic d => d.SourceType,
         ContextDependencyDiagnostic d => d.SourceType,
         ContextAllowOnlyDiagnostic d => d.SourceType,
         PortBoundaryDiagnostic d => d.SourceType,
@@ -226,6 +227,7 @@ public sealed partial class ArchitectureDiagnosticFormatter : IArchitectureDiagn
         InterfaceImplementationDiagnostic d => d.ForbiddenNamespace,
         CompositionDiagnostic d => d.ForbiddenNamespace,
         ProjectMetadataDiagnostic d => d.ForbiddenNamespace,
+        MetricBudgetDiagnostic d => d.ForbiddenNamespace,
         ContextDependencyDiagnostic d => d.ForbiddenNamespace,
         ContextAllowOnlyDiagnostic d => d.ForbiddenNamespace,
         PortBoundaryDiagnostic d => d.ForbiddenNamespace,
@@ -249,6 +251,7 @@ public sealed partial class ArchitectureDiagnosticFormatter : IArchitectureDiagn
         InterfaceImplementationDiagnostic d => d.ForbiddenReferences,
         CompositionDiagnostic d => d.ForbiddenReferences,
         ProjectMetadataDiagnostic d => d.ForbiddenReferences,
+        MetricBudgetDiagnostic d => d.ForbiddenReferences,
         ContextDependencyDiagnostic d => d.ForbiddenReferences,
         ContextAllowOnlyDiagnostic d => d.ForbiddenReferences,
         PortBoundaryDiagnostic d => d.ForbiddenReferences,
@@ -358,6 +361,14 @@ public sealed partial class ArchitectureDiagnosticFormatter : IArchitectureDiagn
         if (diagnostic is ProjectMetadataDiagnostic projectMetadata)
         {
             context += FormatProjectMetadataContextForHumans(projectMetadata);
+        }
+
+        if (diagnostic is MetricBudgetDiagnostic metricBudget)
+        {
+            context += $" (kind: metric_budget, metric_id: {metricBudget.MetricId}, metric_kind: {metricBudget.MetricKind}, "
+                + $"native_subject: {metricBudget.NativeSubject ?? "<none>"}, effective_scope: {metricBudget.EffectiveScope}, "
+                + $"measured_value: {metricBudget.MeasuredValue}, breached_bound: {metricBudget.BreachedBound}, "
+                + $"configured_limit: {metricBudget.ConfiguredLimit}, contributors: [{string.Join(", ", metricBudget.Contributors)}])";
         }
 
         if (diagnostic is ContextDependencyDiagnostic contextDependency)

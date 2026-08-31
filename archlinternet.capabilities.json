@@ -278,6 +278,13 @@
       "validates": "Coverage contracts classify namespace, project, assembly, dependency-edge, semantic-role, and rule-input inventory. For scope: rule_input, optional_inputs identifies exactly one contract field and layer with a required reason. An exact empty match is reported as typed optional-empty state with contract_id/input/layer identity and authored provenance; populated inputs transition to ordinary covered state, while stale, unknown, and unrelated empty inputs still fail closed."
     },
     {
+      "kind": "metric-budget",
+      "strictGroup": "strict_metric_budgets",
+      "auditGroup": "audit_metric_budgets",
+      "fields": ["id", "metric", "minimum", "maximum"],
+      "validates": "An inclusive absolute minimum and/or maximum over one declared architecture metric. The existing metric evaluator provides the value, native subject, effective scope, and deterministic contributors; incomplete or unmapped topology remains shared applicability evidence rather than a fabricated threshold result."
+    },
+    {
       "kind": "context-dependency",
       "strictGroup": "strict_context_dependencies",
       "auditGroup": "audit_context_dependencies",

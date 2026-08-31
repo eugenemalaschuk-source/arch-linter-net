@@ -4,7 +4,9 @@
 
 Provide AI coding agents with a compact, deterministic, and safe summary of the
 effective architecture policy before they generate or modify code.
+
 ## Requirements
+
 ### Requirement: Effective policy context has a public, versioned Core representation
 Core SHALL expose a typed policy-context export operation that loads a selected
 policy through the normal effective-policy loader and returns a versioned
@@ -159,3 +161,13 @@ projection that performs no topology or architecture analysis.
 - **WHEN** equivalent topology declarations contain structurally distinct context metadata values whose text would collide in delimiter serialization
 - **THEN** reordered YAML produces the same semantic selector order while retaining both selectors and their authored provenance
 
+### Requirement: Policy context exports typed metric-budget contract facts
+Policy-context export SHALL support metric-budget contracts in the same closed
+contract-type coverage set as every registered contract family. Its
+deterministic JSON and Markdown representations SHALL include the budget's
+metric ID and configured minimum and maximum facts, when present.
+
+#### Scenario: Budget facts survive policy-context export
+- **WHEN** a composed policy contains an audit metric budget with both bounds
+- **THEN** JSON and Markdown policy context expose its metric, minimum, and
+  maximum facts with ordinary contract identity and provenance
