@@ -9,5 +9,19 @@
       while retaining the authored VSTest filter and its E2E/release-gate exclusions.
     -->
     <AssemblySelectLimit>2147483647</AssemblySelectLimit>
+    <!--
+      NUnit3TestAdapter defaults UseDefaultAssemblyLoadContext to true as of 6.1.0 (NUnit's own
+      release notes describe this as an assembly-loading behavior change). With it true, the test
+      host loads this assembly into AssemblyLoadContext.Default instead of an adapter-owned,
+      non-default context; AspNetSharedFrameworkAcceptanceTests.
+      SharedFrameworkNotConfigured_BaseTypeFromAspNetCoreFailsToResolve depends on
+      ArchLinterNet.Core's own isolated AssemblyLoadContext (ArchitectureAssemblyLoader.
+      IsolatedAssemblyLoadScope) NOT being able to fall through to a shared-framework-aware default
+      context when Microsoft.AspNetCore.App isn't in its probing set — under the default ALC, that
+      fallback now finds the shared framework anyway, so the expected failure never happens. false
+      restores the adapter's own non-default load context, matching this suite's original
+      assumptions.
+    -->
+    <UseDefaultAssemblyLoadContext>false</UseDefaultAssemblyLoadContext>
   </NUnit>
 </RunSettings>

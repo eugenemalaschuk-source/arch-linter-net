@@ -142,16 +142,23 @@ public sealed class ArchitecturePolicyProvenanceTests
         ArchitecturePolicyImportException exception = Assert.Throws<ArchitecturePolicyImportException>(
             () => new ArchitecturePolicyDocumentLoader().Load(root))!;
 
+        // exception.Diagnostic is declared `dynamic` on ArchitecturePolicyImportException; capturing
+        // it once as its concrete static type here (rather than repeating the dynamic member chain
+        // per assertion) avoids NUnit's Assert.That(Action,...)/(TestDelegate,...) overload ambiguity
+        // when a dynamic-typed argument's runtime value is null.
+        ArchitecturePolicyDiagnostic diagnostic = exception.Diagnostic!;
+        ArchitecturePolicySourceLocation location = diagnostic.Location!;
+
         Assert.Multiple(() =>
         {
             Assert.That(exception.Category, Is.EqualTo(ArchitecturePolicyImportErrorCategory.MissingFile));
-            Assert.That(exception.Diagnostic!.Location!.Role, Is.EqualTo(ArchitecturePolicyDocumentRole.Root));
-            Assert.That(exception.Diagnostic.Location.SourcePath, Is.EqualTo("architecture/missing.yml"));
-            Assert.That(exception.Diagnostic.Location.Source.DeclaringSourcePath, Is.Null);
-            Assert.That(exception.Diagnostic.Location.Source.AuthoredImportPath, Is.Null);
+            Assert.That(location.Role, Is.EqualTo(ArchitecturePolicyDocumentRole.Root));
+            Assert.That(location.SourcePath, Is.EqualTo("architecture/missing.yml"));
+            Assert.That(location.Source.DeclaringSourcePath, Is.Null);
+            Assert.That(location.Source.AuthoredImportPath, Is.Null);
             Assert.That(exception.Message, Is.EqualTo("Root policy file not found: architecture/missing.yml"));
             Assert.That(exception.Message, Does.Not.Contain(_temporaryDirectory));
-            Assert.That(exception.Diagnostic.ImportChain, Is.EqualTo(_missingRootImportChain));
+            Assert.That(diagnostic.ImportChain, Is.EqualTo(_missingRootImportChain));
         });
     }
 
