@@ -174,6 +174,39 @@ trusting an artifact name, filesystem timestamp, artifact ordering, or CI job
 name as proof of freshness. `id` is the logical evidence identity used for
 this binding; it is not inferred from a path.
 
+## Reference scenario: current-context evidence
+
+The following is a deliberately synthetic, vendor-neutral evidence flow. It
+describes the values a caller supplies to the Core boundary; it is not an
+analyzer invocation, a producer-service integration, or a CLI artifact option.
+
+```text
+repository-local SARIF 2.1.0 bytes
+  + logical evidence id: static-analysis
+  + current assessment: repository, revision, scope
+  + producer context: repository, revision, scope, logical evidence id
+  -> bounded trust validation
+  -> policy-authorized diagnostic selection
+  -> canonical imported finding and applicability projections
+```
+
+When the matching SARIF run is successful and every configured binding agrees,
+the resulting canonical finding retains the logical evidence identity,
+producer/run facts, repository/revision/scope, deterministic artifact hash, and
+source location/fingerprint provenance. Human, JSON, SARIF, Testing, and later
+report consumers use those canonical facts; they do not need to reopen the source
+SARIF or query a producer service. Baseline candidates retain only the stable
+canonical identity and strict/audit debt-lifecycle semantics, so producer/run and
+artifact provenance cannot create baseline churn.
+
+A successful trusted run with no selected results is explicit evaluable evidence.
+By contrast, a missing required artifact, or a malformed, unsuccessful, wrong-repository,
+wrong-revision, wrong-scope, wrong-logical-key, or binding-incomplete artifact is
+unassessable evidence. It neither becomes a clean zero-result run nor supplies a
+current imported finding. Equivalent repeated current-context results can
+deduplicate deterministically, while different source locations and logical
+evidence and scope contexts remain distinct.
+
 ## What the bounded reader proves
 
 For a declared requirement, the Core boundary:
