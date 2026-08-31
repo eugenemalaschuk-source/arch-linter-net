@@ -131,6 +131,23 @@ def test_main_package_retention_is_complete_set_and_current_build_safe() -> None
     assert "--keep 5" in workflow
 
 
+def test_main_package_consumer_smoke_uses_isolated_nuget_config() -> None:
+    workflow = _read("main-packages.yml")
+    retention = workflow[workflow.index("\n  retention:\n") :]
+
+    assert "<clear />" in retention
+    assert 'key="nuget.org" value="https://api.nuget.org/v3/index.json"' in retention
+    assert 'key="github" value="$feed"' in retention
+    assert "NuGetPackageSourceCredentials_github" in retention
+    assert "dotnet nuget list source" in retention
+    assert "--format Detailed" in retention
+    assert retention.count('--configfile "$smoke_config"') >= 3
+    assert "--add-source \"$feed\"" not in retention
+    assert "dotnet nuget add source" not in retention
+    assert "restore_verbosity=normal" in retention
+    assert "--verbosity \"$restore_verbosity\"" in retention
+
+
 def test_main_workflows_never_publish_mkdocs_or_pages() -> None:
     for name in ("main-quality.yml", "main-packages.yml"):
         workflow = _read(name)
