@@ -193,9 +193,11 @@ repository-local SARIF 2.1.0 bytes
 When the matching SARIF run is successful and every configured binding agrees,
 the resulting canonical finding retains the logical evidence identity,
 producer/run facts, repository/revision/scope, deterministic artifact hash, and
-source location/fingerprint provenance. Human, JSON, SARIF, Testing, baseline,
-and later report consumers use those canonical facts; they do not need to reopen
-the source SARIF or query a producer service.
+source location/fingerprint provenance. Human, JSON, SARIF, Testing, and later
+report consumers use those canonical facts; they do not need to reopen the source
+SARIF or query a producer service. Baseline candidates retain only the stable
+canonical identity and strict/audit debt-lifecycle semantics, so producer/run and
+artifact provenance cannot create baseline churn.
 
 A successful trusted run with no selected results is explicit evaluable evidence.
 By contrast, a missing required artifact, or a malformed, unsuccessful, wrong-repository,
