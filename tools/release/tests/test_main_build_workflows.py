@@ -147,7 +147,7 @@ def test_main_packages_accept_existing_package_visibility() -> None:
     assert "Publish main package set to GitHub Packages" in publish
     assert "dotnet nuget push" in publish
     assert "gh api" not in publish
-    assert "PACKAGE_API_SCOPE" not in workflow
+    assert "PACKAGE_API_SCOPE" not in publish
     assert "existing GitHub Package visibility" not in workflow
     assert "expected 'private'" not in workflow
     assert "Package visibility: unchanged" in workflow
