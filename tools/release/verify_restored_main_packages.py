@@ -9,6 +9,8 @@ import sys
 from pathlib import Path
 from typing import Any
 
+from _release_workspace import _safe_path
+
 LIBRARY_PACKAGE_IDS = (
     "ArchLinterNet.CEL",
     "ArchLinterNet.Core",
@@ -77,7 +79,8 @@ def _parser() -> argparse.ArgumentParser:
 def main() -> None:
     arguments = _parser().parse_args()
     try:
-        verify_restored_main_packages(arguments.assets, arguments.version)
+        assets_path = _safe_path(arguments.assets, "NuGet assets file")
+        verify_restored_main_packages(assets_path, arguments.version)
     except ValueError as error:
         print(f"Error: {error}", file=sys.stderr)
         raise SystemExit(2) from error
