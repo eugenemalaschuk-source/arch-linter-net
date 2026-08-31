@@ -237,10 +237,12 @@ evidence for the validation result. It is the canonical
 configured effective controls once (rather than findings, YAML lines, or
 source-set aliases). It is repository-level for the selected effective policy,
 so its strict, audit, and coverage `rules` partition is the same whether the
-current run evaluates strict or audit findings. `ignore_debt` summarizes only
-explicit manual waiver lifecycle records. Its `waivers` collection retains
-canonical lifecycle IDs, state, target, remediation metadata, and portable
-provenance for drill-down.
+current run evaluates strict or audit findings. Its `ignore_debt` and
+`waivers` use that same selected repository scope, retaining each configured
+manual waiver lifecycle record once. The mode-local `waivers` result outside
+`policy_inventory` remains the evidence used for that mode's validation gate.
+Inventory waiver records retain canonical lifecycle IDs, state, target,
+remediation metadata, and portable provenance for drill-down.
 Baseline finding debt, ordinary findings, and intended scope exclusions are not
 waiver debt. Consumers must preserve a missing `policy_inventory` as missing
 evidence rather than interpreting it as zero rules or zero waivers.

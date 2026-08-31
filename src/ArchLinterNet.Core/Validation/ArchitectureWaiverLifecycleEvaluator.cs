@@ -71,9 +71,26 @@ internal static class ArchitectureWaiverLifecycleEvaluator
     internal static bool HasManualWaivers(ArchitectureContractDocument document)
     {
         ArgumentNullException.ThrowIfNull(document);
-        return document.Contracts.AllStrict.Concat(document.Contracts.AllAudit)
-            .SelectMany(GetIgnoredViolations)
-            .Any(ignore => !ignore.IsBaselineImported);
+        return GetModesWithSelectedManualWaivers(document).Count > 0;
+    }
+
+    internal static IReadOnlyList<string> GetModesWithSelectedManualWaivers(
+        ArchitectureContractDocument document,
+        IReadOnlyCollection<string>? selectedContractIds = null)
+    {
+        ArgumentNullException.ThrowIfNull(document);
+
+        HashSet<string> modes = new(StringComparer.Ordinal);
+        foreach (ArchitectureContractDescriptor descriptor in ArchitectureContractCatalog.Build(document).Descriptors)
+        {
+            if (IsSelected(descriptor, selectedContractIds)
+                && GetIgnoredViolations(descriptor.Contract).Any(ignore => !ignore.IsBaselineImported))
+            {
+                modes.Add(descriptor.Mode);
+            }
+        }
+
+        return [.. modes.OrderBy(mode => mode == "strict" ? 0 : 1)];
     }
 
     private static bool IsSelected(

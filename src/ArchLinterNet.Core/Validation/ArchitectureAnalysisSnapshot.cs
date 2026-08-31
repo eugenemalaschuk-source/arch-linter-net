@@ -220,46 +220,13 @@ public sealed partial class ArchitectureAnalysisSnapshot : IDisposable
 
             try
             {
-                // A snapshot meant to serve any/all requested modes validates a --contract-id filter
-                // against the union of strict and audit IDs at construction time (see
-                // ArchitectureValidationApplicationService.ResolveSelectedContractIds) — that only rejects
-                // an ID unknown to every mode. An ID valid in one mode but not this one would otherwise
-                // silently match nothing when this mode's contracts execute, instead of failing the same
-                // way an independent single-mode Validate call for this mode would. Re-validating here,
-                // per mode, keeps combined execution semantically equivalent to separate runs.
-                EnsureRequestedContractIdsAreKnownForMode(mode);
-
-                _cancellationToken.ThrowIfCancellationRequested();
-                ValidationOutcome? cachedOutcome = _preflight.Blocked ? null : TryEvaluateFromCache(mode, timing);
-                WorkSnapshot? workBefore = cachedOutcome is null && !_preflight.Blocked
-                    ? CaptureWorkSnapshot()
-                    : null;
-                ValidationOutcome outcome = cachedOutcome
-                    ?? (_preflight.Blocked ? BuildBlockedOutcome() : EvaluateCore(mode, timing));
-                if (_preparedPostBuildRunner is not null)
+                ValidationOutcome outcome = EvaluateMode(mode, timing);
+                if (!outcome.PreflightBlocked)
                 {
-                    outcome = outcome with { PreparedPostBuildRunner = _preparedPostBuildRunner };
+                    CompleteRepositoryPolicyInventory(mode, timing);
                 }
 
-                if (cachedOutcome is null
-                    && !outcome.PreflightBlocked
-                    && _cacheAuthorizations.Remove(mode, out AnalysisCachePopulation.PreparedAuthorization? authorization))
-                {
-                    // This opaque plan was captured before contract execution. It is associated
-                    // by object identity rather than stored on ValidationOutcome itself, so its
-                    // transient cache state cannot change that public record's equality contract.
-                    CacheArtifactEvidence artifacts = GetCacheArtifactEvidence();
-                    AnalysisCachePopulation.AttachAuthorization(
-                        outcome,
-                        authorization,
-                        artifacts.Paths,
-                        artifacts.CapturedIdentities,
-                        CreateWorkProvenance(workBefore!.Value));
-                }
-
-                _evaluatedModes[mode] = outcome;
-                _counters = _counters with { ModesEvaluated = _evaluatedModes.Count };
-                return outcome;
+                return _evaluatedModes[mode];
             }
             catch (OperationCanceledException)
             {
@@ -288,6 +255,82 @@ public sealed partial class ArchitectureAnalysisSnapshot : IDisposable
                 throw new ArchitectureAnalysisEvaluationException(
                     ex.Message, ex, GetPolicyImportPaths(), GetResolvedAssemblyPaths(), GetDiscoveredProjectPaths());
             }
+        }
+    }
+
+    private ValidationOutcome EvaluateMode(string mode, ValidationTiming? timing)
+    {
+        // A snapshot meant to serve any/all requested modes validates a --contract-id filter
+        // against the union of strict and audit IDs at construction time (see
+        // ArchitectureValidationApplicationService.ResolveSelectedContractIds) — that only rejects
+        // an ID unknown to every mode. An ID valid in one mode but not this one would otherwise
+        // silently match nothing when this mode's contracts execute, instead of failing the same
+        // way an independent single-mode Validate call for this mode would. Re-validating here,
+        // per mode, keeps combined execution semantically equivalent to separate runs.
+        EnsureRequestedContractIdsAreKnownForMode(mode);
+
+        _cancellationToken.ThrowIfCancellationRequested();
+        ValidationOutcome? cachedOutcome = _preflight.Blocked ? null : TryEvaluateFromCache(mode, timing);
+        WorkSnapshot? workBefore = cachedOutcome is null && !_preflight.Blocked
+            ? CaptureWorkSnapshot()
+            : null;
+        ValidationOutcome outcome = cachedOutcome
+            ?? (_preflight.Blocked ? BuildBlockedOutcome() : EvaluateCore(mode, timing));
+        if (_preparedPostBuildRunner is not null)
+        {
+            outcome = outcome with { PreparedPostBuildRunner = _preparedPostBuildRunner };
+        }
+
+        if (cachedOutcome is null
+            && !outcome.PreflightBlocked
+            && _cacheAuthorizations.Remove(mode, out AnalysisCachePopulation.PreparedAuthorization? authorization))
+        {
+            // This opaque plan was captured before contract execution. It is associated by object
+            // identity rather than stored on ValidationOutcome itself, so transient cache state
+            // cannot change that public record's equality contract.
+            CacheArtifactEvidence artifacts = GetCacheArtifactEvidence();
+            AnalysisCachePopulation.AttachAuthorization(
+                outcome,
+                authorization,
+                artifacts.Paths,
+                artifacts.CapturedIdentities,
+                CreateWorkProvenance(workBefore!.Value));
+        }
+
+        _evaluatedModes[mode] = outcome;
+        _counters = _counters with { ModesEvaluated = _evaluatedModes.Count };
+        return outcome;
+    }
+
+    private void CompleteRepositoryPolicyInventory(string requestedMode, ValidationTiming? timing)
+    {
+        IReadOnlyList<string> waiverModes = ArchitectureWaiverLifecycleEvaluator
+            .GetModesWithSelectedManualWaivers(_document, _requestedContractIds);
+        foreach (string waiverMode in waiverModes)
+        {
+            if (!_evaluatedModes.ContainsKey(waiverMode))
+            {
+                EvaluateMode(waiverMode, timing);
+            }
+        }
+
+        ArchitectureWaiverLifecycleRecord[] repositoryWaivers = waiverModes
+            .SelectMany(waiverMode => _evaluatedModes[waiverMode].Waivers)
+            .ToArray();
+        ArchitecturePolicyInventory inventory = ArchitecturePolicyInventoryProjector.Project(
+            _document,
+            requestedMode,
+            repositoryWaivers,
+            _requestedContractIds,
+            _includeAsmdefContracts,
+            _coverageConfig != "off");
+
+        foreach (string evaluatedMode in _evaluatedModes.Keys.ToArray())
+        {
+            ValidationOutcome previous = _evaluatedModes[evaluatedMode];
+            ValidationOutcome completed = previous with { PolicyInventory = inventory };
+            AnalysisCachePopulation.TransferAuthorization(previous, completed);
+            _evaluatedModes[evaluatedMode] = completed;
         }
     }
 
