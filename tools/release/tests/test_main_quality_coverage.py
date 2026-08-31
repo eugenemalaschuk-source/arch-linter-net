@@ -193,3 +193,85 @@ def test_sonar_verification_requires_all_canonical_reports_and_current_revision(
     assert f"analysis_revision={_SHA}" in rendered
     assert "coverage_import_status=4/4 canonical OpenCover reports parsed" in rendered
     assert "covered_main_files=39" in rendered
+
+
+def test_cli_verify_inventory_round_trip(tmp_path: Path, monkeypatch) -> None:
+    artifacts = _artifact_root(tmp_path)
+    output = _assemble(tmp_path, artifacts)
+    github_output = tmp_path / "cli-output.txt"
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "main_quality_coverage.py",
+            "verify-inventory",
+            "--inventory-root",
+            str(output),
+            "--expected-sha",
+            _SHA,
+            "--github-output",
+            str(github_output),
+        ],
+    )
+
+    assert coverage.main() == 0
+    rendered = github_output.read_text(encoding="utf-8")
+    assert "shard_count=3" in rendered
+    assert "opencover_count=4" in rendered
+    assert "cobertura_count=4" in rendered
+
+
+def _sonar_log_for(output: Path, inventory: dict[str, object], covered_main_files: int) -> str:
+    reports = [
+        (output / record["path"]).resolve()
+        for record in inventory["reports"]  # type: ignore[index]
+        if record["format"] == "opencover"  # type: ignore[index]
+    ]
+    return "\n".join(
+        [f"INFO: Parsing the OpenCover report {report}" for report in reports]
+        + [
+            "INFO: Coverage Report Statistics: 42 files, 40 main files, "
+            f"{covered_main_files} main files with coverage, 2 test files, "
+            "0 project excluded files, 0 other language files."
+        ]
+    )
+
+
+def test_sonar_verification_rejects_stale_analysis_revision(tmp_path: Path) -> None:
+    output = _assemble(tmp_path, _artifact_root(tmp_path))
+    inventory = json.loads((output / "coverage-inventory.json").read_text(encoding="utf-8"))
+    log = tmp_path / "sonar.log"
+    log.write_text(_sonar_log_for(output, inventory, 39), encoding="utf-8")
+    analysis_json = tmp_path / "analysis.json"
+    analysis_json.write_text(json.dumps({"analyses": [{"revision": _OTHER_SHA}]}), encoding="utf-8")
+
+    with pytest.raises(ValueError, match="Sonar analysis revision is stale/wrong"):
+        coverage._verify_sonar(
+            argparse.Namespace(
+                inventory_root=output,
+                expected_sha=_SHA,
+                scanner_log=log,
+                analysis_json=analysis_json,
+                github_output=None,
+            )
+        )
+
+
+def test_sonar_verification_rejects_zero_imported_main_coverage(tmp_path: Path) -> None:
+    output = _assemble(tmp_path, _artifact_root(tmp_path))
+    inventory = json.loads((output / "coverage-inventory.json").read_text(encoding="utf-8"))
+    log = tmp_path / "sonar.log"
+    log.write_text(_sonar_log_for(output, inventory, 0), encoding="utf-8")
+    analysis_json = tmp_path / "analysis.json"
+    analysis_json.write_text(json.dumps({"analyses": [{"revision": _SHA}]}), encoding="utf-8")
+
+    with pytest.raises(ValueError, match="did not report any covered main .NET files"):
+        coverage._verify_sonar(
+            argparse.Namespace(
+                inventory_root=output,
+                expected_sha=_SHA,
+                scanner_log=log,
+                analysis_json=analysis_json,
+                github_output=None,
+            )
+        )
