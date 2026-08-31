@@ -192,7 +192,7 @@ The system SHALL expose a typed details record for every supported finding famil
 - **THEN** the normalized findings carry different typed delta detail records identifying the respective change kinds
 
 ### Requirement: Forward compatibility is explicit
-The system SHALL write the current normalized finding schema version, read both the retained v1 and current v2 envelopes, reject unsupported schema versions, and preserve the envelope and raw details for an unknown kind in non-strict consumption while strict contract validation fails deterministically.
+The system SHALL write the current normalized finding schema version, read retained v1 and v2 envelopes as well as the current v3 envelope, reject unsupported schema versions, and preserve the envelope and raw details for an unknown kind in non-strict consumption while strict contract validation fails deterministically. A finding kind SHALL be recognized only by the schema generation that introduced it or a later generation; frozen generation readers SHALL treat later kinds as opaque or reject them in strict mode.
 
 #### Scenario: Unknown kind has a defined outcome
 - **WHEN** a v1 finding has an unrecognized kind
@@ -201,6 +201,10 @@ The system SHALL write the current normalized finding schema version, read both 
 #### Scenario: Applicability advances the finding document version
 - **WHEN** applicability is introduced as a typed normalized finding discriminator
 - **THEN** writers emit `schema_version: 2`, the v2 packaged schema accepts the typed applicability details, and the immutable v1 schema bytes remain available for legacy v1 input
+
+#### Scenario: Imported diagnostics advance the finding document version
+- **WHEN** imported external diagnostics are introduced as a typed normalized finding discriminator
+- **THEN** writers emit `schema_version: 3`, the v3 packaged schema accepts their typed source and provenance details, and a v2 reader treats `imported_external_diagnostic` as opaque or rejects it in strict mode
 
 ### Requirement: Normalization fixes identity and ordering before projection
 The normalized finding mapper SHALL use canonical identity and ordinal ordering independent of serialization format and SHALL NOT recompute identity from formatted messages.

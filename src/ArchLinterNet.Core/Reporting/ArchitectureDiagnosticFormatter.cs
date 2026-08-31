@@ -300,11 +300,6 @@ public sealed partial class ArchitectureDiagnosticFormatter : IArchitectureDiagn
                 + $"control={applicability.Provenance.ControlIdentity}{policy})";
         }
 
-        if (diagnostic is ImportedExternalDiagnostic imported)
-        {
-            return FormatImportedExternalDiagnosticForHumans(imported);
-        }
-
         string idPrefix = diagnostic.ContractId != null ? $"[{diagnostic.ContractId}] " : string.Empty;
         string context = BuildHumanContext(diagnostic);
 
@@ -320,7 +315,9 @@ public sealed partial class ArchitectureDiagnosticFormatter : IArchitectureDiagn
 
     private static string FormatFindingForHumans(ArchitectureFinding finding)
     {
-        string text = FormatForHumans(finding.Details);
+        string text = finding.Details is ImportedExternalDiagnostic imported
+            ? FormatImportedExternalDiagnosticForHumans(imported, finding.CanonicalIdentity)
+            : FormatForHumans(finding.Details);
         if (finding.RemediationHint is not null)
         {
             text += FormatRemediationHintForHumans(finding.RemediationHint);

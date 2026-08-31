@@ -77,7 +77,8 @@ public sealed class ArchitecturePolicyProvenanceFormattingTests
 
         Assert.Multiple(() =>
         {
-            Assert.That(result.GetProperty("logicalLocations")[0].GetProperty("fullyQualifiedName").GetString(),
+            Assert.That(result.GetProperty("locations")[0].GetProperty("logicalLocations")[0]
+                .GetProperty("fullyQualifiedName").GetString(),
                 Is.EqualTo("App.Application.Service"));
             Assert.That(related.GetProperty("physicalLocation").GetProperty("artifactLocation")
                     .GetProperty("uri").GetString(),

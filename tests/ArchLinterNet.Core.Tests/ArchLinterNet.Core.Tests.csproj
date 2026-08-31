@@ -17,6 +17,7 @@
 
   <ItemGroup>
     <PackageReference Include="JsonSchema.Net" Version="7.3.4" />
+    <PackageReference Include="NJsonSchema" Version="11.0.0" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
     <PackageReference Include="NUnit" Version="4.5.0" />
     <PackageReference Include="NUnit3TestAdapter" Version="5.2.0" />
@@ -39,6 +40,7 @@
 
   <ItemGroup>
     <None Include="ApprovedApi\**" CopyToOutputDirectory="PreserveNewest" />
+    <None Update="SarifSchemas\*.json" CopyToOutputDirectory="PreserveNewest" />
     <None Include="..\..\tools\ArchLinterNet.GitFuzz\corpus-source\*.hex" Link="corpus-source\%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 

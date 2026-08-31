@@ -1,49 +1,94 @@
+using System.Text;
 using ArchLinterNet.Core.Model;
 
 namespace ArchLinterNet.Core.Reporting;
 
 public sealed partial class ArchitectureDiagnosticFormatter
 {
-    private static string FormatImportedExternalDiagnosticForHumans(ImportedExternalDiagnostic diagnostic)
+    private static string FormatImportedExternalDiagnosticForHumans(
+        ImportedExternalDiagnostic diagnostic,
+        string canonicalIdentity)
     {
         SarifEvidenceSourceDiagnostic source = diagnostic.SourceDiagnostic;
         SarifEvidenceSourceLocation? location = source.PrimaryLocation;
-        string tool = diagnostic.EvidenceProvenances[0].ToolName ?? "<unknown-tool>";
-        string rule = source.RuleId ?? "<unknown-rule>";
-        string message = source.Message ?? "<no source message>";
-        string path = location?.Path ?? "<no source location>";
+        string tool = EscapeHumanText(diagnostic.EvidenceProvenances[0].ToolName ?? "<unknown-tool>");
+        string rule = EscapeHumanText(source.RuleId ?? "<unknown-rule>");
+        string message = EscapeHumanText(source.Message ?? "<no source message>");
+        string path = EscapeHumanText(location?.Path ?? "<no source location>");
         string region = FormatRegion(location?.Region);
         string fingerprint = diagnostic.Fingerprint.Origin == SarifExternalDiagnosticFingerprintOrigin.Source
-            ? $"source:{diagnostic.Fingerprint.SourceName}:{diagnostic.Fingerprint.Value}"
-            : $"deterministic:{diagnostic.Fingerprint.Value}";
+            ? $"source:{EscapeHumanText(diagnostic.Fingerprint.SourceName ?? "<unknown>")}:{EscapeHumanText(diagnostic.Fingerprint.Value)}"
+            : $"deterministic:{EscapeHumanText(diagnostic.Fingerprint.Value)}";
         string evidence = string.Join(
             "; ",
             diagnostic.EvidenceProvenances.Select(FormatEvidenceProvenanceForHumans));
 
-        return $"- [{diagnostic.LogicalEvidenceId}] [imported_external_diagnostic] {tool}/{rule} at {path}{region}: "
+        return $"- [{EscapeHumanText(diagnostic.LogicalEvidenceId)}] [imported_external_diagnostic] {tool}/{rule} at {path}{region}: "
             + $"{message} (source_severity={SourceSeverityToken(source.SourceSeverity)}, "
-            + $"governance_mode={GovernanceModeToken(diagnostic.GovernanceMode)}, fingerprint={fingerprint}; "
+            + $"governance_mode={GovernanceModeToken(diagnostic.GovernanceMode)}, "
+            + $"canonical_identity={EscapeHumanText(canonicalIdentity)}, fingerprint={fingerprint}; "
             + $"evidence=[{evidence}])";
     }
 
     private static string FormatEvidenceProvenanceForHumans(SarifEvidenceProvenance provenance)
     {
         SarifEvidenceResolvedContext? context = provenance.Context;
-        return $"logical={provenance.LogicalId}, tool={provenance.ToolName ?? "<unknown>"}, "
-            + $"version={provenance.ToolVersion ?? "<unknown>"}, run={provenance.RunId ?? "<unknown>"}, "
-            + $"repository={context?.Repository ?? "<unknown>"}, revision={context?.Revision ?? "<unknown>"}, "
-            + $"scope={context?.Scope ?? "<unknown>"}, artifact={provenance.ArtifactPath ?? "<unknown>"}, "
-            + $"sha256={provenance.ArtifactSha256 ?? "<unknown>"}";
+        return $"logical={EscapeHumanText(provenance.LogicalId)}, tool={EscapeHumanText(provenance.ToolName ?? "<unknown>")}, "
+            + $"version={EscapeHumanText(provenance.ToolVersion ?? "<unknown>")}, run={EscapeHumanText(provenance.RunId ?? "<unknown>")}, "
+            + $"repository={EscapeHumanText(context?.Repository ?? "<unknown>")}, revision={EscapeHumanText(context?.Revision ?? "<unknown>")}, "
+            + $"scope={EscapeHumanText(context?.Scope ?? "<unknown>")}, artifact={EscapeHumanText(provenance.ArtifactPath ?? "<unknown>")}, "
+            + $"sha256={EscapeHumanText(provenance.ArtifactSha256 ?? "<unknown>")}";
     }
 
     private static string FormatRegion(SarifEvidenceSourceRegion? region)
     {
-        if (region?.StartLine is not { } line)
+        if (region is null)
         {
             return string.Empty;
         }
 
-        return region.StartColumn is { } column ? $":{line}:{column}" : $":{line}";
+        if (region.StartLine is { } line)
+        {
+            return region.StartColumn is { } column ? $":{line}:{column}" : $":{line}";
+        }
+
+        return region.CharOffset is { } offset ? $"@{offset}" : string.Empty;
+    }
+
+    // SARIF fields are producer-controlled. Keep the human and CI console rendering one physical
+    // line per finding, even when a producer supplies newlines or terminal/annotation controls.
+    private static string EscapeHumanText(string value)
+    {
+        ArgumentNullException.ThrowIfNull(value);
+        var escaped = new StringBuilder(value.Length);
+        foreach (char character in value)
+        {
+            switch (character)
+            {
+                case '\r':
+                    escaped.Append("\\r");
+                    break;
+                case '\n':
+                    escaped.Append("\\n");
+                    break;
+                case '\t':
+                    escaped.Append("\\t");
+                    break;
+                default:
+                    if (char.IsControl(character))
+                    {
+                        escaped.Append($"\\u{(int)character:X4}");
+                    }
+                    else
+                    {
+                        escaped.Append(character);
+                    }
+
+                    break;
+            }
+        }
+
+        return escaped.ToString();
     }
 
     private static void ApplyImportedExternalDiagnosticCiFields(

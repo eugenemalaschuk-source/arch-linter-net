@@ -145,7 +145,8 @@ public sealed partial class ArchitectureDiagnosticFormatterTests
         Assert.That(human, Does.Contain("MyApp.Domain"));
         Assert.That(jsonViolation.GetProperty("source").GetString(), Is.EqualTo("MyApp.Domain"));
         Assert.That(
-            sarifResult.GetProperty("logicalLocations")[0].GetProperty("fullyQualifiedName").GetString(),
+            sarifResult.GetProperty("locations")[0].GetProperty("logicalLocations")[0]
+                .GetProperty("fullyQualifiedName").GetString(),
             Is.EqualTo("MyApp.Domain"));
 
         Assert.That(human, Does.Contain("Microsoft.EntityFrameworkCore@8.0.0"));

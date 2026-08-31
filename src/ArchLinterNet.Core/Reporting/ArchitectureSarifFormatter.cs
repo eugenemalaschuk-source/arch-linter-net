@@ -9,7 +9,7 @@ namespace ArchLinterNet.Core.Reporting;
 public sealed partial class ArchitectureSarifFormatter : IArchitectureSarifFormatter
 {
     private const string SchemaUri =
-        "https://raw.githubusercontent.com/oasis-tcs/sarif-spec/master/Schemata/sarif-schema-2.1.0.json";
+        "https://docs.oasis-open.org/sarif/sarif/v2.1.0/errata01/os/schemas/sarif-schema-2.1.0.json";
 
     private const string ToolName = "arch-linter-net";
     private const string SarifVersion = "2.1.0";
@@ -64,15 +64,23 @@ public sealed partial class ArchitectureSarifFormatter : IArchitectureSarifForma
     {
         ArgumentNullException.ThrowIfNull(findings);
 
-        List<ResultEntry> entries = findings
-            .Select(finding =>
-            {
-                cancellationToken.ThrowIfCancellationRequested();
-                string level = finding.Severity == "warning" ? "warning" : "error";
-                return BuildViolationEntry(finding, level);
-            })
-            .OrderBy(entry => entry, new ResultEntryOrderComparer(cancellationToken))
-            .ToList();
+        List<ResultEntry> entries;
+        try
+        {
+            entries = findings
+                .Select(finding =>
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    string level = finding.Severity == "warning" ? "warning" : "error";
+                    return BuildViolationEntry(finding, level);
+                })
+                .OrderBy(entry => entry, new ResultEntryOrderComparer(cancellationToken))
+                .ToList();
+        }
+        catch (InvalidOperationException ex) when (ex.InnerException is OperationCanceledException)
+        {
+            throw ex.InnerException;
+        }
 
         object[] rules = entries
             .GroupBy(entry => entry.RuleId, StringComparer.Ordinal)
@@ -267,9 +275,12 @@ public sealed partial class ArchitectureSarifFormatter : IArchitectureSarifForma
             json["locations"] = BuildPhysicalLocations(matchedFilePath, Array.Empty<string>());
         }
         else if (diagnostic is ImportedExternalDiagnostic importedDiagnostic
-                 && importedDiagnostic.SourceDiagnostic.PrimaryLocation?.Path is not null)
+                 && HasImportedExternalDiagnosticLocation(importedDiagnostic.SourceDiagnostic.PrimaryLocation))
         {
-            json["locations"] = BuildImportedExternalDiagnosticLocations(importedDiagnostic.SourceDiagnostic.PrimaryLocation);
+            json["locations"] = BuildImportedExternalDiagnosticLocations(
+                importedDiagnostic.SourceDiagnostic.PrimaryLocation!,
+                sourceType,
+                LogicalLocationKindFor(diagnostic, forbiddenNamespace));
         }
         else if (FirstFrameworkReferenceSourcePath(diagnostic) is { } frameworkSourcePath)
         {
@@ -281,7 +292,7 @@ public sealed partial class ArchitectureSarifFormatter : IArchitectureSarifForma
         }
         else
         {
-            json["logicalLocations"] = BuildLogicalLocations(sourceType, LogicalLocationKindFor(diagnostic, forbiddenNamespace));
+            json["locations"] = BuildLogicalLocations(sourceType, LogicalLocationKindFor(diagnostic, forbiddenNamespace));
         }
 
         object[] relatedPolicyLocations = FormatPolicyLocationsForSarif(
@@ -563,7 +574,7 @@ public sealed partial class ArchitectureSarifFormatter : IArchitectureSarifForma
             ["ruleId"] = ruleId,
             ["level"] = level,
             [MessagePropertyName] = new Dictionary<string, object?> { ["text"] = $"Dependency cycle detected: {path}" },
-            ["logicalLocations"] = BuildLogicalLocations(path, "namespace"),
+            ["locations"] = BuildLogicalLocations(path, "namespace"),
             [PropertiesKey] = new Dictionary<string, object?>
             {
                 ["arch_linter_net"] = ArchitectureDiagnosticFormatter.FormatNormalizedFindingForSarif(finding),
@@ -585,7 +596,7 @@ public sealed partial class ArchitectureSarifFormatter : IArchitectureSarifForma
             ["ruleId"] = ruleId,
             ["level"] = level,
             [MessagePropertyName] = new Dictionary<string, object?> { ["text"] = $"Dependency cycle detected: {diagnostic.Path}" },
-            ["logicalLocations"] = BuildLogicalLocations(diagnostic.Path, "namespace"),
+            ["locations"] = BuildLogicalLocations(diagnostic.Path, "namespace"),
             [PropertiesKey] = new Dictionary<string, object?>
             {
                 ["arch_linter_net"] = ArchitectureDiagnosticFormatter.FormatNormalizedFindingForSarif(finding),
@@ -634,41 +645,6 @@ public sealed partial class ArchitectureSarifFormatter : IArchitectureSarifForma
 
             return (object)new Dictionary<string, object?> { [PhysicalLocationKey] = physicalLocation };
         }).ToArray();
-    }
-
-    private static object[] BuildImportedExternalDiagnosticLocations(SarifEvidenceSourceLocation location)
-    {
-        var physicalLocation = new Dictionary<string, object?>
-        {
-            [ArtifactLocationKey] = new Dictionary<string, object?> { ["uri"] = location.Path },
-        };
-        if (location.Region is { } region)
-        {
-            var sarifRegion = new Dictionary<string, object?>
-            {
-                ["startLine"] = region.StartLine,
-                ["startColumn"] = region.StartColumn,
-                ["endLine"] = region.EndLine,
-                ["endColumn"] = region.EndColumn,
-                ["charOffset"] = region.CharOffset,
-                ["charLength"] = region.CharLength,
-            };
-            physicalLocation["region"] = sarifRegion;
-        }
-
-        return new object[] { new Dictionary<string, object?> { [PhysicalLocationKey] = physicalLocation } };
-    }
-
-    private static object[] BuildLogicalLocations(string fullyQualifiedName, string kind)
-    {
-        return new object[]
-        {
-            new Dictionary<string, object?>
-            {
-                ["fullyQualifiedName"] = fullyQualifiedName,
-                ["kind"] = kind,
-            },
-        };
     }
 
     // Best-effort hint: no diagnostic kind carries an explicit "this identifier is a

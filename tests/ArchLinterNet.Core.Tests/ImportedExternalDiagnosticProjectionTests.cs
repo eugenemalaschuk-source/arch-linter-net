@@ -125,6 +125,7 @@ public sealed class ImportedExternalDiagnosticProjectionTests
         {
             Assert.That(findings.Select(finding => finding.CanonicalIdentity).Distinct().Count(), Is.EqualTo(2));
             Assert.That(human, Does.Contain("sha256=hash-one"));
+            Assert.That(human, Does.Contain($"canonical_identity={findings[0].CanonicalIdentity}"));
             Assert.That(json["logical_evidence_id"], Is.EqualTo("external.scan"));
             Assert.That(rehydrated.SchemaVersion, Is.EqualTo(ArchitectureFinding.CurrentSchemaVersion));
             Assert.That(rehydrated.Kind, Is.EqualTo("imported_external_diagnostic"));
@@ -189,6 +190,46 @@ public sealed class ImportedExternalDiagnosticProjectionTests
             Assert.That(auditOutcome.Passed, Is.True);
             Assert.That(strictResult.Passed, Is.False);
             Assert.That(auditResult.Passed, Is.True);
+        });
+    }
+
+    [Test]
+    public void HumanProjection_EscapesProducerControlledTextAndRetainsTheCanonicalIdentity()
+    {
+        var source = new SarifEvidenceSourceDiagnostic(
+            "source message\r\n::error title=forged\u001b",
+            "SEC\r100",
+            SarifEvidenceSourceSeverity.Error,
+            new SarifEvidenceSourceLocation("src/Unsafe\n.cs", new SarifEvidenceSourceRegion(startLine: 10)),
+            project: "Project\tName");
+        var provenance = new SarifEvidenceProvenance(
+            "external\rscan",
+            "artifacts/analysis\n.sarif",
+            "hash\tvalue",
+            "Example\rAnalyzer",
+            "1.2.3\n",
+            "run\u001b1",
+            1,
+            new SarifEvidenceResolvedContext("external.scan", "repo\rname", "revision\nname", "scope\tname"));
+        ArchitectureFinding finding = ArchitectureImportedDiagnosticProjector.ToFinding(new SarifSelectedExternalDiagnostic(
+            "external-diagnostic:v2:unsafe-human-output",
+            source,
+            SarifExternalDiagnosticGovernanceMode.Strict,
+            new SarifExternalDiagnosticFingerprint(
+                SarifExternalDiagnosticFingerprintOrigin.Source,
+                "fingerprint\rvalue",
+                "primary\nname"),
+            [provenance]));
+
+        string human = ArchitectureDiagnosticFormatter.FormatFindingsForHumans([finding]);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(human, Does.Not.Contain("\r"));
+            Assert.That(human, Does.Not.Contain("\n"));
+            Assert.That(human, Does.Contain("source message\\r\\n::error title=forged\\u001B"));
+            Assert.That(human, Does.Contain("tool=Example\\rAnalyzer"));
+            Assert.That(human, Does.Contain("canonical_identity=" + finding.CanonicalIdentity));
         });
     }
 

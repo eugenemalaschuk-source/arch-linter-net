@@ -654,14 +654,19 @@
       "type": "object",
       "required": ["path", "start_line", "start_column", "end_line", "end_column", "char_offset", "char_length"],
       "properties": {
-        "path": { "type": "string", "minLength": 1 },
+        "path": { "type": ["string", "null"], "minLength": 1 },
         "start_line": { "type": ["integer", "null"], "minimum": 1 },
         "start_column": { "type": ["integer", "null"], "minimum": 1 },
         "end_line": { "type": ["integer", "null"], "minimum": 1 },
         "end_column": { "type": ["integer", "null"], "minimum": 1 },
         "char_offset": { "type": ["integer", "null"], "minimum": 0 },
         "char_length": { "type": ["integer", "null"], "minimum": 0 }
-      }
+      },
+      "anyOf": [
+        { "properties": { "path": { "type": "string", "minLength": 1 } } },
+        { "properties": { "start_line": { "type": "integer", "minimum": 1 } } },
+        { "properties": { "char_offset": { "type": "integer", "minimum": 0 } } }
+      ]
     },
     "importedFingerprint": {
       "type": "object",
