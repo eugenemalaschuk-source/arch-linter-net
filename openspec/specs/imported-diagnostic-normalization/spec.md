@@ -19,6 +19,21 @@ and SHALL NOT read an artifact, query a producer, or reapply a diagnostic filter
 - **THEN** the imported-diagnostic projection receives no selected source diagnostic and creates
   no ordinary imported finding
 
+### Requirement: Imported projections derive pass state from the native outcome
+Core SHALL retain the native validation pass state separately from the effective pass state after
+an imported-diagnostic projection is attached. Replacing an attached projection SHALL recompute
+the effective state from that native state and the replacement projection's blocking state, so the
+findings and `Passed` outcome cannot diverge.
+
+#### Scenario: Replacing a strict projection with audit restores a passing native outcome
+- **WHEN** a passing native outcome first receives a strict imported projection and then receives
+  an audit-only or empty replacement projection
+- **THEN** the replacement remains reportable and the effective outcome passes
+
+#### Scenario: Audit projection cannot hide a native validation failure
+- **WHEN** a failing native outcome receives an audit-only imported projection
+- **THEN** the effective outcome remains failed
+
 ### Requirement: Imported finding identity is stable and evidence provenance remains drillable
 An imported finding's canonical persistent identity SHALL be deterministic from the selected
 diagnostic's stable semantic identity, logical evidence control, and governance semantics. It

@@ -18,6 +18,11 @@ public sealed record ValidationOutcome(
     IReadOnlyCollection<ArchitectureClassificationConflict> ClassificationConflicts,
     IReadOnlyCollection<ArchitectureClassificationMetadataFailure> ClassificationMetadataFailures)
 {
+    // `Passed` becomes the effective state once imported diagnostics are attached. Keep the
+    // original Core/native result so replacing a strict projection with audit or empty findings
+    // recomputes from the same base rather than carrying an obsolete strict failure forward.
+    private bool NativePassed { get; init; } = Passed;
+
     // Declared as an init-only property outside the primary constructor, not as a 13th positional
     // parameter, so existing positional `new ValidationOutcome(...)` call sites and Deconstruct
     // usages compiled against the prior (12-parameter) shape keep working unchanged; callers who
@@ -127,7 +132,7 @@ public sealed record ValidationOutcome(
         ArgumentNullException.ThrowIfNull(importedDiagnostics);
         return this with
         {
-            Passed = Passed && !importedDiagnostics.HasBlockingFindings,
+            Passed = NativePassed && !importedDiagnostics.HasBlockingFindings,
             ImportedDiagnostics = importedDiagnostics,
         };
     }

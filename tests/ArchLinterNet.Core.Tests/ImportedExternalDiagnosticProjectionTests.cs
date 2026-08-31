@@ -169,6 +169,9 @@ public sealed class ImportedExternalDiagnosticProjectionTests
 
         ValidationOutcome strictOutcome = PassingOutcome().WithImportedDiagnostics(strict);
         ValidationOutcome auditOutcome = PassingOutcome().WithImportedDiagnostics(audit);
+        ValidationOutcome strictThenAuditOutcome = strictOutcome.WithImportedDiagnostics(audit);
+        ValidationOutcome strictThenEmptyOutcome = strictOutcome.WithImportedDiagnostics(ImportedExternalDiagnosticProjection.Empty);
+        ValidationOutcome nativeFailureWithAuditOutcome = Outcome(passed: false).WithImportedDiagnostics(audit);
         var strictResult = new ArchitectureValidationResult(new ArchitectureValidationResultParams(
             Passed: true,
             Violations: Array.Empty<ArchitectureViolation>(),
@@ -188,6 +191,11 @@ public sealed class ImportedExternalDiagnosticProjectionTests
         {
             Assert.That(strictOutcome.Passed, Is.False);
             Assert.That(auditOutcome.Passed, Is.True);
+            Assert.That(strictThenAuditOutcome.Passed, Is.True);
+            Assert.That(strictThenAuditOutcome.ImportedDiagnosticFindings, Is.EqualTo(audit.Findings));
+            Assert.That(strictThenEmptyOutcome.Passed, Is.True);
+            Assert.That(strictThenEmptyOutcome.ImportedDiagnosticFindings, Is.Empty);
+            Assert.That(nativeFailureWithAuditOutcome.Passed, Is.False);
             Assert.That(strictResult.Passed, Is.False);
             Assert.That(auditResult.Passed, Is.True);
         });
@@ -233,8 +241,10 @@ public sealed class ImportedExternalDiagnosticProjectionTests
         });
     }
 
-    private static ValidationOutcome PassingOutcome() => new(
-        Passed: true,
+    private static ValidationOutcome PassingOutcome() => Outcome(passed: true);
+
+    private static ValidationOutcome Outcome(bool passed) => new(
+        Passed: passed,
         Violations: Array.Empty<ArchitectureViolation>(),
         Cycles: Array.Empty<string>(),
         CoverageFindings: Array.Empty<ArchitectureViolation>(),
