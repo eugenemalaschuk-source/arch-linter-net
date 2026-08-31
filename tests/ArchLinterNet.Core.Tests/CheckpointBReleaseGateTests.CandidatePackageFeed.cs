@@ -595,13 +595,13 @@ public sealed partial class CheckpointBReleaseGateTests
                   <PropertyGroup><TargetFramework>net10.0</TargetFramework></PropertyGroup>
                   <ItemGroup>
                     <PackageReference Include="Buildalyzer" Version="9.0.0" />
-                    <PackageReference Include="JsonSchema.Net" Version="7.3.4" />
+                    <PackageReference Include="JsonSchema.Net" Version="7.4.0" />
                     <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="4.14.0" />
                     <PackageReference Include="Microsoft.CodeAnalysis.VisualBasic" Version="4.14.0" />
-                    <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="9.0.0" />
-                    <PackageReference Include="System.CommandLine" Version="2.0.9" />
-                    <PackageReference Include="System.Security.Cryptography.Xml" Version="9.0.18" />
-                    <PackageReference Include="YamlDotNet" Version="16.3.0" />
+                    <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="9.0.19" />
+                    <PackageReference Include="System.CommandLine" Version="2.0.11" />
+                    <PackageReference Include="System.Security.Cryptography.Xml" Version="9.0.19" />
+                    <PackageReference Include="YamlDotNet" Version="18.1.0" />
                   </ItemGroup>
                 </Project>
                 """);
