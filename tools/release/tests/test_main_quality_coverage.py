@@ -17,6 +17,11 @@ _SHA = "a" * 40
 _OTHER_SHA = "b" * 40
 
 
+@pytest.fixture(autouse=True)
+def _release_workspace(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.chdir(tmp_path)
+
+
 def _xml(report_format: str, marker: str = "same") -> str:
     if report_format == "opencover":
         return f"<?xml version='1.0'?><CoverageSession><!--{marker}--><Summary /></CoverageSession>"

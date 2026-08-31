@@ -362,7 +362,6 @@ internal sealed partial class ReportCoordinator
         tool["driver"] = driver;
         run["tool"] = tool;
         JsonArray rules = driver["rules"] as JsonArray ?? new JsonArray();
-        driver["rules"] = rules;
 
         foreach (ArchitectureFinding finding in projection.Findings)
         {
