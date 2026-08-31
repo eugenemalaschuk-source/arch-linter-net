@@ -11,6 +11,7 @@ import pytest
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import main_quality_coverage as coverage  # noqa: E402
+from _release_workspace import _github_command_file_path  # noqa: E402
 
 
 _SHA = "a" * 40
@@ -70,9 +71,10 @@ def _artifact_root(tmp_path: Path, source_sha: str = _SHA, shards: tuple[str, ..
     return artifacts
 
 
-def _assemble(tmp_path: Path, artifacts: Path, expected_sha: str = _SHA) -> Path:
+def _assemble(tmp_path: Path, artifacts: Path, monkeypatch, expected_sha: str = _SHA) -> Path:
     output = tmp_path / "canonical"
     github_output = tmp_path / "github-output.txt"
+    monkeypatch.setenv("GITHUB_OUTPUT", str(github_output))
     coverage._assemble(
         argparse.Namespace(
             artifacts_root=artifacts,
@@ -131,23 +133,65 @@ def test_canonicalization_rejects_empty_or_corrupt_report(tmp_path: Path, conten
         )
 
 
-def test_assemble_fails_closed_when_any_required_shard_is_missing(tmp_path: Path) -> None:
+def test_assemble_fails_closed_when_any_required_shard_is_missing(tmp_path: Path, monkeypatch) -> None:
     artifacts = _artifact_root(tmp_path, shards=("core-1", "other"))
 
     with pytest.raises(ValueError, match=r"observed=2/3.*core-2"):
-        _assemble(tmp_path, artifacts)
+        _assemble(tmp_path, artifacts, monkeypatch)
 
 
-def test_assemble_rejects_stale_or_wrong_sha(tmp_path: Path) -> None:
+def test_assemble_rejects_stale_or_wrong_sha(tmp_path: Path, monkeypatch) -> None:
     artifacts = _artifact_root(tmp_path, source_sha=_OTHER_SHA)
 
     with pytest.raises(ValueError, match="stale/wrong"):
-        _assemble(tmp_path, artifacts, expected_sha=_SHA)
+        _assemble(tmp_path, artifacts, monkeypatch, expected_sha=_SHA)
 
 
-def test_complete_three_shard_inventory_has_four_reports_per_format_and_current_sha(tmp_path: Path) -> None:
+def test_assemble_rejects_arbitrary_github_output_path_not_bound_to_the_runner_env(
+    tmp_path: Path, monkeypatch
+) -> None:
     artifacts = _artifact_root(tmp_path)
-    output = _assemble(tmp_path, artifacts)
+    monkeypatch.setenv("GITHUB_OUTPUT", str(tmp_path / "trusted-runner-file"))
+    attacker_path = tmp_path / "attacker-supplied.txt"
+
+    with pytest.raises(ValueError, match="does not match the runner-provided GITHUB_OUTPUT"):
+        coverage._assemble(
+            argparse.Namespace(
+                artifacts_root=artifacts,
+                expected_sha=_SHA,
+                output_root=tmp_path / "canonical",
+                github_output=attacker_path,
+            )
+        )
+
+
+def test_assemble_accepts_runner_shaped_github_output_path_outside_the_workspace(
+    tmp_path: Path, monkeypatch
+) -> None:
+    artifacts = _artifact_root(tmp_path)
+    runner_command_file = tmp_path.parent / "_runner_file_commands" / f"set_output_{tmp_path.name}"
+    runner_command_file.parent.mkdir(parents=True, exist_ok=True)
+    monkeypatch.setenv("GITHUB_OUTPUT", str(runner_command_file))
+
+    coverage._assemble(
+        argparse.Namespace(
+            artifacts_root=artifacts,
+            expected_sha=_SHA,
+            output_root=tmp_path / "canonical",
+            github_output=runner_command_file,
+        )
+    )
+
+    rendered = runner_command_file.read_text(encoding="utf-8")
+    assert "shard_count=3" in rendered
+    assert "opencover_count=4" in rendered
+
+
+def test_complete_three_shard_inventory_has_four_reports_per_format_and_current_sha(
+    tmp_path: Path, monkeypatch
+) -> None:
+    artifacts = _artifact_root(tmp_path)
+    output = _assemble(tmp_path, artifacts, monkeypatch)
     inventory = json.loads((output / "coverage-inventory.json").read_text(encoding="utf-8"))
 
     assert inventory["source_sha"] == _SHA
@@ -163,9 +207,11 @@ def test_complete_three_shard_inventory_has_four_reports_per_format_and_current_
     ]
 
 
-def test_sonar_verification_requires_all_canonical_reports_and_current_revision(tmp_path: Path) -> None:
+def test_sonar_verification_requires_all_canonical_reports_and_current_revision(
+    tmp_path: Path, monkeypatch
+) -> None:
     artifacts = _artifact_root(tmp_path)
-    output = _assemble(tmp_path, artifacts)
+    output = _assemble(tmp_path, artifacts, monkeypatch)
     inventory = json.loads((output / "coverage-inventory.json").read_text(encoding="utf-8"))
     reports = [
         (output / record["path"]).as_posix()
@@ -183,6 +229,7 @@ def test_sonar_verification_requires_all_canonical_reports_and_current_revision(
     analysis_json = tmp_path / "analysis.json"
     analysis_json.write_text(json.dumps({"analyses": [{"revision": _SHA}]}), encoding="utf-8")
     github_output = tmp_path / "sonar-output.txt"
+    monkeypatch.setenv("GITHUB_OUTPUT", str(github_output))
 
     coverage._verify_sonar(
         argparse.Namespace(
@@ -202,8 +249,9 @@ def test_sonar_verification_requires_all_canonical_reports_and_current_revision(
 
 def test_cli_verify_inventory_round_trip(tmp_path: Path, monkeypatch) -> None:
     artifacts = _artifact_root(tmp_path)
-    output = _assemble(tmp_path, artifacts)
+    output = _assemble(tmp_path, artifacts, monkeypatch)
     github_output = tmp_path / "cli-output.txt"
+    monkeypatch.setenv("GITHUB_OUTPUT", str(github_output))
     monkeypatch.setattr(
         sys,
         "argv",
@@ -242,8 +290,8 @@ def _sonar_log_for(output: Path, inventory: dict[str, object], covered_main_file
     )
 
 
-def test_sonar_verification_rejects_stale_analysis_revision(tmp_path: Path) -> None:
-    output = _assemble(tmp_path, _artifact_root(tmp_path))
+def test_sonar_verification_rejects_stale_analysis_revision(tmp_path: Path, monkeypatch) -> None:
+    output = _assemble(tmp_path, _artifact_root(tmp_path), monkeypatch)
     inventory = json.loads((output / "coverage-inventory.json").read_text(encoding="utf-8"))
     log = tmp_path / "sonar.log"
     log.write_text(_sonar_log_for(output, inventory, 39), encoding="utf-8")
@@ -262,8 +310,8 @@ def test_sonar_verification_rejects_stale_analysis_revision(tmp_path: Path) -> N
         )
 
 
-def test_sonar_verification_rejects_zero_imported_main_coverage(tmp_path: Path) -> None:
-    output = _assemble(tmp_path, _artifact_root(tmp_path))
+def test_sonar_verification_rejects_zero_imported_main_coverage(tmp_path: Path, monkeypatch) -> None:
+    output = _assemble(tmp_path, _artifact_root(tmp_path), monkeypatch)
     inventory = json.loads((output / "coverage-inventory.json").read_text(encoding="utf-8"))
     log = tmp_path / "sonar.log"
     log.write_text(_sonar_log_for(output, inventory, 0), encoding="utf-8")
@@ -280,3 +328,35 @@ def test_sonar_verification_rejects_zero_imported_main_coverage(tmp_path: Path) 
                 github_output=None,
             )
         )
+
+
+def test_github_command_file_path_accepts_the_exact_runner_provided_transport_path(
+    tmp_path: Path, monkeypatch
+) -> None:
+    runner_command_file = tmp_path.parent / "_runner_file_commands" / f"set_output_{tmp_path.name}"
+    runner_command_file.parent.mkdir(parents=True, exist_ok=True)
+    monkeypatch.setenv("GITHUB_OUTPUT", str(runner_command_file))
+
+    resolved = _github_command_file_path(runner_command_file, "GitHub output file", "GITHUB_OUTPUT")
+
+    assert str(resolved) == str(runner_command_file)
+
+
+def test_github_command_file_path_rejects_arbitrary_path_not_matching_the_runner_env_var(
+    tmp_path: Path, monkeypatch
+) -> None:
+    monkeypatch.setenv("GITHUB_OUTPUT", str(tmp_path / "the-real-runner-file"))
+    attacker_path = tmp_path / "attacker-controlled.txt"
+
+    with pytest.raises(ValueError, match="does not match the runner-provided GITHUB_OUTPUT"):
+        _github_command_file_path(attacker_path, "GitHub output file", "GITHUB_OUTPUT")
+
+
+def test_github_command_file_path_rejects_when_the_runner_env_var_is_not_set(
+    tmp_path: Path, monkeypatch
+) -> None:
+    monkeypatch.delenv("GITHUB_OUTPUT", raising=False)
+    candidate = tmp_path / "github-output.txt"
+
+    with pytest.raises(ValueError, match="GITHUB_OUTPUT environment variable is not set"):
+        _github_command_file_path(candidate, "GitHub output file", "GITHUB_OUTPUT")
