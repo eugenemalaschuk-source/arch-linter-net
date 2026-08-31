@@ -23,7 +23,11 @@ internal sealed class UnloadableFieldFixture : IDisposable
 
     public Type SourceType { get; }
 
-    public static UnloadableFieldFixture Create(Action<TypeBuilder>? configureConsumerType = null)
+    public static UnloadableFieldFixture Create(
+        Action<TypeBuilder>? configureConsumerType = null,
+        bool includeUnloadableType = false,
+        bool includeUnloadableField = true,
+        Action<ModuleBuilder, Type>? configureConsumerModule = null)
     {
         string unique = Guid.NewGuid().ToString("N");
         string tempDir = Path.Combine(Path.GetTempPath(), $"arch-linter-unloadable-{unique}");
@@ -35,15 +39,28 @@ internal sealed class UnloadableFieldFixture : IDisposable
         var dependencyBuilder = new PersistedAssemblyBuilder(new AssemblyName($"UnloadableDependency_{unique}"), typeof(object).Assembly);
         ModuleBuilder dependencyModule = dependencyBuilder.DefineDynamicModule("UnloadableDependency.dll");
         TypeBuilder dependencyTypeBuilder = dependencyModule.DefineType("UnloadableTargetType", TypeAttributes.Public);
+        dependencyTypeBuilder.DefineDefaultConstructor(MethodAttributes.Public);
         Type dependencyType = dependencyTypeBuilder.CreateType();
         dependencyBuilder.Save(dependencyPath);
 
         var consumerBuilder = new PersistedAssemblyBuilder(new AssemblyName($"UnloadableConsumer_{unique}"), typeof(object).Assembly);
         ModuleBuilder consumerModule = consumerBuilder.DefineDynamicModule("UnloadableConsumer.dll");
         TypeBuilder consumerTypeBuilder = consumerModule.DefineType("SourceWithUnloadableFieldReference", TypeAttributes.Public);
-        consumerTypeBuilder.DefineField("Target", dependencyType, FieldAttributes.Public);
+        if (includeUnloadableField)
+        {
+            consumerTypeBuilder.DefineField("Target", dependencyType, FieldAttributes.Public);
+        }
+
         configureConsumerType?.Invoke(consumerTypeBuilder);
         consumerTypeBuilder.CreateType();
+        if (includeUnloadableType)
+        {
+            TypeBuilder unloadableType = consumerModule.DefineType("TypeWithUnloadableBase", TypeAttributes.Public);
+            unloadableType.SetParent(dependencyType);
+            unloadableType.CreateType();
+        }
+
+        configureConsumerModule?.Invoke(consumerModule, dependencyType);
         consumerBuilder.Save(consumerPath);
 
         File.Delete(dependencyPath);

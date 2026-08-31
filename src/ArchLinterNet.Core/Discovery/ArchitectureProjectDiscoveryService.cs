@@ -128,6 +128,7 @@ public sealed class ArchitectureProjectDiscoveryService : IArchitectureProjectDi
         List<string> sourceRoots = new();
         List<ArchitectureDiscoveredProject> discoveredProjects = new();
         Dictionary<string, string> resolvedAssemblyPaths = new(StringComparer.Ordinal);
+        Dictionary<string, string> resolvedAssemblyPathsByProject = new(StringComparer.OrdinalIgnoreCase);
 
         foreach (string projectPath in projectPaths.Distinct(StringComparer.OrdinalIgnoreCase))
         {
@@ -135,7 +136,7 @@ public sealed class ArchitectureProjectDiscoveryService : IArchitectureProjectDi
             ProcessProjectPath(
                 projectPath, analysis, repositoryRoot, resolveAssemblyOutputs,
                 diagnostics, targetAssemblyNames, assemblySearchPaths, sourceRoots, discoveredProjects,
-                resolvedAssemblyPaths);
+                resolvedAssemblyPaths, resolvedAssemblyPathsByProject);
         }
 
         return new ProjectDiscoveryResult(
@@ -145,7 +146,8 @@ public sealed class ArchitectureProjectDiscoveryService : IArchitectureProjectDi
             diagnostics)
         {
             DiscoveredProjects = discoveredProjects,
-            ResolvedAssemblyPaths = resolvedAssemblyPaths
+            ResolvedAssemblyPaths = resolvedAssemblyPaths,
+            ResolvedAssemblyPathsByNormalizedProjectPath = resolvedAssemblyPathsByProject,
         };
     }
 
@@ -159,7 +161,8 @@ public sealed class ArchitectureProjectDiscoveryService : IArchitectureProjectDi
         List<string> assemblySearchPaths,
         List<string> sourceRoots,
         List<ArchitectureDiscoveredProject> discoveredProjects,
-        Dictionary<string, string> resolvedAssemblyPaths)
+        Dictionary<string, string> resolvedAssemblyPaths,
+        Dictionary<string, string> resolvedAssemblyPathsByProject)
     {
         if (!_fileSystem.FileExists(projectPath))
         {
@@ -184,6 +187,7 @@ public sealed class ArchitectureProjectDiscoveryService : IArchitectureProjectDi
         // build output can be (or needs to be) resolved for assembly seeding.
         sourceRoots.Add(GetRelativeDirectory(repositoryRoot, projectPath));
         discoveredProjects.Add(BuildDiscoveredProject(projectFile, projectPath, repositoryRoot));
+        string normalizedProjectPath = ProjectPathNormalizer.Normalize(GetRelativePath(repositoryRoot, projectPath));
 
         if (!resolveAssemblyOutputs)
         {
@@ -210,6 +214,7 @@ public sealed class ArchitectureProjectDiscoveryService : IArchitectureProjectDi
             if (staleArtifactPath != null)
             {
                 resolvedAssemblyPaths[projectFile.AssemblyName] = staleArtifactPath;
+                resolvedAssemblyPathsByProject[normalizedProjectPath] = staleArtifactPath;
             }
 
             return;
@@ -217,7 +222,9 @@ public sealed class ArchitectureProjectDiscoveryService : IArchitectureProjectDi
 
         targetAssemblyNames.Add(projectFile.AssemblyName);
         assemblySearchPaths.Add(outputDirectory);
-        resolvedAssemblyPaths[projectFile.AssemblyName] = Path.Combine(outputDirectory, $"{projectFile.AssemblyName}.dll");
+        string resolvedAssemblyPath = Path.Combine(outputDirectory, $"{projectFile.AssemblyName}.dll");
+        resolvedAssemblyPaths[projectFile.AssemblyName] = resolvedAssemblyPath;
+        resolvedAssemblyPathsByProject[normalizedProjectPath] = resolvedAssemblyPath;
     }
 
     private static ArchitectureDiscoveredProject BuildDiscoveredProject(

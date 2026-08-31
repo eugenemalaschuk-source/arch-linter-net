@@ -3,7 +3,9 @@
 ## Purpose
 Define a small, deterministic catalog of architecture-governance metric
 semantics whose values and contributors remain trustworthy and explainable.
+
 ## Requirements
+
 ### Requirement: Architecture metrics use a closed deterministic catalog
 The architecture-metrics capability SHALL support only the following initial
 metric kinds: distinct outgoing architecture components, distinct incoming
@@ -133,12 +135,14 @@ The metric capability SHALL select dependency and external-group facts only
 through the following closed projection matrix. A `map` operation means the
 existing native-topology classification of an observed subject to exactly one
 node; all existing unmapped, ambiguous, and reviewed-out-of-scope semantics
-remain in force.
+remain in force. A namespace subject identity SHALL retain its canonical
+project and resolved assembly owner; matching the namespace text alone SHALL
+NOT bind a fact to a different owner.
 
 | Metric | `type` topology | `namespace` topology | `project` topology | `assembly` topology |
 | --- | --- | --- | --- | --- |
-| Outgoing/incoming component count | Direct first-party edges from the type-level graph, then map each type endpoint. | Direct first-party edges from the namespace-level graph, then map each namespace endpoint. | Direct first-party type-level graph edges; replace each endpoint with its canonical owning project identity, then map each project endpoint. | Direct assembly-level graph edges; bind each graph endpoint to exactly one canonical resolved assembly topology subject, then map each endpoint. |
-| External dependency-group count | Type-level graph edges from a first-party type to an `External` group, then map the source type. | Namespace-level graph edges from a first-party namespace to an `External` group, then map the source namespace. | Type-level graph edges to an `External` group; replace the source type with its canonical owning project identity, then map that project. | Type-level graph edges to an `External` group; replace the source type with its canonical resolved assembly identity, then map that assembly. |
+| Outgoing/incoming component count | Direct first-party edges from the type-level graph, then map each type endpoint. | Direct first-party edges from the namespace-level graph, then map each namespace endpoint with its canonical owner. | Direct first-party type-level graph edges; replace each endpoint with its canonical owning project identity, then map each project endpoint. | Direct assembly-level graph edges; bind each graph endpoint to exactly one canonical resolved assembly topology subject, then map each endpoint. |
+| External dependency-group count | Type-level graph edges from a first-party type to an `External` group, then map the source type. | Namespace-level graph edges from a first-party namespace to an `External` group, then map the source namespace with its canonical owner. | Type-level graph edges to an `External` group; replace the source type with its canonical owning project identity, then map that project. | Type-level graph edges to an `External` group; replace the source type with its canonical resolved assembly identity, then map that assembly. |
 | Project/assembly footprint count | Existing mapped type facts and their canonical owner in the requested unit. | Existing mapped namespace facts and their canonical owner in the requested unit. | Existing mapped project facts and their canonical project/assembly owner in the requested unit. | Existing mapped assembly facts and their canonical project/assembly owner in the requested unit. |
 | Topology-slice type count | Existing mapped canonical type facts. | Configuration-invalid. | Configuration-invalid. | Configuration-invalid. |
 | Public contract-surface size | Not topology-targeted; requires one public API surface contract. | Not topology-targeted; requires one public API surface contract. | Not topology-targeted; requires one public API surface contract. | Not topology-targeted; requires one public API surface contract. |
@@ -157,11 +161,12 @@ A metric is configuration-invalid when it lacks the target shape mandated by
 this matrix, including component/external metrics without a native topology
 node, type count on a non-type topology, and a public surface metric without a
 public API surface contract. A matrix-permitted metric is unassessable when a
-required graph is absent or incomplete; a type, project, or assembly ownership
-binding is missing or ambiguous; an assembly graph endpoint cannot bind to
-exactly one canonical resolved assembly topology subject; or a required mapped
+required graph is absent or incomplete; a type, project, namespace, or assembly
+ownership binding is missing or ambiguous; an assembly graph endpoint has zero
+or multiple canonical resolved assembly topology subjects; or a required mapped
 topology endpoint is unmapped or ambiguous. The capability SHALL NOT substitute
-another graph level or a partial known subset in any of those cases.
+another graph level, choose an arbitrary candidate, join on namespace text
+alone, or use a partial known subset in any of those cases.
 
 #### Scenario: Project topology derives one component relation from direct type edges
 - **WHEN** direct type-level graph edges from types owned by project P to types
@@ -185,8 +190,53 @@ another graph level or a partial known subset in any of those cases.
   type-edge-to-assembly projection rather than a synthetic assembly external
   edge
 
+#### Scenario: Identical namespace names retain their canonical owners
+- **WHEN** two canonical assemblies expose the same namespace text and only one
+  owner's type has a matching external dependency fact
+- **THEN** a namespace-topology external dependency-group metric attributes the
+  group only to that owner's mapped topology node
+
 #### Scenario: Ambiguous assembly binding is unassessable
-- **WHEN** an assembly-level graph endpoint cannot bind to exactly one canonical
-  resolved assembly topology subject
+- **WHEN** an assembly-level graph endpoint has zero or multiple canonical
+  resolved assembly topology subjects for its simple name
 - **THEN** the affected assembly-topology component dependency metric is
   unassessable and does not select a subject by assembly simple name
+
+### Requirement: Project metric ownership binds one resolved artifact
+Project topology, project footprint, and project external-dependency metric
+projections SHALL bind every contributing resolved assembly artifact to exactly
+one discovered project through its stable normalized project identity. They
+SHALL NOT infer a project owner from an output assembly simple name. A metric
+project-topology projection SHALL retain that artifact-derived identity when it
+classifies subjects and relations, while accepting the existing project selector
+spelling only as a policy-facing display selector. When a contributing artifact
+has zero or multiple project-owner candidates, when its output assembly simple
+name identifies multiple distinct discovered project artifacts, or when a
+selected legacy project selector corresponds to more than one artifact-derived
+project subject, the affected metric SHALL be unassessable with missing required
+input instead of selecting a project by discovery order or merging the subjects.
+When an ordinary measurement explicitly selects target assemblies and also
+configures project metrics, the analysis snapshot SHALL materialize the
+project-output evidence needed to establish those artifact-derived bindings
+without requiring build preparation.
+
+#### Scenario: Duplicate output assembly names do not merge project contributors
+- **WHEN** two discovered projects have the same output assembly simple name
+  and a selected metric requires ownership of an artifact with that name
+- **THEN** the metric is unassessable with missing required input and does not
+  publish either project as a canonical contributor
+
+#### Scenario: Project relation retains exact artifact ownership before mapping
+- **WHEN** two resolved artifacts share an output assembly simple name, their
+  discovered project bindings are distinct, and an observed direct edge starts
+  from one artifact
+- **THEN** the metric projection retains the starting artifact's normalized
+  project identity until it has established that the selected project selector
+  denotes exactly one projected project subject
+
+#### Scenario: Explicit target assemblies retain unambiguous project ownership
+- **WHEN** ordinary measurement explicitly selects a target assembly, configures
+  its project, and the selected resolved artifact has exactly one fresh project
+  output candidate
+- **THEN** a project-unit metric is evaluable with that normalized project path
+  as its canonical contributor without requiring build preparation

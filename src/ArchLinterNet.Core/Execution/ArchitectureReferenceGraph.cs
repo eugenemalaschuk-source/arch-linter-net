@@ -4,18 +4,28 @@ namespace ArchLinterNet.Core.Execution;
 
 public sealed class ArchitectureReferenceGraph
 {
-    private readonly Dictionary<Type, IReadOnlyList<Type>> _referencedTypesByType = new();
+    private readonly Dictionary<Type, ReferenceScan> _referencedTypesByType = new();
 
     public IReadOnlyList<Type> GetReferencedTypes(Type type)
     {
-        if (_referencedTypesByType.TryGetValue(type, out IReadOnlyList<Type>? cached))
+        TryGetReferencedTypes(type, out IReadOnlyList<Type> referenced);
+        return referenced;
+    }
+
+    // Validation callers retain the existing best-effort list through GetReferencedTypes. Metric
+    // projections additionally need to know whether that list is a complete direct-reference
+    // universe, so that a scanner degradation cannot be mistaken for a trusted zero.
+    internal bool TryGetReferencedTypes(Type type, out IReadOnlyList<Type> referenced)
+    {
+        if (!_referencedTypesByType.TryGetValue(type, out ReferenceScan? cached))
         {
-            return cached;
+            bool isComplete = ArchitectureReferenceScanner.TryGetReferencedTypes(type, out List<Type> scanned);
+            cached = new ReferenceScan(scanned, isComplete);
+            _referencedTypesByType[type] = cached;
         }
 
-        IReadOnlyList<Type> referenced = ArchitectureReferenceScanner.GetReferencedTypes(type).ToList();
-        _referencedTypesByType[type] = referenced;
-        return referenced;
+        referenced = cached.ReferencedTypes;
+        return cached.IsComplete;
     }
 
     public IEnumerable<(Type referenced, List<Type> path)> GetTransitiveReferencedTypes(
@@ -51,4 +61,6 @@ public sealed class ArchitectureReferenceGraph
             }
         }
     }
+
+    private sealed record ReferenceScan(IReadOnlyList<Type> ReferencedTypes, bool IsComplete);
 }

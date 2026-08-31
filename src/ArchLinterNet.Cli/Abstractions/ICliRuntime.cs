@@ -19,6 +19,16 @@ internal interface ICliRuntime
     ArchitectureAnalysisSnapshot CreateSnapshot(AnalysisSnapshotRequest request, ValidationTiming? timing);
 
     /// <summary>
+    /// Measures declared architecture metrics without entering the validation or finding
+    /// pipeline. The default keeps existing test/runtime fakes source compatible; the production
+    /// runtime forwards to <see cref="ArchLinterNet.Core.Composition.ArchitectureEngine.Measure"/>.
+    /// </summary>
+    ArchitectureMetricMeasurementOutcome Measure(
+        ArchitectureMetricMeasurementRequest request,
+        ValidationTiming? timing) =>
+        throw new NotSupportedException("Architecture metric measurement is not configured for this CLI runtime.");
+
+    /// <summary>
     /// Same behavior as <see cref="Validate"/>, plus the snapshot's typed counters — needed by the
     /// <c>--profile</c> option (issue #374). Default interface implementation delegates to
     /// <see cref="Validate"/> with empty counters, so every existing test fake implementing this

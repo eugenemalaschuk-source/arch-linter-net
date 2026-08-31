@@ -5,7 +5,7 @@ using NUnit.Framework;
 namespace ArchLinterNet.Core.Tests;
 
 [TestFixture]
-public sealed class ArchitectureProjectDiscoveryTests
+public sealed partial class ArchitectureProjectDiscoveryTests
 {
     private static readonly string[] _value = { "Sample" };
     private static readonly string[] _value1 = { "net9.0" };

@@ -1,0 +1,4 @@
+schema: spec-driven
+created: 2026-08-31
+goal: Isolate measure setup from unselected metrics and keep external dependency
+  grouping indexed.

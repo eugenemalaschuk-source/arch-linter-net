@@ -96,6 +96,12 @@ internal sealed class ArchitectureAnalysisFactService
     public bool TryGetProjectByNormalizedPath(string normalizedProjectPath, out ArchitectureDiscoveredProject project) =>
         _metadataIndexes.TryGetProjectByNormalizedPath(normalizedProjectPath, out project!);
 
+    public bool TryGetProjectByResolvedAssembly(Assembly assembly, out ArchitectureDiscoveredProject project) =>
+        _metadataIndexes.TryGetProjectByResolvedAssembly(assembly, out project!);
+
+    public bool HasAmbiguousProjectOutputAssemblyName(string assemblyName) =>
+        _metadataIndexes.HasAmbiguousProjectOutputAssemblyName(assemblyName);
+
     public bool TryGetPackageReferences(
         string assemblyName,
         out IReadOnlyList<ArchitectureDiscoveredPackageReference> references) =>

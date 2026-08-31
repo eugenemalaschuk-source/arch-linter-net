@@ -58,7 +58,7 @@ internal sealed class ArchitectureContractExecutor : IArchitectureContractExecut
         // it once per requested validation mode after ordinary contract checks have populated the
         // shared reference graph, then transport its native applicability evidence through the
         // same result boundary as every other v0.8 control.
-        ArchitectureTopologyEvaluator.Result topology = ArchitectureTopologyEvaluator.Evaluate(session);
+        ArchitectureTopologyEvaluator.Result topology = ArchitectureTopologyEvaluator.EvaluateForValidation(session);
         if (topology.Violations.Count > 0)
         {
             int identityCursor = session.FindingIdentityCursor;

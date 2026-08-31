@@ -98,6 +98,7 @@ The CLI supports normal validation plus:
 - `history analyze`;
 - `public-api` capture/diff/update/migrate;
 - `graph` and `explain`;
+- `measure` for read-only, deterministic declared-metric reports before a budget is authored;
 - persistent cache inspect/clear;
 - packaged schema list/print;
 - architecture-policy badge payload generation;
@@ -111,7 +112,7 @@ Validation can consume current build outputs or explicitly opt in to `--ensure-b
 
 ## Outputs
 
-Supported output includes human, normalized JSON, SARIF where applicable, repeatable report sinks, timing diagnostics, analysis-profile JSON, architecture coverage summaries, and cache/build-state evidence.
+Supported output includes human, normalized JSON, SARIF where applicable, repeatable report sinks, timing diagnostics, analysis-profile JSON, architecture coverage summaries, cache/build-state evidence, and versioned Human/JSON metric measurement reports. Metric applicability counts are evidence completeness, not a quality score or threshold finding.
 
 See [Output formats](../usage/output-formats.md) and [Exit codes](../usage/exit-codes.md).
 

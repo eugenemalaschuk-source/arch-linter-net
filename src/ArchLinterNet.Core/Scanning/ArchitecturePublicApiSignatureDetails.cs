@@ -36,7 +36,7 @@ internal static class ArchitecturePublicApiSignatureDetails
         return open < 0 ? signature : signature[..open];
     }
 
-    public static List<string> ForType(Type type, string visibility)
+    public static List<string> ForType(Type type, string visibility, Action? onIncomplete = null)
     {
         List<string> details = new();
         AddVisibility(details, visibility);
@@ -45,14 +45,18 @@ internal static class ArchitecturePublicApiSignatureDetails
         {
             if (type.IsEnum)
             {
-                string? underlying = ArchitectureTypeNames.SafeFullName(Enum.GetUnderlyingType(type));
+                if (!ArchitectureTypeNames.TryGetFullName(Enum.GetUnderlyingType(type), out string underlying))
+                {
+                    onIncomplete?.Invoke();
+                }
+
                 details.Add($"underlying:{underlying}");
                 return details;
             }
 
             if (type.IsInterface)
             {
-                AddGenericConstraints(type, details);
+                AddGenericConstraints(type, details, onIncomplete);
                 return details;
             }
 
@@ -75,26 +79,28 @@ internal static class ArchitecturePublicApiSignatureDetails
                 }
             }
 
-            if (type.IsValueType && IsReadOnly(type))
+            if (type.IsValueType && IsReadOnly(type, onIncomplete))
             {
                 details.Add("readonly");
             }
 
-            AddGenericConstraints(type, details);
+            AddGenericConstraints(type, details, onIncomplete);
         }
         catch (TypeLoadException)
         {
+            onIncomplete?.Invoke();
             return details;
         }
         catch (FileNotFoundException)
         {
+            onIncomplete?.Invoke();
             return details;
         }
 
         return details;
     }
 
-    public static List<string> ForMethod(MethodBase method, string visibility)
+    public static List<string> ForMethod(MethodBase method, string visibility, Action? onIncomplete = null)
     {
         List<string> details = new();
         AddVisibility(details, visibility);
@@ -108,22 +114,24 @@ internal static class ArchitecturePublicApiSignatureDetails
 
             if (method is MethodInfo methodInfo)
             {
-                AddDispatchModifiers(details, methodInfo);
+                AddDispatchModifiers(details, methodInfo, onIncomplete);
             }
 
-            AddParameterModifiers(method, details);
+            AddParameterModifiers(method, details, onIncomplete);
 
             if (method is MethodInfo { IsGenericMethodDefinition: true } generic)
             {
-                AddGenericConstraints(generic.GetGenericArguments(), details);
+                AddGenericConstraints(generic.GetGenericArguments(), details, onIncomplete);
             }
         }
         catch (TypeLoadException)
         {
+            onIncomplete?.Invoke();
             return details;
         }
         catch (FileNotFoundException)
         {
+            onIncomplete?.Invoke();
             return details;
         }
 
@@ -140,7 +148,7 @@ internal static class ArchitecturePublicApiSignatureDetails
     // (falling back to the setter for a get-less property) is read as the one representative
     // accessor for that purpose, the same way the base signature already treats the property as one
     // declaration rather than two.
-    public static List<string> ForProperty(PropertyInfo property)
+    public static List<string> ForProperty(PropertyInfo property, Action? onIncomplete = null)
     {
         List<string> details = new();
 
@@ -154,7 +162,7 @@ internal static class ArchitecturePublicApiSignatureDetails
                 details.Add(StaticModifier);
             }
 
-            AddDispatchModifiers(details, getter ?? setter);
+            AddDispatchModifiers(details, getter ?? setter, onIncomplete);
 
             if (getter != null)
             {
@@ -163,15 +171,17 @@ internal static class ArchitecturePublicApiSignatureDetails
 
             if (setter != null)
             {
-                details.Add(AccessorToken(IsInitOnly(setter) ? "init" : "set", setter));
+                details.Add(AccessorToken(IsInitOnly(setter, onIncomplete) ? "init" : "set", setter));
             }
         }
         catch (TypeLoadException)
         {
+            onIncomplete?.Invoke();
             return details;
         }
         catch (FileNotFoundException)
         {
+            onIncomplete?.Invoke();
             return details;
         }
 
@@ -181,7 +191,7 @@ internal static class ArchitecturePublicApiSignatureDetails
     // A constant's *value* is the API: consumers inline it at compile time, so changing `1` to `2`
     // is a breaking change that leaves the declaration textually identical. Enum members reflect as
     // literal fields, so this is also what makes an enum value change detectable.
-    public static List<string> ForField(FieldInfo field, string visibility)
+    public static List<string> ForField(FieldInfo field, string visibility, Action? onIncomplete = null)
     {
         List<string> details = new();
         AddVisibility(details, visibility);
@@ -190,7 +200,7 @@ internal static class ArchitecturePublicApiSignatureDetails
         {
             if (field.IsLiteral)
             {
-                details.Add($"value:{FormatConstant(field)}");
+                details.Add($"value:{FormatConstant(field, onIncomplete)}");
                 return details;
             }
 
@@ -206,17 +216,19 @@ internal static class ArchitecturePublicApiSignatureDetails
         }
         catch (TypeLoadException)
         {
+            onIncomplete?.Invoke();
             return details;
         }
         catch (FileNotFoundException)
         {
+            onIncomplete?.Invoke();
             return details;
         }
 
         return details;
     }
 
-    public static List<string> ForEvent(EventInfo evt, string visibility)
+    public static List<string> ForEvent(EventInfo evt, string visibility, Action? onIncomplete = null)
     {
         List<string> details = new();
         AddVisibility(details, visibility);
@@ -228,14 +240,16 @@ internal static class ArchitecturePublicApiSignatureDetails
                 details.Add(StaticModifier);
             }
 
-            AddDispatchModifiers(details, evt.AddMethod);
+            AddDispatchModifiers(details, evt.AddMethod, onIncomplete);
         }
         catch (TypeLoadException)
         {
+            onIncomplete?.Invoke();
             return details;
         }
         catch (FileNotFoundException)
         {
+            onIncomplete?.Invoke();
             return details;
         }
 
@@ -258,7 +272,7 @@ internal static class ArchitecturePublicApiSignatureDetails
     // override shape is dropped by the legacy identity signature just like visibility is, so an
     // override silently becoming non-overridable (or vice versa) would otherwise be invisible —
     // this applies to property and event accessors exactly as it does to ordinary methods.
-    private static void AddDispatchModifiers(List<string> details, MethodInfo? accessor)
+    private static void AddDispatchModifiers(List<string> details, MethodInfo? accessor, Action? onIncomplete)
     {
         if (accessor == null)
         {
@@ -269,12 +283,12 @@ internal static class ArchitecturePublicApiSignatureDetails
         {
             details.Add("abstract");
         }
-        else if (accessor.IsVirtual && !IsOverride(accessor))
+        else if (accessor.IsVirtual && !IsOverride(accessor, onIncomplete))
         {
             details.Add("virtual");
         }
 
-        if (IsOverride(accessor))
+        if (IsOverride(accessor, onIncomplete))
         {
             details.Add(accessor.IsFinal ? "sealed override" : "override");
         }
@@ -313,7 +327,7 @@ internal static class ArchitecturePublicApiSignatureDetails
 
     // The base signature renders `ref`, `out`, and `in` identically as `T&`, so the direction has to
     // be carried here or an `out` turning into a `ref` would be invisible.
-    private static void AddParameterModifiers(MethodBase method, List<string> details)
+    private static void AddParameterModifiers(MethodBase method, List<string> details, Action? onIncomplete)
     {
         ParameterInfo[] parameters;
         try
@@ -322,10 +336,12 @@ internal static class ArchitecturePublicApiSignatureDetails
         }
         catch (TypeLoadException)
         {
+            onIncomplete?.Invoke();
             return;
         }
         catch (FileNotFoundException)
         {
+            onIncomplete?.Invoke();
             return;
         }
 
@@ -338,7 +354,7 @@ internal static class ArchitecturePublicApiSignatureDetails
             {
                 modifier = ByRefDirection(parameter);
             }
-            else if (IsParams(parameter))
+            else if (IsParams(parameter, onIncomplete))
             {
                 modifier = "params";
             }
@@ -360,7 +376,7 @@ internal static class ArchitecturePublicApiSignatureDetails
         return parameter.IsIn ? "in" : "ref";
     }
 
-    private static bool IsParams(ParameterInfo parameter)
+    private static bool IsParams(ParameterInfo parameter, Action? onIncomplete)
     {
         try
         {
@@ -368,31 +384,34 @@ internal static class ArchitecturePublicApiSignatureDetails
         }
         catch (TypeLoadException)
         {
+            onIncomplete?.Invoke();
             return false;
         }
         catch (FileNotFoundException)
         {
+            onIncomplete?.Invoke();
             return false;
         }
         catch (CustomAttributeFormatException)
         {
+            onIncomplete?.Invoke();
             return false;
         }
     }
 
-    private static void AddGenericConstraints(Type type, List<string> details)
+    private static void AddGenericConstraints(Type type, List<string> details, Action? onIncomplete)
     {
         if (type.IsGenericTypeDefinition)
         {
-            AddGenericConstraints(type.GetGenericArguments(), details);
+            AddGenericConstraints(type.GetGenericArguments(), details, onIncomplete);
         }
     }
 
-    private static void AddGenericConstraints(Type[] genericParameters, List<string> details)
+    private static void AddGenericConstraints(Type[] genericParameters, List<string> details, Action? onIncomplete)
     {
         for (int i = 0; i < genericParameters.Length; i++)
         {
-            List<string> constraints = DescribeConstraints(genericParameters[i]);
+            List<string> constraints = DescribeConstraints(genericParameters[i], onIncomplete);
             if (constraints.Count > 0)
             {
                 details.Add($"where{i.ToString(CultureInfo.InvariantCulture)}:{string.Join(" ", constraints)}");
@@ -400,7 +419,7 @@ internal static class ArchitecturePublicApiSignatureDetails
         }
     }
 
-    private static List<string> DescribeConstraints(Type genericParameter)
+    private static List<string> DescribeConstraints(Type genericParameter, Action? onIncomplete)
     {
         List<string> constraints = new();
 
@@ -427,7 +446,16 @@ internal static class ArchitecturePublicApiSignatureDetails
             }
 
             foreach (string constraint in genericParameter.GetGenericParameterConstraints()
-                         .Select(ArchitectureTypeNames.SafeFullName)
+                         .Select(type =>
+                         {
+                             if (ArchitectureTypeNames.TryGetFullName(type, out string fullName))
+                             {
+                                 return fullName;
+                             }
+
+                             onIncomplete?.Invoke();
+                             return string.Empty;
+                         })
                          .OrderBy(name => name, StringComparer.Ordinal))
             {
                 constraints.Add(constraint);
@@ -443,10 +471,12 @@ internal static class ArchitecturePublicApiSignatureDetails
         }
         catch (TypeLoadException)
         {
+            onIncomplete?.Invoke();
             return constraints;
         }
         catch (FileNotFoundException)
         {
+            onIncomplete?.Invoke();
             return constraints;
         }
 
@@ -455,7 +485,7 @@ internal static class ArchitecturePublicApiSignatureDetails
 
     // Culture-invariant and quoted so a snapshot captured under any locale is byte-identical and a
     // string constant's boundaries stay unambiguous.
-    private static string FormatConstant(FieldInfo field)
+    private static string FormatConstant(FieldInfo field, Action? onIncomplete)
     {
         object? value;
         try
@@ -464,18 +494,22 @@ internal static class ArchitecturePublicApiSignatureDetails
         }
         catch (TypeLoadException)
         {
+            onIncomplete?.Invoke();
             return UnavailableConstant;
         }
         catch (FileNotFoundException)
         {
+            onIncomplete?.Invoke();
             return UnavailableConstant;
         }
         catch (NotSupportedException)
         {
+            onIncomplete?.Invoke();
             return UnavailableConstant;
         }
         catch (InvalidOperationException)
         {
+            onIncomplete?.Invoke();
             return UnavailableConstant;
         }
 
@@ -538,7 +572,7 @@ internal static class ArchitecturePublicApiSignatureDetails
         return builder.Append('"').ToString();
     }
 
-    private static bool IsOverride(MethodInfo method)
+    private static bool IsOverride(MethodInfo method, Action? onIncomplete)
     {
         try
         {
@@ -546,15 +580,17 @@ internal static class ArchitecturePublicApiSignatureDetails
         }
         catch (TypeLoadException)
         {
+            onIncomplete?.Invoke();
             return false;
         }
         catch (FileNotFoundException)
         {
+            onIncomplete?.Invoke();
             return false;
         }
     }
 
-    private static bool IsInitOnly(MethodInfo setter)
+    private static bool IsInitOnly(MethodInfo setter, Action? onIncomplete)
     {
         try
         {
@@ -563,15 +599,17 @@ internal static class ArchitecturePublicApiSignatureDetails
         }
         catch (TypeLoadException)
         {
+            onIncomplete?.Invoke();
             return false;
         }
         catch (FileNotFoundException)
         {
+            onIncomplete?.Invoke();
             return false;
         }
     }
 
-    private static bool IsReadOnly(Type type)
+    private static bool IsReadOnly(Type type, Action? onIncomplete)
     {
         try
         {
@@ -580,14 +618,17 @@ internal static class ArchitecturePublicApiSignatureDetails
         }
         catch (TypeLoadException)
         {
+            onIncomplete?.Invoke();
             return false;
         }
         catch (FileNotFoundException)
         {
+            onIncomplete?.Invoke();
             return false;
         }
         catch (CustomAttributeFormatException)
         {
+            onIncomplete?.Invoke();
             return false;
         }
     }

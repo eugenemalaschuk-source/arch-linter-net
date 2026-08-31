@@ -83,4 +83,34 @@ internal static class ArchitectureTypeScanner
             yield return type;
         }
     }
+
+    // Type-counting metrics must distinguish a genuine empty assembly from a partial
+    // ReflectionTypeLoadException result. Keep the existing iterator above for validation's
+    // best-effort callers; this eager metric-only projection retains the completeness bit.
+    internal static ArchitectureLoadableTypeScan GetLoadableTypesWithCompleteness(
+        Assembly assembly,
+        CancellationToken cancellationToken)
+    {
+        Type[] types;
+        bool isComplete;
+        try
+        {
+            types = assembly.GetTypes();
+            isComplete = true;
+        }
+        catch (ReflectionTypeLoadException exception)
+        {
+            types = exception.Types.Where(type => type != null).Cast<Type>().ToArray();
+            isComplete = false;
+        }
+
+        foreach (Type type in types)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+        }
+
+        return new ArchitectureLoadableTypeScan(types, isComplete);
+    }
 }
+
+internal sealed record ArchitectureLoadableTypeScan(Type[] Types, bool IsComplete);

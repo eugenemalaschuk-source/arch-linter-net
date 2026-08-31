@@ -68,6 +68,9 @@ class ArchLinterNet.Core.Contracts.ArchitectureInheritanceClassificationMapping 
 class ArchLinterNet.Core.Contracts.ArchitectureLayer [sealed]
 class ArchLinterNet.Core.Contracts.ArchitectureLayerExclusion [sealed]
 class ArchLinterNet.Core.Contracts.ArchitectureLayerSelector [sealed]
+class ArchLinterNet.Core.Contracts.ArchitectureMetricDefinition [sealed]
+class ArchLinterNet.Core.Contracts.ArchitectureMetricKinds [static]
+class ArchLinterNet.Core.Contracts.ArchitectureMetricTargetKinds [static]
 class ArchLinterNet.Core.Contracts.ArchitectureNamespaceClassificationMapping [sealed]
 class ArchLinterNet.Core.Contracts.ArchitecturePackageGroup [sealed]
 class ArchLinterNet.Core.Contracts.ArchitecturePolicyDocumentLoader [sealed]
@@ -225,6 +228,9 @@ class ArchLinterNet.Core.Model.ArchitectureFindingReadEnvelope [sealed]
 class ArchLinterNet.Core.Model.ArchitectureFindingSourceLocation [sealed]
 class ArchLinterNet.Core.Model.ArchitectureGraphEdge [sealed]
 class ArchLinterNet.Core.Model.ArchitectureGraphNode [sealed]
+class ArchLinterNet.Core.Model.ArchitectureMetricEvidence [sealed]
+class ArchLinterNet.Core.Model.ArchitectureMetricMeasurement [sealed]
+class ArchLinterNet.Core.Model.ArchitectureMetricMeasurementOutcome [sealed]
 class ArchLinterNet.Core.Model.ArchitectureModuleNamespaceMembership [sealed]
 class ArchLinterNet.Core.Model.ArchitectureModuleNamespaceMembershipResolver [static]
 class ArchLinterNet.Core.Model.ArchitecturePolicyDiagnostic [sealed]
@@ -397,6 +403,8 @@ class ArchLinterNet.Core.Validation.ArchitectureDebtGateEvaluation [sealed]
 class ArchLinterNet.Core.Validation.ArchitectureDebtGateFormatter [static]
 class ArchLinterNet.Core.Validation.ArchitectureDebtGateOutcome [sealed]
 class ArchLinterNet.Core.Validation.ArchitectureDebtGateRequest [sealed]
+class ArchLinterNet.Core.Validation.ArchitectureMetricMeasurementApplicationService [sealed]
+class ArchLinterNet.Core.Validation.ArchitectureMetricMeasurementRequest [sealed]
 class ArchLinterNet.Core.Validation.ArchitecturePublicApiApplicationService [sealed]
 class ArchLinterNet.Core.Validation.ArchitectureValidationApplicationService [sealed]
 class ArchLinterNet.Core.Validation.ArchitectureValidationService [static]
@@ -463,6 +471,14 @@ const ArchLinterNet.Core.Caching.AnalysisCacheRejectReason.SizeExceeded: ArchLin
 const ArchLinterNet.Core.Caching.AnalysisCacheRejectReason.Truncated: ArchLinterNet.Core.Caching.AnalysisCacheRejectReason [value:3]
 const ArchLinterNet.Core.Change.ArchitectureChangeSnapshot.CurrentSchemaVersion: System.Int32 [value:2]
 const ArchLinterNet.Core.Change.ArchitectureChangeSnapshot.Kind: System.String [value:"architecture-change-snapshot"]
+const ArchLinterNet.Core.Contracts.ArchitectureMetricKinds.ComponentFootprintCount: System.String [value:"component_footprint_count"]
+const ArchLinterNet.Core.Contracts.ArchitectureMetricKinds.ExternalDependencyGroupCount: System.String [value:"external_dependency_group_count"]
+const ArchLinterNet.Core.Contracts.ArchitectureMetricKinds.IncomingComponentCount: System.String [value:"incoming_component_count"]
+const ArchLinterNet.Core.Contracts.ArchitectureMetricKinds.OutgoingComponentCount: System.String [value:"outgoing_component_count"]
+const ArchLinterNet.Core.Contracts.ArchitectureMetricKinds.PublicContractSurfaceCount: System.String [value:"public_contract_surface_count"]
+const ArchLinterNet.Core.Contracts.ArchitectureMetricKinds.TopologyTypeCount: System.String [value:"topology_type_count"]
+const ArchLinterNet.Core.Contracts.ArchitectureMetricTargetKinds.PublicApiSurface: System.String [value:"public_api_surface"]
+const ArchLinterNet.Core.Contracts.ArchitectureMetricTargetKinds.TopologyNode: System.String [value:"topology_node"]
 const ArchLinterNet.Core.Contracts.ArchitecturePolicyImportErrorCategory.CompositionConflict: ArchLinterNet.Core.Contracts.ArchitecturePolicyImportErrorCategory [value:8]
 const ArchLinterNet.Core.Contracts.ArchitecturePolicyImportErrorCategory.Cycle: ArchLinterNet.Core.Contracts.ArchitecturePolicyImportErrorCategory [value:4]
 const ArchLinterNet.Core.Contracts.ArchitecturePolicyImportErrorCategory.DuplicateImport: ArchLinterNet.Core.Contracts.ArchitecturePolicyImportErrorCategory [value:5]
@@ -734,6 +750,7 @@ ctor ArchLinterNet.Core.Contracts.ArchitectureInheritanceClassificationMapping()
 ctor ArchLinterNet.Core.Contracts.ArchitectureLayer()
 ctor ArchLinterNet.Core.Contracts.ArchitectureLayerExclusion()
 ctor ArchLinterNet.Core.Contracts.ArchitectureLayerSelector()
+ctor ArchLinterNet.Core.Contracts.ArchitectureMetricDefinition()
 ctor ArchLinterNet.Core.Contracts.ArchitectureNamespaceClassificationMapping()
 ctor ArchLinterNet.Core.Contracts.ArchitecturePackageGroup()
 ctor ArchLinterNet.Core.Contracts.ArchitecturePolicyDocumentLoader()
@@ -891,6 +908,9 @@ ctor ArchLinterNet.Core.Model.ArchitectureFindingReadEnvelope(System.Int32, Syst
 ctor ArchLinterNet.Core.Model.ArchitectureFindingSourceLocation(System.String, System.Nullable`1[System.Int32], System.Nullable`1[System.Int32])
 ctor ArchLinterNet.Core.Model.ArchitectureGraphEdge(System.String, System.String, ArchLinterNet.Core.Model.ArchitectureGraphNodeKind, ArchLinterNet.Core.Model.ArchitectureGraphNodeKind, System.Collections.Generic.IReadOnlyList`1[System.String])
 ctor ArchLinterNet.Core.Model.ArchitectureGraphNode(System.String, ArchLinterNet.Core.Model.ArchitectureGraphNodeKind)
+ctor ArchLinterNet.Core.Model.ArchitectureMetricEvidence(System.String, System.String, System.String, System.String, System.String, System.Nullable`1[System.Int32], System.Collections.Generic.IReadOnlyList`1[System.String])
+ctor ArchLinterNet.Core.Model.ArchitectureMetricMeasurement(System.String, System.String, System.String, System.String, System.String, ArchLinterNet.Core.Model.ArchitectureApplicabilityRecordState, System.Nullable`1[System.Int32], System.Collections.Generic.IReadOnlyList`1[System.String])
+ctor ArchLinterNet.Core.Model.ArchitectureMetricMeasurementOutcome(System.Collections.Generic.IReadOnlyList`1[ArchLinterNet.Core.Model.ArchitectureMetricMeasurement], ArchLinterNet.Core.Model.ArchitectureAssessmentCompletionEvidence, ArchLinterNet.Core.Model.ArchitectureApplicabilityProjection)
 ctor ArchLinterNet.Core.Model.ArchitectureModuleNamespaceMembership(System.String, System.String, System.String, System.Boolean)
 ctor ArchLinterNet.Core.Model.ArchitecturePolicyDiagnostic(ArchLinterNet.Core.Model.ArchitecturePolicyDiagnosticKind, ArchLinterNet.Core.Model.ArchitecturePolicySourceLocation, System.Collections.Generic.IReadOnlyList`1[ArchLinterNet.Core.Model.ArchitecturePolicySourceLocation], System.Collections.Generic.IReadOnlyList`1[System.String])
 ctor ArchLinterNet.Core.Model.ArchitecturePolicyErrorDiagnostic(System.String, ArchLinterNet.Core.Model.ArchitecturePolicyDiagnosticKind, System.String, System.Collections.Generic.IReadOnlyList`1[System.String])
@@ -1045,6 +1065,8 @@ ctor ArchLinterNet.Core.Validation.ArchitectureDebtGateApplicationService(ArchLi
 ctor ArchLinterNet.Core.Validation.ArchitectureDebtGateEvaluation(System.Boolean, System.String, System.Collections.Generic.IReadOnlyList`1[ArchLinterNet.Core.Model.BuildStatePreflightDiagnostic])
 ctor ArchLinterNet.Core.Validation.ArchitectureDebtGateOutcome(System.Boolean, System.Boolean, ArchLinterNet.Core.Validation.ArchitectureDebtGateEvaluation, ArchLinterNet.Core.Validation.BaselineVerifyOutcome)
 ctor ArchLinterNet.Core.Validation.ArchitectureDebtGateRequest()
+ctor ArchLinterNet.Core.Validation.ArchitectureMetricMeasurementApplicationService(ArchLinterNet.Core.Validation.Abstractions.IArchitectureValidationApplicationService)
+ctor ArchLinterNet.Core.Validation.ArchitectureMetricMeasurementRequest()
 ctor ArchLinterNet.Core.Validation.ArchitecturePublicApiApplicationService(ArchLinterNet.Core.Execution.Abstractions.IArchitectureRunnerSetupService, ArchLinterNet.Core.BuildState.IBuildStatePreparationService, ArchLinterNet.Core.Contracts.Abstractions.IPublicApiSnapshotStore)
 ctor ArchLinterNet.Core.Validation.ArchitectureValidationApplicationService(ArchLinterNet.Core.Execution.Abstractions.IArchitectureRunnerSetupService, ArchLinterNet.Core.Execution.Abstractions.IArchitectureContractHandlerRegistry, ArchLinterNet.Core.Execution.Abstractions.IArchitectureContractExecutor, ArchLinterNet.Core.BuildState.IBuildStatePreparationService)
 ctor ArchLinterNet.Core.Validation.BaselineCommentInspection(System.String, System.Collections.Generic.IReadOnlyList`1[System.Int32])
@@ -1153,6 +1175,7 @@ interface ArchLinterNet.Core.Resolution.Abstractions.IArchitectureRepositoryRoot
 interface ArchLinterNet.Core.Scanning.Abstractions.IArchitectureAsmdefScanner
 interface ArchLinterNet.Core.Validation.Abstractions.IArchitectureBaselineApplicationService
 interface ArchLinterNet.Core.Validation.Abstractions.IArchitectureDebtGateApplicationService
+interface ArchLinterNet.Core.Validation.Abstractions.IArchitectureMetricMeasurementApplicationService
 interface ArchLinterNet.Core.Validation.Abstractions.IArchitecturePolicyCheckApplicationService
 interface ArchLinterNet.Core.Validation.Abstractions.IArchitecturePublicApiApplicationService
 interface ArchLinterNet.Core.Validation.Abstractions.IArchitectureValidationApplicationService
@@ -1229,6 +1252,7 @@ method ArchLinterNet.Core.Composition.ArchitectureEngine.EvaluateDebtGate(ArchLi
 method ArchLinterNet.Core.Composition.ArchitectureEngine.Explain(ArchLinterNet.Core.Graph.ArchitectureExplainRequest): ArchLinterNet.Core.Graph.ArchitectureExplainOutcome
 method ArchLinterNet.Core.Composition.ArchitectureEngine.ExportPolicyContext(ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextRequest): ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextExport
 method ArchLinterNet.Core.Composition.ArchitectureEngine.GenerateBaseline(ArchLinterNet.Core.Validation.BaselineGenerationRequest): ArchLinterNet.Core.Validation.BaselineGenerationOutcome
+method ArchLinterNet.Core.Composition.ArchitectureEngine.Measure(ArchLinterNet.Core.Validation.ArchitectureMetricMeasurementRequest, ArchLinterNet.Core.Reporting.ValidationTiming): ArchLinterNet.Core.Model.ArchitectureMetricMeasurementOutcome
 method ArchLinterNet.Core.Composition.ArchitectureEngine.MigrateBaseline(ArchLinterNet.Core.Validation.BaselineMigrateRequest): ArchLinterNet.Core.Validation.BaselineMigrateOutcome
 method ArchLinterNet.Core.Composition.ArchitectureEngine.MigratePublicApi(ArchLinterNet.Core.Validation.PublicApiMigrateRequest): ArchLinterNet.Core.Validation.PublicApiMigrateOutcome
 method ArchLinterNet.Core.Composition.ArchitectureEngine.PruneBaseline(ArchLinterNet.Core.Validation.BaselinePruneRequest): ArchLinterNet.Core.Validation.BaselinePruneOutcome
@@ -1645,6 +1669,7 @@ method ArchLinterNet.Core.Validation.Abstractions.IArchitectureBaselineApplicati
 method ArchLinterNet.Core.Validation.Abstractions.IArchitectureBaselineApplicationService.Update(ArchLinterNet.Core.Validation.BaselineUpdateRequest): ArchLinterNet.Core.Validation.BaselineUpdateOutcome [abstract]
 method ArchLinterNet.Core.Validation.Abstractions.IArchitectureBaselineApplicationService.Verify(ArchLinterNet.Core.Validation.BaselineVerifyRequest): ArchLinterNet.Core.Validation.BaselineVerifyOutcome [abstract]
 method ArchLinterNet.Core.Validation.Abstractions.IArchitectureDebtGateApplicationService.Evaluate(ArchLinterNet.Core.Validation.ArchitectureDebtGateRequest): ArchLinterNet.Core.Validation.ArchitectureDebtGateOutcome [abstract]
+method ArchLinterNet.Core.Validation.Abstractions.IArchitectureMetricMeasurementApplicationService.Measure(ArchLinterNet.Core.Validation.ArchitectureMetricMeasurementRequest, ArchLinterNet.Core.Reporting.ValidationTiming): ArchLinterNet.Core.Model.ArchitectureMetricMeasurementOutcome [abstract]
 method ArchLinterNet.Core.Validation.Abstractions.IArchitecturePolicyCheckApplicationService.Check(System.String): ArchLinterNet.Core.Validation.PolicyCheckOutcome [abstract]
 method ArchLinterNet.Core.Validation.Abstractions.IArchitecturePublicApiApplicationService.Capture(ArchLinterNet.Core.Validation.PublicApiCaptureRequest): ArchLinterNet.Core.Validation.PublicApiCaptureOutcome [abstract]
 method ArchLinterNet.Core.Validation.Abstractions.IArchitecturePublicApiApplicationService.Diff(ArchLinterNet.Core.Validation.PublicApiDiffRequest): ArchLinterNet.Core.Validation.PublicApiDiffOutcome [abstract]
@@ -1658,6 +1683,7 @@ method ArchLinterNet.Core.Validation.AnalysisSnapshotRequest.FromValidationReque
 method ArchLinterNet.Core.Validation.ArchitectureAnalysisSnapshot.Dispose(): System.Void [virtual]
 method ArchLinterNet.Core.Validation.ArchitectureAnalysisSnapshot.Evaluate(System.String, ArchLinterNet.Core.Reporting.ValidationTiming): ArchLinterNet.Core.Validation.ValidationOutcome
 method ArchLinterNet.Core.Validation.ArchitectureAnalysisSnapshot.GetProfileInputPaths(): System.Collections.Generic.IReadOnlyList`1[System.String]
+method ArchLinterNet.Core.Validation.ArchitectureAnalysisSnapshot.Measure(System.Collections.Generic.IReadOnlyCollection`1[System.String]): ArchLinterNet.Core.Model.ArchitectureMetricMeasurementOutcome
 method ArchLinterNet.Core.Validation.ArchitectureApplicabilityEvaluator.DeriveCompletion(System.Collections.Generic.IReadOnlyCollection`1[ArchLinterNet.Core.Model.ArchitectureApplicabilityExpectedEntry], System.Collections.Generic.IReadOnlyCollection`1[ArchLinterNet.Core.Model.ArchitectureApplicabilityRecord], System.Boolean): ArchLinterNet.Core.Model.ArchitectureAssessmentCompletionEvidence [static]
 method ArchLinterNet.Core.Validation.ArchitectureApplicabilityEvaluator.Evaluate(System.Collections.Generic.IReadOnlyCollection`1[ArchLinterNet.Core.Model.ArchitectureApplicabilityExpectedEntry], System.Collections.Generic.IReadOnlyCollection`1[ArchLinterNet.Core.Model.ArchitectureApplicabilityRecord], System.Boolean): ArchLinterNet.Core.Model.ArchitectureAssessmentCompletionEvidence [static]
 method ArchLinterNet.Core.Validation.ArchitectureBaselineApplicationService.Diff(ArchLinterNet.Core.Validation.BaselineDiffRequest): ArchLinterNet.Core.Validation.BaselineDiffOutcome [virtual]
@@ -1671,6 +1697,7 @@ method ArchLinterNet.Core.Validation.ArchitectureDebtGateApplicationService.Eval
 method ArchLinterNet.Core.Validation.ArchitectureDebtGateFormatter.FormatAsHuman(ArchLinterNet.Core.Validation.ArchitectureDebtGateOutcome): System.String [static]
 method ArchLinterNet.Core.Validation.ArchitectureDebtGateFormatter.FormatAsJson(ArchLinterNet.Core.Validation.ArchitectureDebtGateOutcome): System.String [static]
 method ArchLinterNet.Core.Validation.ArchitectureDebtGateFormatter.FormatAsSarif(ArchLinterNet.Core.Validation.ArchitectureDebtGateOutcome, System.String): System.String [static]
+method ArchLinterNet.Core.Validation.ArchitectureMetricMeasurementApplicationService.Measure(ArchLinterNet.Core.Validation.ArchitectureMetricMeasurementRequest, ArchLinterNet.Core.Reporting.ValidationTiming): ArchLinterNet.Core.Model.ArchitectureMetricMeasurementOutcome [virtual]
 method ArchLinterNet.Core.Validation.ArchitecturePublicApiApplicationService.Capture(ArchLinterNet.Core.Validation.PublicApiCaptureRequest): ArchLinterNet.Core.Validation.PublicApiCaptureOutcome [virtual]
 method ArchLinterNet.Core.Validation.ArchitecturePublicApiApplicationService.Diff(ArchLinterNet.Core.Validation.PublicApiDiffRequest): ArchLinterNet.Core.Validation.PublicApiDiffOutcome [virtual]
 method ArchLinterNet.Core.Validation.ArchitecturePublicApiApplicationService.Migrate(ArchLinterNet.Core.Validation.PublicApiMigrateRequest): ArchLinterNet.Core.Validation.PublicApiMigrateOutcome [virtual]
@@ -1948,6 +1975,7 @@ property ArchLinterNet.Core.Contracts.ArchitectureContractDocument.FrameworkRefe
 property ArchLinterNet.Core.Contracts.ArchitectureContractDocument.HistoryAnalysis: ArchLinterNet.Core.Contracts.HistoryAnalysisConfiguration [get, set]
 property ArchLinterNet.Core.Contracts.ArchitectureContractDocument.Layers: System.Collections.Generic.Dictionary`2[System.String,ArchLinterNet.Core.Contracts.ArchitectureLayer] [get, set]
 property ArchLinterNet.Core.Contracts.ArchitectureContractDocument.LegacyRuntimeLayers: System.Collections.Generic.List`1[System.String] [get, set]
+property ArchLinterNet.Core.Contracts.ArchitectureContractDocument.Metrics: System.Collections.Generic.List`1[ArchLinterNet.Core.Contracts.ArchitectureMetricDefinition] [get, set]
 property ArchLinterNet.Core.Contracts.ArchitectureContractDocument.Name: System.String [get, set]
 property ArchLinterNet.Core.Contracts.ArchitectureContractDocument.Packages: System.Collections.Generic.Dictionary`2[System.String,ArchLinterNet.Core.Contracts.ArchitecturePackageGroup] [get, set]
 property ArchLinterNet.Core.Contracts.ArchitectureContractDocument.Provenance: ArchLinterNet.Core.Contracts.ArchitecturePolicyProvenanceIndex [get, set:internal]
@@ -2010,6 +2038,14 @@ property ArchLinterNet.Core.Contracts.ArchitectureLayerExclusion.NamespaceSuffix
 property ArchLinterNet.Core.Contracts.ArchitectureLayerSelector.Metadata: System.Collections.Generic.Dictionary`2[System.String,System.Object] [get, set]
 property ArchLinterNet.Core.Contracts.ArchitectureLayerSelector.Role: System.String [get, set]
 property ArchLinterNet.Core.Contracts.ArchitectureLayerSelector.When: System.String [get, set]
+property ArchLinterNet.Core.Contracts.ArchitectureMetricDefinition.Id: System.String [get, set]
+property ArchLinterNet.Core.Contracts.ArchitectureMetricDefinition.Kind: System.String [get, set]
+property ArchLinterNet.Core.Contracts.ArchitectureMetricDefinition.PublicApiSurface: System.String [get, set]
+property ArchLinterNet.Core.Contracts.ArchitectureMetricDefinition.PublicApiSurfaceContractId: System.String [get]
+property ArchLinterNet.Core.Contracts.ArchitectureMetricDefinition.TopologyNode: System.String [get, set]
+property ArchLinterNet.Core.Contracts.ArchitectureMetricDefinition.TopologyNodeId: System.String [get]
+property ArchLinterNet.Core.Contracts.ArchitectureMetricDefinition.Unit: System.String [get, set]
+property ArchLinterNet.Core.Contracts.ArchitectureMetricKinds.All: System.Collections.Generic.IReadOnlyList`1[System.String] [static, get]
 property ArchLinterNet.Core.Contracts.ArchitectureNamespaceClassificationMapping.Metadata: System.Collections.Generic.Dictionary`2[System.String,System.Object] [get, set]
 property ArchLinterNet.Core.Contracts.ArchitectureNamespaceClassificationMapping.Namespace: System.String [get, set]
 property ArchLinterNet.Core.Contracts.ArchitectureNamespaceClassificationMapping.NamespaceSuffix: System.String [get, set]
@@ -2660,6 +2696,7 @@ property ArchLinterNet.Core.Model.ArchitectureApplicabilityReason.Provenance: Ar
 property ArchLinterNet.Core.Model.ArchitectureApplicabilityRecord.ControlIdentity: System.String [get]
 property ArchLinterNet.Core.Model.ArchitectureApplicabilityRecord.EffectiveControlId: System.String [get]
 property ArchLinterNet.Core.Model.ArchitectureApplicabilityRecord.Family: System.String [get]
+property ArchLinterNet.Core.Model.ArchitectureApplicabilityRecord.MetricEvidence: ArchLinterNet.Core.Model.ArchitectureMetricEvidence [get, init]
 property ArchLinterNet.Core.Model.ArchitectureApplicabilityRecord.Provenance: ArchLinterNet.Core.Model.ArchitectureApplicabilityProvenance [get]
 property ArchLinterNet.Core.Model.ArchitectureApplicabilityRecord.Reasons: System.Collections.Generic.IReadOnlyList`1[ArchLinterNet.Core.Model.ArchitectureApplicabilityReason] [get]
 property ArchLinterNet.Core.Model.ArchitectureApplicabilityRecord.State: ArchLinterNet.Core.Model.ArchitectureApplicabilityRecordState [get]
@@ -2825,6 +2862,35 @@ property ArchLinterNet.Core.Model.ArchitectureGraphEdge.TargetId: System.String 
 property ArchLinterNet.Core.Model.ArchitectureGraphEdge.TargetKind: ArchLinterNet.Core.Model.ArchitectureGraphNodeKind [get, init]
 property ArchLinterNet.Core.Model.ArchitectureGraphNode.Id: System.String [get, init]
 property ArchLinterNet.Core.Model.ArchitectureGraphNode.Kind: ArchLinterNet.Core.Model.ArchitectureGraphNodeKind [get, init]
+property ArchLinterNet.Core.Model.ArchitectureMetricEvidence.ContributorCount: System.Nullable`1[System.Int32] [get]
+property ArchLinterNet.Core.Model.ArchitectureMetricEvidence.Contributors: System.Collections.Generic.IReadOnlyList`1[System.String] [get, init]
+property ArchLinterNet.Core.Model.ArchitectureMetricEvidence.EffectiveScope: System.String [get, init]
+property ArchLinterNet.Core.Model.ArchitectureMetricEvidence.IsComplete: System.Boolean [get]
+property ArchLinterNet.Core.Model.ArchitectureMetricEvidence.Kind: System.String [get, init]
+property ArchLinterNet.Core.Model.ArchitectureMetricEvidence.MetricId: System.String [get, init]
+property ArchLinterNet.Core.Model.ArchitectureMetricEvidence.NativeSubject: System.String [get, init]
+property ArchLinterNet.Core.Model.ArchitectureMetricEvidence.Unit: System.String [get, init]
+property ArchLinterNet.Core.Model.ArchitectureMetricEvidence.Value: System.Nullable`1[System.Int32] [get, init]
+property ArchLinterNet.Core.Model.ArchitectureMetricMeasurement.ContributorCount: System.Nullable`1[System.Int32] [get]
+property ArchLinterNet.Core.Model.ArchitectureMetricMeasurement.Contributors: System.Collections.Generic.IReadOnlyList`1[System.String] [get, init]
+property ArchLinterNet.Core.Model.ArchitectureMetricMeasurement.EffectiveScope: System.String [get, init]
+property ArchLinterNet.Core.Model.ArchitectureMetricMeasurement.Id: System.String [get, init]
+property ArchLinterNet.Core.Model.ArchitectureMetricMeasurement.IsEvaluable: System.Boolean [get]
+property ArchLinterNet.Core.Model.ArchitectureMetricMeasurement.IsUnassessable: System.Boolean [get]
+property ArchLinterNet.Core.Model.ArchitectureMetricMeasurement.Kind: System.String [get, init]
+property ArchLinterNet.Core.Model.ArchitectureMetricMeasurement.NativeSubject: System.String [get, init]
+property ArchLinterNet.Core.Model.ArchitectureMetricMeasurement.State: ArchLinterNet.Core.Model.ArchitectureApplicabilityRecordState [get, init]
+property ArchLinterNet.Core.Model.ArchitectureMetricMeasurement.Unit: System.String [get, init]
+property ArchLinterNet.Core.Model.ArchitectureMetricMeasurement.Value: System.Nullable`1[System.Int32] [get, init]
+property ArchLinterNet.Core.Model.ArchitectureMetricMeasurementOutcome.Applicability: ArchLinterNet.Core.Model.ArchitectureApplicabilityProjection [get, init]
+property ArchLinterNet.Core.Model.ArchitectureMetricMeasurementOutcome.ApplicabilityExpectedEntries: System.Collections.Generic.IReadOnlyList`1[ArchLinterNet.Core.Model.ArchitectureApplicabilityExpectedEntry] [get]
+property ArchLinterNet.Core.Model.ArchitectureMetricMeasurementOutcome.ApplicabilityProjection: ArchLinterNet.Core.Model.ArchitectureApplicabilityProjection [get]
+property ArchLinterNet.Core.Model.ArchitectureMetricMeasurementOutcome.ApplicabilityRecords: System.Collections.Generic.IReadOnlyList`1[ArchLinterNet.Core.Model.ArchitectureApplicabilityRecord] [get]
+property ArchLinterNet.Core.Model.ArchitectureMetricMeasurementOutcome.AssessmentCompletionEvidence: ArchLinterNet.Core.Model.ArchitectureAssessmentCompletionEvidence [get]
+property ArchLinterNet.Core.Model.ArchitectureMetricMeasurementOutcome.Completion: ArchLinterNet.Core.Model.ArchitectureAssessmentCompletionEvidence [get, init]
+property ArchLinterNet.Core.Model.ArchitectureMetricMeasurementOutcome.IsComplete: System.Boolean [get]
+property ArchLinterNet.Core.Model.ArchitectureMetricMeasurementOutcome.Measurements: System.Collections.Generic.IReadOnlyList`1[ArchLinterNet.Core.Model.ArchitectureMetricMeasurement] [get, init]
+property ArchLinterNet.Core.Model.ArchitectureMetricMeasurementOutcome.Results: System.Collections.Generic.IReadOnlyList`1[ArchLinterNet.Core.Model.ArchitectureMetricMeasurement] [get]
 property ArchLinterNet.Core.Model.ArchitectureModuleNamespaceMembership.Container: System.String [get, init]
 property ArchLinterNet.Core.Model.ArchitectureModuleNamespaceMembership.IsContainerRoot: System.Boolean [get, init]
 property ArchLinterNet.Core.Model.ArchitectureModuleNamespaceMembership.ModuleName: System.String [get, init]
@@ -3754,6 +3820,18 @@ property ArchLinterNet.Core.Validation.ArchitectureDebtGateRequest.RequestedConf
 property ArchLinterNet.Core.Validation.ArchitectureDebtGateRequest.RequestedPlatform: System.String [get, init]
 property ArchLinterNet.Core.Validation.ArchitectureDebtGateRequest.RequestedRuntimeIdentifier: System.String [get, init]
 property ArchLinterNet.Core.Validation.ArchitectureDebtGateRequest.RequestedTargetFramework: System.String [get, init]
+property ArchLinterNet.Core.Validation.ArchitectureMetricMeasurementRequest.CancellationToken: System.Threading.CancellationToken [get, init]
+property ArchLinterNet.Core.Validation.ArchitectureMetricMeasurementRequest.ConditionSetName: System.String [get, init]
+property ArchLinterNet.Core.Validation.ArchitectureMetricMeasurementRequest.IncludeAsmdefContracts: System.Boolean [get, init]
+property ArchLinterNet.Core.Validation.ArchitectureMetricMeasurementRequest.MaxParallelism: System.Nullable`1[System.Int32] [get, init]
+property ArchLinterNet.Core.Validation.ArchitectureMetricMeasurementRequest.MetricIds: System.Collections.Generic.IReadOnlyCollection`1[System.String] [get, init]
+property ArchLinterNet.Core.Validation.ArchitectureMetricMeasurementRequest.PolicyPath: System.String [get, init]
+property ArchLinterNet.Core.Validation.ArchitectureMetricMeasurementRequest.PreparationMode: ArchLinterNet.Core.BuildState.BuildPreparationMode [get, init]
+property ArchLinterNet.Core.Validation.ArchitectureMetricMeasurementRequest.PreprocessorSymbols: System.Collections.Generic.IReadOnlyList`1[System.String] [get, init]
+property ArchLinterNet.Core.Validation.ArchitectureMetricMeasurementRequest.RequestedConfiguration: System.String [get, init]
+property ArchLinterNet.Core.Validation.ArchitectureMetricMeasurementRequest.RequestedPlatform: System.String [get, init]
+property ArchLinterNet.Core.Validation.ArchitectureMetricMeasurementRequest.RequestedRuntimeIdentifier: System.String [get, init]
+property ArchLinterNet.Core.Validation.ArchitectureMetricMeasurementRequest.RequestedTargetFramework: System.String [get, init]
 property ArchLinterNet.Core.Validation.BaselineCommentInspection.CanRoundTrip: System.Boolean [get]
 property ArchLinterNet.Core.Validation.BaselineCommentInspection.HasHeader: System.Boolean [get]
 property ArchLinterNet.Core.Validation.BaselineCommentInspection.Header: System.String [get, init]

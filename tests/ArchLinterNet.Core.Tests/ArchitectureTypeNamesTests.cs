@@ -1,3 +1,4 @@
+using System.Reflection;
 using ArchLinterNet.Core.Scanning;
 using NUnit.Framework;
 
@@ -20,6 +21,21 @@ public sealed class ArchitectureTypeNamesTests
     }
 
     [Test]
+    public void TryGetFullName_UnavailableMetadata_ReturnsFalseWithoutChangingLegacyFallback()
+    {
+        Type unavailable = new UnavailableFullNameType();
+
+        bool resolved = ArchitectureTypeNames.TryGetFullName(unavailable, out string name);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(resolved, Is.False);
+            Assert.That(name, Is.Empty);
+            Assert.That(ArchitectureTypeNames.SafeFullName(unavailable), Is.Empty);
+        });
+    }
+
+    [Test]
     public void SafeAssemblyName_OrdinaryType_ReturnsContainingAssemblyName()
     {
         string? assemblyName = ArchitectureTypeNames.SafeAssemblyName(typeof(ArchitectureTypeNamesTests));
@@ -35,5 +51,15 @@ public sealed class ArchitectureTypeNamesTests
         string? assemblyName = ArchitectureTypeNames.SafeAssemblyName(typeof(string));
 
         Assert.That(assemblyName, Is.EqualTo(typeof(string).Assembly.GetName().Name));
+    }
+
+    private sealed class UnavailableFullNameType : TypeDelegator
+    {
+        public UnavailableFullNameType()
+            : base(typeof(string))
+        {
+        }
+
+        public override string? FullName => throw new TypeLoadException();
     }
 }

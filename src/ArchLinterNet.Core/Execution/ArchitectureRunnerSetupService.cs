@@ -292,6 +292,14 @@ public sealed class ArchitectureRunnerSetupService(
         string? mode,
         HashSet<string>? selectedContractIds)
     {
+        if (ArchitectureMetricProjectOwnership.RequiresExactArtifactBinding(document))
+        {
+            // Explicit target_assemblies still need read-only project-output evidence before a
+            // metric can turn a resolved assembly artifact into a trusted project contributor.
+            // This does not prepare a build; it only reuses the normal discovery inspection.
+            return true;
+        }
+
         if (document.Analysis.TargetAssemblies.Count > 0)
         {
             return false;
@@ -332,6 +340,7 @@ public sealed class ArchitectureRunnerSetupService(
             resolution.MissingAssemblyNames, resolution.AssemblyProbingPaths, discovery.Diagnostics, attemptedDiscovery,
             resolution.IsolatedLoadScope, resolution.SelectedAssemblyArtifactPaths)
         {
+            ResolvedAssemblyArtifactPaths = resolution.ResolvedAssemblyArtifactPaths,
             CancellationToken = cancellationToken,
             MaxParallelism = MaxParallelismResolver.Resolve(maxParallelism),
         };

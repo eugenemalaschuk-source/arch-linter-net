@@ -8,7 +8,8 @@ namespace ArchLinterNet.Core.Execution;
 // filtering continues to operate on the stored entries.
 internal sealed record ArchitecturePublicApiSurfaceMaterialization(
     IReadOnlyList<ArchitectureExportedApiEntry> Entries,
-    IReadOnlyList<Type> ExportedTypes);
+    IReadOnlyList<Type> ExportedTypes,
+    bool IsComplete);
 
 // Session-local cache for public API surfaces. Assembly identity is deliberately reference-based:
 // the resolved Assembly object, rather than a name/path that could alias a different load context,
@@ -29,9 +30,12 @@ internal sealed class ArchitecturePublicApiSurfaceIndex
             return surface;
         }
 
-        (IReadOnlyList<ArchitectureExportedApiEntry> entries, IReadOnlyList<Type> exportedTypes) =
+        (
+            IReadOnlyList<ArchitectureExportedApiEntry> entries,
+            IReadOnlyList<Type> exportedTypes,
+            bool isComplete) =
             ArchitecturePublicApiSurfaceScanner.MaterializeExportedSurface(assembly);
-        surface = new ArchitecturePublicApiSurfaceMaterialization(entries, exportedTypes);
+        surface = new ArchitecturePublicApiSurfaceMaterialization(entries, exportedTypes, isComplete);
         _surfaces.Add(assembly, surface);
         MaterializationCount++;
         return surface;

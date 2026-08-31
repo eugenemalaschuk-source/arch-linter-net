@@ -43,6 +43,10 @@ public sealed class ArchitectureContractDocument
 
     [YamlMember(Alias = "topology")] public ArchitectureTopology? Topology { get; set; }
 
+    // Optional measure-first declarations. They are deliberately separate from contracts: a
+    // metric has no threshold, baseline, or enforcement semantics.
+    [YamlMember(Alias = "metrics")] public List<ArchitectureMetricDefinition> Metrics { get; set; } = new();
+
     // Not YAML-bound (deliberately: classification.path itself stays unbound/inert, see
     // ArchitectureClassificationConfiguration) — set post-deserialization by ArchitecturePolicyDocumentLoader
     // from a raw-YAML presence check when classification.path declares at least one entry.

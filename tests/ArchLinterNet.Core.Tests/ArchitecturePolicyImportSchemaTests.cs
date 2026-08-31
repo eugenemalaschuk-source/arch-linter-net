@@ -46,7 +46,7 @@ public sealed class ArchitecturePolicyImportSchemaTests
         string[] expected =
         {
             "imports", "layers", "external_dependencies", "packages", "framework_references", "source_sets", "legacy_runtime_layers", "external_evidence",
-            "analysis", "contracts", "classification", "topology"
+            "analysis", "contracts", "classification", "topology", "metrics"
         };
 
         Assert.Multiple(() =>

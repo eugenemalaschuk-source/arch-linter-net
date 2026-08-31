@@ -37,6 +37,7 @@ public sealed partial class PolicyRawValidationSeamTests
         nameof(RawModuleContainerNodeValidator),
         nameof(RawLayerTemplateNodeValidator),
         nameof(RawTopologyNodeValidator),
+        nameof(RawMetricDefinitionValidator),
         nameof(RawWhenFieldLocationValidator),
         nameof(RawHistoryAnalysisNodeValidator),
         nameof(RawExternalEvidenceNodeValidator),
@@ -120,6 +121,18 @@ public sealed partial class PolicyRawValidationSeamTests
                 "      layerz: []\n",
             AnalysisExtra: string.Empty,
             ExpectedMessage: "Contextual contract 'tpl' declares an unknown property 'layerz' on layer template contract."),
+        new(
+            nameof(RawMetricDefinitionValidator),
+            LayerExtra: string.Empty,
+            ContractsExtra: string.Empty,
+            AnalysisExtra: string.Empty,
+            MetricsExtra:
+                "metrics:\n" +
+                "  - id: application-outgoing\n" +
+                "    kind: outgoing_component_count\n" +
+                "    topology_node: application\n" +
+                "    unexpected: value\n",
+            ExpectedMessage: "Metric definition 0 contains unknown property 'unexpected'."),
         new(
             nameof(RawWhenFieldLocationValidator),
             LayerExtra: string.Empty,
@@ -258,7 +271,7 @@ public sealed partial class PolicyRawValidationSeamTests
 
     [Test]
     public void Load_SingleRawMalformation_ReportsThatValidatorsDiagnostic(
-        [Range(0, 6)] int malformationIndex)
+        [Range(0, 7)] int malformationIndex)
     {
         RawMalformation malformation = _malformationsInPipelineOrder[malformationIndex];
         string policy = WritePolicy("architecture/dependencies.arch.yml", BuildPolicy(malformation));
@@ -273,7 +286,7 @@ public sealed partial class PolicyRawValidationSeamTests
     // winning over a later one's for a policy that is invalid in both respects.
     [Test]
     public void Load_TwoRawMalformations_ReportsTheEarlierPipelineStage(
-        [Range(0, 5)] int earlierIndex)
+        [Range(0, 6)] int earlierIndex)
     {
         RawMalformation earlier = _malformationsInPipelineOrder[earlierIndex];
         RawMalformation later = _malformationsInPipelineOrder[earlierIndex + 1];
@@ -349,7 +362,8 @@ public sealed partial class PolicyRawValidationSeamTests
             + string.Concat(malformations.Select(malformation => malformation.ContractsExtra));
         string analysis = "analysis:\n  target_assemblies: [App]\n"
             + string.Concat(malformations.Select(malformation => malformation.AnalysisExtra));
-        return $"version: 1\nname: Example\n{layers}{contracts}{analysis}";
+        string metrics = string.Concat(malformations.Select(malformation => malformation.MetricsExtra));
+        return $"version: 1\nname: Example\n{layers}{metrics}{contracts}{analysis}";
     }
 
     private string WritePolicy(string relativePath, string content)
@@ -365,5 +379,6 @@ public sealed partial class PolicyRawValidationSeamTests
         string LayerExtra,
         string ContractsExtra,
         string AnalysisExtra,
-        string ExpectedMessage);
+        string ExpectedMessage,
+        string MetricsExtra = "");
 }

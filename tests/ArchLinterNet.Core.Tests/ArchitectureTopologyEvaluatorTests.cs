@@ -315,6 +315,8 @@ public sealed class ArchitectureTopologyEvaluatorTests
                 Assert.That(record.TopologyEvidence, Is.Not.Null);
                 Assert.That(record.TopologyEvidence!.MappedSubjectCount, Is.GreaterThan(0));
                 Assert.That(record.TopologyEvidence.UnmappedSubjectCount, Is.Zero);
+                Assert.That(record.TopologyEvidence.Subjects.All(subject =>
+                    !subject.Identity.Contains("canonical_assembly=", StringComparison.Ordinal)), Is.True);
                 Assert.That(record.TopologyEvidence.Relationships.Any(relationship =>
                     relationship.SourceNode == "validation"
                     && relationship.TargetNode == "model"

@@ -10,6 +10,8 @@ global using ArchLinterNet.Cli.Commands.Explain.Application;
 global using ArchLinterNet.Cli.Commands.Explain.EntryPoint;
 global using ArchLinterNet.Cli.Commands.Graph.Application;
 global using ArchLinterNet.Cli.Commands.Graph.EntryPoint;
+global using ArchLinterNet.Cli.Commands.Measure.Application;
+global using ArchLinterNet.Cli.Commands.Measure.EntryPoint;
 global using ArchLinterNet.Cli.Commands.Policy.Application;
 global using ArchLinterNet.Cli.Commands.Policy.EntryPoint;
 global using ArchLinterNet.Cli.Commands.PublicApi.Application;

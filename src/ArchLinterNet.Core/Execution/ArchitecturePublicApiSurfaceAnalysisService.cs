@@ -67,12 +67,29 @@ internal sealed class ArchitecturePublicApiSurfaceAnalysisService
         out IReadOnlyList<string> missingAssemblies,
         out IReadOnlyList<ArchitectureViolation> selectorSafetyViolations)
     {
+        return CapturePublicApiSurface(
+            contract,
+            out missingAssemblies,
+            out selectorSafetyViolations,
+            out _);
+    }
+
+    // The metric evaluator needs this integrity bit in addition to the legacy captured entries.
+    // Validation retains the established best-effort materialization behavior and deliberately does
+    // not turn a partial exported type universe into a new validation diagnostic.
+    internal IReadOnlyList<PublicApiSnapshotEntry> CapturePublicApiSurface(
+        ArchitecturePublicApiSurfaceContract contract,
+        out IReadOnlyList<string> missingAssemblies,
+        out IReadOnlyList<ArchitectureViolation> selectorSafetyViolations,
+        out bool isComplete)
+    {
         IReadOnlyDictionary<string, Assembly> resolvedAssemblies = _session.Facts.BuildAssemblyLookup();
         Func<Type, bool>? selectorPredicate =
             PublicApiSurfaceChecker.BuildSurfaceSelectorPredicate(contract, _session.Document, _session.RoleIndex);
         Func<Assembly, ArchitecturePublicApiSurfaceMaterialization> surfaceResolver = _session.GetPublicApiSurface;
         List<PublicApiSnapshotEntry> entries = new();
         List<string> missing = new();
+        isComplete = true;
 
         foreach (string assemblyName in contract.Assemblies.Distinct(StringComparer.Ordinal)
                      .OrderBy(name => name, StringComparer.Ordinal))
@@ -84,6 +101,7 @@ internal sealed class ArchitecturePublicApiSurfaceAnalysisService
             }
 
             ArchitecturePublicApiSurfaceMaterialization surface = surfaceResolver(targetAssembly);
+            isComplete &= surface.IsComplete;
             IEnumerable<ArchitectureExportedApiEntry> exported = surface.Entries;
             if (selectorPredicate != null)
             {
