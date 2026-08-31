@@ -175,6 +175,13 @@ public sealed record ValidationOutcome
     public IReadOnlyList<ArchitectureWaiverLifecycleRecord> Waivers { get; init; } =
         Array.Empty<ArchitectureWaiverLifecycleRecord>();
 
+    /// <summary>
+    /// The canonical effective-policy control and explicit waiver-debt inventory produced for
+    /// this validation. A null value is retained for compatibility outcomes reconstructed from
+    /// cache entries written before the inventory was introduced.
+    /// </summary>
+    public ArchitecturePolicyInventory? PolicyInventory { get; init; }
+
     // Applicability is an additive, opt-in evidence boundary. Empty expected/produced
     // collections and null completion preserve behavior for policies that do not participate in
     // v0.8 applicability semantics; ordinary findings remain independent of this evidence.

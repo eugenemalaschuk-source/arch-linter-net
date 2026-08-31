@@ -428,6 +428,14 @@ public sealed partial class ArchitectureAnalysisSnapshot : IDisposable
         IReadOnlyList<ArchitectureClassificationRoleFact> classificationRoles = runner.Session.CheckClassificationRoles();
         ArchitectureClassificationPathDeferredNotice? classificationPathDeferred = runner.Session.CheckClassificationPathDeferred();
 
+        ArchitecturePolicyInventory policyInventory = ArchitecturePolicyInventoryProjector.Project(
+            _document,
+            mode,
+            waivers,
+            _requestedContractIds,
+            _includeAsmdefContracts,
+            _coverageConfig != "off");
+
         // Classification post-processing can materialize additional facts. A signal observed
         // there must win over constructing and returning an apparently complete outcome.
         cancellationToken.ThrowIfCancellationRequested();
@@ -447,6 +455,7 @@ public sealed partial class ArchitectureAnalysisSnapshot : IDisposable
             DiscoveredProjectPaths = GetDiscoveredProjectPaths(),
             SourceExpansion = _document.SourceExpansion,
             Waivers = waivers,
+            PolicyInventory = policyInventory,
             ApplicabilityExpectedEntries = execution.ApplicabilityExpectedEntries,
             ApplicabilityRecords = execution.ApplicabilityRecords,
             AssessmentCompletionEvidence = assessmentCompletion,

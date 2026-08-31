@@ -28,6 +28,11 @@ public sealed class ArchitectureValidationResult
     public IReadOnlyCollection<BaselineLifecycleEntry> BaselineLifecycleEntries { get; }
     public IReadOnlyCollection<ArchitectureSubtractiveMatcherParticipation> SubtractiveMatcherParticipation { get; }
     public IReadOnlyCollection<ArchitectureWaiverLifecycleRecord> Waivers { get; }
+    /// <summary>
+    /// The canonical effective-policy control and explicit waiver-debt inventory, when Core
+    /// produced inventory evidence for this validation outcome.
+    /// </summary>
+    public ArchitecturePolicyInventory? PolicyInventory { get; }
     public ArchitectureAssessmentCompletionEvidence? AssessmentCompletionEvidence { get; }
     /// <summary>
     /// The Core-owned applicability projection, when the policy supplied applicability evidence.
@@ -73,6 +78,7 @@ public sealed class ArchitectureValidationResult
         SubtractiveMatcherParticipation = @params.SubtractiveMatcherParticipation
             ?? Array.Empty<ArchitectureSubtractiveMatcherParticipation>();
         Waivers = @params.Waivers ?? Array.Empty<ArchitectureWaiverLifecycleRecord>();
+        PolicyInventory = @params.PolicyInventory;
         AssessmentCompletionEvidence = @params.AssessmentCompletionEvidence;
         ApplicabilityProjection = @params.ApplicabilityProjection;
         ImportedDiagnosticFindings = ImportedDiagnostics.Findings;
@@ -247,6 +253,7 @@ public sealed record ArchitectureValidationResultParams(
     public IReadOnlyCollection<BaselineLifecycleEntry>? BaselineLifecycleEntries { get; init; }
     public IReadOnlyCollection<ArchitectureSubtractiveMatcherParticipation>? SubtractiveMatcherParticipation { get; init; }
     public IReadOnlyCollection<ArchitectureWaiverLifecycleRecord>? Waivers { get; init; }
+    public ArchitecturePolicyInventory? PolicyInventory { get; init; }
     public AnalysisProfile? Profile { get; init; }
     public ArchitectureAssessmentCompletionEvidence? AssessmentCompletionEvidence { get; init; }
     public ArchitectureApplicabilityProjection? ApplicabilityProjection { get; init; }
