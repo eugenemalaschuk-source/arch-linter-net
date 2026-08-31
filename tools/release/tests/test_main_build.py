@@ -343,6 +343,8 @@ def test_version_cli_writes_github_environment_and_outputs(
     github_env = tmp_path / "github.env"
     github_output = tmp_path / "github.output"
     _write_props(props)
+    monkeypatch.setenv("GITHUB_ENV", str(github_env))
+    monkeypatch.setenv("GITHUB_OUTPUT", str(github_output))
     monkeypatch.setattr(
         sys,
         "argv",
@@ -389,6 +391,66 @@ def test_version_cli_allows_omitting_github_files(
     main_build_module.main()
 
     assert capsys.readouterr().out.strip() == "0.8.0-main.1"
+
+
+def test_version_cli_rejects_github_output_not_matching_the_runner_env_var(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    props = tmp_path / "Directory.Build.props"
+    _write_props(props)
+    monkeypatch.setenv("GITHUB_OUTPUT", str(tmp_path / "the-real-runner-file"))
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "main_build.py",
+            "version",
+            "--props",
+            str(props),
+            "--build-number",
+            "1",
+            "--github-output",
+            str(tmp_path / "attacker-controlled.txt"),
+        ],
+    )
+
+    with pytest.raises(SystemExit) as excinfo:
+        main_build_module.main()
+
+    assert excinfo.value.code == 2
+    assert "does not match the runner-provided GITHUB_OUTPUT" in capsys.readouterr().err
+
+
+def test_version_cli_rejects_github_env_when_the_runner_env_var_is_unset(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    props = tmp_path / "Directory.Build.props"
+    _write_props(props)
+    monkeypatch.delenv("GITHUB_ENV", raising=False)
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "main_build.py",
+            "version",
+            "--props",
+            str(props),
+            "--build-number",
+            "1",
+            "--github-env",
+            str(tmp_path / "github.env"),
+        ],
+    )
+
+    with pytest.raises(SystemExit) as excinfo:
+        main_build_module.main()
+
+    assert excinfo.value.code == 2
+    assert "GITHUB_ENV environment variable is not set" in capsys.readouterr().err
 
 
 def test_retention_cli_writes_plan_and_summary(
