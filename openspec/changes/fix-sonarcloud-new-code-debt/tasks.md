@@ -40,6 +40,6 @@
 
 - [x] 4.1 Run `make fmt`.
 - [x] 4.2 Run `make acceptance` (lint + all tests) and confirm it is clean.
-- [ ] 4.3 Commit the change and open a pull request.
+- [x] 4.3 Commit the change and open a pull request.
 - [ ] 4.4 Run `openspec archive fix-sonarcloud-new-code-debt` and `openspec validate --all` once the
       change is merged (or per repository OpenSpec convention for this branch).
