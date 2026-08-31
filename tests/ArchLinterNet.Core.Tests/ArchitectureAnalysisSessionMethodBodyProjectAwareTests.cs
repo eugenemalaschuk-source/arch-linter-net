@@ -56,7 +56,7 @@ public sealed class ArchitectureAnalysisSessionMethodBodyProjectAwareTests
               </PropertyGroup>
               <ItemGroup>
                 <ProjectReference Include="../Fixture.Referenced/Fixture.Referenced.csproj" />
-                <PackageReference Include="YamlDotNet" Version="16.3.0" />
+                <PackageReference Include="YamlDotNet" Version="18.1.0" />
               </ItemGroup>
             </Project>
             """);
