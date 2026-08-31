@@ -14,12 +14,15 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from _release_workspace import _safe_path
+
 _SHARD_SCHEMA = "main-quality-coverage-shard/v1"
 _INVENTORY_SCHEMA = "main-quality-coverage-inventory/v1"
 _SHA_PATTERN = re.compile(r"[0-9a-f]{40}")
 _SONAR_STATS_PATTERN = re.compile(
     r"Coverage Report Statistics: \d+ files, \d+ main files, (\d+) main files with coverage"
 )
+_GITHUB_OUTPUT_DESCRIPTION = "GitHub output file"
 
 
 @dataclass(frozen=True)
@@ -197,14 +200,17 @@ def _canonicalize_shard(arguments: argparse.Namespace) -> None:
     if arguments.shard not in _SHARDS:
         raise ValueError(f"Unknown coverage shard: {arguments.shard}")
 
-    shard_output = arguments.output_root / arguments.shard
+    coverage_root = _safe_path(arguments.coverage_root, "coverage root")
+    output_root = _safe_path(arguments.output_root, "coverage shard output root")
+
+    shard_output = output_root / arguments.shard
     if shard_output.exists():
         shutil.rmtree(shard_output)
     shard_output.mkdir(parents=True)
 
     reports: list[dict[str, Any]] = []
     for producer, report_format, filename in _expected_report_records(arguments.shard):
-        producer_root = arguments.coverage_root / producer.relative_root
+        producer_root = coverage_root / producer.relative_root
         chosen, candidate_count, size, digest = _select_canonical_report(producer_root, report_format)
         destination = shard_output / producer.id / filename
         destination.parent.mkdir(parents=True, exist_ok=True)
@@ -242,7 +248,7 @@ def _canonicalize_shard(arguments: argparse.Namespace) -> None:
 
 def _verify_shard_files(manifest_path: Path, manifest: dict[str, Any]) -> None:
     for record in manifest["reports"]:
-        path = manifest_path.parent / record["file"]
+        path = _safe_path(manifest_path.parent / record["file"], "coverage shard report")
         size, digest = _validate_report(path, record["format"])
         if size != record["size"] or digest != record["sha256"]:
             raise ValueError(f"Coverage shard report does not match its manifest: {path}")
@@ -337,7 +343,15 @@ def _validate_inventory(root: Path, inventory: dict[str, Any], expected_sha: str
 
 def _assemble(arguments: argparse.Namespace) -> None:
     _validate_sha(arguments.expected_sha)
-    manifest_paths = sorted(arguments.artifacts_root.rglob("shard-manifest.json"))
+    artifacts_root = _safe_path(arguments.artifacts_root, "coverage artifacts root")
+    output_root = _safe_path(arguments.output_root, "coverage output root")
+    github_output = (
+        _safe_path(arguments.github_output, _GITHUB_OUTPUT_DESCRIPTION)
+        if arguments.github_output is not None
+        else None
+    )
+
+    manifest_paths = sorted(artifacts_root.rglob("shard-manifest.json"))
     manifests: dict[str, tuple[Path, dict[str, Any]]] = {}
     for path in manifest_paths:
         manifest = _validate_shard_manifest(_read_json(path, "coverage shard manifest"), path)
@@ -361,16 +375,16 @@ def _assemble(arguments: argparse.Namespace) -> None:
             f"missing={missing}, unexpected={unexpected}"
         )
 
-    if arguments.output_root.exists():
-        shutil.rmtree(arguments.output_root)
-    arguments.output_root.mkdir(parents=True)
+    if output_root.exists():
+        shutil.rmtree(output_root)
+    output_root.mkdir(parents=True)
     reports: list[dict[str, Any]] = []
     for shard_id in _SHARD_IDS:
         manifest_path, manifest = manifests[shard_id]
         for record in manifest["reports"]:
-            source = manifest_path.parent / record["file"]
+            source = _safe_path(manifest_path.parent / record["file"], "canonical coverage report")
             relative = Path(shard_id) / record["file"]
-            destination = arguments.output_root / relative
+            destination = _safe_path(output_root / relative, "coverage inventory destination")
             destination.parent.mkdir(parents=True, exist_ok=True)
             shutil.copyfile(source, destination)
             reports.append(
@@ -393,10 +407,10 @@ def _assemble(arguments: argparse.Namespace) -> None:
         "observed_shards": list(_SHARD_IDS),
         "reports": reports,
     }
-    _validate_inventory(arguments.output_root, inventory, arguments.expected_sha)
-    _write_json(arguments.output_root / "coverage-inventory.json", inventory)
-    outputs = _inventory_outputs(arguments.output_root, inventory)
-    _write_github_outputs(arguments.github_output, outputs)
+    _validate_inventory(output_root, inventory, arguments.expected_sha)
+    _write_json(output_root / "coverage-inventory.json", inventory)
+    outputs = _inventory_outputs(output_root, inventory)
+    _write_github_outputs(github_output, outputs)
     print(
         "Coverage inventory complete: "
         f"shards={outputs['shard_count']}/{outputs['expected_shard_count']}, "
@@ -406,11 +420,18 @@ def _assemble(arguments: argparse.Namespace) -> None:
 
 
 def _verify_inventory_command(arguments: argparse.Namespace) -> None:
-    inventory_path = arguments.inventory_root / "coverage-inventory.json"
+    inventory_root = _safe_path(arguments.inventory_root, "coverage inventory root")
+    github_output = (
+        _safe_path(arguments.github_output, _GITHUB_OUTPUT_DESCRIPTION)
+        if arguments.github_output is not None
+        else None
+    )
+
+    inventory_path = inventory_root / "coverage-inventory.json"
     inventory = _read_json(inventory_path, "coverage inventory")
-    _validate_inventory(arguments.inventory_root, inventory, arguments.expected_sha)
-    outputs = _inventory_outputs(arguments.inventory_root, inventory)
-    _write_github_outputs(arguments.github_output, outputs)
+    _validate_inventory(inventory_root, inventory, arguments.expected_sha)
+    outputs = _inventory_outputs(inventory_root, inventory)
+    _write_github_outputs(github_output, outputs)
     print(
         "Verified canonical coverage inventory: "
         f"shards={outputs['shard_count']}/{outputs['expected_shard_count']}, "
@@ -420,17 +441,26 @@ def _verify_inventory_command(arguments: argparse.Namespace) -> None:
 
 
 def _verify_sonar(arguments: argparse.Namespace) -> None:
-    inventory_path = arguments.inventory_root / "coverage-inventory.json"
+    inventory_root = _safe_path(arguments.inventory_root, "coverage inventory root")
+    scanner_log = _safe_path(arguments.scanner_log, "Sonar scanner log")
+    analysis_json = _safe_path(arguments.analysis_json, "Sonar project analyses response")
+    github_output = (
+        _safe_path(arguments.github_output, _GITHUB_OUTPUT_DESCRIPTION)
+        if arguments.github_output is not None
+        else None
+    )
+
+    inventory_path = inventory_root / "coverage-inventory.json"
     inventory = _read_json(inventory_path, "coverage inventory")
-    _validate_inventory(arguments.inventory_root, inventory, arguments.expected_sha)
+    _validate_inventory(inventory_root, inventory, arguments.expected_sha)
     expected_reports = [
-        (arguments.inventory_root / record["path"]).as_posix()
+        (inventory_root / record["path"]).as_posix()
         for record in inventory["reports"]
         if record["format"] == "opencover"
     ]
 
     try:
-        log = arguments.scanner_log.read_text(encoding="utf-8", errors="replace")
+        log = scanner_log.read_text(encoding="utf-8", errors="replace")
     except OSError as error:
         raise ValueError(f"Cannot read Sonar scanner log: {error}") from error
     if "Could not import coverage report" in log or "doesn't contain any coverage data for the included files" in log:
@@ -448,7 +478,7 @@ def _verify_sonar(arguments: argparse.Namespace) -> None:
     if covered_main_files <= 0:
         raise ValueError("Sonar scanner did not report any covered main .NET files.")
 
-    analysis = _read_json(arguments.analysis_json, "Sonar project analyses response")
+    analysis = _read_json(analysis_json, "Sonar project analyses response")
     analyses = analysis.get("analyses")
     if not isinstance(analyses, list):
         raise ValueError("Sonar project analyses response is missing analyses.")
@@ -464,7 +494,7 @@ def _verify_sonar(arguments: argparse.Namespace) -> None:
         "coverage_import_status": f"{len(expected_reports)}/{len(expected_reports)} canonical OpenCover reports parsed",
         "covered_main_files": str(covered_main_files),
     }
-    _write_github_outputs(arguments.github_output, outputs)
+    _write_github_outputs(github_output, outputs)
     print(
         "Verified Sonar coverage import: "
         f"revision={arguments.expected_sha}, reports={len(expected_reports)}/{len(expected_reports)}, "
