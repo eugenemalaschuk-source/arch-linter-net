@@ -10,8 +10,9 @@ using NUnit.Framework;
 namespace ArchLinterNet.Core.Tests;
 
 // A real AnalysisCacheStore-serialized AnalysisCacheEntryV1 validates against the exact
-// release-matched resource returned by PackagedSchemaRegistry, including a violation carrying a
-// real MetricBudgetPayload so the schema's "$kind"/"value" envelope is exercised.
+// release-matched resource returned by PackagedSchemaRegistry, including violations carrying real
+// MetricBudgetPayload and ContractSurfaceExposurePayload values so the schema's "$kind"/"value"
+// envelope stays synchronized with the closed-set cache converter.
 [TestFixture]
 public sealed class AnalysisCacheSchemaValidationTests
 {
@@ -33,10 +34,19 @@ public sealed class AnalysisCacheSchemaValidationTests
             Payload = new MetricBudgetPayload(
                 "model-type-budget", "model-types", "topology_type_count", "model", "model", 3, "maximum", 2, _value1),
         };
+        ArchitectureViolation contractSurfaceExposureViolation = new(
+            "no-external-api-types", "R002", "MyApp.Api.PublicContract", "System.Collections.Generic.List`1",
+            ["System.Collections.Generic.List`1"])
+        {
+            Payload = new ContractSurfaceExposurePayload(
+                "MyApp.Api", "MyApp.Api.PublicContract", "member:Result", "6:member6:Result",
+                "System.Private.CoreLib", "System.Collections.Generic.List`1", "exported",
+                "member:Result", "reviewed-api", [0]),
+        };
 
         AnalysisCacheOutcomeV1 outcome = new(
             Passed: false,
-            Violations: new[] { violationWithPayload },
+            Violations: [violationWithPayload, contractSurfaceExposureViolation],
             Cycles: Array.Empty<string>(),
             CoverageFindings: Array.Empty<ArchitectureViolation>(),
             CoverageConfig: "off",

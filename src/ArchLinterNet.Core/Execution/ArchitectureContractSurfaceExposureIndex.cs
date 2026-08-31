@@ -1,3 +1,4 @@
+using System.Collections.ObjectModel;
 using System.Reflection;
 using ArchLinterNet.Core.Scanning;
 
@@ -66,6 +67,7 @@ internal sealed class ArchitectureContractSurfaceExposureIndex
         List<ArchitectureContractExposureIncompleteEvidence> incomplete = new();
         HashSet<ArchitectureContractExposure> exposureSet = new();
         HashSet<ArchitectureContractExposureIncompleteEvidence> incompleteSet = new();
+        Dictionary<ArchitectureContractExposureTarget, Type> referencedTypes = new();
         foreach (Type root in orderedRoots)
         {
             ArchitectureContractSurfaceExposureResult result = GetOrMaterialize(root, surfaceShape);
@@ -84,6 +86,11 @@ internal sealed class ArchitectureContractSurfaceExposureIndex
                     incomplete.Add(evidence);
                 }
             }
+
+            foreach ((ArchitectureContractExposureTarget target, Type type) in result.ReferencedTypes)
+            {
+                referencedTypes.TryAdd(target, type);
+            }
         }
 
         return new ArchitectureContractSurfaceExposureResult(
@@ -99,7 +106,14 @@ internal sealed class ArchitectureContractSurfaceExposureIndex
                 .ThenBy(item => item.DeclaringType.FullTypeName, StringComparer.Ordinal)
                 .ThenBy(item => item.Path.CanonicalKey, StringComparer.Ordinal)
                 .ThenBy(item => item.Reason, StringComparer.Ordinal)
-                .ToArray()));
+                .ToArray()))
+        {
+            ReferencedTypes = new ReadOnlyDictionary<ArchitectureContractExposureTarget, Type>(
+                referencedTypes
+                    .OrderBy(item => item.Key.AssemblyName, StringComparer.Ordinal)
+                    .ThenBy(item => item.Key.FullTypeName, StringComparer.Ordinal)
+                    .ToDictionary(item => item.Key, item => item.Value)),
+        };
     }
 
     private static string TypeSortKey(Type type)

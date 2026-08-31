@@ -588,6 +588,7 @@ sealed class ArchLinterNet.Core.Contracts.ArchitectureBaselineContractGroups
   property System.Collections.Generic.List<ArchLinterNet.Core.Contracts.ArchitectureBaselineContractEntry> AuditComposition {get;set;}
   property System.Collections.Generic.List<ArchLinterNet.Core.Contracts.ArchitectureBaselineContractEntry> AuditContextAllowOnly {get;set;}
   property System.Collections.Generic.List<ArchLinterNet.Core.Contracts.ArchitectureBaselineContractEntry> AuditContextDependencies {get;set;}
+  property System.Collections.Generic.List<ArchLinterNet.Core.Contracts.ArchitectureBaselineContractEntry> AuditContractSurfaceExposure {get;set;}
   property System.Collections.Generic.List<ArchLinterNet.Core.Contracts.ArchitectureBaselineContractEntry> AuditCoverage {get;set;}
   property System.Collections.Generic.List<ArchLinterNet.Core.Contracts.ArchitectureBaselineContractEntry> AuditCycles {get;set;}
   property System.Collections.Generic.List<ArchLinterNet.Core.Contracts.ArchitectureBaselineContractEntry> AuditExternal {get;set;}
@@ -619,6 +620,7 @@ sealed class ArchLinterNet.Core.Contracts.ArchitectureBaselineContractGroups
   property System.Collections.Generic.List<ArchLinterNet.Core.Contracts.ArchitectureBaselineContractEntry> StrictComposition {get;set;}
   property System.Collections.Generic.List<ArchLinterNet.Core.Contracts.ArchitectureBaselineContractEntry> StrictContextAllowOnly {get;set;}
   property System.Collections.Generic.List<ArchLinterNet.Core.Contracts.ArchitectureBaselineContractEntry> StrictContextDependencies {get;set;}
+  property System.Collections.Generic.List<ArchLinterNet.Core.Contracts.ArchitectureBaselineContractEntry> StrictContractSurfaceExposure {get;set;}
   property System.Collections.Generic.List<ArchLinterNet.Core.Contracts.ArchitectureBaselineContractEntry> StrictCoverage {get;set;}
   property System.Collections.Generic.List<ArchLinterNet.Core.Contracts.ArchitectureBaselineContractEntry> StrictCycles {get;set;}
   property System.Collections.Generic.List<ArchLinterNet.Core.Contracts.ArchitectureBaselineContractEntry> StrictExternal {get;set;}
@@ -1057,6 +1059,8 @@ sealed class ArchLinterNet.Core.Contracts.Families.ArchitectureContractGroups
   property System.Collections.Generic.List<ArchLinterNet.Core.Contracts.Families.ArchitectureContextAllowOnlyContract> StrictContextAllowOnly {get;set;}
   property System.Collections.Generic.List<ArchLinterNet.Core.Contracts.Families.ArchitectureContextDependencyContract> AuditContextDependencies {get;set;}
   property System.Collections.Generic.List<ArchLinterNet.Core.Contracts.Families.ArchitectureContextDependencyContract> StrictContextDependencies {get;set;}
+  property System.Collections.Generic.List<ArchLinterNet.Core.Contracts.Families.ArchitectureContractSurfaceExposureContract> AuditContractSurfaceExposure {get;set;}
+  property System.Collections.Generic.List<ArchLinterNet.Core.Contracts.Families.ArchitectureContractSurfaceExposureContract> StrictContractSurfaceExposure {get;set;}
   property System.Collections.Generic.List<ArchLinterNet.Core.Contracts.Families.ArchitectureCoverageContract> AuditCoverage {get;set;}
   property System.Collections.Generic.List<ArchLinterNet.Core.Contracts.Families.ArchitectureCoverageContract> StrictCoverage {get;set;}
   property System.Collections.Generic.List<ArchLinterNet.Core.Contracts.Families.ArchitectureCycleContract> AuditCycles {get;set;}
@@ -1103,6 +1107,20 @@ sealed class ArchLinterNet.Core.Contracts.Families.ArchitectureContractGroups
   property System.Collections.Generic.List<ArchLinterNet.Core.Contracts.Families.ArchitecturePublicApiSurfaceContract> StrictPublicApiSurface {get;set;}
   property System.Collections.Generic.List<ArchLinterNet.Core.Contracts.Families.ArchitectureTypePlacementContract> AuditTypePlacement {get;set;}
   property System.Collections.Generic.List<ArchLinterNet.Core.Contracts.Families.ArchitectureTypePlacementContract> StrictTypePlacement {get;set;}
+sealed class ArchLinterNet.Core.Contracts.Families.ArchitectureContractSurfaceExposureContract : ArchLinterNet.Core.Contracts.IArchitectureContract
+  ctor()
+  property ArchLinterNet.Core.Contracts.Families.ArchitectureContractSurfaceExposureSource Source {get;set;}
+  property System.Collections.Generic.List<ArchLinterNet.Core.Contracts.ArchitectureIgnoredViolation> IgnoredViolations {get;set;}
+  property System.Collections.Generic.List<ArchLinterNet.Core.Contracts.Families.ArchitecturePublicApiSurfaceSelector> Forbidden {get;set;}
+  property string Name {get;set;}
+  property string Reason {get;set;}
+  property string? Id {get;set;}
+sealed class ArchLinterNet.Core.Contracts.Families.ArchitectureContractSurfaceExposureSource
+  ctor()
+  property ArchLinterNet.Core.Contracts.Families.ArchitecturePublicApiSurfaceSelector? TypesMatching {get;set;}
+  property System.Collections.Generic.List<string> Assemblies {get;set;}
+  property System.Collections.Generic.List<string> Projects {get;set;}
+  property string? PublicApiSurface {get;set;}
 sealed class ArchLinterNet.Core.Contracts.Families.ArchitectureCoverageContract : ArchLinterNet.Core.Contracts.IArchitectureContract
   ctor()
   property System.Collections.Generic.List<ArchLinterNet.Core.Contracts.ArchitectureIgnoredViolation> IgnoredViolations {get;set;}
@@ -1958,6 +1976,8 @@ sealed class ArchLinterNet.Core.Execution.Results.ArchitectureHandlerResult : Sy
   method void Deconstruct(out System.Collections.Generic.IReadOnlyCollection<ArchLinterNet.Core.Model.ArchitectureViolation> Violations, out System.Collections.Generic.IReadOnlyCollection<string> Cycles)
   operator !=(ArchLinterNet.Core.Execution.Results.ArchitectureHandlerResult? left, ArchLinterNet.Core.Execution.Results.ArchitectureHandlerResult? right)
   operator ==(ArchLinterNet.Core.Execution.Results.ArchitectureHandlerResult? left, ArchLinterNet.Core.Execution.Results.ArchitectureHandlerResult? right)
+  property System.Collections.Generic.IReadOnlyCollection<ArchLinterNet.Core.Model.ArchitectureApplicabilityExpectedEntry> ApplicabilityExpectedEntries {get;init;}
+  property System.Collections.Generic.IReadOnlyCollection<ArchLinterNet.Core.Model.ArchitectureApplicabilityRecord> ApplicabilityRecords {get;init;}
   property System.Collections.Generic.IReadOnlyCollection<ArchLinterNet.Core.Model.ArchitectureViolation> Violations {get;init;}
   property System.Collections.Generic.IReadOnlyCollection<string> Cycles {get;init;}
 sealed class ArchLinterNet.Core.Execution.Results.ArchitectureRunnerSetup : System.IEquatable<ArchLinterNet.Core.Execution.Results.ArchitectureRunnerSetup>
@@ -2570,6 +2590,7 @@ enum ArchLinterNet.Core.Model.ArchitectureDiagnosticKind : int
   enum-member Configuration = 3
   enum-member ContextAllowOnly = 15
   enum-member ContextDependency = 14
+  enum-member ContractSurfaceExposure = 27
   enum-member Cycle = 1
   enum-member Dependency = 0
   enum-member ExternalDependency = 4
@@ -3505,6 +3526,52 @@ sealed class ArchLinterNet.Core.Model.ContextDependencyPayload : ArchLinterNet.C
   property string? MatchedSelector {get;init;}
   property string? SourceRole {get;init;}
   property string? TargetRole {get;init;}
+sealed class ArchLinterNet.Core.Model.ContractSurfaceExposureDiagnostic : ArchLinterNet.Core.Model.ArchitectureDiagnostic, System.IEquatable<ArchLinterNet.Core.Model.ContractSurfaceExposureDiagnostic>
+  ctor(string ContractName, string? ContractId, string SourceType, string ForbiddenNamespace, System.Collections.Generic.IReadOnlyCollection<string> ForbiddenReferences)
+  method ArchLinterNet.Core.Model.ContractSurfaceExposureDiagnostic <Clone>$()
+  method bool Equals(ArchLinterNet.Core.Model.ArchitectureDiagnostic? other)
+  method bool Equals(ArchLinterNet.Core.Model.ContractSurfaceExposureDiagnostic? other)
+  method bool Equals(object? obj)
+  method int GetHashCode()
+  method string ToString()
+  method void Deconstruct(out string ContractName, out string? ContractId, out string SourceType, out string ForbiddenNamespace, out System.Collections.Generic.IReadOnlyCollection<string> ForbiddenReferences)
+  operator !=(ArchLinterNet.Core.Model.ContractSurfaceExposureDiagnostic? left, ArchLinterNet.Core.Model.ContractSurfaceExposureDiagnostic? right)
+  operator ==(ArchLinterNet.Core.Model.ContractSurfaceExposureDiagnostic? left, ArchLinterNet.Core.Model.ContractSurfaceExposureDiagnostic? right)
+  property ArchLinterNet.Core.Model.ArchitectureDiagnosticKind Kind {get;}
+  property System.Collections.Generic.IReadOnlyCollection<int>? MatchingForbiddenSelectors {get;init;}
+  property System.Collections.Generic.IReadOnlyCollection<string> ForbiddenReferences {get;init;}
+  property string ForbiddenNamespace {get;init;}
+  property string SourceType {get;init;}
+  property string? CanonicalExposurePath {get;init;}
+  property string? DeclaringSourceType {get;init;}
+  property string? ExposurePath {get;init;}
+  property string? MemberOrMetadataSite {get;init;}
+  property string? ReviewedPublicApiSurface {get;init;}
+  property string? SourceAssemblyName {get;init;}
+  property string? SourceSurface {get;init;}
+  property string? TargetAssemblyName {get;init;}
+  property string? TargetTypeName {get;init;}
+sealed class ArchLinterNet.Core.Model.ContractSurfaceExposurePayload : ArchLinterNet.Core.Model.IArchitectureDiagnosticPayload, System.IEquatable<ArchLinterNet.Core.Model.ContractSurfaceExposurePayload>
+  ctor(string SourceAssemblyName, string DeclaringSourceType, string ExposurePath, string CanonicalExposurePath, string TargetAssemblyName, string TargetTypeName, string SourceSurface, string? MemberOrMetadataSite = null, string? ReviewedPublicApiSurface = null, System.Collections.Generic.IReadOnlyCollection<int>? MatchingForbiddenSelectors = null)
+  method ArchLinterNet.Core.Model.ArchitectureDiagnostic ToDiagnostic(ArchLinterNet.Core.Model.ArchitectureViolation violation)
+  method ArchLinterNet.Core.Model.ContractSurfaceExposurePayload <Clone>$()
+  method bool Equals(ArchLinterNet.Core.Model.ContractSurfaceExposurePayload? other)
+  method bool Equals(object? obj)
+  method int GetHashCode()
+  method string ToString()
+  method void Deconstruct(out string SourceAssemblyName, out string DeclaringSourceType, out string ExposurePath, out string CanonicalExposurePath, out string TargetAssemblyName, out string TargetTypeName, out string SourceSurface, out string? MemberOrMetadataSite, out string? ReviewedPublicApiSurface, out System.Collections.Generic.IReadOnlyCollection<int>? MatchingForbiddenSelectors)
+  operator !=(ArchLinterNet.Core.Model.ContractSurfaceExposurePayload? left, ArchLinterNet.Core.Model.ContractSurfaceExposurePayload? right)
+  operator ==(ArchLinterNet.Core.Model.ContractSurfaceExposurePayload? left, ArchLinterNet.Core.Model.ContractSurfaceExposurePayload? right)
+  property System.Collections.Generic.IReadOnlyCollection<int>? MatchingForbiddenSelectors {get;init;}
+  property string CanonicalExposurePath {get;init;}
+  property string DeclaringSourceType {get;init;}
+  property string ExposurePath {get;init;}
+  property string SourceAssemblyName {get;init;}
+  property string SourceSurface {get;init;}
+  property string TargetAssemblyName {get;init;}
+  property string TargetTypeName {get;init;}
+  property string? MemberOrMetadataSite {get;init;}
+  property string? ReviewedPublicApiSurface {get;init;}
 sealed class ArchLinterNet.Core.Model.CycleDiagnostic : ArchLinterNet.Core.Model.ArchitectureDiagnostic, System.IEquatable<ArchLinterNet.Core.Model.CycleDiagnostic>
   ctor(string ContractName, string? ContractId, string Path)
   method ArchLinterNet.Core.Model.CycleDiagnostic <Clone>$()

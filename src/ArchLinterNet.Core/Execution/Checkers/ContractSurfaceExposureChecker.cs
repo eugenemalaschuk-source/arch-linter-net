@@ -15,26 +15,25 @@ internal static class ContractSurfaceExposureChecker
     private const string ExportedSurface = "exported";
 
     internal static ContractSurfaceExposureEvaluationResult Evaluate(
-        ArchitectureAnalysisSession session,
-        ArchitectureContractSurfaceExposureContract contract)
+        ArchitectureCheckerContext context,
+        ArchitectureContractSurfaceExposureContract contract,
+        ArchitectureContractExecutionContext executionContext)
     {
-        ArgumentNullException.ThrowIfNull(session);
+        ArgumentNullException.ThrowIfNull(context);
         ArgumentNullException.ThrowIfNull(contract);
+        ArgumentNullException.ThrowIfNull(executionContext);
 
         ArchitectureApplicabilityProvenance provenance = new(
             Family,
             contract.Id ?? contract.Name,
-            session.Document.Name);
+            context.Document.Name);
         ArchitectureApplicabilityExpectedEntry expected = new(
             contract.Id ?? contract.Name,
             Family,
             ArchitectureApplicabilityMembership.Required,
             provenance);
 
-        ArchitectureContractExecutionContext executionContext = session.CreateExecutionContext(
-            contract, contract.IgnoredViolations);
-        RootSelection roots = ResolveRoots(session, contract);
-        Type[] targetUniverse = session.TypeIndex.AllTypes();
+        RootSelection roots = ResolveRoots(context, contract);
         List<ArchitectureApplicabilityReason> reasons = new();
 
         if (!roots.IsComplete)
@@ -51,55 +50,42 @@ internal static class ContractSurfaceExposureChecker
                 provenance));
         }
 
-        if (!session.TypeIndex.HasCompleteTypeUniverse)
+        if (!context.TypeIndex.HasCompleteTypeUniverse)
         {
             reasons.Add(Reason(ArchitectureApplicabilityReasonCodes.MissingRequiredInput, provenance));
         }
 
-        var targetMatches = new List<Type>[contract.Forbidden.Count];
-        for (int index = 0; index < contract.Forbidden.Count; index++)
+        // The analysis type index contains only first-party targets. Exposure facts also retain
+        // the actual reflected Type for every referenced target, including framework/external
+        // assemblies, so forbidden selectors operate over the complete relevant universe.
+        ArchitectureContractSurfaceExposureResult? exposure = roots.Roots.Count == 0
+            ? null
+            : context.GetContractSurfaceExposure(roots.Roots, ArchitectureContractSurfaceShape.Exported);
+        if (exposure is not null && !exposure.IsComplete)
         {
-            ArchitecturePublicApiSurfaceSelector selector = contract.Forbidden[index];
-            Type[] matches = targetUniverse
-                .Where(type => ArchitecturePublicApiSurfaceSelectorMatcher.Matches(
-                    type, selector, session.Document, contract.Name, session.RoleIndex))
-                .Distinct()
-                .OrderBy(TypeIdentity, StringComparer.Ordinal)
-                .ToArray();
-            targetMatches[index] = matches.ToList();
-            if (matches.Length == 0)
-            {
-                reasons.Add(Reason(ArchitectureApplicabilityReasonCodes.UnexpectedEmptyInput, provenance));
-            }
+            reasons.Add(Reason(ArchitectureApplicabilityReasonCodes.MissingRequiredInput, provenance));
         }
 
-        HashSet<ArchitectureContractExposureTarget> targetIdentities = targetMatches
-            .SelectMany(matches => matches)
-            .Select(TargetIdentity)
-            .ToHashSet();
+        Type[] targetUniverse = context.TypeIndex.AllTypes()
+            .Concat(exposure?.ReferencedTypes.Values ?? Enumerable.Empty<Type>())
+            .Distinct()
+            .OrderBy(TypeIdentity, StringComparer.Ordinal)
+            .ToArray();
+        IReadOnlyDictionary<ArchitectureContractExposureTarget, int[]> matchingSelectorsByTarget =
+            MatchForbiddenTargets(context, contract, targetUniverse, reasons, provenance);
 
         var violations = new List<ArchitectureViolation>();
-        if (roots.Roots.Count > 0 && targetIdentities.Count > 0)
+        if (exposure is not null && matchingSelectorsByTarget.Count > 0)
         {
-            ArchitectureContractSurfaceExposureResult exposure = session.GetContractSurfaceExposure(
-                roots.Roots, ArchitectureContractSurfaceShape.Exported);
-            if (!exposure.IsComplete)
-            {
-                reasons.Add(Reason(ArchitectureApplicabilityReasonCodes.MissingRequiredInput, provenance));
-            }
-
             foreach (ArchitectureContractExposure occurrence in exposure.Exposures)
             {
-                if (!targetIdentities.Contains(occurrence.ReferencedType))
+                if (!matchingSelectorsByTarget.TryGetValue(
+                        occurrence.ReferencedType,
+                        out int[]? matchingSelectors))
                 {
                     continue;
                 }
 
-                int[] matchingSelectors = targetMatches
-                    .Select((matches, index) => matches.Any(type =>
-                            TargetIdentity(type).Equals(occurrence.ReferencedType)) ? index : -1)
-                    .Where(index => index >= 0)
-                    .ToArray();
                 string targetReference = occurrence.ReferencedType.Identity;
                 string sourceType = occurrence.DeclaringType.FullTypeName;
                 string? sourceSite = SourceSite(occurrence.Path);
@@ -138,7 +124,6 @@ internal static class ContractSurfaceExposureChecker
             }
         }
 
-        session.CollectUnmatchedIgnores(executionContext);
         ArchitectureApplicabilityRecord record = reasons.Count == 0
             ? new ArchitectureApplicabilityRecord(
                 contract.Id ?? contract.Name,
@@ -154,8 +139,51 @@ internal static class ContractSurfaceExposureChecker
         return new ContractSurfaceExposureEvaluationResult(violations, expected, record);
     }
 
+    private static IReadOnlyDictionary<ArchitectureContractExposureTarget, int[]> MatchForbiddenTargets(
+        ArchitectureCheckerContext context,
+        ArchitectureContractSurfaceExposureContract contract,
+        IReadOnlyList<Type> targetUniverse,
+        ICollection<ArchitectureApplicabilityReason> reasons,
+        ArchitectureApplicabilityProvenance provenance)
+    {
+        var selectorIndexesByTarget = new Dictionary<ArchitectureContractExposureTarget, List<int>>();
+
+        for (int index = 0; index < contract.Forbidden.Count; index++)
+        {
+            ArchitecturePublicApiSurfaceSelector selector = contract.Forbidden[index];
+            bool matched = false;
+            foreach (Type type in targetUniverse)
+            {
+                if (!ArchitecturePublicApiSurfaceSelectorMatcher.Matches(
+                        type, selector, context.Document, contract.Name, context.RoleIndex))
+                {
+                    continue;
+                }
+
+                matched = true;
+                ArchitectureContractExposureTarget target = TargetIdentity(type);
+                if (!selectorIndexesByTarget.TryGetValue(target, out List<int>? indexes))
+                {
+                    indexes = new List<int>();
+                    selectorIndexesByTarget.Add(target, indexes);
+                }
+
+                indexes.Add(index);
+            }
+
+            if (!matched)
+            {
+                reasons.Add(Reason(ArchitectureApplicabilityReasonCodes.UnexpectedEmptyInput, provenance));
+            }
+        }
+
+        return selectorIndexesByTarget.ToDictionary(
+            item => item.Key,
+            item => item.Value.ToArray());
+    }
+
     private static RootSelection ResolveRoots(
-        ArchitectureAnalysisSession session,
+        ArchitectureCheckerContext context,
         ArchitectureContractSurfaceExposureContract contract)
     {
         ArchitectureContractSurfaceExposureSource source = contract.Source;
@@ -166,7 +194,7 @@ internal static class ContractSurfaceExposureChecker
             : null;
         HashSet<string>? projectAssemblies = null;
         bool stale = false;
-        HashSet<string> targetAssemblyNames = session.Context.TargetAssemblies
+        HashSet<string> targetAssemblyNames = context.AnalysisContext.TargetAssemblies
             .Select(assembly => assembly.GetName().Name ?? string.Empty)
             .ToHashSet(StringComparer.Ordinal);
         bool isComplete = true;
@@ -186,7 +214,7 @@ internal static class ContractSurfaceExposureChecker
         if (hasProjectFilter)
         {
             string[] requestedProjects = source.Projects.Distinct(StringComparer.Ordinal).ToArray();
-            projectAssemblies = session.Facts.ResolveProjectAssemblyNames(requestedProjects.ToList())
+            projectAssemblies = context.ResolveProjectAssemblyNames(requestedProjects.ToList())
                 .ToHashSet(StringComparer.Ordinal);
             bool hasUnknownProject = projectAssemblies.Count != requestedProjects.Length;
             bool hasNoResolvedTargetProject = !projectAssemblies.Any(targetAssemblyNames.Contains);
@@ -198,7 +226,7 @@ internal static class ContractSurfaceExposureChecker
         if (!string.IsNullOrWhiteSpace(source.PublicApiSurface))
         {
             ArchitecturePublicApiSurfaceRootResolution resolved =
-                session.CheckerContext.ResolvePublicApiSurfaceRoots(source.PublicApiSurface!);
+                context.ResolvePublicApiSurfaceRoots(source.PublicApiSurface!);
             candidates = resolved.Roots.ToList();
             isComplete &= resolved.HasContract && resolved.IsComplete;
             stale |= !resolved.HasContract;
@@ -206,7 +234,7 @@ internal static class ContractSurfaceExposureChecker
         else
         {
             candidates = new List<Type>();
-            foreach (Assembly assembly in session.Context.TargetAssemblies
+            foreach (Assembly assembly in context.AnalysisContext.TargetAssemblies
                          .Distinct()
                          .OrderBy(AssemblyIdentity, StringComparer.Ordinal))
             {
@@ -221,7 +249,7 @@ internal static class ContractSurfaceExposureChecker
                     continue;
                 }
 
-                ArchitecturePublicApiSurfaceMaterialization surface = session.GetPublicApiSurface(assembly);
+                ArchitecturePublicApiSurfaceMaterialization surface = context.GetPublicApiSurface(assembly);
                 isComplete &= surface.IsComplete;
                 candidates.AddRange(surface.ExportedTypes);
             }
@@ -250,7 +278,7 @@ internal static class ContractSurfaceExposureChecker
         {
             candidates = candidates
                 .Where(type => ArchitecturePublicApiSurfaceSelectorMatcher.Matches(
-                    type, source.TypesMatching, session.Document, contract.Name, session.RoleIndex))
+                    type, source.TypesMatching, context.Document, contract.Name, context.RoleIndex))
                 .ToList();
         }
 

@@ -4,7 +4,7 @@ using ArchLinterNet.Core.Model;
 
 namespace ArchLinterNet.Core.Caching;
 
-// Explicit closed-set converter for IArchitectureDiagnosticPayload's 19 concrete record types
+// Explicit closed-set converter for IArchitectureDiagnosticPayload's 20 concrete record types
 // (FrameworkReferenceAllowOnlyPayload, PackageDependencyPayload, FrameworkReferencePayload,
 // ConfigurationPayload, ProjectMetadataPayload, CompositionPayload, TypePlacementPayload,
 // ExternalDependencyPayload, DependencyPayload, PortBoundaryPayload, AttributeUsagePayload,
@@ -83,7 +83,7 @@ internal sealed class AnalysisCacheDiagnosticPayloadConverter : JsonConverter<IA
         writer.WriteStartObject();
         writer.WriteString(KindProperty, value.GetType().Name);
         writer.WritePropertyName(ValueProperty);
-        // value.GetType() is always one of the 19 concrete sealed record types above — never the
+        // value.GetType() is always one of the 20 concrete sealed record types above — never the
         // IArchitectureDiagnosticPayload interface itself — so this call resolves the reflection-based
         // default converter for that concrete record, not this converter again (JsonConverter<T>.CanConvert
         // only matches the exact declared T == IArchitectureDiagnosticPayload).

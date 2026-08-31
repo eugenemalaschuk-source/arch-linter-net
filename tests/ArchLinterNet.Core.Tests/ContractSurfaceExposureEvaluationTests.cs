@@ -124,6 +124,127 @@ public sealed class ContractSurfaceExposureEvaluationTests
                 .Count(), Is.GreaterThanOrEqualTo(2));
         });
     }
+
+    [Test]
+    public void Execute_FrameworkTargetOutsideAnalysisUniverse_IsReported()
+    {
+        Assembly assembly = typeof(SurfaceExposurePublicContract).Assembly;
+        string assemblyName = assembly.GetName().Name!;
+        var exposure = new ArchitectureContractSurfaceExposureContract
+        {
+            Id = "no-framework-collections",
+            Name = "no-framework-collections",
+            Source = new ArchitectureContractSurfaceExposureSource
+            {
+                Assemblies = [assemblyName],
+                TypesMatching = new ArchitecturePublicApiSurfaceSelector
+                {
+                    NameSuffix = nameof(SurfaceExposurePublicContract),
+                },
+            },
+            Forbidden =
+            [
+                new ArchitecturePublicApiSurfaceSelector
+                {
+                    Namespace = "System.Collections.Generic",
+                    NameSuffix = "List`1",
+                },
+            ],
+        };
+        var document = new ArchitectureContractDocument
+        {
+            Version = 1,
+            Name = "external-contract-surface-exposure",
+            Analysis = new ArchitectureAnalysisConfiguration { TargetAssemblies = [assemblyName] },
+            Contracts = new ArchitectureContractGroups
+            {
+                StrictContractSurfaceExposure = [exposure],
+            },
+        };
+        var runner = new ArchitectureContractRunner(
+            new ArchitectureAnalysisContext("/tmp", [assembly], Array.Empty<string>(), Array.Empty<string>()),
+            document);
+
+        ArchitectureContractExecutionResult result = new ArchitectureContractExecutor().Execute(
+            runner.Session,
+            "strict",
+            new ArchitectureContractHandlerRegistry());
+        ArchitectureViolation violation = result.Violations.First(candidate =>
+            candidate.ContractId == exposure.Id
+            && (candidate.Payload as ContractSurfaceExposurePayload)?.TargetTypeName == typeof(List<>).FullName);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(violation.ForbiddenReferences.Single(), Does.Contain(typeof(List<>).Assembly.FullName));
+            Assert.That(result.ApplicabilityRecords,
+                Has.Some.Matches<ArchitectureApplicabilityRecord>(record =>
+                    record.ControlIdentity == exposure.Id
+                    && record.State == ArchitectureApplicabilityRecordState.Evaluable));
+        });
+    }
+
+    [Test]
+    public void Execute_ReviewedPublicApiSnapshotErrorDoesNotMakeExposureUnassessable()
+    {
+        Assembly assembly = typeof(SurfaceExposurePublicContract).Assembly;
+        string assemblyName = assembly.GetName().Name!;
+        var reviewedSurface = new ArchitecturePublicApiSurfaceContract
+        {
+            Id = "reviewed-api",
+            Name = "reviewed-api",
+            Assemblies = [assemblyName],
+            SurfaceSelector = new ArchitecturePublicApiSurfaceSelector
+            {
+                NameSuffix = nameof(SurfaceExposurePublicContract),
+            },
+            ApiSnapshotError = "The reviewed snapshot is unavailable.",
+        };
+        var exposure = new ArchitectureContractSurfaceExposureContract
+        {
+            Id = "no-forbidden-contract-types",
+            Name = "no-forbidden-contract-types",
+            Source = new ArchitectureContractSurfaceExposureSource
+            {
+                PublicApiSurface = reviewedSurface.Id,
+            },
+            Forbidden =
+            [
+                new ArchitecturePublicApiSurfaceSelector
+                {
+                    NameSuffix = nameof(SurfaceExposureForbiddenType),
+                },
+            ],
+        };
+        var document = new ArchitectureContractDocument
+        {
+            Version = 1,
+            Name = "snapshot-independent-contract-surface-exposure",
+            Analysis = new ArchitectureAnalysisConfiguration { TargetAssemblies = [assemblyName] },
+            Contracts = new ArchitectureContractGroups
+            {
+                StrictPublicApiSurface = [reviewedSurface],
+                StrictContractSurfaceExposure = [exposure],
+            },
+        };
+        var runner = new ArchitectureContractRunner(
+            new ArchitectureAnalysisContext("/tmp", [assembly], Array.Empty<string>(), Array.Empty<string>()),
+            document);
+
+        ArchitectureContractExecutionResult result = new ArchitectureContractExecutor().Execute(
+            runner.Session,
+            "strict",
+            new ArchitectureContractHandlerRegistry());
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(result.Violations, Has.Some.Matches<ArchitectureViolation>(violation =>
+                violation.ContractId == exposure.Id));
+            Assert.That(result.ApplicabilityRecords,
+                Has.Some.Matches<ArchitectureApplicabilityRecord>(record =>
+                    record.ControlIdentity == exposure.Id
+                    && record.State == ArchitectureApplicabilityRecordState.Evaluable));
+        });
+    }
 }
 
 [AttributeUsage(AttributeTargets.Class)]
@@ -135,6 +256,8 @@ public sealed class SurfaceExposurePublicContract
     public SurfaceExposureForbiddenType Direct => new();
 
     public SurfaceExposureEnvelope<SurfaceExposureForbiddenType> Read() => new();
+
+    public List<string> FrameworkValues => [];
 }
 
 public sealed class SurfaceExposureEnvelope<T>;

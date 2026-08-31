@@ -58,7 +58,9 @@ internal sealed class ArchitecturePublicApiSurfaceAnalysisService
         Func<Type, bool>? selectorPredicate =
             PublicApiSurfaceChecker.BuildSurfaceSelectorPredicate(contract, _session.Document, _session.RoleIndex);
         List<Type> roots = new();
-        bool isComplete = contract.ApiSnapshotError is null;
+        // Snapshot capture/diff errors affect only the compatibility artifact lifecycle. They do
+        // not make the policy-selected exported membership unknowable to another checker.
+        bool isComplete = true;
 
         foreach (string assemblyName in contract.Assemblies
                      .Distinct(StringComparer.Ordinal)

@@ -150,6 +150,33 @@ public sealed class ContractSurfaceExposurePolicyTests
             Is.EqualTo("reviewed-api"));
     }
 
+    [Test]
+    public void Load_UnknownForbiddenLayer_FailsClosed()
+    {
+        string path = WritePolicy($"""
+            version: 1
+            name: Invalid forbidden layer
+            analysis:
+              target_assemblies: [{TestAssemblyName()}]
+            layers:
+              api:
+                namespace: ArchLinterNet.Core.Tests
+            contracts:
+              strict_contract_surface_exposure:
+                - id: exposure
+                  name: Exposure
+                  source:
+                    assemblies: [{TestAssemblyName()}]
+                  forbidden:
+                    - layer: does-not-exist
+            """);
+
+        InvalidOperationException exception = Assert.Throws<InvalidOperationException>(() =>
+            new ArchitecturePolicyDocumentLoader().Load(path))!;
+
+        Assert.That(exception.Message, Does.Contain("unknown layer 'does-not-exist' in 'forbidden[0]'"));
+    }
+
     private string WritePolicy(string yaml)
     {
         string path = Path.Combine(_tempDir, "dependencies.arch.yml");

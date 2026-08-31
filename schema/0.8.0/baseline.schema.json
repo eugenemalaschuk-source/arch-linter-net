@@ -379,6 +379,20 @@
           },
           "default": []
         },
+        "strict_contract_surface_exposure": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/baselineContractEntryV1"
+          },
+          "default": []
+        },
+        "audit_contract_surface_exposure": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/baselineContractEntryV1"
+          },
+          "default": []
+        },
         "strict_attribute_usage": {
           "type": "array",
           "items": {
@@ -749,6 +763,20 @@
           },
           "default": []
         },
+        "strict_contract_surface_exposure": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/baselineContractEntryV2"
+          },
+          "default": []
+        },
+        "audit_contract_surface_exposure": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/baselineContractEntryV2"
+          },
+          "default": []
+        },
         "strict_attribute_usage": {
           "type": "array",
           "items": {
@@ -1035,7 +1063,8 @@
             "framework",
             "api_change",
             "coverage",
-            "metric_budget"
+            "metric_budget",
+            "contract_surface_exposure"
           ],
           "description": "Denormalized, stable classification of the violation kind."
         },

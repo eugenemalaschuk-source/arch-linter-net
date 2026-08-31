@@ -35,6 +35,7 @@ internal static class ArchitecturePolicyContextContractFactsProjector
         typeof(ArchitectureAcyclicSiblingContract), typeof(ArchitectureModuleContainerContract),
         typeof(ArchitectureTypePlacementContract), typeof(ArchitectureLayoutConventionContract),
         typeof(ArchitecturePublicApiSurfaceContract), typeof(ArchitectureAttributeUsageContract),
+        typeof(ArchitectureContractSurfaceExposureContract),
         typeof(ArchitectureInheritanceContract), typeof(ArchitectureInterfaceImplementationContract),
         typeof(ArchitectureCompositionContract), typeof(ArchitectureContextDependencyContract),
         typeof(ArchitectureContextAllowOnlyContract), typeof(ArchitectureCoverageContract),
@@ -107,6 +108,13 @@ internal static class ArchitecturePolicyContextContractFactsProjector
             Values("allowed_public_constants", value.AllowedPublicConstants),
             Objects("resolved_snapshot_entries", value.ResolvedSnapshotEntries.Select(entry => ObjectFromItems("entry",
                 Text("assembly", entry.AssemblyName), Text("signature", entry.Signature)))))),
+        ArchitectureContractSurfaceExposureContract value => Create(value.Reason, value.IgnoredViolations, Facts(
+            ObjectFromItems("source",
+                Values("assemblies", value.Source.Assemblies), Values("projects", value.Source.Projects),
+                Object("types_matching", PublicApiSelectorFacts(value.Source.TypesMatching)),
+                Text("public_api_surface", value.Source.PublicApiSurface)),
+            Objects(ForbiddenFact, value.Forbidden.Select(selector =>
+                Object("selector", PublicApiSelectorFacts(selector)))))),
         ArchitectureAttributeUsageContract value => Create(value.Reason, value.IgnoredViolations, Scoped(value.Attributes, value.AttributePrefixes,
             new ScopeRestrictions(
                 new ScopeRestrictionSet(value.AllowedOnlyInLayers, value.AllowedOnlyInNamespaces, value.AllowedOnlyInProjects, value.AllowedOnlyInAssemblies),

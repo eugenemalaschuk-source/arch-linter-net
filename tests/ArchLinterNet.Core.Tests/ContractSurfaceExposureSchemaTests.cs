@@ -53,6 +53,58 @@ public sealed class ContractSurfaceExposureSchemaTests
         Assert.That(Validate(yaml, "contractSurfaceExposureContract"), Is.EqualTo(expectedValid), yaml);
     }
 
+    [Test]
+    public void VersionedArtifactSchemas_DeclareAndValidateContractSurfaceExposureArtifacts()
+    {
+        string repositoryRoot = new ArchitectureRepositoryRootResolver().Resolve();
+        string schemaDirectory = Path.Combine(repositoryRoot, "schema", "0.8.0");
+        using JsonDocument normalized = JsonDocument.Parse(File.ReadAllText(
+            Path.Combine(schemaDirectory, "normalized-finding.schema.json")));
+        using JsonDocument cache = JsonDocument.Parse(File.ReadAllText(
+            Path.Combine(schemaDirectory, "analysis-cache.schema.json")));
+        string baselineText = File.ReadAllText(Path.Combine(schemaDirectory, "baseline.schema.json"));
+        JsonSchema baseline = JsonSchema.FromText(baselineText);
+        var baselineDocument = new JsonObject
+        {
+            ["version"] = 3,
+            ["baseline"] = new JsonObject
+            {
+                ["strict_contract_surface_exposure"] = BaselineEntries("strict"),
+                ["audit_contract_surface_exposure"] = BaselineEntries("audit"),
+            },
+        };
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(normalized.RootElement.GetProperty("properties").GetProperty("kind").GetProperty("enum")
+                .EnumerateArray().Select(value => value.GetString()), Does.Contain("contract_surface_exposure"));
+            Assert.That(cache.RootElement.GetProperty("$defs").GetProperty("violation").GetProperty("properties")
+                .GetProperty("Payload").GetProperty("properties").GetProperty("$kind").GetProperty("enum")
+                .EnumerateArray().Select(value => value.GetString()), Does.Contain("ContractSurfaceExposurePayload"));
+            Assert.That(baseline.Evaluate(baselineDocument).IsValid, Is.True);
+        });
+    }
+
+    private static JsonArray BaselineEntries(string control) => new()
+    {
+        new JsonObject
+        {
+            ["id"] = $"{control}-exposure",
+            ["ignored_violations"] = new JsonArray
+            {
+                new JsonObject
+                {
+                    ["source_type"] = "Product.PublicContract",
+                    ["forbidden_reference"] = "System.Collections.Generic.List`1",
+                    ["identity_version"] = 2,
+                    ["contract_family"] = "contract_surface_exposure",
+                    ["kind"] = "contract_surface_exposure",
+                    ["occurrence"] = 0,
+                },
+            },
+        },
+    };
+
     private static JsonSchema LoadSubSchema(string definition)
     {
         using JsonDocument document = LoadSchema();

@@ -4,6 +4,7 @@ using ArchLinterNet.Core.Discovery;
 using ArchLinterNet.Core.Execution.Abstractions;
 using ArchLinterNet.Core.Execution.Checkers;
 using ArchLinterNet.Core.Execution.Results;
+using ArchLinterNet.Core.Resolution;
 
 namespace ArchLinterNet.Core.Execution;
 
@@ -341,8 +342,15 @@ internal static class ArchitectureContractFamilyRegistry
             g => g.StrictContractSurfaceExposure, g => g.AuditContractSurfaceExposure,
             (session, contract) =>
             {
+                var exposureContract = (ArchitectureContractSurfaceExposureContract)contract;
+                ArchitectureContractExecutionContext executionContext = session.CreateExecutionContext(
+                    exposureContract,
+                    exposureContract.IgnoredViolations);
                 ContractSurfaceExposureEvaluationResult result = ContractSurfaceExposureChecker.Evaluate(
-                    session, (ArchitectureContractSurfaceExposureContract)contract);
+                    session.CheckerContext,
+                    exposureContract,
+                    executionContext);
+                session.CollectUnmatchedIgnores(executionContext);
                 return ArchitectureHandlerResult.FromViolations(result.Violations) with
                 {
                     ApplicabilityExpectedEntries = new[] { result.ApplicabilityExpectedEntry },

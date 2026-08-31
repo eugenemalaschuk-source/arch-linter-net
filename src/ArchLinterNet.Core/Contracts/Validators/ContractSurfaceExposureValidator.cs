@@ -68,10 +68,10 @@ internal sealed class ContractSurfaceExposureValidator : IArchitecturePolicyDocu
 
         for (int index = 0; index < contract.Forbidden.Count; index++)
         {
-            ValidateSelector(
-                contract.Forbidden[index],
-                contract.Name,
-                $"forbidden[{index}]");
+            string fieldName = $"forbidden[{index}]";
+            ArchitecturePublicApiSurfaceSelector selector = contract.Forbidden[index];
+            ValidateSelector(selector, contract.Name, fieldName);
+            ValidateLayerReference(document, selector, contract.Name, fieldName);
         }
     }
 
