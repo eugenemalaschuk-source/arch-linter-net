@@ -61,6 +61,52 @@ public sealed class ArchitectureBaselineMergerTests
     }
 
     [Test]
+    public void Merge_MatchingContractSurfaceExposureId_AppendsIgnoresToContractSurfaceExposureContract()
+    {
+        var policy = new ArchitectureContractDocument
+        {
+            Version = 1,
+            Name = "Test",
+            Analysis = new ArchitectureAnalysisConfiguration
+            {
+                TargetAssemblies = new List<string>()
+            },
+            Contracts = new ArchitectureContractGroups
+            {
+                StrictContractSurfaceExposure = new List<ArchitectureContractSurfaceExposureContract>
+                {
+                    new() { Id = "no-internal-contract-types", Name = "no-internal-contract-types" }
+                }
+            }
+        };
+
+        var baseline = new ArchitectureBaselineDocument
+        {
+            Version = 1,
+            Baseline = new ArchitectureBaselineContractGroups
+            {
+                StrictContractSurfaceExposure = new List<ArchitectureBaselineContractEntry>
+                {
+                    new()
+                    {
+                        Id = "no-internal-contract-types",
+                        IgnoredViolations = new List<ArchitectureBaselineIgnoredViolation>
+                        {
+                            new() { SourceType = "Product.Api.OrdersContract", ForbiddenReference = "Product.Internal.OrderEntity" }
+                        }
+                    }
+                }
+            }
+        };
+
+        ArchitectureBaselineLoadingService.Merge(policy, baseline);
+
+        Assert.That(policy.Contracts.StrictContractSurfaceExposure[0].IgnoredViolations, Has.Count.EqualTo(1));
+        Assert.That(policy.Contracts.StrictContractSurfaceExposure[0].IgnoredViolations[0].SourceType,
+            Is.EqualTo("Product.Api.OrdersContract"));
+    }
+
+    [Test]
     public void MergeAndValidate_UnknownId_Throws()
     {
         var policy = new ArchitectureContractDocument

@@ -124,14 +124,12 @@ internal sealed class ContractSurfaceExposureValidator : IArchitecturePolicyDocu
 
         if (source.Assemblies is { Count: > 0 })
         {
-            foreach (string assembly in source.Assemblies)
+            string? unknownAssembly = source.Assemblies.FirstOrDefault(assembly => !targetAssemblies.Contains(assembly));
+            if (unknownAssembly is not null)
             {
-                if (!targetAssemblies.Contains(assembly))
-                {
-                    throw new InvalidOperationException(
-                        $"Contract-surface exposure contract '{contract.Name}' references source assembly '{assembly}' " +
-                        "that is not declared in 'analysis.target_assemblies'.");
-                }
+                throw new InvalidOperationException(
+                    $"Contract-surface exposure contract '{contract.Name}' references source assembly '{unknownAssembly}' " +
+                    "that is not declared in 'analysis.target_assemblies'.");
             }
         }
     }

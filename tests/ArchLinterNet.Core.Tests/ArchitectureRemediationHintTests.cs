@@ -168,6 +168,22 @@ public sealed class ArchitectureRemediationHintTests
     }
 
     [Test]
+    public void FromDiagnostic_ContractSurfaceExposureWithoutTargetTypeName_FallsBackToForbiddenNamespace()
+    {
+        var exposure = new ContractSurfaceExposureDiagnostic(
+            "no-internal-contract-types", "no-internal-contract-types", "Product.Api.OrdersContract",
+            "Product.Internal", ["Product.Internal.OrderEntity"]);
+
+        ArchitectureRemediationHint hint = ArchitectureFindingMapper.FromDiagnostic(exposure).RemediationHint!;
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(hint.Category, Is.EqualTo(ArchitectureRemediationHintCategory.ReviewContract));
+            Assert.That(hint.Evidence.Single(e => e.Kind == "target_type").Value, Is.EqualTo("Product.Internal"));
+        });
+    }
+
+    [Test]
     public void FromDiagnostic_CoverageBuildAndPolicyInput_UseFixPolicyInput()
     {
         var coverage = new DependencyDiagnostic(
