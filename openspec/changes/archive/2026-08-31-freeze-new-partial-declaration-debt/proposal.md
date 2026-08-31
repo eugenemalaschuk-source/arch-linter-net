@@ -3,8 +3,9 @@
 `production-types-have-one-source-declaration` (`architecture/policy/audit-conventions.arch.yml`)
 already detects handwritten production partial-type aggregates via `max_declarations_per_type: 1`,
 but it runs in `audit_layout_conventions`, so it never fails `make lint-architecture`. During v0.8,
-`ArchitectureDiagnosticFormatter` and other aggregates have kept growing (currently 19 declarations
-for `ArchitectureDiagnosticFormatter` alone; 19 distinct production types exceed the limit today).
+`ArchitectureDiagnosticFormatter` and other aggregates have kept growing (currently 20 declarations
+for `ArchitectureDiagnosticFormatter` alone, after #745 added one more; 19 distinct production
+types exceed the limit today).
 The active `decompose-god-classes` OpenSpec change owns removing that debt; this change only stops
 it from growing further while v0.8 work continues, without pulling that refactor forward or
 weakening the audit signal it already provides.
