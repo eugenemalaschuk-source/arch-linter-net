@@ -45,7 +45,20 @@ public sealed class AnalysisCacheSchemaValidationTests
             PolicyConsistencyFindings: Array.Empty<PolicyConsistencyDiagnostic>(),
             PolicyConsistencyConfig: "off",
             ClassificationConflicts: Array.Empty<ArchitectureClassificationConflict>(),
-            ClassificationMetadataFailures: Array.Empty<ArchitectureClassificationMetadataFailure>());
+            ClassificationMetadataFailures: Array.Empty<ArchitectureClassificationMetadataFailure>())
+        {
+            PolicyInventory = new ArchitecturePolicyInventory(
+                ArchitecturePolicyInventory.CurrentSchemaId,
+                2,
+                new ArchitecturePolicyInventoryRules(1, 0, 1),
+                new ArchitecturePolicyInventoryIgnoreDebt(1, 1, 0, 0, 0, 0),
+                [
+                    new ArchitectureWaiverLifecycleRecord(
+                        "ARCH-IGN-001", "active", "model-type-budget", "model-type-budget", "strict", "model",
+                        "MyApp.Infrastructure.Db", null, "Temporary exception", "architecture-team", "#685",
+                        new DateOnly(2026, 8, 1), new DateOnly(2026, 9, 1), new DateOnly(2026, 8, 31), true),
+                ]),
+        };
 
         AnalysisCacheEntryV1 withoutDigest = new()
         {

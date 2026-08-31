@@ -309,6 +309,7 @@ sealed class ArchLinterNet.Core.Caching.AnalysisCacheOutcomeV1 : System.IEquatab
   operator !=(ArchLinterNet.Core.Caching.AnalysisCacheOutcomeV1? left, ArchLinterNet.Core.Caching.AnalysisCacheOutcomeV1? right)
   operator ==(ArchLinterNet.Core.Caching.AnalysisCacheOutcomeV1? left, ArchLinterNet.Core.Caching.AnalysisCacheOutcomeV1? right)
   property ArchLinterNet.Core.Model.ArchitectureClassificationPathDeferredNotice? ClassificationPathDeferred {get;init;}
+  property ArchLinterNet.Core.Model.ArchitecturePolicyInventory? PolicyInventory {get;init;}
   property System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Model.ArchitectureApplicabilityExpectedEntry> ApplicabilityExpectedEntries {get;init;}
   property System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Model.ArchitectureApplicabilityRecord> ApplicabilityRecords {get;init;}
   property System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Model.ArchitectureClassificationConflict> ClassificationConflicts {get;init;}
@@ -2844,6 +2845,51 @@ sealed class ArchLinterNet.Core.Model.ArchitecturePolicyErrorDiagnostic : ArchLi
   property System.Collections.Generic.IReadOnlyList<string> ImportChain {get;init;}
   property string Message {get;init;}
   property string? ErrorCategory {get;init;}
+sealed class ArchLinterNet.Core.Model.ArchitecturePolicyInventory : System.IEquatable<ArchLinterNet.Core.Model.ArchitecturePolicyInventory>
+  ctor(string SchemaId, int EffectiveRuleCount, ArchLinterNet.Core.Model.ArchitecturePolicyInventoryRules Rules, ArchLinterNet.Core.Model.ArchitecturePolicyInventoryIgnoreDebt IgnoreDebt, System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Model.ArchitectureWaiverLifecycleRecord> Waivers)
+  field const string CurrentSchemaId = "architecture-policy-inventory/v1"
+  method ArchLinterNet.Core.Model.ArchitecturePolicyInventory <Clone>$()
+  method bool Equals(ArchLinterNet.Core.Model.ArchitecturePolicyInventory? other)
+  method bool Equals(object? obj)
+  method int GetHashCode()
+  method string ToString()
+  method void Deconstruct(out string SchemaId, out int EffectiveRuleCount, out ArchLinterNet.Core.Model.ArchitecturePolicyInventoryRules Rules, out ArchLinterNet.Core.Model.ArchitecturePolicyInventoryIgnoreDebt IgnoreDebt, out System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Model.ArchitectureWaiverLifecycleRecord> Waivers)
+  operator !=(ArchLinterNet.Core.Model.ArchitecturePolicyInventory? left, ArchLinterNet.Core.Model.ArchitecturePolicyInventory? right)
+  operator ==(ArchLinterNet.Core.Model.ArchitecturePolicyInventory? left, ArchLinterNet.Core.Model.ArchitecturePolicyInventory? right)
+  property ArchLinterNet.Core.Model.ArchitecturePolicyInventoryIgnoreDebt IgnoreDebt {get;init;}
+  property ArchLinterNet.Core.Model.ArchitecturePolicyInventoryRules Rules {get;init;}
+  property System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Model.ArchitectureWaiverLifecycleRecord> Waivers {get;init;}
+  property int EffectiveRuleCount {get;init;}
+  property string SchemaId {get;init;}
+sealed class ArchLinterNet.Core.Model.ArchitecturePolicyInventoryIgnoreDebt : System.IEquatable<ArchLinterNet.Core.Model.ArchitecturePolicyInventoryIgnoreDebt>
+  ctor(int Total, int Active, int Stale, int Expired, int MetadataIncomplete, int Invalid)
+  method ArchLinterNet.Core.Model.ArchitecturePolicyInventoryIgnoreDebt <Clone>$()
+  method bool Equals(ArchLinterNet.Core.Model.ArchitecturePolicyInventoryIgnoreDebt? other)
+  method bool Equals(object? obj)
+  method int GetHashCode()
+  method string ToString()
+  method void Deconstruct(out int Total, out int Active, out int Stale, out int Expired, out int MetadataIncomplete, out int Invalid)
+  operator !=(ArchLinterNet.Core.Model.ArchitecturePolicyInventoryIgnoreDebt? left, ArchLinterNet.Core.Model.ArchitecturePolicyInventoryIgnoreDebt? right)
+  operator ==(ArchLinterNet.Core.Model.ArchitecturePolicyInventoryIgnoreDebt? left, ArchLinterNet.Core.Model.ArchitecturePolicyInventoryIgnoreDebt? right)
+  property int Active {get;init;}
+  property int Expired {get;init;}
+  property int Invalid {get;init;}
+  property int MetadataIncomplete {get;init;}
+  property int Stale {get;init;}
+  property int Total {get;init;}
+sealed class ArchLinterNet.Core.Model.ArchitecturePolicyInventoryRules : System.IEquatable<ArchLinterNet.Core.Model.ArchitecturePolicyInventoryRules>
+  ctor(int Strict, int Audit, int Coverage)
+  method ArchLinterNet.Core.Model.ArchitecturePolicyInventoryRules <Clone>$()
+  method bool Equals(ArchLinterNet.Core.Model.ArchitecturePolicyInventoryRules? other)
+  method bool Equals(object? obj)
+  method int GetHashCode()
+  method string ToString()
+  method void Deconstruct(out int Strict, out int Audit, out int Coverage)
+  operator !=(ArchLinterNet.Core.Model.ArchitecturePolicyInventoryRules? left, ArchLinterNet.Core.Model.ArchitecturePolicyInventoryRules? right)
+  operator ==(ArchLinterNet.Core.Model.ArchitecturePolicyInventoryRules? left, ArchLinterNet.Core.Model.ArchitecturePolicyInventoryRules? right)
+  property int Audit {get;init;}
+  property int Coverage {get;init;}
+  property int Strict {get;init;}
 sealed class ArchLinterNet.Core.Model.ArchitecturePolicyLoadException : System.InvalidOperationException
   ctor(string message, object? diagnostic, string category, System.Exception? innerException = null)
   property object? Diagnostic {get;}
@@ -5224,12 +5270,14 @@ sealed class ArchLinterNet.Core.Reporting.ArchitectureDiagnosticFormatter : Arch
   ctor()
   method static System.Collections.Generic.Dictionary<string,object?> FormatNormalizedFindingForJson(ArchLinterNet.Core.Model.ArchitectureFinding finding)
   method static System.Collections.Generic.Dictionary<string,object?> FormatPolicyLocationForJson(ArchLinterNet.Core.Model.ArchitecturePolicySourceLocation location)
+  method static string AddPolicyInventoryToCiArtifacts(string ciArtifacts, ArchLinterNet.Core.Model.ArchitecturePolicyInventory? inventory)
   method static string AddWaiversToCiArtifacts(string ciArtifacts, System.Collections.Generic.IReadOnlyCollection<ArchLinterNet.Core.Model.ArchitectureWaiverLifecycleRecord> waivers)
   method static string FormatApplicabilityProjectionForHumans(ArchLinterNet.Core.Model.ArchitectureApplicabilityProjection? projection)
   method static string FormatAssessmentCompletionForHumans(ArchLinterNet.Core.Model.ArchitectureAssessmentCompletionEvidence? completion)
   method static string FormatCyclesForCiArtifacts(string contractName, string? contractId, System.Collections.Generic.IReadOnlyCollection<ArchLinterNet.Core.Model.ArchitectureCycleFinding> cycles)
   method static string FormatCyclesForHumans(System.Collections.Generic.IReadOnlyCollection<ArchLinterNet.Core.Model.ArchitectureCycleFinding> cycles)
   method static string FormatFindingsForHumans(System.Collections.Generic.IReadOnlyCollection<ArchLinterNet.Core.Model.ArchitectureFinding> findings, System.Threading.CancellationToken cancellationToken = null)
+  method static string FormatPolicyInventoryForHumans(ArchLinterNet.Core.Model.ArchitecturePolicyInventory? inventory)
   method static string FormatResultForCiArtifacts(string mode, bool passed, System.Collections.Generic.IReadOnlyCollection<ArchLinterNet.Core.Model.ArchitectureViolation> violations, System.Collections.Generic.IReadOnlyCollection<string> cycles, System.Collections.Generic.IReadOnlyCollection<ArchLinterNet.Core.Model.ArchitectureCycleFinding> cycleFindings, System.Collections.Generic.IReadOnlyCollection<ArchLinterNet.Core.Model.ArchitectureClassificationRoleFact> classificationRoles, ArchLinterNet.Core.Model.ArchitectureClassificationPathDeferredNotice? classificationPathDeferred, System.Collections.Generic.IReadOnlyCollection<ArchLinterNet.Core.Model.ArchitectureViolation>? coverageFindings = null, System.Collections.Generic.IReadOnlyCollection<ArchLinterNet.Core.Model.ArchitectureUnmatchedIgnoredViolation>? unmatched = null, System.Collections.Generic.IReadOnlyCollection<ArchLinterNet.Core.Model.PolicyConsistencyDiagnostic>? policyConsistencyFindings = null, System.Collections.Generic.IReadOnlyCollection<ArchLinterNet.Core.Reporting.ArchitectureCoverageSummary>? coverageSummaries = null, System.Collections.Generic.IReadOnlyCollection<ArchLinterNet.Core.Model.ArchitectureClassificationConflict>? classificationConflicts = null, System.Collections.Generic.IReadOnlyCollection<ArchLinterNet.Core.Model.ArchitectureClassificationMetadataFailure>? classificationMetadataFailures = null)
   method static string FormatResultForCiArtifacts(string mode, bool passed, System.Collections.Generic.IReadOnlyCollection<ArchLinterNet.Core.Model.ArchitectureViolation> violations, System.Collections.Generic.IReadOnlyCollection<string> cycles, System.Collections.Generic.IReadOnlyCollection<ArchLinterNet.Core.Model.ArchitectureCycleFinding> cycleFindings, System.Collections.Generic.IReadOnlyCollection<ArchLinterNet.Core.Model.ArchitectureClassificationRoleFact> classificationRoles, ArchLinterNet.Core.Model.ArchitectureClassificationPathDeferredNotice? classificationPathDeferred, System.Collections.Generic.IReadOnlyCollection<ArchLinterNet.Core.Model.BuildStatePreflightDiagnostic> preflightDiagnostics, ArchLinterNet.Core.Model.ArchitectureSourceExpansionInventory sourceExpansion, System.Collections.Generic.IReadOnlyCollection<ArchLinterNet.Core.Model.ArchitectureViolation>? coverageFindings = null, System.Collections.Generic.IReadOnlyCollection<ArchLinterNet.Core.Model.ArchitectureUnmatchedIgnoredViolation>? unmatched = null, System.Collections.Generic.IReadOnlyCollection<ArchLinterNet.Core.Model.PolicyConsistencyDiagnostic>? policyConsistencyFindings = null, System.Collections.Generic.IReadOnlyCollection<ArchLinterNet.Core.Reporting.ArchitectureCoverageSummary>? coverageSummaries = null, System.Collections.Generic.IReadOnlyCollection<ArchLinterNet.Core.Model.ArchitectureClassificationConflict>? classificationConflicts = null, System.Collections.Generic.IReadOnlyCollection<ArchLinterNet.Core.Model.ArchitectureClassificationMetadataFailure>? classificationMetadataFailures = null, System.Collections.Generic.IReadOnlyCollection<ArchLinterNet.Core.Model.ArchitectureSubtractiveMatcherParticipation>? subtractiveMatcherParticipation = null)
   method static string FormatResultForCiArtifacts(string mode, bool passed, System.Collections.Generic.IReadOnlyCollection<ArchLinterNet.Core.Model.ArchitectureViolation> violations, System.Collections.Generic.IReadOnlyCollection<string> cycles, System.Collections.Generic.IReadOnlyCollection<ArchLinterNet.Core.Model.ArchitectureCycleFinding> cycleFindings, System.Collections.Generic.IReadOnlyCollection<ArchLinterNet.Core.Model.ArchitectureClassificationRoleFact> classificationRoles, ArchLinterNet.Core.Model.ArchitectureClassificationPathDeferredNotice? classificationPathDeferred, System.Collections.Generic.IReadOnlyCollection<ArchLinterNet.Core.Model.BuildStatePreflightDiagnostic> preflightDiagnostics, ArchLinterNet.Core.Model.ArchitectureSourceExpansionInventory sourceExpansion, System.Collections.Generic.IReadOnlyCollection<ArchLinterNet.Core.Model.ArchitectureViolation>? coverageFindings, System.Collections.Generic.IReadOnlyCollection<ArchLinterNet.Core.Model.ArchitectureUnmatchedIgnoredViolation>? unmatched, System.Collections.Generic.IReadOnlyCollection<ArchLinterNet.Core.Model.PolicyConsistencyDiagnostic>? policyConsistencyFindings, System.Collections.Generic.IReadOnlyCollection<ArchLinterNet.Core.Reporting.ArchitectureCoverageSummary>? coverageSummaries, System.Collections.Generic.IReadOnlyCollection<ArchLinterNet.Core.Model.ArchitectureClassificationConflict>? classificationConflicts, System.Collections.Generic.IReadOnlyCollection<ArchLinterNet.Core.Model.ArchitectureClassificationMetadataFailure>? classificationMetadataFailures, System.Collections.Generic.IReadOnlyCollection<ArchLinterNet.Core.Model.ArchitectureSubtractiveMatcherParticipation>? subtractiveMatcherParticipation, System.Threading.CancellationToken cancellationToken)
@@ -6065,6 +6113,7 @@ sealed class ArchLinterNet.Core.Validation.ValidationOutcome : System.IEquatable
   property ArchLinterNet.Core.Model.ArchitectureApplicabilityProjection? ApplicabilityProjection {get;init;}
   property ArchLinterNet.Core.Model.ArchitectureAssessmentCompletionEvidence? AssessmentCompletionEvidence {get;init;}
   property ArchLinterNet.Core.Model.ArchitectureClassificationPathDeferredNotice? ClassificationPathDeferred {get;init;}
+  property ArchLinterNet.Core.Model.ArchitecturePolicyInventory? PolicyInventory {get;init;}
   property ArchLinterNet.Core.Model.ArchitectureSourceExpansionInventory SourceExpansion {get;init;}
   property ArchLinterNet.Core.Model.ImportedExternalDiagnosticProjection ImportedDiagnostics {get;private init;}
   property System.Collections.Generic.IReadOnlyCollection<ArchLinterNet.Core.Model.ArchitectureClassificationConflict> ClassificationConflicts {get;init;}

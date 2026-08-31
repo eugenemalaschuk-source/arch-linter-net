@@ -669,6 +669,9 @@ internal sealed partial class ReportCoordinator
         AppendSection(sb, outcome.UnmatchedIgnoredViolations.Count > 0 && outcome.UnmatchedIgnoredViolationsConfig != "off",
             () => _runtime.FormatUnmatchedForHumans(outcome.UnmatchedIgnoredViolations));
         cancellationToken.ThrowIfCancellationRequested();
+        AppendSection(sb, outcome.PolicyInventory is not null,
+            () => ArchitectureDiagnosticFormatter.FormatPolicyInventoryForHumans(outcome.PolicyInventory));
+        cancellationToken.ThrowIfCancellationRequested();
         AppendSection(sb, outcome.Waivers.Count > 0,
             () => _runtime.FormatWaiversForHumans(outcome.Waivers));
         cancellationToken.ThrowIfCancellationRequested();

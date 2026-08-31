@@ -27,9 +27,7 @@ internal static class ArchitectureWaiverLifecycleEvaluator
         ArgumentNullException.ThrowIfNull(unmatched);
 
         ArchitectureContractDescriptor[] descriptors = ArchitectureContractCatalog.Build(document).Descriptors
-            .Where(item => item.Mode == mode
-                && (selectedContractIds is not { Count: > 0 }
-                    || selectedContractIds.Contains(item.Id ?? item.Name, StringComparer.OrdinalIgnoreCase)))
+            .Where(item => item.Mode == mode && IsSelected(item, selectedContractIds))
             .ToArray();
         var declarations = new Dictionary<ArchitectureIgnoredViolation, List<WaiverOccurrence>>(
             ReferenceEqualityComparer.Instance);
@@ -73,9 +71,41 @@ internal static class ArchitectureWaiverLifecycleEvaluator
     internal static bool HasManualWaivers(ArchitectureContractDocument document)
     {
         ArgumentNullException.ThrowIfNull(document);
-        return document.Contracts.AllStrict.Concat(document.Contracts.AllAudit)
-            .SelectMany(GetIgnoredViolations)
-            .Any(ignore => !ignore.IsBaselineImported);
+        return GetModesWithSelectedManualWaivers(document).Count > 0;
+    }
+
+    internal static IReadOnlyList<string> GetModesWithSelectedManualWaivers(
+        ArchitectureContractDocument document,
+        IReadOnlyCollection<string>? selectedContractIds = null)
+    {
+        ArgumentNullException.ThrowIfNull(document);
+
+        HashSet<string> modes = new(StringComparer.Ordinal);
+        foreach (ArchitectureContractDescriptor descriptor in ArchitectureContractCatalog.Build(document).Descriptors)
+        {
+            if (IsSelected(descriptor, selectedContractIds)
+                && GetIgnoredViolations(descriptor.Contract).Any(ignore => !ignore.IsBaselineImported))
+            {
+                modes.Add(descriptor.Mode);
+            }
+        }
+
+        return [.. modes.OrderBy(mode => mode == "strict" ? 0 : 1)];
+    }
+
+    private static bool IsSelected(
+        ArchitectureContractDescriptor descriptor,
+        IReadOnlyCollection<string>? selectedContractIds)
+    {
+        if (selectedContractIds is not { Count: > 0 })
+        {
+            return true;
+        }
+
+        return (descriptor.Id is not null
+                && selectedContractIds.Contains(descriptor.Id, StringComparer.OrdinalIgnoreCase))
+            || (descriptor.AuthoredId is not null
+                && selectedContractIds.Contains(descriptor.AuthoredId, StringComparer.OrdinalIgnoreCase));
     }
 
     private static bool IsUnmatched(

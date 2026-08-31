@@ -210,6 +210,21 @@ public static class AnalysisCachePopulation
             workProvenance ?? new AnalysisCacheWorkProvenanceV1(0, 0, 0, 0, 0)));
     }
 
+    // Policy-inventory completion can replace an immutable outcome after its cache authorization
+    // was captured. Preserve the opaque authorization across that value-record replacement rather
+    // than treating an otherwise cache-eligible completed mode as a skipped population.
+    internal static void TransferAuthorization(ValidationOutcome source, ValidationOutcome destination)
+    {
+        ArgumentNullException.ThrowIfNull(source);
+        ArgumentNullException.ThrowIfNull(destination);
+
+        if (_authorizations.TryGetValue(source, out CompletedAuthorization? authorization))
+        {
+            _authorizations.Remove(destination);
+            _authorizations.Add(destination, authorization);
+        }
+    }
+
     // Called by CLI and Testing hosts after a completed snapshot Evaluate. The opaque prepared
     // authorization is snapshot-owned transient state; consumers cannot manufacture a
     // post-analysis authorization from changed files.

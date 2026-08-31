@@ -50,6 +50,7 @@ public static class AnalysisCacheOutcomeMapper
             outcome.ApplicabilityRecords.ToArray())
         {
             Waivers = outcome.Waivers.ToArray(),
+            PolicyInventory = outcome.PolicyInventory,
         };
     }
 
@@ -105,6 +106,7 @@ public static class AnalysisCacheOutcomeMapper
             ApplicabilityRecords = cached.ApplicabilityRecords.ToArray(),
             AssessmentCompletionEvidence = completion,
             Waivers = cached.Waivers.ToArray(),
+            PolicyInventory = cached.PolicyInventory,
             ApplicabilityProjection = completion is null
                 ? null
                 : ArchitectureApplicabilityProjector.Project(completion, mode),

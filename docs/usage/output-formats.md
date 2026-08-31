@@ -213,13 +213,14 @@ measurement serializes `value`, `contributor_count`, `contributors`, and
 universe. It does not contain
 healthy metric values as violations or SARIF findings.
 
-Current JSON output is a single top-level object with these arrays:
+Current JSON output is a single top-level object with these result fields:
 
 - `violations`
 - `cycles`
 - `coverage_findings`
 - `unmatched_ignored_violations`
 - `waivers`
+- `policy_inventory`
 - `policy_consistency_findings`
 - `coverage_summary`
 
@@ -229,6 +230,22 @@ lifecycle dates, the single `evaluation_date` used for the run, matching status,
 and policy provenance. Structured waivers are `active`, `stale`, or `expired`;
 legacy compatibility entries are `metadata_incomplete`. Invalid metadata fails
 policy loading instead of producing a potentially trusted record.
+
+`policy_inventory` is present when Core produced effective-policy inventory
+evidence for the validation result. It is the canonical
+`architecture-policy-inventory/v1` projection: `effective_rule_count` counts
+configured effective controls once (rather than findings, YAML lines, or
+source-set aliases). It is repository-level for the selected effective policy,
+so its strict, audit, and coverage `rules` partition is the same whether the
+current run evaluates strict or audit findings. Its `ignore_debt` and
+`waivers` use that same selected repository scope, retaining each configured
+manual waiver lifecycle record once. The mode-local `waivers` result outside
+`policy_inventory` remains the evidence used for that mode's validation gate.
+Inventory waiver records retain canonical lifecycle IDs, state, target,
+remediation metadata, and portable provenance for drill-down.
+Baseline finding debt, ordinary findings, and intended scope exclusions are not
+waiver debt. Consumers must preserve a missing `policy_inventory` as missing
+evidence rather than interpreting it as zero rules or zero waivers.
 
 Example shape:
 
@@ -255,6 +272,20 @@ Example shape:
     }
   ],
   "unmatched_ignored_violations": [],
+  "policy_inventory": {
+    "schema": "architecture-policy-inventory/v1",
+    "effective_rule_count": 42,
+    "rules": { "strict": 31, "audit": 7, "coverage": 4 },
+    "ignore_debt": {
+      "total": 7,
+      "active": 5,
+      "stale": 1,
+      "expired": 1,
+      "metadata_incomplete": 0,
+      "invalid": 0
+    },
+    "waivers": []
+  },
   "waivers": [
     {
       "id": "ARCH-IGN-042",

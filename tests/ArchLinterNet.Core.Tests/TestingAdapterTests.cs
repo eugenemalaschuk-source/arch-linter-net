@@ -460,6 +460,9 @@ contracts:
             Assert.That(result.Waivers.Single().State, Is.EqualTo("expired"));
             Assert.That(result.Waivers.Single().EvaluationDate, Is.EqualTo(new DateOnly(2026, 8, 2)));
             Assert.That(result.Waivers.Single().MatchesGovernedFinding, Is.True);
+            Assert.That(result.PolicyInventory, Is.Not.Null);
+            Assert.That(result.PolicyInventory!.IgnoreDebt.Expired, Is.EqualTo(1));
+            Assert.That(result.PolicyInventory.IgnoreDebt.Total, Is.EqualTo(1));
             Assert.That(() => result.ShouldPass(), Throws.InvalidOperationException.With.Message.Contain("[expired] ARCH-IGN-001"));
         });
     }

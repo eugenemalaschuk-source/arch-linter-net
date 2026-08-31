@@ -238,6 +238,9 @@ class ArchLinterNet.Core.Model.ArchitectureModuleNamespaceMembership [sealed]
 class ArchLinterNet.Core.Model.ArchitectureModuleNamespaceMembershipResolver [static]
 class ArchLinterNet.Core.Model.ArchitecturePolicyDiagnostic [sealed]
 class ArchLinterNet.Core.Model.ArchitecturePolicyErrorDiagnostic [sealed]
+class ArchLinterNet.Core.Model.ArchitecturePolicyInventory [sealed]
+class ArchLinterNet.Core.Model.ArchitecturePolicyInventoryIgnoreDebt [sealed]
+class ArchLinterNet.Core.Model.ArchitecturePolicyInventoryRules [sealed]
 class ArchLinterNet.Core.Model.ArchitecturePolicyLoadException [sealed]
 class ArchLinterNet.Core.Model.ArchitecturePolicySourceDescriptor [sealed]
 class ArchLinterNet.Core.Model.ArchitecturePolicySourceLocation [sealed]
@@ -592,6 +595,7 @@ const ArchLinterNet.Core.Model.ArchitecturePolicyDiagnosticKind.SemanticValidati
 const ArchLinterNet.Core.Model.ArchitecturePolicyDiagnosticKind.SourceShape: ArchLinterNet.Core.Model.ArchitecturePolicyDiagnosticKind [value:1]
 const ArchLinterNet.Core.Model.ArchitecturePolicyDocumentRole.Fragment: ArchLinterNet.Core.Model.ArchitecturePolicyDocumentRole [value:1]
 const ArchLinterNet.Core.Model.ArchitecturePolicyDocumentRole.Root: ArchLinterNet.Core.Model.ArchitecturePolicyDocumentRole [value:0]
+const ArchLinterNet.Core.Model.ArchitecturePolicyInventory.CurrentSchemaId: System.String [value:"architecture-policy-inventory/v1"]
 const ArchLinterNet.Core.Model.ArchitectureRemediationHintCategory.DependOnAbstraction: ArchLinterNet.Core.Model.ArchitectureRemediationHintCategory [value:1]
 const ArchLinterNet.Core.Model.ArchitectureRemediationHintCategory.FixClassification: ArchLinterNet.Core.Model.ArchitectureRemediationHintCategory [value:5]
 const ArchLinterNet.Core.Model.ArchitectureRemediationHintCategory.FixPolicyInput: ArchLinterNet.Core.Model.ArchitectureRemediationHintCategory [value:6]
@@ -932,6 +936,9 @@ ctor ArchLinterNet.Core.Model.ArchitectureMetricMeasurementOutcome(System.Collec
 ctor ArchLinterNet.Core.Model.ArchitectureModuleNamespaceMembership(System.String, System.String, System.String, System.Boolean)
 ctor ArchLinterNet.Core.Model.ArchitecturePolicyDiagnostic(ArchLinterNet.Core.Model.ArchitecturePolicyDiagnosticKind, ArchLinterNet.Core.Model.ArchitecturePolicySourceLocation, System.Collections.Generic.IReadOnlyList`1[ArchLinterNet.Core.Model.ArchitecturePolicySourceLocation], System.Collections.Generic.IReadOnlyList`1[System.String])
 ctor ArchLinterNet.Core.Model.ArchitecturePolicyErrorDiagnostic(System.String, ArchLinterNet.Core.Model.ArchitecturePolicyDiagnosticKind, System.String, System.Collections.Generic.IReadOnlyList`1[System.String])
+ctor ArchLinterNet.Core.Model.ArchitecturePolicyInventory(System.String, System.Int32, ArchLinterNet.Core.Model.ArchitecturePolicyInventoryRules, ArchLinterNet.Core.Model.ArchitecturePolicyInventoryIgnoreDebt, System.Collections.Generic.IReadOnlyList`1[ArchLinterNet.Core.Model.ArchitectureWaiverLifecycleRecord])
+ctor ArchLinterNet.Core.Model.ArchitecturePolicyInventoryIgnoreDebt(System.Int32, System.Int32, System.Int32, System.Int32, System.Int32, System.Int32)
+ctor ArchLinterNet.Core.Model.ArchitecturePolicyInventoryRules(System.Int32, System.Int32, System.Int32)
 ctor ArchLinterNet.Core.Model.ArchitecturePolicyLoadException(System.String, System.Object, System.String, System.Exception)
 ctor ArchLinterNet.Core.Model.ArchitecturePolicySourceDescriptor(System.String, System.String, ArchLinterNet.Core.Model.ArchitecturePolicyDocumentRole, System.Int32, System.String, System.String, System.Collections.Generic.IReadOnlyList`1[System.String])
 ctor ArchLinterNet.Core.Model.ArchitecturePolicySourceLocation(ArchLinterNet.Core.Model.ArchitecturePolicySourceDescriptor, System.String, System.Int32, System.Int32, System.String, System.String, System.Int32)
@@ -1612,6 +1619,7 @@ method ArchLinterNet.Core.Reporting.ArchitectureApplicabilityProjector.Project(A
 method ArchLinterNet.Core.Reporting.ArchitectureApplicabilityProjector.Summarize(ArchLinterNet.Core.Model.ArchitectureAssessmentCompletionEvidence): ArchLinterNet.Core.Model.ArchitectureApplicabilitySummary [static]
 method ArchLinterNet.Core.Reporting.ArchitectureApplicabilityProjector.ToFindings(ArchLinterNet.Core.Model.ArchitectureAssessmentCompletionEvidence, System.String): System.Collections.Generic.IReadOnlyList`1[ArchLinterNet.Core.Model.ArchitectureFinding] [static]
 method ArchLinterNet.Core.Reporting.ArchitectureBaselineSarifFormatter.Format(System.Collections.Generic.IReadOnlyList`1[ArchLinterNet.Core.Model.BaselineLifecycleEntry], System.String): System.String [static]
+method ArchLinterNet.Core.Reporting.ArchitectureDiagnosticFormatter.AddPolicyInventoryToCiArtifacts(System.String, ArchLinterNet.Core.Model.ArchitecturePolicyInventory): System.String [static]
 method ArchLinterNet.Core.Reporting.ArchitectureDiagnosticFormatter.AddWaiversToCiArtifacts(System.String, System.Collections.Generic.IReadOnlyCollection`1[ArchLinterNet.Core.Model.ArchitectureWaiverLifecycleRecord]): System.String [static]
 method ArchLinterNet.Core.Reporting.ArchitectureDiagnosticFormatter.FormatApplicabilityProjectionForHumans(ArchLinterNet.Core.Model.ArchitectureApplicabilityProjection): System.String [static]
 method ArchLinterNet.Core.Reporting.ArchitectureDiagnosticFormatter.FormatAssessmentCompletionForHumans(ArchLinterNet.Core.Model.ArchitectureAssessmentCompletionEvidence): System.String [static]
@@ -1628,6 +1636,7 @@ method ArchLinterNet.Core.Reporting.ArchitectureDiagnosticFormatter.FormatCycles
 method ArchLinterNet.Core.Reporting.ArchitectureDiagnosticFormatter.FormatFindingsForHumans(System.Collections.Generic.IReadOnlyCollection`1[ArchLinterNet.Core.Model.ArchitectureFinding], System.Threading.CancellationToken): System.String [static]
 method ArchLinterNet.Core.Reporting.ArchitectureDiagnosticFormatter.FormatNormalizedFindingForJson(ArchLinterNet.Core.Model.ArchitectureFinding): System.Collections.Generic.Dictionary`2[System.String,System.Object] [static]
 method ArchLinterNet.Core.Reporting.ArchitectureDiagnosticFormatter.FormatPolicyConsistencyForHumans(System.Collections.Generic.IReadOnlyCollection`1[ArchLinterNet.Core.Model.PolicyConsistencyDiagnostic]): System.String [virtual]
+method ArchLinterNet.Core.Reporting.ArchitectureDiagnosticFormatter.FormatPolicyInventoryForHumans(ArchLinterNet.Core.Model.ArchitecturePolicyInventory): System.String [static]
 method ArchLinterNet.Core.Reporting.ArchitectureDiagnosticFormatter.FormatPolicyLocationForJson(ArchLinterNet.Core.Model.ArchitecturePolicySourceLocation): System.Collections.Generic.Dictionary`2[System.String,System.Object] [static]
 method ArchLinterNet.Core.Reporting.ArchitectureDiagnosticFormatter.FormatResultForCiArtifacts(System.String, System.Boolean, System.Collections.Generic.IReadOnlyCollection`1[ArchLinterNet.Core.Model.ArchitectureViolation], System.Collections.Generic.IReadOnlyCollection`1[System.String], System.Collections.Generic.IReadOnlyCollection`1[ArchLinterNet.Core.Model.ArchitectureClassificationRoleFact], ArchLinterNet.Core.Model.ArchitectureClassificationPathDeferredNotice, System.Collections.Generic.IReadOnlyCollection`1[ArchLinterNet.Core.Model.ArchitectureViolation], System.Collections.Generic.IReadOnlyCollection`1[ArchLinterNet.Core.Model.ArchitectureUnmatchedIgnoredViolation], System.Collections.Generic.IReadOnlyCollection`1[ArchLinterNet.Core.Model.PolicyConsistencyDiagnostic], System.Collections.Generic.IReadOnlyCollection`1[ArchLinterNet.Core.Reporting.ArchitectureCoverageSummary], System.Collections.Generic.IReadOnlyCollection`1[ArchLinterNet.Core.Model.ArchitectureClassificationConflict], System.Collections.Generic.IReadOnlyCollection`1[ArchLinterNet.Core.Model.ArchitectureClassificationMetadataFailure]): System.String [virtual]
 method ArchLinterNet.Core.Reporting.ArchitectureDiagnosticFormatter.FormatResultForCiArtifacts(System.String, System.Boolean, System.Collections.Generic.IReadOnlyCollection`1[ArchLinterNet.Core.Model.ArchitectureViolation], System.Collections.Generic.IReadOnlyCollection`1[System.String], System.Collections.Generic.IReadOnlyCollection`1[ArchLinterNet.Core.Model.ArchitectureClassificationRoleFact], ArchLinterNet.Core.Model.ArchitectureClassificationPathDeferredNotice, System.Collections.Generic.IReadOnlyCollection`1[ArchLinterNet.Core.Model.BuildStatePreflightDiagnostic], System.Collections.Generic.IReadOnlyCollection`1[ArchLinterNet.Core.Model.ArchitectureViolation], System.Collections.Generic.IReadOnlyCollection`1[ArchLinterNet.Core.Model.ArchitectureUnmatchedIgnoredViolation], System.Collections.Generic.IReadOnlyCollection`1[ArchLinterNet.Core.Model.PolicyConsistencyDiagnostic], System.Collections.Generic.IReadOnlyCollection`1[ArchLinterNet.Core.Reporting.ArchitectureCoverageSummary], System.Collections.Generic.IReadOnlyCollection`1[ArchLinterNet.Core.Model.ArchitectureClassificationConflict], System.Collections.Generic.IReadOnlyCollection`1[ArchLinterNet.Core.Model.ArchitectureClassificationMetadataFailure]): System.String [virtual]
@@ -1850,6 +1859,7 @@ property ArchLinterNet.Core.Caching.AnalysisCacheOutcomeV1.Cycles: System.Collec
 property ArchLinterNet.Core.Caching.AnalysisCacheOutcomeV1.Passed: System.Boolean [get, init]
 property ArchLinterNet.Core.Caching.AnalysisCacheOutcomeV1.PolicyConsistencyConfig: System.String [get, init]
 property ArchLinterNet.Core.Caching.AnalysisCacheOutcomeV1.PolicyConsistencyFindings: System.Collections.Generic.IReadOnlyList`1[ArchLinterNet.Core.Model.PolicyConsistencyDiagnostic] [get, init]
+property ArchLinterNet.Core.Caching.AnalysisCacheOutcomeV1.PolicyInventory: ArchLinterNet.Core.Model.ArchitecturePolicyInventory [get, init]
 property ArchLinterNet.Core.Caching.AnalysisCacheOutcomeV1.SubtractiveMatcherParticipation: System.Collections.Generic.IReadOnlyList`1[ArchLinterNet.Core.Model.ArchitectureSubtractiveMatcherParticipation] [get, init]
 property ArchLinterNet.Core.Caching.AnalysisCacheOutcomeV1.UnmatchedIgnoredViolations: System.Collections.Generic.IReadOnlyList`1[ArchLinterNet.Core.Model.ArchitectureUnmatchedIgnoredViolation] [get, init]
 property ArchLinterNet.Core.Caching.AnalysisCacheOutcomeV1.UnmatchedIgnoredViolationsConfig: System.String [get, init]
@@ -2968,6 +2978,20 @@ property ArchLinterNet.Core.Model.ArchitecturePolicyErrorDiagnostic.ErrorCategor
 property ArchLinterNet.Core.Model.ArchitecturePolicyErrorDiagnostic.ImportChain: System.Collections.Generic.IReadOnlyList`1[System.String] [get, init]
 property ArchLinterNet.Core.Model.ArchitecturePolicyErrorDiagnostic.Kind: ArchLinterNet.Core.Model.ArchitectureDiagnosticKind [override, get]
 property ArchLinterNet.Core.Model.ArchitecturePolicyErrorDiagnostic.Message: System.String [get, init]
+property ArchLinterNet.Core.Model.ArchitecturePolicyInventory.EffectiveRuleCount: System.Int32 [get, init]
+property ArchLinterNet.Core.Model.ArchitecturePolicyInventory.IgnoreDebt: ArchLinterNet.Core.Model.ArchitecturePolicyInventoryIgnoreDebt [get, init]
+property ArchLinterNet.Core.Model.ArchitecturePolicyInventory.Rules: ArchLinterNet.Core.Model.ArchitecturePolicyInventoryRules [get, init]
+property ArchLinterNet.Core.Model.ArchitecturePolicyInventory.SchemaId: System.String [get, init]
+property ArchLinterNet.Core.Model.ArchitecturePolicyInventory.Waivers: System.Collections.Generic.IReadOnlyList`1[ArchLinterNet.Core.Model.ArchitectureWaiverLifecycleRecord] [get, init]
+property ArchLinterNet.Core.Model.ArchitecturePolicyInventoryIgnoreDebt.Active: System.Int32 [get, init]
+property ArchLinterNet.Core.Model.ArchitecturePolicyInventoryIgnoreDebt.Expired: System.Int32 [get, init]
+property ArchLinterNet.Core.Model.ArchitecturePolicyInventoryIgnoreDebt.Invalid: System.Int32 [get, init]
+property ArchLinterNet.Core.Model.ArchitecturePolicyInventoryIgnoreDebt.MetadataIncomplete: System.Int32 [get, init]
+property ArchLinterNet.Core.Model.ArchitecturePolicyInventoryIgnoreDebt.Stale: System.Int32 [get, init]
+property ArchLinterNet.Core.Model.ArchitecturePolicyInventoryIgnoreDebt.Total: System.Int32 [get, init]
+property ArchLinterNet.Core.Model.ArchitecturePolicyInventoryRules.Audit: System.Int32 [get, init]
+property ArchLinterNet.Core.Model.ArchitecturePolicyInventoryRules.Coverage: System.Int32 [get, init]
+property ArchLinterNet.Core.Model.ArchitecturePolicyInventoryRules.Strict: System.Int32 [get, init]
 property ArchLinterNet.Core.Model.ArchitecturePolicyLoadException.Category: System.String [get]
 property ArchLinterNet.Core.Model.ArchitecturePolicyLoadException.Diagnostic: System.Object [get]
 property ArchLinterNet.Core.Model.ArchitecturePolicySourceDescriptor.AuthoredImportPath: System.String [get, init]
@@ -4157,6 +4181,7 @@ property ArchLinterNet.Core.Validation.ValidationOutcome.Passed: System.Boolean 
 property ArchLinterNet.Core.Validation.ValidationOutcome.PolicyConsistencyConfig: System.String [get, init]
 property ArchLinterNet.Core.Validation.ValidationOutcome.PolicyConsistencyFindings: System.Collections.Generic.IReadOnlyCollection`1[ArchLinterNet.Core.Model.PolicyConsistencyDiagnostic] [get, init]
 property ArchLinterNet.Core.Validation.ValidationOutcome.PolicyImportPaths: System.Collections.Generic.IReadOnlyList`1[System.String] [get, init]
+property ArchLinterNet.Core.Validation.ValidationOutcome.PolicyInventory: ArchLinterNet.Core.Model.ArchitecturePolicyInventory [get, init]
 property ArchLinterNet.Core.Validation.ValidationOutcome.PreflightBlocked: System.Boolean [get, init]
 property ArchLinterNet.Core.Validation.ValidationOutcome.PreflightDiagnostics: System.Collections.Generic.IReadOnlyCollection`1[ArchLinterNet.Core.Model.BuildStatePreflightDiagnostic] [get, init]
 property ArchLinterNet.Core.Validation.ValidationOutcome.PreparedPostBuildRunner: ArchLinterNet.Core.Execution.ArchitectureRunnerPreparation [get, init]

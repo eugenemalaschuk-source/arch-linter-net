@@ -220,46 +220,7 @@ public sealed partial class ArchitectureAnalysisSnapshot : IDisposable
 
             try
             {
-                // A snapshot meant to serve any/all requested modes validates a --contract-id filter
-                // against the union of strict and audit IDs at construction time (see
-                // ArchitectureValidationApplicationService.ResolveSelectedContractIds) — that only rejects
-                // an ID unknown to every mode. An ID valid in one mode but not this one would otherwise
-                // silently match nothing when this mode's contracts execute, instead of failing the same
-                // way an independent single-mode Validate call for this mode would. Re-validating here,
-                // per mode, keeps combined execution semantically equivalent to separate runs.
-                EnsureRequestedContractIdsAreKnownForMode(mode);
-
-                _cancellationToken.ThrowIfCancellationRequested();
-                ValidationOutcome? cachedOutcome = _preflight.Blocked ? null : TryEvaluateFromCache(mode, timing);
-                WorkSnapshot? workBefore = cachedOutcome is null && !_preflight.Blocked
-                    ? CaptureWorkSnapshot()
-                    : null;
-                ValidationOutcome outcome = cachedOutcome
-                    ?? (_preflight.Blocked ? BuildBlockedOutcome() : EvaluateCore(mode, timing));
-                if (_preparedPostBuildRunner is not null)
-                {
-                    outcome = outcome with { PreparedPostBuildRunner = _preparedPostBuildRunner };
-                }
-
-                if (cachedOutcome is null
-                    && !outcome.PreflightBlocked
-                    && _cacheAuthorizations.Remove(mode, out AnalysisCachePopulation.PreparedAuthorization? authorization))
-                {
-                    // This opaque plan was captured before contract execution. It is associated
-                    // by object identity rather than stored on ValidationOutcome itself, so its
-                    // transient cache state cannot change that public record's equality contract.
-                    CacheArtifactEvidence artifacts = GetCacheArtifactEvidence();
-                    AnalysisCachePopulation.AttachAuthorization(
-                        outcome,
-                        authorization,
-                        artifacts.Paths,
-                        artifacts.CapturedIdentities,
-                        CreateWorkProvenance(workBefore!.Value));
-                }
-
-                _evaluatedModes[mode] = outcome;
-                _counters = _counters with { ModesEvaluated = _evaluatedModes.Count };
-                return outcome;
+                return EvaluationOrchestrator.Evaluate(this, mode, timing);
             }
             catch (OperationCanceledException)
             {
@@ -428,6 +389,14 @@ public sealed partial class ArchitectureAnalysisSnapshot : IDisposable
         IReadOnlyList<ArchitectureClassificationRoleFact> classificationRoles = runner.Session.CheckClassificationRoles();
         ArchitectureClassificationPathDeferredNotice? classificationPathDeferred = runner.Session.CheckClassificationPathDeferred();
 
+        ArchitecturePolicyInventory policyInventory = ArchitecturePolicyInventoryProjector.Project(
+            _document,
+            mode,
+            waivers,
+            _requestedContractIds,
+            _includeAsmdefContracts,
+            _coverageConfig != "off");
+
         // Classification post-processing can materialize additional facts. A signal observed
         // there must win over constructing and returning an apparently complete outcome.
         cancellationToken.ThrowIfCancellationRequested();
@@ -447,6 +416,7 @@ public sealed partial class ArchitectureAnalysisSnapshot : IDisposable
             DiscoveredProjectPaths = GetDiscoveredProjectPaths(),
             SourceExpansion = _document.SourceExpansion,
             Waivers = waivers,
+            PolicyInventory = policyInventory,
             ApplicabilityExpectedEntries = execution.ApplicabilityExpectedEntries,
             ApplicabilityRecords = execution.ApplicabilityRecords,
             AssessmentCompletionEvidence = assessmentCompletion,

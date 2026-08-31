@@ -1,6 +1,7 @@
 using System.Text.Json;
 using ArchLinterNet.Core.Contracts;
 using ArchLinterNet.Core.Contracts.Families;
+using ArchLinterNet.Core.Execution;
 using ArchLinterNet.Core.Model;
 using ArchLinterNet.Core.Reporting;
 using ArchLinterNet.Core.Validation;
@@ -103,6 +104,63 @@ public sealed class ArchitectureWaiverLifecycleEvaluatorTests
         {
             Assert.That(record.State, Is.EqualTo("active"));
             Assert.That(record.MatchesGovernedFinding, Is.True);
+        });
+    }
+
+    [TestCase("2026-10-01", false, false, "active")]
+    [TestCase("2026-10-01", true, false, "stale")]
+    [TestCase("2026-08-01", false, false, "expired")]
+    [TestCase("2026-10-01", false, true, "invalid")]
+    public void Evaluate_SelectedAuthoredSourceSetId_RetainsLifecycleDebt(
+        string expires,
+        bool isUnmatched,
+        bool isInvalid,
+        string expectedState)
+    {
+        ArchitectureIgnoredViolation waiver = CreateStructuredWaiver(expires);
+        if (isInvalid)
+        {
+            waiver.WaiverValidationError = "target.fingerprint must be canonical";
+        }
+        ArchitectureContractDocument document = new()
+        {
+            Version = 2,
+            Name = "Source-set waiver",
+            Contracts = new ArchitectureContractGroups
+            {
+                StrictExternal =
+                [
+                    new ArchitectureExternalDependencyContract
+                    {
+                        Id = "boundary/app",
+                        Name = "boundary",
+                        Source = "app",
+                        ExpansionOrigin = new ArchitectureSourceExpansionOrigin(
+                            "boundary", "boundary", "app", "applications", "app"),
+                        IgnoredViolations = [waiver],
+                    },
+                ],
+            },
+        };
+        string contractGroup = ArchitectureContractCatalog.Build(document).Descriptors.Single().Group;
+        ArchitectureUnmatchedIgnoredViolation[] unmatched = isUnmatched
+            ?
+            [
+                new ArchitectureUnmatchedIgnoredViolation(
+                    "boundary", "boundary/app", 0, waiver.SourceType, waiver.ForbiddenReference, waiver.Reason)
+                {
+                    ContractGroup = contractGroup,
+                },
+            ]
+            : [];
+
+        ArchitectureWaiverLifecycleRecord record = ArchitectureWaiverLifecycleEvaluator.Evaluate(
+            document, "strict", unmatched, new DateOnly(2026, 8, 2), ["BOUNDARY"]).Single();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(record.State, Is.EqualTo(expectedState));
+            Assert.That(record.Id, Is.EqualTo("ARCH-IGN-001"));
         });
     }
 
