@@ -2,7 +2,6 @@ using ArchLinterNet.Core.Contracts;
 using ArchLinterNet.Core.Contracts.Families;
 using ArchLinterNet.Core.Discovery;
 using ArchLinterNet.Core.Execution.Abstractions;
-using ArchLinterNet.Core.Execution.Checkers;
 using ArchLinterNet.Core.Execution.Results;
 using ArchLinterNet.Core.Resolution;
 
@@ -340,23 +339,8 @@ internal static class ArchitectureContractFamilyRegistry
         new(
             "contract_surface_exposure", "strict_contract_surface_exposure", "audit_contract_surface_exposure", true,
             g => g.StrictContractSurfaceExposure, g => g.AuditContractSurfaceExposure,
-            (session, contract) =>
-            {
-                var exposureContract = (ArchitectureContractSurfaceExposureContract)contract;
-                ArchitectureContractExecutionContext executionContext = session.CreateExecutionContext(
-                    exposureContract,
-                    exposureContract.IgnoredViolations);
-                ContractSurfaceExposureEvaluationResult result = ContractSurfaceExposureChecker.Evaluate(
-                    session.CheckerContext,
-                    exposureContract,
-                    executionContext);
-                session.CollectUnmatchedIgnores(executionContext);
-                return ArchitectureHandlerResult.FromViolations(result.Violations) with
-                {
-                    ApplicabilityExpectedEntries = new[] { result.ApplicabilityExpectedEntry },
-                    ApplicabilityRecords = new[] { result.ApplicabilityRecord },
-                };
-            })
+            (session, contract) => session.CheckContractSurfaceExposureContract(
+                (ArchitectureContractSurfaceExposureContract)contract))
         {
             OwnedContractTypes = new[] { typeof(ArchitectureContractSurfaceExposureContract) },
         },

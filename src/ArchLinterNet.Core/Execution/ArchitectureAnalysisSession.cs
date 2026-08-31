@@ -7,6 +7,7 @@ using ArchLinterNet.Core.Execution.Abstractions;
 using ArchLinterNet.Core.Execution.Checkers;
 using ArchLinterNet.Core.Execution.Configuration;
 using ArchLinterNet.Core.Execution.Expressions;
+using ArchLinterNet.Core.Execution.Results;
 using ArchLinterNet.Core.Model;
 using ArchLinterNet.Core.Reporting;
 using ArchLinterNet.Core.Resolution;
@@ -451,6 +452,10 @@ public sealed class ArchitectureAnalysisSession
 
     public List<ArchitectureViolation> CheckPublicApiSurfaceContract(ArchitecturePublicApiSurfaceContract contract) =>
         _publicApiSurfaceAnalysisService.CheckPublicApiSurfaceContract(contract);
+
+    public ArchitectureHandlerResult CheckContractSurfaceExposureContract(
+        ArchitectureContractSurfaceExposureContract contract) =>
+        _coreContractCheckingService.CheckContractSurfaceExposureContract(contract);
 
     internal ArchitecturePublicApiSurfaceRootResolution ResolvePublicApiSurfaceRoots(string publicApiSurfaceId) =>
         _publicApiSurfaceAnalysisService.ResolveSelectedRoots(publicApiSurfaceId);

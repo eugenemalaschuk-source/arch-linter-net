@@ -1,5 +1,6 @@
 using ArchLinterNet.Core.Contracts.Families;
 using ArchLinterNet.Core.Execution.Checkers;
+using ArchLinterNet.Core.Execution.Results;
 using ArchLinterNet.Core.Model;
 using ArchLinterNet.Core.Resolution;
 
@@ -165,5 +166,27 @@ internal sealed class ArchitectureCoreContractCheckingService
             ExternalDependencyChecker.CheckAllowOnly(contract, _session.CheckerContext, executionContext);
         _session.CollectUnmatchedIgnores(executionContext);
         return violations;
+    }
+
+    public ArchitectureHandlerResult CheckContractSurfaceExposureContract(
+        ArchitectureContractSurfaceExposureContract contract)
+    {
+        if (!_session.IsContractSelected(contract.Id) || _session.IsDanglingButCoveredByRuleInputCoverage(contract))
+        {
+            return ArchitectureHandlerResult.FromViolations(Array.Empty<ArchitectureViolation>());
+        }
+
+        ArchitectureContractExecutionContext executionContext = _session.CreateExecutionContext(contract, contract.IgnoredViolations);
+        ContractSurfaceExposureEvaluationResult result = ContractSurfaceExposureChecker.Evaluate(
+            _session.CheckerContext,
+            contract,
+            executionContext);
+        _session.CollectUnmatchedIgnores(executionContext);
+
+        return ArchitectureHandlerResult.FromViolations(result.Violations) with
+        {
+            ApplicabilityExpectedEntries = new[] { result.ApplicabilityExpectedEntry },
+            ApplicabilityRecords = new[] { result.ApplicabilityRecord },
+        };
     }
 }
