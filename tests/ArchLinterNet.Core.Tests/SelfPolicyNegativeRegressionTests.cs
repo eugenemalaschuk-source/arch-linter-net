@@ -1,5 +1,8 @@
+using System.Globalization;
 using System.Text.Encodings.Web;
 using System.Text.Json;
+using System.Text.RegularExpressions;
+using ArchLinterNet.Core.Model;
 using ArchLinterNet.Core.Reporting;
 using ArchLinterNet.Core.Validation;
 using ArchLinterNet.Testing;
@@ -205,6 +208,52 @@ public sealed class SelfPolicyNegativeRegressionTests
             "exceptions-directories-contain-only-exception-classes");
 
         AssertFailedMentioning(result, "Exception");
+    }
+
+    // ── #742 partial-declaration debt ratchet ───────────────────────────────
+    [Test]
+    public void PartialDeclarationRatchet_RejectsAnAggregateExceedingItsReviewedCount()
+    {
+        const string ReviewedType = "ArchLinterNet.Core.Reporting.ArchitectureDiagnosticFormatter";
+
+        // Discover today's live declaration-count evidence directly from the real repository
+        // instead of hardcoding a count that legitimately shifts as unrelated work adds or removes
+        // partial declarations elsewhere: temporarily retarget the reviewed entry's source_type so
+        // nothing suppresses the live finding, run the real ratchet rule, and read the resulting
+        // "expected at most 1 source declaration(s), found N: <paths>" text back off the actual
+        // violation.
+        string unfrozen = SelfPolicyRepository.Replace(
+            _policy,
+            $"source_type: \"{ReviewedType}\"",
+            $"source_type: \"{ReviewedType}NotFrozen\"");
+        ArchitectureValidationResult liveResult = ValidateMutated(
+            unfrozen, "production-partial-type-declaration-count-does-not-increase");
+        ArchitectureViolation liveViolation = liveResult.Violations.Single(
+            violation => violation.SourceType == ReviewedType);
+        string liveForbiddenReference = liveViolation.ForbiddenReferences.Single();
+
+        // Decrementing the discovered count by exactly one reproduces "the aggregate grew by one
+        // declaration past what was reviewed": the frozen entry keeps the real source_type and the
+        // real path list, but its reviewed count text now reads one lower than what the live
+        // declaration-count checker reports for the same type, so the exact-text match fails and
+        // the violation surfaces unignored — proving growth beyond the reviewed baseline is
+        // blocked, not merely that an unrelated source_type mismatch is.
+        Match countMatch = Regex.Match(liveForbiddenReference, "found (\\d+):", RegexOptions.None, TimeSpan.FromSeconds(1));
+        Assert.That(countMatch.Success, Is.True,
+            "Expected the live declaration-count message to contain 'found N:'.");
+        int liveCount = int.Parse(countMatch.Groups[1].Value, CultureInfo.InvariantCulture);
+        string staleForbiddenReference = liveForbiddenReference.Replace(
+            $"found {liveCount}:", $"found {liveCount - 1}:", StringComparison.Ordinal);
+
+        string mutated = SelfPolicyRepository.Replace(
+            _policy,
+            $"forbidden_reference: \"{liveForbiddenReference}\"",
+            $"forbidden_reference: \"{staleForbiddenReference}\"");
+
+        ArchitectureValidationResult result = ValidateMutated(
+            mutated, "production-partial-type-declaration-count-does-not-increase");
+
+        AssertFailedMentioning(result, "ArchitectureDiagnosticFormatter");
     }
 
     [Test]
