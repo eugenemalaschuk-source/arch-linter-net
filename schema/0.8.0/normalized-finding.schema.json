@@ -12,7 +12,7 @@
     "kind": {
       "enum": [
         "dependency", "cycle", "unmatched_ignore", "configuration", "external_dependency",
-        "policy_consistency", "package_dependency", "type_placement", "public_api_surface",
+        "policy_consistency", "package_dependency", "type_placement", "public_api_surface", "contract_surface_exposure",
         "attribute_usage", "inheritance", "interface_implementation", "composition",
         "project_metadata", "context_dependency", "context_allow_only", "port_boundary",
         "layout_convention", "package_allow_only", "framework_reference",
@@ -28,7 +28,7 @@
     "message_code": {
       "enum": [
         "dependency", "cycle", "unmatched_ignore", "configuration", "external_dependency",
-        "policy_consistency", "package_dependency", "type_placement", "public_api_surface",
+        "policy_consistency", "package_dependency", "type_placement", "public_api_surface", "contract_surface_exposure",
         "attribute_usage", "inheritance", "interface_implementation", "composition",
         "project_metadata", "context_dependency", "context_allow_only", "port_boundary",
         "layout_convention", "package_allow_only", "framework_reference",
@@ -66,6 +66,7 @@
     { "$ref": "#/$defs/packageDependency" },
     { "$ref": "#/$defs/typePlacement" },
     { "$ref": "#/$defs/publicApiSurface" },
+    { "$ref": "#/$defs/contractSurfaceExposure" },
     { "$ref": "#/$defs/attributeUsage" },
     { "$ref": "#/$defs/inheritance" },
     { "$ref": "#/$defs/interfaceImplementation" },
@@ -279,6 +280,18 @@
       "allOf": [
         { "$ref": "#/$defs/ordinaryDetails" },
         { "properties": { "detail_kind": { "const": "public_api_surface" } } }
+      ]
+    },
+    "contractSurfaceExposure": {
+      "allOf": [
+        { "$ref": "#/$defs/ordinaryBranch" },
+        { "properties": { "kind": { "const": "contract_surface_exposure" }, "details": { "$ref": "#/$defs/contractSurfaceExposureDetails" } } }
+      ]
+    },
+    "contractSurfaceExposureDetails": {
+      "allOf": [
+        { "$ref": "#/$defs/ordinaryDetails" },
+        { "properties": { "detail_kind": { "const": "contract_surface_exposure" } } }
       ]
     },
     "attributeUsage": {

@@ -1,4 +1,5 @@
 using System.Collections;
+using System.Collections.ObjectModel;
 using System.Globalization;
 using System.Reflection;
 using System.Runtime.CompilerServices;
@@ -36,6 +37,7 @@ internal static partial class ArchitectureContractSurfaceExposureScanner
         private readonly List<ArchitectureContractExposureIncompleteEvidence> _incomplete = new();
         private readonly HashSet<ArchitectureContractExposure> _exposureSet = new();
         private readonly HashSet<ArchitectureContractExposureIncompleteEvidence> _incompleteSet = new();
+        private readonly Dictionary<ArchitectureContractExposureTarget, Type> _referencedTypes = new();
         // Reflection can recreate Type instances while resolving a recursive generic constraint,
         // so branch protection uses a canonical type identity rather than object reference.
         private readonly HashSet<string> _activeTypes = new(StringComparer.Ordinal);
@@ -72,7 +74,14 @@ internal static partial class ArchitectureContractSurfaceExposureScanner
                 .ThenBy(item => item.Reason, StringComparer.Ordinal)
                 .ToArray();
             return new ArchitectureContractSurfaceExposureResult(
-                Array.AsReadOnly(exposures.ToArray()), Array.AsReadOnly(incomplete.ToArray()));
+                Array.AsReadOnly(exposures.ToArray()), Array.AsReadOnly(incomplete.ToArray()))
+            {
+                ReferencedTypes = new ReadOnlyDictionary<ArchitectureContractExposureTarget, Type>(
+                    _referencedTypes
+                        .OrderBy(item => item.Key.AssemblyName, StringComparer.Ordinal)
+                        .ThenBy(item => item.Key.FullTypeName, StringComparer.Ordinal)
+                        .ToDictionary(item => item.Key, item => item.Value)),
+            };
         }
 
         private void ScanDeclaredType(Type type, ArchitectureContractExposurePath path)
@@ -527,6 +536,11 @@ internal static partial class ArchitectureContractSurfaceExposureScanner
             if (_exposureSet.Add(exposure))
             {
                 _exposures.Add(exposure);
+            }
+
+            if (complete)
+            {
+                _referencedTypes.TryAdd(target, referencedType);
             }
         }
 

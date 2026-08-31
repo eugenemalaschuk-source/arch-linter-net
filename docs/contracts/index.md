@@ -87,6 +87,10 @@ Strict groups are blocking. Audit groups use the same family semantics for non-b
 
 | [Public API surface](public-api-surface.md) | `strict_public_api_surface` / `audit_public_api_surface` | Govern exported API signatures and reviewed snapshots. |
 
+<!-- contract-family: contract-surface-exposure -->
+
+| [Contract-surface exposure](contract-surface-exposure.md) | `strict_contract_surface_exposure` / `audit_contract_surface_exposure` | Prevent selected visible contract signatures from exposing selected type surfaces. |
+
 <!-- contract-family: attribute-usage -->
 
 | [Attribute usage](attribute-usage.md) | `strict_attribute_usage` / `audit_attribute_usage` | Restrict where selected attributes may appear. |

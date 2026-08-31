@@ -9,6 +9,12 @@ public sealed record ArchitectureHandlerResult(
     IReadOnlyCollection<ArchitectureViolation> Violations,
     IReadOnlyCollection<string> Cycles)
 {
+    public IReadOnlyCollection<ArchitectureApplicabilityExpectedEntry> ApplicabilityExpectedEntries { get; init; } =
+        Array.Empty<ArchitectureApplicabilityExpectedEntry>();
+
+    public IReadOnlyCollection<ArchitectureApplicabilityRecord> ApplicabilityRecords { get; init; } =
+        Array.Empty<ArchitectureApplicabilityRecord>();
+
     public static ArchitectureHandlerResult FromViolations(IReadOnlyCollection<ArchitectureViolation> violations) =>
         new(violations, Array.Empty<string>());
 

@@ -23,7 +23,7 @@ public sealed class ArchitectureContractFamilyRegistryTests
         "asmdef", "independence", "assembly_independence", "assembly_dependency", "assembly_allow_only",
         "package_dependency", "package_allow_only", "framework_dependency", "framework_allow_only", "project_metadata",
         "protected", "external", "external_allow_only", "acyclic_sibling", "module_container", "type_placement", "layout_conventions",
-        "public_api_surface", "attribute_usage", "inheritance", "interface_implementation", "composition", "coverage",
+        "public_api_surface", "contract_surface_exposure", "attribute_usage", "inheritance", "interface_implementation", "composition", "coverage",
         "metric_budgets",
         "context_dependency", "context_allow_only", "port_boundary",
     };
@@ -31,7 +31,7 @@ public sealed class ArchitectureContractFamilyRegistryTests
     [Test]
     public void All_ContainsExactlyTheHistoricalFamilyCount()
     {
-        Assert.That(ArchitectureContractFamilyRegistry.All, Has.Count.EqualTo(33));
+        Assert.That(ArchitectureContractFamilyRegistry.All, Has.Count.EqualTo(34));
     }
 
     [Test]

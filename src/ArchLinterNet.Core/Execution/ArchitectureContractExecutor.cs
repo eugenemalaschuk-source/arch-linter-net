@@ -62,7 +62,9 @@ internal sealed class ArchitectureContractExecutor : IArchitectureContractExecut
                 continue;
             }
 
-            ExecuteStandardFamily(session, mode, family, handlerRegistry, timing, standardFamilyFindings, resultCounts);
+            ExecuteStandardFamily(
+                session, mode, family, handlerRegistry, timing, standardFamilyFindings, resultCounts,
+                applicabilityExpected, applicabilityRecords);
         }
 
         // Topology is an opt-in document control rather than a contracts.<mode> family. Evaluate
@@ -187,7 +189,9 @@ internal sealed class ArchitectureContractExecutor : IArchitectureContractExecut
         IArchitectureContractHandlerRegistry handlerRegistry,
         ValidationTiming? timing,
         StandardFamilyFindings findings,
-        IDictionary<string, int> resultCounts)
+        IDictionary<string, int> resultCounts,
+        List<ArchitectureApplicabilityExpectedEntry> applicabilityExpected,
+        List<ArchitectureApplicabilityRecord> applicabilityRecords)
     {
         int[] count = [0];
         using (timing?.MeasureContractFamily(family, () => count[0]))
@@ -219,6 +223,8 @@ internal sealed class ArchitectureContractExecutor : IArchitectureContractExecut
 
                 AddResultCount(resultCounts, family, violations.Length + cycleCount);
                 session.Context.ProfilingCounters.RecordContractFamilyResults(family, violations.Length + cycleCount);
+                applicabilityExpected.AddRange(result.ApplicabilityExpectedEntries);
+                applicabilityRecords.AddRange(result.ApplicabilityRecords);
             }
         }
     }

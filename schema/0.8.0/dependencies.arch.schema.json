@@ -1462,6 +1462,16 @@
           "items": { "$ref": "#/$defs/publicApiSurfaceContract" },
           "default": []
         },
+        "strict_contract_surface_exposure": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/contractSurfaceExposureContract" },
+          "default": []
+        },
+        "audit_contract_surface_exposure": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/contractSurfaceExposureContract" },
+          "default": []
+        },
         "strict_attribute_usage": {
           "type": "array",
           "items": { "$ref": "#/$defs/attributeUsageContract" },
@@ -2323,6 +2333,69 @@
               "description": "When true, every exported const field must have its fully-qualified name listed in allowed_public_constants, even if its full signature is present in declared_api."
             },
             "allowed_public_constants": { "$ref": "#/$defs/stringList" },
+            "ignored_violations": { "$ref": "#/$defs/ignoredViolations" },
+            "reason": { "type": "string" }
+          }
+        }
+      ],
+      "unevaluatedProperties": false
+    },
+    "contractSurfaceExposureSelector": {
+      "type": "object",
+      "additionalProperties": false,
+      "minProperties": 1,
+      "properties": {
+        "name_suffix": { "type": "string", "minLength": 1, "pattern": ".*\\S.*" },
+        "name_prefix": { "type": "string", "minLength": 1, "pattern": ".*\\S.*" },
+        "namespace": { "type": "string", "minLength": 1, "pattern": ".*\\S.*" },
+        "layer": { "type": "string", "minLength": 1, "pattern": ".*\\S.*" },
+        "base_type": { "type": "string", "minLength": 1, "pattern": ".*\\S.*" },
+        "implements_interface": { "type": "string", "minLength": 1, "pattern": ".*\\S.*" },
+        "has_attribute": { "type": "string", "minLength": 1, "pattern": ".*\\S.*" },
+        "role": { "type": "string", "minLength": 1, "pattern": ".*\\S.*" }
+      }
+    },
+    "contractSurfaceExposureSource": {
+      "type": "object",
+      "additionalProperties": false,
+      "anyOf": [
+        { "required": ["assemblies"] },
+        { "required": ["projects"] },
+        { "required": ["types_matching"] },
+        { "required": ["public_api_surface"] }
+      ],
+      "properties": {
+        "assemblies": {
+          "allOf": [
+            { "$ref": "#/$defs/nonBlankStringList" },
+            { "minItems": 1 }
+          ]
+        },
+        "projects": {
+          "allOf": [
+            { "$ref": "#/$defs/nonBlankStringList" },
+            { "minItems": 1 }
+          ]
+        },
+        "types_matching": { "$ref": "#/$defs/contractSurfaceExposureSelector" },
+        "public_api_surface": { "type": "string", "minLength": 1, "pattern": ".*\\S.*" }
+      }
+    },
+    "contractSurfaceExposureContract": {
+      "allOf": [
+        { "$ref": "#/$defs/baseContractFields" },
+        {
+          "type": "object",
+          "required": ["id", "name", "source", "forbidden"],
+          "properties": {
+            "id": { "type": "string", "minLength": 1, "pattern": ".*\\S.*" },
+            "name": { "type": "string", "minLength": 1, "pattern": ".*\\S.*" },
+            "source": { "$ref": "#/$defs/contractSurfaceExposureSource" },
+            "forbidden": {
+              "type": "array",
+              "minItems": 1,
+              "items": { "$ref": "#/$defs/contractSurfaceExposureSelector" }
+            },
             "ignored_violations": { "$ref": "#/$defs/ignoredViolations" },
             "reason": { "type": "string" }
           }

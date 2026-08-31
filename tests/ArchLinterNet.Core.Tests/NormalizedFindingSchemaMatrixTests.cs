@@ -33,8 +33,13 @@ public sealed class NormalizedFindingSchemaMatrixTests
             string json = JsonSerializer.Serialize(
                 ArchitectureDiagnosticFormatter.FormatNormalizedFindingForJson(finding));
             using JsonDocument document = JsonDocument.Parse(json);
-            EvaluationResults result = schema.Evaluate(document.RootElement);
-            Assert.That(result.IsValid, Is.True, $"Schema rejected generated '{finding.Kind}' finding: {json}");
+            EvaluationResults result = schema.Evaluate(
+                document.RootElement,
+                new EvaluationOptions { OutputFormat = OutputFormat.List });
+            Assert.That(result.IsValid, Is.True,
+                $"Schema rejected generated '{finding.Kind}' finding:{Environment.NewLine}" +
+                string.Join(Environment.NewLine, result.Details.Where(detail => !detail.IsValid)
+                    .Select(detail => detail.EvaluationPath + ": " + string.Join(",", detail.Errors?.Values ?? []))));
         }
     }
 
@@ -91,6 +96,10 @@ public sealed class NormalizedFindingSchemaMatrixTests
         yield return Violation(new LayoutConventionPayload("src/App.cs", "class", "interface"));
         yield return Violation(new PublicApiSurfacePayload(
             "public void Added()", false, "Product", "public", "added", null));
+        yield return Violation(new ContractSurfaceExposurePayload(
+            "Product", "Product.PublicContract", "member:Result", "6:member6:Result",
+            "System.Collections", "System.Collections.Generic.List`1", "exported",
+            "member:Result", "reviewed-api", [0]));
         yield return Violation(new AttributeUsagePayload("ObsoleteAttribute", "forbidden"));
         yield return Violation(new InheritancePayload("Forbidden.Base", "public_api"));
         yield return Violation(new InterfaceImplementationPayload("IForbidden", "implemented"));

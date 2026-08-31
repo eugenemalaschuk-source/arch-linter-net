@@ -211,6 +211,7 @@ public static class ArchitectureFindingMapper
         ArchitectureDiagnosticKind.Applicability => "applicability",
         ArchitectureDiagnosticKind.MetricBudget => "metric_budget",
         ArchitectureDiagnosticKind.ImportedExternalDiagnostic => "imported_external_diagnostic",
+        ArchitectureDiagnosticKind.ContractSurfaceExposure => "contract_surface_exposure",
         _ => kind.ToString().ToLowerInvariant()
     };
 
@@ -416,6 +417,13 @@ public static class ArchitectureFindingMapper
             MetricBudgetDiagnostic metricBudget =>
                 (null, metricBudget.MetricId, null, metricBudget.EffectiveScope,
                     $"{metricBudget.BreachedBound}:{metricBudget.ConfiguredLimit}", metricBudget.MetricKind),
+            ContractSurfaceExposureDiagnostic exposure => (
+                exposure.SourceAssemblyName,
+                exposure.MemberOrMetadataSite,
+                exposure.TargetAssemblyName,
+                exposure.TargetTypeName,
+                exposure.CanonicalExposurePath,
+                null),
             _ => (null, null, null, null, SourceIdentifier(diagnostic), diagnostic.Kind.ToString()),
         };
     }
@@ -463,6 +471,8 @@ public static class ArchitectureFindingMapper
             },
             CompositionDiagnostic composition =>
                 composition with { ForbiddenReferences = ReferencesForIdentity(composition.ForbiddenReferences, identity, attributedReference) },
+            ContractSurfaceExposureDiagnostic exposure =>
+                exposure with { ForbiddenReferences = ReferencesForIdentity(exposure.ForbiddenReferences, identity, attributedReference) },
             _ => diagnostic,
         };
     }
@@ -626,6 +636,7 @@ public static class ArchitectureFindingMapper
         ArchitecturePolicyErrorDiagnostic d => d.PolicyLocation?.SourcePath ?? "<policy>",
         ArchitectureApplicabilityDiagnostic d => d.ControlIdentity,
         MetricBudgetDiagnostic d => d.SourceType,
+        ContractSurfaceExposureDiagnostic d => d.SourceType,
         ImportedExternalDiagnostic d => d.SourceDiagnostic.RuleId ?? d.SelectedCanonicalIdentity,
         _ => string.Empty,
     };

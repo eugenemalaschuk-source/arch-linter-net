@@ -240,6 +240,20 @@ contracts:
   audit_public_api_surface:
     - name: public api surface audit rule
       assemblies: [Test.Core]
+  strict_contract_surface_exposure:
+    - id: contract-surface-exposure-strict
+      name: contract surface exposure strict rule
+      source:
+        assemblies: [Test.Core]
+      forbidden:
+        - role: Entity
+  audit_contract_surface_exposure:
+    - id: contract-surface-exposure-audit
+      name: contract surface exposure audit rule
+      source:
+        assemblies: [Test.Core]
+      forbidden:
+        - role: Entity
   strict_attribute_usage:
     - name: attribute usage strict rule
       attributes: [System.ObsoleteAttribute]
@@ -340,6 +354,8 @@ contracts:
         Assert.That(contracts.AuditLayoutConventions, Has.Count.EqualTo(1));
         Assert.That(contracts.StrictPublicApiSurface, Has.Count.EqualTo(1));
         Assert.That(contracts.AuditPublicApiSurface, Has.Count.EqualTo(1));
+        Assert.That(contracts.StrictContractSurfaceExposure, Has.Count.EqualTo(1));
+        Assert.That(contracts.AuditContractSurfaceExposure, Has.Count.EqualTo(1));
         Assert.That(contracts.StrictAttributeUsage, Has.Count.EqualTo(1));
         Assert.That(contracts.AuditAttributeUsage, Has.Count.EqualTo(1));
         Assert.That(contracts.StrictInheritance, Has.Count.EqualTo(1));
@@ -352,8 +368,8 @@ contracts:
         Assert.That(contracts.AuditCoverage, Has.Count.EqualTo(1));
 
         // AllStrict/AllAudit must reflect the populated groups too, excluding layer_template.
-        Assert.That(contracts.AllStrict.Count(), Is.EqualTo(28));
-        Assert.That(contracts.AllAudit.Count(), Is.EqualTo(28));
+        Assert.That(contracts.AllStrict.Count(), Is.EqualTo(29));
+        Assert.That(contracts.AllAudit.Count(), Is.EqualTo(29));
     }
 
     [Test]

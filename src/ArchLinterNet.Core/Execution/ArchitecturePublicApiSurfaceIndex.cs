@@ -11,6 +11,14 @@ internal sealed record ArchitecturePublicApiSurfaceMaterialization(
     IReadOnlyList<Type> ExportedTypes,
     bool IsComplete);
 
+// Effective roots selected by one reviewed public-api contract. `IsComplete` covers both the
+// materialized exported surface and the contract's required assembly evidence; an empty roots
+// collection is intentionally not treated as a clean result by consumers.
+internal sealed record ArchitecturePublicApiSurfaceRootResolution(
+    IReadOnlyList<Type> Roots,
+    bool IsComplete,
+    bool HasContract);
+
 // Session-local cache for public API surfaces. Assembly identity is deliberately reference-based:
 // the resolved Assembly object, rather than a name/path that could alias a different load context,
 // defines the surface that reflection observed. No state escapes the owning analysis session.

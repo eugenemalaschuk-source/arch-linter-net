@@ -29,6 +29,7 @@ public sealed partial class ArchitectureDiagnosticFormatter
             new(typeof(TypePlacementDiagnostic), (d, o) => ApplyTypePlacementCiFields((TypePlacementDiagnostic)d, o)),
             new(typeof(LayoutConventionDiagnostic), (d, o) => ApplyLayoutConventionCiFields((LayoutConventionDiagnostic)d, o)),
             new(typeof(PublicApiSurfaceDiagnostic), (d, o) => ApplyPublicApiSurfaceCiFields((PublicApiSurfaceDiagnostic)d, o)),
+            new(typeof(ContractSurfaceExposureDiagnostic), (d, o) => ApplyContractSurfaceExposureCiFields((ContractSurfaceExposureDiagnostic)d, o)),
             new(typeof(AttributeUsageDiagnostic), (d, o) => ApplyAttributeUsageCiFields((AttributeUsageDiagnostic)d, o)),
             new(typeof(InheritanceDiagnostic), (d, o) => ApplyInheritanceCiFields((InheritanceDiagnostic)d, o)),
             new(typeof(InterfaceImplementationDiagnostic), (d, o) => ApplyInterfaceImplementationCiFields((InterfaceImplementationDiagnostic)d, o)),

@@ -182,5 +182,11 @@ internal sealed record ArchitectureContractSurfaceExposureResult(
     IReadOnlyList<ArchitectureContractExposure> Exposures,
     IReadOnlyList<ArchitectureContractExposureIncompleteEvidence> IncompleteEvidence)
 {
+    // Matching policy selectors against the reflected Type instance keeps external/framework
+    // targets assessable. The stable ArchitectureContractExposureTarget remains the persisted
+    // diagnostic identity; this map is an in-memory index used only during one analysis session.
+    internal IReadOnlyDictionary<ArchitectureContractExposureTarget, Type> ReferencedTypes { get; init; } =
+        new Dictionary<ArchitectureContractExposureTarget, Type>();
+
     public bool IsComplete => IncompleteEvidence.Count == 0;
 }

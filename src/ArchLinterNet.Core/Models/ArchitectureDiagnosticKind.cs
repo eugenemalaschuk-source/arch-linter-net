@@ -28,5 +28,6 @@ public enum ArchitectureDiagnosticKind
     ArchitecturePolicyError,
     Applicability,
     MetricBudget,
-    ImportedExternalDiagnostic
+    ImportedExternalDiagnostic,
+    ContractSurfaceExposure
 }

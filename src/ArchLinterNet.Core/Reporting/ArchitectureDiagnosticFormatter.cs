@@ -215,6 +215,7 @@ public sealed partial class ArchitectureDiagnosticFormatter : IArchitectureDiagn
         TypePlacementDiagnostic d => d.SourceType,
         LayoutConventionDiagnostic d => d.SourceType,
         PublicApiSurfaceDiagnostic d => d.SourceType,
+        ContractSurfaceExposureDiagnostic d => d.SourceType,
         AttributeUsageDiagnostic d => d.SourceType,
         InheritanceDiagnostic d => d.SourceType,
         InterfaceImplementationDiagnostic d => d.SourceType,
@@ -240,6 +241,7 @@ public sealed partial class ArchitectureDiagnosticFormatter : IArchitectureDiagn
         TypePlacementDiagnostic d => d.ForbiddenNamespace,
         LayoutConventionDiagnostic d => d.ForbiddenNamespace,
         PublicApiSurfaceDiagnostic d => d.ForbiddenNamespace,
+        ContractSurfaceExposureDiagnostic d => d.ForbiddenNamespace,
         AttributeUsageDiagnostic d => d.ForbiddenNamespace,
         InheritanceDiagnostic d => d.ForbiddenNamespace,
         InterfaceImplementationDiagnostic d => d.ForbiddenNamespace,
@@ -265,6 +267,7 @@ public sealed partial class ArchitectureDiagnosticFormatter : IArchitectureDiagn
         TypePlacementDiagnostic d => d.ForbiddenReferences,
         LayoutConventionDiagnostic d => d.ForbiddenReferences,
         PublicApiSurfaceDiagnostic d => d.ForbiddenReferences,
+        ContractSurfaceExposureDiagnostic d => d.ForbiddenReferences,
         AttributeUsageDiagnostic d => d.ForbiddenReferences,
         InheritanceDiagnostic d => d.ForbiddenReferences,
         InterfaceImplementationDiagnostic d => d.ForbiddenReferences,
@@ -358,6 +361,11 @@ public sealed partial class ArchitectureDiagnosticFormatter : IArchitectureDiagn
         if (diagnostic is PublicApiSurfaceDiagnostic publicApiSurface)
         {
             context += Reporting.ArchitectureDiagnosticFormatter.FormatPublicApiSurfaceContextForHumans(publicApiSurface);
+        }
+
+        if (diagnostic is ContractSurfaceExposureDiagnostic exposure)
+        {
+            context += FormatContractSurfaceExposureContextForHumans(exposure);
         }
 
         if (diagnostic is AttributeUsageDiagnostic attributeUsage)
