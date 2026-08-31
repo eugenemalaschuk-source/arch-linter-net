@@ -3,6 +3,7 @@ using ArchLinterNet.Core.Contracts.Families;
 using ArchLinterNet.Core.IO;
 using ArchLinterNet.Core.IO.Abstractions;
 using ArchLinterNet.Core.Model;
+using YamlDotNet.RepresentationModel;
 using YamlDotNet.Serialization;
 using YamlDotNet.Serialization.NamingConventions;
 
@@ -70,7 +71,7 @@ public sealed class ArchitectureBaselineLoadingService : IArchitectureBaselineLo
             throw new InvalidOperationException("Failed to deserialize baseline YAML.");
         }
 
-        ValidateBaseline(document);
+        ValidateBaseline(document, yaml);
         return new LoadedBaseline(
             document,
             ArchitectureLoadedTextIdentityFactory.FromText(baselinePath, yaml));
@@ -80,7 +81,7 @@ public sealed class ArchitectureBaselineLoadingService : IArchitectureBaselineLo
         ArchitectureBaselineDocument Document,
         ArchitectureLoadedTextIdentity ContentIdentity);
 
-    private static void ValidateBaseline(ArchitectureBaselineDocument document)
+    private static void ValidateBaseline(ArchitectureBaselineDocument document, string yaml)
     {
         if (document.Version is not (1 or 2 or 3))
         {
@@ -107,8 +108,64 @@ public sealed class ArchitectureBaselineLoadingService : IArchitectureBaselineLo
 
         if (document.Version == 3)
         {
+            ValidateMetricBaselineRequiredFields(yaml);
             ValidateMetricBaselines(document.MetricBaselines);
         }
+    }
+
+    // The baseline deserializer deliberately ignores unmatched properties for forward compatibility.
+    // For the versioned metric record, however, required keys must be fail-closed: an omitted key
+    // or a typo such as `valu` must not be silently mapped to a scalar default value.
+    private static void ValidateMetricBaselineRequiredFields(string yaml)
+    {
+        var stream = new YamlStream();
+        using var reader = new StringReader(yaml);
+        stream.Load(reader);
+
+        if (stream.Documents.Count != 1
+            || stream.Documents[0].RootNode is not YamlMappingNode root
+            || !TryGetChild(root, "metric_baselines", out YamlNode? metricBaselines)
+            || metricBaselines is not YamlSequenceNode entries)
+        {
+            return;
+        }
+
+        for (int index = 0; index < entries.Children.Count; index++)
+        {
+            if (entries.Children[index] is not YamlMappingNode entry)
+            {
+                continue;
+            }
+
+            foreach (string requiredKey in new[]
+                     {
+                         "metric_identity_version", "metric_id", "metric_kind", "native_subject",
+                         "effective_scope", "value",
+                     })
+            {
+                if (!TryGetChild(entry, requiredKey, out _))
+                {
+                    throw new InvalidOperationException(
+                        $"metric_baselines entry at index {index} has a missing '{requiredKey}'.");
+                }
+            }
+        }
+    }
+
+    private static bool TryGetChild(YamlMappingNode mapping, string key, out YamlNode? value)
+    {
+        foreach ((YamlNode node, YamlNode child) in mapping.Children)
+        {
+            if (node is YamlScalarNode { Value: { } nodeKey }
+                && string.Equals(nodeKey, key, StringComparison.Ordinal))
+            {
+                value = child;
+                return true;
+            }
+        }
+
+        value = null;
+        return false;
     }
 
     private static void ValidateMetricBaselines(IReadOnlyList<ArchitectureMetricBaselineEntry> entries)
@@ -118,6 +175,12 @@ public sealed class ArchitectureBaselineLoadingService : IArchitectureBaselineLo
         {
             ArchitectureMetricBaselineEntry entry = entries[index];
             string location = $"metric_baselines entry at index {index}";
+
+            if (entry.MetricIdentityVersion is null)
+            {
+                throw new InvalidOperationException(
+                    $"{location} has a missing 'metric_identity_version'.");
+            }
 
             if (entry.MetricIdentityVersion != ArchitectureMetricBaselineIdentity.CurrentVersion)
             {
@@ -175,6 +238,12 @@ public sealed class ArchitectureBaselineLoadingService : IArchitectureBaselineLo
             {
                 throw new InvalidOperationException(
                     $"{location} for metric '{entry.MetricId}' has an empty or missing 'effective_scope'.");
+            }
+
+            if (entry.Value is null)
+            {
+                throw new InvalidOperationException(
+                    $"{location} for metric '{entry.MetricId}' has a missing 'value'.");
             }
 
             if (entry.Value < 0)
@@ -536,6 +605,7 @@ public sealed class ArchitectureBaselineLoadingService : IArchitectureBaselineLo
                 ArchitectureInterfaceImplementationContract c => c.IgnoredViolations,
                 ArchitectureCompositionContract c => c.IgnoredViolations,
                 ArchitectureCoverageContract c => c.IgnoredViolations,
+                ArchitectureMetricBudgetContract c => c.IgnoredViolations,
                 ArchitectureContextDependencyContract c => c.IgnoredViolations,
                 ArchitectureContextAllowOnlyContract c => c.IgnoredViolations,
                 ArchitecturePortBoundaryContract c => c.IgnoredViolations,

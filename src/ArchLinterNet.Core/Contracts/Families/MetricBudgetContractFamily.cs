@@ -17,6 +17,11 @@ public sealed class ArchitectureMetricBudgetContract : IArchitectureContract
 
     [YamlMember(Alias = "max_delta")] public int? MaxDelta { get; set; }
 
+    // Finding-level baseline entries are merged here in memory. Metric scalar baselines remain
+    // separate on ArchitectureBaselineDocument.MetricBaselines.
+    [YamlIgnore]
+    public List<ArchitectureIgnoredViolation> IgnoredViolations { get; set; } = new();
+
     public bool IsRelative => BaselineMode is not null;
 
     public int AllowedDelta => BaselineMode == "no_worse_than_baseline" ? 0 : MaxDelta ?? 0;

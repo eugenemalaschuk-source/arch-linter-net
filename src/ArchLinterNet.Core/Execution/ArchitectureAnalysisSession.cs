@@ -493,15 +493,6 @@ public sealed class ArchitectureAnalysisSession
         IReadOnlyCollection<CycleCandidateEvidence> candidateEvidence) =>
         _cycleBaselineCandidateRecorder.Record(EnableUnmatchedIgnoreTracking, graph, candidateEvidence);
 
-    internal void AddMetricBudgetBaselineCandidate(ArchitectureBaselineCandidate candidate)
-    {
-        _findingIdentityService.Candidates.Add(candidate);
-        if (EnableUnmatchedIgnoreTracking)
-        {
-            _cycleBaselineCandidateRecorder.CandidateStore.Add(candidate);
-        }
-    }
-
     internal void AddMetricBaselineCandidate(ArchitectureMetricBaselineEntry candidate)
     {
         if (_metricBaselineCandidates.Any(existing =>

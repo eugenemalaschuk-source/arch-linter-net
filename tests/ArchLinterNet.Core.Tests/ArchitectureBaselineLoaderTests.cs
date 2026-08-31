@@ -338,6 +338,30 @@ metric_baselines:
         Assert.That(ex!.Message, Does.Contain(diagnostic));
     }
 
+    [TestCase("    metric_identity_version: 1\n", "", "metric_identity_version")]
+    [TestCase("    value: 3", "", "value")]
+    [TestCase("    value: 3", "    valu: 3", "value")]
+    public void LoadFromPath_Version3MetricEntryWithMissingOrMisspelledRequiredField_Throws(
+        string original,
+        string replacement,
+        string diagnostic)
+    {
+        string metric = """
+  -
+    metric_identity_version: 1
+    metric_id: app-outgoing
+    metric_kind: outgoing_component_count
+    native_subject: application
+    effective_scope: application
+    value: 3
+""".Replace(original, replacement, StringComparison.Ordinal);
+        File.WriteAllText(Path.Combine(_tempDir, "baseline.yml"), $"version: 3\nbaseline: {{}}\nmetric_baselines:\n{metric}");
+
+        InvalidOperationException? exception = Assert.Throws<InvalidOperationException>(() =>
+            _service.LoadFromPath(Path.Combine(_tempDir, "baseline.yml")));
+        Assert.That(exception!.Message, Does.Contain(diagnostic));
+    }
+
     [Test]
     public void LoadFromPath_Version3FindingEntryWithoutStructuredIdentity_Throws()
     {

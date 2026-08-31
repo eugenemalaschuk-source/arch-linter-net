@@ -542,6 +542,46 @@ public sealed class MetricBudgetContractTests
         });
     }
 
+    [Test]
+    public void Validate_GeneratedVersion3MetricBaseline_RoundTripsFindingAndScalarBaselines()
+    {
+        string policyPath = WriteFile("metric-budget-roundtrip.arch.yml", ExecutableMetricPolicy("""
+                - id: relative-budget
+                  metric: model-types
+                  baseline_mode: no_worse_than_baseline
+                - id: absolute-budget
+                  metric: model-types
+                  maximum: 0
+            """));
+        using ArchitectureEngine engine = new ArchitectureEngineBuilder().AddArchLinterNetCore().Build();
+
+        BaselineGenerationOutcome generation = engine.GenerateBaseline(new BaselineGenerationRequest
+        {
+            PolicyPath = policyPath,
+            Mode = "strict",
+        });
+
+        string baseline = generation.Yaml
+            ?? throw new AssertionException("A successful metric-budget baseline generation must produce YAML.");
+        string baselinePath = WriteFile("metric-budget-roundtrip.baseline.yml", baseline);
+        ValidationOutcome validation = engine.Validate(new ValidationRequest
+        {
+            PolicyPath = policyPath,
+            BaselinePath = baselinePath,
+            Mode = "strict",
+        });
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(generation.Succeeded, Is.True);
+            Assert.That(baseline, Does.Contain("version: 3"));
+            Assert.That(baseline, Does.Contain("strict_metric_budgets:"));
+            Assert.That(baseline, Does.Contain("metric_baselines:"));
+            Assert.That(validation.Passed, Is.True);
+            Assert.That(validation.Violations, Is.Empty);
+        });
+    }
+
     private static string ExecutableMetricPolicy(string strictBudgets) => $$"""
         version: 1
         name: Relative metric budget policy

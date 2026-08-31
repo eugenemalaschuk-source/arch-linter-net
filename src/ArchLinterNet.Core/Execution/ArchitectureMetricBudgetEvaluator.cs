@@ -1,6 +1,7 @@
 using ArchLinterNet.Core.Contracts;
 using ArchLinterNet.Core.Contracts.Families;
 using ArchLinterNet.Core.Model;
+using ArchLinterNet.Core.Resolution;
 
 namespace ArchLinterNet.Core.Execution;
 
@@ -47,6 +48,10 @@ internal static class ArchitectureMetricBudgetAnalysisService
         var violations = new List<ArchitectureViolation>();
         var expected = new List<ArchitectureApplicabilityExpectedEntry>(budgets.Length);
         var records = new List<ArchitectureApplicabilityRecord>(budgets.Length);
+        Dictionary<ArchitectureMetricBudgetContract, ArchitectureContractExecutionContext> executionContexts =
+            budgets.ToDictionary(
+                budget => budget,
+                budget => session.CreateExecutionContext(budget, budget.IgnoredViolations));
         foreach (ArchitectureMetricBudgetContract budget in budgets)
         {
             string budgetId = budget.Id ?? budget.Name;
@@ -96,6 +101,7 @@ internal static class ArchitectureMetricBudgetAnalysisService
                 // finding candidate stream used for ignore matching.
                 session.AddMetricBaselineCandidate(new ArchitectureMetricBaselineEntry
                 {
+                    MetricIdentityVersion = ArchitectureMetricBaselineIdentity.CurrentVersion,
                     MetricId = measurement.Id,
                     MetricKind = measurement.Kind,
                     NativeSubject = measurement.NativeSubject ?? string.Empty,
@@ -127,7 +133,8 @@ internal static class ArchitectureMetricBudgetAnalysisService
                     continue;
                 }
 
-                int baselineValue = reviewed.Value;
+                int baselineValue = reviewed.Value
+                    ?? throw new InvalidOperationException("A validated metric baseline must have a value.");
                 int currentValue = measurement.Value!.Value;
                 int delta = currentValue - baselineValue;
                 int allowedDelta = budget.AllowedDelta;
@@ -138,15 +145,18 @@ internal static class ArchitectureMetricBudgetAnalysisService
                 if (currentValue > effectiveThreshold)
                 {
                     bool capIsEffective = budget.Maximum is { } cap && cap <= relativeThreshold;
-                    violations.Add(CreateRelativeViolation(
-                        session,
+                    ArchitectureViolation violation = CreateRelativeViolation(
                         budget,
                         measurement,
                         baselineValue,
                         delta,
                         allowedDelta,
                         effectiveThreshold,
-                        capIsEffective ? budget.Maximum : null));
+                        capIsEffective ? budget.Maximum : null);
+                    if (!IsIgnored(executionContexts[budget], violation))
+                    {
+                        violations.Add(violation);
+                    }
                 }
 
                 continue;
@@ -154,13 +164,26 @@ internal static class ArchitectureMetricBudgetAnalysisService
 
             if (budget.Minimum is { } minimum && measurement.Value < minimum)
             {
-                violations.Add(CreateViolation(session, budget, measurement, "minimum", minimum));
+                ArchitectureViolation violation = CreateViolation(budget, measurement, "minimum", minimum);
+                if (!IsIgnored(executionContexts[budget], violation))
+                {
+                    violations.Add(violation);
+                }
             }
 
             if (budget.Maximum is { } maximum && measurement.Value > maximum)
             {
-                violations.Add(CreateViolation(session, budget, measurement, "maximum", maximum));
+                ArchitectureViolation violation = CreateViolation(budget, measurement, "maximum", maximum);
+                if (!IsIgnored(executionContexts[budget], violation))
+                {
+                    violations.Add(violation);
+                }
             }
+        }
+
+        foreach (ArchitectureContractExecutionContext executionContext in executionContexts.Values)
+        {
+            session.CollectUnmatchedIgnores(executionContext);
         }
 
         return new ArchitectureMetricBudgetEvaluationResult(violations, expected, records);
@@ -180,8 +203,24 @@ internal static class ArchitectureMetricBudgetAnalysisService
             MetricEvidence = metricEvidence,
         };
 
+    private static bool IsIgnored(
+        ArchitectureContractExecutionContext executionContext,
+        ArchitectureViolation violation)
+    {
+        ArchitectureViolationIdentity identity = violation.Identity
+            ?? throw new InvalidOperationException("Metric-budget violations must carry a baseline identity.");
+        return executionContext.IsIgnored(
+            violation.SourceType,
+            violation.ForbiddenReferences.Single(),
+            identity.SourceAssembly,
+            identity.TargetAssembly,
+            identity.TargetType,
+            identity.SourceMember,
+            identity.TargetMember,
+            identity.Configuration);
+    }
+
     private static ArchitectureViolation CreateViolation(
-        ArchitectureAnalysisSession session,
         ArchitectureMetricBudgetContract budget,
         ArchitectureMetricMeasurement measurement,
         string bound,
@@ -226,17 +265,10 @@ internal static class ArchitectureMetricBudgetAnalysisService
                 measurement.Contributors ?? Array.Empty<string>()),
         };
 
-        session.AddMetricBudgetBaselineCandidate(new ArchitectureBaselineCandidate(
-            session.ResolveContractGroup(budget) ?? $"strict_{Family}",
-            budget.Id,
-            subject,
-            identityReference,
-            identity));
         return violation;
     }
 
     private static ArchitectureViolation CreateRelativeViolation(
-        ArchitectureAnalysisSession session,
         ArchitectureMetricBudgetContract budget,
         ArchitectureMetricMeasurement measurement,
         int baselineValue,
@@ -295,12 +327,6 @@ internal static class ArchitectureMetricBudgetAnalysisService
             },
         };
 
-        session.AddMetricBudgetBaselineCandidate(new ArchitectureBaselineCandidate(
-            session.ResolveContractGroup(budget) ?? $"strict_{Family}",
-            budget.Id,
-            subject,
-            identityReference,
-            identity));
         return violation;
     }
 }

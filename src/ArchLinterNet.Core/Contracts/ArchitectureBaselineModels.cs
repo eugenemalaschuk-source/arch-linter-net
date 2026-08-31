@@ -53,7 +53,7 @@ public sealed record ArchitectureMetricBaselineIdentity(
 public sealed class ArchitectureMetricBaselineEntry
 {
     [YamlMember(Alias = "metric_identity_version")]
-    public int MetricIdentityVersion { get; set; } = ArchitectureMetricBaselineIdentity.CurrentVersion;
+    public int? MetricIdentityVersion { get; set; }
 
     [YamlMember(Alias = "metric_id")]
     public string MetricId { get; set; } = string.Empty;
@@ -71,11 +71,11 @@ public sealed class ArchitectureMetricBaselineEntry
     public string EffectiveScope { get; set; } = string.Empty;
 
     [YamlMember(Alias = "value")]
-    public int Value { get; set; }
+    public int? Value { get; set; }
 
     [YamlIgnore]
     public ArchitectureMetricBaselineIdentity Identity => new(
-        MetricIdentityVersion,
+        MetricIdentityVersion ?? 0,
         MetricId,
         MetricKind,
         NativeSubject,
