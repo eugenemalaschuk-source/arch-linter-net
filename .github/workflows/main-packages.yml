@@ -176,25 +176,39 @@ jobs:
         with:
           dotnet-version: 10.0.x
 
-      - name: Configure GitHub Packages NuGet source
+      - name: Verify exact published package set is consumable
         shell: bash
         env:
           GITHUB_TOKEN: ${{ github.token }}
         run: |
-          dotnet nuget add source \
-            --username "$GITHUB_ACTOR" \
-            --password "$GITHUB_TOKEN" \
-            --store-password-in-clear-text \
-            --name github \
-            "https://nuget.pkg.github.com/$GITHUB_REPOSITORY_OWNER/index.json"
-
-      - name: Verify exact published package set is consumable
-        shell: bash
-        run: |
           set -euo pipefail
           smoke_root="$RUNNER_TEMP/arch-linter-main-package-smoke"
+          smoke_config="$RUNNER_TEMP/arch-linter-main-package-smoke.NuGet.Config"
           feed="https://nuget.pkg.github.com/$GITHUB_REPOSITORY_OWNER/index.json"
           export NUGET_PACKAGES="$smoke_root/nuget-packages"
+          export NuGetPackageSourceCredentials_github="Username=$GITHUB_ACTOR;Password=$GITHUB_TOKEN;ValidAuthenticationTypes=Basic"
+
+          cleanup_smoke_config() {
+            rm -f "$smoke_config"
+          }
+          trap cleanup_smoke_config EXIT
+
+          cat > "$smoke_config" <<EOF
+          <?xml version="1.0" encoding="utf-8"?>
+          <configuration>
+            <packageSources>
+              <clear />
+              <add key="nuget.org" value="https://api.nuget.org/v3/index.json" protocolVersion="3" />
+              <add key="github" value="$feed" />
+            </packageSources>
+          </configuration>
+          EOF
+          chmod 600 "$smoke_config"
+
+          echo "NuGet sources used by the main-package consumer smoke:"
+          dotnet nuget list source \
+            --format Detailed \
+            --configfile "$smoke_config"
 
           for attempt in 1 2 3 4 5 6; do
             rm -rf "$smoke_root"
@@ -205,7 +219,7 @@ jobs:
             if ! dotnet tool install ArchLinterNet.Cli \
               --version "$PACKAGE_VERSION" \
               --tool-path "$smoke_root/tool" \
-              --add-source "$feed"; then
+              --configfile "$smoke_config"; then
               smoke_ok=false
             fi
 
@@ -222,14 +236,22 @@ jobs:
             fi
 
             if [ "$smoke_ok" = true ]; then
+              restore_verbosity=minimal
+              if [ "$attempt" -eq 6 ]; then
+                restore_verbosity=normal
+                echo "Final library restore attempt uses normal verbosity to show the feeds NuGet actually queried." >&2
+              fi
+
               (
                 cd "$smoke_root/library"
                 dotnet new classlib --framework net10.0 --no-restore
                 dotnet add package ArchLinterNet.Testing \
                   --version "$PACKAGE_VERSION" \
-                  --source "$feed" \
                   --no-restore
-                dotnet restore --no-cache
+                dotnet restore \
+                  --no-cache \
+                  --configfile "$smoke_config" \
+                  --verbosity "$restore_verbosity"
                 python3 "$GITHUB_WORKSPACE/tools/release/verify_restored_main_packages.py" \
                   --assets obj/project.assets.json \
                   --version "$PACKAGE_VERSION"

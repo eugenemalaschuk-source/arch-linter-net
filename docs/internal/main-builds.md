@@ -51,7 +51,7 @@ The Sonar scanner still waits for the merged-main Quality Gate and records its r
 
 No new repository secret is required for `arch-linter-net`.
 
-The workflow uses the built-in `GITHUB_TOKEN` with job-local `packages: write` permission to publish and to manage package retention. The token is added only to the ephemeral runner's NuGet source; no credential is committed to the repository.
+The workflow uses the built-in `GITHUB_TOKEN` with job-local `packages: write` permission to publish and to manage package retention. The publish step configures credentials only on the ephemeral runner. The consumer-smoke step keeps its temporary `NuGet.Config` credential-free and supplies GitHub Packages credentials through the step-local `NuGetPackageSourceCredentials_github` environment variable. No credential is committed, uploaded as an artifact, or printed by the source diagnostic.
 
 Package visibility is not an authorization boundary for `main.N` publication. The workflow accepts the existing GitHub Package identity visibility and does not attempt to require or change it. This allows the development versions to share the same package IDs as the existing public ArchLinterNet packages while remaining clearly identified by their `-main.N` prerelease version.
 
@@ -61,11 +61,15 @@ Package visibility is not an authorization boundary for `main.N` publication. Th
 
 A successful package upload is not by itself treated as proof that a consumer can restore the build. Before retention starts, a clean runner performs a bounded eventual-consistency smoke against GitHub Packages:
 
-1. installs `ArchLinterNet.Cli` at the exact `main.N` version into an empty tool path;
-2. confirms the installed tool manifest reports that exact package version and executes the packaged entrypoint;
-3. creates an empty `net10.0` consumer project;
-4. restores `ArchLinterNet.Testing` at the exact version;
-5. verifies `project.assets.json` resolved the exact matching `ArchLinterNet.Testing`, `ArchLinterNet.Core`, and `ArchLinterNet.CEL` versions.
+1. creates a temporary `NuGet.Config` with `<clear />` and exactly two sources: NuGet.org for external dependencies and the repository GitHub Packages feed for ArchLinterNet packages;
+2. lists those effective sources without credentials for diagnostics;
+3. installs `ArchLinterNet.Cli` at the exact `main.N` version into an empty tool path using that config;
+4. confirms the installed tool manifest reports that exact package version and executes the packaged entrypoint;
+5. creates an empty `net10.0` consumer project;
+6. restores `ArchLinterNet.Testing` at the exact version using the same explicit config;
+7. verifies `project.assets.json` resolved the exact matching `ArchLinterNet.Testing`, `ArchLinterNet.Core`, and `ArchLinterNet.CEL` versions.
+
+The smoke never relies on user-, machine-, repository-, or temporary-project-location NuGet source discovery. The final bounded retry increases restore verbosity so a persistent failure shows which configured feeds NuGet actually queried, while credentials remain outside the config and logs.
 
 The four-package build is declared consumable only after this proof succeeds. Registry/authentication/dependency convergence failures remain red, and cleanup does not run after a failed availability smoke.
 
