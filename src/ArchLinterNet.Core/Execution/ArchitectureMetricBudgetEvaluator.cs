@@ -144,7 +144,6 @@ internal static class ArchitectureMetricBudgetAnalysisService
                     : relativeThreshold;
                 if (currentValue > effectiveThreshold)
                 {
-                    bool capIsEffective = budget.Maximum is { } cap && cap <= relativeThreshold;
                     ArchitectureViolation violation = CreateRelativeViolation(
                         budget,
                         measurement,
@@ -152,7 +151,7 @@ internal static class ArchitectureMetricBudgetAnalysisService
                         delta,
                         allowedDelta,
                         effectiveThreshold,
-                        capIsEffective ? budget.Maximum : null);
+                        budget.Maximum);
                     if (!IsIgnored(executionContexts[budget], violation))
                     {
                         violations.Add(violation);
@@ -279,11 +278,13 @@ internal static class ArchitectureMetricBudgetAnalysisService
     {
         string budgetId = budget.Id ?? budget.Name;
         string subject = measurement.NativeSubject ?? measurement.EffectiveScope ?? measurement.Id;
-        string bound = absoluteCap is not null
+        bool absoluteCapIsEffective = absoluteCap is { } cap && cap <= (long)baselineValue + allowedDelta;
+        string bound = absoluteCapIsEffective
             ? "maximum"
             : budget.BaselineMode == "max_delta" ? "max_delta" : "baseline";
-        int configuredLimit = absoluteCap
-            ?? (budget.BaselineMode == "max_delta" ? allowedDelta : baselineValue);
+        int configuredLimit = absoluteCapIsEffective
+            ? absoluteCap!.Value
+            : budget.BaselineMode == "max_delta" ? allowedDelta : baselineValue;
         string identityReference =
             $"metric={measurement.Id};subject={subject};bound={bound};limit={effectiveThreshold}";
         var identity = new ArchitectureViolationIdentity(

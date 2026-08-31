@@ -504,6 +504,47 @@ public sealed class MetricBudgetContractTests
     }
 
     [Test]
+    public void Validate_RelativeBudget_ReportsConfiguredCapWhenDeltaIsTheEffectiveBound()
+    {
+        string policyPath = WriteFile("relative-configured-cap.arch.yml", ExecutableMetricPolicy("""
+                - id: ratchet
+                  metric: model-types
+                  baseline_mode: max_delta
+                  max_delta: 0
+                  maximum: 100000
+            """));
+        string baselinePath = WriteFile("relative-configured-cap.baseline.yml", """
+            version: 3
+            baseline: {}
+            metric_baselines:
+              - metric_identity_version: 1
+                metric_id: model-types
+                metric_kind: topology_type_count
+                native_subject: model
+                effective_scope: model
+                value: 0
+            """);
+        using ArchitectureEngine engine = new ArchitectureEngineBuilder().AddArchLinterNetCore().Build();
+
+        ValidationOutcome outcome = engine.Validate(new ValidationRequest
+        {
+            PolicyPath = policyPath,
+            BaselinePath = baselinePath,
+            Mode = "strict",
+        });
+        MetricBudgetPayload payload = (MetricBudgetPayload)outcome.Violations.Single().Payload!;
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(outcome.Passed, Is.False);
+            Assert.That(payload.BreachedBound, Is.EqualTo("max_delta"));
+            Assert.That(payload.ConfiguredLimit, Is.Zero);
+            Assert.That(payload.EffectiveThreshold, Is.Zero);
+            Assert.That(payload.AbsoluteCap, Is.EqualTo(100000));
+        });
+    }
+
+    [Test]
     public void GenerateBaseline_RelativeMetricBudget_EmitsVersion3WithCurrentScalarValue()
     {
         string path = WriteFile("relative-generate.arch.yml", ExecutableMetricPolicy("""

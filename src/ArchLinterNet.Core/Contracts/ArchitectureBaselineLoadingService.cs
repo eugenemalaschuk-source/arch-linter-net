@@ -130,6 +130,11 @@ public sealed class ArchitectureBaselineLoadingService : IArchitectureBaselineLo
             return;
         }
 
+        string[] requiredKeys =
+        [
+            "metric_identity_version", "metric_id", "metric_kind", "native_subject", "effective_scope", "value",
+        ];
+        string[] allowedKeys = [.. requiredKeys, "unit"];
         for (int index = 0; index < entries.Children.Count; index++)
         {
             if (entries.Children[index] is not YamlMappingNode entry)
@@ -137,11 +142,22 @@ public sealed class ArchitectureBaselineLoadingService : IArchitectureBaselineLo
                 continue;
             }
 
-            foreach (string requiredKey in new[]
-                     {
-                         "metric_identity_version", "metric_id", "metric_kind", "native_subject",
-                         "effective_scope", "value",
-                     })
+            foreach (YamlNode field in entry.Children.Keys)
+            {
+                if (field is not YamlScalarNode { Value: { } fieldName })
+                {
+                    throw new InvalidOperationException(
+                        $"metric_baselines entry at index {index} has an unknown non-scalar field.");
+                }
+
+                if (!allowedKeys.Contains(fieldName, StringComparer.Ordinal))
+                {
+                    throw new InvalidOperationException(
+                        $"metric_baselines entry at index {index} has an unknown field '{fieldName}'.");
+                }
+            }
+
+            foreach (string requiredKey in requiredKeys)
             {
                 if (!TryGetChild(entry, requiredKey, out _))
                 {
