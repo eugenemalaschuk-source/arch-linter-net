@@ -3,7 +3,9 @@
 ## Purpose
 Define deterministic, vendor-neutral reference scenarios for the complete external-diagnostic
 evidence federation path.
+
 ## Requirements
+
 ### Requirement: Synthetic reference scenarios preserve trusted external diagnostic semantics end to end
 The system SHALL provide deterministic, public-safe synthetic SARIF reference scenarios that
 compose bounded evidence trust validation, external-diagnostic selection, normalized finding and
@@ -11,12 +13,14 @@ baseline projection, output projection, and applicability evidence. A valid curr
 selected result SHALL retain its logical evidence key, producer/run, repository, revision, scope,
 artifact content hash, source provenance, canonical identity, and strict/audit semantics through
 the canonical finding, Human, JSON, SARIF, and Testing projections. The baseline projection SHALL
-retain the selected diagnostic's stable canonical identity and strict/audit debt-lifecycle
-semantics without retaining producer/run, artifact-path, or artifact-hash provenance. The
-applicability projection SHALL report the external-evidence control's evaluable, unassessable, or
-not-applicable state, associated reason codes, and general policy provenance without carrying the
-selected diagnostic's provenance. A successful trusted zero-result artifact SHALL remain
-explicitly evaluable and distinct from absent or unusable evidence.
+retain the selected diagnostic's canonical identity and strict/audit debt-lifecycle semantics.
+Transient run ID, artifact path, and artifact content hash SHALL NOT participate in baseline
+identity. Producer tool name/version and the selected repository, revision, and scope context
+SHALL remain intentional canonical-identity dimensions; when they change, the result MAY become a
+new baseline occurrence. The applicability projection SHALL report the external-evidence control's
+evaluable, unassessable, or not-applicable state, associated reason codes, and general policy
+provenance without carrying the selected diagnostic's provenance. A successful trusted zero-result
+artifact SHALL remain explicitly evaluable and distinct from absent or unusable evidence.
 
 #### Scenario: Current evidence produces a governed imported finding
 - **WHEN** a synthetic SARIF 2.1.0 artifact has a successful matching producer run and every
@@ -26,6 +30,13 @@ explicitly evaluable and distinct from absent or unusable evidence.
 - **AND** the corresponding baseline candidate retains the selected canonical identity and
   strict/audit debt-lifecycle semantics
 - **AND** the external-evidence applicability record is evaluable with no reason code
+
+#### Scenario: Transient rerun provenance does not change a baseline occurrence
+- **WHEN** equivalent selected diagnostics differ only by run ID, artifact path, or artifact
+  content hash
+- **THEN** their selected, normalized-finding, and baseline identities remain equal
+- **AND** a change to producer tool name/version, repository, revision, or scope remains an
+  intentional identity change that can create a distinct baseline occurrence
 
 #### Scenario: Current evidence has no selected results
 - **WHEN** a successful synthetic current-context artifact contains no policy-selected diagnostics
