@@ -22,6 +22,7 @@ _SHA_PATTERN = re.compile(r"[0-9a-f]{40}")
 _SONAR_STATS_PATTERN = re.compile(
     r"Coverage Report Statistics: \d+ files, \d+ main files, (\d+) main files with coverage"
 )
+_GITHUB_OUTPUT_DESCRIPTION = "GitHub output file"
 
 
 @dataclass(frozen=True)
@@ -247,7 +248,7 @@ def _canonicalize_shard(arguments: argparse.Namespace) -> None:
 
 def _verify_shard_files(manifest_path: Path, manifest: dict[str, Any]) -> None:
     for record in manifest["reports"]:
-        path = manifest_path.parent / record["file"]
+        path = _safe_path(manifest_path.parent / record["file"], "coverage shard report")
         size, digest = _validate_report(path, record["format"])
         if size != record["size"] or digest != record["sha256"]:
             raise ValueError(f"Coverage shard report does not match its manifest: {path}")
@@ -345,7 +346,7 @@ def _assemble(arguments: argparse.Namespace) -> None:
     artifacts_root = _safe_path(arguments.artifacts_root, "coverage artifacts root")
     output_root = _safe_path(arguments.output_root, "coverage output root")
     github_output = (
-        _safe_path(arguments.github_output, "GitHub output file")
+        _safe_path(arguments.github_output, _GITHUB_OUTPUT_DESCRIPTION)
         if arguments.github_output is not None
         else None
     )
@@ -381,9 +382,9 @@ def _assemble(arguments: argparse.Namespace) -> None:
     for shard_id in _SHARD_IDS:
         manifest_path, manifest = manifests[shard_id]
         for record in manifest["reports"]:
-            source = manifest_path.parent / record["file"]
+            source = _safe_path(manifest_path.parent / record["file"], "canonical coverage report")
             relative = Path(shard_id) / record["file"]
-            destination = output_root / relative
+            destination = _safe_path(output_root / relative, "coverage inventory destination")
             destination.parent.mkdir(parents=True, exist_ok=True)
             shutil.copyfile(source, destination)
             reports.append(
@@ -421,7 +422,7 @@ def _assemble(arguments: argparse.Namespace) -> None:
 def _verify_inventory_command(arguments: argparse.Namespace) -> None:
     inventory_root = _safe_path(arguments.inventory_root, "coverage inventory root")
     github_output = (
-        _safe_path(arguments.github_output, "GitHub output file")
+        _safe_path(arguments.github_output, _GITHUB_OUTPUT_DESCRIPTION)
         if arguments.github_output is not None
         else None
     )
@@ -444,7 +445,7 @@ def _verify_sonar(arguments: argparse.Namespace) -> None:
     scanner_log = _safe_path(arguments.scanner_log, "Sonar scanner log")
     analysis_json = _safe_path(arguments.analysis_json, "Sonar project analyses response")
     github_output = (
-        _safe_path(arguments.github_output, "GitHub output file")
+        _safe_path(arguments.github_output, _GITHUB_OUTPUT_DESCRIPTION)
         if arguments.github_output is not None
         else None
     )
