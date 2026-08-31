@@ -2,9 +2,11 @@
 
 ## Purpose
 TBD - created by archiving change ship-versioned-packaged-schemas. Update Purpose after archive.
+
 ## Requirements
+
 ### Requirement: Release-matched packaged schema registry
-The system SHALL ship an immutable `adoption-stabilization/v1` compatibility manifest listing exact schema resources only for persisted formats whose writers are implemented and whose real generated output is validated: policy root v1, policy fragment v1, baseline v2 with identity version v1, public API snapshot v1, normalized finding v2 (with v1 source bytes preserved for legacy readers), analysis build-state receipt v1, analysis-cache v1, and analysis-profile v1. Future formats without implemented writers and generated-output validation SHALL NOT be published in the immutable package registry.
+The system SHALL ship an immutable `adoption-stabilization/v1` compatibility manifest listing exact schema resources only for persisted formats whose writers are implemented and whose real generated output is validated: policy root v1, policy fragment v1, baseline v2 with identity version v1, public API snapshot v1, normalized finding v3 (with v1 and v2 source bytes preserved for legacy readers), analysis build-state receipt v1, analysis-cache v1, and analysis-profile v1. Future formats without implemented writers and generated-output validation SHALL NOT be published in the immutable package registry.
 
 Each manifest entry SHALL contain a logical schema id, document version, packaged resource path, immutable release-qualified `$id`, SHA-256 digest, read/write support, migration or deprecation note, and owning OpenSpec capability. Entries SHALL default to the `0.5.1` release-qualified identity; an individual entry MAY independently advance to a later release-qualified identity (e.g. `0.6.1`) when its own schema shape changes, without requiring every other entry or the manifest's own `productVersion`/`compatibilityEnvelope` to advance. An entry's prior release-qualified bytes SHALL remain preserved, byte-for-byte, in source control after the entry advances, even though the advanced entry is no longer packaged/registry-discoverable under the prior identity.
 
@@ -80,3 +82,16 @@ The repository SHALL validate freshly packed artifacts so that the installed CLI
 #### Scenario: Documentation names an unsupported schema identifier
 - **WHEN** schema guidance names an immutable `$schema` URL not listed by the packed registry
 - **THEN** consistency validation fails with the unsupported URL
+
+### Requirement: Current packaged schemas and frozen legacy resources are distinguished
+The packaged schema registry and compatibility manifest SHALL identify the
+current normalized-finding and analysis-cache schema resources used for writing
+and package smoke validation. They SHALL also retain frozen earlier resources
+as explicit legacy read contracts, without presenting an obsolete resource as
+the current writer schema.
+
+#### Scenario: Packaged tooling inspects current and legacy schemas
+- **WHEN** the packaged CLI prints the normalized-finding and analysis-cache
+  schemas
+- **THEN** it reports the current v3/0.8 normalized-finding and current cache
+  resources, while a separate legacy check verifies the frozen 0.6.1 bytes

@@ -318,6 +318,24 @@ public sealed partial class ArchitecturePolicyWeakeningComparerTests
         });
     }
 
+    [TestCase("maximum", "10", "20")]
+    [TestCase("minimum", "10", "5")]
+    public void Compare_RelaxedMetricBudgetBound_IsSemanticWeakening(string bound, string baselineValue, string currentValue)
+    {
+        ArchitecturePolicyWeakeningFinding finding = ArchitecturePolicyWeakeningComparer.Compare(new(
+            Context(contracts: [Contract("strict", "metric_budgets", "budget", [Fact("metric", "type-count"), Fact(bound, baselineValue)])]),
+            Context(contracts: [Contract("strict", "metric_budgets", "budget", [Fact("metric", "type-count"), Fact(bound, currentValue)])]))).Findings.Single();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(finding.Kind, Is.EqualTo("metric_budget_bound_relaxed"));
+            Assert.That(finding.Classification, Is.EqualTo("semantic"));
+            Assert.That(finding.ControlIdentity, Is.EqualTo("metric_budgets:budget:" + bound));
+            Assert.That(finding.BaseValues, Is.EqualTo([baselineValue]));
+            Assert.That(finding.CurrentValues, Is.EqualTo([currentValue]));
+        });
+    }
+
     [Test]
     public void Compare_ForbiddenNameSuffixChange_IsImpactNotProven()
     {

@@ -2,6 +2,7 @@ using System.Text.Json;
 using ArchLinterNet.Core.Composition;
 using ArchLinterNet.Core.Contracts;
 using ArchLinterNet.Core.Model;
+using ArchLinterNet.Core.PolicyContext;
 using ArchLinterNet.Core.Reporting;
 using ArchLinterNet.Core.Validation;
 using NUnit.Framework;
@@ -63,6 +64,34 @@ public sealed class MetricBudgetContractTests
                 Does.Contain("max-types"));
             Assert.That(document.Contracts.AllAudit.Select(contract => contract.Id),
                 Does.Contain("min-types"));
+        });
+    }
+
+    [Test]
+    public void ExportPolicyContext_MetricBudget_ProjectsTypedMetricAndBoundFacts()
+    {
+        string path = WriteFile("policy-context.arch.yml", Policy("""
+          strict_metric_budgets:
+            - id: bounded-types
+              metric: type-count
+              minimum: 1
+              maximum: 10
+        """));
+        using ArchitectureEngine engine = new ArchitectureEngineBuilder().AddArchLinterNetCore().Build();
+
+        ArchitecturePolicyContextExport context = engine.ExportPolicyContext(new ArchitecturePolicyContextRequest { PolicyPath = path });
+        ArchitecturePolicyContextContract contract = context.Contracts.Single(item => item.Id == "bounded-types");
+        string json = ArchitecturePolicyContextFormatter.FormatAsJson(context);
+        string markdown = ArchitecturePolicyContextFormatter.FormatAsMarkdown(context);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(contract.Family, Is.EqualTo("metric_budgets"));
+            Assert.That(contract.Facts.Single(fact => fact.Name == "metric").Values, Is.EqualTo(["type-count"]));
+            Assert.That(contract.Facts.Single(fact => fact.Name == "minimum").Values, Is.EqualTo(["1"]));
+            Assert.That(contract.Facts.Single(fact => fact.Name == "maximum").Values, Is.EqualTo(["10"]));
+            Assert.That(json, Does.Contain("\"metric\"").And.Contain("\"maximum\""));
+            Assert.That(markdown, Does.Contain("metric: `type-count`").And.Contain("minimum: `1`").And.Contain("maximum: `10`"));
         });
     }
 

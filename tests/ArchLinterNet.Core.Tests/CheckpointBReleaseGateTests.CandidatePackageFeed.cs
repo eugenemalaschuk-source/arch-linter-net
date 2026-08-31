@@ -110,11 +110,11 @@ public sealed partial class CheckpointBReleaseGateTests
                 Assert.That(core.GetEntry($"contentFiles/any/any/schema/0.5.1/{schema}"), Is.Not.Null, schema);
             }
 
-            // Policy root/fragment and normalized findings advance to 0.8.0; the cache stays 0.6.1 and legacy 0.5.1 stays packaged offline.
+            // Policy root/fragment, normalized findings, and the cache advance to 0.8.0; legacy resources stay packaged offline.
             foreach (string schema in new[]
                      {
                          "compatibility-manifest.json", "dependencies.arch.fragment.schema.json", "dependencies.arch.schema.json",
-                         "normalized-finding.schema.json",
+                         "normalized-finding.schema.json", "analysis-cache.schema.json",
                      })
             {
                 Assert.That(core.GetEntry($"contentFiles/any/any/schema/0.8.0/{schema}"), Is.Not.Null, schema);

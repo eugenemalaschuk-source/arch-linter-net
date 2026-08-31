@@ -38,6 +38,7 @@ public sealed partial class PolicyRawValidationSeamTests
         nameof(RawLayerTemplateNodeValidator),
         nameof(RawTopologyNodeValidator),
         nameof(RawMetricDefinitionValidator),
+        nameof(RawMetricBudgetValidator),
         nameof(RawWhenFieldLocationValidator),
         nameof(RawHistoryAnalysisNodeValidator),
         nameof(RawExternalEvidenceNodeValidator),
