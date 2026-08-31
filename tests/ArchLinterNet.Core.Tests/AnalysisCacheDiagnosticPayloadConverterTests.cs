@@ -6,7 +6,7 @@ using NUnit.Framework;
 namespace ArchLinterNet.Core.Tests;
 
 // Review finding #1's closed-set converter (AnalysisCacheDiagnosticPayloadConverter) enumerates
-// all 18 concrete IArchitectureDiagnosticPayload record types in one switch. Each arm is its own
+// all 20 concrete IArchitectureDiagnosticPayload record types in one switch. Each arm is its own
 // branch/line for coverage purposes and for proving the converter actually round-trips that type's
 // own fields (not just falls through to a shared default), so every type gets its own case here
 // rather than one parameterized case reusing a single shape.
@@ -182,6 +182,24 @@ public sealed class AnalysisCacheDiagnosticPayloadConverterTests
         PublicApiSurfacePayload result = RoundTrip(original);
         Assert.That(result.UndeclaredApiSignature, Is.EqualTo(original.UndeclaredApiSignature));
         Assert.That(result.PreviousApiSignature, Is.EqualTo(original.PreviousApiSignature));
+    }
+
+    [Test]
+    public void RoundTrips_ContractSurfaceExposurePayload()
+    {
+        ContractSurfaceExposurePayload original = new(
+            "Product", "Product.PublicContract", "member:Result", "6:member6:Result",
+            "System.Private.CoreLib", "System.Collections.Generic.List`1", "exported",
+            "member:Result", "reviewed-api", [0]);
+
+        ContractSurfaceExposurePayload result = RoundTrip(original);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(result.TargetAssemblyName, Is.EqualTo(original.TargetAssemblyName));
+            Assert.That(result.CanonicalExposurePath, Is.EqualTo(original.CanonicalExposurePath));
+            Assert.That(result.MatchingForbiddenSelectors, Is.EqualTo(original.MatchingForbiddenSelectors));
+        });
     }
 
     [Test]

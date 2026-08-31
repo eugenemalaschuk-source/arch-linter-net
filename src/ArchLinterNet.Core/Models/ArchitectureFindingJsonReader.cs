@@ -60,6 +60,7 @@ public static class ArchitectureFindingJsonReader
     {
         "metric_budget",
         "imported_external_diagnostic",
+        "contract_surface_exposure",
     };
 
     public static ArchitectureFindingReadEnvelope Read(string json, bool strict)

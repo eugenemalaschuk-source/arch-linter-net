@@ -359,6 +359,8 @@ public static class ArchitectureBaselineComparer
             "audit_layout_conventions" => groups.AuditLayoutConventions.Select(c => c.Id),
             "strict_public_api_surface" => groups.StrictPublicApiSurface.Select(c => c.Id),
             "audit_public_api_surface" => groups.AuditPublicApiSurface.Select(c => c.Id),
+            "strict_contract_surface_exposure" => groups.StrictContractSurfaceExposure.Select(c => c.Id),
+            "audit_contract_surface_exposure" => groups.AuditContractSurfaceExposure.Select(c => c.Id),
             "strict_attribute_usage" => groups.StrictAttributeUsage.Select(c => c.Id),
             "audit_attribute_usage" => groups.AuditAttributeUsage.Select(c => c.Id),
             "strict_inheritance" => groups.StrictInheritance.Select(c => c.Id),

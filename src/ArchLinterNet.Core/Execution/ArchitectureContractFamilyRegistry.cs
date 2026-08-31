@@ -3,6 +3,7 @@ using ArchLinterNet.Core.Contracts.Families;
 using ArchLinterNet.Core.Discovery;
 using ArchLinterNet.Core.Execution.Abstractions;
 using ArchLinterNet.Core.Execution.Results;
+using ArchLinterNet.Core.Resolution;
 
 namespace ArchLinterNet.Core.Execution;
 
@@ -334,6 +335,14 @@ internal static class ArchitectureContractFamilyRegistry
                 session.CheckPublicApiSurfaceContract((ArchitecturePublicApiSurfaceContract)contract)))
         {
             OwnedContractTypes = new[] { typeof(ArchitecturePublicApiSurfaceContract) },
+        },
+        new(
+            "contract_surface_exposure", "strict_contract_surface_exposure", "audit_contract_surface_exposure", true,
+            g => g.StrictContractSurfaceExposure, g => g.AuditContractSurfaceExposure,
+            (session, contract) => session.CheckContractSurfaceExposureContract(
+                (ArchitectureContractSurfaceExposureContract)contract))
+        {
+            OwnedContractTypes = new[] { typeof(ArchitectureContractSurfaceExposureContract) },
         },
         new(
             "attribute_usage", "strict_attribute_usage", "audit_attribute_usage", true,

@@ -16,12 +16,12 @@ public sealed class ArchitectureContractFamilyBindingsTests
 {
     private static readonly string[] _value = { "layer_template" };
     [Test]
-    public void All_HasThirtyTwoUniqueFamilyIds()
+    public void All_HasThirtyFourUniqueFamilyIds()
     {
         var familyIds = ArchitectureContractFamilyBindings.All.Select(b => b.FamilyId).ToList();
 
-        Assert.That(familyIds, Has.Count.EqualTo(33));
-        Assert.That(familyIds.Distinct(StringComparer.Ordinal).Count(), Is.EqualTo(33));
+        Assert.That(familyIds, Has.Count.EqualTo(34));
+        Assert.That(familyIds.Distinct(StringComparer.Ordinal).Count(), Is.EqualTo(34));
     }
 
     [Test]
@@ -66,6 +66,16 @@ public sealed class ArchitectureContractFamilyBindingsTests
         StrictTypePlacement = { new ArchitectureTypePlacementContract { Name = "n", Id = "type_placement" } },
         StrictPublicApiSurface =
             { new ArchitecturePublicApiSurfaceContract { Name = "n", Id = "public_api_surface" } },
+        StrictContractSurfaceExposure =
+        {
+            new ArchitectureContractSurfaceExposureContract
+            {
+                Name = "n",
+                Id = "contract_surface_exposure",
+                Source = new ArchitectureContractSurfaceExposureSource { Assemblies = ["Test.Core"] },
+                Forbidden = [new ArchitecturePublicApiSurfaceSelector { Role = "Entity" }],
+            },
+        },
         StrictAttributeUsage = { new ArchitectureAttributeUsageContract { Name = "n", Id = "attribute_usage" } },
         StrictInheritance = { new ArchitectureInheritanceContract { Name = "n", Id = "inheritance" } },
         StrictInterfaceImplementation =
@@ -83,7 +93,7 @@ public sealed class ArchitectureContractFamilyBindingsTests
 
         var strictIds = groups.AllStrict.Select(c => c.Id).ToList();
 
-        Assert.That(strictIds, Has.Count.EqualTo(27));
+        Assert.That(strictIds, Has.Count.EqualTo(28));
         Assert.That(strictIds, Does.Not.Contain("layer_template"));
     }
 
