@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RunSettings>
+  <NUnit>
+    <!--
+      NUnit3TestAdapter defaults AssemblySelectLimit to 2000. When VSTest hands the adapter a
+      larger selected-test list, the adapter intentionally drops that list and runs the whole
+      assembly. Core sharding relies on an exact FullyQualifiedName selection, so the fallback is
+      fail-open for this repository. int.MaxValue effectively disables the count-based fallback
+      while retaining the authored VSTest filter and its E2E/release-gate exclusions.
+    -->
+    <AssemblySelectLimit>2147483647</AssemblySelectLimit>
+  </NUnit>
+</RunSettings>

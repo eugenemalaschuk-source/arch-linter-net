@@ -6,6 +6,13 @@
     <Nullable>enable</Nullable>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <IsPackable>false</IsPackable>
+    <!--
+      NUnit3TestAdapter defaults AssemblySelectLimit to 2000. Above that threshold it may discard
+      the VSTest-selected test list and execute the whole assembly, which makes our deterministic
+      Core shard filters fail open as the suite grows. Keep the adapter settings project-scoped so
+      every dotnet-test entrypoint preserves the authored FullyQualifiedName selection.
+    -->
+    <RunSettingsFilePath>$(MSBuildThisFileDirectory)core-test-selection.runsettings</RunSettingsFilePath>
   </PropertyGroup>
 
   <ItemGroup>
