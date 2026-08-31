@@ -177,6 +177,55 @@ public sealed class ContractSurfaceExposurePolicyTests
         Assert.That(exception.Message, Does.Contain("unknown layer 'does-not-exist' in 'forbidden[0]'"));
     }
 
+    [Test]
+    public void Load_SourceAssemblyOutsideAnalysisTargets_FailsClosed()
+    {
+        string path = WritePolicy($"""
+            version: 1
+            name: Invalid source assembly
+            analysis:
+              target_assemblies: [{TestAssemblyName()}]
+            contracts:
+              strict_contract_surface_exposure:
+                - id: exposure
+                  name: Exposure
+                  source:
+                    assemblies: [Product.Api]
+                  forbidden:
+                    - role: Entity
+            """);
+
+        InvalidOperationException exception = Assert.Throws<InvalidOperationException>(() =>
+            new ArchitecturePolicyDocumentLoader().Load(path))!;
+
+        Assert.That(exception.Message, Does.Contain("source assembly 'Product.Api'"));
+        Assert.That(exception.Message, Does.Contain("analysis.target_assemblies"));
+    }
+
+    [Test]
+    public void Load_PublicApiReferenceToSelf_FailsClosed()
+    {
+        string path = WritePolicy($"""
+            version: 1
+            name: Invalid self reference
+            analysis:
+              target_assemblies: [{TestAssemblyName()}]
+            contracts:
+              strict_contract_surface_exposure:
+                - id: exposure
+                  name: Exposure
+                  source:
+                    public_api_surface: exposure
+                  forbidden:
+                    - role: Entity
+            """);
+
+        InvalidOperationException exception = Assert.Throws<InvalidOperationException>(() =>
+            new ArchitecturePolicyDocumentLoader().Load(path))!;
+
+        Assert.That(exception.Message, Does.Contain("cannot reference itself as a public API surface"));
+    }
+
     private string WritePolicy(string yaml)
     {
         string path = Path.Combine(_tempDir, "dependencies.arch.yml");
