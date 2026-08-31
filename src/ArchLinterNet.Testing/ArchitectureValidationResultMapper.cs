@@ -33,7 +33,7 @@ internal static class ArchitectureValidationResultMapper
             Waivers = outcome.Waivers,
             AssessmentCompletionEvidence = outcome.AssessmentCompletionEvidence,
             ApplicabilityProjection = outcome.ApplicabilityProjection,
-            ImportedDiagnosticFindings = outcome.ImportedDiagnosticFindings,
+            ImportedDiagnostics = outcome.ImportedDiagnostics,
             Profile = profile,
         });
     }

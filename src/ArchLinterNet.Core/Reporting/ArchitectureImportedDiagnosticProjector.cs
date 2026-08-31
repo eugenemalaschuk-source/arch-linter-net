@@ -5,8 +5,11 @@ namespace ArchLinterNet.Core.Reporting;
 /// <summary>Projects trusted, policy-selected external diagnostics through existing finding seams.</summary>
 public static class ArchitectureImportedDiagnosticProjector
 {
-    /// <summary>Projects every selected diagnostic into canonical, deterministically ordered findings.</summary>
-    public static IReadOnlyList<ArchitectureFinding> ToFindings(
+    /// <summary>
+    /// Projects every selected diagnostic into canonical, deterministically ordered findings and
+    /// their inseparable governance-blocking state.
+    /// </summary>
+    public static ImportedExternalDiagnosticProjection Project(
         SarifExternalDiagnosticSelectionResult selection,
         CancellationToken cancellationToken = default)
     {
@@ -19,15 +22,8 @@ public static class ArchitectureImportedDiagnosticProjector
             findings.Add(ToFinding(selectedDiagnostic));
         }
 
-        return ArchitectureFindingMapper.Order(findings, cancellationToken);
-    }
-
-    /// <summary>Whether the selected set contains at least one strict, governance-blocking finding.</summary>
-    public static bool HasBlockingFindings(SarifExternalDiagnosticSelectionResult selection)
-    {
-        ArgumentNullException.ThrowIfNull(selection);
-        return selection.Diagnostics.Any(diagnostic =>
-            diagnostic.GovernanceMode == SarifExternalDiagnosticGovernanceMode.Strict);
+        return new ImportedExternalDiagnosticProjection(
+            ArchitectureFindingMapper.Order(findings, cancellationToken));
     }
 
     /// <summary>Projects one trusted selected diagnostic into its normalized finding.</summary>

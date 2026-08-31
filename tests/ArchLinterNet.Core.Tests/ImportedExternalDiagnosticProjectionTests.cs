@@ -12,7 +12,7 @@ namespace ArchLinterNet.Core.Tests;
 public sealed class ImportedExternalDiagnosticProjectionTests
 {
     [Test]
-    public void ToFindings_ProjectsStrictAndAuditDiagnosticsWithSelectedIdentityAndProvenance()
+    public void Project_ProjectsStrictAndAuditDiagnosticsWithSelectedIdentityAndProvenance()
     {
         SarifSelectedExternalDiagnostic strict = Selected(
             canonicalIdentity: "external-diagnostic:v2:strict",
@@ -29,8 +29,9 @@ public sealed class ImportedExternalDiagnosticProjectionTests
             message: "audit source message",
             path: "src/App/Audit.cs");
 
-        IReadOnlyList<ArchitectureFinding> findings = ArchitectureImportedDiagnosticProjector.ToFindings(
+        ImportedExternalDiagnosticProjection projection = ArchitectureImportedDiagnosticProjector.Project(
             new SarifExternalDiagnosticSelectionResult([audit, strict]));
+        IReadOnlyList<ArchitectureFinding> findings = projection.Findings;
 
         ArchitectureFinding strictFinding = findings.Single(finding => finding.Mode == "strict");
         ArchitectureFinding auditFinding = findings.Single(finding => finding.Mode == "audit");
@@ -44,13 +45,12 @@ public sealed class ImportedExternalDiagnosticProjectionTests
             Assert.That(strictDetail.SourceDiagnostic.Message, Is.EqualTo("strict source message"));
             Assert.That(strictDetail.EvidenceProvenances.Single().ArtifactSha256, Is.EqualTo("hash-one"));
             Assert.That(strictFinding.SourceLocation, Is.EqualTo(new ArchitectureFindingSourceLocation("src/App/Strict.cs", 10, 4)));
-            Assert.That(ArchitectureImportedDiagnosticProjector.HasBlockingFindings(
-                new SarifExternalDiagnosticSelectionResult([audit, strict])), Is.True);
+            Assert.That(projection.HasBlockingFindings, Is.True);
         });
     }
 
     [Test]
-    public void ToFindings_ExcludesTransientRunAndArtifactProvenanceFromPersistentIdentity()
+    public void Project_ExcludesTransientRunAndArtifactProvenanceFromPersistentIdentity()
     {
         SarifSelectedExternalDiagnostic first = Selected(
             canonicalIdentity: "external-diagnostic:v2:stable",
@@ -84,7 +84,7 @@ public sealed class ImportedExternalDiagnosticProjectionTests
     }
 
     [Test]
-    public void ToFindings_DistinguishesSelectedLocationIdentitiesAndRetainsOutputParity()
+    public void Project_DistinguishesSelectedLocationIdentitiesAndRetainsOutputParity()
     {
         SarifSelectedExternalDiagnostic first = Selected(
             canonicalIdentity: "external-diagnostic:v2:location-one",
@@ -100,8 +100,9 @@ public sealed class ImportedExternalDiagnosticProjectionTests
             runId: "run-two",
             message: "source finding",
             path: "src/App/Two.cs");
-        IReadOnlyList<ArchitectureFinding> findings = ArchitectureImportedDiagnosticProjector.ToFindings(
+        ImportedExternalDiagnosticProjection projection = ArchitectureImportedDiagnosticProjector.Project(
             new SarifExternalDiagnosticSelectionResult([first, second]));
+        IReadOnlyList<ArchitectureFinding> findings = projection.Findings;
 
         Dictionary<string, object?> json = ArchitectureDiagnosticFormatter.FormatNormalizedFindingForJson(findings[0]);
         string human = ArchitectureDiagnosticFormatter.FormatFindingsForHumans(findings);
@@ -115,7 +116,7 @@ public sealed class ImportedExternalDiagnosticProjectionTests
             Violations: Array.Empty<ArchitectureViolation>(),
             Cycles: Array.Empty<string>())
         {
-            ImportedDiagnosticFindings = findings,
+            ImportedDiagnostics = projection,
         });
 
         Assert.Multiple(() =>
@@ -128,8 +129,78 @@ public sealed class ImportedExternalDiagnosticProjectionTests
             Assert.That(normalized.GetProperty("evidence_provenance")[0]
                 .GetProperty("artifact_sha256").GetString(), Is.EqualTo("hash-one"));
             Assert.That(testingResult.Findings.Count(finding => finding.Kind == "imported_external_diagnostic"), Is.EqualTo(2));
+            Assert.That(testingResult.Passed, Is.False);
+            Assert.That(() => testingResult.ShouldPass(), Throws.InvalidOperationException
+                .With.Message.Contains("Imported external diagnostics:")
+                .And.Message.Contains("imported_external_diagnostic"));
         });
     }
+
+    [Test]
+    public void WithImportedDiagnostics_DerivesOutcomeAndAdapterPassStateFromGovernanceMode()
+    {
+        ImportedExternalDiagnosticProjection strict = ArchitectureImportedDiagnosticProjector.Project(
+            new SarifExternalDiagnosticSelectionResult(
+            [
+                Selected(
+                    "external-diagnostic:v2:strict",
+                    SarifExternalDiagnosticGovernanceMode.Strict,
+                    "strict-hash",
+                    "strict-run",
+                    "strict source message",
+                    "src/App/Strict.cs"),
+            ]));
+        ImportedExternalDiagnosticProjection audit = ArchitectureImportedDiagnosticProjector.Project(
+            new SarifExternalDiagnosticSelectionResult(
+            [
+                Selected(
+                    "external-diagnostic:v2:audit",
+                    SarifExternalDiagnosticGovernanceMode.Audit,
+                    "audit-hash",
+                    "audit-run",
+                    "audit source message",
+                    "src/App/Audit.cs"),
+            ]));
+
+        ValidationOutcome strictOutcome = PassingOutcome().WithImportedDiagnostics(strict);
+        ValidationOutcome auditOutcome = PassingOutcome().WithImportedDiagnostics(audit);
+        var strictResult = new ArchitectureValidationResult(new ArchitectureValidationResultParams(
+            Passed: true,
+            Violations: Array.Empty<ArchitectureViolation>(),
+            Cycles: Array.Empty<string>())
+        {
+            ImportedDiagnostics = strict,
+        });
+        var auditResult = new ArchitectureValidationResult(new ArchitectureValidationResultParams(
+            Passed: true,
+            Violations: Array.Empty<ArchitectureViolation>(),
+            Cycles: Array.Empty<string>())
+        {
+            ImportedDiagnostics = audit,
+        });
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(strictOutcome.Passed, Is.False);
+            Assert.That(auditOutcome.Passed, Is.True);
+            Assert.That(strictResult.Passed, Is.False);
+            Assert.That(auditResult.Passed, Is.True);
+        });
+    }
+
+    private static ValidationOutcome PassingOutcome() => new(
+        Passed: true,
+        Violations: Array.Empty<ArchitectureViolation>(),
+        Cycles: Array.Empty<string>(),
+        CoverageFindings: Array.Empty<ArchitectureViolation>(),
+        CoverageConfig: "off",
+        UnmatchedIgnoredViolations: Array.Empty<ArchitectureUnmatchedIgnoredViolation>(),
+        UnmatchedIgnoredViolationsConfig: "off",
+        PolicyConsistencyFindings: Array.Empty<PolicyConsistencyDiagnostic>(),
+        PolicyConsistencyConfig: "off",
+        CoverageSummaries: Array.Empty<ArchitectureCoverageSummary>(),
+        ClassificationConflicts: Array.Empty<ArchitectureClassificationConflict>(),
+        ClassificationMetadataFailures: Array.Empty<ArchitectureClassificationMetadataFailure>());
 
     private static SarifSelectedExternalDiagnostic Selected(
         string canonicalIdentity,

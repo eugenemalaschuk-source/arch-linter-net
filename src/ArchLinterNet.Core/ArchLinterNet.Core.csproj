@@ -57,8 +57,8 @@
          policy-root/policy-fragment schemas above. PackagedSchemaRegistry loads this 0.8.0
          manifest, which lists the schemas that advanced at 0.8.0 and every unaffected schema at
          its existing 0.5.1 identity. The frozen finding/cache schemas are also shipped as
-         non-discoverable legacy content so offline consumers can retain the exact 0.5.1 and
-         0.6.1 contracts while the registry resolves the current 0.8.0 resources. -->
+         non-discoverable legacy content so offline consumers retain the exact 0.5.1 and 0.6.1
+         contracts while the registry resolves the current 0.8.0 resources. -->
     <EmbeddedResource Include="..\..\schema\0.8.0\compatibility-manifest.json" Link="Schema\0.8.0\compatibility-manifest.json" LogicalName="ArchLinterNet.Core.Schema.0.8.0.compatibility-manifest.json" />
     <EmbeddedResource Include="..\..\schema\0.5.1\api-snapshot.schema.json" Link="Schema\0.5.1\api-snapshot.schema.json" LogicalName="ArchLinterNet.Core.Schema.0.5.1.api-snapshot.schema.json" />
     <EmbeddedResource Include="..\..\schema\0.6.1\normalized-finding.schema.json" Link="Schema\0.6.1\normalized-finding.schema.json" LogicalName="ArchLinterNet.Core.Schema.0.6.1.normalized-finding.schema.json" />

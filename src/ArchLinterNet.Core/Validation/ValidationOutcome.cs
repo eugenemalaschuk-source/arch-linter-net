@@ -109,12 +109,28 @@ public sealed record ValidationOutcome(
     public ArchitectureApplicabilityProjection? ApplicabilityProjection { get; init; }
 
     /// <summary>
-    /// Trusted imported-diagnostic findings supplied by an external evidence consumer. They use the
-    /// same normalized finding envelope as native diagnostics and are empty when no such consumer
-    /// participates in this validation outcome.
+    /// The Core-owned projection of trusted imported diagnostics. Its findings and blocking state
+    /// remain coupled so strict diagnostics always affect the effective validation outcome.
     /// </summary>
-    public IReadOnlyList<ArchitectureFinding> ImportedDiagnosticFindings { get; init; } =
-        Array.Empty<ArchitectureFinding>();
+    public ImportedExternalDiagnosticProjection ImportedDiagnostics { get; private init; } =
+        ImportedExternalDiagnosticProjection.Empty;
+
+    /// <summary>Trusted imported-diagnostic findings in the normalized finding envelope.</summary>
+    public IReadOnlyList<ArchitectureFinding> ImportedDiagnosticFindings => ImportedDiagnostics.Findings;
+
+    /// <summary>
+    /// Attaches Core-projected imported diagnostics and derives the effective pass state from their
+    /// governance mode. Audit diagnostics remain reportable without making the result fail.
+    /// </summary>
+    public ValidationOutcome WithImportedDiagnostics(ImportedExternalDiagnosticProjection importedDiagnostics)
+    {
+        ArgumentNullException.ThrowIfNull(importedDiagnostics);
+        return this with
+        {
+            Passed = Passed && !importedDiagnostics.HasBlockingFindings,
+            ImportedDiagnostics = importedDiagnostics,
+        };
+    }
 
     /// <summary>Normalized applicability insufficiency findings, when the projection is present.</summary>
     public IReadOnlyList<ArchitectureFinding> ApplicabilityFindings =>

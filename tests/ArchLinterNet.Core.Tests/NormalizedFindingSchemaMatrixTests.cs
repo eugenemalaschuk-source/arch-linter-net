@@ -101,7 +101,44 @@ public sealed class NormalizedFindingSchemaMatrixTests
                     "future-family",
                     "applicability-control",
                     "policy-id")),
-            "strict");
+                "strict");
+        yield return ArchitectureImportedDiagnosticProjector.Project(
+            new SarifExternalDiagnosticSelectionResult(
+            [
+                new SarifSelectedExternalDiagnostic(
+                    "external-diagnostic:v2:matrix",
+                    new SarifEvidenceSourceDiagnostic(
+                        "Imported diagnostic from the schema matrix fixture.",
+                        "SEC100",
+                        SarifEvidenceSourceSeverity.Error,
+                        new SarifEvidenceSourceLocation(
+                            "src/App/Imported.cs",
+                            new SarifEvidenceSourceRegion(startLine: 12, startColumn: 5)),
+                        project: "App",
+                        driverRuleTags: ["security"]),
+                    SarifExternalDiagnosticGovernanceMode.Strict,
+                    new SarifExternalDiagnosticFingerprint(
+                        SarifExternalDiagnosticFingerprintOrigin.Source,
+                        "matrix-fingerprint",
+                        "primary"),
+                    [
+                        new SarifEvidenceProvenance(
+                            "external.scan",
+                            "artifacts/imported.sarif",
+                            "matrix-artifact-sha256",
+                            "Example Analyzer",
+                            "1.2.3",
+                            "assessment-42",
+                            1,
+                            new SarifEvidenceResolvedContext(
+                                "external.scan",
+                                "repository",
+                                "revision",
+                                "scope")),
+                    ]),
+            ]))
+            .Findings
+            .Single();
     }
 
     private static ArchitectureViolation Violation(IArchitectureDiagnosticPayload payload) =>

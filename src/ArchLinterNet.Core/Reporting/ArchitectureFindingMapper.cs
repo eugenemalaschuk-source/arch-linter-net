@@ -339,8 +339,9 @@ public static class ArchitectureFindingMapper
         ImportedExternalDiagnostic diagnostic)
     {
         // #521's selected identity includes the stable logical evidence/current-context/source
-        // dimensions.  It intentionally excludes artifact hash/run provenance, which stays in the
-        // typed diagnostic detail so equivalent reruns remain exact baseline matches.
+        // dimensions. It intentionally excludes tool version, artifact hash, and run provenance,
+        // which stay in the typed diagnostic detail so equivalent tool upgrades and reruns remain
+        // exact baseline matches.
         SarifEvidenceProvenance provenance = diagnostic.EvidenceProvenances[0];
         return new ArchitectureViolationIdentity(
             ArchitectureViolationIdentity.CurrentVersion,
