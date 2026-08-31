@@ -82,6 +82,20 @@ namespaces. A matched entry is still visible, but only new or untrusted
 persistent-debt state fails the debt dimension. The command is read-only and
 does not add a `ratchet` validation mode.
 
+## Architecture health output
+
+`arch-linter-net health --policy <path> --baseline <path>` projects the canonical
+`architecture-health/v1` summary from current evaluation, applicability, coverage, topology,
+metrics, external evidence, policy inventory, baseline debt, waiver debt, new debt, and policy
+weakening authorities. History is explicitly `not_configured` until an advisory-only history input
+is added. The command does not parse another command's output or recompute any dimension in the CLI.
+
+Human output is Core's readable projection. JSON is one health document with `schema_id`, `gate`,
+`health`, and ordered `dimensions`; each dimension retains ordered `reasons`. The health model is
+non-compensating and deliberately has no score, percentage, letter grade, badge, PR rendering, or
+SARIF representation. Valid `gate: unassessable` evidence remains a health document, not a
+`command_error` envelope.
+
 ## Human output
 
 Use human output when reading diagnostics in a terminal or CI log:

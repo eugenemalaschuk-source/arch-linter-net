@@ -323,6 +323,21 @@ internal sealed class CliRuntime : ICliRuntime
         return _engine.EvaluateDebtGate(request);
     }
 
+    public ArchitectureHealthOutcome EvaluateHealth(ArchitectureHealthRequest request)
+    {
+        return _engine.EvaluateHealth(request);
+    }
+
+    public string FormatHealthAsHuman(ArchitectureHealthOutcome outcome)
+    {
+        return ArchitectureHealthProjector.FormatAsHuman(outcome.Summary);
+    }
+
+    public string FormatHealthAsJson(ArchitectureHealthOutcome outcome)
+    {
+        return ArchitectureHealthProjector.FormatAsJson(outcome.Summary);
+    }
+
     public PublicApiCaptureOutcome CapturePublicApi(PublicApiCaptureRequest request)
     {
         return _engine.CapturePublicApi(request);

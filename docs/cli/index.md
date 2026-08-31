@@ -93,6 +93,10 @@ Run `arch-linter-net --help` or `arch-linter-net <command> --help` for the exact
 
 | `arch-linter-net gate ...` | Fail CI on new architecture debt and error-severity policy weakening. |
 
+<!-- cli-command: health -->
+
+| `arch-linter-net health ...` | Project the canonical non-compensating architecture-health/v1 summary. |
+
 <!-- cli-command: graph -->
 
 | `arch-linter-net graph ...` | Export dependency graphs as JSON, DOT, or Mermaid at supported granularities. |
@@ -261,6 +265,22 @@ arch-linter-net gate \
 ```
 
 `gate` can also consume exported base/current policy contexts so CI catches both new findings and error-severity policy weakening.
+
+## Architecture health
+
+```bash
+arch-linter-net health \
+  --policy architecture/arch.yml \
+  --baseline architecture/baseline.arch.yml \
+  --mode all \
+  --format json
+```
+
+`health` is a read-only projection of canonical architecture-governance authorities. It reports
+the ordered `architecture-health/v1` dimensions and their reasons in human or JSON output. The
+projection is non-compensating: it has no score, percentage, letter grade, badge, pull-request
+rendering, or SARIF output. A valid but unassessable result is emitted as a health document rather
+than a command-error document.
 
 ## Change snapshots
 
