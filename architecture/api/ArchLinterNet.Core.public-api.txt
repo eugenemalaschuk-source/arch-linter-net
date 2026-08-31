@@ -560,7 +560,7 @@ const ArchLinterNet.Core.Model.ArchitectureDiagnosticKind.Dependency: ArchLinter
 const ArchLinterNet.Core.Model.ArchitectureDiagnosticKind.ExternalDependency: ArchLinterNet.Core.Model.ArchitectureDiagnosticKind [value:4]
 const ArchLinterNet.Core.Model.ArchitectureDiagnosticKind.FrameworkReference: ArchLinterNet.Core.Model.ArchitectureDiagnosticKind [value:19]
 const ArchLinterNet.Core.Model.ArchitectureDiagnosticKind.FrameworkReferenceAllowOnly: ArchLinterNet.Core.Model.ArchitectureDiagnosticKind [value:20]
-const ArchLinterNet.Core.Model.ArchitectureDiagnosticKind.ImportedExternalDiagnostic: ArchLinterNet.Core.Model.ArchitectureDiagnosticKind [value:25]
+const ArchLinterNet.Core.Model.ArchitectureDiagnosticKind.ImportedExternalDiagnostic: ArchLinterNet.Core.Model.ArchitectureDiagnosticKind [value:26]
 const ArchLinterNet.Core.Model.ArchitectureDiagnosticKind.Inheritance: ArchLinterNet.Core.Model.ArchitectureDiagnosticKind [value:10]
 const ArchLinterNet.Core.Model.ArchitectureDiagnosticKind.InterfaceImplementation: ArchLinterNet.Core.Model.ArchitectureDiagnosticKind [value:11]
 const ArchLinterNet.Core.Model.ArchitectureDiagnosticKind.LayoutConvention: ArchLinterNet.Core.Model.ArchitectureDiagnosticKind [value:17]

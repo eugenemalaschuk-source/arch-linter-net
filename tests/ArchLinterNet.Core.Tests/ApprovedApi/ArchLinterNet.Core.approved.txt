@@ -2539,7 +2539,7 @@ enum ArchLinterNet.Core.Model.ArchitectureDiagnosticKind : int
   enum-member ExternalDependency = 4
   enum-member FrameworkReference = 19
   enum-member FrameworkReferenceAllowOnly = 20
-  enum-member ImportedExternalDiagnostic = 25
+  enum-member ImportedExternalDiagnostic = 26
   enum-member Inheritance = 10
   enum-member InterfaceImplementation = 11
   enum-member LayoutConvention = 17

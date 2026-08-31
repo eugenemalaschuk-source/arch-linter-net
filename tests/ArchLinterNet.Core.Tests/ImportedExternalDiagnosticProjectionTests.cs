@@ -105,6 +105,8 @@ public sealed class ImportedExternalDiagnosticProjectionTests
         IReadOnlyList<ArchitectureFinding> findings = projection.Findings;
 
         Dictionary<string, object?> json = ArchitectureDiagnosticFormatter.FormatNormalizedFindingForJson(findings[0]);
+        ArchitectureFindingReadEnvelope rehydrated = ArchitectureFindingJsonReader.Read(
+            JsonSerializer.Serialize(json), strict: true);
         string human = ArchitectureDiagnosticFormatter.FormatFindingsForHumans(findings);
         string sarif = ArchitectureSarifFormatter.FormatFindingsAsSarif(findings, "1.2.3");
         using JsonDocument document = JsonDocument.Parse(sarif);
@@ -124,6 +126,8 @@ public sealed class ImportedExternalDiagnosticProjectionTests
             Assert.That(findings.Select(finding => finding.CanonicalIdentity).Distinct().Count(), Is.EqualTo(2));
             Assert.That(human, Does.Contain("sha256=hash-one"));
             Assert.That(json["logical_evidence_id"], Is.EqualTo("external.scan"));
+            Assert.That(rehydrated.SchemaVersion, Is.EqualTo(ArchitectureFinding.CurrentSchemaVersion));
+            Assert.That(rehydrated.Kind, Is.EqualTo("imported_external_diagnostic"));
             Assert.That(result.GetProperty("locations")[0].GetProperty("physicalLocation")
                 .GetProperty("artifactLocation").GetProperty("uri").GetString(), Is.EqualTo("src/App/One.cs"));
             Assert.That(normalized.GetProperty("evidence_provenance")[0]

@@ -49,4 +49,3 @@ and SHALL NOT write, suppress, or reinterpret a baseline entry during projection
 - **WHEN** an imported finding is projected again from equivalent current-context evidence
 - **THEN** its baseline candidate has the same structured identity and can match the existing
   reviewed baseline entry without source-message, artifact-hash, or run-ID churn
-
