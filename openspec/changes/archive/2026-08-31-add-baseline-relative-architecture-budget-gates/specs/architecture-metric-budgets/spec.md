@@ -1,10 +1,4 @@
-# architecture-metric-budgets Specification
-
-## Purpose
-Define deterministic strict and audit absolute budget contracts over the
-existing architecture metric catalog without duplicating measurement semantics.
-
-## Requirements
+## MODIFIED Requirements
 
 ### Requirement: Policies declare explicit absolute metric budgets
 The policy SHALL support `strict_metric_budgets` and `audit_metric_budgets`
@@ -49,22 +43,6 @@ policy-configuration path before architecture analysis.
   relative mode with `minimum`
 - **THEN** the policy is rejected through the normal invalid-configuration path
   rather than producing an unassessable result or a threshold finding
-
-### Requirement: Budgets reuse the metric measurement authority
-Each budget SHALL use the same deterministic metric evaluator, native target,
-counting universe, contributor set, contributor ordering, and effective-scope
-semantics as `measure` for its referenced metric. It SHALL not re-scan source
-or assemblies, create a second graph, derive transitive relations, replace a
-metric contributor set, or compute a separate budget-specific number. When
-several budgets reference one metric in an assessment, they SHALL compare the
-same measured value and contributor evidence.
-
-#### Scenario: Multiple budgets compare one measured value
-- **WHEN** strict and audit budgets reference the same complete metric whose
-  canonical contributor set has value four
-- **THEN** each applicable budget compares value four with its own absolute
-  limits and reports the same contributor evidence without a separate metric
-  calculation
 
 ### Requirement: Evaluable budgets enforce their configured bounds
 An evaluable absolute budget SHALL produce one deterministic normal architecture
@@ -111,22 +89,6 @@ budget finding; it remains available through the measure workflow.
 - **WHEN** an evaluable absolute metric has value three and its budget declares
   `maximum: 3`
 - **THEN** normal validation produces no budget finding
-
-### Requirement: Insufficient metric scope is projected through common applicability evidence
-The assessment SHALL reuse the normalized applicability and completion projection
-when a budget's referenced metric has missing required input or an unmapped,
-ambiguous, stale, unexpectedly empty, unresolved, or otherwise incomplete native
-scope. It SHALL retain deterministic policy/control identity,
-reason, provenance, and strict/audit mode through the existing Human, JSON,
-SARIF, Testing, and baseline result paths. It SHALL not publish a partial
-numeric value, silently pass the budget, or recast insufficient evidence as an
-ordinary threshold violation.
-
-#### Scenario: An unmapped endpoint cannot lower a maximum budget
-- **WHEN** a budgeted component metric has one mapped contributor and one
-  required dependency endpoint that cannot map uniquely to a topology node
-- **THEN** the assessment emits common unassessable applicability evidence for
-  that budget scope and does not compare a partial value of one with its limit
 
 ### Requirement: Budget findings use the canonical result envelope
 Budget threshold findings SHALL use the normal canonical finding identity and

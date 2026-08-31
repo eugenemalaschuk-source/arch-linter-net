@@ -14,36 +14,86 @@
       "type": "integer",
       "enum": [
         1,
-        2
+        2,
+        3
       ],
-      "description": "Baseline file format version. Version 1 uses the legacy exact (source_type, forbidden_reference) pair as identity, and its ignored_violations entries MUST NOT carry structured identity fields. Version 2 uses a versioned, structured ArchitectureViolationIdentity per entry, and every entry MUST carry identity_version, contract_family, kind, and occurrence (produced by 'baseline generate' and 'baseline migrate') so a malformed or hand-edited entry cannot silently pass as valid."
+      "description": "Baseline file format version. Version 1 uses the legacy exact (source_type, forbidden_reference) pair as identity, and its ignored_violations entries MUST NOT carry structured identity fields. Versions 2 and 3 use a versioned, structured ArchitectureViolationIdentity per finding entry, and every finding entry MUST carry identity_version, contract_family, kind, and occurrence. Version 3 additionally permits the separate metric_baselines collection."
     },
     "baseline": {
       "type": "object",
       "description": "Contract group entries indexed by contract group name. The exact shape required for each entry depends on the top-level 'version' (see the version-conditional definitions below)."
+    },
+    "metric_baselines": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/metricBaselineEntry"
+      },
+      "description": "Reviewed scalar metric values. This collection is valid only in a version-3 document and is never interpreted as finding-level ignored violations."
     }
   },
-  "if": {
-    "properties": {
-      "version": {
-        "const": 2
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "version": {
+            "const": 1
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "baseline": {
+            "$ref": "#/$defs/baselineGroupsV1"
+          }
+        },
+        "not": {
+          "required": [
+            "metric_baselines"
+          ]
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "version": {
+            "const": 2
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "baseline": {
+            "$ref": "#/$defs/baselineGroupsV2"
+          }
+        },
+        "not": {
+          "required": [
+            "metric_baselines"
+          ]
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "version": {
+            "const": 3
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "baseline": {
+            "$ref": "#/$defs/baselineGroupsV3"
+          },
+          "metric_baselines": {
+            "$ref": "#/$defs/metricBaselineCollection"
+          }
+        }
       }
     }
-  },
-  "then": {
-    "properties": {
-      "baseline": {
-        "$ref": "#/$defs/baselineGroupsV2"
-      }
-    }
-  },
-  "else": {
-    "properties": {
-      "baseline": {
-        "$ref": "#/$defs/baselineGroupsV1"
-      }
-    }
-  },
+  ],
   "$defs": {
     "baselineGroupsV1": {
       "type": "object",
@@ -785,6 +835,76 @@
         }
       }
     },
+    "baselineGroupsV3": {
+      "$ref": "#/$defs/baselineGroupsV2",
+      "description": "Version-3 finding baseline groups retain the structured version-2 entry shape."
+    },
+    "metricBaselineCollection": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/metricBaselineEntry"
+      },
+      "description": "Reviewed scalar metric values for version-3 baselines."
+    },
+    "metricBaselineEntry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "metric_identity_version",
+        "metric_id",
+        "metric_kind",
+        "native_subject",
+        "effective_scope",
+        "value"
+      ],
+      "properties": {
+        "metric_identity_version": {
+          "type": "integer",
+          "const": 1,
+          "description": "Canonical metric identity schema version."
+        },
+        "metric_id": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The declared metric ID; metric baseline IDs must be unique within a document."
+        },
+        "metric_kind": {
+          "type": "string",
+          "enum": [
+            "outgoing_component_count",
+            "incoming_component_count",
+            "external_dependency_group_count",
+            "component_footprint_count",
+            "topology_type_count",
+            "public_contract_surface_count"
+          ],
+          "description": "Canonical metric kind from the metric definition."
+        },
+        "native_subject": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Canonical native subject selected by the metric definition."
+        },
+        "unit": {
+          "type": "string",
+          "enum": [
+            "project",
+            "assembly"
+          ],
+          "description": "Optional metric unit, present when the metric definition declares one."
+        },
+        "effective_scope": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Canonical effective scope reported for the metric measurement."
+        },
+        "value": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Reviewed non-negative scalar metric value."
+        }
+      }
+    },
     "baselineContractEntryV1": {
       "type": "object",
       "additionalProperties": false,
@@ -914,7 +1034,8 @@
             "package",
             "framework",
             "api_change",
-            "coverage"
+            "coverage",
+            "metric_budget"
           ],
           "description": "Denormalized, stable classification of the violation kind."
         },

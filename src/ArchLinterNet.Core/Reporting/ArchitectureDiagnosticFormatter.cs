@@ -390,7 +390,11 @@ public sealed partial class ArchitectureDiagnosticFormatter : IArchitectureDiagn
             context += $" (kind: metric_budget, metric_id: {metricBudget.MetricId}, metric_kind: {metricBudget.MetricKind}, "
                 + $"native_subject: {metricBudget.NativeSubject ?? "<none>"}, effective_scope: {metricBudget.EffectiveScope}, "
                 + $"measured_value: {metricBudget.MeasuredValue}, breached_bound: {metricBudget.BreachedBound}, "
-                + $"configured_limit: {metricBudget.ConfiguredLimit}, contributors: [{string.Join(", ", metricBudget.Contributors)}])";
+                + $"configured_limit: {metricBudget.ConfiguredLimit}, "
+                + $"baseline_mode: {metricBudget.BaselineMode ?? "<none>"}, baseline_value: {metricBudget.BaselineValue?.ToString() ?? "<none>"}, "
+                + $"delta: {metricBudget.Delta?.ToString() ?? "<none>"}, allowed_delta: {metricBudget.AllowedDelta?.ToString() ?? "<none>"}, "
+                + $"effective_threshold: {metricBudget.EffectiveThreshold?.ToString() ?? "<none>"}, absolute_cap: {metricBudget.AbsoluteCap?.ToString() ?? "<none>"}, "
+                + $"contributors: [{string.Join(", ", metricBudget.Contributors)}])";
         }
 
         if (diagnostic is ContextDependencyDiagnostic contextDependency)

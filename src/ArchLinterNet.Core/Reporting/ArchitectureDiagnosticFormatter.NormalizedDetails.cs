@@ -47,6 +47,12 @@ public sealed partial class ArchitectureDiagnosticFormatter
         obj["configured_limit"] = budget.ConfiguredLimit;
         obj["contributor_count"] = budget.ContributorCount;
         obj["contributors"] = budget.Contributors.ToArray();
+        obj["baseline_mode"] = budget.BaselineMode;
+        obj["baseline_value"] = budget.BaselineValue;
+        obj["delta"] = budget.Delta;
+        obj["allowed_delta"] = budget.AllowedDelta;
+        obj["effective_threshold"] = budget.EffectiveThreshold;
+        obj["absolute_cap"] = budget.AbsoluteCap;
     }
 
     private static void ApplyCycleCiFields(CycleDiagnostic cycle, Dictionary<string, object?> obj)

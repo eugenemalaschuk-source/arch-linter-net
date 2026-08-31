@@ -228,6 +228,8 @@ internal sealed class FakeBaselineGenerator : IArchitectureBaselineGenerator
 
     public IReadOnlyList<ArchitectureBaselineComparisonEntry>? EntriesReceived { get; private set; }
 
+    public ArchitectureBaselineDocument? SerializedDocument { get; private set; }
+
     public ArchitectureBaselineDocument Generate(
         ArchitectureContractDocument policyDocument,
         IReadOnlyList<ArchitectureBaselineCandidate> candidates,
@@ -247,6 +249,7 @@ internal sealed class FakeBaselineGenerator : IArchitectureBaselineGenerator
 
     public string Serialize(ArchitectureBaselineDocument document)
     {
+        SerializedDocument = document;
         return YamlToReturn;
     }
 }

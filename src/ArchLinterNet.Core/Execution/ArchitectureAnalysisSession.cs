@@ -48,6 +48,8 @@ public sealed class ArchitectureAnalysisSession
 
     private readonly ArchitectureCycleBaselineCandidateRecorder _cycleBaselineCandidateRecorder = new();
 
+    private readonly List<ArchitectureMetricBaselineEntry> _metricBaselineCandidates = new();
+
     private readonly ArchitectureFindingIdentityService _findingIdentityService = new();
 
     private readonly ArchitectureSubtractiveMatcherParticipationRecorder _subtractiveMatcherParticipationRecorder;
@@ -203,6 +205,11 @@ public sealed class ArchitectureAnalysisSession
 
     public IReadOnlyList<ArchitectureBaselineCandidate> BaselineCandidates
         => _cycleBaselineCandidateRecorder.Candidates;
+
+    // Separate from finding candidates by design: scalar metric values never participate in
+    // occurrence attribution, ignore matching, or finding-debt lifecycle comparison.
+    internal IReadOnlyList<ArchitectureMetricBaselineEntry> MetricBaselineCandidates
+        => _metricBaselineCandidates;
 
     // Coverage-participating consumption recorded by contextual dependency/allow-only contracts.
     // See ArchitectureContextualConsumerReference and design.md Decision 7. Nothing consumes this
@@ -493,6 +500,17 @@ public sealed class ArchitectureAnalysisSession
         {
             _cycleBaselineCandidateRecorder.CandidateStore.Add(candidate);
         }
+    }
+
+    internal void AddMetricBaselineCandidate(ArchitectureMetricBaselineEntry candidate)
+    {
+        if (_metricBaselineCandidates.Any(existing =>
+                string.Equals(existing.MetricId, candidate.MetricId, StringComparison.Ordinal)))
+        {
+            return;
+        }
+
+        _metricBaselineCandidates.Add(candidate);
     }
 
     internal int FindingIdentityCursor => _findingIdentityService.Cursor;

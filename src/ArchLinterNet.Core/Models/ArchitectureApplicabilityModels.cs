@@ -30,6 +30,8 @@ public enum ArchitectureAssessmentCompletionState
 public static class ArchitectureApplicabilityReasonCodes
 {
     public const string MissingRequiredInput = "missing_required_input";
+    public const string MissingMetricBaseline = "missing_metric_baseline";
+    public const string StaleMetricBaseline = "stale_metric_baseline";
     public const string UnexpectedEmptyInput = "unexpected_empty_input";
     public const string UnmappedSubject = "unmapped_subject";
     public const string AmbiguousSubject = "ambiguous_subject";

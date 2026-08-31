@@ -25,6 +25,62 @@ public sealed class ArchitectureBaselineDocument
 
     [YamlMember(Alias = "baseline")]
     public ArchitectureBaselineContractGroups Baseline { get; set; } = new();
+
+    // Metric values are deliberately kept outside the finding-level baseline. They are reviewed
+    // scalar evidence for relative metric budgets, not ignored violations, and must never flow
+    // into ArchitectureIgnoreMatcher or the finding-debt lifecycle.
+    [YamlMember(Alias = "metric_baselines")]
+    public List<ArchitectureMetricBaselineEntry> MetricBaselines { get; set; } = new();
+}
+
+/// <summary>
+/// Versioned canonical identity for one reviewed metric value. Display text, contributors, and
+/// the finding-level budget identity are intentionally absent: a scalar baseline is comparable
+/// only when the metric definition and its native subject are the same.
+/// </summary>
+public sealed record ArchitectureMetricBaselineIdentity(
+    int MetricIdentityVersion,
+    string MetricId,
+    string MetricKind,
+    string NativeSubject,
+    string? Unit,
+    string EffectiveScope)
+{
+    public const int CurrentVersion = 1;
+}
+
+/// <summary>One reviewed scalar metric value stored in a version-3 baseline document.</summary>
+public sealed class ArchitectureMetricBaselineEntry
+{
+    [YamlMember(Alias = "metric_identity_version")]
+    public int MetricIdentityVersion { get; set; } = ArchitectureMetricBaselineIdentity.CurrentVersion;
+
+    [YamlMember(Alias = "metric_id")]
+    public string MetricId { get; set; } = string.Empty;
+
+    [YamlMember(Alias = "metric_kind")]
+    public string MetricKind { get; set; } = string.Empty;
+
+    [YamlMember(Alias = "native_subject")]
+    public string NativeSubject { get; set; } = string.Empty;
+
+    [YamlMember(Alias = "unit")]
+    public string? Unit { get; set; }
+
+    [YamlMember(Alias = "effective_scope")]
+    public string EffectiveScope { get; set; } = string.Empty;
+
+    [YamlMember(Alias = "value")]
+    public int Value { get; set; }
+
+    [YamlIgnore]
+    public ArchitectureMetricBaselineIdentity Identity => new(
+        MetricIdentityVersion,
+        MetricId,
+        MetricKind,
+        NativeSubject,
+        Unit,
+        EffectiveScope);
 }
 
 // Property order below matches ArchitectureContractCatalog.Build's baseline-capable family order

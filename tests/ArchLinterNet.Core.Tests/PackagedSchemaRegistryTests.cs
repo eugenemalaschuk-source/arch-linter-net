@@ -31,7 +31,7 @@ public sealed class PackagedSchemaRegistryTests
         Assert.Multiple(() =>
         {
             Assert.That(schemas.Select(static schema => schema.LogicalId), Is.EqualTo(_value));
-            Assert.That(schemas.Single(static schema => schema.LogicalId == "baseline").DocumentVersion, Is.EqualTo("v2"));
+            Assert.That(schemas.Single(static schema => schema.LogicalId == "baseline").DocumentVersion, Is.EqualTo("v3"));
             Assert.That(schemas.Single(static schema => schema.LogicalId == "normalized-finding").DocumentVersion, Is.EqualTo("v3"));
             // Policy root/fragment, normalized findings, and the analysis cache advanced to 0.8.0.
             // Every previous 0.5.1 resource remains byte-for-byte frozen (see

@@ -6,7 +6,7 @@ namespace ArchLinterNet.Core.Contracts.RawValidators;
 // configuration path instead of allowing IgnoreUnmatchedProperties to erase an author typo.
 internal sealed class RawMetricBudgetValidator : IArchitecturePolicyRawDocumentValidator
 {
-    private static readonly string[] _budgetKeys = ["id", "metric", "minimum", "maximum"];
+    private static readonly string[] _budgetKeys = ["id", "metric", "minimum", "maximum", "baseline_mode", "max_delta"];
 
     public void Validate(ArchitecturePolicyRawDocument document)
     {
