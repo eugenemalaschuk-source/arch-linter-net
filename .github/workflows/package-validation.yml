@@ -221,6 +221,105 @@ jobs:
             exit 1
           fi
 
+      # Issue #741: proves the packed CLI binds a repository-local SARIF artifact to a declared
+      # external_evidence requirement end to end through a real installed `arch-linter-net` tool —
+      # not a synthetic in-process ForcedOutcome — and that --cache never lets a stale SARIF override
+      # a fresh re-read, with no duplicate applicability record accumulating across a --cache
+      # populating run followed by a re-invocation with changed evidence.
+      - name: External evidence binding smoke test
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          cli_version=$(printf '%s\n' "$cli_nupkg" | sed -E 's/^ArchLinterNet\.Cli\.(.+)\.nupkg$/\1/')
+          evidence_dir=$(mktemp -d)
+          trap 'rm -rf "$evidence_dir"' EXIT
+
+          dotnet tool install ArchLinterNet.Cli --tool-path "$evidence_dir/tool" \
+            --add-source "$GITHUB_WORKSPACE/nupkg" --version "$cli_version" --ignore-failed-sources
+
+          # A minimal real project, not a synthetic in-process outcome: the packed CLI's project
+          # discovery/build-state preflight requires at least one resolvable, built project — there
+          # is no way to exercise the real validate seam without one.
+          mkdir -p "$evidence_dir/repo/evidence"
+          pushd "$evidence_dir/repo" >/dev/null
+          dotnet new classlib -n App.Domain -o . --force >/dev/null
+          dotnet build App.Domain.csproj >/dev/null
+
+          cat > policy.arch.yml <<'POLICY'
+          version: 1
+          name: ExternalEvidenceSmokeTest
+          layers:
+            domain:
+              namespace: App.Domain
+          analysis:
+            projects:
+              - App.Domain.csproj
+          contracts:
+            strict: []
+          external_evidence:
+            - id: static-analysis
+              format: sarif
+              required: true
+              tool: Synthetic.Scanner
+              tool_version: "1.0"
+              run: ci
+              require_repository: true
+              require_revision: true
+              require_scope: true
+              diagnostic_filter:
+                severity:
+                  warning: audit
+          POLICY
+
+          write_sarif() {
+            cat > evidence/scan.sarif <<SARIF
+          {"version":"2.1.0","runs":[{"tool":{"driver":{"name":"Synthetic.Scanner","version":"1.0","rules":[{"id":"SEC100"}]}},"automationDetails":{"id":"ci"},"invocations":[{"executionSuccessful":true}],"versionControlProvenance":[{"repositoryUri":"repo","revisionId":"rev1"}],"results":[{"ruleId":"SEC100","level":"warning","message":{"text":"$1"},"locations":[{"physicalLocation":{"artifactLocation":{"uri":"src/App/One.cs"},"region":{"startLine":1,"startColumn":1}}}]}]}]}
+          SARIF
+          }
+
+          run_cli() {
+            "$evidence_dir/tool/arch-linter-net" --policy policy.arch.yml --format json \
+              --external-evidence "id=static-analysis,path=evidence/scan.sarif,scope=ci" \
+              --evidence-repository repo --evidence-revision "$1" --evidence-scope ci \
+              --cache .cache --ensure-built --no-restore
+          }
+
+          write_sarif "first finding"
+          run_cli rev1 > first-run.json
+          jq -e '(.imported_diagnostics | length) == 1' first-run.json
+          grep -qF 'first finding' first-run.json
+          jq -e '[.assessment_completion.controls[] | select(.control_identity == "static-analysis")] | length == 1' first-run.json
+          jq -e '.assessment_completion.controls[] | select(.control_identity == "static-analysis") | .state == "evaluable"' first-run.json
+
+          # Same --cache destination, changed SARIF bytes: the contract requires a fresh re-read on
+          # every invocation, never a stale reuse of the first run's trusted evidence, and exactly
+          # one applicability record for the control — not two accumulated across the two runs.
+          write_sarif "second finding"
+          run_cli rev1 > second-run.json
+          jq -e '(.imported_diagnostics | length) == 1' second-run.json
+          grep -qF 'second finding' second-run.json
+          if grep -qF 'first finding' second-run.json; then
+            echo 'Stale --cache result: second run still reflects the first SARIF content.' >&2
+            exit 1
+          fi
+          jq -e '[.assessment_completion.controls[] | select(.control_identity == "static-analysis")] | length == 1' second-run.json
+
+          # Wrong revision: the same required-evidence trust boundary #520 enforces at the Core
+          # boundary must still hold through the packed CLI — exit 2, not a clean pass.
+          set +e
+          run_cli wrong-revision > third-run.json
+          third_exit=$?
+          set -e
+          if [ "$third_exit" -ne 2 ]; then
+            echo "Expected exit code 2 for wrong-revision required evidence, got $third_exit." >&2
+            cat third-run.json >&2
+            exit 1
+          fi
+          jq -e '.assessment_completion.state == "unassessable"' third-run.json
+
+          popd >/dev/null
+
       - name: External consumer smoke test
         shell: bash
         run: |

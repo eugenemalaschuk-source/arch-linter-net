@@ -1,3 +1,5 @@
+using ArchLinterNet.Core.Model;
+
 namespace ArchLinterNet.Cli.Commands.Validate.Application;
 
 internal sealed record ValidateCommandOptions(
@@ -38,4 +40,16 @@ internal sealed record ValidateCommandOptions(
     // null uses the current UTC calendar date once for the whole validation. Supplying an ISO
     // date makes expiry-boundary runs reproducible in CI and tests.
     public string? WaiverEvaluationDate { get; init; }
+
+    // Empty = no --external-evidence supplied (no behavior change). Each entry binds one declared
+    // external_evidence requirement's logical id to a repository-local SARIF artifact plus optional
+    // producer context. See openspec/specs/cli-external-evidence-binding/spec.md.
+    public IReadOnlyList<SarifEvidenceArtifactReference> ExternalEvidenceArtifacts { get; init; } =
+        Array.Empty<SarifEvidenceArtifactReference>();
+
+    // null = none of --evidence-repository/--evidence-revision/--evidence-scope supplied. Otherwise
+    // the single current assessment context shared by every --external-evidence binding.
+    public SarifEvidenceAssessmentContext? ExternalEvidenceAssessmentContext { get; init; }
+
+    public string? ExternalEvidenceParseError { get; init; }
 }
