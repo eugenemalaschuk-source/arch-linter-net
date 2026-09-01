@@ -230,7 +230,7 @@ def test_sonar_verification_requires_all_canonical_reports_and_current_revision(
         ),
         encoding="utf-8",
     )
-    analysis_json = tmp_path / "analysis.json"
+    analysis_json = runner_temp / "analysis.json"
     analysis_json.write_text(json.dumps({"analyses": [{"revision": _SHA}]}), encoding="utf-8")
     github_output = tmp_path / "sonar-output.txt"
     monkeypatch.setenv("GITHUB_OUTPUT", str(github_output))
@@ -269,6 +269,31 @@ def test_sonar_verification_rejects_scanner_log_outside_runner_temp_before_read(
                 inventory_root=output,
                 expected_sha=_SHA,
                 scanner_log=outside_log,
+                analysis_json=analysis_json,
+                github_output=None,
+            )
+        )
+
+
+def test_sonar_verification_rejects_analysis_json_outside_runner_temp_before_read(
+    tmp_path: Path, monkeypatch
+) -> None:
+    output = _assemble(tmp_path, _artifact_root(tmp_path), monkeypatch)
+    runner_temp = tmp_path.parent / f"{tmp_path.name}-runner-temp"
+    runner_temp.mkdir()
+    monkeypatch.setenv("RUNNER_TEMP", str(runner_temp))
+    inventory = json.loads((output / "coverage-inventory.json").read_text(encoding="utf-8"))
+    log = runner_temp / "sonar.log"
+    log.write_text(_sonar_log_for(output, inventory, 39), encoding="utf-8")
+    analysis_json = tmp_path / "analysis.json"
+    analysis_json.write_text(json.dumps({"analyses": [{"revision": _SHA}]}), encoding="utf-8")
+
+    with pytest.raises(ValueError, match="outside the runner-provided RUNNER_TEMP directory"):
+        coverage._verify_sonar(
+            argparse.Namespace(
+                inventory_root=output,
+                expected_sha=_SHA,
+                scanner_log=log,
                 analysis_json=analysis_json,
                 github_output=None,
             )
