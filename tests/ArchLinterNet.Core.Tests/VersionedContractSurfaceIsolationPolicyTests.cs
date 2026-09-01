@@ -245,7 +245,9 @@ public sealed class VersionedContractSurfaceIsolationSchemaTests
             Assert.That(surface.GetProperty("required").EnumerateArray().Select(v => v.GetString()),
                 Is.EquivalentTo(["id", "types_matching"]));
             Assert.That(contract.GetProperty("required").EnumerateArray().Select(v => v.GetString()),
-                Is.EquivalentTo(["name", "surfaces", "source_surface", "forbidden_surfaces"]));
+                Is.EquivalentTo(["id", "name", "surfaces", "source_surface", "forbidden_surfaces"]));
+            Assert.That(contract.GetProperty("properties").GetProperty("forbidden_surfaces")
+                .GetProperty("uniqueItems").GetBoolean(), Is.True);
         });
     }
 }
