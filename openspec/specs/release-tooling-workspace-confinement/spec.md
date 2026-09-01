@@ -2,21 +2,20 @@
 
 ## Purpose
 TBD - created by archiving change fix-sonarcloud-new-code-debt. Update Purpose after archive.
-
 ## Requirements
-
 ### Requirement: Path-typed CLI arguments are confined to the release workspace
 
 Every script under `tools/release/` that accepts a `Path`-typed CLI argument SHALL pass it through
 the shared `_release_workspace._safe_path` confinement check before using it to read or write on the
 filesystem, **except** an argument that carries a GitHub Actions runner command-file transport path
 (for example `--github-output`/`$GITHUB_OUTPUT` or a sibling `--github-env`/`$GITHUB_ENV`
-argument), which SHALL instead be validated through the GitHub runner command-file trust boundary
-defined below. `_safe_path` SHALL accept a path only when it resolves inside the current working
-directory or the repository root, and SHALL raise `ValueError` naming the offending argument
-otherwise. A script SHALL surface that `ValueError` as a CLI error with a non-zero exit code rather
-than letting it propagate as an unhandled traceback, wherever the script already wraps its own
-argument handling in an error-reporting boundary.
+argument), or an explicitly bounded read-only GitHub runner-temp verification input, which SHALL
+instead be validated through the relevant GitHub runner trust boundary defined below. `_safe_path`
+SHALL accept a path only when it resolves inside the current working directory or the repository
+root, and SHALL raise `ValueError` naming the offending argument otherwise. A script SHALL surface
+that `ValueError` as a CLI error with a non-zero exit code rather than letting it propagate as an
+unhandled traceback, wherever the script already wraps its own argument handling in an
+error-reporting boundary.
 
 #### Scenario: A path inside the working tree is accepted
 
@@ -28,8 +27,9 @@ argument handling in an error-reporting boundary.
 #### Scenario: A path outside the release workspace is rejected
 
 - **WHEN** `main_quality_coverage.py` or `verify_restored_main_packages.py` is invoked with a
-  `Path`-typed argument, other than a GitHub runner command-file transport argument, that resolves
-  outside both the current working directory and the repository root
+  `Path`-typed argument, other than a GitHub runner command-file transport argument or explicitly
+  bounded read-only GitHub runner-temp verification input, that resolves outside both the current
+  working directory and the repository root
 - **THEN** the script rejects it with a `ValueError` identifying the argument by description, before
   any filesystem read or write is attempted at that path
 
@@ -42,10 +42,11 @@ argument handling in an error-reporting boundary.
 
 ### Requirement: GitHub runner command-file transport arguments use an environment-anchored trust boundary
 
-A `--github-output`, `--github-env`, or equivalent GitHub Actions runner command-file transport
-argument in a `tools/release/` script SHALL NOT be confined via `_safe_path`'s repository-workspace
-check, because the runner legitimately creates these files outside the checkout (under its own temp
-directory). Instead, the script SHALL validate the argument via
+A release script MUST use an environment-anchored trust boundary for a GitHub Actions runner
+command-file transport argument such as `--github-output` or `--github-env`. Such an argument in a
+`tools/release/` script SHALL NOT be confined via `_safe_path`'s repository-workspace check, because
+the runner legitimately creates these files outside the checkout (under its own temp directory).
+Instead, the script SHALL validate the argument via
 `_release_workspace._github_command_file_path(value, description, env_var)`, which SHALL accept the
 path only when it resolves to exactly the value of the named environment variable (`env_var`, e.g.
 `GITHUB_OUTPUT`) currently set in the process environment, and SHALL raise `ValueError` naming the
@@ -73,3 +74,33 @@ runner command-file argument on the command line SHALL NOT be trusted on that ba
   outside the working tree) and passes that same path as `--github-output`
 - **THEN** `_github_command_file_path` accepts it, without weakening the production check for any
   path that does not match the environment variable
+
+### Requirement: Read-only runner-temp verification inputs use a root-anchored trust boundary
+
+A read-only GitHub Actions runner-temp verification input SHALL NOT be accepted through `_safe_path`
+when it is outside the checkout. Instead, a release script SHALL validate it through a dedicated
+environment-anchored helper that resolves both the candidate path and the current `RUNNER_TEMP`
+value, accepts the candidate only when it remains contained by that resolved root, and raises a
+`ValueError` naming the argument otherwise. The boundary SHALL not accept paths solely because they
+share a filename with a workflow log, and it SHALL remain limited to explicitly designated read-only
+verification inputs.
+
+#### Scenario: The workflow-owned Sonar scanner log is accepted
+
+- **WHEN** `main_quality_coverage.py verify-sonar` receives a scanner log inside the current resolved
+  `RUNNER_TEMP` root
+- **THEN** it reads that log for canonical coverage-import proof and current-SHA verification without
+  treating the log as a release-workspace path
+
+#### Scenario: Arbitrary external scanner logs are rejected
+
+- **WHEN** `main_quality_coverage.py verify-sonar` receives a scanner-log path outside the current
+  resolved `RUNNER_TEMP` root, including a temporary, home-directory, sibling-workspace, traversal,
+  or symlink-resolved external path
+- **THEN** it raises a `ValueError` before reading the log
+
+#### Scenario: A missing or mismatched runner context fails closed
+
+- **WHEN** `RUNNER_TEMP` is unset or the scanner-log path is not contained by its resolved value
+- **THEN** `main_quality_coverage.py verify-sonar` rejects the path with a `ValueError` and does not
+  read it
