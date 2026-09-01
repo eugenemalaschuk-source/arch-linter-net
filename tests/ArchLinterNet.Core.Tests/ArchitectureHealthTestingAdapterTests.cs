@@ -63,6 +63,16 @@ public sealed class ArchitectureHealthTestingAdapterTests
                 Is.EqualTo(new[] { "strict", "audit" }));
             Assert.That(fromBuilder.DebtGate.Evaluation.ReusedAnalysisSnapshot, Is.True);
             Assert.That(fromEngine.DebtGate.Evaluation.ReusedAnalysisSnapshot, Is.True);
+            Assert.That(fromBuilder.AnalysisCounters.PolicyCompositions, Is.EqualTo(1));
+            Assert.That(fromBuilder.AnalysisCounters.ProjectGraphEvaluations, Is.EqualTo(1));
+            Assert.That(fromBuilder.AnalysisCounters.SnapshotMaterializations, Is.EqualTo(1));
+            Assert.That(fromBuilder.AnalysisCounters.SelectedAssemblyCount, Is.EqualTo(1));
+            Assert.That(fromBuilder.AnalysisCounters.AssemblyLoads, Is.LessThanOrEqualTo(1));
+            Assert.That(fromEngine.AnalysisCounters.PolicyCompositions, Is.EqualTo(1));
+            Assert.That(fromEngine.AnalysisCounters.ProjectGraphEvaluations, Is.EqualTo(1));
+            Assert.That(fromEngine.AnalysisCounters.SnapshotMaterializations, Is.EqualTo(1));
+            Assert.That(fromEngine.AnalysisCounters.SelectedAssemblyCount, Is.EqualTo(1));
+            Assert.That(fromEngine.AnalysisCounters.AssemblyLoads, Is.LessThanOrEqualTo(1));
         });
     }
 
@@ -91,9 +101,18 @@ public sealed class ArchitectureHealthTestingAdapterTests
             layers:
               execution:
                 namespace: ArchLinterNet.Core.Execution
+              nonexistent:
+                namespace: Sample.Does.Not.Exist
 
             analysis:
               target_assemblies: [ArchLinterNet.Core]
+
+            contracts:
+              strict:
+                - id: no-execution-to-nonexistent
+                  name: execution-must-not-depend-on-nonexistent
+                  source: execution
+                  forbidden: [nonexistent]
             """);
         return policyPath;
     }

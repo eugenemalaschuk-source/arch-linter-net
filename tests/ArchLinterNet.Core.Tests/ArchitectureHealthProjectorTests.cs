@@ -8,7 +8,7 @@ using NUnit.Framework;
 namespace ArchLinterNet.Core.Tests;
 
 [TestFixture]
-public sealed class ArchitectureHealthProjectorTests
+public sealed partial class ArchitectureHealthProjectorTests
 {
     [Test]
     public void Project_CleanCompleteStrictOutput_PassesAndIsHealthy()
@@ -472,6 +472,7 @@ public sealed class ArchitectureHealthProjectorTests
             Assert.That(first.Dimensions.Select(dimension => dimension.Name), Is.EqualTo(new[]
             {
                 "applicability",
+                "audit_evidence",
                 "coverage",
                 "current_evaluation",
                 "external_evidence",
@@ -495,6 +496,9 @@ public sealed class ArchitectureHealthProjectorTests
         ArchitecturePolicyInventory? inventory = null,
         ArchitectureAssessmentCompletionEvidence? completion = null,
         IReadOnlyCollection<ArchitectureViolation>? violations = null,
+        IReadOnlyCollection<ArchitectureViolation>? coverageFindings = null,
+        string coverageConfig = "off",
+        IReadOnlyCollection<ArchitectureCoverageSummary>? coverageSummaries = null,
         IReadOnlyList<ArchitectureApplicabilityRecord>? applicabilityRecords = null,
         ImportedExternalDiagnosticProjection? importedDiagnostics = null,
         ArchitectureWaiverLifecycleAssessment? waiverLifecycleAssessment = null,
@@ -505,13 +509,13 @@ public sealed class ArchitectureHealthProjectorTests
             passed,
             violations ?? Array.Empty<ArchitectureViolation>(),
             Array.Empty<string>(),
-            Array.Empty<ArchitectureViolation>(),
-            "off",
+            coverageFindings ?? Array.Empty<ArchitectureViolation>(),
+            coverageConfig,
             Array.Empty<ArchitectureUnmatchedIgnoredViolation>(),
             "off",
             Array.Empty<PolicyConsistencyDiagnostic>(),
             "off",
-            Array.Empty<ArchitectureCoverageSummary>(),
+            coverageSummaries ?? Array.Empty<ArchitectureCoverageSummary>(),
             Array.Empty<ArchitectureClassificationConflict>(),
             Array.Empty<ArchitectureClassificationMetadataFailure>())
         {
@@ -627,6 +631,13 @@ public sealed class ArchitectureHealthProjectorTests
             10,
             ["Sample.Api"]),
     };
+
+    private static ArchitectureViolation CoverageFinding() => new(
+        "namespace is uncovered",
+        "coverage.namespace",
+        "Sample.Application",
+        "Sample.Infrastructure",
+        ["Sample.Application"]);
 
     private static SarifSelectedExternalDiagnostic SelectedExternalDiagnostic(
         string identity,

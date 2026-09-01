@@ -4089,6 +4089,7 @@ property ArchLinterNet.Core.Validation.ArchitectureDebtGateRequest.RequestedConf
 property ArchLinterNet.Core.Validation.ArchitectureDebtGateRequest.RequestedPlatform: System.String [get, init]
 property ArchLinterNet.Core.Validation.ArchitectureDebtGateRequest.RequestedRuntimeIdentifier: System.String [get, init]
 property ArchLinterNet.Core.Validation.ArchitectureDebtGateRequest.RequestedTargetFramework: System.String [get, init]
+property ArchLinterNet.Core.Validation.ArchitectureHealthOutcome.AnalysisCounters: ArchLinterNet.Core.Validation.ArchitectureAnalysisSnapshotCounters [get, init]
 property ArchLinterNet.Core.Validation.ArchitectureHealthOutcome.DebtGate: ArchLinterNet.Core.Validation.ArchitectureDebtGateOutcome [get, init]
 property ArchLinterNet.Core.Validation.ArchitectureHealthOutcome.Gate: ArchLinterNet.Core.Model.ArchitectureHealthGate [get]
 property ArchLinterNet.Core.Validation.ArchitectureHealthOutcome.Health: ArchLinterNet.Core.Model.ArchitectureHealthState [get]

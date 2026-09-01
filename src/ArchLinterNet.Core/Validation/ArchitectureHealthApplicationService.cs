@@ -42,7 +42,10 @@ public sealed class ArchitectureHealthApplicationService(
         return new ArchitectureHealthOutcome(
             ArchitectureHealthProjector.Project(validationOutcomes, debtGate),
             validationOutcomes,
-            debtGate);
+            debtGate)
+        {
+            AnalysisCounters = snapshot.Counters,
+        };
     }
 
     private static string[] ResolveModes(string mode) => mode switch

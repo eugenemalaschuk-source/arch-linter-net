@@ -289,6 +289,11 @@ references so automation can drill into the source receipt. A stale or otherwise
 lifecycle record remains a failing lifecycle result; a resolved baseline entry remains visible as
 baseline hygiene but is not classified as new architecture debt.
 
+Coverage retains its existing severity semantics in Health: `analysis.coverage: error` is failing,
+while `warn` remains non-blocking reportable evidence. For `--mode audit` and `--mode all`,
+`audit_evidence` preserves audit-only diagnostics without turning the Health gate into a strict
+failure.
+
 ## Change snapshots
 
 ```bash

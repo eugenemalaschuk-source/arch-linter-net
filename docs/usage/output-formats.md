@@ -86,9 +86,10 @@ does not add a `ratchet` validation mode.
 
 `arch-linter-net health --policy <path> --baseline <path>` projects the canonical
 `architecture-health/v1` summary from current evaluation, applicability, coverage, topology,
-metrics, external evidence, policy inventory, baseline debt, waiver debt, new debt, and policy
-weakening authorities. History is explicitly `not_configured` until an advisory-only history input
-is added. The command does not parse another command's output or recompute any dimension in the CLI.
+metrics, external evidence, audit evidence, policy inventory, baseline debt, waiver debt, new
+debt, and policy weakening authorities. History is explicitly `not_configured` until an
+advisory-only history input is added. The command does not parse another command's output or
+recompute any dimension in the CLI.
 
 Human output is Core's readable projection. JSON is one health document with `schema_id`, `gate`,
 `health`, and ordered `dimensions`; each dimension retains ordered `reasons`. The health model is
@@ -104,6 +105,10 @@ topology violations, metric-budget breaches, and imported external findings. Wai
 the evaluated lifecycle profile and its blocking states rather than aggregate debt counts. A
 resolved baseline entry is reported as `resolved_baseline_hygiene` on the passing
 `new_architecture_debt` dimension, while the independent gate can still require baseline pruning.
+Coverage follows its existing severity authority: `analysis.coverage: error` produces a failing
+coverage dimension, while `warn` retains the finding as non-blocking degrading evidence. When
+`--mode audit` is requested, ordinary audit diagnostics are retained in the non-blocking
+`audit_evidence` dimension, so a clean result remains distinguishable from an audit-only result.
 
 ## Human output
 

@@ -14,4 +14,10 @@ public sealed record ArchitectureHealthOutcome(
     public ArchitectureHealthGate Gate => Summary.Gate;
 
     public ArchitectureHealthState Health => Summary.Health;
+
+    /// <summary>
+    /// Counters from the immutable analysis snapshot that supplied both validation and baseline
+    /// candidate receipts. They make the one-snapshot Health orchestration observable.
+    /// </summary>
+    public ArchitectureAnalysisSnapshotCounters AnalysisCounters { get; init; } = new();
 }

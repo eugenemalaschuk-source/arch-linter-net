@@ -13,7 +13,6 @@ public static class ArchitectureHealthProjector
 {
     private const string CurrentEvaluation = "current_evaluation";
     private const string Applicability = "applicability";
-    private const string Coverage = "coverage";
     private const string Topology = "topology";
     private const string Metrics = "metrics";
     private const string ExternalEvidence = "external_evidence";
@@ -47,7 +46,8 @@ public static class ArchitectureHealthProjector
         [
             ProjectCurrentEvaluation(orderedOutcomes),
             ProjectApplicability(orderedOutcomes),
-            ProjectCoverage(orderedOutcomes),
+            ArchitectureHealthReceiptProjector.ProjectAuditEvidence(orderedOutcomes),
+            ArchitectureHealthReceiptProjector.ProjectCoverage(orderedOutcomes),
             ProjectTopology(orderedOutcomes),
             ProjectMetrics(orderedOutcomes),
             ProjectExternalEvidence(orderedOutcomes),
@@ -154,29 +154,6 @@ public static class ArchitectureHealthProjector
         return completion.Any(evidence => evidence.State == ArchitectureAssessmentCompletionState.Fail)
             ? Dimension(Applicability, ArchitectureHealthDimensionState.Fail, "applicability_failed")
             : Dimension(Applicability, ArchitectureHealthDimensionState.Pass);
-    }
-
-    private static ArchitectureHealthDimension ProjectCoverage(
-        IReadOnlyList<ArchitectureHealthValidationOutcome> outcomes)
-    {
-        ArchitectureHealthValidationOutcome[] configured = outcomes
-            .Where(outcome => outcome.Outcome.CoverageSummaries.Count > 0
-                || outcome.Outcome.CoverageFindings.Count > 0)
-            .ToArray();
-        if (configured.Length == 0)
-        {
-            return Dimension(Coverage, ArchitectureHealthDimensionState.NotConfigured);
-        }
-
-        if (configured.Any(outcome => outcome.Outcome.CoverageSummaries.Any(summary =>
-            summary.Counts.Stale > 0 || summary.Counts.Unknown > 0)))
-        {
-            return Dimension(Coverage, ArchitectureHealthDimensionState.Unassessable, "coverage_incomplete");
-        }
-
-        return configured.Any(outcome => outcome.Outcome.CoverageFindings.Count > 0)
-            ? Dimension(Coverage, ArchitectureHealthDimensionState.Fail, "coverage_failed")
-            : Dimension(Coverage, ArchitectureHealthDimensionState.Pass);
     }
 
     private static ArchitectureHealthDimension ProjectTopology(

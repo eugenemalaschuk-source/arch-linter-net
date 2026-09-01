@@ -5790,6 +5790,7 @@ sealed class ArchLinterNet.Core.Validation.ArchitectureHealthOutcome : System.IE
   property ArchLinterNet.Core.Model.ArchitectureHealthGate Gate {get;}
   property ArchLinterNet.Core.Model.ArchitectureHealthState Health {get;}
   property ArchLinterNet.Core.Model.ArchitectureHealthSummary Summary {get;init;}
+  property ArchLinterNet.Core.Validation.ArchitectureAnalysisSnapshotCounters AnalysisCounters {get;init;}
   property ArchLinterNet.Core.Validation.ArchitectureDebtGateOutcome DebtGate {get;init;}
   property System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Validation.ArchitectureHealthValidationOutcome> ValidationOutcomes {get;init;}
 static class ArchLinterNet.Core.Validation.ArchitectureHealthProjector
