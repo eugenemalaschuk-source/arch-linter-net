@@ -117,8 +117,8 @@ internal static class ArchitectureAnalysisCommandSupport
         IFileSystem fileSystem,
         ArchitectureAnalysisCommandOptions options)
     {
-        string? baseContextPath = options.BaseContextPath;
-        string? currentContextPath = options.CurrentContextPath;
+        string baseContextPath = options.BaseContextPath ?? string.Empty;
+        string currentContextPath = options.CurrentContextPath ?? string.Empty;
         bool hasBase = !string.IsNullOrWhiteSpace(baseContextPath);
         bool hasCurrent = !string.IsNullOrWhiteSpace(currentContextPath);
         if (hasBase != hasCurrent)
@@ -128,8 +128,7 @@ internal static class ArchitectureAnalysisCommandSupport
         }
 
         if (hasBase
-            && (!fileSystem.FileExists(baseContextPath ?? string.Empty)
-                || !fileSystem.FileExists(currentContextPath ?? string.Empty)))
+            && (!fileSystem.FileExists(baseContextPath) || !fileSystem.FileExists(currentContextPath)))
         {
             CliErrorOutputWriter.Write(console, options.Format, "missing-policy-context", "Both policy-context artifact files must exist.");
             return false;
