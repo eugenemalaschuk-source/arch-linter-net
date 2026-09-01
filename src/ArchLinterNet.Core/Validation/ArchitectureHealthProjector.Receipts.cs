@@ -1,4 +1,5 @@
 using ArchLinterNet.Core.Model;
+using static ArchLinterNet.Core.Validation.ArchitectureHealthProjectionHelpers;
 
 namespace ArchLinterNet.Core.Validation;
 
@@ -112,49 +113,4 @@ internal static class ArchitectureHealthReceiptProjector
         _ => "validation",
     };
 
-    private static ArchitectureHealthDimension Dimension(
-        string name,
-        ArchitectureHealthDimensionState state,
-        params string[] reasonCodes) =>
-        Dimension(name, state, reasonCodes.Select(code => Reason(code, name)));
-
-    private static ArchitectureHealthDimension Dimension(
-        string name,
-        ArchitectureHealthDimensionState state,
-        IEnumerable<ArchitectureHealthReason> reasons) =>
-        new(
-            name,
-            state,
-            reasons
-                .Where(reason => !string.IsNullOrWhiteSpace(reason.Code))
-                .Distinct()
-                .ToArray());
-
-    private static ArchitectureHealthReason Reason(
-        string code,
-        string source,
-        string? family = null,
-        string? controlIdentity = null,
-        string? policyIdentity = null,
-        string? evidenceIdentity = null) =>
-        new(code, source)
-        {
-            Family = family,
-            ControlIdentity = controlIdentity,
-            PolicyIdentity = policyIdentity,
-            EvidenceIdentity = evidenceIdentity,
-        };
-
-    private static string? PolicyIdentity(ArchitecturePolicySourceLocation? location) => location is null
-        ? null
-        : $"{location.SourcePath}:{location.YamlPath}";
-
-    private static string EvidenceIdentity(ArchitectureViolation violation) => violation.Identity is not null
-        ? ArchitectureViolationIdentityJson.Serialize(violation.Identity)
-        : string.Join(
-            "|",
-            violation.ContractId ?? violation.ContractName,
-            violation.SourceType,
-            violation.ForbiddenNamespace,
-            string.Join(",", violation.ForbiddenReferences.OrderBy(reference => reference, StringComparer.Ordinal)));
 }

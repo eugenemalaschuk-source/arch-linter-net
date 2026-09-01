@@ -10,6 +10,25 @@ namespace ArchLinterNet.Core.Tests;
 [TestFixture]
 public sealed partial class ArchitectureHealthProjectorTests
 {
+    private static readonly string[] _expectedDimensionNames =
+    [
+        "applicability",
+        "audit_evidence",
+        "coverage",
+        "current_evaluation",
+        "external_evidence",
+        "history",
+        "metrics",
+        "new_architecture_debt",
+        "policy_inventory",
+        "policy_weakening",
+        "reviewed_finding_debt",
+        "topology",
+        "waiver_debt",
+    ];
+
+    private static readonly string[] _expectedApplicabilityReasonCodes = ["a_reason", "z_reason"];
+
     [Test]
     public void Project_CleanCompleteStrictOutput_PassesAndIsHealthy()
     {
@@ -469,24 +488,9 @@ public sealed partial class ArchitectureHealthProjectorTests
                 Is.EqualTo(ArchitectureHealthProjector.FormatAsHuman(second)));
             Assert.That(ArchitectureHealthProjector.FormatAsJson(first),
                 Is.EqualTo(ArchitectureHealthProjector.FormatAsJson(second)));
-            Assert.That(first.Dimensions.Select(dimension => dimension.Name), Is.EqualTo(new[]
-            {
-                "applicability",
-                "audit_evidence",
-                "coverage",
-                "current_evaluation",
-                "external_evidence",
-                "history",
-                "metrics",
-                "new_architecture_debt",
-                "policy_inventory",
-                "policy_weakening",
-                "reviewed_finding_debt",
-                "topology",
-                "waiver_debt",
-            }));
+            Assert.That(first.Dimensions.Select(dimension => dimension.Name), Is.EqualTo(_expectedDimensionNames));
             Assert.That(Dimension(first, "applicability").Reasons.Select(reason => reason.Code),
-                Is.EqualTo(new[] { "a_reason", "z_reason" }));
+                Is.EqualTo(_expectedApplicabilityReasonCodes));
         });
     }
 

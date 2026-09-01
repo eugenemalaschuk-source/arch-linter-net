@@ -9,6 +9,8 @@ namespace ArchLinterNet.Core.Tests;
 [TestFixture]
 public sealed class ArchitectureHealthTestingAdapterTests
 {
+    private static readonly string[] _expectedValidationModes = ["strict", "audit"];
+
     private string _tempDir = null!;
 
     [SetUp]
@@ -58,9 +60,9 @@ public sealed class ArchitectureHealthTestingAdapterTests
             Assert.That(fromBuilder.Summary.Gate, Is.EqualTo(fromEngine.Summary.Gate));
             Assert.That(fromBuilder.Summary.Health, Is.EqualTo(fromEngine.Summary.Health));
             Assert.That(fromBuilder.ValidationOutcomes.Select(outcome => outcome.Mode),
-                Is.EqualTo(new[] { "strict", "audit" }));
+                Is.EqualTo(_expectedValidationModes));
             Assert.That(fromEngine.ValidationOutcomes.Select(outcome => outcome.Mode),
-                Is.EqualTo(new[] { "strict", "audit" }));
+                Is.EqualTo(_expectedValidationModes));
             Assert.That(fromBuilder.DebtGate.Evaluation.ReusedAnalysisSnapshot, Is.True);
             Assert.That(fromEngine.DebtGate.Evaluation.ReusedAnalysisSnapshot, Is.True);
             Assert.That(fromBuilder.AnalysisCounters.PolicyCompositions, Is.EqualTo(1));

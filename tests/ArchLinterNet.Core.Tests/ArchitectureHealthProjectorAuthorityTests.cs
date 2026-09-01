@@ -6,6 +6,24 @@ namespace ArchLinterNet.Core.Tests;
 
 public sealed partial class ArchitectureHealthProjectorTests
 {
+    private static readonly string[] _expectedExternalReasonCodes =
+    [
+        "wrong_external_revision",
+        "wrong_external_revision",
+    ];
+
+    private static readonly string[] _expectedExternalControlIdentities =
+    [
+        "external.codeql",
+        "external.sonar",
+    ];
+
+    private static readonly string[] _expectedExternalPolicyIdentities =
+    [
+        "strict-external-codeql",
+        "strict-external-sonar",
+    ];
+
     [Test]
     public void Project_WarningCoverageFinding_IsReportableWithoutFailingGate()
     {
@@ -104,11 +122,11 @@ public sealed partial class ArchitectureHealthProjectorTests
         {
             Assert.That(reasons, Has.Length.EqualTo(2));
             Assert.That(reasons.Select(reason => reason.Code), Is.EqualTo(
-                new[] { "wrong_external_revision", "wrong_external_revision" }));
+                _expectedExternalReasonCodes));
             Assert.That(reasons.Select(reason => reason.ControlIdentity), Is.EqualTo(
-                new[] { "external.codeql", "external.sonar" }));
+                _expectedExternalControlIdentities));
             Assert.That(reasons.Select(reason => reason.PolicyIdentity), Is.EqualTo(
-                new[] { "strict-external-codeql", "strict-external-sonar" }));
+                _expectedExternalPolicyIdentities));
         });
     }
 

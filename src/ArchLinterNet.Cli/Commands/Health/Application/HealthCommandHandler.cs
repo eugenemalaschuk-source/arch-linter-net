@@ -47,7 +47,7 @@ internal sealed class HealthCommandHandler(
           2   Gate is unassessable, or arguments/contexts/policy/runtime are invalid
         """;
 
-    public int Execute(HealthCommandOptions options)
+    public int Execute(ArchitectureAnalysisCommandOptions options)
     {
         if (options.ShowHelp)
         {
@@ -59,8 +59,8 @@ internal sealed class HealthCommandHandler(
             || !TryValidateFormat(options.Format)
             || !BaselineCommandGuards.TryRequireBaselinePath(console, options.Format, "health", options.BaselinePath)
             || !BaselineCommandGuards.TryValidatePolicyFile(console, fileSystem, options.Format, options.PolicyPath)
-            || !BaselineCommandGuards.TryValidateBaselineFile(console, fileSystem, options.Format, options.BaselinePath!)
-            || !TryValidateContexts(options))
+            || !BaselineCommandGuards.TryValidateBaselineFile(console, fileSystem, options.Format, options.BaselinePath ?? string.Empty)
+            || !ArchitectureAnalysisCommandSupport.TryValidateContexts(console, fileSystem, options))
         {
             return CliExitCodes.InvalidArgumentsOrRuntimeError;
         }
@@ -69,27 +69,7 @@ internal sealed class HealthCommandHandler(
         {
             ArchitectureHealthOutcome outcome = runtime.EvaluateHealth(new ArchitectureHealthRequest
             {
-                DebtGate = new ArchitectureDebtGateRequest
-                {
-                    PolicyPath = options.PolicyPath,
-                    BaselinePath = options.BaselinePath!,
-                    Mode = options.Mode,
-                    ConditionSetName = options.ConditionSetName,
-                    ContractIds = options.ContractIds,
-                    BasePolicyContext = options.BaseContextPath is null
-                        ? null
-                        : ArchitecturePolicyWeakeningFormatter.DeserializeContext(fileSystem.ReadAllText(options.BaseContextPath)),
-                    CurrentPolicyContext = options.CurrentContextPath is null
-                        ? null
-                        : ArchitecturePolicyWeakeningFormatter.DeserializeContext(fileSystem.ReadAllText(options.CurrentContextPath)),
-                    PreparationMode = options.EnsureBuilt ? BuildPreparationMode.EnsureBuilt : BuildPreparationMode.Ordinary,
-                    NoRestore = options.NoRestore,
-                    RequestedConfiguration = options.Configuration,
-                    RequestedTargetFramework = options.TargetFramework,
-                    RequestedPlatform = options.Platform,
-                    RequestedRuntimeIdentifier = options.RuntimeIdentifier,
-                    CancellationToken = cancellationToken,
-                },
+                DebtGate = ArchitectureAnalysisCommandSupport.CreateDebtGateRequest(options, fileSystem, cancellationToken),
             });
 
             console.Out.WriteLine(options.Format == "json"
@@ -127,22 +107,4 @@ internal sealed class HealthCommandHandler(
         return false;
     }
 
-    private bool TryValidateContexts(HealthCommandOptions options)
-    {
-        bool hasBase = !string.IsNullOrWhiteSpace(options.BaseContextPath);
-        bool hasCurrent = !string.IsNullOrWhiteSpace(options.CurrentContextPath);
-        if (hasBase != hasCurrent)
-        {
-            CliErrorOutputWriter.Write(console, options.Format, "missing-policy-context", "Both --base-context and --current-context are required together.");
-            return false;
-        }
-
-        if (hasBase && (!fileSystem.FileExists(options.BaseContextPath!) || !fileSystem.FileExists(options.CurrentContextPath!)))
-        {
-            CliErrorOutputWriter.Write(console, options.Format, "missing-policy-context", "Both policy-context artifact files must exist.");
-            return false;
-        }
-
-        return true;
-    }
 }

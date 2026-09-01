@@ -1,6 +1,7 @@
 using System.Text;
 using System.Text.Json;
 using ArchLinterNet.Core.Model;
+using static ArchLinterNet.Core.Validation.ArchitectureHealthProjectionHelpers;
 
 namespace ArchLinterNet.Core.Validation;
 
@@ -243,10 +244,10 @@ public static class ArchitectureHealthProjector
                 records.SelectMany(record => record.Reasons).Select(reason => Reason(dimensionName, reason)));
         }
 
-        if (findings.Any(finding => string.Equals(finding.Mode, "strict", StringComparison.Ordinal)))
+        if (findings.Any(finding => string.Equals(finding.AnalysisMode, "strict", StringComparison.Ordinal)))
         {
             return Dimension(dimensionName, ArchitectureHealthDimensionState.Fail,
-                findings.Where(finding => string.Equals(finding.Mode, "strict", StringComparison.Ordinal))
+                findings.Where(finding => string.Equals(finding.AnalysisMode, "strict", StringComparison.Ordinal))
                     .Select(finding => finding.Reason));
         }
 
@@ -256,7 +257,7 @@ public static class ArchitectureHealthProjector
                 findings.Select(finding => finding.Reason));
         }
 
-        return records.Length > 0 && records.All(record => record.State == ArchitectureApplicabilityRecordState.NotApplicable)
+        return records.All(record => record.State == ArchitectureApplicabilityRecordState.NotApplicable)
             ? Dimension(dimensionName, ArchitectureHealthDimensionState.NotApplicable)
             : Dimension(dimensionName, ArchitectureHealthDimensionState.Pass);
     }
@@ -396,61 +397,6 @@ public static class ArchitectureHealthProjector
             : ArchitectureHealthState.Healthy;
     }
 
-    private static ArchitectureHealthDimension Dimension(
-        string name,
-        ArchitectureHealthDimensionState state,
-        params string[] reasonCodes)
-    {
-        return Dimension(name, state, (IEnumerable<string>)reasonCodes);
-    }
-
-    private static ArchitectureHealthDimension Dimension(
-        string name,
-        ArchitectureHealthDimensionState state,
-        IEnumerable<string> reasonCodes)
-    {
-        return Dimension(name, state, reasonCodes
-            .Where(code => !string.IsNullOrWhiteSpace(code))
-            .Select(code => new ArchitectureHealthReason(code, name)));
-    }
-
-    private static ArchitectureHealthDimension Dimension(
-        string name,
-        ArchitectureHealthDimensionState state,
-        IEnumerable<ArchitectureHealthReason> reasons) =>
-        new(
-            name,
-            state,
-            reasons
-                .Where(reason => !string.IsNullOrWhiteSpace(reason.Code))
-                .Distinct()
-                .ToArray());
-
-    private static ArchitectureHealthReason Reason(
-        string code,
-        string source,
-        string? family = null,
-        string? controlIdentity = null,
-        string? policyIdentity = null,
-        string? evidenceIdentity = null) =>
-        new(code, source)
-        {
-            Family = family,
-            ControlIdentity = controlIdentity,
-            PolicyIdentity = policyIdentity,
-            EvidenceIdentity = evidenceIdentity,
-        };
-
-    private static ArchitectureHealthReason Reason(
-        string source,
-        ArchitectureApplicabilityReason reason) =>
-        Reason(
-            reason.Code,
-            source,
-            reason.Provenance.Family,
-            reason.Provenance.ControlIdentity,
-            reason.Provenance.PolicyIdentity);
-
     private static ArchitectureHealthReason WaiverReason(
         ArchitectureWaiverLifecycleRecord record,
         string code) =>
@@ -466,19 +412,6 @@ public static class ArchitectureHealthProjector
             // synthetic aggregate. Keeping it in code makes the JSON receipt self-describing.
             Code = $"{code}:{record.State}",
         };
-
-    private static string? PolicyIdentity(ArchitecturePolicySourceLocation? location) => location is null
-        ? null
-        : $"{location.SourcePath}:{location.YamlPath}";
-
-    private static string EvidenceIdentity(ArchitectureViolation violation) => violation.Identity is not null
-        ? ArchitectureViolationIdentityJson.Serialize(violation.Identity)
-        : string.Join(
-            "|",
-            violation.ContractId ?? violation.ContractName,
-            violation.SourceType,
-            violation.ForbiddenNamespace,
-            string.Join(",", violation.ForbiddenReferences.OrderBy(reference => reference, StringComparer.Ordinal)));
 
     private static string FormatProvenance(ArchitectureHealthReason reason)
     {
@@ -497,7 +430,7 @@ public static class ArchitectureHealthProjector
         ? string.Empty
         : $"{name}={value}";
 
-    private sealed record ArchitectureHealthAuthorityFinding(string Mode, ArchitectureHealthReason Reason);
+    private sealed record ArchitectureHealthAuthorityFinding(string AnalysisMode, ArchitectureHealthReason Reason);
 
     private static string WireName(ArchitectureHealthGate value) => value switch
     {
