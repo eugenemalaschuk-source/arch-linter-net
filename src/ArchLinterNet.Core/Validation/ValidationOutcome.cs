@@ -176,6 +176,12 @@ public sealed record ValidationOutcome
         Array.Empty<ArchitectureWaiverLifecycleRecord>();
 
     /// <summary>
+    /// The profile-aware lifecycle receipt computed while this mode was evaluated. This keeps
+    /// downstream projections from inferring blocking semantics from aggregate waiver debt.
+    /// </summary>
+    public ArchitectureWaiverLifecycleAssessment? WaiverLifecycleAssessment { get; init; }
+
+    /// <summary>
     /// The canonical effective-policy control and explicit waiver-debt inventory produced for
     /// this validation. A null value is retained for compatibility outcomes reconstructed from
     /// cache entries written before the inventory was introduced.

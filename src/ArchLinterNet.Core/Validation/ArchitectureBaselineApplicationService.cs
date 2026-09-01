@@ -203,8 +203,39 @@ public sealed partial class ArchitectureBaselineApplicationService(
     public BaselineVerifyOutcome Verify(BaselineVerifyRequest request)
     {
         BaselineCandidateCollection collection = CollectVerifyCandidates(request);
+        return VerifyCollectedCandidates(
+            request,
+            collection.Document,
+            collection.Candidates,
+            collection.ConfigurationViolations,
+            collection.PreflightDiagnostics);
+    }
 
-        if (collection.Candidates == null)
+    /// <summary>
+    /// Verifies persistent debt from candidate evidence already produced by an analysis snapshot.
+    /// This avoids a second repository analysis for composite consumers such as Health.
+    /// </summary>
+    public BaselineVerifyOutcome Verify(BaselineVerifyRequest request, ArchitectureAnalysisSnapshot snapshot)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        ArgumentNullException.ThrowIfNull(snapshot);
+        ArchitectureSnapshotBaselineCandidateReceipt receipt = snapshot.CollectBaselineCandidates(request.Mode);
+        return VerifyCollectedCandidates(
+            request,
+            receipt.Document,
+            receipt.Candidates,
+            receipt.ConfigurationViolations,
+            receipt.PreflightDiagnostics);
+    }
+
+    private BaselineVerifyOutcome VerifyCollectedCandidates(
+        BaselineVerifyRequest request,
+        ArchitectureContractDocument document,
+        IReadOnlyList<ArchitectureBaselineCandidate>? candidates,
+        IReadOnlyCollection<ArchitectureViolation> configurationViolations,
+        IReadOnlyCollection<BuildStatePreflightDiagnostic> preflightDiagnostics)
+    {
+        if (candidates == null)
         {
             return new BaselineVerifyOutcome(
                 Succeeded: false,
@@ -213,15 +244,15 @@ public sealed partial class ArchitectureBaselineApplicationService(
                 Frozen: Array.Empty<ArchitectureBaselineComparisonEntry>(),
                 Resolved: Array.Empty<ArchitectureBaselineComparisonEntry>(),
                 ConfigurationErrors: Array.Empty<ArchitectureBaselineComparisonEntry>(),
-                ConfigurationViolations: collection.ConfigurationViolations)
+                ConfigurationViolations: configurationViolations)
             {
-                PreflightDiagnostics = collection.PreflightDiagnostics,
+                PreflightDiagnostics = preflightDiagnostics,
             };
         }
 
         ArchitectureBaselineDocument existingBaseline = baselineLoadingService.Load(request.BaselinePath);
         ArchitectureBaselineComparisonResult comparison = ArchitectureBaselineComparer.Compare(
-            collection.Document, existingBaseline, collection.Candidates, request.Mode, request.ContractIds);
+            document, existingBaseline, candidates, request.Mode, request.ContractIds);
 
         // Ambiguity is out-of-sync too: one entry standing in for several distinct violations
         // suppresses more than it was reviewed for.

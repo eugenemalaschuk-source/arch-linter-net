@@ -8,7 +8,14 @@ namespace ArchLinterNet.Core.Validation;
 public sealed record ArchitectureDebtGateEvaluation(
     bool Completed,
     string Mode,
-    IReadOnlyList<BuildStatePreflightDiagnostic> PreflightDiagnostics);
+    IReadOnlyList<BuildStatePreflightDiagnostic> PreflightDiagnostics)
+{
+    /// <summary>
+    /// Whether persistent-debt comparison used the candidate receipt from the caller's existing
+    /// analysis snapshot instead of collecting candidates through a second analysis path.
+    /// </summary>
+    public bool ReusedAnalysisSnapshot { get; init; }
+}
 
 /// <summary>One normalized, read-only architecture debt gate result.</summary>
 public sealed record ArchitectureDebtGateOutcome(

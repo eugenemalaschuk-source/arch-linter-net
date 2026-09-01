@@ -93,6 +93,10 @@ Run `arch-linter-net --help` or `arch-linter-net <command> --help` for the exact
 
 | `arch-linter-net gate ...` | Fail CI on new architecture debt and error-severity policy weakening. |
 
+<!-- cli-command: health -->
+
+| `arch-linter-net health ...` | Project the canonical non-compensating architecture-health/v1 summary. |
+
 <!-- cli-command: graph -->
 
 | `arch-linter-net graph ...` | Export dependency graphs as JSON, DOT, or Mermaid at supported granularities. |
@@ -261,6 +265,34 @@ arch-linter-net gate \
 ```
 
 `gate` can also consume exported base/current policy contexts so CI catches both new findings and error-severity policy weakening.
+
+## Architecture health
+
+```bash
+arch-linter-net health \
+  --policy architecture/arch.yml \
+  --baseline architecture/baseline.arch.yml \
+  --mode all \
+  --format json
+```
+
+`health` is a read-only projection of canonical architecture-governance authorities. It reports
+the ordered `architecture-health/v1` dimensions and their reasons in human or JSON output. The
+projection is non-compensating: it has no score, percentage, letter grade, badge, pull-request
+rendering, or SARIF output. A valid but unassessable result is emitted as a health document rather
+than a command-error document.
+
+For topology, metric budgets, and imported external diagnostics, `evaluable` means only that the
+authority could assess the control; the health dimension still reflects that authority's resulting
+strict finding or clean receipt. Each reason retains canonical family, control, policy, and evidence
+references so automation can drill into the source receipt. A stale or otherwise blocking waiver
+lifecycle record remains a failing lifecycle result; a resolved baseline entry remains visible as
+baseline hygiene but is not classified as new architecture debt.
+
+Coverage retains its existing severity semantics in Health: `analysis.coverage: error` is failing,
+while `warn` remains non-blocking reportable evidence. For `--mode audit` and `--mode all`,
+`audit_evidence` preserves audit-only diagnostics without turning the Health gate into a strict
+failure.
 
 ## Change snapshots
 

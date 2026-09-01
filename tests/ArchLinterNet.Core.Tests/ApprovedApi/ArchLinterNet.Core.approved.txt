@@ -488,6 +488,7 @@ sealed class ArchLinterNet.Core.Composition.ArchitectureEngine : System.IAsyncDi
   method ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextExport ExportPolicyContext(ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextRequest request)
   method ArchLinterNet.Core.Validation.ArchitectureAnalysisSnapshot CreateSnapshot(ArchLinterNet.Core.Validation.AnalysisSnapshotRequest request, ArchLinterNet.Core.Reporting.ValidationTiming? timing = null)
   method ArchLinterNet.Core.Validation.ArchitectureDebtGateOutcome EvaluateDebtGate(ArchLinterNet.Core.Validation.ArchitectureDebtGateRequest request)
+  method ArchLinterNet.Core.Validation.ArchitectureHealthOutcome EvaluateHealth(ArchLinterNet.Core.Validation.ArchitectureHealthRequest request)
   method ArchLinterNet.Core.Validation.BaselineDiffOutcome DiffBaseline(ArchLinterNet.Core.Validation.BaselineDiffRequest request)
   method ArchLinterNet.Core.Validation.BaselineGenerationOutcome GenerateBaseline(ArchLinterNet.Core.Validation.BaselineGenerationRequest request)
   method ArchLinterNet.Core.Validation.BaselineMigrateOutcome MigrateBaseline(ArchLinterNet.Core.Validation.BaselineMigrateRequest request)
@@ -2772,6 +2773,69 @@ enum ArchLinterNet.Core.Model.ArchitectureGraphNodeKind : int
   enum-member External = 3
   enum-member Namespace = 1
   enum-member Type = 0
+sealed class ArchLinterNet.Core.Model.ArchitectureHealthDimension : System.IEquatable<ArchLinterNet.Core.Model.ArchitectureHealthDimension>
+  ctor(string Name, ArchLinterNet.Core.Model.ArchitectureHealthDimensionState State, System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Model.ArchitectureHealthReason> Reasons)
+  method ArchLinterNet.Core.Model.ArchitectureHealthDimension <Clone>$()
+  method bool Equals(ArchLinterNet.Core.Model.ArchitectureHealthDimension? other)
+  method bool Equals(object? obj)
+  method int GetHashCode()
+  method string ToString()
+  method void Deconstruct(out string Name, out ArchLinterNet.Core.Model.ArchitectureHealthDimensionState State, out System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Model.ArchitectureHealthReason> Reasons)
+  operator !=(ArchLinterNet.Core.Model.ArchitectureHealthDimension? left, ArchLinterNet.Core.Model.ArchitectureHealthDimension? right)
+  operator ==(ArchLinterNet.Core.Model.ArchitectureHealthDimension? left, ArchLinterNet.Core.Model.ArchitectureHealthDimension? right)
+  property ArchLinterNet.Core.Model.ArchitectureHealthDimensionState State {get;init;}
+  property System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Model.ArchitectureHealthReason> Reasons {get;init;}
+  property string Name {get;init;}
+enum ArchLinterNet.Core.Model.ArchitectureHealthDimensionState : int
+  enum-member Debt = 2
+  enum-member Degrading = 3
+  enum-member Fail = 1
+  enum-member NotApplicable = 6
+  enum-member NotConfigured = 5
+  enum-member Pass = 0
+  enum-member Unassessable = 4
+enum ArchLinterNet.Core.Model.ArchitectureHealthGate : int
+  enum-member Fail = 1
+  enum-member Pass = 0
+  enum-member Unassessable = 2
+sealed class ArchLinterNet.Core.Model.ArchitectureHealthReason : System.IEquatable<ArchLinterNet.Core.Model.ArchitectureHealthReason>
+  ctor(string Code, string Source)
+  ctor(string code)
+  method ArchLinterNet.Core.Model.ArchitectureHealthReason <Clone>$()
+  method bool Equals(ArchLinterNet.Core.Model.ArchitectureHealthReason? other)
+  method bool Equals(object? obj)
+  method int GetHashCode()
+  method string ToString()
+  method void Deconstruct(out string Code, out string Source)
+  operator !=(ArchLinterNet.Core.Model.ArchitectureHealthReason? left, ArchLinterNet.Core.Model.ArchitectureHealthReason? right)
+  operator ==(ArchLinterNet.Core.Model.ArchitectureHealthReason? left, ArchLinterNet.Core.Model.ArchitectureHealthReason? right)
+  property string Code {get;init;}
+  property string Source {get;init;}
+  property string? ControlIdentity {get;init;}
+  property string? EvidenceIdentity {get;init;}
+  property string? Family {get;init;}
+  property string? PolicyIdentity {get;init;}
+enum ArchLinterNet.Core.Model.ArchitectureHealthState : int
+  enum-member Debt = 1
+  enum-member Degrading = 2
+  enum-member Failing = 3
+  enum-member Healthy = 0
+  enum-member Unassessable = 4
+sealed class ArchLinterNet.Core.Model.ArchitectureHealthSummary : System.IEquatable<ArchLinterNet.Core.Model.ArchitectureHealthSummary>
+  ctor(string SchemaId, ArchLinterNet.Core.Model.ArchitectureHealthGate Gate, ArchLinterNet.Core.Model.ArchitectureHealthState Health, System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Model.ArchitectureHealthDimension> Dimensions)
+  field const string CurrentSchemaId = "architecture-health/v1"
+  method ArchLinterNet.Core.Model.ArchitectureHealthSummary <Clone>$()
+  method bool Equals(ArchLinterNet.Core.Model.ArchitectureHealthSummary? other)
+  method bool Equals(object? obj)
+  method int GetHashCode()
+  method string ToString()
+  method void Deconstruct(out string SchemaId, out ArchLinterNet.Core.Model.ArchitectureHealthGate Gate, out ArchLinterNet.Core.Model.ArchitectureHealthState Health, out System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Model.ArchitectureHealthDimension> Dimensions)
+  operator !=(ArchLinterNet.Core.Model.ArchitectureHealthSummary? left, ArchLinterNet.Core.Model.ArchitectureHealthSummary? right)
+  operator ==(ArchLinterNet.Core.Model.ArchitectureHealthSummary? left, ArchLinterNet.Core.Model.ArchitectureHealthSummary? right)
+  property ArchLinterNet.Core.Model.ArchitectureHealthGate Gate {get;init;}
+  property ArchLinterNet.Core.Model.ArchitectureHealthState Health {get;init;}
+  property System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Model.ArchitectureHealthDimension> Dimensions {get;init;}
+  property string SchemaId {get;init;}
 sealed class ArchLinterNet.Core.Model.ArchitectureMetricEvidence : System.IEquatable<ArchLinterNet.Core.Model.ArchitectureMetricEvidence>
   ctor(string MetricId, string Kind, string? NativeSubject, string? Unit, string EffectiveScope, int? Value, System.Collections.Generic.IReadOnlyList<string>? Contributors)
   method ArchLinterNet.Core.Model.ArchitectureMetricEvidence <Clone>$()
@@ -3227,6 +3291,20 @@ sealed class ArchLinterNet.Core.Model.ArchitectureViolationIdentity : System.IEq
 static class ArchLinterNet.Core.Model.ArchitectureViolationIdentityJson
   method static System.Collections.Generic.IReadOnlyDictionary<string,object?> ToWireObject(ArchLinterNet.Core.Model.ArchitectureViolationIdentity identity)
   method static string Serialize(ArchLinterNet.Core.Model.ArchitectureViolationIdentity identity)
+sealed class ArchLinterNet.Core.Model.ArchitectureWaiverLifecycleAssessment : System.IEquatable<ArchLinterNet.Core.Model.ArchitectureWaiverLifecycleAssessment>
+  ctor(string Profile, System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Model.ArchitectureWaiverLifecycleRecord> Records, System.Collections.Generic.IReadOnlyList<string> BlockingStates)
+  method ArchLinterNet.Core.Model.ArchitectureWaiverLifecycleAssessment <Clone>$()
+  method bool Equals(ArchLinterNet.Core.Model.ArchitectureWaiverLifecycleAssessment? other)
+  method bool Equals(object? obj)
+  method int GetHashCode()
+  method string ToString()
+  method void Deconstruct(out string Profile, out System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Model.ArchitectureWaiverLifecycleRecord> Records, out System.Collections.Generic.IReadOnlyList<string> BlockingStates)
+  operator !=(ArchLinterNet.Core.Model.ArchitectureWaiverLifecycleAssessment? left, ArchLinterNet.Core.Model.ArchitectureWaiverLifecycleAssessment? right)
+  operator ==(ArchLinterNet.Core.Model.ArchitectureWaiverLifecycleAssessment? left, ArchLinterNet.Core.Model.ArchitectureWaiverLifecycleAssessment? right)
+  property System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Model.ArchitectureWaiverLifecycleRecord> Records {get;init;}
+  property System.Collections.Generic.IReadOnlyList<string> BlockingStates {get;init;}
+  property bool HasBlockingRecords {get;}
+  property string Profile {get;init;}
 sealed class ArchLinterNet.Core.Model.ArchitectureWaiverLifecycleRecord : System.IEquatable<ArchLinterNet.Core.Model.ArchitectureWaiverLifecycleRecord>
   ctor(string Id, string State, string ContractName, string? ContractId, string ContractGroup, string SourceType, string ForbiddenReference, string? TargetFingerprint, string Reason, string? Owner, string? Issue, System.DateOnly? Introduced, System.DateOnly? Expires, System.DateOnly EvaluationDate, bool MatchesGovernedFinding)
   method ArchLinterNet.Core.Model.ArchitectureWaiverLifecycleRecord <Clone>$()
@@ -5506,8 +5584,12 @@ interface ArchLinterNet.Core.Validation.Abstractions.IArchitectureBaselineApplic
   method ArchLinterNet.Core.Validation.BaselinePruneOutcome Prune(ArchLinterNet.Core.Validation.BaselinePruneRequest request)
   method ArchLinterNet.Core.Validation.BaselineUpdateOutcome Update(ArchLinterNet.Core.Validation.BaselineUpdateRequest request)
   method ArchLinterNet.Core.Validation.BaselineVerifyOutcome Verify(ArchLinterNet.Core.Validation.BaselineVerifyRequest request)
+  method ArchLinterNet.Core.Validation.BaselineVerifyOutcome Verify(ArchLinterNet.Core.Validation.BaselineVerifyRequest request, ArchLinterNet.Core.Validation.ArchitectureAnalysisSnapshot snapshot)
 interface ArchLinterNet.Core.Validation.Abstractions.IArchitectureDebtGateApplicationService
   method ArchLinterNet.Core.Validation.ArchitectureDebtGateOutcome Evaluate(ArchLinterNet.Core.Validation.ArchitectureDebtGateRequest request)
+  method ArchLinterNet.Core.Validation.ArchitectureDebtGateOutcome Evaluate(ArchLinterNet.Core.Validation.ArchitectureDebtGateRequest request, ArchLinterNet.Core.Validation.ArchitectureAnalysisSnapshot snapshot)
+interface ArchLinterNet.Core.Validation.Abstractions.IArchitectureHealthApplicationService
+  method ArchLinterNet.Core.Validation.ArchitectureHealthOutcome Evaluate(ArchLinterNet.Core.Validation.ArchitectureHealthRequest request)
 interface ArchLinterNet.Core.Validation.Abstractions.IArchitectureMetricMeasurementApplicationService
   method ArchLinterNet.Core.Model.ArchitectureMetricMeasurementOutcome Measure(ArchLinterNet.Core.Validation.ArchitectureMetricMeasurementRequest request, ArchLinterNet.Core.Reporting.ValidationTiming? timing = null)
 interface ArchLinterNet.Core.Validation.Abstractions.IArchitecturePolicyCheckApplicationService
@@ -5623,11 +5705,13 @@ sealed class ArchLinterNet.Core.Validation.ArchitectureBaselineApplicationServic
   method ArchLinterNet.Core.Validation.BaselinePruneOutcome Prune(ArchLinterNet.Core.Validation.BaselinePruneRequest request)
   method ArchLinterNet.Core.Validation.BaselineUpdateOutcome Update(ArchLinterNet.Core.Validation.BaselineUpdateRequest request)
   method ArchLinterNet.Core.Validation.BaselineVerifyOutcome Verify(ArchLinterNet.Core.Validation.BaselineVerifyRequest request)
+  method ArchLinterNet.Core.Validation.BaselineVerifyOutcome Verify(ArchLinterNet.Core.Validation.BaselineVerifyRequest request, ArchLinterNet.Core.Validation.ArchitectureAnalysisSnapshot snapshot)
 static class ArchLinterNet.Core.Validation.ArchitectureBaselineService
   method static ArchLinterNet.Core.Validation.BaselineGenerationOutcome Generate(ArchLinterNet.Core.Validation.BaselineGenerationRequest request)
 sealed class ArchLinterNet.Core.Validation.ArchitectureDebtGateApplicationService : ArchLinterNet.Core.Validation.Abstractions.IArchitectureDebtGateApplicationService
   ctor(ArchLinterNet.Core.Validation.Abstractions.IArchitectureBaselineApplicationService baselineService)
   method ArchLinterNet.Core.Validation.ArchitectureDebtGateOutcome Evaluate(ArchLinterNet.Core.Validation.ArchitectureDebtGateRequest request)
+  method ArchLinterNet.Core.Validation.ArchitectureDebtGateOutcome Evaluate(ArchLinterNet.Core.Validation.ArchitectureDebtGateRequest request, ArchLinterNet.Core.Validation.ArchitectureAnalysisSnapshot snapshot)
 sealed class ArchLinterNet.Core.Validation.ArchitectureDebtGateEvaluation : System.IEquatable<ArchLinterNet.Core.Validation.ArchitectureDebtGateEvaluation>
   ctor(bool Completed, string Mode, System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Model.BuildStatePreflightDiagnostic> PreflightDiagnostics)
   method ArchLinterNet.Core.Validation.ArchitectureDebtGateEvaluation <Clone>$()
@@ -5640,6 +5724,7 @@ sealed class ArchLinterNet.Core.Validation.ArchitectureDebtGateEvaluation : Syst
   operator ==(ArchLinterNet.Core.Validation.ArchitectureDebtGateEvaluation? left, ArchLinterNet.Core.Validation.ArchitectureDebtGateEvaluation? right)
   property System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Model.BuildStatePreflightDiagnostic> PreflightDiagnostics {get;init;}
   property bool Completed {get;init;}
+  property bool ReusedAnalysisSnapshot {get;init;}
   property string Mode {get;init;}
 static class ArchLinterNet.Core.Validation.ArchitectureDebtGateFormatter
   method static string FormatAsHuman(ArchLinterNet.Core.Validation.ArchitectureDebtGateOutcome outcome)
@@ -5689,6 +5774,51 @@ static class ArchLinterNet.Core.Validation.ArchitectureExternalEvidenceApplicabi
   method static System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Model.ArchitectureApplicabilityExpectedEntry> ProjectExpectedEntries(System.Collections.Generic.IEnumerable<ArchLinterNet.Core.Contracts.ArchitectureExternalEvidenceRequirement> requirements)
   method static System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Model.ArchitectureApplicabilityRecord> ProjectRecords(System.Collections.Generic.IEnumerable<ArchLinterNet.Core.Contracts.ArchitectureExternalEvidenceRequirement> requirements, System.Collections.Generic.IEnumerable<ArchLinterNet.Core.Model.SarifEvidenceReadResult> readResults, ArchLinterNet.Core.Model.SarifExternalDiagnosticSelectionResult? selection = null)
   method static System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Model.ArchitectureApplicabilityRecord> ProjectRecords(System.Collections.Generic.IEnumerable<ArchLinterNet.Core.Model.SarifEvidenceReadResult> readResults, ArchLinterNet.Core.Model.SarifExternalDiagnosticSelectionResult? selection = null)
+sealed class ArchLinterNet.Core.Validation.ArchitectureHealthApplicationService : ArchLinterNet.Core.Validation.Abstractions.IArchitectureHealthApplicationService
+  ctor(ArchLinterNet.Core.Validation.Abstractions.IArchitectureValidationApplicationService validationService, ArchLinterNet.Core.Validation.Abstractions.IArchitectureDebtGateApplicationService debtGateService)
+  method ArchLinterNet.Core.Validation.ArchitectureHealthOutcome Evaluate(ArchLinterNet.Core.Validation.ArchitectureHealthRequest request)
+sealed class ArchLinterNet.Core.Validation.ArchitectureHealthOutcome : System.IEquatable<ArchLinterNet.Core.Validation.ArchitectureHealthOutcome>
+  ctor(ArchLinterNet.Core.Model.ArchitectureHealthSummary Summary, System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Validation.ArchitectureHealthValidationOutcome> ValidationOutcomes, ArchLinterNet.Core.Validation.ArchitectureDebtGateOutcome DebtGate)
+  method ArchLinterNet.Core.Validation.ArchitectureHealthOutcome <Clone>$()
+  method bool Equals(ArchLinterNet.Core.Validation.ArchitectureHealthOutcome? other)
+  method bool Equals(object? obj)
+  method int GetHashCode()
+  method string ToString()
+  method void Deconstruct(out ArchLinterNet.Core.Model.ArchitectureHealthSummary Summary, out System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Validation.ArchitectureHealthValidationOutcome> ValidationOutcomes, out ArchLinterNet.Core.Validation.ArchitectureDebtGateOutcome DebtGate)
+  operator !=(ArchLinterNet.Core.Validation.ArchitectureHealthOutcome? left, ArchLinterNet.Core.Validation.ArchitectureHealthOutcome? right)
+  operator ==(ArchLinterNet.Core.Validation.ArchitectureHealthOutcome? left, ArchLinterNet.Core.Validation.ArchitectureHealthOutcome? right)
+  property ArchLinterNet.Core.Model.ArchitectureHealthGate Gate {get;}
+  property ArchLinterNet.Core.Model.ArchitectureHealthState Health {get;}
+  property ArchLinterNet.Core.Model.ArchitectureHealthSummary Summary {get;init;}
+  property ArchLinterNet.Core.Validation.ArchitectureAnalysisSnapshotCounters AnalysisCounters {get;init;}
+  property ArchLinterNet.Core.Validation.ArchitectureDebtGateOutcome DebtGate {get;init;}
+  property System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Validation.ArchitectureHealthValidationOutcome> ValidationOutcomes {get;init;}
+static class ArchLinterNet.Core.Validation.ArchitectureHealthProjector
+  method static ArchLinterNet.Core.Model.ArchitectureHealthSummary Project(System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Validation.ArchitectureHealthValidationOutcome> validationOutcomes, ArchLinterNet.Core.Validation.ArchitectureDebtGateOutcome debtGate)
+  method static string FormatAsHuman(ArchLinterNet.Core.Model.ArchitectureHealthSummary summary)
+  method static string FormatAsJson(ArchLinterNet.Core.Model.ArchitectureHealthSummary summary)
+sealed class ArchLinterNet.Core.Validation.ArchitectureHealthRequest : System.IEquatable<ArchLinterNet.Core.Validation.ArchitectureHealthRequest>
+  ctor()
+  method ArchLinterNet.Core.Validation.ArchitectureHealthRequest <Clone>$()
+  method bool Equals(ArchLinterNet.Core.Validation.ArchitectureHealthRequest? other)
+  method bool Equals(object? obj)
+  method int GetHashCode()
+  method string ToString()
+  operator !=(ArchLinterNet.Core.Validation.ArchitectureHealthRequest? left, ArchLinterNet.Core.Validation.ArchitectureHealthRequest? right)
+  operator ==(ArchLinterNet.Core.Validation.ArchitectureHealthRequest? left, ArchLinterNet.Core.Validation.ArchitectureHealthRequest? right)
+  property ArchLinterNet.Core.Validation.ArchitectureDebtGateRequest DebtGate {get;init;}
+sealed class ArchLinterNet.Core.Validation.ArchitectureHealthValidationOutcome : System.IEquatable<ArchLinterNet.Core.Validation.ArchitectureHealthValidationOutcome>
+  ctor(string Mode, ArchLinterNet.Core.Validation.ValidationOutcome Outcome)
+  method ArchLinterNet.Core.Validation.ArchitectureHealthValidationOutcome <Clone>$()
+  method bool Equals(ArchLinterNet.Core.Validation.ArchitectureHealthValidationOutcome? other)
+  method bool Equals(object? obj)
+  method int GetHashCode()
+  method string ToString()
+  method void Deconstruct(out string Mode, out ArchLinterNet.Core.Validation.ValidationOutcome Outcome)
+  operator !=(ArchLinterNet.Core.Validation.ArchitectureHealthValidationOutcome? left, ArchLinterNet.Core.Validation.ArchitectureHealthValidationOutcome? right)
+  operator ==(ArchLinterNet.Core.Validation.ArchitectureHealthValidationOutcome? left, ArchLinterNet.Core.Validation.ArchitectureHealthValidationOutcome? right)
+  property ArchLinterNet.Core.Validation.ValidationOutcome Outcome {get;init;}
+  property string Mode {get;init;}
 static class ArchLinterNet.Core.Validation.ArchitectureImportedDiagnosticBaselineProjector
   method static System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Contracts.ArchitectureBaselineCandidate> ToBaselineCandidates(ArchLinterNet.Core.Model.SarifExternalDiagnosticSelectionResult selection, System.Threading.CancellationToken cancellationToken = null)
 sealed class ArchLinterNet.Core.Validation.ArchitectureMetricMeasurementApplicationService : ArchLinterNet.Core.Validation.Abstractions.IArchitectureMetricMeasurementApplicationService
@@ -6201,6 +6331,7 @@ sealed class ArchLinterNet.Core.Validation.ValidationOutcome : System.IEquatable
   property ArchLinterNet.Core.Model.ArchitectureClassificationPathDeferredNotice? ClassificationPathDeferred {get;init;}
   property ArchLinterNet.Core.Model.ArchitecturePolicyInventory? PolicyInventory {get;init;}
   property ArchLinterNet.Core.Model.ArchitectureSourceExpansionInventory SourceExpansion {get;init;}
+  property ArchLinterNet.Core.Model.ArchitectureWaiverLifecycleAssessment? WaiverLifecycleAssessment {get;init;}
   property ArchLinterNet.Core.Model.ImportedExternalDiagnosticProjection ImportedDiagnostics {get;private init;}
   property System.Collections.Generic.IReadOnlyCollection<ArchLinterNet.Core.Model.ArchitectureClassificationConflict> ClassificationConflicts {get;init;}
   property System.Collections.Generic.IReadOnlyCollection<ArchLinterNet.Core.Model.ArchitectureClassificationMetadataFailure> ClassificationMetadataFailures {get;init;}

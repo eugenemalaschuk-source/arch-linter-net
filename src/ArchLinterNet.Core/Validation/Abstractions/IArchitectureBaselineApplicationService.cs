@@ -14,5 +14,11 @@ public interface IArchitectureBaselineApplicationService
 
     BaselineVerifyOutcome Verify(BaselineVerifyRequest request);
 
+    /// <summary>
+    /// Verifies against candidates already collected by <paramref name="snapshot"/>. This is the
+    /// snapshot-sharing path for a single composed consumer such as Architecture Health.
+    /// </summary>
+    BaselineVerifyOutcome Verify(BaselineVerifyRequest request, ArchitectureAnalysisSnapshot snapshot);
+
     BaselineMigrateOutcome Migrate(BaselineMigrateRequest request);
 }

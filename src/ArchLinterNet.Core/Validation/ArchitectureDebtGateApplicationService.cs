@@ -13,6 +13,20 @@ public sealed class ArchitectureDebtGateApplicationService(
 {
     public ArchitectureDebtGateOutcome Evaluate(ArchitectureDebtGateRequest request)
     {
+        return EvaluateCore(request, snapshot: null);
+    }
+
+    /// <summary>Evaluates debt from the exact candidate receipt retained by an analysis snapshot.</summary>
+    public ArchitectureDebtGateOutcome Evaluate(ArchitectureDebtGateRequest request, ArchitectureAnalysisSnapshot snapshot)
+    {
+        ArgumentNullException.ThrowIfNull(snapshot);
+        return EvaluateCore(request, snapshot);
+    }
+
+    private ArchitectureDebtGateOutcome EvaluateCore(
+        ArchitectureDebtGateRequest request,
+        ArchitectureAnalysisSnapshot? snapshot)
+    {
         ArgumentNullException.ThrowIfNull(request);
         bool hasBaseContext = request.BasePolicyContext is not null;
         bool hasCurrentContext = request.CurrentPolicyContext is not null;
@@ -23,7 +37,7 @@ public sealed class ArchitectureDebtGateApplicationService(
                 nameof(request));
         }
 
-        BaselineVerifyOutcome persistentDebt = baselineService.Verify(new BaselineVerifyRequest
+        var baselineRequest = new BaselineVerifyRequest
         {
             PolicyPath = request.PolicyPath,
             BaselinePath = request.BaselinePath,
@@ -37,7 +51,10 @@ public sealed class ArchitectureDebtGateApplicationService(
             RequestedPlatform = request.RequestedPlatform,
             RequestedRuntimeIdentifier = request.RequestedRuntimeIdentifier,
             CancellationToken = request.CancellationToken,
-        });
+        };
+        BaselineVerifyOutcome persistentDebt = snapshot is null
+            ? baselineService.Verify(baselineRequest)
+            : baselineService.Verify(baselineRequest, snapshot);
 
         ArchitecturePolicyWeakeningResult? weakening = hasBaseContext
             ? ArchitecturePolicyWeakeningComparer.Compare(new ArchitecturePolicyWeakeningRequest(
@@ -53,7 +70,10 @@ public sealed class ArchitectureDebtGateApplicationService(
             new ArchitectureDebtGateEvaluation(
                 persistentDebt.Succeeded,
                 request.Mode,
-                persistentDebt.PreflightDiagnostics.ToArray()),
+                persistentDebt.PreflightDiagnostics.ToArray())
+            {
+                ReusedAnalysisSnapshot = snapshot is not null,
+            },
             persistentDebt)
         {
             PolicyWeakening = weakening,

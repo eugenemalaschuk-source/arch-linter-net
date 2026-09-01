@@ -104,6 +104,13 @@ public sealed class ArchitectureEngine : IDisposable, IAsyncDisposable
             .Evaluate(request);
     }
 
+    /// <summary>Projects the complete architecture-health/v1 summary from existing governance authorities.</summary>
+    public ArchitectureHealthOutcome EvaluateHealth(ArchitectureHealthRequest request)
+    {
+        return _serviceProvider.GetRequiredService<IArchitectureHealthApplicationService>()
+            .Evaluate(request);
+    }
+
     public PublicApiCaptureOutcome CapturePublicApi(PublicApiCaptureRequest request)
     {
         return _serviceProvider.GetRequiredService<IArchitecturePublicApiApplicationService>()
