@@ -4,4 +4,7 @@ namespace ArchLinterNet.Core.Validation.Abstractions;
 public interface IArchitectureDebtGateApplicationService
 {
     ArchitectureDebtGateOutcome Evaluate(ArchitectureDebtGateRequest request);
+
+    /// <summary>Evaluates debt from candidates already collected by the supplied analysis snapshot.</summary>
+    ArchitectureDebtGateOutcome Evaluate(ArchitectureDebtGateRequest request, ArchitectureAnalysisSnapshot snapshot);
 }

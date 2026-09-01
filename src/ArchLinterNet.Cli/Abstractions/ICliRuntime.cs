@@ -251,6 +251,15 @@ internal interface ICliRuntime
     string FormatDebtGateAsSarif(ArchitectureDebtGateOutcome outcome) =>
         ArchitectureDebtGateFormatter.FormatAsSarif(outcome, Version);
 
+    ArchitectureHealthOutcome EvaluateHealth(ArchitectureHealthRequest request) =>
+        throw new NotSupportedException("Architecture health is not configured for this CLI runtime.");
+
+    string FormatHealthAsHuman(ArchitectureHealthOutcome outcome) =>
+        ArchitectureHealthProjector.FormatAsHuman(outcome.Summary);
+
+    string FormatHealthAsJson(ArchitectureHealthOutcome outcome) =>
+        ArchitectureHealthProjector.FormatAsJson(outcome.Summary);
+
     PublicApiCaptureOutcome CapturePublicApi(PublicApiCaptureRequest request);
 
     PublicApiDiffOutcome DiffPublicApi(PublicApiDiffRequest request);

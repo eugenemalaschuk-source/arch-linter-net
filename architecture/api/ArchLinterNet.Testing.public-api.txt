@@ -19,6 +19,7 @@ method ArchLinterNet.Testing.ArchitectureAssertions.FromRepositoryRoot(System.St
 method ArchLinterNet.Testing.ArchitectureValidationBuilder.CreateSnapshot(): ArchLinterNet.Testing.ArchitectureValidationSnapshotSession
 method ArchLinterNet.Testing.ArchitectureValidationBuilder.DiffBaseline(System.String): ArchLinterNet.Core.Validation.BaselineDiffOutcome
 method ArchLinterNet.Testing.ArchitectureValidationBuilder.EvaluateDebtGate(System.String): ArchLinterNet.Core.Validation.ArchitectureDebtGateOutcome
+method ArchLinterNet.Testing.ArchitectureValidationBuilder.EvaluateHealth(System.String): ArchLinterNet.Core.Validation.ArchitectureHealthOutcome
 method ArchLinterNet.Testing.ArchitectureValidationBuilder.MigrateBaseline(): ArchLinterNet.Core.Validation.BaselineMigrateOutcome
 method ArchLinterNet.Testing.ArchitectureValidationBuilder.ValidateAudit(): ArchLinterNet.Testing.ArchitectureValidationResult
 method ArchLinterNet.Testing.ArchitectureValidationBuilder.ValidateStrict(): ArchLinterNet.Testing.ArchitectureValidationResult

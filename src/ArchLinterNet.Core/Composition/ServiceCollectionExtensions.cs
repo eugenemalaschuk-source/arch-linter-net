@@ -69,6 +69,7 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<IArchitecturePolicyContextApplicationService, ArchitecturePolicyContextApplicationService>();
         services.AddSingleton<IArchitectureBaselineApplicationService, ArchitectureBaselineApplicationService>();
         services.AddSingleton<IArchitectureDebtGateApplicationService, ArchitectureDebtGateApplicationService>();
+        services.AddSingleton<IArchitectureHealthApplicationService, ArchitectureHealthApplicationService>();
         services.AddSingleton<IPublicApiSnapshotStore, PublicApiSnapshotStore>();
         services.AddSingleton<IArchitecturePublicApiApplicationService, ArchitecturePublicApiApplicationService>();
         services.AddSingleton<IAsmdefValidationService, AsmdefValidationService>();

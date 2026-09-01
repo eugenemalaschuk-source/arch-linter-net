@@ -235,6 +235,9 @@ class ArchLinterNet.Core.Model.ArchitectureFindingReadEnvelope [sealed]
 class ArchLinterNet.Core.Model.ArchitectureFindingSourceLocation [sealed]
 class ArchLinterNet.Core.Model.ArchitectureGraphEdge [sealed]
 class ArchLinterNet.Core.Model.ArchitectureGraphNode [sealed]
+class ArchLinterNet.Core.Model.ArchitectureHealthDimension [sealed]
+class ArchLinterNet.Core.Model.ArchitectureHealthReason [sealed]
+class ArchLinterNet.Core.Model.ArchitectureHealthSummary [sealed]
 class ArchLinterNet.Core.Model.ArchitectureMetricEvidence [sealed]
 class ArchLinterNet.Core.Model.ArchitectureMetricMeasurement [sealed]
 class ArchLinterNet.Core.Model.ArchitectureMetricMeasurementOutcome [sealed]
@@ -263,6 +266,7 @@ class ArchLinterNet.Core.Model.ArchitectureUnmatchedIgnoredViolation [sealed]
 class ArchLinterNet.Core.Model.ArchitectureViolation [sealed]
 class ArchLinterNet.Core.Model.ArchitectureViolationIdentity [sealed]
 class ArchLinterNet.Core.Model.ArchitectureViolationIdentityJson [static]
+class ArchLinterNet.Core.Model.ArchitectureWaiverLifecycleAssessment [sealed]
 class ArchLinterNet.Core.Model.ArchitectureWaiverLifecycleRecord [sealed]
 class ArchLinterNet.Core.Model.ArchitectureWaiverTargetFingerprint [static]
 class ArchLinterNet.Core.Model.AttributeUsageDiagnostic [sealed]
@@ -421,6 +425,11 @@ class ArchLinterNet.Core.Validation.ArchitectureDebtGateFormatter [static]
 class ArchLinterNet.Core.Validation.ArchitectureDebtGateOutcome [sealed]
 class ArchLinterNet.Core.Validation.ArchitectureDebtGateRequest [sealed]
 class ArchLinterNet.Core.Validation.ArchitectureExternalEvidenceApplicabilityProjector [static]
+class ArchLinterNet.Core.Validation.ArchitectureHealthApplicationService [sealed]
+class ArchLinterNet.Core.Validation.ArchitectureHealthOutcome [sealed]
+class ArchLinterNet.Core.Validation.ArchitectureHealthProjector [static]
+class ArchLinterNet.Core.Validation.ArchitectureHealthRequest [sealed]
+class ArchLinterNet.Core.Validation.ArchitectureHealthValidationOutcome [sealed]
 class ArchLinterNet.Core.Validation.ArchitectureImportedDiagnosticBaselineProjector [static]
 class ArchLinterNet.Core.Validation.ArchitectureMetricMeasurementApplicationService [sealed]
 class ArchLinterNet.Core.Validation.ArchitectureMetricMeasurementRequest [sealed]
@@ -596,6 +605,22 @@ const ArchLinterNet.Core.Model.ArchitectureGraphNodeKind.Assembly: ArchLinterNet
 const ArchLinterNet.Core.Model.ArchitectureGraphNodeKind.External: ArchLinterNet.Core.Model.ArchitectureGraphNodeKind [value:3]
 const ArchLinterNet.Core.Model.ArchitectureGraphNodeKind.Namespace: ArchLinterNet.Core.Model.ArchitectureGraphNodeKind [value:1]
 const ArchLinterNet.Core.Model.ArchitectureGraphNodeKind.Type: ArchLinterNet.Core.Model.ArchitectureGraphNodeKind [value:0]
+const ArchLinterNet.Core.Model.ArchitectureHealthDimensionState.Debt: ArchLinterNet.Core.Model.ArchitectureHealthDimensionState [value:2]
+const ArchLinterNet.Core.Model.ArchitectureHealthDimensionState.Degrading: ArchLinterNet.Core.Model.ArchitectureHealthDimensionState [value:3]
+const ArchLinterNet.Core.Model.ArchitectureHealthDimensionState.Fail: ArchLinterNet.Core.Model.ArchitectureHealthDimensionState [value:1]
+const ArchLinterNet.Core.Model.ArchitectureHealthDimensionState.NotApplicable: ArchLinterNet.Core.Model.ArchitectureHealthDimensionState [value:6]
+const ArchLinterNet.Core.Model.ArchitectureHealthDimensionState.NotConfigured: ArchLinterNet.Core.Model.ArchitectureHealthDimensionState [value:5]
+const ArchLinterNet.Core.Model.ArchitectureHealthDimensionState.Pass: ArchLinterNet.Core.Model.ArchitectureHealthDimensionState [value:0]
+const ArchLinterNet.Core.Model.ArchitectureHealthDimensionState.Unassessable: ArchLinterNet.Core.Model.ArchitectureHealthDimensionState [value:4]
+const ArchLinterNet.Core.Model.ArchitectureHealthGate.Fail: ArchLinterNet.Core.Model.ArchitectureHealthGate [value:1]
+const ArchLinterNet.Core.Model.ArchitectureHealthGate.Pass: ArchLinterNet.Core.Model.ArchitectureHealthGate [value:0]
+const ArchLinterNet.Core.Model.ArchitectureHealthGate.Unassessable: ArchLinterNet.Core.Model.ArchitectureHealthGate [value:2]
+const ArchLinterNet.Core.Model.ArchitectureHealthState.Debt: ArchLinterNet.Core.Model.ArchitectureHealthState [value:1]
+const ArchLinterNet.Core.Model.ArchitectureHealthState.Degrading: ArchLinterNet.Core.Model.ArchitectureHealthState [value:2]
+const ArchLinterNet.Core.Model.ArchitectureHealthState.Failing: ArchLinterNet.Core.Model.ArchitectureHealthState [value:3]
+const ArchLinterNet.Core.Model.ArchitectureHealthState.Healthy: ArchLinterNet.Core.Model.ArchitectureHealthState [value:0]
+const ArchLinterNet.Core.Model.ArchitectureHealthState.Unassessable: ArchLinterNet.Core.Model.ArchitectureHealthState [value:4]
+const ArchLinterNet.Core.Model.ArchitectureHealthSummary.CurrentSchemaId: System.String [value:"architecture-health/v1"]
 const ArchLinterNet.Core.Model.ArchitecturePolicyDiagnosticKind.CompositionConflict: ArchLinterNet.Core.Model.ArchitecturePolicyDiagnosticKind [value:2]
 const ArchLinterNet.Core.Model.ArchitecturePolicyDiagnosticKind.ImportResolution: ArchLinterNet.Core.Model.ArchitecturePolicyDiagnosticKind [value:0]
 const ArchLinterNet.Core.Model.ArchitecturePolicyDiagnosticKind.SemanticValidation: ArchLinterNet.Core.Model.ArchitecturePolicyDiagnosticKind [value:3]
@@ -941,6 +966,10 @@ ctor ArchLinterNet.Core.Model.ArchitectureFindingReadEnvelope(System.Int32, Syst
 ctor ArchLinterNet.Core.Model.ArchitectureFindingSourceLocation(System.String, System.Nullable`1[System.Int32], System.Nullable`1[System.Int32])
 ctor ArchLinterNet.Core.Model.ArchitectureGraphEdge(System.String, System.String, ArchLinterNet.Core.Model.ArchitectureGraphNodeKind, ArchLinterNet.Core.Model.ArchitectureGraphNodeKind, System.Collections.Generic.IReadOnlyList`1[System.String])
 ctor ArchLinterNet.Core.Model.ArchitectureGraphNode(System.String, ArchLinterNet.Core.Model.ArchitectureGraphNodeKind)
+ctor ArchLinterNet.Core.Model.ArchitectureHealthDimension(System.String, ArchLinterNet.Core.Model.ArchitectureHealthDimensionState, System.Collections.Generic.IReadOnlyList`1[ArchLinterNet.Core.Model.ArchitectureHealthReason])
+ctor ArchLinterNet.Core.Model.ArchitectureHealthReason(System.String)
+ctor ArchLinterNet.Core.Model.ArchitectureHealthReason(System.String, System.String)
+ctor ArchLinterNet.Core.Model.ArchitectureHealthSummary(System.String, ArchLinterNet.Core.Model.ArchitectureHealthGate, ArchLinterNet.Core.Model.ArchitectureHealthState, System.Collections.Generic.IReadOnlyList`1[ArchLinterNet.Core.Model.ArchitectureHealthDimension])
 ctor ArchLinterNet.Core.Model.ArchitectureMetricEvidence(System.String, System.String, System.String, System.String, System.String, System.Nullable`1[System.Int32], System.Collections.Generic.IReadOnlyList`1[System.String])
 ctor ArchLinterNet.Core.Model.ArchitectureMetricMeasurement(System.String, System.String, System.String, System.String, System.String, ArchLinterNet.Core.Model.ArchitectureApplicabilityRecordState, System.Nullable`1[System.Int32], System.Collections.Generic.IReadOnlyList`1[System.String])
 ctor ArchLinterNet.Core.Model.ArchitectureMetricMeasurementOutcome(System.Collections.Generic.IReadOnlyList`1[ArchLinterNet.Core.Model.ArchitectureMetricMeasurement], ArchLinterNet.Core.Model.ArchitectureAssessmentCompletionEvidence, ArchLinterNet.Core.Model.ArchitectureApplicabilityProjection)
@@ -967,6 +996,7 @@ ctor ArchLinterNet.Core.Model.ArchitectureTopologySubjectEvidence(System.String,
 ctor ArchLinterNet.Core.Model.ArchitectureUnmatchedIgnoredViolation(System.String, System.String, System.Int32, System.String, System.String, System.String)
 ctor ArchLinterNet.Core.Model.ArchitectureViolation(System.String, System.String, System.String, System.String, System.Collections.Generic.IReadOnlyCollection`1[System.String])
 ctor ArchLinterNet.Core.Model.ArchitectureViolationIdentity(System.Int32, System.String, System.String, System.String, System.String, System.String, System.String, System.String, System.String, System.String, System.Int32, System.String)
+ctor ArchLinterNet.Core.Model.ArchitectureWaiverLifecycleAssessment(System.String, System.Collections.Generic.IReadOnlyList`1[ArchLinterNet.Core.Model.ArchitectureWaiverLifecycleRecord], System.Collections.Generic.IReadOnlyList`1[System.String])
 ctor ArchLinterNet.Core.Model.ArchitectureWaiverLifecycleRecord(System.String, System.String, System.String, System.String, System.String, System.String, System.String, System.String, System.String, System.String, System.String, System.Nullable`1[System.DateOnly], System.Nullable`1[System.DateOnly], System.DateOnly, System.Boolean)
 ctor ArchLinterNet.Core.Model.AttributeUsageDiagnostic(System.String, System.String, System.String, System.String, System.Collections.Generic.IReadOnlyCollection`1[System.String])
 ctor ArchLinterNet.Core.Model.AttributeUsagePayload(System.String, System.String, System.String, System.String)
@@ -1106,6 +1136,10 @@ ctor ArchLinterNet.Core.Validation.ArchitectureDebtGateApplicationService(ArchLi
 ctor ArchLinterNet.Core.Validation.ArchitectureDebtGateEvaluation(System.Boolean, System.String, System.Collections.Generic.IReadOnlyList`1[ArchLinterNet.Core.Model.BuildStatePreflightDiagnostic])
 ctor ArchLinterNet.Core.Validation.ArchitectureDebtGateOutcome(System.Boolean, System.Boolean, ArchLinterNet.Core.Validation.ArchitectureDebtGateEvaluation, ArchLinterNet.Core.Validation.BaselineVerifyOutcome)
 ctor ArchLinterNet.Core.Validation.ArchitectureDebtGateRequest()
+ctor ArchLinterNet.Core.Validation.ArchitectureHealthApplicationService(ArchLinterNet.Core.Validation.Abstractions.IArchitectureValidationApplicationService, ArchLinterNet.Core.Validation.Abstractions.IArchitectureDebtGateApplicationService)
+ctor ArchLinterNet.Core.Validation.ArchitectureHealthOutcome(ArchLinterNet.Core.Model.ArchitectureHealthSummary, System.Collections.Generic.IReadOnlyList`1[ArchLinterNet.Core.Validation.ArchitectureHealthValidationOutcome], ArchLinterNet.Core.Validation.ArchitectureDebtGateOutcome)
+ctor ArchLinterNet.Core.Validation.ArchitectureHealthRequest()
+ctor ArchLinterNet.Core.Validation.ArchitectureHealthValidationOutcome(System.String, ArchLinterNet.Core.Validation.ValidationOutcome)
 ctor ArchLinterNet.Core.Validation.ArchitectureMetricMeasurementApplicationService(ArchLinterNet.Core.Validation.Abstractions.IArchitectureValidationApplicationService)
 ctor ArchLinterNet.Core.Validation.ArchitectureMetricMeasurementRequest()
 ctor ArchLinterNet.Core.Validation.ArchitecturePublicApiApplicationService(ArchLinterNet.Core.Execution.Abstractions.IArchitectureRunnerSetupService, ArchLinterNet.Core.BuildState.IBuildStatePreparationService, ArchLinterNet.Core.Contracts.Abstractions.IPublicApiSnapshotStore)
@@ -1156,6 +1190,9 @@ enum ArchLinterNet.Core.Model.ArchitectureContractExpansionKind [underlying:Syst
 enum ArchLinterNet.Core.Model.ArchitectureDiagnosticKind [underlying:System.Int32]
 enum ArchLinterNet.Core.Model.ArchitectureGraphLevel [underlying:System.Int32]
 enum ArchLinterNet.Core.Model.ArchitectureGraphNodeKind [underlying:System.Int32]
+enum ArchLinterNet.Core.Model.ArchitectureHealthDimensionState [underlying:System.Int32]
+enum ArchLinterNet.Core.Model.ArchitectureHealthGate [underlying:System.Int32]
+enum ArchLinterNet.Core.Model.ArchitectureHealthState [underlying:System.Int32]
 enum ArchLinterNet.Core.Model.ArchitecturePolicyDiagnosticKind [underlying:System.Int32]
 enum ArchLinterNet.Core.Model.ArchitecturePolicyDocumentRole [underlying:System.Int32]
 enum ArchLinterNet.Core.Model.ArchitectureRemediationHintCategory [underlying:System.Int32]
@@ -1216,6 +1253,7 @@ interface ArchLinterNet.Core.Resolution.Abstractions.IArchitectureRepositoryRoot
 interface ArchLinterNet.Core.Scanning.Abstractions.IArchitectureAsmdefScanner
 interface ArchLinterNet.Core.Validation.Abstractions.IArchitectureBaselineApplicationService
 interface ArchLinterNet.Core.Validation.Abstractions.IArchitectureDebtGateApplicationService
+interface ArchLinterNet.Core.Validation.Abstractions.IArchitectureHealthApplicationService
 interface ArchLinterNet.Core.Validation.Abstractions.IArchitectureMetricMeasurementApplicationService
 interface ArchLinterNet.Core.Validation.Abstractions.IArchitecturePolicyCheckApplicationService
 interface ArchLinterNet.Core.Validation.Abstractions.IArchitecturePublicApiApplicationService
@@ -1290,6 +1328,7 @@ method ArchLinterNet.Core.Composition.ArchitectureEngine.DiffPublicApi(ArchLinte
 method ArchLinterNet.Core.Composition.ArchitectureEngine.Dispose(): System.Void [virtual]
 method ArchLinterNet.Core.Composition.ArchitectureEngine.DisposeAsync(): System.Threading.Tasks.ValueTask [virtual]
 method ArchLinterNet.Core.Composition.ArchitectureEngine.EvaluateDebtGate(ArchLinterNet.Core.Validation.ArchitectureDebtGateRequest): ArchLinterNet.Core.Validation.ArchitectureDebtGateOutcome
+method ArchLinterNet.Core.Composition.ArchitectureEngine.EvaluateHealth(ArchLinterNet.Core.Validation.ArchitectureHealthRequest): ArchLinterNet.Core.Validation.ArchitectureHealthOutcome
 method ArchLinterNet.Core.Composition.ArchitectureEngine.Explain(ArchLinterNet.Core.Graph.ArchitectureExplainRequest): ArchLinterNet.Core.Graph.ArchitectureExplainOutcome
 method ArchLinterNet.Core.Composition.ArchitectureEngine.ExportPolicyContext(ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextRequest): ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextExport
 method ArchLinterNet.Core.Composition.ArchitectureEngine.GenerateBaseline(ArchLinterNet.Core.Validation.BaselineGenerationRequest): ArchLinterNet.Core.Validation.BaselineGenerationOutcome
@@ -1721,7 +1760,10 @@ method ArchLinterNet.Core.Validation.Abstractions.IArchitectureBaselineApplicati
 method ArchLinterNet.Core.Validation.Abstractions.IArchitectureBaselineApplicationService.Prune(ArchLinterNet.Core.Validation.BaselinePruneRequest): ArchLinterNet.Core.Validation.BaselinePruneOutcome [abstract]
 method ArchLinterNet.Core.Validation.Abstractions.IArchitectureBaselineApplicationService.Update(ArchLinterNet.Core.Validation.BaselineUpdateRequest): ArchLinterNet.Core.Validation.BaselineUpdateOutcome [abstract]
 method ArchLinterNet.Core.Validation.Abstractions.IArchitectureBaselineApplicationService.Verify(ArchLinterNet.Core.Validation.BaselineVerifyRequest): ArchLinterNet.Core.Validation.BaselineVerifyOutcome [abstract]
+method ArchLinterNet.Core.Validation.Abstractions.IArchitectureBaselineApplicationService.Verify(ArchLinterNet.Core.Validation.BaselineVerifyRequest, ArchLinterNet.Core.Validation.ArchitectureAnalysisSnapshot): ArchLinterNet.Core.Validation.BaselineVerifyOutcome [abstract]
 method ArchLinterNet.Core.Validation.Abstractions.IArchitectureDebtGateApplicationService.Evaluate(ArchLinterNet.Core.Validation.ArchitectureDebtGateRequest): ArchLinterNet.Core.Validation.ArchitectureDebtGateOutcome [abstract]
+method ArchLinterNet.Core.Validation.Abstractions.IArchitectureDebtGateApplicationService.Evaluate(ArchLinterNet.Core.Validation.ArchitectureDebtGateRequest, ArchLinterNet.Core.Validation.ArchitectureAnalysisSnapshot): ArchLinterNet.Core.Validation.ArchitectureDebtGateOutcome [abstract]
+method ArchLinterNet.Core.Validation.Abstractions.IArchitectureHealthApplicationService.Evaluate(ArchLinterNet.Core.Validation.ArchitectureHealthRequest): ArchLinterNet.Core.Validation.ArchitectureHealthOutcome [abstract]
 method ArchLinterNet.Core.Validation.Abstractions.IArchitectureMetricMeasurementApplicationService.Measure(ArchLinterNet.Core.Validation.ArchitectureMetricMeasurementRequest, ArchLinterNet.Core.Reporting.ValidationTiming): ArchLinterNet.Core.Model.ArchitectureMetricMeasurementOutcome [abstract]
 method ArchLinterNet.Core.Validation.Abstractions.IArchitecturePolicyCheckApplicationService.Check(System.String): ArchLinterNet.Core.Validation.PolicyCheckOutcome [abstract]
 method ArchLinterNet.Core.Validation.Abstractions.IArchitecturePublicApiApplicationService.Capture(ArchLinterNet.Core.Validation.PublicApiCaptureRequest): ArchLinterNet.Core.Validation.PublicApiCaptureOutcome [abstract]
@@ -1745,8 +1787,10 @@ method ArchLinterNet.Core.Validation.ArchitectureBaselineApplicationService.Migr
 method ArchLinterNet.Core.Validation.ArchitectureBaselineApplicationService.Prune(ArchLinterNet.Core.Validation.BaselinePruneRequest): ArchLinterNet.Core.Validation.BaselinePruneOutcome [virtual]
 method ArchLinterNet.Core.Validation.ArchitectureBaselineApplicationService.Update(ArchLinterNet.Core.Validation.BaselineUpdateRequest): ArchLinterNet.Core.Validation.BaselineUpdateOutcome [virtual]
 method ArchLinterNet.Core.Validation.ArchitectureBaselineApplicationService.Verify(ArchLinterNet.Core.Validation.BaselineVerifyRequest): ArchLinterNet.Core.Validation.BaselineVerifyOutcome [virtual]
+method ArchLinterNet.Core.Validation.ArchitectureBaselineApplicationService.Verify(ArchLinterNet.Core.Validation.BaselineVerifyRequest, ArchLinterNet.Core.Validation.ArchitectureAnalysisSnapshot): ArchLinterNet.Core.Validation.BaselineVerifyOutcome [virtual]
 method ArchLinterNet.Core.Validation.ArchitectureBaselineService.Generate(ArchLinterNet.Core.Validation.BaselineGenerationRequest): ArchLinterNet.Core.Validation.BaselineGenerationOutcome [static]
 method ArchLinterNet.Core.Validation.ArchitectureDebtGateApplicationService.Evaluate(ArchLinterNet.Core.Validation.ArchitectureDebtGateRequest): ArchLinterNet.Core.Validation.ArchitectureDebtGateOutcome [virtual]
+method ArchLinterNet.Core.Validation.ArchitectureDebtGateApplicationService.Evaluate(ArchLinterNet.Core.Validation.ArchitectureDebtGateRequest, ArchLinterNet.Core.Validation.ArchitectureAnalysisSnapshot): ArchLinterNet.Core.Validation.ArchitectureDebtGateOutcome [virtual]
 method ArchLinterNet.Core.Validation.ArchitectureDebtGateFormatter.FormatAsHuman(ArchLinterNet.Core.Validation.ArchitectureDebtGateOutcome): System.String [static]
 method ArchLinterNet.Core.Validation.ArchitectureDebtGateFormatter.FormatAsJson(ArchLinterNet.Core.Validation.ArchitectureDebtGateOutcome): System.String [static]
 method ArchLinterNet.Core.Validation.ArchitectureDebtGateFormatter.FormatAsSarif(ArchLinterNet.Core.Validation.ArchitectureDebtGateOutcome, System.String): System.String [static]
@@ -1754,6 +1798,10 @@ method ArchLinterNet.Core.Validation.ArchitectureExternalEvidenceApplicabilityPr
 method ArchLinterNet.Core.Validation.ArchitectureExternalEvidenceApplicabilityProjector.ProjectExpectedEntries(System.Collections.Generic.IEnumerable`1[ArchLinterNet.Core.Contracts.ArchitectureExternalEvidenceRequirement]): System.Collections.Generic.IReadOnlyList`1[ArchLinterNet.Core.Model.ArchitectureApplicabilityExpectedEntry] [static]
 method ArchLinterNet.Core.Validation.ArchitectureExternalEvidenceApplicabilityProjector.ProjectRecords(System.Collections.Generic.IEnumerable`1[ArchLinterNet.Core.Contracts.ArchitectureExternalEvidenceRequirement], System.Collections.Generic.IEnumerable`1[ArchLinterNet.Core.Model.SarifEvidenceReadResult], ArchLinterNet.Core.Model.SarifExternalDiagnosticSelectionResult): System.Collections.Generic.IReadOnlyList`1[ArchLinterNet.Core.Model.ArchitectureApplicabilityRecord] [static]
 method ArchLinterNet.Core.Validation.ArchitectureExternalEvidenceApplicabilityProjector.ProjectRecords(System.Collections.Generic.IEnumerable`1[ArchLinterNet.Core.Model.SarifEvidenceReadResult], ArchLinterNet.Core.Model.SarifExternalDiagnosticSelectionResult): System.Collections.Generic.IReadOnlyList`1[ArchLinterNet.Core.Model.ArchitectureApplicabilityRecord] [static]
+method ArchLinterNet.Core.Validation.ArchitectureHealthApplicationService.Evaluate(ArchLinterNet.Core.Validation.ArchitectureHealthRequest): ArchLinterNet.Core.Validation.ArchitectureHealthOutcome [virtual]
+method ArchLinterNet.Core.Validation.ArchitectureHealthProjector.FormatAsHuman(ArchLinterNet.Core.Model.ArchitectureHealthSummary): System.String [static]
+method ArchLinterNet.Core.Validation.ArchitectureHealthProjector.FormatAsJson(ArchLinterNet.Core.Model.ArchitectureHealthSummary): System.String [static]
+method ArchLinterNet.Core.Validation.ArchitectureHealthProjector.Project(System.Collections.Generic.IReadOnlyList`1[ArchLinterNet.Core.Validation.ArchitectureHealthValidationOutcome], ArchLinterNet.Core.Validation.ArchitectureDebtGateOutcome): ArchLinterNet.Core.Model.ArchitectureHealthSummary [static]
 method ArchLinterNet.Core.Validation.ArchitectureImportedDiagnosticBaselineProjector.ToBaselineCandidates(ArchLinterNet.Core.Model.SarifExternalDiagnosticSelectionResult, System.Threading.CancellationToken): System.Collections.Generic.IReadOnlyList`1[ArchLinterNet.Core.Contracts.ArchitectureBaselineCandidate] [static]
 method ArchLinterNet.Core.Validation.ArchitectureMetricMeasurementApplicationService.Measure(ArchLinterNet.Core.Validation.ArchitectureMetricMeasurementRequest, ArchLinterNet.Core.Reporting.ValidationTiming): ArchLinterNet.Core.Model.ArchitectureMetricMeasurementOutcome [virtual]
 method ArchLinterNet.Core.Validation.ArchitecturePublicApiApplicationService.Capture(ArchLinterNet.Core.Validation.PublicApiCaptureRequest): ArchLinterNet.Core.Validation.PublicApiCaptureOutcome [virtual]
@@ -2981,6 +3029,19 @@ property ArchLinterNet.Core.Model.ArchitectureGraphEdge.TargetId: System.String 
 property ArchLinterNet.Core.Model.ArchitectureGraphEdge.TargetKind: ArchLinterNet.Core.Model.ArchitectureGraphNodeKind [get, init]
 property ArchLinterNet.Core.Model.ArchitectureGraphNode.Id: System.String [get, init]
 property ArchLinterNet.Core.Model.ArchitectureGraphNode.Kind: ArchLinterNet.Core.Model.ArchitectureGraphNodeKind [get, init]
+property ArchLinterNet.Core.Model.ArchitectureHealthDimension.Name: System.String [get, init]
+property ArchLinterNet.Core.Model.ArchitectureHealthDimension.Reasons: System.Collections.Generic.IReadOnlyList`1[ArchLinterNet.Core.Model.ArchitectureHealthReason] [get, init]
+property ArchLinterNet.Core.Model.ArchitectureHealthDimension.State: ArchLinterNet.Core.Model.ArchitectureHealthDimensionState [get, init]
+property ArchLinterNet.Core.Model.ArchitectureHealthReason.Code: System.String [get, init]
+property ArchLinterNet.Core.Model.ArchitectureHealthReason.ControlIdentity: System.String [get, init]
+property ArchLinterNet.Core.Model.ArchitectureHealthReason.EvidenceIdentity: System.String [get, init]
+property ArchLinterNet.Core.Model.ArchitectureHealthReason.Family: System.String [get, init]
+property ArchLinterNet.Core.Model.ArchitectureHealthReason.PolicyIdentity: System.String [get, init]
+property ArchLinterNet.Core.Model.ArchitectureHealthReason.Source: System.String [get, init]
+property ArchLinterNet.Core.Model.ArchitectureHealthSummary.Dimensions: System.Collections.Generic.IReadOnlyList`1[ArchLinterNet.Core.Model.ArchitectureHealthDimension] [get, init]
+property ArchLinterNet.Core.Model.ArchitectureHealthSummary.Gate: ArchLinterNet.Core.Model.ArchitectureHealthGate [get, init]
+property ArchLinterNet.Core.Model.ArchitectureHealthSummary.Health: ArchLinterNet.Core.Model.ArchitectureHealthState [get, init]
+property ArchLinterNet.Core.Model.ArchitectureHealthSummary.SchemaId: System.String [get, init]
 property ArchLinterNet.Core.Model.ArchitectureMetricEvidence.ContributorCount: System.Nullable`1[System.Int32] [get]
 property ArchLinterNet.Core.Model.ArchitectureMetricEvidence.Contributors: System.Collections.Generic.IReadOnlyList`1[System.String] [get, init]
 property ArchLinterNet.Core.Model.ArchitectureMetricEvidence.EffectiveScope: System.String [get, init]
@@ -3149,6 +3210,10 @@ property ArchLinterNet.Core.Model.ArchitectureViolationIdentity.SourceType: Syst
 property ArchLinterNet.Core.Model.ArchitectureViolationIdentity.TargetAssembly: System.String [get, init]
 property ArchLinterNet.Core.Model.ArchitectureViolationIdentity.TargetMember: System.String [get, init]
 property ArchLinterNet.Core.Model.ArchitectureViolationIdentity.TargetType: System.String [get, init]
+property ArchLinterNet.Core.Model.ArchitectureWaiverLifecycleAssessment.BlockingStates: System.Collections.Generic.IReadOnlyList`1[System.String] [get, init]
+property ArchLinterNet.Core.Model.ArchitectureWaiverLifecycleAssessment.HasBlockingRecords: System.Boolean [get]
+property ArchLinterNet.Core.Model.ArchitectureWaiverLifecycleAssessment.Profile: System.String [get, init]
+property ArchLinterNet.Core.Model.ArchitectureWaiverLifecycleAssessment.Records: System.Collections.Generic.IReadOnlyList`1[ArchLinterNet.Core.Model.ArchitectureWaiverLifecycleRecord] [get, init]
 property ArchLinterNet.Core.Model.ArchitectureWaiverLifecycleRecord.ContractGroup: System.String [get, init]
 property ArchLinterNet.Core.Model.ArchitectureWaiverLifecycleRecord.ContractId: System.String [get, init]
 property ArchLinterNet.Core.Model.ArchitectureWaiverLifecycleRecord.ContractName: System.String [get, init]
@@ -4003,6 +4068,7 @@ property ArchLinterNet.Core.Validation.ArchitectureAnalysisSnapshotCounters.Sour
 property ArchLinterNet.Core.Validation.ArchitectureDebtGateEvaluation.Completed: System.Boolean [get, init]
 property ArchLinterNet.Core.Validation.ArchitectureDebtGateEvaluation.Mode: System.String [get, init]
 property ArchLinterNet.Core.Validation.ArchitectureDebtGateEvaluation.PreflightDiagnostics: System.Collections.Generic.IReadOnlyList`1[ArchLinterNet.Core.Model.BuildStatePreflightDiagnostic] [get, init]
+property ArchLinterNet.Core.Validation.ArchitectureDebtGateEvaluation.ReusedAnalysisSnapshot: System.Boolean [get, init]
 property ArchLinterNet.Core.Validation.ArchitectureDebtGateOutcome.Evaluation: ArchLinterNet.Core.Validation.ArchitectureDebtGateEvaluation [get, init]
 property ArchLinterNet.Core.Validation.ArchitectureDebtGateOutcome.Passed: System.Boolean [get, init]
 property ArchLinterNet.Core.Validation.ArchitectureDebtGateOutcome.PersistentDebt: ArchLinterNet.Core.Validation.BaselineVerifyOutcome [get, init]
@@ -4023,6 +4089,15 @@ property ArchLinterNet.Core.Validation.ArchitectureDebtGateRequest.RequestedConf
 property ArchLinterNet.Core.Validation.ArchitectureDebtGateRequest.RequestedPlatform: System.String [get, init]
 property ArchLinterNet.Core.Validation.ArchitectureDebtGateRequest.RequestedRuntimeIdentifier: System.String [get, init]
 property ArchLinterNet.Core.Validation.ArchitectureDebtGateRequest.RequestedTargetFramework: System.String [get, init]
+property ArchLinterNet.Core.Validation.ArchitectureHealthOutcome.AnalysisCounters: ArchLinterNet.Core.Validation.ArchitectureAnalysisSnapshotCounters [get, init]
+property ArchLinterNet.Core.Validation.ArchitectureHealthOutcome.DebtGate: ArchLinterNet.Core.Validation.ArchitectureDebtGateOutcome [get, init]
+property ArchLinterNet.Core.Validation.ArchitectureHealthOutcome.Gate: ArchLinterNet.Core.Model.ArchitectureHealthGate [get]
+property ArchLinterNet.Core.Validation.ArchitectureHealthOutcome.Health: ArchLinterNet.Core.Model.ArchitectureHealthState [get]
+property ArchLinterNet.Core.Validation.ArchitectureHealthOutcome.Summary: ArchLinterNet.Core.Model.ArchitectureHealthSummary [get, init]
+property ArchLinterNet.Core.Validation.ArchitectureHealthOutcome.ValidationOutcomes: System.Collections.Generic.IReadOnlyList`1[ArchLinterNet.Core.Validation.ArchitectureHealthValidationOutcome] [get, init]
+property ArchLinterNet.Core.Validation.ArchitectureHealthRequest.DebtGate: ArchLinterNet.Core.Validation.ArchitectureDebtGateRequest [get, init]
+property ArchLinterNet.Core.Validation.ArchitectureHealthValidationOutcome.Mode: System.String [get, init]
+property ArchLinterNet.Core.Validation.ArchitectureHealthValidationOutcome.Outcome: ArchLinterNet.Core.Validation.ValidationOutcome [get, init]
 property ArchLinterNet.Core.Validation.ArchitectureMetricMeasurementRequest.CancellationToken: System.Threading.CancellationToken [get, init]
 property ArchLinterNet.Core.Validation.ArchitectureMetricMeasurementRequest.ConditionSetName: System.String [get, init]
 property ArchLinterNet.Core.Validation.ArchitectureMetricMeasurementRequest.IncludeAsmdefContracts: System.Boolean [get, init]
@@ -4261,6 +4336,7 @@ property ArchLinterNet.Core.Validation.ValidationOutcome.SubtractiveMatcherParti
 property ArchLinterNet.Core.Validation.ValidationOutcome.UnmatchedIgnoredViolations: System.Collections.Generic.IReadOnlyList`1[ArchLinterNet.Core.Model.ArchitectureUnmatchedIgnoredViolation] [get, init]
 property ArchLinterNet.Core.Validation.ValidationOutcome.UnmatchedIgnoredViolationsConfig: System.String [get, init]
 property ArchLinterNet.Core.Validation.ValidationOutcome.Violations: System.Collections.Generic.IReadOnlyCollection`1[ArchLinterNet.Core.Model.ArchitectureViolation] [get, init]
+property ArchLinterNet.Core.Validation.ValidationOutcome.WaiverLifecycleAssessment: ArchLinterNet.Core.Model.ArchitectureWaiverLifecycleAssessment [get, init]
 property ArchLinterNet.Core.Validation.ValidationOutcome.Waivers: System.Collections.Generic.IReadOnlyList`1[ArchLinterNet.Core.Model.ArchitectureWaiverLifecycleRecord] [get, init]
 property ArchLinterNet.Core.Validation.ValidationRequest.BaselinePath: System.String [get, init]
 property ArchLinterNet.Core.Validation.ValidationRequest.CacheLocation: ArchLinterNet.Core.Caching.AnalysisCacheLocation [get, init]

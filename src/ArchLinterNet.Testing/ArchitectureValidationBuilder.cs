@@ -223,6 +223,35 @@ public sealed class ArchitectureValidationBuilder
         });
     }
 
+    /// <summary>Projects the Core-owned architecture-health outcome for the configured baseline.</summary>
+    public ArchitectureHealthOutcome EvaluateHealth(string mode = "all")
+    {
+        return _engine.Value.EvaluateHealth(new ArchitectureHealthRequest
+        {
+            DebtGate = new ArchitectureDebtGateRequest
+            {
+                PolicyPath = _policyPath,
+                BaselinePath = RequireBaselinePath(),
+                Mode = mode,
+                ConditionSetName = _conditionSetName,
+                ContractIds = _contractIds,
+                BasePolicyContext = _basePolicyContextPath is null
+                    ? null
+                    : ArchitecturePolicyWeakeningFormatter.DeserializeContext(File.ReadAllText(_basePolicyContextPath)),
+                CurrentPolicyContext = _currentPolicyContextPath is null
+                    ? null
+                    : ArchitecturePolicyWeakeningFormatter.DeserializeContext(File.ReadAllText(_currentPolicyContextPath)),
+                PreparationMode = _preparationMode,
+                NoRestore = _noRestore,
+                RequestedConfiguration = _requestedConfiguration,
+                RequestedTargetFramework = _requestedTargetFramework,
+                RequestedPlatform = _requestedPlatform,
+                RequestedRuntimeIdentifier = _requestedRuntimeIdentifier,
+                CancellationToken = _cancellationToken,
+            },
+        });
+    }
+
     /// <summary>Performs a non-writing migration analysis for the configured version-1 baseline.</summary>
     public BaselineMigrateOutcome MigrateBaseline()
     {

@@ -372,9 +372,15 @@ public sealed partial class ArchitectureAnalysisSnapshot : IDisposable
 
         IReadOnlyList<ArchitectureWaiverLifecycleRecord> waivers = ArchitectureWaiverLifecycleEvaluator.Evaluate(
             _document, mode, rawUnmatched, _waiverEvaluationDate, _requestedContractIds);
-        bool hasBlockingWaiver = waivers.Any(waiver => waiver.State == "invalid")
-            || (ArchitectureWaiverProfile.Resolve(_document) == ArchitectureWaiverProfile.Strict
-                && waivers.Any(waiver => waiver.State is "expired" or "stale"));
+        string waiverProfile = ArchitectureWaiverProfile.Resolve(_document);
+        string[] blockingWaiverStates = waiverProfile == ArchitectureWaiverProfile.Strict
+            ? ["expired", "invalid", "stale"]
+            : ["invalid"];
+        var waiverLifecycleAssessment = new ArchitectureWaiverLifecycleAssessment(
+            waiverProfile,
+            waivers,
+            blockingWaiverStates);
+        bool hasBlockingWaiver = waiverLifecycleAssessment.HasBlockingRecords;
 
         bool ordinaryPassed = allViolations.Count == 0 && execution.Cycles.Count == 0
             && !hasBlockingUnmatched && !hasBlockingPolicyConsistency && !hasBlockingCoverage && !hasBlockingWaiver;
@@ -416,6 +422,7 @@ public sealed partial class ArchitectureAnalysisSnapshot : IDisposable
             DiscoveredProjectPaths = GetDiscoveredProjectPaths(),
             SourceExpansion = _document.SourceExpansion,
             Waivers = waivers,
+            WaiverLifecycleAssessment = waiverLifecycleAssessment,
             PolicyInventory = policyInventory,
             ApplicabilityExpectedEntries = execution.ApplicabilityExpectedEntries,
             ApplicabilityRecords = execution.ApplicabilityRecords,

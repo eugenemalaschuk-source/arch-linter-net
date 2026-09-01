@@ -168,6 +168,12 @@ public sealed class ArchitectureDebtGateApplicationServiceTests
             return Outcome;
         }
 
+        public BaselineVerifyOutcome Verify(BaselineVerifyRequest request, ArchitectureAnalysisSnapshot snapshot)
+        {
+            VerifyCalls++;
+            return Outcome;
+        }
+
         public BaselineMigrateOutcome Migrate(BaselineMigrateRequest request) => throw new NotSupportedException();
     }
 }
