@@ -117,7 +117,7 @@ internal static class VersionedContractSurfaceIsolationChecker
     private static Dictionary<ArchitectureContractExposureTarget, int[]> MatchForbiddenSurfaces(
         ArchitectureCheckerContext context,
         ArchitectureVersionedContractSurfaceIsolationContract contract,
-        IReadOnlyDictionary<string, ArchitectureVersionedContractSurfaceIsolationSurface> surfaces,
+        Dictionary<string, ArchitectureVersionedContractSurfaceIsolationSurface> surfaces,
         IReadOnlyList<Type> targetUniverse,
         List<ArchitectureApplicabilityReason> reasons,
         ArchitectureApplicabilityProvenance provenance)

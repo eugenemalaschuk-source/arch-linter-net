@@ -52,10 +52,10 @@ internal sealed class RawVersionedContractSurfaceIsolationNodeValidator : IArchi
             ValidateSelector(selector, name, $"surface '{id}'.types_matching");
         }
         Require(contract, "source_surface", name, "source surface ID");
-        ValidateReferences(contract, name, surfaces, ids);
+        ValidateReferences(contract, name, ids);
     }
 
-    private static void ValidateReferences(YamlMappingNode contract, string name, YamlSequenceNode surfaces, HashSet<string> ids)
+    private static void ValidateReferences(YamlMappingNode contract, string name, HashSet<string> ids)
     {
         string source = Require(contract, "source_surface", name, "source surface ID");
         if (!ids.Contains(source)) throw new InvalidOperationException($"Versioned contract-surface isolation contract '{name}' references unknown source surface '{source}'.");
@@ -66,7 +66,7 @@ internal sealed class RawVersionedContractSurfaceIsolationNodeValidator : IArchi
         foreach (YamlNode node in forbidden.Children)
         {
             if (node is not YamlScalarNode scalar || string.IsNullOrWhiteSpace(scalar.Value)) throw new InvalidOperationException($"Versioned contract-surface isolation contract '{name}' declares a blank forbidden surface reference.");
-            string id = scalar.Value!;
+            string id = scalar.Value;
             if (!refs.Add(id)) throw new InvalidOperationException($"Versioned contract-surface isolation contract '{name}' declares duplicate forbidden surface '{id}'.");
             if (string.Equals(id, source, StringComparison.OrdinalIgnoreCase)) throw new InvalidOperationException($"Versioned contract-surface isolation contract '{name}' cannot forbid its source surface '{source}'.");
             if (!ids.Contains(id)) throw new InvalidOperationException($"Versioned contract-surface isolation contract '{name}' references unknown forbidden surface '{id}'.");
@@ -86,6 +86,6 @@ internal sealed class RawVersionedContractSurfaceIsolationNodeValidator : IArchi
     {
         if (!RawYamlNodes.TryGetChild(parent, key, out YamlNode? node) || node is not YamlScalarNode scalar || string.IsNullOrWhiteSpace(scalar.Value))
             throw new InvalidOperationException($"Versioned contract-surface isolation contract '{name}' must declare a non-blank '{key}' ({description}).");
-        return scalar.Value!;
+        return scalar.Value;
     }
 }

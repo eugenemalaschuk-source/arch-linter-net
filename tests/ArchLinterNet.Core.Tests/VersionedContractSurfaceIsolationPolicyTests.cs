@@ -10,6 +10,8 @@ namespace ArchLinterNet.Core.Tests;
 [TestFixture]
 public sealed class VersionedContractSurfaceIsolationPolicyTests
 {
+    private static readonly string[] _expectedAuditForbiddenSurfaces = ["implementation-v2"];
+
     private string _directory = null!;
 
     [SetUp]
@@ -67,7 +69,7 @@ public sealed class VersionedContractSurfaceIsolationPolicyTests
             Assert.That(document.Contracts.StrictVersionedContractSurfaceIsolation[0].Surfaces[0].TypesMatching.Namespace,
                 Is.EqualTo("Product.Api.V1"));
             Assert.That(document.Contracts.AuditVersionedContractSurfaceIsolation[0].ForbiddenSurfaces,
-                Is.EqualTo(new[] { "implementation-v2" }));
+                Is.EqualTo(_expectedAuditForbiddenSurfaces));
         });
     }
 
