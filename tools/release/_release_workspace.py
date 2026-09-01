@@ -55,3 +55,29 @@ def _github_command_file_path(value: Path, description: str, env_var: str) -> Pa
             f"The {description} '{value}' does not match the runner-provided {env_var} transport path."
         )
     return Path(resolved)
+
+
+def _github_runner_temp_path(value: Path, description: str, env_var: str) -> Path:
+    """Validate a path supplied from the GitHub Actions runner's temp directory.
+
+    Unlike command files, scanner logs may be any file below the runner temp root. Both
+    paths are resolved before checking containment so traversal and symlink escapes cannot
+    bypass the boundary.
+    """
+    resolved = os.path.realpath(str(value))
+    trusted = os.environ.get(env_var)
+    if not trusted:
+        raise ValueError(
+            f"The {description} '{value}' cannot be trusted: the {env_var} "
+            "environment variable is not set by the runner."
+        )
+    trusted_root = os.path.realpath(trusted)
+    try:
+        contained = os.path.commonpath([resolved, trusted_root]) == trusted_root
+    except ValueError:
+        contained = False
+    if not contained:
+        raise ValueError(
+            f"The {description} '{value}' resolves outside the runner-provided {env_var} directory."
+        )
+    return Path(resolved)

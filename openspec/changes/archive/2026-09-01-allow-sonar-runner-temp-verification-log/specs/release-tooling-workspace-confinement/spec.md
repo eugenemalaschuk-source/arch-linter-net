@@ -1,8 +1,5 @@
-# release-tooling-workspace-confinement Specification
+## MODIFIED Requirements
 
-## Purpose
-TBD - created by archiving change fix-sonarcloud-new-code-debt. Update Purpose after archive.
-## Requirements
 ### Requirement: Path-typed CLI arguments are confined to the release workspace
 
 Every script under `tools/release/` that accepts a `Path`-typed CLI argument SHALL pass it through
@@ -74,6 +71,8 @@ runner command-file argument on the command line SHALL NOT be trusted on that ba
   outside the working tree) and passes that same path as `--github-output`
 - **THEN** `_github_command_file_path` accepts it, without weakening the production check for any
   path that does not match the environment variable
+
+## ADDED Requirements
 
 ### Requirement: Read-only runner-temp verification inputs use a root-anchored trust boundary
 
