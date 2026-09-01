@@ -20,6 +20,7 @@ internal static class ArchitecturePolicyRawDocumentValidatorPipeline
         new RawLayoutConventionNodeValidator(),
         new RawModuleContainerNodeValidator(),
         new RawContractSurfaceExposureNodeValidator(),
+        new RawVersionedContractSurfaceIsolationNodeValidator(),
         new RawLayerTemplateNodeValidator(),
         new RawTopologyNodeValidator(),
         new RawMetricDefinitionValidator(),

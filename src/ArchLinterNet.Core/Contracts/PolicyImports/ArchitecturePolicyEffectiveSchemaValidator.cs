@@ -486,9 +486,14 @@ internal static class ArchitecturePolicyEffectiveSchemaValidator
 
                 // Validate the shared id field here (non-empty string, with a precise composed-
                 // policy provenance location) rather than relying solely on the family schema's
-                // own error reporting, then evaluate the remaining contract against the family
-                // schema. The effective YAML itself is unchanged.
-                contract.Remove("id");
+                // own error reporting. Versioned contract-surface isolation has an id-required
+                // schema contract, so keep that validated field in the instance; older families
+                // retain their fallback-id-compatible shape by evaluating their remaining fields.
+                if (groupName is not "strict_versioned_contract_surface_isolation"
+                    and not "audit_versioned_contract_surface_isolation")
+                {
+                    contract.Remove("id");
+                }
             }
         }
     }

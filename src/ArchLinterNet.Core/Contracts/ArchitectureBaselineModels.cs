@@ -135,6 +135,8 @@ public sealed class ArchitectureBaselineContractGroups
     [YamlMember(Alias = "audit_public_api_surface")] public List<ArchitectureBaselineContractEntry> AuditPublicApiSurface { get; set; } = new();
     [YamlMember(Alias = "strict_contract_surface_exposure")] public List<ArchitectureBaselineContractEntry> StrictContractSurfaceExposure { get; set; } = new();
     [YamlMember(Alias = "audit_contract_surface_exposure")] public List<ArchitectureBaselineContractEntry> AuditContractSurfaceExposure { get; set; } = new();
+    [YamlMember(Alias = "strict_versioned_contract_surface_isolation")] public List<ArchitectureBaselineContractEntry> StrictVersionedContractSurfaceIsolation { get; set; } = new();
+    [YamlMember(Alias = "audit_versioned_contract_surface_isolation")] public List<ArchitectureBaselineContractEntry> AuditVersionedContractSurfaceIsolation { get; set; } = new();
     [YamlMember(Alias = "strict_attribute_usage")] public List<ArchitectureBaselineContractEntry> StrictAttributeUsage { get; set; } = new();
     [YamlMember(Alias = "audit_attribute_usage")] public List<ArchitectureBaselineContractEntry> AuditAttributeUsage { get; set; } = new();
     [YamlMember(Alias = "strict_inheritance")] public List<ArchitectureBaselineContractEntry> StrictInheritance { get; set; } = new();
@@ -183,6 +185,7 @@ public sealed class ArchitectureBaselineContractGroups
         "strict_layout_conventions", "audit_layout_conventions",
         "strict_public_api_surface", "audit_public_api_surface",
         "strict_contract_surface_exposure", "audit_contract_surface_exposure",
+        "strict_versioned_contract_surface_isolation", "audit_versioned_contract_surface_isolation",
         "strict_attribute_usage", "audit_attribute_usage",
         "strict_inheritance", "audit_inheritance",
         "strict_interface_implementation", "audit_interface_implementation",
@@ -244,6 +247,8 @@ public sealed class ArchitectureBaselineContractGroups
             "audit_public_api_surface" => AuditPublicApiSurface,
             "strict_contract_surface_exposure" => StrictContractSurfaceExposure,
             "audit_contract_surface_exposure" => AuditContractSurfaceExposure,
+            "strict_versioned_contract_surface_isolation" => StrictVersionedContractSurfaceIsolation,
+            "audit_versioned_contract_surface_isolation" => AuditVersionedContractSurfaceIsolation,
             "strict_attribute_usage" => StrictAttributeUsage,
             "audit_attribute_usage" => AuditAttributeUsage,
             "strict_inheritance" => StrictInheritance,
@@ -317,6 +322,8 @@ public sealed class ArchitectureBaselineContractGroups
             case "audit_public_api_surface": AuditPublicApiSurface = entries; break;
             case "strict_contract_surface_exposure": StrictContractSurfaceExposure = entries; break;
             case "audit_contract_surface_exposure": AuditContractSurfaceExposure = entries; break;
+            case "strict_versioned_contract_surface_isolation": StrictVersionedContractSurfaceIsolation = entries; break;
+            case "audit_versioned_contract_surface_isolation": AuditVersionedContractSurfaceIsolation = entries; break;
             case "strict_attribute_usage": StrictAttributeUsage = entries; break;
             case "audit_attribute_usage": AuditAttributeUsage = entries; break;
             case "strict_inheritance": StrictInheritance = entries; break;

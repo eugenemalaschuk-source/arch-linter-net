@@ -1,6 +1,7 @@
 using ArchLinterNet.Core.Contracts;
 using ArchLinterNet.Core.Contracts.Families;
 using ArchLinterNet.Core.IO;
+using ArchLinterNet.Core.Model;
 using NUnit.Framework;
 using ArchitectureContractGroups = ArchLinterNet.Core.Contracts.Families.ArchitectureContractGroups;
 
@@ -437,5 +438,57 @@ metric_baselines: []
         Assert.That(policy.Contracts.StrictProjectMetadata[0].IgnoredViolations, Has.Count.EqualTo(1));
         Assert.That(policy.Contracts.StrictProjectMetadata[0].IgnoredViolations[0].ForbiddenReference,
             Is.EqualTo("friend_assembly:MyApp.Tools"));
+    }
+
+    [Test]
+    public void MergeAndValidate_VersionedIsolationGroup_AppliesIgnoredViolations()
+    {
+        ArchitectureContractDocument policy = new()
+        {
+            Version = 1,
+            Name = "Test",
+            Contracts = new ArchitectureContractGroups
+            {
+                StrictVersionedContractSurfaceIsolation =
+                [
+                    new ArchitectureVersionedContractSurfaceIsolationContract
+                    {
+                        Id = "versioned-isolation",
+                        Name = "versioned-isolation",
+                    },
+                ],
+            },
+        };
+        ArchitectureBaselineDocument baseline = new()
+        {
+            Version = 1,
+            Baseline = new ArchitectureBaselineContractGroups
+            {
+                StrictVersionedContractSurfaceIsolation =
+                [
+                    new ArchitectureBaselineContractEntry
+                    {
+                        Id = "versioned-isolation",
+                        IgnoredViolations =
+                        [
+                            new ArchitectureBaselineIgnoredViolation
+                            {
+                                SourceType = "Product.Api.Contract",
+                                ForbiddenReference = "Product.Domain.Entity",
+                                Reason = "known debt",
+                            },
+                        ],
+                    },
+                ],
+            },
+        };
+
+        ArchitectureBaselineLoadingService.MergeAndValidate(policy, baseline);
+
+        Assert.That(policy.Contracts.StrictVersionedContractSurfaceIsolation.Single().IgnoredViolations,
+            Has.One.Matches<ArchitectureIgnoredViolation>(ignore =>
+                ignore.SourceType == "Product.Api.Contract"
+                && ignore.ForbiddenReference == "Product.Domain.Entity"
+                && ignore.Reason == "known debt"));
     }
 }

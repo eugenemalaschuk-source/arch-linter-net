@@ -200,6 +200,12 @@ public sealed class ArchitectureContractGroups
     [YamlMember(Alias = "audit_contract_surface_exposure")]
     public List<ArchitectureContractSurfaceExposureContract> AuditContractSurfaceExposure { get; set; } = new();
 
+    [YamlMember(Alias = "strict_versioned_contract_surface_isolation")]
+    public List<ArchitectureVersionedContractSurfaceIsolationContract> StrictVersionedContractSurfaceIsolation { get; set; } = new();
+
+    [YamlMember(Alias = "audit_versioned_contract_surface_isolation")]
+    public List<ArchitectureVersionedContractSurfaceIsolationContract> AuditVersionedContractSurfaceIsolation { get; set; } = new();
+
     [YamlMember(Alias = "strict_coverage")]
     public List<ArchitectureCoverageContract> StrictCoverage { get; set; } = new();
 

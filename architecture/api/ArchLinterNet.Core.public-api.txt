@@ -138,6 +138,8 @@ class ArchLinterNet.Core.Contracts.Families.ArchitectureRequireMatchingInterface
 class ArchLinterNet.Core.Contracts.Families.ArchitectureTemplateLayer [sealed]
 class ArchLinterNet.Core.Contracts.Families.ArchitectureTypeMatcher [sealed]
 class ArchLinterNet.Core.Contracts.Families.ArchitectureTypePlacementContract [sealed]
+class ArchLinterNet.Core.Contracts.Families.ArchitectureVersionedContractSurfaceIsolationContract [sealed]
+class ArchLinterNet.Core.Contracts.Families.ArchitectureVersionedContractSurfaceIsolationSurface [sealed]
 class ArchLinterNet.Core.Contracts.Families.PublicApiComparisonModes [static]
 class ArchLinterNet.Core.Contracts.HistoryAnalysisConfiguration [sealed]
 class ArchLinterNet.Core.Contracts.HistoryAnalysisThresholds [sealed]
@@ -841,6 +843,8 @@ ctor ArchLinterNet.Core.Contracts.Families.ArchitectureRequireMatchingInterface(
 ctor ArchLinterNet.Core.Contracts.Families.ArchitectureTemplateLayer()
 ctor ArchLinterNet.Core.Contracts.Families.ArchitectureTypeMatcher()
 ctor ArchLinterNet.Core.Contracts.Families.ArchitectureTypePlacementContract()
+ctor ArchLinterNet.Core.Contracts.Families.ArchitectureVersionedContractSurfaceIsolationContract()
+ctor ArchLinterNet.Core.Contracts.Families.ArchitectureVersionedContractSurfaceIsolationSurface()
 ctor ArchLinterNet.Core.Contracts.HistoryAnalysisConfiguration()
 ctor ArchLinterNet.Core.Contracts.HistoryAnalysisThresholds()
 ctor ArchLinterNet.Core.Contracts.HistoryAnalysisWeightProfiles()
@@ -1419,6 +1423,7 @@ method ArchLinterNet.Core.Execution.ArchitectureAnalysisSession.CheckProjectMeta
 method ArchLinterNet.Core.Execution.ArchitectureAnalysisSession.CheckProtectedContract(ArchLinterNet.Core.Contracts.Families.ArchitectureProtectedContract): System.Collections.Generic.List`1[ArchLinterNet.Core.Model.ArchitectureViolation]
 method ArchLinterNet.Core.Execution.ArchitectureAnalysisSession.CheckPublicApiSurfaceContract(ArchLinterNet.Core.Contracts.Families.ArchitecturePublicApiSurfaceContract): System.Collections.Generic.List`1[ArchLinterNet.Core.Model.ArchitectureViolation]
 method ArchLinterNet.Core.Execution.ArchitectureAnalysisSession.CheckTypePlacementContract(ArchLinterNet.Core.Contracts.Families.ArchitectureTypePlacementContract): System.Collections.Generic.List`1[ArchLinterNet.Core.Model.ArchitectureViolation]
+method ArchLinterNet.Core.Execution.ArchitectureAnalysisSession.CheckVersionedContractSurfaceIsolationContract(ArchLinterNet.Core.Contracts.Families.ArchitectureVersionedContractSurfaceIsolationContract): ArchLinterNet.Core.Execution.Results.ArchitectureHandlerResult
 method ArchLinterNet.Core.Execution.ArchitectureAnalysisSession.IsContractSelected(ArchLinterNet.Core.Contracts.IArchitectureContract): System.Boolean
 method ArchLinterNet.Core.Execution.ArchitectureAnalysisSession.IsContractSelected(System.String): System.Boolean
 method ArchLinterNet.Core.Execution.ArchitectureAnalysisSession.PrepareRuleInputCoverageDeferral(System.String): System.Void
@@ -1969,6 +1974,7 @@ property ArchLinterNet.Core.Contracts.ArchitectureBaselineContractGroups.AuditPr
 property ArchLinterNet.Core.Contracts.ArchitectureBaselineContractGroups.AuditProtected: System.Collections.Generic.List`1[ArchLinterNet.Core.Contracts.ArchitectureBaselineContractEntry] [get, set]
 property ArchLinterNet.Core.Contracts.ArchitectureBaselineContractGroups.AuditPublicApiSurface: System.Collections.Generic.List`1[ArchLinterNet.Core.Contracts.ArchitectureBaselineContractEntry] [get, set]
 property ArchLinterNet.Core.Contracts.ArchitectureBaselineContractGroups.AuditTypePlacement: System.Collections.Generic.List`1[ArchLinterNet.Core.Contracts.ArchitectureBaselineContractEntry] [get, set]
+property ArchLinterNet.Core.Contracts.ArchitectureBaselineContractGroups.AuditVersionedContractSurfaceIsolation: System.Collections.Generic.List`1[ArchLinterNet.Core.Contracts.ArchitectureBaselineContractEntry] [get, set]
 property ArchLinterNet.Core.Contracts.ArchitectureBaselineContractGroups.Strict: System.Collections.Generic.List`1[ArchLinterNet.Core.Contracts.ArchitectureBaselineContractEntry] [get, set]
 property ArchLinterNet.Core.Contracts.ArchitectureBaselineContractGroups.StrictAcyclicSiblings: System.Collections.Generic.List`1[ArchLinterNet.Core.Contracts.ArchitectureBaselineContractEntry] [get, set]
 property ArchLinterNet.Core.Contracts.ArchitectureBaselineContractGroups.StrictAllowOnly: System.Collections.Generic.List`1[ArchLinterNet.Core.Contracts.ArchitectureBaselineContractEntry] [get, set]
@@ -2001,6 +2007,7 @@ property ArchLinterNet.Core.Contracts.ArchitectureBaselineContractGroups.StrictP
 property ArchLinterNet.Core.Contracts.ArchitectureBaselineContractGroups.StrictProtected: System.Collections.Generic.List`1[ArchLinterNet.Core.Contracts.ArchitectureBaselineContractEntry] [get, set]
 property ArchLinterNet.Core.Contracts.ArchitectureBaselineContractGroups.StrictPublicApiSurface: System.Collections.Generic.List`1[ArchLinterNet.Core.Contracts.ArchitectureBaselineContractEntry] [get, set]
 property ArchLinterNet.Core.Contracts.ArchitectureBaselineContractGroups.StrictTypePlacement: System.Collections.Generic.List`1[ArchLinterNet.Core.Contracts.ArchitectureBaselineContractEntry] [get, set]
+property ArchLinterNet.Core.Contracts.ArchitectureBaselineContractGroups.StrictVersionedContractSurfaceIsolation: System.Collections.Generic.List`1[ArchLinterNet.Core.Contracts.ArchitectureBaselineContractEntry] [get, set]
 property ArchLinterNet.Core.Contracts.ArchitectureBaselineDocument.Baseline: ArchLinterNet.Core.Contracts.ArchitectureBaselineContractGroups [get, set]
 property ArchLinterNet.Core.Contracts.ArchitectureBaselineDocument.MetricBaselines: System.Collections.Generic.List`1[ArchLinterNet.Core.Contracts.ArchitectureMetricBaselineEntry] [get, set]
 property ArchLinterNet.Core.Contracts.ArchitectureBaselineDocument.Version: System.Int32 [get, set]
@@ -2283,6 +2290,7 @@ property ArchLinterNet.Core.Contracts.Families.ArchitectureContractGroups.AuditP
 property ArchLinterNet.Core.Contracts.Families.ArchitectureContractGroups.AuditProtected: System.Collections.Generic.List`1[ArchLinterNet.Core.Contracts.Families.ArchitectureProtectedContract] [get, set]
 property ArchLinterNet.Core.Contracts.Families.ArchitectureContractGroups.AuditPublicApiSurface: System.Collections.Generic.List`1[ArchLinterNet.Core.Contracts.Families.ArchitecturePublicApiSurfaceContract] [get, set]
 property ArchLinterNet.Core.Contracts.Families.ArchitectureContractGroups.AuditTypePlacement: System.Collections.Generic.List`1[ArchLinterNet.Core.Contracts.Families.ArchitectureTypePlacementContract] [get, set]
+property ArchLinterNet.Core.Contracts.Families.ArchitectureContractGroups.AuditVersionedContractSurfaceIsolation: System.Collections.Generic.List`1[ArchLinterNet.Core.Contracts.Families.ArchitectureVersionedContractSurfaceIsolationContract] [get, set]
 property ArchLinterNet.Core.Contracts.Families.ArchitectureContractGroups.Strict: System.Collections.Generic.List`1[ArchLinterNet.Core.Contracts.Families.ArchitectureDependencyContract] [get, set]
 property ArchLinterNet.Core.Contracts.Families.ArchitectureContractGroups.StrictAcyclicSiblings: System.Collections.Generic.List`1[ArchLinterNet.Core.Contracts.Families.ArchitectureAcyclicSiblingContract] [get, set]
 property ArchLinterNet.Core.Contracts.Families.ArchitectureContractGroups.StrictAllowOnly: System.Collections.Generic.List`1[ArchLinterNet.Core.Contracts.Families.ArchitectureAllowOnlyContract] [get, set]
@@ -2317,6 +2325,7 @@ property ArchLinterNet.Core.Contracts.Families.ArchitectureContractGroups.Strict
 property ArchLinterNet.Core.Contracts.Families.ArchitectureContractGroups.StrictProtected: System.Collections.Generic.List`1[ArchLinterNet.Core.Contracts.Families.ArchitectureProtectedContract] [get, set]
 property ArchLinterNet.Core.Contracts.Families.ArchitectureContractGroups.StrictPublicApiSurface: System.Collections.Generic.List`1[ArchLinterNet.Core.Contracts.Families.ArchitecturePublicApiSurfaceContract] [get, set]
 property ArchLinterNet.Core.Contracts.Families.ArchitectureContractGroups.StrictTypePlacement: System.Collections.Generic.List`1[ArchLinterNet.Core.Contracts.Families.ArchitectureTypePlacementContract] [get, set]
+property ArchLinterNet.Core.Contracts.Families.ArchitectureContractGroups.StrictVersionedContractSurfaceIsolation: System.Collections.Generic.List`1[ArchLinterNet.Core.Contracts.Families.ArchitectureVersionedContractSurfaceIsolationContract] [get, set]
 property ArchLinterNet.Core.Contracts.Families.ArchitectureContractSurfaceExposureContract.Forbidden: System.Collections.Generic.List`1[ArchLinterNet.Core.Contracts.Families.ArchitecturePublicApiSurfaceSelector] [get, set]
 property ArchLinterNet.Core.Contracts.Families.ArchitectureContractSurfaceExposureContract.Id: System.String [virtual, get, set]
 property ArchLinterNet.Core.Contracts.Families.ArchitectureContractSurfaceExposureContract.IgnoredViolations: System.Collections.Generic.List`1[ArchLinterNet.Core.Contracts.ArchitectureIgnoredViolation] [get, set]
@@ -2550,6 +2559,15 @@ property ArchLinterNet.Core.Contracts.Families.ArchitectureTypePlacementContract
 property ArchLinterNet.Core.Contracts.Families.ArchitectureTypePlacementContract.RequiredNamePrefix: System.String [get, set]
 property ArchLinterNet.Core.Contracts.Families.ArchitectureTypePlacementContract.RequiredNameSuffix: System.String [get, set]
 property ArchLinterNet.Core.Contracts.Families.ArchitectureTypePlacementContract.TypesMatching: ArchLinterNet.Core.Contracts.Families.ArchitectureTypeMatcher [get, set]
+property ArchLinterNet.Core.Contracts.Families.ArchitectureVersionedContractSurfaceIsolationContract.ForbiddenSurfaces: System.Collections.Generic.List`1[System.String] [get, set]
+property ArchLinterNet.Core.Contracts.Families.ArchitectureVersionedContractSurfaceIsolationContract.Id: System.String [virtual, get, set]
+property ArchLinterNet.Core.Contracts.Families.ArchitectureVersionedContractSurfaceIsolationContract.IgnoredViolations: System.Collections.Generic.List`1[ArchLinterNet.Core.Contracts.ArchitectureIgnoredViolation] [get, set]
+property ArchLinterNet.Core.Contracts.Families.ArchitectureVersionedContractSurfaceIsolationContract.Name: System.String [virtual, get, set]
+property ArchLinterNet.Core.Contracts.Families.ArchitectureVersionedContractSurfaceIsolationContract.Reason: System.String [get, set]
+property ArchLinterNet.Core.Contracts.Families.ArchitectureVersionedContractSurfaceIsolationContract.SourceSurface: System.String [get, set]
+property ArchLinterNet.Core.Contracts.Families.ArchitectureVersionedContractSurfaceIsolationContract.Surfaces: System.Collections.Generic.List`1[ArchLinterNet.Core.Contracts.Families.ArchitectureVersionedContractSurfaceIsolationSurface] [get, set]
+property ArchLinterNet.Core.Contracts.Families.ArchitectureVersionedContractSurfaceIsolationSurface.Id: System.String [get, set]
+property ArchLinterNet.Core.Contracts.Families.ArchitectureVersionedContractSurfaceIsolationSurface.TypesMatching: ArchLinterNet.Core.Contracts.Families.ArchitecturePublicApiSurfaceSelector [get, set]
 property ArchLinterNet.Core.Contracts.HistoryAnalysisConfiguration.Extractors: System.Collections.Generic.List`1[ArchLinterNet.Core.Contracts.HistoryTaskExtractorConfiguration] [get, set]
 property ArchLinterNet.Core.Contracts.HistoryAnalysisConfiguration.Ignore: System.Collections.Generic.List`1[System.String] [get, set]
 property ArchLinterNet.Core.Contracts.HistoryAnalysisConfiguration.Paths: ArchLinterNet.Core.Contracts.HistoryPathConfiguration [get, set]

@@ -91,6 +91,10 @@ Strict groups are blocking. Audit groups use the same family semantics for non-b
 
 | [Contract-surface exposure](contract-surface-exposure.md) | `strict_contract_surface_exposure` / `audit_contract_surface_exposure` | Prevent selected visible contract signatures from exposing selected type surfaces. |
 
+<!-- contract-family: versioned-contract-surface-isolation -->
+
+| [Versioned contract-surface isolation](versioned-contract-surface-isolation.md) | `strict_versioned_contract_surface_isolation` / `audit_versioned_contract_surface_isolation` | Prevent a selected versioned contract surface from exposing types selected by other version or implementation surfaces. |
+
 <!-- contract-family: attribute-usage -->
 
 | [Attribute usage](attribute-usage.md) | `strict_attribute_usage` / `audit_attribute_usage` | Restrict where selected attributes may appear. |

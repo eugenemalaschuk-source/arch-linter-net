@@ -189,4 +189,26 @@ internal sealed class ArchitectureCoreContractCheckingService
             ApplicabilityRecords = new[] { result.ApplicabilityRecord },
         };
     }
+
+    public ArchitectureHandlerResult CheckVersionedContractSurfaceIsolationContract(
+        ArchitectureVersionedContractSurfaceIsolationContract contract)
+    {
+        if (!_session.IsContractSelected(contract.Id) || _session.IsDanglingButCoveredByRuleInputCoverage(contract))
+        {
+            return ArchitectureHandlerResult.FromViolations(Array.Empty<ArchitectureViolation>());
+        }
+
+        ArchitectureContractExecutionContext executionContext = _session.CreateExecutionContext(contract, contract.IgnoredViolations);
+        ContractSurfaceExposureEvaluationResult result = VersionedContractSurfaceIsolationChecker.Evaluate(
+            _session.CheckerContext,
+            contract,
+            executionContext);
+        _session.CollectUnmatchedIgnores(executionContext);
+
+        return ArchitectureHandlerResult.FromViolations(result.Violations) with
+        {
+            ApplicabilityExpectedEntries = new[] { result.ApplicabilityExpectedEntry },
+            ApplicabilityRecords = new[] { result.ApplicabilityRecord },
+        };
+    }
 }

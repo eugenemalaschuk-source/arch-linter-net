@@ -345,6 +345,15 @@ internal static class ArchitectureContractFamilyRegistry
             OwnedContractTypes = new[] { typeof(ArchitectureContractSurfaceExposureContract) },
         },
         new(
+            "versioned_contract_surface_isolation", "strict_versioned_contract_surface_isolation",
+            "audit_versioned_contract_surface_isolation", true,
+            g => g.StrictVersionedContractSurfaceIsolation, g => g.AuditVersionedContractSurfaceIsolation,
+            (session, contract) => session.CheckVersionedContractSurfaceIsolationContract(
+                (ArchitectureVersionedContractSurfaceIsolationContract)contract))
+        {
+            OwnedContractTypes = new[] { typeof(ArchitectureVersionedContractSurfaceIsolationContract) },
+        },
+        new(
             "attribute_usage", "strict_attribute_usage", "audit_attribute_usage", true,
             g => g.StrictAttributeUsage, g => g.AuditAttributeUsage,
             (session, contract) => ArchitectureHandlerResult.FromViolations(

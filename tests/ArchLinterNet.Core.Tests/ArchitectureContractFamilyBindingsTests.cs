@@ -16,12 +16,12 @@ public sealed class ArchitectureContractFamilyBindingsTests
 {
     private static readonly string[] _value = { "layer_template" };
     [Test]
-    public void All_HasThirtyFourUniqueFamilyIds()
+    public void All_HasThirtyFiveUniqueFamilyIds()
     {
         var familyIds = ArchitectureContractFamilyBindings.All.Select(b => b.FamilyId).ToList();
 
-        Assert.That(familyIds, Has.Count.EqualTo(34));
-        Assert.That(familyIds.Distinct(StringComparer.Ordinal).Count(), Is.EqualTo(34));
+        Assert.That(familyIds, Has.Count.EqualTo(35));
+        Assert.That(familyIds.Distinct(StringComparer.Ordinal).Count(), Is.EqualTo(35));
     }
 
     [Test]
@@ -76,6 +76,29 @@ public sealed class ArchitectureContractFamilyBindingsTests
                 Forbidden = [new ArchitecturePublicApiSurfaceSelector { Role = "Entity" }],
             },
         },
+        StrictVersionedContractSurfaceIsolation =
+        {
+            new ArchitectureVersionedContractSurfaceIsolationContract
+            {
+                Name = "n",
+                Id = "versioned_contract_surface_isolation",
+                Surfaces =
+                [
+                    new ArchitectureVersionedContractSurfaceIsolationSurface
+                    {
+                        Id = "v1",
+                        TypesMatching = new ArchitecturePublicApiSurfaceSelector { Role = "ApiContract" },
+                    },
+                    new ArchitectureVersionedContractSurfaceIsolationSurface
+                    {
+                        Id = "v2",
+                        TypesMatching = new ArchitecturePublicApiSurfaceSelector { Role = "Entity" },
+                    },
+                ],
+                SourceSurface = "v1",
+                ForbiddenSurfaces = ["v2"],
+            },
+        },
         StrictAttributeUsage = { new ArchitectureAttributeUsageContract { Name = "n", Id = "attribute_usage" } },
         StrictInheritance = { new ArchitectureInheritanceContract { Name = "n", Id = "inheritance" } },
         StrictInterfaceImplementation =
@@ -93,7 +116,7 @@ public sealed class ArchitectureContractFamilyBindingsTests
 
         var strictIds = groups.AllStrict.Select(c => c.Id).ToList();
 
-        Assert.That(strictIds, Has.Count.EqualTo(28));
+        Assert.That(strictIds, Has.Count.EqualTo(29));
         Assert.That(strictIds, Does.Not.Contain("layer_template"));
     }
 

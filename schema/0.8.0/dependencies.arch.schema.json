@@ -1472,6 +1472,12 @@
           "items": { "$ref": "#/$defs/contractSurfaceExposureContract" },
           "default": []
         },
+        "strict_versioned_contract_surface_isolation": {
+          "type": "array", "items": { "$ref": "#/$defs/versionedContractSurfaceIsolationContract" }, "default": []
+        },
+        "audit_versioned_contract_surface_isolation": {
+          "type": "array", "items": { "$ref": "#/$defs/versionedContractSurfaceIsolationContract" }, "default": []
+        },
         "strict_attribute_usage": {
           "type": "array",
           "items": { "$ref": "#/$defs/attributeUsageContract" },
@@ -2402,6 +2408,27 @@
         }
       ],
       "unevaluatedProperties": false
+    },
+    "versionedContractSurfaceIsolationSurface": {
+      "type": "object", "additionalProperties": false, "required": ["id", "types_matching"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1, "pattern": ".*\\S.*" },
+        "types_matching": { "$ref": "#/$defs/contractSurfaceExposureSelector" }
+      }
+    },
+    "versionedContractSurfaceIsolationContract": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "name", "surfaces", "source_surface", "forbidden_surfaces"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1, "pattern": ".*\\S.*" },
+        "name": { "type": "string", "minLength": 1, "pattern": ".*\\S.*" },
+        "surfaces": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/versionedContractSurfaceIsolationSurface" } },
+        "source_surface": { "type": "string", "minLength": 1, "pattern": ".*\\S.*" },
+        "forbidden_surfaces": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "type": "string", "minLength": 1, "pattern": ".*\\S.*" } },
+        "ignored_violations": { "$ref": "#/$defs/ignoredViolations" },
+        "reason": { "type": "string" }
+      }
     },
     "attributeUsageContract": {
       "allOf": [
