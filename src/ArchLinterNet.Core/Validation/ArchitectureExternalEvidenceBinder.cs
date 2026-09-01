@@ -47,7 +47,37 @@ public static class ArchitectureExternalEvidenceBinder
 
         Dictionary<string, SarifEvidenceArtifactReference> artifactsById = IndexArtifacts(
             requirements, artifacts);
+        return EvaluateBound(requirements, repositoryRoot, artifactsById, assessmentContext, cancellationToken);
+    }
 
+    /// <summary>
+    /// Validates every supplied artifact's logical id against the declared requirements — the same
+    /// check <see cref="Evaluate"/> performs before it reads any artifact bytes — without touching
+    /// the filesystem. A caller that must reject an invalid binding before it is safe to attempt
+    /// evidence I/O at all (for example, a run whose repository/build-state preflight has already
+    /// failed for an unrelated reason) calls this directly instead of <see cref="Evaluate"/>, so a
+    /// mistyped id is never silently dropped merely because the read step itself was skipped.
+    /// </summary>
+    /// <exception cref="ArgumentException">
+    /// A supplied artifact's logical id does not match any declared requirement, or two supplied
+    /// artifacts share the same logical id.
+    /// </exception>
+    public static void ValidateBindingIds(
+        IReadOnlyList<ArchitectureExternalEvidenceRequirement> requirements,
+        IReadOnlyList<SarifEvidenceArtifactReference> artifacts)
+    {
+        ArgumentNullException.ThrowIfNull(requirements);
+        ArgumentNullException.ThrowIfNull(artifacts);
+        IndexArtifacts(requirements, artifacts);
+    }
+
+    private static ArchitectureExternalEvidenceBindingResult EvaluateBound(
+        IReadOnlyList<ArchitectureExternalEvidenceRequirement> requirements,
+        string repositoryRoot,
+        Dictionary<string, SarifEvidenceArtifactReference> artifactsById,
+        SarifEvidenceAssessmentContext? assessmentContext,
+        CancellationToken cancellationToken)
+    {
         var reader = new SarifEvidenceReader();
         List<SarifEvidenceReadResult> reads = new(requirements.Count);
         foreach (ArchitectureExternalEvidenceRequirement requirement in requirements)

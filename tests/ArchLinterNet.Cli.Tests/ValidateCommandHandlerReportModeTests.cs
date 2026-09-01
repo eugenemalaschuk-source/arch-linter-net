@@ -542,6 +542,11 @@ public sealed partial class ValidateCommandHandlerReportModeTests
 
         public ValidationOutcome? ForcedOutcome { get; init; }
 
+        // null preserves every existing test's hardcoded empty-runs default; set this to supply a
+        // native SARIF document a test needs to assert against (e.g. a native rule/result the CLI's
+        // imported-diagnostics merge must not collide with — see ExternalEvidence tests).
+        public string? ForcedSarif { get; init; }
+
         public bool TryParseGraphLevel(string value, out ArchitectureGraphLevel level)
         {
             level = ArchitectureGraphLevel.Namespace;
@@ -619,7 +624,7 @@ public sealed partial class ValidateCommandHandlerReportModeTests
             IReadOnlyCollection<ArchitectureCycleFinding> cycleFindings,
             IReadOnlyCollection<BuildStatePreflightDiagnostic> preflightDiagnostics)
         {
-            return "{\"version\":\"2.1.0\",\"runs\":[]}";
+            return ForcedSarif ?? "{\"version\":\"2.1.0\",\"runs\":[]}";
         }
 
         public string FormatViolationsForHumans(IReadOnlyCollection<ArchitectureViolation> violations)

@@ -107,6 +107,28 @@ internal sealed partial class ValidateCommandHandler
             return CliExitCodes.InvalidArgumentsOrRuntimeError;
         }
 
+        // Every --external-evidence artifact is a trust-read input the same way an imported policy
+        // file or a discovered project is — a --report/--profile destination must never be allowed
+        // to overwrite the SARIF this invocation just read as trusted evidence. Checked before
+        // AttachExternalEvidence below (which performs the actual read) so an invalid invocation
+        // never reaches output routing at all.
+        string? evidenceReportCollision = FindExternalEvidenceReportCollision(options, nativeOutcome.RepositoryRoot);
+        if (evidenceReportCollision is not null)
+        {
+            _console.Error.WriteLine(evidenceReportCollision);
+            return CliExitCodes.InvalidArgumentsOrRuntimeError;
+        }
+
+        string? evidenceProfileCollision = FindProfileFileCollision(
+            options,
+            ResolveExternalEvidencePaths(options, nativeOutcome.RepositoryRoot),
+            "an --external-evidence artifact path");
+        if (evidenceProfileCollision is not null)
+        {
+            _console.Error.WriteLine(evidenceProfileCollision);
+            return CliExitCodes.InvalidArgumentsOrRuntimeError;
+        }
+
         // External evidence is bound onto the outcome AFTER the outcome used for cache population
         // is captured (nativeOutcome, below) and NEVER before — see design.md in
         // openspec/changes/cli-external-evidence-binding. This guarantees SARIF bytes are always
@@ -153,12 +175,17 @@ internal sealed partial class ValidateCommandHandler
         return ResolveValidationExitCode(outcome);
     }
 
-    // Skips PreflightBlocked outcomes: a blocked run already fails for an unrelated build-state
-    // reason and has no requirements to bind against (ExternalEvidenceRequirements is not
-    // populated for that path), so evaluating bindings here would risk masking the real failure
-    // behind an unrelated "unknown binding id" error.
+    // Id validation (does every supplied --external-evidence id match a declared requirement, with
+    // no duplicates?) is cheap and touches no filesystem, so it runs unconditionally — including for
+    // a PreflightBlocked outcome — so a mistyped binding id is always rejected as invalid invocation
+    // rather than silently dropped merely because the run's build state already failed for an
+    // unrelated reason. Only the SARIF read/attach step (which needs a trustworthy repository/build
+    // state and touches disk) is skipped when preflight is blocked.
     private ValidationOutcome AttachExternalEvidence(ValidateCommandOptions options, ValidationOutcome outcome, string mode)
     {
+        ArchitectureExternalEvidenceBinder.ValidateBindingIds(
+            outcome.ExternalEvidenceRequirements, options.ExternalEvidenceArtifacts);
+
         if (outcome.PreflightBlocked)
         {
             return outcome;
@@ -277,6 +304,26 @@ internal sealed partial class ValidateCommandHandler
             return CliExitCodes.InvalidArgumentsOrRuntimeError;
         }
 
+        // See the identical comment in ExecuteSingleMode: every --external-evidence artifact is a
+        // trust-read input that a --report/--profile destination must never be allowed to overwrite.
+        string? evidenceReportCollision = FindExternalEvidenceReportCollision(
+            options, outcomesByMode[0].Outcome.RepositoryRoot);
+        if (evidenceReportCollision is not null)
+        {
+            _console.Error.WriteLine(evidenceReportCollision);
+            return CliExitCodes.InvalidArgumentsOrRuntimeError;
+        }
+
+        string? evidenceProfileCollision = FindProfileFileCollision(
+            options,
+            ResolveExternalEvidencePaths(options, outcomesByMode[0].Outcome.RepositoryRoot),
+            "an --external-evidence artifact path");
+        if (evidenceProfileCollision is not null)
+        {
+            _console.Error.WriteLine(evidenceProfileCollision);
+            return CliExitCodes.InvalidArgumentsOrRuntimeError;
+        }
+
         // Bound once per invocation (not per mode) and attached to each mode's own outcome — see
         // the identical comment in ExecuteSingleMode. outcomesByMode (native) remains what
         // TryPopulateCache uses below; enrichedOutcomesByMode is used for everything user-facing.
@@ -333,15 +380,26 @@ internal sealed partial class ValidateCommandHandler
         return ResolveCombinedValidationExitCode(enrichedOutcomesByMode, allPassed);
     }
 
+    // See the identical comment in AttachExternalEvidence: id validation runs unconditionally
+    // (including for a PreflightBlocked outcome), and only the SARIF read/attach step is skipped
+    // when preflight is blocked.
     private IReadOnlyList<(string Mode, ValidationOutcome Outcome)> AttachExternalEvidenceToAll(
         ValidateCommandOptions options, IReadOnlyList<(string Mode, ValidationOutcome Outcome)> outcomesByMode)
     {
-        if (outcomesByMode.Count == 0 || outcomesByMode[0].Outcome.PreflightBlocked)
+        if (outcomesByMode.Count == 0)
         {
             return outcomesByMode;
         }
 
         ValidationOutcome first = outcomesByMode[0].Outcome;
+        ArchitectureExternalEvidenceBinder.ValidateBindingIds(
+            first.ExternalEvidenceRequirements, options.ExternalEvidenceArtifacts);
+
+        if (first.PreflightBlocked)
+        {
+            return outcomesByMode;
+        }
+
         ArchitectureExternalEvidenceBindingResult binding = ArchitectureExternalEvidenceBinder.Evaluate(
             first.ExternalEvidenceRequirements,
             first.RepositoryRoot,

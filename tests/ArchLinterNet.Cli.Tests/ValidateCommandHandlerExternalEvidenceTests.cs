@@ -69,6 +69,86 @@ public sealed partial class ValidateCommandHandlerReportModeTests
     }
 
     [Test]
+    public void ExternalEvidence_SameIdAsNativeContract_DoesNotCollideInMergedSarifOutput()
+    {
+        // Nothing in policy validation forbids external_evidence.id from matching an unrelated
+        // native contract's own id (only strict_external/audit_external conflicts are forbidden).
+        // ArchitectureSarifFormatter uses ContractId as ruleId for both native and imported findings,
+        // so a same-named native rule descriptor must never be silently kept while an imported result
+        // with the same raw id points at it — see #741 review.
+        const string sharedId = "static-analysis";
+        using TempRepository repo = new();
+        repo.AddSarif("evidence/current.sarif", Sarif(Result("SEC100", "error", "src/App/One.cs", "finding")));
+        string nativeSarif = JsonSerializer.Serialize(new
+        {
+            version = "2.1.0",
+            runs = new[]
+            {
+                new
+                {
+                    tool = new
+                    {
+                        driver = new
+                        {
+                            name = "arch-linter-net",
+                            rules = new[] { new { id = sharedId, shortDescription = new { text = "native contract" } } },
+                        },
+                    },
+                    results = new[]
+                    {
+                        new
+                        {
+                            ruleId = sharedId,
+                            level = "error",
+                            message = new { text = "native violation" },
+                            locations = Array.Empty<object>(),
+                        },
+                    },
+                },
+            },
+        });
+        FakeCliRuntime runtime = new()
+        {
+            ForcedOutcome = PassingOutcomeWithRequirements(repo.Root, Requirement(sharedId)),
+            ForcedSarif = nativeSarif,
+        };
+        FakeCliConsole console = new();
+        ValidateCommandHandler handler = new(runtime, console, new FakeFileSystem(exists: true));
+
+        handler.Execute(ExternalEvidenceOptions(
+            [Binding(sharedId, "evidence/current.sarif")],
+            new SarifEvidenceAssessmentContext("repo", "revision", "scope"),
+            format: "sarif"));
+
+        using JsonDocument sarif = JsonDocument.Parse(console.StdOut);
+        JsonElement run = sarif.RootElement.GetProperty("runs")[0];
+        JsonElement[] results = run.GetProperty("results").EnumerateArray().ToArray();
+        JsonElement[] rules = run.GetProperty("tool").GetProperty("driver").GetProperty("rules").EnumerateArray().ToArray();
+
+        Assert.Multiple(() =>
+        {
+            // Both results are present and each still points at its own distinct rule descriptor.
+            Assert.That(results, Has.Length.EqualTo(2));
+            Assert.That(results.Select(result => result.GetProperty("ruleId").GetString()),
+                Is.EquivalentTo([sharedId, "external-evidence:" + sharedId]));
+            Assert.That(rules.Select(rule => rule.GetProperty("id").GetString()),
+                Is.EquivalentTo([sharedId, "external-evidence:" + sharedId]));
+
+            // The native rule descriptor's own description was never overwritten by the imported merge.
+            JsonElement nativeRule = rules.Single(rule => rule.GetProperty("id").GetString() == sharedId);
+            Assert.That(nativeRule.GetProperty("shortDescription").GetProperty("text").GetString(),
+                Is.EqualTo("native contract"));
+
+            // The imported result is still identifiable as an imported diagnostic through its own
+            // namespaced rule id, not the native one.
+            JsonElement importedResult = results.Single(result =>
+                result.GetProperty("ruleId").GetString() == "external-evidence:" + sharedId);
+            Assert.That(importedResult.GetProperty("properties").GetProperty("arch_linter_net")
+                .GetProperty("kind").GetString(), Is.EqualTo("imported_external_diagnostic"));
+        });
+    }
+
+    [Test]
     public void ExternalEvidence_RequiredArtifactWithZeroFindings_PassesWithNoFindings()
     {
         using TempRepository repo = new();
@@ -200,6 +280,90 @@ public sealed partial class ValidateCommandHandlerReportModeTests
 
         Assert.That(exitCode, Is.EqualTo(CliExitCodes.InvalidArgumentsOrRuntimeError));
         Assert.That(console.StdErr, Does.Contain("does not match a declared"));
+    }
+
+    [Test]
+    public void ExternalEvidence_UnknownBindingId_IsRejectedEvenWhenPreflightBlocked()
+    {
+        // ExternalEvidenceRequirements is populated on a PreflightBlocked outcome too (see
+        // ArchitectureAnalysisSnapshot.BuildBlockedOutcome), so a mistyped --external-evidence id
+        // must still be rejected as invalid invocation rather than silently dropped just because the
+        // SARIF read/attach step itself is skipped for a blocked run — see #741 review.
+        using TempRepository repo = new();
+        ValidationOutcome blockedOutcome = PassingOutcomeWithRequirements(repo.Root, Requirement("external.scan"))
+            with
+        {
+            PreflightBlocked = true,
+        };
+        FakeCliRuntime runtime = new() { ForcedOutcome = blockedOutcome };
+        FakeCliConsole console = new();
+        ValidateCommandHandler handler = new(runtime, console, new FakeFileSystem(exists: true));
+
+        int exitCode = handler.Execute(ExternalEvidenceOptions(
+            [Binding("external.unknown", "evidence/current.sarif")],
+            new SarifEvidenceAssessmentContext("repo", "revision", "scope"),
+            format: "human"));
+
+        Assert.That(exitCode, Is.EqualTo(CliExitCodes.InvalidArgumentsOrRuntimeError));
+        Assert.That(console.StdErr, Does.Contain("does not match a declared"));
+    }
+
+    [Test]
+    public void ExternalEvidence_ReportDestinationCollidesWithArtifactPath_IsRejected()
+    {
+        // A --report file sink must never be allowed to overwrite the SARIF this invocation just
+        // trust-read as external evidence — see #741 review.
+        using TempRepository repo = new();
+        repo.AddSarif("evidence/current.sarif", Sarif(Result("SEC100", "error", "src/App/One.cs", "finding")));
+        FakeCliRuntime runtime = new()
+        {
+            ForcedOutcome = PassingOutcomeWithRequirements(repo.Root, Requirement("external.scan")),
+        };
+        FakeCliConsole console = new();
+        ValidateCommandHandler handler = new(runtime, console, new FakeFileSystem(exists: true));
+        string evidenceFullPath = Path.Combine(repo.Root, "evidence", "current.sarif");
+
+        ValidateCommandOptions options = ExternalEvidenceOptions(
+            [Binding("external.scan", "evidence/current.sarif")],
+            new SarifEvidenceAssessmentContext("repo", "revision", "scope"),
+            format: "human") with
+        {
+            AdditionalSinks = [new ReportSink("json", ReportDestinationType.File, evidenceFullPath)],
+        };
+
+        int exitCode = handler.Execute(options);
+
+        Assert.That(exitCode, Is.EqualTo(CliExitCodes.InvalidArgumentsOrRuntimeError));
+        Assert.That(console.StdErr, Does.Contain("matches an --external-evidence artifact path"));
+    }
+
+    [Test]
+    public void ExternalEvidence_ProfileDestinationCollidesWithArtifactPath_IsRejected()
+    {
+        // A --profile destination must never be allowed to overwrite the SARIF this invocation just
+        // trust-read as external evidence — see #741 review.
+        using TempRepository repo = new();
+        repo.AddSarif("evidence/current.sarif", Sarif(Result("SEC100", "error", "src/App/One.cs", "finding")));
+        FakeCliRuntime runtime = new()
+        {
+            ForcedOutcome = PassingOutcomeWithRequirements(repo.Root, Requirement("external.scan")),
+        };
+        FakeCliConsole console = new();
+        ValidateCommandHandler handler = new(runtime, console, new FakeFileSystem(exists: true));
+        string evidenceFullPath = Path.Combine(repo.Root, "evidence", "current.sarif");
+
+        ValidateCommandOptions options = ExternalEvidenceOptions(
+            [Binding("external.scan", "evidence/current.sarif")],
+            new SarifEvidenceAssessmentContext("repo", "revision", "scope"),
+            format: "human") with
+        {
+            ProfileDestination = evidenceFullPath,
+        };
+
+        int exitCode = handler.Execute(options);
+
+        Assert.That(exitCode, Is.EqualTo(CliExitCodes.InvalidArgumentsOrRuntimeError));
+        Assert.That(console.StdErr, Does.Contain("matches an --external-evidence artifact path"));
     }
 
     [Test]

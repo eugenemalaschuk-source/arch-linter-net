@@ -11,6 +11,15 @@ internal sealed partial class ReportCoordinator
 {
     private const string PropertiesPropertyName = "properties";
 
+    // ArchitectureSarifFormatter uses ContractId as ruleId — for an imported diagnostic that is the
+    // raw external_evidence logical id, which shares its namespace with native contract ids (policy
+    // validation forbids external_evidence conflicting with strict_external/audit_external, but does
+    // not forbid it from matching an unrelated native contract's own id — see #741 review). Every
+    // imported rule/result is namespaced with this stable prefix before merging so a same-named
+    // native rule descriptor can never be misattributed to an imported result, or vice versa,
+    // regardless of what any one policy happens to declare.
+    private const string ImportedRuleIdPrefix = "external-evidence:";
+
     private string FormatHumanContent(
         bool isSingleMode,
         IReadOnlyList<(string Mode, ValidationOutcome Outcome)> outcomesByMode,
@@ -548,8 +557,30 @@ internal sealed partial class ReportCoordinator
         JsonArray importedRules = ((importedRun["tool"] as JsonObject)?["driver"] as JsonObject)?["rules"]
             as JsonArray ?? new JsonArray();
 
+        NamespaceImportedRuleIds(importedResults, importedRules);
         MergeImportedDiagnosticsIntoRun((JsonObject)runs[0]!, importedResults, importedRules);
         return payload.ToJsonString();
+    }
+
+    private static void NamespaceImportedRuleIds(JsonArray results, JsonArray rules)
+    {
+        foreach (JsonObject ruleObject in rules.OfType<JsonObject>())
+        {
+            string? id = ruleObject["id"]?.GetValue<string>();
+            if (id is not null)
+            {
+                ruleObject["id"] = ImportedRuleIdPrefix + id;
+            }
+        }
+
+        foreach (JsonObject resultObject in results.OfType<JsonObject>())
+        {
+            string? ruleId = resultObject["ruleId"]?.GetValue<string>();
+            if (ruleId is not null)
+            {
+                resultObject["ruleId"] = ImportedRuleIdPrefix + ruleId;
+            }
+        }
     }
 
     private static void MergeImportedDiagnosticsIntoRun(

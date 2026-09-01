@@ -203,6 +203,51 @@ public sealed class ArchitectureExternalEvidenceBinderTests
     }
 
     [Test]
+    public void ValidateBindingIds_UnknownSuppliedId_Throws_WithoutTouchingDisk()
+    {
+        ArchitectureExternalEvidenceRequirement requirement = Requirement("external.scan");
+
+        // No SARIF file exists at this path anywhere — proves the failure comes from pure id
+        // matching, never from an attempted read.
+        Assert.That(() => ArchitectureExternalEvidenceBinder.ValidateBindingIds(
+                [requirement],
+                [new SarifEvidenceArtifactReference("evidence/does-not-exist.sarif", "external.unknown")]),
+            Throws.ArgumentException);
+    }
+
+    [Test]
+    public void ValidateBindingIds_DuplicateSuppliedId_Throws()
+    {
+        ArchitectureExternalEvidenceRequirement requirement = Requirement("external.scan");
+
+        Assert.That(() => ArchitectureExternalEvidenceBinder.ValidateBindingIds(
+                [requirement],
+                [
+                    new SarifEvidenceArtifactReference("evidence/first.sarif", "external.scan"),
+                    new SarifEvidenceArtifactReference("evidence/second.sarif", "external.scan"),
+                ]),
+            Throws.ArgumentException);
+    }
+
+    [Test]
+    public void ValidateBindingIds_KnownAndDistinctIds_DoesNotThrow()
+    {
+        ArchitectureExternalEvidenceRequirement[] requirements =
+        [
+            Requirement("external.first"),
+            Requirement("external.second"),
+        ];
+
+        Assert.That(() => ArchitectureExternalEvidenceBinder.ValidateBindingIds(
+                requirements,
+                [
+                    new SarifEvidenceArtifactReference("evidence/first.sarif", "external.first"),
+                    new SarifEvidenceArtifactReference("evidence/second.sarif", "external.second"),
+                ]),
+            Throws.Nothing);
+    }
+
+    [Test]
     public void Attach_EmptyBinding_ReturnsOutcomeUnchanged()
     {
         ValidationOutcome outcome = PassingOutcome();
