@@ -146,7 +146,7 @@ public sealed partial class ValidateCommandHandlerReportModeTests
         // ArchitectureSarifFormatter uses ContractId as ruleId for both native and imported findings,
         // so a same-named native rule descriptor must never be silently kept while an imported result
         // with the same raw id points at it — see #741 review.
-        const string sharedId = "static-analysis";
+        const string SharedId = "static-analysis";
         using TempRepository repo = new();
         repo.AddSarif("evidence/current.sarif", Sarif(Result("SEC100", "error", "src/App/One.cs", "finding")));
         string nativeSarif = JsonSerializer.Serialize(new
@@ -161,14 +161,14 @@ public sealed partial class ValidateCommandHandlerReportModeTests
                         driver = new
                         {
                             name = "arch-linter-net",
-                            rules = new[] { new { id = sharedId, shortDescription = new { text = "native contract" } } },
+                            rules = new[] { new { id = SharedId, shortDescription = new { text = "native contract" } } },
                         },
                     },
                     results = new[]
                     {
                         new
                         {
-                            ruleId = sharedId,
+                            ruleId = SharedId,
                             level = "error",
                             message = new { text = "native violation" },
                             locations = Array.Empty<object>(),
@@ -179,14 +179,14 @@ public sealed partial class ValidateCommandHandlerReportModeTests
         });
         FakeCliRuntime runtime = new()
         {
-            ForcedOutcome = PassingOutcomeWithRequirements(repo.Root, Requirement(sharedId)),
+            ForcedOutcome = PassingOutcomeWithRequirements(repo.Root, Requirement(SharedId)),
             ForcedSarif = nativeSarif,
         };
         FakeCliConsole console = new();
         ValidateCommandHandler handler = new(runtime, console, new FakeFileSystem(exists: true));
 
         handler.Execute(ExternalEvidenceOptions(
-            [Binding(sharedId, "evidence/current.sarif")],
+            [Binding(SharedId, "evidence/current.sarif")],
             new SarifEvidenceAssessmentContext("repo", "revision", "scope"),
             format: "sarif"));
 
@@ -200,19 +200,19 @@ public sealed partial class ValidateCommandHandlerReportModeTests
             // Both results are present and each still points at its own distinct rule descriptor.
             Assert.That(results, Has.Length.EqualTo(2));
             Assert.That(results.Select(result => result.GetProperty("ruleId").GetString()),
-                Is.EquivalentTo([sharedId, "external-evidence:" + sharedId]));
+                Is.EquivalentTo([SharedId, "external-evidence:" + SharedId]));
             Assert.That(rules.Select(rule => rule.GetProperty("id").GetString()),
-                Is.EquivalentTo([sharedId, "external-evidence:" + sharedId]));
+                Is.EquivalentTo([SharedId, "external-evidence:" + SharedId]));
 
             // The native rule descriptor's own description was never overwritten by the imported merge.
-            JsonElement nativeRule = rules.Single(rule => rule.GetProperty("id").GetString() == sharedId);
+            JsonElement nativeRule = rules.Single(rule => rule.GetProperty("id").GetString() == SharedId);
             Assert.That(nativeRule.GetProperty("shortDescription").GetProperty("text").GetString(),
                 Is.EqualTo("native contract"));
 
             // The imported result is still identifiable as an imported diagnostic through its own
             // namespaced rule id, not the native one.
             JsonElement importedResult = results.Single(result =>
-                result.GetProperty("ruleId").GetString() == "external-evidence:" + sharedId);
+                result.GetProperty("ruleId").GetString() == "external-evidence:" + SharedId);
             Assert.That(importedResult.GetProperty("properties").GetProperty("arch_linter_net")
                 .GetProperty("kind").GetString(), Is.EqualTo("imported_external_diagnostic"));
         });
