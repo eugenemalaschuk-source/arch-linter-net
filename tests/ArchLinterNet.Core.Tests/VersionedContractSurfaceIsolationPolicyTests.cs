@@ -1,6 +1,7 @@
 using System.Text.Json;
 using ArchLinterNet.Core.Contracts;
 using ArchLinterNet.Core.Contracts.Families;
+using ArchLinterNet.Core.Model;
 using ArchLinterNet.Core.Resolution;
 using NUnit.Framework;
 
@@ -156,11 +157,65 @@ public sealed class VersionedContractSurfaceIsolationPolicyTests
         Assert.That(error.Message, Does.Contain(expected));
     }
 
+    [Test]
+    public void Load_UnknownLayerInImportedVersionedSurface_PreservesFragmentProvenance()
+    {
+        string root = Write("root.yml", """
+            version: 1
+            name: Root policy
+            imports: [fragment.yml]
+            layers:
+              known:
+                namespace: Product.Known
+            analysis:
+              target_assemblies: []
+            contracts: {}
+            """);
+        Write("fragment.yml", """
+            contracts:
+              strict_versioned_contract_surface_isolation:
+                - id: imported-isolation
+                  name: Imported isolation
+                  surfaces:
+                    - id: v1
+                      types_matching:
+                        layer: unknown-layer
+                    - id: v2
+                      types_matching:
+                        namespace: Product.Api.V2
+                  source_surface: v1
+                  forbidden_surfaces: [v2]
+            """);
+
+        ArchitecturePolicyValidationException exception = Assert.Throws<ArchitecturePolicyValidationException>(
+            () => new ArchitecturePolicyDocumentLoader().Load(root))!;
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(exception.Message, Does.Contain("unknown layer 'unknown-layer'"));
+            Assert.That(exception.Diagnostic.Location, Is.Not.Null);
+            Assert.That(exception.Diagnostic.Location!.Role, Is.EqualTo(ArchitecturePolicyDocumentRole.Fragment));
+            Assert.That(exception.Diagnostic.Location.SourcePath, Is.EqualTo("fragment.yml"));
+            Assert.That(exception.Diagnostic.ImportChain, Is.EqualTo(["root.yml", "fragment.yml"]));
+        });
+    }
+
     private ArchitectureContractDocument Load(string yaml) => new ArchitecturePolicyDocumentLoader().Load(Write(yaml));
 
     private string Write(string yaml)
     {
-        string path = Path.Combine(_directory, "policy.arch.yml");
+        return Write("policy.arch.yml", yaml);
+    }
+
+    private string Write(string relativePath, string yaml)
+    {
+        string path = Path.Combine(_directory, relativePath);
+        string? directory = Path.GetDirectoryName(path);
+        if (!string.IsNullOrEmpty(directory))
+        {
+            Directory.CreateDirectory(directory);
+        }
+
         File.WriteAllText(path, yaml);
         return path;
     }
@@ -185,12 +240,12 @@ public sealed class VersionedContractSurfaceIsolationSchemaTests
                 .GetProperty("$ref").GetString(), Is.EqualTo("#/$defs/versionedContractSurfaceIsolationContract"));
             Assert.That(contracts.GetProperty("audit_versioned_contract_surface_isolation").GetProperty("items")
                 .GetProperty("$ref").GetString(), Is.EqualTo("#/$defs/versionedContractSurfaceIsolationContract"));
-            Assert.That(contract.GetProperty("unevaluatedProperties").GetBoolean(), Is.False);
+            Assert.That(contract.GetProperty("additionalProperties").GetBoolean(), Is.False);
             Assert.That(surface.GetProperty("additionalProperties").GetBoolean(), Is.False);
             Assert.That(surface.GetProperty("required").EnumerateArray().Select(v => v.GetString()),
                 Is.EquivalentTo(["id", "types_matching"]));
-            Assert.That(contract.GetProperty("allOf")[1].GetProperty("required").EnumerateArray().Select(v => v.GetString()),
-                Is.EquivalentTo(["id", "name", "surfaces", "source_surface", "forbidden_surfaces"]));
+            Assert.That(contract.GetProperty("required").EnumerateArray().Select(v => v.GetString()),
+                Is.EquivalentTo(["name", "surfaces", "source_surface", "forbidden_surfaces"]));
         });
     }
 }

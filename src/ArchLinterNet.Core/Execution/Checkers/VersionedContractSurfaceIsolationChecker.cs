@@ -50,7 +50,19 @@ internal static class VersionedContractSurfaceIsolationChecker
             reasons.Add(Reason(ArchitectureApplicabilityReasonCodes.UnexpectedEmptyInput, provenance));
         }
 
-        Type[] roots = ResolveExportedRoots(context, sourceMatches);
+        ExportedRootResolution exportedRoots = ContractSurfaceExposureChecker.ResolveExportedRoots(
+            context,
+            context.AnalysisContext.TargetAssemblies);
+        if (!exportedRoots.IsComplete)
+        {
+            reasons.Add(Reason(ArchitectureApplicabilityReasonCodes.MissingRequiredInput, provenance));
+        }
+
+        HashSet<Type> matchedSourceTypes = new(sourceMatches);
+        Type[] roots = exportedRoots.Roots
+            .Where(matchedSourceTypes.Contains)
+            .OrderBy(TypeIdentity, StringComparer.Ordinal)
+            .ToArray();
         if (roots.Length == 0)
         {
             reasons.Add(Reason(ArchitectureApplicabilityReasonCodes.UnexpectedEmptyInput, provenance));
@@ -100,19 +112,6 @@ internal static class VersionedContractSurfaceIsolationChecker
                 reasons.Distinct().ToArray(),
                 provenance);
         return new ContractSurfaceExposureEvaluationResult(violations, expected, record);
-    }
-
-    private static Type[] ResolveExportedRoots(ArchitectureCheckerContext context, IReadOnlyCollection<Type> sourceMatches)
-    {
-        HashSet<Type> matched = new(sourceMatches);
-        return context.AnalysisContext.TargetAssemblies
-            .Distinct()
-            .OrderBy(AssemblyIdentity, StringComparer.Ordinal)
-            .SelectMany(assembly => context.GetPublicApiSurface(assembly).ExportedTypes)
-            .Where(matched.Contains)
-            .Distinct()
-            .OrderBy(TypeIdentity, StringComparer.Ordinal)
-            .ToArray();
     }
 
     private static Dictionary<ArchitectureContractExposureTarget, int[]> MatchForbiddenSurfaces(

@@ -1,4 +1,5 @@
 using System.Reflection;
+using System.Reflection.Emit;
 using ArchLinterNet.Core.Contracts;
 using ArchLinterNet.Core.Contracts.Families;
 using ArchLinterNet.Core.Execution;
@@ -106,6 +107,125 @@ namespace ArchLinterNet.Core.Tests
             });
         }
 
+        [Test]
+        public void Execute_IncompleteExportedRootMaterializationIsUnassessable()
+        {
+            using UnloadableFieldFixture fixture = UnloadableFieldFixture.Create(
+                includeUnloadableField: false,
+                configureConsumerModule: static (module, dependencyType) =>
+                {
+                    TypeBuilder healthySource = module.DefineType(
+                        "HealthySource",
+                        TypeAttributes.Public | TypeAttributes.Sealed);
+                    healthySource.DefineDefaultConstructor(MethodAttributes.Public);
+                    healthySource.CreateType();
+
+                    // Resolving this unavailable custom attribute while materializing exported
+                    // API details leaves the type universe intact but marks the public surface
+                    // incomplete. This isolates the root-materialization condition from the
+                    // checker's separate partial-type-universe guard.
+                    TypeBuilder incompleteDetails = module.DefineType(
+                        "PublicValueTypeWithUnavailableAttribute",
+                        TypeAttributes.Public | TypeAttributes.Sealed | TypeAttributes.SequentialLayout,
+                        typeof(ValueType));
+                    ConstructorInfo dependencyConstructor = dependencyType.GetConstructor(Type.EmptyTypes)!;
+                    incompleteDetails.SetCustomAttribute(new CustomAttributeBuilder(dependencyConstructor, []));
+                    incompleteDetails.CreateType();
+                });
+            Assembly assembly = fixture.SourceType.Assembly;
+            var contract = new ArchitectureVersionedContractSurfaceIsolationContract
+            {
+                Id = "incomplete-exported-roots",
+                Name = "incomplete-exported-roots",
+                Surfaces =
+                [
+                    new ArchitectureVersionedContractSurfaceIsolationSurface
+                    {
+                        Id = "healthy-source",
+                        TypesMatching = new ArchitecturePublicApiSurfaceSelector { NamePrefix = "HealthySource" },
+                    },
+                    new ArchitectureVersionedContractSurfaceIsolationSurface
+                    {
+                        Id = "healthy-target",
+                        TypesMatching = new ArchitecturePublicApiSurfaceSelector { NamePrefix = "HealthySource" },
+                    },
+                ],
+                SourceSurface = "healthy-source",
+                ForbiddenSurfaces = ["healthy-target"],
+            };
+            var runner = new ArchitectureContractRunner(
+                new ArchitectureAnalysisContext("/tmp", [assembly], Array.Empty<string>(), Array.Empty<string>()),
+                CreateDocument(contract, audit: false, assembly));
+
+            ArchitectureContractExecutionResult result = new ArchitectureContractExecutor().Execute(
+                runner.Session,
+                "strict",
+                new ArchitectureContractHandlerRegistry());
+            ArchitectureApplicabilityRecord record = result.ApplicabilityRecords.Single(item => item.ControlIdentity == contract.Id);
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(runner.Session.TypeIndex.HasCompleteTypeUniverse, Is.True);
+                Assert.That(runner.Session.GetPublicApiSurface(assembly).IsComplete, Is.False);
+                Assert.That(record.State, Is.EqualTo(ArchitectureApplicabilityRecordState.Unassessable));
+                Assert.That(record.Reasons.Select(reason => reason.Code),
+                    Has.Some.EqualTo(ArchitectureApplicabilityReasonCodes.MissingRequiredInput));
+            });
+        }
+
+        [Test]
+        public void Execute_SameQualifiedForbiddenTypesFromDifferentAssembliesRemainDistinct()
+        {
+            Type firstForbidden = CreatePublicDynamicType("VersionedIsolationFirst", "Collision.Forbidden");
+            Type secondForbidden = CreatePublicDynamicType("VersionedIsolationSecond", "Collision.Forbidden");
+            Type source = CreateSourceWithForbiddenProperties(firstForbidden, secondForbidden);
+            var contract = new ArchitectureVersionedContractSurfaceIsolationContract
+            {
+                Id = "cross-assembly-collision",
+                Name = "cross-assembly-collision",
+                Surfaces =
+                [
+                    new ArchitectureVersionedContractSurfaceIsolationSurface
+                    {
+                        Id = "source",
+                        TypesMatching = new ArchitecturePublicApiSurfaceSelector { NamePrefix = "SourceContract" },
+                    },
+                    new ArchitectureVersionedContractSurfaceIsolationSurface
+                    {
+                        Id = "forbidden",
+                        TypesMatching = new ArchitecturePublicApiSurfaceSelector { NamePrefix = "Forbidden" },
+                    },
+                ],
+                SourceSurface = "source",
+                ForbiddenSurfaces = ["forbidden"],
+            };
+            Assembly[] assemblies = [source.Assembly, firstForbidden.Assembly, secondForbidden.Assembly];
+            var runner = new ArchitectureContractRunner(
+                new ArchitectureAnalysisContext("/tmp", assemblies, Array.Empty<string>(), Array.Empty<string>()),
+                CreateDocument(contract, audit: false, assemblies));
+
+            ArchitectureContractExecutionResult result = new ArchitectureContractExecutor().Execute(
+                runner.Session,
+                "strict",
+                new ArchitectureContractHandlerRegistry());
+            ContractSurfaceExposurePayload[] payloads = result.Violations
+                .Where(violation => violation.ContractId == contract.Id)
+                .Select(AssertPayload)
+                .ToArray();
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(payloads, Has.Length.EqualTo(4));
+                Assert.That(payloads.Select(payload => payload.TargetTypeName), Is.All.EqualTo("Collision.Forbidden"));
+                Assert.That(payloads.Select(payload => payload.TargetAssemblyName).Distinct(), Is.EquivalentTo(
+                    [firstForbidden.Assembly.FullName!, secondForbidden.Assembly.FullName!]));
+                Assert.That(payloads.Select(payload => payload.ExposurePath),
+                    Has.Some.Contains("Property:First"));
+                Assert.That(payloads.Select(payload => payload.ExposurePath),
+                    Has.Some.Contains("Property:Second"));
+            });
+        }
+
         private static ArchitectureContractExecutionResult Execute(ArchitectureVersionedContractSurfaceIsolationContract contract)
         {
             Assembly assembly = typeof(V1.Contract).Assembly;
@@ -121,14 +241,18 @@ namespace ArchLinterNet.Core.Tests
 
         private static ArchitectureContractDocument CreateDocument(
             ArchitectureVersionedContractSurfaceIsolationContract contract,
-            bool audit)
+            bool audit,
+            params Assembly[] targetAssemblies)
         {
-            string assemblyName = typeof(V1.Contract).Assembly.GetName().Name!;
+            Assembly[] assemblies = targetAssemblies.Length == 0 ? [typeof(V1.Contract).Assembly] : targetAssemblies;
             return new ArchitectureContractDocument
             {
                 Version = 1,
                 Name = "versioned-contract-surface-isolation",
-                Analysis = new ArchitectureAnalysisConfiguration { TargetAssemblies = [assemblyName] },
+                Analysis = new ArchitectureAnalysisConfiguration
+                {
+                    TargetAssemblies = assemblies.Select(assembly => assembly.GetName().Name!).ToList(),
+                },
                 Contracts = new ArchitectureContractGroups
                 {
                     StrictVersionedContractSurfaceIsolation = audit ? [] : [contract],
@@ -163,6 +287,46 @@ namespace ArchLinterNet.Core.Tests
                 SourceSurface = "v1-contracts",
                 ForbiddenSurfaces = ["v2-contracts", "transport-implementation"],
             };
+
+        private static Type CreatePublicDynamicType(string assemblyPrefix, string typeName)
+        {
+            AssemblyBuilder assembly = AssemblyBuilder.DefineDynamicAssembly(
+                new AssemblyName($"{assemblyPrefix}_{Guid.NewGuid():N}"),
+                AssemblyBuilderAccess.Run);
+            ModuleBuilder module = assembly.DefineDynamicModule("Main");
+            TypeBuilder type = module.DefineType(typeName, TypeAttributes.Public | TypeAttributes.Sealed);
+            type.DefineDefaultConstructor(MethodAttributes.Public);
+            return type.CreateType()!;
+        }
+
+        private static Type CreateSourceWithForbiddenProperties(Type firstForbidden, Type secondForbidden)
+        {
+            AssemblyBuilder assembly = AssemblyBuilder.DefineDynamicAssembly(
+                new AssemblyName($"VersionedIsolationSource_{Guid.NewGuid():N}"),
+                AssemblyBuilderAccess.Run);
+            ModuleBuilder module = assembly.DefineDynamicModule("Main");
+            TypeBuilder source = module.DefineType(
+                "Collision.SourceContract",
+                TypeAttributes.Public | TypeAttributes.Abstract | TypeAttributes.Sealed);
+            DefineStaticProperty(source, "First", firstForbidden);
+            DefineStaticProperty(source, "Second", secondForbidden);
+            return source.CreateType()!;
+        }
+
+        private static void DefineStaticProperty(TypeBuilder source, string propertyName, Type propertyType)
+        {
+            MethodBuilder getter = source.DefineMethod(
+                $"get_{propertyName}",
+                MethodAttributes.Public | MethodAttributes.Static | MethodAttributes.SpecialName | MethodAttributes.HideBySig,
+                propertyType,
+                Type.EmptyTypes);
+            ILGenerator body = getter.GetILGenerator();
+            body.Emit(OpCodes.Ldnull);
+            body.Emit(OpCodes.Ret);
+
+            PropertyBuilder property = source.DefineProperty(propertyName, PropertyAttributes.None, propertyType, Type.EmptyTypes);
+            property.SetGetMethod(getter);
+        }
 
         private static ContractSurfaceExposurePayload AssertPayload(ArchitectureViolation violation)
         {

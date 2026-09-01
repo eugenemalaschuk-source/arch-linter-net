@@ -6,8 +6,9 @@ internal sealed class VersionedContractSurfaceIsolationValidator : IArchitecture
 {
     public void Validate(ArchitectureContractDocument document)
     {
-        foreach (ArchitectureVersionedContractSurfaceIsolationContract contract in document.Contracts.StrictVersionedContractSurfaceIsolation
-            .Concat(document.Contracts.AuditVersionedContractSurfaceIsolation))
+        foreach (ArchitectureVersionedContractSurfaceIsolationContract contract in document.Provenance.Track(
+                     document.Contracts.StrictVersionedContractSurfaceIsolation.Concat(
+                         document.Contracts.AuditVersionedContractSurfaceIsolation)))
         {
             if (string.IsNullOrWhiteSpace(contract.Id) || string.IsNullOrWhiteSpace(contract.Name))
                 throw new InvalidOperationException($"Versioned contract-surface isolation contract '{contract.Name}' must declare non-blank 'id' and 'name'.");

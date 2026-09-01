@@ -159,6 +159,29 @@ internal static class ContractSurfaceExposureChecker
         return violations;
     }
 
+    // Both exposure families root their work in the session-cached exported public surface. Keep
+    // materialization completeness with those roots so a partial reflection result cannot become a
+    // trusted empty exposure set in one family while the other fails closed.
+    internal static ExportedRootResolution ResolveExportedRoots(
+        ArchitectureCheckerContext context,
+        IEnumerable<Assembly> assemblies)
+    {
+        var roots = new List<Type>();
+        bool isComplete = true;
+        foreach (Assembly assembly in assemblies
+                     .Distinct()
+                     .OrderBy(AssemblyIdentity, StringComparer.Ordinal))
+        {
+            ArchitecturePublicApiSurfaceMaterialization surface = context.GetPublicApiSurface(assembly);
+            isComplete &= surface.IsComplete;
+            roots.AddRange(surface.ExportedTypes);
+        }
+
+        return new ExportedRootResolution(
+            roots.Distinct().OrderBy(TypeIdentity, StringComparer.Ordinal).ToArray(),
+            isComplete);
+    }
+
     private static Dictionary<ArchitectureContractExposureTarget, int[]> MatchForbiddenTargets(
         ArchitectureCheckerContext context,
         ArchitectureContractSurfaceExposureContract contract,
@@ -283,30 +306,17 @@ internal static class ContractSurfaceExposureChecker
                 !resolved.HasContract);
         }
 
-        var candidates = new List<Type>();
-        bool isComplete = true;
-        foreach (Assembly assembly in context.AnalysisContext.TargetAssemblies
-                     .Distinct()
-                     .OrderBy(AssemblyIdentity, StringComparer.Ordinal))
-        {
-            string assemblyName = assembly.GetName().Name ?? string.Empty;
-            if (assemblyFilter is not null && !assemblyFilter.Contains(assemblyName))
+        ExportedRootResolution exported = ResolveExportedRoots(
+            context,
+            context.AnalysisContext.TargetAssemblies.Where(assembly =>
             {
-                continue;
-            }
+                string assemblyName = assembly.GetName().Name ?? string.Empty;
+                return (assemblyFilter is null || assemblyFilter.Contains(assemblyName))
+                    && (projectAssemblies is null || projectAssemblies.Contains(assemblyName));
+            }));
 
-            if (projectAssemblies is not null && !projectAssemblies.Contains(assemblyName))
-            {
-                continue;
-            }
-
-            ArchitecturePublicApiSurfaceMaterialization surface = context.GetPublicApiSurface(assembly);
-            isComplete &= surface.IsComplete;
-            candidates.AddRange(surface.ExportedTypes);
-        }
-
-        bool stale = assemblyFilter is not null && candidates.Count == 0;
-        return new RootCandidateResolution(candidates, isComplete, stale);
+        bool stale = assemblyFilter is not null && exported.Roots.Count == 0;
+        return new RootCandidateResolution(exported.Roots.ToList(), exported.IsComplete, stale);
     }
 
     private static List<Type> FilterCandidates(
@@ -377,6 +387,10 @@ internal static class ContractSurfaceExposureChecker
         bool IsComplete,
         bool Stale);
 }
+
+internal sealed record ExportedRootResolution(
+    IReadOnlyList<Type> Roots,
+    bool IsComplete);
 
 internal sealed record ContractSurfaceExposureEvaluationResult(
     IReadOnlyList<ArchitectureViolation> Violations,

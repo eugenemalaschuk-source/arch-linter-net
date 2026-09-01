@@ -1,7 +1,9 @@
 # versioned-contract-surface-isolation Specification
 
 ## Purpose
-TBD - created by archiving change add-versioned-contract-surface-isolation. Update Purpose after archive.
+Define bounded, static controls that keep versioned public contract surfaces isolated from newer
+contract versions and implementation transport types.
+
 ## Requirements
 ### Requirement: Policies declare versioned contract-surface isolation controls
 The system SHALL support `strict_versioned_contract_surface_isolation` and
