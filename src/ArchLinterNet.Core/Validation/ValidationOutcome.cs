@@ -1,3 +1,4 @@
+using ArchLinterNet.Core.Contracts;
 using ArchLinterNet.Core.Execution;
 using ArchLinterNet.Core.Model;
 using ArchLinterNet.Core.Reporting;
@@ -214,6 +215,14 @@ public sealed record ValidationOutcome
 
     /// <summary>Trusted imported-diagnostic findings in the normalized finding envelope.</summary>
     public IReadOnlyList<ArchitectureFinding> ImportedDiagnosticFindings => ImportedDiagnostics.Findings;
+
+    // Portable run metadata — same category as SourceExpansion above — echoing which
+    // external_evidence requirements the loaded policy declared, so a caller (the CLI) can bind
+    // artifacts to them without re-parsing the policy document. Populated on both a freshly
+    // evaluated outcome and a cache-hit reconstruction (see AnalysisCacheOutcomeMapper). Never
+    // itself part of the cached AnalysisCacheOutcomeV1 analysis result.
+    public IReadOnlyList<ArchitectureExternalEvidenceRequirement> ExternalEvidenceRequirements { get; init; } =
+        Array.Empty<ArchitectureExternalEvidenceRequirement>();
 
     /// <summary>
     /// Attaches Core-projected imported diagnostics and derives the effective pass state from their

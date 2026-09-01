@@ -1,5 +1,6 @@
 using System.CommandLine;
 using System.CommandLine.Parsing;
+using ArchLinterNet.Core.Model;
 
 namespace ArchLinterNet.Cli.Commands.Validate.Application;
 
@@ -48,6 +49,23 @@ internal sealed class ValidateCommandDefinition(ValidateCommandHandler handler)
               --waiver-evaluation-date <yyyy-MM-dd>
                                 Evaluate waiver expiry against this UTC calendar date;
                                 useful for reproducible CI boundary checks.
+              --external-evidence <binding>
+                                Bind a declared external_evidence requirement to a
+                                repository-local SARIF artifact. Repeatable, one binding
+                                per occurrence: id=<id>,path=<path>[,repository=<value>]
+                                [,revision=<value>][,scope=<value>]. The repository/
+                                revision/scope fields are the producer/CI context for
+                                that one artifact; see --evidence-repository etc. for
+                                the current assessment context.
+              --evidence-repository <value>
+                                Current repository identity for external_evidence
+                                context binding.
+              --evidence-revision <value>
+                                Current source revision for external_evidence context
+                                binding.
+              --evidence-scope <value>
+                                Current assessment scope for external_evidence context
+                                binding.
               --ensure-built    Build the selected project graph once, verify it via an
                                 ArchLinterNet build receipt, then validate (never implicit;
                                 opt-in only)
@@ -107,6 +125,10 @@ internal sealed class ValidateCommandDefinition(ValidateCommandHandler handler)
         Option<string> cacheOption = new("--cache");
         Option<int?> maxParallelismOption = new("--max-parallelism");
         Option<string> waiverEvaluationDateOption = new("--waiver-evaluation-date");
+        Option<string[]> externalEvidenceOption = new("--external-evidence") { AllowMultipleArgumentsPerToken = true };
+        Option<string> evidenceRepositoryOption = new("--evidence-repository");
+        Option<string> evidenceRevisionOption = new("--evidence-revision");
+        Option<string> evidenceScopeOption = new("--evidence-scope");
         Option<bool> ensureBuiltOption = new("--ensure-built");
         Option<bool> noRestoreOption = new("--no-restore");
         Option<string> configurationOption = new("--configuration");
@@ -133,6 +155,10 @@ internal sealed class ValidateCommandDefinition(ValidateCommandHandler handler)
         command.Options.Add(cacheOption);
         command.Options.Add(maxParallelismOption);
         command.Options.Add(waiverEvaluationDateOption);
+        command.Options.Add(externalEvidenceOption);
+        command.Options.Add(evidenceRepositoryOption);
+        command.Options.Add(evidenceRevisionOption);
+        command.Options.Add(evidenceScopeOption);
         command.Options.Add(ensureBuiltOption);
         command.Options.Add(noRestoreOption);
         command.Options.Add(configurationOption);
@@ -154,6 +180,10 @@ internal sealed class ValidateCommandDefinition(ValidateCommandHandler handler)
             cacheOption,
             maxParallelismOption,
             waiverEvaluationDateOption,
+            externalEvidenceOption,
+            evidenceRepositoryOption,
+            evidenceRevisionOption,
+            evidenceScopeOption,
             ensureBuiltOption,
             noRestoreOption,
             configurationOption,
@@ -193,6 +223,10 @@ internal sealed class ValidateCommandDefinition(ValidateCommandHandler handler)
         Option<string> cacheOption,
         Option<int?> maxParallelismOption,
         Option<string> waiverEvaluationDateOption,
+        Option<string[]> externalEvidenceOption,
+        Option<string> evidenceRepositoryOption,
+        Option<string> evidenceRevisionOption,
+        Option<string> evidenceScopeOption,
         Option<bool> ensureBuiltOption,
         Option<bool> noRestoreOption,
         Option<string> configurationOption,
@@ -215,6 +249,23 @@ internal sealed class ValidateCommandDefinition(ValidateCommandHandler handler)
         {
             reportParseError = ex.Message;
         }
+
+        IReadOnlyList<SarifEvidenceArtifactReference> externalEvidenceArtifacts =
+            Array.Empty<SarifEvidenceArtifactReference>();
+        string? externalEvidenceParseError = null;
+        try
+        {
+            externalEvidenceArtifacts = ParseExternalEvidenceBindings(parseResult.GetValue(externalEvidenceOption));
+        }
+        catch (InvalidOperationException ex)
+        {
+            externalEvidenceParseError = ex.Message;
+        }
+
+        SarifEvidenceAssessmentContext? externalEvidenceAssessmentContext = ResolveExternalEvidenceAssessmentContext(
+            parseResult.GetValue(evidenceRepositoryOption),
+            parseResult.GetValue(evidenceRevisionOption),
+            parseResult.GetValue(evidenceScopeOption));
 
         return new ValidateCommandOptions(
             parseResult.GetValue(policyOption) ?? "architecture/dependencies.arch.yml",
@@ -240,7 +291,97 @@ internal sealed class ValidateCommandDefinition(ValidateCommandHandler handler)
             CacheDestination = parseResult.GetValue(cacheOption),
             MaxParallelism = parseResult.GetValue(maxParallelismOption),
             WaiverEvaluationDate = parseResult.GetValue(waiverEvaluationDateOption),
+            ExternalEvidenceArtifacts = externalEvidenceArtifacts,
+            ExternalEvidenceAssessmentContext = externalEvidenceAssessmentContext,
+            ExternalEvidenceParseError = externalEvidenceParseError,
         };
+    }
+
+    private static SarifEvidenceAssessmentContext? ResolveExternalEvidenceAssessmentContext(
+        string? repository, string? revision, string? scope)
+    {
+        return repository is null && revision is null && scope is null
+            ? null
+            : new SarifEvidenceAssessmentContext(repository, revision, scope);
+    }
+
+    // One occurrence = one binding: id=<id>,path=<path>[,repository=<v>][,revision=<v>][,scope=<v>].
+    // Mirrors ParseReportSinks' key=value structured-option shape. Bindings are matched to declared
+    // external_evidence requirements by id, not position, so multiple occurrences remain
+    // order-independent (see ArchitectureExternalEvidenceBinder).
+    private static IReadOnlyList<SarifEvidenceArtifactReference> ParseExternalEvidenceBindings(
+        string[]? rawValues)
+    {
+        if (rawValues is null || rawValues.Length == 0)
+        {
+            return Array.Empty<SarifEvidenceArtifactReference>();
+        }
+
+        List<SarifEvidenceArtifactReference> artifacts = new(rawValues.Length);
+        HashSet<string> seenIds = new(StringComparer.Ordinal);
+        foreach (string raw in rawValues)
+        {
+            Dictionary<string, string> fields = ParseExternalEvidenceFields(raw);
+            if (!fields.TryGetValue("id", out string? id) || string.IsNullOrWhiteSpace(id))
+            {
+                throw new InvalidOperationException(
+                    $"Invalid --external-evidence value: '{raw}'. Missing required 'id'.");
+            }
+
+            if (!fields.TryGetValue("path", out string? path) || string.IsNullOrWhiteSpace(path))
+            {
+                throw new InvalidOperationException(
+                    $"Invalid --external-evidence value: '{raw}'. Missing required 'path'.");
+            }
+
+            if (!seenIds.Add(id))
+            {
+                throw new InvalidOperationException(
+                    $"Duplicate --external-evidence binding for id '{id}'.");
+            }
+
+            fields.TryGetValue("repository", out string? repository);
+            fields.TryGetValue("revision", out string? revision);
+            fields.TryGetValue("scope", out string? scope);
+            SarifEvidenceProducerContext? producer = repository is null && revision is null && scope is null
+                ? null
+                : new SarifEvidenceProducerContext(repository, revision, scope);
+            artifacts.Add(new SarifEvidenceArtifactReference(path, id, producer));
+        }
+
+        return artifacts;
+    }
+
+    private static Dictionary<string, string> ParseExternalEvidenceFields(string raw)
+    {
+        Dictionary<string, string> fields = new(StringComparer.Ordinal);
+        foreach (string segment in raw.Split(','))
+        {
+            int eqIndex = segment.IndexOf('=');
+            if (eqIndex <= 0 || eqIndex >= segment.Length - 1)
+            {
+                throw new InvalidOperationException(
+                    $"Invalid --external-evidence value: '{raw}'. Use " +
+                    "id=<id>,path=<path>[,repository=<value>][,revision=<value>][,scope=<value>].");
+            }
+
+            string key = segment[..eqIndex];
+            string value = segment[(eqIndex + 1)..];
+            if (key is not ("id" or "path" or "repository" or "revision" or "scope"))
+            {
+                throw new InvalidOperationException(
+                    $"Invalid --external-evidence key '{key}' in '{raw}'. " +
+                    "Supported keys: id, path, repository, revision, scope.");
+            }
+
+            if (!fields.TryAdd(key, value))
+            {
+                throw new InvalidOperationException(
+                    $"Duplicate key '{key}' in --external-evidence value '{raw}'.");
+            }
+        }
+
+        return fields;
     }
 
     private static string ResolveMode(ParseResult parseResult)

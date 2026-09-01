@@ -1,3 +1,4 @@
+using ArchLinterNet.Core.Contracts;
 using ArchLinterNet.Core.Model;
 using ArchLinterNet.Core.Reporting;
 using ArchLinterNet.Core.Validation;
@@ -69,7 +70,12 @@ public static class AnalysisCacheOutcomeMapper
         IReadOnlyList<string> resolvedAssemblyPaths,
         IReadOnlyList<string> discoveredProjectPaths,
         ArchitectureSourceExpansionInventory sourceExpansion,
-        string? mode)
+        string? mode,
+        // Portable run metadata, not part of the cached analysis result — see
+        // ValidationOutcome.ExternalEvidenceRequirements. Supplied fresh by the caller from its own
+        // already-loaded policy document, the same way sourceExpansion is, so a cache-hit
+        // reconstruction still reports which external_evidence requirements are declared.
+        IReadOnlyList<ArchitectureExternalEvidenceRequirement>? externalEvidenceRequirements = null)
     {
         ArgumentNullException.ThrowIfNull(cached);
 
@@ -110,6 +116,8 @@ public static class AnalysisCacheOutcomeMapper
             ApplicabilityProjection = completion is null
                 ? null
                 : ArchitectureApplicabilityProjector.Project(completion, mode),
+            ExternalEvidenceRequirements = externalEvidenceRequirements
+                ?? Array.Empty<ArchitectureExternalEvidenceRequirement>(),
         };
     }
 }

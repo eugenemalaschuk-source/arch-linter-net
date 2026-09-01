@@ -179,7 +179,9 @@ this binding; it is not inferred from a path.
 
 The following is a deliberately synthetic, vendor-neutral evidence flow. It
 describes the values a caller supplies to the Core boundary; it is not an
-analyzer invocation, a producer-service integration, or a CLI artifact option.
+analyzer invocation or a producer-service integration. See
+[CLI binding](#cli-binding) below for the packed-CLI artifact option that
+supplies these same values without custom .NET host code.
 
 ```text
 repository-local SARIF 2.1.0 bytes
@@ -264,15 +266,80 @@ automatically. If an optional artifact is supplied but is malformed, unsafe,
 unsuccessful, over the configured bound, or bound to the wrong context, the
 reader returns an unassessable failure for the supplied evidence.
 
+## CLI binding
+
+The packed `arch-linter-net` CLI binds repository-local SARIF artifacts to
+declared `external_evidence` requirements directly, without custom .NET host
+code. It delegates every trust, selection, normalization, and applicability
+decision to the same Core boundary described above; the CLI only supplies the
+artifact paths and context values and merges the already-produced result into
+its normal validate output and exit code.
+
+Two option groups compose one invocation:
+
+- `--external-evidence id=<id>,path=<path>[,repository=<value>][,revision=<value>][,scope=<value>]`,
+  repeatable once per declared logical evidence id. `id` and `path` are
+  required; `repository`/`revision`/`scope` are the optional producer/CI
+  context for that one artifact, used when the SARIF file itself does not
+  already carry that metadata (`versionControlProvenance`). Bindings are
+  matched to declared requirements by `id`, not by the order the options were
+  supplied, so multiple `--external-evidence` occurrences remain
+  order-independent.
+- `--evidence-repository`, `--evidence-revision`, and `--evidence-scope`
+  supply the single current assessment context shared by every binding in the
+  invocation.
+
+A requirement with no matching `--external-evidence` binding behaves exactly
+as an unbound artifact does at the Core boundary: unassessable when required,
+explicitly optional/not-configured when not. Malformed `--external-evidence`
+syntax (a missing `id`/`path`, an unknown key, or a duplicate id) is rejected
+as invalid invocation before any policy or build work starts; a bound `id`
+that does not match any requirement declared by the loaded policy is rejected
+the same way. None of this weakens the trust boundary: a missing, stale, or
+wrong-context required artifact can never become a clean zero-result run
+merely because the CLI accepted its syntax.
+
+### Local example
+
+```bash
+arch-linter-net \
+  --policy architecture/dependencies.arch.yml \
+  --external-evidence "id=static-analysis,path=evidence/static-analysis.sarif" \
+  --evidence-repository "https://github.com/example/example-repo" \
+  --evidence-revision "$(git rev-parse HEAD)" \
+  --evidence-scope "local"
+```
+
+### CI example
+
+```bash
+arch-linter-net \
+  --policy architecture/dependencies.arch.yml \
+  --format sarif \
+  --external-evidence "id=static-analysis,path=evidence/static-analysis.sarif" \
+  --evidence-repository "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY" \
+  --evidence-revision "$GITHUB_SHA" \
+  --evidence-scope "ci"
+```
+
+The producing analyzer still runs as its own separate CI step and writes its
+own SARIF artifact to `evidence/static-analysis.sarif` before this command
+runs; ArchLinterNet never installs, invokes, or authenticates to it. Selected
+imported findings, their evidence provenance, and the merged applicability
+state appear in Human, JSON, and SARIF output the same way native findings
+do, and in the `ArchLinterNet.Testing` adapter's `ImportedDiagnostics`
+projection. A required binding that is missing, stale, or bound to the wrong
+repository/revision/scope maps to the same authoritative `UNASSESSABLE` ->
+exit code `2` contract every other v0.8 completeness gap uses; a trusted
+strict-mode imported finding fails the gate exactly as a native strict
+violation would.
+
 ## Non-goals
 
-This declaration and reader do not provide:
+This declaration, reader, and CLI binding do not provide:
 
 - analyzer execution or analyzer configuration;
 - remote URLs or vendor service APIs;
 - producer-service queries; or
 - freshness inference from filenames, modification times, or workflow/job
   names.
-
-The documented consumption point is the Core external-evidence boundary for a
-later consuming family. This page does not define a command-line integration.

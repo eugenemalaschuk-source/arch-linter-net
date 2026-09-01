@@ -53,15 +53,15 @@ internal sealed partial class ValidateCommandHandler
         profileState.Timing = timing;
         ValidationRequest request = BuildValidationRequest(options, mode);
 
-        (ValidationOutcome outcome, ArchitectureAnalysisSnapshotCounters counters) =
+        (ValidationOutcome nativeOutcome, ArchitectureAnalysisSnapshotCounters counters) =
             _runtime.ValidateWithCounters(request, timing);
         profileState.Counters = counters;
-        profileState.InputPaths = CreateProfileInputPaths(outcome.PolicyImportPaths
-            .Concat(outcome.ResolvedAssemblyPaths
+        profileState.InputPaths = CreateProfileInputPaths(nativeOutcome.PolicyImportPaths
+            .Concat(nativeOutcome.ResolvedAssemblyPaths
                 .SelectMany(path => new[] { path, BuildReceiptStore.ReceiptPathFor(path) }))
-            .Concat(outcome.DiscoveredProjectPaths));
+            .Concat(nativeOutcome.DiscoveredProjectPaths));
 
-        string? importCollision = FindImportFileCollision(options, outcome.PolicyImportPaths);
+        string? importCollision = FindImportFileCollision(options, nativeOutcome.PolicyImportPaths);
         if (importCollision is not null)
         {
             _console.Error.WriteLine(importCollision);
@@ -69,14 +69,14 @@ internal sealed partial class ValidateCommandHandler
         }
 
         string? profileImportCollision = FindProfileFileCollision(
-            options, outcome.PolicyImportPaths, "imported policy file");
+            options, nativeOutcome.PolicyImportPaths, "imported policy file");
         if (profileImportCollision is not null)
         {
             _console.Error.WriteLine(profileImportCollision);
             return CliExitCodes.InvalidArgumentsOrRuntimeError;
         }
 
-        string? receiptCollision = FindReceiptFileCollision(options, outcome.ResolvedAssemblyPaths);
+        string? receiptCollision = FindReceiptFileCollision(options, nativeOutcome.ResolvedAssemblyPaths);
         if (receiptCollision is not null)
         {
             _console.Error.WriteLine(receiptCollision);
@@ -84,7 +84,7 @@ internal sealed partial class ValidateCommandHandler
         }
 
         string? profileReceiptCollision = FindProfileFileCollision(
-            options, outcome.ResolvedAssemblyPaths.SelectMany(path => new[] { path, BuildReceiptStore.ReceiptPathFor(path) }),
+            options, nativeOutcome.ResolvedAssemblyPaths.SelectMany(path => new[] { path, BuildReceiptStore.ReceiptPathFor(path) }),
             "a build artifact or receipt loaded during this run");
         if (profileReceiptCollision is not null)
         {
@@ -92,7 +92,7 @@ internal sealed partial class ValidateCommandHandler
             return CliExitCodes.InvalidArgumentsOrRuntimeError;
         }
 
-        string? projectCollision = FindDiscoveredProjectFileCollision(options, outcome.DiscoveredProjectPaths);
+        string? projectCollision = FindDiscoveredProjectFileCollision(options, nativeOutcome.DiscoveredProjectPaths);
         if (projectCollision is not null)
         {
             _console.Error.WriteLine(projectCollision);
@@ -100,12 +100,19 @@ internal sealed partial class ValidateCommandHandler
         }
 
         string? profileProjectCollision = FindProfileFileCollision(
-            options, outcome.DiscoveredProjectPaths, "a project file loaded during this run");
+            options, nativeOutcome.DiscoveredProjectPaths, "a project file loaded during this run");
         if (profileProjectCollision is not null)
         {
             _console.Error.WriteLine(profileProjectCollision);
             return CliExitCodes.InvalidArgumentsOrRuntimeError;
         }
+
+        // External evidence is bound onto the outcome AFTER the outcome used for cache population
+        // is captured (nativeOutcome, below) and NEVER before — see design.md in
+        // openspec/changes/cli-external-evidence-binding. This guarantees SARIF bytes are always
+        // freshly read regardless of --cache, and that a cache hit's reconstructed applicability
+        // records never already contain a previous run's external-evidence entries.
+        ValidationOutcome outcome = AttachExternalEvidence(options, nativeOutcome, mode);
 
         RouteResult result = _coordinator.RouteSingleOutcome(
             options.Format, mode, outcome, options.AdditionalSinks, timing, _cancellationToken);
@@ -118,10 +125,11 @@ internal sealed partial class ValidateCommandHandler
 
         // A completed, non-cancelled run is eligible to populate the cache regardless of
         // Passed/Violations — see openspec/specs/analysis-cache/spec.md; population itself
-        // still gates on every discovered project being #406 VerifiedCacheEligible.
+        // still gates on every discovered project being #406 VerifiedCacheEligible. Populates from
+        // nativeOutcome (never the external-evidence-enriched outcome) — see the comment above.
         if (!result.Cancelled)
         {
-            TryPopulateCache(options, outcome, counters, profileState.Cache);
+            TryPopulateCache(options, nativeOutcome, counters, profileState.Cache);
         }
 
         WriteProfile(
@@ -143,6 +151,26 @@ internal sealed partial class ValidateCommandHandler
         }
 
         return ResolveValidationExitCode(outcome);
+    }
+
+    // Skips PreflightBlocked outcomes: a blocked run already fails for an unrelated build-state
+    // reason and has no requirements to bind against (ExternalEvidenceRequirements is not
+    // populated for that path), so evaluating bindings here would risk masking the real failure
+    // behind an unrelated "unknown binding id" error.
+    private ValidationOutcome AttachExternalEvidence(ValidateCommandOptions options, ValidationOutcome outcome, string mode)
+    {
+        if (outcome.PreflightBlocked)
+        {
+            return outcome;
+        }
+
+        ArchitectureExternalEvidenceBindingResult binding = ArchitectureExternalEvidenceBinder.Evaluate(
+            outcome.ExternalEvidenceRequirements,
+            outcome.RepositoryRoot,
+            options.ExternalEvidenceArtifacts,
+            options.ExternalEvidenceAssessmentContext,
+            _cancellationToken);
+        return ArchitectureExternalEvidenceBinder.Attach(outcome, binding, mode);
     }
 
     // One ArchitectureAnalysisSnapshot serves every requested mode: policy composition, project
@@ -184,7 +212,6 @@ internal sealed partial class ValidateCommandHandler
         profileState.Counters = snapshot.Counters;
         profileState.InputPaths = CreateProfileInputPaths(snapshot.GetProfileInputPaths());
 
-        bool allPassed = true;
         List<(string Mode, ValidationOutcome Outcome)> outcomesByMode = new();
         try
         {
@@ -192,7 +219,6 @@ internal sealed partial class ValidateCommandHandler
             {
                 ValidationOutcome outcome = snapshot.Evaluate(mode, timing);
                 outcomesByMode.Add((mode, outcome));
-                allPassed &= outcome.Passed;
             }
         }
         finally
@@ -251,8 +277,15 @@ internal sealed partial class ValidateCommandHandler
             return CliExitCodes.InvalidArgumentsOrRuntimeError;
         }
 
+        // Bound once per invocation (not per mode) and attached to each mode's own outcome — see
+        // the identical comment in ExecuteSingleMode. outcomesByMode (native) remains what
+        // TryPopulateCache uses below; enrichedOutcomesByMode is used for everything user-facing.
+        IReadOnlyList<(string Mode, ValidationOutcome Outcome)> enrichedOutcomesByMode =
+            AttachExternalEvidenceToAll(options, outcomesByMode);
+        bool allPassed = enrichedOutcomesByMode.All(pair => pair.Outcome.Passed);
+
         RouteResult result = _coordinator.RouteCombinedOutcomes(
-            options.Format, outcomesByMode, options.AdditionalSinks, timing, _cancellationToken);
+            options.Format, enrichedOutcomesByMode, options.AdditionalSinks, timing, _cancellationToken);
         profileState.Output = CreateOutputProfile(result);
         profileState.RenderedSinkCount = result.RenderedFormats.Count;
 
@@ -264,7 +297,8 @@ internal sealed partial class ValidateCommandHandler
         // One cache entry per requested mode — see finding #4: a combined "strict,audit" request
         // must never collapse more than one mode's outcome under a single "strict,audit"-shaped
         // key. Each mode's own outcome (and this snapshot's shared discovery/eligibility state) is
-        // populated independently.
+        // populated independently. Populates from the native outcomesByMode (never the
+        // external-evidence-enriched list) — see the comment in ExecuteSingleMode.
         if (!result.Cancelled)
         {
             foreach ((_, ValidationOutcome modeOutcome) in outcomesByMode)
@@ -281,22 +315,42 @@ internal sealed partial class ValidateCommandHandler
             options,
             profileState,
             ResolveCompletionStatus(
-                outcomesByMode[0].Outcome.PreflightBlocked, allPassed, result.Cancelled),
+                enrichedOutcomesByMode[0].Outcome.PreflightBlocked, allPassed, result.Cancelled),
             result.Cancelled);
 
         if (result.Cancelled)
         {
-            WriteCancelledRouting(options, errorFormat, result, isSingleMode: false, outcomesByMode);
+            WriteCancelledRouting(options, errorFormat, result, isSingleMode: false, enrichedOutcomesByMode);
             return CliExitCodes.InvalidArgumentsOrRuntimeError;
         }
 
         if (result.Status != ReportRouteStatus.AllSucceeded)
         {
-            WriteOutputError(options, errorFormat, result, isSingleMode: false, outcomesByMode);
+            WriteOutputError(options, errorFormat, result, isSingleMode: false, enrichedOutcomesByMode);
             return CliExitCodes.InvalidArgumentsOrRuntimeError;
         }
 
-        return ResolveCombinedValidationExitCode(outcomesByMode, allPassed);
+        return ResolveCombinedValidationExitCode(enrichedOutcomesByMode, allPassed);
+    }
+
+    private IReadOnlyList<(string Mode, ValidationOutcome Outcome)> AttachExternalEvidenceToAll(
+        ValidateCommandOptions options, IReadOnlyList<(string Mode, ValidationOutcome Outcome)> outcomesByMode)
+    {
+        if (outcomesByMode.Count == 0 || outcomesByMode[0].Outcome.PreflightBlocked)
+        {
+            return outcomesByMode;
+        }
+
+        ValidationOutcome first = outcomesByMode[0].Outcome;
+        ArchitectureExternalEvidenceBindingResult binding = ArchitectureExternalEvidenceBinder.Evaluate(
+            first.ExternalEvidenceRequirements,
+            first.RepositoryRoot,
+            options.ExternalEvidenceArtifacts,
+            options.ExternalEvidenceAssessmentContext,
+            _cancellationToken);
+        return outcomesByMode
+            .Select(pair => (pair.Mode, ArchitectureExternalEvidenceBinder.Attach(pair.Outcome, binding, pair.Mode)))
+            .ToList();
     }
 
     internal static int ResolveValidationExitCode(ValidationOutcome outcome)

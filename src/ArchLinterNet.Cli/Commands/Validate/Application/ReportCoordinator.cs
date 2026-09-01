@@ -653,6 +653,15 @@ internal sealed partial class ReportCoordinator
             }
         }
 
+        // Imported external-evidence diagnostics are independent of native Passed/Violations: an
+        // audit-mode imported finding can be present and non-blocking even when native conformance
+        // passed, so this is rendered unconditionally rather than nested in the branch above.
+        cancellationToken.ThrowIfCancellationRequested();
+        if (outcome.ImportedDiagnosticFindings.Count > 0)
+        {
+            sb.AppendLine(ArchitectureDiagnosticFormatter.FormatFindingsForHumans(outcome.ImportedDiagnosticFindings));
+        }
+
         string assessmentCompletion = outcome.ApplicabilityProjection is { } applicabilityProjection
             ? ArchitectureDiagnosticFormatter.FormatApplicabilityProjectionForHumans(applicabilityProjection)
             : ArchitectureDiagnosticFormatter.FormatAssessmentCompletionForHumans(
