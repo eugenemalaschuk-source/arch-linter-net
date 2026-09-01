@@ -14,7 +14,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from _release_workspace import _github_command_file_path, _safe_path
+from _release_workspace import _github_command_file_path, _github_runner_temp_path, _safe_path
 
 _SHARD_SCHEMA = "main-quality-coverage-shard/v1"
 _INVENTORY_SCHEMA = "main-quality-coverage-inventory/v1"
@@ -442,7 +442,7 @@ def _verify_inventory_command(arguments: argparse.Namespace) -> None:
 
 def _verify_sonar(arguments: argparse.Namespace) -> None:
     inventory_root = _safe_path(arguments.inventory_root, "coverage inventory root")
-    scanner_log = _safe_path(arguments.scanner_log, "Sonar scanner log")
+    scanner_log = _github_runner_temp_path(arguments.scanner_log, "Sonar scanner log", "RUNNER_TEMP")
     analysis_json = _safe_path(arguments.analysis_json, "Sonar project analyses response")
     github_output = (
         _github_command_file_path(arguments.github_output, _GITHUB_OUTPUT_DESCRIPTION, "GITHUB_OUTPUT")

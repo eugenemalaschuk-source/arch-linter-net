@@ -11,7 +11,7 @@ import pytest
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import main_quality_coverage as coverage  # noqa: E402
-from _release_workspace import _github_command_file_path  # noqa: E402
+from _release_workspace import _github_command_file_path, _github_runner_temp_path  # noqa: E402
 
 
 _SHA = "a" * 40
@@ -21,6 +21,7 @@ _OTHER_SHA = "b" * 40
 @pytest.fixture(autouse=True)
 def _release_workspace(tmp_path: Path, monkeypatch) -> None:
     monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("RUNNER_TEMP", str(tmp_path))
 
 
 def _xml(report_format: str, marker: str = "same") -> str:
@@ -218,7 +219,10 @@ def test_sonar_verification_requires_all_canonical_reports_and_current_revision(
         for record in inventory["reports"]
         if record["format"] == "opencover"
     ]
-    log = tmp_path / "sonar.log"
+    runner_temp = tmp_path.parent / f"{tmp_path.name}-runner-temp"
+    runner_temp.mkdir()
+    monkeypatch.setenv("RUNNER_TEMP", str(runner_temp))
+    log = runner_temp / "sonar.log"
     log.write_text(
         "\n".join(
             [f"INFO: Parsing the OpenCover report {Path(report).resolve()}" for report in reports]
@@ -245,6 +249,82 @@ def test_sonar_verification_requires_all_canonical_reports_and_current_revision(
     assert f"analysis_revision={_SHA}" in rendered
     assert "coverage_import_status=4/4 canonical OpenCover reports parsed" in rendered
     assert "covered_main_files=39" in rendered
+
+
+def test_sonar_verification_rejects_scanner_log_outside_runner_temp_before_read(
+    tmp_path: Path, monkeypatch
+) -> None:
+    output = _assemble(tmp_path, _artifact_root(tmp_path), monkeypatch)
+    runner_temp = tmp_path / "runner-temp"
+    runner_temp.mkdir()
+    monkeypatch.setenv("RUNNER_TEMP", str(runner_temp))
+    outside_log = tmp_path / "outside-sonar.log"
+    outside_log.write_text("not read", encoding="utf-8")
+    analysis_json = tmp_path / "analysis.json"
+    analysis_json.write_text(json.dumps({"analyses": [{"revision": _SHA}]}), encoding="utf-8")
+
+    with pytest.raises(ValueError, match="outside the runner-provided RUNNER_TEMP directory"):
+        coverage._verify_sonar(
+            argparse.Namespace(
+                inventory_root=output,
+                expected_sha=_SHA,
+                scanner_log=outside_log,
+                analysis_json=analysis_json,
+                github_output=None,
+            )
+        )
+
+
+def test_sonar_verification_rejects_mismatched_runner_temp_root(tmp_path: Path, monkeypatch) -> None:
+    output = _assemble(tmp_path, _artifact_root(tmp_path), monkeypatch)
+    scanner_root = tmp_path / "scanner-root"
+    scanner_root.mkdir()
+    log = scanner_root / "sonar.log"
+    log.write_text("not read", encoding="utf-8")
+    monkeypatch.setenv("RUNNER_TEMP", str(tmp_path / "different-runner-root"))
+    analysis_json = tmp_path / "analysis.json"
+    analysis_json.write_text(json.dumps({"analyses": [{"revision": _SHA}]}), encoding="utf-8")
+
+    with pytest.raises(ValueError, match="outside the runner-provided RUNNER_TEMP directory"):
+        coverage._verify_sonar(
+            argparse.Namespace(
+                inventory_root=output,
+                expected_sha=_SHA,
+                scanner_log=log,
+                analysis_json=analysis_json,
+                github_output=None,
+            )
+        )
+
+
+def test_sonar_verification_rejects_runner_temp_symlink_escape(tmp_path: Path, monkeypatch) -> None:
+    output = _assemble(tmp_path, _artifact_root(tmp_path), monkeypatch)
+    runner_temp = tmp_path.parent / f"{tmp_path.name}-runner-temp"
+    runner_temp.mkdir()
+    outside_root = tmp_path.parent / f"{tmp_path.name}-outside"
+    outside_root.mkdir()
+    outside_log = outside_root / "sonar.log"
+    outside_log.write_text("not read", encoding="utf-8")
+    linked_log = runner_temp / "sonar.log"
+    try:
+        linked_log.symlink_to(outside_log)
+    except (OSError, NotImplementedError):
+        pytest.skip("creating symlinks is not available on this platform")
+
+    monkeypatch.setenv("RUNNER_TEMP", str(runner_temp))
+    analysis_json = tmp_path / "analysis.json"
+    analysis_json.write_text(json.dumps({"analyses": [{"revision": _SHA}]}), encoding="utf-8")
+
+    with pytest.raises(ValueError, match="outside the runner-provided RUNNER_TEMP directory"):
+        coverage._verify_sonar(
+            argparse.Namespace(
+                inventory_root=output,
+                expected_sha=_SHA,
+                scanner_log=linked_log,
+                analysis_json=analysis_json,
+                github_output=None,
+            )
+        )
 
 
 def test_cli_verify_inventory_round_trip(tmp_path: Path, monkeypatch) -> None:
@@ -360,3 +440,13 @@ def test_github_command_file_path_rejects_when_the_runner_env_var_is_not_set(
 
     with pytest.raises(ValueError, match="GITHUB_OUTPUT environment variable is not set"):
         _github_command_file_path(candidate, "GitHub output file", "GITHUB_OUTPUT")
+
+
+def test_github_runner_temp_path_rejects_when_the_runner_env_var_is_not_set(
+    tmp_path: Path, monkeypatch
+) -> None:
+    monkeypatch.delenv("RUNNER_TEMP", raising=False)
+    candidate = tmp_path / "scanner.log"
+
+    with pytest.raises(ValueError, match="RUNNER_TEMP environment variable is not set"):
+        _github_runner_temp_path(candidate, "Sonar scanner log", "RUNNER_TEMP")
