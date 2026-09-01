@@ -66,7 +66,7 @@ public sealed class PrReportMarkdownRendererTests
 
             """;
 
-        Assert.That(markdown, Is.EqualTo(Expected.Replace("\n", Environment.NewLine, StringComparison.Ordinal)));
+        Assert.That(markdown, Is.EqualTo(Expected.ReplaceLineEndings(Environment.NewLine)));
     }
 
     [Test]
