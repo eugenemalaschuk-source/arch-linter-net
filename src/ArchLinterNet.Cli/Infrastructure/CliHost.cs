@@ -148,6 +148,7 @@ internal sealed class CliHost(ICliRootCommandFactory rootCommandFactory, ICliCon
         return commandName switch
         {
             "graph" => "Run 'arch-linter-net graph --help' for usage information.",
+            "topology" => "Run 'arch-linter-net topology --help' for usage information.",
             "explain" => "Run 'arch-linter-net explain --help' for usage information.",
             "update" => "Run 'arch-linter-net baseline update --help' for usage information.",
             "prune" => "Run 'arch-linter-net baseline prune --help' for usage information.",

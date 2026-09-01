@@ -252,6 +252,31 @@ public sealed partial class ArchitectureAnalysisSnapshot : IDisposable
         }
     }
 
+    // Capture is deliberately a session-level observation operation, not a validation shortcut:
+    // it materializes the exact runner owned by this snapshot and delegates to the same
+    // type-derived projection used by normal declared-topology validation. The returned
+    // observation remains internal so scanner and Assembly details never cross the public Core
+    // boundary.
+    internal ArchitectureTopologyEvaluator.ValidationObservation CaptureTopologyObservation(
+        string subjectKind)
+    {
+        lock (_gate)
+        {
+            ObjectDisposedException.ThrowIf(_disposed, this);
+            if (_preflight.Blocked)
+            {
+                throw new InvalidOperationException(
+                    "Topology capture cannot materialize a session after build-state preflight was blocked.");
+            }
+
+            _cancellationToken.ThrowIfCancellationRequested();
+            ArchitectureTopologyEvaluator.ValidationObservation observation =
+                ArchitectureTopologyEvaluator.ObserveForValidation(EnsureSetup().Runner.Session, subjectKind);
+            _cancellationToken.ThrowIfCancellationRequested();
+            return observation;
+        }
+    }
+
     private void EnsureRequestedContractIdsAreKnownForMode(string mode)
     {
         if (_requestedContractIds is not { Count: > 0 })

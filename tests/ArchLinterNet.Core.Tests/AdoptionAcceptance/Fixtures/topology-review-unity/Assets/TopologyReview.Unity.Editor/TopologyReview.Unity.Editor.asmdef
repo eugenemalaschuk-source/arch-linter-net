@@ -1,0 +1,16 @@
+{
+  "name": "TopologyReview.Unity.Editor",
+  "references": [
+    "TopologyReview.Unity.Gameplay"
+  ],
+  "includePlatforms": [
+    "Editor"
+  ],
+  "excludePlatforms": [],
+  "allowUnsafeCode": false,
+  "overrideReferences": false,
+  "autoReferenced": false,
+  "defineConstraints": [],
+  "versionDefines": [],
+  "noEngineReferences": false
+}

@@ -4,6 +4,15 @@ namespace ArchLinterNet.Core.Validation;
 
 public sealed partial class ArchitectureAnalysisSnapshot
 {
+    // These narrow internal accessors let Core-owned review workflows expose the exact input
+    // provenance already captured by the snapshot. They intentionally return snapshots of the
+    // collections, never the mutable runner/session state.
+    internal IReadOnlyList<string> GetCapturePolicyImportPaths() => GetPolicyImportPaths();
+
+    internal IReadOnlyList<string> GetCaptureResolvedAssemblyPaths() => GetResolvedAssemblyPaths();
+
+    internal IReadOnlyList<string> GetCaptureDiscoveredProjectPaths() => GetDiscoveredProjectPaths();
+
     private List<string> GetPolicyImportPaths()
     {
         return _document.Provenance.Sources

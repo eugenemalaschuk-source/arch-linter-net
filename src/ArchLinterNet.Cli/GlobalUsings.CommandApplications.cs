@@ -8,4 +8,5 @@ global using ArchLinterNet.Cli.Commands.Policy.Application;
 global using ArchLinterNet.Cli.Commands.PublicApi.Application;
 global using ArchLinterNet.Cli.Commands.Scaffold.Application;
 global using ArchLinterNet.Cli.Commands.Schema.Application;
+global using ArchLinterNet.Cli.Commands.Topology.Application;
 global using ArchLinterNet.Cli.Commands.Validate.Application;

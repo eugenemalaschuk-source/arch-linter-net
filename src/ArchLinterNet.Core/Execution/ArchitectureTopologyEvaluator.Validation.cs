@@ -17,15 +17,29 @@ internal static partial class ArchitectureTopologyEvaluator
             return Result.Empty;
         }
 
+        ValidationObservation observation = ObserveForValidation(session, topology.SubjectKind);
+        return Evaluate(session, topology, observation.Subjects, observation.Dependencies);
+    }
+
+    // This is the canonical normal-validation observation projection. Capture deliberately calls
+    // this same seam instead of rebuilding a graph or using the richer metric projection. Keeping
+    // the observation itself internal ensures scanner/session implementation details never become
+    // part of the public capture API.
+    internal static ValidationObservation ObserveForValidation(
+        ArchitectureAnalysisSession session,
+        string subjectKind)
+    {
+        ArgumentNullException.ThrowIfNull(session);
+
         (IReadOnlyList<ObservedSubject> subjects, IReadOnlyList<ObservedDependency> dependencies) =
-            ObserveForValidation(session, topology.SubjectKind);
-        return Evaluate(session, topology, subjects, dependencies);
+            ObserveForValidationCore(session, subjectKind);
+        return new ValidationObservation(subjects, dependencies);
     }
 
     // Existing validation reports, SARIF identities, and relationship results must not change
     // merely because a policy has a declared topology; the executor opts into this projection.
     private static (IReadOnlyList<ObservedSubject> Subjects, IReadOnlyList<ObservedDependency> Dependencies)
-        ObserveForValidation(ArchitectureAnalysisSession session, string subjectKind)
+        ObserveForValidationCore(ArchitectureAnalysisSession session, string subjectKind)
     {
         Type[] types = session.TypeIndex.AllTypes()
             .OrderBy(ArchitectureTypeNames.SafeFullName, StringComparer.Ordinal)
@@ -88,4 +102,8 @@ internal static partial class ArchitectureTopologyEvaluator
                 .ThenBy(dependency => dependency.Witness, StringComparer.Ordinal)
                 .ToArray());
     }
+
+    internal sealed record ValidationObservation(
+        IReadOnlyList<ObservedSubject> Subjects,
+        IReadOnlyList<ObservedDependency> Dependencies);
 }

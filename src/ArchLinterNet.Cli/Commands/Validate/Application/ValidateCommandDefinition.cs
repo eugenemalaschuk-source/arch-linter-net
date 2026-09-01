@@ -18,6 +18,7 @@ internal sealed class ValidateCommandDefinition(ValidateCommandHandler handler)
           arch-linter-net [options]
           arch-linter-net baseline generate --config <path> --output <path> [options]
           arch-linter-net graph [options]
+          arch-linter-net topology capture|diff|verify [options]
           arch-linter-net explain --source <id> --target <id> [options]
 
         Validate Options:

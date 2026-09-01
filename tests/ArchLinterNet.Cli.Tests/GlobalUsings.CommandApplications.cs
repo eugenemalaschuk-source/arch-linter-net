@@ -22,5 +22,7 @@ global using ArchLinterNet.Cli.Commands.Scaffold.Application;
 global using ArchLinterNet.Cli.Commands.Scaffold.EntryPoint;
 global using ArchLinterNet.Cli.Commands.Schema.Application;
 global using ArchLinterNet.Cli.Commands.Schema.EntryPoint;
+global using ArchLinterNet.Cli.Commands.Topology.Application;
+global using ArchLinterNet.Cli.Commands.Topology.EntryPoint;
 global using ArchLinterNet.Cli.Commands.Validate.Application;
 global using ArchLinterNet.Cli.Commands.Validate.EntryPoint;

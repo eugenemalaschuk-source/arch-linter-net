@@ -157,6 +157,22 @@ Run `arch-linter-net --help` or `arch-linter-net <command> --help` for the exact
 
 | `arch-linter-net report pr --health <architecture-health.json> --change <architecture-change.json>` | Render a deterministic architecture-only pull-request Markdown report from canonical artifacts; does not rerun analysis or call GitHub. |
 
+<!-- cli-command: topology -->
+
+| `arch-linter-net topology` | Capture, compare, and verify declared architecture topology. |
+
+<!-- cli-command: topology capture -->
+
+| `arch-linter-net topology capture ...` | Capture canonical observed topology as a review artifact. |
+
+<!-- cli-command: topology diff -->
+
+| `arch-linter-net topology diff ...` | Compare declared topology with ordinary validation evidence. |
+
+<!-- cli-command: topology verify -->
+
+| `arch-linter-net topology verify ...` | Verify declared topology with ordinary validation semantics. |
+
 <!-- cli-command: scaffold -->
 
 | `arch-linter-net scaffold` | Repository-development scaffolding. |
@@ -461,6 +477,12 @@ Use `history analyze` when the question is how architecture evidence changed ove
 ## Public API
 
 The `public-api` command family supports capture, diff, update, and migration of reviewed public API snapshots used by public API surface contracts. See [Public API surface contracts](../contracts/public-api-surface.md).
+
+## Topology review
+
+The `topology` command family captures observed facts for review, projects declared-versus-observed
+drift, and invokes ordinary validation with a focused entry point. It never writes a reviewed
+topology declaration. See [Review a topology before declaring it](../guides/topology-review-workflow.md).
 
 ## Cache
 
