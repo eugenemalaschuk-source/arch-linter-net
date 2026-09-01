@@ -20,4 +20,10 @@ public sealed record ArchitectureHealthOutcome(
     /// candidate receipts. They make the one-snapshot Health orchestration observable.
     /// </summary>
     public ArchitectureAnalysisSnapshotCounters AnalysisCounters { get; init; } = new();
+
+    /// <summary>Workflow identity supplied with the request, when the caller persisted one.</summary>
+    public string? ExecutionContext { get; init; }
+
+    /// <summary>Condition set used by the shared immutable Health analysis snapshot.</summary>
+    public string ConditionSetName { get; init; } = string.Empty;
 }

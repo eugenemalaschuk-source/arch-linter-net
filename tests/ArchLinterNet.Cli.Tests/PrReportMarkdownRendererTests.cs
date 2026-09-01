@@ -1,6 +1,7 @@
 using System.Text.Json;
 using ArchLinterNet.Core.Change;
 using ArchLinterNet.Core.Model;
+using ArchLinterNet.Core.Reporting;
 using NUnit.Framework;
 
 namespace ArchLinterNet.Cli.Tests;
@@ -23,8 +24,49 @@ public sealed class PrReportMarkdownRendererTests
             Assert.That(markdown, Does.Contain("Explicit waiver debt: `0`"));
             Assert.That(markdown, Does.Contain("Existing finding debt: `0`"));
             Assert.That(markdown, Does.Contain("New architecture debt: `0`"));
+            Assert.That(markdown, Does.Not.Contain("## Blockers"));
+            Assert.That(markdown, Does.Not.Contain("## Non-blocking debt"));
+            Assert.That(markdown, Does.Not.Contain("Showing 0 of 0"));
             Assert.That(markdown, Does.Not.Contain("score"));
         });
+    }
+
+    [Test]
+    public void CleanProjection_RendersExactConciseMarkdownWithoutEmptyDrillDowns()
+    {
+        string markdown = PrReportMarkdownRenderer.Render(CreateProjection(evidence: Evidence()));
+
+        const string Expected = """
+            # Architecture PR report
+
+            ## Acceptance
+            - Architecture acceptance: **pass** (`gate=pass`)
+            - Architecture health: `healthy`
+            - Report availability: `complete`
+            - Effective policy controls: `2` (strict 1, audit 1, coverage 0)
+            - Control applicability/evaluability: `pass` — 2/2 evaluable
+            - Configured topology: `not_configured`
+            - Explicit waiver debt: `0` total (`0` active, `0` stale, `0` expired)
+            - Existing finding debt: `0` baseline entries
+            - New architecture debt: `0` new baseline entries
+            - Policy weakening: `not_configured`
+            - Metrics: `not_configured`
+            - Required external evidence: `not_configured`
+
+            ## Completeness and evidence
+            - Applicability: `pass` — 2/2 evaluable; 0 unassessable.
+            ### Applicability controls (2)
+            Showing 2 of 2; omitted 0.
+            - `control-1` state=`pass` membership=`required` integrity=valid
+            - `control-2` state=`pass` membership=`required` integrity=valid
+            - Topology evidence: `not_configured`
+            - External evidence: `not_configured`
+
+            ## Canonical navigation
+
+            """;
+
+        Assert.That(markdown, Is.EqualTo(Expected.Replace("\n", Environment.NewLine, StringComparison.Ordinal)));
     }
 
     [Test]
@@ -51,7 +93,7 @@ public sealed class PrReportMarkdownRendererTests
     {
         ArchitecturePrReportEvidence evidence = Evidence(
             weakening: new ArchitecturePrReportPolicyWeakening(
-                1, "policy-weakening", "policy", 1, "high",
+                1, "policy-weakening", "policy", 1, "high", true,
                 [new ArchitecturePrReportPolicyWeakeningFinding(
                     "weak-1", "broadened_waiver", "control-1", "broadened", "high",
                     ["old"], ["new"], ["subject"], null, null, "review")]),
@@ -60,6 +102,45 @@ public sealed class PrReportMarkdownRendererTests
 
         Assert.That(markdown.IndexOf("policy weakening `weak-1`", StringComparison.Ordinal),
             Is.LessThan(markdown.IndexOf("## Non-blocking debt", StringComparison.Ordinal)));
+    }
+
+    [Test]
+    public void StrictBlocker_DoesNotPromoteAuditFinding()
+    {
+        ArchitecturePrReportEvidence evidence = Evidence(receipts:
+        [
+            Receipt("strict", [Finding("strict-finding", "strict", "error", "strict-code")]),
+            Receipt("audit", [Finding("audit-finding", "audit", "warning", "audit-code")]),
+        ]);
+
+        string markdown = PrReportMarkdownRenderer.Render(CreateProjection(evidence: evidence));
+        int blockersStart = markdown.IndexOf("## Blockers", StringComparison.Ordinal);
+        int blockersEnd = markdown.IndexOf("## Completeness and evidence", StringComparison.Ordinal);
+        string blockers = markdown[blockersStart..blockersEnd];
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(blockers, Does.Contain("strict-finding"));
+            Assert.That(blockers, Does.Not.Contain("audit-finding"));
+        });
+    }
+
+    [Test]
+    public void HostileArtifactValues_CannotInjectMarkdownStructure()
+    {
+        string markdown = PrReportMarkdownRenderer.Render(CreateProjection(change: Change(
+            [new ArchitectureChangeEntry(
+                "kind`<!--",
+                "identity`<!--",
+                "[spoof](https://invalid.example)<!--\u0001")])));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(markdown, Does.Contain("&#96;"));
+            Assert.That(markdown, Does.Not.Contain("<!--"));
+            Assert.That(markdown, Does.Not.Contain("[spoof](https://invalid.example)"));
+            Assert.That(markdown.Where(character => character is not '\r' and not '\n').Any(char.IsControl), Is.False);
+        });
     }
 
     [Test]
@@ -161,12 +242,10 @@ public sealed class PrReportMarkdownRendererTests
     [Test]
     public void MissingEvidence_IsUnavailableAndAllChangeSectionsKeepCounts()
     {
-        ArchitecturePrReportProjection projection = CreateProjection(evidence: null, change: new ArchitectureChangeReport(
+        ArchitecturePrReportProjection projection = CreateProjection(evidence: null, change: Change(
             [new("surface", "added", "Added")], [new("surface", "removed", "Removed")],
-            [new("finding-new", "new", "New")], [new("finding-existing", "existing", "Existing")], ["baseline"])
-        {
-            ResolvedFindings = [new("finding-resolved", "resolved", "Resolved")],
-        });
+            [new("finding-new", "new", "New")], [new("finding-existing", "existing", "Existing")],
+            [new("finding-resolved", "resolved", "Resolved")], ["baseline"]));
         string markdown = PrReportMarkdownRenderer.Render(projection, 1);
 
         Assert.Multiple(() =>
@@ -186,8 +265,7 @@ public sealed class PrReportMarkdownRendererTests
     {
         ArchitectureChangeEntry[] added = [
             new("surface", "a", "A"), new("surface", "b", "B"), new("surface", "c", "C")];
-        string markdown = PrReportMarkdownRenderer.Render(CreateProjection(change: new ArchitectureChangeReport(
-            added, [], [], [], [])), 1);
+        string markdown = PrReportMarkdownRenderer.Render(CreateProjection(change: Change(added)), 1);
 
         Assert.Multiple(() =>
         {
@@ -203,7 +281,7 @@ public sealed class PrReportMarkdownRendererTests
         ArchitecturePolicyInventory? inventory = null,
         IReadOnlyList<ArchitecturePrReportBaselineEntry>? baseline = null,
         IReadOnlyList<ArchitectureHealthDimension>? dimensions = null,
-        ArchitectureChangeReport? change = null) =>
+        ArchitecturePrReportChange? change = null) =>
         new(
             new ArchitecturePrReportHeadline(
                 ArchitectureHealthGate.Pass,
@@ -211,7 +289,7 @@ public sealed class PrReportMarkdownRendererTests
                 evidence is null && inventory is null ? ArchitecturePrReportAvailability.Unavailable : ArchitecturePrReportAvailability.Complete,
                 dimensions ?? [Dimension("applicability", ArchitectureHealthDimensionState.Pass), Dimension("topology", ArchitectureHealthDimensionState.NotConfigured), Dimension("metrics", ArchitectureHealthDimensionState.NotConfigured), Dimension("external_evidence", ArchitectureHealthDimensionState.NotConfigured)]),
             evidence ?? (inventory is null ? null : Evidence(inventory: inventory, baseline: baseline)),
-            change ?? new ArchitectureChangeReport([], [], [], [], []),
+            change ?? Change(),
             []);
 
     private static ArchitecturePrReportEvidence Evidence(
@@ -220,12 +298,48 @@ public sealed class PrReportMarkdownRendererTests
         ArchitecturePrReportApplicability? applicability = null,
         ArchitecturePrReportExternalEvidence? external = null,
         ArchitecturePrReportPolicyWeakening? weakening = null,
-        IReadOnlyList<ArchitecturePrReportBaselineEntry>? baseline = null) =>
-        new(1, ArchitecturePrReportEvidence.EvidenceKind, ArchitectureHealthGate.Pass, ArchitectureHealthState.Healthy,
-            [new ArchitecturePrReportValidationReceipt(
-                "strict", new Dictionary<string, string>(), inventory ?? Inventory(), lifecycle ?? new("strict", [], []), applicability ?? Applicability(), external, [],
-                new("/repo", [], [], []))],
-            new(true, true, new(true, "strict", true, []), new(true, true, baseline ?? [], []), weakening));
+        IReadOnlyList<ArchitecturePrReportBaselineEntry>? baseline = null,
+        IReadOnlyList<ArchitecturePrReportValidationReceipt>? receipts = null) =>
+        new(ArchitecturePrReportEvidence.CurrentSchemaVersion, ArchitecturePrReportEvidence.EvidenceKind, ArchitectureHealthGate.Pass, ArchitectureHealthState.Healthy,
+            receipts ?? [Receipt("strict", [], inventory, lifecycle, applicability, external)],
+            new(true, weakening is null, new(true, "strict", true, []), new(true, true, baseline ?? [], []), weakening));
+
+    private static ArchitecturePrReportValidationReceipt Receipt(
+        string mode,
+        IReadOnlyList<ArchitecturePrReportFinding> findings,
+        ArchitecturePolicyInventory? inventory = null,
+        ArchitectureWaiverLifecycleAssessment? lifecycle = null,
+        ArchitecturePrReportApplicability? applicability = null,
+        ArchitecturePrReportExternalEvidence? external = null) =>
+        new(
+            mode,
+            new Dictionary<string, string>(),
+            inventory ?? Inventory(),
+            lifecycle ?? new(mode, [], []),
+            applicability ?? Applicability(),
+            external,
+            findings,
+            new("/repo", [], [], []));
+
+    private static ArchitecturePrReportFinding Finding(string identity, string mode, string severity, string code) =>
+        new(3, "diagnostic", identity, mode, severity, code, "contract", "contract", null, null, null, default);
+
+    private static ArchitecturePrReportChange Change(
+        IReadOnlyList<ArchitectureChangeEntry>? added = null,
+        IReadOnlyList<ArchitectureChangeEntry>? removed = null,
+        IReadOnlyList<ArchitectureChangeFinding>? newFindings = null,
+        IReadOnlyList<ArchitectureChangeFinding>? existingFindings = null,
+        IReadOnlyList<ArchitectureChangeFinding>? resolvedFindings = null,
+        IReadOnlyList<string>? baselineDebt = null) =>
+        new(
+            new ArchitecturePrReportExecutionContext("run", string.Empty),
+            "strict",
+            added ?? [],
+            removed ?? [],
+            newFindings ?? [],
+            existingFindings ?? [],
+            resolvedFindings ?? [],
+            baselineDebt ?? []);
 
     private static ArchitecturePolicyInventory Inventory(
         ArchitecturePolicyInventoryIgnoreDebt? debt = null,

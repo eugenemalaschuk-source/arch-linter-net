@@ -1,6 +1,8 @@
 using System.Text;
 using ArchLinterNet.Core.Change;
 using ArchLinterNet.Core.Model;
+using ArchLinterNet.Core.Reporting;
+using static ArchLinterNet.Cli.Commands.Report.Application.PrReportMarkdownFormatter;
 
 namespace ArchLinterNet.Cli.Commands.Report.Application;
 
@@ -8,7 +10,7 @@ namespace ArchLinterNet.Cli.Commands.Report.Application;
 /// Renders the Core PR-report projection as architecture-only Markdown.
 /// This type deliberately has no access to policy, analysis, SARIF, or network services.
 /// </summary>
-internal static partial class PrReportMarkdownRenderer
+internal static class PrReportMarkdownRenderer
 {
     public static string Render(ArchitecturePrReportProjection projection, int maxDetails = 20)
     {
@@ -23,16 +25,28 @@ internal static partial class PrReportMarkdownRenderer
         builder.AppendLine();
         AppendHeadline(builder, projection);
         builder.AppendLine();
-        AppendBlockers(builder, projection, maxDetails);
-        builder.AppendLine();
-        AppendDebt(builder, projection, maxDetails);
-        builder.AppendLine();
+        if (AppendBlockers(builder, projection, maxDetails))
+        {
+            builder.AppendLine();
+        }
+
+        if (AppendDebt(builder, projection, maxDetails))
+        {
+            builder.AppendLine();
+        }
+
         AppendCompleteness(builder, projection, maxDetails);
         builder.AppendLine();
-        AppendChanges(builder, projection, maxDetails);
-        builder.AppendLine();
-        AppendRemediation(builder, projection, maxDetails);
-        builder.AppendLine();
+        if (AppendChanges(builder, projection, maxDetails))
+        {
+            builder.AppendLine();
+        }
+
+        if (AppendRemediation(builder, projection, maxDetails))
+        {
+            builder.AppendLine();
+        }
+
         AppendNavigation(builder, projection, maxDetails);
         return builder.ToString().TrimEnd() + Environment.NewLine;
     }
@@ -59,47 +73,50 @@ internal static partial class PrReportMarkdownRenderer
         builder.AppendLine($"- Required external evidence: {ExternalHeadline(projection)}");
     }
 
-    private static void AppendBlockers(
+    private static bool AppendBlockers(
         StringBuilder builder,
         ArchitecturePrReportProjection projection,
         int maxDetails)
     {
-        builder.AppendLine("## Blockers");
         List<string> blockers = new();
         ArchitecturePrReportEvidence? evidence = projection.Evidence;
         if (evidence is not null)
         {
-            if (evidence.DebtGate.PolicyWeakening is not null)
+            ArchitecturePrReportPolicyWeakening? weakening = evidence.DebtGate.PolicyWeakening;
+            if (weakening is { HasBlockingFindings: true }
+                && evidence.DebtGate.Succeeded
+                && evidence.DebtGate.Evaluation.Completed
+                && !evidence.DebtGate.Passed)
             {
-                foreach (ArchitecturePrReportPolicyWeakeningFinding finding in evidence.DebtGate.PolicyWeakening.Findings
-                    .Where(IsPolicyWeakeningBlocker)
+                foreach (ArchitecturePrReportPolicyWeakeningFinding finding in weakening.Findings
                     .OrderBy(item => item.Identity, StringComparer.Ordinal))
                 {
-                    blockers.Add($"policy weakening `{Safe(finding.Identity)}`: {Safe(finding.Classification)} {Safe(finding.ControlIdentity)}");
+                    blockers.Add($"policy weakening `{Inline(finding.Identity)}`: {Text(finding.Classification)} {Text(finding.ControlIdentity)}");
                 }
             }
 
-            foreach (ArchitecturePrReportValidationReceipt receipt in evidence.ValidationOutcomes)
+            ArchitecturePrReportValidationReceipt? receipt = PrimaryReceipt(projection);
+            if (receipt?.WaiverLifecycle is not null)
             {
-                if (receipt.WaiverLifecycle is not null)
+                HashSet<string> blockingStates = receipt.WaiverLifecycle.BlockingStates.ToHashSet(StringComparer.Ordinal);
+                foreach (ArchitectureWaiverLifecycleRecord waiver in receipt.WaiverLifecycle.Records
+                    .Where(item => blockingStates.Contains(item.State))
+                    .OrderBy(item => item.Id, StringComparer.Ordinal))
                 {
-                    HashSet<string> blockingStates = receipt.WaiverLifecycle.BlockingStates.ToHashSet(StringComparer.Ordinal);
-                    foreach (ArchitectureWaiverLifecycleRecord waiver in receipt.WaiverLifecycle.Records
-                        .Where(item => blockingStates.Contains(item.State))
-                        .OrderBy(item => item.Id, StringComparer.Ordinal))
-                    {
-                        blockers.Add($"waiver `{Safe(waiver.Id)}`: lifecycle `{Safe(waiver.State)}` ({Safe(waiver.ContractId ?? waiver.ContractName)})");
-                    }
+                    blockers.Add($"waiver `{Inline(waiver.Id)}`: lifecycle `{Inline(waiver.State)}` ({Text(waiver.ContractId ?? waiver.ContractName)})");
                 }
             }
 
-            if (projection.Headline.Gate != ArchitectureHealthGate.Pass)
+            if (receipt is not null)
             {
-                foreach (ArchitecturePrReportFinding finding in AllFindings(evidence)
+                foreach (ArchitecturePrReportFinding finding in receipt.Findings
+                    .Where(finding => string.Equals(finding.Mode, "strict", StringComparison.Ordinal)
+                        && string.Equals(finding.Severity, "error", StringComparison.Ordinal)
+                        && !string.Equals(finding.Kind, "build_state_preflight", StringComparison.Ordinal))
                     .OrderBy(item => item.ContractId ?? item.ContractName, StringComparer.Ordinal)
                     .ThenBy(item => item.CanonicalIdentity, StringComparer.Ordinal))
                 {
-                    blockers.Add($"finding `{Safe(finding.CanonicalIdentity)}`: {Safe(finding.MessageCode)} ({Safe(finding.ContractId ?? finding.ContractName)})");
+                    blockers.Add($"finding `{Inline(finding.CanonicalIdentity)}`: {Text(finding.MessageCode)} ({Text(finding.ContractId ?? finding.ContractName)})");
                 }
             }
         }
@@ -110,32 +127,36 @@ internal static partial class PrReportMarkdownRenderer
         {
             foreach (ArchitectureHealthReason reason in dimension.Reasons)
             {
-                blockers.Add($"{Safe(dimension.Name)} `{DimensionToken(dimension.State)}`: {Safe(reason.Code)}{FormatReasonIdentity(reason)}");
+                blockers.Add($"{Text(dimension.Name)} `{DimensionToken(dimension.State)}`: {Text(reason.Code)}{FormatReasonIdentity(reason)}");
             }
         }
 
+        if (blockers.Count == 0)
+        {
+            return false;
+        }
+
+        builder.AppendLine("## Blockers");
         AppendBounded(builder, "Blocking governance and findings", blockers.Count, blockers, maxDetails,
             static item => $"- {item}");
+        return true;
     }
 
-    private static void AppendDebt(
+    private static bool AppendDebt(
         StringBuilder builder,
         ArchitecturePrReportProjection projection,
         int maxDetails)
     {
-        builder.AppendLine("## Non-blocking debt");
         ArchitecturePrReportEvidence? evidence = projection.Evidence;
         if (evidence is null)
         {
+            builder.AppendLine("## Non-blocking debt");
             builder.AppendLine("- Debt evidence: `unavailable`");
-            return;
+            return true;
         }
 
         ArchitecturePrReportValidationReceipt? receipt = PrimaryReceipt(projection);
         ArchitecturePolicyInventoryIgnoreDebt? waiverDebt = receipt?.PolicyInventory?.IgnoreDebt;
-        builder.AppendLine(waiverDebt is null
-            ? "- Explicit waiver debt: `unavailable`"
-            : $"- Explicit waiver debt: {waiverDebt.Total} total ({waiverDebt.Active} active; {waiverDebt.Stale} stale; {waiverDebt.Expired} expired; {waiverDebt.MetadataIncomplete} metadata-incomplete; {waiverDebt.Invalid} invalid)");
 
         IReadOnlyList<ArchitectureWaiverLifecycleRecord> lifecycleRecords = receipt?.WaiverLifecycle?.Records is { Count: > 0 } records
             ? records
@@ -145,17 +166,28 @@ internal static partial class PrReportMarkdownRenderer
             .Where(item => !blockingStates.Contains(item.State))
             .OrderBy(item => item.Id, StringComparer.Ordinal)
             .Select(FormatWaiver)
-            .ToList() ?? new();
-        AppendBounded(builder, "Waiver lifecycle detail", waivers.Count, waivers, maxDetails,
-            static item => $"- {item}");
+            .ToList();
 
         List<string> baseline = evidence.DebtGate.PersistentDebt.Entries
             .OrderBy(item => item.Identity ?? item.ContractId, StringComparer.Ordinal)
             .ThenBy(item => item.Status, StringComparer.Ordinal)
             .Select(FormatBaseline)
             .ToList();
+
+        if (waiverDebt is not null && waivers.Count == 0 && baseline.Count == 0)
+        {
+            return false;
+        }
+
+        builder.AppendLine("## Non-blocking debt");
+        builder.AppendLine(waiverDebt is null
+            ? "- Explicit waiver debt: `unavailable`"
+            : $"- Explicit waiver debt: {waiverDebt.Total} total ({waiverDebt.Active} active; {waiverDebt.Stale} stale; {waiverDebt.Expired} expired; {waiverDebt.MetadataIncomplete} metadata-incomplete; {waiverDebt.Invalid} invalid)");
+        AppendBounded(builder, "Waiver lifecycle detail", waivers.Count, waivers, maxDetails,
+            static item => $"- {item}");
         AppendBounded(builder, "Existing baseline/finding debt", baseline.Count, baseline, maxDetails,
             static item => $"- {item}");
+        return true;
     }
 
     private static void AppendCompleteness(
@@ -179,7 +211,7 @@ internal static partial class PrReportMarkdownRenderer
         else
         {
             ArchitecturePrReportApplicabilitySummary summary = applicability.Summary;
-            builder.AppendLine($"- Applicability: `{Safe(applicability.State)}` — {summary.RequiredEvaluable}/{summary.Required} evaluable; {summary.RequiredUnassessable} unassessable.");
+            builder.AppendLine($"- Applicability: `{Inline(applicability.State)}` — {summary.RequiredEvaluable}/{summary.Required} evaluable; {summary.RequiredUnassessable} unassessable.");
             List<string> controls = applicability.Controls
                 .OrderBy(item => item.ControlIdentity, StringComparer.Ordinal)
                 .Select(FormatApplicabilityControl)
@@ -241,28 +273,38 @@ internal static partial class PrReportMarkdownRenderer
         }
     }
 
-    private static void AppendChanges(
+    private static bool AppendChanges(
         StringBuilder builder,
         ArchitecturePrReportProjection projection,
         int maxDetails)
     {
+        ArchitecturePrReportChange change = projection.Change;
+        if (change.Added.Count == 0
+            && change.Removed.Count == 0
+            && change.NewFindings.Count == 0
+            && change.ExistingFindings.Count == 0
+            && change.ResolvedFindings.Count == 0
+            && change.BaselineDebt.Count == 0)
+        {
+            return false;
+        }
+
         builder.AppendLine("## Architecture change");
-        ArchitectureChangeReport change = projection.Change;
         AppendChangeEntries(builder, "Added", change.Added, maxDetails);
         AppendChangeEntries(builder, "Removed", change.Removed, maxDetails);
         AppendChangeFindings(builder, "New findings", change.NewFindings, maxDetails);
         AppendChangeFindings(builder, "Existing findings", change.ExistingFindings, maxDetails);
         AppendChangeFindings(builder, "Resolved findings", change.ResolvedFindings, maxDetails);
         AppendBounded(builder, "Baseline debt identities", change.BaselineDebt.Count, change.BaselineDebt,
-            maxDetails, static item => $"- `{Safe(item)}`");
+            maxDetails, static item => $"- `{Inline(item)}`");
+        return true;
     }
 
-    private static void AppendRemediation(
+    private static bool AppendRemediation(
         StringBuilder builder,
         ArchitecturePrReportProjection projection,
         int maxDetails)
     {
-        builder.AppendLine("## Supplied remediation");
         List<ArchitecturePrReportFinding> findings = projection.Evidence is null
             ? new()
             : AllFindings(projection.Evidence)
@@ -273,8 +315,15 @@ internal static partial class PrReportMarkdownRenderer
                 .ThenBy(item => item.CanonicalIdentity, StringComparer.Ordinal)
                 .ToList();
         List<string> entries = findings.Select(FormatRemediation).ToList();
+        if (entries.Count == 0)
+        {
+            return false;
+        }
+
+        builder.AppendLine("## Supplied remediation");
         AppendBounded(builder, "Remediation categories", entries.Count, entries, maxDetails,
             static item => $"- {item}");
+        return true;
     }
 
     private static void AppendNavigation(
@@ -287,9 +336,9 @@ internal static partial class PrReportMarkdownRenderer
             .OrderBy(item => item.Authority, StringComparer.Ordinal)
             .ThenBy(item => item.Identity, StringComparer.Ordinal)
             .ThenBy(item => item.Path, StringComparer.Ordinal)
-            .Select(item => $"`{Safe(item.Authority)}`" +
-                (string.IsNullOrWhiteSpace(item.Identity) ? string.Empty : $" `{Safe(item.Identity)}`") +
-                (string.IsNullOrWhiteSpace(item.Path) ? string.Empty : $" ({Safe(item.Path)})"))
+            .Select(item => $"`{Inline(item.Authority)}`" +
+                (string.IsNullOrWhiteSpace(item.Identity) ? string.Empty : $" `{Inline(item.Identity)}`") +
+                (string.IsNullOrWhiteSpace(item.Path) ? string.Empty : $" ({Text(item.Path)})"))
             .ToList();
         AppendBounded(builder, "References", references.Count, references, maxDetails,
             static item => $"- {item}");
@@ -303,7 +352,7 @@ internal static partial class PrReportMarkdownRenderer
         AppendBounded(builder, $"{title} surfaces", entries.Count,
             entries.OrderBy(item => item.Kind, StringComparer.Ordinal)
                 .ThenBy(item => item.Identity, StringComparer.Ordinal)
-                .Select(item => $"[{Safe(item.Kind)}] `{Safe(item.Identity)}` — {Safe(item.Display)}")
+                .Select(item => $"[{Text(item.Kind)}] `{Inline(item.Identity)}` — {Text(item.Display)}")
                 .ToList(), maxDetails, static item => $"- {item}");
 
     private static void AppendChangeFindings(
@@ -314,7 +363,7 @@ internal static partial class PrReportMarkdownRenderer
         AppendBounded(builder, title, findings.Count,
             findings.OrderBy(item => item.Kind, StringComparer.Ordinal)
                 .ThenBy(item => item.Identity, StringComparer.Ordinal)
-                .Select(item => $"[{Safe(item.Kind)}] `{Safe(item.Identity)}` — {Safe(item.Display)}")
+                .Select(item => $"[{Text(item.Kind)}] `{Inline(item.Identity)}` — {Text(item.Display)}")
                 .ToList(), maxDetails, static item => $"- {item}");
 
     private static void AppendBounded<T>(
@@ -325,6 +374,11 @@ internal static partial class PrReportMarkdownRenderer
         int maxDetails,
         Func<T, string> format)
     {
+        if (total <= 0 || items.Count == 0)
+        {
+            return;
+        }
+
         builder.AppendLine($"### {title} ({total})");
         int shown = Math.Min(total, Math.Min(maxDetails, items.Count));
         builder.AppendLine($"Showing {shown} of {total}; omitted {Math.Max(0, total - shown)}.");

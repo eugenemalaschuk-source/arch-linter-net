@@ -183,9 +183,9 @@ public sealed class ChangeCommandHandlerTests
         ChangeSnapshotCommandOptions snapshotWithBaselineCollision = new(
             "policy.yml", "strict", null, "baseline.yml", "baseline.yml", false);
         ChangeReportCommandOptions reportWithBaseCollision = new(
-            "base.json", "current.json", "json", "base.json", false);
+            "base.json", "current.json", "json", "base.json", false, "run");
         ChangeReportCommandOptions reportWithCurrentCollision = new(
-            "base.json", "current.json", "json", "current.json", false);
+            "base.json", "current.json", "json", "current.json", false, "run");
 
         Assert.Multiple(() =>
         {

@@ -8,15 +8,15 @@ using ArchLinterNet.Core.Reporting;
 
 namespace ArchLinterNet.Core.Validation;
 
-public static partial class ArchitectureHealthProjector
+internal static class ArchitectureHealthReportFindingEvidenceWriter
 {
-    private static bool HasExternalEvidence(ValidationOutcome outcome) =>
+    internal static bool HasExternalEvidence(ValidationOutcome outcome) =>
         outcome.ExternalEvidenceRequirements.Count > 0
         || outcome.ImportedDiagnosticFindings.Count > 0
         || outcome.ApplicabilityRecords.Any(record =>
             string.Equals(record.Family, "external_diagnostics", StringComparison.Ordinal));
 
-    private static JsonObject BuildExternalEvidence(ValidationOutcome outcome, string mode)
+    internal static JsonObject BuildExternalEvidence(ValidationOutcome outcome, string mode)
     {
         var requirements = new JsonArray();
         foreach (ArchitectureExternalEvidenceRequirement requirement in outcome.ExternalEvidenceRequirements
@@ -59,7 +59,7 @@ public static partial class ArchitectureHealthProjector
         };
     }
 
-    private static JsonArray BuildFindings(ValidationOutcome outcome, string mode)
+    internal static JsonArray BuildFindings(ValidationOutcome outcome, string mode)
     {
         var findings = new List<ArchitectureFinding>();
         findings.AddRange(ArchitectureFindingMapper.FromViolations(outcome.Violations, mode));
@@ -84,7 +84,7 @@ public static partial class ArchitectureHealthProjector
         return BuildFindings(ArchitectureFindingMapper.Order(findings), mode);
     }
 
-    private static JsonArray BuildFindings(IEnumerable<ArchitectureFinding> findings, string? mode)
+    internal static JsonArray BuildFindings(IEnumerable<ArchitectureFinding> findings, string? mode)
     {
         var result = new JsonArray();
         foreach (ArchitectureFinding finding in findings
@@ -102,7 +102,7 @@ public static partial class ArchitectureHealthProjector
         return result;
     }
 
-    private static JsonObject BuildProvenance(ValidationOutcome outcome) =>
+    internal static JsonObject BuildProvenance(ValidationOutcome outcome) =>
         new()
         {
             ["repository_root"] = outcome.RepositoryRoot,
@@ -111,7 +111,7 @@ public static partial class ArchitectureHealthProjector
             ["discovered_project_paths"] = ToStringArray(outcome.DiscoveredProjectPaths),
         };
 
-    private static JsonObject BuildStringMap(IReadOnlyDictionary<string, string> values)
+    internal static JsonObject BuildStringMap(IReadOnlyDictionary<string, string> values)
     {
         var result = new JsonObject();
         foreach ((string key, string value) in values.OrderBy(item => item.Key, StringComparer.Ordinal))
@@ -122,7 +122,7 @@ public static partial class ArchitectureHealthProjector
         return result;
     }
 
-    private static JsonArray ToStringArray(IEnumerable<string> values)
+    internal static JsonArray ToStringArray(IEnumerable<string> values)
     {
         var result = new JsonArray();
         foreach (string value in values.OrderBy(item => item, StringComparer.Ordinal))

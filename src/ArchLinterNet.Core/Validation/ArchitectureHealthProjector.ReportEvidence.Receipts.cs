@@ -4,12 +4,14 @@ using System.Text.Json.Nodes;
 using ArchLinterNet.Core.Contracts;
 using ArchLinterNet.Core.Model;
 using ArchLinterNet.Core.Reporting;
+using static ArchLinterNet.Core.Validation.ArchitectureHealthReportDebtEvidenceWriter;
+using static ArchLinterNet.Core.Validation.ArchitectureHealthReportFindingEvidenceWriter;
 
 namespace ArchLinterNet.Core.Validation;
 
-public static partial class ArchitectureHealthProjector
+internal static class ArchitectureHealthReportReceiptEvidenceWriter
 {
-    private static JsonObject BuildPolicyInventory(ArchitecturePolicyInventory inventory)
+    internal static JsonObject BuildPolicyInventory(ArchitecturePolicyInventory inventory)
     {
         ArchitecturePolicyInventoryRules rules = inventory.Rules;
         ArchitecturePolicyInventoryIgnoreDebt debt = inventory.IgnoreDebt;
@@ -36,7 +38,7 @@ public static partial class ArchitectureHealthProjector
         };
     }
 
-    private static JsonObject BuildWaiverLifecycle(ArchitectureWaiverLifecycleAssessment assessment) =>
+    internal static JsonObject BuildWaiverLifecycle(ArchitectureWaiverLifecycleAssessment assessment) =>
         new()
         {
             ["profile"] = assessment.Profile,
@@ -78,7 +80,7 @@ public static partial class ArchitectureHealthProjector
         return result;
     }
 
-    private static JsonObject BuildApplicability(ArchitectureAssessmentCompletionEvidence completion)
+    internal static JsonObject BuildApplicability(ArchitectureAssessmentCompletionEvidence completion)
     {
         var result = new JsonObject
         {

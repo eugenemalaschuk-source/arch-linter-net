@@ -8,4 +8,7 @@ public sealed record ArchitectureHealthRequest
     /// authority. Health reuses this request rather than defining another policy/baseline shape.
     /// </summary>
     public required ArchitectureDebtGateRequest DebtGate { get; init; }
+
+    /// <summary>Optional workflow identity retained for a later persisted report projection.</summary>
+    public string? ExecutionContext { get; init; }
 }

@@ -78,7 +78,7 @@ public sealed class ReportCommandHandlerTests
         FakeConsole console = new();
         FakeFileSystem fileSystem = new(
             ("health.json", Health),
-            ("change.json", ArchitectureChangeReports.FormatJson(new ArchitectureChangeReport([], [], [], [], []))));
+            ("change.json", EmptyChange()));
 
         int exitCode = CreateHandler(console, fileSystem).Execute(
             new PrReportCommandOptions("health.json", "change.json", "report.md", 20, false));
@@ -100,7 +100,7 @@ public sealed class ReportCommandHandlerTests
         FakeConsole console = new();
         FakeFileSystem fileSystem = new(
             ("health.json", Health),
-            ("change.json", ArchitectureChangeReports.FormatJson(new ArchitectureChangeReport([], [], [], [], []))));
+            ("change.json", EmptyChange()));
         RootCommand root = new();
         root.Subcommands.Add(new ReportCommandDefinition(CreateHandler(console, fileSystem)).Create());
 
@@ -116,6 +116,12 @@ public sealed class ReportCommandHandlerTests
 
     private static ReportCommandHandler CreateHandler(FakeConsole console, FakeFileSystem fileSystem) =>
         new(console, fileSystem);
+
+    private static string EmptyChange() => ArchitectureChangeReports.FormatJson(
+        new ArchitectureChangeReport([], [], [], [], [])
+        {
+            ExecutionContext = new ArchitectureChangeReportContext("run", "strict", string.Empty),
+        });
 
     private sealed class FakeConsole : ICliConsole
     {

@@ -34,22 +34,50 @@ public static class ArchitecturePrReportProjector
             return ArchitecturePrReportAvailability.Unavailable;
         }
 
-        if (input.Summary.Health == ArchitectureHealthState.Unassessable
-            || input.Evidence.ValidationOutcomes.Any(receipt =>
-                receipt.Availability.Values.Any(value => string.Equals(value, "unassessable", StringComparison.Ordinal))))
+        if (input.Summary.Health == ArchitectureHealthState.Unassessable)
         {
             return ArchitecturePrReportAvailability.Unassessable;
         }
 
-        bool unavailable = input.Evidence.ValidationOutcomes.Any(receipt =>
-            receipt.Availability.Values.Any(value => string.Equals(value, "unavailable", StringComparison.Ordinal))
-            || receipt.PolicyInventory is null
-            || receipt.WaiverLifecycle is null
-            || receipt.Applicability is null);
+        bool unavailable = input.Evidence.ValidationOutcomes.Any(receipt => !IsAvailableReceipt(receipt));
         return unavailable
             ? ArchitecturePrReportAvailability.Unavailable
             : ArchitecturePrReportAvailability.Complete;
     }
+
+    private static bool IsAvailableReceipt(ArchitecturePrReportValidationReceipt receipt)
+    {
+        IReadOnlyDictionary<string, string> availability = receipt.Availability;
+        string[] expectedKeys =
+        [
+            "applicability",
+            "external_evidence",
+            "findings",
+            "policy_inventory",
+            "topology",
+            "waiver_lifecycle",
+        ];
+        if (availability.Count != expectedKeys.Length || !expectedKeys.All(availability.ContainsKey))
+        {
+            return false;
+        }
+
+        bool topology = receipt.Applicability?.Controls.Any(control => control.Record?.Topology is not null) == true;
+        return Matches(availability, "policy_inventory", receipt.PolicyInventory is not null, "unavailable")
+            && Matches(availability, "waiver_lifecycle", receipt.WaiverLifecycle is not null, "unavailable")
+            && Matches(availability, "applicability", receipt.Applicability is not null, "unavailable")
+            && Matches(availability, "topology", topology, "not_configured")
+            && Matches(availability, "external_evidence", receipt.ExternalEvidence is not null, "not_configured")
+            && Matches(availability, "findings", receipt.Findings is not null, "unavailable");
+    }
+
+    private static bool Matches(
+        IReadOnlyDictionary<string, string> availability,
+        string key,
+        bool hasPayload,
+        string absentValue) => availability.TryGetValue(key, out string? value)
+            && (value == "available" || value == absentValue)
+            && hasPayload == string.Equals(value, "available", StringComparison.Ordinal);
 
     private static IReadOnlyList<ArchitecturePrReportNavigationReference> BuildNavigation(
         ArchitecturePrReportInput input)

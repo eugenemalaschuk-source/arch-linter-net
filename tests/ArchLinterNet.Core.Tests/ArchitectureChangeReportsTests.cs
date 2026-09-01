@@ -48,7 +48,7 @@ public sealed class ArchitectureChangeReportsTests
             },
             debt: _knownDebtIdentities);
 
-        ArchitectureChangeReport report = ArchitectureChangeReports.Compare(baseline, current);
+        ArchitectureChangeReport report = ArchitectureChangeReports.Compare(baseline, current, "run");
 
         Assert.Multiple(() =>
         {
@@ -58,6 +58,7 @@ public sealed class ArchitectureChangeReportsTests
             Assert.That(report.ExistingFindings.Select(static finding => finding.Identity), Is.EqualTo(_knownDebtIdentities));
             Assert.That(report.ResolvedFindings.Select(static finding => finding.Identity), Is.EqualTo(_resolvedFindingIdentities));
             Assert.That(report.BaselineDebt, Is.EqualTo(_knownDebtIdentities));
+            Assert.That(report.ExecutionContext, Is.EqualTo(new ArchitectureChangeReportContext("run", "strict", string.Empty)));
         });
     }
 
@@ -76,7 +77,7 @@ public sealed class ArchitectureChangeReportsTests
         {
             Assert.That(restored.SchemaVersion, Is.EqualTo(ArchitectureChangeSnapshot.CurrentSchemaVersion));
             Assert.That(restored.Entries.Select(static entry => entry.Identity), Is.EqualTo(_sortedNamespaceIdentities));
-            Assert.That(ArchitectureChangeReports.FormatJson(ArchitectureChangeReports.Compare(restored, restored)),
+            Assert.That(ArchitectureChangeReports.FormatJson(ArchitectureChangeReports.Compare(restored, restored, "run")),
                 Does.Contain("resolved_findings"));
         });
     }
@@ -97,7 +98,7 @@ public sealed class ArchitectureChangeReportsTests
                 new ArchitectureChangeFinding("new", "dependency", "new"),
             });
 
-        ArchitectureChangeReport report = ArchitectureChangeReports.Compare(baseline, current);
+        ArchitectureChangeReport report = ArchitectureChangeReports.Compare(baseline, current, "run");
 
         Assert.Multiple(() =>
         {
@@ -119,7 +120,7 @@ public sealed class ArchitectureChangeReportsTests
 
         Assert.Multiple(() =>
         {
-            Assert.That(() => ArchitectureChangeReports.Compare(strict, audit), Throws.ArgumentException);
+            Assert.That(() => ArchitectureChangeReports.Compare(strict, audit, "run"), Throws.ArgumentException);
             Assert.That(() => ArchitectureChangeReports.DeserializeSnapshot("{}"), Throws.ArgumentException);
         });
     }
@@ -130,7 +131,16 @@ public sealed class ArchitectureChangeReportsTests
         ArchitectureChangeSnapshot baseline = Snapshot(conditionSetName: "ci");
         ArchitectureChangeSnapshot current = Snapshot(conditionSetName: "developer");
 
-        Assert.That(() => ArchitectureChangeReports.Compare(baseline, current), Throws.ArgumentException);
+        Assert.That(() => ArchitectureChangeReports.Compare(baseline, current, "run"), Throws.ArgumentException);
+    }
+
+    [Test]
+    public void DeserializeReport_RejectsMissingExecutionContext()
+    {
+        const string Report =
+            "{\"kind\":\"architecture-change-report\",\"schema_version\":2,\"added\":[],\"removed\":[],\"new_findings\":[],\"existing_findings\":[],\"resolved_findings\":[],\"baseline_debt\":[]}";
+
+        Assert.That(() => ArchitectureChangeReports.DeserializeReport(Report), Throws.ArgumentException);
     }
 
     [TestCase("{\"snapshot_kind\":\"architecture-change-snapshot\",\"schema_version\":2,\"mode\":\"strict\",\"condition_set_name\":\"\",\"findings\":[],\"baseline_debt\":[]}")]
@@ -148,7 +158,7 @@ public sealed class ArchitectureChangeReportsTests
         ArchitectureChangeSnapshot current = Snapshot(
             findings: new[] { new ArchitectureChangeFinding("frozen-debt", "dependency", "known debt") });
 
-        ArchitectureChangeReport report = ArchitectureChangeReports.Compare(baseline, current);
+        ArchitectureChangeReport report = ArchitectureChangeReports.Compare(baseline, current, "run");
 
         Assert.Multiple(() =>
         {

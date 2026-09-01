@@ -1,6 +1,10 @@
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using ArchLinterNet.Core.Model;
+using static ArchLinterNet.Core.Validation.ArchitectureHealthProjector;
+using static ArchLinterNet.Core.Validation.ArchitectureHealthReportDebtEvidenceWriter;
+using static ArchLinterNet.Core.Validation.ArchitectureHealthReportFindingEvidenceWriter;
+using static ArchLinterNet.Core.Validation.ArchitectureHealthReportReceiptEvidenceWriter;
 
 namespace ArchLinterNet.Core.Validation;
 
@@ -14,25 +18,32 @@ internal sealed record ArchitectureHealthReportEvidenceEnvelope(
     string Kind,
     string Gate,
     string Health,
+    string? ExecutionId,
+    string ConditionSet,
     IReadOnlyList<ArchitectureHealthValidationOutcome> ValidationOutcomes,
     ArchitectureDebtGateOutcome DebtGate);
 
-public static partial class ArchitectureHealthProjector
+internal static class ArchitectureHealthReportEvidenceWriter
 {
-    private const int ReportEvidenceSchemaVersion = 1;
+    private const int ReportEvidenceSchemaVersion = 2;
     private const string ReportEvidenceKind = "architecture-health-report-evidence";
 
     /// <summary>
     /// Renders the complete architecture-health/v1 artifact, including additive canonical evidence
     /// from the same immutable validation and debt-gate receipts as <paramref name="outcome"/>.
     /// </summary>
-    public static string FormatAsJson(ArchitectureHealthOutcome outcome)
+    internal static string Format(ArchitectureHealthOutcome outcome)
     {
         ArgumentNullException.ThrowIfNull(outcome);
-        JsonNode? summaryNode = JsonNode.Parse(FormatAsJson(outcome.Summary));
+        JsonNode? summaryNode = JsonNode.Parse(ArchitectureHealthProjector.FormatAsJson(outcome.Summary));
         if (summaryNode is not JsonObject summary)
         {
             throw new InvalidOperationException("Architecture Health summary must be a JSON object.");
+        }
+
+        if (string.IsNullOrWhiteSpace(outcome.ExecutionContext))
+        {
+            return summary.ToJsonString();
         }
 
         ArchitectureHealthReportEvidenceEnvelope evidence = new(
@@ -40,6 +51,8 @@ public static partial class ArchitectureHealthProjector
             ReportEvidenceKind,
             WireName(outcome.Summary.Gate),
             WireName(outcome.Summary.Health),
+            outcome.ExecutionContext,
+            outcome.ConditionSetName,
             outcome.ValidationOutcomes.OrderBy(item => item.Mode, StringComparer.Ordinal).ToArray(),
             outcome.DebtGate);
         summary["report_evidence"] = BuildReportEvidence(evidence);
@@ -55,6 +68,15 @@ public static partial class ArchitectureHealthProjector
             ["gate"] = evidence.Gate,
             ["health"] = evidence.Health,
         };
+
+        if (!string.IsNullOrWhiteSpace(evidence.ExecutionId))
+        {
+            result["execution_context"] = new JsonObject
+            {
+                ["execution_id"] = evidence.ExecutionId,
+                ["condition_set"] = evidence.ConditionSet,
+            };
+        }
 
         var outcomes = new JsonArray();
         foreach (ArchitectureHealthValidationOutcome outcome in evidence.ValidationOutcomes)
@@ -103,9 +125,8 @@ public static partial class ArchitectureHealthProjector
 
     private static JsonObject BuildAvailability(ValidationOutcome outcome)
     {
-        bool hasTopology = outcome.ApplicabilityRecords.Any(record => record.TopologyEvidence is not null)
-            || outcome.AssessmentCompletionEvidence?.Controls.Any(control =>
-                control.Record?.TopologyEvidence is not null) == true;
+        bool hasTopology = outcome.AssessmentCompletionEvidence?.Controls.Any(control =>
+            control.Record?.TopologyEvidence is not null) == true;
         bool hasExternal = HasExternalEvidence(outcome);
         return new JsonObject
         {

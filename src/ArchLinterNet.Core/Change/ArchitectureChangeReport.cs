@@ -31,7 +31,7 @@ public sealed record ArchitectureChangeReport(
     IReadOnlyList<string> BaselineDebt)
 {
     /// <summary>Current version of the serialized architecture-change report artifact.</summary>
-    public const int CurrentSchemaVersion = 1;
+    public const int CurrentSchemaVersion = 2;
 
     /// <summary>Stable kind discriminator for the serialized architecture-change report.</summary>
     public const string ReportKind = "architecture-change-report";
@@ -42,12 +42,21 @@ public sealed record ArchitectureChangeReport(
     /// <summary>Serialized report kind discriminator.</summary>
     public string Kind { get; init; } = ReportKind;
 
+    /// <summary>Correlation context supplied by the workflow that created this report.</summary>
+    public ArchitectureChangeReportContext? ExecutionContext { get; init; }
+
     // Keep resolved findings additive rather than adding a positional constructor parameter. This
     // preserves the public five-argument construction/deconstruction shape while extending the
     // canonical report document for downstream consumers.
     public IReadOnlyList<ArchitectureChangeFinding> ResolvedFindings { get; init; } =
         Array.Empty<ArchitectureChangeFinding>();
 }
+
+/// <summary>Mode, condition set, and workflow identity proven by one change report.</summary>
+public sealed record ArchitectureChangeReportContext(
+    string ExecutionId,
+    string Mode,
+    string ConditionSet);
 
 /// <summary>Serializes, validates, and compares architecture change snapshots.</summary>
 public static class ArchitectureChangeReports
@@ -107,7 +116,10 @@ public static class ArchitectureChangeReports
         };
     }
 
-    public static ArchitectureChangeReport Compare(ArchitectureChangeSnapshot baseline, ArchitectureChangeSnapshot current)
+    public static ArchitectureChangeReport Compare(
+        ArchitectureChangeSnapshot baseline,
+        ArchitectureChangeSnapshot current,
+        string executionId)
     {
         ArgumentNullException.ThrowIfNull(baseline);
         ArgumentNullException.ThrowIfNull(current);
@@ -123,6 +135,11 @@ public static class ArchitectureChangeReports
             throw new ArgumentException("Base and current snapshots must use the same condition set.");
         }
 
+        if (string.IsNullOrWhiteSpace(executionId))
+        {
+            throw new ArgumentException("Architecture change reports require a non-empty execution context.", nameof(executionId));
+        }
+
         Dictionary<string, ArchitectureChangeEntry> baseEntries = baseline.Entries.ToDictionary(Key, StringComparer.Ordinal);
         Dictionary<string, ArchitectureChangeEntry> currentEntries = current.Entries.ToDictionary(Key, StringComparer.Ordinal);
         HashSet<string> knownBaseIdentities = baseline.Findings
@@ -130,6 +147,9 @@ public static class ArchitectureChangeReports
             .Concat(baseline.BaselineDebt)
             .ToHashSet(StringComparer.Ordinal);
 
+        HashSet<string> currentFindingIdentities = current.Findings
+            .Select(static finding => finding.Identity)
+            .ToHashSet(StringComparer.Ordinal);
         return new ArchitectureChangeReport(
             Order(currentEntries.Where(pair => !baseEntries.ContainsKey(pair.Key)).Select(static pair => pair.Value)),
             Order(baseEntries.Where(pair => !currentEntries.ContainsKey(pair.Key)).Select(static pair => pair.Value)),
@@ -137,9 +157,12 @@ public static class ArchitectureChangeReports
             Order(current.Findings.Where(finding => knownBaseIdentities.Contains(finding.Identity))),
             current.BaselineDebt.OrderBy(static value => value, StringComparer.Ordinal).ToArray())
         {
+            ExecutionContext = new ArchitectureChangeReportContext(
+                executionId,
+                current.Mode,
+                current.ConditionSetName),
             ResolvedFindings = Order(baseline.Findings.Where(finding =>
-                !current.Findings.Any(currentFinding =>
-                    string.Equals(currentFinding.Identity, finding.Identity, StringComparison.Ordinal))))
+                !currentFindingIdentities.Contains(finding.Identity)))
         };
     }
 
@@ -212,6 +235,12 @@ public static class ArchitectureChangeReports
         {
             SchemaVersion = document.SchemaVersion,
             Kind = document.Kind!,
+            ExecutionContext = document.ExecutionContext is null
+                ? null
+                : new ArchitectureChangeReportContext(
+                    document.ExecutionContext.ExecutionId ?? string.Empty,
+                    document.ExecutionContext.Mode ?? string.Empty,
+                    document.ExecutionContext.ConditionSet ?? string.Empty),
             ResolvedFindings = document.ResolvedFindings,
         };
         Validate(report);
@@ -227,7 +256,11 @@ public static class ArchitectureChangeReports
             || report.NewFindings is null
             || report.ExistingFindings is null
             || report.ResolvedFindings is null
-            || report.BaselineDebt is null)
+            || report.BaselineDebt is null
+            || report.ExecutionContext is null
+            || string.IsNullOrWhiteSpace(report.ExecutionContext.ExecutionId)
+            || report.ExecutionContext.Mode is not ("strict" or "audit")
+            || report.ExecutionContext.ConditionSet is null)
         {
             throw new ArgumentException("The architecture change report is incomplete or unsupported.", nameof(report));
         }
@@ -318,10 +351,16 @@ public static class ArchitectureChangeReports
     private sealed record ReportDocument(
         string? Kind,
         int SchemaVersion,
+        ReportContextDocument? ExecutionContext,
         IReadOnlyList<ArchitectureChangeEntry>? Added,
         IReadOnlyList<ArchitectureChangeEntry>? Removed,
         IReadOnlyList<ArchitectureChangeFinding>? NewFindings,
         IReadOnlyList<ArchitectureChangeFinding>? ExistingFindings,
         IReadOnlyList<ArchitectureChangeFinding>? ResolvedFindings,
         IReadOnlyList<string>? BaselineDebt);
+
+    private sealed record ReportContextDocument(
+        string? ExecutionId,
+        string? Mode,
+        string? ConditionSet);
 }

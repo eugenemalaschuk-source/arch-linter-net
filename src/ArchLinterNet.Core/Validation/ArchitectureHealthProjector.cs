@@ -10,7 +10,7 @@ namespace ArchLinterNet.Core.Validation;
 /// It deliberately owns no policy loading, scanning, trust validation, lifecycle comparison, or
 /// applicability evaluation.
 /// </summary>
-public static partial class ArchitectureHealthProjector
+public static class ArchitectureHealthProjector
 {
     private const string CurrentEvaluation = "current_evaluation";
     private const string Applicability = "applicability";
@@ -117,6 +117,10 @@ public static partial class ArchitectureHealthProjector
             }).ToArray(),
         });
     }
+
+    /// <summary>Renders Health JSON together with its additive canonical reporting evidence.</summary>
+    public static string FormatAsJson(ArchitectureHealthOutcome outcome) =>
+        ArchitectureHealthReportEvidenceWriter.Format(outcome);
 
     private static ArchitectureHealthDimension ProjectCurrentEvaluation(
         IReadOnlyList<ArchitectureHealthValidationOutcome> outcomes)
@@ -432,7 +436,7 @@ public static partial class ArchitectureHealthProjector
 
     private sealed record ArchitectureHealthAuthorityFinding(string AnalysisMode, ArchitectureHealthReason Reason);
 
-    private static string WireName(ArchitectureHealthGate value) => value switch
+    internal static string WireName(ArchitectureHealthGate value) => value switch
     {
         ArchitectureHealthGate.Pass => "pass",
         ArchitectureHealthGate.Fail => "fail",
@@ -440,7 +444,7 @@ public static partial class ArchitectureHealthProjector
         _ => throw new ArgumentOutOfRangeException(nameof(value), value, null),
     };
 
-    private static string WireName(ArchitectureHealthState value) => value switch
+    internal static string WireName(ArchitectureHealthState value) => value switch
     {
         ArchitectureHealthState.Healthy => "healthy",
         ArchitectureHealthState.Debt => "debt",
@@ -450,7 +454,7 @@ public static partial class ArchitectureHealthProjector
         _ => throw new ArgumentOutOfRangeException(nameof(value), value, null),
     };
 
-    private static string WireName(ArchitectureHealthDimensionState value) => value switch
+    internal static string WireName(ArchitectureHealthDimensionState value) => value switch
     {
         ArchitectureHealthDimensionState.Pass => "pass",
         ArchitectureHealthDimensionState.Fail => "fail",

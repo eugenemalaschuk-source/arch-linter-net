@@ -443,6 +443,8 @@ sealed class ArchLinterNet.Core.Change.ArchitectureChangeFinding : System.IEquat
   property string Kind {get;init;}
 sealed class ArchLinterNet.Core.Change.ArchitectureChangeReport : System.IEquatable<ArchLinterNet.Core.Change.ArchitectureChangeReport>
   ctor(System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Change.ArchitectureChangeEntry> Added, System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Change.ArchitectureChangeEntry> Removed, System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Change.ArchitectureChangeFinding> NewFindings, System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Change.ArchitectureChangeFinding> ExistingFindings, System.Collections.Generic.IReadOnlyList<string> BaselineDebt)
+  field const int CurrentSchemaVersion = 2
+  field const string ReportKind = "architecture-change-report"
   method ArchLinterNet.Core.Change.ArchitectureChangeReport <Clone>$()
   method bool Equals(ArchLinterNet.Core.Change.ArchitectureChangeReport? other)
   method bool Equals(object? obj)
@@ -451,13 +453,31 @@ sealed class ArchLinterNet.Core.Change.ArchitectureChangeReport : System.IEquata
   method void Deconstruct(out System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Change.ArchitectureChangeEntry> Added, out System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Change.ArchitectureChangeEntry> Removed, out System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Change.ArchitectureChangeFinding> NewFindings, out System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Change.ArchitectureChangeFinding> ExistingFindings, out System.Collections.Generic.IReadOnlyList<string> BaselineDebt)
   operator !=(ArchLinterNet.Core.Change.ArchitectureChangeReport? left, ArchLinterNet.Core.Change.ArchitectureChangeReport? right)
   operator ==(ArchLinterNet.Core.Change.ArchitectureChangeReport? left, ArchLinterNet.Core.Change.ArchitectureChangeReport? right)
+  property ArchLinterNet.Core.Change.ArchitectureChangeReportContext? ExecutionContext {get;init;}
   property System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Change.ArchitectureChangeEntry> Added {get;init;}
   property System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Change.ArchitectureChangeEntry> Removed {get;init;}
   property System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Change.ArchitectureChangeFinding> ExistingFindings {get;init;}
   property System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Change.ArchitectureChangeFinding> NewFindings {get;init;}
+  property System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Change.ArchitectureChangeFinding> ResolvedFindings {get;init;}
   property System.Collections.Generic.IReadOnlyList<string> BaselineDebt {get;init;}
+  property int SchemaVersion {get;init;}
+  property string Kind {get;init;}
+sealed class ArchLinterNet.Core.Change.ArchitectureChangeReportContext : System.IEquatable<ArchLinterNet.Core.Change.ArchitectureChangeReportContext>
+  ctor(string ExecutionId, string Mode, string ConditionSet)
+  method ArchLinterNet.Core.Change.ArchitectureChangeReportContext <Clone>$()
+  method bool Equals(ArchLinterNet.Core.Change.ArchitectureChangeReportContext? other)
+  method bool Equals(object? obj)
+  method int GetHashCode()
+  method string ToString()
+  method void Deconstruct(out string ExecutionId, out string Mode, out string ConditionSet)
+  operator !=(ArchLinterNet.Core.Change.ArchitectureChangeReportContext? left, ArchLinterNet.Core.Change.ArchitectureChangeReportContext? right)
+  operator ==(ArchLinterNet.Core.Change.ArchitectureChangeReportContext? left, ArchLinterNet.Core.Change.ArchitectureChangeReportContext? right)
+  property string ConditionSet {get;init;}
+  property string ExecutionId {get;init;}
+  property string Mode {get;init;}
 static class ArchLinterNet.Core.Change.ArchitectureChangeReports
-  method static ArchLinterNet.Core.Change.ArchitectureChangeReport Compare(ArchLinterNet.Core.Change.ArchitectureChangeSnapshot baseline, ArchLinterNet.Core.Change.ArchitectureChangeSnapshot current)
+  method static ArchLinterNet.Core.Change.ArchitectureChangeReport Compare(ArchLinterNet.Core.Change.ArchitectureChangeSnapshot baseline, ArchLinterNet.Core.Change.ArchitectureChangeSnapshot current, string executionId)
+  method static ArchLinterNet.Core.Change.ArchitectureChangeReport DeserializeReport(string json)
   method static ArchLinterNet.Core.Change.ArchitectureChangeSnapshot DeserializeSnapshot(string json)
   method static string FormatHuman(ArchLinterNet.Core.Change.ArchitectureChangeReport report)
   method static string FormatJson(ArchLinterNet.Core.Change.ArchitectureChangeReport report)
@@ -5489,6 +5509,577 @@ static class ArchLinterNet.Core.Reporting.ArchitectureFindingMapper
 static class ArchLinterNet.Core.Reporting.ArchitectureImportedDiagnosticProjector
   method static ArchLinterNet.Core.Model.ArchitectureFinding ToFinding(ArchLinterNet.Core.Model.SarifSelectedExternalDiagnostic selectedDiagnostic)
   method static ArchLinterNet.Core.Model.ImportedExternalDiagnosticProjection Project(ArchLinterNet.Core.Model.SarifExternalDiagnosticSelectionResult selection, System.Threading.CancellationToken cancellationToken = null)
+sealed class ArchLinterNet.Core.Reporting.ArchitecturePrReportApplicability : System.IEquatable<ArchLinterNet.Core.Reporting.ArchitecturePrReportApplicability>
+  ctor(string State, ArchLinterNet.Core.Reporting.ArchitecturePrReportApplicabilitySummary Summary, System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Reporting.ArchitecturePrReportApplicabilityReason> Reasons, System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Reporting.ArchitecturePrReportApplicabilityControl> Controls)
+  method ArchLinterNet.Core.Reporting.ArchitecturePrReportApplicability <Clone>$()
+  method bool Equals(ArchLinterNet.Core.Reporting.ArchitecturePrReportApplicability? other)
+  method bool Equals(object? obj)
+  method int GetHashCode()
+  method string ToString()
+  method void Deconstruct(out string State, out ArchLinterNet.Core.Reporting.ArchitecturePrReportApplicabilitySummary Summary, out System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Reporting.ArchitecturePrReportApplicabilityReason> Reasons, out System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Reporting.ArchitecturePrReportApplicabilityControl> Controls)
+  operator !=(ArchLinterNet.Core.Reporting.ArchitecturePrReportApplicability? left, ArchLinterNet.Core.Reporting.ArchitecturePrReportApplicability? right)
+  operator ==(ArchLinterNet.Core.Reporting.ArchitecturePrReportApplicability? left, ArchLinterNet.Core.Reporting.ArchitecturePrReportApplicability? right)
+  property ArchLinterNet.Core.Reporting.ArchitecturePrReportApplicabilitySummary Summary {get;init;}
+  property System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Reporting.ArchitecturePrReportApplicabilityControl> Controls {get;init;}
+  property System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Reporting.ArchitecturePrReportApplicabilityReason> Reasons {get;init;}
+  property string State {get;init;}
+sealed class ArchLinterNet.Core.Reporting.ArchitecturePrReportApplicabilityControl : System.IEquatable<ArchLinterNet.Core.Reporting.ArchitecturePrReportApplicabilityControl>
+  ctor(string ControlIdentity, string? Membership, string State, bool IntegrityValid, System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Reporting.ArchitecturePrReportApplicabilityReason> IntegrityReasons, ArchLinterNet.Core.Reporting.ArchitecturePrReportApplicabilityExpected? Expected, ArchLinterNet.Core.Reporting.ArchitecturePrReportApplicabilityRecord? Record)
+  method ArchLinterNet.Core.Reporting.ArchitecturePrReportApplicabilityControl <Clone>$()
+  method bool Equals(ArchLinterNet.Core.Reporting.ArchitecturePrReportApplicabilityControl? other)
+  method bool Equals(object? obj)
+  method int GetHashCode()
+  method string ToString()
+  method void Deconstruct(out string ControlIdentity, out string? Membership, out string State, out bool IntegrityValid, out System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Reporting.ArchitecturePrReportApplicabilityReason> IntegrityReasons, out ArchLinterNet.Core.Reporting.ArchitecturePrReportApplicabilityExpected? Expected, out ArchLinterNet.Core.Reporting.ArchitecturePrReportApplicabilityRecord? Record)
+  operator !=(ArchLinterNet.Core.Reporting.ArchitecturePrReportApplicabilityControl? left, ArchLinterNet.Core.Reporting.ArchitecturePrReportApplicabilityControl? right)
+  operator ==(ArchLinterNet.Core.Reporting.ArchitecturePrReportApplicabilityControl? left, ArchLinterNet.Core.Reporting.ArchitecturePrReportApplicabilityControl? right)
+  property ArchLinterNet.Core.Reporting.ArchitecturePrReportApplicabilityExpected? Expected {get;init;}
+  property ArchLinterNet.Core.Reporting.ArchitecturePrReportApplicabilityRecord? Record {get;init;}
+  property System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Reporting.ArchitecturePrReportApplicabilityReason> IntegrityReasons {get;init;}
+  property bool IntegrityValid {get;init;}
+  property string ControlIdentity {get;init;}
+  property string State {get;init;}
+  property string? Membership {get;init;}
+sealed class ArchLinterNet.Core.Reporting.ArchitecturePrReportApplicabilityExpected : System.IEquatable<ArchLinterNet.Core.Reporting.ArchitecturePrReportApplicabilityExpected>
+  ctor(string ControlIdentity, string Family, string Membership, ArchLinterNet.Core.Reporting.ArchitecturePrReportProvenanceReference Provenance)
+  method ArchLinterNet.Core.Reporting.ArchitecturePrReportApplicabilityExpected <Clone>$()
+  method bool Equals(ArchLinterNet.Core.Reporting.ArchitecturePrReportApplicabilityExpected? other)
+  method bool Equals(object? obj)
+  method int GetHashCode()
+  method string ToString()
+  method void Deconstruct(out string ControlIdentity, out string Family, out string Membership, out ArchLinterNet.Core.Reporting.ArchitecturePrReportProvenanceReference Provenance)
+  operator !=(ArchLinterNet.Core.Reporting.ArchitecturePrReportApplicabilityExpected? left, ArchLinterNet.Core.Reporting.ArchitecturePrReportApplicabilityExpected? right)
+  operator ==(ArchLinterNet.Core.Reporting.ArchitecturePrReportApplicabilityExpected? left, ArchLinterNet.Core.Reporting.ArchitecturePrReportApplicabilityExpected? right)
+  property ArchLinterNet.Core.Reporting.ArchitecturePrReportProvenanceReference Provenance {get;init;}
+  property string ControlIdentity {get;init;}
+  property string Family {get;init;}
+  property string Membership {get;init;}
+sealed class ArchLinterNet.Core.Reporting.ArchitecturePrReportApplicabilityReason : System.IEquatable<ArchLinterNet.Core.Reporting.ArchitecturePrReportApplicabilityReason>
+  ctor(string Code, ArchLinterNet.Core.Reporting.ArchitecturePrReportProvenanceReference Provenance)
+  method ArchLinterNet.Core.Reporting.ArchitecturePrReportApplicabilityReason <Clone>$()
+  method bool Equals(ArchLinterNet.Core.Reporting.ArchitecturePrReportApplicabilityReason? other)
+  method bool Equals(object? obj)
+  method int GetHashCode()
+  method string ToString()
+  method void Deconstruct(out string Code, out ArchLinterNet.Core.Reporting.ArchitecturePrReportProvenanceReference Provenance)
+  operator !=(ArchLinterNet.Core.Reporting.ArchitecturePrReportApplicabilityReason? left, ArchLinterNet.Core.Reporting.ArchitecturePrReportApplicabilityReason? right)
+  operator ==(ArchLinterNet.Core.Reporting.ArchitecturePrReportApplicabilityReason? left, ArchLinterNet.Core.Reporting.ArchitecturePrReportApplicabilityReason? right)
+  property ArchLinterNet.Core.Reporting.ArchitecturePrReportProvenanceReference Provenance {get;init;}
+  property string Code {get;init;}
+sealed class ArchLinterNet.Core.Reporting.ArchitecturePrReportApplicabilityRecord : System.IEquatable<ArchLinterNet.Core.Reporting.ArchitecturePrReportApplicabilityRecord>
+  ctor(string ControlIdentity, string Family, string State, System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Reporting.ArchitecturePrReportApplicabilityReason> Reasons, ArchLinterNet.Core.Reporting.ArchitecturePrReportProvenanceReference Provenance, ArchLinterNet.Core.Reporting.ArchitecturePrReportTopology? Topology, ArchLinterNet.Core.Reporting.ArchitecturePrReportMetric? Metric)
+  method ArchLinterNet.Core.Reporting.ArchitecturePrReportApplicabilityRecord <Clone>$()
+  method bool Equals(ArchLinterNet.Core.Reporting.ArchitecturePrReportApplicabilityRecord? other)
+  method bool Equals(object? obj)
+  method int GetHashCode()
+  method string ToString()
+  method void Deconstruct(out string ControlIdentity, out string Family, out string State, out System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Reporting.ArchitecturePrReportApplicabilityReason> Reasons, out ArchLinterNet.Core.Reporting.ArchitecturePrReportProvenanceReference Provenance, out ArchLinterNet.Core.Reporting.ArchitecturePrReportTopology? Topology, out ArchLinterNet.Core.Reporting.ArchitecturePrReportMetric? Metric)
+  operator !=(ArchLinterNet.Core.Reporting.ArchitecturePrReportApplicabilityRecord? left, ArchLinterNet.Core.Reporting.ArchitecturePrReportApplicabilityRecord? right)
+  operator ==(ArchLinterNet.Core.Reporting.ArchitecturePrReportApplicabilityRecord? left, ArchLinterNet.Core.Reporting.ArchitecturePrReportApplicabilityRecord? right)
+  property ArchLinterNet.Core.Reporting.ArchitecturePrReportMetric? Metric {get;init;}
+  property ArchLinterNet.Core.Reporting.ArchitecturePrReportProvenanceReference Provenance {get;init;}
+  property ArchLinterNet.Core.Reporting.ArchitecturePrReportTopology? Topology {get;init;}
+  property System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Reporting.ArchitecturePrReportApplicabilityReason> Reasons {get;init;}
+  property string ControlIdentity {get;init;}
+  property string Family {get;init;}
+  property string State {get;init;}
+sealed class ArchLinterNet.Core.Reporting.ArchitecturePrReportApplicabilitySummary : System.IEquatable<ArchLinterNet.Core.Reporting.ArchitecturePrReportApplicabilitySummary>
+  ctor(int Required, int RequiredEvaluable, int RequiredUnassessable)
+  method ArchLinterNet.Core.Reporting.ArchitecturePrReportApplicabilitySummary <Clone>$()
+  method bool Equals(ArchLinterNet.Core.Reporting.ArchitecturePrReportApplicabilitySummary? other)
+  method bool Equals(object? obj)
+  method int GetHashCode()
+  method string ToString()
+  method void Deconstruct(out int Required, out int RequiredEvaluable, out int RequiredUnassessable)
+  operator !=(ArchLinterNet.Core.Reporting.ArchitecturePrReportApplicabilitySummary? left, ArchLinterNet.Core.Reporting.ArchitecturePrReportApplicabilitySummary? right)
+  operator ==(ArchLinterNet.Core.Reporting.ArchitecturePrReportApplicabilitySummary? left, ArchLinterNet.Core.Reporting.ArchitecturePrReportApplicabilitySummary? right)
+  property int Required {get;init;}
+  property int RequiredEvaluable {get;init;}
+  property int RequiredUnassessable {get;init;}
+enum ArchLinterNet.Core.Reporting.ArchitecturePrReportAvailability : int
+  enum-member Complete = 0
+  enum-member Unassessable = 2
+  enum-member Unavailable = 1
+sealed class ArchLinterNet.Core.Reporting.ArchitecturePrReportBaselineEntry : System.IEquatable<ArchLinterNet.Core.Reporting.ArchitecturePrReportBaselineEntry>
+  ctor(string Status, string Disposition, string ContractGroup, string ContractId, string SourceType, string ForbiddenReference, string? Reason, string? Issue, string? CurrentForbiddenReference, string? Identity)
+  method ArchLinterNet.Core.Reporting.ArchitecturePrReportBaselineEntry <Clone>$()
+  method bool Equals(ArchLinterNet.Core.Reporting.ArchitecturePrReportBaselineEntry? other)
+  method bool Equals(object? obj)
+  method int GetHashCode()
+  method string ToString()
+  method void Deconstruct(out string Status, out string Disposition, out string ContractGroup, out string ContractId, out string SourceType, out string ForbiddenReference, out string? Reason, out string? Issue, out string? CurrentForbiddenReference, out string? Identity)
+  operator !=(ArchLinterNet.Core.Reporting.ArchitecturePrReportBaselineEntry? left, ArchLinterNet.Core.Reporting.ArchitecturePrReportBaselineEntry? right)
+  operator ==(ArchLinterNet.Core.Reporting.ArchitecturePrReportBaselineEntry? left, ArchLinterNet.Core.Reporting.ArchitecturePrReportBaselineEntry? right)
+  property string ContractGroup {get;init;}
+  property string ContractId {get;init;}
+  property string Disposition {get;init;}
+  property string ForbiddenReference {get;init;}
+  property string SourceType {get;init;}
+  property string Status {get;init;}
+  property string? CurrentForbiddenReference {get;init;}
+  property string? Identity {get;init;}
+  property string? Issue {get;init;}
+  property string? Reason {get;init;}
+sealed class ArchLinterNet.Core.Reporting.ArchitecturePrReportChange : System.IEquatable<ArchLinterNet.Core.Reporting.ArchitecturePrReportChange>
+  ctor(ArchLinterNet.Core.Reporting.ArchitecturePrReportExecutionContext ExecutionContext, string Mode, System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Change.ArchitectureChangeEntry> Added, System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Change.ArchitectureChangeEntry> Removed, System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Change.ArchitectureChangeFinding> NewFindings, System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Change.ArchitectureChangeFinding> ExistingFindings, System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Change.ArchitectureChangeFinding> ResolvedFindings, System.Collections.Generic.IReadOnlyList<string> BaselineDebt)
+  method ArchLinterNet.Core.Reporting.ArchitecturePrReportChange <Clone>$()
+  method bool Equals(ArchLinterNet.Core.Reporting.ArchitecturePrReportChange? other)
+  method bool Equals(object? obj)
+  method int GetHashCode()
+  method string ToString()
+  method void Deconstruct(out ArchLinterNet.Core.Reporting.ArchitecturePrReportExecutionContext ExecutionContext, out string Mode, out System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Change.ArchitectureChangeEntry> Added, out System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Change.ArchitectureChangeEntry> Removed, out System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Change.ArchitectureChangeFinding> NewFindings, out System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Change.ArchitectureChangeFinding> ExistingFindings, out System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Change.ArchitectureChangeFinding> ResolvedFindings, out System.Collections.Generic.IReadOnlyList<string> BaselineDebt)
+  operator !=(ArchLinterNet.Core.Reporting.ArchitecturePrReportChange? left, ArchLinterNet.Core.Reporting.ArchitecturePrReportChange? right)
+  operator ==(ArchLinterNet.Core.Reporting.ArchitecturePrReportChange? left, ArchLinterNet.Core.Reporting.ArchitecturePrReportChange? right)
+  property ArchLinterNet.Core.Reporting.ArchitecturePrReportExecutionContext ExecutionContext {get;init;}
+  property System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Change.ArchitectureChangeEntry> Added {get;init;}
+  property System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Change.ArchitectureChangeEntry> Removed {get;init;}
+  property System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Change.ArchitectureChangeFinding> ExistingFindings {get;init;}
+  property System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Change.ArchitectureChangeFinding> NewFindings {get;init;}
+  property System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Change.ArchitectureChangeFinding> ResolvedFindings {get;init;}
+  property System.Collections.Generic.IReadOnlyList<string> BaselineDebt {get;init;}
+  property string Mode {get;init;}
+sealed class ArchLinterNet.Core.Reporting.ArchitecturePrReportDebtEvaluation : System.IEquatable<ArchLinterNet.Core.Reporting.ArchitecturePrReportDebtEvaluation>
+  ctor(bool Completed, string Mode, bool ReusedAnalysisSnapshot, System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Reporting.ArchitecturePrReportFinding> PreflightDiagnostics)
+  method ArchLinterNet.Core.Reporting.ArchitecturePrReportDebtEvaluation <Clone>$()
+  method bool Equals(ArchLinterNet.Core.Reporting.ArchitecturePrReportDebtEvaluation? other)
+  method bool Equals(object? obj)
+  method int GetHashCode()
+  method string ToString()
+  method void Deconstruct(out bool Completed, out string Mode, out bool ReusedAnalysisSnapshot, out System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Reporting.ArchitecturePrReportFinding> PreflightDiagnostics)
+  operator !=(ArchLinterNet.Core.Reporting.ArchitecturePrReportDebtEvaluation? left, ArchLinterNet.Core.Reporting.ArchitecturePrReportDebtEvaluation? right)
+  operator ==(ArchLinterNet.Core.Reporting.ArchitecturePrReportDebtEvaluation? left, ArchLinterNet.Core.Reporting.ArchitecturePrReportDebtEvaluation? right)
+  property System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Reporting.ArchitecturePrReportFinding> PreflightDiagnostics {get;init;}
+  property bool Completed {get;init;}
+  property bool ReusedAnalysisSnapshot {get;init;}
+  property string Mode {get;init;}
+sealed class ArchLinterNet.Core.Reporting.ArchitecturePrReportDebtGateReceipt : System.IEquatable<ArchLinterNet.Core.Reporting.ArchitecturePrReportDebtGateReceipt>
+  ctor(bool Succeeded, bool Passed, ArchLinterNet.Core.Reporting.ArchitecturePrReportDebtEvaluation Evaluation, ArchLinterNet.Core.Reporting.ArchitecturePrReportPersistentDebt PersistentDebt, ArchLinterNet.Core.Reporting.ArchitecturePrReportPolicyWeakening? PolicyWeakening)
+  method ArchLinterNet.Core.Reporting.ArchitecturePrReportDebtGateReceipt <Clone>$()
+  method bool Equals(ArchLinterNet.Core.Reporting.ArchitecturePrReportDebtGateReceipt? other)
+  method bool Equals(object? obj)
+  method int GetHashCode()
+  method string ToString()
+  method void Deconstruct(out bool Succeeded, out bool Passed, out ArchLinterNet.Core.Reporting.ArchitecturePrReportDebtEvaluation Evaluation, out ArchLinterNet.Core.Reporting.ArchitecturePrReportPersistentDebt PersistentDebt, out ArchLinterNet.Core.Reporting.ArchitecturePrReportPolicyWeakening? PolicyWeakening)
+  operator !=(ArchLinterNet.Core.Reporting.ArchitecturePrReportDebtGateReceipt? left, ArchLinterNet.Core.Reporting.ArchitecturePrReportDebtGateReceipt? right)
+  operator ==(ArchLinterNet.Core.Reporting.ArchitecturePrReportDebtGateReceipt? left, ArchLinterNet.Core.Reporting.ArchitecturePrReportDebtGateReceipt? right)
+  property ArchLinterNet.Core.Reporting.ArchitecturePrReportDebtEvaluation Evaluation {get;init;}
+  property ArchLinterNet.Core.Reporting.ArchitecturePrReportPersistentDebt PersistentDebt {get;init;}
+  property ArchLinterNet.Core.Reporting.ArchitecturePrReportPolicyWeakening? PolicyWeakening {get;init;}
+  property bool Passed {get;init;}
+  property bool Succeeded {get;init;}
+sealed class ArchLinterNet.Core.Reporting.ArchitecturePrReportDiagnosticFilter : System.IEquatable<ArchLinterNet.Core.Reporting.ArchitecturePrReportDiagnosticFilter>
+  ctor(System.Collections.Generic.IReadOnlyList<string> RuleIds, System.Collections.Generic.IReadOnlyList<string> RuleTags, System.Collections.Generic.IReadOnlyList<string> Projects, System.Collections.Generic.IReadOnlyList<string> PathPrefixes, System.Collections.Generic.IReadOnlyDictionary<string,string> Severity, bool RequireMatches)
+  method ArchLinterNet.Core.Reporting.ArchitecturePrReportDiagnosticFilter <Clone>$()
+  method bool Equals(ArchLinterNet.Core.Reporting.ArchitecturePrReportDiagnosticFilter? other)
+  method bool Equals(object? obj)
+  method int GetHashCode()
+  method string ToString()
+  method void Deconstruct(out System.Collections.Generic.IReadOnlyList<string> RuleIds, out System.Collections.Generic.IReadOnlyList<string> RuleTags, out System.Collections.Generic.IReadOnlyList<string> Projects, out System.Collections.Generic.IReadOnlyList<string> PathPrefixes, out System.Collections.Generic.IReadOnlyDictionary<string,string> Severity, out bool RequireMatches)
+  operator !=(ArchLinterNet.Core.Reporting.ArchitecturePrReportDiagnosticFilter? left, ArchLinterNet.Core.Reporting.ArchitecturePrReportDiagnosticFilter? right)
+  operator ==(ArchLinterNet.Core.Reporting.ArchitecturePrReportDiagnosticFilter? left, ArchLinterNet.Core.Reporting.ArchitecturePrReportDiagnosticFilter? right)
+  property System.Collections.Generic.IReadOnlyDictionary<string,string> Severity {get;init;}
+  property System.Collections.Generic.IReadOnlyList<string> PathPrefixes {get;init;}
+  property System.Collections.Generic.IReadOnlyList<string> Projects {get;init;}
+  property System.Collections.Generic.IReadOnlyList<string> RuleIds {get;init;}
+  property System.Collections.Generic.IReadOnlyList<string> RuleTags {get;init;}
+  property bool RequireMatches {get;init;}
+sealed class ArchLinterNet.Core.Reporting.ArchitecturePrReportEvidence : System.IEquatable<ArchLinterNet.Core.Reporting.ArchitecturePrReportEvidence>
+  ctor(int SchemaVersion, string Kind, ArchLinterNet.Core.Model.ArchitectureHealthGate Gate, ArchLinterNet.Core.Model.ArchitectureHealthState Health, System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Reporting.ArchitecturePrReportValidationReceipt> ValidationOutcomes, ArchLinterNet.Core.Reporting.ArchitecturePrReportDebtGateReceipt DebtGate)
+  field const int CurrentSchemaVersion = 2
+  field const string EvidenceKind = "architecture-health-report-evidence"
+  method ArchLinterNet.Core.Reporting.ArchitecturePrReportEvidence <Clone>$()
+  method bool Equals(ArchLinterNet.Core.Reporting.ArchitecturePrReportEvidence? other)
+  method bool Equals(object? obj)
+  method int GetHashCode()
+  method string ToString()
+  method void Deconstruct(out int SchemaVersion, out string Kind, out ArchLinterNet.Core.Model.ArchitectureHealthGate Gate, out ArchLinterNet.Core.Model.ArchitectureHealthState Health, out System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Reporting.ArchitecturePrReportValidationReceipt> ValidationOutcomes, out ArchLinterNet.Core.Reporting.ArchitecturePrReportDebtGateReceipt DebtGate)
+  operator !=(ArchLinterNet.Core.Reporting.ArchitecturePrReportEvidence? left, ArchLinterNet.Core.Reporting.ArchitecturePrReportEvidence? right)
+  operator ==(ArchLinterNet.Core.Reporting.ArchitecturePrReportEvidence? left, ArchLinterNet.Core.Reporting.ArchitecturePrReportEvidence? right)
+  property ArchLinterNet.Core.Model.ArchitectureHealthGate Gate {get;init;}
+  property ArchLinterNet.Core.Model.ArchitectureHealthState Health {get;init;}
+  property ArchLinterNet.Core.Reporting.ArchitecturePrReportDebtGateReceipt DebtGate {get;init;}
+  property ArchLinterNet.Core.Reporting.ArchitecturePrReportExecutionContext? ExecutionContext {get;init;}
+  property System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Reporting.ArchitecturePrReportValidationReceipt> ValidationOutcomes {get;init;}
+  property int SchemaVersion {get;init;}
+  property string Kind {get;init;}
+sealed class ArchLinterNet.Core.Reporting.ArchitecturePrReportEvidenceFact : System.IEquatable<ArchLinterNet.Core.Reporting.ArchitecturePrReportEvidenceFact>
+  ctor(string Kind, string Value)
+  method ArchLinterNet.Core.Reporting.ArchitecturePrReportEvidenceFact <Clone>$()
+  method bool Equals(ArchLinterNet.Core.Reporting.ArchitecturePrReportEvidenceFact? other)
+  method bool Equals(object? obj)
+  method int GetHashCode()
+  method string ToString()
+  method void Deconstruct(out string Kind, out string Value)
+  operator !=(ArchLinterNet.Core.Reporting.ArchitecturePrReportEvidenceFact? left, ArchLinterNet.Core.Reporting.ArchitecturePrReportEvidenceFact? right)
+  operator ==(ArchLinterNet.Core.Reporting.ArchitecturePrReportEvidenceFact? left, ArchLinterNet.Core.Reporting.ArchitecturePrReportEvidenceFact? right)
+  property string Kind {get;init;}
+  property string Value {get;init;}
+sealed class ArchLinterNet.Core.Reporting.ArchitecturePrReportExecutionContext : System.IEquatable<ArchLinterNet.Core.Reporting.ArchitecturePrReportExecutionContext>
+  ctor(string ExecutionId, string ConditionSetName)
+  method ArchLinterNet.Core.Reporting.ArchitecturePrReportExecutionContext <Clone>$()
+  method bool Equals(ArchLinterNet.Core.Reporting.ArchitecturePrReportExecutionContext? other)
+  method bool Equals(object? obj)
+  method int GetHashCode()
+  method string ToString()
+  method void Deconstruct(out string ExecutionId, out string ConditionSetName)
+  operator !=(ArchLinterNet.Core.Reporting.ArchitecturePrReportExecutionContext? left, ArchLinterNet.Core.Reporting.ArchitecturePrReportExecutionContext? right)
+  operator ==(ArchLinterNet.Core.Reporting.ArchitecturePrReportExecutionContext? left, ArchLinterNet.Core.Reporting.ArchitecturePrReportExecutionContext? right)
+  property string ConditionSetName {get;init;}
+  property string ExecutionId {get;init;}
+sealed class ArchLinterNet.Core.Reporting.ArchitecturePrReportExternalEvidence : System.IEquatable<ArchLinterNet.Core.Reporting.ArchitecturePrReportExternalEvidence>
+  ctor(string Mode, System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Reporting.ArchitecturePrReportExternalRequirement> Requirements, System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Reporting.ArchitecturePrReportFinding> Findings)
+  method ArchLinterNet.Core.Reporting.ArchitecturePrReportExternalEvidence <Clone>$()
+  method bool Equals(ArchLinterNet.Core.Reporting.ArchitecturePrReportExternalEvidence? other)
+  method bool Equals(object? obj)
+  method int GetHashCode()
+  method string ToString()
+  method void Deconstruct(out string Mode, out System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Reporting.ArchitecturePrReportExternalRequirement> Requirements, out System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Reporting.ArchitecturePrReportFinding> Findings)
+  operator !=(ArchLinterNet.Core.Reporting.ArchitecturePrReportExternalEvidence? left, ArchLinterNet.Core.Reporting.ArchitecturePrReportExternalEvidence? right)
+  operator ==(ArchLinterNet.Core.Reporting.ArchitecturePrReportExternalEvidence? left, ArchLinterNet.Core.Reporting.ArchitecturePrReportExternalEvidence? right)
+  property System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Reporting.ArchitecturePrReportExternalRequirement> Requirements {get;init;}
+  property System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Reporting.ArchitecturePrReportFinding> Findings {get;init;}
+  property string Mode {get;init;}
+sealed class ArchLinterNet.Core.Reporting.ArchitecturePrReportExternalRequirement : System.IEquatable<ArchLinterNet.Core.Reporting.ArchitecturePrReportExternalRequirement>
+  ctor(string Id, string Format, bool Required, string Tool, string? ToolVersion, string Run, bool RequireRepository, bool RequireRevision, bool RequireScope, ArchLinterNet.Core.Reporting.ArchitecturePrReportDiagnosticFilter? DiagnosticFilter)
+  method ArchLinterNet.Core.Reporting.ArchitecturePrReportExternalRequirement <Clone>$()
+  method bool Equals(ArchLinterNet.Core.Reporting.ArchitecturePrReportExternalRequirement? other)
+  method bool Equals(object? obj)
+  method int GetHashCode()
+  method string ToString()
+  method void Deconstruct(out string Id, out string Format, out bool Required, out string Tool, out string? ToolVersion, out string Run, out bool RequireRepository, out bool RequireRevision, out bool RequireScope, out ArchLinterNet.Core.Reporting.ArchitecturePrReportDiagnosticFilter? DiagnosticFilter)
+  operator !=(ArchLinterNet.Core.Reporting.ArchitecturePrReportExternalRequirement? left, ArchLinterNet.Core.Reporting.ArchitecturePrReportExternalRequirement? right)
+  operator ==(ArchLinterNet.Core.Reporting.ArchitecturePrReportExternalRequirement? left, ArchLinterNet.Core.Reporting.ArchitecturePrReportExternalRequirement? right)
+  property ArchLinterNet.Core.Reporting.ArchitecturePrReportDiagnosticFilter? DiagnosticFilter {get;init;}
+  property bool RequireRepository {get;init;}
+  property bool RequireRevision {get;init;}
+  property bool RequireScope {get;init;}
+  property bool Required {get;init;}
+  property string Format {get;init;}
+  property string Id {get;init;}
+  property string Run {get;init;}
+  property string Tool {get;init;}
+  property string? ToolVersion {get;init;}
+sealed class ArchLinterNet.Core.Reporting.ArchitecturePrReportFinding : System.IEquatable<ArchLinterNet.Core.Reporting.ArchitecturePrReportFinding>
+  ctor(int SchemaVersion, string Kind, string CanonicalIdentity, string? Mode, string? Severity, string MessageCode, string ContractName, string? ContractId, string? PolicyIdentity, ArchLinterNet.Core.Reporting.ArchitecturePrReportSourceLocation? SourceLocation, ArchLinterNet.Core.Reporting.ArchitecturePrReportRemediation? Remediation, System.Text.Json.JsonElement Details)
+  method ArchLinterNet.Core.Reporting.ArchitecturePrReportFinding <Clone>$()
+  method bool Equals(ArchLinterNet.Core.Reporting.ArchitecturePrReportFinding? other)
+  method bool Equals(object? obj)
+  method int GetHashCode()
+  method string ToString()
+  method void Deconstruct(out int SchemaVersion, out string Kind, out string CanonicalIdentity, out string? Mode, out string? Severity, out string MessageCode, out string ContractName, out string? ContractId, out string? PolicyIdentity, out ArchLinterNet.Core.Reporting.ArchitecturePrReportSourceLocation? SourceLocation, out ArchLinterNet.Core.Reporting.ArchitecturePrReportRemediation? Remediation, out System.Text.Json.JsonElement Details)
+  operator !=(ArchLinterNet.Core.Reporting.ArchitecturePrReportFinding? left, ArchLinterNet.Core.Reporting.ArchitecturePrReportFinding? right)
+  operator ==(ArchLinterNet.Core.Reporting.ArchitecturePrReportFinding? left, ArchLinterNet.Core.Reporting.ArchitecturePrReportFinding? right)
+  property ArchLinterNet.Core.Reporting.ArchitecturePrReportRemediation? Remediation {get;init;}
+  property ArchLinterNet.Core.Reporting.ArchitecturePrReportSourceLocation? SourceLocation {get;init;}
+  property System.Text.Json.JsonElement Details {get;init;}
+  property int SchemaVersion {get;init;}
+  property string CanonicalIdentity {get;init;}
+  property string ContractName {get;init;}
+  property string Kind {get;init;}
+  property string MessageCode {get;init;}
+  property string? ContractId {get;init;}
+  property string? Mode {get;init;}
+  property string? PolicyIdentity {get;init;}
+  property string? Severity {get;init;}
+sealed class ArchLinterNet.Core.Reporting.ArchitecturePrReportHeadline : System.IEquatable<ArchLinterNet.Core.Reporting.ArchitecturePrReportHeadline>
+  ctor(ArchLinterNet.Core.Model.ArchitectureHealthGate Gate, ArchLinterNet.Core.Model.ArchitectureHealthState Health, ArchLinterNet.Core.Reporting.ArchitecturePrReportAvailability Availability, System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Model.ArchitectureHealthDimension> Dimensions)
+  method ArchLinterNet.Core.Reporting.ArchitecturePrReportHeadline <Clone>$()
+  method bool Equals(ArchLinterNet.Core.Reporting.ArchitecturePrReportHeadline? other)
+  method bool Equals(object? obj)
+  method int GetHashCode()
+  method string ToString()
+  method void Deconstruct(out ArchLinterNet.Core.Model.ArchitectureHealthGate Gate, out ArchLinterNet.Core.Model.ArchitectureHealthState Health, out ArchLinterNet.Core.Reporting.ArchitecturePrReportAvailability Availability, out System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Model.ArchitectureHealthDimension> Dimensions)
+  operator !=(ArchLinterNet.Core.Reporting.ArchitecturePrReportHeadline? left, ArchLinterNet.Core.Reporting.ArchitecturePrReportHeadline? right)
+  operator ==(ArchLinterNet.Core.Reporting.ArchitecturePrReportHeadline? left, ArchLinterNet.Core.Reporting.ArchitecturePrReportHeadline? right)
+  property ArchLinterNet.Core.Model.ArchitectureHealthGate Gate {get;init;}
+  property ArchLinterNet.Core.Model.ArchitectureHealthState Health {get;init;}
+  property ArchLinterNet.Core.Reporting.ArchitecturePrReportAvailability Availability {get;init;}
+  property System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Model.ArchitectureHealthDimension> Dimensions {get;init;}
+sealed class ArchLinterNet.Core.Reporting.ArchitecturePrReportInput : System.IEquatable<ArchLinterNet.Core.Reporting.ArchitecturePrReportInput>
+  ctor(ArchLinterNet.Core.Model.ArchitectureHealthSummary Summary, ArchLinterNet.Core.Reporting.ArchitecturePrReportEvidence? Evidence, ArchLinterNet.Core.Reporting.ArchitecturePrReportChange Change)
+  method ArchLinterNet.Core.Reporting.ArchitecturePrReportInput <Clone>$()
+  method bool Equals(ArchLinterNet.Core.Reporting.ArchitecturePrReportInput? other)
+  method bool Equals(object? obj)
+  method int GetHashCode()
+  method string ToString()
+  method void Deconstruct(out ArchLinterNet.Core.Model.ArchitectureHealthSummary Summary, out ArchLinterNet.Core.Reporting.ArchitecturePrReportEvidence? Evidence, out ArchLinterNet.Core.Reporting.ArchitecturePrReportChange Change)
+  operator !=(ArchLinterNet.Core.Reporting.ArchitecturePrReportInput? left, ArchLinterNet.Core.Reporting.ArchitecturePrReportInput? right)
+  operator ==(ArchLinterNet.Core.Reporting.ArchitecturePrReportInput? left, ArchLinterNet.Core.Reporting.ArchitecturePrReportInput? right)
+  property ArchLinterNet.Core.Model.ArchitectureHealthSummary Summary {get;init;}
+  property ArchLinterNet.Core.Reporting.ArchitecturePrReportChange Change {get;init;}
+  property ArchLinterNet.Core.Reporting.ArchitecturePrReportEvidence? Evidence {get;init;}
+sealed class ArchLinterNet.Core.Reporting.ArchitecturePrReportMetric : System.IEquatable<ArchLinterNet.Core.Reporting.ArchitecturePrReportMetric>
+  ctor(string MetricId, string Kind, string? NativeSubject, string? Unit, string EffectiveScope, int? Value, System.Collections.Generic.IReadOnlyList<string>? Contributors)
+  method ArchLinterNet.Core.Reporting.ArchitecturePrReportMetric <Clone>$()
+  method bool Equals(ArchLinterNet.Core.Reporting.ArchitecturePrReportMetric? other)
+  method bool Equals(object? obj)
+  method int GetHashCode()
+  method string ToString()
+  method void Deconstruct(out string MetricId, out string Kind, out string? NativeSubject, out string? Unit, out string EffectiveScope, out int? Value, out System.Collections.Generic.IReadOnlyList<string>? Contributors)
+  operator !=(ArchLinterNet.Core.Reporting.ArchitecturePrReportMetric? left, ArchLinterNet.Core.Reporting.ArchitecturePrReportMetric? right)
+  operator ==(ArchLinterNet.Core.Reporting.ArchitecturePrReportMetric? left, ArchLinterNet.Core.Reporting.ArchitecturePrReportMetric? right)
+  property System.Collections.Generic.IReadOnlyList<string>? Contributors {get;init;}
+  property int? Value {get;init;}
+  property string EffectiveScope {get;init;}
+  property string Kind {get;init;}
+  property string MetricId {get;init;}
+  property string? NativeSubject {get;init;}
+  property string? Unit {get;init;}
+sealed class ArchLinterNet.Core.Reporting.ArchitecturePrReportNavigationReference : System.IEquatable<ArchLinterNet.Core.Reporting.ArchitecturePrReportNavigationReference>
+  ctor(string Authority, string? Identity, string? Path)
+  method ArchLinterNet.Core.Reporting.ArchitecturePrReportNavigationReference <Clone>$()
+  method bool Equals(ArchLinterNet.Core.Reporting.ArchitecturePrReportNavigationReference? other)
+  method bool Equals(object? obj)
+  method int GetHashCode()
+  method string ToString()
+  method void Deconstruct(out string Authority, out string? Identity, out string? Path)
+  operator !=(ArchLinterNet.Core.Reporting.ArchitecturePrReportNavigationReference? left, ArchLinterNet.Core.Reporting.ArchitecturePrReportNavigationReference? right)
+  operator ==(ArchLinterNet.Core.Reporting.ArchitecturePrReportNavigationReference? left, ArchLinterNet.Core.Reporting.ArchitecturePrReportNavigationReference? right)
+  property string Authority {get;init;}
+  property string? Identity {get;init;}
+  property string? Path {get;init;}
+sealed class ArchLinterNet.Core.Reporting.ArchitecturePrReportPersistentDebt : System.IEquatable<ArchLinterNet.Core.Reporting.ArchitecturePrReportPersistentDebt>
+  ctor(bool Succeeded, bool InSync, System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Reporting.ArchitecturePrReportBaselineEntry> Entries, System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Reporting.ArchitecturePrReportFinding> ConfigurationViolations)
+  method ArchLinterNet.Core.Reporting.ArchitecturePrReportPersistentDebt <Clone>$()
+  method bool Equals(ArchLinterNet.Core.Reporting.ArchitecturePrReportPersistentDebt? other)
+  method bool Equals(object? obj)
+  method int GetHashCode()
+  method string ToString()
+  method void Deconstruct(out bool Succeeded, out bool InSync, out System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Reporting.ArchitecturePrReportBaselineEntry> Entries, out System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Reporting.ArchitecturePrReportFinding> ConfigurationViolations)
+  operator !=(ArchLinterNet.Core.Reporting.ArchitecturePrReportPersistentDebt? left, ArchLinterNet.Core.Reporting.ArchitecturePrReportPersistentDebt? right)
+  operator ==(ArchLinterNet.Core.Reporting.ArchitecturePrReportPersistentDebt? left, ArchLinterNet.Core.Reporting.ArchitecturePrReportPersistentDebt? right)
+  property System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Reporting.ArchitecturePrReportBaselineEntry> Entries {get;init;}
+  property System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Reporting.ArchitecturePrReportFinding> ConfigurationViolations {get;init;}
+  property bool InSync {get;init;}
+  property bool Succeeded {get;init;}
+sealed class ArchLinterNet.Core.Reporting.ArchitecturePrReportPolicyContextProvenance : System.IEquatable<ArchLinterNet.Core.Reporting.ArchitecturePrReportPolicyContextProvenance>
+  ctor(string SourcePath, string RootPath, string Role, string YamlPath, int SourceOrder)
+  method ArchLinterNet.Core.Reporting.ArchitecturePrReportPolicyContextProvenance <Clone>$()
+  method bool Equals(ArchLinterNet.Core.Reporting.ArchitecturePrReportPolicyContextProvenance? other)
+  method bool Equals(object? obj)
+  method int GetHashCode()
+  method string ToString()
+  method void Deconstruct(out string SourcePath, out string RootPath, out string Role, out string YamlPath, out int SourceOrder)
+  operator !=(ArchLinterNet.Core.Reporting.ArchitecturePrReportPolicyContextProvenance? left, ArchLinterNet.Core.Reporting.ArchitecturePrReportPolicyContextProvenance? right)
+  operator ==(ArchLinterNet.Core.Reporting.ArchitecturePrReportPolicyContextProvenance? left, ArchLinterNet.Core.Reporting.ArchitecturePrReportPolicyContextProvenance? right)
+  property int SourceOrder {get;init;}
+  property string Role {get;init;}
+  property string RootPath {get;init;}
+  property string SourcePath {get;init;}
+  property string YamlPath {get;init;}
+sealed class ArchLinterNet.Core.Reporting.ArchitecturePrReportPolicyWeakening : System.IEquatable<ArchLinterNet.Core.Reporting.ArchitecturePrReportPolicyWeakening>
+  ctor(int SchemaVersion, string Kind, string PolicyName, int PolicyVersion, string Severity, bool HasBlockingFindings, System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Reporting.ArchitecturePrReportPolicyWeakeningFinding> Findings)
+  method ArchLinterNet.Core.Reporting.ArchitecturePrReportPolicyWeakening <Clone>$()
+  method bool Equals(ArchLinterNet.Core.Reporting.ArchitecturePrReportPolicyWeakening? other)
+  method bool Equals(object? obj)
+  method int GetHashCode()
+  method string ToString()
+  method void Deconstruct(out int SchemaVersion, out string Kind, out string PolicyName, out int PolicyVersion, out string Severity, out bool HasBlockingFindings, out System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Reporting.ArchitecturePrReportPolicyWeakeningFinding> Findings)
+  operator !=(ArchLinterNet.Core.Reporting.ArchitecturePrReportPolicyWeakening? left, ArchLinterNet.Core.Reporting.ArchitecturePrReportPolicyWeakening? right)
+  operator ==(ArchLinterNet.Core.Reporting.ArchitecturePrReportPolicyWeakening? left, ArchLinterNet.Core.Reporting.ArchitecturePrReportPolicyWeakening? right)
+  property System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Reporting.ArchitecturePrReportPolicyWeakeningFinding> Findings {get;init;}
+  property bool HasBlockingFindings {get;init;}
+  property int PolicyVersion {get;init;}
+  property int SchemaVersion {get;init;}
+  property string Kind {get;init;}
+  property string PolicyName {get;init;}
+  property string Severity {get;init;}
+sealed class ArchLinterNet.Core.Reporting.ArchitecturePrReportPolicyWeakeningFinding : System.IEquatable<ArchLinterNet.Core.Reporting.ArchitecturePrReportPolicyWeakeningFinding>
+  ctor(string Identity, string Kind, string ControlIdentity, string Classification, string Severity, System.Collections.Generic.IReadOnlyList<string> BaseValues, System.Collections.Generic.IReadOnlyList<string> CurrentValues, System.Collections.Generic.IReadOnlyList<string> AffectedSubjects, ArchLinterNet.Core.Reporting.ArchitecturePrReportPolicyContextProvenance? BaseProvenance, ArchLinterNet.Core.Reporting.ArchitecturePrReportPolicyContextProvenance? CurrentProvenance, string? Rationale)
+  method ArchLinterNet.Core.Reporting.ArchitecturePrReportPolicyWeakeningFinding <Clone>$()
+  method bool Equals(ArchLinterNet.Core.Reporting.ArchitecturePrReportPolicyWeakeningFinding? other)
+  method bool Equals(object? obj)
+  method int GetHashCode()
+  method string ToString()
+  method void Deconstruct(out string Identity, out string Kind, out string ControlIdentity, out string Classification, out string Severity, out System.Collections.Generic.IReadOnlyList<string> BaseValues, out System.Collections.Generic.IReadOnlyList<string> CurrentValues, out System.Collections.Generic.IReadOnlyList<string> AffectedSubjects, out ArchLinterNet.Core.Reporting.ArchitecturePrReportPolicyContextProvenance? BaseProvenance, out ArchLinterNet.Core.Reporting.ArchitecturePrReportPolicyContextProvenance? CurrentProvenance, out string? Rationale)
+  operator !=(ArchLinterNet.Core.Reporting.ArchitecturePrReportPolicyWeakeningFinding? left, ArchLinterNet.Core.Reporting.ArchitecturePrReportPolicyWeakeningFinding? right)
+  operator ==(ArchLinterNet.Core.Reporting.ArchitecturePrReportPolicyWeakeningFinding? left, ArchLinterNet.Core.Reporting.ArchitecturePrReportPolicyWeakeningFinding? right)
+  property ArchLinterNet.Core.Reporting.ArchitecturePrReportPolicyContextProvenance? BaseProvenance {get;init;}
+  property ArchLinterNet.Core.Reporting.ArchitecturePrReportPolicyContextProvenance? CurrentProvenance {get;init;}
+  property System.Collections.Generic.IReadOnlyList<string> AffectedSubjects {get;init;}
+  property System.Collections.Generic.IReadOnlyList<string> BaseValues {get;init;}
+  property System.Collections.Generic.IReadOnlyList<string> CurrentValues {get;init;}
+  property string Classification {get;init;}
+  property string ControlIdentity {get;init;}
+  property string Identity {get;init;}
+  property string Kind {get;init;}
+  property string Severity {get;init;}
+  property string? Rationale {get;init;}
+sealed class ArchLinterNet.Core.Reporting.ArchitecturePrReportProjection : System.IEquatable<ArchLinterNet.Core.Reporting.ArchitecturePrReportProjection>
+  ctor(ArchLinterNet.Core.Reporting.ArchitecturePrReportHeadline Headline, ArchLinterNet.Core.Reporting.ArchitecturePrReportEvidence? Evidence, ArchLinterNet.Core.Reporting.ArchitecturePrReportChange Change, System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Reporting.ArchitecturePrReportNavigationReference> Navigation)
+  method ArchLinterNet.Core.Reporting.ArchitecturePrReportProjection <Clone>$()
+  method bool Equals(ArchLinterNet.Core.Reporting.ArchitecturePrReportProjection? other)
+  method bool Equals(object? obj)
+  method int GetHashCode()
+  method string ToString()
+  method void Deconstruct(out ArchLinterNet.Core.Reporting.ArchitecturePrReportHeadline Headline, out ArchLinterNet.Core.Reporting.ArchitecturePrReportEvidence? Evidence, out ArchLinterNet.Core.Reporting.ArchitecturePrReportChange Change, out System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Reporting.ArchitecturePrReportNavigationReference> Navigation)
+  operator !=(ArchLinterNet.Core.Reporting.ArchitecturePrReportProjection? left, ArchLinterNet.Core.Reporting.ArchitecturePrReportProjection? right)
+  operator ==(ArchLinterNet.Core.Reporting.ArchitecturePrReportProjection? left, ArchLinterNet.Core.Reporting.ArchitecturePrReportProjection? right)
+  property ArchLinterNet.Core.Reporting.ArchitecturePrReportAvailability Availability {get;}
+  property ArchLinterNet.Core.Reporting.ArchitecturePrReportChange Change {get;init;}
+  property ArchLinterNet.Core.Reporting.ArchitecturePrReportEvidence? Evidence {get;init;}
+  property ArchLinterNet.Core.Reporting.ArchitecturePrReportHeadline Headline {get;init;}
+  property System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Reporting.ArchitecturePrReportNavigationReference> Navigation {get;init;}
+  property bool IsAvailable {get;}
+static class ArchLinterNet.Core.Reporting.ArchitecturePrReportProjector
+  method static ArchLinterNet.Core.Reporting.ArchitecturePrReportProjection Project(ArchLinterNet.Core.Reporting.ArchitecturePrReportInput input)
+  method static ArchLinterNet.Core.Reporting.ArchitecturePrReportProjection ReadAndProject(string healthJson, string changeJson)
+sealed class ArchLinterNet.Core.Reporting.ArchitecturePrReportProvenance : System.IEquatable<ArchLinterNet.Core.Reporting.ArchitecturePrReportProvenance>
+  ctor(string RepositoryRoot, System.Collections.Generic.IReadOnlyList<string> PolicyImportPaths, System.Collections.Generic.IReadOnlyList<string> ResolvedAssemblyPaths, System.Collections.Generic.IReadOnlyList<string> DiscoveredProjectPaths)
+  method ArchLinterNet.Core.Reporting.ArchitecturePrReportProvenance <Clone>$()
+  method bool Equals(ArchLinterNet.Core.Reporting.ArchitecturePrReportProvenance? other)
+  method bool Equals(object? obj)
+  method int GetHashCode()
+  method string ToString()
+  method void Deconstruct(out string RepositoryRoot, out System.Collections.Generic.IReadOnlyList<string> PolicyImportPaths, out System.Collections.Generic.IReadOnlyList<string> ResolvedAssemblyPaths, out System.Collections.Generic.IReadOnlyList<string> DiscoveredProjectPaths)
+  operator !=(ArchLinterNet.Core.Reporting.ArchitecturePrReportProvenance? left, ArchLinterNet.Core.Reporting.ArchitecturePrReportProvenance? right)
+  operator ==(ArchLinterNet.Core.Reporting.ArchitecturePrReportProvenance? left, ArchLinterNet.Core.Reporting.ArchitecturePrReportProvenance? right)
+  property System.Collections.Generic.IReadOnlyList<string> DiscoveredProjectPaths {get;init;}
+  property System.Collections.Generic.IReadOnlyList<string> PolicyImportPaths {get;init;}
+  property System.Collections.Generic.IReadOnlyList<string> ResolvedAssemblyPaths {get;init;}
+  property string RepositoryRoot {get;init;}
+sealed class ArchLinterNet.Core.Reporting.ArchitecturePrReportProvenanceReference : System.IEquatable<ArchLinterNet.Core.Reporting.ArchitecturePrReportProvenanceReference>
+  ctor(string? Family, string? ControlIdentity, string? PolicyIdentity, string? EvidenceIdentity)
+  method ArchLinterNet.Core.Reporting.ArchitecturePrReportProvenanceReference <Clone>$()
+  method bool Equals(ArchLinterNet.Core.Reporting.ArchitecturePrReportProvenanceReference? other)
+  method bool Equals(object? obj)
+  method int GetHashCode()
+  method string ToString()
+  method void Deconstruct(out string? Family, out string? ControlIdentity, out string? PolicyIdentity, out string? EvidenceIdentity)
+  operator !=(ArchLinterNet.Core.Reporting.ArchitecturePrReportProvenanceReference? left, ArchLinterNet.Core.Reporting.ArchitecturePrReportProvenanceReference? right)
+  operator ==(ArchLinterNet.Core.Reporting.ArchitecturePrReportProvenanceReference? left, ArchLinterNet.Core.Reporting.ArchitecturePrReportProvenanceReference? right)
+  property string? ControlIdentity {get;init;}
+  property string? EvidenceIdentity {get;init;}
+  property string? Family {get;init;}
+  property string? PolicyIdentity {get;init;}
+static class ArchLinterNet.Core.Reporting.ArchitecturePrReportReader
+  method static ArchLinterNet.Core.Reporting.ArchitecturePrReportInput Deserialize(string healthJson, string changeJson)
+  method static ArchLinterNet.Core.Reporting.ArchitecturePrReportInput Read(string healthJson, string changeJson)
+sealed class ArchLinterNet.Core.Reporting.ArchitecturePrReportRemediation : System.IEquatable<ArchLinterNet.Core.Reporting.ArchitecturePrReportRemediation>
+  ctor(string Category, string Summary, string ContractIdentity, string FindingIdentity, System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Reporting.ArchitecturePrReportEvidenceFact> Evidence, string? ExpectedSeamOrDirection, string? Caveat, bool RequiresReview)
+  method ArchLinterNet.Core.Reporting.ArchitecturePrReportRemediation <Clone>$()
+  method bool Equals(ArchLinterNet.Core.Reporting.ArchitecturePrReportRemediation? other)
+  method bool Equals(object? obj)
+  method int GetHashCode()
+  method string ToString()
+  method void Deconstruct(out string Category, out string Summary, out string ContractIdentity, out string FindingIdentity, out System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Reporting.ArchitecturePrReportEvidenceFact> Evidence, out string? ExpectedSeamOrDirection, out string? Caveat, out bool RequiresReview)
+  operator !=(ArchLinterNet.Core.Reporting.ArchitecturePrReportRemediation? left, ArchLinterNet.Core.Reporting.ArchitecturePrReportRemediation? right)
+  operator ==(ArchLinterNet.Core.Reporting.ArchitecturePrReportRemediation? left, ArchLinterNet.Core.Reporting.ArchitecturePrReportRemediation? right)
+  property System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Reporting.ArchitecturePrReportEvidenceFact> Evidence {get;init;}
+  property bool RequiresReview {get;init;}
+  property string Category {get;init;}
+  property string ContractIdentity {get;init;}
+  property string FindingIdentity {get;init;}
+  property string Summary {get;init;}
+  property string? Caveat {get;init;}
+  property string? ExpectedSeamOrDirection {get;init;}
+sealed class ArchLinterNet.Core.Reporting.ArchitecturePrReportSourceLocation : System.IEquatable<ArchLinterNet.Core.Reporting.ArchitecturePrReportSourceLocation>
+  ctor(string Path, int? Line, int? Column)
+  method ArchLinterNet.Core.Reporting.ArchitecturePrReportSourceLocation <Clone>$()
+  method bool Equals(ArchLinterNet.Core.Reporting.ArchitecturePrReportSourceLocation? other)
+  method bool Equals(object? obj)
+  method int GetHashCode()
+  method string ToString()
+  method void Deconstruct(out string Path, out int? Line, out int? Column)
+  operator !=(ArchLinterNet.Core.Reporting.ArchitecturePrReportSourceLocation? left, ArchLinterNet.Core.Reporting.ArchitecturePrReportSourceLocation? right)
+  operator ==(ArchLinterNet.Core.Reporting.ArchitecturePrReportSourceLocation? left, ArchLinterNet.Core.Reporting.ArchitecturePrReportSourceLocation? right)
+  property int? Column {get;init;}
+  property int? Line {get;init;}
+  property string Path {get;init;}
+sealed class ArchLinterNet.Core.Reporting.ArchitecturePrReportTopology : System.IEquatable<ArchLinterNet.Core.Reporting.ArchitecturePrReportTopology>
+  ctor(string Mode, string SubjectKind, int DeclaredComponentCount, ArchLinterNet.Core.Reporting.ArchitecturePrReportTopologyCounts Counts, System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Reporting.ArchitecturePrReportTopologySubject> Subjects, System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Reporting.ArchitecturePrReportTopologyRelation> Relationships, System.Collections.Generic.IReadOnlyList<string> StaleNodes, System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Reporting.ArchitecturePrReportTopologyEdge> StaleEdges)
+  method ArchLinterNet.Core.Reporting.ArchitecturePrReportTopology <Clone>$()
+  method bool Equals(ArchLinterNet.Core.Reporting.ArchitecturePrReportTopology? other)
+  method bool Equals(object? obj)
+  method int GetHashCode()
+  method string ToString()
+  method void Deconstruct(out string Mode, out string SubjectKind, out int DeclaredComponentCount, out ArchLinterNet.Core.Reporting.ArchitecturePrReportTopologyCounts Counts, out System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Reporting.ArchitecturePrReportTopologySubject> Subjects, out System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Reporting.ArchitecturePrReportTopologyRelation> Relationships, out System.Collections.Generic.IReadOnlyList<string> StaleNodes, out System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Reporting.ArchitecturePrReportTopologyEdge> StaleEdges)
+  operator !=(ArchLinterNet.Core.Reporting.ArchitecturePrReportTopology? left, ArchLinterNet.Core.Reporting.ArchitecturePrReportTopology? right)
+  operator ==(ArchLinterNet.Core.Reporting.ArchitecturePrReportTopology? left, ArchLinterNet.Core.Reporting.ArchitecturePrReportTopology? right)
+  property ArchLinterNet.Core.Reporting.ArchitecturePrReportTopologyCounts Counts {get;init;}
+  property System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Reporting.ArchitecturePrReportTopologyEdge> StaleEdges {get;init;}
+  property System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Reporting.ArchitecturePrReportTopologyRelation> Relationships {get;init;}
+  property System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Reporting.ArchitecturePrReportTopologySubject> Subjects {get;init;}
+  property System.Collections.Generic.IReadOnlyList<string> StaleNodes {get;init;}
+  property int DeclaredComponentCount {get;init;}
+  property string Mode {get;init;}
+  property string SubjectKind {get;init;}
+sealed class ArchLinterNet.Core.Reporting.ArchitecturePrReportTopologyCounts : System.IEquatable<ArchLinterNet.Core.Reporting.ArchitecturePrReportTopologyCounts>
+  ctor(int Observed, int Mapped, int ReviewedOutOfScope, int Unmapped, int Ambiguous)
+  method ArchLinterNet.Core.Reporting.ArchitecturePrReportTopologyCounts <Clone>$()
+  method bool Equals(ArchLinterNet.Core.Reporting.ArchitecturePrReportTopologyCounts? other)
+  method bool Equals(object? obj)
+  method int GetHashCode()
+  method string ToString()
+  method void Deconstruct(out int Observed, out int Mapped, out int ReviewedOutOfScope, out int Unmapped, out int Ambiguous)
+  operator !=(ArchLinterNet.Core.Reporting.ArchitecturePrReportTopologyCounts? left, ArchLinterNet.Core.Reporting.ArchitecturePrReportTopologyCounts? right)
+  operator ==(ArchLinterNet.Core.Reporting.ArchitecturePrReportTopologyCounts? left, ArchLinterNet.Core.Reporting.ArchitecturePrReportTopologyCounts? right)
+  property int Ambiguous {get;init;}
+  property int Mapped {get;init;}
+  property int Observed {get;init;}
+  property int ReviewedOutOfScope {get;init;}
+  property int Unmapped {get;init;}
+sealed class ArchLinterNet.Core.Reporting.ArchitecturePrReportTopologyEdge : System.IEquatable<ArchLinterNet.Core.Reporting.ArchitecturePrReportTopologyEdge>
+  ctor(string SourceNode, string TargetNode)
+  method ArchLinterNet.Core.Reporting.ArchitecturePrReportTopologyEdge <Clone>$()
+  method bool Equals(ArchLinterNet.Core.Reporting.ArchitecturePrReportTopologyEdge? other)
+  method bool Equals(object? obj)
+  method int GetHashCode()
+  method string ToString()
+  method void Deconstruct(out string SourceNode, out string TargetNode)
+  operator !=(ArchLinterNet.Core.Reporting.ArchitecturePrReportTopologyEdge? left, ArchLinterNet.Core.Reporting.ArchitecturePrReportTopologyEdge? right)
+  operator ==(ArchLinterNet.Core.Reporting.ArchitecturePrReportTopologyEdge? left, ArchLinterNet.Core.Reporting.ArchitecturePrReportTopologyEdge? right)
+  property string SourceNode {get;init;}
+  property string TargetNode {get;init;}
+sealed class ArchLinterNet.Core.Reporting.ArchitecturePrReportTopologyRelation : System.IEquatable<ArchLinterNet.Core.Reporting.ArchitecturePrReportTopologyRelation>
+  ctor(string SourceNode, string TargetNode, string Witness, bool IsAllowed)
+  method ArchLinterNet.Core.Reporting.ArchitecturePrReportTopologyRelation <Clone>$()
+  method bool Equals(ArchLinterNet.Core.Reporting.ArchitecturePrReportTopologyRelation? other)
+  method bool Equals(object? obj)
+  method int GetHashCode()
+  method string ToString()
+  method void Deconstruct(out string SourceNode, out string TargetNode, out string Witness, out bool IsAllowed)
+  operator !=(ArchLinterNet.Core.Reporting.ArchitecturePrReportTopologyRelation? left, ArchLinterNet.Core.Reporting.ArchitecturePrReportTopologyRelation? right)
+  operator ==(ArchLinterNet.Core.Reporting.ArchitecturePrReportTopologyRelation? left, ArchLinterNet.Core.Reporting.ArchitecturePrReportTopologyRelation? right)
+  property bool IsAllowed {get;init;}
+  property string SourceNode {get;init;}
+  property string TargetNode {get;init;}
+  property string Witness {get;init;}
+sealed class ArchLinterNet.Core.Reporting.ArchitecturePrReportTopologySubject : System.IEquatable<ArchLinterNet.Core.Reporting.ArchitecturePrReportTopologySubject>
+  ctor(string Identity, string Project, string Assembly, string Subject, string Disposition, System.Collections.Generic.IReadOnlyList<string> NodeIds, string? ReviewedOutOfScopeId)
+  method ArchLinterNet.Core.Reporting.ArchitecturePrReportTopologySubject <Clone>$()
+  method bool Equals(ArchLinterNet.Core.Reporting.ArchitecturePrReportTopologySubject? other)
+  method bool Equals(object? obj)
+  method int GetHashCode()
+  method string ToString()
+  method void Deconstruct(out string Identity, out string Project, out string Assembly, out string Subject, out string Disposition, out System.Collections.Generic.IReadOnlyList<string> NodeIds, out string? ReviewedOutOfScopeId)
+  operator !=(ArchLinterNet.Core.Reporting.ArchitecturePrReportTopologySubject? left, ArchLinterNet.Core.Reporting.ArchitecturePrReportTopologySubject? right)
+  operator ==(ArchLinterNet.Core.Reporting.ArchitecturePrReportTopologySubject? left, ArchLinterNet.Core.Reporting.ArchitecturePrReportTopologySubject? right)
+  property System.Collections.Generic.IReadOnlyList<string> NodeIds {get;init;}
+  property string Assembly {get;init;}
+  property string Disposition {get;init;}
+  property string Identity {get;init;}
+  property string Project {get;init;}
+  property string Subject {get;init;}
+  property string? ReviewedOutOfScopeId {get;init;}
+sealed class ArchLinterNet.Core.Reporting.ArchitecturePrReportValidationReceipt : System.IEquatable<ArchLinterNet.Core.Reporting.ArchitecturePrReportValidationReceipt>
+  ctor(string Mode, System.Collections.Generic.IReadOnlyDictionary<string,string> Availability, ArchLinterNet.Core.Model.ArchitecturePolicyInventory? PolicyInventory, ArchLinterNet.Core.Model.ArchitectureWaiverLifecycleAssessment? WaiverLifecycle, ArchLinterNet.Core.Reporting.ArchitecturePrReportApplicability? Applicability, ArchLinterNet.Core.Reporting.ArchitecturePrReportExternalEvidence? ExternalEvidence, System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Reporting.ArchitecturePrReportFinding> Findings, ArchLinterNet.Core.Reporting.ArchitecturePrReportProvenance Provenance)
+  method ArchLinterNet.Core.Reporting.ArchitecturePrReportValidationReceipt <Clone>$()
+  method bool Equals(ArchLinterNet.Core.Reporting.ArchitecturePrReportValidationReceipt? other)
+  method bool Equals(object? obj)
+  method int GetHashCode()
+  method string ToString()
+  method void Deconstruct(out string Mode, out System.Collections.Generic.IReadOnlyDictionary<string,string> Availability, out ArchLinterNet.Core.Model.ArchitecturePolicyInventory? PolicyInventory, out ArchLinterNet.Core.Model.ArchitectureWaiverLifecycleAssessment? WaiverLifecycle, out ArchLinterNet.Core.Reporting.ArchitecturePrReportApplicability? Applicability, out ArchLinterNet.Core.Reporting.ArchitecturePrReportExternalEvidence? ExternalEvidence, out System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Reporting.ArchitecturePrReportFinding> Findings, out ArchLinterNet.Core.Reporting.ArchitecturePrReportProvenance Provenance)
+  operator !=(ArchLinterNet.Core.Reporting.ArchitecturePrReportValidationReceipt? left, ArchLinterNet.Core.Reporting.ArchitecturePrReportValidationReceipt? right)
+  operator ==(ArchLinterNet.Core.Reporting.ArchitecturePrReportValidationReceipt? left, ArchLinterNet.Core.Reporting.ArchitecturePrReportValidationReceipt? right)
+  property ArchLinterNet.Core.Model.ArchitecturePolicyInventory? PolicyInventory {get;init;}
+  property ArchLinterNet.Core.Model.ArchitectureWaiverLifecycleAssessment? WaiverLifecycle {get;init;}
+  property ArchLinterNet.Core.Reporting.ArchitecturePrReportApplicability? Applicability {get;init;}
+  property ArchLinterNet.Core.Reporting.ArchitecturePrReportExternalEvidence? ExternalEvidence {get;init;}
+  property ArchLinterNet.Core.Reporting.ArchitecturePrReportProvenance Provenance {get;init;}
+  property System.Collections.Generic.IReadOnlyDictionary<string,string> Availability {get;init;}
+  property System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Reporting.ArchitecturePrReportFinding> Findings {get;init;}
+  property string Mode {get;init;}
 sealed class ArchLinterNet.Core.Reporting.ArchitectureSarifFormatter : ArchLinterNet.Core.Reporting.Abstractions.IArchitectureSarifFormatter
   ctor()
   method static object[] FormatPolicyLocationsForSarif(ArchLinterNet.Core.Model.ArchitecturePolicySourceLocation? primaryLocation, System.Collections.Generic.IEnumerable<ArchLinterNet.Core.Model.ArchitecturePolicySourceLocation> relatedLocations)
@@ -5812,10 +6403,13 @@ sealed class ArchLinterNet.Core.Validation.ArchitectureHealthOutcome : System.IE
   property ArchLinterNet.Core.Validation.ArchitectureAnalysisSnapshotCounters AnalysisCounters {get;init;}
   property ArchLinterNet.Core.Validation.ArchitectureDebtGateOutcome DebtGate {get;init;}
   property System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Validation.ArchitectureHealthValidationOutcome> ValidationOutcomes {get;init;}
+  property string ConditionSetName {get;init;}
+  property string? ExecutionContext {get;init;}
 static class ArchLinterNet.Core.Validation.ArchitectureHealthProjector
   method static ArchLinterNet.Core.Model.ArchitectureHealthSummary Project(System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Validation.ArchitectureHealthValidationOutcome> validationOutcomes, ArchLinterNet.Core.Validation.ArchitectureDebtGateOutcome debtGate)
   method static string FormatAsHuman(ArchLinterNet.Core.Model.ArchitectureHealthSummary summary)
   method static string FormatAsJson(ArchLinterNet.Core.Model.ArchitectureHealthSummary summary)
+  method static string FormatAsJson(ArchLinterNet.Core.Validation.ArchitectureHealthOutcome outcome)
 sealed class ArchLinterNet.Core.Validation.ArchitectureHealthRequest : System.IEquatable<ArchLinterNet.Core.Validation.ArchitectureHealthRequest>
   ctor()
   method ArchLinterNet.Core.Validation.ArchitectureHealthRequest <Clone>$()
@@ -5826,6 +6420,7 @@ sealed class ArchLinterNet.Core.Validation.ArchitectureHealthRequest : System.IE
   operator !=(ArchLinterNet.Core.Validation.ArchitectureHealthRequest? left, ArchLinterNet.Core.Validation.ArchitectureHealthRequest? right)
   operator ==(ArchLinterNet.Core.Validation.ArchitectureHealthRequest? left, ArchLinterNet.Core.Validation.ArchitectureHealthRequest? right)
   property ArchLinterNet.Core.Validation.ArchitectureDebtGateRequest DebtGate {get;init;}
+  property string? ExecutionContext {get;init;}
 sealed class ArchLinterNet.Core.Validation.ArchitectureHealthValidationOutcome : System.IEquatable<ArchLinterNet.Core.Validation.ArchitectureHealthValidationOutcome>
   ctor(string Mode, ArchLinterNet.Core.Validation.ValidationOutcome Outcome)
   method ArchLinterNet.Core.Validation.ArchitectureHealthValidationOutcome <Clone>$()

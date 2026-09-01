@@ -1,12 +1,13 @@
 using System.Globalization;
 using System.Text.Json;
 using ArchLinterNet.Core.Model;
+using static ArchLinterNet.Core.Reporting.ArchitecturePrReportReader;
 
 namespace ArchLinterNet.Core.Reporting;
 
-public static partial class ArchitecturePrReportReader
+internal static class ArchitecturePrReportDebtReceiptParser
 {
-    private static ArchitecturePrReportFinding ReadFinding(JsonElement element)
+    internal static ArchitecturePrReportFinding ReadFinding(JsonElement element)
     {
         JsonElement? sourceLocation = element.TryGetProperty("source_location", out JsonElement source)
             && source.ValueKind != JsonValueKind.Null
@@ -69,22 +70,31 @@ public static partial class ArchitecturePrReportReader
             : $"{sourcePath ?? string.Empty}:{yamlPath ?? string.Empty}";
     }
 
-    private static ArchitecturePrReportDebtGateReceipt ReadDebtGate(JsonElement element)
+    internal static ArchitecturePrReportDebtGateReceipt ReadDebtGate(JsonElement element)
     {
         JsonElement evaluation = Required(element, "evaluation", JsonValueKind.Object);
         JsonElement persistentDebt = Required(element, "persistent_debt", JsonValueKind.Object);
         JsonElement policyWeakening = Required(element, "policy_weakening", JsonValueKind.Object);
-        return new ArchitecturePrReportDebtGateReceipt(
-            RequiredBool(element, "succeeded"),
-            RequiredBool(element, "passed"),
-            new ArchitecturePrReportDebtEvaluation(
+        bool succeeded = RequiredBool(element, "succeeded");
+        bool passed = RequiredBool(element, "passed");
+        var parsedEvaluation = new ArchitecturePrReportDebtEvaluation(
                 RequiredBool(evaluation, "completed"),
                 RequiredString(evaluation, "mode"),
                 RequiredBool(evaluation, "reused_analysis_snapshot"),
                 Required(evaluation, "preflight_diagnostics", JsonValueKind.Array).EnumerateArray()
-                    .Select(ReadFinding).ToArray()),
+                    .Select(ReadFinding).ToArray());
+        ArchitecturePrReportPolicyWeakening? parsedWeakening = ReadPolicyWeakening(policyWeakening);
+        if (RequiredBool(policyWeakening, "requested") && (!succeeded || !parsedEvaluation.Completed || parsedWeakening is null))
+        {
+            throw InvalidArtifact("Requested policy-weakening evidence must be complete before it can be reported.");
+        }
+
+        return new ArchitecturePrReportDebtGateReceipt(
+            succeeded,
+            passed,
+            parsedEvaluation,
             ReadPersistentDebt(persistentDebt),
-            ReadPolicyWeakening(policyWeakening));
+            parsedWeakening);
     }
 
     private static ArchitecturePrReportPersistentDebt ReadPersistentDebt(JsonElement element) =>
@@ -122,6 +132,7 @@ public static partial class ArchitecturePrReportReader
             RequiredString(element, "policy_name"),
             RequiredInt(element, "policy_version"),
             RequiredString(element, "severity"),
+            RequiredBool(element, "has_blocking_findings"),
             Required(element, "findings", JsonValueKind.Array).EnumerateArray()
                 .Select(ReadPolicyWeakeningFinding).ToArray());
     }
@@ -157,7 +168,7 @@ public static partial class ArchitecturePrReportReader
             RequiredInt(element, "source_order"));
     }
 
-    private static IReadOnlyList<string> ReadStringArray(JsonElement element)
+    internal static IReadOnlyList<string> ReadStringArray(JsonElement element)
     {
         if (element.ValueKind != JsonValueKind.Array)
         {
@@ -172,7 +183,7 @@ public static partial class ArchitecturePrReportReader
             .ToArray();
     }
 
-    private static IReadOnlyDictionary<string, string> ReadStringMap(JsonElement element)
+    internal static IReadOnlyDictionary<string, string> ReadStringMap(JsonElement element)
     {
         if (element.ValueKind != JsonValueKind.Object)
         {
@@ -183,12 +194,12 @@ public static partial class ArchitecturePrReportReader
             .ToDictionary(item => item.Name, item => RequiredString(item.Value), StringComparer.Ordinal);
     }
 
-    private static DateOnly? OptionalDate(JsonElement parent, string name) =>
+    internal static DateOnly? OptionalDate(JsonElement parent, string name) =>
         !parent.TryGetProperty(name, out JsonElement value) || value.ValueKind == JsonValueKind.Null
             ? null
             : ParseDate(value, name);
 
-    private static DateOnly RequiredDate(JsonElement parent, string name) =>
+    internal static DateOnly RequiredDate(JsonElement parent, string name) =>
         ParseDate(Required(parent, name, JsonValueKind.String), name)
         ?? throw InvalidArtifact($"The report artifact requires a date for '{name}'.");
 
@@ -203,7 +214,7 @@ public static partial class ArchitecturePrReportReader
                 : throw InvalidArtifact($"The report artifact field '{name}' contains an invalid date.");
     }
 
-    private static bool RequiredBool(JsonElement parent, string name)
+    internal static bool RequiredBool(JsonElement parent, string name)
     {
         JsonElement value = Required(parent, name, JsonValueKind.True, JsonValueKind.False);
         return value.GetBoolean();
@@ -220,7 +231,7 @@ public static partial class ArchitecturePrReportReader
         return value;
     }
 
-    private static int? OptionalInt(JsonElement parent, string name) =>
+    internal static int? OptionalInt(JsonElement parent, string name) =>
         !parent.TryGetProperty(name, out JsonElement value) || value.ValueKind == JsonValueKind.Null
             ? null
             : value.ValueKind == JsonValueKind.Number && value.TryGetInt32(out int number)

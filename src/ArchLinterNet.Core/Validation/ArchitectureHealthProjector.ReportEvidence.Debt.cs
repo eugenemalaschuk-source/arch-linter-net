@@ -5,12 +5,13 @@ using ArchLinterNet.Core.Model;
 using ArchLinterNet.Core.PolicyContext;
 using ArchLinterNet.Core.PolicyWeakening;
 using ArchLinterNet.Core.Reporting;
+using static ArchLinterNet.Core.Validation.ArchitectureHealthReportFindingEvidenceWriter;
 
 namespace ArchLinterNet.Core.Validation;
 
-public static partial class ArchitectureHealthProjector
+internal static class ArchitectureHealthReportDebtEvidenceWriter
 {
-    private static JsonObject BuildDebtGateEvidence(ArchitectureDebtGateOutcome outcome)
+    internal static JsonObject BuildDebtGateEvidence(ArchitectureDebtGateOutcome outcome)
     {
         var result = new JsonObject
         {
@@ -99,6 +100,7 @@ public static partial class ArchitectureHealthProjector
             ["policy_name"] = weakening.PolicyName,
             ["policy_version"] = weakening.PolicyVersion,
             ["severity"] = weakening.Severity,
+            ["has_blocking_findings"] = weakening.HasErrors,
             ["findings"] = findings,
         };
     }
@@ -139,10 +141,10 @@ public static partial class ArchitectureHealthProjector
             .ToArray();
     }
 
-    private static string? FormatDate(DateOnly? date) =>
+    internal static string? FormatDate(DateOnly? date) =>
         date?.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
 
-    private static string CompletionToken(ArchitectureAssessmentCompletionState state) => state switch
+    internal static string CompletionToken(ArchitectureAssessmentCompletionState state) => state switch
     {
         ArchitectureAssessmentCompletionState.Pass => "pass",
         ArchitectureAssessmentCompletionState.Fail => "fail",

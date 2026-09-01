@@ -1,12 +1,14 @@
 using System.Globalization;
 using System.Text.Json;
 using ArchLinterNet.Core.Model;
+using static ArchLinterNet.Core.Reporting.ArchitecturePrReportDebtReceiptParser;
+using static ArchLinterNet.Core.Reporting.ArchitecturePrReportReader;
 
 namespace ArchLinterNet.Core.Reporting;
 
-public static partial class ArchitecturePrReportReader
+internal static class ArchitecturePrReportReceiptParser
 {
-    private static ArchitecturePolicyInventory ReadPolicyInventory(JsonElement element)
+    internal static ArchitecturePolicyInventory ReadPolicyInventory(JsonElement element)
     {
         string schema = RequiredString(element, "schema");
         if (!string.Equals(schema, ArchitecturePolicyInventory.CurrentSchemaId, StringComparison.Ordinal))
@@ -86,7 +88,7 @@ public static partial class ArchitecturePrReportReader
             OptionalString(element, "contract_id"));
     }
 
-    private static ArchitectureWaiverLifecycleAssessment ReadWaiverLifecycle(JsonElement element)
+    internal static ArchitectureWaiverLifecycleAssessment ReadWaiverLifecycle(JsonElement element)
     {
         JsonElement records = Required(element, "records", JsonValueKind.Array);
         return new ArchitectureWaiverLifecycleAssessment(
@@ -95,7 +97,7 @@ public static partial class ArchitecturePrReportReader
             ReadStringArray(Required(element, "blocking_states", JsonValueKind.Array)));
     }
 
-    private static ArchitecturePrReportApplicability ReadApplicability(JsonElement element)
+    internal static ArchitecturePrReportApplicability ReadApplicability(JsonElement element)
     {
         JsonElement summary = Required(element, "summary", JsonValueKind.Object);
         JsonElement reasons = Required(element, "reasons", JsonValueKind.Array);
@@ -197,7 +199,7 @@ public static partial class ArchitecturePrReportReader
                 ? ReadStringArray(contributors)
                 : null);
 
-    private static ArchitecturePrReportExternalEvidence ReadExternalEvidence(JsonElement element) =>
+    internal static ArchitecturePrReportExternalEvidence ReadExternalEvidence(JsonElement element) =>
         new(
             RequiredString(element, "mode"),
             Required(element, "requirements", JsonValueKind.Array).EnumerateArray()
@@ -228,7 +230,7 @@ public static partial class ArchitecturePrReportReader
         new(OptionalString(element, "family"), OptionalString(element, "control_identity"),
             OptionalString(element, "policy_identity"), OptionalString(element, "evidence_identity"));
 
-    private static ArchitecturePrReportProvenance ReadProvenance(JsonElement element) =>
+    internal static ArchitecturePrReportProvenance ReadProvenance(JsonElement element) =>
         new(RequiredString(element, "repository_root"),
             ReadStringArray(Required(element, "policy_import_paths", JsonValueKind.Array)),
             ReadStringArray(Required(element, "resolved_assembly_paths", JsonValueKind.Array)),

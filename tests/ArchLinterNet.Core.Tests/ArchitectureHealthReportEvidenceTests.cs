@@ -23,8 +23,10 @@ public sealed class ArchitectureHealthReportEvidenceTests
             Assert.That(root.GetProperty("schema_id").GetString(), Is.EqualTo(ArchitectureHealthSummary.CurrentSchemaId));
             Assert.That(root.GetProperty("gate").GetString(), Is.EqualTo(outcome.Summary.Gate.ToString().ToLowerInvariant()));
             Assert.That(root.GetProperty("health").GetString(), Is.EqualTo(outcome.Summary.Health.ToString().ToLowerInvariant()));
-            Assert.That(evidence.GetProperty("schema_version").GetInt32(), Is.EqualTo(1));
+            Assert.That(evidence.GetProperty("schema_version").GetInt32(), Is.EqualTo(2));
             Assert.That(evidence.GetProperty("kind").GetString(), Is.EqualTo("architecture-health-report-evidence"));
+            Assert.That(evidence.GetProperty("execution_context").GetProperty("execution_id").GetString(), Is.EqualTo("run"));
+            Assert.That(evidence.GetProperty("execution_context").GetProperty("condition_set").GetString(), Is.EqualTo("ci"));
             Assert.That(evidence.GetProperty("gate").GetString(), Is.EqualTo(root.GetProperty("gate").GetString()));
             Assert.That(evidence.GetProperty("health").GetString(), Is.EqualTo(root.GetProperty("health").GetString()));
             Assert.That(receipt.GetProperty("policy_inventory").GetProperty("effective_rule_count").GetInt32(), Is.EqualTo(3));
@@ -166,7 +168,11 @@ public sealed class ArchitectureHealthReportEvidenceTests
         return new ArchitectureHealthOutcome(
             summary,
             [new ArchitectureHealthValidationOutcome(mode, validation)],
-            debtGate);
+            debtGate)
+        {
+            ExecutionContext = "run",
+            ConditionSetName = "ci",
+        };
     }
 
     private static ArchitectureWaiverLifecycleRecord Waiver() => new(

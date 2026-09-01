@@ -1,7 +1,8 @@
 using System.Text.Json;
 using ArchLinterNet.Core.Change;
+using ArchLinterNet.Core.Model;
 
-namespace ArchLinterNet.Core.Model;
+namespace ArchLinterNet.Core.Reporting;
 
 /// <summary>Availability of the canonical evidence needed to render an architecture PR report.</summary>
 public enum ArchitecturePrReportAvailability
@@ -15,7 +16,12 @@ public enum ArchitecturePrReportAvailability
 public sealed record ArchitecturePrReportInput(
     ArchitectureHealthSummary Summary,
     ArchitecturePrReportEvidence? Evidence,
-    ArchitectureChangeReport Change);
+    ArchitecturePrReportChange Change);
+
+/// <summary>Correlation metadata carried by report artifacts from one workflow execution.</summary>
+public sealed record ArchitecturePrReportExecutionContext(
+    string ExecutionId,
+    string ConditionSetName);
 
 /// <summary>Versioned report evidence exported by the Health formatter.</summary>
 public sealed record ArchitecturePrReportEvidence(
@@ -26,8 +32,11 @@ public sealed record ArchitecturePrReportEvidence(
     IReadOnlyList<ArchitecturePrReportValidationReceipt> ValidationOutcomes,
     ArchitecturePrReportDebtGateReceipt DebtGate)
 {
-    public const int CurrentSchemaVersion = 1;
+    public const int CurrentSchemaVersion = 2;
     public const string EvidenceKind = "architecture-health-report-evidence";
+
+    /// <summary>Workflow context required before the evidence can be paired with change data.</summary>
+    public ArchitecturePrReportExecutionContext? ExecutionContext { get; init; }
 }
 
 /// <summary>One already-evaluated mode receipt in a Health report-evidence envelope.</summary>
@@ -231,6 +240,7 @@ public sealed record ArchitecturePrReportPolicyWeakening(
     string PolicyName,
     int PolicyVersion,
     string Severity,
+    bool HasBlockingFindings,
     IReadOnlyList<ArchitecturePrReportPolicyWeakeningFinding> Findings);
 
 public sealed record ArchitecturePrReportPolicyWeakeningFinding(
@@ -257,13 +267,24 @@ public sealed record ArchitecturePrReportPolicyContextProvenance(
 public sealed record ArchitecturePrReportProjection(
     ArchitecturePrReportHeadline Headline,
     ArchitecturePrReportEvidence? Evidence,
-    ArchitectureChangeReport Change,
+    ArchitecturePrReportChange Change,
     IReadOnlyList<ArchitecturePrReportNavigationReference> Navigation)
 {
     public ArchitecturePrReportAvailability Availability => Headline.Availability;
 
     public bool IsAvailable => Availability == ArchitecturePrReportAvailability.Complete;
 }
+
+/// <summary>Report-owned view of the compatible canonical change artifact.</summary>
+public sealed record ArchitecturePrReportChange(
+    ArchitecturePrReportExecutionContext ExecutionContext,
+    string Mode,
+    IReadOnlyList<ArchitectureChangeEntry> Added,
+    IReadOnlyList<ArchitectureChangeEntry> Removed,
+    IReadOnlyList<ArchitectureChangeFinding> NewFindings,
+    IReadOnlyList<ArchitectureChangeFinding> ExistingFindings,
+    IReadOnlyList<ArchitectureChangeFinding> ResolvedFindings,
+    IReadOnlyList<string> BaselineDebt);
 
 public sealed record ArchitecturePrReportHeadline(
     ArchitectureHealthGate Gate,

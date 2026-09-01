@@ -106,13 +106,16 @@ internal sealed class ChangeCommandHandler(ICliRuntime runtime, ICliConsole cons
     {
         if (options.ShowHelp)
         {
-            console.Out.WriteLine("arch-linter-net change report --base <snapshot> --current <snapshot> [--format human|json] [--output <path>]");
+            console.Out.WriteLine("arch-linter-net change report --base <snapshot> --current <snapshot> --execution-context <id> [--format human|json] [--output <path>]");
             return CliExitCodes.Success;
         }
 
-        if (string.IsNullOrWhiteSpace(options.BasePath) || string.IsNullOrWhiteSpace(options.CurrentPath) || options.Format is not ("human" or "json"))
+        if (string.IsNullOrWhiteSpace(options.BasePath)
+            || string.IsNullOrWhiteSpace(options.CurrentPath)
+            || string.IsNullOrWhiteSpace(options.ExecutionContext)
+            || options.Format is not ("human" or "json"))
         {
-            console.Error.WriteLine("Change report requires --base, --current, and a human or json --format.");
+            console.Error.WriteLine("Change report requires --base, --current, --execution-context, and a human or json --format.");
             return CliExitCodes.InvalidArgumentsOrRuntimeError;
         }
 
@@ -127,7 +130,7 @@ internal sealed class ChangeCommandHandler(ICliRuntime runtime, ICliConsole cons
 
             ArchitectureChangeSnapshot baseline = ArchitectureChangeReports.DeserializeSnapshot(fileSystem.ReadAllText(options.BasePath));
             ArchitectureChangeSnapshot current = ArchitectureChangeReports.DeserializeSnapshot(fileSystem.ReadAllText(options.CurrentPath));
-            ArchitectureChangeReport report = ArchitectureChangeReports.Compare(baseline, current);
+            ArchitectureChangeReport report = ArchitectureChangeReports.Compare(baseline, current, options.ExecutionContext);
             string output = options.Format == "json" ? ArchitectureChangeReports.FormatJson(report) : ArchitectureChangeReports.FormatHuman(report);
             if (options.OutputPath is null)
             {

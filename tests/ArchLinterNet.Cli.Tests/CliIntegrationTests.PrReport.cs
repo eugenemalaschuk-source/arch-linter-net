@@ -18,11 +18,14 @@ public partial class CliIntegrationTests
             Assert.That(baselineExit, Is.EqualTo(0), $"stderr: {baselineError}");
 
             var (healthExit, healthJson, healthError) = RunCli(
-                "health", "--policy", _passingPolicy, "--baseline", baselinePath, "--format", "json");
+                "health", "--policy", _passingPolicy, "--baseline", baselinePath, "--format", "json", "--execution-context", "run");
             Assert.That(healthExit, Is.EqualTo(0), $"stderr: {healthError}");
             File.WriteAllText(healthPath, healthJson);
             File.WriteAllText(changePath, ArchitectureChangeReports.FormatJson(
-                new ArchitectureChangeReport([], [], [], [], [])));
+                new ArchitectureChangeReport([], [], [], [], [])
+                {
+                    ExecutionContext = new ArchitectureChangeReportContext("run", "strict", string.Empty),
+                }));
 
             var (reportExit, markdown, reportError) = RunCli(
                 "report", "pr", "--health", healthPath, "--change", changePath, "--max-details", "3");
@@ -32,7 +35,7 @@ public partial class CliIntegrationTests
                 Assert.That(reportExit, Is.EqualTo(0), $"stderr: {reportError}");
                 Assert.That(markdown, Does.Contain("# Architecture PR report"));
                 Assert.That(markdown, Does.Contain("Architecture acceptance: **pass**"));
-                Assert.That(markdown, Does.Contain("## Architecture change"));
+                Assert.That(markdown, Does.Not.Contain("Showing 0 of 0"));
                 Assert.That(reportError, Is.Empty);
             });
         }

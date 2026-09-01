@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using ArchLinterNet.Core.Change;
 using ArchLinterNet.Core.Model;
 using ArchLinterNet.Core.Reporting;
@@ -16,7 +17,8 @@ public sealed class ArchitecturePrReportReaderTests
         ArchitectureHealthOutcome outcome = CreateOutcome();
         ArchitectureChangeReport change = ArchitectureChangeReports.Compare(
             Snapshot([new ArchitectureChangeFinding("resolved", "dependency", "resolved")]),
-            Snapshot());
+            Snapshot(),
+            "run-1");
 
         ArchitecturePrReportProjection projection = ArchitecturePrReportProjector.ReadAndProject(
             ArchitectureHealthProjector.FormatAsJson(outcome),
@@ -38,7 +40,7 @@ public sealed class ArchitecturePrReportReaderTests
     public void ReadAndProject_LegacySummaryWithoutEvidencePreservesGateAndMarksUnavailable()
     {
         ArchitectureHealthOutcome outcome = CreateOutcome();
-        ArchitectureChangeReport change = ArchitectureChangeReports.Compare(Snapshot(), Snapshot());
+        ArchitectureChangeReport change = ArchitectureChangeReports.Compare(Snapshot(), Snapshot(), "run-1");
 
         ArchitecturePrReportProjection projection = ArchitecturePrReportProjector.ReadAndProject(
             ArchitectureHealthProjector.FormatAsJson(outcome.Summary),
@@ -56,7 +58,7 @@ public sealed class ArchitecturePrReportReaderTests
     [Test]
     public void Read_RejectsMalformedAndUnsupportedArtifacts()
     {
-        ArchitectureChangeReport change = ArchitectureChangeReports.Compare(Snapshot(), Snapshot());
+        ArchitectureChangeReport change = ArchitectureChangeReports.Compare(Snapshot(), Snapshot(), "run-1");
         string changeJson = ArchitectureChangeReports.FormatJson(change);
         string healthJson = ArchitectureHealthProjector.FormatAsJson(CreateOutcome());
 
@@ -73,6 +75,73 @@ public sealed class ArchitecturePrReportReaderTests
                 healthJson, changeJson.Replace("architecture-change-report", "unknown-change", StringComparison.Ordinal)),
                 Throws.ArgumentException);
         });
+    }
+
+    [Test]
+    public void Read_RejectsHealthAndChangeArtifactsWithDifferentExecutionContextModeOrConditionSet()
+    {
+        string healthJson = ArchitectureHealthProjector.FormatAsJson(CreateOutcome());
+        string changeJson = ArchitectureChangeReports.FormatJson(
+            ArchitectureChangeReports.Compare(Snapshot(), Snapshot(), "run-1"));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(() => ArchitecturePrReportReader.Read(
+                healthJson,
+                changeJson.Replace("run-1", "run-2", StringComparison.Ordinal)), Throws.ArgumentException);
+            Assert.That(() => ArchitecturePrReportReader.Read(
+                healthJson,
+                changeJson.Replace("\"mode\": \"strict\"", "\"mode\": \"audit\"", StringComparison.Ordinal)), Throws.ArgumentException);
+            Assert.That(() => ArchitecturePrReportReader.Read(
+                healthJson,
+                changeJson.Replace("\"condition_set\": \"ci\"", "\"condition_set\": \"developer\"", StringComparison.Ordinal)), Throws.ArgumentException);
+        });
+    }
+
+    [Test]
+    public void Read_RejectsAvailabilityThatDoesNotMatchPayloadOrKnownWireContract()
+    {
+        string changeJson = ArchitectureChangeReports.FormatJson(
+            ArchitectureChangeReports.Compare(Snapshot(), Snapshot(), "run-1"));
+
+        JsonNode missingPayload = JsonNode.Parse(ArchitectureHealthProjector.FormatAsJson(CreateOutcome()))!;
+        missingPayload["report_evidence"]!["validation_outcomes"]![0]!["availability"]!["external_evidence"] = "available";
+
+        JsonNode unknownKey = JsonNode.Parse(ArchitectureHealthProjector.FormatAsJson(CreateOutcome()))!;
+        unknownKey["report_evidence"]!["validation_outcomes"]![0]!["availability"]!["future_authority"] = "available";
+
+        JsonNode unknownValue = JsonNode.Parse(ArchitectureHealthProjector.FormatAsJson(CreateOutcome()))!;
+        unknownValue["report_evidence"]!["validation_outcomes"]![0]!["availability"]!["policy_inventory"] = "clean";
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(() => ArchitecturePrReportReader.Read(missingPayload.ToJsonString(), changeJson), Throws.ArgumentException);
+            Assert.That(() => ArchitecturePrReportReader.Read(unknownKey.ToJsonString(), changeJson), Throws.ArgumentException);
+            Assert.That(() => ArchitecturePrReportReader.Read(unknownValue.ToJsonString(), changeJson), Throws.ArgumentException);
+        });
+    }
+
+    [Test]
+    public void Read_RejectsRequestedButIncompletePolicyWeakeningReceipt()
+    {
+        string changeJson = ArchitectureChangeReports.FormatJson(
+            ArchitectureChangeReports.Compare(Snapshot(), Snapshot(), "run-1"));
+        JsonNode health = JsonNode.Parse(ArchitectureHealthProjector.FormatAsJson(CreateOutcome()))!;
+        JsonNode debtGate = health["report_evidence"]!["debt_gate"]!;
+        debtGate["succeeded"] = false;
+        debtGate["policy_weakening"] = new JsonObject
+        {
+            ["requested"] = true,
+            ["schema_version"] = 1,
+            ["kind"] = "policy-weakening",
+            ["policy_name"] = "policy",
+            ["policy_version"] = 1,
+            ["severity"] = "error",
+            ["has_blocking_findings"] = true,
+            ["findings"] = new JsonArray(),
+        };
+
+        Assert.That(() => ArchitecturePrReportReader.Read(health.ToJsonString(), changeJson), Throws.ArgumentException);
     }
 
     private static ArchitectureChangeSnapshot Snapshot(IReadOnlyList<ArchitectureChangeFinding>? findings = null) =>
@@ -138,6 +207,10 @@ public sealed class ArchitecturePrReportReaderTests
         return new ArchitectureHealthOutcome(
             summary,
             [new ArchitectureHealthValidationOutcome("strict", validation)],
-            debtGate);
+            debtGate)
+        {
+            ExecutionContext = "run-1",
+            ConditionSetName = "ci",
+        };
     }
 }

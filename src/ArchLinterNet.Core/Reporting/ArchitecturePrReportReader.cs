@@ -1,11 +1,13 @@
 using System.Text.Json;
 using ArchLinterNet.Core.Change;
 using ArchLinterNet.Core.Model;
+using static ArchLinterNet.Core.Reporting.ArchitecturePrReportDebtReceiptParser;
+using static ArchLinterNet.Core.Reporting.ArchitecturePrReportReceiptParser;
 
 namespace ArchLinterNet.Core.Reporting;
 
 /// <summary>Reads the two canonical, local artifacts consumed by an architecture PR report.</summary>
-public static partial class ArchitecturePrReportReader
+public static class ArchitecturePrReportReader
 {
     /// <summary>
     /// Parses one architecture-health/v1 artifact and one versioned architecture-change report.
@@ -20,7 +22,9 @@ public static partial class ArchitecturePrReportReader
             using JsonDocument healthDocument = JsonDocument.Parse(healthJson);
             ArchitecturePrReportInput health = ReadHealth(healthDocument.RootElement);
             ArchitectureChangeReport change = ArchitectureChangeReports.DeserializeReport(changeJson);
-            return health with { Change = change };
+            ArchitecturePrReportChange reportChange = ReadChange(change);
+            ValidateCompatibleContext(health.Evidence, reportChange);
+            return health with { Change = reportChange };
         }
         catch (JsonException exception)
         {
@@ -95,6 +99,11 @@ public static partial class ArchitecturePrReportReader
             throw InvalidArtifact("The report-evidence envelope must contain a validation receipt.");
         }
 
+        if (parsedReceipts.Select(receipt => receipt.Mode).Distinct(StringComparer.Ordinal).Count() != parsedReceipts.Length)
+        {
+            throw InvalidArtifact("The report-evidence envelope must not repeat a validation receipt mode.");
+        }
+
         ArchitecturePrReportDebtGateReceipt debtGate = ReadDebtGate(
             Required(element, "debt_gate", JsonValueKind.Object));
         return new ArchitecturePrReportEvidence(
@@ -103,7 +112,10 @@ public static partial class ArchitecturePrReportReader
             gate,
             health,
             parsedReceipts,
-            debtGate);
+            debtGate)
+        {
+            ExecutionContext = ReadExecutionContext(Required(element, "execution_context", JsonValueKind.Object)),
+        };
     }
 
     private static ArchitecturePrReportValidationReceipt ReadValidationReceipt(JsonElement element)
@@ -120,8 +132,6 @@ public static partial class ArchitecturePrReportReader
         }
 
         JsonElement availability = Required(element, "availability", JsonValueKind.Object);
-        Dictionary<string, string> availabilityValues = availability.EnumerateObject()
-            .ToDictionary(property => property.Name, property => RequiredString(property.Value), StringComparer.Ordinal);
         ArchitecturePolicyInventory? inventory = element.TryGetProperty("policy_inventory", out JsonElement inventoryElement)
             ? ReadPolicyInventory(inventoryElement)
             : null;
@@ -143,6 +153,13 @@ public static partial class ArchitecturePrReportReader
             .ToArray();
         ArchitecturePrReportProvenance provenance = ReadProvenance(
             Required(element, "provenance", JsonValueKind.Object));
+        Dictionary<string, string> availabilityValues = ReadAvailability(
+            availability,
+            inventory,
+            lifecycle,
+            applicability,
+            external,
+            findings);
         return new ArchitecturePrReportValidationReceipt(
             mode,
             availabilityValues,
@@ -152,6 +169,114 @@ public static partial class ArchitecturePrReportReader
             external,
             parsedFindings,
             provenance);
+    }
+
+    private static ArchitecturePrReportExecutionContext ReadExecutionContext(JsonElement element)
+    {
+        string executionId = RequiredString(element, "execution_id");
+        JsonElement conditionSet = Required(element, "condition_set", JsonValueKind.String);
+        return new ArchitecturePrReportExecutionContext(executionId, conditionSet.GetString() ?? string.Empty);
+    }
+
+    private static Dictionary<string, string> ReadAvailability(
+        JsonElement availability,
+        ArchitecturePolicyInventory? inventory,
+        ArchitectureWaiverLifecycleAssessment? lifecycle,
+        ArchitecturePrReportApplicability? applicability,
+        ArchitecturePrReportExternalEvidence? external,
+        JsonElement findings)
+    {
+        string[] expectedKeys =
+        [
+            "applicability",
+            "external_evidence",
+            "findings",
+            "policy_inventory",
+            "topology",
+            "waiver_lifecycle",
+        ];
+        Dictionary<string, string> values = new(StringComparer.Ordinal);
+        foreach (JsonProperty property in availability.EnumerateObject())
+        {
+            if (!values.TryAdd(property.Name, RequiredString(property.Value)))
+            {
+                throw InvalidArtifact($"The availability map repeats '{property.Name}'.");
+            }
+        }
+
+        if (values.Count != expectedKeys.Length || !expectedKeys.All(values.ContainsKey))
+        {
+            throw InvalidArtifact("The availability map must contain exactly the supported authority keys.");
+        }
+
+        ValidateAvailabilityValue(values, "policy_inventory", inventory is not null, "available", "unavailable");
+        ValidateAvailabilityValue(values, "waiver_lifecycle", lifecycle is not null, "available", "unavailable");
+        ValidateAvailabilityValue(values, "applicability", applicability is not null, "available", "unavailable");
+        bool hasTopology = applicability?.Controls.Any(control => control.Record?.Topology is not null) == true;
+        ValidateAvailabilityValue(values, "topology", hasTopology, "available", "not_configured");
+        ValidateAvailabilityValue(values, "external_evidence", external is not null, "available", "not_configured");
+        ValidateAvailabilityValue(values, "findings", findings.ValueKind == JsonValueKind.Array, "available", "unavailable");
+        return values;
+    }
+
+    private static void ValidateAvailabilityValue(
+        IReadOnlyDictionary<string, string> values,
+        string key,
+        bool hasPayload,
+        string available,
+        string absent)
+    {
+        string value = values[key];
+        if (!string.Equals(value, available, StringComparison.Ordinal)
+            && !string.Equals(value, absent, StringComparison.Ordinal))
+        {
+            throw InvalidArtifact($"Unsupported availability value '{value}' for '{key}'.");
+        }
+
+        if (hasPayload != string.Equals(value, available, StringComparison.Ordinal))
+        {
+            throw InvalidArtifact($"Availability '{key}={value}' does not match its canonical payload.");
+        }
+    }
+
+    private static ArchitecturePrReportChange ReadChange(ArchitectureChangeReport change)
+    {
+        ArchitectureChangeReportContext context = change.ExecutionContext
+            ?? throw InvalidArtifact("The architecture change report requires execution context.");
+        return new ArchitecturePrReportChange(
+            new ArchitecturePrReportExecutionContext(context.ExecutionId, context.ConditionSet),
+            context.Mode,
+            change.Added,
+            change.Removed,
+            change.NewFindings,
+            change.ExistingFindings,
+            change.ResolvedFindings,
+            change.BaselineDebt);
+    }
+
+    private static void ValidateCompatibleContext(
+        ArchitecturePrReportEvidence? evidence,
+        ArchitecturePrReportChange change)
+    {
+        if (evidence is null)
+        {
+            return;
+        }
+
+        ArchitecturePrReportExecutionContext health = evidence.ExecutionContext
+            ?? throw InvalidArtifact("The Health report evidence requires execution context.");
+        if (!string.Equals(health.ExecutionId, change.ExecutionContext.ExecutionId, StringComparison.Ordinal)
+            || !string.Equals(health.ConditionSetName, change.ExecutionContext.ConditionSetName, StringComparison.Ordinal))
+        {
+            throw InvalidArtifact("Health and change artifacts have incompatible execution context.");
+        }
+
+        int matchingReceipts = evidence.ValidationOutcomes.Count(receipt =>
+            string.Equals(receipt.Mode, change.Mode, StringComparison.Ordinal));
+        if (matchingReceipts != 1)
+        {
+            throw InvalidArtifact("Health report evidence must contain exactly one receipt for the change-report mode.");
+        }
     }
 
     private static ArchitectureHealthDimension ReadDimension(JsonElement element)
@@ -220,7 +345,7 @@ public static partial class ArchitecturePrReportReader
         _ => throw InvalidArtifact($"Unsupported Health dimension state '{value}'."),
     };
 
-    private static JsonElement Required(JsonElement parent, string name, JsonValueKind kind)
+    internal static JsonElement Required(JsonElement parent, string name, JsonValueKind kind)
     {
         if (!parent.TryGetProperty(name, out JsonElement value) || value.ValueKind != kind)
         {
@@ -230,13 +355,13 @@ public static partial class ArchitecturePrReportReader
         return value;
     }
 
-    private static string RequiredString(JsonElement parent, string name)
+    internal static string RequiredString(JsonElement parent, string name)
     {
         JsonElement value = Required(parent, name, JsonValueKind.String);
         return RequiredString(value);
     }
 
-    private static string RequiredString(JsonElement value)
+    internal static string RequiredString(JsonElement value)
     {
         if (value.ValueKind != JsonValueKind.String)
         {
@@ -249,14 +374,14 @@ public static partial class ArchitecturePrReportReader
             : text;
     }
 
-    private static string? OptionalString(JsonElement parent, string name) =>
+    internal static string? OptionalString(JsonElement parent, string name) =>
         !parent.TryGetProperty(name, out JsonElement value) || value.ValueKind == JsonValueKind.Null
             ? null
             : value.ValueKind == JsonValueKind.String
                 ? value.GetString()
                 : throw InvalidArtifact($"The Health report artifact field '{name}' must be a string or null.");
 
-    private static int RequiredInt(JsonElement parent, string name)
+    internal static int RequiredInt(JsonElement parent, string name)
     {
         JsonElement value = Required(parent, name, JsonValueKind.Number);
         return value.TryGetInt32(out int result)
@@ -264,6 +389,6 @@ public static partial class ArchitecturePrReportReader
             : throw InvalidArtifact($"The Health report artifact field '{name}' must be a 32-bit integer.");
     }
 
-    private static ArgumentException InvalidArtifact(string message) =>
+    internal static ArgumentException InvalidArtifact(string message) =>
         new(message, "json");
 }

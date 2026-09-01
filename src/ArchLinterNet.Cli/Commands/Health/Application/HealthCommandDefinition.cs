@@ -9,8 +9,10 @@ internal sealed class HealthCommandDefinition(HealthCommandHandler handler)
     {
         Command command = new("health", "Project the canonical architecture-health/v1 summary.");
         ArchitectureAnalysisCommandOptionSet options = new();
+        Option<string> executionContext = new("--execution-context");
         options.AddTo(command);
-        command.SetAction(result => handler.Execute(options.Read(result)));
+        command.Options.Add(executionContext);
+        command.SetAction(result => handler.Execute(options.Read(result), result.GetValue(executionContext)));
         return command;
     }
 }

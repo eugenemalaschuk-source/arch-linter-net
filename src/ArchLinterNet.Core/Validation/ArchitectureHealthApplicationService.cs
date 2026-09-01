@@ -45,6 +45,8 @@ public sealed class ArchitectureHealthApplicationService(
             debtGate)
         {
             AnalysisCounters = snapshot.Counters,
+            ExecutionContext = request.ExecutionContext,
+            ConditionSetName = debtGateRequest.ConditionSetName ?? string.Empty,
         };
     }
 
