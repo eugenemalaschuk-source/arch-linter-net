@@ -36,6 +36,7 @@ internal static class ArchitecturePolicyContextContractFactsProjector
         typeof(ArchitectureTypePlacementContract), typeof(ArchitectureLayoutConventionContract),
         typeof(ArchitecturePublicApiSurfaceContract), typeof(ArchitectureAttributeUsageContract),
         typeof(ArchitectureContractSurfaceExposureContract),
+        typeof(ArchitectureVersionedContractSurfaceIsolationContract),
         typeof(ArchitectureInheritanceContract), typeof(ArchitectureInterfaceImplementationContract),
         typeof(ArchitectureCompositionContract), typeof(ArchitectureContextDependencyContract),
         typeof(ArchitectureContextAllowOnlyContract), typeof(ArchitectureCoverageContract),
@@ -115,6 +116,10 @@ internal static class ArchitecturePolicyContextContractFactsProjector
                 Text("public_api_surface", value.Source.PublicApiSurface)),
             Objects(ForbiddenFact, value.Forbidden.Select(selector =>
                 Object("selector", PublicApiSelectorFacts(selector)))))),
+        ArchitectureVersionedContractSurfaceIsolationContract value => Create(value.Reason, value.IgnoredViolations, Facts(
+            Objects("surfaces", value.Surfaces.Select(surface => ObjectFromItems("surface",
+                Text("id", surface.Id), Object("types_matching", PublicApiSelectorFacts(surface.TypesMatching))))),
+            Text("source_surface", value.SourceSurface), Values("forbidden_surfaces", value.ForbiddenSurfaces))),
         ArchitectureAttributeUsageContract value => Create(value.Reason, value.IgnoredViolations, Scoped(value.Attributes, value.AttributePrefixes,
             new ScopeRestrictions(
                 new ScopeRestrictionSet(value.AllowedOnlyInLayers, value.AllowedOnlyInNamespaces, value.AllowedOnlyInProjects, value.AllowedOnlyInAssemblies),

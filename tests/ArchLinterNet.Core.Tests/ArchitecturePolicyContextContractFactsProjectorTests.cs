@@ -16,6 +16,9 @@ public sealed class ArchitecturePolicyContextContractFactsProjectorTests
     private static readonly string[] _expectedPublicApiSurface = ["reviewed-api"];
     private static readonly string[] _expectedForbiddenNamespace = ["Product.Internal"];
     private static readonly string[] _expectedForbiddenAttribute = ["Product.InternalAttribute"];
+    private static readonly string[] _expectedVersionedNamespace = ["Product.Api.V1"];
+    private static readonly string[] _expectedVersionedLayer = ["api"];
+    private static readonly string[] _expectedVersionedForbiddenSurface = ["domain-v1"];
 
     [Test]
     public void Project_ContractSurfaceExposure_PreservesSourceAndForbiddenSelectorFacts()
@@ -70,6 +73,51 @@ public sealed class ArchitecturePolicyContextContractFactsProjectorTests
                 Is.EqualTo(_expectedForbiddenNamespace));
             Assert.That(selector.Items.Single(fact => fact.Name == "has_attribute").Values,
                 Is.EqualTo(_expectedForbiddenAttribute));
+        });
+    }
+
+    [Test]
+    public void Project_VersionedContractSurfaceIsolation_PreservesSurfaceAndReferenceFacts()
+    {
+        var contract = new ArchitectureVersionedContractSurfaceIsolationContract
+        {
+            Reason = "Keep API versions isolated.",
+            Surfaces =
+            [
+                new ArchitectureVersionedContractSurfaceIsolationSurface
+                {
+                    Id = "api-v1",
+                    TypesMatching = new ArchitecturePublicApiSurfaceSelector
+                    {
+                        Namespace = "Product.Api.V1",
+                        Layer = "api",
+                    },
+                },
+                new ArchitectureVersionedContractSurfaceIsolationSurface
+                {
+                    Id = "domain-v1",
+                    TypesMatching = new ArchitecturePublicApiSurfaceSelector { Role = "Entity" },
+                },
+            ],
+            SourceSurface = "api-v1",
+            ForbiddenSurfaces = ["domain-v1"],
+        };
+
+        ArchitecturePolicyContextContractProjection projection =
+            ArchitecturePolicyContextContractFactsProjector.Project(contract);
+        ArchitecturePolicyContextContractFact surfaces = projection.Facts.Single(fact => fact.Name == "surfaces");
+        ArchitecturePolicyContextContractFact source = surfaces.Items.Single(item =>
+            item.Items.Single(fact => fact.Name == "id").Values.Single() == "api-v1");
+        ArchitecturePolicyContextContractFact forbidden = projection.Facts.Single(fact => fact.Name == "forbidden_surfaces");
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(projection.Reason, Is.EqualTo(contract.Reason));
+            Assert.That(source.Items.Single(fact => fact.Name == "types_matching").Items
+                .Single(fact => fact.Name == "namespace").Values, Is.EqualTo(_expectedVersionedNamespace));
+            Assert.That(source.Items.Single(fact => fact.Name == "types_matching").Items
+                .Single(fact => fact.Name == "layer").Values, Is.EqualTo(_expectedVersionedLayer));
+            Assert.That(forbidden.Values, Is.EqualTo(_expectedVersionedForbiddenSurface));
         });
     }
 }

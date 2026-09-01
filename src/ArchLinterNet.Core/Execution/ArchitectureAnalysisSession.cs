@@ -457,6 +457,10 @@ public sealed class ArchitectureAnalysisSession
         ArchitectureContractSurfaceExposureContract contract) =>
         _coreContractCheckingService.CheckContractSurfaceExposureContract(contract);
 
+    public ArchitectureHandlerResult CheckVersionedContractSurfaceIsolationContract(
+        ArchitectureVersionedContractSurfaceIsolationContract contract) =>
+        _coreContractCheckingService.CheckVersionedContractSurfaceIsolationContract(contract);
+
     internal ArchitecturePublicApiSurfaceRootResolution ResolvePublicApiSurfaceRoots(string publicApiSurfaceId) =>
         _publicApiSurfaceAnalysisService.ResolveSelectedRoots(publicApiSurfaceId);
 

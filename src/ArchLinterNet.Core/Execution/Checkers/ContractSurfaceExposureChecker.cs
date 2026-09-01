@@ -57,7 +57,13 @@ internal static class ContractSurfaceExposureChecker
 
         List<ArchitectureViolation> violations = exposure is null || matchingSelectorsByTarget.Count == 0
             ? new List<ArchitectureViolation>()
-            : BuildViolations(contract, executionContext, exposure, matchingSelectorsByTarget);
+            : BuildViolations(new ContractSurfaceExposureFindingInput(
+                contract,
+                executionContext,
+                exposure,
+                matchingSelectorsByTarget,
+                ExportedSurface,
+                contract.Source.PublicApiSurface));
 
         ArchitectureApplicabilityRecord record = reasons.Count == 0
             ? new ArchitectureApplicabilityRecord(
@@ -103,16 +109,12 @@ internal static class ContractSurfaceExposureChecker
         return reasons;
     }
 
-    private static List<ArchitectureViolation> BuildViolations(
-        ArchitectureContractSurfaceExposureContract contract,
-        ArchitectureContractExecutionContext executionContext,
-        ArchitectureContractSurfaceExposureResult exposure,
-        Dictionary<ArchitectureContractExposureTarget, int[]> matchingSelectorsByTarget)
+    internal static List<ArchitectureViolation> BuildViolations(ContractSurfaceExposureFindingInput input)
     {
         var violations = new List<ArchitectureViolation>();
-        foreach (ArchitectureContractExposure occurrence in exposure.Exposures)
+        foreach (ArchitectureContractExposure occurrence in input.Exposure.Exposures)
         {
-            if (!matchingSelectorsByTarget.TryGetValue(occurrence.ReferencedType, out int[]? matchingSelectors))
+            if (!input.MatchingSelectorsByTarget.TryGetValue(occurrence.ReferencedType, out int[]? matchingSelectors))
             {
                 continue;
             }
@@ -120,7 +122,7 @@ internal static class ContractSurfaceExposureChecker
             string targetReference = occurrence.ReferencedType.Identity;
             string sourceType = occurrence.DeclaringType.FullTypeName;
             string? sourceSite = SourceSite(occurrence.Path);
-            bool ignored = executionContext.IsIgnored(
+            bool ignored = input.ExecutionContext.IsIgnored(
                 sourceType,
                 targetReference,
                 sourceAssembly: occurrence.DeclaringType.AssemblyName,
@@ -134,8 +136,8 @@ internal static class ContractSurfaceExposureChecker
             }
 
             violations.Add(new ArchitectureViolation(
-                contract.Name,
-                contract.Id,
+                input.Contract.Name,
+                input.Contract.Id,
                 sourceType,
                 occurrence.ReferencedType.FullTypeName,
                 [targetReference])
@@ -147,14 +149,37 @@ internal static class ContractSurfaceExposureChecker
                     occurrence.Path.CanonicalKey,
                     occurrence.ReferencedType.AssemblyName,
                     occurrence.ReferencedType.FullTypeName,
-                    ExportedSurface,
+                    input.SourceSurface,
                     sourceSite,
-                    contract.Source.PublicApiSurface,
+                    input.ReviewedPublicApiSurface,
                     matchingSelectors),
             });
         }
 
         return violations;
+    }
+
+    // Both exposure families root their work in the session-cached exported public surface. Keep
+    // materialization completeness with those roots so a partial reflection result cannot become a
+    // trusted empty exposure set in one family while the other fails closed.
+    internal static ExportedRootResolution ResolveExportedRoots(
+        ArchitectureCheckerContext context,
+        IEnumerable<Assembly> assemblies)
+    {
+        var roots = new List<Type>();
+        bool isComplete = true;
+        foreach (Assembly assembly in assemblies
+                     .Distinct()
+                     .OrderBy(AssemblyIdentity, StringComparer.Ordinal))
+        {
+            ArchitecturePublicApiSurfaceMaterialization surface = context.GetPublicApiSurface(assembly);
+            isComplete &= surface.IsComplete;
+            roots.AddRange(surface.ExportedTypes);
+        }
+
+        return new ExportedRootResolution(
+            roots.Distinct().OrderBy(TypeIdentity, StringComparer.Ordinal).ToArray(),
+            isComplete);
     }
 
     private static Dictionary<ArchitectureContractExposureTarget, int[]> MatchForbiddenTargets(
@@ -281,30 +306,17 @@ internal static class ContractSurfaceExposureChecker
                 !resolved.HasContract);
         }
 
-        var candidates = new List<Type>();
-        bool isComplete = true;
-        foreach (Assembly assembly in context.AnalysisContext.TargetAssemblies
-                     .Distinct()
-                     .OrderBy(AssemblyIdentity, StringComparer.Ordinal))
-        {
-            string assemblyName = assembly.GetName().Name ?? string.Empty;
-            if (assemblyFilter is not null && !assemblyFilter.Contains(assemblyName))
+        ExportedRootResolution exported = ResolveExportedRoots(
+            context,
+            context.AnalysisContext.TargetAssemblies.Where(assembly =>
             {
-                continue;
-            }
+                string assemblyName = assembly.GetName().Name ?? string.Empty;
+                return (assemblyFilter is null || assemblyFilter.Contains(assemblyName))
+                    && (projectAssemblies is null || projectAssemblies.Contains(assemblyName));
+            }));
 
-            if (projectAssemblies is not null && !projectAssemblies.Contains(assemblyName))
-            {
-                continue;
-            }
-
-            ArchitecturePublicApiSurfaceMaterialization surface = context.GetPublicApiSurface(assembly);
-            isComplete &= surface.IsComplete;
-            candidates.AddRange(surface.ExportedTypes);
-        }
-
-        bool stale = assemblyFilter is not null && candidates.Count == 0;
-        return new RootCandidateResolution(candidates, isComplete, stale);
+        bool stale = assemblyFilter is not null && exported.Roots.Count == 0;
+        return new RootCandidateResolution(exported.Roots.ToList(), exported.IsComplete, stale);
     }
 
     private static List<Type> FilterCandidates(
@@ -376,7 +388,20 @@ internal static class ContractSurfaceExposureChecker
         bool Stale);
 }
 
+internal sealed record ExportedRootResolution(
+    IReadOnlyList<Type> Roots,
+    bool IsComplete);
+
 internal sealed record ContractSurfaceExposureEvaluationResult(
     IReadOnlyList<ArchitectureViolation> Violations,
     ArchitectureApplicabilityExpectedEntry ApplicabilityExpectedEntry,
     ArchitectureApplicabilityRecord ApplicabilityRecord);
+
+/// <summary>Shared typed input for families that project existing exposure facts into findings.</summary>
+internal sealed record ContractSurfaceExposureFindingInput(
+    IArchitectureContract Contract,
+    ArchitectureContractExecutionContext ExecutionContext,
+    ArchitectureContractSurfaceExposureResult Exposure,
+    IReadOnlyDictionary<ArchitectureContractExposureTarget, int[]> MatchingSelectorsByTarget,
+    string SourceSurface,
+    string? ReviewedPublicApiSurface);

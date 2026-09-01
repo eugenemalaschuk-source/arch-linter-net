@@ -41,7 +41,7 @@ internal sealed record ArchitectureBaselineIdentityDescriptor(
             "package_dependency" or "package_allow_only" => common.Concat(["source-project", "package-id"]).ToArray(),
             "framework_dependency" or "framework_allow_only" => common.Concat(["source-project", "framework-reference", "target-framework", "condition"]).ToArray(),
             "public_api_surface" => common.Concat([SourceAssembly, "api-symbol"]).ToArray(),
-            "contract_surface_exposure" => common.Concat([SourceAssembly, "source-type", "source-member", "exposure-path", TargetAssembly, "target-type"]).ToArray(),
+            "contract_surface_exposure" or "versioned_contract_surface_isolation" => common.Concat([SourceAssembly, "source-type", "source-member", "exposure-path", TargetAssembly, "target-type"]).ToArray(),
             "coverage" => common.Concat(["coverage-subject", "coverage-kind"]).ToArray(),
             "metric_budgets" => common.Concat(["metric-id", "metric-kind", "native-subject", "effective-scope", "bound", "limit"]).ToArray(),
             "project_metadata" => common.Concat(["source-project", "metadata-key", "configuration", "target-framework"]).ToArray(),

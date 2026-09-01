@@ -53,6 +53,8 @@ internal static class ArchitectureContractFamilyBindings
             g => g.AuditPublicApiSurface, true),
         new ArchitectureContractFamilyBinding("contract_surface_exposure", g => g.StrictContractSurfaceExposure,
             g => g.AuditContractSurfaceExposure, true),
+        new ArchitectureContractFamilyBinding("versioned_contract_surface_isolation",
+            g => g.StrictVersionedContractSurfaceIsolation, g => g.AuditVersionedContractSurfaceIsolation, true),
         new ArchitectureContractFamilyBinding("attribute_usage", g => g.StrictAttributeUsage,
             g => g.AuditAttributeUsage, true),
         new ArchitectureContractFamilyBinding("inheritance", g => g.StrictInheritance, g => g.AuditInheritance, true),
