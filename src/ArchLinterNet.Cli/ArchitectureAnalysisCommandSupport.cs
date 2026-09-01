@@ -127,8 +127,9 @@ internal static class ArchitectureAnalysisCommandSupport
             return false;
         }
 
-        if (hasBase && baseContextPath is not null && currentContextPath is not null
-            && (!fileSystem.FileExists(baseContextPath) || !fileSystem.FileExists(currentContextPath)))
+        if (hasBase
+            && (!fileSystem.FileExists(baseContextPath ?? string.Empty)
+                || !fileSystem.FileExists(currentContextPath ?? string.Empty)))
         {
             CliErrorOutputWriter.Write(console, options.Format, "missing-policy-context", "Both policy-context artifact files must exist.");
             return false;
