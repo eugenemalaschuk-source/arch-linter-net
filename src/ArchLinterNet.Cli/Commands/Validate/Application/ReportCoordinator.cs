@@ -659,7 +659,7 @@ internal sealed partial class ReportCoordinator
         cancellationToken.ThrowIfCancellationRequested();
         if (outcome.ImportedDiagnosticFindings.Count > 0)
         {
-            sb.AppendLine(ArchitectureDiagnosticFormatter.FormatFindingsForHumans(outcome.ImportedDiagnosticFindings));
+            sb.AppendLine(ArchitectureDiagnosticFormatter.FormatFindingsForHumans(outcome.ImportedDiagnosticFindings, cancellationToken));
         }
 
         string assessmentCompletion = outcome.ApplicabilityProjection is { } applicabilityProjection
