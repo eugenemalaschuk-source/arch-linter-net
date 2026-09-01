@@ -363,6 +363,12 @@ internal sealed partial class ValidateCommandHandler
             return CliExitCodes.InvalidArgumentsOrRuntimeError;
         }
 
+        if (options.ExternalEvidenceParseError is not null)
+        {
+            WriteImmediateError(options, options.ExternalEvidenceParseError);
+            return CliExitCodes.InvalidArgumentsOrRuntimeError;
+        }
+
         if (!TryGetWaiverEvaluationDate(options, out _, out string? waiverDateError))
         {
             WriteImmediateError(options, waiverDateError!);

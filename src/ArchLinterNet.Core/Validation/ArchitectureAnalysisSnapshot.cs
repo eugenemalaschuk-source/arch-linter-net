@@ -290,6 +290,7 @@ public sealed partial class ArchitectureAnalysisSnapshot : IDisposable
             ResolvedAssemblyPaths = GetResolvedAssemblyPaths(),
             DiscoveredProjectPaths = GetDiscoveredProjectPaths(),
             SourceExpansion = _document.SourceExpansion,
+            ExternalEvidenceRequirements = _document.ExternalEvidence,
         };
     }
 
@@ -430,7 +431,8 @@ public sealed partial class ArchitectureAnalysisSnapshot : IDisposable
             ApplicabilityProjection = applicabilityProjection,
             SubtractiveMatcherParticipation = runner.Session.SubtractiveMatcherParticipation
                 .Skip(subtractiveMatcherStartIndex)
-                .ToList()
+                .ToList(),
+            ExternalEvidenceRequirements = _document.ExternalEvidence,
         };
     }
 
@@ -537,7 +539,7 @@ public sealed partial class ArchitectureAnalysisSnapshot : IDisposable
 
         return AnalysisCacheOutcomeMapper.FromCacheOutcome(
             lookup.Entry.Outcome, _repositoryRoot, policyImportPaths, GetResolvedAssemblyPaths(),
-            GetDiscoveredProjectPaths(), _document.SourceExpansion, mode);
+            GetDiscoveredProjectPaths(), _document.SourceExpansion, mode, _document.ExternalEvidence);
     }
 
     private CacheArtifactEvidence GetCacheArtifactEvidence()
