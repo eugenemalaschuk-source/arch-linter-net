@@ -177,6 +177,21 @@ public sealed class ArchitecturePrReportReaderTests
         });
     }
 
+    [Test]
+    public void FormatAsJson_UsesLegacyDebtBucketsWhenLifecycleEntriesAreAbsent()
+    {
+        using JsonDocument document = JsonDocument.Parse(
+            ArchitectureHealthProjector.FormatAsJson(CreateOutcomeWithDebtEvidence(includeLifecycleEntries: false)));
+
+        JsonElement entries = document.RootElement.GetProperty("report_evidence")
+            .GetProperty("debt_gate")
+            .GetProperty("persistent_debt")
+            .GetProperty("entries");
+
+        Assert.That(entries.EnumerateArray().Select(entry => entry.GetProperty("status").GetString()),
+            Is.EquivalentTo(["new", "matched", "resolved", "ambiguous", "configuration-error"]));
+    }
+
     private static ArchitectureChangeSnapshot Snapshot(IReadOnlyList<ArchitectureChangeFinding>? findings = null) =>
         new(
             ArchitectureChangeSnapshot.CurrentSchemaVersion,
@@ -247,7 +262,7 @@ public sealed class ArchitecturePrReportReaderTests
         };
     }
 
-    private static ArchitectureHealthOutcome CreateOutcomeWithDebtEvidence()
+    private static ArchitectureHealthOutcome CreateOutcomeWithDebtEvidence(bool includeLifecycleEntries = true)
     {
         ArchitectureHealthOutcome outcome = CreateOutcome();
         ArchitectureBaselineComparisonEntry Entry(string suffix) => new(
@@ -274,13 +289,22 @@ public sealed class ArchitecturePrReportReaderTests
         };
 
         ArchitectureBaselineComparisonEntry newEntry = Entry("new");
+        ArchitectureBaselineComparisonEntry matchedEntry = Entry("matched");
+        ArchitectureBaselineComparisonEntry resolvedEntry = Entry("resolved");
+        ArchitectureBaselineComparisonEntry ambiguousEntry = Entry("ambiguous");
+        ArchitectureBaselineComparisonEntry configurationEntry = Entry("configuration");
+        IReadOnlyList<ArchitectureBaselineComparisonEntry> newEntries = includeLifecycleEntries ? [] : [newEntry];
+        IReadOnlyList<ArchitectureBaselineComparisonEntry> frozenEntries = includeLifecycleEntries ? [] : [matchedEntry];
+        IReadOnlyList<ArchitectureBaselineComparisonEntry> resolvedEntries = includeLifecycleEntries ? [] : [resolvedEntry];
+        IReadOnlyList<ArchitectureBaselineComparisonEntry> configurationEntries = includeLifecycleEntries ? [] : [configurationEntry];
+        IReadOnlyList<ArchitectureBaselineComparisonEntry> ambiguousEntries = includeLifecycleEntries ? [] : [ambiguousEntry];
         var persistentDebt = new BaselineVerifyOutcome(
             Succeeded: true,
             InSync: false,
-            New: [],
-            Frozen: [],
-            Resolved: [],
-            ConfigurationErrors: [],
+            New: newEntries,
+            Frozen: frozenEntries,
+            Resolved: resolvedEntries,
+            ConfigurationErrors: configurationEntries,
             ConfigurationViolations:
             [
                 new ArchitectureViolation(
@@ -292,17 +316,21 @@ public sealed class ArchitecturePrReportReaderTests
             ])
         {
             Entries =
-            [
-                new BaselineLifecycleEntry(newEntry, BaselineEntryLifecycle.New, BaselineEntryDisposition.Added),
-                new BaselineLifecycleEntry(Entry("matched"), BaselineEntryLifecycle.Matched,
-                    BaselineEntryDisposition.Retained),
-                new BaselineLifecycleEntry(Entry("resolved"), BaselineEntryLifecycle.Resolved,
-                    BaselineEntryDisposition.Removed),
-                new BaselineLifecycleEntry(Entry("stale"), BaselineEntryLifecycle.Stale),
-                new BaselineLifecycleEntry(Entry("changed"), BaselineEntryLifecycle.Changed),
-                new BaselineLifecycleEntry(Entry("ambiguous"), BaselineEntryLifecycle.Ambiguous),
-                new BaselineLifecycleEntry(Entry("configuration"), BaselineEntryLifecycle.ConfigurationError),
-            ],
+                includeLifecycleEntries
+                    ?
+                    [
+                        new BaselineLifecycleEntry(newEntry, BaselineEntryLifecycle.New, BaselineEntryDisposition.Added),
+                        new BaselineLifecycleEntry(matchedEntry, BaselineEntryLifecycle.Matched,
+                            BaselineEntryDisposition.Retained),
+                        new BaselineLifecycleEntry(resolvedEntry, BaselineEntryLifecycle.Resolved,
+                            BaselineEntryDisposition.Removed),
+                        new BaselineLifecycleEntry(Entry("stale"), BaselineEntryLifecycle.Stale),
+                        new BaselineLifecycleEntry(Entry("changed"), BaselineEntryLifecycle.Changed),
+                        new BaselineLifecycleEntry(ambiguousEntry, BaselineEntryLifecycle.Ambiguous),
+                        new BaselineLifecycleEntry(configurationEntry, BaselineEntryLifecycle.ConfigurationError),
+                    ]
+                    : [],
+            Ambiguous = ambiguousEntries,
         };
         var debtGate = new ArchitectureDebtGateOutcome(
             Succeeded: true,
