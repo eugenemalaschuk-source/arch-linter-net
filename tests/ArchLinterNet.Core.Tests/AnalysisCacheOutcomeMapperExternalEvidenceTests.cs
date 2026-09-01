@@ -41,6 +41,27 @@ public sealed class AnalysisCacheOutcomeMapperExternalEvidenceTests
         Assert.That(reconstructed.ExternalEvidenceRequirements, Is.Empty);
     }
 
+    // Regression for #741 review: the pre-#741 public 7-parameter overload (repositoryRoot,
+    // policyImportPaths, resolvedAssemblyPaths, discoveredProjectPaths, sourceExpansion, mode — no
+    // externalEvidenceRequirements) must remain callable as its own distinct method, not merely
+    // source-compatible via a defaulted 8th parameter, so callers already compiled against the
+    // prior public API keep resolving to a method that actually exists at their expected token.
+    [Test]
+    public void FromCacheOutcome_SevenParameterOverload_StillResolvesAndDefaultsToEmpty()
+    {
+        AnalysisCacheOutcomeV1 cached = AnalysisCacheOutcomeMapper.ToCacheOutcome(PassingOutcome());
+
+        ValidationOutcome reconstructed = AnalysisCacheOutcomeMapper.FromCacheOutcome(
+            cached, "/repo", Array.Empty<string>(), Array.Empty<string>(), Array.Empty<string>(),
+            ArchitectureSourceExpansionInventory.Empty, mode: "strict");
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(reconstructed.ExternalEvidenceRequirements, Is.Empty);
+            Assert.That(reconstructed.Passed, Is.True);
+        });
+    }
+
     private static ValidationOutcome PassingOutcome() => new(
         Passed: true,
         Violations: Array.Empty<ArchitectureViolation>(),

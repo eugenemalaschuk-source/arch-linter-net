@@ -69,6 +69,76 @@ public sealed partial class ValidateCommandHandlerReportModeTests
     }
 
     [Test]
+    public void ExternalEvidence_ValidZeroResultRun_SarifOutputHasNoImportedResultsOrRuleMerge()
+    {
+        // Covers AddImportedDiagnosticsToSarif's early-return branch: with zero selected findings,
+        // no imported result/rule merge happens at all. A run still appears in the final document
+        // (added downstream by the assessment_completion projection, which is present regardless of
+        // finding count), but its results/rules must stay exactly as the native formatter produced
+        // them — no NamespaceImportedRuleIds/MergeImportedDiagnosticsIntoRun mutation occurred.
+        using TempRepository repo = new();
+        repo.AddSarif("evidence/zero.sarif", Sarif());
+        FakeCliRuntime runtime = new()
+        {
+            ForcedOutcome = PassingOutcomeWithRequirements(repo.Root, Requirement("external.scan")),
+        };
+        FakeCliConsole console = new();
+        ValidateCommandHandler handler = new(runtime, console, new FakeFileSystem(exists: true));
+
+        int exitCode = handler.Execute(ExternalEvidenceOptions(
+            [Binding("external.scan", "evidence/zero.sarif")],
+            new SarifEvidenceAssessmentContext("repo", "revision", "scope"),
+            format: "sarif"));
+
+        Assert.That(exitCode, Is.EqualTo(CliExitCodes.Success));
+        using JsonDocument sarif = JsonDocument.Parse(console.StdOut);
+        JsonElement run = sarif.RootElement.GetProperty("runs")[0];
+        Assert.Multiple(() =>
+        {
+            Assert.That(run.GetProperty("results").GetArrayLength(), Is.EqualTo(0));
+            Assert.That(run.GetProperty("tool").GetProperty("driver").GetProperty("rules").GetArrayLength(),
+                Is.EqualTo(0));
+        });
+    }
+
+    [Test]
+    public void ExternalEvidence_TwoFindingsSharingARuleId_MergeAddsOneNamespacedRuleDescriptor()
+    {
+        // Covers MergeImportedDiagnosticsIntoRun's rule-dedup branch: ArchitectureSarifFormatter
+        // uses ContractId (the logical evidence id, "external.scan" here) as ruleId for imported
+        // findings, so any two selected findings from the same requirement share one rule
+        // descriptor after merge — the dedup path must not add it twice.
+        using TempRepository repo = new();
+        repo.AddSarif("evidence/current.sarif", Sarif(
+            Result("SEC100", "error", "src/App/One.cs", "first")
+            + ","
+            + Result("SEC100", "error", "src/App/Two.cs", "second")));
+        FakeCliRuntime runtime = new()
+        {
+            ForcedOutcome = PassingOutcomeWithRequirements(repo.Root, Requirement("external.scan")),
+        };
+        FakeCliConsole console = new();
+        ValidateCommandHandler handler = new(runtime, console, new FakeFileSystem(exists: true));
+
+        int exitCode = handler.Execute(ExternalEvidenceOptions(
+            [Binding("external.scan", "evidence/current.sarif")],
+            new SarifEvidenceAssessmentContext("repo", "revision", "scope"),
+            format: "sarif"));
+
+        Assert.That(exitCode, Is.EqualTo(CliExitCodes.Success));
+        using JsonDocument sarif = JsonDocument.Parse(console.StdOut);
+        JsonElement run = sarif.RootElement.GetProperty("runs")[0];
+        Assert.Multiple(() =>
+        {
+            Assert.That(run.GetProperty("results").GetArrayLength(), Is.EqualTo(2));
+            Assert.That(run.GetProperty("tool").GetProperty("driver").GetProperty("rules")
+                .EnumerateArray()
+                .Count(rule => rule.GetProperty("id").GetString() == "external-evidence:external.scan"),
+                Is.EqualTo(1));
+        });
+    }
+
+    [Test]
     public void ExternalEvidence_SameIdAsNativeContract_DoesNotCollideInMergedSarifOutput()
     {
         // Nothing in policy validation forbids external_evidence.id from matching an unrelated

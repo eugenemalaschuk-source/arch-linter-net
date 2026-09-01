@@ -411,6 +411,52 @@ internal sealed partial class ValidateCommandHandler
             .ToList();
     }
 
+    // Moved out of ValidateCommandHandler.cs (which grew past the file-size lint threshold) —
+    // kept alongside AttachExternalEvidence/AttachExternalEvidenceToAll above, the only callers.
+    //
+    // A repository-local SARIF artifact bound via --external-evidence is trust-read as external
+    // evidence; if a --report file sink or --profile destination pointed at that same path, this
+    // invocation would overwrite the artifact it just read as trusted with its own tool output —
+    // especially dangerous with --cache, whose contract requires every run to re-read evidence
+    // fresh from disk. Resolved against RepositoryRoot the same way SarifEvidenceReader resolves a
+    // relative artifact path (Path.Combine short-circuits to the artifact path itself when it is
+    // already rooted, so an absolute/unsafe artifact path still resolves to a comparable full path
+    // here even though the Core trust boundary separately rejects it as unsafe).
+    private static IReadOnlyList<string> ResolveExternalEvidencePaths(
+        ValidateCommandOptions options, string repositoryRoot)
+    {
+        return options.ExternalEvidenceArtifacts
+            .Select(artifact => Path.GetFullPath(Path.Combine(repositoryRoot, artifact.Path)))
+            .ToArray();
+    }
+
+    private static string? FindExternalEvidenceReportCollision(
+        ValidateCommandOptions options, string repositoryRoot)
+    {
+        if (options.ExternalEvidenceArtifacts.Count == 0)
+        {
+            return null;
+        }
+
+        HashSet<string> evidencePaths = new(
+            ResolveExternalEvidencePaths(options, repositoryRoot), StringComparer.OrdinalIgnoreCase);
+
+        foreach (ReportSink sink in options.AdditionalSinks)
+        {
+            if (sink.DestinationType != ReportDestinationType.File || sink.FilePath is null)
+            {
+                continue;
+            }
+
+            if (evidencePaths.Contains(Path.GetFullPath(sink.FilePath)))
+            {
+                return $"--report destination '{sink.FilePath}' matches an --external-evidence artifact path";
+            }
+        }
+
+        return null;
+    }
+
     internal static int ResolveValidationExitCode(ValidationOutcome outcome)
     {
         return outcome.AssessmentCompletionEvidence?.State switch

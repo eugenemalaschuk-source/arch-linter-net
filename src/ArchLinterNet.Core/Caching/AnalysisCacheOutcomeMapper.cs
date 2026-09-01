@@ -55,6 +55,30 @@ public static class AnalysisCacheOutcomeMapper
         };
     }
 
+    // Preserves the exact pre-#741 7-parameter public method signature/token. Replacing it outright
+    // with the 8-parameter overload below stayed source-compatible (the added parameter was
+    // optional) but broke binary compatibility for callers already compiled against the prior
+    // public API — the CLR resolves an already-compiled call site by exact method signature, not by
+    // "would recompiling still bind here" (see #741 review). Delegates into the 8-parameter overload
+    // with no external-evidence requirements, matching this overload's pre-#741 behavior exactly.
+    public static ValidationOutcome FromCacheOutcome(
+        AnalysisCacheOutcomeV1 cached,
+        string repositoryRoot,
+        IReadOnlyList<string> policyImportPaths,
+        IReadOnlyList<string> resolvedAssemblyPaths,
+        IReadOnlyList<string> discoveredProjectPaths,
+        ArchitectureSourceExpansionInventory sourceExpansion,
+        string? mode) =>
+        FromCacheOutcome(
+            cached,
+            repositoryRoot,
+            policyImportPaths,
+            resolvedAssemblyPaths,
+            discoveredProjectPaths,
+            sourceExpansion,
+            mode,
+            externalEvidenceRequirements: null);
+
     // Reconstructs a ValidationOutcome from a cache hit. PolicyImportPaths/ResolvedAssemblyPaths/
     // DiscoveredProjectPaths/RepositoryRoot/SourceExpansion are supplied fresh by the caller (they
     // come from this run's own already-completed policy composition and project discovery — see
@@ -75,7 +99,7 @@ public static class AnalysisCacheOutcomeMapper
         // ValidationOutcome.ExternalEvidenceRequirements. Supplied fresh by the caller from its own
         // already-loaded policy document, the same way sourceExpansion is, so a cache-hit
         // reconstruction still reports which external_evidence requirements are declared.
-        IReadOnlyList<ArchitectureExternalEvidenceRequirement>? externalEvidenceRequirements = null)
+        IReadOnlyList<ArchitectureExternalEvidenceRequirement>? externalEvidenceRequirements)
     {
         ArgumentNullException.ThrowIfNull(cached);
 
