@@ -282,6 +282,13 @@ projection is non-compensating: it has no score, percentage, letter grade, badge
 rendering, or SARIF output. A valid but unassessable result is emitted as a health document rather
 than a command-error document.
 
+For topology, metric budgets, and imported external diagnostics, `evaluable` means only that the
+authority could assess the control; the health dimension still reflects that authority's resulting
+strict finding or clean receipt. Each reason retains canonical family, control, policy, and evidence
+references so automation can drill into the source receipt. A stale or otherwise blocking waiver
+lifecycle record remains a failing lifecycle result; a resolved baseline entry remains visible as
+baseline hygiene but is not classified as new architecture debt.
+
 ## Change snapshots
 
 ```bash

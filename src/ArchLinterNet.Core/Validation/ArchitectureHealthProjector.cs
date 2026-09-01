@@ -48,9 +48,9 @@ public static class ArchitectureHealthProjector
             ProjectCurrentEvaluation(orderedOutcomes),
             ProjectApplicability(orderedOutcomes),
             ProjectCoverage(orderedOutcomes),
-            ProjectFamily(Topology, TopologyFamily, orderedOutcomes),
-            ProjectFamily(Metrics, MetricsFamily, orderedOutcomes, MetricBudgetsFamily),
-            ProjectFamily(ExternalEvidence, ExternalEvidenceFamily, orderedOutcomes),
+            ProjectTopology(orderedOutcomes),
+            ProjectMetrics(orderedOutcomes),
+            ProjectExternalEvidence(orderedOutcomes),
             ProjectPolicyInventory(orderedOutcomes),
             ProjectReviewedFindingDebt(debtGate),
             ProjectNewDebt(debtGate),
@@ -83,7 +83,8 @@ public static class ArchitectureHealthProjector
             foreach (ArchitectureHealthReason reason in dimension.Reasons)
             {
                 string source = string.IsNullOrEmpty(reason.Source) ? string.Empty : $" ({reason.Source})";
-                builder.AppendLine($"  - {reason.Code}{source}");
+                string provenance = FormatProvenance(reason);
+                builder.AppendLine($"  - {reason.Code}{source}{provenance}");
             }
         }
 
@@ -103,10 +104,14 @@ public static class ArchitectureHealthProjector
             {
                 ["name"] = dimension.Name,
                 ["state"] = WireName(dimension.State),
-                ["reasons"] = dimension.Reasons.Select(reason => new Dictionary<string, string>
+                ["reasons"] = dimension.Reasons.Select(reason => new Dictionary<string, object?>
                 {
                     ["code"] = reason.Code,
                     ["source"] = reason.Source,
+                    ["family"] = reason.Family,
+                    ["control_identity"] = reason.ControlIdentity,
+                    ["policy_identity"] = reason.PolicyIdentity,
+                    ["evidence_identity"] = reason.EvidenceIdentity,
                 }).ToArray(),
             }).ToArray(),
         });
@@ -143,7 +148,7 @@ public static class ArchitectureHealthProjector
         if (completion.Any(evidence => evidence.State == ArchitectureAssessmentCompletionState.Unassessable))
         {
             return Dimension(Applicability, ArchitectureHealthDimensionState.Unassessable,
-                completion.SelectMany(evidence => evidence.Reasons).Select(reason => reason.Code));
+                completion.SelectMany(evidence => evidence.Reasons).Select(reason => Reason(Applicability, reason)));
         }
 
         return completion.Any(evidence => evidence.State == ArchitectureAssessmentCompletionState.Fail)
@@ -174,18 +179,83 @@ public static class ArchitectureHealthProjector
             : Dimension(Coverage, ArchitectureHealthDimensionState.Pass);
     }
 
-    private static ArchitectureHealthDimension ProjectFamily(
+    private static ArchitectureHealthDimension ProjectTopology(
+        IReadOnlyList<ArchitectureHealthValidationOutcome> outcomes) =>
+        ProjectAuthorityFamily(
+            Topology,
+            [TopologyFamily],
+            outcomes,
+            outcome => outcome.Outcome.Violations
+                .Where(violation => string.Equals(violation.ContractId, "declared-topology", StringComparison.Ordinal))
+                .Select(violation => new ArchitectureHealthAuthorityFinding(
+                    outcome.Mode,
+                    Reason(
+                        "topology_violation",
+                        Topology,
+                        TopologyFamily,
+                        violation.ContractId ?? "declared-topology",
+                        PolicyIdentity(violation.PolicyLocation),
+                        EvidenceIdentity(violation)))));
+
+    private static ArchitectureHealthDimension ProjectMetrics(
+        IReadOnlyList<ArchitectureHealthValidationOutcome> outcomes) =>
+        ProjectAuthorityFamily(
+            Metrics,
+            [MetricsFamily, MetricBudgetsFamily],
+            outcomes,
+            outcome => outcome.Outcome.Violations
+                .Where(violation => violation.Payload is MetricBudgetPayload)
+                .Select(violation =>
+                {
+                    var payload = (MetricBudgetPayload)violation.Payload!;
+                    return new ArchitectureHealthAuthorityFinding(
+                        outcome.Mode,
+                        Reason(
+                            "metric_budget_breach",
+                            Metrics,
+                            MetricBudgetsFamily,
+                            violation.ContractId ?? payload.BudgetId,
+                            PolicyIdentity(violation.PolicyLocation),
+                            EvidenceIdentity(violation)));
+                }));
+
+    private static ArchitectureHealthDimension ProjectExternalEvidence(
+        IReadOnlyList<ArchitectureHealthValidationOutcome> outcomes) =>
+        ProjectAuthorityFamily(
+            ExternalEvidence,
+            [ExternalEvidenceFamily],
+            outcomes,
+            outcome => outcome.Outcome.ImportedDiagnosticFindings
+                .Select(finding =>
+                {
+                    string evidenceIdentity = finding.Details is ImportedExternalDiagnostic imported
+                        ? imported.SelectedCanonicalIdentity
+                        : finding.CanonicalIdentity;
+                    return new ArchitectureHealthAuthorityFinding(
+                        finding.Mode ?? outcome.Mode,
+                        Reason(
+                            "imported_external_diagnostic",
+                            ExternalEvidence,
+                            ExternalEvidenceFamily,
+                            finding.ContractId ?? string.Empty,
+                            PolicyIdentity(finding.PolicyLocation),
+                            evidenceIdentity));
+                }));
+
+    private static ArchitectureHealthDimension ProjectAuthorityFamily(
         string dimensionName,
-        string family,
+        IReadOnlyCollection<string> families,
         IReadOnlyList<ArchitectureHealthValidationOutcome> outcomes,
-        string? additionalFamily = null)
+        Func<ArchitectureHealthValidationOutcome, IEnumerable<ArchitectureHealthAuthorityFinding>> findingsSelector)
     {
         ArchitectureApplicabilityRecord[] records = outcomes
             .SelectMany(outcome => outcome.Outcome.ApplicabilityRecords)
-            .Where(record => string.Equals(record.Family, family, StringComparison.Ordinal)
-                || string.Equals(record.Family, additionalFamily, StringComparison.Ordinal))
+            .Where(record => families.Contains(record.Family, StringComparer.Ordinal))
             .ToArray();
-        if (records.Length == 0)
+        ArchitectureHealthAuthorityFinding[] findings = outcomes
+            .SelectMany(findingsSelector)
+            .ToArray();
+        if (records.Length == 0 && findings.Length == 0)
         {
             return Dimension(dimensionName, ArchitectureHealthDimensionState.NotConfigured);
         }
@@ -193,10 +263,23 @@ public static class ArchitectureHealthProjector
         if (records.Any(record => record.State == ArchitectureApplicabilityRecordState.Unassessable))
         {
             return Dimension(dimensionName, ArchitectureHealthDimensionState.Unassessable,
-                records.SelectMany(record => record.Reasons).Select(reason => reason.Code));
+                records.SelectMany(record => record.Reasons).Select(reason => Reason(dimensionName, reason)));
         }
 
-        return records.All(record => record.State == ArchitectureApplicabilityRecordState.NotApplicable)
+        if (findings.Any(finding => string.Equals(finding.Mode, "strict", StringComparison.Ordinal)))
+        {
+            return Dimension(dimensionName, ArchitectureHealthDimensionState.Fail,
+                findings.Where(finding => string.Equals(finding.Mode, "strict", StringComparison.Ordinal))
+                    .Select(finding => finding.Reason));
+        }
+
+        if (findings.Length > 0)
+        {
+            return Dimension(dimensionName, ArchitectureHealthDimensionState.Degrading,
+                findings.Select(finding => finding.Reason));
+        }
+
+        return records.Length > 0 && records.All(record => record.State == ArchitectureApplicabilityRecordState.NotApplicable)
             ? Dimension(dimensionName, ArchitectureHealthDimensionState.NotApplicable)
             : Dimension(dimensionName, ArchitectureHealthDimensionState.Pass);
     }
@@ -230,29 +313,59 @@ public static class ArchitectureHealthProjector
             return Dimension(NewArchitectureDebt, ArchitectureHealthDimensionState.Unassessable, "baseline_verification_untrusted");
         }
 
-        return debtGate.PersistentDebt.New.Count > 0 || debtGate.PersistentDebt.Resolved.Count > 0
-            ? Dimension(NewArchitectureDebt, ArchitectureHealthDimensionState.Degrading, "baseline_debt_changed")
+        if (debtGate.PersistentDebt.New.Count > 0)
+        {
+            return Dimension(NewArchitectureDebt, ArchitectureHealthDimensionState.Degrading, "new_baseline_debt");
+        }
+
+        // A resolved entry still makes the baseline receipt out of sync and therefore keeps the
+        // gate failing until maintenance prunes it. It is an improvement to the architecture,
+        // however, not new debt or a degradation of Health.
+        return debtGate.PersistentDebt.Resolved.Count > 0
+            ? Dimension(NewArchitectureDebt, ArchitectureHealthDimensionState.Pass, "resolved_baseline_hygiene")
             : Dimension(NewArchitectureDebt, ArchitectureHealthDimensionState.Pass);
     }
 
     private static ArchitectureHealthDimension ProjectWaiverDebt(
         IReadOnlyList<ArchitectureHealthValidationOutcome> outcomes)
     {
-        ArchitecturePolicyInventory? inventory = outcomes
-            .Select(outcome => outcome.Outcome.PolicyInventory)
-            .FirstOrDefault(value => value is not null);
-        if (inventory is null)
+        ArchitectureWaiverLifecycleAssessment[] assessments = outcomes
+            .Select(outcome => outcome.Outcome.WaiverLifecycleAssessment)
+            .Where(assessment => assessment is not null)
+            .Cast<ArchitectureWaiverLifecycleAssessment>()
+            .ToArray();
+        if (assessments.Length == 0)
         {
-            return Dimension(WaiverDebt, ArchitectureHealthDimensionState.Unassessable, "missing_policy_inventory");
+            return Dimension(WaiverDebt, ArchitectureHealthDimensionState.Unassessable, "missing_waiver_lifecycle_receipt");
         }
 
-        if (inventory.IgnoreDebt.Invalid > 0 || inventory.IgnoreDebt.Expired > 0)
+        ArchitectureWaiverLifecycleRecord[] records = assessments
+            .SelectMany(assessment => assessment.Records)
+            .OrderBy(record => record.Id, StringComparer.Ordinal)
+            .ThenBy(record => record.ContractGroup, StringComparer.Ordinal)
+            .ToArray();
+        ArchitectureWaiverLifecycleRecord[] blocking = assessments
+            .SelectMany(assessment => assessment.Records.Where(record =>
+                assessment.BlockingStates.Contains(record.State, StringComparer.Ordinal)))
+            .ToArray();
+        if (blocking.Length > 0)
         {
-            return Dimension(WaiverDebt, ArchitectureHealthDimensionState.Fail, "invalid_or_expired_waiver");
+            return Dimension(WaiverDebt, ArchitectureHealthDimensionState.Fail,
+                blocking.Select(record => WaiverReason(record, "blocking_waiver_lifecycle")));
         }
 
-        return inventory.IgnoreDebt.Total > 0
-            ? Dimension(WaiverDebt, ArchitectureHealthDimensionState.Debt, "explicit_waiver_debt")
+        ArchitectureWaiverLifecycleRecord[] nonActive = records
+            .Where(record => !string.Equals(record.State, "active", StringComparison.Ordinal))
+            .ToArray();
+        if (nonActive.Length > 0)
+        {
+            return Dimension(WaiverDebt, ArchitectureHealthDimensionState.Degrading,
+                nonActive.Select(record => WaiverReason(record, "waiver_lifecycle_attention")));
+        }
+
+        return records.Length > 0
+            ? Dimension(WaiverDebt, ArchitectureHealthDimensionState.Debt,
+                records.Select(record => WaiverReason(record, "active_waiver_debt")))
             : Dimension(WaiverDebt, ArchitectureHealthDimensionState.Pass);
     }
 
@@ -319,15 +432,95 @@ public static class ArchitectureHealthProjector
         ArchitectureHealthDimensionState state,
         IEnumerable<string> reasonCodes)
     {
-        return new ArchitectureHealthDimension(
+        return Dimension(name, state, reasonCodes
+            .Where(code => !string.IsNullOrWhiteSpace(code))
+            .Select(code => new ArchitectureHealthReason(code, name)));
+    }
+
+    private static ArchitectureHealthDimension Dimension(
+        string name,
+        ArchitectureHealthDimensionState state,
+        IEnumerable<ArchitectureHealthReason> reasons) =>
+        new(
             name,
             state,
-            reasonCodes
-                .Where(code => !string.IsNullOrWhiteSpace(code))
-                .Distinct(StringComparer.Ordinal)
-                .Select(code => new ArchitectureHealthReason(code, name))
+            reasons
+                .Where(reason => !string.IsNullOrWhiteSpace(reason.Code))
+                .Distinct()
                 .ToArray());
+
+    private static ArchitectureHealthReason Reason(
+        string code,
+        string source,
+        string? family = null,
+        string? controlIdentity = null,
+        string? policyIdentity = null,
+        string? evidenceIdentity = null) =>
+        new(code, source)
+        {
+            Family = family,
+            ControlIdentity = controlIdentity,
+            PolicyIdentity = policyIdentity,
+            EvidenceIdentity = evidenceIdentity,
+        };
+
+    private static ArchitectureHealthReason Reason(
+        string source,
+        ArchitectureApplicabilityReason reason) =>
+        Reason(
+            reason.Code,
+            source,
+            reason.Provenance.Family,
+            reason.Provenance.ControlIdentity,
+            reason.Provenance.PolicyIdentity);
+
+    private static ArchitectureHealthReason WaiverReason(
+        ArchitectureWaiverLifecycleRecord record,
+        string code) =>
+        Reason(
+            code,
+            WaiverDebt,
+            "waiver",
+            record.ContractId ?? record.Id,
+            PolicyIdentity(record.PolicyLocation),
+            record.Id) with
+        {
+            // The lifecycle state is the authoritative detail for this instance rather than a
+            // synthetic aggregate. Keeping it in code makes the JSON receipt self-describing.
+            Code = $"{code}:{record.State}",
+        };
+
+    private static string? PolicyIdentity(ArchitecturePolicySourceLocation? location) => location is null
+        ? null
+        : $"{location.SourcePath}:{location.YamlPath}";
+
+    private static string EvidenceIdentity(ArchitectureViolation violation) => violation.Identity is not null
+        ? ArchitectureViolationIdentityJson.Serialize(violation.Identity)
+        : string.Join(
+            "|",
+            violation.ContractId ?? violation.ContractName,
+            violation.SourceType,
+            violation.ForbiddenNamespace,
+            string.Join(",", violation.ForbiddenReferences.OrderBy(reference => reference, StringComparer.Ordinal)));
+
+    private static string FormatProvenance(ArchitectureHealthReason reason)
+    {
+        string[] references =
+        [
+            FormatReference("family", reason.Family),
+            FormatReference("control", reason.ControlIdentity),
+            FormatReference("policy", reason.PolicyIdentity),
+            FormatReference("evidence", reason.EvidenceIdentity),
+        ];
+        string joined = string.Join(", ", references.Where(reference => reference.Length > 0));
+        return joined.Length == 0 ? string.Empty : $" [{joined}]";
     }
+
+    private static string FormatReference(string name, string? value) => string.IsNullOrEmpty(value)
+        ? string.Empty
+        : $"{name}={value}";
+
+    private sealed record ArchitectureHealthAuthorityFinding(string Mode, ArchitectureHealthReason Reason);
 
     private static string WireName(ArchitectureHealthGate value) => value switch
     {

@@ -96,6 +96,15 @@ non-compensating and deliberately has no score, percentage, letter grade, badge,
 SARIF representation. Valid `gate: unassessable` evidence remains a health document, not a
 `command_error` envelope.
 
+Every reason has stable `code` and `source` fields. When the owning authority supplies them, JSON
+also carries `family`, `control_identity`, `policy_identity`, and `evidence_identity`; these are
+canonical drill-down references, not formatted display text. Family applicability state reports
+whether a control can be assessed, while the family health state separately projects authoritative
+topology violations, metric-budget breaches, and imported external findings. Waiver health projects
+the evaluated lifecycle profile and its blocking states rather than aggregate debt counts. A
+resolved baseline entry is reported as `resolved_baseline_hygiene` on the passing
+`new_architecture_debt` dimension, while the independent gate can still require baseline pruning.
+
 ## Human output
 
 Use human output when reading diagnostics in a terminal or CI log:

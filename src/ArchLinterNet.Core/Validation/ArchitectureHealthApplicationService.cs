@@ -38,7 +38,7 @@ public sealed class ArchitectureHealthApplicationService(
         ArchitectureHealthValidationOutcome[] validationOutcomes = modes
             .Select(mode => new ArchitectureHealthValidationOutcome(mode, snapshot.Evaluate(mode)))
             .ToArray();
-        ArchitectureDebtGateOutcome debtGate = debtGateService.Evaluate(debtGateRequest);
+        ArchitectureDebtGateOutcome debtGate = debtGateService.Evaluate(debtGateRequest, snapshot);
         return new ArchitectureHealthOutcome(
             ArchitectureHealthProjector.Project(validationOutcomes, debtGate),
             validationOutcomes,

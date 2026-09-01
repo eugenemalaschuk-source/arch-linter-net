@@ -61,6 +61,8 @@ public sealed class ArchitectureHealthTestingAdapterTests
                 Is.EqualTo(new[] { "strict", "audit" }));
             Assert.That(fromEngine.ValidationOutcomes.Select(outcome => outcome.Mode),
                 Is.EqualTo(new[] { "strict", "audit" }));
+            Assert.That(fromBuilder.DebtGate.Evaluation.ReusedAnalysisSnapshot, Is.True);
+            Assert.That(fromEngine.DebtGate.Evaluation.ReusedAnalysisSnapshot, Is.True);
         });
     }
 
