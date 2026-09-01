@@ -443,7 +443,9 @@ def _verify_inventory_command(arguments: argparse.Namespace) -> None:
 def _verify_sonar(arguments: argparse.Namespace) -> None:
     inventory_root = _safe_path(arguments.inventory_root, "coverage inventory root")
     scanner_log = _github_runner_temp_path(arguments.scanner_log, "Sonar scanner log", "RUNNER_TEMP")
-    analysis_json = _safe_path(arguments.analysis_json, "Sonar project analyses response")
+    analysis_json = _github_runner_temp_path(
+        arguments.analysis_json, "Sonar project analyses response", "RUNNER_TEMP"
+    )
     github_output = (
         _github_command_file_path(arguments.github_output, _GITHUB_OUTPUT_DESCRIPTION, "GITHUB_OUTPUT")
         if arguments.github_output is not None
