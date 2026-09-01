@@ -1,0 +1,249 @@
+using System.Text.Json;
+using ArchLinterNet.Core.Change;
+using ArchLinterNet.Core.Model;
+using NUnit.Framework;
+
+namespace ArchLinterNet.Cli.Tests;
+
+[TestFixture]
+public sealed class PrReportMarkdownRendererTests
+{
+    [Test]
+    public void CleanProjection_RendersIndependentAcceptanceDimensions()
+    {
+        string markdown = PrReportMarkdownRenderer.Render(CreateProjection(evidence: Evidence()), 20);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(markdown, Does.Contain("Architecture acceptance: **pass**"));
+            Assert.That(markdown, Does.Contain("Architecture health: `healthy`"));
+            Assert.That(markdown, Does.Contain("Report availability: `complete`"));
+            Assert.That(markdown, Does.Contain("Effective policy controls: `2`"));
+            Assert.That(markdown, Does.Contain("2/2 evaluable"));
+            Assert.That(markdown, Does.Contain("Explicit waiver debt: `0`"));
+            Assert.That(markdown, Does.Contain("Existing finding debt: `0`"));
+            Assert.That(markdown, Does.Contain("New architecture debt: `0`"));
+            Assert.That(markdown, Does.Not.Contain("score"));
+        });
+    }
+
+    [Test]
+    public void ActiveWaiverAndExistingFindingDebt_RemainSeparate()
+    {
+        ArchitecturePrReportProjection projection = CreateProjection(
+            inventory: Inventory(new ArchitecturePolicyInventoryIgnoreDebt(1, 1, 0, 0, 0, 0),
+                [Waiver("active", "active")]),
+            baseline: [Baseline("matched", "existing")]);
+
+        string markdown = PrReportMarkdownRenderer.Render(projection);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(markdown, Does.Contain("Explicit waiver debt: `1`"));
+            Assert.That(markdown, Does.Contain("Existing finding debt: `1` baseline entries"));
+            Assert.That(markdown, Does.Contain("Waiver lifecycle detail (1)"));
+            Assert.That(markdown, Does.Contain("`active` state=`active`"));
+        });
+    }
+
+    [Test]
+    public void NewPolicyWeakening_IsRenderedBeforeOrdinaryDebt()
+    {
+        ArchitecturePrReportEvidence evidence = Evidence(
+            weakening: new ArchitecturePrReportPolicyWeakening(
+                1, "policy-weakening", "policy", 1, "high",
+                [new ArchitecturePrReportPolicyWeakeningFinding(
+                    "weak-1", "broadened_waiver", "control-1", "broadened", "high",
+                    ["old"], ["new"], ["subject"], null, null, "review")]),
+            baseline: [Baseline("matched", "existing")]);
+        string markdown = PrReportMarkdownRenderer.Render(CreateProjection(evidence: evidence));
+
+        Assert.That(markdown.IndexOf("policy weakening `weak-1`", StringComparison.Ordinal),
+            Is.LessThan(markdown.IndexOf("## Non-blocking debt", StringComparison.Ordinal)));
+    }
+
+    [Test]
+    public void LifecycleStates_PreserveExpiredAndStaleMetadata()
+    {
+        ArchitectureWaiverLifecycleRecord expired = Waiver("waiver-expired", "expired") with
+        {
+            Owner = "team",
+            Issue = "#12",
+            Expires = new DateOnly(2025, 1, 2),
+        };
+        ArchitectureWaiverLifecycleRecord stale = Waiver("waiver-stale", "stale");
+        ArchitecturePrReportEvidence evidence = Evidence(
+            inventory: Inventory(new ArchitecturePolicyInventoryIgnoreDebt(2, 0, 1, 1, 0, 0), [expired, stale]),
+            lifecycle: new ArchitectureWaiverLifecycleAssessment("strict", [expired, stale], []));
+
+        string markdown = PrReportMarkdownRenderer.Render(CreateProjection(evidence: evidence));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(markdown, Does.Contain("state=`expired`"));
+            Assert.That(markdown, Does.Contain("state=`stale`"));
+            Assert.That(markdown, Does.Contain("expires=2025-01-02"));
+            Assert.That(markdown, Does.Contain("2 total"));
+        });
+    }
+
+    [Test]
+    public void IncompleteApplicability_RendersEvaluabilityAndCanonicalReason()
+    {
+        ArchitecturePrReportApplicability applicability = new(
+            "unassessable",
+            new ArchitecturePrReportApplicabilitySummary(2, 1, 1),
+            [new ArchitecturePrReportApplicabilityReason("missing-receipt", new("family", "control-2", null, "evidence-2"))],
+            [
+                new ArchitecturePrReportApplicabilityControl("control-1", "required", "pass", true, [], null, null),
+                new ArchitecturePrReportApplicabilityControl("control-2", "required", "unassessable", false, [], null, null),
+            ]);
+        string markdown = PrReportMarkdownRenderer.Render(CreateProjection(
+            evidence: Evidence(applicability: applicability),
+            dimensions: [Dimension("applicability", ArchitectureHealthDimensionState.Unassessable), Dimension("topology", ArchitectureHealthDimensionState.NotConfigured)]));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(markdown, Does.Contain("1/2 evaluable; 1 unassessable"));
+            Assert.That(markdown, Does.Contain("`control-2` state=`unassessable`"));
+            Assert.That(markdown, Does.Contain("`missing-receipt`"));
+            Assert.That(markdown, Does.Contain("`evidence-2`"));
+        });
+    }
+
+    [Test]
+    public void IncompleteTopology_RendersUnmappedAndAmbiguousSubjects()
+    {
+        ArchitecturePrReportTopology topology = new(
+            "strict", "project", 2,
+            new ArchitecturePrReportTopologyCounts(2, 0, 0, 1, 1),
+            [
+                new ArchitecturePrReportTopologySubject("subject-a", "A", "A", "A", "unmapped", [], null),
+                new ArchitecturePrReportTopologySubject("subject-b", "B", "B", "B", "ambiguous", [], null),
+            ], [], [], []);
+        ArchitecturePrReportApplicability applicability = new(
+            "pass", new(1, 1, 0), [],
+            [new ArchitecturePrReportApplicabilityControl(
+                "topology-control", "required", "pass", true, [], null,
+                new ArchitecturePrReportApplicabilityRecord("topology-control", "declared_topology", "pass", [],
+                    new(null, "topology-control", null, "topology"), topology, null))]);
+        string markdown = PrReportMarkdownRenderer.Render(CreateProjection(
+            evidence: Evidence(applicability: applicability),
+            dimensions: [Dimension("applicability", ArchitectureHealthDimensionState.Pass), Dimension("topology", ArchitectureHealthDimensionState.Degrading)]));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(markdown, Does.Contain("0 mapped, 1 unmapped, 1 ambiguous"));
+            Assert.That(markdown, Does.Contain("disposition=`unmapped`"));
+            Assert.That(markdown, Does.Contain("disposition=`ambiguous`"));
+        });
+    }
+
+    [Test]
+    public void WrongContextExternalEvidence_RemainsUnassessable()
+    {
+        ArchitecturePrReportExternalEvidence external = new(
+            "strict",
+            [new ArchitecturePrReportExternalRequirement("sarif", "sarif", true, "tool", "1", "run", true, true, true, null)],
+            []);
+        string markdown = PrReportMarkdownRenderer.Render(CreateProjection(
+            evidence: Evidence(external: external),
+            dimensions: [Dimension("applicability", ArchitectureHealthDimensionState.Pass), Dimension("external_evidence", ArchitectureHealthDimensionState.Unassessable)]));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(markdown, Does.Contain("Required external evidence: `unassessable`"));
+            Assert.That(markdown, Does.Contain("External evidence: `unassessable`"));
+            Assert.That(markdown, Does.Not.Contain("external evidence: `pass`"));
+        });
+    }
+
+    [Test]
+    public void MissingEvidence_IsUnavailableAndAllChangeSectionsKeepCounts()
+    {
+        ArchitecturePrReportProjection projection = CreateProjection(evidence: null, change: new ArchitectureChangeReport(
+            [new("surface", "added", "Added")], [new("surface", "removed", "Removed")],
+            [new("finding-new", "new", "New")], [new("finding-existing", "existing", "Existing")], ["baseline"])
+        {
+            ResolvedFindings = [new("finding-resolved", "resolved", "Resolved")],
+        });
+        string markdown = PrReportMarkdownRenderer.Render(projection, 1);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(markdown, Does.Contain("Report availability: `unavailable`"));
+            Assert.That(markdown, Does.Contain("Canonical report evidence: `unavailable`"));
+            Assert.That(markdown, Does.Contain("Added surfaces (1)"));
+            Assert.That(markdown, Does.Contain("Removed surfaces (1)"));
+            Assert.That(markdown, Does.Contain("New findings (1)"));
+            Assert.That(markdown, Does.Contain("Existing findings (1)"));
+            Assert.That(markdown, Does.Contain("Resolved findings (1)"));
+        });
+    }
+
+    [Test]
+    public void BoundedSections_PreserveTotalAndOmittedCount()
+    {
+        ArchitectureChangeEntry[] added = [
+            new("surface", "a", "A"), new("surface", "b", "B"), new("surface", "c", "C")];
+        string markdown = PrReportMarkdownRenderer.Render(CreateProjection(change: new ArchitectureChangeReport(
+            added, [], [], [], [])), 1);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(markdown, Does.Contain("Added surfaces (3)"));
+            Assert.That(markdown, Does.Contain("Showing 1 of 3; omitted 2."));
+            Assert.That(markdown, Does.Contain("`a`"));
+            Assert.That(markdown, Does.Not.Contain("`b`"));
+        });
+    }
+
+    private static ArchitecturePrReportProjection CreateProjection(
+        ArchitecturePrReportEvidence? evidence = null,
+        ArchitecturePolicyInventory? inventory = null,
+        IReadOnlyList<ArchitecturePrReportBaselineEntry>? baseline = null,
+        IReadOnlyList<ArchitectureHealthDimension>? dimensions = null,
+        ArchitectureChangeReport? change = null) =>
+        new(
+            new ArchitecturePrReportHeadline(
+                ArchitectureHealthGate.Pass,
+                ArchitectureHealthState.Healthy,
+                evidence is null && inventory is null ? ArchitecturePrReportAvailability.Unavailable : ArchitecturePrReportAvailability.Complete,
+                dimensions ?? [Dimension("applicability", ArchitectureHealthDimensionState.Pass), Dimension("topology", ArchitectureHealthDimensionState.NotConfigured), Dimension("metrics", ArchitectureHealthDimensionState.NotConfigured), Dimension("external_evidence", ArchitectureHealthDimensionState.NotConfigured)]),
+            evidence ?? (inventory is null ? null : Evidence(inventory: inventory, baseline: baseline)),
+            change ?? new ArchitectureChangeReport([], [], [], [], []),
+            []);
+
+    private static ArchitecturePrReportEvidence Evidence(
+        ArchitecturePolicyInventory? inventory = null,
+        ArchitectureWaiverLifecycleAssessment? lifecycle = null,
+        ArchitecturePrReportApplicability? applicability = null,
+        ArchitecturePrReportExternalEvidence? external = null,
+        ArchitecturePrReportPolicyWeakening? weakening = null,
+        IReadOnlyList<ArchitecturePrReportBaselineEntry>? baseline = null) =>
+        new(1, ArchitecturePrReportEvidence.EvidenceKind, ArchitectureHealthGate.Pass, ArchitectureHealthState.Healthy,
+            [new ArchitecturePrReportValidationReceipt(
+                "strict", new Dictionary<string, string>(), inventory ?? Inventory(), lifecycle ?? new("strict", [], []), applicability ?? Applicability(), external, [],
+                new("/repo", [], [], []))],
+            new(true, true, new(true, "strict", true, []), new(true, true, baseline ?? [], []), weakening));
+
+    private static ArchitecturePolicyInventory Inventory(
+        ArchitecturePolicyInventoryIgnoreDebt? debt = null,
+        IReadOnlyList<ArchitectureWaiverLifecycleRecord>? waivers = null) =>
+        new(ArchitecturePolicyInventory.CurrentSchemaId, 2, new(1, 1, 0), debt ?? new(0, 0, 0, 0, 0, 0), waivers ?? []);
+
+    private static ArchitecturePrReportApplicability Applicability() =>
+        new("pass", new(2, 2, 0), [], [
+            new ArchitecturePrReportApplicabilityControl("control-1", "required", "pass", true, [], null, null),
+            new ArchitecturePrReportApplicabilityControl("control-2", "required", "pass", true, [], null, null)]);
+
+    private static ArchitectureWaiverLifecycleRecord Waiver(string id, string state) =>
+        new(id, state, "Rule", id, "layer", "namespace", "Forbidden.Namespace", null, "Reason", null, null,
+            new DateOnly(2024, 1, 1), null, new DateOnly(2026, 1, 1), true);
+
+    private static ArchitecturePrReportBaselineEntry Baseline(string status, string identity) =>
+        new(status, status, "layer", identity, "namespace", "Forbidden.Namespace", null, null, null, identity);
+
+    private static ArchitectureHealthDimension Dimension(string name, ArchitectureHealthDimensionState state) =>
+        new(name, state, []);
+}

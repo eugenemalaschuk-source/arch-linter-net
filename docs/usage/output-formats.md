@@ -110,6 +110,32 @@ coverage dimension, while `warn` retains the finding as non-blocking degrading e
 `--mode audit` is requested, ordinary audit diagnostics are retained in the non-blocking
 `audit_evidence` dimension, so a clean result remains distinguishable from an audit-only result.
 
+## Architecture pull-request report output
+
+`arch-linter-net report pr --health <architecture-health.json> --change <architecture-change.json>` renders deterministic Markdown from two canonical local artifacts. The
+Health input is an `architecture-health/v1` document with additive canonical reporting evidence; the
+change input is the canonical architecture-change report. The command consumes those artifacts only:
+it does not rerun or recreate analysis, reopen snapshots, inspect GitHub, or publish a pull-request
+comment. Use `--output <architecture-pr-report.md>` to write the Markdown file; otherwise it is
+written to standard output.
+
+Use `--max-details <positive-count>` to bound each detailed evidence family independently. Canonical
+totals and omitted counts remain visible, and ordering is stable across runs. The report combines
+neither evidence nor authority: its headline repeats direct Health/projection `gate` and `health`
+facts and is not a score, percentage, grade, or compensating quality calculation. Effective rule
+counts, applicability completeness, topology evidence, and external evidence remain distinct report
+sections. Change details likewise retain the canonical added, continuing, and resolved evidence
+supplied by the change report.
+
+Missing or incomplete canonical evidence is represented as unavailable or unassessable, never as a
+zero count or passing state. Input/schema incompatibility fails closed rather than being interpreted
+as a clean report. Canonical family, control, policy, evidence, and navigation identities remain
+source references for drill-down; the renderer does not manufacture replacements.
+
+GitHub comment publication, workflow/event orchestration, security permissions, and related
+integration are intentionally deferred to #681. This command is the local architecture-report
+projection only.
+
 ## Human output
 
 Use human output when reading diagnostics in a terminal or CI log:

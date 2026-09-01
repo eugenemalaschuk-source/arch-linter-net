@@ -28,7 +28,26 @@ public sealed record ArchitectureChangeReport(
     IReadOnlyList<ArchitectureChangeEntry> Removed,
     IReadOnlyList<ArchitectureChangeFinding> NewFindings,
     IReadOnlyList<ArchitectureChangeFinding> ExistingFindings,
-    IReadOnlyList<string> BaselineDebt);
+    IReadOnlyList<string> BaselineDebt)
+{
+    /// <summary>Current version of the serialized architecture-change report artifact.</summary>
+    public const int CurrentSchemaVersion = 1;
+
+    /// <summary>Stable kind discriminator for the serialized architecture-change report.</summary>
+    public const string ReportKind = "architecture-change-report";
+
+    /// <summary>Serialized report schema version.</summary>
+    public int SchemaVersion { get; init; } = CurrentSchemaVersion;
+
+    /// <summary>Serialized report kind discriminator.</summary>
+    public string Kind { get; init; } = ReportKind;
+
+    // Keep resolved findings additive rather than adding a positional constructor parameter. This
+    // preserves the public five-argument construction/deconstruction shape while extending the
+    // canonical report document for downstream consumers.
+    public IReadOnlyList<ArchitectureChangeFinding> ResolvedFindings { get; init; } =
+        Array.Empty<ArchitectureChangeFinding>();
+}
 
 /// <summary>Serializes, validates, and compares architecture change snapshots.</summary>
 public static class ArchitectureChangeReports
@@ -116,24 +135,33 @@ public static class ArchitectureChangeReports
             Order(baseEntries.Where(pair => !currentEntries.ContainsKey(pair.Key)).Select(static pair => pair.Value)),
             Order(current.Findings.Where(finding => !knownBaseIdentities.Contains(finding.Identity))),
             Order(current.Findings.Where(finding => knownBaseIdentities.Contains(finding.Identity))),
-            current.BaselineDebt.OrderBy(static value => value, StringComparer.Ordinal).ToArray());
+            current.BaselineDebt.OrderBy(static value => value, StringComparer.Ordinal).ToArray())
+        {
+            ResolvedFindings = Order(baseline.Findings.Where(finding =>
+                !current.Findings.Any(currentFinding =>
+                    string.Equals(currentFinding.Identity, finding.Identity, StringComparison.Ordinal))))
+        };
     }
 
     public static string FormatJson(ArchitectureChangeReport report)
     {
         ArgumentNullException.ThrowIfNull(report);
-        return JsonSerializer.Serialize(report, _jsonOptions);
+        Validate(report);
+        return JsonSerializer.Serialize(OrderReport(report), _jsonOptions);
     }
 
     public static string FormatHuman(ArchitectureChangeReport report)
     {
         ArgumentNullException.ThrowIfNull(report);
+        Validate(report);
+        report = OrderReport(report);
         StringBuilder builder = new();
         builder.AppendLine("Architecture change report");
         AppendEntries(builder, "Added surfaces", report.Added);
         AppendEntries(builder, "Removed surfaces", report.Removed);
         AppendFindings(builder, "New findings", report.NewFindings);
         AppendFindings(builder, "Existing findings", report.ExistingFindings);
+        AppendFindings(builder, "Resolved findings", report.ResolvedFindings);
         builder.AppendLine($"Baseline debt: {report.BaselineDebt.Count}");
         foreach (string identity in report.BaselineDebt)
         {
@@ -141,6 +169,82 @@ public static class ArchitectureChangeReports
         }
 
         return builder.ToString();
+    }
+
+    private static ArchitectureChangeReport OrderReport(ArchitectureChangeReport report) => report with
+    {
+        Added = Order(report.Added),
+        Removed = Order(report.Removed),
+        NewFindings = Order(report.NewFindings),
+        ExistingFindings = Order(report.ExistingFindings),
+        ResolvedFindings = Order(report.ResolvedFindings),
+        BaselineDebt = report.BaselineDebt.OrderBy(static value => value, StringComparer.Ordinal).ToArray(),
+    };
+
+    /// <summary>Reads and validates one serialized architecture-change report artifact.</summary>
+    public static ArchitectureChangeReport DeserializeReport(string json)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(json);
+        ReportDocument document = JsonSerializer.Deserialize<ReportDocument>(json, _jsonOptions)
+            ?? throw new ArgumentException("The architecture change report is empty.", nameof(json));
+        if (!string.Equals(document.Kind, ArchitectureChangeReport.ReportKind, StringComparison.Ordinal))
+        {
+            throw new ArgumentException("The input is not an architecture-change-report artifact.", nameof(json));
+        }
+
+        if (document.SchemaVersion != ArchitectureChangeReport.CurrentSchemaVersion
+            || document.Added is null
+            || document.Removed is null
+            || document.NewFindings is null
+            || document.ExistingFindings is null
+            || document.ResolvedFindings is null
+            || document.BaselineDebt is null)
+        {
+            throw new ArgumentException("The architecture change report is incomplete or unsupported.", nameof(json));
+        }
+
+        ArchitectureChangeReport report = new(
+            document.Added,
+            document.Removed,
+            document.NewFindings,
+            document.ExistingFindings,
+            document.BaselineDebt)
+        {
+            SchemaVersion = document.SchemaVersion,
+            Kind = document.Kind!,
+            ResolvedFindings = document.ResolvedFindings,
+        };
+        Validate(report);
+        return OrderReport(report);
+    }
+
+    private static void Validate(ArchitectureChangeReport report)
+    {
+        if (report.SchemaVersion != ArchitectureChangeReport.CurrentSchemaVersion
+            || !string.Equals(report.Kind, ArchitectureChangeReport.ReportKind, StringComparison.Ordinal)
+            || report.Added is null
+            || report.Removed is null
+            || report.NewFindings is null
+            || report.ExistingFindings is null
+            || report.ResolvedFindings is null
+            || report.BaselineDebt is null)
+        {
+            throw new ArgumentException("The architecture change report is incomplete or unsupported.", nameof(report));
+        }
+
+        HashSet<string> findingIdentities = new(StringComparer.Ordinal);
+        foreach (ArchitectureChangeFinding finding in report.NewFindings
+            .Concat(report.ExistingFindings)
+            .Concat(report.ResolvedFindings))
+        {
+            if (string.IsNullOrWhiteSpace(finding.Identity)
+                || !findingIdentities.Add(finding.Identity))
+            {
+                throw new ArgumentException(
+                    "Architecture change report findings must have unique identities across new, existing, and resolved sections.",
+                    nameof(report));
+            }
+        }
     }
 
     private static void Validate(ArchitectureChangeSnapshot snapshot)
@@ -209,5 +313,15 @@ public static class ArchitectureChangeReports
         string? ConditionSetName,
         IReadOnlyList<ArchitectureChangeEntry>? Entries,
         IReadOnlyList<ArchitectureChangeFinding>? Findings,
+        IReadOnlyList<string>? BaselineDebt);
+
+    private sealed record ReportDocument(
+        string? Kind,
+        int SchemaVersion,
+        IReadOnlyList<ArchitectureChangeEntry>? Added,
+        IReadOnlyList<ArchitectureChangeEntry>? Removed,
+        IReadOnlyList<ArchitectureChangeFinding>? NewFindings,
+        IReadOnlyList<ArchitectureChangeFinding>? ExistingFindings,
+        IReadOnlyList<ArchitectureChangeFinding>? ResolvedFindings,
         IReadOnlyList<string>? BaselineDebt);
 }

@@ -10,7 +10,7 @@ namespace ArchLinterNet.Core.Validation;
 /// It deliberately owns no policy loading, scanning, trust validation, lifecycle comparison, or
 /// applicability evaluation.
 /// </summary>
-public static class ArchitectureHealthProjector
+public static partial class ArchitectureHealthProjector
 {
     private const string CurrentEvaluation = "current_evaluation";
     private const string Applicability = "applicability";

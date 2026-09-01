@@ -149,6 +149,14 @@ Run `arch-linter-net --help` or `arch-linter-net <command> --help` for the exact
 
 | `arch-linter-net public-api update ...` | Update a reviewed public API snapshot. |
 
+<!-- cli-command: report -->
+
+| `arch-linter-net report` | Render reports from canonical local architecture artifacts. |
+
+<!-- cli-command: report pr -->
+
+| `arch-linter-net report pr --health <architecture-health.json> --change <architecture-change.json>` | Render a deterministic architecture-only pull-request Markdown report from canonical artifacts; does not rerun analysis or call GitHub. |
+
 <!-- cli-command: scaffold -->
 
 | `arch-linter-net scaffold` | Repository-development scaffolding. |
@@ -293,6 +301,40 @@ Coverage retains its existing severity semantics in Health: `analysis.coverage: 
 while `warn` remains non-blocking reportable evidence. For `--mode audit` and `--mode all`,
 `audit_evidence` preserves audit-only diagnostics without turning the Health gate into a strict
 failure.
+
+## Architecture pull-request report
+
+Render a reviewer-oriented Markdown report from a canonical Health artifact and a canonical
+architecture-change report:
+
+```bash
+arch-linter-net report pr \
+  --health architecture-health.json \
+  --change architecture-change.json \
+  --output architecture-pr-report.md \
+  --max-details 20
+```
+
+`--output` is optional; without it, Markdown is written to standard output. `--max-details` is
+optional and must be a positive count. It bounds each detailed evidence section independently while
+retaining canonical totals and making omitted details explicit. The report is deterministic and
+architecture-only: it reads the supplied artifacts, does not run or recreate analysis, and does not
+inspect or call GitHub.
+
+The Health input must be an `architecture-health/v1` document from a supported CLI, including its
+additive canonical reporting evidence. The change input is the canonical architecture-change JSON
+report, which carries the supplied added, continuing, and resolved finding evidence. The command
+does not reopen snapshots or compare them again.
+
+The report headline repeats direct Health/projection facts such as `gate` and `health`; it is not a
+score, percentage, grade, or compensating quality calculation. Rule/effective-control counts,
+applicability completeness, topology evidence, and external evidence remain separate sections and
+must not be combined or inferred from one another. Missing or incomplete canonical evidence is
+rendered as unavailable or unassessable, never as zero or pass. Canonical identities and provenance
+are retained where supplied so reviewers can drill back to the source artifacts.
+
+This command only renders the local report. GitHub comment publication, workflow/event orchestration,
+security permissions, and related integration remain outside this command's boundary in #681.
 
 ## Change snapshots
 

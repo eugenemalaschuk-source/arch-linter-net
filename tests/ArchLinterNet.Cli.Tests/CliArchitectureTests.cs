@@ -31,7 +31,7 @@ namespace ArchLinterNet.Cli.Tests;
 [TestFixture]
 public sealed partial class CliArchitectureTests
 {
-    private static readonly string[] _value = { "badge", "baseline", "cache", "change", "coverage", "graph", "explain", "gate", "health", "history", "measure", "policy", "public-api", "scaffold", "schema" };
+    private static readonly string[] _value = { "badge", "baseline", "cache", "change", "coverage", "graph", "explain", "gate", "health", "history", "measure", "policy", "public-api", "report", "scaffold", "schema" };
     private static readonly string[] _value1 = { "generate", "update", "prune", "diff", "verify", "migrate" };
     private static readonly string[] _value2 = { "rule-1" };
     [Test]
@@ -60,6 +60,7 @@ public sealed partial class CliArchitectureTests
                 typeof(MeasureCommandModule),
                 typeof(PolicyCommandModule),
                 typeof(PublicApiCommandModule),
+                typeof(ReportCommandModule),
                 typeof(ScaffoldCommandModule),
                 typeof(SchemaCommandModule),
             }));
