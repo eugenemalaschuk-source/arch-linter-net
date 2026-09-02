@@ -357,10 +357,16 @@ public static class ArchitectureChangeReports
             if (entry is null
                 || string.IsNullOrWhiteSpace(entry.Kind)
                 || string.IsNullOrWhiteSpace(entry.Identity)
-                || string.IsNullOrWhiteSpace(entry.Display)
-                || (identities is not null && !identities.Add(Key(entry))))
+                || string.IsNullOrWhiteSpace(entry.Display))
             {
                 throw new ArgumentException("Architecture change artifact contains an invalid entry.", parameterName);
+            }
+
+            if (identities is not null && !identities.Add(Key(entry)))
+            {
+                throw new ArgumentException(
+                    "Architecture change snapshot contains duplicate or empty entry identities.",
+                    parameterName);
             }
         }
     }
@@ -376,10 +382,16 @@ public static class ArchitectureChangeReports
             if (finding is null
                 || string.IsNullOrWhiteSpace(finding.Identity)
                 || string.IsNullOrWhiteSpace(finding.Kind)
-                || string.IsNullOrWhiteSpace(finding.Display)
-                || (identities is not null && !identities.Add(finding.Identity)))
+                || string.IsNullOrWhiteSpace(finding.Display))
             {
                 throw new ArgumentException("Architecture change artifact contains an invalid finding.", parameterName);
+            }
+
+            if (identities is not null && !identities.Add(finding.Identity))
+            {
+                throw new ArgumentException(
+                    "Architecture change snapshot contains duplicate or empty finding identities.",
+                    parameterName);
             }
         }
     }
