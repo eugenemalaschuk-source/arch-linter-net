@@ -252,6 +252,32 @@ public sealed partial class ArchitectureAnalysisSnapshot : IDisposable
         }
     }
 
+    // Project ordinary evaluator observations here, at the permitted Validation-to-Execution
+    // boundary, so Topology consumes only neutral DTOs and never Execution-owned types.
+    internal ArchitectureTopologyObservation CaptureTopologyObservation(string subjectKind)
+    {
+        lock (_gate)
+        {
+            ObjectDisposedException.ThrowIf(_disposed, this);
+            if (_preflight.Blocked)
+            {
+                throw new InvalidOperationException(
+                    "Topology capture cannot materialize a session after build-state preflight was blocked.");
+            }
+
+            _cancellationToken.ThrowIfCancellationRequested();
+            ArchitectureTopologyEvaluator.ValidationObservation observation =
+                ArchitectureTopologyEvaluator.ObserveForValidation(EnsureSetup().Runner.Session, subjectKind);
+            ArchitectureTopologyObservation captured = new(
+                observation.Subjects.Select(subject => new ArchitectureTopologyObservedSubject(
+                    subject.Identity, subject.Subject, subject.Project, subject.Assembly)).ToArray(),
+                observation.Dependencies.Select(dependency => new ArchitectureTopologyObservedDependency(
+                    dependency.SourceIdentity, dependency.TargetIdentity, dependency.Witness)).ToArray());
+            _cancellationToken.ThrowIfCancellationRequested();
+            return captured;
+        }
+    }
+
     private void EnsureRequestedContractIdsAreKnownForMode(string mode)
     {
         if (_requestedContractIds is not { Count: > 0 })
@@ -289,6 +315,7 @@ public sealed partial class ArchitectureAnalysisSnapshot : IDisposable
             PolicyImportPaths = GetPolicyImportPaths(),
             ResolvedAssemblyPaths = GetResolvedAssemblyPaths(),
             DiscoveredProjectPaths = GetDiscoveredProjectPaths(),
+            ConsumedInputPaths = GetConsumedInputPaths(),
             SourceExpansion = _document.SourceExpansion,
             ExternalEvidenceRequirements = _document.ExternalEvidence,
         };
@@ -539,7 +566,10 @@ public sealed partial class ArchitectureAnalysisSnapshot : IDisposable
 
         return AnalysisCacheOutcomeMapper.FromCacheOutcome(
             lookup.Entry.Outcome, _repositoryRoot, policyImportPaths, GetResolvedAssemblyPaths(),
-            GetDiscoveredProjectPaths(), _document.SourceExpansion, mode, _document.ExternalEvidence);
+            GetDiscoveredProjectPaths(), _document.SourceExpansion, mode, _document.ExternalEvidence) with
+        {
+            ConsumedInputPaths = GetConsumedInputPaths(),
+        };
     }
 
     private CacheArtifactEvidence GetCacheArtifactEvidence()

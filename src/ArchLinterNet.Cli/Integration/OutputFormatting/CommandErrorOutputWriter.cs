@@ -78,7 +78,7 @@ internal static class CliErrorOutputWriter
                 {
                     contract_name = diagnostic.ContractName,
                     contract_id = diagnostic.ContractId,
-                    state = PreflightStateToken(diagnostic.State),
+                    state = FormatPreflightState(diagnostic.State),
                     project_path = diagnostic.Evidence.ProjectPath,
                     assembly_name = diagnostic.Evidence.AssemblyName,
                     requested_configuration = diagnostic.Evidence.RequestedConfiguration,
@@ -103,7 +103,7 @@ internal static class CliErrorOutputWriter
         }
     }
 
-    private static string PreflightStateToken(BuildStatePreflightState state) => state switch
+    internal static string FormatPreflightState(BuildStatePreflightState state) => state switch
     {
         BuildStatePreflightState.Cancelled => "cancelled",
         BuildStatePreflightState.RestoreRequired => "restore-required",

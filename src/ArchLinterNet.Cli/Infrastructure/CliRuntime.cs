@@ -5,6 +5,7 @@ using ArchLinterNet.Core.Graph;
 using ArchLinterNet.Core.Model;
 using ArchLinterNet.Core.PolicyContext;
 using ArchLinterNet.Core.Reporting;
+using ArchLinterNet.Core.Topology;
 using ArchLinterNet.Core.Validation;
 
 namespace ArchLinterNet.Cli.Infrastructure;
@@ -376,6 +377,11 @@ internal sealed class CliRuntime : ICliRuntime
     public ArchitectureGraphOutcome BuildGraph(ArchitectureGraphRequest request)
     {
         return _engine.BuildGraph(request);
+    }
+
+    public ArchitectureTopologyCaptureOutcome CaptureTopology(ArchitectureTopologyCaptureRequest request)
+    {
+        return _engine.CaptureTopology(request);
     }
 
     public string FormatGraphAsJson(ArchitectureDependencyGraph graph)

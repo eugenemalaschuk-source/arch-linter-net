@@ -1,0 +1,29 @@
+version: 1
+name: Unity-style topology structural review fixture
+imports: [topology-review.fragment.yml]
+layers: {}
+analysis:
+  target_assemblies:
+    - TopologyReview.Unity.Runtime
+    - TopologyReview.Unity.Gameplay
+    - TopologyReview.Unity.Editor
+  assembly_search_paths:
+    - Library/ScriptAssemblies
+  source_roots:
+    - Assets
+topology:
+  mode: exhaustive
+  subject_kind: type
+  scope:
+    allow_empty: false
+    selectors:
+      - namespace: TopologyReview.Unity.*
+  nodes:
+    - id: gameplay
+      mappings:
+        - namespace: TopologyReview.Unity.Gameplay
+    - id: all-review-types
+      mappings:
+        - namespace: TopologyReview.Unity.*
+  allowed_edges: []
+contracts: {}

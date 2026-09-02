@@ -10,5 +10,10 @@ public sealed record BuildStatePreflightResult(IReadOnlyList<BuildStatePreflight
     internal IReadOnlyDictionary<string, string> VerifiedArtifactContentDigests { get; init; } =
         new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
 
+    // Exact file inputs retained from the preflight's evaluated build manifests. This internal
+    // handoff lets the owning analysis snapshot protect inputs after a successful preparation
+    // without asking a host to reconstruct source roots or walk the repository again.
+    internal IReadOnlyList<string> ConsumedInputPaths { get; init; } = Array.Empty<string>();
+
     public bool Blocked => Diagnostics.Any(d => d.IsBlocking);
 }

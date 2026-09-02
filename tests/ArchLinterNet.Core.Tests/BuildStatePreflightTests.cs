@@ -10,7 +10,7 @@ namespace ArchLinterNet.Core.Tests;
 
 [TestFixture]
 [Category("E2E")]
-public sealed class BuildStatePreflightTests
+public sealed partial class BuildStatePreflightTests
 {
     private static readonly string[] _value = { "Fixture" };
     private static readonly string[] _value1 = { "Fixture" };

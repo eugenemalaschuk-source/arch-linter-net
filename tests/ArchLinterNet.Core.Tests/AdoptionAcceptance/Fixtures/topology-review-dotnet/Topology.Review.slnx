@@ -1,0 +1,6 @@
+<Solution>
+  <Project Path="src/TopologyReview.Domain/TopologyReview.Domain.csproj" />
+  <Project Path="src/TopologyReview.Application/TopologyReview.Application.csproj" />
+  <Project Path="src/TopologyReview.Infrastructure/TopologyReview.Infrastructure.csproj" />
+  <Project Path="src/TopologyReview.Server/TopologyReview.Server.csproj" />
+</Solution>

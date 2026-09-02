@@ -85,6 +85,8 @@ layers:
     overlaps_with: [exception_types]
   core_validation:
     namespace: ArchLinterNet.Core.Validation
+  core_topology:
+    namespace: ArchLinterNet.Core.Topology
   core_profiling:
     namespace: ArchLinterNet.Core.Profiling
   core_asmdef:
@@ -189,6 +191,7 @@ source_sets:
       - core_history_reporting
       - core_history_enrichment
       - core_validation
+      - core_topology
       - core_profiling
       - core_asmdef
       - core_composition

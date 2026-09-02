@@ -19,6 +19,8 @@ using ArchLinterNet.Core.Resolution;
 using ArchLinterNet.Core.Resolution.Abstractions;
 using ArchLinterNet.Core.Scanning;
 using ArchLinterNet.Core.Scanning.Abstractions;
+using ArchLinterNet.Core.Topology;
+using ArchLinterNet.Core.Topology.Abstractions;
 using ArchLinterNet.Core.Validation;
 using ArchLinterNet.Core.Validation.Abstractions;
 using Microsoft.Extensions.DependencyInjection;
@@ -76,6 +78,7 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<IArchitectureGraphFormatter, ArchitectureGraphFormatter>();
         services.AddSingleton<IArchitectureGraphApplicationService, ArchitectureGraphApplicationService>();
         services.AddSingleton<IArchitectureExplainApplicationService, ArchitectureExplainApplicationService>();
+        services.AddSingleton<IArchitectureTopologyCaptureService, ArchitectureTopologyCaptureService>();
         return services;
     }
 

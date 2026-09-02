@@ -1,0 +1,50 @@
+version: 1
+name: Unity-style topology declared review fixture
+imports: [topology-review.fragment.yml]
+layers: {}
+analysis:
+  target_assemblies:
+    - TopologyReview.Unity.Runtime
+    - TopologyReview.Unity.Gameplay
+    - TopologyReview.Unity.Editor
+  assembly_search_paths:
+    - Library/ScriptAssemblies
+  source_roots:
+    - Assets
+topology:
+  mode: exhaustive
+  subject_kind: assembly
+  scope:
+    allow_empty: false
+    selectors:
+      - assembly: TopologyReview.Unity.Editor
+      - assembly: TopologyReview.Unity.Gameplay
+      - assembly: TopologyReview.Unity.Runtime
+  nodes:
+    - id: editor
+      mappings:
+        - assembly: TopologyReview.Unity.Editor
+    - id: gameplay
+      mappings:
+        - assembly: TopologyReview.Unity.Gameplay
+    - id: runtime
+      mappings:
+        - assembly: TopologyReview.Unity.Runtime
+    - id: retired-tooling
+      mappings:
+        - assembly: TopologyReview.Unity.RetiredTooling
+  allowed_edges:
+    - from: editor
+      to: gameplay
+    - from: runtime
+      to: retired-tooling
+  stale_declarations: true
+contracts:
+  strict_asmdef:
+    - id: unity-runtime-no-editor
+      name: Unity runtime asmdefs do not reference editor assemblies
+      source_assemblies:
+        - TopologyReview.Unity.Runtime
+        - TopologyReview.Unity.Gameplay
+      forbidden_editor_refs: true
+      reason: Runtime and gameplay code must not depend on editor-only tooling.

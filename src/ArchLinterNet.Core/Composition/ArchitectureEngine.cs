@@ -6,6 +6,8 @@ using ArchLinterNet.Core.Model;
 using ArchLinterNet.Core.PolicyContext;
 using ArchLinterNet.Core.PolicyContext.Abstractions;
 using ArchLinterNet.Core.Reporting;
+using ArchLinterNet.Core.Topology;
+using ArchLinterNet.Core.Topology.Abstractions;
 using ArchLinterNet.Core.Validation;
 using ArchLinterNet.Core.Validation.Abstractions;
 using Microsoft.Extensions.DependencyInjection;
@@ -145,6 +147,13 @@ public sealed class ArchitectureEngine : IDisposable, IAsyncDisposable
     {
         return _serviceProvider.GetRequiredService<IArchitectureGraphApplicationService>()
             .BuildGraph(request);
+    }
+
+    /// <summary>Captures canonical, read-only topology observations for review.</summary>
+    public ArchitectureTopologyCaptureOutcome CaptureTopology(ArchitectureTopologyCaptureRequest request)
+    {
+        return _serviceProvider.GetRequiredService<IArchitectureTopologyCaptureService>()
+            .Capture(request);
     }
 
     public ArchitectureExplainOutcome Explain(ArchitectureExplainRequest request)

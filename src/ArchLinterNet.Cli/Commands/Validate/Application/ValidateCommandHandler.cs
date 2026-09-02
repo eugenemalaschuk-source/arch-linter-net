@@ -369,7 +369,8 @@ internal sealed partial class ValidateCommandHandler
             return CliExitCodes.InvalidArgumentsOrRuntimeError;
         }
 
-        if (!TryGetWaiverEvaluationDate(options, out _, out string? waiverDateError))
+        if (!ValidationExecutionSemantics.TryGetWaiverEvaluationDate(
+                options.WaiverEvaluationDate, out _, out string? waiverDateError))
         {
             WriteImmediateError(options, waiverDateError!);
             return CliExitCodes.InvalidArgumentsOrRuntimeError;

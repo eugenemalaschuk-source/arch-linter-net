@@ -549,7 +549,8 @@ contracts:
                 "ArchLinterNet.Core.Change", "ArchLinterNet.Core.Graph", "ArchLinterNet.Core.History", "ArchLinterNet.Core.IO",
                 "ArchLinterNet.Core.Model",
                 "ArchLinterNet.Core.PolicyContext", "ArchLinterNet.Core.PolicyWeakening", "ArchLinterNet.Core.Profiling", "ArchLinterNet.Core.Reporting", "ArchLinterNet.Core.Resolution",
-                "ArchLinterNet.Core.Scanning", "ArchLinterNet.Core.Schema", "ArchLinterNet.Core.Validation"
+                "ArchLinterNet.Core.Scanning", "ArchLinterNet.Core.Schema", "ArchLinterNet.Core.Topology",
+                "ArchLinterNet.Core.Validation"
             },
             OptionalLayers = new HashSet<string>()
         };

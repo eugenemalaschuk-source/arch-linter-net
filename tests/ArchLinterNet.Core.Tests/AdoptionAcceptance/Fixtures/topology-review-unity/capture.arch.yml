@@ -1,0 +1,22 @@
+version: 1
+name: Unity-style topology capture fixture
+imports: [topology-review.fragment.yml]
+layers: {}
+analysis:
+  target_assemblies:
+    - TopologyReview.Unity.Runtime
+    - TopologyReview.Unity.Gameplay
+    - TopologyReview.Unity.Editor
+  assembly_search_paths:
+    - Library/ScriptAssemblies
+  source_roots:
+    - Assets
+contracts:
+  strict_asmdef:
+    - id: unity-runtime-no-editor
+      name: Unity runtime asmdefs do not reference editor assemblies
+      source_assemblies:
+        - TopologyReview.Unity.Runtime
+        - TopologyReview.Unity.Gameplay
+      forbidden_editor_refs: true
+      reason: Runtime and gameplay code must not depend on editor-only tooling.

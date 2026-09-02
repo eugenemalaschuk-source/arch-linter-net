@@ -1,3 +1,4 @@
+using ArchLinterNet.Cli.Abstractions;
 using ArchLinterNet.Core.Model;
 
 namespace ArchLinterNet.Cli.Commands.Validate.Application;
@@ -17,7 +18,7 @@ internal sealed record ValidateCommandOptions(
     string? Configuration = null,
     string? TargetFramework = null,
     string? Platform = null,
-    string? RuntimeIdentifier = null)
+    string? RuntimeIdentifier = null) : IValidationExecutionOptions
 {
     public bool IsFormatExplicit { get; init; }
 

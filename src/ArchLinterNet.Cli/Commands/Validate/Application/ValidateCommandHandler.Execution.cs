@@ -1,3 +1,4 @@
+using ArchLinterNet.Cli.Abstractions;
 using ArchLinterNet.Core.BuildState;
 using ArchLinterNet.Core.Model;
 using ArchLinterNet.Core.Reporting;
@@ -134,7 +135,8 @@ internal sealed partial class ValidateCommandHandler
         // openspec/changes/cli-external-evidence-binding. This guarantees SARIF bytes are always
         // freshly read regardless of --cache, and that a cache hit's reconstructed applicability
         // records never already contain a previous run's external-evidence entries.
-        ValidationOutcome outcome = AttachExternalEvidence(options, nativeOutcome, mode);
+        ValidationOutcome outcome = ValidationExecutionSemantics.AttachExternalEvidence(
+            options, nativeOutcome, mode, _cancellationToken);
 
         RouteResult result = _coordinator.RouteSingleOutcome(
             options.Format, mode, outcome, options.AdditionalSinks, timing, _cancellationToken);
@@ -175,31 +177,6 @@ internal sealed partial class ValidateCommandHandler
         return ResolveValidationExitCode(outcome);
     }
 
-    // Id validation (does every supplied --external-evidence id match a declared requirement, with
-    // no duplicates?) is cheap and touches no filesystem, so it runs unconditionally — including for
-    // a PreflightBlocked outcome — so a mistyped binding id is always rejected as invalid invocation
-    // rather than silently dropped merely because the run's build state already failed for an
-    // unrelated reason. Only the SARIF read/attach step (which needs a trustworthy repository/build
-    // state and touches disk) is skipped when preflight is blocked.
-    private ValidationOutcome AttachExternalEvidence(ValidateCommandOptions options, ValidationOutcome outcome, string mode)
-    {
-        ArchitectureExternalEvidenceBinder.ValidateBindingIds(
-            outcome.ExternalEvidenceRequirements, options.ExternalEvidenceArtifacts);
-
-        if (outcome.PreflightBlocked)
-        {
-            return outcome;
-        }
-
-        ArchitectureExternalEvidenceBindingResult binding = ArchitectureExternalEvidenceBinder.Evaluate(
-            outcome.ExternalEvidenceRequirements,
-            outcome.RepositoryRoot,
-            options.ExternalEvidenceArtifacts,
-            options.ExternalEvidenceAssessmentContext,
-            _cancellationToken);
-        return ArchitectureExternalEvidenceBinder.Attach(outcome, binding, mode);
-    }
-
     // One ArchitectureAnalysisSnapshot serves every requested mode: policy composition, project
     // discovery, and assembly loading happen once (inside _runtime.CreateSnapshot), and each
     // requested mode is evaluated against that same snapshot — see issue #363 /
@@ -231,7 +208,7 @@ internal sealed partial class ValidateCommandHandler
             RequestedRuntimeIdentifier = options.RuntimeIdentifier,
             CacheLocation = ResolveCacheLocationForExecution(options),
             MaxParallelism = options.MaxParallelism,
-            WaiverEvaluationDate = GetWaiverEvaluationDate(options),
+            WaiverEvaluationDate = ValidationExecutionSemantics.GetWaiverEvaluationDate(options.WaiverEvaluationDate),
             CancellationToken = _cancellationToken,
         };
 
@@ -425,9 +402,7 @@ internal sealed partial class ValidateCommandHandler
     private static IReadOnlyList<string> ResolveExternalEvidencePaths(
         ValidateCommandOptions options, string repositoryRoot)
     {
-        return options.ExternalEvidenceArtifacts
-            .Select(artifact => Path.GetFullPath(Path.Combine(repositoryRoot, artifact.Path)))
-            .ToArray();
+        return ValidationExecutionSemantics.ResolveExternalEvidencePaths(options, repositoryRoot);
     }
 
     private static string? FindExternalEvidenceReportCollision(
@@ -493,58 +468,7 @@ internal sealed partial class ValidateCommandHandler
 
     private ValidationRequest BuildValidationRequest(ValidateCommandOptions options, string mode)
     {
-        return new ValidationRequest
-        {
-            PolicyPath = options.PolicyPath,
-            Mode = mode,
-            ConditionSetName = options.ConditionSetName,
-            ContractIds = options.ContractIds.ToList(),
-            BaselinePath = options.BaselinePath,
-            EnforceUnmatchedIgnoredViolationsPolicy = true,
-            PreparationMode = options.EnsureBuilt ? BuildPreparationMode.EnsureBuilt : BuildPreparationMode.Ordinary,
-            NoRestore = options.NoRestore,
-            RequestedConfiguration = options.Configuration,
-            RequestedTargetFramework = options.TargetFramework,
-            RequestedPlatform = options.Platform,
-            RequestedRuntimeIdentifier = options.RuntimeIdentifier,
-            CacheLocation = ResolveCacheLocationForExecution(options),
-            MaxParallelism = options.MaxParallelism,
-            WaiverEvaluationDate = GetWaiverEvaluationDate(options),
-            CancellationToken = _cancellationToken,
-        };
-    }
-
-    private static DateOnly? GetWaiverEvaluationDate(ValidateCommandOptions options)
-    {
-        return TryGetWaiverEvaluationDate(options, out DateOnly? evaluationDate, out _)
-            ? evaluationDate
-            : throw new InvalidOperationException("The waiver evaluation date was not validated.");
-    }
-
-    private static bool TryGetWaiverEvaluationDate(
-        ValidateCommandOptions options, out DateOnly? evaluationDate, out string? error)
-    {
-        if (string.IsNullOrWhiteSpace(options.WaiverEvaluationDate))
-        {
-            evaluationDate = null;
-            error = null;
-            return true;
-        }
-
-        if (DateOnly.TryParseExact(
-                options.WaiverEvaluationDate,
-                "yyyy-MM-dd",
-                System.Globalization.CultureInfo.InvariantCulture,
-                System.Globalization.DateTimeStyles.None,
-                out DateOnly parsed))
-        {
-            evaluationDate = parsed;
-            error = null;
-            return true;
-        }
-
-        evaluationDate = null;
-        error = "Invalid --waiver-evaluation-date value. Use an ISO calendar date in yyyy-MM-dd format.";
-        return false;
+        return ValidationExecutionSemantics.CreateRequest(
+            options, mode, ResolveCacheLocationForExecution(options), _cancellationToken);
     }
 }
