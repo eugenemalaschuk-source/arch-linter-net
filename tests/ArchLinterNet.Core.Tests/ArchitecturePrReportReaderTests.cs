@@ -397,6 +397,44 @@ public sealed class ArchitecturePrReportReaderTests
         });
     }
 
+    [Test]
+    public void ReadAndProject_LegacyExternalRequirementWithoutTrustReceipt_IsUnavailable()
+    {
+        JsonNode health = JsonNode.Parse(ArchitectureHealthProjector.FormatAsJson(CreateOutcome()))!;
+        JsonObject receipt = health["report_evidence"]!["validation_outcomes"]![0]!.AsObject();
+        receipt["availability"]!["external_evidence"] = "available";
+        receipt["external_evidence"] = new JsonObject
+        {
+            ["mode"] = "strict",
+            ["requirements"] = new JsonArray(
+                new JsonObject
+                {
+                    ["id"] = "external.scan",
+                    ["format"] = "sarif",
+                    ["required"] = true,
+                    ["tool"] = "scanner",
+                    ["tool_version"] = "1.0",
+                    ["run"] = "current",
+                    ["require_repository"] = true,
+                    ["require_revision"] = true,
+                    ["require_scope"] = true,
+                }),
+            ["findings"] = new JsonArray(),
+        };
+
+        ArchitecturePrReportProjection projection = ArchitecturePrReportProjector.ReadAndProject(
+            health.ToJsonString(),
+            ArchitectureChangeReports.FormatJson(ArchitectureChangeReports.Compare(Snapshot(), Snapshot(), "run-1")));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(projection.Availability, Is.EqualTo(ArchitecturePrReportAvailability.Unavailable));
+            Assert.That(projection.Evidence!.ValidationOutcomes.Single().ExternalEvidence!.TrustReceipts, Is.Empty);
+            Assert.That(projection.Evidence.ValidationOutcomes.Single().ExternalEvidence!.HasCompleteTrustReceipts,
+                Is.False);
+        });
+    }
+
     private static ArchitectureChangeSnapshot Snapshot(IReadOnlyList<ArchitectureChangeFinding>? findings = null) =>
         new(
             ArchitectureChangeSnapshot.CurrentSchemaVersion,
