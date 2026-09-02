@@ -324,6 +324,7 @@ jobs:
     env:
       ARCHITECTURE_REPORT_DIRECTORY: architecture-pr-report
       ARCHITECTURE_REPORT_ARTIFACT_DIRECTORY: architecture-pr-report-artifact
+      ARCHITECTURE_HEALTH_BADGE_ARTIFACT_DIRECTORY: architecture-health-badge-artifact
     outputs:
       strict_coverage_outcome: ${{ steps.architecture_coverage.outcome }}
 
@@ -475,6 +476,36 @@ jobs:
             exit "$health_exit"
           fi
 
+          set +e
+          dotnet run --no-build --project "$cli_project" -- badge architecture-health \
+            --input "$output_directory/architecture-health.json" \
+            --output "$output_directory/architecture-health-badge.json"
+          badge_exit=$?
+          set -e
+          if [ "$badge_exit" -ne 0 ] && [ ! -s "$output_directory/architecture-health-badge.json" ]; then
+            exit "$badge_exit"
+          fi
+          if ! python3 - "$output_directory/architecture-health-badge.json" <<'PY'
+          import json
+          import sys
+          from pathlib import Path
+
+          try:
+              document = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
+          except (OSError, UnicodeDecodeError, json.JSONDecodeError) as error:
+              raise SystemExit(f"Architecture Health badge output is not valid JSON: {error}")
+
+          if (not isinstance(document, dict)
+                  or set(document) != {"schemaVersion", "label", "message", "color"}
+                  or document.get("schemaVersion") != 1
+                  or document.get("label") != "architecture"
+                  or not all(isinstance(document.get(key), str) and document[key] for key in ("message", "color"))):
+              raise SystemExit("Architecture Health badge output must be a complete Shields endpoint document.")
+          PY
+          then
+            exit 2
+          fi
+
           dotnet run --no-build --project "$cli_project" -- report pr \
             --health "$output_directory/architecture-health.json" \
             --change "$output_directory/architecture-change.json" \
@@ -519,6 +550,57 @@ jobs:
                   "path": "architecture-pr-report.md",
                   "bytes": len(report_bytes),
                   "sha256": hashlib.sha256(report_bytes).hexdigest(),
+              },
+          }
+          Path(os.environ["manifest_path"]).write_text(
+              json.dumps(manifest, sort_keys=True, separators=(",", ":")) + "\n",
+              encoding="utf-8",
+          )
+          PY
+
+      - name: Create bound Architecture Health badge manifest
+        id: architecture_health_badge_manifest
+        if: always() && steps.architecture_report_inputs.outcome == 'success'
+        continue-on-error: true
+        env:
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_BASE_REF: ${{ github.event.pull_request.base.ref }}
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        shell: bash
+        run: |
+          payload_path="$ARCHITECTURE_REPORT_DIRECTORY/architecture-health-badge.json"
+          artifact_directory="$ARCHITECTURE_HEALTH_BADGE_ARTIFACT_DIRECTORY"
+          mkdir -p "$artifact_directory"
+          cp "$payload_path" "$artifact_directory/architecture-health-badge.json"
+          export payload_path="$artifact_directory/architecture-health-badge.json"
+          export manifest_path="$artifact_directory/architecture-health-badge.manifest.json"
+          export PR_HEAD_TREE_SHA="$(git rev-parse "$PR_HEAD_SHA^{tree}")"
+          python3 - <<'PY'
+          import hashlib
+          import json
+          import os
+          from pathlib import Path
+
+          payload_path = Path(os.environ["payload_path"])
+          payload_bytes = payload_path.read_bytes()
+          manifest = {
+              "schema": "architecture-health-badge-promotion/v1",
+              "kind": "architecture-health-badge",
+              "context": {
+                  "repository": os.environ["GITHUB_REPOSITORY"],
+                  "pr_number": os.environ["PR_NUMBER"],
+                  "base_ref": os.environ["PR_BASE_REF"],
+                  "base_sha": os.environ["PR_BASE_SHA"],
+                  "head_sha": os.environ["PR_HEAD_SHA"],
+                  "head_tree_sha": os.environ["PR_HEAD_TREE_SHA"],
+                  "run_id": os.environ["GITHUB_RUN_ID"],
+                  "run_attempt": os.environ["GITHUB_RUN_ATTEMPT"],
+              },
+              "payload": {
+                  "path": "architecture-health-badge.json",
+                  "bytes": len(payload_bytes),
+                  "sha256": hashlib.sha256(payload_bytes).hexdigest(),
               },
           }
           Path(os.environ["manifest_path"]).write_text(
@@ -572,6 +654,16 @@ jobs:
             architecture-pr-report-artifact/architecture-pr-report.manifest.json
           if-no-files-found: error
 
+      - name: Upload bound Architecture Health badge
+        if: always() && hashFiles('architecture-health-badge-artifact/architecture-health-badge.json') != '' && hashFiles('architecture-health-badge-artifact/architecture-health-badge.manifest.json') != ''
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: architecture-health-badge-v1
+          path: |
+            architecture-health-badge-artifact/architecture-health-badge.json
+            architecture-health-badge-artifact/architecture-health-badge.manifest.json
+          if-no-files-found: error
+
       - name: Remove architecture report base worktree
         if: always() && steps.architecture_report_base.outcome == 'success'
         env:
@@ -585,6 +677,10 @@ jobs:
 
       - name: Fail if architecture PR report manifest is unavailable
         if: always() && steps.architecture_report_manifest.outcome != 'success'
+        run: exit 1
+
+      - name: Fail if Architecture Health badge manifest is unavailable
+        if: always() && steps.architecture_health_badge_manifest.outcome != 'success'
         run: exit 1
 
   architecture_pr_report_gate:

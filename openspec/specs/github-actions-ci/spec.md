@@ -2,7 +2,9 @@
 
 ## Purpose
 Defines the GitHub Actions workflows for pull request validation and the separated CI/release pipeline.
+
 ## Requirements
+
 ### Requirement: Pull request validation workflow
 ArchLinterNet SHALL provide a GitHub Actions CI workflow that validates pull requests and pushes with the repository acceptance gate and SonarCloud analysis without producing official release packages.
 
@@ -32,22 +34,22 @@ The CI workflow SHALL NOT perform official release packaging, publication, taggi
 - **THEN** it does not publish packages, create tags, or create GitHub Releases
 
 ### Requirement: README quality signal badge
-The repository README SHALL display the CI status badge, the dynamic Codecov
-coverage badge, a dynamic ArchLinterNet architecture-policy badge sourced from
-the dedicated strict-self-policy workflow on `main`, and live SonarCloud quality
-badges. It SHALL explain that the architecture-policy badge proves a strict
-self-policy pass, while architecture coverage and test coverage remain separate
-signals.
+The repository README SHALL display Main quality, dynamic Codecov coverage,
+dynamic Architecture Health, and live SonarCloud badges as distinct signals.
+The Architecture Health badge SHALL resolve through the repository's stable
+public endpoint payload and SHALL describe canonical Health, explicit waiver
+debt, and effective policy-control count. It SHALL not be sourced from a
+generic GitHub workflow-status endpoint or represent a strict self-policy pass.
 
 #### Scenario: Quality badges and explanation are present
 - **WHEN** a reader views the README
-- **THEN** it shows a CI status badge sourced from `ci.yml`
+- **THEN** it shows a Main quality badge sourced from `main-quality.yml`
 - **AND** it keeps the dynamic Codecov coverage badge
-- **AND** it shows a dynamic architecture-policy badge sourced from the
-  dedicated workflow's `main` status
+- **AND** it shows an Architecture Health badge sourced from the stable public
+  endpoint payload
 - **AND** it shows live SonarCloud badges for the configured SonarCloud project
-- **AND** it links to documentation explaining the distinct CI, architecture
-  policy, architecture coverage, and SonarCloud quality signals
+- **AND** it links to documentation explaining that Main quality, Architecture
+  Health, architecture coverage, and SonarCloud quality are distinct signals
 
 ### Requirement: SonarCloud analysis consumes isolated coverage artifacts
 
@@ -287,26 +289,6 @@ Local `make acceptance` SHALL remain the complete lint + unit + ordinary E2E + p
 - **THEN** the final release-evidence job consumes repository-gate evidence already bound to the candidate manifest
 - **AND** it does not invoke `make acceptance` or another command that reruns Checkpoint B
 
-### Requirement: Dedicated architecture-policy workflow
-GitHub Actions SHALL run a dedicated architecture-policy workflow for pull
-requests and pushes to `main`. Its strict self-policy job SHALL run the
-authoritative read-only `make lint-architecture` target and SHALL not publish
-packages, releases, GitHub Pages content, or repository commits.
-
-#### Scenario: Main push refreshes strict-policy status
-- **WHEN** code is pushed to `main`
-- **THEN** the dedicated workflow restores the required dependencies and runs
-  `make lint-architecture`
-- **AND** its workflow conclusion is the public architecture-policy badge
-  source
-
-#### Scenario: Pull request validates strict policy without publication
-- **WHEN** the dedicated workflow runs for a pull request
-- **THEN** it executes the same strict self-policy target
-- **AND** it uses only read permission for repository contents
-- **AND** it does not publish packages, releases, Pages content, or repository
-  commits
-
 ### Requirement: Scheduled and manually dispatched Git-parser fuzzing
 GitHub Actions SHALL provide a dedicated fuzzing workflow for the synthetic Git
 binary-parser harness. The workflow SHALL run only on a schedule or explicit
@@ -344,18 +326,32 @@ by the stable Windows packed-artifact fan-in check.
 ### Requirement: Architecture PR report producer runs in the existing CI workflow
 
 The architecture report producer SHALL run strict/audit coverage, canonical Health/change
-artifacts, and the CLI-rendered PR report artifact inside a dedicated read-only `ci.yml`
-job that is independently schedulable from repository lint, coverage/Sonar, and the other
-pull-request validation jobs. Because this job does not share a runner or checkout with a job that
-builds the CLI/Testing projects, it SHALL build those projects itself before invoking the CLI in
-`--no-build` mode. It SHALL not have pull-request write permission or a comment-writing step.
+artifacts, the CLI-rendered PR report artifact, and the CLI-rendered Architecture Health badge
+payload inside a dedicated read-only `ci.yml` job that is independently schedulable from
+repository lint, coverage/Sonar, and the other pull-request validation jobs. Because this job
+does not share a runner or checkout with a job that builds the CLI/Testing projects, it SHALL
+build those projects itself before invoking the CLI in `--no-build` mode. It SHALL not have
+pull-request write permission or a comment-writing step.
+
+The producer SHALL bind its badge payload in a bounded immutable manifest containing the
+repository, pull-request number, target base ref and SHA, PR head SHA and Git-tree identity,
+producer run ID and attempt, fixed payload path, byte count, and SHA-256. It SHALL upload only
+the exact CLI-generated payload and its manifest as the named badge-promotion artifact. Workflow
+glue SHALL not derive Health, ignore debt, rule count, colors, or badge message text.
 
 #### Scenario: Producer builds and renders independently
 
 - **WHEN** the architecture report producer job runs
 - **THEN** it builds `ArchLinterNet.Cli` and `ArchLinterNet.Testing` before it runs the coverage,
-  Health, change, and report CLI steps
+  Health, change, report, and badge CLI steps
 - **AND** it does not depend on a build performed by repository lint or another job
+
+#### Scenario: Badge evidence is inert and bound to the validated PR tree
+
+- **WHEN** the producer obtains a canonical Health document and generates its badge payload
+- **THEN** it uploads the exact payload with a manifest bound to that PR, base context, run, head
+  SHA, and head Git-tree identity
+- **AND** it does not publish the payload or execute it as workflow code
 
 ### Requirement: Architecture report readiness is separate from strict gate enforcement
 
@@ -392,3 +388,45 @@ that baseline as repository state. After Health runs, the producer SHALL require
   `schema_id: architecture-health/v1`
 - **THEN** the producer fails before it invokes `report pr`
 - **AND** it does not upload a manifest claiming a canonical report
+
+### Requirement: Architecture Health badge promotion verifies merged-tree identity
+Trusted automation triggered by a `push` to `main` SHALL publish the Architecture Health payload
+only after it resolves exactly one merged pull request for that commit and verifies the repository,
+target base context, merged commit, successful required `Architecture Coverage` PR producer run,
+non-expired named artifact, manifest binding, and byte hash. It SHALL compare the immutable Git
+tree identity of the validated PR head with the pushed merged `main` commit; matching commit SHA
+alone SHALL not satisfy this requirement.
+
+The publisher SHALL transport the complete validated CLI-generated payload unchanged to one fixed,
+repository-controlled public endpoint and may write separate publication metadata. It SHALL not
+check out or execute PR-controlled artifact content, recreate badge semantics in workflow code,
+rerun architecture analysis, modify policy/baseline state, or deploy GitHub Pages/MkDocs. If any
+proof or artifact is missing, stale, failed, expired, malformed, oversized, ambiguous, or
+mismatched, it SHALL fail closed by replacing the stable endpoint with the CLI-generated explicit
+unassessable payload and metadata rather than leaving an older healthy payload represented as
+current.
+
+#### Scenario: Squash merge promotes an exact-tree payload
+- **WHEN** a required successful Architecture Coverage PR run produced a valid manifest-bound
+  badge payload and the squash-merged `main` commit has the same Git tree as that PR head
+- **THEN** the publisher transports that exact payload to the stable endpoint
+- **AND** it records separate metadata binding the publication to the merged commit and validated
+  producer evidence
+
+#### Scenario: Same-looking metadata with another tree is rejected
+- **WHEN** the manifest and pull-request metadata appear valid but the validated PR-head tree and
+  pushed `main` tree differ
+- **THEN** the publisher does not publish the ready payload
+- **AND** the stable endpoint becomes the explicit unassessable payload
+
+#### Scenario: Stale, failed, or unavailable evidence fails closed
+- **WHEN** the associated PR, required producer run, artifact, manifest, or payload is missing,
+  stale, failed, expired, malformed, or inconsistent
+- **THEN** the publisher does not reuse a prior healthy payload as the current badge
+- **AND** it publishes only the CLI-generated unassessable payload and bounded publication metadata
+
+#### Scenario: Badge-only publication does not duplicate main validation or docs deployment
+- **WHEN** a verified main badge publication runs
+- **THEN** it does not execute the architecture validation matrix, `make acceptance`, or a
+  GitHub Pages/MkDocs deployment
+- **AND** it updates only the fixed static badge endpoint and optional publication metadata

@@ -6,6 +6,7 @@
   <a href="https://www.nuget.org/packages/ArchLinterNet.Cli/"><img alt="NuGet version" src="https://img.shields.io/nuget/v/ArchLinterNet.Cli.svg"></a>
   <a href="https://www.nuget.org/packages/ArchLinterNet.Cli/"><img alt="NuGet downloads" src="https://img.shields.io/nuget/dt/ArchLinterNet.Cli"></a>
   <a href="https://github.com/eugenemalaschuk-source/arch-linter-net/actions/workflows/main-quality.yml"><img alt="Main quality" src="https://github.com/eugenemalaschuk-source/arch-linter-net/actions/workflows/main-quality.yml/badge.svg?branch=main"></a>
+  <a href="https://raw.githubusercontent.com/eugenemalaschuk-source/arch-linter-net/architecture-health-badge/architecture-health-publication.json"><img alt="Architecture Health" src="https://img.shields.io/endpoint?url=https%3A%2F%2Fraw.githubusercontent.com%2Feugenemalaschuk-source%2Farch-linter-net%2Farchitecture-health-badge%2Farchitecture-health.json"></a>
   <a href="https://sonarcloud.io/summary/overall?id=eugenemalaschuk-source_arch-linter-net&branch=main"><img alt="Sonar Quality Gate" src="https://sonarcloud.io/api/project_badges/measure?project=eugenemalaschuk-source_arch-linter-net&metric=alert_status&branch=main"></a>
   <a href="https://app.codecov.io/github/eugenemalaschuk-source/arch-linter-net"><img alt="Test coverage" src="https://codecov.io/github/eugenemalaschuk-source/arch-linter-net/graph/badge.svg?branch=main"></a>
   <a href="https://eugenemalaschuk-source.github.io/arch-linter-net/"><img alt="Documentation" src="https://img.shields.io/badge/docs-GitHub%20Pages-blue"></a>
@@ -99,7 +100,7 @@ ArchLinterNet focuses on static architecture governance:
 - Coverage contracts for `namespace`, `project`, `assembly`, `dependency_edge`, `rule_input`, and `semantic_role` inventory.
 - Project/solution discovery, explicit build-state preflight, opt-in `--ensure-built`, condition sets, persistent analysis cache, and bounded parallel scanning.
 - Strict gates, audit discovery, migration baselines, policy consistency, policy-context export, and policy-weakening review.
-- Architecture change snapshots/reports, history forensics, dependency graphs/path explanation, architecture-policy badge projection, and public API lifecycle commands.
+- Architecture change snapshots/reports, history forensics, dependency graphs/path explanation, Architecture Health and legacy architecture-policy badge projections, and public API lifecycle commands.
 - Human, normalized JSON, SARIF where applicable, repeatable report sinks, timings, analysis profiles, and CI-oriented coverage artifacts.
 - CEL-backed `when` predicates at documented closed locations — standard CEL under a safe profile, not an open-ended scripting language.
 
@@ -142,9 +143,24 @@ make lint-docs   # strict structure + semantic documentation validation
 
 Generated `site/` output is a build artifact and should not be committed.
 
-## Architecture-policy badge
+## Architecture Health badge
 
-Project an existing strict JSON result to a Shields endpoint payload without rerunning analysis:
+Project canonical Architecture Health and canonical policy inventory into a
+Shields endpoint payload without rerunning analysis:
+
+```bash
+arch-linter-net badge architecture-health \
+  --input architecture-health.json \
+  --output architecture-health-badge.json
+```
+
+The payload headline contains the non-compensating Health category, accumulated
+explicit ignore debt, and effective policy-control count. It is not a score,
+coverage percentage, test result, or generic workflow status. `UNASSESSABLE · ? ignores · ? rules` explicitly means the required Health/inventory evidence
+was not available; it never means zero debt.
+
+`badge architecture-policy` remains available for integrations that need the
+older, narrower strict-validation signal:
 
 ```bash
 arch-linter-net badge architecture-policy --input architecture-strict.json
@@ -165,13 +181,13 @@ arch-linter-net badge architecture-policy --input architecture-strict.json
   <a href="https://sonarcloud.io/summary/overall?id=eugenemalaschuk-source_arch-linter-net&branch=main"><img alt="Sonar Security" src="https://sonarcloud.io/api/project_badges/measure?project=eugenemalaschuk-source_arch-linter-net&metric=security_rating&branch=main"></a>
 </p>
 
-The Main quality badge tracks the latest merged `main` coverage telemetry run. That run refreshes Codecov and SonarCloud for the same merged revision and fails closed if coverage collection, Codecov upload, or the Sonar quality-gate scan cannot complete successfully. The old README `Architecture policy` image was only a second label over the generic CI workflow badge, so it is intentionally removed rather than presented as architecture evidence; v0.8 will publish a real Architecture Health badge from ArchLinterNet canonical outputs. SonarCloud also analyzes trusted pull requests, decorates the PR, and evaluates the quality gate on new code before merge:
+The Main quality badge tracks the latest merged `main` coverage telemetry run. That run refreshes Codecov and SonarCloud for the same merged revision and fails closed if coverage collection, Codecov upload, or the Sonar quality-gate scan cannot complete successfully. The Architecture Health badge is different: a required PR Architecture Coverage job creates the exact ArchLinterNet payload, and a trusted post-merge publisher releases it only after proving the PR head and squash-merged `main` commit have the same Git tree. Missing, stale, or mismatched evidence replaces the stable endpoint with an explicit unassessable badge; it never leaves an old healthy payload represented as current. This publication does not rerun the architecture matrix or deploy MkDocs. SonarCloud also analyzes trusted pull requests, decorates the PR, and evaluates the quality gate on new code before merge:
 
 | Quality signal | Source |
 |---|---|
 | Build/test | Required pull-request validation runs `make acceptance`-equivalent unit/E2E/packed-artifact gates before merge |
 | Test coverage (line %) | PR CI and post-merge `Main Quality Telemetry` collect coverage; the merged-main run uploads Cobertura XML to Codecov so the primary coverage badge follows `main` |
-| Architecture policy | Required PR self-policy/architecture checks validate the up-to-date merge candidate; generic post-merge quality telemetry does not pretend to be architecture evidence |
+| Architecture Health | Canonical Health, accumulated explicit ignore debt, and effective policy controls from required PR evidence promoted only after exact merged-tree proof; it is not generic CI, a score, or coverage |
 | SonarCloud PR quality gate | trusted `pull_request` runs analyze new code, publish a SonarCloud PR result link, and fail CI when the Sonar quality gate fails |
 | SonarCloud main quality signals | `Main Quality Telemetry` analyzes the merged revision with OpenCover/TRX/Python coverage and refreshes the `main` quality-gate, maintainability, reliability, and security badges |
 | OpenSSF Scorecard | trusted pull requests produce reviewable SARIF; default-branch and scheduled runs publish the supply-chain score to the public Scorecard API and GitHub code scanning |

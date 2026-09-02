@@ -1,10 +1,4 @@
-# architecture-policy-badge Specification
-
-## Purpose
-Expose canonical Architecture Health through a stable public badge source while
-retaining the narrower strict architecture-policy projection for compatibility.
-
-## Requirements
+## MODIFIED Requirements
 
 ### Requirement: Dynamic strict self-policy badge
 The repository SHALL expose one primary ArchLinterNet-specific README
@@ -41,12 +35,13 @@ SonarCloud, or Codecov status.
   generic-quality signals
 - **AND** none of them is labeled or described as Architecture Health
 
-### Requirement: Badge payload is available from the standard CLI
-The native `badge architecture-policy` CLI command SHALL project the strict result
-produced by central CI. The command SHALL be usable by other repositories without
-copying a Python script or triggering another analysis.
+## REMOVED Requirements
 
-#### Scenario: Workflow produces the payload through CLI
-- **WHEN** central CI produces its strict JSON artifact
-- **THEN** `badge architecture-policy` can project that artifact
-- **AND** the workflow status and the command's payload represent the same strict-policy outcome
+### Requirement: Architecture-policy badge remains publication-free
+**Reason**: A workflow-status badge cannot truthfully represent the canonical
+Architecture Health, waiver debt, and effective-control inventory after PR CI
+became the authoritative validation path.
+
+**Migration**: Use the trusted stable Architecture Health endpoint for the
+primary README signal; retain `badge architecture-policy` only for integrations
+that explicitly need the legacy strict-validation projection.

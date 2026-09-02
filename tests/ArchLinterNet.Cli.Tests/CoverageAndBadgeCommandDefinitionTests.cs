@@ -1,5 +1,6 @@
 using System.CommandLine;
 using System.Text;
+using System.Text.Json;
 using ArchLinterNet.Cli.Abstractions;
 using ArchLinterNet.Cli.Commands.Badge.Application;
 using ArchLinterNet.Cli.Commands.Coverage.Application;
@@ -95,6 +96,43 @@ public sealed class CoverageAndBadgeCommandDefinitionTests
         });
     }
 
+    [Test]
+    public void BadgeDefinition_ArchitectureHealthSubcommand_WritesRequestedOutput()
+    {
+        const string Health =
+            """
+            {"schema_id":"architecture-health/v1","gate":"pass","health":"debt","report_evidence":{"validation_outcomes":[{"policy_inventory":{"schema":"architecture-policy-inventory/v1","effective_rule_count":42,"ignore_debt":{"total":7}}}]}}
+            """;
+        FakeFileSystem fileSystem = new(("input.json", Health));
+        RootCommand root = new();
+        root.Subcommands.Add(new BadgeCommandDefinition(new BadgeCommandHandler(new FakeConsole(), fileSystem)).Create());
+
+        int exitCode = root.Parse(["badge", "architecture-health", "--input", "input.json", "--output", "badge.json"]).Invoke();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(exitCode, Is.EqualTo(0));
+            using JsonDocument badge = JsonDocument.Parse(fileSystem.Written["badge.json"]);
+            Assert.That(badge.RootElement.GetProperty("message").GetString(), Is.EqualTo("DEBT · 7 ignores · 42 rules"));
+        });
+    }
+
+    [Test]
+    public void BadgeDefinition_ArchitectureHealthSubcommand_HelpFlagShortCircuits()
+    {
+        FakeConsole console = new();
+        RootCommand root = new();
+        root.Subcommands.Add(new BadgeCommandDefinition(new BadgeCommandHandler(console, new FakeFileSystem())).Create());
+
+        int exitCode = root.Parse(["badge", "architecture-health", "-h"]).Invoke();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(exitCode, Is.EqualTo(0));
+            Assert.That(console.Output, Does.Contain("arch-linter-net badge architecture-health"));
+        });
+    }
+
     private sealed class FakeConsole : ICliConsole
     {
         private readonly StringBuilder _output = new();
@@ -114,8 +152,14 @@ public sealed class CoverageAndBadgeCommandDefinitionTests
         public bool FileExists(string path) => _files.ContainsKey(path);
         public string ReadAllText(string path) => _files.TryGetValue(path, out string? content) ? content : throw new FileNotFoundException(path);
         public void WriteAllText(string path, string contents) => Written[path] = contents;
-        public string WriteAllTextToTemp(string targetPath, string contents) => targetPath;
-        public void RenameTempToTarget(string tempPath, string targetPath) { }
+        public string WriteAllTextToTemp(string targetPath, string contents)
+        {
+            string temporaryPath = targetPath + ".tmp";
+            Written[temporaryPath] = contents;
+            return temporaryPath;
+        }
+
+        public void RenameTempToTarget(string tempPath, string targetPath) => Written[targetPath] = Written[tempPath];
         public bool TryRenameTempToNewTarget(string tempPath, string targetPath) => true;
         public void DeleteFile(string path) { }
         public bool TryCreateNewFile(string path) => true;
