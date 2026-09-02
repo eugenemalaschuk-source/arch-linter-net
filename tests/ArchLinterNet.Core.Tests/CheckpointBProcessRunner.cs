@@ -1,5 +1,4 @@
 using System.Diagnostics;
-using System.Runtime.InteropServices;
 using System.Text;
 
 namespace ArchLinterNet.Core.Tests;
@@ -16,6 +15,9 @@ internal static partial class CheckpointBProcessRunner
 
     private const int StreamBufferSize = 4096;
     private const int DiagnosticTailCharacterLimit = 4096;
+
+    private static readonly char[] _charsRequiringQuoting = [' ', '\t', '\n', '\v', '"'];
+    private static readonly UTF8Encoding _spoolEncoding = new(encoderShouldEmitUTF8Identifier: false);
 
     internal static CheckpointBReleaseGateTests.CommandResult Run(
         ProcessStartInfo startInfo,
@@ -37,22 +39,35 @@ internal static partial class CheckpointBProcessRunner
         Task? standardErrorTask = null;
         StreamCapture? standardOutput = null;
         StreamCapture? standardError = null;
+        StreamReader? standardOutputReader = null;
+        StreamReader? standardErrorReader = null;
 
         try
         {
-            process = Process.Start(startInfo)
-                ?? throw new InvalidOperationException($"Failed to start '{startInfo.FileName}'.");
-            int processId = process.Id;
+            // On Windows, the job list is attached to process creation itself (STARTUPINFOEX +
+            // PROC_THREAD_ATTRIBUTE_JOB_LIST), so the root process is already contained before its
+            // first instruction runs. There is no window between start and containment in which an
+            // early descendant could be spawned outside the job, and no separate
+            // AssignProcessToJobObject call whose failure could leave the root untracked.
+            if (job is not null)
+            {
+                (process, standardOutputReader, standardErrorReader) = job.LaunchContained(startInfo);
+            }
+            else
+            {
+                process = Process.Start(startInfo)
+                    ?? throw new InvalidOperationException($"Failed to start '{startInfo.FileName}'.");
+                standardOutputReader = process.StandardOutput;
+                standardErrorReader = process.StandardError;
+            }
 
-            // The job is created before start and assigned at the first possible point after
-            // start, so descendants created by the Checkpoint B command remain in its scope.
-            job?.Assign(process);
+            int processId = process.Id;
 
             standardOutput = new StreamCapture();
             standardError = new StreamCapture();
 #pragma warning disable CA2016
-            standardOutputTask = standardOutput.ReadAsync(process.StandardOutput);
-            standardErrorTask = standardError.ReadAsync(process.StandardError);
+            standardOutputTask = standardOutput.ReadAsync(standardOutputReader);
+            standardErrorTask = standardError.ReadAsync(standardErrorReader);
 #pragma warning restore CA2016
             completion = process.WaitForExitAsync();
 
@@ -113,8 +128,8 @@ internal static partial class CheckpointBProcessRunner
             await streams.ConfigureAwait(false);
             return new CheckpointBReleaseGateTests.CommandResult(
                 process.ExitCode,
-                standardOutput.Result,
-                standardError.Result);
+                standardOutput.ReadResult(),
+                standardError.ReadResult());
         }
         finally
         {
@@ -128,6 +143,10 @@ internal static partial class CheckpointBProcessRunner
                 ObserveFailure(standardErrorTask);
             }
 
+            standardOutputReader?.Dispose();
+            standardErrorReader?.Dispose();
+            standardOutput?.Dispose();
+            standardError?.Dispose();
             process?.Dispose();
             job?.Dispose();
         }
@@ -210,31 +229,77 @@ internal static partial class CheckpointBProcessRunner
             + $"stderr tail (bounded): {RenderTail(standardError.Tail)}";
     }
 
-    private static string RenderCommand(ProcessStartInfo startInfo)
+    private static string RenderCommand(ProcessStartInfo startInfo) => BuildCommandLine(startInfo);
+
+    private static string BuildCommandLine(ProcessStartInfo startInfo)
     {
-        var parts = new List<string> { startInfo.FileName };
+        var commandLine = new StringBuilder();
+        AppendArgument(commandLine, startInfo.FileName);
         if (startInfo.ArgumentList.Count > 0)
         {
-            parts.AddRange(startInfo.ArgumentList.Select(RenderArgument));
+            foreach (string argument in startInfo.ArgumentList)
+            {
+                commandLine.Append(' ');
+                AppendArgument(commandLine, argument);
+            }
         }
         else if (!string.IsNullOrWhiteSpace(startInfo.Arguments))
         {
-            parts.Add(startInfo.Arguments);
+            commandLine.Append(' ').Append(startInfo.Arguments);
         }
 
-        return string.Join(' ', parts);
+        return commandLine.ToString();
     }
 
-    private static string RenderArgument(string argument)
+    private static void AppendArgument(StringBuilder commandLine, string argument)
     {
-        if (argument.Length == 0)
+        if (argument.Length != 0 && argument.IndexOfAny(_charsRequiringQuoting) < 0)
         {
-            return "\"\"";
+            commandLine.Append(argument);
+            return;
         }
 
-        return argument.Any(char.IsWhiteSpace) || argument.Contains('"', StringComparison.Ordinal)
-            ? $"\"{argument.Replace("\\", "\\\\", StringComparison.Ordinal).Replace("\"", "\\\"", StringComparison.Ordinal)}\""
-            : argument;
+        commandLine.Append('"');
+        int index = 0;
+        while (index < argument.Length)
+        {
+            char current = argument[index++];
+            if (current == '\\')
+            {
+                int backslashCount = 1;
+                while (index < argument.Length && argument[index] == '\\')
+                {
+                    backslashCount++;
+                    index++;
+                }
+
+                if (index == argument.Length)
+                {
+                    commandLine.Append('\\', backslashCount * 2);
+                }
+                else if (argument[index] == '"')
+                {
+                    commandLine.Append('\\', (backslashCount * 2) + 1);
+                    commandLine.Append('"');
+                    index++;
+                }
+                else
+                {
+                    commandLine.Append('\\', backslashCount);
+                }
+            }
+            else if (current == '"')
+            {
+                commandLine.Append('\\');
+                commandLine.Append('"');
+            }
+            else
+            {
+                commandLine.Append(current);
+            }
+        }
+
+        commandLine.Append('"');
     }
 
     private static string RenderTail(string tail) => tail.Length == 0 ? "<empty>" : tail;
@@ -255,21 +320,32 @@ internal static partial class CheckpointBProcessRunner
         Canceled,
     }
 
-    private sealed class StreamCapture
+    /// <summary>
+    /// Captures a redirected stream without holding its full content in memory: every chunk is
+    /// appended to a delete-on-close temp-file spool and folded into a small bounded tail used for
+    /// timeout diagnostics. The full content is only materialized (read back from the spool) on
+    /// the successful completion path, where a caller actually needs it.
+    /// </summary>
+    private sealed class StreamCapture : IDisposable
     {
         private readonly object _gate = new();
-        private readonly StringBuilder _all = new();
         private readonly StringBuilder _tail = new();
+        private readonly FileStream _spool;
+        private readonly StreamWriter _spoolWriter;
 
-        internal string Result
+        internal StreamCapture()
         {
-            get
-            {
-                lock (_gate)
-                {
-                    return _all.ToString();
-                }
-            }
+            string path = Path.Combine(
+                Path.GetTempPath(),
+                $"checkpoint-b-process-runner-{Guid.NewGuid():N}.spool");
+            _spool = new FileStream(
+                path,
+                FileMode.CreateNew,
+                FileAccess.ReadWrite,
+                FileShare.None,
+                StreamBufferSize,
+                FileOptions.DeleteOnClose);
+            _spoolWriter = new StreamWriter(_spool, _spoolEncoding, StreamBufferSize) { AutoFlush = false };
         }
 
         internal string Tail
@@ -291,7 +367,7 @@ internal static partial class CheckpointBProcessRunner
             {
                 lock (_gate)
                 {
-                    _all.Append(buffer, 0, read);
+                    _spoolWriter.Write(buffer, 0, read);
                     _tail.Append(buffer, 0, read);
                     if (_tail.Length > DiagnosticTailCharacterLimit)
                     {
@@ -300,117 +376,23 @@ internal static partial class CheckpointBProcessRunner
                 }
             }
         }
-    }
 
-    private sealed partial class WindowsJobScope : IDisposable
-    {
-        private const uint JobObjectLimitKillOnJobClose = 0x00002000;
-        private const int JobObjectExtendedLimitInformationClass = 9;
-
-        private nint _handle;
-
-        internal WindowsJobScope()
+        internal string ReadResult()
         {
-            _handle = NativeMethods.CreateJobObject(0, null);
-            if (_handle == 0)
+            lock (_gate)
             {
-                throw NativeFailure("create the Checkpoint B process job");
-            }
-
-            var limits = new JobObjectExtendedLimitInformation();
-            limits.BasicLimitInformation.LimitFlags = JobObjectLimitKillOnJobClose;
-            if (!NativeMethods.SetInformationJobObject(
-                    _handle,
-                    JobObjectExtendedLimitInformationClass,
-                    ref limits,
-                    (uint)Marshal.SizeOf<JobObjectExtendedLimitInformation>()))
-            {
-                int error = Marshal.GetLastWin32Error();
-                NativeMethods.CloseHandle(_handle);
-                _handle = 0;
-                throw NativeFailure("configure the Checkpoint B process job", error);
+                _spoolWriter.Flush();
+                _spool.Position = 0;
+                using var reader = new StreamReader(
+                    _spool,
+                    _spoolEncoding,
+                    detectEncodingFromByteOrderMarks: false,
+                    StreamBufferSize,
+                    leaveOpen: true);
+                return reader.ReadToEnd();
             }
         }
 
-        internal void Assign(Process process)
-        {
-            if (!NativeMethods.AssignProcessToJobObject(_handle, process.Handle))
-            {
-                throw NativeFailure("attach the Checkpoint B root process to its job");
-            }
-        }
-
-        public void Dispose()
-        {
-            nint handle = Interlocked.Exchange(ref _handle, 0);
-            if (handle != 0)
-            {
-                NativeMethods.CloseHandle(handle);
-            }
-        }
-
-        private static InvalidOperationException NativeFailure(string action, int? error = null)
-        {
-            int win32Error = error ?? Marshal.GetLastWin32Error();
-            return new InvalidOperationException($"Could not {action} (Win32 error {win32Error}).");
-        }
-
-        private static partial class NativeMethods
-        {
-            [LibraryImport("kernel32.dll", EntryPoint = "CreateJobObjectW", SetLastError = true, StringMarshalling = StringMarshalling.Utf16)]
-            internal static partial nint CreateJobObject(nint attributes, string? name);
-
-            [LibraryImport("kernel32.dll", SetLastError = true)]
-            [return: MarshalAs(UnmanagedType.Bool)]
-            internal static partial bool SetInformationJobObject(
-                nint job,
-                int informationClass,
-                ref JobObjectExtendedLimitInformation information,
-                uint informationLength);
-
-            [LibraryImport("kernel32.dll", SetLastError = true)]
-            [return: MarshalAs(UnmanagedType.Bool)]
-            internal static partial bool AssignProcessToJobObject(nint job, nint process);
-
-            [LibraryImport("kernel32.dll", SetLastError = true)]
-            [return: MarshalAs(UnmanagedType.Bool)]
-            internal static partial bool CloseHandle(nint handle);
-        }
-
-        [StructLayout(LayoutKind.Sequential)]
-        private struct JobObjectExtendedLimitInformation
-        {
-            internal JobObjectBasicLimitInformation BasicLimitInformation;
-            internal IoCounters IoInfo;
-            internal nuint ProcessMemoryLimit;
-            internal nuint JobMemoryLimit;
-            internal nuint PeakProcessMemoryUsed;
-            internal nuint PeakJobMemoryUsed;
-        }
-
-        [StructLayout(LayoutKind.Sequential)]
-        private struct JobObjectBasicLimitInformation
-        {
-            internal long PerProcessUserTimeLimit;
-            internal long PerJobUserTimeLimit;
-            internal uint LimitFlags;
-            internal nuint MinimumWorkingSetSize;
-            internal nuint MaximumWorkingSetSize;
-            internal uint ActiveProcessLimit;
-            internal nuint Affinity;
-            internal uint PriorityClass;
-            internal uint SchedulingClass;
-        }
-
-        [StructLayout(LayoutKind.Sequential)]
-        private struct IoCounters
-        {
-            internal ulong ReadOperationCount;
-            internal ulong WriteOperationCount;
-            internal ulong OtherOperationCount;
-            internal ulong ReadTransferCount;
-            internal ulong WriteTransferCount;
-            internal ulong OtherTransferCount;
-        }
+        public void Dispose() => _spoolWriter.Dispose();
     }
 }

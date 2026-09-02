@@ -82,7 +82,7 @@ public sealed class CheckpointBProcessRunnerTests
         try
         {
             TimeoutException? failure = Assert.Throws<TimeoutException>(() =>
-                CheckpointBReleaseGateTests.Run(startInfo, CancellationToken.None));
+                CheckpointBReleaseGateTests.Run(startInfo, TestContext.CurrentContext.CancellationToken));
 
             Assert.That(elapsed.Elapsed, Is.LessThan(
                     CheckpointBProcessRunner.PostExitDrainTimeout
@@ -144,23 +144,30 @@ public sealed class CheckpointBProcessRunnerTests
         return shell;
     }
 
+    /// <summary>
+    /// Root exits immediately after starting a descendant that inherits the root's own
+    /// redirected stdout/stderr pipe handles and then sleeps: the descendant, not the root,
+    /// keeps the write end of those pipes open past the post-exit drain bound. This is the
+    /// production failure mode being regression-tested, reproduced deterministically via a
+    /// dedicated native helper instead of a shell (`cmd.exe /c start`) whose own exit-signaling
+    /// timing is not guaranteed on every Windows image.
+    /// </summary>
     private static ProcessStartInfo CreateRootExitWithInheritedHandle(string childPidPath)
     {
-        string escapedPath = childPidPath.Replace("'", "''", StringComparison.Ordinal);
-        string childCommand = $"[System.IO.File]::WriteAllText('{escapedPath}', [string]$PID); "
-            + "[Console]::Out.WriteLine('descendant-output'); Start-Sleep -Seconds 30";
-        string command = $"start \"\" /b pwsh -NoProfile -NonInteractive -Command \"{childCommand}\" "
-            + "& echo root-output & echo root-error 1>&2";
-        var startInfo = new ProcessStartInfo("cmd.exe")
+        var startInfo = new ProcessStartInfo(ProcessTreeProbePath)
         {
             RedirectStandardOutput = true,
             RedirectStandardError = true,
             UseShellExecute = false,
         };
-        startInfo.ArgumentList.Add("/c");
-        startInfo.ArgumentList.Add(command);
+        startInfo.ArgumentList.Add("root");
+        startInfo.ArgumentList.Add(childPidPath);
+        startInfo.ArgumentList.Add("30");
         return startInfo;
     }
+
+    private static string ProcessTreeProbePath { get; } =
+        Path.Combine(AppContext.BaseDirectory, "ArchLinterNet.ProcessTreeProbe.exe");
 
     private static void DeleteDirectoryEventually(string root)
     {
