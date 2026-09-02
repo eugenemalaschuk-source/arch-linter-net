@@ -71,7 +71,15 @@ jobs:
               per_page: 100,
             });
             const producerJobs = jobs.filter((job) => job.name === 'Architecture PR Report Producer');
-            if (producerJobs.length !== 1 || producerJobs[0].conclusion !== 'success') {
+            if (producerJobs.length === 0) {
+              setResult('producer_missing', values);
+              return;
+            }
+            if (producerJobs.length !== 1) {
+              setResult('producer_ambiguous', values);
+              return;
+            }
+            if (producerJobs[0].conclusion !== 'success') {
               setResult('producer_not_success', values);
               return;
             }
@@ -130,6 +138,7 @@ jobs:
             const crypto = require('crypto');
             const fs = require('fs');
             const path = require('path');
+            const { TextDecoder } = require('util');
             const root = path.resolve('incoming-report');
             const expectedFiles = ['architecture-pr-report.manifest.json', 'architecture-pr-report.md'];
             const fail = (reason) => {
@@ -211,9 +220,16 @@ jobs:
               fail('report_integrity_invalid');
               return;
             }
+            try {
+              new TextDecoder('utf-8', { fatal: true }).decode(report);
+            } catch {
+              fail('report_encoding_invalid');
+              return;
+            }
 
             core.setOutput('status', 'ready');
             core.setOutput('reason', 'ready');
+            core.setOutput('report-base64', report.toString('base64'));
 
       - name: Publish or replace one architecture report comment
         id: comment
@@ -226,18 +242,23 @@ jobs:
           RESOLUTION_REASON: ${{ steps.resolve.outputs.reason }}
           VALIDATION_STATUS: ${{ steps.validate.outputs.status }}
           VALIDATION_REASON: ${{ steps.validate.outputs.reason }}
+          VALIDATED_REPORT_BASE64: ${{ steps.validate.outputs.report-base64 }}
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3
         with:
           script: |
-            const fs = require('fs');
+            const { TextDecoder } = require('util');
             const marker = '<!-- arch-linter-net-pr-report:v1 -->';
             const legacyMarker = '<!-- architecture-coverage-report -->';
-            const contextMarker = `<!-- arch-linter-net-pr-report-context:head=${process.env.CURRENT_HEAD_SHA};run=${process.env.PRODUCER_RUN_ID};attempt=${process.env.PRODUCER_RUN_ATTEMPT} -->`;
+            const contextMarkerFor = (headSha) =>
+              `<!-- arch-linter-net-pr-report-context:head=${headSha};run=${process.env.PRODUCER_RUN_ID};attempt=${process.env.PRODUCER_RUN_ATTEMPT} -->`;
+            const unavailableBody = (headSha, unavailableReason) =>
+              `${marker}\n${contextMarkerFor(headSha)}\n# Architecture PR report unavailable\n\nPublication integrity validation failed for the current pull-request head: \`${unavailableReason}\`.\n\nNo substitute architecture verdict was created.\n`;
             const allowedReasons = new Set([
               'ambiguous_pull_request', 'artifact_ambiguous', 'artifact_download_failed', 'artifact_expired',
               'artifact_missing', 'artifact_oversized', 'artifact_parse_failed', 'artifact_shape_invalid',
               'artifact_size_or_type_invalid', 'manifest_binding_invalid', 'manifest_shape_invalid',
-              'producer_not_success', 'report_integrity_invalid', 'stale_head', 'unexpected_producer',
+              'producer_ambiguous', 'producer_missing', 'producer_not_success', 'report_encoding_invalid',
+              'report_integrity_invalid', 'stale_head', 'unexpected_producer',
             ]);
             const isReady = process.env.VALIDATION_STATUS === 'ready';
             const reason = isReady ? 'ready' : (process.env.VALIDATION_REASON || process.env.RESOLUTION_REASON);
@@ -245,6 +266,21 @@ jobs:
               core.setOutput('status', 'rejected');
               core.setOutput('reason', 'unexpected_publisher_state');
               return;
+            }
+            let validatedReport;
+            if (isReady) {
+              try {
+                const reportBytes = Buffer.from(process.env.VALIDATED_REPORT_BASE64, 'base64');
+                if (reportBytes.length === 0
+                    || reportBytes.toString('base64') !== process.env.VALIDATED_REPORT_BASE64) {
+                  throw new Error('Validated report output is not canonical base64.');
+                }
+                validatedReport = new TextDecoder('utf-8', { fatal: true }).decode(reportBytes);
+              } catch {
+                core.setOutput('status', 'rejected');
+                core.setOutput('reason', 'report_encoding_invalid');
+                return;
+              }
             }
 
             const comments = await github.paginate(github.rest.issues.listComments, {
@@ -269,29 +305,65 @@ jobs:
               core.setOutput('reason', reason);
               return;
             }
+            if (!isReady && reason === 'producer_missing'
+                && unified.length === 1
+                && unified[0].body.includes(`<!-- arch-linter-net-pr-report-context:head=${process.env.CURRENT_HEAD_SHA};`)) {
+              core.setOutput('status', 'preserved');
+              core.setOutput('reason', reason);
+              return;
+            }
 
             const body = isReady
-              ? `${marker}\n${contextMarker}\n${fs.readFileSync('incoming-report/architecture-pr-report.md', 'utf8')}`
-              : `${marker}\n${contextMarker}\n# Architecture PR report unavailable\n\nPublication integrity validation failed for the current pull-request head: \`${reason}\`.\n\nNo substitute architecture verdict was created.\n`;
+              ? `${marker}\n${contextMarkerFor(process.env.CURRENT_HEAD_SHA)}\n${validatedReport}`
+              : unavailableBody(process.env.CURRENT_HEAD_SHA, reason);
             const existing = unified[0] ?? legacy[0];
+            const { data: beforeWritePullRequest } = await github.rest.pulls.get({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: Number(process.env.PR_NUMBER),
+            });
+            if (beforeWritePullRequest.head?.sha !== process.env.CURRENT_HEAD_SHA) {
+              core.setOutput('status', 'rejected');
+              core.setOutput('reason', 'stale_head');
+              return;
+            }
+            let commentId;
             if (existing) {
+              commentId = existing.id;
               await github.rest.issues.updateComment({
                 owner: context.repo.owner,
                 repo: context.repo.repo,
-                comment_id: existing.id,
+                comment_id: commentId,
                 body,
               });
             } else {
-              await github.rest.issues.createComment({
+              const { data: createdComment } = await github.rest.issues.createComment({
                 owner: context.repo.owner,
                 repo: context.repo.repo,
                 issue_number: Number(process.env.PR_NUMBER),
                 body,
               });
+              commentId = createdComment.id;
+            }
+            const { data: afterWritePullRequest } = await github.rest.pulls.get({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: Number(process.env.PR_NUMBER),
+            });
+            if (afterWritePullRequest.head?.sha !== process.env.CURRENT_HEAD_SHA) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: commentId,
+                body: unavailableBody(afterWritePullRequest.head.sha, 'stale_head'),
+              });
+              core.setOutput('status', 'rejected');
+              core.setOutput('reason', 'stale_head');
+              return;
             }
             core.setOutput('status', isReady ? 'published' : 'rejected');
             core.setOutput('reason', reason);
 
       - name: Fail closed when report publication is rejected
-        if: always() && steps.comment.outputs.status != 'published'
+        if: always() && steps.comment.outputs.status != 'published' && steps.comment.outputs.status != 'preserved'
         run: exit 1

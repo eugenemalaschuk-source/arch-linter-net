@@ -28,6 +28,9 @@ const script = Buffer.from(process.env.WORKFLOW_SCRIPT_B64, 'base64').toString('
 const fixture = JSON.parse(Buffer.from(process.env.WORKFLOW_FIXTURE_B64, 'base64').toString('utf8'));
 const outputs = {};
 const calls = [];
+const pullRequests = fixture.pullRequests
+  ?? [fixture.pullRequest ?? { head: { sha: process.env.CURRENT_HEAD_SHA ?? '' } }];
+let nextPullRequest = 0;
 const core = {
   setOutput(name, value) {
     outputs[name] = String(value);
@@ -51,7 +54,9 @@ const github = {
     pulls: {
       get: async (parameters) => {
         calls.push({ type: 'pulls.get', parameters });
-        return { data: fixture.pullRequest };
+        const index = Math.min(nextPullRequest, pullRequests.length - 1);
+        nextPullRequest += 1;
+        return { data: pullRequests[index] };
       },
     },
     actions: {
@@ -66,7 +71,7 @@ const github = {
       },
       createComment: async (parameters) => {
         calls.push({ type: 'issues.createComment', parameters });
-        return { data: {} };
+        return { data: { id: fixture.createdCommentId ?? 999 } };
       },
     },
   },
@@ -233,7 +238,12 @@ def _validate_environment() -> dict[str, str]:
     }
 
 
-def _comment_environment(*, ready: bool, reason: str = "ready") -> dict[str, str]:
+def _comment_environment(
+    *,
+    ready: bool,
+    report: bytes = b"# Architecture PR report\n",
+    reason: str = "ready",
+) -> dict[str, str]:
     return {
         "PR_NUMBER": str(_PR_NUMBER),
         "CURRENT_HEAD_SHA": _HEAD_SHA,
@@ -242,6 +252,7 @@ def _comment_environment(*, ready: bool, reason: str = "ready") -> dict[str, str
         "RESOLUTION_REASON": reason,
         "VALIDATION_STATUS": "ready" if ready else "",
         "VALIDATION_REASON": "" if ready else reason,
+        "VALIDATED_REPORT_BASE64": base64.b64encode(report).decode() if ready else "",
     }
 
 
@@ -262,6 +273,8 @@ def test_ci_producer_uses_per_tree_baseline_and_separate_strict_gate() -> None:
     assert producer.count("if [[ -f architecture/baseline.arch.yml ]]; then") == 2
     assert "snapshot \"$output_directory/base-architecture-change-snapshot.json\"" in producer
     assert "snapshot \"$output_directory/current-architecture-change-snapshot.json\"" in producer
+    assert "arch-linter-net-empty-baseline-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}.arch.yml" in producer
+    assert 'document.get("schema_id") != "architecture-health/v1"' in producer
     assert "strict_coverage_outcome: ${{ steps.architecture_coverage.outcome }}" in producer
     assert "pull-requests: write" not in workflow
     assert "Fail if strict architecture coverage failed" not in producer
@@ -297,7 +310,17 @@ def test_resolve_rejects_ambiguous_producer_jobs() -> None:
     )
     result = _run_script("Resolve current PR and bound report artifact", fixture)
 
-    assert result["outputs"]["reason"] == "producer_not_success"
+    assert result["outputs"]["reason"] == "producer_ambiguous"
+    assert "artifact-id" not in result["outputs"]
+
+
+def test_resolve_marks_a_partial_rerun_without_a_producer_as_missing() -> None:
+    fixture = _resolve_fixture(conclusion="failure")
+    fixture["jobs"] = []
+    result = _run_script("Resolve current PR and bound report artifact", fixture)
+
+    assert result["outputs"]["reason"] == "producer_missing"
+    assert result["outputs"]["producer-run-attempt"] == str(_RUN_ATTEMPT)
     assert "artifact-id" not in result["outputs"]
 
 
@@ -319,9 +342,18 @@ def test_resolve_rejects_stale_head_before_artifact_lookup() -> None:
         (b"# Architecture PR report\n", {"context": {"head_sha": "b" * 40}}, "manifest_binding_invalid"),
         (b"# Architecture PR report\n", {"context": {"run_id": "123457"}}, "manifest_binding_invalid"),
         (b"# Architecture PR report\n", {"report": {"sha256": "0" * 64}}, "report_integrity_invalid"),
+        (b"# Architecture PR report\n\xff", {}, "report_encoding_invalid"),
         (b"# Architecture PR report\n" + b"x" * 60000, {}, "artifact_size_or_type_invalid"),
     ],
-    ids=("bad-schema", "bad-pr-binding", "bad-head-binding", "bad-run-binding", "bad-hash", "oversized-report"),
+    ids=(
+        "bad-schema",
+        "bad-pr-binding",
+        "bad-head-binding",
+        "bad-run-binding",
+        "bad-hash",
+        "malformed-utf8",
+        "oversized-report",
+    ),
 )
 def test_validate_rejects_bad_binding_schema_hash_and_oversized_payload(
     report: bytes,
@@ -353,14 +385,18 @@ def test_validate_accepts_inert_fork_report_bytes_without_checkout() -> None:
     publication = _run_script(
         "Publish or replace one architecture report comment",
         {"comments": []},
-        environment=_comment_environment(ready=True),
+        environment=_comment_environment(ready=True, report=report),
         files={"incoming-report/architecture-pr-report.md": report},
     )
 
     assert resolution["outputs"]["reason"] == "ready"
-    assert validation["outputs"] == {"status": "ready", "reason": "ready"}
+    assert validation["outputs"]["status"] == "ready"
+    assert validation["outputs"]["reason"] == "ready"
+    assert base64.b64decode(validation["outputs"]["report-base64"]) == report
     assert publication["outputs"] == {"status": "published", "reason": "ready"}
-    assert publication["calls"][-1]["parameters"]["body"].endswith(report.decode())
+    writes = [call for call in publication["calls"] if call["type"].startswith("issues.")]
+    assert [write["type"] for write in writes] == ["issues.createComment"]
+    assert writes[0]["parameters"]["body"].endswith(report.decode())
     assert "actions/checkout@" not in _read("publish-architecture-pr-report.yml")
 
 
@@ -380,7 +416,7 @@ def test_comment_script_creates_updates_and_migrates_one_sticky_comment(
     result = _run_script(
         "Publish or replace one architecture report comment",
         {"comments": comments},
-        environment=_comment_environment(ready=True),
+        environment=_comment_environment(ready=True, report=report),
         files={"incoming-report/architecture-pr-report.md": report},
     )
 
@@ -404,3 +440,52 @@ def test_comment_script_never_overwrites_a_current_report_with_stale_evidence() 
 
     assert result["outputs"] == {"status": "rejected", "reason": "stale_head"}
     assert not [call for call in result["calls"] if call["type"].startswith("issues.") and call["type"] != "paginate"]
+
+
+def test_comment_script_preserves_verified_same_head_report_when_partial_rerun_has_no_producer() -> None:
+    current = _comment(
+        4,
+        "<!-- arch-linter-net-pr-report:v1 -->",
+        f"<!-- arch-linter-net-pr-report-context:head={_HEAD_SHA};run=1;attempt=1 -->",
+    )
+    result = _run_script(
+        "Publish or replace one architecture report comment",
+        {"comments": [current]},
+        environment=_comment_environment(ready=False, reason="producer_missing"),
+    )
+
+    assert result["outputs"] == {"status": "preserved", "reason": "producer_missing"}
+    assert not [call for call in result["calls"] if call["type"].startswith("issues.") and call["type"] != "paginate"]
+
+
+def test_comment_script_rejects_stale_head_immediately_before_comment_mutation() -> None:
+    report = b"# Architecture PR report\n\nCanonical report\n"
+    result = _run_script(
+        "Publish or replace one architecture report comment",
+        {"comments": [], "pullRequests": [{"head": {"sha": "b" * 40}}]},
+        environment=_comment_environment(ready=True, report=report),
+    )
+
+    assert result["outputs"] == {"status": "rejected", "reason": "stale_head"}
+    assert not [call for call in result["calls"] if call["type"].startswith("issues.") and call["type"] != "paginate"]
+
+
+def test_comment_script_replaces_just_written_report_when_head_changes_after_write() -> None:
+    newer_head = "b" * 40
+    report = b"# Architecture PR report\n\nCanonical report\n"
+    result = _run_script(
+        "Publish or replace one architecture report comment",
+        {
+            "comments": [],
+            "createdCommentId": 17,
+            "pullRequests": [{"head": {"sha": _HEAD_SHA}}, {"head": {"sha": newer_head}}],
+        },
+        environment=_comment_environment(ready=True, report=report),
+    )
+
+    writes = [call for call in result["calls"] if call["type"].startswith("issues.") and call["type"] != "paginate"]
+    assert result["outputs"] == {"status": "rejected", "reason": "stale_head"}
+    assert [call["type"] for call in writes] == ["issues.createComment", "issues.updateComment"]
+    assert writes[1]["parameters"]["comment_id"] == 17
+    assert f"head={newer_head}" in writes[1]["parameters"]["body"]
+    assert "# Architecture PR report unavailable" in writes[1]["parameters"]["body"]

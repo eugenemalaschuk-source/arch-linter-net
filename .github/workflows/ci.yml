@@ -439,6 +439,10 @@ jobs:
           )
           if [[ -f architecture/baseline.arch.yml ]]; then
             health_args+=(--baseline architecture/baseline.arch.yml)
+          else
+            empty_baseline="$RUNNER_TEMP/arch-linter-net-empty-baseline-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}.arch.yml"
+            printf '%s\n' 'version: 3' 'baseline: {}' 'metric_baselines: []' > "$empty_baseline"
+            health_args+=(--baseline "$empty_baseline")
           fi
           set +e
           dotnet run --no-build --project "$cli_project" -- health \
@@ -449,6 +453,25 @@ jobs:
           health_exit=$?
           set -e
           if [ "$health_exit" -ne 0 ] && [ ! -s "$output_directory/architecture-health.json" ]; then
+            exit "$health_exit"
+          fi
+          if ! python3 - "$output_directory/architecture-health.json" <<'PY'
+          import json
+          import sys
+          from pathlib import Path
+
+          try:
+              document = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
+          except (OSError, UnicodeDecodeError, json.JSONDecodeError) as error:
+              raise SystemExit(f"Architecture Health output is not valid JSON: {error}")
+
+          if not isinstance(document, dict) or document.get("schema_id") != "architecture-health/v1":
+              raise SystemExit("Architecture Health output must use schema_id architecture-health/v1.")
+          PY
+          then
+            if [ "$health_exit" -eq 0 ]; then
+              exit 2
+            fi
             exit "$health_exit"
           fi
 
