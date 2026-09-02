@@ -1,0 +1,50 @@
+version: 1
+name: .NET server/library topology declared review fixture
+imports: [topology-review.fragment.yml]
+layers: {}
+analysis:
+  target_assemblies:
+    - TopologyReview.Server
+    - TopologyReview.Application
+    - TopologyReview.Infrastructure
+    - TopologyReview.Domain
+  projects:
+    - src/TopologyReview.Server/TopologyReview.Server.csproj
+    - src/TopologyReview.Application/TopologyReview.Application.csproj
+    - src/TopologyReview.Infrastructure/TopologyReview.Infrastructure.csproj
+    - src/TopologyReview.Domain/TopologyReview.Domain.csproj
+topology:
+  mode: exhaustive
+  subject_kind: assembly
+  scope:
+    allow_empty: false
+    selectors:
+      - assembly: TopologyReview.Application
+      - assembly: TopologyReview.Domain
+      - assembly: TopologyReview.Infrastructure
+      - assembly: TopologyReview.Server
+  nodes:
+    - id: application
+      mappings:
+        - assembly: TopologyReview.Application
+    - id: domain
+      mappings:
+        - assembly: TopologyReview.Domain
+    - id: infrastructure
+      mappings:
+        - assembly: TopologyReview.Infrastructure
+    - id: server
+      mappings:
+        - assembly: TopologyReview.Server
+    - id: retired-adapter
+      mappings:
+        - assembly: TopologyReview.RetiredAdapter
+  allowed_edges:
+    - from: application
+      to: domain
+    - from: server
+      to: application
+    - from: server
+      to: retired-adapter
+  stale_declarations: true
+contracts: {}

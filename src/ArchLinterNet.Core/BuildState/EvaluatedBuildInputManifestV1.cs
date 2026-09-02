@@ -83,6 +83,22 @@ public static class EvaluatedBuildInputManifestCollector
             context.Inputs.Select(entry => entry.Key).ToArray());
     }
 
+    internal static IReadOnlyList<string> ResolveFileInputPaths(
+        EvaluatedBuildInputManifestV1 manifest,
+        string repositoryRoot)
+    {
+        ArgumentNullException.ThrowIfNull(manifest);
+        string root = Path.GetFullPath(repositoryRoot);
+        const string FilePrefix = "file:";
+        return manifest.Inputs
+            .Where(input => input.StartsWith(FilePrefix, StringComparison.Ordinal))
+            .Select(input => input[FilePrefix.Length..].Replace('/', Path.DirectorySeparatorChar))
+            .Select(input => Path.GetFullPath(Path.Combine(root, input)))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .OrderBy(path => path, StringComparer.Ordinal)
+            .ToArray();
+    }
+
     private static void CollectProjectXml(string projectPath, ManifestCollectionContext context, CancellationToken cancellationToken)
     {
         XDocument document;

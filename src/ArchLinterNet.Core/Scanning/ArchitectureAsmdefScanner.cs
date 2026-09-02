@@ -11,6 +11,9 @@ namespace ArchLinterNet.Core.Scanning;
 public sealed class ArchitectureAsmdefScanner : IArchitectureAsmdefScanner
 {
     private const string DefaultAsmdefRoot = "Assets";
+    private readonly List<string> _consumedInputPaths = [];
+
+    internal IReadOnlyList<string> ConsumedInputPaths => _consumedInputPaths;
 
     public IEnumerable<ArchitectureViolation> FindAsmdefViolations(
         string contractName,
@@ -21,6 +24,7 @@ public sealed class ArchitectureAsmdefScanner : IArchitectureAsmdefScanner
         IArchitectureFileSystem? fileSystem = null)
     {
         fileSystem ??= ArchitectureFileSystem.Real;
+        _consumedInputPaths.Clear();
         string root = asmdefRoot ?? DefaultAsmdefRoot;
         Dictionary<string, AsmdefEntry> asmdefMap = LoadFirstPartyAsmdefs(repositoryRoot, root, fileSystem);
         HashSet<string> editorOnlyAssemblies = BuildEditorOnlySet(asmdefMap);
@@ -64,7 +68,7 @@ public sealed class ArchitectureAsmdefScanner : IArchitectureAsmdefScanner
         }
     }
 
-    private static Dictionary<string, AsmdefEntry> LoadFirstPartyAsmdefs(
+    private Dictionary<string, AsmdefEntry> LoadFirstPartyAsmdefs(
         string repositoryRoot, string asmdefRoot, IArchitectureFileSystem fileSystem)
     {
         string fullPath = Path.Combine(repositoryRoot, asmdefRoot.Replace('/', Path.DirectorySeparatorChar));
@@ -77,6 +81,7 @@ public sealed class ArchitectureAsmdefScanner : IArchitectureAsmdefScanner
 
         foreach (string file in fileSystem.EnumerateFiles(fullPath, "*.asmdef", SearchOption.AllDirectories))
         {
+            _consumedInputPaths.Add(Path.GetFullPath(file));
             AsmdefEntry? entry = TryParseAsmdef(file, fileSystem);
 
             if (entry != null)

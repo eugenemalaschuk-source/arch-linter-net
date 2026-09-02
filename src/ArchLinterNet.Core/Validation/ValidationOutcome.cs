@@ -160,6 +160,13 @@ public sealed record ValidationOutcome
     public IReadOnlyList<string> DiscoveredProjectPaths { get; init; } =
         Array.Empty<string>();
 
+    /// <summary>
+    /// Exact repository input files consumed by the current analysis session, including source
+    /// and asmdef inputs where their corresponding analysis stage ran. Hosts use this provenance
+    /// to prevent report publication from replacing a physical alias of an input.
+    /// </summary>
+    public IReadOnlyList<string> ConsumedInputPaths { get; init; } = Array.Empty<string>();
+
     // The loaded policy's resolved source-set expansion, so JSON and SARIF consumers can prove
     // which sources each authored contract expanded to. Empty for policies that declare no set.
     public Model.ArchitectureSourceExpansionInventory SourceExpansion { get; init; } =

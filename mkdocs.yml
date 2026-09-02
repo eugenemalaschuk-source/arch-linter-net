@@ -78,6 +78,7 @@ nav:
   - Guides:
       - Adopt in an existing repository: guides/adoption.md
       - Real-repository workflow: guides/real-repository-workflow.md
+      - Topology review workflow: guides/topology-review-workflow.md
       - Adopt or upgrade: guides/upgrading.md
       - Reference entrypoints: guides/reference-entrypoints.md
       - Verify release provenance: guides/release-provenance-verification.md

@@ -1,0 +1,14 @@
+{
+  "name": "TopologyReview.Unity.Gameplay",
+  "references": [
+    "TopologyReview.Unity.Runtime"
+  ],
+  "includePlatforms": [],
+  "excludePlatforms": [],
+  "allowUnsafeCode": false,
+  "overrideReferences": false,
+  "autoReferenced": true,
+  "defineConstraints": [],
+  "versionDefines": [],
+  "noEngineReferences": false
+}

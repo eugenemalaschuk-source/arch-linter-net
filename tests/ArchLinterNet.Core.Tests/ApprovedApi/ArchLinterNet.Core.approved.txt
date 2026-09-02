@@ -508,6 +508,7 @@ sealed class ArchLinterNet.Core.Composition.ArchitectureEngine : System.IAsyncDi
   method ArchLinterNet.Core.Graph.ArchitectureGraphOutcome BuildGraph(ArchLinterNet.Core.Graph.ArchitectureGraphRequest request)
   method ArchLinterNet.Core.Model.ArchitectureMetricMeasurementOutcome Measure(ArchLinterNet.Core.Validation.ArchitectureMetricMeasurementRequest request, ArchLinterNet.Core.Reporting.ValidationTiming? timing = null)
   method ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextExport ExportPolicyContext(ArchLinterNet.Core.PolicyContext.ArchitecturePolicyContextRequest request)
+  method ArchLinterNet.Core.Topology.ArchitectureTopologyCaptureOutcome CaptureTopology(ArchLinterNet.Core.Topology.ArchitectureTopologyCaptureRequest request)
   method ArchLinterNet.Core.Validation.ArchitectureAnalysisSnapshot CreateSnapshot(ArchLinterNet.Core.Validation.AnalysisSnapshotRequest request, ArchLinterNet.Core.Reporting.ValidationTiming? timing = null)
   method ArchLinterNet.Core.Validation.ArchitectureDebtGateOutcome EvaluateDebtGate(ArchLinterNet.Core.Validation.ArchitectureDebtGateRequest request)
   method ArchLinterNet.Core.Validation.ArchitectureHealthOutcome EvaluateHealth(ArchLinterNet.Core.Validation.ArchitectureHealthRequest request)
@@ -6211,6 +6212,79 @@ sealed class ArchLinterNet.Core.Schema.PackagedSchemaRegistry
   method System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Schema.PackagedSchemaDescriptor> List()
   method bool TryRead(string logicalId, out string schema)
   method bool TryValidateText(string logicalId, string content, out string diagnostic)
+sealed class ArchLinterNet.Core.Topology.ArchitectureTopologyCaptureFact : System.IEquatable<ArchLinterNet.Core.Topology.ArchitectureTopologyCaptureFact>
+  ctor(string Identity, string SubjectKind, string Subject, string Project, string Assembly)
+  method ArchLinterNet.Core.Topology.ArchitectureTopologyCaptureFact <Clone>$()
+  method bool Equals(ArchLinterNet.Core.Topology.ArchitectureTopologyCaptureFact? other)
+  method bool Equals(object? obj)
+  method int GetHashCode()
+  method string ToString()
+  method void Deconstruct(out string Identity, out string SubjectKind, out string Subject, out string Project, out string Assembly)
+  operator !=(ArchLinterNet.Core.Topology.ArchitectureTopologyCaptureFact? left, ArchLinterNet.Core.Topology.ArchitectureTopologyCaptureFact? right)
+  operator ==(ArchLinterNet.Core.Topology.ArchitectureTopologyCaptureFact? left, ArchLinterNet.Core.Topology.ArchitectureTopologyCaptureFact? right)
+  property string Assembly {get;init;}
+  property string Identity {get;init;}
+  property string Project {get;init;}
+  property string Subject {get;init;}
+  property string SubjectKind {get;init;}
+sealed class ArchLinterNet.Core.Topology.ArchitectureTopologyCaptureOutcome : System.IEquatable<ArchLinterNet.Core.Topology.ArchitectureTopologyCaptureOutcome>
+  ctor(string SubjectKind, System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Topology.ArchitectureTopologyCaptureFact> Subjects, System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Topology.ArchitectureTopologyCaptureRelationship> Relationships, string RepositoryRoot, System.Collections.Generic.IReadOnlyList<string> PolicyImportPaths, System.Collections.Generic.IReadOnlyList<string> ResolvedAssemblyPaths, System.Collections.Generic.IReadOnlyList<string> DiscoveredProjectPaths, System.Collections.Generic.IReadOnlyCollection<ArchLinterNet.Core.Model.BuildStatePreflightDiagnostic> PreflightDiagnostics, bool PreflightBlocked = false)
+  field const int CurrentSchemaVersion = 1
+  field const string DocumentKind = "topology-capture"
+  method ArchLinterNet.Core.Topology.ArchitectureTopologyCaptureOutcome <Clone>$()
+  method bool Equals(ArchLinterNet.Core.Topology.ArchitectureTopologyCaptureOutcome? other)
+  method bool Equals(object? obj)
+  method int GetHashCode()
+  method string ToString()
+  method void Deconstruct(out string SubjectKind, out System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Topology.ArchitectureTopologyCaptureFact> Subjects, out System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Topology.ArchitectureTopologyCaptureRelationship> Relationships, out string RepositoryRoot, out System.Collections.Generic.IReadOnlyList<string> PolicyImportPaths, out System.Collections.Generic.IReadOnlyList<string> ResolvedAssemblyPaths, out System.Collections.Generic.IReadOnlyList<string> DiscoveredProjectPaths, out System.Collections.Generic.IReadOnlyCollection<ArchLinterNet.Core.Model.BuildStatePreflightDiagnostic> PreflightDiagnostics, out bool PreflightBlocked)
+  operator !=(ArchLinterNet.Core.Topology.ArchitectureTopologyCaptureOutcome? left, ArchLinterNet.Core.Topology.ArchitectureTopologyCaptureOutcome? right)
+  operator ==(ArchLinterNet.Core.Topology.ArchitectureTopologyCaptureOutcome? left, ArchLinterNet.Core.Topology.ArchitectureTopologyCaptureOutcome? right)
+  property System.Collections.Generic.IReadOnlyCollection<ArchLinterNet.Core.Model.BuildStatePreflightDiagnostic> PreflightDiagnostics {get;init;}
+  property System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Topology.ArchitectureTopologyCaptureFact> Subjects {get;init;}
+  property System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Topology.ArchitectureTopologyCaptureRelationship> Relationships {get;init;}
+  property System.Collections.Generic.IReadOnlyList<string> ConsumedInputPaths {get;init;}
+  property System.Collections.Generic.IReadOnlyList<string> DiscoveredProjectPaths {get;init;}
+  property System.Collections.Generic.IReadOnlyList<string> PolicyImportPaths {get;init;}
+  property System.Collections.Generic.IReadOnlyList<string> ResolvedAssemblyPaths {get;init;}
+  property bool PreflightBlocked {get;init;}
+  property bool Succeeded {get;}
+  property string RepositoryRoot {get;init;}
+  property string SubjectKind {get;init;}
+sealed class ArchLinterNet.Core.Topology.ArchitectureTopologyCaptureRelationship : System.IEquatable<ArchLinterNet.Core.Topology.ArchitectureTopologyCaptureRelationship>
+  ctor(string SourceIdentity, string TargetIdentity, string Witness)
+  method ArchLinterNet.Core.Topology.ArchitectureTopologyCaptureRelationship <Clone>$()
+  method bool Equals(ArchLinterNet.Core.Topology.ArchitectureTopologyCaptureRelationship? other)
+  method bool Equals(object? obj)
+  method int GetHashCode()
+  method string ToString()
+  method void Deconstruct(out string SourceIdentity, out string TargetIdentity, out string Witness)
+  operator !=(ArchLinterNet.Core.Topology.ArchitectureTopologyCaptureRelationship? left, ArchLinterNet.Core.Topology.ArchitectureTopologyCaptureRelationship? right)
+  operator ==(ArchLinterNet.Core.Topology.ArchitectureTopologyCaptureRelationship? left, ArchLinterNet.Core.Topology.ArchitectureTopologyCaptureRelationship? right)
+  property string SourceIdentity {get;init;}
+  property string TargetIdentity {get;init;}
+  property string Witness {get;init;}
+sealed class ArchLinterNet.Core.Topology.ArchitectureTopologyCaptureRequest : System.IEquatable<ArchLinterNet.Core.Topology.ArchitectureTopologyCaptureRequest>
+  ctor()
+  method ArchLinterNet.Core.Topology.ArchitectureTopologyCaptureRequest <Clone>$()
+  method bool Equals(ArchLinterNet.Core.Topology.ArchitectureTopologyCaptureRequest? other)
+  method bool Equals(object? obj)
+  method int GetHashCode()
+  method string ToString()
+  operator !=(ArchLinterNet.Core.Topology.ArchitectureTopologyCaptureRequest? left, ArchLinterNet.Core.Topology.ArchitectureTopologyCaptureRequest? right)
+  operator ==(ArchLinterNet.Core.Topology.ArchitectureTopologyCaptureRequest? left, ArchLinterNet.Core.Topology.ArchitectureTopologyCaptureRequest? right)
+  property ArchLinterNet.Core.BuildState.BuildPreparationMode PreparationMode {get;init;}
+  property System.Collections.Generic.IReadOnlyList<string>? PreprocessorSymbols {get;init;}
+  property System.Threading.CancellationToken CancellationToken {get;init;}
+  property bool IncludeAsmdefContracts {get;init;}
+  property bool NoRestore {get;init;}
+  property int? MaxParallelism {get;init;}
+  property string PolicyPath {get;init;}
+  property string SubjectKind {get;init;}
+  property string? ConditionSetName {get;init;}
+  property string? RequestedConfiguration {get;init;}
+  property string? RequestedPlatform {get;init;}
+  property string? RequestedRuntimeIdentifier {get;init;}
+  property string? RequestedTargetFramework {get;init;}
 interface ArchLinterNet.Core.Validation.Abstractions.IArchitectureBaselineApplicationService
   method ArchLinterNet.Core.Validation.BaselineDiffOutcome Diff(ArchLinterNet.Core.Validation.BaselineDiffRequest request)
   method ArchLinterNet.Core.Validation.BaselineGenerationOutcome Generate(ArchLinterNet.Core.Validation.BaselineGenerationRequest request)
@@ -7009,6 +7083,7 @@ sealed class ArchLinterNet.Core.Validation.ValidationOutcome : System.IEquatable
   property System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Model.ArchitectureSubtractiveMatcherParticipation> SubtractiveMatcherParticipation {get;init;}
   property System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Model.ArchitectureUnmatchedIgnoredViolation> UnmatchedIgnoredViolations {get;init;}
   property System.Collections.Generic.IReadOnlyList<ArchLinterNet.Core.Model.ArchitectureWaiverLifecycleRecord> Waivers {get;init;}
+  property System.Collections.Generic.IReadOnlyList<string> ConsumedInputPaths {get;init;}
   property System.Collections.Generic.IReadOnlyList<string> DiscoveredProjectPaths {get;init;}
   property System.Collections.Generic.IReadOnlyList<string> PolicyImportPaths {get;init;}
   property System.Collections.Generic.IReadOnlyList<string> ResolvedAssemblyPaths {get;init;}

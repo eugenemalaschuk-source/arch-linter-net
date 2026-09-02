@@ -4,6 +4,7 @@ using ArchLinterNet.Core.Model;
 using ArchLinterNet.Core.PolicyContext;
 using ArchLinterNet.Core.PolicyWeakening;
 using ArchLinterNet.Core.Reporting;
+using ArchLinterNet.Core.Topology;
 using ArchLinterNet.Core.Validation;
 
 namespace ArchLinterNet.Cli.Abstractions;
@@ -290,6 +291,13 @@ internal interface ICliRuntime
         ArchitecturePolicyWeakeningFormatter.FormatAsSarif(result);
 
     ArchitectureGraphOutcome BuildGraph(ArchitectureGraphRequest request);
+
+    /// <summary>
+    /// Captures canonical topology observations through Core. The default keeps existing CLI
+    /// test doubles source-compatible while the production runtime forwards to the engine.
+    /// </summary>
+    ArchitectureTopologyCaptureOutcome CaptureTopology(ArchitectureTopologyCaptureRequest request) =>
+        throw new NotSupportedException("Topology capture is not configured for this CLI runtime.");
 
     string FormatGraphAsJson(ArchitectureDependencyGraph graph);
 

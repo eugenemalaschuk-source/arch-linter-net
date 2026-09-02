@@ -10,8 +10,11 @@ internal static class AsmdefChecker
         ArchitectureAsmdefContract contract,
         ArchitectureCheckerContext context)
     {
-        return new ArchitectureAsmdefScanner()
+        var scanner = new ArchitectureAsmdefScanner();
+        List<ArchitectureViolation> violations = scanner
             .FindAsmdefViolations(contract.Name, contract.Id, context.AnalysisContext.RepositoryRoot, contract)
             .ToList();
+        context.AnalysisContext.RecordConsumedInputPaths(scanner.ConsumedInputPaths);
+        return violations;
     }
 }

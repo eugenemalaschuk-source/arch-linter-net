@@ -1,0 +1,31 @@
+version: 1
+name: .NET server/library topology structural review fixture
+imports: [topology-review.fragment.yml]
+layers: {}
+analysis:
+  target_assemblies:
+    - TopologyReview.Server
+    - TopologyReview.Application
+    - TopologyReview.Infrastructure
+    - TopologyReview.Domain
+  projects:
+    - src/TopologyReview.Server/TopologyReview.Server.csproj
+    - src/TopologyReview.Application/TopologyReview.Application.csproj
+    - src/TopologyReview.Infrastructure/TopologyReview.Infrastructure.csproj
+    - src/TopologyReview.Domain/TopologyReview.Domain.csproj
+topology:
+  mode: exhaustive
+  subject_kind: type
+  scope:
+    allow_empty: false
+    selectors:
+      - namespace: TopologyReview.*
+  nodes:
+    - id: application
+      mappings:
+        - namespace: TopologyReview.Application
+    - id: all-review-types
+      mappings:
+        - namespace: TopologyReview.*
+  allowed_edges: []
+contracts: {}

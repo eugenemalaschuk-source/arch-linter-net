@@ -116,6 +116,23 @@ public sealed class FileSystemTests
     }
 
     [Test]
+    public void AreSameExistingFile_DistinguishesDifferentFilesAndHandlesIdenticalOrMissingPaths()
+    {
+        var fs = new FileSystem();
+        string first = Path.Combine(_tempRoot, "first.txt");
+        string second = Path.Combine(_tempRoot, "second.txt");
+        File.WriteAllText(first, "first");
+        File.WriteAllText(second, "second");
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(fs.AreSameExistingFile(first, first), Is.True);
+            Assert.That(fs.AreSameExistingFile(first, second), Is.False);
+            Assert.That(fs.AreSameExistingFile(first, Path.Combine(_tempRoot, "missing.txt")), Is.False);
+        });
+    }
+
+    [Test]
     public void WriteAllText_DelegatesToFileSystem()
     {
         var fs = new FileSystem();

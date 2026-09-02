@@ -105,7 +105,7 @@ internal sealed class CliHost(ICliRootCommandFactory rootCommandFactory, ICliCon
             WriteUnknownToken(token);
         }
 
-        console.Error.WriteLine(GetUsageHint(parseResult.CommandResult.Command.Name));
+        console.Error.WriteLine(GetUsageHint(parseResult));
     }
 
     private void WriteUnknownToken(string token)
@@ -143,11 +143,38 @@ internal sealed class CliHost(ICliRootCommandFactory rootCommandFactory, ICliCon
         return message;
     }
 
+    private static string? GetUsageHint(ParseResult parseResult)
+    {
+        List<string> commandPath = GetCommandPath(parseResult);
+        if (commandPath.Contains("topology", StringComparer.Ordinal))
+        {
+            if (commandPath.Contains("capture", StringComparer.Ordinal))
+            {
+                return "Run 'arch-linter-net topology capture --help' for usage information.";
+            }
+
+            if (commandPath.Contains("diff", StringComparer.Ordinal))
+            {
+                return "Run 'arch-linter-net topology diff --help' for usage information.";
+            }
+
+            if (commandPath.Contains("verify", StringComparer.Ordinal))
+            {
+                return "Run 'arch-linter-net topology verify --help' for usage information.";
+            }
+
+            return "Run 'arch-linter-net topology --help' for usage information.";
+        }
+
+        return GetUsageHint(parseResult.CommandResult.Command.Name);
+    }
+
     private static string? GetUsageHint(string commandName)
     {
         return commandName switch
         {
             "graph" => "Run 'arch-linter-net graph --help' for usage information.",
+            "topology" => "Run 'arch-linter-net topology --help' for usage information.",
             "explain" => "Run 'arch-linter-net explain --help' for usage information.",
             "update" => "Run 'arch-linter-net baseline update --help' for usage information.",
             "prune" => "Run 'arch-linter-net baseline prune --help' for usage information.",
@@ -158,4 +185,19 @@ internal sealed class CliHost(ICliRootCommandFactory rootCommandFactory, ICliCon
             _ => "Run with --help for usage information.",
         };
     }
+
+    private static List<string> GetCommandPath(ParseResult parseResult)
+    {
+        var path = new List<string>();
+        for (SymbolResult? current = parseResult.CommandResult; current is not null; current = current.Parent)
+        {
+            if (current is CommandResult commandResult)
+            {
+                path.Add(commandResult.Command.Name);
+            }
+        }
+
+        return path;
+    }
+
 }
