@@ -138,7 +138,21 @@ public sealed record ArchitecturePrReportMetric(
 public sealed record ArchitecturePrReportExternalEvidence(
     string Mode,
     IReadOnlyList<ArchitecturePrReportExternalRequirement> Requirements,
-    IReadOnlyList<ArchitecturePrReportFinding> Findings);
+    IReadOnlyList<ArchitecturePrReportFinding> Findings)
+{
+    /// <summary>
+    /// Canonical trust results for the declared logical evidence requirements. An empty collection
+    /// on a non-empty requirement set denotes a legacy/incomplete report-evidence envelope and is
+    /// deliberately unavailable rather than implicitly trusted.
+    /// </summary>
+    public IReadOnlyList<ArchitecturePrReportExternalEvidenceTrustReceipt> TrustReceipts { get; init; } =
+        Array.Empty<ArchitecturePrReportExternalEvidenceTrustReceipt>();
+
+    /// <summary>Whether the receipt set covers every declared logical evidence requirement exactly once.</summary>
+    public bool HasCompleteTrustReceipts => TrustReceipts.Count == Requirements.Count
+        && Requirements.All(requirement => TrustReceipts.Any(receipt =>
+            string.Equals(receipt.LogicalId, requirement.Id, StringComparison.Ordinal)));
+}
 
 public sealed record ArchitecturePrReportExternalRequirement(
     string Id,
@@ -151,6 +165,37 @@ public sealed record ArchitecturePrReportExternalRequirement(
     bool RequireRevision,
     bool RequireScope,
     ArchitecturePrReportDiagnosticFilter? DiagnosticFilter);
+
+/// <summary>Report-owned summary state for one canonical external-evidence trust decision.</summary>
+public enum ArchitecturePrReportExternalEvidenceTrustState
+{
+    Current,
+    Stale,
+    WrongContext,
+    Missing,
+    Invalid,
+    NotConfigured,
+}
+
+/// <summary>
+/// Canonical trust and provenance retained for one externally produced evidence artifact.
+/// </summary>
+public sealed record ArchitecturePrReportExternalEvidenceTrustReceipt(
+    string LogicalId,
+    ArchitecturePrReportExternalEvidenceTrustState State,
+    SarifEvidenceTrustStatus Status,
+    string ReasonCode,
+    string? ArtifactPath,
+    string? ArtifactSha256,
+    string? RunId,
+    int? ResultCount,
+    ArchitecturePrReportExternalEvidenceContext? Context);
+
+/// <summary>Resolved producer context retained by one external-evidence trust receipt.</summary>
+public sealed record ArchitecturePrReportExternalEvidenceContext(
+    string? Repository,
+    string? Revision,
+    string? Scope);
 
 public sealed record ArchitecturePrReportDiagnosticFilter(
     IReadOnlyList<string> RuleIds,

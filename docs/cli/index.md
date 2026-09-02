@@ -353,7 +353,10 @@ arch-linter-net health \
 The report headline repeats direct Health/projection facts such as `gate` and `health`; it is not a
 score, percentage, grade, or compensating quality calculation. Rule/effective-control counts,
 applicability completeness, topology evidence, and external evidence remain separate sections and
-must not be combined or inferred from one another. Missing or incomplete canonical evidence is
+must not be combined or inferred from one another. For each configured external evidence artifact,
+the report retains its logical identity and canonical trust receipt: `current`, `stale`, or
+`wrong_context` as applicable, plus the selected run/result provenance. A valid evidence run with
+zero findings is shown as `current` with `results=0`. Missing or incomplete canonical evidence is
 rendered as unavailable or unassessable, never as zero or pass. Canonical identities and provenance
 are retained where supplied so reviewers can drill back to the source artifacts.
 

@@ -352,6 +352,24 @@ public sealed class ArchitecturePrReportReaderTests
                         ["require_matches"] = true,
                     },
                 }),
+            ["trust_receipts"] = new JsonArray(
+                new JsonObject
+                {
+                    ["logical_id"] = "sarif",
+                    ["state"] = "current",
+                    ["trust_status"] = "valid",
+                    ["reason_code"] = "trusted",
+                    ["artifact_path"] = "evidence/current.sarif",
+                    ["artifact_sha256"] = "sha256",
+                    ["run_id"] = "current",
+                    ["result_count"] = 0,
+                    ["context"] = new JsonObject
+                    {
+                        ["repository"] = "repo",
+                        ["revision"] = "revision",
+                        ["scope"] = "scope",
+                    },
+                }),
             ["findings"] = new JsonArray(FullFinding("external-finding")),
         };
         receipt["findings"] = new JsonArray(FullFinding("validation-finding"));
@@ -369,6 +387,10 @@ public sealed class ArchitecturePrReportReaderTests
             Assert.That(parsed.Applicability.Controls.Single().Record!.Metric!.Contributors,
                 Is.EqualTo(["App.Api", "App.Core"]));
             Assert.That(parsed.ExternalEvidence!.Requirements.Single().DiagnosticFilter!.Severity["error"], Is.EqualTo("high"));
+            Assert.That(parsed.ExternalEvidence.TrustReceipts.Single().State,
+                Is.EqualTo(ArchitecturePrReportExternalEvidenceTrustState.Current));
+            Assert.That(parsed.ExternalEvidence.TrustReceipts.Single().ResultCount, Is.EqualTo(0));
+            Assert.That(parsed.ExternalEvidence.TrustReceipts.Single().Context!.Revision, Is.EqualTo("revision"));
             Assert.That(parsed.ExternalEvidence.Findings.Single().Remediation!.Evidence.Single().Value,
                 Is.EqualTo("runtime"));
             Assert.That(parsed.Findings.Single().PolicyIdentity, Is.EqualTo("/repo/policy.yml:rules[0]"));

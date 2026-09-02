@@ -51,10 +51,37 @@ internal static class ArchitectureHealthReportFindingEvidenceWriter
             requirements.Add(item);
         }
 
+        var trustReceipts = new JsonArray();
+        foreach (SarifEvidenceReadResult receipt in outcome.ExternalEvidenceTrustReceipts
+            .OrderBy(item => item.LogicalId, StringComparer.Ordinal))
+        {
+            SarifEvidenceResolvedContext? context = receipt.Context;
+            trustReceipts.Add(new JsonObject
+            {
+                ["logical_id"] = receipt.LogicalId,
+                ["state"] = TrustStateToken(ArchitecturePrReportExternalEvidenceTrustStateMapper.Map(receipt.Status)),
+                ["trust_status"] = TrustStatusToken(receipt.Status),
+                ["reason_code"] = receipt.ReasonCode,
+                ["artifact_path"] = receipt.ArtifactPath,
+                ["artifact_sha256"] = receipt.ArtifactSha256,
+                ["run_id"] = receipt.RunId,
+                ["result_count"] = receipt.ResultCount,
+                ["context"] = context is null
+                    ? null
+                    : new JsonObject
+                    {
+                        ["repository"] = context.Repository,
+                        ["revision"] = context.Revision,
+                        ["scope"] = context.Scope,
+                    },
+            });
+        }
+
         return new JsonObject
         {
             ["mode"] = mode,
             ["requirements"] = requirements,
+            ["trust_receipts"] = trustReceipts,
             ["findings"] = BuildFindings(outcome.ImportedDiagnosticFindings, mode),
         };
     }
@@ -132,4 +159,18 @@ internal static class ArchitectureHealthReportFindingEvidenceWriter
 
         return result;
     }
+
+    private static string TrustStateToken(ArchitecturePrReportExternalEvidenceTrustState state) => state switch
+    {
+        ArchitecturePrReportExternalEvidenceTrustState.Current => "current",
+        ArchitecturePrReportExternalEvidenceTrustState.Stale => "stale",
+        ArchitecturePrReportExternalEvidenceTrustState.WrongContext => "wrong_context",
+        ArchitecturePrReportExternalEvidenceTrustState.Missing => "missing",
+        ArchitecturePrReportExternalEvidenceTrustState.Invalid => "invalid",
+        ArchitecturePrReportExternalEvidenceTrustState.NotConfigured => "not_configured",
+        _ => throw new InvalidOperationException($"Unsupported external-evidence trust state '{state}'."),
+    };
+
+    private static string TrustStatusToken(SarifEvidenceTrustStatus status) =>
+        JsonNamingPolicy.SnakeCaseLower.ConvertName(status.ToString());
 }

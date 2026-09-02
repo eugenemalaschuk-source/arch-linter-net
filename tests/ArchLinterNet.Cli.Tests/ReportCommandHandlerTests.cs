@@ -56,6 +56,22 @@ public sealed class ReportCommandHandlerTests
     }
 
     [Test]
+    public void FindOutputCollision_UsesCurrentPlatformCaseSemantics()
+    {
+        string? collision = ReportCommandHandler.FindOutputCollision(
+            new PrReportCommandOptions("health.json", "change.json", "HEALTH.json", 20, false));
+
+        if (OperatingSystem.IsWindows())
+        {
+            Assert.That(collision, Does.Contain("--health"));
+        }
+        else
+        {
+            Assert.That(collision, Is.Null);
+        }
+    }
+
+    [Test]
     public void Execute_MalformedArtifacts_ReturnsEstablishedErrorCode()
     {
         FakeConsole console = new();

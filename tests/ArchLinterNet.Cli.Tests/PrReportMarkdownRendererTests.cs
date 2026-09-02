@@ -321,12 +321,27 @@ public sealed class PrReportMarkdownRendererTests
     }
 
     [Test]
-    public void WrongContextExternalEvidence_RemainsUnassessable()
+    public void WrongRevisionExternalEvidence_RendersStaleCanonicalTrustReceipt()
     {
         ArchitecturePrReportExternalEvidence external = new(
             "strict",
             [new ArchitecturePrReportExternalRequirement("sarif", "sarif", true, "tool", "1", "run", true, true, true, null)],
-            []);
+            [])
+        {
+            TrustReceipts =
+            [
+                new ArchitecturePrReportExternalEvidenceTrustReceipt(
+                    "sarif",
+                    ArchitecturePrReportExternalEvidenceTrustState.Stale,
+                    SarifEvidenceTrustStatus.WrongRevision,
+                    "wrong_revision",
+                    "evidence/previous.sarif",
+                    "sha256",
+                    "run",
+                    0,
+                    new ArchitecturePrReportExternalEvidenceContext("repo", "previous", "scope")),
+            ],
+        };
         string markdown = PrReportMarkdownRenderer.Render(CreateProjection(
             evidence: Evidence(external: external),
             dimensions: [Dimension("applicability", ArchitectureHealthDimensionState.Pass), Dimension("external_evidence", ArchitectureHealthDimensionState.Unassessable)]));
@@ -335,7 +350,43 @@ public sealed class PrReportMarkdownRendererTests
         {
             Assert.That(markdown, Does.Contain("Required external evidence: `unassessable`"));
             Assert.That(markdown, Does.Contain("External evidence: `unassessable`"));
-            Assert.That(markdown, Does.Not.Contain("external evidence: `pass`"));
+            Assert.That(markdown, Does.Contain("logical_evidence=`sarif` state=`stale` trust_status=`wrong_revision`"));
+            Assert.That(markdown, Does.Contain("revision=`previous`"));
+        });
+    }
+
+    [Test]
+    public void CurrentZeroResultExternalEvidence_RendersLogicalTrustReceipt()
+    {
+        ArchitecturePrReportExternalEvidence external = new(
+            "strict",
+            [new ArchitecturePrReportExternalRequirement("sarif", "sarif", true, "tool", "1", "run", true, true, true, null)],
+            [])
+        {
+            TrustReceipts =
+            [
+                new ArchitecturePrReportExternalEvidenceTrustReceipt(
+                    "sarif",
+                    ArchitecturePrReportExternalEvidenceTrustState.Current,
+                    SarifEvidenceTrustStatus.Valid,
+                    "trusted",
+                    "evidence/current.sarif",
+                    "sha256",
+                    "run",
+                    0,
+                    new ArchitecturePrReportExternalEvidenceContext("repo", "current", "scope")),
+            ],
+        };
+        string markdown = PrReportMarkdownRenderer.Render(CreateProjection(
+            evidence: Evidence(external: external),
+            dimensions: [Dimension("applicability", ArchitectureHealthDimensionState.Pass), Dimension("external_evidence", ArchitectureHealthDimensionState.Pass)]));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(markdown, Does.Contain("Required external evidence: `pass`"));
+            Assert.That(markdown, Does.Contain("External evidence trust receipts (1)"));
+            Assert.That(markdown, Does.Contain("logical_evidence=`sarif` state=`current` trust_status=`valid`"));
+            Assert.That(markdown, Does.Contain("results=`0`"));
         });
     }
 

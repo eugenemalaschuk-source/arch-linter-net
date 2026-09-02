@@ -51,6 +51,29 @@ rejected as malformed input.
 - **WHEN** a receipt contains an unrecognized availability key or wire token
 - **THEN** PR-report generation fails with an invalid-artifact error
 
+### Requirement: External-evidence trust remains per logical artifact
+For every declared external-evidence requirement, Health report evidence SHALL
+retain exactly one receipt from the existing canonical SARIF trust reader. The
+receipt SHALL retain the logical evidence identity, closed trust status and
+reason, selected artifact/run/result provenance, and resolved producer context
+where available. The report-owned state SHALL distinguish `current`, `stale`,
+and `wrong_context` evidence without re-reading SARIF or re-evaluating
+repository/revision/scope context. A report-evidence envelope that declares
+external requirements but lacks their canonical trust receipts SHALL be
+explicitly unavailable rather than complete or clean.
+
+#### Scenario: Valid zero-result external evidence remains current
+- **WHEN** a canonical external-evidence receipt is valid and its selected run
+  contains zero results
+- **THEN** Markdown identifies its logical evidence as `current` and displays
+  the canonical result count of zero
+
+#### Scenario: Wrong revision remains visible as stale evidence
+- **WHEN** the canonical trust reader reports a wrong revision for a logical
+  external-evidence requirement
+- **THEN** Markdown identifies that logical evidence as `stale` and retains
+  the canonical `wrong_revision` trust status
+
 ### Requirement: Markdown is safe and concise for canonical evidence
 The CLI SHALL escape every repository-controlled or artifact-controlled value
 according to its Markdown context.  Inline-code values SHALL not close or

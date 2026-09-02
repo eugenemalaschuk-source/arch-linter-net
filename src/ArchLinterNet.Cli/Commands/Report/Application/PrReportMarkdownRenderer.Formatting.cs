@@ -96,6 +96,11 @@ internal static class PrReportMarkdownFormatter
         }
 
         ArchitecturePrReportExternalEvidence external = receipt.ExternalEvidence;
+        if (!external.HasCompleteTrustReceipts)
+        {
+            return "`unavailable` — canonical trust receipt missing";
+        }
+
         return $"`{DimensionToken(projection, "external_evidence")}` — {external.Requirements.Count} requirement(s), {external.Findings.Count} finding(s)";
     }
 
@@ -164,6 +169,16 @@ internal static class PrReportMarkdownFormatter
         $"`{Inline(requirement.Id)}` tool=`{Inline(requirement.Tool)}` format=`{Inline(requirement.Format)}` " +
         $"required={requirement.Required} run=`{Inline(requirement.Run)}`";
 
+    internal static string FormatExternalEvidenceTrustReceipt(ArchitecturePrReportExternalEvidenceTrustReceipt receipt)
+    {
+        string resultCount = receipt.ResultCount is null ? string.Empty : $" results=`{receipt.ResultCount}`";
+        string run = string.IsNullOrWhiteSpace(receipt.RunId) ? string.Empty : $" run=`{Inline(receipt.RunId)}`";
+        string artifact = string.IsNullOrWhiteSpace(receipt.ArtifactPath) ? string.Empty : $" artifact=`{Inline(receipt.ArtifactPath)}`";
+        return $"logical_evidence=`{Inline(receipt.LogicalId)}` state=`{TrustStateToken(receipt.State)}` " +
+            $"trust_status=`{TrustStatusToken(receipt.Status)}` reason=`{Inline(receipt.ReasonCode)}`{resultCount}{run}{artifact}" +
+            FormatExternalEvidenceContext(receipt.Context);
+    }
+
     internal static string FormatFinding(ArchitecturePrReportFinding finding) =>
         $"`{Inline(finding.CanonicalIdentity)}` {Text(finding.MessageCode)} ({Text(finding.ContractId ?? finding.ContractName)})";
 
@@ -196,4 +211,29 @@ internal static class PrReportMarkdownFormatter
     internal static string Inline(string value) => PrReportMarkdownEscaping.EscapeInlineCode(value);
 
     internal static string Text(string value) => PrReportMarkdownEscaping.EscapeMarkdownText(value);
+
+    private static string TrustStateToken(ArchitecturePrReportExternalEvidenceTrustState state) => state switch
+    {
+        ArchitecturePrReportExternalEvidenceTrustState.Current => "current",
+        ArchitecturePrReportExternalEvidenceTrustState.Stale => "stale",
+        ArchitecturePrReportExternalEvidenceTrustState.WrongContext => "wrong_context",
+        ArchitecturePrReportExternalEvidenceTrustState.Missing => "missing",
+        ArchitecturePrReportExternalEvidenceTrustState.Invalid => "invalid",
+        ArchitecturePrReportExternalEvidenceTrustState.NotConfigured => "not_configured",
+        _ => "invalid",
+    };
+
+    private static string TrustStatusToken(SarifEvidenceTrustStatus status) =>
+        System.Text.Json.JsonNamingPolicy.SnakeCaseLower.ConvertName(status.ToString());
+
+    private static string FormatExternalEvidenceContext(ArchitecturePrReportExternalEvidenceContext? context)
+    {
+        if (context is null)
+        {
+            return string.Empty;
+        }
+
+        return $" repository=`{Inline(context.Repository ?? "-")}` revision=`{Inline(context.Revision ?? "-")}` " +
+            $"scope=`{Inline(context.Scope ?? "-")}`";
+    }
 }

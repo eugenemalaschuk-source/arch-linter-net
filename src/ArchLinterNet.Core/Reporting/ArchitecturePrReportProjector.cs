@@ -62,6 +62,11 @@ public static class ArchitecturePrReportProjector
             return false;
         }
 
+        if (receipt.ExternalEvidence is { } external && !external.HasCompleteTrustReceipts)
+        {
+            return false;
+        }
+
         bool topology = receipt.Applicability?.Controls.Any(control => control.Record?.Topology is not null) == true;
         return Matches(availability, "policy_inventory", receipt.PolicyInventory is not null, "unavailable")
             && Matches(availability, "waiver_lifecycle", receipt.WaiverLifecycle is not null, "unavailable")
@@ -134,6 +139,11 @@ public static class ArchitecturePrReportProjector
                     foreach (ArchitecturePrReportExternalRequirement requirement in receipt.ExternalEvidence.Requirements)
                     {
                         references.Add(new("external_evidence", requirement.Id, null));
+                    }
+
+                    foreach (ArchitecturePrReportExternalEvidenceTrustReceipt trust in receipt.ExternalEvidence.TrustReceipts)
+                    {
+                        references.Add(new("external_evidence", trust.LogicalId, trust.ArtifactPath));
                     }
                 }
             }

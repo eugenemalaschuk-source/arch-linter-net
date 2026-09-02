@@ -267,13 +267,25 @@ internal static class PrReportMarkdownRenderer
         }
         else
         {
-            builder.AppendLine($"- External evidence: `{DimensionToken(projection, "external_evidence")}` — {external.Requirements.Count} requirement(s), {external.Findings.Count} finding(s).");
+            bool hasCompleteTrust = external.HasCompleteTrustReceipts;
+            builder.AppendLine(hasCompleteTrust
+                ? $"- External evidence: `{DimensionToken(projection, "external_evidence")}` — {external.Requirements.Count} requirement(s), {external.Findings.Count} finding(s)."
+                : "- External evidence: `unavailable` — canonical trust receipt missing.");
             List<string> requirements = external.Requirements
                 .OrderBy(item => item.Id, StringComparer.Ordinal)
                 .Select(FormatExternalRequirement)
                 .ToList();
             AppendBounded(builder, "External evidence requirements", requirements.Count, requirements, maxDetails,
                 static item => $"- {item}");
+            if (hasCompleteTrust)
+            {
+                List<string> trustReceipts = external.TrustReceipts
+                    .OrderBy(item => item.LogicalId, StringComparer.Ordinal)
+                    .Select(FormatExternalEvidenceTrustReceipt)
+                    .ToList();
+                AppendBounded(builder, "External evidence trust receipts", trustReceipts.Count, trustReceipts, maxDetails,
+                    static item => $"- {item}");
+            }
             List<string> findings = external.Findings
                 .OrderBy(item => item.CanonicalIdentity, StringComparer.Ordinal)
                 .Select(FormatFinding)

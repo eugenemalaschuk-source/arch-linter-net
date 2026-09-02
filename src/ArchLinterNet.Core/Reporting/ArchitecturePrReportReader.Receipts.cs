@@ -201,13 +201,41 @@ internal static class ArchitecturePrReportReceiptParser
                 ? ReadStringArray(contributors)
                 : null);
 
-    internal static ArchitecturePrReportExternalEvidence ReadExternalEvidence(JsonElement element) =>
-        new(
+    internal static ArchitecturePrReportExternalEvidence ReadExternalEvidence(JsonElement element)
+    {
+        RequireObject(element, "External evidence");
+        JsonElement requirementsElement = Required(element, "requirements", JsonValueKind.Array);
+        ArchitecturePrReportExternalRequirement[] requirements = requirementsElement.EnumerateArray()
+            .Select(ReadExternalRequirement)
+            .OrderBy(item => item.Id, StringComparer.Ordinal)
+            .ToArray();
+        ArchitecturePrReportExternalEvidenceTrustReceipt[] trustReceipts;
+        if (element.TryGetProperty("trust_receipts", out JsonElement receiptsElement))
+        {
+            if (receiptsElement.ValueKind != JsonValueKind.Array)
+            {
+                throw InvalidArtifact("External-evidence trust receipts must be an array.");
+            }
+
+            trustReceipts = receiptsElement.EnumerateArray()
+                .Select(ReadExternalEvidenceTrustReceipt)
+                .OrderBy(item => item.LogicalId, StringComparer.Ordinal)
+                .ToArray();
+        }
+        else
+        {
+            trustReceipts = Array.Empty<ArchitecturePrReportExternalEvidenceTrustReceipt>();
+        }
+        ValidateExternalEvidenceTrustReceipts(requirements, trustReceipts);
+        return new ArchitecturePrReportExternalEvidence(
             RequiredString(element, "mode"),
-            Required(element, "requirements", JsonValueKind.Array).EnumerateArray()
-                .Select(ReadExternalRequirement).ToArray(),
+            requirements,
             Required(element, "findings", JsonValueKind.Array).EnumerateArray()
-                .Select(ReadFinding).ToArray());
+                .Select(ReadFinding).ToArray())
+        {
+            TrustReceipts = trustReceipts,
+        };
+    }
 
     private static ArchitecturePrReportExternalRequirement ReadExternalRequirement(JsonElement element)
     {
@@ -227,6 +255,95 @@ internal static class ArchitecturePrReportReceiptParser
             OptionalString(element, "tool_version"), RequiredString(element, "run"),
             RequiredBool(element, "require_repository"), RequiredBool(element, "require_revision"),
             RequiredBool(element, "require_scope"), filter);
+    }
+
+    private static ArchitecturePrReportExternalEvidenceTrustReceipt ReadExternalEvidenceTrustReceipt(JsonElement element)
+    {
+        RequireObject(element, "An external-evidence trust receipt");
+        string logicalId = RequiredString(element, "logical_id");
+        ArchitecturePrReportExternalEvidenceTrustState state = ParseExternalEvidenceTrustState(
+            RequiredString(element, "state"));
+        SarifEvidenceTrustStatus status = ParseExternalEvidenceTrustStatus(
+            RequiredString(element, "trust_status"));
+        if (state != ArchitecturePrReportExternalEvidenceTrustStateMapper.Map(status))
+        {
+            throw InvalidArtifact("An external-evidence trust receipt state does not match its canonical trust status.");
+        }
+
+        ArchitecturePrReportExternalEvidenceContext? context = element.TryGetProperty("context", out JsonElement contextElement)
+            && contextElement.ValueKind != JsonValueKind.Null
+            ? ReadExternalEvidenceContext(contextElement)
+            : null;
+        return new ArchitecturePrReportExternalEvidenceTrustReceipt(
+            logicalId,
+            state,
+            status,
+            RequiredString(element, "reason_code"),
+            OptionalString(element, "artifact_path"),
+            OptionalString(element, "artifact_sha256"),
+            OptionalString(element, "run_id"),
+            OptionalInt(element, "result_count"),
+            context);
+    }
+
+    private static ArchitecturePrReportExternalEvidenceContext ReadExternalEvidenceContext(JsonElement element)
+    {
+        RequireObject(element, "An external-evidence trust context");
+        return new ArchitecturePrReportExternalEvidenceContext(
+            OptionalString(element, "repository"),
+            OptionalString(element, "revision"),
+            OptionalString(element, "scope"));
+    }
+
+    private static void ValidateExternalEvidenceTrustReceipts(
+        IReadOnlyList<ArchitecturePrReportExternalRequirement> requirements,
+        IReadOnlyList<ArchitecturePrReportExternalEvidenceTrustReceipt> trustReceipts)
+    {
+        // report_evidence/v2 predates per-evidence receipts. Accept that persisted envelope, but
+        // let the projector render it unavailable instead of trusting its requirement configuration.
+        if (trustReceipts.Count == 0)
+        {
+            return;
+        }
+
+        if (trustReceipts.Count != requirements.Count)
+        {
+            throw InvalidArtifact("External-evidence trust receipts must match the declared requirement set exactly.");
+        }
+
+        HashSet<string> requiredIds = requirements.Select(item => item.Id).ToHashSet(StringComparer.Ordinal);
+        HashSet<string> receiptIds = new(StringComparer.Ordinal);
+        foreach (ArchitecturePrReportExternalEvidenceTrustReceipt receipt in trustReceipts)
+        {
+            if (!requiredIds.Contains(receipt.LogicalId) || !receiptIds.Add(receipt.LogicalId))
+            {
+                throw InvalidArtifact("External-evidence trust receipts must use each declared logical id exactly once.");
+            }
+        }
+    }
+
+    private static ArchitecturePrReportExternalEvidenceTrustState ParseExternalEvidenceTrustState(string value) => value switch
+    {
+        "current" => ArchitecturePrReportExternalEvidenceTrustState.Current,
+        "stale" => ArchitecturePrReportExternalEvidenceTrustState.Stale,
+        "wrong_context" => ArchitecturePrReportExternalEvidenceTrustState.WrongContext,
+        "missing" => ArchitecturePrReportExternalEvidenceTrustState.Missing,
+        "invalid" => ArchitecturePrReportExternalEvidenceTrustState.Invalid,
+        "not_configured" => ArchitecturePrReportExternalEvidenceTrustState.NotConfigured,
+        _ => throw InvalidArtifact($"Unsupported external-evidence trust state '{value}'."),
+    };
+
+    private static SarifEvidenceTrustStatus ParseExternalEvidenceTrustStatus(string value)
+    {
+        foreach (SarifEvidenceTrustStatus status in Enum.GetValues<SarifEvidenceTrustStatus>())
+        {
+            if (string.Equals(JsonNamingPolicy.SnakeCaseLower.ConvertName(status.ToString()), value, StringComparison.Ordinal))
+            {
+                return status;
+            }
+        }
+
+        throw InvalidArtifact($"Unsupported external-evidence trust status '{value}'.");
     }
 
     private static ArchitecturePrReportProvenanceReference ReadProvenanceReference(JsonElement element)

@@ -109,7 +109,7 @@ internal sealed class ReportCommandHandler(
             ("--change", options.ChangePath),
         })
         {
-            if (string.Equals(output, Path.GetFullPath(path), StringComparison.OrdinalIgnoreCase))
+            if (string.Equals(output, Path.GetFullPath(path), FileSystemPathComparison))
             {
                 return $"--output destination '{options.OutputPath}' matches {name} input '{path}'";
             }
@@ -117,4 +117,8 @@ internal sealed class ReportCommandHandler(
 
         return null;
     }
+
+    private static StringComparison FileSystemPathComparison => OperatingSystem.IsWindows()
+        ? StringComparison.OrdinalIgnoreCase
+        : StringComparison.Ordinal;
 }

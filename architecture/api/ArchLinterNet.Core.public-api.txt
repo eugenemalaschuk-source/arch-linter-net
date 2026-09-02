@@ -417,6 +417,8 @@ class ArchLinterNet.Core.Reporting.ArchitecturePrReportEvidence [sealed]
 class ArchLinterNet.Core.Reporting.ArchitecturePrReportEvidenceFact [sealed]
 class ArchLinterNet.Core.Reporting.ArchitecturePrReportExecutionContext [sealed]
 class ArchLinterNet.Core.Reporting.ArchitecturePrReportExternalEvidence [sealed]
+class ArchLinterNet.Core.Reporting.ArchitecturePrReportExternalEvidenceContext [sealed]
+class ArchLinterNet.Core.Reporting.ArchitecturePrReportExternalEvidenceTrustReceipt [sealed]
 class ArchLinterNet.Core.Reporting.ArchitecturePrReportExternalRequirement [sealed]
 class ArchLinterNet.Core.Reporting.ArchitecturePrReportFinding [sealed]
 class ArchLinterNet.Core.Reporting.ArchitecturePrReportHeadline [sealed]
@@ -793,6 +795,12 @@ const ArchLinterNet.Core.Reporting.ArchitecturePrReportAvailability.Unassessable
 const ArchLinterNet.Core.Reporting.ArchitecturePrReportAvailability.Unavailable: ArchLinterNet.Core.Reporting.ArchitecturePrReportAvailability [value:1]
 const ArchLinterNet.Core.Reporting.ArchitecturePrReportEvidence.CurrentSchemaVersion: System.Int32 [value:2]
 const ArchLinterNet.Core.Reporting.ArchitecturePrReportEvidence.EvidenceKind: System.String [value:"architecture-health-report-evidence"]
+const ArchLinterNet.Core.Reporting.ArchitecturePrReportExternalEvidenceTrustState.Current: ArchLinterNet.Core.Reporting.ArchitecturePrReportExternalEvidenceTrustState [value:0]
+const ArchLinterNet.Core.Reporting.ArchitecturePrReportExternalEvidenceTrustState.Invalid: ArchLinterNet.Core.Reporting.ArchitecturePrReportExternalEvidenceTrustState [value:4]
+const ArchLinterNet.Core.Reporting.ArchitecturePrReportExternalEvidenceTrustState.Missing: ArchLinterNet.Core.Reporting.ArchitecturePrReportExternalEvidenceTrustState [value:3]
+const ArchLinterNet.Core.Reporting.ArchitecturePrReportExternalEvidenceTrustState.NotConfigured: ArchLinterNet.Core.Reporting.ArchitecturePrReportExternalEvidenceTrustState [value:5]
+const ArchLinterNet.Core.Reporting.ArchitecturePrReportExternalEvidenceTrustState.Stale: ArchLinterNet.Core.Reporting.ArchitecturePrReportExternalEvidenceTrustState [value:1]
+const ArchLinterNet.Core.Reporting.ArchitecturePrReportExternalEvidenceTrustState.WrongContext: ArchLinterNet.Core.Reporting.ArchitecturePrReportExternalEvidenceTrustState [value:2]
 const ArchLinterNet.Core.Validation.BaselineReasonMap.DefaultReasonText: System.String [value:"generated baseline"]
 const ArchLinterNet.Core.Validation.PublicApiFailureKind.Drift: ArchLinterNet.Core.Validation.PublicApiFailureKind [value:1]
 const ArchLinterNet.Core.Validation.PublicApiFailureKind.InvalidInput: ArchLinterNet.Core.Validation.PublicApiFailureKind [value:2]
@@ -1180,6 +1188,8 @@ ctor ArchLinterNet.Core.Reporting.ArchitecturePrReportEvidence(System.Int32, Sys
 ctor ArchLinterNet.Core.Reporting.ArchitecturePrReportEvidenceFact(System.String, System.String)
 ctor ArchLinterNet.Core.Reporting.ArchitecturePrReportExecutionContext(System.String, System.String)
 ctor ArchLinterNet.Core.Reporting.ArchitecturePrReportExternalEvidence(System.String, System.Collections.Generic.IReadOnlyList`1[ArchLinterNet.Core.Reporting.ArchitecturePrReportExternalRequirement], System.Collections.Generic.IReadOnlyList`1[ArchLinterNet.Core.Reporting.ArchitecturePrReportFinding])
+ctor ArchLinterNet.Core.Reporting.ArchitecturePrReportExternalEvidenceContext(System.String, System.String, System.String)
+ctor ArchLinterNet.Core.Reporting.ArchitecturePrReportExternalEvidenceTrustReceipt(System.String, ArchLinterNet.Core.Reporting.ArchitecturePrReportExternalEvidenceTrustState, ArchLinterNet.Core.Model.SarifEvidenceTrustStatus, System.String, System.String, System.String, System.String, System.Nullable`1[System.Int32], ArchLinterNet.Core.Reporting.ArchitecturePrReportExternalEvidenceContext)
 ctor ArchLinterNet.Core.Reporting.ArchitecturePrReportExternalRequirement(System.String, System.String, System.Boolean, System.String, System.String, System.String, System.Boolean, System.Boolean, System.Boolean, ArchLinterNet.Core.Reporting.ArchitecturePrReportDiagnosticFilter)
 ctor ArchLinterNet.Core.Reporting.ArchitecturePrReportFinding(System.Int32, System.String, System.String, System.String, System.String, System.String, System.String, System.String, System.String, ArchLinterNet.Core.Reporting.ArchitecturePrReportSourceLocation, ArchLinterNet.Core.Reporting.ArchitecturePrReportRemediation, System.Text.Json.JsonElement)
 ctor ArchLinterNet.Core.Reporting.ArchitecturePrReportHeadline(ArchLinterNet.Core.Model.ArchitectureHealthGate, ArchLinterNet.Core.Model.ArchitectureHealthState, ArchLinterNet.Core.Reporting.ArchitecturePrReportAvailability, System.Collections.Generic.IReadOnlyList`1[ArchLinterNet.Core.Model.ArchitectureHealthDimension])
@@ -1299,6 +1309,7 @@ enum ArchLinterNet.Core.Model.SarifExternalDiagnosticGovernanceMode [underlying:
 enum ArchLinterNet.Core.Profiling.AnalysisProfileCompletionStatus [underlying:System.Int32]
 enum ArchLinterNet.Core.Profiling.AnalysisProfileReservedFieldStatus [underlying:System.Int32]
 enum ArchLinterNet.Core.Reporting.ArchitecturePrReportAvailability [underlying:System.Int32]
+enum ArchLinterNet.Core.Reporting.ArchitecturePrReportExternalEvidenceTrustState [underlying:System.Int32]
 enum ArchLinterNet.Core.Validation.PublicApiFailureKind [underlying:System.Int32]
 field ArchLinterNet.Core.Contracts.ArchitectureBaselineContractGroups.GroupNames: System.Collections.Generic.IReadOnlyList`1[System.String] [static, readonly]
 field ArchLinterNet.Core.Contracts.Families.PublicApiComparisonModes.All: System.Collections.Generic.IReadOnlyList`1[System.String] [static, readonly]
@@ -4165,8 +4176,22 @@ property ArchLinterNet.Core.Reporting.ArchitecturePrReportEvidenceFact.Value: Sy
 property ArchLinterNet.Core.Reporting.ArchitecturePrReportExecutionContext.ConditionSetName: System.String [get, init]
 property ArchLinterNet.Core.Reporting.ArchitecturePrReportExecutionContext.ExecutionId: System.String [get, init]
 property ArchLinterNet.Core.Reporting.ArchitecturePrReportExternalEvidence.Findings: System.Collections.Generic.IReadOnlyList`1[ArchLinterNet.Core.Reporting.ArchitecturePrReportFinding] [get, init]
+property ArchLinterNet.Core.Reporting.ArchitecturePrReportExternalEvidence.HasCompleteTrustReceipts: System.Boolean [get]
 property ArchLinterNet.Core.Reporting.ArchitecturePrReportExternalEvidence.Mode: System.String [get, init]
 property ArchLinterNet.Core.Reporting.ArchitecturePrReportExternalEvidence.Requirements: System.Collections.Generic.IReadOnlyList`1[ArchLinterNet.Core.Reporting.ArchitecturePrReportExternalRequirement] [get, init]
+property ArchLinterNet.Core.Reporting.ArchitecturePrReportExternalEvidence.TrustReceipts: System.Collections.Generic.IReadOnlyList`1[ArchLinterNet.Core.Reporting.ArchitecturePrReportExternalEvidenceTrustReceipt] [get, init]
+property ArchLinterNet.Core.Reporting.ArchitecturePrReportExternalEvidenceContext.Repository: System.String [get, init]
+property ArchLinterNet.Core.Reporting.ArchitecturePrReportExternalEvidenceContext.Revision: System.String [get, init]
+property ArchLinterNet.Core.Reporting.ArchitecturePrReportExternalEvidenceContext.Scope: System.String [get, init]
+property ArchLinterNet.Core.Reporting.ArchitecturePrReportExternalEvidenceTrustReceipt.ArtifactPath: System.String [get, init]
+property ArchLinterNet.Core.Reporting.ArchitecturePrReportExternalEvidenceTrustReceipt.ArtifactSha256: System.String [get, init]
+property ArchLinterNet.Core.Reporting.ArchitecturePrReportExternalEvidenceTrustReceipt.Context: ArchLinterNet.Core.Reporting.ArchitecturePrReportExternalEvidenceContext [get, init]
+property ArchLinterNet.Core.Reporting.ArchitecturePrReportExternalEvidenceTrustReceipt.LogicalId: System.String [get, init]
+property ArchLinterNet.Core.Reporting.ArchitecturePrReportExternalEvidenceTrustReceipt.ReasonCode: System.String [get, init]
+property ArchLinterNet.Core.Reporting.ArchitecturePrReportExternalEvidenceTrustReceipt.ResultCount: System.Nullable`1[System.Int32] [get, init]
+property ArchLinterNet.Core.Reporting.ArchitecturePrReportExternalEvidenceTrustReceipt.RunId: System.String [get, init]
+property ArchLinterNet.Core.Reporting.ArchitecturePrReportExternalEvidenceTrustReceipt.State: ArchLinterNet.Core.Reporting.ArchitecturePrReportExternalEvidenceTrustState [get, init]
+property ArchLinterNet.Core.Reporting.ArchitecturePrReportExternalEvidenceTrustReceipt.Status: ArchLinterNet.Core.Model.SarifEvidenceTrustStatus [get, init]
 property ArchLinterNet.Core.Reporting.ArchitecturePrReportExternalRequirement.DiagnosticFilter: ArchLinterNet.Core.Reporting.ArchitecturePrReportDiagnosticFilter [get, init]
 property ArchLinterNet.Core.Reporting.ArchitecturePrReportExternalRequirement.Format: System.String [get, init]
 property ArchLinterNet.Core.Reporting.ArchitecturePrReportExternalRequirement.Id: System.String [get, init]

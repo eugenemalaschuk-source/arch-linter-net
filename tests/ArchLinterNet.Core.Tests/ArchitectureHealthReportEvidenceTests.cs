@@ -1,4 +1,5 @@
 using System.Text.Json;
+using ArchLinterNet.Core.Contracts;
 using ArchLinterNet.Core.Model;
 using ArchLinterNet.Core.Validation;
 using NUnit.Framework;
@@ -76,6 +77,38 @@ public sealed class ArchitectureHealthReportEvidenceTests
     }
 
     [Test]
+    public void FormatAsJson_RetainsCanonicalExternalEvidenceTrustStateAndLogicalIdentity()
+    {
+        ArchitectureHealthOutcome outcome = CreateOutcome(
+            includeInventory: true,
+            externalTrustReceipts:
+            [
+                TrustReceipt("external.current", SarifEvidenceTrustStatus.Valid, "current", 0),
+                TrustReceipt("external.previous", SarifEvidenceTrustStatus.WrongRevision, "previous", 4),
+            ]);
+
+        using JsonDocument document = JsonDocument.Parse(ArchitectureHealthProjector.FormatAsJson(outcome));
+        JsonElement trustReceipts = document.RootElement.GetProperty("report_evidence")
+            .GetProperty("validation_outcomes")[0]
+            .GetProperty("external_evidence")
+            .GetProperty("trust_receipts");
+        JsonElement current = trustReceipts.EnumerateArray().Single(item =>
+            item.GetProperty("logical_id").GetString() == "external.current");
+        JsonElement previous = trustReceipts.EnumerateArray().Single(item =>
+            item.GetProperty("logical_id").GetString() == "external.previous");
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(current.GetProperty("state").GetString(), Is.EqualTo("current"));
+            Assert.That(current.GetProperty("trust_status").GetString(), Is.EqualTo("valid"));
+            Assert.That(current.GetProperty("result_count").GetInt32(), Is.EqualTo(0));
+            Assert.That(previous.GetProperty("state").GetString(), Is.EqualTo("stale"));
+            Assert.That(previous.GetProperty("trust_status").GetString(), Is.EqualTo("wrong_revision"));
+            Assert.That(previous.GetProperty("context").GetProperty("revision").GetString(), Is.EqualTo("previous"));
+        });
+    }
+
+    [Test]
     public void FormatAsJson_OrdersValidationReceiptsIndependentlyOfInputOrder()
     {
         ArchitectureHealthOutcome strict = CreateOutcome(includeInventory: true, mode: "strict");
@@ -93,7 +126,10 @@ public sealed class ArchitectureHealthReportEvidenceTests
             Is.EqualTo(ArchitectureHealthProjector.FormatAsJson(second)));
     }
 
-    private static ArchitectureHealthOutcome CreateOutcome(bool includeInventory, string mode = "strict")
+    private static ArchitectureHealthOutcome CreateOutcome(
+        bool includeInventory,
+        string mode = "strict",
+        IReadOnlyList<SarifEvidenceReadResult>? externalTrustReceipts = null)
     {
         ArchitecturePolicyInventory? inventory = includeInventory
             ? new ArchitecturePolicyInventory(
@@ -156,6 +192,20 @@ public sealed class ArchitectureHealthReportEvidenceTests
             PolicyImportPaths = ["/repo/architecture/dependencies.arch.yml"],
             ResolvedAssemblyPaths = ["/repo/bin/App.dll"],
             DiscoveredProjectPaths = ["/repo/App.csproj"],
+            ExternalEvidenceRequirements = externalTrustReceipts is null
+                ? []
+                : externalTrustReceipts.Select(receipt => new ArchitectureExternalEvidenceRequirement
+                {
+                    Id = receipt.LogicalId,
+                    Format = "sarif",
+                    Required = true,
+                    Tool = "Synthetic.Scanner",
+                    Run = "assessment-42",
+                    RequireRepository = true,
+                    RequireRevision = true,
+                    RequireScope = true,
+                }).ToArray(),
+            ExternalEvidenceTrustReceipts = externalTrustReceipts ?? [],
         };
         var debt = new BaselineVerifyOutcome(true, true, [], [], [], [], []);
         var debtGate = new ArchitectureDebtGateOutcome(
@@ -191,4 +241,22 @@ public sealed class ArchitectureHealthReportEvidenceTests
         new DateOnly(2027, 1, 1),
         new DateOnly(2026, 9, 1),
         true);
+
+    private static SarifEvidenceReadResult TrustReceipt(
+        string logicalId,
+        SarifEvidenceTrustStatus status,
+        string revision,
+        int resultCount) => new(
+        status,
+        status == SarifEvidenceTrustStatus.Valid ? "trusted" : "wrong_revision",
+        "Synthetic trust receipt",
+        new SarifEvidenceProvenance(
+            logicalId,
+            $"evidence/{logicalId}.sarif",
+            "sha256",
+            "Synthetic.Scanner",
+            "1.0",
+            "assessment-42",
+            resultCount,
+            new SarifEvidenceResolvedContext(logicalId, "repo", revision, "scope")));
 }
