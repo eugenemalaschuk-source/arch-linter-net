@@ -67,7 +67,7 @@ The fixture governs one assembly with a deliberately large incidental exported s
 |---|---|
 | `public-api-surface-selector-snapshot-reduction` | Selected snapshots omit incidental types the assembly-wide sibling still governs; selected contracts validate independently of the assembly-wide one; BCL-only members need no evidence; the orthogonal marker is never mapped into classification |
 | `public-api-surface-selector-role-preservation` | A selected `ValueObject`-role type stays governed by an ordinary role-based contract, unchanged by selection |
-| `public-api-surface-selector-exact-delta-lifecycle` | Added/removed/changed signatures on a selected type are all observed exactly, and `update` restores a clean comparison |
+| `public-api-surface-selector-exact-delta-lifecycle` | Added/removed/changed signatures on a selected type are all observed exactly; `update --dry-run` leaves its reviewed snapshot unchanged, and `update` restores a clean comparison |
 | `public-api-surface-selector-membership-review-visibility` | Adding or removing selector-matching evidence on a type is a review-visible snapshot delta in both directions |
 | `public-api-surface-selector-escape-fails-closed` | A selected member referencing an unselected first-party exported type fails closed instead of silently escaping |
 | `public-api-surface-selector-strict-run-is-green` | The full policy, with every permanent selector contract in place, validates green |

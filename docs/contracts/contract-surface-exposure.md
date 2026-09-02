@@ -62,6 +62,71 @@ contracts:
 
 This consumes the existing public-API materialization; it does not read, alter, or create API snapshot membership. A type selected into the reviewed API remains its existing role—for example, a selected `ValueObject`, `Entity`, or `Controller` does not become an API-specific role.
 
+## Recommended composition
+
+Compose the families in a fixed order of responsibility:
+
+1. [Attribute usage](attribute-usage.md) governs where a marker appears.
+2. [Public API surface](public-api-surface.md) decides intentional membership
+   and owns `declared_api`/`api_snapshot` review.
+3. This family checks whether each selected exported root exposes a forbidden
+   type through its recursive CLR-visible signatures and metadata.
+4. [Versioned contract-surface isolation](versioned-contract-surface-isolation.md)
+   reuses the same exposure evidence for local v1/v2 or runtime/implementation
+   groups.
+
+For a server-style API, the strict rule can protect the reviewed v1 DTO
+surface immediately while an equivalent v2 boundary is audited during
+migration:
+
+```yaml
+contracts:
+  strict_public_api_surface:
+    - id: orders-v1-api
+      name: orders-v1-reviewed-api
+      assemblies: [Acme.Orders.Api]
+      surface_selector:
+        has_attribute: Acme.Orders.Api.PublicApiContractAttribute
+      api_snapshot: architecture/api/orders-v1.public-api.txt
+      api_comparison: exact
+      reason: The reviewed v1 DTO surface is the published API membership.
+
+  audit_public_api_surface:
+    - id: orders-v2-api-candidate
+      name: orders-v2-api-candidate
+      assemblies: [Acme.Orders.Api]
+      surface_selector:
+        namespace: Acme.Orders.Api.Contracts.V2
+      reason: Review v2 membership before making it a strict compatibility surface.
+
+  strict_contract_surface_exposure:
+    - id: orders-v1-no-internals
+      name: orders-v1-must-not-expose-domain-or-persistence
+      source:
+        public_api_surface: orders-v1-api
+      forbidden:
+        - namespace: Acme.Orders.Domain
+        - namespace: Acme.Orders.Persistence
+      reason: Published DTO signatures must not disclose domain or persistence implementation types.
+
+  audit_contract_surface_exposure:
+    - id: orders-v2-no-internals-yet
+      name: audit-orders-v2-internal-type-exposure
+      source:
+        public_api_surface: orders-v2-api-candidate
+      forbidden:
+        - namespace: Acme.Orders.Domain
+        - namespace: Acme.Orders.Persistence
+      reason: Discover recursive v2 DTO leaks before enforcing the new boundary.
+```
+
+If an API method returns `Task<Envelope<OrderRow>>`, where `OrderRow` is in
+`Acme.Orders.Persistence`, this family follows the wrapper and reports the
+`OrderRow` occurrence. A normal dependency contract may report a namespace or
+assembly reference, but it must not be used as a substitute for this
+recursive, visible-signature check. The selected API surface and its snapshot
+remain owned by `public_api_surface`.
+
 ## What is inspected
 
 For every selected exported root, the checker uses the recursive visible-signature index. It follows each visible signature position through nested generic arguments, tuple elements, array and wrapper element types, and other metadata-supported signature shapes. A violation is emitted for each matched forbidden occurrence.
@@ -80,5 +145,9 @@ This family is static contract-surface exposure analysis only. It does not:
 
 - modify reviewed public-API snapshots or decide API membership;
 - introduce multi-role classification or mutate a type's existing semantic role;
-- evaluate runtime behavior, endpoint routing, serialization configuration, dependency injection, or data flow;
+- evaluate runtime behavior, including serialization configuration, endpoint
+  routing, API-version negotiation, dependency injection, or data flow;
 - replace dependency, type-placement, or binary/package compatibility checks.
+- provide a Unity magic preset or a built-in marker package. Unity-style
+  marker placement remains an explicit `attribute_usage` contract, and API
+  membership remains a user-owned `surface_selector` decision.
